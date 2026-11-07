@@ -1,12 +1,17 @@
-use std::fmt;
+use named_derive::Named;
+use strum::VariantArray;
 
 use crate::form::Form;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shape {
+    #[name("sentence")]
     Sentence,
+    #[name("item")]
     Item,
+    #[name("bullet")]
     Bullet,
+    #[name("quote")]
     Quote,
 }
 
@@ -17,17 +22,6 @@ impl From<Form> for Shape {
             Form::Item(..) => Shape::Item,
             Form::Bullet => Shape::Bullet,
             Form::Quote => Shape::Quote,
-        }
-    }
-}
-
-impl fmt::Display for Shape {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Shape::Sentence => formatter.write_str("sentence"),
-            Shape::Item => formatter.write_str("item"),
-            Shape::Bullet => formatter.write_str("bullet"),
-            Shape::Quote => formatter.write_str("quote"),
         }
     }
 }

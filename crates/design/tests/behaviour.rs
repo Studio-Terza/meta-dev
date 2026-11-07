@@ -4,25 +4,37 @@ use std::path::{Path, PathBuf};
 
 use std::sync::Mutex;
 
+use std::str::FromStr;
+
 use console_ports::Variables;
-use design::{Cli, Failure, Outcome, Unresolved};
-use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
-use design_store::{
-    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema,
+
+use design::{Anchored, Cli, Count, Failure, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
+use design_model::{
+    AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, Kin, Node,
+    NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, SegmentRelation,
+    Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
 };
-use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
-use laws::proptest::prelude::{prop_assert, prop_assert_eq};
+use design_store::{
+    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShapeName, ShownMessage, ShownNode, Stored,
+    StreamSchema,
+};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
+use laws::proptest;
+use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
+use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
-use newtype::Counter;
+use newtype::{Counter, Newtype};
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use store_ports::{Busy, Sqlite, Store, Written};
+use stream::{Relation, Shape};
+use structurer::{Directive, NodeRef, Proposal, SegmentRef};
 use strum::VariantArray;
-use transcript_ports::Uuid;
+use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
 const HOME: &str = "/home/tester";
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Speaker {
     Owner,
     Lead,
@@ -115,6 +127,16 @@ impl Session {
                     "\"aaaaaaaa-0000-4000-8000-000000000004\"",
                     "what of aaaaaaaa-0000-4000-8000-000000000004",
                 ),
+            ]
+            .concat(),
+        )
+    }
+
+    fn distinct() -> Session {
+        Session::working(
+            [
+                Self::line(Speaker::Owner, "abcd0001-0000-4000-8000-000000000001", "null", "1. yes\\n2. no\\n3. later"),
+                Self::line(Speaker::Lead, "bcde0002-0000-4000-8000-000000000002", "null", "1. a\\n2. b"),
             ]
             .concat(),
         )
@@ -254,7 +276,7 @@ fn ingest_counts_each_authorship_unrecognised_kind_form_and_relation() -> Result
     let out = Invocation::output(&Session::typical(), &["ingest"])?;
     assert!(out.contains("authorship owner 2\n"));
     assert!(out.contains("authorship lead 1\n"));
-    assert!(out.contains("unrecognised brand-new-kind 1\n"));
+    assert!(out.contains("unrecognised \"brand-new-kind\" 1\n"));
     assert!(out.contains("form item 1\n"));
     assert!(out.contains("form sentence 2\n"));
     Ok(())
@@ -277,7 +299,8 @@ impl Links {
             .iter()
             .map(|uuid| {
                 let uuid = Uuid::new((*uuid).to_owned());
-                port.read(ShownMessage::named(uuid.clone()))?.ok_or(Failure::Missing(uuid))
+                port.read(ShownMessage::named(uuid.clone()))?
+                    .ok_or(Failure::Unmatched(Unmatched::NoMatch(Prefix::new(uuid.into_inner()))))
             })
             .collect::<Result<Vec<_>, Failure>>()?;
         Ok(shown
@@ -351,15 +374,15 @@ fn ingest_counts_a_reply_once() -> Result<(), Failure> {
 #[test]
 fn show_prints_a_message_by_uuid_from_the_store() -> Result<(), Failure> {
     let out = Invocation::shown(&Session::typical(), "o1")?;
-    assert!(out.contains("o1 owner session s at 2026-01-01T00:00:00Z"));
-    assert!(out.contains("0 item"));
+    assert!(out.contains("o1 owner session \"s\" at \"2026-01-01T00:00:00Z\""));
+    assert!(out.contains("  segment o1.0 item "));
     Ok(())
 }
 
 #[test]
 fn show_of_an_unknown_uuid_fails_naming_it() {
     let failed = Invocation::shown(&Session::typical(), "nobody");
-    assert!(matches!(failed, Err(Failure::Missing(_))));
+    assert!(matches!(failed, Err(Failure::Unmatched(Unmatched::NoMatch(_)))));
 }
 
 #[test]
@@ -386,7 +409,7 @@ fn a_workspace_flag_without_a_path_is_a_usage_failure() {
 fn show_reads_the_store_not_the_live_transcript() {
     let store = Sqlite::in_memory::<StreamSchema>();
     let before = Invocation::against(&store, &Session::typical(), &["show", "o1"]);
-    assert!(matches!(before, Err(Failure::Missing(_))));
+    assert!(matches!(before, Err(Failure::Unmatched(Unmatched::NoMatch(_)))));
 }
 
 struct Opened {
@@ -445,7 +468,7 @@ fn ingest_resumes_each_session_from_its_stored_cursor() -> Result<(), Failure> {
     let resumed = Invocation::against(&store, &Session::answered(), &["ingest"])?;
     assert!(resumed.contains("authorship lead 1\n"));
     assert_eq!(resumed.matches("authorship owner").count(), 0);
-    assert!(Invocation::against(&store, &Session::answered(), &["show", "l1"])?.contains("l1 lead session s"));
+    assert!(Invocation::against(&store, &Session::answered(), &["show", "l1"])?.contains("l1 lead session \"s\""));
     Ok(())
 }
 
@@ -519,8 +542,8 @@ laws::law!(an_owner_segment_is_found_by_a_word_it_contains_and_no_other_is, "[a-
         Said::by(Speaker::Owner, "o2", "1234 5678".to_owned()),
     ]);
     let out = Found::by(&session, &["search", &word])?;
-    prop_assert!(out.contains("o1 owner"));
-    prop_assert!(!out.contains("o2 owner"));
+    prop_assert!(out.contains("hit o1.0 owner"));
+    prop_assert!(!out.contains("hit o2.0 owner"));
 });
 
 laws::law!(several_words_find_only_the_segments_holding_every_one, ("a[a-z]{3,8}", "b[a-z]{3,8}"), words, {
@@ -532,7 +555,7 @@ laws::law!(several_words_find_only_the_segments_holding_every_one, ("a[a-z]{3,8}
     ]);
     let out = Found::by(&session, &["search", &first, &second])?;
     prop_assert_eq!(out.matches(" owner ").count(), 1);
-    prop_assert!(out.contains("o1 owner"));
+    prop_assert!(out.contains("hit o1.0 owner"));
 });
 
 laws::law!(the_lead_is_searched_only_when_everyone_is_asked_for, "[a-z]{4,10}", word, {
@@ -540,10 +563,10 @@ laws::law!(the_lead_is_searched_only_when_everyone_is_asked_for, "[a-z]{4,10}", 
         Found::said(&[Said::by(Speaker::Owner, "o1", word.clone()), Said::by(Speaker::Lead, "l1", word.clone())]);
     let owner = Found::by(&session, &["search", &word])?;
     let everyone = Found::by(&session, &["search", "--all", &word])?;
-    prop_assert!(owner.contains("o1 owner"));
-    prop_assert!(!owner.contains("l1 lead"));
-    prop_assert!(everyone.contains("o1 owner"));
-    prop_assert!(everyone.contains("l1 lead"));
+    prop_assert!(owner.contains("hit o1.0 owner"));
+    prop_assert!(!owner.contains("hit l1.0 lead"));
+    prop_assert!(everyone.contains("hit o1.0 owner"));
+    prop_assert!(everyone.contains("hit l1.0 lead"));
 });
 
 laws::law!(a_word_is_found_whatever_its_case, "[a-z]{4,10}", word, {
@@ -552,8 +575,8 @@ laws::law!(a_word_is_found_whatever_its_case, "[a-z]{4,10}", word, {
         Found::said(&[Said::by(Speaker::Owner, "o1", raised.clone()), Said::by(Speaker::Owner, "o2", word.clone())]);
     let lower = Found::by(&session, &["search", &word])?;
     let upper = Found::by(&session, &["search", &raised])?;
-    prop_assert!(lower.contains("o1 owner") && lower.contains("o2 owner"));
-    prop_assert!(upper.contains("o1 owner") && upper.contains("o2 owner"));
+    prop_assert!(lower.contains("hit o1.0 owner") && lower.contains("hit o2.0 owner"));
+    prop_assert!(upper.contains("hit o1.0 owner") && upper.contains("hit o2.0 owner"));
 });
 
 #[test]
@@ -621,7 +644,7 @@ impl Graph {
 fn init_plants_the_project_root_in_the_workspace_store() -> Result<(), Failure> {
     let opened = Opened::by(&["init", "demo"])?;
     assert_eq!(opened.paths, [PathBuf::from("/work/.meta/design.sqlite")]);
-    assert!(opened.out.contains("root n1 project demo"));
+    assert!(opened.out.contains("root n1 project \"demo\""));
     Ok(())
 }
 
@@ -651,14 +674,14 @@ fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
     Graph::init(&store, &["demo"])?;
     assert_eq!(Graph::shown(&store, "n2")?.matches("consumes").count(), 0);
     let consuming = Graph::init(&store, &["demo", "--consumes", "meta-dev"])?;
-    assert!(consuming.contains("consumes n1 project meta-dev"));
+    assert!(consuming.contains("consumes n1 project \"meta-dev\""));
     assert!(
         Graph::shown(&store, "n2")?
-            .contains("n2 demo project vague core entered init\n  n2 consumes n1 entered init\n")
+            .contains("n2 \"demo\" project vague core entered init\n  edge n2 consumes n1 entered init\n")
     );
     assert!(
         Graph::shown(&store, "n1")?
-            .contains("n1 meta-dev project vague core entered init\n  n2 consumes n1 entered init\n")
+            .contains("n1 \"meta-dev\" project vague core entered init\n  edge n2 consumes n1 entered init\n")
     );
     Ok(())
 }
@@ -777,7 +800,11 @@ impl Applying {
     const ANSWER: &str = "aaaaaaaa-0000-4000-8000-000000000003";
 
     fn ready() -> Result<Applying, Failure> {
-        let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Session::linked().files() };
+        Applying::over(&Session::linked())
+    }
+
+    fn over(session: &Session) -> Result<Applying, Failure> {
+        let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: session.files() };
         applying.run(&["ingest"])?;
         applying.run(&["init", "demo"])?;
         Ok(applying)
@@ -811,10 +838,10 @@ fn apply_places_proposes_and_reports_the_owner_segments_it_leaves_uncovered() ->
     .join("\n");
     let out = applying.applied(&directives)?;
     let wanted = [
-        format!("applied place({answer}, n1, decides)"),
-        "proposed n2 by propose(new, refines(n1), feature, \"Apply \\\"directives\\\"\")".to_owned(),
-        format!("applied sense({answer}, decision, specific, firm, explicit)"),
-        format!("applied link({answer}, aaaaaaaa-0000-4000-8000-000000000002.0, answers)"),
+        format!("applied \"place({answer}, n1, decides)\""),
+        "proposed n2 by \"propose(new, refines(n1), feature, \\\"Apply \\\\\\\"directives\\\\\\\"\\\")\"".to_owned(),
+        format!("applied \"sense({answer}, decision, specific, firm, explicit)\""),
+        format!("applied \"link({answer}, aaaaaaaa-0000-4000-8000-000000000002.0, answers)\""),
         format!("uncovered {}", Applying::answer(1)),
         "written 7".to_owned(),
     ];
@@ -830,17 +857,17 @@ fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result
     applying.applied("propose(new, refines(n2), feature, \"echo\")")?;
     let child = applying.run(&["show", "n4"])?;
     let wanted = [
-        "n4 demo feature vague core entered apply \"echo\"",
-        "  ancestor n1 demo project vague core entered init",
-        "  ancestor n2 demo feature vague core entered apply \"apply\"",
-        "  n4 refines n2 entered apply",
+        "n4 \"demo\" feature vague core entered apply \"echo\"",
+        "  ancestor n1 \"demo\" project vague core entered init",
+        "  ancestor n2 \"demo\" feature vague core entered apply \"apply\"",
+        "  edge n4 refines n2 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&child, &wanted), Vec::<&&str>::new());
     assert_eq!(child.matches('\n').count(), wanted.len());
     let root = applying.run(&["show", "n1"])?;
     assert_eq!(root.matches("  child ").count(), 2);
-    assert!(root.contains("  child n3 demo smell vague core entered apply \"drift\"\n"));
+    assert!(root.contains("  child n3 \"demo\" smell vague core entered apply \"drift\"\n"));
     Ok(())
 }
 
@@ -849,16 +876,16 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     applying.applied("propose(new, refines(n1), feature, \"old\")\npropose(new, refines(n1), feature, \"new\")")?;
     applying.applied("supersede(n2, by(n3))")?;
-    let root = "  ancestor n1 demo project vague core entered init";
-    let supersedes = "  n3 supersedes n2 entered apply";
+    let root = "  ancestor n1 \"demo\" project vague core entered init";
+    let supersedes = "  edge n3 supersedes n2 entered apply";
     let cast = "  role core entered apply";
     let wanted = [
         (
             "n2",
             vec![
-                "n2 demo feature vague core entered apply \"old\"",
+                "n2 \"demo\" feature vague core entered apply \"old\"",
                 root,
-                "  n2 refines n1 entered apply",
+                "  edge n2 refines n1 entered apply",
                 supersedes,
                 cast,
             ],
@@ -866,9 +893,9 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
         (
             "n3",
             vec![
-                "n3 demo feature vague core entered apply \"new\"",
+                "n3 \"demo\" feature vague core entered apply \"new\"",
                 root,
-                "  n3 refines n1 entered apply",
+                "  edge n3 refines n1 entered apply",
                 supersedes,
                 cast,
             ],
@@ -1040,17 +1067,17 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     applying.applied(&directives)?;
     let message = applying.run(&["show", Applying::ANSWER])?;
     let wanted = [
-        format!("  place {answer} defines n3 current entered apply"),
-        format!("  sense {answer} decision specific firm explicit current entered apply"),
-        format!("  link {answer} answers aaaaaaaa-0000-4000-8000-000000000002.0 current entered apply"),
-        format!("  conversational {} current entered apply", Applying::answer(1)),
+        format!("  annotation place {answer} defines n3 current entered apply"),
+        format!("  annotation sense {answer} decision specific firm explicit current entered apply"),
+        format!("  annotation link {answer} answers aaaaaaaa-0000-4000-8000-000000000002.0 current entered apply"),
+        format!("  annotation conversational {} current entered apply", Applying::answer(1)),
     ];
     assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
     let node = applying.run(&["show", "n3"])?;
     let wanted = [
-        "n3 demo feature vague core entered apply \"b\"",
-        "  n3 refines n2 entered apply",
-        "  n3 supersedes n2 entered apply",
+        "n3 \"demo\" feature vague core entered apply \"b\"",
+        "  edge n3 refines n2 entered apply",
+        "  edge n3 supersedes n2 entered apply",
     ];
     assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());
     Ok(())
@@ -1064,11 +1091,11 @@ fn a_corrected_sense_supersedes_the_earlier_one_and_both_stay_stored() -> Result
     applying.applied(&format!("sense({answer}, opinion, general, tentative, implicit)"))?;
     let shown = applying.run(&["show", Applying::ANSWER])?;
     let wanted = [
-        format!("  sense {answer} decision specific firm explicit superseded entered apply"),
-        format!("  sense {answer} opinion general tentative implicit current entered apply"),
+        format!("  annotation sense {answer} decision specific firm explicit superseded entered apply"),
+        format!("  annotation sense {answer} opinion general tentative implicit current entered apply"),
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&String>::new());
-    assert_eq!(shown.matches("  sense ").count(), 2);
+    assert_eq!(shown.matches("  annotation sense ").count(), 2);
     Ok(())
 }
 
@@ -1083,11 +1110,11 @@ fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Re
     ]
     .join("\n");
     let out = applying.applied(&directives)?;
-    assert!(out.contains("proposed n3 by propose(new b, refines(n2), feature, \"b\")\n"));
+    assert!(out.contains("proposed n3 by \"propose(new b, refines(n2), feature, \\\"b\\\")\"\n"));
     let shown = applying.run(&["show", Applying::ANSWER])?;
     let wanted = [
-        format!("  place {} defines n2 current entered apply", Applying::answer(0)),
-        format!("  place {} decides n3 current entered apply", Applying::answer(1)),
+        format!("  annotation place {} defines n2 current entered apply", Applying::answer(0)),
+        format!("  annotation place {} decides n3 current entered apply", Applying::answer(1)),
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&String>::new());
     let refusals = [
@@ -1150,7 +1177,7 @@ fn a_file_applied_twice_writes_nothing_the_second_time_and_names_the_earlier_app
         Outcome::AlreadyApplied { earlier }
             if earlier.identity() == AppliedId::new(1)
                 && earlier.stamp().to_string().len() == "2026-11-06T00:00:00Z".len()
-                && second.out == format!("already applied as file 1 at {}; nothing written\n", earlier.stamp())
+                && second.out == format!("already applied file 1 at \"{}\"\n", earlier.stamp())
     ));
     assert_eq!(applying.graph()?, before);
     assert!(matches!(applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
@@ -1163,7 +1190,7 @@ fn a_file_one_byte_away_from_an_applied_one_applies() -> Result<(), Failure> {
     applying.rooted(Bytes::from(&Applying::twice()))?;
     let changed = applying.rooted(Bytes::from(&format!("{}\n", Applying::twice())))?;
     assert_eq!(changed.outcome, Outcome::Applied);
-    assert!(changed.out.contains("proposed n3 by propose(new, refines(n1), feature, \"once\")\n"));
+    assert!(changed.out.contains("proposed n3 by \"propose(new, refines(n1), feature, \\\"once\\\")\"\n"));
     assert_eq!(applying.run(&["show", "n1"])?.matches("  child ").count(), 2);
     Ok(())
 }
@@ -1203,11 +1230,11 @@ laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VA
     let store = Sqlite::in_memory::<StreamSchema>();
     let shown = Graph::planted(&store, facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let wanted = [
-        format!("n3 demo {facet} vague core entered init"),
-        "  ancestor n1 demo project vague core entered init".to_owned(),
-        format!("  ancestor n2 demo {facet} vague core entered init"),
-        format!("  child n5 demo {facet} vague core entered init"),
-        "  n3 refines n2 entered init".to_owned(),
+        format!("n3 \"demo\" {facet} vague core entered init"),
+        "  ancestor n1 \"demo\" project vague core entered init".to_owned(),
+        format!("  ancestor n2 \"demo\" {facet} vague core entered init"),
+        format!("  child n5 \"demo\" {facet} vague core entered init"),
+        "  edge n3 refines n2 entered init".to_owned(),
     ];
     let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
     prop_assert_eq!(missing, Vec::<&String>::new());
@@ -1349,7 +1376,7 @@ fn specify_without_both_an_artifact_and_a_condition_fails_to_parse() -> Result<(
         applying.run(&["specify", "--artifact", "lint:no-comments", "--condition", "every comment is refused"]),
     ];
     assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature refining core entered apply"));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining core entered apply"));
     Ok(())
 }
 
@@ -1362,7 +1389,7 @@ fn an_unparsed_artifact_condition_or_reason_is_refused_as_such() -> Result<(), F
     assert!(matches!(unspecified, Err(Failure::Unspecified(_))));
     assert!(matches!(unstated, Err(Failure::Unstated(_))));
     assert!(matches!(unreasoned, Err(Failure::Unstated(_))));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature refining core entered apply"));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining core entered apply"));
     Ok(())
 }
 
@@ -1385,7 +1412,7 @@ fn each_lifecycle_option_belongs_to_its_own_command() -> Result<(), Failure> {
         applying.run(&["refine", "n2", "--dry-run"]),
     ];
     assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague core entered apply"));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature vague core entered apply"));
     Ok(())
 }
 
@@ -1394,17 +1421,17 @@ fn show_renders_a_terminal_node_with_its_artifact_and_condition() -> Result<(), 
     let applying = Lifecycle::reached(Stage::Terminal)?;
     let shown = applying.run(&["show", "n2"])?;
     let wanted = [
-        "n2 demo feature terminal core entered apply \"child\"",
-        "  artifact lint:no-comments",
+        "n2 \"demo\" feature terminal core entered apply \"child\"",
+        "  artifact \"lint:no-comments\"",
         "  condition \"every comment is refused\"",
-        "  ancestor n1 demo project vague core entered init",
-        "  n2 refines n1 entered apply",
+        "  ancestor n1 \"demo\" project vague core entered init",
+        "  edge n2 refines n1 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
     assert_eq!(shown.matches('\n').count(), wanted.len());
     let reopened = applying.run(&["reopen", "n2"])?;
-    assert!(reopened.contains("n2 demo feature refining core entered apply \"child\"\n  ancestor "));
+    assert!(reopened.contains("n2 \"demo\" feature refining core entered apply \"child\"\n  ancestor "));
     Ok(())
 }
 
@@ -1413,15 +1440,17 @@ fn a_dropped_node_stays_resolvable_with_its_reason() -> Result<(), Failure> {
     let applying = Lifecycle::reached(Stage::Dropped)?;
     let shown = applying.run(&["show", "n2"])?;
     let wanted = [
-        "n2 demo feature dropped core entered apply \"child\"",
+        "n2 \"demo\" feature dropped core entered apply \"child\"",
         "  reason \"folded into n1\"",
-        "  ancestor n1 demo project vague core entered init",
-        "  n2 refines n1 entered apply",
+        "  ancestor n1 \"demo\" project vague core entered init",
+        "  edge n2 refines n1 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
     assert_eq!(shown.matches('\n').count(), wanted.len());
-    assert!(applying.run(&["show", "n1"])?.contains("  child n2 demo feature dropped core entered apply \"child\"\n"));
+    assert!(
+        applying.run(&["show", "n1"])?.contains("  child n2 \"demo\" feature dropped core entered apply \"child\"\n")
+    );
     let placed = applying.applied(&format!("place({}, n2, mentions)", Applying::answer(1)))?;
     assert!(placed.contains("written 2\n"));
     Ok(())
@@ -1455,13 +1484,13 @@ fn a_secondary_parent_never_takes_a_core_child_and_the_refusal_names_the_edge() 
     let edge = NodeEdge::new(NodeId::new(2), NodeRelation::Refines, NodeId::new(1));
     let parent = applying.run(&["role", "n1", "secondary"]);
     assert!(matches!(parent, Err(Failure::Inverted { edge: refused }) if refused == edge));
-    assert!(applying.run(&["show", "n1"])?.contains("n1 demo project vague core entered init\n"));
+    assert!(applying.run(&["show", "n1"])?.contains("n1 \"demo\" project vague core entered init\n"));
     assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
     assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
     let child = applying.run(&["role", "n2", "core"]);
     assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
     let child = applying.run(&["show", "n2"])?;
-    assert!(child.contains("n2 demo feature vague secondary entered apply"));
+    assert!(child.contains("n2 \"demo\" feature vague secondary entered apply"));
     assert!(child.contains("  role secondary entered role\n"));
     Ok(())
 }
@@ -1472,7 +1501,7 @@ fn a_proposal_inherits_a_secondary_parent_s_role_and_records_the_inheritance() -
     applying.run(&["role", "n1", "secondary"])?;
     applying.applied("propose(new, refines(n1), feature, \"child\")")?;
     let child = applying.run(&["show", "n2"])?;
-    assert!(child.contains("n2 demo feature vague secondary entered apply"));
+    assert!(child.contains("n2 \"demo\" feature vague secondary entered apply"));
     assert!(child.contains("  role secondary entered inheritance\n"));
     assert_eq!(applying.outcome(&["role", "n1", "core"])?, Outcome::Recast(Role::Core));
     Ok(())
@@ -1609,7 +1638,7 @@ laws::law!(
         prop_assert_eq!(replanted.refused, Some(unplanted));
         prop_assert_eq!(replanted.unplaced, Some(NodeId::new(2)));
         prop_assert_eq!(replanted.config, Kind::Missing);
-        prop_assert_eq!(replanted.out, "root n2 project q\n");
+        prop_assert_eq!(replanted.out, "root n2 project \"q\"\n");
     }
 );
 
@@ -1801,3 +1830,511 @@ fn show_renders_every_stage_edge_role_and_placement_of_a_small_tree() -> Result<
     golden::golden!("show.txt", &rendered)?;
     Ok(())
 }
+
+#[test]
+fn apply_echoes_every_directive_kind_and_show_cites_every_remarked_segment() -> Result<(), Box<dyn std::error::Error>> {
+    let applying = Applying::over(&Session::distinct())?;
+    let directives = [
+        "place(abcd0001.0, n1, decides)",
+        "sense(abcd0001.0, decision, specific, firm, explicit)",
+        "link(abcd0001.1, bcde0002.0, answers)",
+        "conversational(abcd0001.2)",
+        "propose(new, refines(n1), feature, \"applied\")",
+    ]
+    .join("\n");
+    let applied = applying.applied(&directives)?;
+    let shown = applying.run(&["show", "abcd0001"])?;
+    golden::golden!("apply.txt", &format!("design apply notes/directives\n{applied}design show abcd0001\n{shown}"))?;
+    Ok(())
+}
+
+struct Generated;
+
+impl Generated {
+    fn text() -> BoxedStrategy<String> {
+        any::<String>().boxed()
+    }
+
+    fn word() -> BoxedStrategy<String> {
+        "[A-Za-z0-9_][A-Za-z0-9_-]{0,15}".boxed()
+    }
+
+    fn shape() -> BoxedStrategy<ShapeName> {
+        prop_oneof![Generated::word(), select(Shape::VARIANTS).prop_map(|shape| shape.to_string())]
+            .prop_map(ShapeName::new)
+            .boxed()
+    }
+
+    fn relation() -> BoxedStrategy<RelationName> {
+        prop_oneof![Generated::word(), select(Relation::VARIANTS).prop_map(|relation| relation.to_string())]
+            .prop_map(RelationName::new)
+            .boxed()
+    }
+
+    fn node() -> BoxedStrategy<NodeId> {
+        (0..i64::MAX).prop_map(NodeId::new).boxed()
+    }
+
+    fn count() -> BoxedStrategy<Count> {
+        any::<usize>().prop_map(Count::new).boxed()
+    }
+
+    fn author() -> BoxedStrategy<Authorship> {
+        select(vec![Authorship::Owner, Authorship::Lead]).boxed()
+    }
+
+    fn entered() -> BoxedStrategy<Entered> {
+        select(Entered::VARIANTS).boxed()
+    }
+
+    fn segment() -> BoxedStrategy<SegmentRef> {
+        (Generated::message(), 0usize..100_000)
+            .prop_map(|(prefix, ordinal)| SegmentRef::new(Prefix::new(prefix), Ordinal::new(ordinal)))
+            .boxed()
+    }
+
+    fn anchored() -> BoxedStrategy<Anchored> {
+        prop_oneof![
+            Generated::segment().prop_map(Anchored::Segment),
+            Generated::message().prop_map(|prefix| Anchored::Message(Prefix::new(prefix))),
+        ]
+        .boxed()
+    }
+
+    fn message() -> BoxedStrategy<String> {
+        "[A-Za-z0-9_][A-Za-z0-9_-]{0,36}".boxed()
+    }
+
+    fn uuid() -> BoxedStrategy<Uuid> {
+        Generated::message().prop_map(Uuid::new).boxed()
+    }
+
+    fn project() -> BoxedStrategy<Project> {
+        "[a-z0-9][a-z0-9._-]{0,10}".prop_filter_map("a project name", |name| name.parse().ok()).boxed()
+    }
+
+    fn sentence<Spelled: FromStr + std::fmt::Debug + 'static>() -> BoxedStrategy<Spelled> {
+        "[a-z][a-z \"]{0,20}[a-z]".prop_filter_map("one line of text", |text| text.parse().ok()).boxed()
+    }
+
+    fn artifact() -> BoxedStrategy<Artifact> {
+        "(lint|hook|tool|behaviour):[a-z][a-z-]{0,10}".prop_filter_map("an artifact", |text| text.parse().ok()).boxed()
+    }
+
+    fn sense() -> BoxedStrategy<Sense> {
+        (
+            select(SenseKind::VARIANTS),
+            select(Specificity::VARIANTS),
+            select(Confidence::VARIANTS),
+            select(Explicitness::VARIANTS),
+        )
+            .prop_map(|(kind, specificity, confidence, explicitness)| {
+                Sense::new(kind, specificity, confidence, explicitness)
+            })
+            .boxed()
+    }
+
+    fn stage() -> BoxedStrategy<AnyStage> {
+        prop_oneof![
+            Just(AnyStage::from(Vague)),
+            Just(AnyStage::from(Refining)),
+            (Generated::artifact(), Generated::sentence::<Condition>())
+                .prop_map(|(artifact, condition)| AnyStage::from(Terminal::new(artifact, condition))),
+            Generated::sentence::<Reason>().prop_map(|reason| AnyStage::from(Dropped::from(reason))),
+        ]
+        .boxed()
+    }
+
+    fn summary() -> BoxedStrategy<Summary> {
+        (
+            (Generated::node(), Generated::project(), select(Facet::VARIANTS), Generated::entered()),
+            (select(Role::VARIANTS), Generated::entered(), Generated::stage()),
+            proptest::option::of(Generated::text()),
+        )
+            .prop_map(|((node, project, facet, entered), (role, cast, stage), title)| {
+                let entry = Entry::new(project, facet, Provenance::from(entered));
+                let loaded = Node::loaded(node, entry, Casting::new(role, Provenance::from(cast)), stage);
+                Summary::from(&title.into_iter().fold(loaded, |node, title| node.titled(Title::new(title))))
+            })
+            .boxed()
+    }
+
+    fn directive() -> BoxedStrategy<Directive> {
+        prop_oneof![
+            (Generated::segment(), Generated::node(), select(SpanRelation::VARIANTS)).prop_map(
+                |(segment, node, relation)| Directive::Place { segment, node: NodeRef::Stored(node), relation }
+            ),
+            (Generated::segment(), Generated::sense()).prop_map(|(segment, sense)| Directive::Sense { segment, sense }),
+            (Generated::node(), select(Facet::VARIANTS), "[^\r\n]{0,24}").prop_map(|(node, facet, title)| {
+                Directive::Propose {
+                    proposal: Proposal::Anonymous(NodeRef::Stored(node)),
+                    facet,
+                    title: Title::new(title),
+                }
+            }),
+            Generated::segment().prop_map(|segment| Directive::Conversational { segment }),
+        ]
+        .boxed()
+    }
+
+    fn remark() -> BoxedStrategy<Remark> {
+        prop_oneof![
+            (Generated::segment(), select(SpanRelation::VARIANTS), Generated::node())
+                .prop_map(|(segment, relation, node)| Remark::Place { segment, relation, node }),
+            (Generated::segment(), Generated::sense()).prop_map(|(segment, sense)| Remark::Sense { segment, sense }),
+            (Generated::segment(), select(SegmentRelation::VARIANTS), Generated::segment())
+                .prop_map(|(source, relation, target)| Remark::Link { source, relation, target }),
+            Generated::segment().prop_map(|segment| Remark::Conversational { segment }),
+        ]
+        .boxed()
+    }
+
+    fn counted() -> BoxedStrategy<Line> {
+        prop_oneof![
+            (Generated::text(), any::<u64>()).prop_map(|(session, cursor)| Line::Read {
+                session: SessionId::new(session),
+                cursor: Cursor::new(Offset::new(cursor))
+            }),
+            (Generated::author(), Generated::count()).prop_map(|(author, count)| Line::Authored { author, count }),
+            (Generated::text(), Generated::count())
+                .prop_map(|(kind, count)| Line::Unrecognised { kind: transcript_ports::Kind::new(kind), count }),
+            (select(Shape::VARIANTS), Generated::count()).prop_map(|(shape, count)| Line::Formed { shape, count }),
+            (select(Relation::VARIANTS), Generated::count())
+                .prop_map(|(relation, count)| Line::Related { relation, count }),
+            Generated::count().prop_map(Line::Written),
+            (Generated::node(), Generated::project()).prop_map(|(node, project)| Line::Root { node, project }),
+            (Generated::node(), Generated::project()).prop_map(|(node, project)| Line::Consumes { node, project }),
+        ]
+        .boxed()
+    }
+
+    fn shown_node() -> BoxedStrategy<Line> {
+        prop_oneof![
+            Generated::summary().prop_map(Line::Node),
+            Generated::artifact().prop_map(Line::Artifact),
+            Generated::sentence::<Condition>().prop_map(Line::Condition),
+            Generated::sentence::<Reason>().prop_map(Line::Reason),
+            (select(Kin::VARIANTS), Generated::summary()).prop_map(|(kin, node)| Line::Relative { kin, node }),
+            (Generated::node(), select(NodeRelation::VARIANTS), Generated::node(), Generated::entered()).prop_map(
+                |(source, relation, target, entered)| Line::Edge {
+                    edge: NodeEdge::new(source, relation, target),
+                    entered
+                }
+            ),
+            (select(Role::VARIANTS), Generated::entered()).prop_map(|(role, entered)| Line::Role { role, entered }),
+            (
+                (select(SpanRelation::VARIANTS), Generated::segment(), Generated::author()),
+                (proptest::option::of(Generated::sense()), Generated::entered(), Generated::text())
+            )
+                .prop_map(|((relation, segment, author), (sense, entered, body))| Line::Placed {
+                    relation,
+                    segment,
+                    author,
+                    sense,
+                    entered,
+                    body: Body::new(body)
+                }),
+        ]
+        .boxed()
+    }
+
+    fn shown_message() -> BoxedStrategy<Line> {
+        prop_oneof![
+            (Generated::uuid(), Generated::author(), Generated::text(), Generated::text()).prop_map(
+                |(uuid, author, session, stamp)| Line::Message {
+                    uuid,
+                    author,
+                    session: SessionId::new(session),
+                    stamp: Instant::new(stamp)
+                }
+            ),
+            (Generated::segment(), Generated::shape(), Generated::text())
+                .prop_map(|(segment, shape, body)| Line::Segment { segment, shape, body: Body::new(body) }),
+            (Generated::anchored(), Generated::relation(), Generated::anchored())
+                .prop_map(|(source, relation, target)| Line::Link { source, relation, target }),
+            (Generated::remark(), select(Standing::VARIANTS), Generated::entered())
+                .prop_map(|(remark, standing, entered)| Line::Annotated { remark, standing, entered }),
+            (Generated::segment(), Generated::author(), Generated::text(), Generated::text()).prop_map(
+                |(segment, author, stamp, body)| Line::Hit {
+                    segment,
+                    author,
+                    stamp: Instant::new(stamp),
+                    body: Body::new(body)
+                }
+            ),
+        ]
+        .boxed()
+    }
+
+    fn applied() -> BoxedStrategy<Line> {
+        prop_oneof![
+            Generated::directive().prop_map(Line::Applied),
+            (Generated::node(), Generated::directive())
+                .prop_map(|(node, directive)| Line::Proposed { node, directive }),
+            Generated::segment().prop_map(Line::Uncovered),
+            (0..i64::MAX, Generated::text())
+                .prop_map(|(file, stamp)| Line::Repeated { file: AppliedId::new(file), stamp: Instant::new(stamp) }),
+        ]
+        .boxed()
+    }
+
+    fn line() -> BoxedStrategy<Line> {
+        prop_oneof![Generated::counted(), Generated::shown_node(), Generated::shown_message(), Generated::applied()]
+            .boxed()
+    }
+}
+
+laws::roundtrip!(
+    every_output_line_is_displayed_and_parsed_back,
+    Generated::line(),
+    |line: &Line| line.to_string(),
+    |text: &String| text.parse::<Line>().ok(),
+    Some
+);
+
+const SPREAD: [&str; 3] = [
+    "12345678-0000-4000-8000-000000000001",
+    "abcdef01-0000-4000-8000-000000000001",
+    "abcdef01-1111-4000-8000-000000000001",
+];
+
+struct Spread;
+
+impl Spread {
+    fn applying() -> Result<Applying, Failure> {
+        let session = Found::said(&[
+            Said::by(Speaker::Owner, SPREAD[0], "first thought. second thought".to_owned()),
+            Said::by(Speaker::Owner, SPREAD[1], "third thought".to_owned()),
+            Said::by(Speaker::Owner, SPREAD[2], "fourth thought".to_owned()),
+        ]);
+        let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: session.files() };
+        applying.run(&["ingest"])?;
+        applying.run(&["init", "demo"])?;
+        Ok(applying)
+    }
+
+    fn parsed(out: &str) -> Vec<Line> {
+        let ends: Vec<usize> = out.match_indices('\n').map(|(end, _)| end).collect();
+        let starts = [0].into_iter().chain(ends.iter().map(|end| end.saturating_add(1)));
+        starts
+            .zip(ends.iter())
+            .filter_map(|(start, end)| out.get(start..*end))
+            .filter_map(|line| line.parse::<Line>().ok())
+            .collect()
+    }
+
+    fn reference(prefix: &str, ordinal: usize) -> SegmentRef {
+        SegmentRef::new(Prefix::new(prefix.to_owned()), Ordinal::new(ordinal))
+    }
+
+    fn segment(prefix: &str, ordinal: usize, body: &str) -> Line {
+        Line::Segment {
+            segment: Spread::reference(prefix, ordinal),
+            shape: ShapeName::new("sentence".to_owned()),
+            body: Body::new(body.to_owned()),
+        }
+    }
+
+    fn message(uuid: &str) -> Line {
+        Line::Message {
+            uuid: Uuid::new(uuid.to_owned()),
+            author: Authorship::Owner,
+            session: SessionId::new("s".to_owned()),
+            stamp: Instant::new("2026-01-01T00:00:00Z".to_owned()),
+        }
+    }
+}
+
+#[test]
+fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies() -> Result<(), Failure> {
+    let applying = Spread::applying()?;
+    let shown = [
+        Spread::parsed(&applying.run(&["show", SPREAD[0]])?),
+        Spread::parsed(&applying.run(&["show", SPREAD[1]])?),
+        Spread::parsed(&applying.run(&["show", SPREAD[2]])?),
+    ];
+    let wanted = [
+        vec![
+            Spread::message(SPREAD[0]),
+            Spread::segment("12345678", 0, "first thought."),
+            Spread::segment("12345678", 1, "second thought"),
+        ],
+        vec![Spread::message(SPREAD[1]), Spread::segment("abcdef01-0", 0, "third thought")],
+        vec![Spread::message(SPREAD[2]), Spread::segment("abcdef01-1", 0, "fourth thought")],
+    ];
+    assert_eq!(shown, wanted);
+    let found = Spread::parsed(&applying.run(&["search", "thought"])?);
+    let hit = |prefix: &str, ordinal: usize, body: &str| Line::Hit {
+        segment: Spread::reference(prefix, ordinal),
+        author: Authorship::Owner,
+        stamp: Instant::new("2026-01-01T00:00:00Z".to_owned()),
+        body: Body::new(body.to_owned()),
+    };
+    let hits = [
+        hit("12345678", 0, "first thought."),
+        hit("12345678", 1, "second thought"),
+        hit("abcdef01-0", 0, "third thought"),
+        hit("abcdef01-1", 0, "fourth thought"),
+    ];
+    assert_eq!(found.len(), hits.len());
+    assert!(hits.iter().all(|hit| found.contains(hit)));
+    let refs = ["12345678.0", "12345678.1", "abcdef01-0.0", "abcdef01-1.0"];
+    let directives: Vec<String> = refs.iter().map(|reference| format!("conversational({reference})")).collect();
+    let applied = Spread::parsed(&applying.applied(&directives.join("\n"))?);
+    let echoed: Vec<Line> =
+        directives.iter().filter_map(|directive| directive.parse().ok()).map(Line::Applied).collect();
+    assert_eq!(echoed.len(), refs.len());
+    assert!(echoed.iter().all(|echo| applied.contains(echo)));
+    refs.iter().try_for_each(|reference| applying.run(&["show", reference]).map(|_shown| ()))
+}
+
+#[test]
+fn show_takes_the_message_and_segment_prefixes_apply_takes_and_refuses_an_ambiguous_or_unknown_one()
+-> Result<(), Failure> {
+    let applying = Spread::applying()?;
+    let whole = Spread::parsed(&applying.run(&["show", SPREAD[0]])?);
+    assert_eq!(Spread::parsed(&applying.run(&["show", "12345678"])?), whole);
+    assert_eq!(Spread::parsed(&applying.run(&["show", "12345678.1"])?), whole);
+    assert!(matches!(applying.run(&["show", "abcdef01"]), Err(Failure::Unmatched(Unmatched::Ambiguous(_)))));
+    assert!(matches!(applying.run(&["show", "abcdef01.0"]), Err(Failure::Unmatched(Unmatched::Ambiguous(_)))));
+    assert!(matches!(applying.run(&["show", "fedcba98"]), Err(Failure::Unmatched(Unmatched::NoMatch(_)))));
+    assert!(matches!(applying.run(&["show", "12345678.7"]), Err(Failure::Unresolved(Unresolved::Unsegmented(_)))));
+    let applied = applying.applied("conversational(12345678.1)");
+    assert!(applied.is_ok(), "{applied:?}");
+    assert!(matches!(
+        applying.applied("conversational(abcdef01.0)"),
+        Err(Failure::Unresolved(Unresolved::Ambiguous(_)))
+    ));
+    assert!(matches!(applying.applied("conversational(fedcba98.0)"), Err(Failure::Unresolved(Unresolved::Unheard(_)))));
+    Ok(())
+}
+
+struct Ends;
+
+impl Ends {
+    fn of(line: Line) -> Vec<Anchored> {
+        match line {
+            Line::Link { source, target, .. } => vec![source, target],
+            _ => Vec::new(),
+        }
+    }
+
+    fn conversational(anchor: &Anchored) -> Option<String> {
+        match anchor {
+            Anchored::Segment(segment) => Some(format!("conversational({segment})")),
+            Anchored::Message(_) => None,
+        }
+    }
+}
+
+#[test]
+fn review_every_segment_ref_on_a_shown_link_line_is_shown_again() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let shown = applying.run(&["show", "aaaaaaaa-0000-4000-8000-000000000003"])?;
+    let anchors: Vec<Anchored> = Spread::parsed(&shown).into_iter().flat_map(Ends::of).collect();
+    assert_ne!(anchors, Vec::<Anchored>::new(), "{shown}");
+    let refused: Vec<&Anchored> =
+        anchors.iter().filter(|anchor| applying.run(&["show", &anchor.to_string()]).is_err()).collect();
+    assert_eq!(refused, Vec::<&Anchored>::new(), "{shown}");
+    let directives: Vec<String> = anchors.iter().filter_map(Ends::conversational).collect();
+    assert_ne!(directives, Vec::<String>::new(), "{shown}");
+    let applied = applying.applied(&directives.join("\n"));
+    assert!(applied.is_ok(), "{applied:?}");
+    Ok(())
+}
+
+#[test]
+fn review_a_seven_character_prefix_is_shown_whatever_its_first_character() -> Result<(), Failure> {
+    let session = Found::said(&[
+        Said::by(Speaker::Owner, "1a2b3c4d-0000-4000-8000-000000000001", "first thought".to_owned()),
+        Said::by(Speaker::Owner, "a1b2c3d4-0000-4000-8000-000000000001", "second thought".to_owned()),
+    ]);
+    let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: session.files() };
+    applying.run(&["ingest"])?;
+    let lettered = applying.run(&["show", "a1b2c3d"]).map(|_shown| ());
+    let numbered = applying.run(&["show", "1a2b3c4"]).map(|_shown| ());
+    assert!(lettered.is_ok(), "{lettered:?}");
+    assert!(numbered.is_ok(), "{numbered:?}");
+    Ok(())
+}
+
+const STEMS: [&str; 3] = ["aaaa1111", "aaaa1112", "bbbb2222"];
+
+const SAYINGS: [&str; 3] = ["", "word", "1. word\\n2. more word"];
+
+#[derive(Clone, Debug)]
+struct Uttered {
+    stem: &'static str,
+    speaker: Speaker,
+    text: &'static str,
+    back: Option<usize>,
+}
+
+struct Echoes;
+
+impl Echoes {
+    fn uttered() -> BoxedStrategy<Vec<Uttered>> {
+        proptest::collection::vec(
+            (
+                select(STEMS.to_vec()),
+                select(vec![Speaker::Owner, Speaker::Lead]),
+                select(SAYINGS.to_vec()),
+                proptest::option::of(0usize..3),
+            )
+                .prop_map(|(stem, speaker, text, back)| Uttered { stem, speaker, text, back }),
+            1..6,
+        )
+        .boxed()
+    }
+
+    fn uuid(stem: &str, index: usize) -> String {
+        format!("{stem}-0000-4000-8000-{index:012}")
+    }
+
+    fn uuids(uttered: &[Uttered]) -> Vec<String> {
+        uttered.iter().enumerate().map(|(index, said)| Echoes::uuid(said.stem, index)).collect()
+    }
+
+    fn session(uttered: &[Uttered]) -> Session {
+        let uuids = Echoes::uuids(uttered);
+        Session::working(
+            uttered
+                .iter()
+                .zip(&uuids)
+                .enumerate()
+                .map(|(index, (said, uuid))| {
+                    let parent = said
+                        .back
+                        .and_then(|back| index.checked_sub(back.saturating_add(1)))
+                        .and_then(|earlier| uuids.get(earlier))
+                        .map_or_else(|| "null".to_owned(), |earlier| format!("\"{earlier}\""));
+                    Session::line(said.speaker, uuid, &parent, said.text)
+                })
+                .collect(),
+        )
+    }
+
+    fn refs(line: Line) -> Vec<String> {
+        match line {
+            Line::Message { uuid, .. } => vec![uuid.to_string()],
+            Line::Segment { segment, .. } | Line::Hit { segment, .. } => vec![segment.to_string()],
+            Line::Link { source, target, .. } => vec![source.to_string(), target.to_string()],
+            _ => Vec::new(),
+        }
+    }
+}
+
+laws::law!(every_ref_that_show_or_search_prints_is_shown, Echoes::uttered(), uttered, {
+    let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Echoes::session(&uttered).files() };
+    applying.run(&["ingest"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let printed = Echoes::uuids(&uttered)
+        .iter()
+        .map(|uuid| applying.run(&["show", uuid]))
+        .chain([applying.run(&["search", "--all", "word"])])
+        .collect::<Result<String, Failure>>()
+        .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let refs: Vec<String> = Spread::parsed(&printed).into_iter().flat_map(Echoes::refs).collect();
+    prop_assert!(refs.len() >= uttered.len(), "{}", printed);
+    let refused: Vec<&String> = refs.iter().filter(|reference| applying.run(&["show", reference]).is_err()).collect();
+    prop_assert_eq!(refused, Vec::<&String>::new(), "{}", printed);
+});

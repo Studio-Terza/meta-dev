@@ -16,6 +16,7 @@ doctest = false
 [dependencies]
 logos.workspace = true
 newtype = { path = "../newtype" }
+thiserror.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }

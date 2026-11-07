@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use logos::Logos;
 
 use super::Lexemes;
@@ -25,6 +27,14 @@ enum Token {
     Plain,
 }
 
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+enum Ink {
+    #[regex(r"\p{White_Space}+")]
+    Blank,
+    #[regex(r"\P{White_Space}+")]
+    Inked,
+}
+
 impl Lexemes {
     #[must_use]
     pub fn scanned(text: &impl AsRef<str>) -> Vec<Lexeme> {
@@ -35,13 +45,26 @@ impl Lexemes {
             .map(|(token, range)| {
                 Lexeme::new(
                     token.unwrap_or(Token::Plain).mark(),
-                    Span::new(
-                        Position::new(range.start).without_sentinel(),
-                        Position::new(range.end).without_sentinel(),
-                    ),
+                    Ink::spanned(range.clone()),
+                    Ink::inked(sentinel.get(range.clone()).unwrap_or_default(), range.start),
                 )
             })
             .collect()
+    }
+}
+
+impl Ink {
+    fn spanned(range: Range<usize>) -> Span {
+        Span::new(Position::new(range.start).without_sentinel(), Position::new(range.end).without_sentinel())
+    }
+
+    fn inked(slice: &str, start: usize) -> Option<Span> {
+        let inked: Vec<Range<usize>> =
+            Ink::lexer(slice).spanned().filter(|(ink, _)| *ink == Ok(Ink::Inked)).map(|(_, range)| range).collect();
+        inked
+            .first()
+            .zip(inked.last())
+            .map(|(first, last)| Ink::spanned(start.saturating_add(first.start)..start.saturating_add(last.end)))
     }
 }
 

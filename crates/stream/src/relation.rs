@@ -1,20 +1,14 @@
-use std::fmt;
+use named_derive::Named;
+use strum::VariantArray;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Relation {
+    #[name("replies-to")]
     RepliesTo,
+    #[name("answers")]
     Answers,
+    #[name("cites")]
     Cites,
+    #[name("resends")]
     Resends,
-}
-
-impl fmt::Display for Relation {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Relation::RepliesTo => formatter.write_str("replies-to"),
-            Relation::Answers => formatter.write_str("answers"),
-            Relation::Cites => formatter.write_str("cites"),
-            Relation::Resends => formatter.write_str("resends"),
-        }
-    }
 }

@@ -15,7 +15,7 @@ use grammar::flag::Flags;
 use store_ports::Sqlite;
 
 use super::failure::Failure;
-pub use command::{Applied, Unresolved};
+pub use command::Unresolved;
 use command::{Command, Verb};
 pub use ground::Ground;
 use persistence::Persistence;

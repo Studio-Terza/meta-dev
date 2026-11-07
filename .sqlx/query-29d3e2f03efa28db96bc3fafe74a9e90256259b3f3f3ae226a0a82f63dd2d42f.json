@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "\nWITH\nRECURSIVE neighbours (uuid) AS (\n  SELECT\n    max(uuid)\n  FROM\n    messages\n  WHERE\n    uuid < ?1\n  UNION ALL\n  SELECT\n    min(uuid)\n  FROM\n    messages\n  WHERE\n    uuid > ?1\n),\nlengths (n) AS (\n  SELECT\n    8\n  UNION ALL\n  SELECT\n    n + 1\n  FROM\n    lengths\n  WHERE\n    n < length(?1)\n)\nSELECT\n  substr(?1, 1, coalesce(min(n), length(?1))) AS \"prefix!: String\"\nFROM\n  lengths\nWHERE\n  NOT EXISTS (\n    SELECT\n      1\n    FROM\n      neighbours\n    WHERE\n      substr(neighbours.uuid, 1, n) = substr(?1, 1, n)\n  )\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "prefix!: String",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "29d3e2f03efa28db96bc3fafe74a9e90256259b3f3f3ae226a0a82f63dd2d42f"
+}

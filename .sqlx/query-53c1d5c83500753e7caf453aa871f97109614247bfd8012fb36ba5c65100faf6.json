@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  segments.rowid AS \"id!: i64\",\n  messages.uuid,\n  messages.author,\n  messages.at,\n  segments.body,\n  segments_fts.rank AS \"rank!: f64\"\nFROM\n  segments_fts\n  JOIN segments ON segments.rowid = segments_fts.rowid\n  JOIN messages ON messages.uuid = segments.message\nWHERE\n  segments_fts MATCH ?1\n  AND (\n    ?2 IS NULL\n    OR messages.author = ?2\n  )\n",
+  "query": "\nSELECT\n  segments.rowid AS \"id!: i64\",\n  messages.uuid,\n  segments.ordinal,\n  messages.author,\n  messages.at,\n  segments.body,\n  segments_fts.rank AS \"rank!: f64\"\nFROM\n  segments_fts\n  JOIN segments ON segments.rowid = segments_fts.rowid\n  JOIN messages ON messages.uuid = segments.message\nWHERE\n  segments_fts MATCH ?1\n  AND (\n    ?2 IS NULL\n    OR messages.author = ?2\n  )\n",
   "describe": {
     "columns": [
       {
@@ -26,8 +26,19 @@
         }
       },
       {
-        "name": "author",
+        "name": "ordinal",
         "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "author",
+        "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -38,7 +49,7 @@
       },
       {
         "name": "at",
-        "ordinal": 3,
+        "ordinal": 4,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -49,7 +60,7 @@
       },
       {
         "name": "body",
-        "ordinal": 4,
+        "ordinal": 5,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -60,7 +71,7 @@
       },
       {
         "name": "rank!: f64",
-        "ordinal": 5,
+        "ordinal": 6,
         "type_info": "Null",
         "origin": {
           "Table": {
@@ -79,8 +90,9 @@
       false,
       false,
       false,
+      false,
       true
     ]
   },
-  "hash": "f9a820275478ced395c0d3a91e0345c08cb65095dff3154f673e710afd8c0933"
+  "hash": "53c1d5c83500753e7caf453aa871f97109614247bfd8012fb36ba5c65100faf6"
 }

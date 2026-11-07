@@ -28,6 +28,6 @@ fn a_store_kept_on_disk_answers_show_and_a_second_ingest_writes_nothing() -> Res
     let shown = design.in_work(&["show", "o1"])?;
     assert!(String::from_utf8(first.stdout)?.contains("written 4\n"));
     assert!(String::from_utf8(second.stdout)?.contains("written 0\n"));
-    assert!(String::from_utf8(shown.stdout)?.contains("o1 owner session s at 2026-01-01T00:00:00Z\n"));
+    assert!(String::from_utf8(shown.stdout)?.contains("o1 owner session \"s\" at \"2026-01-01T00:00:00Z\"\n"));
     Ok(())
 }

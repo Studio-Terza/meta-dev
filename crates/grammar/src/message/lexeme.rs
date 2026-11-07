@@ -4,11 +4,12 @@ use super::{Mark, Span};
 pub struct Lexeme {
     mark: Mark,
     span: Span,
+    ink: Option<Span>,
 }
 
 impl Lexeme {
-    pub(crate) fn new(mark: Mark, span: Span) -> Lexeme {
-        Lexeme { mark, span }
+    pub(crate) fn new(mark: Mark, span: Span, ink: Option<Span>) -> Lexeme {
+        Lexeme { mark, span, ink }
     }
 
     #[must_use]
@@ -19,5 +20,10 @@ impl Lexeme {
     #[must_use]
     pub fn span(&self) -> Span {
         self.span
+    }
+
+    #[must_use]
+    pub fn ink(&self) -> Option<Span> {
+        self.ink
     }
 }

@@ -2,10 +2,11 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
-use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::prelude::{prop_assert, prop_assert_eq};
+use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
-use stream::{Message, Relation, Shape, Stream};
+use stream::{Anchor, Message, Relation, Shape, Stream};
 use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts, Uuid};
 
 const CITED: &str = "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b";
@@ -155,6 +156,12 @@ impl Cases {
             .unwrap_or_default()
     }
 
+    fn bodies(text: &&str) -> Vec<String> {
+        Fixture::first(text)
+            .map(|message| message.segments().iter().map(|segment| segment.text(&message).to_string()).collect())
+            .unwrap_or_default()
+    }
+
     fn resends(texts: &[&str]) -> Vec<String> {
         let ids: Vec<String> = (0..texts.len()).map(|position| format!("m{position}")).collect();
         let said: Vec<Say<'_>> =
@@ -237,11 +244,24 @@ laws::table!(
     ]
 );
 
-laws::law!(segments_tile_the_message_without_loss, "[ -~\n•]{0,80}", text, {
+laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace, "[ -~\n\t•]{0,80}", text, {
     let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let rebuilt: String = message.segments().iter().map(|segment| segment.text(&message).to_string()).collect();
-    prop_assert_eq!(rebuilt, text);
+    let bodies: Vec<String> = message.segments().iter().map(|segment| segment.text(&message).to_string()).collect();
+    let inked = |text: &str| text.chars().filter(|letter| !letter.is_whitespace()).collect::<String>();
+    prop_assert_eq!(inked(&bodies.concat()), inked(&text));
+    let ends = |body: &String| [body.chars().next(), body.chars().last()].into_iter().flatten().collect::<Vec<char>>();
+    prop_assert!(bodies.iter().flat_map(ends).all(|end| !end.is_whitespace()));
 });
+
+laws::table!(
+    a_segment_is_lexed_without_stray_leading_or_trailing_whitespace,
+    Cases::bodies,
+    [
+        "Hello there.  How are you? \n1. one \n  - two\t\n> three \n" => ["Hello there.", "How are you?", "1. one", "- two", "> three"],
+        "  padded  " => ["padded"],
+        "1. yes\n2. no" => ["1. yes", "2. no"],
+    ]
+);
 
 laws::table!(
     numbered_answers_align_with_the_last_numbered_list_of_the_lead_turn,
@@ -326,4 +346,12 @@ laws::table!(
         [OWNER, Turn::Unheard, Turn::Unheard][..] => ["brand-new-kind", "brand-new-kind"],
         [OWNER, LEAD][..] => Vec::<String>::new(),
     ]
+);
+
+laws::roundtrip!(
+    every_anchor_is_displayed_and_parsed_back,
+    "[0-9a-f-]{1,36}(#(0|[1-9][0-9]{0,5}))?".prop_filter_map("an anchor", |text| text.parse::<Anchor>().ok()),
+    |anchor: &Anchor| anchor.to_string(),
+    |text: &String| text.parse::<Anchor>().ok(),
+    Some
 );

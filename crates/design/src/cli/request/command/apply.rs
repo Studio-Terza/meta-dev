@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt;
 use std::io::Write;
 use std::path::Path;
 
@@ -12,7 +11,7 @@ use design_store::{
     Unseen,
 };
 use file_ports::{Files, Text};
-use newtype::Newtype;
+use newtype::{Counter, Newtype};
 use store_ports::{Store, Written};
 use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
 use transcript_ports::{Authorship, Uuid};
@@ -20,8 +19,9 @@ use transcript_ports::{Authorship, Uuid};
 use super::Printed;
 use crate::Outcome;
 use crate::cli::failure::Failure;
-use crate::cli::rendering::{Id, Repeat};
+use crate::cli::output::{Count, Line};
 use crate::cli::request::Ground;
+use crate::cli::request::command::rendering::Refs;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Unresolved {
@@ -31,7 +31,7 @@ pub enum Unresolved {
     Ambiguous(SegmentRef),
     #[error("the message of segment {0} has no segment at that index")]
     Unsegmented(SegmentRef),
-    #[error("no node {} in the design store", Id::from(*.0))]
+    #[error("no node n{} in the design store", .0.into_inner())]
     Unplaced(NodeId),
     #[error("no node labelled {0} is proposed earlier in the file")]
     Unbound(Label),
@@ -40,9 +40,9 @@ pub enum Unresolved {
     #[error("{0}")]
     Straddling(#[from] Straddling),
     #[error(
-        "{} cannot be linked as {relation} {}, which already {relation} it, directly or through a chain",
-        Id::from(*from),
-        Id::from(*to)
+        "n{} cannot be linked as {relation} n{}, which already {relation} it, directly or through a chain",
+        from.into_inner(),
+        to.into_inner()
     )]
     Cyclic { from: NodeId, relation: NodeRelation, to: NodeId },
     #[error("segment {0} cannot be linked to itself")]
@@ -137,16 +137,15 @@ impl Application {
         Ok(application)
     }
 
-    pub(crate) fn reported(self, out: &mut impl Write) -> Result<Outcome, Failure> {
-        Printed::shown(out, &self).map(|_printed| Outcome::from(self))
+    pub(crate) fn reported(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
+        let lines = self.lines(store)?;
+        Printed::lines(out, &lines).map(|_printed| Outcome::from(self))
     }
-}
 
-impl fmt::Display for Application {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn lines(&self, store: &impl Store) -> Result<Vec<Line>, Failure> {
         match self {
-            Application::Fresh(applied) => applied.fmt(formatter),
-            Application::Repeated(earlier) => Repeat::from(earlier).fmt(formatter),
+            Application::Fresh(applied) => applied.lines(store),
+            Application::Repeated(earlier) => Ok(vec![Line::from(earlier)]),
         }
     }
 }
@@ -199,26 +198,25 @@ impl Applied {
         Ok(Applied { echoes: resolved.into_iter().map(Echo::from).collect(), uncovered, written })
     }
 
-    pub(crate) fn echoes(&self) -> &[Echo] {
-        &self.echoes
-    }
-
-    pub(crate) fn uncovered(&self) -> &[Segment] {
-        &self.uncovered
-    }
-
-    pub(crate) fn written(&self) -> Written {
-        self.written
+    fn lines(&self, store: &impl Store) -> Result<Vec<Line>, Failure> {
+        let refs = Refs::read(store, self.uncovered.iter().cloned())?;
+        Ok(self
+            .echoes
+            .iter()
+            .map(Line::from)
+            .chain(refs.uncovered(&self.uncovered))
+            .chain([Line::Written(Count::new(self.written.count()))])
+            .collect())
     }
 }
 
-impl Echo {
-    pub(crate) fn directive(&self) -> &Directive {
-        &self.directive
-    }
-
-    pub(crate) fn proposed(&self) -> Option<NodeId> {
-        self.proposed
+impl From<&Echo> for Line {
+    fn from(echo: &Echo) -> Line {
+        let directive = echo.directive.clone();
+        echo.proposed.map_or_else(
+            || Line::Applied(directive.clone()),
+            |node| Line::Proposed { node, directive: directive.clone() },
+        )
     }
 }
 

@@ -36,6 +36,16 @@ impl Remark {
             Remark::Conversational { segment } => remarking.conversational(segment),
         }
     }
+
+    #[must_use]
+    pub fn cited(&self) -> Vec<Segment> {
+        match self {
+            Remark::Related { source, target, .. } => vec![source.clone(), target.clone()],
+            Remark::Placed { segment, .. } | Remark::Sensed { segment, .. } | Remark::Conversational { segment } => {
+                vec![segment.clone()]
+            }
+        }
+    }
 }
 
 impl Annotation {

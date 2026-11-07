@@ -1,8 +1,12 @@
+use std::io::Write;
+
 use design_model::NodeId;
 use design_store::{Placed, Resolved, Resolving, ShownNode};
 use store_ports::Store;
 
 use crate::cli::failure::Failure;
+use crate::cli::request::command::printed::Printed;
+use crate::cli::request::command::rendering::Refs;
 
 #[derive(Debug)]
 pub struct Found(Placed);
@@ -18,5 +22,9 @@ impl Found {
 
     pub fn placed(&self) -> &Placed {
         &self.0
+    }
+
+    pub fn printed(&self, store: &impl Store, out: &mut impl Write) -> Result<Printed, Failure> {
+        Printed::lines(out, &Refs::placed(store, &self.0)?)
     }
 }

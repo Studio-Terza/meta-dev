@@ -8,7 +8,7 @@ use super::Printed;
 use super::subject::Found;
 use crate::Outcome;
 use crate::cli::failure::Failure;
-use crate::cli::rendering::Neighbourhood;
+use crate::cli::request::command::rendering::Refs;
 use crate::cli::request::{Shaped, Token, Valued};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,7 +66,7 @@ impl Move {
         store.write(Restaged::new(node, self.transition))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
-        Printed::shown(out, &Neighbourhood::from(shown.placed()))?;
+        Printed::lines(out, &Refs::placed(store, shown.placed())?)?;
         Ok(Outcome::Moved(shown.placed().node().stage().stage()))
     }
 }
@@ -83,7 +83,7 @@ impl Recast {
         store.write(Cast::new(node, Casting::new(self.role, Provenance::from(Entered::Role))))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
-        Printed::shown(out, &Neighbourhood::from(shown.placed()))?;
+        Printed::lines(out, &Refs::placed(store, shown.placed())?)?;
         Ok(Outcome::Recast(shown.placed().node().casting().role()))
     }
 }

@@ -262,6 +262,7 @@ dependencies = [
  "grammar",
  "laws",
  "local-config",
+ "named-derive",
  "newtype",
  "port-core",
  "store-ports",
@@ -291,7 +292,9 @@ dependencies = [
 name = "design-store"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
  "design-model",
+ "exit",
  "file-ports",
  "grammar",
  "laws",
@@ -612,6 +615,7 @@ dependencies = [
  "laws",
  "logos",
  "newtype",
+ "thiserror",
 ]
 
 [[package]]
@@ -2437,8 +2441,11 @@ dependencies = [
  "file-ports",
  "grammar",
  "laws",
+ "named-derive",
  "newtype",
  "port-core",
+ "strum",
+ "thiserror",
  "transcript-ports",
 ]
 

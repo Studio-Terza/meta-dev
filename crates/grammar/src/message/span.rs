@@ -26,4 +26,9 @@ impl Span {
     pub fn through(self, later: Span) -> Span {
         Span { start: self.start, end: later.end }
     }
+
+    #[must_use]
+    pub fn emptied(self) -> Span {
+        Span { start: self.start, end: self.start }
+    }
 }

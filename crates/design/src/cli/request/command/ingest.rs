@@ -1,7 +1,5 @@
 mod count;
 
-use std::fmt;
-
 use design_store::{Cursors, EarlierLines, SessionCursors, SessionRecords};
 use newtype::Counter;
 use store_ports::{Store, Written};
@@ -9,7 +7,8 @@ use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts, Unrecognised};
 
 use crate::cli::failure::Failure;
-use count::{Counts, Label};
+use crate::cli::output::{self, Count};
+use count::Counts;
 
 #[derive(Debug)]
 struct ReadTo {
@@ -85,13 +84,16 @@ impl Tally {
     }
 }
 
-impl fmt::Display for Tally {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.ends.iter().try_for_each(|end| writeln!(formatter, "session {} read to {}", end.session, end.cursor))?;
-        self.authorship.lines(Label::AUTHORSHIP, formatter)?;
-        self.unrecognised.lines(Label::UNRECOGNISED, formatter)?;
-        self.forms.lines(Label::FORM, formatter)?;
-        self.relations.lines(Label::RELATION, formatter)?;
-        writeln!(formatter, "{} {}", Label::WRITTEN, self.written.count())
+impl Tally {
+    pub fn lines(&self) -> Vec<output::Line> {
+        self.ends
+            .iter()
+            .map(|end| output::Line::Read { session: end.session.clone(), cursor: end.cursor })
+            .chain(self.authorship.lines(|author, count| output::Line::Authored { author, count }))
+            .chain(self.unrecognised.lines(|kind, count| output::Line::Unrecognised { kind, count }))
+            .chain(self.forms.lines(|shape, count| output::Line::Formed { shape, count }))
+            .chain(self.relations.lines(|relation, count| output::Line::Related { relation, count }))
+            .chain([output::Line::Written(Count::new(self.written.count()))])
+            .collect()
     }
 }
