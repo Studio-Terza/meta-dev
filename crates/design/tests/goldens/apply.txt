@@ -1,0 +1,16 @@
+design apply notes/directives
+applied "place(abcd0001.0, n1, decides)"
+applied "sense(abcd0001.0, decision, specific, firm, explicit)"
+applied "link(abcd0001.1, bcde0002.0, answers)"
+applied "conversational(abcd0001.2)"
+proposed n2 by "propose(new, refines(n1), feature, \"applied\")"
+written 8
+design show abcd0001
+message abcd0001-0000-4000-8000-000000000001 owner session "s" at "2026-01-01T00:00:00Z"
+  segment abcd0001.0 item "1. yes"
+  segment abcd0001.1 item "2. no"
+  segment abcd0001.2 item "3. later"
+  annotation place abcd0001.0 decides n1 current entered apply
+  annotation sense abcd0001.0 decision specific firm explicit current entered apply
+  annotation link abcd0001.1 answers bcde0002.0 current entered apply
+  annotation conversational abcd0001.2 current entered apply

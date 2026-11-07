@@ -132,6 +132,16 @@ impl Session {
         )
     }
 
+    fn distinct() -> Session {
+        Session::working(
+            [
+                Self::line(Speaker::Owner, "abcd0001-0000-4000-8000-000000000001", "null", "1. yes\\n2. no\\n3. later"),
+                Self::line(Speaker::Lead, "bcde0002-0000-4000-8000-000000000002", "null", "1. a\\n2. b"),
+            ]
+            .concat(),
+        )
+    }
+
     const ASKED: &str = "aaaaaaaa-0000-4000-8000-000000000001";
 
     const SAID: [&str; 5] = [
@@ -790,7 +800,11 @@ impl Applying {
     const ANSWER: &str = "aaaaaaaa-0000-4000-8000-000000000003";
 
     fn ready() -> Result<Applying, Failure> {
-        let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Session::linked().files() };
+        Applying::over(&Session::linked())
+    }
+
+    fn over(session: &Session) -> Result<Applying, Failure> {
+        let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: session.files() };
         applying.run(&["ingest"])?;
         applying.run(&["init", "demo"])?;
         Ok(applying)
@@ -1814,6 +1828,23 @@ impl Rendered {
 fn show_renders_every_stage_edge_role_and_placement_of_a_small_tree() -> Result<(), Box<dyn std::error::Error>> {
     let rendered = Rendered::tree()?;
     golden::golden!("show.txt", &rendered)?;
+    Ok(())
+}
+
+#[test]
+fn apply_echoes_every_directive_kind_and_show_cites_every_remarked_segment() -> Result<(), Box<dyn std::error::Error>> {
+    let applying = Applying::over(&Session::distinct())?;
+    let directives = [
+        "place(abcd0001.0, n1, decides)",
+        "sense(abcd0001.0, decision, specific, firm, explicit)",
+        "link(abcd0001.1, bcde0002.0, answers)",
+        "conversational(abcd0001.2)",
+        "propose(new, refines(n1), feature, \"applied\")",
+    ]
+    .join("\n");
+    let applied = applying.applied(&directives)?;
+    let shown = applying.run(&["show", "abcd0001"])?;
+    golden::golden!("apply.txt", &format!("design apply notes/directives\n{applied}design show abcd0001\n{shown}"))?;
     Ok(())
 }
 

@@ -22,9 +22,6 @@ struct Details;
 struct Remarks<'refs>(&'refs Refs);
 
 #[derive(Clone, Copy, Debug)]
-struct Cited;
-
-#[derive(Clone, Copy, Debug)]
 struct Ends<'refs>(&'refs Refs);
 
 impl Refs {
@@ -41,7 +38,7 @@ impl Refs {
     pub fn stored(store: &impl Store, stored: &Stored) -> Result<Vec<Line>, StoreFailure> {
         let uuid: &Uuid = stored.message().as_ref();
         let segments = stored.segments().iter().map(|segment| Segment::new(uuid.clone(), segment.ordinal()));
-        let remarked = stored.annotations().iter().flat_map(|annotation| annotation.remark().visited(Cited));
+        let remarked = stored.annotations().iter().flat_map(|annotation| annotation.remark().cited());
         let linked = stored.links().iter().flat_map(|link| link.anchors().map(|anchor| anchor.message().clone()));
         let messages: Prefixes =
             segments.chain(remarked).map(|segment| AsRef::<Uuid>::as_ref(&segment).clone()).chain(linked).collect();
@@ -188,25 +185,5 @@ impl Anchors for Ends<'_> {
         Anchored::Segment(
             self.0.reference(&Segment::new(segment.message().clone(), Ordinal::new(segment.ordinal().into_inner()))),
         )
-    }
-}
-
-impl Remarking for Cited {
-    type Output = Vec<Segment>;
-
-    fn placed(self, segment: &Segment, _node: NodeId, _relation: SpanRelation) -> Vec<Segment> {
-        vec![segment.clone()]
-    }
-
-    fn sensed(self, segment: &Segment, _sense: Sense) -> Vec<Segment> {
-        vec![segment.clone()]
-    }
-
-    fn related(self, source: &Segment, target: &Segment, _relation: SegmentRelation) -> Vec<Segment> {
-        vec![source.clone(), target.clone()]
-    }
-
-    fn conversational(self, segment: &Segment) -> Vec<Segment> {
-        vec![segment.clone()]
     }
 }
