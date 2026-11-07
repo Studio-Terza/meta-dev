@@ -44,7 +44,7 @@ impl<'file> ModuleTree<'file> {
             .reexports
             .iter()
             .filter(|(module, _)| module.parent().is_some())
-            .filter_map(move |(module, count)| count.beyond(most).map(|count| (module, count)))
+            .filter_map(move |(module, count)| count.beyond(most).map(|crowded| (module, crowded)))
             .map(move |(module, count)| {
                 Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
             });
@@ -69,9 +69,9 @@ impl<'file> ModuleTree<'file> {
 
     fn absorb(&mut self, module: ModulePath<'file>, path: &UsePath) {
         let target = Target::from_use(&module, path, &self.modules);
-        let used = target.as_ref().and_then(|target| target.deepest_in(&self.modules));
+        let used = target.as_ref().and_then(|found| found.deepest_in(&self.modules));
         self.users.record(used, module);
-        let crossed = target.as_ref().and_then(|target| target.crossed_directory(&module, &self.modules));
+        let crossed = target.as_ref().and_then(|found| found.crossed_directory(&module, &self.modules));
         self.deep_uses.extend(crossed.map(|crossing| {
             Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: crossing })
         }));

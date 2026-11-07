@@ -33,9 +33,11 @@ impl<'ast> Visit<'ast> for CloneSites<'_> {
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
         let cloned = Some(call)
-            .filter(|call| call.method == Self::CLONE)
-            .filter(|call| call.args.is_empty())
-            .map(|call| Violation::new(Site::new(self.file.path(), LineNumber::from(call.method.span())), Finding));
+            .filter(|candidate| candidate.method == Self::CLONE)
+            .filter(|clone| clone.args.is_empty())
+            .map(|bare_clone| {
+                Violation::new(Site::new(self.file.path(), LineNumber::from(bare_clone.method.span())), Finding)
+            });
         self.found.extend(cloned);
         visit::visit_expr_method_call(self, call);
     }

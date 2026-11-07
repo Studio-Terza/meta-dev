@@ -39,7 +39,7 @@ impl<'read, 'model> Texts<'read, 'model> {
     fn sighted(&self, placed: Placed<'model, &'model Call>) -> Option<Violation<'model>> {
         let handler = self.handler(placed.entity().callee());
         let call = handler.as_ref().and_then(|_| self.scope.call(placed.entity(), placed.site().path()));
-        call.and(handler).map(|handler| Violation::new(placed.site(), Finding::TextOutsideDoor { handler }))
+        call.and(handler).map(|called| Violation::new(placed.site(), Finding::TextOutsideDoor { handler: called }))
     }
 
     fn handler(&self, callee: &Callee) -> Option<Name> {

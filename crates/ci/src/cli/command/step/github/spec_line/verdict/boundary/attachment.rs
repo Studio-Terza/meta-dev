@@ -13,7 +13,9 @@ impl Attachment<'_> {
     const SHORTEST_ID_LEN: usize = 8;
 
     fn id_letter(letter: char) -> Option<char> {
-        Some(letter).filter(char::is_ascii_hexdigit).or_else(|| Some(letter).filter(|letter| *letter == Self::DASH))
+        Some(letter)
+            .filter(char::is_ascii_hexdigit)
+            .or_else(|| Some(letter).filter(|candidate| *candidate == Self::DASH))
     }
 
     fn owner(value: &str) -> Option<&str> {
@@ -21,7 +23,7 @@ impl Attachment<'_> {
         id.get(..Self::SHORTEST_ID_LEN)
             .filter(|start| start.chars().all(|letter| letter.is_ascii_hexdigit()))
             .and(Some(id))
-            .filter(|id| id.chars().all(|letter| Self::id_letter(letter).is_some()))
+            .filter(|whole| whole.chars().all(|letter| Self::id_letter(letter).is_some()))
     }
 
     fn labels(value: &str) -> Option<Reading> {
@@ -34,7 +36,7 @@ impl<'line> TryFrom<&'line str> for Attachment<'line> {
 
     fn try_from(value: &'line str) -> Result<Attachment<'line>, NotWellFormed> {
         Some(value)
-            .filter(|value| *value == Self::NONE)
+            .filter(|candidate| *candidate == Self::NONE)
             .or_else(|| Self::owner(value).map(|_| value))
             .or_else(|| Self::labels(value).map(|_| value))
             .map(Attachment)

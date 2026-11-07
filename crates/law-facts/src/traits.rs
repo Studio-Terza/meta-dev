@@ -29,11 +29,11 @@ impl Exports<'_> {
         self.declared
             .get(owner)
             .and_then(|declared| declared.get(name))
-            .or_else(|| hops.next().and_then(|hops| self.through(self.exports.get(owner), owner, name, hops)))
+            .or_else(|| hops.next().and_then(|remaining| self.through(self.exports.get(owner), owner, name, remaining)))
     }
 
     fn through(&self, uses: Option<&Uses>, owner: &CrateName, name: &Name, hops: Hops) -> Option<&Name> {
-        uses.into_iter().flat_map(|uses| uses.sources(name)).find_map(|place| {
+        uses.into_iter().flat_map(|listed| listed.sources(name)).find_map(|place| {
             place.routed(|used| self.exported(owner, used, hops), |source, used| self.exported(source, used, hops))
         })
     }
@@ -66,7 +66,7 @@ impl<'file> Traits<'file> {
             .iter()
             .find_map(|place| self.holding(place, home))
             .or_else(|| Operators::named(named))
-            .or_else(|| Some(named).filter(|named| named.matches::<Whole>(&Self::CONVERSIONS).is_some()))
+            .or_else(|| Some(named).filter(|candidate| candidate.matches::<Whole>(&Self::CONVERSIONS).is_some()))
     }
 
     fn holding(&self, place: &Place<'_>, home: &CrateName) -> Option<&Name> {

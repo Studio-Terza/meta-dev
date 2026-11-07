@@ -32,8 +32,8 @@ impl Cli {
     pub fn from_args(arguments: impl Iterator<Item = OsString>) -> Cli {
         let given: Vec<OsString> = arguments.collect();
         let mode = Mode::of_arguments(&given);
-        let roots = mode.roots(&given);
-        let roots = roots.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| roots);
+        let named = mode.roots(&given);
+        let roots = named.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| named);
         Cli { roots, mode }
     }
 

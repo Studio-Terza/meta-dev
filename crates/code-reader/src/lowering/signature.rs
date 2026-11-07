@@ -200,13 +200,13 @@ impl InScope {
 
     fn held(&self, path: &syn::Path, position: Position) -> Option<TypeRef<Written>> {
         let first = path.segments.first().map(|first| Name::from(&first.ident));
-        let declared = first.as_ref().and_then(|first| self.parameters.iter().find(|parameter| *parameter == first));
+        let declared = first.as_ref().and_then(|head| self.parameters.iter().find(|parameter| *parameter == head));
         let parameter = declared.map(|name| {
             Written::parameter(name.clone(), Spelling::Written([name.clone()].into_iter().collect(), position))
         });
         let subject = first
             .as_ref()
-            .and_then(|first| first.matches::<Whole>(&[Self::SELF]))
+            .and_then(|head| head.matches::<Whole>(&[Self::SELF]))
             .map(|_| self.subject.clone().respelled(Written::implied));
         parameter.or(subject)
     }
@@ -336,8 +336,8 @@ impl Bounding<'_> {
 
     fn bound(self, bound: &TypeParamBound) -> Option<TypeRef<Written>> {
         match bound {
-            TypeParamBound::Trait(bound) => {
-                Some(Bracketed { scope: self.scope }.named(&bound.path, Position::from(bound.path.span())))
+            TypeParamBound::Trait(trait_bound) => {
+                Some(Bracketed { scope: self.scope }.named(&trait_bound.path, Position::from(trait_bound.path.span())))
             }
             _ => None,
         }

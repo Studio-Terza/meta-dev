@@ -73,8 +73,8 @@ impl ShardSummary {
 }
 
 impl Step for ShardSummary {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ShardSummary, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<ShardSummary, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let shards = &arguments.taken()?;
         let summary = &arguments.taken()?;
         arguments.ended()?;

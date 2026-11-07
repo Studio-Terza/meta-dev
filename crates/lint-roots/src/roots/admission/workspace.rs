@@ -29,14 +29,14 @@ impl Workspace {
             .collect();
         let read = Regrouped::like(&directories, Manifest::read_many(files, &directories.concat()));
         let manifests: Vec<Result<BTreeMap<PathBuf, Manifest>, Failure>> =
-            trees.into_iter().zip(read).map(|(tree, read)| tree.and_then(|_| Self::keyed(read))).collect();
-        let named: Vec<PathBuf> =
+            trees.into_iter().zip(read).map(|(tree, outcomes)| tree.and_then(|_| Self::keyed(outcomes))).collect();
+        let named_paths: Vec<PathBuf> =
             manifests.iter().flatten().flat_map(BTreeMap::values).flat_map(Manifest::named_paths).collect();
-        let named = Survey::default().learn(files, Fact::Canonical, &named);
+        let named = Survey::default().learn(files, Fact::Canonical, &named_paths);
         roots
             .iter()
             .zip(manifests)
-            .map(|(root, manifests)| manifests.map(|manifests| Self::assembled(root, manifests, &named)))
+            .map(|(root, outcome)| outcome.map(|keyed| Self::assembled(root, keyed, &named)))
             .collect()
     }
 
@@ -68,7 +68,11 @@ impl Workspace {
             manifests.keys().map(|directory| members.get(directory.as_path()).map(|_| ())).collect()
         };
         Workspace {
-            members: manifests.into_keys().zip(kept).filter_map(|(directory, kept)| kept.map(|()| directory)).collect(),
+            members: manifests
+                .into_keys()
+                .zip(kept)
+                .filter_map(|(directory, member)| member.map(|()| directory))
+                .collect(),
         }
     }
 
@@ -93,16 +97,16 @@ impl Workspace {
         dependencies: &BTreeMap<&Path, PathDependencies>,
         root: &Path,
     ) -> BTreeSet<&'manifests Path> {
-        iter::successors(Some(members), |members| {
-            let packaged: BTreeSet<&'manifests Path> = members
+        iter::successors(Some(members), |grown| {
+            let packaged: BTreeSet<&'manifests Path> = grown
                 .iter()
                 .copied()
                 .chain([root])
                 .filter_map(|directory| dependencies.get(directory))
                 .flat_map(|found| found.packaged(manifests))
                 .collect();
-            let reached: Vec<&'manifests Path> = packaged.difference(members).copied().collect();
-            reached.first().map(|_| members.iter().copied().chain(reached.iter().copied()).collect())
+            let reached: Vec<&'manifests Path> = packaged.difference(grown).copied().collect();
+            reached.first().map(|_| grown.iter().copied().chain(reached.iter().copied()).collect())
         })
         .last()
         .unwrap_or_default()

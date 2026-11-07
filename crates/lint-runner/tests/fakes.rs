@@ -42,7 +42,7 @@ impl Files for FakeUnlistable<'_> {
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        Some(directory).filter(|directory| *directory == self.unlistable).map_or_else(
+        Some(directory).filter(|candidate| *candidate == self.unlistable).map_or_else(
             || self.memory.entries(directory),
             |_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::PermissionDenied))),
         )
@@ -73,7 +73,7 @@ impl FakeLinked<'_> {
     }
 
     fn followed<'path>(&'path self, path: &'path Path) -> &'path Path {
-        Some(path).filter(|path| *path == self.link).map_or(path, |_| &self.target)
+        Some(path).filter(|candidate| *candidate == self.link).map_or(path, |_| &self.target)
     }
 }
 
@@ -113,7 +113,7 @@ impl Files for FakeLinked<'_> {
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        Some(path).filter(|path| *path == self.link).map_or_else(|| self.memory.kind(path), |_| Kind::Link)
+        Some(path).filter(|candidate| *candidate == self.link).map_or_else(|| self.memory.kind(path), |_| Kind::Link)
     }
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {

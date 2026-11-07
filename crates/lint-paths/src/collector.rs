@@ -37,7 +37,8 @@ impl<'file> Collector<'file> {
     }
 
     fn bound(&mut self, prefix: &UsePath, ident: &Ident, rename: Option<&Ident>) {
-        let named: Vec<Name> = Some(ident).filter(|ident| *ident != Self::SELF).map(Name::from).into_iter().collect();
+        let named: Vec<Name> =
+            Some(ident).filter(|candidate| *candidate != Self::SELF).map(Name::from).into_iter().collect();
         let target = prefix.joined(&named);
         let local = rename.map(Name::from).or_else(|| target.segments().last().cloned());
         self.scopes.import(&self.module, local, target);

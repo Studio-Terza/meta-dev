@@ -64,7 +64,9 @@ impl Journal {
             .map(|(journal, text)| text.map_err(|failure| Failure::unusable(journal, failure)));
         kinds
             .into_iter()
-            .scan(texts, |texts, kind| Some(Some(kind).filter(|kind| *kind == Kind::File).and_then(|_| texts.next())))
+            .scan(texts, |remaining, kind| {
+                Some(Some(kind).filter(|candidate| *candidate == Kind::File).and_then(|_| remaining.next()))
+            })
             .collect()
     }
 

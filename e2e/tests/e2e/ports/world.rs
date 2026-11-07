@@ -105,7 +105,7 @@ impl World {
             .map(|(name, _)| name.clone())
             .chain(reached.iter().cloned())
             .collect();
-        Some(grown).filter(|grown| grown.len() != reached.len()).map_or(reached, |grown| self.closure(grown))
+        Some(grown).filter(|candidate| candidate.len() != reached.len()).map_or(reached, |larger| self.closure(larger))
     }
 
     fn directories(files: &impl Files, root: &Path, pattern: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
@@ -127,8 +127,7 @@ impl World {
     fn member(files: &impl Files, root: &Path, directory: PathBuf) -> Result<Member, Box<dyn Error>> {
         let manifest = Self::table(files, &root.join(&directory).join(Self::MANIFEST))?;
         let package = manifest.get("package");
-        let name =
-            package.and_then(|package| package.get("name")).and_then(Value::as_str).unwrap_or_default().to_owned();
+        let name = package.and_then(|table| table.get("name")).and_then(Value::as_str).unwrap_or_default().to_owned();
         let dependencies = Self::DEPENDENCY_TABLES
             .iter()
             .filter_map(|table| manifest.get(*table).and_then(Value::as_table))
@@ -139,7 +138,7 @@ impl World {
             })
             .collect();
         let reads = package
-            .and_then(|package| package.get("metadata"))
+            .and_then(|table| table.get("metadata"))
             .and_then(|metadata| metadata.get("reach"))
             .and_then(|reach| reach.get("reads"))
             .and_then(Value::as_array)

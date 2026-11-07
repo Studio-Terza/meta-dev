@@ -40,11 +40,11 @@ impl FromStr for TestResult {
 
     fn from_str(line: &str) -> Result<TestResult, Unmatched> {
         let parsed = || {
-            let body =
+            let padded =
                 line.get(..Self::TEST.len()).filter(|start| *start == Self::TEST).and(line.get(Self::TEST.len()..))?;
             let trailing: usize =
-                body.chars().rev().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
-            let body = body.get(..body.len() - trailing)?;
+                padded.chars().rev().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
+            let body = padded.get(..padded.len() - trailing)?;
             let (at, separator) = body.match_indices(Self::SEPARATOR).last()?;
             let name = body.get(..at).filter(|_| at > 0)?;
             let verdict = Self::verdict_of(body.get(at + separator.len()..)?)?;

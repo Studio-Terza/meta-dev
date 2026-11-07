@@ -31,8 +31,8 @@ impl Walk {
 
     fn of_attribute(attribute: &Attribute) -> Walk {
         Some(attribute)
-            .filter(|attribute| attribute.path().is_ident("cfg"))
-            .and_then(|attribute| attribute.parse_args::<Meta>().ok())
+            .filter(|candidate| candidate.path().is_ident("cfg"))
+            .and_then(|cfg| cfg.parse_args::<Meta>().ok())
             .map_or(Walk::Entered, |condition| Self::of_condition(&condition))
     }
 

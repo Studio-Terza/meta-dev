@@ -26,10 +26,10 @@ impl Run {
         Self::reported_only(name, limits, measured, &[])
     }
 
-    fn reported_only(name: &str, limits: &str, measured: &str, only: &[&str]) -> io::Result<Reported> {
+    fn reported_only(name: &str, limits_text: &str, measured_text: &str, only: &[&str]) -> io::Result<Reported> {
         let fixture = Fixture::default();
-        let limits = fixture.stored(&format!("{name}-limits.toml"), limits)?;
-        let measured = fixture.stored(&format!("{name}-measured.toml"), measured)?;
+        let limits = fixture.stored(&format!("{name}-limits.toml"), limits_text)?;
+        let measured = fixture.stored(&format!("{name}-measured.toml"), measured_text)?;
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let named = [limits.as_os_str().to_owned(), measured.as_os_str().to_owned()]
             .into_iter()

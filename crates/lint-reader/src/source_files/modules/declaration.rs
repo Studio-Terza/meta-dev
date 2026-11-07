@@ -66,9 +66,9 @@ impl<'items> Declaration<'items> {
             .filter(|_| walk == Walk::Entered)
             .flat_map(|(_, inner)| Self::within(inner, &directory.join(Name::from(&module.ident)), wanted));
         let declared = Some(module)
-            .filter(|module| module.content.is_none())
+            .filter(|candidate| candidate.content.is_none())
             .filter(|_| walk == wanted)
-            .map(|module| Declaration::new(module, directory.to_path_buf()));
+            .map(|outlined| Declaration::new(outlined, directory.to_path_buf()));
         inline.chain(declared).collect()
     }
 

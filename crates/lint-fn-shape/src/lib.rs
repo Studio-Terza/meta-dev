@@ -161,7 +161,7 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
 
     fn visit_local(&mut self, local: &'ast Local) {
         self.violations.extend(
-            FnShape::binds_bool(local).map(|local| Self::found(self.path, local.span(), Finding::BooleanLocal)),
+            FnShape::binds_bool(local).map(|binding| Self::found(self.path, binding.span(), Finding::BooleanLocal)),
         );
         self.violations.extend(
             local

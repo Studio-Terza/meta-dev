@@ -40,7 +40,7 @@ impl VecOutParams<'_> {
     fn vec_out(parameter: &Type) -> Option<&Type> {
         match parameter {
             Type::Reference(reference) => Some(reference)
-                .filter(|reference| reference.mutability.is_some())
+                .filter(|candidate| candidate.mutability.is_some())
                 .and_then(Self::vec_reference)
                 .map(|_| parameter),
             Type::Path(path) => Self::last_segment(path, Self::OPTION).and_then(Self::vec_argument).map(|_| parameter),

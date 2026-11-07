@@ -127,7 +127,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             });
         self.facts.add_generic(generic);
         let block = target
-            .map(|target| ImplBlock::new(self.krate, target, implementation, inherent))
+            .map(|named| ImplBlock::new(self.krate, named, implementation, inherent))
             .filter(|_| walk == Walk::Entered);
         self.facts.add_block(block);
     }

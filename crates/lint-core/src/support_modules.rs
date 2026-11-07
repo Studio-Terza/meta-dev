@@ -49,8 +49,8 @@ impl<'ast> Visit<'ast> for SupportModules {
                 .content
                 .as_ref()
                 .map_or(Some(module), |_| None)
-                .filter(|module| Walk::outside_tests(&module.attrs) == Walk::Skipped)
-                .map(|module| Name::from(&module.ident)),
+                .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Skipped)
+                .map(|support| Name::from(&support.ident)),
         );
         syn::visit::visit_item_mod(self, module);
     }

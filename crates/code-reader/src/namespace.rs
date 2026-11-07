@@ -41,7 +41,7 @@ impl<'read> Namespace<'read> {
     pub(crate) fn planted(&mut self, form: CrateForm, name: Option<&'read Name>, entries: Entries) -> ScopeId {
         let root = ScopeId::after(&self.scopes);
         self.scopes.push(ScopeRow::root(root, form, entries));
-        self.crates.extend(name.map(|name| (name, root)));
+        self.crates.extend(name.map(|crate_name| (crate_name, root)));
         root
     }
 
@@ -58,7 +58,7 @@ impl<'read> Namespace<'read> {
             .map(ScopeRow::entries_mut)
             .zip(Some(declared))
             .into_iter()
-            .for_each(|(entries, declared)| entries.declare(declared));
+            .for_each(|(entries, item)| entries.declare(item));
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {

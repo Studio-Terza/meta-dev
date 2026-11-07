@@ -44,9 +44,9 @@ impl<'item, 'file> Referenced<'item, 'file> {
     pub(crate) fn of_trait(mut self, found: &ItemTrait) -> Vec<Dependency<'file>> {
         found.supertraits.iter().for_each(|bound| self.visit_type_param_bound(bound));
         let associated = found.items.iter().filter_map(Self::associated_type);
-        associated.for_each(|associated| {
-            associated.bounds.iter().for_each(|bound| self.visit_type_param_bound(bound));
-            self.visit_generics(&associated.generics);
+        associated.for_each(|declared| {
+            declared.bounds.iter().for_each(|bound| self.visit_type_param_bound(bound));
+            self.visit_generics(&declared.generics);
         });
         self.bounded(&found.generics)
     }

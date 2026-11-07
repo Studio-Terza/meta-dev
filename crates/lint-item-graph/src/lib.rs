@@ -81,20 +81,22 @@ impl<Node: Ord> ItemGraph<Node> {
         let forward = |node: NodeIndex| self.links.get(node.into_inner()).into_iter().flatten().copied();
         let finished = Traversal::trees(everyone, forward).into_iter().flatten().rev();
         let backward = Self::reversed(&self.links);
-        let tangles: BTreeSet<Vec<NodeIndex>> = Traversal::trees(finished, |node: NodeIndex| {
+        let distinct: BTreeSet<Vec<NodeIndex>> = Traversal::trees(finished, |node: NodeIndex| {
             backward.get(node.into_inner()).into_iter().flatten().copied()
         })
         .into_iter()
         .map(|component| component.into_iter().collect::<BTreeSet<NodeIndex>>().into_iter().collect())
         .collect();
-        let mut tangles: Vec<Vec<NodeIndex>> = tangles.into_iter().collect();
+        let mut tangles: Vec<Vec<NodeIndex>> = distinct.into_iter().collect();
         tangles.sort_by_key(|tangle| std::cmp::Reverse(tangle.len()));
         tangles.into_iter().map(|tangle| tangle.into_iter().filter_map(|index| self.name_at(index)).collect()).collect()
     }
 
     fn reversed(links: &[Vec<NodeIndex>]) -> Vec<Vec<NodeIndex>> {
-        let edges =
-            links.iter().enumerate().flat_map(|(from, to)| to.iter().map(move |to| (NodeIndex::from(from), *to)));
+        let edges = links
+            .iter()
+            .enumerate()
+            .flat_map(|(from, targets)| targets.iter().map(move |to| (NodeIndex::from(from), *to)));
         edges.fold(vec![Vec::new(); links.len()], |mut backward, (from, to)| {
             backward.get_mut(to.into_inner()).into_iter().for_each(|reaching| reaching.push(from));
             backward

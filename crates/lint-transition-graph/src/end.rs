@@ -21,7 +21,7 @@ impl<'found> Node<'found> {
         name: &'found Name,
     ) -> Option<Node<'found>> {
         let krate = declaring.get(from).or_else(|| declaring.first().filter(|_| declaring.len() == 1));
-        krate.map(|krate| Node { krate, name })
+        krate.map(|found| Node { krate: found, name })
     }
 }
 
@@ -176,7 +176,7 @@ impl<'found> Ends<'found> {
 
     pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<Node<'found>> {
         let receiver = Some(mutation)
-            .filter(|mutation| *mutation == Mutation::ThroughSelf)
+            .filter(|candidate| *candidate == Mutation::ThroughSelf)
             .filter(|_| wrapping == Wrapping::Plain)
             .and_then(|_| self.gives.unit())
             .and_then(|_| self.takes.first().or(self.implementer.as_ref()));

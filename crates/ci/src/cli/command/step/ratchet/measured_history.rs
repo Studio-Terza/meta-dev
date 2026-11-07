@@ -16,8 +16,8 @@ pub struct MeasuredHistory {
 }
 
 impl Step for MeasuredHistory {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<MeasuredHistory, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<MeasuredHistory, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let measured = &arguments.taken()?;
         let file = &arguments.taken()?;
         let revision = &arguments.taken()?;

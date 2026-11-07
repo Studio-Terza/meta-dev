@@ -58,7 +58,7 @@ impl MustUse {
     const CONDITIONAL: &str = "cfg_attr";
 
     fn mark(attribute: &Attribute) -> Option<&Attribute> {
-        Some(attribute).filter(|attribute| attribute.path().is_ident(Self::MUST_USE)).or_else(|| {
+        Some(attribute).filter(|candidate| candidate.path().is_ident(Self::MUST_USE)).or_else(|| {
             attribute
                 .meta
                 .require_list()

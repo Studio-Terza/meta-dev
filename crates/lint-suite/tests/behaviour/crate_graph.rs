@@ -118,8 +118,8 @@ fn a_link_closed_only_in_a_test_impl_does_not_count() {
 fn a_cycle_closed_through_a_type_alias_path_is_flagged() {
     let link = |Link { index, next }: Link| {
         let called = Some(next)
-            .filter(|next| *next != 0)
-            .map_or_else(|| "crate::L".to_owned(), |next| format!("crate::R{next}"));
+            .filter(|candidate| *candidate != 0)
+            .map_or_else(|| "crate::L".to_owned(), |target| format!("crate::R{target}"));
         format!("pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        {called}::f();\n    }}\n}}\n")
     };
     let links: Vec<String> = Items::links(BIG_RING).map(link).collect();

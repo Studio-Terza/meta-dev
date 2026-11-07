@@ -164,7 +164,7 @@ fn terms_match_camel_and_snake_words_and_plurals() {
 fn a_role_agrees_on_receiver_arity_self_arguments_and_return_shape() {
     let role: Result<Role, QueryFailure> = "fn f(&self, other: &Self) -> Option<Self>".parse();
     assert_eq!(
-        role.map(|role| AsRef::<MethodShape>::as_ref(&role).to_string()),
+        role.map(|parsed| AsRef::<MethodShape>::as_ref(&parsed).to_string()),
         Ok("fn(&self, Self) -> Option".to_owned())
     );
 }

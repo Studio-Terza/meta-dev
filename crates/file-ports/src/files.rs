@@ -77,8 +77,8 @@ pub trait Files {
         into.create_directories(root)?;
         self.entries(root)?.iter().try_for_each(|path| {
             Some(path)
-                .filter(|path| self.kind(path) == Kind::Directory)
-                .map_or_else(|| into.write(path, self.read(path)?), |path| self.mirror(path, into))
+                .filter(|candidate| self.kind(candidate) == Kind::Directory)
+                .map_or_else(|| into.write(path, self.read(path)?), |directory| self.mirror(directory, into))
         })
     }
 }

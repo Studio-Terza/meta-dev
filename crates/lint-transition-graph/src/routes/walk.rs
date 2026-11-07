@@ -53,6 +53,6 @@ impl<'graph, 'found, 'file> Walk<'graph, 'found, 'file> {
     }
 
     fn varied(stops: &[Stop]) -> Option<&[Stop]> {
-        Some(stops).filter(|stops| stops.iter().collect::<BTreeSet<&Stop>>().len() >= Self::LEAST_DISTINCT)
+        Some(stops).filter(|candidate| candidate.iter().collect::<BTreeSet<&Stop>>().len() >= Self::LEAST_DISTINCT)
     }
 }

@@ -19,8 +19,8 @@ struct Budgets;
 
 impl Budgets {
     fn of_crate(files: &[SourceFile], name: &str) -> Option<String> {
-        let name = CrateName::from(&CrateRoot::new(PathBuf::from(name)));
-        TestBudget::measured(files).of_crate(&name).map(|budget| budget.to_string())
+        let crate_name = CrateName::from(&CrateRoot::new(PathBuf::from(name)));
+        TestBudget::measured(files).of_crate(&crate_name).map(|budget| budget.to_string())
     }
 
     fn of_test_file(text: &&str) -> Option<String> {

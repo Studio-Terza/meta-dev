@@ -53,7 +53,7 @@ impl Targets {
                     .iter()
                     .skip(usize::from(kind))
                     .take(1)
-                    .fold(bytes, |bytes, mutation| mutation.applied(&bytes, at, byte));
+                    .fold(bytes, |damaged, mutation| mutation.applied(&damaged, at, byte));
                 Input::new(role, mutated)
             },
         )

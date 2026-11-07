@@ -39,10 +39,7 @@ impl PackageRoot {
                     name: CrateName::from(&root),
                     root,
                     features: manifest.as_ref().map(Manifest::features).unwrap_or_default(),
-                    untested: manifest
-                        .as_ref()
-                        .map(|manifest| manifest.untested_targets(canonical))
-                        .unwrap_or_default(),
+                    untested: manifest.as_ref().map(|present| present.untested_targets(canonical)).unwrap_or_default(),
                 }
             })
             .collect()

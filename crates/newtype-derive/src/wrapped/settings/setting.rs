@@ -47,7 +47,7 @@ impl Parse for Setting {
         .into_iter()
         .find(|(peeked, _)| *peeked)
         .map(|(_, key)| key);
-        key.map_or_else(|| Err(look.error()), |key| key.parsed(input))
+        key.map_or_else(|| Err(look.error()), |found| found.parsed(input))
     }
 }
 
