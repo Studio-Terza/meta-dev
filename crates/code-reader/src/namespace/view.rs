@@ -27,6 +27,13 @@ impl<'rows> Found<'rows> {
         }
     }
 
+    fn undisputed(self) -> Found<'rows> {
+        match self {
+            Found::Conflict => Found::Nothing,
+            Found::Nothing | Found::One(_) => self,
+        }
+    }
+
     fn agreed(left: &'rows Binding, right: &'rows Binding) -> Found<'rows> {
         match [left].into_iter().find(|binding| *binding == right) {
             Some(agreed) => Found::One(agreed),
@@ -82,6 +89,10 @@ impl<'rows> View<'rows> {
 
     pub(super) fn union(self, other: View<'rows>) -> View<'rows> {
         View { found: self.found.union(other.found), pending: self.pending.max(other.pending) }
+    }
+
+    pub(super) fn undisputed(self) -> View<'rows> {
+        View { found: self.found.undisputed(), pending: self.pending }
     }
 
     pub(super) fn admitted(admission: Admission, shown: impl FnOnce() -> View<'rows>) -> View<'rows> {

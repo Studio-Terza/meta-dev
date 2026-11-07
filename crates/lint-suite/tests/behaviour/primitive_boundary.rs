@@ -65,8 +65,11 @@ const PROJECTIONS: &str = "pub fn f<T: Tr>(x: <Vec<u32> as Tr>::X, y: <T as Tr>:
 const CALLABLE_BOUNDS: &str = "pub fn f(x: impl Fn(u16) -> char, y: Box<dyn Fn(&str) -> i64>) {}\npub fn g<T: Into<f32>, U>(t: T, u: U)\nwhere\n    U: AsRef<[i16]>,\n{\n}\npub fn h(x: impl Iterator<Item: Into<String>>, y: impl Iterator<Item = f64>) {}\npub struct A<T: Into<u8>> {\n    pub b: T,\n}\n";
 const COMPOUNDS: &str = "pub fn f(x: [u64; 4], y: (A, i32), z: &&mut u128, w: *const isize) {}\npub struct A {\n    pub b: [u16; 2],\n    pub c: (B, i64),\n}\n";
 const CONST_ARGUMENT: &str = "pub fn f(x: A<{ size_of::<u64>() }>) {}\n";
+const WIRE_BESIDE_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\npub fn f(v: Value) -> Z {}\n";
+const WIRE_RENAMED_CRATE: &str = "use toml as t;\npub fn f(v: t::Value) -> Z {}\n";
+const LOCAL_STRING: &str = "pub struct String;\npub fn f(x: String) -> A {}\n";
 
-const CASES: [Case; 61] = [
+const CASES: [Case; 64] = [
     Case::new(
         Title::new("std's Any is a trait, so dyn, impl and bound uses of it are not primitives"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ANY_TRAIT))],
@@ -366,6 +369,21 @@ const CASES: [Case; 61] = [
         Title::new("a primitive inside a const generic argument"),
         &[Source::new(Located::new("a.rs"), Text::new(CONST_ARGUMENT))],
         Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("an explicitly imported wire type beside a glob from outside the crate"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE_BESIDE_GLOB))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a wire type reached through a renamed crate import"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE_RENAMED_CRATE))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("the crate's own String is not a primitive"),
+        &[Source::new(Located::new("a.rs"), Text::new(LOCAL_STRING))],
+        Flagged::new(&[]),
     ),
 ];
 

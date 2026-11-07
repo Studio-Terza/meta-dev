@@ -91,6 +91,15 @@ const EXTERN_CORE: &str =
 const EXTERN_OTHER: &str =
     "extern crate serde;\nextern crate serde as s;\nimpl serde::Serialize for R {}\nimpl s::Serialize for R {}\n";
 const EXTERN_DISCARDED: &str = "extern crate serde as _;\nimpl Clone for R {}\n";
+const EXTERN_RENAMED: &str = "extern crate toml as t;\nimpl t::Value for R {}\n";
+const CRATE_RENAMED: &str = "use toml as t;\nimpl t::Value for R {}\n";
+const CRATE_SELF_RENAMED: &str = "use serde_json::{self as sj};\nimpl sj::Value for R {}\n";
+const STD_RENAMED: &str = "use core as c;\nimpl c::clone::Clone for R {}\n";
+
+const IMPORT_BESIDE_STD_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\nimpl Value for R {}\n";
+const IMPORT_BESIDE_OTHER_GLOB: &str = "use other::*;\nuse rust_decimal::Decimal;\nimpl Decimal for R {}\n";
+const IMPORT_BESIDE_CRATE_GLOB: &str = "mod rejection {\n    pub use axum_core::extract::rejection::*;\n}\nuse crate::rejection::*;\nuse serde_json::Value;\nimpl Value for R {}\n";
+const GLOB_STILL_HIDES_UNIMPORTED: &str = "use std::collections::*;\nuse serde_json::Value;\nimpl Clone for R {}\n";
 
 const DERIVE_SHADOWED: &str = "trait Clone {}\n#[derive(Clone, Debug)]\nstruct A;\n";
 const DERIVE_IMPORTED: &str =
@@ -527,6 +536,20 @@ laws::table!(an_extern_crate_item_binds_its_name, |text: &&str| Read::resolved(t
     EXTERN_CORE => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "fmt", "Debug"])],
     EXTERN_OTHER => [Expect::external(&["serde", "Serialize"]), Expect::external(&["serde", "Serialize"])],
     EXTERN_DISCARDED => [Expect::std_trait(&["std", "clone", "Clone"])],
+    EXTERN_RENAMED => [Expect::external(&["toml", "Value"])],
+]);
+
+laws::table!(a_renaming_import_binds_the_crate_it_names, |text: &&str| Read::resolved(text), [
+    CRATE_RENAMED => [Expect::external(&["toml", "Value"])],
+    CRATE_SELF_RENAMED => [Expect::external(&["serde_json", "Value"])],
+    STD_RENAMED => [Expect::std_trait(&["std", "clone", "Clone"])],
+]);
+
+laws::table!(an_explicit_import_shadows_every_glob_beside_it, |text: &&str| Read::resolved(text), [
+    IMPORT_BESIDE_STD_GLOB => [Expect::external(&["serde_json", "Value"])],
+    IMPORT_BESIDE_OTHER_GLOB => [Expect::external(&["rust_decimal", "Decimal"])],
+    IMPORT_BESIDE_CRATE_GLOB => [Expect::external(&["serde_json", "Value"])],
+    GLOB_STILL_HIDES_UNIMPORTED => [Expect::unknown(&["Clone"])],
 ]);
 
 laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resolved(text), [

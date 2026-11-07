@@ -9,8 +9,8 @@ use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::Sight;
 use super::settling::Target;
 use super::std_names::{Canonical, StdNames, Table};
-use super::tables::{Domain, Key, Tables};
-use super::use_path::{Shape, UsePath};
+use super::tables::{Domain, Key, Lookup, Tables};
+use super::use_path::{Reading, Shape, UsePath};
 use super::view::View;
 
 #[derive(Debug)]
@@ -129,13 +129,13 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     pub(super) fn macro_named(&self, first: &Name, viewer: ScopeId) -> Resolution {
-        self.chained(viewer, Key::new(Domain::Macros, first))
+        self.chained(viewer, Key::new(Domain::Macros, first), Reading::Written)
             .settled(|| Outer::from(StdNames::canonical(Table::Derives, first)))
     }
 
-    pub(super) fn named(&self, first: &Name, shape: Shape, viewer: ScopeId) -> Resolution {
-        self.chained(viewer, Key::new(Domain::Types, first))
-            .settled(|| shape.fallback(first, self.space.prelude(first, viewer), self.space))
+    pub(super) fn named(&self, first: &Name, shape: Shape, reading: Reading, viewer: ScopeId) -> Resolution {
+        self.chained(viewer, Key::new(Domain::Types, first), reading)
+            .settled(|| shape.fallback(first, reading, self.space.prelude(first, viewer), self.space))
     }
 
     fn entered(&self, module: ScopeId, segment: &Name, viewer: ScopeId) -> Resolution {
@@ -146,8 +146,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
                 .found(
                     module,
                     Key::new(Domain::Types, segment),
-                    Sight::ByPath.beyond(self.space.within_reach(module, viewer)),
-                    None,
+                    Lookup::new(Sight::ByPath.beyond(self.space.within_reach(module, viewer)), None, Reading::Written),
                 )
                 .settled(|| Outer::Assumed(Binding::Unknown)),
         }
@@ -160,10 +159,10 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         }
     }
 
-    fn chained(&self, scope: ScopeId, key: Key<'_>) -> View<'rows> {
+    fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
         let ignored = iter::once(self.ignored).chain(iter::repeat(None));
         self.space.chain(scope).iter().zip(ignored).fold(View::ABSENT, |found, (level, ignored)| {
-            found.or_else(|| self.tables.found(*level, key, Sight::Inside, ignored))
+            found.or_else(|| self.tables.found(*level, key, Lookup::new(Sight::Inside, ignored, reading)))
         })
     }
 }

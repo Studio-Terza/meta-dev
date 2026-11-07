@@ -4,6 +4,7 @@ use lint_layout::Name;
 
 use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::{Sight, Visibility};
+use super::use_path::Reading;
 use super::view::View;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -203,6 +204,28 @@ impl<'rows> Lattice for ModuleGlob<'rows> {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub(super) struct Lookup {
+    sight: Sight,
+    ignored: Option<GlobId>,
+    reading: Reading,
+}
+
+impl Lookup {
+    pub(super) fn new(sight: Sight, ignored: Option<GlobId>, reading: Reading) -> Lookup {
+        Lookup { sight, ignored, reading }
+    }
+
+    fn found<'rows>(self, level: Level<'_, 'rows>, sought: Sought<'_>) -> View<'rows> {
+        let globbed = || {
+            level
+                .globs(self.ignored)
+                .fold(View::ABSENT, |found, glob| found.union(self.reading.seen(glob.found(sought, self.sight))))
+        };
+        level.explicit.found(sought, self.sight).unwrap_or_else(globbed)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Level<'tables, 'rows> {
     explicit: &'tables Explicit<'rows>,
     fixed: &'tables [GlobView<'rows>],
@@ -210,17 +233,13 @@ struct Level<'tables, 'rows> {
 }
 
 impl<'tables, 'rows> Level<'tables, 'rows> {
-    fn found(self, sought: Sought<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
-        let globbed = || self.globs(ignored).fold(View::ABSENT, |found, glob| found.union(glob.found(sought, sight)));
-        self.explicit.found(sought, sight).unwrap_or_else(globbed)
-    }
-
     fn exposure(self, sight: Sight) -> Exposed<'rows> {
         let explicit = self.explicit.0.keys().map(|placed| placed.key);
         let globbed = self.globs(None).flat_map(|glob| glob.exposed.names.keys().copied());
         let keys: BTreeSet<Key<'rows>> = explicit.chain(globbed).collect();
-        let names = keys.into_iter().map(|key| (key, self.found(Sought::Named(key), sight, None))).collect();
-        Exposed { default: self.found(Sought::Unlisted, sight, None), names }
+        let lookup = Lookup::new(sight, None, Reading::Written);
+        let names = keys.into_iter().map(|key| (key, lookup.found(self, Sought::Named(key)))).collect();
+        Exposed { default: lookup.found(self, Sought::Unlisted), names }
     }
 
     fn globs(self, ignored: Option<GlobId>) -> impl Iterator<Item = &'tables GlobView<'rows>> {
@@ -244,9 +263,9 @@ impl<'tables, 'rows> Names<'tables, 'rows> {
         rows.map(|((explicit, fixed), modules)| Level { explicit, fixed, modules })
     }
 
-    fn found(self, scope: ScopeId, sought: Sought<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
+    fn found(self, scope: ScopeId, key: Key<'_>, lookup: Lookup) -> View<'rows> {
         match self.level(scope) {
-            Some(level) => level.found(sought, sight, ignored),
+            Some(level) => lookup.found(level, Sought::Named(key)),
             None => View::CONFLICT,
         }
     }
@@ -280,8 +299,8 @@ impl<'rows> Tables<'rows> {
         Tables { explicit, fixed, modules }
     }
 
-    pub(super) fn found(&self, scope: ScopeId, key: Key<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
+    pub(super) fn found(&self, scope: ScopeId, key: Key<'_>, lookup: Lookup) -> View<'rows> {
         let names = Names { explicit: &self.explicit, fixed: &self.fixed, modules: &self.modules };
-        names.found(scope, Sought::Named(key), sight, ignored)
+        names.found(scope, key, lookup)
     }
 }
