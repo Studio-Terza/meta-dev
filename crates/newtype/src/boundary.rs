@@ -1,8 +1,10 @@
 mod checked;
 mod plain;
+mod validity;
 
 pub use checked::Checked;
 pub use plain::{Newtype, Wrapping};
+pub use validity::Validity;
 
 pub trait Counter: Newtype<Inner = usize> + Copy {
     #[must_use]

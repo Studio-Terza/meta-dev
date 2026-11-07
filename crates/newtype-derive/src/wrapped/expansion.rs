@@ -34,6 +34,13 @@ impl Constructors {
             Checking::Checked => guarded,
         }
     }
+
+    fn kind(checking: Checking) -> TokenStream {
+        match checking {
+            Checking::Unchecked => quote!(::newtype::kind::Unchecked),
+            Checking::Checked => quote!(::newtype::kind::Checked),
+        }
+    }
 }
 
 impl Strategy {
@@ -105,7 +112,12 @@ impl Expansion for Constructors {
         };
         let guarded = quote! {
             impl #implemented #name #arguments #bounds {
-                pub fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error> {
+                pub fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error>
+                where
+                    Self: ::newtype::Validity<Kind = ::newtype::kind::Checked>
+                        + ::newtype::Checked
+                        + ::newtype::Wrapping<Inner = #inner>,
+                {
                     <Self as ::newtype::Wrapping>::admitted(inner, |inner| Self { #member: inner })
                 }
 
@@ -116,8 +128,13 @@ impl Expansion for Constructors {
             }
         };
         let entry = Constructors::chosen(wrapped.settings.checking(), opened, guarded);
+        let kind = Constructors::kind(wrapped.settings.checking());
         quote! {
             #entry
+
+            impl #implemented ::newtype::Validity for #name #arguments #bounds {
+                type Kind = #kind;
+            }
 
             impl #implemented ::newtype::Wrapping for #name #arguments #bounds {
                 type Inner = #inner;
@@ -182,16 +199,20 @@ impl Expansion for Deserializing {
 
 impl Expansion for CheckedDeserializing {
     fn of(wrapped: Wrapped) -> TokenStream {
-        Deserializing::reading(wrapped, [parse_quote!(Self: ::newtype::Checked)], |member| {
-            quote! {
-                ::core::result::Result::and_then(read, |inner| {
-                    ::core::result::Result::map_err(
-                        <Self as ::newtype::Wrapping>::admitted(inner, |inner| Self { #member: inner }),
-                        <Arriving::Error as ::newtype::serde::de::Error>::custom,
-                    )
-                })
-            }
-        })
+        Deserializing::reading(
+            wrapped,
+            [parse_quote!(Self: ::newtype::Validity<Kind = ::newtype::kind::Checked> + ::newtype::Checked)],
+            |member| {
+                quote! {
+                    ::core::result::Result::and_then(read, |inner| {
+                        ::core::result::Result::map_err(
+                            <Self as ::newtype::Wrapping>::admitted(inner, |inner| Self { #member: inner }),
+                            <Arriving::Error as ::newtype::serde::de::Error>::custom,
+                        )
+                    })
+                }
+            },
+        )
     }
 }
 

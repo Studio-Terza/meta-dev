@@ -162,6 +162,11 @@ laws::law!(a_checked_newtype_reads_what_its_check_builds, any::<String>(), text,
     prop_assert_eq!(Json::word(&text), Word::try_new(text).ok());
 });
 
+laws::law!(a_checked_newtype_built_by_try_new_reads_back_through_serde, any::<String>(), text, {
+    let built = Word::try_new(text).ok();
+    prop_assert_eq!(built.as_ref().and_then(|word| Json::read::<Word>(Json::written(word).as_deref())), built);
+});
+
 laws::law!(a_newtype_writes_its_inner_value, any::<usize>(), number, {
     prop_assert_eq!(Json::written(&Rounds::new(number)), Json::written(&number));
 });
