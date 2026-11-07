@@ -1,5 +1,6 @@
+use std::char::EscapeDebug;
+use std::cmp::Ordering;
 use std::fmt::{self, Write};
-use std::iter;
 
 use newtype::{Arbitrary, Newtype};
 
@@ -14,17 +15,35 @@ impl AsRef<str> for Line {
 
 impl fmt::Display for Line {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let leads = iter::once("").chain(iter::repeat("'"));
         formatter.write_char('"')?;
-        self.0.split('\'').map(Escaped).zip(leads).try_for_each(|(piece, lead)| write!(formatter, "{lead}{piece}"))?;
+        self.0.chars().map(Shown::from).try_for_each(|shown| write!(formatter, "{shown}"))?;
         formatter.write_char('"')
     }
 }
 
-struct Escaped<'line>(&'line str);
+enum Shown {
+    Apostrophe,
+    Escaped(EscapeDebug),
+}
 
-impl fmt::Display for Escaped<'_> {
+impl Shown {
+    const APOSTROPHE: char = '\'';
+}
+
+impl From<char> for Shown {
+    fn from(character: char) -> Shown {
+        match character.cmp(&Shown::APOSTROPHE) {
+            Ordering::Equal => Shown::Apostrophe,
+            Ordering::Less | Ordering::Greater => Shown::Escaped(character.escape_debug()),
+        }
+    }
+}
+
+impl fmt::Display for Shown {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.chars().map(char::escape_debug).try_for_each(|escaped| write!(formatter, "{escaped}"))
+        match self {
+            Shown::Apostrophe => formatter.write_char(Self::APOSTROPHE),
+            Shown::Escaped(escaped) => write!(formatter, "{escaped}"),
+        }
     }
 }
