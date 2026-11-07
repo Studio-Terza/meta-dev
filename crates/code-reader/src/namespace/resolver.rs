@@ -138,8 +138,8 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
             .target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
     }
 
-    pub(super) fn global(&self, first: &Name) -> Resolution {
-        Resolution::Bound(self.space.global(first))
+    pub(super) fn global(&self, first: &Name, viewer: ScopeId) -> Resolution {
+        Resolution::Bound(self.space.global(first, viewer))
     }
 
     pub(super) fn anchored(&self, anchor: Anchor, scope: ScopeId) -> Resolution {
@@ -155,7 +155,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     pub(super) fn named(&self, first: &Name, shape: Shape, reading: Reading, viewer: ScopeId) -> Resolution {
         self.chained(viewer, Key::new(Domain::Types, first), reading)
             .contested(shape.primitive(first).map(Binding::Primitive), || {
-                shape.fallback(first, reading, self.space.prelude(first, viewer), self.space)
+                shape.fallback(first, reading, self.space.prelude(first, viewer), self.space, viewer)
             })
     }
 

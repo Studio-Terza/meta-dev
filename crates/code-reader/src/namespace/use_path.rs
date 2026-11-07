@@ -52,10 +52,10 @@ impl Reading {
         }
     }
 
-    fn lone(self, first: &Name) -> Binding {
+    fn lone(self, external: Binding) -> Binding {
         match self {
             Reading::Written | Reading::Explicit => Binding::Unknown,
-            Reading::Imported => Binding::External(ItemPath::default().joined(first)),
+            Reading::Imported => external,
         }
     }
 }
@@ -76,7 +76,14 @@ impl From<&[Name]> for Shape {
 }
 
 impl Shape {
-    pub(super) fn fallback(self, first: &Name, reading: Reading, prelude: Option<Binding>, space: &Namespace) -> Outer {
+    pub(super) fn fallback(
+        self,
+        first: &Name,
+        reading: Reading,
+        prelude: Option<Binding>,
+        space: &Namespace,
+        viewer: ScopeId,
+    ) -> Outer {
         let known = self
             .primitive(first)
             .map(Binding::Primitive)
@@ -84,7 +91,7 @@ impl Shape {
             .or_else(|| space.workspace(first).map(Binding::Module))
             .or_else(|| StdNames::root(first))
             .or_else(|| self.prelude(first).map(Binding::Std));
-        Outer::known_or(known, || self.unbound(first, reading))
+        Outer::known_or(known, || self.unbound(reading, space.external(first, viewer)))
     }
 
     pub(super) fn primitive(self, first: &Name) -> Option<Primitive> {
@@ -108,10 +115,10 @@ impl Shape {
         }
     }
 
-    fn unbound(self, first: &Name, reading: Reading) -> Binding {
+    fn unbound(self, reading: Reading, external: Binding) -> Binding {
         match self {
-            Shape::Single => reading.lone(first),
-            Shape::Multiple => Binding::External(ItemPath::default().joined(first)),
+            Shape::Single => reading.lone(external),
+            Shape::Multiple => external,
         }
     }
 }
@@ -144,7 +151,7 @@ impl Head<'_> {
     pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
         match self {
             Head::Empty => Resolution::Bound(Binding::Unknown),
-            Head::Global(first) => resolver.global(first),
+            Head::Global(first) => resolver.global(first, viewer),
             Head::Anchored(anchor) => resolver.anchored(anchor, viewer),
             Head::Named(relative) => relative.started(resolver, viewer, domain),
         }

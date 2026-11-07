@@ -260,7 +260,7 @@ pub(crate) struct Lowered<'read> {
 }
 
 impl<'read> Lowered<'read> {
-    pub(crate) fn rooted(&mut self, read: ReadFile<'_>, name: Option<&'read Name>, form: CrateForm) -> Vec<Slot> {
+    pub(crate) fn rooted(&mut self, read: ReadFile<'read>, name: Option<&'read Name>, form: CrateForm) -> Vec<Slot> {
         let enclosure = read
             .source()
             .placement()
@@ -283,7 +283,7 @@ impl<'read> Lowered<'read> {
         self.space.declare(slot.scope, Declared::new(slot.name, slot.visibility, DeclaredKind::OpaqueModule));
     }
 
-    pub(crate) fn island(&mut self, read: ReadFile<'_>) {
+    pub(crate) fn island(&mut self, read: ReadFile<'read>) {
         let slots = self.root_lowered(read, None, CrateForm::Island, Enclosure::Module);
         slots.into_iter().fold(self, |lowered, slot| {
             lowered.opaque(slot);
@@ -314,13 +314,14 @@ impl<'read> Lowered<'read> {
 
     fn root_lowered(
         &mut self,
-        read: ReadFile<'_>,
+        read: ReadFile<'read>,
         name: Option<&'read Name>,
         form: CrateForm,
         enclosure: Enclosure,
     ) -> Vec<Slot> {
         let syntax = read.source().syntax();
-        let scope = self.space.planted(form, name, Entries::of_items(&syntax.items));
+        let dependencies = read.source().placement().package().dependencies();
+        let scope = self.space.planted(form, name, dependencies, Entries::of_items(&syntax.items));
         let children = Rc::from(read.source().path().parent().unwrap_or_else(|| Path::new("")));
         let context = Context::outermost(Regions::of_file(read));
         self.lowered(Seat::new(read.file(), scope, children), context, enclosure, syntax)

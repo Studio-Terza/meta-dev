@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use code_model::{Domain, ItemPath, Model, Resolved};
-use lint_layout::{Word, words};
+use code_model::{Domain, External, ItemPath, Model, Resolved};
+use lint_layout::{PackageName, Word, words};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Role {
@@ -12,36 +12,38 @@ pub(super) enum Role {
 
 #[derive(Debug)]
 pub(super) struct Identities {
-    known: BTreeMap<Resolved, Role>,
+    exported: BTreeMap<Resolved, Role>,
+    packaged: BTreeMap<(PackageName, ItemPath), Role>,
 }
 
 impl Identities {
-    const SERDE_PACKAGES: [Word<'static>; 2] = words!["serde", "serde_derive"];
-    const SERDE_DERIVE: Word<'static> = Word::new("Deserialize");
-    const NEWTYPE_DESERIALIZE: [Word<'static>; 2] = words!["newtype", "Deserialize"];
-    const NEWTYPE_CHECKED_DESERIALIZE: [Word<'static>; 2] = words!["newtype", "CheckedDeserialize"];
+    const SERDE: [Word<'static>; 2] = words!["serde", "serde_derive"];
+    const DESERIALIZE: Word<'static> = Word::new("Deserialize");
+    const NEWTYPE: Word<'static> = Word::new("newtype");
+    const NEWTYPE_DERIVES: [(Word<'static>, Role); 2] =
+        [(Self::DESERIALIZE, Role::Deserializes), (Word::new("CheckedDeserialize"), Role::DeserializesChecked)];
 
     pub(super) fn read(model: &Model) -> Identities {
-        let serde = Self::SERDE_PACKAGES.into_iter().map(|package| {
-            let derive: ItemPath = [package, Self::SERDE_DERIVE].into_iter().collect();
-            (Resolved::External(derive), Role::Deserializes)
+        let serde = Self::SERDE.into_iter().map(|package| ((package, Self::DESERIALIZE), Role::Deserializes));
+        let newtype = Self::NEWTYPE_DERIVES.into_iter().map(|(derive, role)| ((Self::NEWTYPE, derive), role));
+        let packaged = serde
+            .chain(newtype)
+            .map(|((package, derive), role)| ((PackageName::from(package), [derive].into_iter().collect()), role));
+        let exported = Self::NEWTYPE_DERIVES.into_iter().filter_map(|(derive, role)| {
+            let path: ItemPath = [Self::NEWTYPE, derive].into_iter().collect();
+            model.exported(Domain::Macros, &path).cloned().map(|resolved| (resolved, role))
         });
-        let newtype = [
-            (Self::NEWTYPE_DESERIALIZE, Role::Deserializes),
-            (Self::NEWTYPE_CHECKED_DESERIALIZE, Role::DeserializesChecked),
-        ]
-        .into_iter()
-        .map(|(path, role)| (Self::resolved(model, &path), role));
-        Identities { known: serde.chain(newtype).collect() }
+        Identities { exported: exported.collect(), packaged: packaged.collect() }
     }
 
     pub(super) fn role(&self, implemented: &Resolved) -> Option<Role> {
-        implemented.known().map_or(Some(Role::Unresolved), |known| self.known.get(known).copied())
+        implemented.known().map_or(Some(Role::Unresolved), |known| {
+            self.exported.get(known).copied().or_else(|| known.external().and_then(|external| self.packaged(external)))
+        })
     }
 
-    fn resolved(model: &Model, path: &[Word<'static>]) -> Resolved {
-        let path: ItemPath = path.iter().copied().collect();
-        let exported = model.exported(Domain::Macros, &path).cloned();
-        exported.unwrap_or(Resolved::External(path))
+    fn packaged(&self, external: &External) -> Option<Role> {
+        let package = external.package()?.clone();
+        self.packaged.get(&(package, external.item())).copied()
     }
 }

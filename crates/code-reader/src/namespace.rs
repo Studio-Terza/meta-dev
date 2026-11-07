@@ -14,8 +14,8 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use code_model::{Building, ItemPath};
-use lint_layout::Name;
+use code_model::{Building, External, ItemPath};
+use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
 use binding::Binding;
@@ -49,13 +49,21 @@ impl Export {
 pub(crate) struct Namespace<'read> {
     scopes: Vec<ScopeRow>,
     crates: BTreeMap<&'read Name, ScopeId>,
+    dependencies: BTreeMap<ScopeId, &'read Dependencies>,
 }
 
 impl<'read> Namespace<'read> {
-    pub(crate) fn planted(&mut self, form: CrateForm, name: Option<&'read Name>, entries: Entries) -> ScopeId {
+    pub(crate) fn planted(
+        &mut self,
+        form: CrateForm,
+        name: Option<&'read Name>,
+        dependencies: &'read Dependencies,
+        entries: Entries,
+    ) -> ScopeId {
         let root = ScopeId::after(&self.scopes);
         self.scopes.push(ScopeRow::root(root, form, entries));
         self.crates.extend(name.map(|name| (name, root)));
+        self.dependencies.insert(root, dependencies);
         root
     }
 
@@ -115,9 +123,18 @@ impl<'read> Namespace<'read> {
         self.crates.get(name).copied()
     }
 
-    pub(super) fn global(&self, first: &Name) -> Binding {
+    pub(super) fn global(&self, first: &Name, viewer: ScopeId) -> Binding {
         StdNames::root(first)
             .or_else(|| self.workspace(first).map(Binding::Module))
-            .unwrap_or_else(|| Binding::External(ItemPath::default().joined(first)))
+            .unwrap_or_else(|| self.external(first, viewer))
+    }
+
+    pub(super) fn external(&self, first: &Name, viewer: ScopeId) -> Binding {
+        let package = viewer
+            .row(&self.scopes)
+            .and_then(ScopeRow::outermost)
+            .and_then(|root| self.dependencies.get(&root))
+            .and_then(|dependencies| dependencies.package(first));
+        Binding::External(External::new(package.cloned(), ItemPath::default().joined(first)))
     }
 }

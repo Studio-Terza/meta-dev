@@ -1,6 +1,7 @@
 use lint_layout::Name;
 
 use crate::boundary::ItemId;
+use crate::external::External;
 use crate::item_path::ItemPath;
 use crate::primitive::Primitive;
 
@@ -9,7 +10,7 @@ pub enum Resolved {
     Std(ItemPath),
     StdTrait(ItemPath),
     Crate(ItemId),
-    External(ItemPath),
+    External(External),
     Primitive(Primitive),
     Param(Name),
     Unknown(ItemPath),
@@ -22,6 +23,19 @@ impl Resolved {
             Resolved::Std(path) | Resolved::StdTrait(path) => Some(path),
             Resolved::Crate(_)
             | Resolved::External(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_)
+            | Resolved::Unknown(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn external(&self) -> Option<&External> {
+        match self {
+            Resolved::External(external) => Some(external),
+            Resolved::Std(_)
+            | Resolved::StdTrait(_)
+            | Resolved::Crate(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
             | Resolved::Unknown(_) => None,

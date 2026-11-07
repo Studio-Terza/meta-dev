@@ -1,2 +1,6 @@
 [package]
 name = "corpus"
+
+[dependencies]
+newtype = "1"
+serde = "1"

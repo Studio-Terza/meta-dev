@@ -1,8 +1,10 @@
+mod dependencies;
 mod failure;
 mod line_number;
 mod manifest;
 mod matching;
 mod name;
+mod package_name;
 mod path_dependencies;
 mod path_tail;
 mod position;
@@ -13,11 +15,13 @@ mod use_edges;
 mod use_path;
 mod word;
 
+pub use dependencies::Dependencies;
 pub use failure::Failure;
 pub use line_number::LineNumber;
 pub use manifest::Manifest;
 pub use matching::Matching;
 pub use name::{CamelWord, Casing, Length, Lowered, Name, Prefix};
+pub use package_name::PackageName;
 pub use path_dependencies::PathDependencies;
 pub use path_tail::PathTail;
 pub use position::Position;

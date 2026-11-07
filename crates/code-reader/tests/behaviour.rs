@@ -1,5 +1,6 @@
 use code_model::{
-    Domain, Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
+    Domain, Entry, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited,
+    TypeRef,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -290,7 +291,10 @@ impl Expect {
     }
 
     fn external(path: &[&str]) -> Seen {
-        Seen::Resolved(Resolved::External(path.iter().map(|segment| Name::from(*segment)).collect()))
+        Seen::Resolved(Resolved::External(External::new(
+            None,
+            path.iter().map(|segment| Name::from(*segment)).collect(),
+        )))
     }
 
     fn unknown(path: &[&str]) -> Seen {

@@ -10,9 +10,11 @@ use toml::Spanned;
 use toml::de::DeTable;
 use toml::{Table, Value};
 
+use crate::dependencies::Dependencies;
 use crate::failure::Failure;
 use crate::line_number::LineNumber;
 use crate::name::Name;
+use crate::package_name::PackageName;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
@@ -41,6 +43,8 @@ impl Manifest {
     const TESTED_LISTS: [&'static str; 3] = ["test", "bin", "bench"];
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+    const PLATFORMS: &'static str = "target";
+    const INHERITED: &'static str = "dependencies";
 
     pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Manifest>, Failure>> {
         let paths: Vec<PathBuf> = directories.iter().map(|directory| directory.as_ref().join(Self::FILE)).collect();
@@ -76,6 +80,29 @@ impl Manifest {
     #[must_use]
     pub fn package_name(&self) -> Option<Name> {
         self.table.get(Self::PACKAGE)?.get("name")?.as_str().map(Name::from)
+    }
+
+    #[must_use]
+    pub fn workspace_root(&self) -> Option<&Manifest> {
+        self.table.contains_key(Self::WORKSPACE).then_some(self)
+    }
+
+    #[must_use]
+    pub fn dependencies(&self, workspace: Option<&Manifest>) -> Dependencies {
+        let inherited = workspace.and_then(|root| root.table.get(Self::WORKSPACE)?.get(Self::INHERITED)?.as_table());
+        let platforms = self.table.get(Self::PLATFORMS).and_then(Value::as_table).into_iter().flat_map(Table::values);
+        std::iter::once(&self.table)
+            .chain(platforms.filter_map(Value::as_table))
+            .flat_map(|section| Self::DEPENDENCIES.iter().filter_map(|kind| section.get(*kind)))
+            .filter_map(Value::as_table)
+            .flat_map(Table::iter)
+            .map(|(key, declared)| {
+                let source =
+                    declared.get(Self::WORKSPACE).and(inherited.and_then(|table| table.get(key))).unwrap_or(declared);
+                let package = source.get(Self::PACKAGE).and_then(Value::as_str).unwrap_or(key);
+                (Name::from(key.replace('-', "_").as_str()), PackageName::from(&Name::from(package)))
+            })
+            .collect()
     }
 
     #[must_use]

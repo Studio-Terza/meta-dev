@@ -1,6 +1,7 @@
 mod boundary;
 mod call;
 mod domain;
+mod external;
 mod found;
 mod function;
 mod holding;
@@ -19,6 +20,7 @@ mod type_ref;
 pub use boundary::{FileId, ItemId};
 pub use call::{Call, Callee, MacroCall};
 pub use domain::Domain;
+pub use external::External;
 pub use found::Found;
 pub use function::{Entry, Function, Input, Output, Owner, Signature};
 pub use holding::{Held, Holding};

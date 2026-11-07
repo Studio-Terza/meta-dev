@@ -1,4 +1,4 @@
-use code_model::{Domain, ItemId, ItemPath, Primitive, Resolved};
+use code_model::{Domain, External, ItemId, ItemPath, Primitive, Resolved};
 use lint_layout::Name;
 
 use super::boundary::ScopeId;
@@ -13,7 +13,7 @@ pub(crate) enum Binding {
     Module(ScopeId),
     Item(ScopeId, DeclaredId),
     Std(ItemPath),
-    External(ItemPath),
+    External(External),
     Primitive(Primitive),
     Unknown,
     Absent,
@@ -29,7 +29,7 @@ impl Binding {
         match self {
             Binding::Module(module) => entered(module),
             Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
-            Binding::External(path) => Resolution::Bound(Binding::reached(&path, segment, domain)),
+            Binding::External(external) => Resolution::Bound(Binding::reached(&external, segment, domain)),
             Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown | Binding::Absent => {
                 Resolution::Bound(Binding::Unknown)
             }
@@ -57,7 +57,7 @@ impl Binding {
         match self {
             Binding::Item(scope, item) => Binding::issued(ids.issued(scope, item), written),
             Binding::Std(path) => StdNames::resolved(path),
-            Binding::External(path) => Resolved::External(path),
+            Binding::External(external) => Resolved::External(external),
             Binding::Primitive(primitive) => Resolved::Primitive(primitive),
             Binding::Module(_) | Binding::Unknown | Binding::Absent => Resolved::Unknown(written),
         }
@@ -65,15 +65,15 @@ impl Binding {
 }
 
 impl Binding {
-    fn reached(module: &ItemPath, segment: &Name, domain: Domain) -> Binding {
+    fn reached(module: &External, segment: &Name, domain: Domain) -> Binding {
         match domain {
             Domain::Types => Binding::External(module.joined(segment)),
             Domain::Macros => Binding::macro_at(module, segment),
         }
     }
 
-    fn macro_at(module: &ItemPath, segment: &Name) -> Binding {
-        match module.as_ref().split_first().and_then(|(_, inner)| inner.first()) {
+    fn macro_at(module: &External, segment: &Name) -> Binding {
+        match module.path().as_ref().split_first().and_then(|(_, inner)| inner.first()) {
             Some(_) => Binding::Unknown,
             None => Binding::External(module.joined(segment)),
         }

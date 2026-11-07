@@ -1,5 +1,62 @@
-use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+use std::path::PathBuf;
+
+use file_ports::{Bytes, Memory};
+use lint_core::SourceFile;
+use lint_fixtures::{Case, Checks, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 use lint_no_plaintext::NoPlaintext;
+use lint_placement::Placement;
+
+struct Manifest {
+    path: &'static str,
+    text: &'static str,
+}
+
+const MANIFESTS: [Manifest; 11] = [
+    Manifest {
+        path: "Cargo.toml",
+        text: "[package]\nname = \"fixture\"\n[dependencies]\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
+    },
+    Manifest {
+        path: "a/Cargo.toml",
+        text: "[package]\nname = \"a\"\n[dependencies]\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
+    },
+    Manifest {
+        path: "b/Cargo.toml",
+        text: "[package]\nname = \"b\"\n[dependencies]\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
+    },
+    Manifest {
+        path: "x/Cargo.toml",
+        text: "[package]\nname = \"x\"\n[dependencies]\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
+    },
+    Manifest {
+        path: "crates/newtype/Cargo.toml",
+        text: "[package]\nname = \"newtype\"\n[dependencies]\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
+    },
+    Manifest {
+        path: "crates/user/Cargo.toml",
+        text: "[package]\nname = \"user\"\n[dependencies]\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
+    },
+    Manifest {
+        path: "renamed/Cargo.toml",
+        text: "[package]\nname = \"renamed\"\n[dependencies]\nwire = { package = \"serde\", version = \"1\" }\nserde = { package = \"not-serde\", version = \"1\" }\n",
+    },
+    Manifest { path: "undeclared/Cargo.toml", text: "[package]\nname = \"undeclared\"\n" },
+    Manifest {
+        path: "ws/Cargo.toml",
+        text: "[workspace]\nmembers = [\"member\"]\n[workspace.dependencies]\nwire = { package = \"serde\", version = \"1\" }\n",
+    },
+    Manifest {
+        path: "ws/member/Cargo.toml",
+        text: "[package]\nname = \"member\"\n[dependencies]\nwire.workspace = true\n",
+    },
+    Manifest {
+        path: "platform/Cargo.toml",
+        text: "[package]\nname = \"platform\"\n[target.'cfg(unix)'.dependencies]\nwire = { package = \"serde_derive\", version = \"1\" }\n",
+    },
+];
+const RENAMED: &str = "#[derive(wire::Deserialize)]\nstruct A {\n    a: String,\n}\n#[derive(serde::Deserialize)]\nstruct B {\n    b: String,\n}\n";
+const UNDECLARED: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    a: String,\n}\n";
+const INHERITED: &str = "#[derive(wire::Deserialize)]\nstruct A {\n    a: String,\n}\n";
 
 const TEXT_FIELDS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A<'a> {\n    owned: String,\n    borrowed: &'a str,\n    cow: Cow<'a, str>,\n    boxed: Box<str>,\n    optional: Option<String>,\n    many: Vec<String>,\n    keyed: BTreeMap<String, u8>,\n    pathed: std::string::String,\n    count: u32,\n    path: std::path::PathBuf,\n    other: other::Strand,\n    elsewhere: elsewhere::Id,\n}\n";
 const TUPLE_AND_ENUM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A(String);\n#[derive(Deserialize)]\nenum B {\n    Named(String),\n    Counted(u32),\n    Noted { note: String },\n}\n";
@@ -44,46 +101,55 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 26] = [
+const CASES: [Case; 30] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
-        &[Source::new(Located::new("a.rs"), Text::new(TEXT_FIELDS))],
-        Flagged::new(&["a.rs:4", "a.rs:5", "a.rs:6", "a.rs:7", "a.rs:8", "a.rs:9", "a.rs:10", "a.rs:11"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_FIELDS))],
+        Flagged::new(&[
+            "src/lib.rs:4",
+            "src/lib.rs:5",
+            "src/lib.rs:6",
+            "src/lib.rs:7",
+            "src/lib.rs:8",
+            "src/lib.rs:9",
+            "src/lib.rs:10",
+            "src/lib.rs:11",
+        ]),
     ),
     Case::new(
         Title::new("tuple fields and enum variant fields"),
-        &[Source::new(Located::new("a.rs"), Text::new(TUPLE_AND_ENUM))],
-        Flagged::new(&["a.rs:3", "a.rs:6", "a.rs:8"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(TUPLE_AND_ENUM))],
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:6", "src/lib.rs:8"]),
     ),
     Case::new(
         Title::new("serde's derive by path, behind cfg_attr and among others"),
-        &[Source::new(Located::new("a.rs"), Text::new(DERIVE_FORMS))],
-        Flagged::new(&["a.rs:3", "a.rs:7", "a.rs:11"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(DERIVE_FORMS))],
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:7", "src/lib.rs:11"]),
     ),
     Case::new(
         Title::new("a derive that resolves elsewhere is not serde's Deserialize"),
-        &[Source::new(Located::new("a.rs"), Text::new(NOT_DESERIALIZED))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(NOT_DESERIALIZED))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("serde's derive through its derive crate"),
-        &[Source::new(Located::new("a.rs"), Text::new(DERIVE_CRATE))],
-        Flagged::new(&["a.rs:3"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(DERIVE_CRATE))],
+        Flagged::new(&["src/lib.rs:3"]),
     ),
     Case::new(
         Title::new("a derive through a glob, an unread re-export or no import is not resolvable, at the derive"),
-        &[Source::new(Located::new("a.rs"), Text::new(UNRESOLVED_DERIVES))],
-        Flagged::new(&["a.rs:3", "a.rs:8", "a.rs:12", "a.rs:18"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(UNRESOLVED_DERIVES))],
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:8", "src/lib.rs:12", "src/lib.rs:18"]),
     ),
     Case::new(
         Title::new("a resolved derive that is not serde's"),
-        &[Source::new(Located::new("a.rs"), Text::new(RESOLVED_OTHER_DERIVE))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(RESOLVED_OTHER_DERIVE))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("a field whose type is not resolvable, under serde's derive, another derive and an unresolved one"),
-        &[Source::new(Located::new("a.rs"), Text::new(UNKNOWN_FIELD_TYPE))],
-        Flagged::new(&["a.rs:3", "a.rs:9"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(UNKNOWN_FIELD_TYPE))],
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:9"]),
     ),
     Case::new(
         Title::new("serde's derive through a workspace crate's re-exports"),
@@ -95,37 +161,46 @@ const CASES: [Case; 26] = [
     ),
     Case::new(
         Title::new("a local type spelled String is not text"),
-        &[Source::new(Located::new("a.rs"), Text::new(LOCAL_STRING))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(LOCAL_STRING))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("an alias of String is text"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_STRING))],
-        Flagged::new(&["a.rs:5"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(ALIASED_STRING))],
+        Flagged::new(&["src/lib.rs:5"]),
     ),
     Case::new(
         Title::new("a field is flagged at its type, below its attributes"),
-        &[Source::new(Located::new("a.rs"), Text::new(ATTRIBUTED_FIELD))],
-        Flagged::new(&["a.rs:5"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(ATTRIBUTED_FIELD))],
+        Flagged::new(&["src/lib.rs:5"]),
     ),
     Case::new(
         Title::new("transparent and from do not validate"),
-        &[Source::new(Located::new("a.rs"), Text::new(SERDE_SETTINGS))],
-        Flagged::new(&["a.rs:4", "a.rs:7"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(SERDE_SETTINGS))],
+        Flagged::new(&["src/lib.rs:4", "src/lib.rs:7"]),
     ),
     Case::new(
         Title::new("serde try_from with a written TryFrom impl does not validate"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM))],
-        Flagged::new(&["a.rs:4", "a.rs:11", "a.rs:19", "a.rs:27", "a.rs:28"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(TRY_FROM))],
+        Flagged::new(&["src/lib.rs:4", "src/lib.rs:11", "src/lib.rs:19", "src/lib.rs:27", "src/lib.rs:28"]),
     ),
     Case::new(
         Title::new("an unvalidated newtype of text is text, through newtypes and containers"),
-        &[Source::new(Located::new("a.rs"), Text::new(NEWTYPES))],
-        Flagged::new(&["a.rs:3", "a.rs:17", "a.rs:18", "a.rs:19", "a.rs:20", "a.rs:21", "a.rs:22", "a.rs:23"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(NEWTYPES))],
+        Flagged::new(&[
+            "src/lib.rs:3",
+            "src/lib.rs:17",
+            "src/lib.rs:18",
+            "src/lib.rs:19",
+            "src/lib.rs:20",
+            "src/lib.rs:21",
+            "src/lib.rs:22",
+            "src/lib.rs:23",
+        ]),
     ),
     Case::new(
         Title::new("pairs, units, numbers and two fields are not text newtypes"),
-        &[Source::new(Located::new("a.rs"), Text::new(NOT_NEWTYPES))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(NOT_NEWTYPES))],
         Flagged::new(&[]),
     ),
     Case::new(
@@ -150,26 +225,26 @@ const CASES: [Case; 26] = [
     ),
     Case::new(
         Title::new("newtype's CheckedDeserialize validates its newtype and every user"),
-        &[Source::new(Located::new("a.rs"), Text::new(CHECKED))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(CHECKED))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("an impl of newtype's Checked beside an unchecked derive, or none, does not validate"),
-        &[Source::new(Located::new("a.rs"), Text::new(STRAY_CHECKED))],
-        Flagged::new(&["a.rs:3", "a.rs:11", "a.rs:20"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(STRAY_CHECKED))],
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:11", "src/lib.rs:20"]),
     ),
     Case::new(
         Title::new("an unchecked newtype deriving newtype's Deserialize, and its user"),
-        &[Source::new(Located::new("a.rs"), Text::new(UNCHECKED))],
-        Flagged::new(&["a.rs:3", "a.rs:6"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(UNCHECKED))],
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:6"]),
     ),
     Case::new(
         Title::new("another derive named CheckedDeserialize, or a hand-written Deserialize, does not validate"),
         &[
-            Source::new(Located::new("a.rs"), Text::new(OTHER_CHECKED)),
-            Source::new(Located::new("b.rs"), Text::new(HAND_DESERIALIZE)),
+            Source::new(Located::new("a/src/lib.rs"), Text::new(OTHER_CHECKED)),
+            Source::new(Located::new("b/src/lib.rs"), Text::new(HAND_DESERIALIZE)),
         ],
-        Flagged::new(&["a.rs:10", "b.rs:11"]),
+        Flagged::new(&["a/src/lib.rs:10", "b/src/lib.rs:11"]),
     ),
     Case::new(
         Title::new("newtype's derives declared in the workspace"),
@@ -182,8 +257,8 @@ const CASES: [Case; 26] = [
     ),
     Case::new(
         Title::new("a test module"),
-        &[Source::new(Located::new("a.rs"), Text::new(TESTED))],
-        Flagged::new(&["a.rs:6"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(TESTED))],
+        Flagged::new(&["src/lib.rs:6"]),
     ),
     Case::new(
         Title::new("an integration test"),
@@ -192,12 +267,67 @@ const CASES: [Case; 26] = [
     ),
     Case::new(
         Title::new("an inline module, beside a function taking text"),
-        &[Source::new(Located::new("a.rs"), Text::new(INLINE_MODULE))],
-        Flagged::new(&["a.rs:5"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(INLINE_MODULE))],
+        Flagged::new(&["src/lib.rs:5"]),
+    ),
+    Case::new(
+        Title::new("serde's derive is the one its dependency's package names, renamed or not"),
+        &[Source::new(Located::new("renamed/src/lib.rs"), Text::new(RENAMED))],
+        Flagged::new(&["renamed/src/lib.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a crate path no dependency declares is not serde's"),
+        &[Source::new(Located::new("undeclared/src/lib.rs"), Text::new(UNDECLARED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a dependency inherited from the workspace names its package there"),
+        &[Source::new(Located::new("ws/member/src/lib.rs"), Text::new(INHERITED))],
+        Flagged::new(&["ws/member/src/lib.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a platform's dependency names its package"),
+        &[Source::new(Located::new("platform/src/lib.rs"), Text::new(INHERITED))],
+        Flagged::new(&["platform/src/lib.rs:3"]),
     ),
 ];
 
+struct Packaged;
+
+impl Packaged {
+    fn manifests() -> Memory {
+        MANIFESTS.iter().map(|manifest| (PathBuf::from(manifest.path), Bytes::from(manifest.text))).collect()
+    }
+
+    fn parsed(manifests: &Memory, source: &Source) -> SourceFile {
+        let shown = Sources::file(source.path(), source.text());
+        let path = source.path().to_path_buf();
+        match SourceFile::parse_at(
+            path.clone(),
+            path.clone(),
+            Placement::locate(manifests, &path),
+            shown.text().clone(),
+        ) {
+            Ok(file) => file,
+            Err(failure) => unreachable!("fixture source parses: {failure}"),
+        }
+    }
+
+    fn mismatches(cases: &[Case]) -> Vec<String> {
+        let manifests = Self::manifests();
+        cases
+            .iter()
+            .filter_map(|case| {
+                let files: Vec<SourceFile> =
+                    case.sources().iter().map(|source| Self::parsed(&manifests, source)).collect();
+                let found = Queried::<NoPlaintext>::flagged(&files);
+                Some(format!("{} flagged {found}", case.name())).filter(|_| found != Lines::from(case.flagged()))
+            })
+            .collect()
+    }
+}
+
 #[test]
 fn deserialized_data_holds_no_free_text() {
-    assert_eq!(Sources::mismatches::<Queried<NoPlaintext>>(&CASES), Lines::default());
+    assert_eq!(Packaged::mismatches(&CASES), Vec::<String>::new());
 }
