@@ -1,4 +1,4 @@
-use lint_layout::{LineNumber, Position};
+use lint_layout::Position;
 
 use crate::item_path::ItemPath;
 use crate::resolved::Resolved;
@@ -16,11 +16,6 @@ impl Spelling {
             Spelling::Written(path, _) => Some(path),
             Spelling::Implied => None,
         }
-    }
-
-    #[must_use]
-    pub fn line(&self) -> Option<LineNumber> {
-        self.position().map(Position::line)
     }
 
     #[must_use]
