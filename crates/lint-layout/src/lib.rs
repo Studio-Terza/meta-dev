@@ -1,3 +1,4 @@
+mod crate_key;
 mod dependencies;
 mod failure;
 mod line_number;
