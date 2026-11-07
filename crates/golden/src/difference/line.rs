@@ -1,5 +1,4 @@
 use std::char::EscapeDebug;
-use std::cmp::Ordering;
 use std::fmt::{self, Write};
 
 use newtype::{Arbitrary, Newtype};
@@ -28,13 +27,14 @@ enum Shown {
 
 impl Shown {
     const APOSTROPHE: char = '\'';
+    const UNESCAPED: [char; 1] = [Shown::APOSTROPHE];
 }
 
 impl From<char> for Shown {
     fn from(character: char) -> Shown {
-        match character.cmp(&Shown::APOSTROPHE) {
-            Ordering::Equal => Shown::Apostrophe,
-            Ordering::Less | Ordering::Greater => Shown::Escaped(character.escape_debug()),
+        match Shown::UNESCAPED.binary_search(&character) {
+            Ok(_) => Shown::Apostrophe,
+            Err(_) => Shown::Escaped(character.escape_debug()),
         }
     }
 }
