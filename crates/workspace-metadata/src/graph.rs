@@ -57,8 +57,12 @@ impl<'meta> Graph<'meta> {
     }
 
     fn units(&self) -> Vec<Unit<'meta>> {
-        let macros: BTreeSet<&PackageId> =
-            self.members.iter().copied().filter(|id| self.package(id).and_then(Package::proc_macro).is_some()).collect();
+        let macros: BTreeSet<&PackageId> = self
+            .members
+            .iter()
+            .copied()
+            .filter(|id| self.package(id).and_then(Package::proc_macro).is_some())
+            .collect();
         let ports: BTreeMap<&PackageId, BTreeSet<&PackageId>> = self
             .members
             .iter()

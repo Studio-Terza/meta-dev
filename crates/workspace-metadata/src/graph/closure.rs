@@ -14,9 +14,11 @@ impl<'meta> Closure<'meta> {
     pub(super) fn reached(requires: &Requires<'meta>, start: BTreeSet<&'meta PackageId>) -> Closure<'meta> {
         Closure(
             iter::successors(Some((start.clone(), start)), |(seen, frontier)| {
-                let required: BTreeSet<&PackageId> = frontier.iter().flat_map(|id| requires.direct(id)).collect();
-                let next: BTreeSet<&PackageId> = required.difference(seen).copied().collect();
-                Some(next).filter(|next| next.first().is_some()).map(|next| (seen.union(&next).copied().collect(), next))
+                let reached: BTreeSet<&PackageId> = frontier.iter().flat_map(|id| requires.direct(id)).collect();
+                let next: BTreeSet<&PackageId> = reached.difference(seen).copied().collect();
+                Some(next)
+                    .filter(|next| next.first().is_some())
+                    .map(|next| (seen.union(&next).copied().collect(), next))
             })
             .last()
             .map(|(seen, _)| seen)

@@ -38,7 +38,9 @@ const DEV_ON_OWNED: Source = Source::new(
 );
 const RENAMED: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),
-    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\ndatabase = { package = \"sqlx\", version = \"0.9\" }\n"),
+    Text::new(
+        "[package]\nname = \"design-store\"\n\n[dependencies]\ndatabase = { package = \"sqlx\", version = \"0.9\" }\n",
+    ),
 );
 const ON_MACRO_CLOSURE: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),

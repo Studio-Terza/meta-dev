@@ -39,7 +39,7 @@ impl<'file> Owners<'file> {
                     let named = Self::named(dependency)?;
                     let (package, owner) = required.get_key_value(&&named)?;
                     let site = Site::new(file.manifest_file().as_ref(), dependency.line());
-                    Some(Violation::new(site, ForeignDependency::new(*package, *owner)))
+                    Some(Violation::new(site, ForeignDependency::new(package, owner)))
                 })
             })
             .collect()
