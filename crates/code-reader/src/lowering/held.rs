@@ -75,15 +75,9 @@ impl Lowering<'_, '_> {
         self.lowered.holdings.push(HoldingRow { located, holder, region: self.context.region(), link, ty });
     }
 
-    pub(super) fn attributed(&mut self, attributes: &Attributes, ident: &Ident, scope: &InScope) {
+    pub(super) fn attributed(&mut self, attributes: &Attributes, ident: &Ident) {
         let rows = ImplRow::derives(&self.here, self.context.region(), attributes, ident);
         self.lowered.rows.extend(rows);
-        let source = attributes.try_from_source().map(|ty| scope.lowered(&ty));
-        source.into_iter().fold(self, |lowering, ty| {
-            let link = Link::declaring(ident);
-            lowering.hold(Holder::named(ident, Held::TryFromSource), link, ty);
-            lowering
-        });
     }
 
     pub(super) fn parameters(&mut self, holder: &Holder, generics: &Generics, link: &Link) {

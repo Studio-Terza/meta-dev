@@ -142,13 +142,16 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     pub(super) fn macro_named(&self, first: &Name, viewer: ScopeId) -> Resolution {
+        let derive = StdNames::canonical(Table::Derives, first);
         self.chained(viewer, Key::new(Domain::Macros, first), Reading::Written)
-            .settled(|| Outer::from(StdNames::canonical(Table::Derives, first)))
+            .contested(derive.map(|found| Binding::Std(found.path())), || Outer::from(derive))
     }
 
     pub(super) fn named(&self, first: &Name, shape: Shape, reading: Reading, viewer: ScopeId) -> Resolution {
         self.chained(viewer, Key::new(Domain::Types, first), reading)
-            .settled(|| shape.fallback(first, reading, self.space.prelude(first, viewer), self.space))
+            .contested(shape.primitive(first).map(Binding::Primitive), || {
+                shape.fallback(first, reading, self.space.prelude(first, viewer), self.space)
+            })
     }
 
     fn entered(&self, module: ScopeId, segment: &Name, viewer: ScopeId, domain: Domain) -> Resolution {
@@ -169,7 +172,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         match resolution {
             Resolution::Waiting => Resolution::Waiting,
             Resolution::Bound(binding) => {
-                binding.stepped(segment, |module| self.entered(module, segment, viewer, domain))
+                binding.stepped(segment, domain, |module| self.entered(module, segment, viewer, domain))
             }
         }
     }

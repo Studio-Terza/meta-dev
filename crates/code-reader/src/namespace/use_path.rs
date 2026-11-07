@@ -87,7 +87,7 @@ impl Shape {
         Outer::known_or(known, || self.unbound(first, reading))
     }
 
-    fn primitive(self, first: &Name) -> Option<Primitive> {
+    pub(super) fn primitive(self, first: &Name) -> Option<Primitive> {
         match self {
             Shape::Single => StdNames::primitive(first),
             Shape::Multiple => None,

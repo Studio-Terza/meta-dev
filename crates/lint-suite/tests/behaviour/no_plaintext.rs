@@ -1,10 +1,13 @@
 use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 use lint_no_plaintext::NoPlaintext;
 
-const TEXT_FIELDS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A<'a> {\n    owned: String,\n    borrowed: &'a str,\n    cow: Cow<'a, str>,\n    boxed: Box<str>,\n    optional: Option<String>,\n    many: Vec<String>,\n    keyed: BTreeMap<String, u8>,\n    pathed: std::string::String,\n    count: u32,\n    path: PathBuf,\n    other: other::Strand,\n    elsewhere: elsewhere::Id,\n}\n";
+const TEXT_FIELDS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A<'a> {\n    owned: String,\n    borrowed: &'a str,\n    cow: Cow<'a, str>,\n    boxed: Box<str>,\n    optional: Option<String>,\n    many: Vec<String>,\n    keyed: BTreeMap<String, u8>,\n    pathed: std::string::String,\n    count: u32,\n    path: std::path::PathBuf,\n    other: other::Strand,\n    elsewhere: elsewhere::Id,\n}\n";
 const TUPLE_AND_ENUM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A(String);\n#[derive(Deserialize)]\nenum B {\n    Named(String),\n    Counted(u32),\n    Noted { note: String },\n}\n";
 const DERIVE_FORMS: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    a: String,\n}\n#[cfg_attr(feature = \"serde\", derive(serde::Deserialize))]\nstruct B {\n    b: String,\n}\n#[derive(Debug, serde::Deserialize, Clone)]\nstruct C {\n    c: String,\n}\n";
-const NOT_DESERIALIZED: &str = "use serde::Serialize;\n#[derive(Debug)]\nstruct A {\n    a: String,\n}\n#[derive(Serialize)]\nstruct B {\n    b: String,\n}\n#[cfg_attr(feature = \"serde\", derive(Serialize))]\nstruct C {\n    c: String,\n}\n#[derive(Deserialize)]\nstruct D {\n    d: String,\n}\n#[derive(other::Deserialize)]\nstruct E {\n    e: String,\n}\n";
+const NOT_DESERIALIZED: &str = "use serde::Serialize;\n#[derive(Debug)]\nstruct A {\n    a: String,\n}\n#[derive(Serialize)]\nstruct B {\n    b: String,\n}\n#[cfg_attr(feature = \"serde\", derive(Serialize))]\nstruct C {\n    c: String,\n}\n#[derive(other::Deserialize)]\nstruct D {\n    d: String,\n}\n#[derive(Debug, Clone, PartialEq, thiserror::Error, newtype::Newtype)]\nstruct E {\n    e: String,\n}\n";
+const SERDE_SPELLINGS: &str = "#[derive(serde_derive::Deserialize)]\nstruct A {\n    a: String,\n}\nmod globbed {\n    use serde::*;\n    #[derive(Deserialize)]\n    struct B {\n        b: String,\n    }\n}\n#[derive(newtype::serde::Deserialize)]\nstruct C {\n    c: String,\n}\n#[derive(Deserialize)]\nstruct D {\n    d: String,\n}\n";
+const REEXPORTED_ROOT: &str = "pub use serde;\npub mod de {\n    pub use serde::Deserialize;\n}\n";
+const REEXPORTED_USER: &str = "#[derive(newtype::serde::Deserialize)]\npub struct A {\n    a: String,\n}\n#[derive(newtype::de::Deserialize)]\npub struct B {\n    b: String,\n}\n";
 const LOCAL_STRING: &str =
     "use serde::Deserialize;\nstruct String;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const ALIASED_STRING: &str =
@@ -14,12 +17,6 @@ const ATTRIBUTED_FIELD: &str =
 const SERDE_SETTINGS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(transparent)]\nstruct A(String);\n#[derive(Deserialize)]\n#[serde(from = \"String\")]\nstruct B(String);\nimpl From<String> for B {\n    fn from(text: String) -> B { B(text) }\n}\n";
 
 const TRY_FROM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\nimpl TryFrom<String> for A {\n    type Error = u8;\n    fn try_from(text: String) -> Result<A, u8> { Ok(A(text)) }\n}\n#[derive(Deserialize)]\n#[serde(deny_unknown_fields, try_from = \"String\")]\nstruct B(String);\nimpl std::convert::TryFrom<String> for B {\n    type Error = u8;\n    fn try_from(text: String) -> Result<B, u8> { Ok(B(text)) }\n}\n#[derive(Deserialize)]\n#[cfg_attr(feature = \"serde\", serde(try_from = \"String\"))]\nenum C {\n    Named(String),\n}\nimpl TryFrom<String> for C {\n    type Error = u8;\n    fn try_from(text: String) -> Result<C, u8> { Ok(C::Named(text)) }\n}\n#[derive(Deserialize)]\nstruct User {\n    a: A,\n    b: Option<B>,\n}\n";
-const TRY_FROM_UNWRITTEN: &str =
-    "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\n";
-const TRY_FROM_ELSEWHERE: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\nstruct B;\nimpl TryFrom<String> for B {\n    type Error = u8;\n    fn try_from(text: String) -> Result<B, u8> { Ok(B) }\n}\n";
-
-const TRY_FROM_UNASKED: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A(String);\nimpl TryFrom<String> for A {\n    type Error = u8;\n    fn try_from(text: String) -> Result<A, u8> { Ok(A(text)) }\n}\n";
-
 const NEWTYPES: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct Id(String);\nstruct Plain(String);\nstruct Named {\n    text: String,\n}\nstruct Key(Plain);\nstruct C(B);\nstruct B(Z);\nstruct Z(String);\nmod inner {\n    pub struct Hidden(String);\n}\n#[derive(Deserialize)]\nstruct U {\n    id: Id,\n    plain: Plain,\n    named: Named,\n    nested: Vec<Option<Plain>>,\n    key: Key,\n    deep: C,\n    hidden: inner::Hidden,\n}\n";
 const NOT_NEWTYPES: &str = "use serde::Deserialize;\nstruct Pair(String, String);\nstruct Unit;\nstruct Count(u32);\nstruct Two {\n    a: String,\n    b: String,\n}\n#[derive(Deserialize)]\nstruct U {\n    pair: Pair,\n    unit: Unit,\n    count: Count,\n    two: Two,\n}\n";
 const ROOT: &str = "mod a;\nmod b;\nmod c;\n";
@@ -43,7 +40,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 24] = [
+const CASES: [Case; 23] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("a.rs"), Text::new(TEXT_FIELDS))],
@@ -60,9 +57,22 @@ const CASES: [Case; 24] = [
         Flagged::new(&["a.rs:3", "a.rs:7", "a.rs:11"]),
     ),
     Case::new(
-        Title::new("no derive that resolves to serde's or newtype's Deserialize"),
+        Title::new("a derive that resolves elsewhere is not serde's Deserialize"),
         &[Source::new(Located::new("a.rs"), Text::new(NOT_DESERIALIZED))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("serde's derive through its derive crate, a glob, an unread re-export, or unresolved"),
+        &[Source::new(Located::new("a.rs"), Text::new(SERDE_SPELLINGS))],
+        Flagged::new(&["a.rs:3", "a.rs:9", "a.rs:14", "a.rs:18"]),
+    ),
+    Case::new(
+        Title::new("serde's derive through a workspace crate's re-exports"),
+        &[
+            Source::new(Located::new("crates/newtype/src/lib.rs"), Text::new(REEXPORTED_ROOT)),
+            Source::new(Located::new("crates/user/src/lib.rs"), Text::new(REEXPORTED_USER)),
+        ],
+        Flagged::new(&["crates/user/src/lib.rs:3", "crates/user/src/lib.rs:7"]),
     ),
     Case::new(
         Title::new("a local type spelled String is not text"),
@@ -85,24 +95,9 @@ const CASES: [Case; 24] = [
         Flagged::new(&["a.rs:4", "a.rs:7"]),
     ),
     Case::new(
-        Title::new("serde try_from with a written TryFrom impl validates"),
+        Title::new("serde try_from with a written TryFrom impl does not validate"),
         &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("serde try_from without a written TryFrom impl"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM_UNWRITTEN))],
-        Flagged::new(&["a.rs:4"]),
-    ),
-    Case::new(
-        Title::new("serde try_from with a TryFrom impl for another type"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM_ELSEWHERE))],
-        Flagged::new(&["a.rs:4"]),
-    ),
-    Case::new(
-        Title::new("a TryFrom impl without serde try_from"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM_UNASKED))],
-        Flagged::new(&["a.rs:3"]),
+        Flagged::new(&["a.rs:4", "a.rs:11", "a.rs:19", "a.rs:27", "a.rs:28"]),
     ),
     Case::new(
         Title::new("an unvalidated newtype of text is text, through newtypes and containers"),

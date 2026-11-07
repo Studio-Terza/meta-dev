@@ -462,7 +462,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident, &scope);
+        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
         self.struct_held(item, &scope, link);
         visit::visit_item_struct(self, item);
@@ -471,7 +471,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident, &scope);
+        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         item.variants.iter().fold(&mut *self, |lowering, variant| {
             let holder = Holder::named(&variant.ident, Held::EnumField);
             lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
@@ -483,7 +483,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_union(&mut self, item: &'ast ItemUnion) {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident, &scope);
+        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.fields_held(&Holder::named(&item.ident, Held::UnionField), &link, item.fields.named.iter(), &scope);
         visit::visit_item_union(self, item);
     }

@@ -2,7 +2,7 @@ mod identities;
 
 use std::collections::BTreeSet;
 
-use code_model::{Held, Holding, Implementation, ItemId, Model, Origin, Placed, Resolved};
+use code_model::{Holding, Implementation, ItemId, Model, Origin, Resolved};
 
 use identities::{Identities, Role};
 
@@ -29,20 +29,12 @@ impl Kinds {
         let identities = Identities::read(model);
         let played: Vec<Played> =
             model.implementations().filter_map(|placed| Self::played(&identities, placed.entity())).collect();
-        let subjects = |role: Role, origin: Origin| {
-            let part = Part { role, origin };
+        let derived = |role: Role| {
+            let part = Part { role, origin: Origin::Derived };
             played.iter().filter(move |played| played.part == part).map(|played| played.subject)
         };
-        let deserialized: BTreeSet<ItemId> = subjects(Role::Deserializes, Origin::Derived).collect();
-        let converting: BTreeSet<ItemId> = subjects(Role::Converts, Origin::Written).collect();
-        let converted = model
-            .holdings()
-            .map(Placed::entity)
-            .filter(|holding| holding.held() == Held::TryFromSource)
-            .filter_map(Holding::declares)
-            .filter_map(|item| converting.get(&item).copied());
-        let validated: BTreeSet<ItemId> =
-            subjects(Role::DeserializesChecked, Origin::Derived).chain(converted).collect();
+        let deserialized: BTreeSet<ItemId> = derived(Role::Deserializes).collect();
+        let validated: BTreeSet<ItemId> = derived(Role::DeserializesChecked).collect();
         let plain_owners = deserialized.difference(&validated).copied().collect();
         Kinds { validated, plain_owners }
     }

@@ -246,10 +246,10 @@ fn self_is_not_a_written_spelling() {
     assert_eq!(spellings, [&Spelling::Implied]);
 }
 
-const HOLDINGS: &str = "struct Pair<T = u8>(T, u8);\nstruct Count(usize);\nenum E<T = u8> {\n    A(u8),\n    B { b: u8 },\n}\nunion U {\n    a: u8,\n}\nconst C: u8 = 1;\ntype A = u8;\n#[serde(try_from = \"u8\")]\nstruct Converted;\n#[cfg_attr(feature = \"serde\", serde(try_from = \"u8\"))]\nenum Read {}\n#[serde(from = \"u8\")]\nstruct Plain;\n";
+const HOLDINGS: &str = "struct Pair<T = u8>(T, u8);\nstruct Count(usize);\nenum E<T = u8> {\n    A(u8),\n    B { b: u8 },\n}\nunion U {\n    a: u8,\n}\nconst C: u8 = 1;\ntype A = u8;\n";
 
 #[test]
-fn every_field_struct_parameter_alias_and_try_from_source_is_read_with_its_kind_and_item() {
+fn every_field_struct_parameter_and_alias_is_read_with_its_kind_and_item() {
     assert_eq!(
         Read::held(HOLDINGS),
         [
@@ -261,8 +261,6 @@ fn every_field_struct_parameter_alias_and_try_from_source_is_read_with_its_kind_
             HeldRow::declaring("b", Held::EnumField),
             HeldRow::declaring("a", Held::UnionField),
             HeldRow::declaring("A", Held::Alias),
-            HeldRow::declaring("Converted", Held::TryFromSource),
-            HeldRow::declaring("Read", Held::TryFromSource),
         ]
     );
 }

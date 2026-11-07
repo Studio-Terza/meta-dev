@@ -76,10 +76,13 @@ impl Texts {
     }
 
     fn leaf<'path>(&self, string: &ItemPath, resolved: &'path Resolved) -> Option<&'path Resolved> {
-        let owned = resolved.std().filter(|std| *std == string);
-        let borrowed = resolved.primitive().filter(|primitive| *primitive == Primitive::Str);
-        let wrapped = resolved.crate_item().and_then(|item| self.wrappers.get(&item));
-        owned.map(|_| ()).or(borrowed.map(|_| ())).or(wrapped.map(|_| ())).map(|()| resolved)
+        let text = |known: &'path Resolved| {
+            let owned = known.std().filter(|std| *std == string);
+            let borrowed = known.primitive().filter(|primitive| *primitive == Primitive::Str);
+            let wrapped = known.crate_item().and_then(|item| self.wrappers.get(&item));
+            owned.map(|_| ()).or(borrowed.map(|_| ())).or(wrapped.map(|_| ())).map(|()| known)
+        };
+        resolved.known().map_or(Some(resolved), text)
     }
 }
 

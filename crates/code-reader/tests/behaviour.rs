@@ -110,6 +110,10 @@ const DERIVE_IMPORTED: &str =
     "use serde::Serialize;\nuse std::fmt::Debug as Clone;\n#[derive(Serialize, Clone, Hash)]\nstruct A;\n";
 const DERIVE_UNLISTED: &str = "#[derive(Serialize)]\nstruct A;\n";
 const DERIVE_GLOBBED: &str = "use std::hash::*;\nuse other::*;\n#[derive(Hash, Debug)]\nstruct A;\n";
+const DERIVE_PAST_EXPANSION: &str = "make!();\n#[derive(Clone)]\nstruct A;\n";
+const DERIVE_THROUGH_UNREAD: &str = "#[derive(newtype::serde::Deserialize, serde_derive::Deserialize)]\nstruct A;\n";
+const PRIMITIVE_PAST_GLOB: &str = "use other::*;\nfn f() -> u8 {}\n";
+const PRIMITIVE_PAST_EXPANSION: &str = "make!();\nfn f() -> bool {}\n";
 const DERIVE_CONDITIONAL: &str = "#[cfg_attr(feature = \"serde\", derive(Clone), derive(Debug))]\n#[cfg_attr(unix, cfg_attr(test, derive(Hash)))]\n#[cfg_attr(windows, allow(dead_code))]\nstruct A;\n";
 
 const RENAMED_ACROSS: [Fixture; 2] = [
@@ -663,7 +667,12 @@ laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resol
         Expect::std_trait(&["std", "hash", "Hash"]),
     ],
     DERIVE_UNLISTED => [Expect::unknown(&["Serialize"])],
-    DERIVE_GLOBBED => [Expect::unknown(&["Hash"]), Expect::unknown(&["Debug"])],
+    DERIVE_GLOBBED => [Expect::std_trait(&["std", "hash", "Hash"]), Expect::std_trait(&["std", "fmt", "Debug"])],
+    DERIVE_PAST_EXPANSION => [Expect::std_trait(&["std", "clone", "Clone"])],
+    DERIVE_THROUGH_UNREAD => [
+        Expect::unknown(&["newtype", "serde", "Deserialize"]),
+        Expect::external(&["serde_derive", "Deserialize"]),
+    ],
     DERIVE_CONDITIONAL => [
         Expect::std_trait(&["std", "clone", "Clone"]),
         Expect::std_trait(&["std", "fmt", "Debug"]),
@@ -799,6 +808,11 @@ laws::table!(a_parenthesised_output_reads_as_the_type_inside, |text: &&str| Read
     PAREN_PATH => Read::outputs(PLAIN_PATH),
     PAREN_GENERIC => Read::outputs(PLAIN_GENERIC),
     PAREN_REFERENCE => Read::outputs(PLAIN_REFERENCE),
+]);
+
+laws::table!(a_primitive_is_read_past_an_opaque_glob, |text: &&str| Read::expanded(text), [
+    PRIMITIVE_PAST_GLOB => [Expect::primitive(Primitive::Integer)],
+    PRIMITIVE_PAST_EXPANSION => [Expect::primitive(Primitive::Bool)],
 ]);
 
 laws::table!(an_alias_expands_to_its_target_with_its_arguments, |text: &&str| Read::expanded(text), [

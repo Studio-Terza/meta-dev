@@ -12,7 +12,6 @@ pub enum Held {
     NewtypeField,
     StructParameter,
     Alias,
-    TryFromSource,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

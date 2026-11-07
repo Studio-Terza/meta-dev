@@ -136,6 +136,13 @@ impl<'rows> View<'rows> {
         }
     }
 
+    pub(super) fn contested(self, builtin: Option<Binding>, absent: impl FnOnce() -> Outer) -> Resolution {
+        match self.found {
+            Found::Conflict => builtin.map_or_else(|| self.settled(absent), Resolution::Bound),
+            Found::Nothing | Found::One(_) => self.settled(absent),
+        }
+    }
+
     pub(super) fn settled(self, absent: impl FnOnce() -> Outer) -> Resolution {
         match self.found {
             Found::Nothing => self.pending.absent(absent),
