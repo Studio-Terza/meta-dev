@@ -32,12 +32,13 @@ impl<'file> Owners<'file> {
         packages: &BTreeMap<&'file PackageRoot, &'file SourceFile>,
         claims: impl Fn(&'file PackageRoot) -> &'file BTreeSet<Name>,
     ) -> Claims<'file> {
-        packages.keys().fold(Claims::new(), |mut claimed, package| {
-            claims(package).iter().for_each(|name| {
-                claimed.entry(name).or_default().insert(*package);
-            });
-            claimed
-        })
+        packages.keys().flat_map(|package| claims(package).iter().map(move |name| (name, *package))).fold(
+            Claims::new(),
+            |mut claimed, (name, package)| {
+                claimed.entry(name).or_default().insert(package);
+                claimed
+            },
+        )
     }
 
     pub(crate) fn foreign(&self) -> Vec<Violation<'file>> {

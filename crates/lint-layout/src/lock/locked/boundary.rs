@@ -57,9 +57,14 @@ impl FromStr for Required {
     type Err = Infallible;
 
     fn from_str(spelled: &str) -> Result<Required, Infallible> {
-        let words: Vec<&str> = spelled.split_whitespace().collect();
+        let letters: Vec<char> = spelled.chars().collect();
+        let words: Vec<String> = letters
+            .chunk_by(|left, right| left.is_ascii_graphic() == right.is_ascii_graphic())
+            .filter(|word| word.iter().all(char::is_ascii_graphic))
+            .map(|word| word.iter().collect())
+            .collect();
         Ok(Required {
-            name: words.first().copied().map(Name::from).unwrap_or_default(),
+            name: words.first().map(|name| Name::from(name.as_str())).unwrap_or_default(),
             version: words.get(1).and_then(|version| version.parse().ok()),
         })
     }
