@@ -10,18 +10,12 @@ use newtype::Newtype;
 enum Lexeme {
     #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*")]
     Bare,
-    #[regex(r"[0-9a-f][0-9a-f-]{6,}\.(0|[1-9][0-9]*)")]
+    #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*\.(0|[1-9][0-9]*)")]
     Cited,
     #[regex(r#""([^"\\\r\n]|\\["\\nrt])*""#, Lexeme::unquoted)]
     Quoted(String),
     #[regex(r"\r?\n")]
     End,
-}
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Hex {
-    #[regex(r"[0-9a-f][0-9a-f-]{6,}")]
-    Prefix,
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]

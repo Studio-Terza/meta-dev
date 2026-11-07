@@ -8,7 +8,7 @@ use design_model::{
 use design_store::{AppliedId, RelationName, ShapeName};
 use file_ports::Offset;
 use grammar::cited::Cited;
-use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Ref, Word};
+use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
 use newtype::{Arbitrary, Display, Newtype};
@@ -402,7 +402,7 @@ impl Line {
                 body: fields.field::<Quoted<_>>()?,
             }),
             Key::Message => Ok(Line::Message {
-                uuid: fields.field::<Ref<_>>()?,
+                uuid: fields.field::<Bare<_>>()?,
                 author: fields.field::<Word<_>>()?,
                 session: fields.past(&[Key::Session])?.field::<Quoted<_>>()?,
                 stamp: fields.past(&[Key::At])?.field::<Quoted<_>>()?,
@@ -461,7 +461,7 @@ impl fmt::Display for Anchored {
 impl Anchored {
     fn read(fields: &mut Fields) -> Result<Anchored, Unread> {
         fields.optional::<Cited>().map_or_else(
-            || fields.field::<Ref<_>>().map(Anchored::Message),
+            || fields.field::<Bare<_>>().map(Anchored::Message),
             |cited| Ok(Anchored::Segment(SegmentRef::from(&cited))),
         )
     }

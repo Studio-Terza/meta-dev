@@ -3,7 +3,7 @@ use std::str::FromStr;
 use design_model::{NodeId, Prefix};
 use grammar::cited::Cited;
 use grammar::output::Fields;
-use grammar::output::field::{Bare, Checked, Ref};
+use grammar::output::field::{Bare, Checked};
 use newtype::Newtype;
 use structurer::SegmentRef;
 
@@ -19,9 +19,7 @@ impl FromStr for Subject {
             .optional::<Checked<NodeId>>()
             .map(|node| Ok(Subject::Node(node?)))
             .or_else(|| fields.optional::<Cited>().map(|cited| Ok(Subject::Segment(SegmentRef::from(&cited)))))
-            .or_else(|| {
-                fields.optional::<Ref<Prefix>>().or_else(|| fields.optional::<Bare<Prefix>>()).map(Subject::prefixed)
-            })
+            .or_else(|| fields.optional::<Bare<Prefix>>().map(Subject::prefixed))
             .ok_or(Failure::Usage)??;
         fields.ended(subject).map_err(|_unended| Failure::Usage)
     }

@@ -6,7 +6,7 @@ use grammar::ident::Words;
 use grammar::line::Unbroken;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
-use grammar::output::field::{Bare, Id, Integer, Quoted, Ref};
+use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
 use grammar::search::Term;
 use grammar::search::Terms;
@@ -219,7 +219,7 @@ impl Read {
             bare: fields.field::<Bare<Term>>()?,
             integer: fields.past(&["to".to_owned()])?.field::<Integer<u64>>()?,
             ordinal: fields.field::<Cited>()?.ordinal(),
-            message: fields.field::<Ref<Term>>()?,
+            message: fields.field::<Bare<Term>>()?,
         })
     }
 }
@@ -276,8 +276,16 @@ laws::table!(
             ordinal: 12,
             message: Term::new("7e57ab1-0000".to_owned()),
         }),
-        "n4 \"x\" feature to 7 1a2b3c.0 1a2b3c4" => None,
-        "n4 \"x\" feature to 7 1a2b3c4.0 1a2b3c" => None,
+        "n4 \"x\" feature to 7 o1.0 O1" => Some(Read6 {
+            node: 4,
+            quoted: Term::new("x".to_owned()),
+            bare: Term::new("feature".to_owned()),
+            integer: 7,
+            ordinal: 0,
+            message: Term::new("O1".to_owned()),
+        }),
+        "n4 \"x\" feature to 7 o1. o1" => None,
+        "n4 \"x\" feature to 7 o1.01 o1" => None,
         "n4 \"x\" feature to 1a2b3c4 1a2b3c4.0 1a2b3c4" => None,
         "n4 \"x\" feature to 12 deadbeef.3 deadbeef extra" => None,
         "n4 \"x\" feature from 12 deadbeef.3 deadbeef" => None,

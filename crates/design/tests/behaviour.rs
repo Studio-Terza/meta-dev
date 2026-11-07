@@ -1888,7 +1888,7 @@ impl Generated {
     }
 
     fn segment() -> BoxedStrategy<SegmentRef> {
-        ("[0-9a-f]{8}[0-9a-f-]{0,28}", 0usize..100_000)
+        (Generated::message(), 0usize..100_000)
             .prop_map(|(prefix, ordinal)| SegmentRef::new(Prefix::new(prefix), Ordinal::new(ordinal)))
             .boxed()
     }
@@ -1896,13 +1896,17 @@ impl Generated {
     fn anchored() -> BoxedStrategy<Anchored> {
         prop_oneof![
             Generated::segment().prop_map(Anchored::Segment),
-            "[0-9a-f]{7}[0-9a-f-]{0,29}".prop_map(|prefix| Anchored::Message(Prefix::new(prefix))),
+            Generated::message().prop_map(|prefix| Anchored::Message(Prefix::new(prefix))),
         ]
         .boxed()
     }
 
+    fn message() -> BoxedStrategy<String> {
+        "[A-Za-z0-9_][A-Za-z0-9_-]{0,36}".boxed()
+    }
+
     fn uuid() -> BoxedStrategy<Uuid> {
-        "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".prop_map(Uuid::new).boxed()
+        Generated::message().prop_map(Uuid::new).boxed()
     }
 
     fn project() -> BoxedStrategy<Project> {

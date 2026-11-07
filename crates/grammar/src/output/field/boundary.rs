@@ -4,7 +4,7 @@ use std::str::FromStr;
 use newtype::Newtype;
 
 use crate::cited::Cited;
-use crate::output::{Decimal, Field, Hex, Kind, Numbered, Token};
+use crate::output::{Decimal, Field, Kind, Numbered, Token};
 
 #[derive(Debug)]
 pub struct Word<T>(PhantomData<T>);
@@ -23,9 +23,6 @@ pub struct Bare<T>(PhantomData<T>);
 
 #[derive(Debug)]
 pub struct Quoted<T>(PhantomData<T>);
-
-#[derive(Debug)]
-pub struct Ref<T>(PhantomData<T>);
 
 #[derive(Debug)]
 pub struct Integer<T>(PhantomData<T>);
@@ -75,14 +72,6 @@ impl<T: Newtype<Inner = String>> Field for Quoted<T> {
 
     fn taken(token: Token) -> Result<T, Token> {
         token.wrapped(Kind::Quoted)
-    }
-}
-
-impl<T: Newtype<Inner = String>> Field for Ref<T> {
-    type Value = T;
-
-    fn taken(token: Token) -> Result<T, Token> {
-        token.spelled::<Hex>().and_then(|hex| hex.wrapped(Kind::Bare))
     }
 }
 
