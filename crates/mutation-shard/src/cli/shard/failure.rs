@@ -1,10 +1,11 @@
+use std::array::TryFromSliceError;
 use std::io;
 use std::path::PathBuf;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error("usage: mutation-shard <mutants.out> <out.json>")]
-    Usage,
+    Usage(#[source] TryFromSliceError),
     #[error("cannot use {path}: {source}", path = path.display())]
     Io { path: PathBuf, source: io::Error },
     #[error("cannot parse {path}: {source}", path = path.display())]
