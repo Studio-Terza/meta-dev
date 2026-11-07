@@ -7,7 +7,7 @@ mod readers;
 mod unreadable;
 
 pub use crate_name::CrateName;
-pub use graph::Graph;
+pub use graph::{Bypasses, Graph, Stale};
 pub use metadata::Metadata;
 pub use outside::Outside;
 pub use readers::Readers;

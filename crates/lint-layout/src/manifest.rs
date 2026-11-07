@@ -1,3 +1,4 @@
+mod boundary;
 mod members;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,7 +14,6 @@ use crate::dependencies::Dependencies;
 use crate::failure::Failure;
 use crate::line_number::LineNumber;
 use crate::name::Name;
-use crate::owned::Owned;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
@@ -42,6 +42,8 @@ impl Manifest {
     const TESTED_LISTS: [&'static str; 3] = ["test", "bin", "bench"];
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+    const PORT_TABLE: [&'static str; 3] = ["package", "metadata", "port"];
+    const OWNS: &'static str = "owns";
 
     pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Manifest>, Failure>> {
         let paths: Vec<PathBuf> = directories.iter().map(|directory| directory.as_ref().join(Self::FILE)).collect();
@@ -93,6 +95,14 @@ impl Manifest {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    #[must_use]
+    pub fn owns(&self) -> Option<LineNumber> {
+        DeTable::parse(self.text.as_ref()).ok().and_then(|document| {
+            let port = Self::PORT_TABLE.iter().try_fold(document.get_ref(), Self::table_in)?;
+            port.keys().find(|key| key.get_ref() == Self::OWNS).map(|key| self.text.line_of(key))
+        })
     }
 
     #[must_use]
@@ -180,14 +190,6 @@ impl Manifest {
             .filter_map(Value::as_str)
             .map(Name::from)
             .collect()
-    }
-}
-
-impl From<&Manifest> for Option<Owned> {
-    fn from(manifest: &Manifest) -> Option<Owned> {
-        DeTable::parse(manifest.text.as_ref())
-            .ok()
-            .and_then(|document| Owned::declared(&manifest.text, document.get_ref()))
     }
 }
 

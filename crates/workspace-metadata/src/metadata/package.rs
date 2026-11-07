@@ -10,6 +10,7 @@ use serde::Deserialize;
 use crate::crate_name::CrateName;
 use crate::package_id::PackageId;
 use declared::Declared;
+pub use declared::PortTable;
 use dependency::Dependency;
 use target::{Kind, Target};
 
@@ -35,6 +36,10 @@ impl Package {
 
     pub fn proc_macro(&self) -> Option<&Package> {
         self.targets.iter().flat_map(AsRef::as_ref).find(|kind| **kind == Kind::ProcMacro).map(|_| self)
+    }
+
+    pub fn port(&self) -> Option<&PortTable> {
+        self.metadata.as_ref().and_then(Declared::port)
     }
 
     pub fn readings(&self) -> &[PathBuf] {

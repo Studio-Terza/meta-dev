@@ -4,9 +4,8 @@ grammar: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 store: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-a package listed in some [package.metadata.port] owns is depended on directly only by its one owning unit, the declaring crate and the workspace proc-macro crates it depends on, in dependencies and dev-dependencies alike:
-design/Cargo.toml:5: depends on logos, which crate grammar owns; depend on the owning crate and call its API instead of the owned dependency
-design/Cargo.toml:8: depends on logos, which crate grammar owns; depend on the owning crate and call its API instead of the owned dependency
-grammar/Cargo.toml:8: owns logos, which crate store owns too; leave the dependency to its one owner and call that crate's API; a dependency has one owner
-store/Cargo.toml:8: owns logos, which crate grammar owns too; leave the dependency to its one owner and call that crate's API; a dependency has one owner
+a package some [package.metadata.port] owns is depended on directly only by its declaring unit, a port and the workspace proc-macro crates it depends on; a package only in an owned closure only by the units whose closure holds it, unless declared shared; and every owns entry names a package its unit depends on:
+design/Cargo.toml:5: depends on logos, in the closure of what crate grammar owns; depend on the owning crate and call its API, or have its unit declare the package in [package.metadata.port] shared
+design/Cargo.toml:8: depends on logos, in the closure of what crate grammar owns; depend on the owning crate and call its API, or have its unit declare the package in [package.metadata.port] shared
+store/Cargo.toml:5: depends on hashbrown, in the closure of what crate grammar owns; depend on the owning crate and call its API, or have its unit declare the package in [package.metadata.port] shared
 fails

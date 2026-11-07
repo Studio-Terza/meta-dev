@@ -12,7 +12,7 @@ use crate::outside::Outside;
 use crate::package_id::PackageId;
 use crate::readers::Readers;
 use crate::unreadable::Unreadable;
-pub(crate) use package::Package;
+pub(crate) use package::{Package, PortTable};
 pub(crate) use resolve::Node;
 use resolve::Resolve;
 

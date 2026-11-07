@@ -6,7 +6,8 @@ license.workspace = true
 publish.workspace = true
 
 [package.metadata.port]
-owns = ["sqlx", "sqlx-core", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "tokio", "tokio-stream"]
+owns = ["sqlx", "sqlx-core", "sqlx-macros", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "tokio", "tokio-stream"]
+shared = ["proc-macro2", "quote", "serde", "serde_core", "serde_json", "syn", "thiserror"]
 
 [lib]
 test = false

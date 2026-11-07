@@ -1,8 +1,6 @@
 [package]
 name = "store"
 
-[package.metadata.port]
-owns = ["logos"]
-
 [dependencies]
-logos = "1"
+hashbrown = "0.16"
+serde = "1"

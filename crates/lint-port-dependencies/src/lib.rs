@@ -2,10 +2,10 @@ mod owners;
 mod port_crate;
 mod reserved_names;
 
-use lint_core::{Headline, Lint, Report, SourceFile, WorkspaceLint};
+use lint_core::{Headline, Lint, Report, SourceFile, Violation, WorkspaceLint};
 use lint_effect_sites::EffectSites;
 use lint_file::FileLint;
-use workspace_metadata::Metadata;
+use workspace_metadata::{Graph, Metadata};
 
 use owners::Owners;
 use port_crate::PortCrate;
@@ -27,10 +27,16 @@ impl WorkspaceLint for OwnedDependencies {
     fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
         Report::new(
             Headline::new(
-                "a package listed in some [package.metadata.port] owns is depended on directly only by its one owning unit, the declaring crate and the workspace proc-macro crates it depends on, in dependencies and dev-dependencies alike",
+                "a package some [package.metadata.port] owns is depended on directly only by its declaring unit, a port and the workspace proc-macro crates it depends on; a package only in an owned closure only by the units whose closure holds it, unless declared shared; and every owns entry names a package its unit depends on",
             ),
-            Owners::declared(files, &workspaces.iter().collect()).foreign(),
+            Self::flagged(&Owners::declared(files), &workspaces.iter().collect()),
         )
+    }
+}
+
+impl OwnedDependencies {
+    fn flagged<'file>(owners: &Owners<'file>, graph: &Graph<'file>) -> Vec<Violation<'file>> {
+        owners.foreign(graph.bypasses()).into_iter().chain(owners.stale(graph.stale())).collect()
     }
 }
 
