@@ -7,6 +7,7 @@ const TWO: &str = "crates/two/src/lib.rs";
 const FLAGGED: [&str; 1] = ["crates/one/src/lib.rs:1"];
 const BIG_RING: usize = 41;
 const SMALL_RING: usize = 6;
+const LINKS_IN_ROOT: usize = 20;
 const LONG_CHAIN: usize = 20_000;
 
 struct Items;
@@ -72,9 +73,8 @@ fn a_cycle_closed_through_impl_bodies_across_files_is_flagged() {
             (index + 1) % BIG_RING
         )
     };
-    let half = BIG_RING / 2;
-    let first: Vec<String> = (0..half).map(link).collect();
-    let second: Vec<String> = (half..BIG_RING).map(link).collect();
+    let first: Vec<String> = (0..LINKS_IN_ROOT).map(link).collect();
+    let second: Vec<String> = (LINKS_IN_ROOT..BIG_RING).map(link).collect();
     let root = Sources::file(ONE, Text::new(&format!("mod other;\n{}", first.concat())));
     let other = Sources::file("crates/one/src/other.rs", Text::new(&second.concat()));
     assert_eq!(Items::flagged(&[root, other]), Lines::from(FLAGGED));
