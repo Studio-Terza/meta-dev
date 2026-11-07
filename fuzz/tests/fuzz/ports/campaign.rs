@@ -1,12 +1,13 @@
 use std::ffi::OsString;
 use std::iter;
 use std::path::Path;
+use std::process::ExitCode;
 use std::time::Instant;
 
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
 use lint_runner::Cli;
-use proptest::prelude::Strategy;
+use proptest::prelude::{Strategy, prop_assert_eq};
 use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
 
 use crate::crash::Crash;
@@ -32,7 +33,9 @@ impl Campaign {
         .into_iter()
         .collect();
         let arguments = [OsString::from(root)];
-        let _ = Cli::from_args(arguments.into_iter()).report_to(&files, &mut Vec::new(), &mut Vec::new());
+        let mut explained = Vec::new();
+        let reported = Cli::from_args(arguments.into_iter()).report_to(&files, &mut Vec::new(), &mut explained);
+        prop_assert_eq!(reported == ExitCode::FAILURE, !explained.is_empty());
         Ok(())
     }
 
