@@ -2,7 +2,7 @@ use std::fmt;
 use std::num::NonZeroUsize;
 
 use lint_core::Site;
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Newtype, Wrapping};
 
 use super::super::Containment;
 use super::super::member::Member;

@@ -1,6 +1,7 @@
 mod boundary;
 
-pub use boundary::{Counter, Newtype};
-pub use newtype_derive::{Arbitrary, Display, Newtype};
+pub use boundary::{Checked, Counter, Newtype, Wrapping};
+pub use newtype_derive::{Arbitrary, Deserialize, Display, Newtype, Serialize};
 
 pub use proptest;
+pub use serde;

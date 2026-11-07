@@ -10,8 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-proptest.workspace = true
-serde.workspace = true
+newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]

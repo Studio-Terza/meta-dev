@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 use boundary::GoldenTest;
 use file_ports::Files;
-use newtype::Newtype;
+use newtype::Wrapping;
 use rust_files::RustFiles;
 use text_lines::LossyText;
 

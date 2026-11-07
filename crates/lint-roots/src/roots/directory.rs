@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use file_ports::Files;
 use lint_layout::Failure;
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Newtype, Wrapping};
 
 use crate::survey::{Fact, Survey};
 use gathered::Gathered;
@@ -59,7 +59,7 @@ impl Directory {
         match next.first() {
             Some(_) => Self::surveyed(
                 files,
-                &next.into_iter().map(Newtype::into_inner).collect::<Vec<PathBuf>>(),
+                &next.into_iter().map(Wrapping::into_inner).collect::<Vec<PathBuf>>(),
                 ignored,
                 survey,
             ),

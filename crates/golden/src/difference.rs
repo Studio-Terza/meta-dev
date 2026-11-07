@@ -8,7 +8,7 @@ use std::fmt;
 use first_change::FirstChange;
 use line::Line;
 use mark::Mark;
-use newtype::Newtype;
+use newtype::Wrapping;
 use text_lines::TextLines;
 
 use crate::Output;

@@ -39,7 +39,7 @@ impl Mode {
                     .find(|argument| argument.as_os_str() == Self::REPORT_FLAG)
                     .map_or(Mode::Gate, |_| Mode::Report)
             },
-            |(_, rest)| Mode::Query(Query::try_from(rest)),
+            |(_, rest)| Mode::Query(Query::read(rest)),
         )
     }
 

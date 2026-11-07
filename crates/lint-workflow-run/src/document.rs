@@ -1,3 +1,4 @@
+mod boundary;
 mod command;
 mod environment;
 mod found;
@@ -8,7 +9,7 @@ mod node;
 mod script;
 mod text;
 
-use saphyr::{LoadableYamlNode, MarkedYaml, ScanError, YamlData};
+use saphyr::{MarkedYaml, YamlData};
 
 use crate::actions::Actions;
 use crate::finding::Finding;
@@ -63,13 +64,5 @@ impl Document<'_> {
             }
             None => Self::judged(value, actions),
         }
-    }
-}
-
-impl<'text> TryFrom<&'text str> for Document<'text> {
-    type Error = ScanError;
-
-    fn try_from(text: &'text str) -> Result<Document<'text>, ScanError> {
-        MarkedYaml::load_from_str(text).map(Document)
     }
 }

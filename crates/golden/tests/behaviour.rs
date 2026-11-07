@@ -137,7 +137,7 @@ mod fixture {
     use console_ports::Variables;
     use file_ports::{Bytes, FileFailure, Files, Memory};
     use golden::{Golden, Mode, Output};
-    use newtype::Newtype;
+    use newtype::Wrapping;
 
     #[derive(Default)]
     pub struct Fixture {
@@ -186,7 +186,7 @@ mod fixture {
         }
 
         pub fn text(&self) -> Result<String, FileFailure> {
-            self.files.read_text(&Self::path()).map(Newtype::into_inner)
+            self.files.read_text(&Self::path()).map(Wrapping::into_inner)
         }
 
         pub fn recorded_through_the_api(text: &str) -> Option<Self> {

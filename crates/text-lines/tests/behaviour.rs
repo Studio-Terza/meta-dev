@@ -51,7 +51,7 @@ struct Read;
 
 impl Read {
     fn line(text: &&str) -> Result<String, ()> {
-        OneLine::try_from((*text).to_owned()).map(|line| line.to_string()).map_err(|_| ())
+        OneLine::try_new((*text).to_owned()).map(|line| line.to_string()).map_err(|_| ())
     }
 
     fn deserialized(json: &&str) -> Result<String, ()> {

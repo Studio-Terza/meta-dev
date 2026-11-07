@@ -5,7 +5,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Text};
-use newtype::Newtype;
+use newtype::Wrapping;
 use toml::Spanned;
 use toml::de::DeTable;
 use toml::{Table, Value};
@@ -52,7 +52,7 @@ impl Manifest {
     }
 
     fn parsed(directory: &Path, read: Result<Text, FileFailure>) -> Result<Option<Manifest>, Failure> {
-        match read.map(Newtype::into_inner).map_err(io::Error::from) {
+        match read.map(Wrapping::into_inner).map_err(io::Error::from) {
             Ok(text) => text
                 .parse::<Table>()
                 .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text), table }))

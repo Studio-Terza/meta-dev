@@ -1,9 +1,12 @@
 use std::fmt;
 
+use newtype::Checked;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotWellFormed;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(newtype::Newtype, Debug, PartialEq, Eq)]
+#[newtype(checked)]
 pub struct Attachment<'line>(&'line str);
 
 impl Attachment<'_> {
@@ -29,15 +32,14 @@ impl Attachment<'_> {
     }
 }
 
-impl<'line> TryFrom<&'line str> for Attachment<'line> {
+impl<'line> Checked for Attachment<'line> {
     type Error = NotWellFormed;
 
-    fn try_from(value: &'line str) -> Result<Attachment<'line>, NotWellFormed> {
+    fn checked<'held>(value: &'held &'line str) -> Result<&'held &'line str, NotWellFormed> {
         Some(value)
-            .filter(|value| *value == Self::NONE)
+            .filter(|value| **value == Self::NONE)
             .or_else(|| Self::owner(value).map(|_| value))
             .or_else(|| Self::labels(value).map(|_| value))
-            .map(Attachment)
             .ok_or(NotWellFormed)
     }
 }

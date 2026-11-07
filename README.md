@@ -412,19 +412,30 @@ cannot judge a slice. Main, and every pull request into main, ignore all this an
 
 ## Newtypes
 
-`#[derive(Newtype)]` implements `Newtype` (`type Inner`, `new`, `into_inner`) for a struct with one field,
+`#[derive(Newtype)]` implements `Wrapping` (`type Inner`, `into_inner`) and `Newtype` (`new`) for a struct with one field,
 tuple or named, generic or not.
 
     #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct Rounds(usize);
 
-A validated newtype has no `new`. With `#[newtype(check = ..., error = ...)]` the same derive implements
-inherent `try_new` and `into_inner` instead, and `try_new` is the only way in. The check is a function from `&Inner` to
-`Result<(), Error>`.
+A validated newtype has no `new`. With `#[newtype(checked)]` the same derive implements `Wrapping` and
+inherent `try_new` and `into_inner` instead, and `try_new` is the only way in. The rule lives on the type, in an
+`impl Checked`: a function from `&Inner` to `Result<&Inner, Error>`.
 
     #[derive(Newtype, Arbitrary, Debug)]
-    #[newtype(check = Even::check, error = Odd)]
+    #[newtype(checked)]
     struct Even(u32);
+
+    impl Checked for Even {
+        type Error = Odd;
+
+        fn checked(number: &u32) -> Result<&u32, Odd> { ... }
+    }
+
+`#[derive(Serialize, Deserialize)]` (`newtype::Serialize`, `newtype::Deserialize`) write and read a newtype as its inner
+value. Reading goes through `new`, or through `try_new` for a validated newtype, so a value its check refuses is a
+deserialization error carrying the check's message. They reach serde through `newtype::serde`, so the using crate
+needs only `newtype`.
 
 `#[derive(Arbitrary)]` (`newtype::Arbitrary`) implements proptest's `Arbitrary` through those constructors, so a validated newtype
 only generates values its check admits. It reaches proptest through `newtype::proptest`, so the using crate needs only
