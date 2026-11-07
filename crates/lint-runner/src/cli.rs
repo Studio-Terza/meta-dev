@@ -1,8 +1,10 @@
 mod boundary;
 mod mode;
 mod outcome;
+mod refusal;
 mod sources;
 mod stack_size;
+mod workspaces;
 
 use std::ffi::OsString;
 use std::fmt;
@@ -11,13 +13,16 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
 
+use console_ports::Cargo;
 use file_ports::Files;
 use lint_reader::SourceFiles;
 
 use mode::Mode;
 use outcome::Outcome;
+use refusal::Refusal;
 use sources::Sources;
 use stack_size::StackSize;
+use workspaces::Workspaces;
 
 #[derive(Debug)]
 pub struct Cli {
@@ -38,21 +43,23 @@ impl Cli {
     pub fn report_to(
         &self,
         files: &(impl Files + Sync),
+        cargo: &impl Cargo,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> ExitCode {
-        match self.mode.refusal() {
-            Some(refused) => Self::refused(refused, err),
-            None => StackSize::LINT
-                .ran(|| self.linted(&Sources::new(files, &self.roots), out, err))
+        match self.mode.workspaces(cargo, &self.roots) {
+            Ok(workspaces) => StackSize::LINT
+                .ran(|| self.linted(&Sources::new(files, &self.roots, workspaces.as_ref()), out, err))
                 .unwrap_or_else(|failure| Self::refused(&failure, err)),
+            Err(refused) => Self::refused(&refused, err),
         }
     }
 
     fn linted(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         thread::scope(|scope| {
             let helpers = self.mode.helpers(scope, sources);
-            let read = SourceFiles::read_all(sources.files(), sources.roots());
+            let read =
+                SourceFiles::read_all(sources.files(), sources.roots()).map(|readout| sources.described(readout));
             let outcome = read.as_ref().map(|readout| self.mode.outcome_of(readout, helpers, out));
             let refusal = outcome.as_ref().err().map(|failure| Self::refused(failure, err));
             let written =

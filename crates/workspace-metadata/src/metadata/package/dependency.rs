@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::crate_name::CrateName;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Dependency {
     name: CrateName,
 }

@@ -2,6 +2,7 @@ test budget, report only:
 corpus: 0 tests in 5 files, 0 of 40 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
 function names say what the function does:
 src/associated.rs:3: fn make names nothing; say what it does
 src/associated.rs:7: fn make names nothing; say what it does

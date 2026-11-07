@@ -183,9 +183,11 @@ impl Manifest {
     }
 }
 
-impl From<&Manifest> for Owned {
-    fn from(manifest: &Manifest) -> Owned {
-        Owned::from(&manifest.table)
+impl From<&Manifest> for Option<Owned> {
+    fn from(manifest: &Manifest) -> Option<Owned> {
+        DeTable::parse(manifest.text.as_ref())
+            .ok()
+            .and_then(|document| Owned::declared(&manifest.text, document.get_ref()))
     }
 }
 

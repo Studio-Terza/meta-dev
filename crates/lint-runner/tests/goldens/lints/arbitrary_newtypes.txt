@@ -2,6 +2,7 @@ test budget, report only:
 corpus: 0 tests in 4 files, 0 of 15 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/generated.rs:4: Rounds only carries values into one other file; give it the logic that consumes it
 src/ungenerated.rs:4: Rounds only carries values into one other file; give it the logic that consumes it

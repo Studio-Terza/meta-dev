@@ -2,6 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use console_ports::Cargo;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 
 pub struct FakeUnlistable<'memory> {
@@ -176,5 +177,25 @@ impl Files for FakeCounted<'_> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
+    }
+}
+
+pub struct FakeCargo(String);
+
+impl FakeCargo {
+    const EMPTY: &'static str = "{\"workspace_root\": \"/\", \"packages\": [], \"resolve\": null}";
+
+    pub fn new(metadata: String) -> FakeCargo {
+        FakeCargo(metadata)
+    }
+
+    pub fn empty() -> FakeCargo {
+        FakeCargo(Self::EMPTY.to_owned())
+    }
+}
+
+impl Cargo for FakeCargo {
+    fn metadata(&self, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
+        roots.iter().map(|_| Ok(Text::new(self.0.clone()))).collect()
     }
 }

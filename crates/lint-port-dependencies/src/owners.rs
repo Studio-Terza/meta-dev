@@ -1,44 +1,51 @@
 mod co_owned;
 mod foreign_dependency;
+mod undeclared;
+mod unit;
 
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Site, SourceFile, Violation};
-use lint_layout::{Dependency, Name};
+use lint_layout::Dependency;
 use lint_placement::PackageRoot;
+use workspace_metadata::{CrateName as PackageName, Graph};
 
 use co_owned::CoOwned;
 use foreign_dependency::ForeignDependency;
+use undeclared::Undeclared;
+use unit::Unit;
 
 #[derive(Debug)]
 pub(crate) struct Owners<'file> {
     packages: BTreeMap<&'file PackageRoot, &'file SourceFile>,
-    owning: Claims<'file>,
-    kin: Claims<'file>,
+    units: Vec<Unit<'file>>,
 }
 
-type Claims<'file> = BTreeMap<&'file Name, BTreeSet<&'file PackageRoot>>;
-
 impl<'file> Owners<'file> {
-    pub(crate) fn declared(files: &'file [SourceFile]) -> Owners<'file> {
+    pub(crate) fn declared(files: &'file [SourceFile], graph: &Graph<'file>) -> Owners<'file> {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
             files.iter().rev().map(|file| (file.placement().package(), file)).collect();
-        let owning = Self::claimed(&packages, |package| package.owned().as_ref());
-        let kin = Self::claimed(&packages, |package| package.family().as_ref());
-        Owners { packages, owning, kin }
-    }
-
-    fn claimed(
-        packages: &BTreeMap<&'file PackageRoot, &'file SourceFile>,
-        claims: impl Fn(&'file PackageRoot) -> &'file BTreeSet<Name>,
-    ) -> Claims<'file> {
-        packages.keys().flat_map(|package| claims(package).iter().map(move |name| (name, *package))).fold(
-            Claims::new(),
-            |mut claimed, (name, package)| {
-                claimed.entry(name).or_default().insert(package);
-                claimed
-            },
-        )
+        let named: BTreeMap<PackageName, &PackageRoot> = packages
+            .keys()
+            .filter_map(|package| Some((PackageName::try_from(package.root().package()?.borrow()).ok()?, *package)))
+            .collect();
+        let required = graph.macros();
+        let macros: BTreeMap<&PackageRoot, BTreeSet<&PackageRoot>> = named
+            .iter()
+            .filter(|(_, package)| package.owned().is_some())
+            .map(|(name, package)| {
+                let joined = required.get(name).into_iter().flatten().filter_map(|found| named.get(*found).copied());
+                (*package, joined.collect())
+            })
+            .collect();
+        let absorbed: BTreeSet<&PackageRoot> = macros.values().flatten().copied().collect();
+        let ports: BTreeSet<&PackageRoot> = macros.keys().copied().collect();
+        let units = ports
+            .difference(&absorbed)
+            .filter_map(|port| Unit::joined(port, packages.get(port)?, macros.get(port)?))
+            .collect();
+        Owners { packages, units }
     }
 
     pub(crate) fn foreign(&self) -> Vec<Violation<'file>> {
@@ -50,18 +57,35 @@ impl<'file> Owners<'file> {
             .collect()
     }
 
+    pub(crate) fn undeclared(&self, graph: &Graph<'file>) -> Vec<Violation<'file>> {
+        self.units
+            .iter()
+            .flat_map(|unit| {
+                graph.dominated(&unit.packages()).into_iter().map(move |reached| {
+                    Violation::new(Site::from(unit), Undeclared::new(reached, unit.port().crate_name()))
+                })
+            })
+            .collect()
+    }
+
     fn flagged(
         &self,
         package: &PackageRoot,
         file: &'file SourceFile,
         dependency: &'file Dependency,
     ) -> Option<Violation<'file>> {
-        let owners = self.owning.get(dependency.as_ref()).or_else(|| self.kin.get(dependency.as_ref()))?;
-        let other = owners.iter().find(|owner| **owner != package)?.crate_name();
+        let owners: Vec<&Unit<'file>> =
+            self.units.iter().filter(|unit| unit.owns().contains(dependency.as_ref())).collect();
+        let first = owners.first()?;
         let site = Site::new(file.manifest_file().as_ref(), dependency.line());
-        Some(owners.get(package).map_or_else(
-            || Violation::new(site, ForeignDependency::new(dependency.as_ref(), other)),
-            |_| Violation::new(site, CoOwned::new(dependency.as_ref(), other)),
-        ))
+        owners.iter().find(|unit| unit.holds(package).is_some()).map_or_else(
+            || Some(Violation::new(site, ForeignDependency::new(dependency.as_ref(), first.port().crate_name()))),
+            |_| {
+                owners
+                    .iter()
+                    .find(|unit| unit.holds(package).is_none())
+                    .map(|other| Violation::new(site, CoOwned::new(dependency.as_ref(), other.port().crate_name())))
+            },
+        )
     }
 }

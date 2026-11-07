@@ -1,0 +1,8 @@
+[package]
+name = "grammar"
+
+[package.metadata.port]
+owns = ["logos"]
+
+[dependencies]
+logos = "1"

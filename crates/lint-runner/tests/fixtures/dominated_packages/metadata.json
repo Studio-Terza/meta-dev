@@ -1,0 +1,15 @@
+{"workspace_root": "/", "workspace_members": ["grammar", "design"], "packages": [
+  {"id": "grammar", "name": "grammar", "manifest_path": "/grammar/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"]}]},
+  {"id": "design", "name": "design", "manifest_path": "/design/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"]}]},
+  {"id": "logos", "name": "logos", "manifest_path": "/r/logos/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"]}]},
+  {"id": "logos-derive", "name": "logos-derive", "manifest_path": "/r/logos-derive/Cargo.toml", "dependencies": [], "targets": [{"kind": ["proc-macro"]}]},
+  {"id": "hashbrown", "name": "hashbrown", "manifest_path": "/r/hashbrown/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"]}]},
+  {"id": "serde", "name": "serde", "manifest_path": "/r/serde/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"]}]}
+], "resolve": {"nodes": [
+  {"id": "grammar", "dependencies": ["logos"]},
+  {"id": "design", "dependencies": ["serde"]},
+  {"id": "logos", "dependencies": ["logos-derive", "hashbrown"]},
+  {"id": "logos-derive", "dependencies": []},
+  {"id": "hashbrown", "dependencies": []},
+  {"id": "serde", "dependencies": []}
+]}}

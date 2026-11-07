@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use reach_table::ReachTable;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Declared {
     reach: Option<ReachTable>,
 }

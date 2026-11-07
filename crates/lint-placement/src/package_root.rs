@@ -5,9 +5,7 @@ use crate::crate_name::CrateName;
 use crate::crate_root::CrateRoot;
 use file_ports::Files;
 use lint_layout::Dependencies;
-use lint_layout::Family;
 use lint_layout::LineNumber;
-use lint_layout::Locks;
 use lint_layout::Manifest;
 use lint_layout::Name;
 use lint_layout::Owned;
@@ -19,8 +17,7 @@ pub struct PackageRoot {
     name: CrateName,
     features: BTreeMap<Name, LineNumber>,
     untested: Untested,
-    owned: Owned,
-    family: Family,
+    owned: Option<Owned>,
     dependencies: Dependencies,
 }
 
@@ -37,13 +34,11 @@ impl PackageRoot {
             .filter_map(|(path, real)| Some((path, real.ok()?)))
             .collect();
         let canonical = |path: &Path| found.get(path).cloned();
-        let locks = Locks::read_many(files, directories);
         directories
             .iter()
             .zip(&manifests)
             .map(|(directory, manifest)| {
                 let root = CrateRoot::of_manifest(directory.as_ref(), manifest.as_ref());
-                let owned = manifest.as_ref().map(Owned::from).unwrap_or_default();
                 PackageRoot {
                     name: CrateName::from(&root),
                     root,
@@ -52,8 +47,7 @@ impl PackageRoot {
                         .as_ref()
                         .map(|manifest| manifest.untested_targets(canonical))
                         .unwrap_or_default(),
-                    family: locks.family(directory.as_ref(), &owned),
-                    owned,
+                    owned: manifest.as_ref().and_then(Option::<Owned>::from),
                     dependencies: manifest.as_ref().map(Dependencies::from).unwrap_or_default(),
                 }
             })
@@ -67,8 +61,7 @@ impl PackageRoot {
             root,
             features: BTreeMap::new(),
             untested: Untested::default(),
-            owned: Owned::default(),
-            family: Family::default(),
+            owned: None,
             dependencies: Dependencies::default(),
         }
     }
@@ -94,13 +87,8 @@ impl PackageRoot {
     }
 
     #[must_use]
-    pub fn owned(&self) -> &Owned {
-        &self.owned
-    }
-
-    #[must_use]
-    pub fn family(&self) -> &Family {
-        &self.family
+    pub fn owned(&self) -> Option<&Owned> {
+        self.owned.as_ref()
     }
 
     #[must_use]

@@ -2,7 +2,7 @@ use std::iter;
 use std::thread::Scope;
 
 use file_ports::Files;
-use lint_core::{Lint, Readout, Report};
+use lint_core::{Lint, Readout, Report, WorkspaceLint};
 use lint_layout::Failure;
 use lint_reader::SourceFiles;
 
@@ -98,7 +98,7 @@ impl Lints {
         |readout| vec![NoTestIo::report(readout.files())],
         |readout| vec![FakesAtPorts::report(readout.files())],
         |readout| vec![PortBatching::report(readout.files())],
-        |readout| vec![OwnedDependencies::report(readout.files())],
+        |readout| vec![OwnedDependencies::report(readout.files(), readout.workspaces())],
         |readout| vec![EffectsInFillers::report(readout.files())],
         |readout| vec![CountedCalls::report(readout.files())],
         |readout| vec![HiddenSqlx::report(readout.files())],
@@ -151,7 +151,7 @@ impl Lints {
     }
 
     fn helped(sources: &Sources<impl Files>, shard: Shard) -> Result<Vec<Rendered>, Failure> {
-        SourceFiles::read_all(sources.files(), sources.roots()).map(|own| Self::sharded(&own, shard))
+        SourceFiles::read_all(sources.files(), sources.roots()).map(|own| Self::sharded(&sources.described(own), shard))
     }
 
     fn sharded(readout: &Readout, shard: Shard) -> Vec<Rendered> {

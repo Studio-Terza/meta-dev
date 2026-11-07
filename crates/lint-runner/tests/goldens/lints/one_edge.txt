@@ -2,6 +2,7 @@ test budget, report only:
 corpus: 0 tests in 1 files, 0 of 19 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
 methods do their own work, they do not forward to another type of ours:
 src/lib.rs:12: fn policy only forwards to Policy::from; expose the part or call that directly
 one edge per pair: in shipped code, a set of input types reaches one output type by one written edge (function, method or trait impl), read through references, Option, Result and collections, compared where every type is a domain type; a trait impl also takes its implementing type when no input or output carries it; operations whose inputs and output are all one type (A, A -> A) are that type's algebra, judged by its laws, not edges; derived lifts and store operations are not written edges:

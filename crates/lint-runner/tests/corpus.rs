@@ -5,11 +5,14 @@ use std::process::ExitCode;
 
 use file_ports::{FileFailure, Files, Kind, Memory};
 use lint_runner::Cli;
+
+use crate::fakes::FakeCargo;
 use text_lines::Lines;
 
 const FIXTURES: &str = "tests/fixtures";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
+const METADATA: &str = "metadata.json";
 const SITE_END: &str = ": ";
 const FIX_START: &str = "; ";
 
@@ -64,9 +67,13 @@ impl Corpus {
         corpus
             .entries(fixture)?
             .iter()
+            .filter(|found| found.file_name() != Some(METADATA.as_ref()))
             .try_for_each(|found| Self::copied(corpus, found, Path::new(Self::renamed(found)), &root))?;
+        let cargo = corpus
+            .read_text(&fixture.join(METADATA))
+            .map_or_else(|_| FakeCargo::empty(), |text| FakeCargo::new(text.as_ref().to_owned()));
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
+        let exit = Cli::from_args(std::iter::empty()).report_to(&root, &cargo, &mut printed, &mut failed);
         let verdict = Some(exit).filter(|exit| *exit == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }
@@ -74,6 +81,8 @@ impl Corpus {
     fn lints() -> usize {
         [
             include_str!("../src/cli/mode/lints.rs").matches("::report(readout.files())").count(),
+            include_str!("../src/cli/mode/lints.rs").matches("::report(readout.files(), readout.workspaces())").count(),
+            include_str!("../src/cli/mode.rs").matches("::report(files, readout.workspaces())").count(),
             include_str!("../src/cli/mode/lints.rs").matches("flows.report::<").count(),
             include_str!("../src/cli/mode/lints.rs").matches("::dirty(&system)").count(),
             include_str!("../src/cli/mode.rs").matches("::report(files)").count(),

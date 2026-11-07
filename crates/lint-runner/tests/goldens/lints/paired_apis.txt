@@ -3,6 +3,7 @@ corpus: 0 tests in 1 files, 0 of 5 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 src/lib.rs:3: fn open pairs with fn close; write a guard whose Drop does the ending
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
 two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
 src/lib.rs:3: corpus::Door: open at src/lib.rs:3, close at src/lib.rs:4 share the signature (corpus::Door) -> (); distinguish the types they take or return, or keep one method and route the other through it
 fails

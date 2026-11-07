@@ -1,5 +1,6 @@
 mod declared;
 mod dependency;
+mod target;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -7,20 +8,33 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
+use crate::package_id::PackageId;
 use declared::Declared;
 use dependency::Dependency;
+use target::{Kind, Target};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Package {
+    id: Option<PackageId>,
     name: CrateName,
     manifest_path: PathBuf,
     dependencies: Vec<Dependency>,
     metadata: Option<Declared>,
+    #[serde(default)]
+    targets: Vec<Target>,
 }
 
 impl Package {
     pub fn name(&self) -> &CrateName {
         &self.name
+    }
+
+    pub fn identity(&self) -> Option<&PackageId> {
+        self.id.as_ref()
+    }
+
+    pub fn proc_macro(&self) -> Option<&Package> {
+        self.targets.iter().flat_map(AsRef::as_ref).find(|kind| **kind == Kind::ProcMacro).map(|_| self)
     }
 
     pub fn readings(&self) -> &[PathBuf] {

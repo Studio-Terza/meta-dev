@@ -2,9 +2,10 @@ mod owners;
 mod port_crate;
 mod reserved_names;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, Lint, Report, SourceFile, WorkspaceLint};
 use lint_effect_sites::EffectSites;
 use lint_file::FileLint;
+use workspace_metadata::{Graph, Metadata};
 
 use owners::Owners;
 use port_crate::PortCrate;
@@ -12,6 +13,9 @@ use reserved_names::{CountedName, ReservedNames, SqlxName};
 
 #[derive(Debug)]
 pub struct OwnedDependencies;
+
+#[derive(Debug)]
+pub struct DominatedPackages;
 
 #[derive(Debug)]
 pub struct EffectsInFillers;
@@ -22,13 +26,27 @@ pub struct CountedCalls;
 #[derive(Debug)]
 pub struct HiddenSqlx;
 
-impl Lint for OwnedDependencies {
-    fn report(files: &[SourceFile]) -> Report<'_> {
+impl WorkspaceLint for OwnedDependencies {
+    fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
         Report::new(
             Headline::new(
-                "a dependency some crate owns through [package.metadata.port] owns has that one owner and is depended on by no other crate, in dependencies and dev-dependencies alike",
+                "a package listed in some [package.metadata.port] owns is depended on directly only by its one owning unit, the declaring crate and the workspace proc-macro crates it depends on, in dependencies and dev-dependencies alike",
             ),
-            Owners::declared(files).foreign(),
+            Owners::declared(files, &workspaces.iter().collect()).foreign(),
+        )
+    }
+}
+
+impl WorkspaceLint for DominatedPackages {
+    fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
+        Report::new(
+            Headline::new(
+                "report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns",
+            ),
+            {
+                let graph: Graph<'file> = workspaces.iter().collect();
+                Owners::declared(files, &graph).undeclared(&graph)
+            },
         )
     }
 }

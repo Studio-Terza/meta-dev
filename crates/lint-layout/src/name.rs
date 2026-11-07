@@ -4,6 +4,7 @@ mod length;
 mod lowered;
 mod prefix;
 
+use std::borrow::Borrow;
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::Path;
@@ -105,6 +106,12 @@ impl Name {
 impl From<&str> for Name {
     fn from(text: &str) -> Name {
         Name(text.to_owned())
+    }
+}
+
+impl Borrow<str> for Name {
+    fn borrow(&self) -> &str {
+        &self.0
     }
 }
 

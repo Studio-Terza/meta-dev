@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [package.metadata.port]
-owns = ["sqlx-macros-core"]
+owns = ["sqlx-macros", "sqlx-macros-core"]
 
 [package.metadata.lockstep]
 sqlx-macros-core = "sqlx"
