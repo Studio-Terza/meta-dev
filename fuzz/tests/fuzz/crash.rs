@@ -36,11 +36,11 @@ pub struct Failing {
 }
 
 impl Failing {
-    pub fn new(input: Input, reason: String, kept: Kept) -> Self {
+    pub const fn new(input: Input, reason: String, kept: Kept) -> Self {
         Self { input, reason, kept }
     }
 
-    pub fn input(&self) -> &Input {
+    pub const fn input(&self) -> &Input {
         &self.input
     }
 }

@@ -12,7 +12,7 @@ pub struct Fraction {
 impl Fraction {
     const PLACES: usize = 1_000;
 
-    pub fn of(part: usize, whole: usize) -> Self {
+    pub const fn of(part: usize, whole: usize) -> Self {
         Self { part, whole }
     }
 }
@@ -30,7 +30,7 @@ pub struct Report {
 }
 
 impl Report {
-    pub fn named(scenario: &'static str) -> Self {
+    pub const fn named(scenario: &'static str) -> Self {
         Self { scenario }
     }
 

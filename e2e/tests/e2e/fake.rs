@@ -11,7 +11,7 @@ pub enum Edit {
 }
 
 impl Edit {
-    fn status(self) -> &'static str {
+    const fn status(self) -> &'static str {
         match self {
             Self::Modified => "M",
             Self::Added => "A",
@@ -26,7 +26,7 @@ pub struct Change {
 }
 
 impl Change {
-    pub fn new(edit: Edit, path: PathBuf) -> Self {
+    pub const fn new(edit: Edit, path: PathBuf) -> Self {
         Self { edit, path }
     }
 }

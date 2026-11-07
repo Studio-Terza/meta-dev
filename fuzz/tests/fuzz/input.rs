@@ -11,7 +11,7 @@ impl Role {
 
     const MANIFEST_TEXT: &'static str = "[package]\nname = \"fuzzed\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
 
-    fn file(self) -> &'static str {
+    const fn file(self) -> &'static str {
         match self {
             Self::Library | Self::Manifest => "src/lib.rs",
             Self::Binary => "src/main.rs",
@@ -27,7 +27,7 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(role: Role, bytes: Vec<u8>) -> Self {
+    pub const fn new(role: Role, bytes: Vec<u8>) -> Self {
         Self { role, bytes }
     }
 
@@ -35,7 +35,7 @@ impl Input {
         &self.bytes
     }
 
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self.role {
             Role::Library => "library",
             Role::Binary => "binary",
@@ -44,7 +44,7 @@ impl Input {
         }
     }
 
-    pub fn file(&self) -> &'static str {
+    pub const fn file(&self) -> &'static str {
         self.role.file()
     }
 

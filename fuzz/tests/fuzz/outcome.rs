@@ -35,7 +35,7 @@ impl Outcome {
 }
 
 impl Check {
-    fn silent(verdict: Verdict) -> Self {
+    const fn silent(verdict: Verdict) -> Self {
         match verdict {
             Verdict::Clean => Self::Held,
             Verdict::Violations | Verdict::Refused => Self::FailingRunSilent(verdict),

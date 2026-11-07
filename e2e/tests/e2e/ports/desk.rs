@@ -55,7 +55,7 @@ impl Scope {
         }
     }
 
-    pub fn mutated(&self) -> &BTreeSet<String> {
+    pub const fn mutated(&self) -> &BTreeSet<String> {
         &self.mutated
     }
 }
