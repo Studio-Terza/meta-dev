@@ -8,7 +8,7 @@ use std::io::Write;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Invocation, Ports, Run, Text};
 use listed::Listed;
-use newtype::Newtype;
+use newtype::Wrapping;
 use number::Number;
 pub use title::Title;
 

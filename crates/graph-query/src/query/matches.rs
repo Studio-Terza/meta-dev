@@ -2,7 +2,7 @@ use std::cmp::Reverse;
 use std::fmt;
 
 use lint_layout::Name;
-use newtype::Newtype;
+use newtype::Wrapping;
 use type_facts::{Method, MethodShape};
 
 use crate::query::candidate::Candidate;

@@ -54,6 +54,19 @@ impl Resolved {
         }
     }
 
+    #[must_use]
+    pub fn known(&self) -> Option<&Resolved> {
+        match self {
+            Resolved::Unknown(_) => None,
+            Resolved::Std(_)
+            | Resolved::StdTrait(_)
+            | Resolved::Crate(_)
+            | Resolved::External(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_) => Some(self),
+        }
+    }
+
     pub(crate) fn parameter(&self) -> Option<&Name> {
         match self {
             Resolved::Param(name) => Some(name),

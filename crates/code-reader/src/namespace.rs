@@ -20,6 +20,7 @@ use lint_layout::Name;
 use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::ScopeId;
+pub(crate) use code_model::Domain;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Visibility};
 pub(crate) use items::ItemIds;
 pub(crate) use resolver::Resolver;
@@ -28,8 +29,21 @@ use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;
 pub(crate) use std_names::StdNames;
-pub(crate) use tables::Domain;
 pub(crate) use use_path::UsePath;
+
+#[derive(Debug)]
+pub(crate) struct Export {
+    root: ScopeId,
+    path: UsePath,
+    domain: Domain,
+}
+
+impl Export {
+    pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>, mut building: Building) -> Building {
+        building.export(self.domain, self.path.written(), &resolving.path(self.root, &self.path, self.domain));
+        building
+    }
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct Namespace<'read> {
@@ -59,6 +73,20 @@ impl<'read> Namespace<'read> {
             .zip(Some(declared))
             .into_iter()
             .for_each(|(entries, declared)| entries.declare(declared));
+    }
+
+    pub(crate) fn exports(&self) -> Vec<Export> {
+        self.crates
+            .iter()
+            .filter_map(|(krate, root)| Some((*krate, *root, root.row(&self.scopes)?)))
+            .flat_map(|(krate, root, row)| {
+                row.entries().exported().map(move |key| Export {
+                    root,
+                    path: UsePath::exported(krate, key.name()),
+                    domain: key.domain(),
+                })
+            })
+            .collect()
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {

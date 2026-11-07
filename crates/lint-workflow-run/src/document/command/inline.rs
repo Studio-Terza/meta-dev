@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::ffi::OsStr;
 use std::str::FromStr;
 
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::document::text::Text;
 use crate::word::Word;

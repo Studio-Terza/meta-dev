@@ -1,7 +1,7 @@
 use std::fmt;
 
 use lint_layout::Name;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::super::Containment;
 use super::super::slice::Slice;

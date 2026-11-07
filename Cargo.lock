@@ -678,9 +678,9 @@ dependencies = [
 name = "lint-no-plaintext"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1140,6 +1140,9 @@ dependencies = [
  "laws",
  "newtype-derive",
  "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -1416,8 +1419,7 @@ name = "text-lines"
 version = "0.1.0"
 dependencies = [
  "laws",
- "proptest",
- "serde",
+ "newtype",
  "serde_json",
  "thiserror",
 ]

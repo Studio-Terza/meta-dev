@@ -1,6 +1,6 @@
 use syn::{Ident, ItemUse, Path, Token, UseTree};
 
-use code_model::{ItemPath, Primitive};
+use code_model::{Domain, ItemPath, Primitive};
 use lint_layout::{Name, Whole, Word, words};
 
 use super::Namespace;
@@ -10,7 +10,6 @@ use super::boundary::ScopeId;
 use super::entries::Imported;
 use super::resolver::{Outer, Resolution, Resolver};
 use super::std_names::{Canonical, StdNames, Table};
-use super::tables::Domain;
 use super::view::View;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -88,7 +87,7 @@ impl Shape {
         Outer::known_or(known, || self.unbound(first, reading))
     }
 
-    fn primitive(self, first: &Name) -> Option<Primitive> {
+    pub(super) fn primitive(self, first: &Name) -> Option<Primitive> {
         match self {
             Shape::Single => StdNames::primitive(first),
             Shape::Multiple => None,
@@ -102,10 +101,10 @@ impl Shape {
         }
     }
 
-    fn derived(self, first: &Name, resolver: &Resolver<'_, '_>, path: &UsePath, viewer: ScopeId) -> Resolution {
+    fn looked(self, domain: Domain) -> Domain {
         match self {
-            Shape::Single => resolver.macro_named(first, viewer),
-            Shape::Multiple => resolver.path(path, viewer),
+            Shape::Single => domain,
+            Shape::Multiple => Domain::Types,
         }
     }
 
@@ -117,35 +116,44 @@ impl Shape {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Relative<'path> {
+    first: &'path Name,
+    shape: Shape,
+    reading: Reading,
+}
+
+impl Relative<'_> {
+    fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
+        match self.shape.looked(domain) {
+            Domain::Types => resolver.named(self.first, self.shape, self.reading, viewer),
+            Domain::Macros => resolver.macro_named(self.first, viewer),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum Head<'path> {
     Empty,
     Global(&'path Name),
     Anchored(Anchor),
-    Named(&'path Name, Shape, Reading),
+    Named(Relative<'path>),
 }
 
 impl Head<'_> {
-    pub(super) fn derived(self, resolver: &Resolver<'_, '_>, path: &UsePath, viewer: ScopeId) -> Resolution {
-        match self {
-            Head::Named(first, shape, _) => shape.derived(first, resolver, path, viewer),
-            Head::Empty | Head::Global(_) | Head::Anchored(_) => resolver.path(path, viewer),
-        }
-    }
-
-    pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId) -> Resolution {
+    pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
         match self {
             Head::Empty => Resolution::Bound(Binding::Unknown),
             Head::Global(first) => resolver.global(first),
             Head::Anchored(anchor) => resolver.anchored(anchor, viewer),
-            Head::Named(first, shape, reading) => resolver.named(first, shape, reading, viewer),
+            Head::Named(relative) => relative.started(resolver, viewer, domain),
         }
     }
 
     fn relative<'path>(first: &'path Name, rest: &[Name], reading: Reading) -> Head<'path> {
         match Anchor::spelled(first) {
             Some(anchor) => Head::Anchored(anchor),
-            None => Head::Named(first, Shape::from(rest), reading),
+            None => Head::Named(Relative { first, shape: Shape::from(rest), reading }),
         }
     }
 }
@@ -218,11 +226,8 @@ impl UsePath {
         self.segments.get(1..).unwrap_or_default()
     }
 
-    pub(super) fn bound(&self, domain: Domain, resolver: &Resolver<'_, '_>, viewer: ScopeId) -> Resolution {
-        match domain {
-            Domain::Types => resolver.path(self, viewer),
-            Domain::Macros => self.head().derived(resolver, self, viewer),
-        }
+    pub(super) fn exported(krate: &Name, entry: &Name) -> UsePath {
+        UsePath { leading: Leading::Global, reading: Reading::Written, segments: vec![krate.clone(), entry.clone()] }
     }
 
     pub(crate) fn written(&self) -> ItemPath {

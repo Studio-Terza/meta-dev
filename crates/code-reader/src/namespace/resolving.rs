@@ -1,9 +1,8 @@
-use code_model::Resolved;
+use code_model::{Domain, Resolved};
 
 use super::boundary::ScopeId;
 use super::items::ItemIds;
 use super::resolver::Resolver;
-use super::tables::Domain;
 use super::use_path::UsePath;
 
 #[derive(Clone, Copy, Debug)]
@@ -18,6 +17,6 @@ impl<'ids, 'tables, 'rows> Resolving<'ids, 'tables, 'rows> {
     }
 
     pub(crate) fn path(&self, scope: ScopeId, path: &UsePath, domain: Domain) -> Resolved {
-        path.bound(domain, &self.resolver, scope).forced().resolved(self.ids, path.written())
+        self.resolver.path(path, scope, domain).forced().resolved(self.ids, path.written())
     }
 }

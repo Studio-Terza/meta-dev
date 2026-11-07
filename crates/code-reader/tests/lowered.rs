@@ -114,10 +114,6 @@ struct HeldRow {
 }
 
 impl HeldRow {
-    fn new(name: &str, held: Held) -> HeldRow {
-        HeldRow { name: name.to_owned(), held, declares: None }
-    }
-
     fn declaring(name: &str, held: Held) -> HeldRow {
         HeldRow { name: name.to_owned(), held, declares: Some(Declares::Item) }
     }
@@ -253,17 +249,17 @@ fn self_is_not_a_written_spelling() {
 const HOLDINGS: &str = "struct Pair<T = u8>(T, u8);\nstruct Count(usize);\nenum E<T = u8> {\n    A(u8),\n    B { b: u8 },\n}\nunion U {\n    a: u8,\n}\nconst C: u8 = 1;\ntype A = u8;\n";
 
 #[test]
-fn every_field_struct_parameter_and_alias_is_read_with_its_kind() {
+fn every_field_struct_parameter_and_alias_is_read_with_its_kind_and_item() {
     assert_eq!(
         Read::held(HOLDINGS),
         [
             HeldRow::declaring("Pair", Held::StructParameter),
-            HeldRow::new("Pair", Held::StructField),
-            HeldRow::new("Pair", Held::StructField),
+            HeldRow::declaring("Pair", Held::StructField),
+            HeldRow::declaring("Pair", Held::StructField),
             HeldRow::declaring("Count", Held::NewtypeField),
-            HeldRow::new("A", Held::EnumField),
-            HeldRow::new("b", Held::EnumField),
-            HeldRow::new("a", Held::UnionField),
+            HeldRow::declaring("A", Held::EnumField),
+            HeldRow::declaring("b", Held::EnumField),
+            HeldRow::declaring("a", Held::UnionField),
             HeldRow::declaring("A", Held::Alias),
         ]
     );

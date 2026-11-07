@@ -2,7 +2,7 @@ mod located;
 
 use std::path::Path;
 
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::Text;
 pub use located::Located;

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::boundary::ItemId;
+use crate::domain::Domain;
 use crate::item::{Alias, Item};
 use crate::item_path::ItemPath;
 use crate::resolved::Resolved;
@@ -45,11 +46,20 @@ impl Aliases {
 pub(crate) struct Declarations {
     items: Vec<Item>,
     aliases: Aliases,
+    exports: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
 }
 
 impl Declarations {
-    pub(crate) fn new(items: Vec<Item>, aliases: Aliases) -> Declarations {
-        Declarations { items, aliases }
+    pub(crate) fn new(
+        items: Vec<Item>,
+        aliases: Aliases,
+        exports: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
+    ) -> Declarations {
+        Declarations { items, aliases, exports }
+    }
+
+    pub(crate) fn exports(&self) -> &BTreeMap<Domain, BTreeMap<ItemPath, Resolved>> {
+        &self.exports
     }
 
     pub(crate) fn items(&self) -> &[Item] {

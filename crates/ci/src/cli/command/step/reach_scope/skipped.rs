@@ -1,4 +1,5 @@
 use std::fmt;
+use std::str::FromStr;
 
 use text_lines::Lines;
 
@@ -15,10 +16,10 @@ impl Skipped {
     const EMPTY: char = '=';
 }
 
-impl TryFrom<&str> for Skipped {
-    type Error = NotSkipped;
+impl FromStr for Skipped {
+    type Err = NotSkipped;
 
-    fn try_from(line: &str) -> Result<Skipped, NotSkipped> {
+    fn from_str(line: &str) -> Result<Skipped, NotSkipped> {
         line.char_indices()
             .last()
             .filter(|(_, last)| *last == Self::EMPTY)
@@ -28,20 +29,16 @@ impl TryFrom<&str> for Skipped {
     }
 }
 
-impl fmt::Display for Skipped {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "skipped: {} is empty, so the steps that use it do not run", self.0)
-    }
-}
-
 impl From<&str> for Skips {
     fn from(report: &str) -> Skips {
-        Skips(Lines::from(report).filter_map(|line| Skipped::try_from(line).ok()).collect())
+        Skips(Lines::from(report).filter_map(|line| line.parse::<Skipped>().ok()).collect())
     }
 }
 
 impl fmt::Display for Skips {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.iter().try_for_each(|skipped| writeln!(formatter, "{skipped}"))
+        self.0.iter().try_for_each(|Skipped(scope)| {
+            writeln!(formatter, "skipped: {scope} is empty, so the steps that use it do not run")
+        })
     }
 }

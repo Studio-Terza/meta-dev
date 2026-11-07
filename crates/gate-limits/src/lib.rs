@@ -16,7 +16,7 @@ use file_ports::{Bytes, Files};
 use gate::Finding;
 use gate::Gate;
 use gate::Record;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 #[derive(Debug)]
 pub struct Cli {

@@ -67,7 +67,7 @@ type Check = for<'file> fn(&'file Readout, &'file Queue) -> Vec<Report<'file>>;
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
 impl Lints {
-    const CHECKS: [Check; 45] = [
+    const CHECKS: [Check; 44] = [
         |readout, _| vec![NoComments::report(readout.files())],
         |readout, _| vec![NoFreeFns::report(readout.files())],
         |readout, _| vec![ThinMain::report(readout.files())],
@@ -85,7 +85,6 @@ impl Lints {
         |readout, _| vec![NoForwarders::report(readout.files())],
         |readout, _| vec![NoNumbersInBinaries::report(readout.files())],
         |readout, _| vec![NoParameterBags::report(readout.files())],
-        |readout, _| vec![NoPlaintext::report(readout.files())],
         |readout, queue| vec![<PrimitiveBoundary as ModelLint>::report(queue.model(readout))],
         |readout, _| vec![PrivateFns::report(readout.files())],
         |readout, _| vec![ProcessStarters::report(readout.files())],
@@ -125,7 +124,7 @@ impl Lints {
         |readout, _| vec![WorkflowRun::report(readout.repo_files())],
     ];
 
-    const QUERIES: [Query; 1] = [<HandImpls as ModelLint>::report];
+    const QUERIES: [Query; 2] = [<HandImpls as ModelLint>::report, <NoPlaintext as ModelLint>::report];
 
     pub fn started<'scope, F: Files + Sync>(
         scope: &'scope Scope<'scope, '_>,

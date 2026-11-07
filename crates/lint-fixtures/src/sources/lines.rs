@@ -1,6 +1,6 @@
 use std::fmt;
 
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Newtype, Wrapping};
 
 use super::Flagged;
 

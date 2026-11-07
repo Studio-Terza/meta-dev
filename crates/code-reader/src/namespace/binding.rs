@@ -1,4 +1,4 @@
-use code_model::{ItemId, ItemPath, Primitive, Resolved};
+use code_model::{Domain, ItemId, ItemPath, Primitive, Resolved};
 use lint_layout::Name;
 
 use super::boundary::ScopeId;
@@ -16,15 +16,23 @@ pub(crate) enum Binding {
     External(ItemPath),
     Primitive(Primitive),
     Unknown,
+    Absent,
 }
 
 impl Binding {
-    pub(super) fn stepped(self, segment: &Name, entered: impl FnOnce(ScopeId) -> Resolution) -> Resolution {
+    pub(super) fn stepped(
+        self,
+        segment: &Name,
+        domain: Domain,
+        entered: impl FnOnce(ScopeId) -> Resolution,
+    ) -> Resolution {
         match self {
             Binding::Module(module) => entered(module),
             Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
-            Binding::External(path) => Resolution::Bound(Binding::External(path.joined(segment))),
-            Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown => Resolution::Bound(Binding::Unknown),
+            Binding::External(path) => Resolution::Bound(Binding::reached(&path, segment, domain)),
+            Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown | Binding::Absent => {
+                Resolution::Bound(Binding::Unknown)
+            }
         }
     }
 
@@ -32,7 +40,9 @@ impl Binding {
         match self {
             Binding::Module(module) => Target::Module(module, sight_of(module)),
             Binding::Std(path) => Target::listed(&path),
-            Binding::Item(..) | Binding::External(_) | Binding::Primitive(_) | Binding::Unknown => Target::Opaque,
+            Binding::Item(..) | Binding::External(_) | Binding::Primitive(_) | Binding::Unknown | Binding::Absent => {
+                Target::Opaque
+            }
         }
     }
 
@@ -49,12 +59,26 @@ impl Binding {
             Binding::Std(path) => StdNames::resolved(path),
             Binding::External(path) => Resolved::External(path),
             Binding::Primitive(primitive) => Resolved::Primitive(primitive),
-            Binding::Module(_) | Binding::Unknown => Resolved::Unknown(written),
+            Binding::Module(_) | Binding::Unknown | Binding::Absent => Resolved::Unknown(written),
         }
     }
 }
 
 impl Binding {
+    fn reached(module: &ItemPath, segment: &Name, domain: Domain) -> Binding {
+        match domain {
+            Domain::Types => Binding::External(module.joined(segment)),
+            Domain::Macros => Binding::macro_at(module, segment),
+        }
+    }
+
+    fn macro_at(module: &ItemPath, segment: &Name) -> Binding {
+        match module.as_ref().split_first().and_then(|(_, inner)| inner.first()) {
+            Some(_) => Binding::Unknown,
+            None => Binding::External(module.joined(segment)),
+        }
+    }
+
     fn issued(item: Option<ItemId>, written: ItemPath) -> Resolved {
         match item {
             Some(item) => Resolved::Crate(item),

@@ -412,19 +412,32 @@ cannot judge a slice. Main, and every pull request into main, ignore all this an
 
 ## Newtypes
 
-`#[derive(Newtype)]` implements `Newtype` (`type Inner`, `new`, `into_inner`) for a struct with one field,
+`#[derive(Newtype)]` implements `Wrapping` (`type Inner`, `into_inner`) and `Newtype` (`new`) for a struct with one field,
 tuple or named, generic or not.
 
     #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct Rounds(usize);
 
-A validated newtype has no `new`. With `#[newtype(check = ..., error = ...)]` the same derive implements
-inherent `try_new` and `into_inner` instead, and `try_new` is the only way in. The check is a function from `&Inner` to
-`Result<(), Error>`.
+A validated newtype has no `new`. With `#[newtype(checked)]` the same derive implements `Wrapping` and
+inherent `try_new` and `into_inner` instead, and `try_new` is the only way in. The rule lives on the type, in an
+`impl Checked`: a function from `&Inner` to `Result<&Inner, Error>`.
 
     #[derive(Newtype, Arbitrary, Debug)]
-    #[newtype(check = Even::check, error = Odd)]
+    #[newtype(checked)]
     struct Even(u32);
+
+    impl Checked for Even {
+        type Error = Odd;
+
+        fn checked(number: &u32) -> Result<&u32, Odd> { ... }
+    }
+
+`#[derive(Serialize, Deserialize)]` (`newtype::Serialize`, `newtype::Deserialize`) write and read a newtype as its inner
+value; `Deserialize` reads through `Newtype::new`, so only an unchecked newtype can derive it. A validated newtype
+derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through the type's `impl Checked` and is
+bounded by `Self: Checked`, so it does not compile without the check. A value the check refuses is a deserialization
+error carrying the check's message, so `Checked::Error` implements `Display`. They reach serde through `newtype::serde`,
+so the using crate needs only `newtype`.
 
 `#[derive(Arbitrary)]` (`newtype::Arbitrary`) implements proptest's `Arbitrary` through those constructors, so a validated newtype
 only generates values its check admits. It reaches proptest through `newtype::proptest`, so the using crate needs only
@@ -451,7 +464,7 @@ counts as `Inner`); a `const fn` is never counted, since a trait method cannot b
 
 Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; a public trait declaration is checked like a public function, a private one is not, and a type alias is read through (`type Label = String;` then `pub fn f(x: Label)` is flagged, the alias itself is not); use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
-Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
+Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: it derives `newtype::CheckedDeserialize`, or it has `#[serde(try_from = ...)]` with a written `TryFrom` impl. An `impl Checked` beside an unchecked derive, or a hand-written `Deserialize`, does not validate. The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
 
 ## Guards
 

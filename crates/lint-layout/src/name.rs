@@ -16,7 +16,7 @@ pub use camel_word::CamelWord;
 pub use casing::Casing;
 pub use length::Length;
 pub use lowered::Lowered;
-use newtype::Newtype;
+use newtype::Wrapping;
 use newtype::proptest::arbitrary::{Arbitrary, any};
 use newtype::proptest::strategy::{BoxedStrategy, Strategy};
 pub use prefix::Prefix;

@@ -34,10 +34,8 @@ pub(crate) struct Reading {
     expecting: Expecting,
 }
 
-impl TryFrom<&[OsString]> for Query {
-    type Error = QueryFailure;
-
-    fn try_from(arguments: &[OsString]) -> Result<Query, QueryFailure> {
+impl Query {
+    pub fn read(arguments: &[OsString]) -> Result<Query, QueryFailure> {
         let start = Reading { query: Query::default(), expecting: Expecting::Word };
         let finished = arguments.iter().try_fold(start, |reading, argument| {
             argument.to_str().ok_or(QueryFailure::Unreadable).and_then(|word| reading.next(word))

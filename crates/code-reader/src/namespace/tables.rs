@@ -3,6 +3,7 @@ mod components;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::ControlFlow;
 
+use code_model::Domain;
 use lint_layout::Name;
 
 use super::boundary::{GlobId, Lattice, ScopeId};
@@ -10,16 +11,6 @@ use super::entries::{Sight, Visibility};
 use super::use_path::Reading;
 use super::view::View;
 use components::{Components, Settling};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Domain {
-    Types,
-    Macros,
-}
-
-impl Domain {
-    const ALL: [Domain; 2] = [Domain::Types, Domain::Macros];
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Key<'name> {
@@ -30,6 +21,14 @@ pub(super) struct Key<'name> {
 impl<'name> Key<'name> {
     pub(super) fn new(domain: Domain, name: &'name Name) -> Key<'name> {
         Key { domain, name }
+    }
+
+    pub(super) fn domain(self) -> Domain {
+        self.domain
+    }
+
+    pub(super) fn name(self) -> &'name Name {
+        self.name
     }
 
     pub(super) fn every(name: &'name Name) -> impl Iterator<Item = Key<'name>> {

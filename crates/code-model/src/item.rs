@@ -13,6 +13,7 @@ pub enum ItemKind {
     Union,
     Trait,
     Alias,
+    Derive,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
