@@ -1,8 +1,7 @@
-use std::collections::BTreeSet;
 use std::io::Write;
 
 use design_model::{Ordinal, Prefix};
-use design_store::{Prefixed, ShownMessage, Spoken, Stored};
+use design_store::{ShownMessage, Started, Stored};
 use newtype::Newtype;
 use store_ports::Store;
 use structurer::SegmentRef;
@@ -41,14 +40,13 @@ impl Shown {
     }
 
     fn prefixed(store: &impl Store, prefix: &Prefix) -> Result<Stored, Failure> {
-        let spoken = store.read(Prefixed::from(prefix.clone()))?;
-        let messages: BTreeSet<&Uuid> = spoken.iter().map(Spoken::segment).map(AsRef::as_ref).collect();
-        let [message] = <[&Uuid; 1]>::try_from(messages.into_iter().collect::<Vec<&Uuid>>()).map_err(|found| {
+        let messages = store.read(Started::from(prefix.clone()))?;
+        let [message] = <[Uuid; 1]>::try_from(messages).map_err(|found| {
             found
                 .first()
                 .map_or_else(|| Unmatched::NoMatch(prefix.clone()), |_several| Unmatched::Ambiguous(prefix.clone()))
         })?;
-        let stored = store.read(ShownMessage::named(message.clone()))?;
+        let stored = store.read(ShownMessage::named(message))?;
         stored.ok_or_else(|| Failure::from(Unmatched::NoMatch(prefix.clone())))
     }
 }

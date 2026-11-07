@@ -2195,6 +2195,13 @@ fn show_takes_the_message_and_segment_prefixes_apply_takes_and_refuses_an_ambigu
     assert!(matches!(applying.run(&["show", "abcdef01.0"]), Err(Failure::Unmatched(Unmatched::Ambiguous(_)))));
     assert!(matches!(applying.run(&["show", "fedcba98"]), Err(Failure::Unmatched(Unmatched::NoMatch(_)))));
     assert!(matches!(applying.run(&["show", "12345678.7"]), Err(Failure::Unresolved(Unresolved::Unsegmented(_)))));
+    let applied = applying.applied("conversational(12345678.1)");
+    assert!(applied.is_ok(), "{applied:?}");
+    assert!(matches!(
+        applying.applied("conversational(abcdef01.0)"),
+        Err(Failure::Unresolved(Unresolved::Ambiguous(_)))
+    ));
+    assert!(matches!(applying.applied("conversational(fedcba98.0)"), Err(Failure::Unresolved(Unresolved::Unheard(_)))));
     Ok(())
 }
 
@@ -2246,3 +2253,84 @@ fn review_a_seven_character_prefix_is_shown_whatever_its_first_character() -> Re
     assert!(numbered.is_ok(), "{numbered:?}");
     Ok(())
 }
+
+const STEMS: [&str; 3] = ["aaaa1111", "aaaa1112", "bbbb2222"];
+
+const SAYINGS: [&str; 3] = ["", "word", "1. word\\n2. more word"];
+
+#[derive(Clone, Debug)]
+struct Uttered {
+    stem: &'static str,
+    owner: bool,
+    text: &'static str,
+    back: Option<usize>,
+}
+
+struct Echoes;
+
+impl Echoes {
+    fn uttered() -> BoxedStrategy<Vec<Uttered>> {
+        proptest::collection::vec(
+            (select(STEMS.to_vec()), any::<bool>(), select(SAYINGS.to_vec()), proptest::option::of(0usize..3))
+                .prop_map(|(stem, owner, text, back)| Uttered { stem, owner, text, back }),
+            1..6,
+        )
+        .boxed()
+    }
+
+    fn uuid(stem: &str, index: usize) -> String {
+        format!("{stem}-0000-4000-8000-{index:012}")
+    }
+
+    fn uuids(uttered: &[Uttered]) -> Vec<String> {
+        uttered.iter().enumerate().map(|(index, said)| Echoes::uuid(said.stem, index)).collect()
+    }
+
+    fn session(uttered: &[Uttered]) -> Session {
+        let uuids = Echoes::uuids(uttered);
+        Session::working(
+            uttered
+                .iter()
+                .zip(&uuids)
+                .enumerate()
+                .map(|(index, (said, uuid))| {
+                    let speaker = if said.owner { Speaker::Owner } else { Speaker::Lead };
+                    let parent = said
+                        .back
+                        .and_then(|back| index.checked_sub(back.saturating_add(1)))
+                        .and_then(|earlier| uuids.get(earlier))
+                        .map_or_else(|| "null".to_owned(), |earlier| format!("\"{earlier}\""));
+                    Session::line(speaker, uuid, &parent, said.text)
+                })
+                .collect(),
+        )
+    }
+
+    fn refs(line: Line) -> Vec<String> {
+        match line {
+            Line::Message { uuid, .. } => vec![uuid.to_string()],
+            Line::Segment { segment, .. } | Line::Hit { segment, .. } => vec![segment.to_string()],
+            Line::Link { source, target, .. } => vec![source.to_string(), target.to_string()],
+            _ => Vec::new(),
+        }
+    }
+
+    fn failed(failure: Failure) -> TestCaseError {
+        TestCaseError::fail(failure.to_string())
+    }
+}
+
+laws::law!(every_ref_that_show_or_search_prints_is_shown, Echoes::uttered(), uttered, {
+    let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Echoes::session(&uttered).files() };
+    applying.run(&["ingest"]).map_err(Echoes::failed)?;
+    let printed = Echoes::uuids(&uttered)
+        .iter()
+        .map(|uuid| applying.run(&["show", uuid]))
+        .chain([applying.run(&["search", "--all", "word"])])
+        .collect::<Result<String, Failure>>()
+        .map_err(Echoes::failed)?;
+    let refs: Vec<String> = Spread::parsed(&printed).into_iter().flat_map(Echoes::refs).collect();
+    prop_assert!(refs.len() >= uttered.len(), "{}", printed);
+    let refused: Vec<&String> = refs.iter().filter(|reference| applying.run(&["show", reference]).is_err()).collect();
+    prop_assert_eq!(refused, Vec::<&String>::new(), "{}", printed);
+});

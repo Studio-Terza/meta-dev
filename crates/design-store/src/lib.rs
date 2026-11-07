@@ -35,7 +35,7 @@ pub use graph::{Cast, Linked, Planting, Resolved, Resolving, Restaged};
 use link::Link;
 pub use placed::Placed;
 pub use placement::Placement;
-pub use prefixed::{NextNode, Prefixed, Spoken};
+pub use prefixed::{NextNode, Prefixed, Spoken, Started};
 pub use prefixes::{Prefixes, Shortest};
 pub use project_root::ProjectRoot;
 use relative::Relative;
