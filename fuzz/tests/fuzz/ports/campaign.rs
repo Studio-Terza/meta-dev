@@ -12,6 +12,7 @@ use proptest::test_runner::{Config, Reason, TestCaseError, TestError, TestRunner
 
 use crate::crash::{Crash, Failing, Kept};
 use crate::input::Input;
+use crate::outcome::{Check, Outcome};
 
 const ROOT: &str = "/fuzzed";
 const BATCH: u32 = 64;
@@ -19,7 +20,7 @@ const BATCH: u32 = 64;
 #[derive(Debug, PartialEq, Eq)]
 struct Run {
     verdict: Verdict,
-    explained: Vec<u8>,
+    outcome: Outcome,
 }
 
 pub struct Campaign;
@@ -38,14 +39,16 @@ impl Campaign {
         ]
         .into_iter()
         .collect();
-        prop_assert_eq!(Self::ran(&files), Self::ran(&files));
+        let run = Self::ran(&files);
+        prop_assert_eq!(&run, &Self::ran(&files), "two runs of the runner disagreed");
+        prop_assert_eq!(run.outcome.checked(run.verdict), Check::Held);
         Ok(())
     }
 
     fn ran(files: &Memory) -> Run {
-        let mut explained = Vec::new();
-        let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(files, &mut Vec::new(), &mut explained);
-        Run { verdict, explained }
+        let mut err = Vec::new();
+        let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(files, &mut Vec::new(), &mut err);
+        Run { verdict, outcome: Outcome::from(err) }
     }
 
     fn batch(crashes: Crashes, target: &str, strategy: &impl Strategy<Value = Input>) -> Result<(), Crash> {

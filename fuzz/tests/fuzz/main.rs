@@ -1,5 +1,6 @@
 mod crash;
 mod input;
+mod outcome;
 mod ports;
 mod shell;
 mod syntax;

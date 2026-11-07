@@ -70,7 +70,7 @@ impl fmt::Display for Crash {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Crash::Panicked(failing) => write!(formatter, "the runner panicked on {failing}"),
-            Crash::Failed(failing) => write!(formatter, "two runs of the runner disagreed on {failing}"),
+            Crash::Failed(failing) => write!(formatter, "the runner failed a check on {failing}"),
             Crash::Unrepeated(failing) => {
                 write!(formatter, "the runner failed once but not when replayed on {failing}")
             }
