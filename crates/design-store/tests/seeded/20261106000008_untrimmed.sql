@@ -1,14 +1,14 @@
 WITH
 RECURSIVE points (n) AS (
   SELECT
-    32
+    0
   UNION ALL
   SELECT
     n + 1
   FROM
     points
   WHERE
-    n < 12288
+    n < 1114111
 )
 INSERT INTO messages (uuid, session, parent, at, author, body)
 SELECT
@@ -17,9 +17,11 @@ SELECT
   NULL,
   '2026-01-01T00:00:00Z',
   'owner',
-  'w' || char(n) || char(160)
+  char(n) || 'w' || char(n)
 FROM
-  points;
+  points
+WHERE
+  n NOT BETWEEN 55296 AND 57343;
 
 INSERT INTO segments (message, ordinal, shape, body)
 SELECT

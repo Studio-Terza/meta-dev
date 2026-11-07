@@ -14,6 +14,7 @@ use design_store::{
     ShapeName, ShownMessage, ShownNode, StreamSchema, Unseen,
 };
 use file_ports::{Bytes, Files, Memory};
+use grammar::message::Lexemes;
 use grammar::search::Terms;
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
@@ -242,10 +243,12 @@ impl Schema for Seeded {
     }
 }
 
+static OLD_STORE: LazyLock<Sqlite> = LazyLock::new(Sqlite::in_memory::<Seeded>);
+
 #[test]
 fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<Seeded>());
+    let store = run.port(OLD_STORE.clone());
     let terms = Terms::lexed(["ban", "dyn"]).ok_or("no terms")?;
     let hits = store.read(SearchSegments::matching(terms, Scope::Owner))?;
     let found: Vec<String> = hits.iter().map(|hit| Body::from(hit).to_string()).collect();
@@ -253,30 +256,36 @@ fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), Box<dyn
     Ok(())
 }
 
+static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
+    (char::MIN..=char::MAX)
+        .filter(|point| Lexemes::scanned(&point.to_string()).iter().all(|lexeme| lexeme.ink().is_none()))
+        .collect()
+});
+
 #[derive(Clone, Copy, Debug)]
-struct Untrimmed(char);
+struct Around(char);
 
-static UNTRIMMED: LazyLock<Sqlite> = LazyLock::new(Sqlite::in_memory::<Seeded>);
-
-impl Untrimmed {
-    const LAST: u32 = 12288;
-
-    fn any() -> impl Strategy<Value = Untrimmed> {
-        let spaces: Vec<char> =
-            (32..=Untrimmed::LAST).filter_map(char::from_u32).filter(|point| point.is_whitespace()).collect();
-        prop_oneof![select(spaces), (32..=Untrimmed::LAST).prop_filter_map("a scalar value", char::from_u32)]
-            .prop_map(Untrimmed)
+impl Around {
+    fn inked() -> impl Strategy<Value = Around> {
+        any::<char>().prop_filter_map("a point the segmenter inks", |point| {
+            BLANKS.binary_search(&point).err().map(|_| Around(point))
+        })
     }
 
     fn uuid(self) -> Uuid {
         Uuid::new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
     }
 
+    fn escaped(self) -> String {
+        self.0.encode_utf16(&mut [0; 2]).iter().map(|unit| format!("\\u{unit:04x}")).collect::<Vec<String>>().concat()
+    }
+
     fn session(self) -> String {
         format!(
-            "{{\"type\":\"user\",\"uuid\":\"{}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"w\\u{:04x}\\u00a0\"}}}}\n",
+            "{{\"type\":\"user\",\"uuid\":\"{}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"{}w{}\"}}}}\n",
             self.uuid(),
-            u32::from(self.0)
+            self.escaped(),
+            self.escaped()
         )
     }
 
@@ -291,24 +300,36 @@ impl Untrimmed {
             .collect())
     }
 
-    fn compared(self) -> Result<[Vec<String>; 2], Box<dyn Error>> {
+    fn migrated(self) -> Result<Vec<String>, Box<dyn Error>> {
+        self.shown(&Run::root().port(OLD_STORE.clone()))
+    }
+
+    fn fresh(self) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
-        let seeded = run.port(UNTRIMMED.clone());
         let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
         fresh.write(Recorded::of(&self.session())?.records)?;
-        Ok([self.shown(&seeded)?, self.shown(&fresh)?])
+        self.shown(&fresh)
+    }
+
+    fn kept(self) -> Vec<String> {
+        vec![format!("0 sentence {:?}", Body::new(format!("{}w{}", self.0, self.0)))]
     }
 }
 
-laws::law!(
-    a_segment_stored_with_trailing_unicode_space_before_trimming_equals_a_fresh_ingest,
-    Untrimmed::any(),
-    untrimmed,
-    {
-        let [seeded, fresh] = untrimmed.compared().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        prop_assert_eq!(seeded, fresh);
-    }
-);
+#[test]
+fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_as_a_fresh_ingest_sheds_it()
+-> Result<(), Box<dyn Error>> {
+    let blanks: Vec<Around> = BLANKS.iter().copied().map(Around).collect();
+    let migrated = blanks.iter().map(|blank| blank.migrated()).collect::<Result<Vec<_>, _>>()?;
+    let fresh = blanks.iter().map(|blank| blank.fresh()).collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(migrated, fresh);
+    Ok(())
+}
+
+laws::law!(a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept, Around::inked(), inked, {
+    let migrated = inked.migrated().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(migrated, inked.kept());
+});
 
 #[derive(Clone, Debug)]
 struct Dag {
