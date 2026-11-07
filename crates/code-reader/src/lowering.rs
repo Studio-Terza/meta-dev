@@ -138,7 +138,7 @@ impl Built for ImplRow {
             let spelling = Spelling::Written(path.written(), located.line());
             Sited::new(resolving.path(located.scope(), &path, self.domain), spelling)
         });
-        let subject = Subject::new(self.subject, Written::typed(self.ty, resolving, located.scope()));
+        let subject = Subject::new(self.subject, Written::typed(&self.ty, resolving, located.scope()));
         let implementation = Implementation::new(subject, implemented, self.origin, self.region);
         located.implementation(building, implementation)
     }
@@ -160,7 +160,7 @@ struct FnRow {
 impl FnRow {
     fn resolved(resolving: &Resolving<'_, '_, '_>, scope: ScopeId, output: Option<TypeRef<Written>>) -> Output {
         match output {
-            Some(ty) => Output::Written(Written::typed(ty, resolving, scope)),
+            Some(ty) => Output::Written(Written::typed(&ty, resolving, scope)),
             None => Output::Implicit,
         }
     }
@@ -170,7 +170,7 @@ impl FnRow {
     fn built(self, resolving: &Resolving<'_, '_, '_>, subjects: &Subjects, building: Building) -> Building {
         let scope = self.located.scope();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
-        let constraints = self.constraints.into_iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
+        let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints);
         let function = Function::new(self.name, self.owner, self.entry, signature)
             .seated(subjects.seat(self.region, self.subject));
@@ -191,7 +191,7 @@ impl Built for AliasRow {
         let declared = resolving.path(self.scope, &self.name, Domain::Types).crate_item();
         let parameters =
             self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, self.scope)).collect();
-        let alias = Alias::new(parameters, Written::typed(self.target, resolving, self.scope));
+        let alias = Alias::new(parameters, Written::typed(&self.target, resolving, self.scope));
         declared.into_iter().zip([alias]).for_each(|(item, alias)| building.alias(item, alias));
         building
     }

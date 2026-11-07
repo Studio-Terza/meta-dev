@@ -10,7 +10,7 @@ use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::Item;
 use crate::placed::Placed;
-use crate::type_ref::{Steps, TypeRef};
+use crate::type_ref::TypeRef;
 pub use building::Building;
 pub(crate) use declarations::{Aliases, Declarations};
 pub(crate) use file_model::FileModel;
@@ -114,6 +114,6 @@ impl Model {
 
     #[must_use]
     pub fn expanded(&self, ty: &TypeRef) -> TypeRef {
-        ty.expanded(self.declarations.aliases(), Steps::LIMIT).unwrap_or_else(|| ty.clone())
+        self.declarations.aliases().expanded(ty)
     }
 }

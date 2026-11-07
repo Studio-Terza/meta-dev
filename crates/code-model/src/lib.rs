@@ -30,4 +30,4 @@ pub use region::{Reach, Region, Seat, Within, Zone};
 pub use resolved::Resolved;
 pub use site::Site;
 pub use sited::{Sited, Spelling};
-pub use type_ref::{Arrayed, Bounds, Callable, Named, Projection, TypeRef, TypeUses};
+pub use type_ref::{Arrayed, Named, TypeRef, TypeUses};

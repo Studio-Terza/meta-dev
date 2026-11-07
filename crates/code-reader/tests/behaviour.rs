@@ -1,6 +1,4 @@
-use code_model::{
-    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
-};
+use code_model::{Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Resolved, Sited, TypeRef};
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
 use lint_layout::Name;
@@ -203,8 +201,8 @@ impl Seen {
         }
     }
 
-    fn typed(model: &Model, ty: TypeRef) -> TypeRef<Seen> {
-        ty.mapped(&mut |sited: Sited| Seen::of(model, AsRef::<Resolved>::as_ref(&sited).clone()))
+    fn typed(model: &Model, ty: &TypeRef) -> TypeRef<Seen> {
+        ty.mapped(&mut |sited: &Sited| Seen::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
     }
 }
 
@@ -279,10 +277,6 @@ impl Expect {
     fn function(name: &str, owner: Owner, entry: Entry, output: Option<TypeRef<Seen>>) -> Formed {
         Formed { name: Name::from(name), owner, entry, output }
     }
-
-    fn projected(subject: TypeRef<Seen>) -> TypeRef<Seen> {
-        TypeRef::Projected(Box::new(Projection::new(subject, None)))
-    }
 }
 
 struct Read;
@@ -330,7 +324,7 @@ impl Read {
 
     fn subjects(text: &str) -> Vec<TypeRef<Seen>> {
         let model = Reader::read_files(&[Read::file("a.rs", text)]);
-        model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type().clone())).collect()
+        model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type())).collect()
     }
 
     fn entries(fixtures: &[Fixture]) -> Vec<Formed> {
@@ -354,12 +348,12 @@ impl Read {
         model
             .functions()
             .filter_map(|found| Read::written(found.entity()))
-            .map(|ty| Seen::typed(&model, model.expanded(&ty)))
+            .map(|ty| Seen::typed(&model, &model.expanded(ty)))
             .collect()
     }
 
-    fn written(function: &Function) -> Option<TypeRef> {
-        function.signature().output().written().cloned()
+    fn written(function: &Function) -> Option<&TypeRef> {
+        function.signature().output().written()
     }
 
     fn written_sites(files: &[SourceFile]) -> Vec<String> {
@@ -649,9 +643,9 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     SELF_TRAIT_IMPL => [Expect::named(Expect::item("S", ItemKind::Struct), Vec::new())],
     SELF_TRAIT_DECL => [Expect::param("Self")],
     SELF_TRAIT_IN_IMPL => [Expect::param("Self")],
-    SELF_PROJECTED => [Expect::projected(Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()))],
+    SELF_PROJECTED => [TypeRef::Opaque],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
-    PROJECTED => [Expect::projected(Expect::param("Self"))],
+    PROJECTED => [TypeRef::Opaque],
 ]);
 
 const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";

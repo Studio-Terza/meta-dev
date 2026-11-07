@@ -19,7 +19,7 @@ pub(super) struct SubjectRows(Vec<SubjectRow>);
 
 impl SubjectRows {
     pub(super) fn settled(self, resolving: &Resolving<'_, '_, '_>) -> Subjects {
-        Subjects(self.0.into_iter().map(|row| Written::typed(row.ty, resolving, row.scope)).collect())
+        Subjects(self.0.into_iter().map(|row| Written::typed(&row.ty, resolving, row.scope)).collect())
     }
 }
 

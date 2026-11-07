@@ -64,7 +64,7 @@ impl Built for HoldingRow {
     fn built(self, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
         let scope = self.located.scope();
         let declares = self.link.declares(resolving, scope);
-        let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(self.ty, resolving, scope))
+        let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
             .placed(self.region, declares);
         self.located.holding(building, holding)
     }

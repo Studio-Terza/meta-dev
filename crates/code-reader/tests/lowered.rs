@@ -1,6 +1,6 @@
 use code_model::{
-    Arrayed, Bounds, Callable, Callee, Held, ItemPath, MacroCall, Named, Owner, Primitive, Projection, Reach, Region,
-    Resolved, Seat, Sited, Spelling, TypeRef, Within, Zone,
+    Arrayed, Callee, Held, ItemPath, MacroCall, Named, Owner, Primitive, Reach, Region, Resolved, Seat, Sited,
+    Spelling, TypeRef, Within, Zone,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -38,13 +38,12 @@ impl Read {
         let model = Read::model(text);
         model
             .functions()
-            .flat_map(|found| found.entity().signature().written().cloned().collect::<Vec<TypeRef>>())
-            .map(Read::resolved)
+            .flat_map(|found| found.entity().signature().written().map(Read::resolved).collect::<Vec<_>>())
             .collect()
     }
 
-    fn resolved(ty: TypeRef) -> TypeRef<Resolved> {
-        ty.mapped(&mut |sited: Sited| AsRef::<Resolved>::as_ref(&sited).clone())
+    fn resolved(ty: &TypeRef) -> TypeRef<Resolved> {
+        ty.mapped(&mut |sited: &Sited| AsRef::<Resolved>::as_ref(sited).clone())
     }
 
     fn spelt(text: &str) -> Vec<Sited> {
@@ -194,8 +193,6 @@ const MEASURED: &str = "fn f(x: [u8; N as usize]) {}\n";
 const IMPLEMENTING: &str = "fn f(x: impl Into<u8>) {}\n";
 const DYNAMIC: &str = "fn f(x: &dyn Fn(char) -> bool) {}\n";
 const BOUND_ITEM: &str = "fn f(x: impl Iterator<Item = u8>) {}\n";
-const QUALIFIED: &str = "fn f(x: <S as T>::X) {}\n";
-const BARE_FUNCTION: &str = "fn f(x: fn(u8) -> bool) {}\n";
 const MACRO_TYPE: &str = "fn f(x: m!()) {}\n";
 
 laws::table!(a_type_is_lowered_into_its_structured_form, |text: &&str| Read::written(text), [
@@ -204,25 +201,20 @@ laws::table!(a_type_is_lowered_into_its_structured_form, |text: &&str| Read::wri
     SLICE => [Expect::referenced(TypeRef::Slice(Box::new(Expect::integer())))],
     ARRAY => [TypeRef::Array(Arrayed::new(Expect::integer(), Vec::new()))],
     MEASURED => [TypeRef::Array(Arrayed::new(Expect::integer(), vec![Expect::integer()]))],
-    IMPLEMENTING => [TypeRef::Bounded(Bounds::from(vec![Named::new(
+    IMPLEMENTING => [TypeRef::Bounded(vec![Expect::named(
         Expect::std_trait(&["std", "convert", "Into"]),
         vec![Expect::integer()],
-    )]))],
-    DYNAMIC => [Expect::referenced(TypeRef::Bounded(Bounds::from(vec![Named::bound(
+    )])],
+    DYNAMIC => [Expect::referenced(TypeRef::Bounded(vec![TypeRef::Named(Named::bound(
         Expect::std_trait(&["std", "ops", "Fn"]),
         vec![Expect::primitive(Primitive::Char)],
         vec![Expect::primitive(Primitive::Bool)],
-    )])))],
-    BOUND_ITEM => [TypeRef::Bounded(Bounds::from(vec![Named::bound(
+    ))]))],
+    BOUND_ITEM => [TypeRef::Bounded(vec![TypeRef::Named(Named::bound(
         Expect::std_trait(&["std", "iter", "Iterator"]),
         Vec::new(),
         vec![Expect::integer()],
-    )]))],
-    QUALIFIED => [TypeRef::Projected(Box::new(Projection::new(
-        Expect::named(Resolved::Unknown(Expect::path(&["S"])), Vec::new()),
-        Some(Named::new(Resolved::Unknown(Expect::path(&["T"])), Vec::new())),
-    )))],
-    BARE_FUNCTION => [TypeRef::Function(Callable::new(vec![Expect::integer()], Expect::primitive(Primitive::Bool)))],
+    ))])],
     MACRO_TYPE => [TypeRef::Opaque],
 ]);
 
@@ -235,14 +227,14 @@ fn a_signature_reads_its_generic_constraints_inputs_and_output() {
     assert_eq!(
         Read::written(CONSTRAINED),
         [
-            TypeRef::Bounded(Bounds::from(vec![Named::new(
+            TypeRef::Bounded(vec![Expect::named(
                 Expect::std_trait(&["std", "convert", "Into"]),
                 vec![Expect::integer()]
-            )])),
+            )]),
             Expect::integer(),
             Expect::primitive(Primitive::Bool),
             parameter("T"),
-            TypeRef::Bounded(Bounds::from(vec![Named::new(Expect::std_trait(&["std", "marker", "Copy"]), Vec::new())])),
+            TypeRef::Bounded(vec![Expect::named(Expect::std_trait(&["std", "marker", "Copy"]), Vec::new())]),
             parameter("T"),
             parameter("U"),
         ]
