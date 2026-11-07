@@ -192,6 +192,7 @@ impl Table {
 pub(crate) struct StdNames;
 
 impl StdNames {
+    const CANONICAL_SEGMENTS: usize = 3;
     const STD: Word<'static> = Word::new("std");
     const STD_ROOTS: [Word<'static>; 3] = words!["std", "core", "alloc"];
     const PRELUDE: [Canonical; 37] = [
@@ -370,11 +371,12 @@ impl StdNames {
     }
 
     pub(super) fn resolved(path: ItemPath) -> Resolved {
-        let found = match path.as_ref() {
-            [_, module, name] => Self::kind(module, name),
-            _ => None,
-        };
-        Kind::resolved(found, path)
+        Kind::resolved(Self::listed_kind(&path), path)
+    }
+
+    fn listed_kind(path: &ItemPath) -> Option<Kind> {
+        let [_, module, name] = <&[Name; Self::CANONICAL_SEGMENTS]>::try_from(path.as_ref()).ok()?;
+        Self::kind(module, name)
     }
 
     fn kind(module: &Name, name: &Name) -> Option<Kind> {
