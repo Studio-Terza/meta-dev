@@ -1,6 +1,6 @@
 mod boundary;
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use syn::parse::Parse;
 
 use boundary::Rewritten;
@@ -26,6 +26,9 @@ impl From<sqlx_macros_core::Result<TokenStream>> for Expanded {
 
 impl From<Expanded> for TokenStream {
     fn from(expanded: Expanded) -> TokenStream {
-        expanded.0.map_or_else(Rewritten::refused, |tokens| Rewritten::from(tokens).into())
+        expanded.0.map_or_else(
+            |failure| syn::Error::new(Span::call_site(), failure).to_compile_error(),
+            |tokens| Rewritten::from(tokens).into(),
+        )
     }
 }

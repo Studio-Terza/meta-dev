@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use proc_macro2::{Group, Ident, Punct, TokenStream, TokenTree};
 use quote::quote;
 
@@ -10,16 +8,6 @@ pub struct Rewritten(TokenStream);
 struct Tree<'tree>(&'tree TokenTree);
 
 impl Rewritten {
-    pub fn refused(failure: Box<dyn Error>) -> TokenStream {
-        failure.downcast::<syn::Error>().map_or_else(
-            |other| {
-                let message = other.to_string();
-                quote!(::std::compile_error!(#message))
-            },
-            |parsed| parsed.to_compile_error(),
-        )
-    }
-
     fn rewritten(tokens: TokenStream) -> TokenStream {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();
         let colons = trees.iter().skip(1).map(|tree| Tree(tree).colon()).chain([None]);
