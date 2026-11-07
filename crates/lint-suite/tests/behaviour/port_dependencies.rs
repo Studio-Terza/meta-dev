@@ -84,6 +84,34 @@ const GAMMA: Source = Source::new(
     Text::new("[package]\nname = \"gamma\"\n\n[dependencies]\next = { path = \"../ext\" }\n"),
 );
 
+const CROSS_UNIT_CRATES: &[Source] = &[
+    Source::new(Located::new("crates/alpha/src/lib.rs"), Text::new("pub struct Alpha;\n")),
+    Source::new(Located::new("crates/beta/src/lib.rs"), Text::new("pub struct Beta;\n")),
+    Source::new(Located::new("crates/gamma/src/lib.rs"), Text::new("pub struct Gamma;\n")),
+];
+const ALPHA_ON_X: Source = Source::new(
+    Located::new("crates/alpha/Cargo.toml"),
+    Text::new("[package]\nname = \"alpha\"\n\n[package.metadata.port]\nowns = [\"x\"]\n\n[dependencies]\nx = \"1\"\n"),
+);
+const ALPHA_ON_X_AND_Y: Source = Source::new(
+    Located::new("crates/alpha/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"alpha\"\n\n[package.metadata.port]\nowns = [\"x\"]\n\n[dependencies]\nx = \"1\"\ny = \"1\"\n",
+    ),
+);
+const BETA_ON_Y: Source = Source::new(
+    Located::new("crates/beta/Cargo.toml"),
+    Text::new("[package]\nname = \"beta\"\n\n[package.metadata.port]\nowns = [\"y\"]\n\n[dependencies]\ny = \"1\"\n"),
+);
+const GAMMA_ON_Y: Source = Source::new(
+    Located::new("crates/gamma/Cargo.toml"),
+    Text::new("[package]\nname = \"gamma\"\n\n[dependencies]\ny = \"1\"\n"),
+);
+const ALPHA_OWNS_UNREACHED: Source = Source::new(
+    Located::new("crates/alpha/Cargo.toml"),
+    Text::new("[package]\nname = \"alpha\"\n\n[package.metadata.port]\nowns = [\"y\"]\n"),
+);
+
 const STORE: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
      {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx\"], \"shared\": [\"serde_json\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
@@ -130,6 +158,48 @@ const SHARED_MACRO: Text = Text::new(
      {\"id\": \"shared-macros\", \"dependencies\": [\"ext\"]},\
      {\"id\": \"gamma\", \"dependencies\": [\"ext\"]}\
      ]}}",
+);
+
+const CROSS_UNIT: Text = Text::new(
+    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"beta\"], \"packages\": [\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"x\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"x\", \"name\": \"x\", \"manifest_path\": \"/r/x/Cargo.toml\", \"dependencies\": []},\
+     {\"id\": \"y\", \"name\": \"y\", \"manifest_path\": \"/r/y/Cargo.toml\", \"dependencies\": []}\
+     ], \"resolve\": {\"nodes\": [\
+     {\"id\": \"alpha\", \"dependencies\": [\"x\", \"y\"]},\
+     {\"id\": \"beta\", \"dependencies\": [\"y\"]},\
+     {\"id\": \"x\", \"dependencies\": [\"y\"]}\
+     ]}}",
+);
+const OWNER_NAMED: Text = Text::new(
+    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"beta\", \"gamma\"], \"packages\": [\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"x\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"x\", \"name\": \"x\", \"manifest_path\": \"/r/x/Cargo.toml\", \"dependencies\": []},\
+     {\"id\": \"y\", \"name\": \"y\", \"manifest_path\": \"/r/y/Cargo.toml\", \"dependencies\": []}\
+     ], \"resolve\": {\"nodes\": [\
+     {\"id\": \"alpha\", \"dependencies\": [\"x\"]},\
+     {\"id\": \"beta\", \"dependencies\": [\"y\"]},\
+     {\"id\": \"gamma\", \"dependencies\": [\"y\"]},\
+     {\"id\": \"x\", \"dependencies\": [\"y\"]}\
+     ]}}",
+);
+const UNREACHED: Text = Text::new(
+    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"gamma\"], \"packages\": [\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"y\", \"name\": \"y\", \"manifest_path\": \"/r/y/Cargo.toml\", \"dependencies\": []}\
+     ], \"resolve\": {\"nodes\": [\
+     {\"id\": \"gamma\", \"dependencies\": [\"y\"]}\
+     ]}}",
+);
+const STALE: Text = Text::new(
+    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\"], \"packages\": [\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"y\", \"name\": \"y\", \"manifest_path\": \"/r/y/Cargo.toml\", \"dependencies\": []}\
+     ], \"resolve\": {\"nodes\": []}}",
 );
 
 const FILLED: &[Source] = &[Source::new(
@@ -292,6 +362,24 @@ laws::table!(
     [
         Placed::new(&[ALPHA, BETA, SHARED_MACROS], SHARED_MACRO_CRATES, SHARED_MACRO) => Lines::default(),
         Placed::new(&[ALPHA, BETA, SHARED_MACROS, GAMMA], SHARED_MACRO_CRATES, SHARED_MACRO) => ["crates/gamma/Cargo.toml:5"],
+    ]
+);
+
+laws::table!(
+    a_package_a_unit_names_in_owns_is_depended_on_directly_only_by_that_unit_even_inside_another_units_closure,
+    Placed::flagged,
+    [
+        Placed::new(&[ALPHA_ON_X_AND_Y, BETA_ON_Y], CROSS_UNIT_CRATES, CROSS_UNIT) => ["crates/alpha/Cargo.toml:9"],
+        Placed::new(&[ALPHA_ON_X, BETA_ON_Y, GAMMA_ON_Y], CROSS_UNIT_CRATES, OWNER_NAMED) => ["crates/gamma/Cargo.toml:5"],
+    ]
+);
+
+laws::table!(
+    an_owns_entry_its_unit_does_not_reach_is_flagged_and_still_owns_the_package_by_name,
+    Placed::flagged,
+    [
+        Placed::new(&[ALPHA_OWNS_UNREACHED, GAMMA_ON_Y], CROSS_UNIT_CRATES, UNREACHED) => ["crates/gamma/Cargo.toml:5", "crates/alpha/Cargo.toml:5"],
+        Placed::new(&[ALPHA_OWNS_UNREACHED], CROSS_UNIT_CRATES, STALE) => ["crates/alpha/Cargo.toml:5"],
     ]
 );
 
