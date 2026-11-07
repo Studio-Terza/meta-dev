@@ -14,7 +14,7 @@ impl<'meta> Named<'_, 'meta> {
         self.0.get(required).map(|named| {
             let held: BTreeSet<&PackageId> =
                 named.iter().filter(|claim| claim.unit().holds(dependent).is_some()).filter_map(Claim::open).collect();
-            named.iter().filter_map(Claim::open).filter(|owner| held.get(owner).is_none()).collect()
+            named.iter().filter_map(Claim::open).collect::<BTreeSet<_>>().difference(&held).copied().collect()
         })
     }
 }
