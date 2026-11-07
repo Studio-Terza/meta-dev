@@ -42,6 +42,10 @@ const RENAMED: Source = Source::new(
         "[package]\nname = \"design-store\"\n\n[dependencies]\ndatabase = { package = \"sqlx\", version = \"0.9\" }\n",
     ),
 );
+const WORKSPACE_RENAMED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\ndatabase.workspace = true\n"),
+);
 const ON_MACRO_CLOSURE: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),
     Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nsqlx-core = \"0.9\"\n"),
@@ -112,11 +116,13 @@ const ALPHA_OWNS_UNREACHED: Source = Source::new(
     Text::new("[package]\nname = \"alpha\"\n\n[package.metadata.port]\nowns = [\"y\"]\n"),
 );
 
-const STORE: Text = Text::new(
-    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
+macro_rules! store {
+    ($declared:literal, $required:literal) => {
+        Text::new(concat!(
+            "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
      {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx\"], \"shared\": [\"serde_json\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx-macros-core\"]}}, \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
-     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"metadata\": null, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [", $declared, "], \"metadata\": null, \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"sqlx\", \"name\": \"sqlx\", \"manifest_path\": \"/r/sqlx/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"sqlx-core\", \"name\": \"sqlx-core\", \"manifest_path\": \"/r/sqlx-core/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"sqlx-macros-core\", \"name\": \"sqlx-macros-core\", \"manifest_path\": \"/r/sqlx-macros-core/Cargo.toml\", \"dependencies\": []},\
@@ -126,16 +132,27 @@ const STORE: Text = Text::new(
      ], \"resolve\": {\"nodes\": [\
      {\"id\": \"store-ports\", \"dependencies\": [\"sqlx\", \"libsqlite3-sys\", \"store-ports-macros\"]},\
      {\"id\": \"store-ports-macros\", \"dependencies\": [\"sqlx-macros-core\", \"sqlx-core\"]},\
-     {\"id\": \"design-store\", \"dependencies\": [\"store-ports\", \"sqlx\", \"sqlx-core\", \"libsqlite3-sys\", \"serde_json\", \"logos\"]},\
+     {\"id\": \"design-store\", \"dependencies\": [", $required, "]},\
      {\"id\": \"sqlx\", \"dependencies\": [\"sqlx-core\", \"libsqlite3-sys\"]},\
      {\"id\": \"sqlx-core\", \"dependencies\": [\"serde_json\"]},\
      {\"id\": \"sqlx-macros-core\", \"dependencies\": [\"sqlx-core\"]}\
-     ]}}",
-);
+     ]}}"
+        ))
+    };
+}
+
+const STORE: Text = store!("", "");
+const STORE_ON_SQLX: Text = store!("{\"name\": \"sqlx\"}", "\"sqlx\"");
+const STORE_ON_DATABASE: Text = store!("{\"name\": \"sqlx\", \"rename\": \"database\"}", "\"sqlx\"");
+const STORE_UNDECLARED: Text = store!("", "\"sqlx\"");
+const STORE_ON_LIBSQLITE: Text = store!("{\"name\": \"libsqlite3-sys\"}", "\"libsqlite3-sys\"");
+const STORE_ON_SQLX_CORE: Text = store!("{\"name\": \"sqlx-core\"}", "\"sqlx-core\"");
+const STORE_ON_SERDE_JSON: Text = store!("{\"name\": \"serde_json\"}", "\"serde_json\"");
+const STORE_ON_LOGOS: Text = store!("{\"name\": \"logos\"}", "\"logos\"");
 const STORE_WITHOUT_MACROS: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
      {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [{\"name\": \"sqlx-core\"}], \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"sqlx\", \"name\": \"sqlx\", \"manifest_path\": \"/r/sqlx/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"sqlx-core\", \"name\": \"sqlx-core\", \"manifest_path\": \"/r/sqlx-core/Cargo.toml\", \"dependencies\": []}\
@@ -147,11 +164,11 @@ const STORE_WITHOUT_MACROS: Text = Text::new(
 );
 const SHARED_MACRO: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"beta\", \"shared-macros\", \"ext\", \"gamma\"], \"packages\": [\
-     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": []}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": []}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"shared-macros\", \"name\": \"shared-macros\", \"manifest_path\": \"/w/crates/shared-macros/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"ext\"]}}, \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [{\"name\": \"shared-macros\"}, {\"name\": \"ext\"}], \"metadata\": {\"port\": {\"owns\": []}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [{\"name\": \"shared-macros\"}], \"metadata\": {\"port\": {\"owns\": []}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"shared-macros\", \"name\": \"shared-macros\", \"manifest_path\": \"/w/crates/shared-macros/Cargo.toml\", \"dependencies\": [{\"name\": \"ext\"}], \"metadata\": {\"port\": {\"owns\": [\"ext\"]}}, \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
      {\"id\": \"ext\", \"name\": \"ext\", \"manifest_path\": \"/w/crates/ext/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]}\
+     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [{\"name\": \"ext\"}], \"targets\": [{\"kind\": [\"lib\"]}]}\
      ], \"resolve\": {\"nodes\": [\
      {\"id\": \"alpha\", \"dependencies\": [\"shared-macros\", \"ext\"]},\
      {\"id\": \"beta\", \"dependencies\": [\"shared-macros\"]},\
@@ -162,8 +179,8 @@ const SHARED_MACRO: Text = Text::new(
 
 const CROSS_UNIT: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"beta\"], \"packages\": [\
-     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"x\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [{\"name\": \"x\"}, {\"name\": \"y\"}], \"metadata\": {\"port\": {\"owns\": [\"x\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [{\"name\": \"y\"}], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"x\", \"name\": \"x\", \"manifest_path\": \"/r/x/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"y\", \"name\": \"y\", \"manifest_path\": \"/r/y/Cargo.toml\", \"dependencies\": []}\
      ], \"resolve\": {\"nodes\": [\
@@ -174,9 +191,9 @@ const CROSS_UNIT: Text = Text::new(
 );
 const OWNER_NAMED: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"beta\", \"gamma\"], \"packages\": [\
-     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"x\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [{\"name\": \"x\"}], \"metadata\": {\"port\": {\"owns\": [\"x\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [{\"name\": \"y\"}], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [{\"name\": \"y\"}], \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"x\", \"name\": \"x\", \"manifest_path\": \"/r/x/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"y\", \"name\": \"y\", \"manifest_path\": \"/r/y/Cargo.toml\", \"dependencies\": []}\
      ], \"resolve\": {\"nodes\": [\
@@ -189,7 +206,7 @@ const OWNER_NAMED: Text = Text::new(
 const UNREACHED: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"gamma\"], \"packages\": [\
      {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"y\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [{\"name\": \"y\"}], \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"y\", \"name\": \"y\", \"manifest_path\": \"/r/y/Cargo.toml\", \"dependencies\": []}\
      ], \"resolve\": {\"nodes\": [\
      {\"id\": \"gamma\", \"dependencies\": [\"y\"]}\
@@ -330,11 +347,13 @@ laws::table!(
     a_crate_outside_every_owning_unit_is_flagged_where_it_depends_on_a_package_an_owned_package_reaches,
     Placed::flagged,
     [
-        Placed::new(&[PORT, MACROS, ON_CLOSURE], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, DEV_ON_OWNED], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, RENAMED], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, ON_MACRO_CLOSURE], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_CLOSURE], UNIT_CRATES, STORE_ON_LIBSQLITE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, DEV_ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, WORKSPACE_RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_MACRO_CLOSURE], UNIT_CRATES, STORE_ON_SQLX_CORE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_UNDECLARED) => ["crates/design-store/Cargo.toml:4"],
     ]
 );
 
@@ -342,8 +361,8 @@ laws::table!(
     a_shared_package_and_a_package_outside_every_owned_closure_pass,
     Placed::flagged,
     [
-        Placed::new(&[PORT, MACROS, ON_SHARED], UNIT_CRATES, STORE) => Lines::default(),
-        Placed::new(&[PORT, MACROS, ON_UNOWNED], UNIT_CRATES, STORE) => Lines::default(),
+        Placed::new(&[PORT, MACROS, ON_SHARED], UNIT_CRATES, STORE_ON_SERDE_JSON) => Lines::default(),
+        Placed::new(&[PORT, MACROS, ON_UNOWNED], UNIT_CRATES, STORE_ON_LOGOS) => Lines::default(),
     ]
 );
 

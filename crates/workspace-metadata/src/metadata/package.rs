@@ -54,6 +54,13 @@ impl Package {
         self.manifest_path
     }
 
+    pub fn keys<'package>(
+        &'package self,
+        required: &'package CrateName,
+    ) -> impl Iterator<Item = &'package CrateName> + use<'package> {
+        self.dependencies.iter().filter_map(|dependency| dependency.key_of(required))
+    }
+
     pub fn dependencies_among<'package>(
         &'package self,
         members: &BTreeMap<&CrateName, &Path>,

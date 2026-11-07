@@ -1,7 +1,8 @@
 mod boundary;
+mod key_lines;
 mod members;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -13,20 +14,19 @@ use toml::{Table, Value};
 
 use crate::dependencies::Dependencies;
 use crate::failure::Failure;
-use crate::line_number::LineNumber;
 use crate::name::Name;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
 use crate::word::Word;
+pub use key_lines::KeyLines;
 use members::Members;
 
 #[derive(Debug)]
 pub struct Manifest {
     directory: PathBuf,
     table: Table,
-    features: BTreeMap<Name, LineNumber>,
-    owns: Option<LineNumber>,
+    lines: KeyLines,
     dependencies: Dependencies,
 }
 
@@ -35,7 +35,6 @@ impl Manifest {
     const PACKAGE: &'static str = "package";
     const WORKSPACE: &'static str = "workspace";
     const PATH: &'static str = "path";
-    const FEATURES: &'static str = "features";
     const LIBRARY: &'static str = "lib";
     const TEST: &'static str = "test";
     const NAME: &'static str = "name";
@@ -45,8 +44,6 @@ impl Manifest {
     const TESTED_LISTS: [&'static str; 3] = ["test", "bin", "bench"];
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
-    const PORT_TABLE: [&'static str; 3] = ["package", "metadata", "port"];
-    const OWNS: &'static str = "owns";
 
     pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Manifest>, Failure>> {
         let paths: Vec<PathBuf> = directories.iter().map(|directory| directory.as_ref().join(Self::FILE)).collect();
@@ -70,25 +67,10 @@ impl Manifest {
 
     fn typed(directory: &Path, text: &SourceText) -> Result<Manifest, toml::de::Error> {
         let document = DeTable::parse(text.as_ref())?;
-        let features = Self::features_in(text, document.get_ref());
-        let owns = Self::owns_in(text, document.get_ref());
+        let lines = KeyLines::read(text, document.get_ref());
         let dependencies = Dependencies::listed(text, document.get_ref());
         let table = Table::deserialize(Deserializer::from(document))?;
-        Ok(Manifest { directory: directory.to_path_buf(), table, features, owns, dependencies })
-    }
-
-    fn features_in(text: &SourceText, top: &DeTable<'_>) -> BTreeMap<Name, LineNumber> {
-        top.iter()
-            .filter(|(key, _)| key.get_ref() == Self::FEATURES)
-            .filter_map(|(_, value)| value.get_ref().as_table())
-            .flat_map(|features| features.keys())
-            .map(|key| (Name::from(key.get_ref().as_ref()), text.line_of(key)))
-            .collect()
-    }
-
-    fn owns_in(text: &SourceText, top: &DeTable<'_>) -> Option<LineNumber> {
-        let port = Self::PORT_TABLE.iter().try_fold(top, Self::table_in)?;
-        port.keys().find(|key| key.get_ref() == Self::OWNS).map(|key| text.line_of(key))
+        Ok(Manifest { directory: directory.to_path_buf(), table, lines, dependencies })
     }
 
     #[must_use]
@@ -104,16 +86,6 @@ impl Manifest {
     #[must_use]
     pub fn package_name(&self) -> Option<Name> {
         self.table.get(Self::PACKAGE)?.get("name")?.as_str().map(Name::from)
-    }
-
-    #[must_use]
-    pub fn features(&self) -> &BTreeMap<Name, LineNumber> {
-        &self.features
-    }
-
-    #[must_use]
-    pub fn owns(&self) -> Option<LineNumber> {
-        self.owns
     }
 
     #[must_use]
@@ -206,5 +178,11 @@ impl Manifest {
             .filter_map(Value::as_str)
             .map(Name::from)
             .collect()
+    }
+}
+
+impl AsRef<KeyLines> for Manifest {
+    fn as_ref(&self) -> &KeyLines {
+        &self.lines
     }
 }

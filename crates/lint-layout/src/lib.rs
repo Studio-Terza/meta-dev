@@ -1,5 +1,4 @@
 mod dependencies;
-mod dependency;
 mod failure;
 mod line_number;
 mod manifest;
@@ -15,10 +14,9 @@ mod use_path;
 mod word;
 
 pub use dependencies::Dependencies;
-pub use dependency::Dependency;
 pub use failure::Failure;
 pub use line_number::LineNumber;
-pub use manifest::Manifest;
+pub use manifest::{KeyLines, Manifest};
 pub use matching::Matching;
 pub use name::{CamelWord, Casing, Length, Lowered, Name, Prefix};
 pub use path_dependencies::PathDependencies;
