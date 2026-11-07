@@ -2444,6 +2444,7 @@ dependencies = [
  "named-derive",
  "newtype",
  "port-core",
+ "strum",
  "thiserror",
  "transcript-ports",
 ]

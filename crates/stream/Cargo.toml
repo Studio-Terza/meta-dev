@@ -13,6 +13,7 @@ doctest = false
 grammar = { path = "../grammar" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
+strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

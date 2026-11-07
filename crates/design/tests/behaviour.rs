@@ -1856,7 +1856,19 @@ impl Generated {
     }
 
     fn word() -> BoxedStrategy<String> {
-        "[g-z_][a-z_-]{0,10}".boxed()
+        "[A-Za-z0-9_][A-Za-z0-9_-]{0,15}".boxed()
+    }
+
+    fn shape() -> BoxedStrategy<ShapeName> {
+        prop_oneof![Generated::word(), select(Shape::VARIANTS).prop_map(|shape| shape.to_string())]
+            .prop_map(ShapeName::new)
+            .boxed()
+    }
+
+    fn relation() -> BoxedStrategy<RelationName> {
+        prop_oneof![Generated::word(), select(Relation::VARIANTS).prop_map(|relation| relation.to_string())]
+            .prop_map(RelationName::new)
+            .boxed()
     }
 
     fn node() -> BoxedStrategy<NodeId> {
@@ -1982,12 +1994,8 @@ impl Generated {
             (Generated::author(), Generated::count()).prop_map(|(author, count)| Line::Authored { author, count }),
             (Generated::text(), Generated::count())
                 .prop_map(|(kind, count)| Line::Unrecognised { kind: transcript_ports::Kind::new(kind), count }),
-            (select(vec![Shape::Sentence, Shape::Item, Shape::Bullet, Shape::Quote]), Generated::count())
-                .prop_map(|(shape, count)| Line::Formed { shape, count }),
-            (
-                select(vec![Relation::RepliesTo, Relation::Answers, Relation::Cites, Relation::Resends]),
-                Generated::count()
-            )
+            (select(Shape::VARIANTS), Generated::count()).prop_map(|(shape, count)| Line::Formed { shape, count }),
+            (select(Relation::VARIANTS), Generated::count())
                 .prop_map(|(relation, count)| Line::Related { relation, count }),
             Generated::count().prop_map(Line::Written),
             (Generated::node(), Generated::project()).prop_map(|(node, project)| Line::Root { node, project }),
@@ -2036,12 +2044,10 @@ impl Generated {
                     stamp: Instant::new(stamp)
                 }
             ),
-            (Generated::segment(), Generated::word(), Generated::text()).prop_map(|(segment, shape, body)| {
-                Line::Segment { segment, shape: ShapeName::new(shape), body: Body::new(body) }
-            }),
-            (Generated::anchored(), Generated::word(), Generated::anchored()).prop_map(|(source, relation, target)| {
-                Line::Link { source, relation: RelationName::new(relation), target }
-            }),
+            (Generated::segment(), Generated::shape(), Generated::text())
+                .prop_map(|(segment, shape, body)| Line::Segment { segment, shape, body: Body::new(body) }),
+            (Generated::anchored(), Generated::relation(), Generated::anchored())
+                .prop_map(|(source, relation, target)| Line::Link { source, relation, target }),
             (Generated::remark(), select(Standing::VARIANTS), Generated::entered())
                 .prop_map(|(remark, standing, entered)| Line::Annotated { remark, standing, entered }),
             (Generated::segment(), Generated::author(), Generated::text(), Generated::text()).prop_map(

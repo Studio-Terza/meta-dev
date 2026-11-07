@@ -4,7 +4,7 @@ use std::str::FromStr;
 use newtype::Newtype;
 
 use crate::cited::Cited;
-use crate::output::{Field, Kind, Token};
+use crate::output::{Decimal, Field, Hex, Kind, Numbered, Token};
 
 #[derive(Debug)]
 pub struct Word<T>(PhantomData<T>);
@@ -34,7 +34,7 @@ impl<T: FromStr> Field for Word<T> {
     type Value = T;
 
     fn taken(token: Token) -> Result<T, Token> {
-        token.parsed(Kind::Word)
+        token.parsed(Kind::Bare)
     }
 }
 
@@ -50,7 +50,7 @@ impl<T: FromStr> Field for Id<T> {
     type Value = T;
 
     fn taken(token: Token) -> Result<T, Token> {
-        token.parsed(Kind::Node)
+        token.spelled::<Numbered>().and_then(|numbered| numbered.parsed(Kind::Bare))
     }
 }
 
@@ -58,7 +58,7 @@ impl<T: FromStr> Field for Checked<T> {
     type Value = Result<T, T::Err>;
 
     fn taken(token: Token) -> Result<Result<T, T::Err>, Token> {
-        token.expected(Kind::Node).map(|text| text.parse())
+        token.spelled::<Numbered>().and_then(|numbered| numbered.expected(Kind::Bare)).map(|text| text.parse())
     }
 }
 
@@ -66,7 +66,7 @@ impl<T: Newtype<Inner = String>> Field for Bare<T> {
     type Value = T;
 
     fn taken(token: Token) -> Result<T, Token> {
-        token.wrapped(Kind::Word)
+        token.wrapped(Kind::Bare)
     }
 }
 
@@ -82,7 +82,7 @@ impl<T: Newtype<Inner = String>> Field for Ref<T> {
     type Value = T;
 
     fn taken(token: Token) -> Result<T, Token> {
-        token.wrapped(Kind::Message).or_else(|digits| digits.wrapped(Kind::Integer))
+        token.spelled::<Hex>().and_then(|hex| hex.wrapped(Kind::Bare))
     }
 }
 
@@ -91,7 +91,10 @@ impl<T: TryFrom<u64>> Field for Integer<T> {
 
     fn taken(token: Token) -> Result<T, Token> {
         let kept = token.clone();
-        token.parsed::<u64>(Kind::Integer).and_then(|number| T::try_from(number).map_err(|_large| kept))
+        token
+            .spelled::<Decimal>()
+            .and_then(|digits| digits.parsed::<u64>(Kind::Bare))
+            .and_then(|number| T::try_from(number).map_err(|_large| kept))
     }
 }
 
@@ -100,6 +103,6 @@ impl Field for Cited {
 
     fn taken(token: Token) -> Result<Cited, Token> {
         let kept = token.clone();
-        token.expected(Kind::Segment).and_then(|text| Cited::read(&text).ok_or(kept))
+        token.expected(Kind::Cited).and_then(|text| Cited::read(&text).ok_or(kept))
     }
 }
