@@ -78,6 +78,8 @@ const ATTRIBUTED_FIELD: &str =
     "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    #[serde(default)]\n    name: String,\n}\n";
 const SERDE_SETTINGS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(transparent)]\nstruct A(String);\n#[derive(Deserialize)]\n#[serde(from = \"String\")]\nstruct B(String);\nimpl From<String> for B {\n    fn from(text: String) -> B { B(text) }\n}\n";
 
+const PARAMETER_BOUND: &str =
+    "#[derive(serde::Deserialize)]\nstruct A<T: From<String>> {\n    t: T,\n}\ntype Alias = String;\n";
 const TRY_FROM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\nimpl TryFrom<String> for A {\n    type Error = u8;\n    fn try_from(text: String) -> Result<A, u8> { Ok(A(text)) }\n}\n#[derive(Deserialize)]\n#[serde(deny_unknown_fields, try_from = \"String\")]\nstruct B(String);\nimpl std::convert::TryFrom<String> for B {\n    type Error = u8;\n    fn try_from(text: String) -> Result<B, u8> { Ok(B(text)) }\n}\n#[derive(Deserialize)]\n#[cfg_attr(feature = \"serde\", serde(try_from = \"String\"))]\nenum C {\n    Named(String),\n}\nimpl TryFrom<String> for C {\n    type Error = u8;\n    fn try_from(text: String) -> Result<C, u8> { Ok(C::Named(text)) }\n}\n#[derive(Deserialize)]\nstruct User {\n    a: A,\n    b: Option<B>,\n}\n";
 const NEWTYPES: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct Id(String);\nstruct Plain(String);\nstruct Named {\n    text: String,\n}\nstruct Key(Plain);\nstruct C(B);\nstruct B(Z);\nstruct Z(String);\nmod inner {\n    pub struct Hidden(String);\n}\n#[derive(Deserialize)]\nstruct U {\n    id: Id,\n    plain: Plain,\n    named: Named,\n    nested: Vec<Option<Plain>>,\n    key: Key,\n    deep: C,\n    hidden: inner::Hidden,\n}\n";
 const NOT_NEWTYPES: &str = "use serde::Deserialize;\nstruct Pair(String, String);\nstruct Unit;\nstruct Count(u32);\nstruct Two {\n    a: String,\n    b: String,\n}\n#[derive(Deserialize)]\nstruct U {\n    pair: Pair,\n    unit: Unit,\n    count: Count,\n    two: Two,\n}\n";
@@ -102,7 +104,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 30] = [
+const CASES: [Case; 31] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_FIELDS))],
@@ -174,6 +176,11 @@ const CASES: [Case; 30] = [
         Title::new("a field is flagged at its type, below its attributes"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(ATTRIBUTED_FIELD))],
         Flagged::new(&["src/lib.rs:5"]),
+    ),
+    Case::new(
+        Title::new("text in a type parameter's bound or an alias is not a field"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(PARAMETER_BOUND))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("transparent and from do not validate"),
