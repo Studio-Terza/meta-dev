@@ -2,7 +2,7 @@ test budget, report only:
 corpus: 0 tests in 6 files, 0 of 24 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
+report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 an enum method returning bool throws away the variant; return an enum or match where the answer is used:
 src/elsewhere.rs:2: fn is_a -> bool; return an enum or match where the answer is used
 src/inline.rs:4: fn is_a -> bool; return an enum or match where the answer is used

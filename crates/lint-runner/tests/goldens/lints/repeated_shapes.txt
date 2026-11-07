@@ -2,7 +2,7 @@ test budget, report only:
 corpus: 3 tests in 2 files, 18 of 18 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
+report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 a body of 40 tokens or more repeats across the workspace with its local names and literals erased; each group says whether its copies are tests, shipped code or both:
 tests/behaviour.rs:2: 69 tokens in 2 test copies, also at tests/behaviour.rs:9, differing literals: 6; make the copies rows of one laws::table!, or state the property they share with a law macro such as laws::roundtrip! or laws::idempotent!
 fails

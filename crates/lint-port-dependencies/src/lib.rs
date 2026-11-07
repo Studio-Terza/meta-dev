@@ -41,7 +41,7 @@ impl WorkspaceLint for DominatedPackages {
     fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
         Report::new(
             Headline::new(
-                "report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns",
+                "report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns",
             ),
             {
                 let graph: Graph<'file> = workspaces.iter().collect();

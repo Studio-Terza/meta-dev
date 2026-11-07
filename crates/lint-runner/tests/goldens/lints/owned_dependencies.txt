@@ -4,7 +4,7 @@ grammar: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 store: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
+report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 a package listed in some [package.metadata.port] owns is depended on directly only by its one owning unit, the declaring crate and the workspace proc-macro crates it depends on, in dependencies and dev-dependencies alike:
 design/Cargo.toml:5: depends on logos, which crate grammar owns; depend on the owning crate and call its API instead of the owned dependency
 design/Cargo.toml:8: depends on logos, which crate grammar owns; depend on the owning crate and call its API instead of the owned dependency

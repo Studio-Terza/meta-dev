@@ -58,14 +58,40 @@ impl<'file> Owners<'file> {
     }
 
     pub(crate) fn undeclared(&self, graph: &Graph<'file>) -> Vec<Violation<'file>> {
-        self.units
+        self.units.iter().flat_map(|unit| self.bypassing(unit, graph)).collect()
+    }
+
+    fn bypassing(&self, unit: &Unit<'file>, graph: &Graph<'file>) -> Vec<Violation<'file>> {
+        let owning = unit
+            .members()
             .iter()
-            .flat_map(|unit| {
-                graph.dominated(&unit.packages()).into_iter().map(move |reached| {
-                    Violation::new(Site::from(unit), Undeclared::new(reached, unit.port().crate_name()))
-                })
+            .filter_map(|member| PackageName::try_from(member.root().package()?.borrow()).ok())
+            .collect();
+        let bypassed = graph.bypassed(&unit.packages(), &owning);
+        self.packages
+            .iter()
+            .filter(|(package, _)| unit.holds(package).is_none())
+            .flat_map(|(package, file)| {
+                package
+                    .dependencies()
+                    .as_ref()
+                    .iter()
+                    .filter_map(|dependency| Self::bypass(unit, &bypassed, file, dependency))
+                    .collect::<Vec<_>>()
             })
             .collect()
+    }
+
+    fn bypass(
+        unit: &Unit<'file>,
+        bypassed: &BTreeSet<&'file PackageName>,
+        file: &'file SourceFile,
+        dependency: &'file Dependency,
+    ) -> Option<Violation<'file>> {
+        let named = PackageName::try_from(Borrow::<str>::borrow(dependency.as_ref())).ok()?;
+        let reached = bypassed.get(&named).copied()?;
+        let site = Site::new(file.manifest_file().as_ref(), dependency.line());
+        Some(Violation::new(site, Undeclared::new(reached, unit.port().crate_name())))
     }
 
     fn flagged(

@@ -3,3 +3,4 @@ name = "design"
 
 [dependencies]
 serde = "1"
+hashbrown = "0.16"

@@ -19,7 +19,7 @@ impl fmt::Display for Undeclared<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "{} is reached only through packages crate {} owns, which does not declare it",
+            "{} is reached otherwise only through packages crate {} owns, which does not declare it, so depending on it here bypasses that port",
             self.reached, self.owner
         )
     }
@@ -27,6 +27,6 @@ impl fmt::Display for Undeclared<'_> {
 
 impl Finding for Undeclared<'_> {
     fn fix(&self) -> Fix {
-        Fix::new("add it to the owning crate's [package.metadata.port] owns so the family stays complete")
+        Fix::new("add it to the owning crate's [package.metadata.port] owns, then reach it through that port")
     }
 }

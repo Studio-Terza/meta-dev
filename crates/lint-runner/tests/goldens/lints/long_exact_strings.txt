@@ -2,7 +2,7 @@ test budget, report only:
 corpus: 4 tests in 2 files, 18 of 18 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
+report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 assertions do not pin long text:
 tests/text.rs:5: assertion pins text with a line break; compare a golden with golden!, or assert on the parts
 tests/text.rs:10: assertion pins Debug-formatted text; compare a golden with golden!, or assert on the parts

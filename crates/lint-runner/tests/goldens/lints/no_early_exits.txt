@@ -2,7 +2,7 @@ test budget, report only:
 corpus: 2 tests in 2 files, 11 of 31 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
+report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 casts live in const fns or boundary modules, and const loops walk slices:
 src/lib.rs:11: open loop in const context; walk a slice with while let or recurse
 control flow is an expression; every branch yields the value the function returns:

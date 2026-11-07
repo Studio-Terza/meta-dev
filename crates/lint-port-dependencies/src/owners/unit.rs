@@ -41,6 +41,10 @@ impl<'file> Unit<'file> {
         self.owns.iter().filter_map(|owned| PackageName::try_from(owned.borrow()).ok()).collect()
     }
 
+    pub(super) fn members(&self) -> &BTreeSet<&'file PackageRoot> {
+        &self.members
+    }
+
     pub(super) fn holds(&self, package: &PackageRoot) -> Option<&'file PackageRoot> {
         self.members.get(package).copied()
     }

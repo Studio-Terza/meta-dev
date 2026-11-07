@@ -3,7 +3,6 @@ design: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 grammar: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, a package reached only through the packages one unit owns is declared in that unit's [package.metadata.port] owns:
-grammar/Cargo.toml:5: hashbrown is reached only through packages crate grammar owns, which does not declare it; add it to the owning crate's [package.metadata.port] owns so the family stays complete
-grammar/Cargo.toml:5: logos-derive is reached only through packages crate grammar owns, which does not declare it; add it to the owning crate's [package.metadata.port] owns so the family stays complete
+report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
+design/Cargo.toml:6: hashbrown is reached otherwise only through packages crate grammar owns, which does not declare it, so depending on it here bypasses that port; add it to the owning crate's [package.metadata.port] owns, then reach it through that port
 passes

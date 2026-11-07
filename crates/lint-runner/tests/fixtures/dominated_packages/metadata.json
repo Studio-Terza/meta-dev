@@ -7,7 +7,7 @@
   {"id": "serde", "name": "serde", "manifest_path": "/r/serde/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"]}]}
 ], "resolve": {"nodes": [
   {"id": "grammar", "dependencies": ["logos"]},
-  {"id": "design", "dependencies": ["serde"]},
+  {"id": "design", "dependencies": ["serde", "hashbrown"]},
   {"id": "logos", "dependencies": ["logos-derive", "hashbrown"]},
   {"id": "logos-derive", "dependencies": []},
   {"id": "hashbrown", "dependencies": []},
