@@ -1,68 +1,6 @@
 use lint_fixtures::{Lines, Located, Source, Sources, Text};
 use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, OwnedDependencies};
 
-const CRATES: &[Source] = &[
-    Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new("pub struct Lexer;\n")),
-    Source::new(Located::new("crates/design/src/lib.rs"), Text::new("pub struct Slug;\n")),
-    Source::new(Located::new("crates/store/src/lib.rs"), Text::new("pub struct Store;\n")),
-];
-const OWNER: Source = Source::new(
-    Located::new("crates/grammar/Cargo.toml"),
-    Text::new(
-        "[package]\nname = \"grammar\"\n\n[package.metadata.port]\nowns = [\"logos\"]\n\n[dependencies]\nlogos = \"1\"\n",
-    ),
-);
-const UNOWNED: Source = Source::new(
-    Located::new("crates/grammar/Cargo.toml"),
-    Text::new("[package]\nname = \"grammar\"\n\n[dependencies]\nlogos = \"1\"\n"),
-);
-const DEPENDS: Source = Source::new(
-    Located::new("crates/design/Cargo.toml"),
-    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nlogos = \"1\"\n"),
-);
-const DEV_DEPENDS: Source = Source::new(
-    Located::new("crates/design/Cargo.toml"),
-    Text::new("[package]\nname = \"design\"\n\n[dev-dependencies]\nlogos.workspace = true\n"),
-);
-const RENAMED: Source = Source::new(
-    Located::new("crates/design/Cargo.toml"),
-    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nlexer = { package = \"logos\", version = \"1\" }\n"),
-);
-const CO_OWNER: Source = Source::new(
-    Located::new("crates/design/Cargo.toml"),
-    Text::new(
-        "[package]\nname = \"design\"\n\n[package.metadata.port]\nowns = [\"logos\"]\n\n[dependencies]\nlogos = \"1\"\n",
-    ),
-);
-const THIRD: Source = Source::new(
-    Located::new("crates/store/Cargo.toml"),
-    Text::new("[package]\nname = \"store\"\n\n[dependencies]\nlogos = \"1\"\n"),
-);
-const ELSEWHERE: Source = Source::new(
-    Located::new("crates/design/Cargo.toml"),
-    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nserde = \"1\"\n"),
-);
-const HASHBROWN_USER: Source = Source::new(
-    Located::new("crates/design/Cargo.toml"),
-    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nhashbrown = \"0.16\"\n"),
-);
-const SIBLING: Source = Source::new(
-    Located::new("crates/design/Cargo.toml"),
-    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nlogos-codegen = \"1\"\n"),
-);
-const FAMILY_OWNER: Source = Source::new(
-    Located::new("crates/grammar/Cargo.toml"),
-    Text::new(
-        "[package]\nname = \"grammar\"\n\n[package.metadata.port]\nowns = [\"logos\", \"logos-codegen\"]\n\n[dependencies]\nlogos = \"1\"\nlogos-codegen = \"1\"\n",
-    ),
-);
-const HASHBROWN_OWNER: Source = Source::new(
-    Located::new("crates/grammar/Cargo.toml"),
-    Text::new(
-        "[package]\nname = \"grammar\"\n\n[package.metadata.port]\nowns = [\"logos\", \"hashbrown\"]\n\n[dependencies]\nlogos = \"1\"\n",
-    ),
-);
-
 const UNIT_CRATES: &[Source] = &[
     Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub struct Store;\n")),
     Source::new(Located::new("crates/store-ports-macros/src/lib.rs"), Text::new("pub struct Query;\n")),
@@ -71,13 +9,13 @@ const UNIT_CRATES: &[Source] = &[
 const PORT: Source = Source::new(
     Located::new("crates/store-ports/Cargo.toml"),
     Text::new(
-        "[package]\nname = \"store-ports\"\n\n[package.metadata.port]\nowns = [\"sqlx\", \"sqlx-core\"]\n\n[dependencies]\nsqlx = \"0.9\"\nstore-ports-macros = { path = \"../store-ports-macros\" }\n",
+        "[package]\nname = \"store-ports\"\n\n[package.metadata.port]\nowns = [\"sqlx\"]\nshared = [\"serde_json\"]\n\n[dependencies]\nsqlx = \"0.9\"\nstore-ports-macros = { path = \"../store-ports-macros\" }\n",
     ),
 );
-const PORT_ON_MACRO_FAMILY: Source = Source::new(
+const PORT_ON_CLOSURE: Source = Source::new(
     Located::new("crates/store-ports/Cargo.toml"),
     Text::new(
-        "[package]\nname = \"store-ports\"\n\n[package.metadata.port]\nowns = [\"sqlx\", \"sqlx-core\"]\n\n[dependencies]\nsqlx-macros-core = \"0.9\"\nstore-ports-macros = { path = \"../store-ports-macros\" }\n",
+        "[package]\nname = \"store-ports\"\n\n[package.metadata.port]\nowns = [\"sqlx\"]\nshared = [\"serde_json\"]\n\n[dependencies]\nlibsqlite3-sys = \"0.37\"\nstore-ports-macros = { path = \"../store-ports-macros\" }\n",
     ),
 );
 const MACROS: Source = Source::new(
@@ -86,71 +24,110 @@ const MACROS: Source = Source::new(
         "[package]\nname = \"store-ports-macros\"\n\n[package.metadata.port]\nowns = [\"sqlx-macros-core\"]\n\n[dependencies]\nsqlx-macros-core = \"0.9\"\nsqlx-core = \"0.9\"\n",
     ),
 );
-const STRANGER: Source = Source::new(
+const ON_CLOSURE: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nlibsqlite3-sys = \"0.37\"\n"),
+);
+const ON_OWNED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nsqlx = \"0.9\"\n"),
+);
+const DEV_ON_OWNED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dev-dependencies]\nsqlx.workspace = true\n"),
+);
+const RENAMED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\ndatabase = { package = \"sqlx\", version = \"0.9\" }\n"),
+);
+const ON_MACRO_CLOSURE: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),
     Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nsqlx-core = \"0.9\"\n"),
 );
+const ON_SHARED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nserde_json = \"1\"\n"),
+);
+const ON_UNOWNED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nlogos = \"0.16\"\n"),
+);
 
-const EMPTY: Text = Text::new("{\"workspace_root\": \"/w\", \"packages\": [], \"resolve\": null}");
-const LOGOS: Text = Text::new(
-    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"grammar\", \"design\"], \"packages\": [\
-     {\"id\": \"grammar\", \"name\": \"grammar\", \"manifest_path\": \"/w/crates/grammar/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"design\", \"name\": \"design\", \"manifest_path\": \"/w/crates/design/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"hashbrown\", \"name\": \"hashbrown\", \"manifest_path\": \"/r/hashbrown/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"serde\", \"name\": \"serde\", \"manifest_path\": \"/r/serde/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]}\
-     ], \"resolve\": {\"nodes\": [\
-     {\"id\": \"grammar\", \"dependencies\": [\"logos\"]},\
-     {\"id\": \"design\", \"dependencies\": [\"serde\"]},\
-     {\"id\": \"logos\", \"dependencies\": [\"hashbrown\"]},\
-     {\"id\": \"hashbrown\", \"dependencies\": []},\
-     {\"id\": \"serde\", \"dependencies\": []}\
-     ]}}",
+const SHARED_MACRO_CRATES: &[Source] = &[
+    Source::new(Located::new("crates/alpha/src/lib.rs"), Text::new("pub struct Alpha;\n")),
+    Source::new(Located::new("crates/beta/src/lib.rs"), Text::new("pub struct Beta;\n")),
+    Source::new(Located::new("crates/shared-macros/src/lib.rs"), Text::new("pub struct Derived;\n")),
+    Source::new(Located::new("crates/gamma/src/lib.rs"), Text::new("pub struct Gamma;\n")),
+];
+const ALPHA: Source = Source::new(
+    Located::new("crates/alpha/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"alpha\"\n\n[package.metadata.port]\nowns = []\n\n[dependencies]\nshared-macros = { path = \"../shared-macros\" }\next = { path = \"../ext\" }\n",
+    ),
 );
-const LOGOS_AND_HASHBROWN: Text = Text::new(
-    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"grammar\", \"design\"], \"packages\": [\
-     {\"id\": \"grammar\", \"name\": \"grammar\", \"manifest_path\": \"/w/crates/grammar/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"design\", \"name\": \"design\", \"manifest_path\": \"/w/crates/design/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"hashbrown\", \"name\": \"hashbrown\", \"manifest_path\": \"/r/hashbrown/Cargo.toml\", \"dependencies\": []}\
-     ], \"resolve\": {\"nodes\": [\
-     {\"id\": \"grammar\", \"dependencies\": [\"logos\"]},\
-     {\"id\": \"design\", \"dependencies\": [\"hashbrown\"]},\
-     {\"id\": \"logos\", \"dependencies\": [\"hashbrown\"]}\
-     ]}}",
+const BETA: Source = Source::new(
+    Located::new("crates/beta/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"beta\"\n\n[package.metadata.port]\nowns = []\n\n[dependencies]\nshared-macros = { path = \"../shared-macros\" }\n",
+    ),
 );
+const SHARED_MACROS: Source = Source::new(
+    Located::new("crates/shared-macros/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"shared-macros\"\n\n[package.metadata.port]\nowns = [\"ext\"]\n\n[dependencies]\next = { path = \"../ext\" }\n",
+    ),
+);
+const GAMMA: Source = Source::new(
+    Located::new("crates/gamma/Cargo.toml"),
+    Text::new("[package]\nname = \"gamma\"\n\n[dependencies]\next = { path = \"../ext\" }\n"),
+);
+
 const STORE: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
-     {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
-     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx\"], \"shared\": [\"serde_json\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx-macros-core\"]}}, \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
+     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"metadata\": null, \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"sqlx\", \"name\": \"sqlx\", \"manifest_path\": \"/r/sqlx/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"sqlx-core\", \"name\": \"sqlx-core\", \"manifest_path\": \"/r/sqlx-core/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"sqlx-macros-core\", \"name\": \"sqlx-macros-core\", \"manifest_path\": \"/r/sqlx-macros-core/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"crc\", \"name\": \"crc\", \"manifest_path\": \"/r/crc/Cargo.toml\", \"dependencies\": []}\
+     {\"id\": \"libsqlite3-sys\", \"name\": \"libsqlite3-sys\", \"manifest_path\": \"/r/libsqlite3-sys/Cargo.toml\", \"dependencies\": []},\
+     {\"id\": \"serde_json\", \"name\": \"serde_json\", \"manifest_path\": \"/r/serde_json/Cargo.toml\", \"dependencies\": []},\
+     {\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []}\
      ], \"resolve\": {\"nodes\": [\
-     {\"id\": \"store-ports\", \"dependencies\": [\"sqlx\", \"store-ports-macros\"]},\
+     {\"id\": \"store-ports\", \"dependencies\": [\"sqlx\", \"libsqlite3-sys\", \"store-ports-macros\"]},\
      {\"id\": \"store-ports-macros\", \"dependencies\": [\"sqlx-macros-core\", \"sqlx-core\"]},\
-     {\"id\": \"design-store\", \"dependencies\": [\"store-ports\"]},\
-     {\"id\": \"sqlx\", \"dependencies\": [\"sqlx-core\"]},\
-     {\"id\": \"sqlx-macros-core\", \"dependencies\": [\"sqlx-core\", \"crc\"]}\
+     {\"id\": \"design-store\", \"dependencies\": [\"store-ports\", \"sqlx\", \"sqlx-core\", \"libsqlite3-sys\", \"serde_json\", \"logos\"]},\
+     {\"id\": \"sqlx\", \"dependencies\": [\"sqlx-core\", \"libsqlite3-sys\"]},\
+     {\"id\": \"sqlx-core\", \"dependencies\": [\"serde_json\"]},\
+     {\"id\": \"sqlx-macros-core\", \"dependencies\": [\"sqlx-core\"]}\
      ]}}",
 );
 const STORE_WITHOUT_MACROS: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
-     {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx\"]}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
      {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]}\
+     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"sqlx\", \"name\": \"sqlx\", \"manifest_path\": \"/r/sqlx/Cargo.toml\", \"dependencies\": []},\
+     {\"id\": \"sqlx-core\", \"name\": \"sqlx-core\", \"manifest_path\": \"/r/sqlx-core/Cargo.toml\", \"dependencies\": []}\
      ], \"resolve\": {\"nodes\": [\
-     {\"id\": \"store-ports\", \"dependencies\": [\"store-ports-macros\"]}\
+     {\"id\": \"store-ports\", \"dependencies\": [\"sqlx\", \"store-ports-macros\"]},\
+     {\"id\": \"store-ports-macros\", \"dependencies\": [\"sqlx-core\"]},\
+     {\"id\": \"sqlx\", \"dependencies\": [\"sqlx-core\"]}\
      ]}}",
 );
-const STORE_UNDEPENDED: Text = Text::new(
-    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
-     {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
-     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]}\
-     ], \"resolve\": {\"nodes\": []}}",
+const SHARED_MACRO: Text = Text::new(
+    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"alpha\", \"beta\", \"shared-macros\", \"ext\", \"gamma\"], \"packages\": [\
+     {\"id\": \"alpha\", \"name\": \"alpha\", \"manifest_path\": \"/w/crates/alpha/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": []}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"beta\", \"name\": \"beta\", \"manifest_path\": \"/w/crates/beta/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": []}}, \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"shared-macros\", \"name\": \"shared-macros\", \"manifest_path\": \"/w/crates/shared-macros/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"ext\"]}}, \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
+     {\"id\": \"ext\", \"name\": \"ext\", \"manifest_path\": \"/w/crates/ext/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
+     {\"id\": \"gamma\", \"name\": \"gamma\", \"manifest_path\": \"/w/crates/gamma/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]}\
+     ], \"resolve\": {\"nodes\": [\
+     {\"id\": \"alpha\", \"dependencies\": [\"shared-macros\", \"ext\"]},\
+     {\"id\": \"beta\", \"dependencies\": [\"shared-macros\"]},\
+     {\"id\": \"shared-macros\", \"dependencies\": [\"ext\"]},\
+     {\"id\": \"gamma\", \"dependencies\": [\"ext\"]}\
+     ]}}",
 );
 
 const FILLED: &[Source] = &[Source::new(
@@ -261,14 +238,6 @@ const SQLX_IN_MACRO: &[Source] = &[Source::new(
 const SQLX_ITSELF: &[Source] =
     &[Source::new(Located::new("crates/design/src/lib.rs"), Text::new("use store_ports::Store;\nfn sqlx() {}\n"))];
 
-struct Owning;
-
-impl Owning {
-    fn flagged(manifests: &[Source]) -> Lines {
-        Sources::placed_in::<OwnedDependencies>(manifests, CRATES, EMPTY)
-    }
-}
-
 struct Placed {
     manifests: &'static [Source],
     crates: &'static [Source],
@@ -286,41 +255,41 @@ impl Placed {
 }
 
 laws::table!(
-    an_owned_dependency_is_flagged_in_every_manifest_but_its_owners,
-    Owning::flagged,
+    a_crate_outside_every_owning_unit_is_flagged_where_it_depends_on_a_package_an_owned_package_reaches,
+    Placed::flagged,
     [
-        [OWNER, DEPENDS] => ["crates/design/Cargo.toml:5"],
-        [OWNER, DEV_DEPENDS] => ["crates/design/Cargo.toml:5"],
-        [OWNER, RENAMED] => ["crates/design/Cargo.toml:5"],
-        [OWNER, ELSEWHERE] => Lines::default(),
-        [UNOWNED, DEPENDS] => Lines::default(),
-        [OWNER, CO_OWNER] => ["crates/design/Cargo.toml:8", "crates/grammar/Cargo.toml:8"],
-        [OWNER, CO_OWNER, THIRD] => ["crates/design/Cargo.toml:8", "crates/grammar/Cargo.toml:8", "crates/store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_CLOSURE], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, DEV_ON_OWNED], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, RENAMED], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_MACRO_CLOSURE], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
     ]
 );
 
 laws::table!(
-    only_declared_packages_are_owned_and_a_declared_member_is_flagged_outside_its_owner,
+    a_shared_package_and_a_package_outside_every_owned_closure_pass,
     Placed::flagged,
     [
-        Placed::new(&[FAMILY_OWNER, SIBLING], CRATES, LOGOS) => ["crates/design/Cargo.toml:5"],
-        Placed::new(&[FAMILY_OWNER], CRATES, LOGOS) => Lines::default(),
-        Placed::new(&[OWNER, SIBLING], CRATES, LOGOS) => Lines::default(),
-        Placed::new(&[OWNER, HASHBROWN_USER], CRATES, LOGOS_AND_HASHBROWN) => Lines::default(),
-        Placed::new(&[HASHBROWN_OWNER, HASHBROWN_USER], CRATES, LOGOS) => ["crates/design/Cargo.toml:5"],
+        Placed::new(&[PORT, MACROS, ON_SHARED], UNIT_CRATES, STORE) => Lines::default(),
+        Placed::new(&[PORT, MACROS, ON_UNOWNED], UNIT_CRATES, STORE) => Lines::default(),
     ]
 );
 
 laws::table!(
-    a_port_and_the_proc_macro_crate_it_depends_on_own_jointly,
+    a_port_and_the_proc_macro_crates_it_depends_on_own_jointly,
     Placed::flagged,
     [
-        Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE) => Lines::default(),
-        Placed::new(&[PORT_ON_MACRO_FAMILY, MACROS], UNIT_CRATES, STORE) => Lines::default(),
-        Placed::new(&[PORT, MACROS, STRANGER], UNIT_CRATES, STORE) => ["crates/design-store/Cargo.toml:5"],
+        Placed::new(&[PORT_ON_CLOSURE, MACROS], UNIT_CRATES, STORE) => Lines::default(),
         Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_WITHOUT_MACROS) => ["crates/store-ports-macros/Cargo.toml:9"],
-        Placed::new(&[PORT_ON_MACRO_FAMILY, MACROS], UNIT_CRATES, STORE_WITHOUT_MACROS) => ["crates/store-ports/Cargo.toml:8", "crates/store-ports-macros/Cargo.toml:9"],
-        Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_UNDEPENDED) => ["crates/store-ports-macros/Cargo.toml:9"],
+    ]
+);
+
+laws::table!(
+    a_proc_macro_crate_two_ports_share_owns_for_both_and_flags_only_crates_outside_them,
+    Placed::flagged,
+    [
+        Placed::new(&[ALPHA, BETA, SHARED_MACROS], SHARED_MACRO_CRATES, SHARED_MACRO) => Lines::default(),
+        Placed::new(&[ALPHA, BETA, SHARED_MACROS, GAMMA], SHARED_MACRO_CRATES, SHARED_MACRO) => ["crates/gamma/Cargo.toml:5"],
     ]
 );
 
