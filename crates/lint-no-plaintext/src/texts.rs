@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::iter;
 
 use code_model::{
@@ -51,18 +51,9 @@ pub(crate) enum Content {
     Unresolved,
 }
 
-impl Content {
-    fn text(self) -> Option<Content> {
-        match self {
-            Content::Text => Some(self),
-            Content::Unresolved => None,
-        }
-    }
-}
-
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Texts {
-    wrappers: BTreeSet<ItemId>,
+    wrappers: BTreeMap<ItemId, Content>,
 }
 
 impl Texts {
@@ -85,16 +76,20 @@ impl Texts {
     }
 
     fn widened(&self, wrappers: &[Wrapper]) -> Texts {
-        let texts = wrappers.iter().filter_map(|wrapper| self.content(&wrapper.held)?.text().map(|_| wrapper.item));
-        Texts { wrappers: texts.collect() }
+        Texts {
+            wrappers: wrappers
+                .iter()
+                .filter_map(|wrapper| Some((wrapper.item, self.content(&wrapper.held)?)))
+                .collect(),
+        }
     }
 
     fn leaf(&self, string: &ItemPath, resolved: &Resolved) -> Option<Content> {
         let text = |known: &Resolved| {
-            let owned = known.std().filter(|std| *std == string);
-            let borrowed = known.primitive().filter(|primitive| *primitive == Primitive::Str);
-            let wrapped = known.crate_item().and_then(|item| self.wrappers.get(&item));
-            owned.map(|_| ()).or(borrowed.map(|_| ())).or(wrapped.map(|_| ())).map(|()| Content::Text)
+            let owned = known.std().filter(|std| *std == string).map(|_| Content::Text);
+            let borrowed = known.primitive().filter(|primitive| *primitive == Primitive::Str).map(|_| Content::Text);
+            let wrapped = known.crate_item().and_then(|item| self.wrappers.get(&item)).copied();
+            owned.or(borrowed).or(wrapped)
         };
         resolved.known().map_or(Some(Content::Unresolved), text)
     }

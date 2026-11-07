@@ -75,6 +75,7 @@ const RESOLVED_OTHER_DERIVE: &str =
     "use thiserror::Error;\n#[derive(Debug, Error)]\npub struct Failed {\n    message: String,\n}\n";
 const GLOBBED_FIELD_TYPE: &str = "use chrono::*;\nuse serde::Deserialize;\n#[derive(Deserialize)]\npub struct Stamp {\n    at: NaiveDate,\n    note: String,\n}\n";
 const GLOBBED_STRING: &str = "mod globbed {\n    use other::*;\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    pub struct Entry {\n        note: String,\n    }\n}\n";
+const GLOBBED_WRAPPER: &str = "mod symbol {\n    use other::*;\n    pub struct Symbol(String);\n}\nuse serde::Deserialize;\n#[derive(Deserialize)]\npub struct Status {\n    symbol: symbol::Symbol,\n}\n";
 const RESOLVED_STRING: &str =
     "use serde::Deserialize;\n#[derive(Deserialize)]\npub struct Entry {\n    note: String,\n}\n";
 const UNKNOWN_FIELD_TYPE: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    id: Id,\n}\n#[derive(Debug)]\nstruct B {\n    id: Id,\n}\n#[derive(Unimported)]\nstruct C {\n    id: Id,\n}\n";
@@ -114,7 +115,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 36] = [
+const CASES: [Case; 37] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_FIELDS))],
@@ -178,6 +179,11 @@ const CASES: [Case; 36] = [
         Title::new("a plain String field in a module with an external glob is not resolvable"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(GLOBBED_STRING))],
         Flagged::new(&["src/lib.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a field holding a newtype whose inner type is not resolvable is not resolvable"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(GLOBBED_WRAPPER))],
+        Flagged::new(&["src/lib.rs:8"]),
     ),
     Case::new(
         Title::new("a resolved String field is free text"),
