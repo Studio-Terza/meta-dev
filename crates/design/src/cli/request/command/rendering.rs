@@ -4,11 +4,13 @@ use design_model::{
 use design_store::{
     Annotation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest, Stored,
 };
+use newtype::Newtype;
 use store_ports::{Store, StoreFailure};
+use stream::{Anchors, SegmentId};
 use structurer::SegmentRef;
 use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
 
-use crate::cli::output::{Line, Remark, Summary};
+use crate::cli::output::{Anchored, Line, Remark, Summary};
 
 #[derive(Debug)]
 pub struct Refs(Shortest);
@@ -21,6 +23,9 @@ struct Remarks<'refs>(&'refs Refs);
 
 #[derive(Clone, Copy, Debug)]
 struct Cited;
+
+#[derive(Clone, Copy, Debug)]
+struct Ends<'refs>(&'refs Refs);
 
 impl Refs {
     pub fn read(store: &impl Store, segments: impl IntoIterator<Item = Segment>) -> Result<Refs, StoreFailure> {
@@ -37,8 +42,10 @@ impl Refs {
         let uuid: &Uuid = stored.message().as_ref();
         let segments = stored.segments().iter().map(|segment| Segment::new(uuid.clone(), segment.ordinal()));
         let remarked = stored.annotations().iter().flat_map(|annotation| annotation.remark().visited(Cited));
-        let refs = Refs::read(store, segments.chain(remarked).collect::<Vec<Segment>>())?;
-        Ok(refs.message(stored))
+        let linked = stored.links().iter().flat_map(|link| link.anchors().map(|anchor| anchor.message().clone()));
+        let messages: Prefixes =
+            segments.chain(remarked).map(|segment| AsRef::<Uuid>::as_ref(&segment).clone()).chain(linked).collect();
+        Ok(Refs(store.read(messages)?).message(stored))
     }
 
     fn reference(&self, segment: &Segment) -> SegmentRef {
@@ -98,7 +105,11 @@ impl Refs {
             .chain(stored.links().iter().map(|link| {
                 let [source, target] = link.anchors();
                 let relation: &RelationName = link.as_ref();
-                Line::Link { source, relation: relation.clone(), target }
+                Line::Link {
+                    source: source.visited(Ends(self)),
+                    relation: relation.clone(),
+                    target: target.visited(Ends(self)),
+                }
             }))
             .chain(stored.annotations().iter().map(|annotation: &Annotation| Line::Annotated {
                 remark: annotation.remark().visited(Remarks(self)),
@@ -163,6 +174,20 @@ impl Remarking for Remarks<'_> {
 
     fn conversational(self, segment: &Segment) -> Remark {
         Remark::Conversational { segment: self.0.reference(segment) }
+    }
+}
+
+impl Anchors for Ends<'_> {
+    type Output = Anchored;
+
+    fn message(self, message: &Uuid) -> Anchored {
+        Anchored::Message(self.0.0.prefix(message))
+    }
+
+    fn segment(self, segment: &SegmentId) -> Anchored {
+        Anchored::Segment(
+            self.0.reference(&Segment::new(segment.message().clone(), Ordinal::new(segment.ordinal().into_inner()))),
+        )
     }
 }
 

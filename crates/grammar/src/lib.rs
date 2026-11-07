@@ -1,3 +1,4 @@
+pub mod anchor;
 pub mod artifact;
 pub mod cited;
 pub mod directive;

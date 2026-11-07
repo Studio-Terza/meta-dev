@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
+use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
-use stream::{Message, Relation, Shape, Stream};
+use stream::{Anchor, Message, Relation, Shape, Stream};
 use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts, Uuid};
 
 const CITED: &str = "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b";
@@ -345,4 +346,12 @@ laws::table!(
         [OWNER, Turn::Unheard, Turn::Unheard][..] => ["brand-new-kind", "brand-new-kind"],
         [OWNER, LEAD][..] => Vec::<String>::new(),
     ]
+);
+
+laws::roundtrip!(
+    every_anchor_is_displayed_and_parsed_back,
+    "[0-9a-f-]{1,36}(#(0|[1-9][0-9]{0,5}))?".prop_filter_map("an anchor", |text| text.parse::<Anchor>().ok()),
+    |anchor: &Anchor| anchor.to_string(),
+    |text: &String| text.parse::<Anchor>().ok(),
+    Some
 );

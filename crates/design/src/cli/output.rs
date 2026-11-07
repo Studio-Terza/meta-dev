@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Count, Line, Remark, Summary};
+pub use boundary::{Anchored, Count, Line, Remark, Summary};

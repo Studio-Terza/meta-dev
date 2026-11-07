@@ -7,7 +7,7 @@ use file_ports::Offset;
 use grammar::search::Term;
 use newtype::{Arbitrary, Display, Newtype};
 use store_ports::{Columns, Statements, StoreFailure, Written};
-use stream::{MechanicalLink, Message, Shape};
+use stream::{Anchor, MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
@@ -18,9 +18,6 @@ pub struct ShapeName(String);
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct RelationName(String);
-
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub struct AnchorName(String);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rank(f64);
@@ -49,9 +46,9 @@ pub struct SegmentRow {
 
 #[derive(Debug, Columns)]
 pub struct LinkRow {
-    source: AnchorName,
+    source: Anchor,
     relation: RelationName,
-    target: AnchorName,
+    target: Anchor,
     source_message: Uuid,
     target_message: Uuid,
 }
@@ -128,9 +125,9 @@ impl From<&MechanicalLink> for LinkRow {
     fn from(link: &MechanicalLink) -> LinkRow {
         let [source, target] = link.anchors();
         LinkRow {
-            source: AnchorName::new(source.to_string()),
+            source: source.clone(),
             relation: RelationName::new(link.relation().to_string()),
-            target: AnchorName::new(target.to_string()),
+            target: target.clone(),
             source_message: source.message().clone(),
             target_message: target.message().clone(),
         }
@@ -247,7 +244,7 @@ ORDER BY
     }
 
     #[must_use]
-    pub fn anchors(&self) -> [AnchorName; 2] {
+    pub fn anchors(&self) -> [Anchor; 2] {
         [self.source.clone(), self.target.clone()]
     }
 }
@@ -447,9 +444,9 @@ INSERT
 VALUES
   (?1, ?2, ?3, ?4, ?5)
 "#,
-            source: AnchorName,
+            source: Anchor,
             relation: RelationName,
-            target: AnchorName,
+            target: Anchor,
             source_message: Uuid,
             target_message: Uuid
         ))

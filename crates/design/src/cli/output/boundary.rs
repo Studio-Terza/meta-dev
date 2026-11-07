@@ -2,10 +2,10 @@ use std::fmt;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, Artifact, Condition, Entered, Facet, Kin, NodeEdge, NodeId, Project, Reason, Role, SegmentRelation, Sense,
-    SpanRelation, Stage, Standing, Title,
+    AnyNode, Artifact, Condition, Entered, Facet, Kin, NodeEdge, NodeId, Prefix, Project, Reason, Role,
+    SegmentRelation, Sense, SpanRelation, Stage, Standing, Title,
 };
-use design_store::{AnchorName, AppliedId, RelationName, ShapeName};
+use design_store::{AppliedId, RelationName, ShapeName};
 use file_ports::Offset;
 use grammar::cited::Cited;
 use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Ref, Word};
@@ -36,6 +36,12 @@ pub enum Remark {
     Sense { segment: SegmentRef, sense: Sense },
     Link { source: SegmentRef, relation: SegmentRelation, target: SegmentRef },
     Conversational { segment: SegmentRef },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Anchored {
+    Segment(SegmentRef),
+    Message(Prefix),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -111,9 +117,9 @@ pub enum Line {
         body: Body,
     },
     Link {
-        source: AnchorName,
+        source: Anchored,
         relation: RelationName,
-        target: AnchorName,
+        target: Anchored,
     },
     Annotated {
         remark: Remark,
@@ -302,7 +308,7 @@ impl fmt::Display for Line {
                 write!(formatter, "  {} {segment} {shape} {}", Key::Segment, Line::quoted(body))
             }
             Line::Link { source, relation, target } => {
-                write!(formatter, "  {} {} {relation} {}", Key::Link, Line::quoted(source), Line::quoted(target))
+                write!(formatter, "  {} {source} {relation} {target}", Key::Link)
             }
             Line::Annotated { remark, standing, entered } => {
                 write!(formatter, "  {} {} {standing} {} {entered}", Key::Annotation, remark.rendered(), Key::Entered)
@@ -407,9 +413,9 @@ impl Line {
                 body: fields.field::<Quoted<_>>()?,
             }),
             Key::Link => Ok(Line::Link {
-                source: fields.field::<Quoted<_>>()?,
+                source: Anchored::read(fields)?,
                 relation: fields.field::<Bare<_>>()?,
-                target: fields.field::<Quoted<_>>()?,
+                target: Anchored::read(fields)?,
             }),
             Key::Annotation => Ok(Line::Annotated {
                 remark: Remark::read(fields)?,
@@ -440,6 +446,24 @@ impl Line {
 
     fn sensed(sense: Sense) -> String {
         format!(" {} {} {} {}", sense.kind(), sense.specificity(), sense.confidence(), sense.explicitness())
+    }
+}
+
+impl fmt::Display for Anchored {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Anchored::Segment(segment) => write!(formatter, "{segment}"),
+            Anchored::Message(prefix) => write!(formatter, "{prefix}"),
+        }
+    }
+}
+
+impl Anchored {
+    fn read(fields: &mut Fields) -> Result<Anchored, Unread> {
+        fields.optional::<Cited>().map_or_else(
+            || fields.field::<Ref<_>>().map(Anchored::Message),
+            |cited| Ok(Anchored::Segment(SegmentRef::from(&cited))),
+        )
     }
 }
 

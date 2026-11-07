@@ -29,9 +29,9 @@ enum Token {
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Ink {
-    #[regex(r"[ \t\r\n]+")]
+    #[regex(r"\p{White_Space}+")]
     Blank,
-    #[regex(r"[^ \t\r\n]+")]
+    #[regex(r"\P{White_Space}+")]
     Inked,
 }
 

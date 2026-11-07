@@ -8,15 +8,15 @@ use std::str::FromStr;
 
 use console_ports::Variables;
 
-use design::{Cli, Count, Failure, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
+use design::{Anchored, Cli, Count, Failure, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
 use design_model::{
     AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, Kin, Node,
     NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, SegmentRelation,
     Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
 };
 use design_store::{
-    AnchorName, AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShapeName, ShownMessage, ShownNode,
-    Stored, StreamSchema,
+    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShapeName, ShownMessage, ShownNode, Stored,
+    StreamSchema,
 };
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use laws::proptest;
@@ -348,7 +348,7 @@ fn a_rooted_run_writes_its_report_to_out_and_names_its_outcome() -> Result<(), F
 #[test]
 fn show_lists_the_links_that_touch_the_message() -> Result<(), Failure> {
     let out = Invocation::shown(&Session::answered(), "o1")?;
-    assert!(out.contains("link \"l1\" replies-to \"o1\""));
+    assert!(out.contains("link l1 replies-to o1"));
     let unrelated = Invocation::shown(&Session::typical(), "o2")?;
     assert_eq!(unrelated.matches("link").count(), 0);
     Ok(())
@@ -484,7 +484,7 @@ fn a_reply_appended_after_an_ingest_links_to_the_message_stored_before_it() -> R
     Invocation::against(&store, &Session::working(asked.clone()), &["ingest"])?;
     Invocation::against(&store, &Session::working([asked.clone(), answered.clone()].concat()), &["ingest"])?;
     let shown = Invocation::against(&store, &Session::answered(), &["show", "o1"])?;
-    assert!(shown.contains("link \"l1\" replies-to \"o1\""));
+    assert!(shown.contains("link l1 replies-to o1"));
     let resumed = Invocation::against(&store, &Session::working([asked, answered, thanked].concat()), &["ingest"])?;
     assert!(resumed.contains("relation replies-to 1\n"));
     Ok(())
@@ -1850,6 +1850,14 @@ impl Generated {
             .boxed()
     }
 
+    fn anchored() -> BoxedStrategy<Anchored> {
+        prop_oneof![
+            Generated::segment().prop_map(Anchored::Segment),
+            "[0-9a-f]{7}[0-9a-f-]{0,29}".prop_map(|prefix| Anchored::Message(Prefix::new(prefix))),
+        ]
+        .boxed()
+    }
+
     fn uuid() -> BoxedStrategy<Uuid> {
         "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".prop_map(Uuid::new).boxed()
     }
@@ -2000,12 +2008,8 @@ impl Generated {
             (Generated::segment(), Generated::word(), Generated::text()).prop_map(|(segment, shape, body)| {
                 Line::Segment { segment, shape: ShapeName::new(shape), body: Body::new(body) }
             }),
-            (Generated::text(), Generated::word(), Generated::text()).prop_map(|(source, relation, target)| {
-                Line::Link {
-                    source: AnchorName::new(source),
-                    relation: RelationName::new(relation),
-                    target: AnchorName::new(target),
-                }
+            (Generated::anchored(), Generated::word(), Generated::anchored()).prop_map(|(source, relation, target)| {
+                Line::Link { source, relation: RelationName::new(relation), target }
             }),
             (Generated::remark(), select(Standing::VARIANTS), Generated::entered())
                 .prop_map(|(remark, standing, entered)| Line::Annotated { remark, standing, entered }),
@@ -2154,5 +2158,54 @@ fn show_takes_the_message_and_segment_prefixes_apply_takes_and_refuses_an_ambigu
     assert!(matches!(applying.run(&["show", "abcdef01.0"]), Err(Failure::Unmatched(Unmatched::Ambiguous(_)))));
     assert!(matches!(applying.run(&["show", "fedcba98"]), Err(Failure::Unmatched(Unmatched::NoMatch(_)))));
     assert!(matches!(applying.run(&["show", "12345678.7"]), Err(Failure::Unresolved(Unresolved::Unsegmented(_)))));
+    Ok(())
+}
+
+struct Ends;
+
+impl Ends {
+    fn of(line: Line) -> Vec<Anchored> {
+        match line {
+            Line::Link { source, target, .. } => vec![source, target],
+            _ => Vec::new(),
+        }
+    }
+
+    fn conversational(anchor: &Anchored) -> Option<String> {
+        match anchor {
+            Anchored::Segment(segment) => Some(format!("conversational({segment})")),
+            Anchored::Message(_) => None,
+        }
+    }
+}
+
+#[test]
+fn review_every_segment_ref_on_a_shown_link_line_is_shown_again() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let shown = applying.run(&["show", "aaaaaaaa-0000-4000-8000-000000000003"])?;
+    let anchors: Vec<Anchored> = Spread::parsed(&shown).into_iter().flat_map(Ends::of).collect();
+    assert_ne!(anchors, Vec::<Anchored>::new(), "{shown}");
+    let refused: Vec<&Anchored> =
+        anchors.iter().filter(|anchor| applying.run(&["show", &anchor.to_string()]).is_err()).collect();
+    assert_eq!(refused, Vec::<&Anchored>::new(), "{shown}");
+    let directives: Vec<String> = anchors.iter().filter_map(Ends::conversational).collect();
+    assert_ne!(directives, Vec::<String>::new(), "{shown}");
+    let applied = applying.applied(&directives.join("\n"));
+    assert!(applied.is_ok(), "{applied:?}");
+    Ok(())
+}
+
+#[test]
+fn review_a_seven_character_prefix_is_shown_whatever_its_first_character() -> Result<(), Failure> {
+    let session = Found::said(&[
+        Said::by(Speaker::Owner, "1a2b3c4d-0000-4000-8000-000000000001", "first thought".to_owned()),
+        Said::by(Speaker::Owner, "a1b2c3d4-0000-4000-8000-000000000001", "second thought".to_owned()),
+    ]);
+    let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: session.files() };
+    applying.run(&["ingest"])?;
+    let lettered = applying.run(&["show", "a1b2c3d"]).map(|_shown| ());
+    let numbered = applying.run(&["show", "1a2b3c4"]).map(|_shown| ());
+    assert!(lettered.is_ok(), "{lettered:?}");
+    assert!(numbered.is_ok(), "{numbered:?}");
     Ok(())
 }

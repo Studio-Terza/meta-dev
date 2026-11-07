@@ -10,9 +10,9 @@ use newtype::Newtype;
 enum Lexeme {
     #[regex(r"[A-Za-z_][A-Za-z0-9_-]*", priority = 1)]
     Word,
-    #[regex(r"[0-9a-f][0-9a-f-]{7,}", priority = 2)]
+    #[regex(r"[0-9a-f][0-9a-f-]{6,}", priority = 2)]
     Message,
-    #[regex(r"[0-9a-f][0-9a-f-]{7,}\.(0|[1-9][0-9]*)")]
+    #[regex(r"[0-9a-f][0-9a-f-]{6,}\.(0|[1-9][0-9]*)")]
     Segment,
     #[regex(r"n(0|[1-9][0-9]*)", priority = 3)]
     Node,

@@ -1,9 +1,10 @@
+use grammar::anchor::Anchoring;
 use grammar::artifact::Artifacts;
 use grammar::cited::Cited;
 use grammar::flag::Flags;
 use grammar::ident::Words;
 use grammar::line::Unbroken;
-use grammar::message::{Depth, Lexemes, Mark, Number};
+use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
 use grammar::output::field::{Bare, Id, Integer, Quoted, Ref};
 use grammar::output::{Fields, Unread};
@@ -259,8 +260,72 @@ laws::table!(
             ordinal: 3,
             message: Term::new("85b287b3-4d5e-4f60".to_owned()),
         }),
+        "n4 \"x\" feature to 1234567 1a2b3c4.0 0a1b2c3" => Some(Read6 {
+            node: 4,
+            quoted: Term::new("x".to_owned()),
+            bare: Term::new("feature".to_owned()),
+            integer: 1_234_567,
+            ordinal: 0,
+            message: Term::new("0a1b2c3".to_owned()),
+        }),
+        "n4 \"x\" feature to 7 9abcdef0.12 7e57ab1-0000" => Some(Read6 {
+            node: 4,
+            quoted: Term::new("x".to_owned()),
+            bare: Term::new("feature".to_owned()),
+            integer: 7,
+            ordinal: 12,
+            message: Term::new("7e57ab1-0000".to_owned()),
+        }),
+        "n4 \"x\" feature to 7 1a2b3c.0 1a2b3c4" => None,
+        "n4 \"x\" feature to 7 1a2b3c4.0 1a2b3c" => None,
+        "n4 \"x\" feature to 1a2b3c4 1a2b3c4.0 1a2b3c4" => None,
         "n4 \"x\" feature to 12 deadbeef.3 deadbeef extra" => None,
         "n4 \"x\" feature from 12 deadbeef.3 deadbeef" => None,
         "n4 \"x\" ( feature" => None,
+    ]
+);
+
+struct Inks;
+
+#[derive(Debug, PartialEq, Eq)]
+struct Anchored {
+    message: String,
+    ordinal: Option<usize>,
+}
+
+impl Inks {
+    fn of(text: &&str) -> String {
+        Lexemes::scanned(text).iter().filter_map(Lexeme::ink).map(|ink| ink.slice(text)).collect()
+    }
+
+    fn anchored(text: &&str) -> Option<Anchored> {
+        Anchoring::read(text)
+            .map(|anchoring| Anchored { message: anchoring.message().to_owned(), ordinal: anchoring.ordinal() })
+    }
+}
+
+laws::table!(
+    review_a_lexeme_ink_sheds_unicode_whitespace,
+    Inks::of,
+    [
+        "agreed.\u{a0}" => "agreed.".to_owned(),
+        "\u{3000}fine" => "fine".to_owned(),
+        "\u{2003}one\u{85}two\u{2029}" => "onetwo".to_owned(),
+        "\u{200b}kept" => "\u{200b}kept".to_owned(),
+    ]
+);
+
+laws::table!(
+    an_anchor_reads_as_a_message_id_or_one_with_a_segment_index,
+    Inks::anchored,
+    [
+        "85b287b3-4d5e" => Some(Anchored { message: "85b287b3-4d5e".to_owned(), ordinal: None }),
+        "85b287b3-4d5e#0" => Some(Anchored { message: "85b287b3-4d5e".to_owned(), ordinal: Some(0) }),
+        "o1#12" => Some(Anchored { message: "o1".to_owned(), ordinal: Some(12) }),
+        "o1#" => None,
+        "o1#01" => None,
+        "o1#2#3" => None,
+        "#2" => None,
+        "" => None,
     ]
 );
