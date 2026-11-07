@@ -114,7 +114,7 @@ impl Expansion for Constructors {
             impl #implemented #name #arguments #bounds {
                 pub fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error>
                 where
-                    Self: ::newtype::Validity<Kind = ::newtype::kind::Checked>
+                    Self: ::newtype::kind::Validity<Kind = ::newtype::kind::Checked>
                         + ::newtype::Checked
                         + ::newtype::Wrapping<Inner = #inner>,
                 {
@@ -132,7 +132,7 @@ impl Expansion for Constructors {
         quote! {
             #entry
 
-            impl #implemented ::newtype::Validity for #name #arguments #bounds {
+            impl #implemented ::newtype::kind::Validity for #name #arguments #bounds {
                 type Kind = #kind;
             }
 
@@ -201,7 +201,7 @@ impl Expansion for CheckedDeserializing {
     fn of(wrapped: Wrapped) -> TokenStream {
         Deserializing::reading(
             wrapped,
-            [parse_quote!(Self: ::newtype::Validity<Kind = ::newtype::kind::Checked> + ::newtype::Checked)],
+            [parse_quote!(Self: ::newtype::kind::Validity<Kind = ::newtype::kind::Checked> + ::newtype::Checked)],
             |member| {
                 quote! {
                     ::core::result::Result::and_then(read, |inner| {

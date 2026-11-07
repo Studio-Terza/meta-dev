@@ -14,7 +14,7 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use code_model::{Building, External, ItemPath};
+use code_model::Building;
 use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
@@ -123,18 +123,13 @@ impl<'read> Namespace<'read> {
         self.crates.get(name).copied()
     }
 
-    pub(super) fn global(&self, first: &Name, viewer: ScopeId) -> Binding {
+    pub(super) fn global(&self, first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         StdNames::root(first)
             .or_else(|| self.workspace(first).map(Binding::Module))
-            .unwrap_or_else(|| self.external(first, viewer))
+            .unwrap_or_else(|| Binding::external(first, dependencies))
     }
 
-    pub(super) fn external(&self, first: &Name, viewer: ScopeId) -> Binding {
-        let package = viewer
-            .row(&self.scopes)
-            .and_then(ScopeRow::outermost)
-            .and_then(|root| self.dependencies.get(&root))
-            .and_then(|dependencies| dependencies.package(first));
-        Binding::External(External::new(package.cloned(), ItemPath::default().joined(first)))
+    pub(super) fn dependencies(&self, viewer: ScopeId) -> Option<&'read Dependencies> {
+        viewer.row(&self.scopes).and_then(ScopeRow::outermost).and_then(|root| self.dependencies.get(&root)).copied()
     }
 }

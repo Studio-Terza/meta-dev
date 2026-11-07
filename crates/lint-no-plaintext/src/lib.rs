@@ -30,11 +30,9 @@ impl ModelLint for NoPlaintext {
             model.holdings().filter_map(|placed| Self::texted(model, &texts, placed)).collect();
         let owners: BTreeSet<ItemId> = texted.iter().map(|field| field.owner).collect();
         let plain = texted.iter().filter_map(|field| {
-            kinds.plain(field.owner).map(|_| Violation::new(field.site, Finding::Plain(field.name)))
+            kinds.plain().get(&field.owner).map(|_| Violation::new(field.site, Finding::Plain(field.name)))
         });
-        let unresolved = kinds.unresolved().iter().filter_map(|derive: &Derive<'_>| {
-            owners.get(&derive.subject()).map(|_| Violation::new(derive.site(), Finding::Unresolved(derive.name())))
-        });
+        let unresolved = kinds.unresolved().iter().filter_map(|derive: &Derive<'_>| derive.flagged(&owners));
         let mut found: Vec<Violation<'_>> = plain.chain(unresolved).collect();
         found.sort_by(|left, right| left.site().cmp(right.site()));
         Report::new(

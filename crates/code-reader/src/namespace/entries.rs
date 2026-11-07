@@ -233,7 +233,7 @@ impl Extern {
     fn bound(&self, space: &Namespace, scope: ScopeId) -> Binding {
         match Anchor::spelled(&self.krate) {
             Some(Anchor::Module) => Binding::from(Anchor::Crate.anchored(space.anchors(scope))),
-            _ => space.global(&self.krate, scope),
+            _ => space.global(&self.krate, space.dependencies(scope)),
         }
     }
 }

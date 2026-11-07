@@ -106,6 +106,18 @@ impl<'rows> From<&'rows Resolution> for View<'rows> {
 }
 
 #[derive(Clone, Copy, Debug)]
+struct Importing<'tables>(Option<Key<'tables>>);
+
+impl Importing<'_> {
+    fn levels<'levels>(self, levels: &'levels [ScopeId], key: Key<'_>) -> &'levels [ScopeId] {
+        match self.0.filter(|importing| *importing == key) {
+            Some(_) => levels.get(1..).unwrap_or_default(),
+            None => levels,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct Resolver<'tables, 'rows> {
     space: &'tables Namespace<'tables>,
     tables: &'tables Tables<'rows>,
@@ -138,8 +150,8 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
             .target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
     }
 
-    pub(super) fn global(&self, first: &Name, viewer: ScopeId) -> Resolution {
-        Resolution::Bound(self.space.global(first, viewer))
+    pub(super) fn space(&self) -> &'tables Namespace<'tables> {
+        self.space
     }
 
     pub(super) fn anchored(&self, anchor: Anchor, scope: ScopeId) -> Resolution {
@@ -155,7 +167,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     pub(super) fn named(&self, first: &Name, shape: Shape, reading: Reading, viewer: ScopeId) -> Resolution {
         self.chained(viewer, Key::new(Domain::Types, first), reading)
             .contested(shape.primitive(first).map(Binding::Primitive), || {
-                shape.fallback(first, reading, self.space.prelude(first, viewer), self.space, viewer)
+                shape.fallback(first, reading, self.space, viewer)
             })
     }
 
@@ -182,16 +194,8 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         }
     }
 
-    fn levels(&self, scope: ScopeId, key: Key<'_>) -> &'tables [ScopeId] {
-        let levels = self.space.chain(scope);
-        match self.importing.filter(|importing| *importing == key) {
-            Some(_) => levels.get(1..).unwrap_or_default(),
-            None => levels,
-        }
-    }
-
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
-        let levels = self.levels(scope, key);
+        let levels = Importing(self.importing).levels(self.space.chain(scope), key);
         let first = |reading: Reading| Lookup::new(Sight::Inside, self.ignored, reading);
         self.walked(levels, key, first(reading)).disputed(
             || self.walked(levels, key, first(Reading::Explicit)),

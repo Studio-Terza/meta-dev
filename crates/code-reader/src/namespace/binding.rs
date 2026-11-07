@@ -1,5 +1,5 @@
 use code_model::{Domain, External, ItemId, ItemPath, Primitive, Resolved};
-use lint_layout::Name;
+use lint_layout::{Dependencies, Name};
 
 use super::boundary::ScopeId;
 use super::entries::{DeclaredId, Sight};
@@ -65,6 +65,11 @@ impl Binding {
 }
 
 impl Binding {
+    pub(super) fn external(first: &Name, dependencies: Option<&Dependencies>) -> Binding {
+        let package = dependencies.and_then(|dependencies| dependencies.package(first)).cloned();
+        Binding::External(External::new(package, ItemPath::default().joined(first)))
+    }
+
     fn reached(module: &External, segment: &Name, domain: Domain) -> Binding {
         match domain {
             Domain::Types => Binding::External(module.joined(segment)),

@@ -1,6 +1,7 @@
 use super::checked::Checked;
-use super::validity::Validity;
-use crate::kind;
+pub mod kind;
+
+use kind::Validity;
 
 pub trait Wrapping: Sized {
     type Inner;

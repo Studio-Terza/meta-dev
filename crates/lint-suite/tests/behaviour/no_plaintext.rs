@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use file_ports::{Bytes, Memory};
 use lint_core::SourceFile;
 use lint_fixtures::{Case, Checks, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+use lint_layout::Failure;
 use lint_no_plaintext::NoPlaintext;
 use lint_placement::Placement;
 
@@ -302,12 +303,12 @@ impl Packaged {
     fn parsed(manifests: &Memory, source: &Source) -> SourceFile {
         let shown = Sources::file(source.path(), source.text());
         let path = source.path().to_path_buf();
-        match SourceFile::parse_at(
-            path.clone(),
-            path.clone(),
-            Placement::locate(manifests, &path),
-            shown.text().clone(),
-        ) {
+        let placement = Placement::locate(manifests, &path);
+        Self::read(SourceFile::parse_at(path.clone(), path, placement, shown.text().clone()))
+    }
+
+    fn read(parsed: Result<SourceFile, Failure>) -> SourceFile {
+        match parsed {
             Ok(file) => file,
             Err(failure) => unreachable!("fixture source parses: {failure}"),
         }

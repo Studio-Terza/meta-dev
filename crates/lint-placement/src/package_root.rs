@@ -38,10 +38,7 @@ impl PackageRoot {
             .zip(&manifests)
             .map(|(directory, manifest)| {
                 let root = CrateRoot::of_manifest(directory.as_ref(), manifest.as_ref());
-                let workspace = manifest
-                    .as_ref()
-                    .and_then(Manifest::workspace_root)
-                    .or_else(|| directory.as_ref().ancestors().skip(1).find_map(|enclosing| workspaces.get(enclosing)));
+                let workspace = Self::workspace(&workspaces, directory.as_ref(), manifest.as_ref());
                 PackageRoot {
                     dependencies: manifest
                         .as_ref()
@@ -72,8 +69,17 @@ impl PackageRoot {
             .cloned()
             .zip(Manifest::read_many(files, &enclosing))
             .filter_map(|(directory, read)| Some((directory, read.ok().flatten()?)))
-            .filter(|(_, manifest)| manifest.workspace_root().is_some())
+            .filter(|(_, manifest)| manifest.workspace().is_some())
             .collect()
+    }
+
+    fn workspace<'read>(
+        workspaces: &'read BTreeMap<PathBuf, Manifest>,
+        directory: &Path,
+        manifest: Option<&'read Manifest>,
+    ) -> Option<&'read Manifest> {
+        let own = manifest.filter(|manifest| manifest.workspace().is_some());
+        own.or_else(|| directory.ancestors().skip(1).find_map(|enclosing| workspaces.get(enclosing)))
     }
 
     #[must_use]

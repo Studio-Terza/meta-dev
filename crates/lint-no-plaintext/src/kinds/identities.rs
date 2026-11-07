@@ -10,10 +10,16 @@ pub(super) enum Role {
     Unresolved,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Packaged {
+    package: PackageName,
+    item: ItemPath,
+}
+
 #[derive(Debug)]
 pub(super) struct Identities {
     exported: BTreeMap<Resolved, Role>,
-    packaged: BTreeMap<(PackageName, ItemPath), Role>,
+    packaged: BTreeMap<Packaged, Role>,
 }
 
 impl Identities {
@@ -26,9 +32,9 @@ impl Identities {
     pub(super) fn read(model: &Model) -> Identities {
         let serde = Self::SERDE.into_iter().map(|package| ((package, Self::DESERIALIZE), Role::Deserializes));
         let newtype = Self::NEWTYPE_DERIVES.into_iter().map(|(derive, role)| ((Self::NEWTYPE, derive), role));
-        let packaged = serde
-            .chain(newtype)
-            .map(|((package, derive), role)| ((PackageName::from(package), [derive].into_iter().collect()), role));
+        let packaged = serde.chain(newtype).map(|((package, derive), role)| {
+            (Packaged { package: PackageName::from(package), item: [derive].into_iter().collect() }, role)
+        });
         let exported = Self::NEWTYPE_DERIVES.into_iter().filter_map(|(derive, role)| {
             let path: ItemPath = [Self::NEWTYPE, derive].into_iter().collect();
             model.exported(Domain::Macros, &path).cloned().map(|resolved| (resolved, role))
@@ -38,12 +44,13 @@ impl Identities {
 
     pub(super) fn role(&self, implemented: &Resolved) -> Option<Role> {
         implemented.known().map_or(Some(Role::Unresolved), |known| {
-            self.exported.get(known).copied().or_else(|| known.external().and_then(|external| self.packaged(external)))
+            self.exported.get(known).copied().or_else(|| self.packaged(known.external()?))
         })
     }
 
     fn packaged(&self, external: &External) -> Option<Role> {
-        let package = external.package()?.clone();
-        self.packaged.get(&(package, external.item())).copied()
+        let packaged =
+            Packaged { package: external.package()?.clone(), item: external.below_root().iter().cloned().collect() };
+        self.packaged.get(&packaged).copied()
     }
 }

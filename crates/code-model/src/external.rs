@@ -30,7 +30,7 @@ impl External {
     }
 
     #[must_use]
-    pub fn item(&self) -> ItemPath {
-        self.path.as_ref().iter().skip(1).cloned().collect()
+    pub fn below_root(&self) -> &[Name] {
+        self.path.as_ref().get(1..).unwrap_or_default()
     }
 }

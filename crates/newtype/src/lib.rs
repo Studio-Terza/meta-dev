@@ -1,7 +1,6 @@
 mod boundary;
-pub mod kind;
 
-pub use boundary::{Checked, Counter, Newtype, Validity, Wrapping};
+pub use boundary::{Checked, Counter, Newtype, Wrapping, kind};
 pub use newtype_derive::{Arbitrary, CheckedDeserialize, Deserialize, Display, Newtype, Serialize};
 
 pub use proptest;

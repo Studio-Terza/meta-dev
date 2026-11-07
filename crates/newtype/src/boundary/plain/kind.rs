@@ -1,5 +1,9 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Checked;
+pub trait Validity {
+    type Kind;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Unchecked;
+pub enum Checked {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unchecked {}

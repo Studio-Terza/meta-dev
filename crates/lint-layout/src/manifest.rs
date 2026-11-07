@@ -83,11 +83,6 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn workspace_root(&self) -> Option<&Manifest> {
-        self.table.contains_key(Self::WORKSPACE).then_some(self)
-    }
-
-    #[must_use]
     pub fn dependencies(&self, workspace: Option<&Manifest>) -> Dependencies {
         let inherited = workspace.and_then(|root| root.table.get(Self::WORKSPACE)?.get(Self::INHERITED)?.as_table());
         let platforms = self.table.get(Self::PLATFORMS).and_then(Value::as_table).into_iter().flat_map(Table::values);

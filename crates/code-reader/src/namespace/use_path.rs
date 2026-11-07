@@ -76,14 +76,8 @@ impl From<&[Name]> for Shape {
 }
 
 impl Shape {
-    pub(super) fn fallback(
-        self,
-        first: &Name,
-        reading: Reading,
-        prelude: Option<Binding>,
-        space: &Namespace,
-        viewer: ScopeId,
-    ) -> Outer {
+    pub(super) fn fallback(self, first: &Name, reading: Reading, space: &Namespace, viewer: ScopeId) -> Outer {
+        let prelude = space.prelude(first, viewer);
         let known = self
             .primitive(first)
             .map(Binding::Primitive)
@@ -91,7 +85,7 @@ impl Shape {
             .or_else(|| space.workspace(first).map(Binding::Module))
             .or_else(|| StdNames::root(first))
             .or_else(|| self.prelude(first).map(Binding::Std));
-        Outer::known_or(known, || self.unbound(reading, space.external(first, viewer)))
+        Outer::known_or(known, || self.unbound(reading, Binding::external(first, space.dependencies(viewer))))
     }
 
     pub(super) fn primitive(self, first: &Name) -> Option<Primitive> {
@@ -151,7 +145,9 @@ impl Head<'_> {
     pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
         match self {
             Head::Empty => Resolution::Bound(Binding::Unknown),
-            Head::Global(first) => resolver.global(first, viewer),
+            Head::Global(first) => {
+                Resolution::Bound(resolver.space().global(first, resolver.space().dependencies(viewer)))
+            }
             Head::Anchored(anchor) => resolver.anchored(anchor, viewer),
             Head::Named(relative) => relative.started(resolver, viewer, domain),
         }
