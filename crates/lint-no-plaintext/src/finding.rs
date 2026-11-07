@@ -17,7 +17,7 @@ impl<'model> Finding<'model> {
 impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "split it into typed parts, or use a newtype that validates (#[newtype(checked)] with an impl of newtype::Checked)",
+            "split it into typed parts, or use a newtype that validates (derive newtype::CheckedDeserialize, which reads through its impl of newtype::Checked)",
         )
     }
 }

@@ -16,6 +16,7 @@ pub(crate) enum Binding {
     External(ItemPath),
     Primitive(Primitive),
     Unknown,
+    Absent,
 }
 
 impl Binding {
@@ -24,7 +25,9 @@ impl Binding {
             Binding::Module(module) => entered(module),
             Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
             Binding::External(path) => Resolution::Bound(Binding::External(path.joined(segment))),
-            Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown => Resolution::Bound(Binding::Unknown),
+            Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown | Binding::Absent => {
+                Resolution::Bound(Binding::Unknown)
+            }
         }
     }
 
@@ -32,7 +35,9 @@ impl Binding {
         match self {
             Binding::Module(module) => Target::Module(module, sight_of(module)),
             Binding::Std(path) => Target::listed(&path),
-            Binding::Item(..) | Binding::External(_) | Binding::Primitive(_) | Binding::Unknown => Target::Opaque,
+            Binding::Item(..) | Binding::External(_) | Binding::Primitive(_) | Binding::Unknown | Binding::Absent => {
+                Target::Opaque
+            }
         }
     }
 
@@ -49,7 +54,7 @@ impl Binding {
             Binding::Std(path) => StdNames::resolved(path),
             Binding::External(path) => Resolved::External(path),
             Binding::Primitive(primitive) => Resolved::Primitive(primitive),
-            Binding::Module(_) | Binding::Unknown => Resolved::Unknown(written),
+            Binding::Module(_) | Binding::Unknown | Binding::Absent => Resolved::Unknown(written),
         }
     }
 }

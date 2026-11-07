@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{GenericParam, LifetimeParam, parse_quote};
+use syn::{GenericParam, LifetimeParam, Member, WherePredicate, parse_quote};
 
 use super::Wrapped;
 use super::settings::Checking;
@@ -20,6 +20,9 @@ pub struct Formatting;
 
 #[derive(Debug)]
 pub struct Deserializing;
+
+#[derive(Debug)]
+pub struct CheckedDeserializing;
 
 #[derive(Debug)]
 pub struct Serializing;
@@ -51,17 +54,31 @@ impl Strategy {
 }
 
 impl Deserializing {
-    fn built(checking: Checking) -> TokenStream {
-        match checking {
-            Checking::Unchecked => quote!(::core::result::Result::map(read, Self::new)),
-            Checking::Checked => quote! {
-                ::core::result::Result::and_then(read, |inner| {
-                    ::core::result::Result::map_err(
-                        Self::try_new(inner),
-                        <Arriving::Error as ::newtype::serde::de::Error>::custom,
-                    )
-                })
-            },
+    fn reading(
+        wrapped: Wrapped,
+        required: impl IntoIterator<Item = WherePredicate>,
+        built: impl FnOnce(&Member) -> TokenStream,
+    ) -> TokenStream {
+        let Wrapped { ident, generics, field, .. } = wrapped;
+        let inner = field.inner();
+        let built = built(field.member());
+        let (_, arguments, _) = generics.split_for_impl();
+        let named = quote!(#ident #arguments);
+        let mut borrowing = generics;
+        borrowing.params.insert(0, GenericParam::Lifetime(LifetimeParam::new(parse_quote!('newtype))));
+        let predicates = &mut borrowing.make_where_clause().predicates;
+        predicates.push(parse_quote!(#inner: ::newtype::serde::Deserialize<'newtype>));
+        predicates.extend(required);
+        let (implemented, _, bounds) = borrowing.split_for_impl();
+        quote! {
+            impl #implemented ::newtype::serde::Deserialize<'newtype> for #named #bounds {
+                fn deserialize<Arriving: ::newtype::serde::Deserializer<'newtype>>(
+                    arriving: Arriving,
+                ) -> ::core::result::Result<Self, Arriving::Error> {
+                    let read = <#inner as ::newtype::serde::Deserialize<'newtype>>::deserialize(arriving);
+                    #built
+                }
+            }
         }
     }
 }
@@ -157,25 +174,24 @@ impl Expansion for Formatting {
 
 impl Expansion for Deserializing {
     fn of(wrapped: Wrapped) -> TokenStream {
-        let name = &wrapped.ident;
-        let inner = wrapped.field.inner();
-        let built = Deserializing::built(wrapped.settings.checking());
-        let (_, arguments, _) = wrapped.generics.split_for_impl();
-        let named = quote!(#name #arguments);
-        let mut borrowing = wrapped.generics;
-        borrowing.params.insert(0, GenericParam::Lifetime(LifetimeParam::new(parse_quote!('newtype))));
-        borrowing.make_where_clause().predicates.push(parse_quote!(#inner: ::newtype::serde::Deserialize<'newtype>));
-        let (implemented, _, bounds) = borrowing.split_for_impl();
-        quote! {
-            impl #implemented ::newtype::serde::Deserialize<'newtype> for #named #bounds {
-                fn deserialize<Arriving: ::newtype::serde::Deserializer<'newtype>>(
-                    arriving: Arriving,
-                ) -> ::core::result::Result<Self, Arriving::Error> {
-                    let read = <#inner as ::newtype::serde::Deserialize<'newtype>>::deserialize(arriving);
-                    #built
-                }
+        Deserializing::reading(wrapped, [], |_| {
+            quote!(::core::result::Result::map(read, <Self as ::newtype::Newtype>::new))
+        })
+    }
+}
+
+impl Expansion for CheckedDeserializing {
+    fn of(wrapped: Wrapped) -> TokenStream {
+        Deserializing::reading(wrapped, [parse_quote!(Self: ::newtype::Checked)], |member| {
+            quote! {
+                ::core::result::Result::and_then(read, |inner| {
+                    ::core::result::Result::map_err(
+                        <Self as ::newtype::Wrapping>::admitted(inner, |inner| Self { #member: inner }),
+                        <Arriving::Error as ::newtype::serde::de::Error>::custom,
+                    )
+                })
             }
-        }
+        })
     }
 }
 

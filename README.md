@@ -433,9 +433,11 @@ inherent `try_new` and `into_inner` instead, and `try_new` is the only way in. T
     }
 
 `#[derive(Serialize, Deserialize)]` (`newtype::Serialize`, `newtype::Deserialize`) write and read a newtype as its inner
-value. Reading goes through `new`, or through `try_new` for a validated newtype, so a value its check refuses is a
-deserialization error carrying the check's message. They reach serde through `newtype::serde`, so the using crate
-needs only `newtype`.
+value; `Deserialize` reads through `Newtype::new`, so only an unchecked newtype can derive it. A validated newtype
+derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through the type's `impl Checked` and is
+bounded by `Self: Checked`, so it does not compile without the check. A value the check refuses is a deserialization
+error carrying the check's message, so `Checked::Error` implements `Display`. They reach serde through `newtype::serde`,
+so the using crate needs only `newtype`.
 
 `#[derive(Arbitrary)]` (`newtype::Arbitrary`) implements proptest's `Arbitrary` through those constructors, so a validated newtype
 only generates values its check admits. It reaches proptest through `newtype::proptest`, so the using crate needs only
@@ -462,7 +464,7 @@ counts as `Inner`); a `const fn` is never counted, since a trait method cannot b
 
 Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; a public trait declaration is checked like a public function, a private one is not, and a type alias is read through (`type Label = String;` then `pub fn f(x: Label)` is flagged, the alias itself is not); use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
-Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
+Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: it derives `newtype::CheckedDeserialize`, or it has `#[serde(try_from = ...)]` with a written `TryFrom` impl. An `impl Checked` beside an unchecked derive, or a hand-written `Deserialize`, does not validate. The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
 
 ## Guards
 

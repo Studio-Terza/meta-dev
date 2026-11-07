@@ -1,9 +1,13 @@
 use std::collections::BTreeMap;
 
-use syn::{Ident, Item, ItemExternCrate, ItemMacro, ItemUse, Macro, Stmt, StmtMacro, VisRestricted};
+use syn::punctuated::Punctuated;
+use syn::{
+    Attribute, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemUse, Macro, Meta, Stmt, StmtMacro, Token,
+    VisRestricted,
+};
 
-use code_model::{Building, Item as ModelItem, ItemId, ItemKind};
-use lint_layout::Name;
+use code_model::{Building, Domain, Item as ModelItem, ItemId, ItemKind};
+use lint_layout::{Name, Whole, Word, words};
 
 use super::Namespace;
 use super::anchor::Anchor;
@@ -12,7 +16,7 @@ use super::boundary::{GlobId, ScopeId};
 use super::resolver::{Resolution, Resolver};
 use super::settling::{ScopeSettling, Seed, Target};
 use super::std_names::{Expansion, StdNames};
-use super::tables::{Domain, Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
+use super::tables::{Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
 use super::use_path::{Leaf, UsePath};
 use super::view::View;
 
@@ -124,20 +128,49 @@ pub(crate) struct Declared {
     name: Name,
     visibility: Visibility,
     kind: DeclaredKind,
+    domain: Domain,
 }
 
 impl Declared {
     pub(crate) fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Declared {
-        Declared { name, visibility, kind }
+        Declared { name, visibility, kind, domain: Domain::Types }
     }
 
     fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Declared {
-        Declared { name: Name::from(ident), visibility: Visibility::from(visibility), kind: DeclaredKind::Item(kind) }
+        Declared::new(Name::from(ident), Visibility::from(visibility), DeclaredKind::Item(kind))
     }
 
     fn issued(&self, building: &mut Building) -> Option<ItemId> {
         let kind = self.kind.item_kind()?;
         Some(building.declared(ModelItem::new(self.name.clone(), kind)))
+    }
+}
+
+#[derive(Debug)]
+struct DeriveMacro<'item>(&'item ItemFn);
+
+impl DeriveMacro<'_> {
+    const ATTRIBUTE: [Word<'static>; 1] = words!["proc_macro_derive"];
+
+    fn declared(self) -> Vec<Declared> {
+        let visibility = Visibility::from(&self.0.vis);
+        self.0
+            .attrs
+            .iter()
+            .filter_map(DeriveMacro::named)
+            .map(|name| Declared {
+                name,
+                visibility,
+                kind: DeclaredKind::Item(ItemKind::Derive),
+                domain: Domain::Macros,
+            })
+            .collect()
+    }
+
+    fn named(attribute: &Attribute) -> Option<Name> {
+        attribute.path().get_ident().map(Name::from).and_then(|ident| ident.matches::<Whole>(&Self::ATTRIBUTE))?;
+        let settings = attribute.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ok()?;
+        settings.first().and_then(|first| first.path().get_ident()).map(Name::from)
     }
 }
 
@@ -150,7 +183,10 @@ pub(crate) enum Imported {
 impl Imported {
     fn entries(self, visibility: Visibility) -> Entries {
         match self {
-            Imported::Named(name, path) => Entries::from(Import { name, path, visibility }),
+            Imported::Named(name, path) => Domain::ALL
+                .into_iter()
+                .map(|domain| Entries::from(Import { name: name.clone(), path: path.clone(), visibility, domain }))
+                .fold(Entries::default(), Entries::merged),
             Imported::Glob(path) => Entries::from(Glob { source: GlobSource::Path(path), visibility }),
         }
     }
@@ -161,12 +197,13 @@ struct Import {
     name: Name,
     path: UsePath,
     visibility: Visibility,
+    domain: Domain,
 }
 
 impl Import {
-    fn rows<'rows>(&'rows self, resolution: &'rows Resolution) -> impl Iterator<Item = Keyed<'rows, Row<'rows>>> {
-        let row = Row::new(Layer::Imported, self.visibility, View::from(resolution));
-        Key::every(&self.name).map(move |key| Keyed::new(key, row))
+    fn row<'rows>(&'rows self, resolution: &'rows Resolution) -> Option<Keyed<'rows, Row<'rows>>> {
+        let row = Row::new(Layer::Imported, self.visibility, View::from(resolution.present()?));
+        Some(Keyed::new(Key::new(self.domain, &self.name), row))
     }
 }
 
@@ -306,6 +343,11 @@ impl From<&Item> for Entries {
             Item::TraitAlias(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
             }
+            Item::Fn(declared) => DeriveMacro(declared)
+                .declared()
+                .into_iter()
+                .map(Entries::from)
+                .fold(Entries::default(), Entries::merged),
             _ => Entries::default(),
         }
     }
@@ -338,10 +380,11 @@ impl Entries {
         self.declared.iter().map(|declared| declared.issued(building)).collect()
     }
 
-    pub(super) fn exported(&self) -> impl Iterator<Item = &Name> {
-        let declared = self.declared.iter().map(|declared| (&declared.name, declared.visibility));
-        let imported = self.imports.iter().map(|import| (&import.name, import.visibility));
-        declared.chain(imported).filter(|(_, visibility)| *visibility == Visibility::Visible).map(|(name, _)| name)
+    pub(super) fn exported(&self) -> impl Iterator<Item = Key<'_>> {
+        let declared =
+            self.declared.iter().map(|declared| (Key::new(declared.domain, &declared.name), declared.visibility));
+        let imported = self.imports.iter().map(|import| (Key::new(import.domain, &import.name), import.visibility));
+        declared.chain(imported).filter(|(_, visibility)| *visibility == Visibility::Visible).map(|(key, _)| key)
     }
 
     pub(super) fn prelude(&self, name: &Name, space: &Namespace, root: ScopeId) -> Option<Binding> {
@@ -351,7 +394,7 @@ impl Entries {
     pub(super) fn seeds(&self, scope: ScopeId, space: &Namespace) -> Vec<Seed<'_>> {
         let declared = self.declared.iter().enumerate().map(|(index, declared)| {
             Seed::new(
-                Key::new(Domain::Types, &declared.name),
+                Key::new(declared.domain, &declared.name),
                 Layer::Declared,
                 declared.visibility,
                 declared.kind.bound(scope, DeclaredId(index)),
@@ -379,7 +422,7 @@ impl Entries {
 
     pub(super) fn settled(&self, scope: ScopeId, resolver: &Resolver<'_, '_>) -> ScopeSettling {
         ScopeSettling::new(
-            self.imports.iter().map(|import| resolver.path(&import.path, scope)).collect(),
+            self.imports.iter().map(|import| resolver.path(&import.path, scope, import.domain)).collect(),
             self.globs
                 .iter()
                 .zip(GlobId::ids(&self.globs))
@@ -393,7 +436,7 @@ impl Entries {
         seeds: &'rows [Seed<'rows>],
         imports: &'rows [Resolution],
     ) -> Explicit<'rows> {
-        let imported = self.imports.iter().zip(imports).flat_map(|(import, resolution)| import.rows(resolution));
+        let imported = self.imports.iter().zip(imports).filter_map(|(import, resolution)| import.row(resolution));
         seeds.iter().map(Seed::row).chain(imported).collect()
     }
 

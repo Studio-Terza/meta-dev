@@ -5,7 +5,7 @@ mod settings;
 use proc_macro2::TokenStream;
 use syn::{DeriveInput, Generics, Ident};
 
-pub use expansion::{Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy};
+pub use expansion::{CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy};
 use only_field::OnlyField;
 use settings::Settings;
 

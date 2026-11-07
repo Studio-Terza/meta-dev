@@ -5,6 +5,7 @@ use lint_layout::LineNumber;
 
 use crate::boundary::{FileId, ItemId};
 use crate::call::Call;
+use crate::domain::Domain;
 use crate::found::Found;
 use crate::function::Function;
 use crate::holding::Holding;
@@ -20,7 +21,7 @@ pub struct Building {
     model: Model,
     items: Vec<Item>,
     aliases: Aliases,
-    exports: BTreeMap<ItemPath, Resolved>,
+    exports: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
 }
 
 impl Building {
@@ -56,8 +57,8 @@ impl Building {
         self.aliases.declare(item, alias);
     }
 
-    pub fn export(&mut self, path: ItemPath, resolved: &Resolved) {
-        self.exports.extend(resolved.known().map(|known| (path, known.clone())));
+    pub fn export(&mut self, domain: Domain, path: ItemPath, resolved: &Resolved) {
+        self.exports.entry(domain).or_default().extend(resolved.known().map(|known| (path, known.clone())));
     }
 
     pub fn std_alias(&mut self, path: ItemPath, alias: Alias) {

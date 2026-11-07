@@ -1,10 +1,11 @@
 use serde::Deserialize;
 
-#[derive(newtype::Newtype, newtype::Arbitrary, newtype::Deserialize)]
+#[derive(newtype::Newtype, newtype::Arbitrary, newtype::CheckedDeserialize, Debug)]
 #[newtype(checked)]
 pub struct Title(String);
 
-pub struct Untitled;
+#[derive(newtype::Newtype, newtype::Display, Debug)]
+pub struct Untitled(&'static str);
 
 impl newtype::Checked for Title {
     type Error = Untitled;

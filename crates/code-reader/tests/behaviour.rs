@@ -1,5 +1,5 @@
 use code_model::{
-    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
+    Domain, Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -337,13 +337,13 @@ impl Read {
         Read::implemented(&files)
     }
 
-    fn exported(fixtures: &[Fixture], paths: &[&[&str]]) -> Vec<Option<Seen>> {
+    fn exported(fixtures: &[Fixture], domain: Domain, paths: &[&[&str]]) -> Vec<Option<Seen>> {
         let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
         let model = Reader::read_files(&files);
         paths
             .iter()
             .map(|path| path.iter().map(|segment| Name::from(*segment)).collect())
-            .map(|path| model.exported(&path).cloned().map(|resolved| Seen::of(&model, resolved)))
+            .map(|path| model.exported(domain, &path).cloned().map(|resolved| Seen::of(&model, resolved)))
             .collect()
     }
 
@@ -423,6 +423,7 @@ fn a_crate_root_exports_each_public_name_as_it_resolves() {
     assert_eq!(
         Read::exported(
             &EXPORTING,
+            Domain::Types,
             &[
                 &["a", "T"],
                 &["a", "Dup"],
@@ -443,6 +444,46 @@ fn a_crate_root_exports_each_public_name_as_it_resolves() {
             None,
             Some(Expect::item("T", ItemKind::Trait)),
             None,
+        ]
+    );
+}
+
+const DERIVE_MACROS: [Fixture; 3] = [
+    Fixture::new(
+        "crates/d/src/lib.rs",
+        "#[proc_macro_derive(Shown, attributes(shown))]\npub fn derive_shown(input: TokenStream) -> TokenStream {\n    input\n}\npub fn shown() {}\n",
+    ),
+    Fixture::new("crates/e/src/lib.rs", "mod m {\n    pub trait Shown {}\n}\npub use m::Shown;\npub use d::Shown;\n"),
+    Fixture::new(
+        "crates/f/src/lib.rs",
+        "use e::Shown as Show;\n#[derive(e::Shown, Show)]\nstruct S;\nimpl e::Shown for S {}\nimpl Show for S {}\n",
+    ),
+];
+
+#[test]
+fn a_derive_macro_is_exported_beside_a_trait_of_its_name() {
+    assert_eq!(
+        [Domain::Types, Domain::Macros].map(|domain| Read::exported(
+            &DERIVE_MACROS,
+            domain,
+            &[&["e", "Shown"], &["d", "Shown"]]
+        )),
+        [
+            [Some(Expect::item("Shown", ItemKind::Trait)), None],
+            [Some(Expect::item("Shown", ItemKind::Derive)), Some(Expect::item("Shown", ItemKind::Derive))],
+        ]
+    );
+}
+
+#[test]
+fn a_derive_resolves_to_its_macro_and_an_impl_to_its_trait() {
+    assert_eq!(
+        Read::across(&DERIVE_MACROS),
+        [
+            Expect::item("Shown", ItemKind::Derive),
+            Expect::item("Shown", ItemKind::Derive),
+            Expect::item("Shown", ItemKind::Trait),
+            Expect::item("Shown", ItemKind::Trait),
         ]
     );
 }

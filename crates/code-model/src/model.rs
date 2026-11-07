@@ -5,6 +5,7 @@ mod filed;
 
 use crate::boundary::ItemId;
 use crate::call::Call;
+use crate::domain::Domain;
 use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
@@ -115,8 +116,8 @@ impl Model {
     }
 
     #[must_use]
-    pub fn exported(&self, path: &ItemPath) -> Option<&Resolved> {
-        self.declarations.exports().get(path)
+    pub fn exported(&self, domain: Domain, path: &ItemPath) -> Option<&Resolved> {
+        self.declarations.exports().get(&domain).and_then(|paths| paths.get(path))
     }
 
     #[must_use]

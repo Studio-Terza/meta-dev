@@ -1,10 +1,10 @@
-use code_model::{ItemPath, Model, Resolved};
+use code_model::{Domain, ItemPath, Model, Resolved};
 use lint_layout::{Word, words};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Role {
     Deserializes,
-    Checks,
+    DeserializesChecked,
     Converts,
 }
 
@@ -23,14 +23,14 @@ pub(super) struct Identities {
 impl Identities {
     const SERDE_DESERIALIZE: [Word<'static>; 2] = words!["serde", "Deserialize"];
     const NEWTYPE_DESERIALIZE: [Word<'static>; 2] = words!["newtype", "Deserialize"];
-    const NEWTYPE_CHECKED: [Word<'static>; 2] = words!["newtype", "Checked"];
+    const NEWTYPE_CHECKED_DESERIALIZE: [Word<'static>; 2] = words!["newtype", "CheckedDeserialize"];
     const TRY_FROM: [Word<'static>; 3] = words!["std", "convert", "TryFrom"];
 
     pub(super) fn read(model: &Model) -> Identities {
         let known = [
             (Self::SERDE_DESERIALIZE, Role::Deserializes),
             (Self::NEWTYPE_DESERIALIZE, Role::Deserializes),
-            (Self::NEWTYPE_CHECKED, Role::Checks),
+            (Self::NEWTYPE_CHECKED_DESERIALIZE, Role::DeserializesChecked),
         ]
         .into_iter()
         .map(|(path, role)| Identity { resolved: Self::resolved(model, &path), role })
@@ -45,7 +45,7 @@ impl Identities {
 
     fn resolved(model: &Model, path: &[Word<'static>]) -> Resolved {
         let path: ItemPath = path.iter().copied().collect();
-        let exported = model.exported(&path).cloned();
+        let exported = model.exported(Domain::Macros, &path).cloned();
         exported.unwrap_or(Resolved::External(path))
     }
 }

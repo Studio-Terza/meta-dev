@@ -41,7 +41,8 @@ impl Kinds {
             .filter(|holding| holding.held() == Held::TryFromSource)
             .filter_map(Holding::declares)
             .filter_map(|item| converting.get(&item).copied());
-        let validated: BTreeSet<ItemId> = subjects(Role::Checks, Origin::Written).chain(converted).collect();
+        let validated: BTreeSet<ItemId> =
+            subjects(Role::DeserializesChecked, Origin::Derived).chain(converted).collect();
         let plain_owners = deserialized.difference(&validated).copied().collect();
         Kinds { validated, plain_owners }
     }

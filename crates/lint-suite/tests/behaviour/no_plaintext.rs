@@ -24,24 +24,26 @@ const NEWTYPES: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct 
 const NOT_NEWTYPES: &str = "use serde::Deserialize;\nstruct Pair(String, String);\nstruct Unit;\nstruct Count(u32);\nstruct Two {\n    a: String,\n    b: String,\n}\n#[derive(Deserialize)]\nstruct U {\n    pair: Pair,\n    unit: Unit,\n    count: Count,\n    two: Two,\n}\n";
 const ROOT: &str = "mod a;\nmod b;\nmod c;\n";
 const PLAIN_ID: &str = "pub struct Id(String);\n";
-const CHECKED_ID: &str = "pub struct Id(String);\nimpl newtype::Checked for Id {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\n";
+const CHECKED_ID: &str = "#[derive(newtype::CheckedDeserialize)]\npub struct Id(String);\nimpl newtype::Checked for Id {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\n";
 const USES_PLAIN: &str =
     "use serde::Deserialize;\nuse crate::a::Id;\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n";
 const USES_CHECKED: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    id: crate::b::Id,\n}\n";
 
-const CHECKED: &str = "use serde::Deserialize;\nuse newtype::Checked;\n#[derive(newtype::Newtype, newtype::Deserialize)]\n#[newtype(checked)]\nstruct OneLine(String);\nimpl Checked for OneLine {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\nstruct Line(String);\nimpl newtype::Checked for Line {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\n#[derive(Deserialize)]\nstruct A {\n    line: OneLine,\n    lines: Vec<Line>,\n}\n";
+const CHECKED: &str = "use serde::Deserialize;\nuse newtype::{Checked, CheckedDeserialize};\n#[derive(newtype::Newtype, newtype::CheckedDeserialize)]\n#[newtype(checked)]\nstruct OneLine(String);\nimpl Checked for OneLine {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\n#[derive(CheckedDeserialize)]\nstruct Line(String);\nimpl newtype::Checked for Line {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\n#[derive(Deserialize)]\nstruct A {\n    line: OneLine,\n    lines: Vec<Line>,\n}\n";
+const STRAY_CHECKED: &str = "use serde::Deserialize;\n#[derive(newtype::Newtype, newtype::Deserialize)]\npub struct Title(String);\npub struct Untitled;\nimpl newtype::Checked for Title {\n    type Error = Untitled;\n    fn checked(text: &String) -> Result<&String, Untitled> { Err(Untitled) }\n}\n#[derive(Deserialize)]\npub struct Entry {\n    title: Title,\n}\npub struct Line(String);\nimpl newtype::Checked for Line {\n    type Error = Untitled;\n    fn checked(text: &String) -> Result<&String, Untitled> { Err(Untitled) }\n}\n#[derive(Deserialize)]\npub struct Lines {\n    lines: Vec<Line>,\n}\n";
 const UNCHECKED: &str = "use serde::Deserialize;\n#[derive(newtype::Newtype, newtype::Deserialize)]\nstruct Name(String);\n#[derive(Deserialize)]\nstruct A {\n    name: Name,\n}\n";
-const OTHER_CHECKED: &str = "use serde::Deserialize;\nmod other {\n    pub trait Checked {}\n}\nstruct Name(String);\nimpl other::Checked for Name {}\n#[derive(Deserialize)]\nstruct A {\n    name: Name,\n}\n";
+const OTHER_CHECKED: &str = "use serde::Deserialize;\nmod other {\n    pub use other_derive::CheckedDeserialize;\n}\n#[derive(other::CheckedDeserialize)]\nstruct Name(String);\nimpl newtype::Checked for Name {}\n#[derive(Deserialize)]\nstruct A {\n    name: Name,\n}\n";
 const HAND_DESERIALIZE: &str = "use serde::Deserialize;\nstruct Id(String);\nimpl<'de> Deserialize<'de> for Id {\n    fn deserialize<D>(d: D) -> Result<Id, D::Error> {\n        let text = String::deserialize(d)?;\n        Id::from_str(&text).map_err(D::Error::custom)\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n";
-const NEWTYPE_ROOT: &str = "mod boundary;\npub use boundary::Checked;\npub use newtype_derive::Deserialize;\n";
+const NEWTYPE_ROOT: &str =
+    "mod boundary;\npub use boundary::Checked;\npub use newtype_derive::{CheckedDeserialize, Deserialize};\n";
 const NEWTYPE_BOUNDARY: &str = "pub trait Checked {}\n";
-const WORKSPACE_USER: &str = "use serde::Deserialize;\npub struct Line(String);\nimpl newtype::Checked for Line {}\npub struct Name(String);\n#[derive(Deserialize)]\npub struct A {\n    line: Line,\n    name: Name,\n}\n";
+const WORKSPACE_USER: &str = "use serde::Deserialize;\n#[derive(newtype::CheckedDeserialize)]\npub struct Line(String);\nimpl newtype::Checked for Line {}\n#[derive(newtype::Deserialize)]\npub struct Name(String);\nimpl newtype::Checked for Name {}\n#[derive(Deserialize)]\npub struct A {\n    line: Line,\n    name: Name,\n}\n";
 
 const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n}\n";
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 23] = [
+const CASES: [Case; 24] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("a.rs"), Text::new(TEXT_FIELDS))],
@@ -133,9 +135,14 @@ const CASES: [Case; 23] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("an impl of newtype's Checked validates its newtype and every user"),
+        Title::new("newtype's CheckedDeserialize validates its newtype and every user"),
         &[Source::new(Located::new("a.rs"), Text::new(CHECKED))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an impl of newtype's Checked beside an unchecked derive, or none, does not validate"),
+        &[Source::new(Located::new("a.rs"), Text::new(STRAY_CHECKED))],
+        Flagged::new(&["a.rs:3", "a.rs:11", "a.rs:20"]),
     ),
     Case::new(
         Title::new("an unchecked newtype deriving newtype's Deserialize, and its user"),
@@ -143,21 +150,21 @@ const CASES: [Case; 23] = [
         Flagged::new(&["a.rs:3", "a.rs:6"]),
     ),
     Case::new(
-        Title::new("another trait named Checked, or a hand-written Deserialize, does not validate"),
+        Title::new("another derive named CheckedDeserialize, or a hand-written Deserialize, does not validate"),
         &[
             Source::new(Located::new("a.rs"), Text::new(OTHER_CHECKED)),
             Source::new(Located::new("b.rs"), Text::new(HAND_DESERIALIZE)),
         ],
-        Flagged::new(&["a.rs:9", "b.rs:11"]),
+        Flagged::new(&["a.rs:10", "b.rs:11"]),
     ),
     Case::new(
-        Title::new("newtype's Checked declared in the workspace"),
+        Title::new("newtype's derives declared in the workspace"),
         &[
             Source::new(Located::new("crates/newtype/src/lib.rs"), Text::new(NEWTYPE_ROOT)),
             Source::new(Located::new("crates/newtype/src/boundary.rs"), Text::new(NEWTYPE_BOUNDARY)),
             Source::new(Located::new("crates/user/src/lib.rs"), Text::new(WORKSPACE_USER)),
         ],
-        Flagged::new(&["crates/user/src/lib.rs:8"]),
+        Flagged::new(&["crates/user/src/lib.rs:6", "crates/user/src/lib.rs:11"]),
     ),
     Case::new(
         Title::new("a test module"),

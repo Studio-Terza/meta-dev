@@ -1,6 +1,6 @@
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
-use newtype::{Checked, Counter, Deserialize, Display, Newtype, Serialize, Wrapping};
+use newtype::{Checked, CheckedDeserialize, Counter, Deserialize, Display, Newtype, Serialize, Wrapping};
 use newtype_derive::Arbitrary;
 
 #[derive(Newtype, Arbitrary, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -18,7 +18,7 @@ struct Wrapper<Wrapped>(Wrapped);
 #[error("the text is empty")]
 struct Empty;
 
-#[derive(Newtype, Arbitrary, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Serialize, CheckedDeserialize, Clone, Debug, PartialEq, Eq)]
 #[newtype(checked)]
 struct Word(String);
 

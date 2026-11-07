@@ -1,5 +1,6 @@
 use std::iter;
 
+use code_model::Domain;
 use lint_layout::Name;
 
 use super::Namespace;
@@ -9,7 +10,7 @@ use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::Sight;
 use super::settling::Target;
 use super::std_names::{Canonical, StdNames, Table};
-use super::tables::{Domain, Key, Lookup, Tables};
+use super::tables::{Key, Lookup, Tables};
 use super::use_path::{Reading, Shape, UsePath};
 use super::view::View;
 
@@ -57,6 +58,13 @@ pub(crate) enum Resolution {
 }
 
 impl Resolution {
+    pub(super) fn present(&self) -> Option<&Resolution> {
+        match self {
+            Resolution::Bound(Binding::Absent) => None,
+            Resolution::Waiting | Resolution::Bound(_) => Some(self),
+        }
+    }
+
     pub(super) fn forced(self) -> Binding {
         match self {
             Resolution::Waiting => Binding::Unknown,
@@ -109,15 +117,20 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         Resolver { space, tables, ignored: None }
     }
 
-    pub(super) fn path(&self, path: &UsePath, viewer: ScopeId) -> Resolution {
-        path.tail()
-            .iter()
-            .fold(path.head().started(self, viewer), |resolution, segment| self.stepped(resolution, segment, viewer))
+    pub(super) fn path(&self, path: &UsePath, viewer: ScopeId, domain: Domain) -> Resolution {
+        let tail = path.tail();
+        let (within, last) = tail.split_at(tail.len().saturating_sub(1));
+        let module = within.iter().fold(path.head().started(self, viewer, domain), |resolution, segment| {
+            self.stepped(resolution, segment, viewer, Domain::Types)
+        });
+        last.iter().fold(module, |resolution, segment| self.stepped(resolution, segment, viewer, domain))
     }
 
     pub(super) fn glob_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId) -> Target {
         let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob) };
-        resolver.path(path, scope).target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
+        resolver
+            .path(path, scope, Domain::Types)
+            .target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
     }
 
     pub(super) fn global(&self, first: &Name) -> Resolution {
@@ -138,24 +151,26 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
             .settled(|| shape.fallback(first, reading, self.space.prelude(first, viewer), self.space))
     }
 
-    fn entered(&self, module: ScopeId, segment: &Name, viewer: ScopeId) -> Resolution {
+    fn entered(&self, module: ScopeId, segment: &Name, viewer: ScopeId, domain: Domain) -> Resolution {
         match Anchor::spelled(segment) {
             Some(anchor) => self.anchored(anchor, module),
             None => self
                 .tables
                 .found(
                     module,
-                    Key::new(Domain::Types, segment),
+                    Key::new(domain, segment),
                     Lookup::new(Sight::ByPath.beyond(self.space.within_reach(module, viewer)), None, Reading::Written),
                 )
-                .settled(|| Outer::Assumed(Binding::Unknown)),
+                .settled(|| Outer::Assumed(Binding::Absent)),
         }
     }
 
-    fn stepped(&self, resolution: Resolution, segment: &Name, viewer: ScopeId) -> Resolution {
+    fn stepped(&self, resolution: Resolution, segment: &Name, viewer: ScopeId, domain: Domain) -> Resolution {
         match resolution {
             Resolution::Waiting => Resolution::Waiting,
-            Resolution::Bound(binding) => binding.stepped(segment, |module| self.entered(module, segment, viewer)),
+            Resolution::Bound(binding) => {
+                binding.stepped(segment, |module| self.entered(module, segment, viewer, domain))
+            }
         }
     }
 

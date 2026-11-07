@@ -2,7 +2,8 @@ use std::fmt;
 
 use newtype::Checked;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("an attachment is none, an owner id, or a list of spec labels")]
 pub struct NotWellFormed;
 
 #[derive(newtype::Newtype, Debug, PartialEq, Eq)]
