@@ -1,30 +1,34 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
 use toml::de::{DeTable, DeValue};
+use workspace_metadata::CrateName;
 
 use super::Dependencies;
-use crate::dependency::Dependency;
-use crate::name::Name;
+use crate::line_number::LineNumber;
 use crate::source_text::SourceText;
 
 impl Dependencies {
     const LISTS: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
     const PLATFORMS: &'static str = "target";
-    const RENAMED: &'static str = "package";
+    const HEADER: &'static str = "dependencies";
 
     pub(crate) fn listed(text: &SourceText, top: &DeTable<'_>) -> Dependencies {
         let platforms = Self::entries(top, Self::PLATFORMS)
             .filter_map(DeValue::as_table)
             .flat_map(|platforms| platforms.values())
             .filter_map(|platform| platform.get_ref().as_table());
-        Dependencies(
-            iter::once(top)
-                .chain(platforms)
-                .flat_map(Self::lists)
-                .flat_map(|listed| listed.iter())
-                .map(|(key, value)| Dependency::new(Self::depended(key.get_ref(), value.get_ref()), text.line_of(key)))
-                .collect(),
-        )
+        let keys = iter::once(top)
+            .chain(platforms)
+            .flat_map(Self::lists)
+            .flat_map(|listed| listed.keys())
+            .filter_map(|key| Some((CrateName::try_from(key.get_ref().as_ref()).ok()?, text.line_of(key))))
+            .fold(BTreeMap::new(), |mut keys: BTreeMap<CrateName, BTreeSet<LineNumber>>, (key, line)| {
+                keys.entry(key).or_default().insert(line);
+                keys
+            });
+        let header = top.keys().find(|key| key.get_ref() == Self::HEADER).map(|key| text.line_of(key));
+        Dependencies { keys, header }
     }
 
     fn lists<'table, 'text>(table: &'table DeTable<'text>) -> impl Iterator<Item = &'table DeTable<'text>> {
@@ -36,14 +40,5 @@ impl Dependencies {
         wanted: &str,
     ) -> impl Iterator<Item = &'table DeValue<'text>> {
         table.iter().filter(move |(key, _)| key.get_ref() == wanted).map(|(_, value)| value.get_ref())
-    }
-
-    fn depended(key: &str, value: &DeValue<'_>) -> Name {
-        value
-            .as_table()
-            .into_iter()
-            .flat_map(|table| Self::entries(table, Self::RENAMED))
-            .find_map(DeValue::as_str)
-            .map_or_else(|| Name::from(key), Name::from)
     }
 }

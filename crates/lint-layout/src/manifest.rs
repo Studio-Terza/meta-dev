@@ -1,30 +1,33 @@
 mod boundary;
+mod key_lines;
 mod members;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Text};
 use newtype::Newtype;
-use toml::de::DeTable;
+use serde_core::Deserialize;
+use toml::de::{DeTable, Deserializer};
 use toml::{Table, Value};
 
 use crate::dependencies::Dependencies;
 use crate::failure::Failure;
-use crate::line_number::LineNumber;
 use crate::name::Name;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
 use crate::word::Word;
+pub use key_lines::KeyLines;
 use members::Members;
 
 #[derive(Debug)]
 pub struct Manifest {
     directory: PathBuf,
-    text: SourceText,
     table: Table,
+    lines: KeyLines,
+    dependencies: Dependencies,
 }
 
 impl Manifest {
@@ -32,7 +35,6 @@ impl Manifest {
     const PACKAGE: &'static str = "package";
     const WORKSPACE: &'static str = "workspace";
     const PATH: &'static str = "path";
-    const FEATURES: &'static str = "features";
     const LIBRARY: &'static str = "lib";
     const TEST: &'static str = "test";
     const NAME: &'static str = "name";
@@ -42,8 +44,6 @@ impl Manifest {
     const TESTED_LISTS: [&'static str; 3] = ["test", "bin", "bench"];
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
-    const PORT_TABLE: [&'static str; 3] = ["package", "metadata", "port"];
-    const OWNS: &'static str = "owns";
 
     pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Manifest>, Failure>> {
         let paths: Vec<PathBuf> = directories.iter().map(|directory| directory.as_ref().join(Self::FILE)).collect();
@@ -56,14 +56,21 @@ impl Manifest {
 
     fn parsed(directory: &Path, read: Result<Text, FileFailure>) -> Result<Option<Manifest>, Failure> {
         match read.map(Newtype::into_inner).map_err(io::Error::from) {
-            Ok(text) => text
-                .parse::<Table>()
-                .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text), table }))
+            Ok(text) => Self::typed(directory, &SourceText::new(text))
+                .map(Some)
                 .map_err(|source| Failure::Manifest { path: directory.join(Self::FILE), source }),
             Err(source) => Some(source.kind())
                 .filter(|kind| *kind == io::ErrorKind::NotFound)
                 .map_or(Err(Failure::Io { path: directory.join(Self::FILE), source }), |_| Ok(None)),
         }
+    }
+
+    fn typed(directory: &Path, text: &SourceText) -> Result<Manifest, toml::de::Error> {
+        let document = DeTable::parse(text.as_ref())?;
+        let lines = KeyLines::read(text, document.get_ref());
+        let dependencies = Dependencies::listed(text, document.get_ref());
+        let table = Table::deserialize(Deserializer::from(document))?;
+        Ok(Manifest { directory: directory.to_path_buf(), table, lines, dependencies })
     }
 
     #[must_use]
@@ -82,27 +89,8 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn features(&self) -> BTreeMap<Name, LineNumber> {
-        DeTable::parse(self.text.as_ref())
-            .map(|document| {
-                document
-                    .get_ref()
-                    .iter()
-                    .filter(|(key, _)| key.get_ref() == Self::FEATURES)
-                    .filter_map(|(_, value)| value.get_ref().as_table())
-                    .flat_map(|features| features.keys())
-                    .map(|key| (Name::from(key.get_ref().as_ref()), self.text.line_of(key)))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    #[must_use]
-    pub fn owns(&self) -> Option<LineNumber> {
-        DeTable::parse(self.text.as_ref()).ok().and_then(|document| {
-            let port = Self::PORT_TABLE.iter().try_fold(document.get_ref(), Self::table_in)?;
-            port.keys().find(|key| key.get_ref() == Self::OWNS).map(|key| self.text.line_of(key))
-        })
+    pub fn dependencies(&self) -> &Dependencies {
+        &self.dependencies
     }
 
     #[must_use]
@@ -193,10 +181,8 @@ impl Manifest {
     }
 }
 
-impl From<&Manifest> for Dependencies {
-    fn from(manifest: &Manifest) -> Dependencies {
-        DeTable::parse(manifest.text.as_ref())
-            .map(|document| Dependencies::listed(&manifest.text, document.get_ref()))
-            .unwrap_or_default()
+impl AsRef<KeyLines> for Manifest {
+    fn as_ref(&self) -> &KeyLines {
+        &self.lines
     }
 }

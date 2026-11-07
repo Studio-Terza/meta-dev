@@ -27,7 +27,7 @@ impl WorkspaceLint for OwnedDependencies {
     fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
         Report::new(
             Headline::new(
-                "a package some [package.metadata.port] owns is depended on directly only by its declaring unit, a port and the workspace proc-macro crates it depends on; a package only in an owned closure only by the units whose closure holds it, unless declared shared; and every owns entry names a package its unit depends on",
+                "only the owning unit, which is a port together with the workspace proc-macro crates it depends on, depends directly on a package its [package.metadata.port] owns or on a package in that package's closure, unless the unit declares the package shared; and every owns entry names a package its unit depends on",
             ),
             Self::flagged(&Owners::declared(files), &workspaces.iter().collect()),
         )

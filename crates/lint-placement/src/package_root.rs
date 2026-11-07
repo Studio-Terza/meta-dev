@@ -5,18 +5,16 @@ use crate::crate_name::CrateName;
 use crate::crate_root::CrateRoot;
 use file_ports::Files;
 use lint_layout::Dependencies;
-use lint_layout::LineNumber;
+use lint_layout::KeyLines;
 use lint_layout::Manifest;
-use lint_layout::Name;
 use lint_layout::Untested;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PackageRoot {
     root: CrateRoot,
     name: CrateName,
-    features: BTreeMap<Name, LineNumber>,
+    lines: KeyLines,
     untested: Untested,
-    owns: Option<LineNumber>,
     dependencies: Dependencies,
 }
 
@@ -41,13 +39,12 @@ impl PackageRoot {
                 PackageRoot {
                     name: CrateName::from(&root),
                     root,
-                    features: manifest.as_ref().map(Manifest::features).unwrap_or_default(),
+                    lines: manifest.as_ref().map(AsRef::as_ref).cloned().unwrap_or_default(),
                     untested: manifest
                         .as_ref()
                         .map(|manifest| manifest.untested_targets(canonical))
                         .unwrap_or_default(),
-                    owns: manifest.as_ref().and_then(Manifest::owns),
-                    dependencies: manifest.as_ref().map(Dependencies::from).unwrap_or_default(),
+                    dependencies: manifest.as_ref().map(Manifest::dependencies).cloned().unwrap_or_default(),
                 }
             })
             .collect()
@@ -58,9 +55,8 @@ impl PackageRoot {
         PackageRoot {
             name: CrateName::from(&root),
             root,
-            features: BTreeMap::new(),
+            lines: KeyLines::default(),
             untested: Untested::default(),
-            owns: None,
             dependencies: Dependencies::default(),
         }
     }
@@ -76,18 +72,13 @@ impl PackageRoot {
     }
 
     #[must_use]
-    pub fn features(&self) -> &BTreeMap<Name, LineNumber> {
-        &self.features
+    pub fn key_lines(&self) -> &KeyLines {
+        &self.lines
     }
 
     #[must_use]
     pub fn untested(&self) -> &Untested {
         &self.untested
-    }
-
-    #[must_use]
-    pub fn owns(&self) -> Option<LineNumber> {
-        self.owns
     }
 
     #[must_use]

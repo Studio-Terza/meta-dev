@@ -13,7 +13,7 @@ use newtype::Newtype;
 use crate::crate_name::CrateName;
 use crate::metadata::{Metadata, Package};
 use crate::package_id::PackageId;
-pub use bypasses::Bypasses;
+pub use bypasses::{Bypass, Bypasses, DependencyKeys};
 use claims::Claims;
 use closure::Closure;
 use requires::Requires;
@@ -58,9 +58,11 @@ impl<'meta> Graph<'meta> {
                     .into_iter()
                     .filter_map(|owner| Some(self.package(owner)?.name()))
                     .collect();
+                let required = self.package(required)?.name();
+                let dependent = self.package(dependent)?;
                 Some(owners)
                     .filter(|owners| owners.first().is_some())
-                    .and_then(|owners| Some((self.package(dependent)?.name(), self.package(required)?.name(), owners)))
+                    .map(|owners| (dependent.name(), required, Bypass::new(owners, dependent.keys(required).collect())))
             })
             .collect()
     }
