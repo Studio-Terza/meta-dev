@@ -21,8 +21,7 @@ pub struct Usage {
     cache_read: Tokens,
 }
 
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(transparent)]
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct Reply(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,13 +31,15 @@ pub struct Finished {
 }
 
 impl Usage {
+    const SPENDS: usize = 4;
+
     #[must_use]
     pub fn new(input: Tokens, output: Tokens, cache_written: Tokens, cache_read: Tokens) -> Usage {
         Usage { input, output, cache_written, cache_read }
     }
 
     #[must_use]
-    pub fn spent(&self) -> [Tokens; 4] {
+    pub fn spent(&self) -> [Tokens; Usage::SPENDS] {
         [self.input, self.output, self.cache_written, self.cache_read]
     }
 }

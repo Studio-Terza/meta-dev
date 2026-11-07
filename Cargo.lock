@@ -330,6 +330,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dispatch-ports"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+ "named-derive",
+ "newtype",
+ "port-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "displaydoc"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

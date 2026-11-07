@@ -23,7 +23,7 @@ enum Subtype {
 #[derive(Deserialize, Debug)]
 struct Envelope {
     subtype: Subtype,
-    result: Option<Reply>,
+    result: Option<String>,
     usage: Usage,
 }
 
@@ -36,7 +36,7 @@ impl FromStr for Finished {
         Some(envelope.subtype)
             .filter(|subtype| *subtype == Subtype::Success)
             .and(envelope.result)
-            .map(|reply| Finished { reply, usage })
+            .map(|reply| Finished { reply: Reply(reply), usage })
             .ok_or(Unreadable::Unsuccessful)
     }
 }
