@@ -1,5 +1,5 @@
 use std::io;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::thread::JoinHandle;
 
 use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
@@ -26,9 +26,6 @@ pub(crate) type Reading = JoinHandle<io::Result<String>>;
 pub struct Unkilled(#[from] io::Error);
 
 impl AgentRun {
-    const KILL: &'static str = "kill";
-    const SIGNAL: [&'static str; 2] = ["-KILL", "--"];
-
     #[must_use]
     pub fn new(pid: Pid, deadline: Deadline) -> AgentRun {
         AgentRun { pid, deadline, process: None }
@@ -61,8 +58,9 @@ impl Release for AgentRun {
         self.process
             .take()
             .map(|mut process| {
-                Command::new(Self::KILL)
-                    .args(Self::SIGNAL)
+                Command::new(Pid::KILL)
+                    .args(Pid::SIGNAL)
+                    .stderr(Stdio::null())
                     .arg(&group)
                     .status()
                     .and_then(|_signalled| process.child.wait())

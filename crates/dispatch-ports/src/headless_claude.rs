@@ -7,7 +7,7 @@ use std::thread;
 
 use port_core::Pass;
 
-use crate::{AgentRun, DispatchFailure, DispatchFiller, Finished, Job, Pid, Prompt, dispatch_ops};
+use crate::{AgentRun, DispatchFailure, DispatchFiller, Ended, Finished, Job, Pid, Prompt, Started, dispatch_ops};
 
 #[derive(Clone, Debug)]
 pub struct HeadlessClaude {
@@ -18,6 +18,9 @@ impl HeadlessClaude {
     const PROGRAM: &'static str = "claude";
     const ARGUMENTS: [&'static str; 9] =
         ["-p", "--model", "haiku", "--output-format", "json", "--setting-sources", "user", "--tools", ""];
+    const LISTER: &'static str = "ps";
+    const LISTING: [&'static str; 3] = ["-o", "lstart=", "-p"];
+    const LOCALE: [&'static str; 2] = ["LC_ALL", "C"];
 }
 
 impl From<PathBuf> for HeadlessClaude {
@@ -67,5 +70,26 @@ impl DispatchFiller for HeadlessClaude {
                 Ok(read.map_err(DispatchFailure::Collect)?.parse::<Finished>()?)
             })
             .transpose()
+    }
+
+    fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, pid: Pid) -> Result<Option<Started>, DispatchFailure> {
+        let [name, value] = Self::LOCALE;
+        let listed = Command::new(Self::LISTER)
+            .args(Self::LISTING)
+            .arg(pid.listed())
+            .env(name, value)
+            .output()
+            .map_err(DispatchFailure::Lookup)?;
+        Ok(str::from_utf8(&listed.stdout).ok().and_then(|text| text.parse::<Started>().ok()))
+    }
+
+    fn kill(&self, _pass: Pass<'_, dispatch_ops::Kill>, pid: Pid) -> Result<Ended, DispatchFailure> {
+        let status = Command::new(Pid::KILL)
+            .args(Pid::SIGNAL)
+            .arg(pid.group())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(DispatchFailure::Kill)?;
+        Ok(Ended::from(status))
     }
 }

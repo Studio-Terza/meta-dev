@@ -3,7 +3,7 @@ mod boundary;
 use newtype::{Arbitrary, Display, Newtype};
 use serde::Deserialize;
 
-pub use boundary::Unreadable;
+pub use boundary::{Uninked, Unreadable};
 
 #[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]

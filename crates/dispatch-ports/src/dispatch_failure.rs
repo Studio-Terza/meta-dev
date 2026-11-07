@@ -18,6 +18,10 @@ pub enum DispatchFailure {
     Unjoined,
     #[error("{0}")]
     Unreadable(#[from] Unreadable),
+    #[error("cannot look up a process start time: {0}")]
+    Lookup(#[source] io::Error),
+    #[error("cannot kill a process group: {0}")]
+    Kill(#[source] io::Error),
     #[error("{0}")]
     Unkilled(#[from] Unkilled),
 }

@@ -9,6 +9,7 @@ use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
+use grammar::reply::Inked;
 use grammar::search::Term;
 use grammar::search::Terms;
 use grammar::slug::Letters;
@@ -354,5 +355,19 @@ laws::table!(
         "fri Nov  6 01:16:00 2026" => None,
         "Fri Nov  6 01:16:00 99999" => None,
         "" => None,
+    ]
+);
+
+laws::table!(
+    a_reply_is_text_with_ink_and_no_nul,
+    |text: &&'static str| Inked::read(text).map(|inked| inked.as_ref().len()),
+    [
+        "place(a.0, n1, about)" => Some(21),
+        "  x  " => Some(5),
+        "x\ny" => Some(3),
+        "" => None,
+        " \n\t" => None,
+        "x\0y" => None,
+        "\0" => None,
     ]
 );
