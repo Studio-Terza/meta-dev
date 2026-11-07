@@ -2,22 +2,40 @@ mod finding;
 mod kinds;
 mod texts;
 
-use code_model::{Held, Holding, Model, Placed, Site, TypeRef};
+use std::collections::BTreeSet;
+
+use code_model::{Held, Holding, ItemId, Model, Placed, Site, TypeRef};
 use lint_core::{Headline, ModelLint, Report, Violation};
+use lint_layout::Name;
 
 use finding::Finding;
-use kinds::Kinds;
+use kinds::{Derive, Kinds};
 use texts::{Spots, Texts};
 
 #[derive(Debug)]
 pub struct NoPlaintext;
 
+#[derive(Clone, Copy, Debug)]
+struct Texted<'model> {
+    owner: ItemId,
+    name: &'model Name,
+    site: Site<'model>,
+}
+
 impl ModelLint for NoPlaintext {
     fn report(model: &Model) -> Report<'_> {
         let kinds = Kinds::read(model);
         let texts = Texts::settled(model, &kinds);
-        let mut found: Vec<Violation<'_>> =
-            model.holdings().filter_map(|placed| Self::flagged(model, &kinds, &texts, placed)).collect();
+        let texted: Vec<Texted<'_>> =
+            model.holdings().filter_map(|placed| Self::texted(model, &texts, placed)).collect();
+        let owners: BTreeSet<ItemId> = texted.iter().map(|field| field.owner).collect();
+        let plain = texted.iter().filter_map(|field| {
+            kinds.plain(field.owner).map(|_| Violation::new(field.site, Finding::Plain(field.name)))
+        });
+        let unresolved = kinds.unresolved().iter().filter_map(|derive: &Derive<'_>| {
+            owners.get(&derive.subject()).map(|_| Violation::new(derive.site(), Finding::Unresolved(derive.name())))
+        });
+        let mut found: Vec<Violation<'_>> = plain.chain(unresolved).collect();
         found.sort_by(|left, right| left.site().cmp(right.site()));
         Report::new(
             Headline::new(
@@ -29,19 +47,18 @@ impl ModelLint for NoPlaintext {
 }
 
 impl NoPlaintext {
-    fn flagged<'model>(
+    fn texted<'model>(
         model: &'model Model,
-        kinds: &Kinds,
         texts: &Texts,
         placed: Placed<'model, &'model Holding>,
-    ) -> Option<Violation<'model>> {
+    ) -> Option<Texted<'model>> {
         let holding = Self::field(placed.entity())?;
-        let reading = kinds.reading(holding)?;
+        let owner = holding.declares()?;
         let ty: &TypeRef = holding.as_ref();
         texts.text(&model.expanded(ty))?;
         let site = placed.site();
         let spotted = Spots::first(ty).map_or(site, |position| Site::new(site.path(), position.line()));
-        Some(Violation::new(spotted, Finding::new(reading, holding.as_ref())))
+        Some(Texted { owner, name: holding.as_ref(), site: spotted })
     }
 
     fn field(holding: &Holding) -> Option<&Holding> {

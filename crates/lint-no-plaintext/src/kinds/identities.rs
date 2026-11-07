@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use code_model::{Domain, ItemPath, Model, Resolved};
 use lint_layout::{Word, words};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Role {
     Deserializes,
     DeserializesChecked,

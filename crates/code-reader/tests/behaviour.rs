@@ -178,6 +178,13 @@ const WORKSPACE: [Fixture; 2] = [
     Fixture::new("crates/a/src/lib.rs", "pub use std::clone::Clone as Dup;\n"),
     Fixture::new("crates/b/src/lib.rs", "impl a::Dup for R {}\nimpl ::a::Dup for R {}\n"),
 ];
+const WORKSPACE_CRATE_REEXPORTED: [Fixture; 2] = [
+    Fixture::new("crates/a/src/lib.rs", "pub use serde;\npub mod de {\n    pub use serde::Deserialize;\n}\n"),
+    Fixture::new(
+        "crates/b/src/lib.rs",
+        "#[derive(a::serde::Deserialize, a::de::Deserialize)]\nstruct A;\nimpl a::serde::Serialize for R {}\n",
+    ),
+];
 const ISLAND: [Fixture; 1] = [Fixture::new("src/x.rs", "trait T {}\nimpl crate::T for R {}\nimpl super::T for R {}\n")];
 const ISLAND_OWN: [Fixture; 1] = [Fixture::new(
     "src/x.rs",
@@ -705,6 +712,11 @@ laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     GLOB_THROUGH_A_LATER_SIBLING => [Expect::krate(&["crate", "e", "Far"])],
     WORKSPACE => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "clone", "Clone"])],
     NESTED_FILES => [Expect::krate(&["crate", "Mark"]), Expect::krate(&["crate", "Mark"])],
+    WORKSPACE_CRATE_REEXPORTED => [
+        Expect::external(&["serde", "Deserialize"]),
+        Expect::external(&["serde", "Deserialize"]),
+        Expect::external(&["serde", "Serialize"]),
+    ],
 ]);
 
 laws::table!(a_path_through_an_unplanted_module_is_unknown, Read::across, [

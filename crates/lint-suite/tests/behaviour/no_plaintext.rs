@@ -5,7 +5,11 @@ const TEXT_FIELDS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstru
 const TUPLE_AND_ENUM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A(String);\n#[derive(Deserialize)]\nenum B {\n    Named(String),\n    Counted(u32),\n    Noted { note: String },\n}\n";
 const DERIVE_FORMS: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    a: String,\n}\n#[cfg_attr(feature = \"serde\", derive(serde::Deserialize))]\nstruct B {\n    b: String,\n}\n#[derive(Debug, serde::Deserialize, Clone)]\nstruct C {\n    c: String,\n}\n";
 const NOT_DESERIALIZED: &str = "use serde::Serialize;\n#[derive(Debug)]\nstruct A {\n    a: String,\n}\n#[derive(Serialize)]\nstruct B {\n    b: String,\n}\n#[cfg_attr(feature = \"serde\", derive(Serialize))]\nstruct C {\n    c: String,\n}\n#[derive(other::Deserialize)]\nstruct D {\n    d: String,\n}\n#[derive(Debug, Clone, PartialEq, thiserror::Error, newtype::Newtype)]\nstruct E {\n    e: String,\n}\n";
-const SERDE_SPELLINGS: &str = "#[derive(serde_derive::Deserialize)]\nstruct A {\n    a: String,\n}\nmod globbed {\n    use serde::*;\n    #[derive(Deserialize)]\n    struct B {\n        b: String,\n    }\n}\n#[derive(newtype::serde::Deserialize)]\nstruct C {\n    c: String,\n}\n#[derive(Deserialize)]\nstruct D {\n    d: String,\n}\n";
+const DERIVE_CRATE: &str = "#[derive(serde_derive::Deserialize)]\nstruct A {\n    a: String,\n}\n";
+const UNRESOLVED_DERIVES: &str = "mod globbed {\n    use serde::*;\n    #[derive(Deserialize)]\n    struct A {\n        a: String,\n    }\n}\n#[derive(newtype::serde::Deserialize)]\nstruct B {\n    b: String,\n}\n#[derive(Deserialize)]\nstruct C {\n    c: String,\n}\nmod failed {\n    use other::*;\n    #[derive(Debug, Error)]\n    pub struct Failed {\n        message: String,\n    }\n}\n#[derive(Unimported)]\nstruct D {\n    count: u32,\n}\n";
+const RESOLVED_OTHER_DERIVE: &str =
+    "use thiserror::Error;\n#[derive(Debug, Error)]\npub struct Failed {\n    message: String,\n}\n";
+const UNKNOWN_FIELD_TYPE: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    id: Id,\n}\n#[derive(Debug)]\nstruct B {\n    id: Id,\n}\n#[derive(Unimported)]\nstruct C {\n    id: Id,\n}\n";
 const REEXPORTED_ROOT: &str = "pub use serde;\npub mod de {\n    pub use serde::Deserialize;\n}\n";
 const REEXPORTED_USER: &str = "#[derive(newtype::serde::Deserialize)]\npub struct A {\n    a: String,\n}\n#[derive(newtype::de::Deserialize)]\npub struct B {\n    b: String,\n}\n";
 const LOCAL_STRING: &str =
@@ -40,7 +44,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 23] = [
+const CASES: [Case; 26] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("a.rs"), Text::new(TEXT_FIELDS))],
@@ -62,9 +66,24 @@ const CASES: [Case; 23] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("serde's derive through its derive crate, a glob, an unread re-export, or unresolved"),
-        &[Source::new(Located::new("a.rs"), Text::new(SERDE_SPELLINGS))],
-        Flagged::new(&["a.rs:3", "a.rs:9", "a.rs:14", "a.rs:18"]),
+        Title::new("serde's derive through its derive crate"),
+        &[Source::new(Located::new("a.rs"), Text::new(DERIVE_CRATE))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a derive through a glob, an unread re-export or no import is not resolvable, at the derive"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNRESOLVED_DERIVES))],
+        Flagged::new(&["a.rs:3", "a.rs:8", "a.rs:12", "a.rs:18"]),
+    ),
+    Case::new(
+        Title::new("a resolved derive that is not serde's"),
+        &[Source::new(Located::new("a.rs"), Text::new(RESOLVED_OTHER_DERIVE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a field whose type is not resolvable, under serde's derive, another derive and an unresolved one"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNKNOWN_FIELD_TYPE))],
+        Flagged::new(&["a.rs:3", "a.rs:9"]),
     ),
     Case::new(
         Title::new("serde's derive through a workspace crate's re-exports"),

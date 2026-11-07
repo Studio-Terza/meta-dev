@@ -422,7 +422,12 @@ impl Entries {
 
     pub(super) fn settled(&self, scope: ScopeId, resolver: &Resolver<'_, '_>) -> ScopeSettling {
         ScopeSettling::new(
-            self.imports.iter().map(|import| resolver.path(&import.path, scope, import.domain)).collect(),
+            self.imports
+                .iter()
+                .map(|import| {
+                    resolver.importing(Key::new(import.domain, &import.name)).path(&import.path, scope, import.domain)
+                })
+                .collect(),
             self.globs
                 .iter()
                 .zip(GlobId::ids(&self.globs))

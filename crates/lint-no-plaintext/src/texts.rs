@@ -21,7 +21,7 @@ struct Wrapper {
 }
 
 impl Wrapper {
-    fn read(model: &Model, kinds: &Kinds) -> Vec<Wrapper> {
+    fn read(model: &Model, kinds: &Kinds<'_>) -> Vec<Wrapper> {
         let holdings: Vec<&Holding> = model.holdings().map(Placed::entity).collect();
         let newtypes = holdings
             .iter()
@@ -53,7 +53,7 @@ pub(crate) struct Texts {
 impl Texts {
     const STRING: [Word<'static>; 3] = words!["std", "string", "String"];
 
-    pub(crate) fn settled(model: &Model, kinds: &Kinds) -> Texts {
+    pub(crate) fn settled(model: &Model, kinds: &Kinds<'_>) -> Texts {
         let wrappers = Wrapper::read(model, kinds);
         iter::successors(Some(Texts::default()), |settled| {
             Some(settled.widened(&wrappers)).filter(|wider| wider != settled)

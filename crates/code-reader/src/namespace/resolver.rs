@@ -110,11 +110,16 @@ pub(crate) struct Resolver<'tables, 'rows> {
     space: &'tables Namespace<'tables>,
     tables: &'tables Tables<'rows>,
     ignored: Option<GlobId>,
+    importing: Option<Key<'tables>>,
 }
 
 impl<'tables, 'rows> Resolver<'tables, 'rows> {
     pub(crate) fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Resolver<'tables, 'rows> {
-        Resolver { space, tables, ignored: None }
+        Resolver { space, tables, ignored: None, importing: None }
+    }
+
+    pub(super) fn importing(self, key: Key<'tables>) -> Resolver<'tables, 'rows> {
+        Resolver { space: self.space, tables: self.tables, ignored: self.ignored, importing: Some(key) }
     }
 
     pub(super) fn path(&self, path: &UsePath, viewer: ScopeId, domain: Domain) -> Resolution {
@@ -127,7 +132,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     pub(super) fn glob_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId) -> Target {
-        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob) };
+        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), importing: None };
         resolver
             .path(path, scope, Domain::Types)
             .target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
@@ -177,8 +182,16 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         }
     }
 
-    fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
+    fn levels(&self, scope: ScopeId, key: Key<'_>) -> &'tables [ScopeId] {
         let levels = self.space.chain(scope);
+        match self.importing.filter(|importing| *importing == key) {
+            Some(_) => levels.get(1..).unwrap_or_default(),
+            None => levels,
+        }
+    }
+
+    fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
+        let levels = self.levels(scope, key);
         let first = |reading: Reading| Lookup::new(Sight::Inside, self.ignored, reading);
         self.walked(levels, key, first(reading)).disputed(
             || self.walked(levels, key, first(Reading::Explicit)),

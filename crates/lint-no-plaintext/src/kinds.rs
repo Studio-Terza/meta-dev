@@ -2,50 +2,56 @@ mod identities;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::{Holding, Implementation, ItemId, Model, Origin, Resolved};
+use code_model::{Implementation, ItemId, Model, Origin, Placed, Resolved, Site};
+use lint_layout::Name;
 
 use identities::{Identities, Role};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Reading {
-    Plain,
-    Unresolved,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Part {
-    role: Role,
-    origin: Origin,
-}
-
-#[derive(Debug)]
-struct Played {
-    part: Part,
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Derive<'model> {
     subject: ItemId,
+    name: &'model Name,
+    site: Site<'model>,
+}
+
+impl<'model> Derive<'model> {
+    pub(crate) fn subject(&self) -> ItemId {
+        self.subject
+    }
+
+    pub(crate) fn name(&self) -> &'model Name {
+        self.name
+    }
+
+    pub(crate) fn site(&self) -> Site<'model> {
+        self.site
+    }
 }
 
 #[derive(Debug)]
-pub(crate) struct Kinds {
+pub(crate) struct Kinds<'model> {
     validated: BTreeSet<ItemId>,
-    owners: BTreeMap<ItemId, Reading>,
+    plain: BTreeSet<ItemId>,
+    unresolved: Vec<Derive<'model>>,
 }
 
-impl Kinds {
-    pub(crate) fn read(model: &Model) -> Kinds {
+impl<'model> Kinds<'model> {
+    pub(crate) fn read(model: &'model Model) -> Kinds<'model> {
         let identities = Identities::read(model);
-        let played: Vec<Played> =
-            model.implementations().filter_map(|placed| Self::played(&identities, placed.entity())).collect();
-        let derived = |role: Role| -> BTreeSet<ItemId> {
-            let part = Part { role, origin: Origin::Derived };
-            played.iter().filter(|played| played.part == part).map(|played| played.subject).collect()
+        let mut played: BTreeMap<Role, Vec<Derive<'model>>> = model
+            .implementations()
+            .filter_map(|placed| Self::played(&identities, placed))
+            .fold(BTreeMap::new(), |mut played, (role, derive)| {
+                played.entry(role).or_default().push(derive);
+                played
+            });
+        let mut subjects = |role: Role| -> BTreeSet<ItemId> {
+            played.remove(&role).unwrap_or_default().iter().map(Derive::subject).collect()
         };
-        let validated = derived(Role::DeserializesChecked);
-        let read: BTreeSet<ItemId> = derived(Role::Deserializes).union(&validated).copied().collect();
-        let plain = read.difference(&validated).map(|item| (*item, Reading::Plain));
-        let unresolved = derived(Role::Unresolved);
-        let unread = unresolved.difference(&read).map(|item| (*item, Reading::Unresolved));
-        let owners = plain.chain(unread).collect();
-        Kinds { validated, owners }
+        let validated = subjects(Role::DeserializesChecked);
+        let plain = subjects(Role::Deserializes).difference(&validated).copied().collect();
+        let unresolved = played.remove(&Role::Unresolved).unwrap_or_default();
+        Kinds { validated, plain, unresolved }
     }
 
     pub(crate) fn unvalidated(&self, item: ItemId) -> Option<ItemId> {
@@ -55,13 +61,25 @@ impl Kinds {
         }
     }
 
-    pub(crate) fn reading(&self, holding: &Holding) -> Option<Reading> {
-        holding.declares().and_then(|item| self.owners.get(&item).copied())
+    pub(crate) fn plain(&self, item: ItemId) -> Option<ItemId> {
+        self.plain.get(&item).copied()
     }
 
-    fn played(identities: &Identities, implementation: &Implementation) -> Option<Played> {
-        let role = identities.role(implementation.implemented()?)?;
-        let subject: &Resolved = implementation.subject_type().named()?.as_ref();
-        Some(Played { part: Part { role, origin: implementation.origin() }, subject: subject.crate_item()? })
+    pub(crate) fn unresolved(&self) -> &[Derive<'model>] {
+        &self.unresolved
+    }
+
+    fn played(
+        identities: &Identities,
+        placed: Placed<'model, &'model Implementation>,
+    ) -> Option<(Role, Derive<'model>)> {
+        let implementation = placed.entity();
+        let derived = match implementation.origin() {
+            Origin::Derived => Some(implementation),
+            Origin::Written => None,
+        }?;
+        let role = identities.role(derived.implemented()?)?;
+        let subject: &Resolved = derived.subject_type().named()?.as_ref();
+        Some((role, Derive { subject: subject.crate_item()?, name: derived.subject(), site: placed.site() }))
     }
 }
