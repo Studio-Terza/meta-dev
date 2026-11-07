@@ -1,11 +1,11 @@
-use lint_layout::LineNumber;
+use lint_layout::Position;
 
 use crate::item_path::ItemPath;
 use crate::resolved::Resolved;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Spelling {
-    Written(ItemPath, LineNumber),
+    Written(ItemPath, Position),
     Implied,
 }
 
@@ -19,9 +19,9 @@ impl Spelling {
     }
 
     #[must_use]
-    pub fn line(&self) -> Option<LineNumber> {
+    pub fn position(&self) -> Option<Position> {
         match self {
-            Spelling::Written(_, line) => Some(*line),
+            Spelling::Written(_, position) => Some(*position),
             Spelling::Implied => None,
         }
     }

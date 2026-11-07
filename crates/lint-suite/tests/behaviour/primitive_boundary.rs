@@ -67,9 +67,33 @@ const COMPOUNDS: &str = "pub fn f(x: [u64; 4], y: (A, i32), z: &&mut u128, w: *c
 const CONST_ARGUMENT: &str = "pub fn f(x: A<{ size_of::<u64>() }>) {}\n";
 const WIRE_BESIDE_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\npub fn f(v: Value) -> Z {}\n";
 const WIRE_RENAMED_CRATE: &str = "use toml as t;\npub fn f(v: t::Value) -> Z {}\n";
+const SHADOWED_ALIAS: &str = "type Count = usize;\nmod inner {\n    struct Count;\n    fn c(x: Count) {}\n}\n";
+const WIRE_THROUGH_SUPER_GLOB: &str =
+    "use serde_json::Value;\nmod inner {\n    use super::*;\n    fn c(x: Value) {}\n}\n";
 const LOCAL_STRING: &str = "pub struct String;\npub fn f(x: String) -> A {}\n";
 
-const CASES: [Case; 64] = [
+const OTHER_CRATE_NEWTYPE: &str = "pub struct Capture(Sink);\n";
+const OTHER_CRATE_CONSTRUCTOR: &str = "pub struct Capture {\n    sink: Sink,\n    yields: Yields,\n}\nimpl Capture {\n    pub fn new(v: u64) -> Capture {\n        g(v)\n    }\n}\n";
+
+const CASES: [Case; 67] = [
+    Case::new(
+        Title::new("a constructor on a struct with fields beside a same-named newtype in another crate"),
+        &[
+            Source::new(Located::new("crates/a/src/lib.rs"), Text::new(OTHER_CRATE_NEWTYPE)),
+            Source::new(Located::new("crates/b/src/lib.rs"), Text::new(OTHER_CRATE_CONSTRUCTOR)),
+        ],
+        Flagged::new(&["crates/b/src/lib.rs:6"]),
+    ),
+    Case::new(
+        Title::new("an inner struct shadows an outer alias of a primitive, as rustc resolves it"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SHADOWED_ALIAS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a wire type reached through use super::* in a child module"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(WIRE_THROUGH_SUPER_GLOB))],
+        Flagged::new(&["crates/x/src/lib.rs:4"]),
+    ),
     Case::new(
         Title::new("std's Any is a trait, so dyn, impl and bound uses of it are not primitives"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ANY_TRAIT))],

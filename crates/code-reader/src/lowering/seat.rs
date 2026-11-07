@@ -2,7 +2,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 use code_model::{Building, Call, FileId, Found, Function, Holding, Implementation};
-use lint_layout::LineNumber;
+use lint_layout::Position;
 
 use crate::namespace::{Resolving, ScopeId};
 
@@ -34,15 +34,15 @@ impl Seat {
         Rc::clone(&self.children)
     }
 
-    pub(super) fn located(&self, line: LineNumber) -> Located {
-        Located { file: self.file, line, scope: self.scope }
+    pub(super) fn located(&self, position: Position) -> Located {
+        Located { file: self.file, position, scope: self.scope }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Located {
     file: FileId,
-    line: LineNumber,
+    position: Position,
     scope: ScopeId,
 }
 
@@ -51,27 +51,27 @@ impl Located {
         self.scope
     }
 
-    pub(super) fn line(self) -> LineNumber {
-        self.line
+    pub(super) fn position(self) -> Position {
+        self.position
     }
 
     pub(super) fn holding(self, mut building: Building, holding: Holding) -> Building {
-        building.holding(self.file, self.line, holding);
+        building.holding(self.file, self.position.line(), holding);
         building
     }
 
     pub(super) fn call(self, mut building: Building, call: Call) -> Building {
-        building.call(self.file, self.line, call);
+        building.call(self.file, self.position.line(), call);
         building
     }
 
     pub(super) fn implementation(self, mut building: Building, implementation: Implementation) -> Building {
-        building.implementation(self.file, Found::new(self.line, implementation));
+        building.implementation(self.file, Found::new(self.position.line(), implementation));
         building
     }
 
     pub(super) fn function(self, mut building: Building, function: Function) -> Building {
-        building.function(self.file, self.line, function);
+        building.function(self.file, self.position.line(), function);
         building
     }
 }

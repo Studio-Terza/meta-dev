@@ -7,7 +7,7 @@ use syn::{
 };
 
 use code_model::{AliasParameter, Arrayed, Callable, Input, Named, Projection, Resolved, Sited, Spelling, TypeRef};
-use lint_layout::{LineNumber, Name, Whole, Word};
+use lint_layout::{Name, Position, Whole, Word};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
@@ -33,8 +33,8 @@ pub(super) struct Written {
 }
 
 impl Written {
-    pub(super) fn path(path: UsePath, line: LineNumber) -> Written {
-        let spelling = Spelling::Written(path.written(), line);
+    pub(super) fn path(path: UsePath, position: Position) -> Written {
+        let spelling = Spelling::Written(path.written(), position);
         Written { target: Referent::Path(path), spelling }
     }
 
@@ -180,10 +180,10 @@ impl InScope {
         }
     }
 
-    fn path_lowered(&self, path: &syn::Path, line: LineNumber) -> TypeRef<Written> {
-        match self.held(path, line) {
+    fn path_lowered(&self, path: &syn::Path, position: Position) -> TypeRef<Written> {
+        match self.held(path, position) {
             Some(held) => Projecting { scope: self }.held(held, path),
-            None => Bracketed { scope: self }.named(path, line),
+            None => Bracketed { scope: self }.named(path, position),
         }
     }
 
@@ -194,15 +194,15 @@ impl InScope {
     fn type_path_lowered(&self, path: &TypePath) -> TypeRef<Written> {
         match &path.qself {
             Some(qself) => Projecting { scope: self }.qualified(qself, &path.path),
-            None => self.path_lowered(&path.path, LineNumber::from(path.span())),
+            None => self.path_lowered(&path.path, Position::from(path.span())),
         }
     }
 
-    fn held(&self, path: &syn::Path, line: LineNumber) -> Option<TypeRef<Written>> {
+    fn held(&self, path: &syn::Path, position: Position) -> Option<TypeRef<Written>> {
         let first = path.segments.first().map(|first| Name::from(&first.ident));
         let declared = first.as_ref().and_then(|first| self.parameters.iter().find(|parameter| *parameter == first));
         let parameter = declared.map(|name| {
-            Written::parameter(name.clone(), Spelling::Written([name.clone()].into_iter().collect(), line))
+            Written::parameter(name.clone(), Spelling::Written([name.clone()].into_iter().collect(), position))
         });
         let subject = first
             .as_ref()
@@ -283,9 +283,9 @@ struct Bracketed<'scope> {
 }
 
 impl Bracketed<'_> {
-    fn named(self, path: &syn::Path, line: LineNumber) -> TypeRef<Written> {
+    fn named(self, path: &syn::Path, position: Position) -> TypeRef<Written> {
         let listed = self.last_listed(path);
-        TypeRef::Named(Named::bound(Written::path(UsePath::from(path), line), listed.arguments, listed.bindings))
+        TypeRef::Named(Named::bound(Written::path(UsePath::from(path), position), listed.arguments, listed.bindings))
     }
 
     fn last_listed(self, path: &syn::Path) -> Arguments {
@@ -337,7 +337,7 @@ impl Bounding<'_> {
     fn bound(self, bound: &TypeParamBound) -> Option<TypeRef<Written>> {
         match bound {
             TypeParamBound::Trait(bound) => {
-                Some(Bracketed { scope: self.scope }.named(&bound.path, LineNumber::from(bound.path.span())))
+                Some(Bracketed { scope: self.scope }.named(&bound.path, Position::from(bound.path.span())))
             }
             _ => None,
         }

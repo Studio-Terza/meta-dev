@@ -52,7 +52,11 @@ const SELF_AS_CORE: &str = "extern crate self as core;\npub mod clone {\n    pub
 const BLOCK_GLOB_RENAME: &str = "mod a {}\nuse std::fmt::Debug as Clone;\npub struct R;\npub fn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
 const GLOB_UNDER_OWN_ITEM: &str = "mod inner {\n    pub trait Clone {}\n}\nmod m {\n    pub use crate::inner::*;\n    trait Clone {}\n}\nuse m::*;\npub struct R;\nimpl Clone for R {}\n";
 
-const CASES: [Case; 30] = [
+const OPAQUE_ROOT: &str = "mod topic;\nmod head;\n";
+const OPAQUE_TOPIC: &str = "pub use other::*;\n";
+const BESIDE_OPAQUE_GLOB: &str = "use crate::topic::*;\nuse std::fmt;\npub struct Head;\nimpl fmt::Debug for Head {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.finish() }\n}\n";
+
+const CASES: [Case; 31] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -212,6 +216,15 @@ const CASES: [Case; 30] = [
         Title::new("a prelude trait whose name a module's private item hides in that module's glob"),
         &[Source::new(Located::new("a.rs"), Text::new(GLOB_UNDER_OWN_ITEM))],
         Flagged::new(&["a.rs:10"]),
+    ),
+    Case::new(
+        Title::new("an explicit std import beside a glob of a module that re-exports another crate's glob"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(OPAQUE_ROOT)),
+            Source::new(Located::new("src/topic.rs"), Text::new(OPAQUE_TOPIC)),
+            Source::new(Located::new("src/head.rs"), Text::new(BESIDE_OPAQUE_GLOB)),
+        ],
+        Flagged::new(&["src/head.rs:4"]),
     ),
 ];
 
