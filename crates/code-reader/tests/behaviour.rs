@@ -1,5 +1,5 @@
 use code_model::{
-    Entry, Function, Item, ItemKind, Model, Named, Output, Owner, Primitive, Resolved, Signature, TypeRef,
+    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -18,6 +18,7 @@ const DECLARED: &str =
 const SCOPED: &str = "use std::clone::Clone as Dup;\nmod a {\n    impl Dup for R {}\n}\nfn f() {\n    use std::fmt::Debug as Show;\n    impl Dup for R {}\n    impl Show for R {}\n    mod b {\n        impl Show for R {}\n    }\n}\nimpl Show for R {}\n";
 const SHADOWED: &str = "use std::clone::Clone;\nfn f() {\n    trait Clone {}\n    impl Clone for R {}\n}\n";
 const DERIVES: &str = "#[derive(Clone, serde::Serialize)]\nstruct A;\n";
+const STD_KINDS: &str = "impl std::any::Any for R {}\nimpl core::any::Any for R {}\nimpl std::io::Write for R {}\nimpl std::string::String for R {}\nimpl std::fmt::Error for R {}\nimpl std::collections::HashMap for R {}\n";
 
 const GLOB_DECLARED: &str = "trait Clone {}\nmod tests {\n    use super::*;\n    impl Clone for R {}\n}\n";
 const GLOB_CRATE: &str = "use crate::shapes::*;\nimpl Hash for R {}\n";
@@ -90,6 +91,19 @@ const EXTERN_CORE: &str =
 const EXTERN_OTHER: &str =
     "extern crate serde;\nextern crate serde as s;\nimpl serde::Serialize for R {}\nimpl s::Serialize for R {}\n";
 const EXTERN_DISCARDED: &str = "extern crate serde as _;\nimpl Clone for R {}\n";
+const EXTERN_RENAMED: &str = "extern crate toml as t;\nimpl t::Value for R {}\n";
+const CRATE_RENAMED: &str = "use toml as t;\nimpl t::Value for R {}\n";
+const CRATE_SELF_RENAMED: &str = "use serde_json::{self as sj};\nimpl sj::Value for R {}\n";
+const STD_RENAMED: &str = "use core as c;\nimpl c::clone::Clone for R {}\n";
+
+const IMPORT_BESIDE_STD_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\nimpl Value for R {}\n";
+const IMPORT_BESIDE_OTHER_GLOB: &str = "use other::*;\nuse rust_decimal::Decimal;\nimpl Decimal for R {}\n";
+const IMPORT_BESIDE_CRATE_GLOB: &str = "mod rejection {\n    pub use axum_core::extract::rejection::*;\n}\nuse crate::rejection::*;\nuse serde_json::Value;\nimpl Value for R {}\n";
+const IMPORT_BESIDE_BLOCK_MACRO: &str =
+    "use rust_decimal::Decimal;\nfn f() {\n    make!();\n    impl Decimal for R {}\n}\n";
+const IMPORT_BESIDE_BLOCK_GLOB: &str =
+    "use rust_decimal::Decimal;\nfn f() {\n    use other::*;\n    impl Decimal for R {}\n}\n";
+const GLOB_STILL_HIDES_UNIMPORTED: &str = "use std::collections::*;\nuse serde_json::Value;\nimpl Clone for R {}\n";
 
 const DERIVE_SHADOWED: &str = "trait Clone {}\n#[derive(Clone, Debug)]\nstruct A;\n";
 const DERIVE_IMPORTED: &str =
@@ -147,6 +161,14 @@ const RE_EXPORT_CYCLE: [Fixture; 11] = [
     Fixture::new("src/m8.rs", "pub use super::*;\n"),
     Fixture::new("src/m9.rs", "pub use super::*;\nimpl Mark for R {}\nimpl Clone for R {}\n"),
 ];
+const GLOB_THROUGH_A_LATER_SIBLING: [Fixture; 6] = [
+    Fixture::new("src/lib.rs", "mod a;\nmod b;\nmod c;\nmod d;\nmod e;\n"),
+    Fixture::new("src/a.rs", "pub use crate::b::*;\npub use crate::c::*;\n"),
+    Fixture::new("src/b.rs", "pub trait Near {}\n"),
+    Fixture::new("src/c.rs", "pub use crate::e::*;\n"),
+    Fixture::new("src/d.rs", "use crate::a::*;\nimpl Far for R {}\n"),
+    Fixture::new("src/e.rs", "pub trait Far {}\n"),
+];
 const WORKSPACE: [Fixture; 2] = [
     Fixture::new("crates/a/src/lib.rs", "pub use std::clone::Clone as Dup;\n"),
     Fixture::new("crates/b/src/lib.rs", "impl a::Dup for R {}\nimpl ::a::Dup for R {}\n"),
@@ -202,8 +224,27 @@ impl Seen {
         }
     }
 
-    fn typed(model: &Model, ty: TypeRef) -> TypeRef<Seen> {
-        ty.mapped(&mut |resolved| Seen::of(model, resolved))
+    fn typed(model: &Model, ty: &TypeRef) -> TypeRef<Seen> {
+        ty.mapped(&mut |sited: &Sited| Seen::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Formed {
+    name: Name,
+    owner: Owner,
+    entry: Entry,
+    output: Option<TypeRef<Seen>>,
+}
+
+impl Formed {
+    fn of(model: &Model, function: &Function) -> Formed {
+        Formed {
+            name: AsRef::<Name>::as_ref(function).clone(),
+            owner: function.owner(),
+            entry: function.entry(),
+            output: Read::written(function).map(|ty| Seen::typed(model, ty)),
+        }
     }
 }
 
@@ -222,6 +263,10 @@ impl Expect {
 
     fn std(path: &[&str]) -> Seen {
         Seen::Resolved(Resolved::Std(path.iter().map(|segment| Name::from(*segment)).collect()))
+    }
+
+    fn std_trait(path: &[&str]) -> Seen {
+        Seen::Resolved(Resolved::StdTrait(path.iter().map(|segment| Name::from(*segment)).collect()))
     }
 
     fn krate(path: &[&str]) -> Seen {
@@ -252,12 +297,8 @@ impl Expect {
         Expect::named(Seen::Resolved(Resolved::Param(Name::from(name))), Vec::new())
     }
 
-    fn function(name: &str, owner: Owner, entry: Entry, output: Output) -> Function {
-        Function::new(Name::from(name), owner, entry, Signature::from(output))
-    }
-
-    fn returning(primitive: Primitive) -> Output {
-        Output::Written(TypeRef::Named(Named::new(Resolved::Primitive(primitive), Vec::new())))
+    fn function(name: &str, owner: Owner, entry: Entry, output: Option<TypeRef<Seen>>) -> Formed {
+        Formed { name: Name::from(name), owner, entry, output }
     }
 }
 
@@ -306,16 +347,18 @@ impl Read {
 
     fn subjects(text: &str) -> Vec<TypeRef<Seen>> {
         let model = Reader::read_files(&[Read::file("a.rs", text)]);
-        model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type().clone())).collect()
+        model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type())).collect()
     }
 
-    fn entries(fixtures: &[Fixture]) -> Vec<Function> {
+    fn entries(fixtures: &[Fixture]) -> Vec<Formed> {
         let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
-        Reader::read_files(&files).functions().map(|found| found.entity().clone()).collect()
+        let model = Reader::read_files(&files);
+        model.functions().map(|found| Formed::of(&model, found.entity())).collect()
     }
 
-    fn functions(text: &str) -> Vec<Function> {
-        Reader::read_files(&[Read::file("a.rs", text)]).functions().map(|found| found.entity().clone()).collect()
+    fn functions(text: &str) -> Vec<Formed> {
+        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        model.functions().map(|found| Formed::of(&model, found.entity())).collect()
     }
 
     fn outputs(text: &str) -> Vec<TypeRef<Seen>> {
@@ -328,12 +371,12 @@ impl Read {
         model
             .functions()
             .filter_map(|found| Read::written(found.entity()))
-            .map(|ty| Seen::typed(&model, model.expanded(&ty)))
+            .map(|ty| Seen::typed(&model, &model.expanded(ty)))
             .collect()
     }
 
-    fn written(function: &Function) -> Option<TypeRef> {
-        function.signature().output().written().cloned()
+    fn written(function: &Function) -> Option<&TypeRef> {
+        function.signature().output().written()
     }
 
     fn written_sites(files: &[SourceFile]) -> Vec<String> {
@@ -381,49 +424,64 @@ fn a_renamed_trait_is_read_as_its_original() {
     assert_eq!(
         Read::implementations(&[Read::file("a.rs", RENAMED)]),
         [
-            Expect::written("R", Expect::std(&["std", "clone", "Clone"])),
+            Expect::written("R", Expect::std_trait(&["std", "clone", "Clone"])),
             Expect::written("R", Expect::external(&["a", "Dup"])),
+        ]
+    );
+}
+
+#[test]
+fn a_std_path_resolves_as_a_trait_only_when_its_item_is_a_trait() {
+    assert_eq!(
+        Read::resolved(STD_KINDS),
+        [
+            Expect::std_trait(&["std", "any", "Any"]),
+            Expect::std_trait(&["std", "any", "Any"]),
+            Expect::std_trait(&["std", "io", "Write"]),
+            Expect::std(&["std", "string", "String"]),
+            Expect::std(&["std", "fmt", "Error"]),
+            Expect::std(&["std", "collections", "HashMap"]),
         ]
     );
 }
 
 laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text: &&str| Read::resolved(text), [
     ROOTED => [
-        Expect::std(&["std", "fmt", "Debug"]),
-        Expect::std(&["std", "borrow", "ToOwned"]),
-        Expect::std(&["std", "hash", "Hash"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "borrow", "ToOwned"]),
+        Expect::std_trait(&["std", "hash", "Hash"]),
         Expect::external(&["serde", "Serialize"]),
         Expect::unknown(&["crate", "a", "T"]),
         Expect::unknown(&["self", "T"]),
         Expect::unknown(&["super", "T"]),
     ],
     BOUND => [
-        Expect::std(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
         Expect::unknown(&["U"]),
         Expect::external(&["other", "Shown"]),
     ],
     GROUPED => [
-        Expect::std(&["std", "fmt", "Debug"]),
-        Expect::std(&["std", "fmt", "Display"]),
-        Expect::std(&["std", "hash", "Hasher"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "fmt", "Display"]),
+        Expect::std_trait(&["std", "hash", "Hasher"]),
     ],
     DECLARED => [
         Expect::krate(&["crate", "Clone"]),
-        Expect::std(&["std", "marker", "Copy"]),
+        Expect::std_trait(&["std", "marker", "Copy"]),
         Expect::unknown(&["Display"]),
         Expect::external(&["a", "Clone"]),
     ],
     SCOPED => [
         Expect::unknown(&["Dup"]),
-        Expect::std(&["std", "clone", "Clone"]),
-        Expect::std(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "clone", "Clone"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
         Expect::unknown(&["Show"]),
         Expect::unknown(&["Show"]),
     ],
     SHADOWED => [Expect::krate(&["crate", "Clone"])],
-    DERIVES => [Expect::std(&["std", "clone", "Clone"]), Expect::external(&["serde", "Serialize"])],
-    BLOCK_CHAIN => [Expect::std(&["std", "fmt", "Debug"]), Expect::unknown(&["Show"])],
-    BLOCK_SUPER => [Expect::std(&["std", "clone", "Clone"])],
+    DERIVES => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::external(&["serde", "Serialize"])],
+    BLOCK_CHAIN => [Expect::std_trait(&["std", "fmt", "Debug"]), Expect::unknown(&["Show"])],
+    BLOCK_SUPER => [Expect::std_trait(&["std", "clone", "Clone"])],
     CFG_ALTERNATIVES => [Expect::unknown(&["Clone"])],
     DECLARED_KINDS => [
         Expect::item("Clone", ItemKind::Struct),
@@ -433,7 +491,7 @@ laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text
         Expect::item("Hash", ItemKind::Trait),
     ],
     ALTERNATIVE_IMPORTS => [Expect::unknown(&["Dup"])],
-    DISCARDED => [Expect::unknown(&["Debug"]), Expect::std(&["std", "fmt", "Debug"])],
+    DISCARDED => [Expect::unknown(&["Debug"]), Expect::std_trait(&["std", "fmt", "Debug"])],
     ITEM_PATH => [Expect::unknown(&["S", "T"]), Expect::external(&["Option", "T"]), Expect::external(&["a", "T"])],
     IMPORT_SEES_ITS_MODULE => [Expect::krate(&["crate", "m", "hidden", "T"])],
 ]);
@@ -442,26 +500,26 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_DECLARED => [Expect::krate(&["crate", "Clone"])],
     GLOB_CRATE => [Expect::unknown(&["Hash"])],
     GLOB_STD => [
-        Expect::std(&["std", "fmt", "Debug"]),
-        Expect::std(&["std", "hash", "Hash"]),
-        Expect::std(&["std", "clone", "Clone"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "hash", "Hash"]),
+        Expect::std_trait(&["std", "clone", "Clone"]),
     ],
-    SELF_IMPORT => [Expect::std(&["std", "fmt", "Debug"])],
+    SELF_IMPORT => [Expect::std_trait(&["std", "fmt", "Debug"])],
     GLOB_OTHER => [Expect::unknown(&["Clone"])],
     GLOB_UNLISTED => [Expect::unknown(&["Clone"])],
     GLOB_SHADOWING => [Expect::std(&["std", "fmt", "Result"])],
     GLOB_ENUM => [Expect::unknown(&["Clone"])],
-    GLOB_ITSELF => [Expect::std(&["std", "clone", "Clone"])],
+    GLOB_ITSELF => [Expect::std_trait(&["std", "clone", "Clone"])],
     GLOB_OPAQUE_FIRST => [Expect::unknown(&["Clone"])],
     GLOB_OPAQUE_LAST => [Expect::unknown(&["Debug"])],
     GLOB_CONFLICT => [Expect::unknown(&["Result"])],
     GLOB_MODULES_CONFLICT => [Expect::unknown(&["T"])],
     GLOB_MODULES_AGREE => [Expect::krate(&["crate", "a", "T"])],
-    GLOB_BENEATH_IMPORT => [Expect::std(&["std", "clone", "Clone"])],
-    GLOB_BENEATH_DECLARED => [Expect::krate(&["crate", "Debug"]), Expect::std(&["std", "fmt", "Display"])],
+    GLOB_BENEATH_IMPORT => [Expect::std_trait(&["std", "clone", "Clone"])],
+    GLOB_BENEATH_DECLARED => [Expect::krate(&["crate", "Debug"]), Expect::std_trait(&["std", "fmt", "Display"])],
     GLOB_THROUGH_GLOB => [Expect::krate(&["crate", "a", "b", "T"])],
     GLOB_PRIVATE_SELF => [Expect::krate(&["crate", "Clone"])],
-    GLOB_VISIBLE_CRATE => [Expect::std(&["std", "fmt", "Debug"])],
+    GLOB_VISIBLE_CRATE => [Expect::std_trait(&["std", "fmt", "Debug"])],
     GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],
     GLOB_RESTRICTED_IN => [Expect::unknown(&["Debug"])],
     PATH_RESTRICTED => [Expect::item("T", ItemKind::Struct)],
@@ -473,8 +531,8 @@ laws::table!(a_block_looks_past_its_glob_to_the_enclosing_module, |text: &&str| 
 ]);
 
 laws::table!(a_module_s_own_name_hides_the_same_name_in_its_globs, |text: &&str| Read::resolved(text), [
-    OWN_ITEM_HIDES_GLOB => [Expect::std(&["std", "clone", "Clone"]), Expect::unknown(&["m", "Clone"])],
-    OWN_IMPORT_HIDES_GLOB => [Expect::std(&["std", "clone", "Clone"])],
+    OWN_ITEM_HIDES_GLOB => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::unknown(&["m", "Clone"])],
+    OWN_IMPORT_HIDES_GLOB => [Expect::std_trait(&["std", "clone", "Clone"])],
     OWN_VISIBLE_ITEM_HIDES_GLOB => [Expect::krate(&["crate", "m", "Clone"])],
 ]);
 
@@ -487,17 +545,33 @@ laws::table!(a_glob_carries_the_hidden_names_of_its_module, |text: &&str| Read::
 laws::table!(an_extern_crate_item_binds_its_name, |text: &&str| Read::resolved(text), [
     EXTERN_SELF => [Expect::krate(&["crate", "clone", "Clone"])],
     EXTERN_SELF_NESTED => [Expect::krate(&["crate", "clone", "Clone"])],
-    EXTERN_CORE => [Expect::std(&["std", "clone", "Clone"]), Expect::std(&["std", "fmt", "Debug"])],
+    EXTERN_CORE => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "fmt", "Debug"])],
     EXTERN_OTHER => [Expect::external(&["serde", "Serialize"]), Expect::external(&["serde", "Serialize"])],
-    EXTERN_DISCARDED => [Expect::std(&["std", "clone", "Clone"])],
+    EXTERN_DISCARDED => [Expect::std_trait(&["std", "clone", "Clone"])],
+    EXTERN_RENAMED => [Expect::external(&["toml", "Value"])],
+]);
+
+laws::table!(a_renaming_import_binds_the_crate_it_names, |text: &&str| Read::resolved(text), [
+    CRATE_RENAMED => [Expect::external(&["toml", "Value"])],
+    CRATE_SELF_RENAMED => [Expect::external(&["serde_json", "Value"])],
+    STD_RENAMED => [Expect::std_trait(&["std", "clone", "Clone"])],
+]);
+
+laws::table!(an_explicit_import_shadows_every_glob_beside_it, |text: &&str| Read::resolved(text), [
+    IMPORT_BESIDE_STD_GLOB => [Expect::external(&["serde_json", "Value"])],
+    IMPORT_BESIDE_OTHER_GLOB => [Expect::external(&["rust_decimal", "Decimal"])],
+    IMPORT_BESIDE_CRATE_GLOB => [Expect::external(&["serde_json", "Value"])],
+    IMPORT_BESIDE_BLOCK_MACRO => [Expect::external(&["rust_decimal", "Decimal"])],
+    IMPORT_BESIDE_BLOCK_GLOB => [Expect::external(&["rust_decimal", "Decimal"])],
+    GLOB_STILL_HIDES_UNIMPORTED => [Expect::unknown(&["Clone"])],
 ]);
 
 laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resolved(text), [
-    DERIVE_SHADOWED => [Expect::std(&["std", "clone", "Clone"]), Expect::std(&["std", "fmt", "Debug"])],
+    DERIVE_SHADOWED => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "fmt", "Debug"])],
     DERIVE_IMPORTED => [
         Expect::external(&["serde", "Serialize"]),
-        Expect::std(&["std", "fmt", "Debug"]),
-        Expect::std(&["std", "hash", "Hash"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "hash", "Hash"]),
     ],
     DERIVE_UNLISTED => [Expect::unknown(&["Serialize"])],
     DERIVE_GLOBBED => [Expect::unknown(&["Hash"]), Expect::unknown(&["Debug"])],
@@ -506,26 +580,27 @@ laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resol
 laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| Read::resolved(text), [
     MACRO_CALL => [Expect::unknown(&["Clone"])],
     MACRO_STATEMENT => [Expect::unknown(&["Clone"])],
-    MACRO_DEFINED => [Expect::std(&["std", "clone", "Clone"])],
+    MACRO_DEFINED => [Expect::std_trait(&["std", "clone", "Clone"])],
     MACRO_DEFINED_CALLED => [Expect::unknown(&["Clone"])],
     MACRO_PATHED_STATEMENT => [Expect::unknown(&["Clone"])],
 ]);
 
 laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(text), [
-    MACRO_ASSERT => [Expect::std(&["std", "clone", "Clone"])],
-    MACRO_STD_STATEMENTS => [Expect::std(&["std", "clone", "Clone"])],
+    MACRO_ASSERT => [Expect::std_trait(&["std", "clone", "Clone"])],
+    MACRO_STD_STATEMENTS => [Expect::std_trait(&["std", "clone", "Clone"])],
 ]);
 
 laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
-    RENAMED_ACROSS => [Expect::std(&["std", "clone", "Clone"])],
-    PARENT_GLOB => [Expect::std(&["std", "clone", "Clone"])],
-    SIBLING_GLOB => [Expect::std(&["std", "cmp", "PartialEq"])],
+    RENAMED_ACROSS => [Expect::std_trait(&["std", "clone", "Clone"])],
+    PARENT_GLOB => [Expect::std_trait(&["std", "clone", "Clone"])],
+    SIBLING_GLOB => [Expect::std_trait(&["std", "cmp", "PartialEq"])],
     PARENT_DECLARES => [Expect::krate(&["crate", "Clone"])],
-    PRIVATE_IMPORT => [Expect::std(&["std", "hash", "Hash"]), Expect::unknown(&["Hash"])],
-    REEXPORTED => [Expect::std(&["std", "fmt", "Debug"]), Expect::unknown(&["crate", "b", "Hidden"])],
+    PRIVATE_IMPORT => [Expect::std_trait(&["std", "hash", "Hash"]), Expect::unknown(&["Hash"])],
+    REEXPORTED => [Expect::std_trait(&["std", "fmt", "Debug"]), Expect::unknown(&["crate", "b", "Hidden"])],
     CYCLE => [Expect::unknown(&["X"])],
-    RE_EXPORT_CYCLE => [Expect::krate(&["crate", "Mark"]), Expect::std(&["std", "clone", "Clone"])],
-    WORKSPACE => [Expect::std(&["std", "clone", "Clone"]), Expect::std(&["std", "clone", "Clone"])],
+    RE_EXPORT_CYCLE => [Expect::krate(&["crate", "Mark"]), Expect::std_trait(&["std", "clone", "Clone"])],
+    GLOB_THROUGH_A_LATER_SIBLING => [Expect::krate(&["crate", "e", "Far"])],
+    WORKSPACE => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "clone", "Clone"])],
     NESTED_FILES => [Expect::krate(&["crate", "Mark"]), Expect::krate(&["crate", "Mark"])],
 ]);
 
@@ -541,7 +616,10 @@ laws::table!(a_path_through_an_unplanted_module_is_unknown, Read::across, [
 fn a_test_module_file_is_planted_under_its_parent() {
     let tests = Read::file("src/tests.rs", "use super::*;\nimpl Default for R {}\n");
     let root = Read::file("src/lib.rs", "struct R;\n#[cfg(test)]\nmod tests;\n").with_test_modules(vec![tests]);
-    assert_eq!(Read::implementations(&[root]), [Expect::written("R", Expect::std(&["std", "default", "Default"]))]);
+    assert_eq!(
+        Read::implementations(&[root]),
+        [Expect::written("R", Expect::std_trait(&["std", "default", "Default"]))]
+    );
 }
 
 const FORMS: &str = "fn free() {}\nimpl S {\n    fn inherent(&self) -> bool { true }\n}\ntrait T {\n    fn declared(&self) -> u8;\n}\nimpl T for S {\n    fn declared(&self) -> u8 { 0 }\n}\nfn outer() {\n    fn nested() -> char { 'a' }\n    impl S {\n        fn inner(&self) {}\n    }\n}\n#[test]\nfn checked() {}\n#[tokio::test]\nasync fn awaited() {}\nfn main() {}\nmod m {\n    fn main() {}\n}\n";
@@ -582,17 +660,17 @@ fn every_function_is_read_with_its_owner_entry_and_output() {
     assert_eq!(
         Read::functions(FORMS),
         [
-            Expect::function("free", Owner::Free, Entry::Called, Output::Implicit),
-            Expect::function("inherent", Owner::Inherent, Entry::Called, Expect::returning(Primitive::Bool)),
-            Expect::function("declared", Owner::TraitDecl, Entry::Called, Expect::returning(Primitive::Integer)),
-            Expect::function("declared", Owner::TraitImpl, Entry::Called, Expect::returning(Primitive::Integer)),
-            Expect::function("outer", Owner::Free, Entry::Called, Output::Implicit),
-            Expect::function("nested", Owner::Nested, Entry::Called, Expect::returning(Primitive::Char)),
-            Expect::function("inner", Owner::Inherent, Entry::Called, Output::Implicit),
-            Expect::function("checked", Owner::Free, Entry::Test, Output::Implicit),
-            Expect::function("awaited", Owner::Free, Entry::Test, Output::Implicit),
-            Expect::function("main", Owner::Free, Entry::Called, Output::Implicit),
-            Expect::function("main", Owner::Free, Entry::Called, Output::Implicit),
+            Expect::function("free", Owner::Free, Entry::Called, None),
+            Expect::function("inherent", Owner::Inherent, Entry::Called, Some(Expect::primitive(Primitive::Bool))),
+            Expect::function("declared", Owner::TraitDecl, Entry::Called, Some(Expect::primitive(Primitive::Integer))),
+            Expect::function("declared", Owner::TraitImpl, Entry::Called, Some(Expect::primitive(Primitive::Integer))),
+            Expect::function("outer", Owner::Free, Entry::Called, None),
+            Expect::function("nested", Owner::Nested, Entry::Called, Some(Expect::primitive(Primitive::Char))),
+            Expect::function("inner", Owner::Inherent, Entry::Called, None),
+            Expect::function("checked", Owner::Free, Entry::Test, None),
+            Expect::function("awaited", Owner::Free, Entry::Test, None),
+            Expect::function("main", Owner::Free, Entry::Called, None),
+            Expect::function("main", Owner::Free, Entry::Called, None),
         ]
     );
 }
@@ -605,9 +683,12 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     SELF_TRAIT_IMPL => [Expect::named(Expect::item("S", ItemKind::Struct), Vec::new())],
     SELF_TRAIT_DECL => [Expect::param("Self")],
     SELF_TRAIT_IN_IMPL => [Expect::param("Self")],
-    SELF_PROJECTED => [TypeRef::Opaque],
+    SELF_PROJECTED => [TypeRef::Projected(Projection::new(
+        Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()),
+        Vec::new(),
+    ))],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
-    PROJECTED => [TypeRef::Opaque],
+    PROJECTED => [TypeRef::Projected(Projection::new(Expect::param("Self"), Vec::new()))],
 ]);
 
 const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";
@@ -681,11 +762,11 @@ const BINARY_CHILD_MAIN: [Fixture; 2] =
     [Fixture::new("src/main.rs", "mod m;\n"), Fixture::new("src/m.rs", "fn main() {}\n")];
 
 laws::table!(only_the_main_of_a_binary_crate_root_is_the_entry, Read::entries, [
-    BINARY_MAIN => [Expect::function("main", Owner::Free, Entry::Main, Output::Implicit)],
-    BINARY_LISTED_MAIN => [Expect::function("main", Owner::Free, Entry::Main, Output::Implicit)],
-    LIBRARY_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
-    ISLAND_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
-    BINARY_CHILD_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
+    BINARY_MAIN => [Expect::function("main", Owner::Free, Entry::Main, None)],
+    BINARY_LISTED_MAIN => [Expect::function("main", Owner::Free, Entry::Main, None)],
+    LIBRARY_MAIN => [Expect::function("main", Owner::Free, Entry::Called, None)],
+    ISLAND_MAIN => [Expect::function("main", Owner::Free, Entry::Called, None)],
+    BINARY_CHILD_MAIN => [Expect::function("main", Owner::Free, Entry::Called, None)],
 ]);
 
 #[test]

@@ -28,3 +28,9 @@ impl ItemPath {
         self.segments.last()
     }
 }
+
+impl AsRef<[Name]> for ItemPath {
+    fn as_ref(&self) -> &[Name] {
+        &self.segments
+    }
+}

@@ -1,9 +1,8 @@
-use std::cell::OnceCell;
 use std::iter;
 use std::thread::Scope;
 
 use code_model::Model;
-use code_reader::Reader;
+
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
@@ -63,57 +62,57 @@ use crate::cli::{Outcome, Sources};
 #[derive(Debug)]
 pub struct Lints;
 
-type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
+type Check = for<'file> fn(&'file Readout, &'file Queue) -> Vec<Report<'file>>;
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
 impl Lints {
     const CHECKS: [Check; 45] = [
-        |readout| vec![NoComments::report(readout.files())],
-        |readout| vec![NoFreeFns::report(readout.files())],
-        |readout| vec![ThinMain::report(readout.files())],
-        |readout| vec![VecOutParams::report(readout.files())],
-        |readout| vec![NamedLifetimes::report(readout.files())],
-        |readout| vec![EnumPredicates::report(readout.files())],
-        |readout| vec![ConstShape::report(readout.files())],
-        |readout| vec![TypeShape::report(readout.files())],
-        |readout| vec![ExpressionFlow::report(readout.files())],
-        |readout| vec![FnShape::report(readout.files())],
-        |readout| vec![LiteralNames::report(readout.files())],
-        |readout| vec![ManualIteration::report(readout.files())],
-        |readout| vec![ModuleNesting::report(readout.files())],
-        |readout| vec![NamedNumbers::report(readout.files())],
-        |readout| vec![NoForwarders::report(readout.files())],
-        |readout| vec![NoNumbersInBinaries::report(readout.files())],
-        |readout| vec![NoParameterBags::report(readout.files())],
-        |readout| vec![NoPlaintext::report(readout.files())],
-        |readout| vec![PrimitiveBoundary::report(readout.files())],
-        |readout| vec![PrivateFns::report(readout.files())],
-        |readout| vec![ProcessStarters::report(readout.files())],
-        |readout| vec![RawResources::report(readout.files())],
-        |readout| vec![PublicSurface::report(readout.files())],
-        |readout| vec![RepeatedMethods::report(readout.files())],
-        |readout| vec![StateGraph::report(readout.files())],
-        |readout| vec![GuardMustUse::report(readout.files())],
-        |readout| vec![CrateGraph::report(readout.files())],
-        |readout| vec![PublicApiTests::report(readout.files())],
-        |readout| vec![NoTestOnlyApi::report(readout.files())],
-        |readout| vec![NoIgnoredTests::report(readout.files())],
-        |readout| vec![NoTestIo::report(readout.files())],
-        |readout| vec![FakesAtPorts::report(readout.files())],
-        |readout| vec![PortBatching::report(readout.files())],
-        |readout| vec![LongExactStrings::report(readout.files())],
-        |readout| vec![RepeatedShapes::report(readout.files())],
-        |readout| vec![MandatoryLaws::report(readout.files())],
-        |readout| vec![ArbitraryNewtypes::report(readout.files())],
-        |readout| vec![BoolMethods::report(readout.files())],
-        |readout| vec![EffectsInPorts::report(readout.files())],
-        |readout| vec![NoEarlyExits::report(readout.files())],
-        |readout| {
+        |readout, _| vec![NoComments::report(readout.files())],
+        |readout, _| vec![NoFreeFns::report(readout.files())],
+        |readout, _| vec![ThinMain::report(readout.files())],
+        |readout, _| vec![VecOutParams::report(readout.files())],
+        |readout, _| vec![NamedLifetimes::report(readout.files())],
+        |readout, _| vec![EnumPredicates::report(readout.files())],
+        |readout, _| vec![ConstShape::report(readout.files())],
+        |readout, _| vec![TypeShape::report(readout.files())],
+        |readout, _| vec![ExpressionFlow::report(readout.files())],
+        |readout, _| vec![FnShape::report(readout.files())],
+        |readout, _| vec![LiteralNames::report(readout.files())],
+        |readout, _| vec![ManualIteration::report(readout.files())],
+        |readout, _| vec![ModuleNesting::report(readout.files())],
+        |readout, _| vec![NamedNumbers::report(readout.files())],
+        |readout, _| vec![NoForwarders::report(readout.files())],
+        |readout, _| vec![NoNumbersInBinaries::report(readout.files())],
+        |readout, _| vec![NoParameterBags::report(readout.files())],
+        |readout, _| vec![NoPlaintext::report(readout.files())],
+        |readout, queue| vec![<PrimitiveBoundary as ModelLint>::report(queue.model(readout))],
+        |readout, _| vec![PrivateFns::report(readout.files())],
+        |readout, _| vec![ProcessStarters::report(readout.files())],
+        |readout, _| vec![RawResources::report(readout.files())],
+        |readout, _| vec![PublicSurface::report(readout.files())],
+        |readout, _| vec![RepeatedMethods::report(readout.files())],
+        |readout, _| vec![StateGraph::report(readout.files())],
+        |readout, _| vec![GuardMustUse::report(readout.files())],
+        |readout, _| vec![CrateGraph::report(readout.files())],
+        |readout, _| vec![PublicApiTests::report(readout.files())],
+        |readout, _| vec![NoTestOnlyApi::report(readout.files())],
+        |readout, _| vec![NoIgnoredTests::report(readout.files())],
+        |readout, _| vec![NoTestIo::report(readout.files())],
+        |readout, _| vec![FakesAtPorts::report(readout.files())],
+        |readout, _| vec![PortBatching::report(readout.files())],
+        |readout, _| vec![LongExactStrings::report(readout.files())],
+        |readout, _| vec![RepeatedShapes::report(readout.files())],
+        |readout, _| vec![MandatoryLaws::report(readout.files())],
+        |readout, _| vec![ArbitraryNewtypes::report(readout.files())],
+        |readout, _| vec![BoolMethods::report(readout.files())],
+        |readout, _| vec![EffectsInPorts::report(readout.files())],
+        |readout, _| vec![NoEarlyExits::report(readout.files())],
+        |readout, _| {
             let flows = Flows::from(readout.files());
             vec![flows.report::<LinearBodies>(), flows.report::<PureRouters>(), flows.report::<PlainConditions>()]
         },
-        |readout| {
+        |readout, _| {
             let extraction = Extraction::from(readout.files());
             let system = TypeSystem::built_from(readout.files(), &extraction);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
@@ -121,9 +120,9 @@ impl Lints {
                 .flatten()
                 .collect()
         },
-        |readout| vec![UnconsumedTraits::report(readout.files())],
-        |readout| vec![RustOnly::report(readout.repo_files())],
-        |readout| vec![WorkflowRun::report(readout.repo_files())],
+        |readout, _| vec![UnconsumedTraits::report(readout.files())],
+        |readout, _| vec![RustOnly::report(readout.repo_files())],
+        |readout, _| vec![WorkflowRun::report(readout.repo_files())],
     ];
 
     const QUERIES: [Query; 1] = [<HandImpls as ModelLint>::report];
@@ -164,8 +163,7 @@ impl Lints {
             )
             .rev()
             .collect();
-        let model = OnceCell::new();
-        queue.claimed(&jobs).flat_map(|job| job.done(readout, &model)).collect()
+        queue.claimed(&jobs).flat_map(|job| job.done(readout, queue)).collect()
     }
 }
 
@@ -176,18 +174,16 @@ enum Job {
 }
 
 impl Job {
-    fn done(self, readout: &Readout, model: &OnceCell<Model>) -> Vec<Rendered> {
+    fn done(self, readout: &Readout, queue: &Queue) -> Vec<Rendered> {
         match self {
-            Job::Check { slot, check } => check(readout)
+            Job::Check { slot, check } => check(readout, queue)
                 .into_iter()
                 .filter_map(Report::dirty)
                 .map(|report| Rendered::render(slot, &report))
                 .collect(),
-            Job::Query { slot, query } => query(model.get_or_init(|| Reader::read(readout)))
-                .dirty()
-                .map(|report| Rendered::render(slot, &report))
-                .into_iter()
-                .collect(),
+            Job::Query { slot, query } => {
+                query(queue.model(readout)).dirty().map(|report| Rendered::render(slot, &report)).into_iter().collect()
+            }
         }
     }
 }

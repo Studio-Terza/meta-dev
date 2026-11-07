@@ -27,6 +27,13 @@ impl<'rows> Found<'rows> {
         }
     }
 
+    fn undisputed(self) -> Found<'rows> {
+        match self {
+            Found::Conflict => Found::Nothing,
+            Found::Nothing | Found::One(_) => self,
+        }
+    }
+
     fn agreed(left: &'rows Binding, right: &'rows Binding) -> Found<'rows> {
         match [left].into_iter().find(|binding| *binding == right) {
             Some(agreed) => Found::One(agreed),
@@ -59,6 +66,13 @@ impl Determinacy {
         }
     }
 
+    fn deferring<'rows>(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
+        match self {
+            Determinacy::Determined => disputed,
+            Determinacy::Weak | Determinacy::Strong => deferred(),
+        }
+    }
+
     fn absent(self, absent: impl FnOnce() -> Outer) -> Resolution {
         match self {
             Determinacy::Determined => Resolution::Bound(absent().binding()),
@@ -82,6 +96,29 @@ impl<'rows> View<'rows> {
 
     pub(super) fn union(self, other: View<'rows>) -> View<'rows> {
         View { found: self.found.union(other.found), pending: self.pending.max(other.pending) }
+    }
+
+    pub(super) fn undisputed(self) -> View<'rows> {
+        View { found: self.found.undisputed(), pending: self.pending }
+    }
+
+    pub(super) fn disputed(
+        self,
+        explicit: impl FnOnce() -> View<'rows>,
+        deferred: impl FnOnce() -> View<'rows>,
+    ) -> View<'rows> {
+        match self.found {
+            Found::Conflict => explicit().deferring(self, deferred),
+            Found::Nothing | Found::One(_) => self,
+        }
+    }
+
+    fn deferring(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
+        match self.found {
+            Found::One(_) => deferred(),
+            Found::Conflict => disputed,
+            Found::Nothing => self.pending.deferring(disputed, deferred),
+        }
     }
 
     pub(super) fn admitted(admission: Admission, shown: impl FnOnce() -> View<'rows>) -> View<'rows> {

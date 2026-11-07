@@ -10,10 +10,9 @@ test = false
 doctest = false
 
 [dependencies]
+code-model = { path = "../code-model" }
 lint-core = { path = "../lint-core" }
-lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
-syn.workspace = true
 
 [lints]
 workspace = true

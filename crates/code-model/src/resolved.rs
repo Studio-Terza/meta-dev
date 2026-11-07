@@ -7,6 +7,7 @@ use crate::primitive::Primitive;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Resolved {
     Std(ItemPath),
+    StdTrait(ItemPath),
     Crate(ItemId),
     External(ItemPath),
     Primitive(Primitive),
@@ -18,7 +19,7 @@ impl Resolved {
     #[must_use]
     pub fn std(&self) -> Option<&ItemPath> {
         match self {
-            Resolved::Std(path) => Some(path),
+            Resolved::Std(path) | Resolved::StdTrait(path) => Some(path),
             Resolved::Crate(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
@@ -32,6 +33,7 @@ impl Resolved {
         match self {
             Resolved::Crate(item) => Some(*item),
             Resolved::Std(_)
+            | Resolved::StdTrait(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
@@ -44,6 +46,7 @@ impl Resolved {
         match self {
             Resolved::Primitive(primitive) => Some(*primitive),
             Resolved::Std(_)
+            | Resolved::StdTrait(_)
             | Resolved::Crate(_)
             | Resolved::External(_)
             | Resolved::Param(_)
@@ -55,6 +58,7 @@ impl Resolved {
         match self {
             Resolved::Param(name) => Some(name),
             Resolved::Std(_)
+            | Resolved::StdTrait(_)
             | Resolved::Crate(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)

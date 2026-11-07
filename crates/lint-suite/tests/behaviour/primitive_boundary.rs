@@ -1,6 +1,6 @@
 use lint_primitive_boundary::PrimitiveBoundary;
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 
 const BARE: &str = "fn f(x: u32) -> f64 {\n    g(x)\n}\n";
 const SUPPORT_MODULE: &str = "#[cfg(test)]\nmod fixtures;\n";
@@ -47,8 +47,57 @@ const INLINE_TEXT: &str = "mod inner {\n    pub fn f(x: Name) {\n        x.trim(
 const DOOR: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\n";
 const DOOR_AND_HELPER: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 const DOOR_AND_OTHER_TYPE: &str = "struct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl B {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
+const TEST_NEWTYPE: &str = "pub struct Id(u64);\n";
+const SHIPPED_CONSTRUCTOR: &str =
+    "pub struct Id {\n    v: V,\n}\nimpl Id {\n    pub fn new(v: u64) -> Id {\n        g(v)\n    }\n}\n";
+const TEST_DOOR: &str = "struct A;\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n#[cfg(test)]\nmod tests {\n    impl fmt::Display for super::A {\n        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n            g(f)\n        }\n    }\n}\n";
+const MACRO_DOOR: &str = "struct A;\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\nm! {\n    impl fmt::Display for A {\n        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n            g(f)\n        }\n    }\n}\n";
+const MACRO_TEXT: &str =
+    "fn f(x: Name) {\n    assert!(x.trim().is_empty());\n    println!(\"{}\", x.to_string());\n}\n";
+const BESIDE_MACRO: &str = "m! {\n    fn f(x: &str) {}\n}\nfn g(y: u8) {}\n";
+const SAME_NAME_DOOR: &str = "mod m {\n    pub struct A;\n    impl std::fmt::Display for A {\n        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {\n            g(f)\n        }\n    }\n}\nmod n {\n    pub struct A;\n    impl A {\n        fn f(x: Name) {\n            x.trim();\n        }\n    }\n}\n";
+const SAME_NAME_NEWTYPE: &str = "pub struct Id(u64);\nmod other {\n    pub struct Id {\n        v: V,\n    }\n    impl Id {\n        pub fn new(v: u64) -> Id {\n            g(v)\n        }\n    }\n}\n";
+const ANY_TRAIT: &str = "use std::any::Any;\npub fn f(a: &dyn Any, b: impl core::any::Any) {}\npub fn g<T: std::any::Any>(t: T, c: u32) {}\n";
+const MODULE_ALIAS: &str =
+    "pub type Count = usize;\nmod inner {\n    use super::Count;\n    fn c(x: Count) {}\n}\nfn d(x: Count) {}\n";
+const BARE_FUNCTION_TYPES: &str = "pub fn f(x: fn(u8) -> String, y: Option<fn(&[usize]) -> bool>) {}\npub struct A {\n    pub b: fn(char),\n    pub c: Vec<fn() -> u32>,\n}\npub enum B {\n    C(fn(f32)),\n}\n";
+const PROJECTIONS: &str = "pub fn f<T: Tr>(x: <Vec<u32> as Tr>::X, y: <T as Tr>::X, z: <A as Tr<u8>>::X, w: <u16>::X) {}\npub fn g<T: Lending>(x: T::Item<i32>) {}\npub struct A {\n    pub b: <Vec<i64> as Tr>::X,\n}\ntrait L {\n    fn l(&self, x: Self::Item<char>);\n}\n";
+const CALLABLE_BOUNDS: &str = "pub fn f(x: impl Fn(u16) -> char, y: Box<dyn Fn(&str) -> i64>) {}\npub fn g<T: Into<f32>, U>(t: T, u: U)\nwhere\n    U: AsRef<[i16]>,\n{\n}\npub fn h(x: impl Iterator<Item: Into<String>>, y: impl Iterator<Item = f64>) {}\npub struct A<T: Into<u8>> {\n    pub b: T,\n}\n";
+const COMPOUNDS: &str = "pub fn f(x: [u64; 4], y: (A, i32), z: &&mut u128, w: *const isize) {}\npub struct A {\n    pub b: [u16; 2],\n    pub c: (B, i64),\n}\n";
+const CONST_ARGUMENT: &str = "pub fn f(x: A<{ size_of::<u64>() }>) {}\n";
+const WIRE_BESIDE_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\npub fn f(v: Value) -> Z {}\n";
+const WIRE_RENAMED_CRATE: &str = "use toml as t;\npub fn f(v: t::Value) -> Z {}\n";
+const LOCAL_STRING: &str = "pub struct String;\npub fn f(x: String) -> A {}\n";
 
-const CASES: [Case; 47] = [
+const CASES: [Case; 64] = [
+    Case::new(
+        Title::new("std's Any is a trait, so dyn, impl and bound uses of it are not primitives"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ANY_TRAIT))],
+        Flagged::new(&["crates/x/src/lib.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a door on another same-named type exempts nothing"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME_NAME_DOOR))],
+        Flagged::new(&["crates/x/src/lib.rs:13"]),
+    ),
+    Case::new(
+        Title::new("a constructor on a same-named type elsewhere than the newtype"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME_NAME_NEWTYPE))],
+        Flagged::new(&["crates/x/src/lib.rs:7"]),
+    ),
+    Case::new(
+        Title::new("an alias resolves through module scope"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(MODULE_ALIAS))],
+        Flagged::new(&["crates/x/src/lib.rs:4", "crates/x/src/lib.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a shipped constructor beside a same-named newtype in a test file"),
+        &[
+            Source::new(Located::new("crates/x/tests/a.rs"), Text::new(TEST_NEWTYPE)),
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SHIPPED_CONSTRUCTOR)),
+        ],
+        Flagged::new(&["crates/x/src/lib.rs:5"]),
+    ),
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -276,9 +325,69 @@ const CASES: [Case; 47] = [
         &[Source::new(Located::new("crates/x/src/ports.rs"), Text::new(FLAG))],
         Flagged::new(&["crates/x/src/ports.rs:1"]),
     ),
+    Case::new(
+        Title::new("a door impl in a cfg(test) module opens no door for shipped text"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_DOOR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a door impl in a macro body opens no door for shipped text"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACRO_DOOR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("text in std macro arguments is not blocked yet"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACRO_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a primitive beside an item macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(BESIDE_MACRO))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("primitives inside bare fn types in signatures, fields and variants"),
+        &[Source::new(Located::new("a.rs"), Text::new(BARE_FUNCTION_TYPES))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:3", "a.rs:4", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("primitives inside projections and qualified paths"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROJECTIONS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:2", "a.rs:4", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("primitives inside bounds, Fn sugar and associated constraints"),
+        &[Source::new(Located::new("a.rs"), Text::new(CALLABLE_BOUNDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:2", "a.rs:4", "a.rs:7", "a.rs:7", "a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("primitives inside arrays, tuples, references and pointers"),
+        &[Source::new(Located::new("a.rs"), Text::new(COMPOUNDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:3", "a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a primitive inside a const generic argument"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONST_ARGUMENT))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("an explicitly imported wire type beside a glob from outside the crate"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE_BESIDE_GLOB))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a wire type reached through a renamed crate import"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE_RENAMED_CRATE))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("the crate's own String is not a primitive"),
+        &[Source::new(Located::new("a.rs"), Text::new(LOCAL_STRING))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
 fn primitives_outside_a_boundary_are_flagged() {
-    assert_eq!(Sources::mismatches::<PrimitiveBoundary>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<PrimitiveBoundary>>(&CASES), Lines::default());
 }

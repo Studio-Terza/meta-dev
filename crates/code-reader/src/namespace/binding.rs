@@ -6,6 +6,7 @@ use super::entries::{DeclaredId, Sight};
 use super::items::ItemIds;
 use super::resolver::Resolution;
 use super::settling::Target;
+use super::std_names::StdNames;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Binding {
@@ -45,7 +46,7 @@ impl Binding {
     pub(super) fn resolved(self, ids: &ItemIds, written: ItemPath) -> Resolved {
         match self {
             Binding::Item(scope, item) => Binding::issued(ids.issued(scope, item), written),
-            Binding::Std(path) => Resolved::Std(path),
+            Binding::Std(path) => StdNames::resolved(path),
             Binding::External(path) => Resolved::External(path),
             Binding::Primitive(primitive) => Resolved::Primitive(primitive),
             Binding::Module(_) | Binding::Unknown => Resolved::Unknown(written),
