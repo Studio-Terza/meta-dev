@@ -16,7 +16,7 @@ impl Lint for EveryFile {
 
 laws::table!(a_case_mismatches_only_when_its_lines_differ, Sources::mismatches::<EveryFile>, [
     [Case::new(Title::new("wanted"), SOURCES, Flagged::new(&["a.rs:1"]))] => Lines::default(),
-    [Case::new(Title::new("unwanted"), SOURCES, Flagged::new(&[]))] => Lines::from(["unwanted (a.rs ) flagged [\"a.rs:1\"]"]),
+    [Case::new(Title::new("unwanted"), SOURCES, Flagged::new(&[]))] => Lines::from(["unwanted (a.rs ) flagged [a.rs:1 ]"]),
 ]);
 
 #[test]

@@ -54,7 +54,7 @@ impl Sources {
                     let sources = Sources(case.sources());
                     let found = Self::flagged::<Checked>(sources.0);
                     (found != Lines::from(case.flagged()))
-                        .then(|| format!("{} ({sources}) flagged {found}", case.name()))
+                        .then(|| format!("{} ({sources}) flagged [{found}]", case.name()))
                 })
                 .collect(),
         )
