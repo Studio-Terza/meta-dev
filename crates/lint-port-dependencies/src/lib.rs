@@ -5,7 +5,7 @@ mod reserved_names;
 use lint_core::{Headline, Lint, Report, SourceFile, WorkspaceLint};
 use lint_effect_sites::EffectSites;
 use lint_file::FileLint;
-use workspace_metadata::Metadata;
+use workspace_metadata::{Graph, Metadata};
 
 use owners::Owners;
 use port_crate::PortCrate;
@@ -27,9 +27,9 @@ impl WorkspaceLint for OwnedDependencies {
     fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
         Report::new(
             Headline::new(
-                "a package listed in some [package.metadata.port] owns is depended on directly only by its one owning unit, the declaring crate and the workspace proc-macro crates it depends on, in dependencies and dev-dependencies alike",
+                "a package in the dependency closure of a package some [package.metadata.port] owns is depended on directly only by an owning unit, a port and the workspace proc-macro crates it depends on, unless that unit declares it in [package.metadata.port] shared",
             ),
-            Owners::declared(files, &workspaces.iter().collect()).foreign(),
+            Owners::declared(files).foreign(&workspaces.iter().collect::<Graph<'_>>().bypasses()),
         )
     }
 }

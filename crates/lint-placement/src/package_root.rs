@@ -8,7 +8,6 @@ use lint_layout::Dependencies;
 use lint_layout::LineNumber;
 use lint_layout::Manifest;
 use lint_layout::Name;
-use lint_layout::Owned;
 use lint_layout::Untested;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -17,7 +16,6 @@ pub struct PackageRoot {
     name: CrateName,
     features: BTreeMap<Name, LineNumber>,
     untested: Untested,
-    owned: Option<Owned>,
     dependencies: Dependencies,
 }
 
@@ -47,7 +45,6 @@ impl PackageRoot {
                         .as_ref()
                         .map(|manifest| manifest.untested_targets(canonical))
                         .unwrap_or_default(),
-                    owned: manifest.as_ref().and_then(Option::<Owned>::from),
                     dependencies: manifest.as_ref().map(Dependencies::from).unwrap_or_default(),
                 }
             })
@@ -61,7 +58,6 @@ impl PackageRoot {
             root,
             features: BTreeMap::new(),
             untested: Untested::default(),
-            owned: None,
             dependencies: Dependencies::default(),
         }
     }
@@ -84,11 +80,6 @@ impl PackageRoot {
     #[must_use]
     pub fn untested(&self) -> &Untested {
         &self.untested
-    }
-
-    #[must_use]
-    pub fn owned(&self) -> Option<&Owned> {
-        self.owned.as_ref()
     }
 
     #[must_use]
