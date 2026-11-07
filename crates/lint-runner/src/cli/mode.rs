@@ -10,9 +10,8 @@ use console_ports::Cargo;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;
-use lint_core::{Lint, Readout, SourceFile, WorkspaceLint};
+use lint_core::{Lint, Readout, SourceFile};
 use lint_paired_apis::PairedApis;
-use lint_port_dependencies::DominatedPackages;
 use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
@@ -90,15 +89,7 @@ impl Mode {
 
     fn gated<'file>(readout: &'file Readout, helpers: Helpers<'_>, out: &mut impl Write) -> Outcome<'file> {
         let files = readout.files();
-        write!(
-            out,
-            "{}{}{}{}",
-            TestBudget::measured(files),
-            PairedApis::report(files),
-            Clones::report(files),
-            DominatedPackages::report(files, readout.workspaces())
-        )
-        .ok();
+        write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)).ok();
         Lints::checked(readout, helpers)
     }
 

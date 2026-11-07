@@ -2,7 +2,6 @@ test budget, report only:
 corpus: 2 tests in 5 files, 5 of 32 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 free functions are not allowed; make them associated functions or methods:
 src/free.rs:1: fn helper; make it an associated function or a method
 src/free.rs:3: fn nested; make it an associated function or a method

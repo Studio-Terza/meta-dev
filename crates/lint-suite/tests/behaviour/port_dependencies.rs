@@ -1,5 +1,5 @@
 use lint_fixtures::{Lines, Located, Source, Sources, Text};
-use lint_port_dependencies::{CountedCalls, DominatedPackages, EffectsInFillers, HiddenSqlx, OwnedDependencies};
+use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, OwnedDependencies};
 
 const CRATES: &[Source] = &[
     Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new("pub struct Lexer;\n")),
@@ -134,26 +134,6 @@ const STORE: Text = Text::new(
      {\"id\": \"design-store\", \"dependencies\": [\"store-ports\"]},\
      {\"id\": \"sqlx\", \"dependencies\": [\"sqlx-core\"]},\
      {\"id\": \"sqlx-macros-core\", \"dependencies\": [\"sqlx-core\", \"crc\"]}\
-     ]}}",
-);
-const SQLITE_USER: Source = Source::new(
-    Located::new("crates/design-store/Cargo.toml"),
-    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nlibsqlite3-sys = \"0.30\"\n"),
-);
-const STORE_BYPASSED: Text = Text::new(
-    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
-     {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"store-ports-macros\", \"name\": \"store-ports-macros\", \"manifest_path\": \"/w/crates/store-ports-macros/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"proc-macro\"]}]},\
-     {\"id\": \"design-store\", \"name\": \"design-store\", \"manifest_path\": \"/w/crates/design-store/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"lib\"]}]},\
-     {\"id\": \"sqlx\", \"name\": \"sqlx\", \"manifest_path\": \"/r/sqlx/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"sqlx-core\", \"name\": \"sqlx-core\", \"manifest_path\": \"/r/sqlx-core/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"sqlx-macros-core\", \"name\": \"sqlx-macros-core\", \"manifest_path\": \"/r/sqlx-macros-core/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"libsqlite3-sys\", \"name\": \"libsqlite3-sys\", \"manifest_path\": \"/r/libsqlite3-sys/Cargo.toml\", \"dependencies\": []}\
-     ], \"resolve\": {\"nodes\": [\
-     {\"id\": \"store-ports\", \"dependencies\": [\"sqlx\", \"store-ports-macros\"]},\
-     {\"id\": \"store-ports-macros\", \"dependencies\": [\"sqlx-macros-core\", \"sqlx-core\"]},\
-     {\"id\": \"design-store\", \"dependencies\": [\"store-ports\", \"libsqlite3-sys\"]},\
-     {\"id\": \"sqlx\", \"dependencies\": [\"sqlx-core\", \"libsqlite3-sys\"]}\
      ]}}",
 );
 const STORE_WITHOUT_MACROS: Text = Text::new(
@@ -303,10 +283,6 @@ impl Placed {
     fn flagged(&self) -> Lines {
         Sources::placed_in::<OwnedDependencies>(self.manifests, self.crates, self.workspace)
     }
-
-    fn reported(&self) -> Lines {
-        Sources::placed_in::<DominatedPackages>(self.manifests, self.crates, self.workspace)
-    }
 }
 
 laws::table!(
@@ -345,30 +321,6 @@ laws::table!(
         Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_WITHOUT_MACROS) => ["crates/store-ports-macros/Cargo.toml:9"],
         Placed::new(&[PORT_ON_MACRO_FAMILY, MACROS], UNIT_CRATES, STORE_WITHOUT_MACROS) => ["crates/store-ports/Cargo.toml:8", "crates/store-ports-macros/Cargo.toml:9"],
         Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_UNDEPENDED) => ["crates/store-ports-macros/Cargo.toml:9"],
-    ]
-);
-
-laws::table!(
-    a_crate_outside_a_unit_is_reported_where_it_depends_on_an_undeclared_package_only_that_units_packages_reach,
-    Placed::reported,
-    [
-        Placed::new(&[OWNER], CRATES, LOGOS) => Lines::default(),
-        Placed::new(&[OWNER, HASHBROWN_USER], CRATES, LOGOS_AND_HASHBROWN) => ["crates/design/Cargo.toml:5"],
-        Placed::new(&[HASHBROWN_OWNER, HASHBROWN_USER], CRATES, LOGOS_AND_HASHBROWN) => Lines::default(),
-        Placed::new(&[UNOWNED, HASHBROWN_USER], CRATES, LOGOS_AND_HASHBROWN) => Lines::default(),
-        Placed::new(&[OWNER, ELSEWHERE], CRATES, LOGOS) => Lines::default(),
-        Placed::new(&[OWNER], CRATES, EMPTY) => Lines::default(),
-    ]
-);
-
-laws::table!(
-    a_crate_depending_on_what_a_port_unit_alone_reaches_is_reported_at_that_dependency,
-    Placed::reported,
-    [
-        Placed::new(&[PORT, MACROS, SQLITE_USER], UNIT_CRATES, STORE_BYPASSED) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_BYPASSED) => Lines::default(),
-        Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE) => Lines::default(),
-        Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_UNDEPENDED) => Lines::default(),
     ]
 );
 

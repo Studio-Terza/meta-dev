@@ -1,6 +1,5 @@
 mod co_owned;
 mod foreign_dependency;
-mod undeclared;
 mod unit;
 
 use std::borrow::Borrow;
@@ -13,7 +12,6 @@ use workspace_metadata::{CrateName as PackageName, Graph};
 
 use co_owned::CoOwned;
 use foreign_dependency::ForeignDependency;
-use undeclared::Undeclared;
 use unit::Unit;
 
 #[derive(Debug)]
@@ -41,10 +39,7 @@ impl<'file> Owners<'file> {
             .collect();
         let absorbed: BTreeSet<&PackageRoot> = macros.values().flatten().copied().collect();
         let ports: BTreeSet<&PackageRoot> = macros.keys().copied().collect();
-        let units = ports
-            .difference(&absorbed)
-            .filter_map(|port| Unit::joined(port, packages.get(port)?, macros.get(port)?))
-            .collect();
+        let units = ports.difference(&absorbed).filter_map(|port| Unit::joined(port, macros.get(port)?)).collect();
         Owners { packages, units }
     }
 
@@ -55,43 +50,6 @@ impl<'file> Owners<'file> {
                 package.dependencies().as_ref().iter().filter_map(|dependency| self.flagged(package, file, dependency))
             })
             .collect()
-    }
-
-    pub(crate) fn undeclared(&self, graph: &Graph<'file>) -> Vec<Violation<'file>> {
-        self.units.iter().flat_map(|unit| self.bypassing(unit, graph)).collect()
-    }
-
-    fn bypassing(&self, unit: &Unit<'file>, graph: &Graph<'file>) -> Vec<Violation<'file>> {
-        let owning = unit
-            .members()
-            .iter()
-            .filter_map(|member| PackageName::try_from(member.root().package()?.borrow()).ok())
-            .collect();
-        let bypassed = graph.bypassed(&unit.packages(), &owning);
-        self.packages
-            .iter()
-            .filter(|(package, _)| unit.holds(package).is_none())
-            .flat_map(|(package, file)| {
-                package
-                    .dependencies()
-                    .as_ref()
-                    .iter()
-                    .filter_map(|dependency| Self::bypass(unit, &bypassed, file, dependency))
-                    .collect::<Vec<_>>()
-            })
-            .collect()
-    }
-
-    fn bypass(
-        unit: &Unit<'file>,
-        bypassed: &BTreeSet<&'file PackageName>,
-        file: &'file SourceFile,
-        dependency: &'file Dependency,
-    ) -> Option<Violation<'file>> {
-        let named = PackageName::try_from(Borrow::<str>::borrow(dependency.as_ref())).ok()?;
-        let reached = bypassed.get(&named).copied()?;
-        let site = Site::new(file.manifest_file().as_ref(), dependency.line());
-        Some(Violation::new(site, Undeclared::new(reached, unit.port().crate_name())))
     }
 
     fn flagged(

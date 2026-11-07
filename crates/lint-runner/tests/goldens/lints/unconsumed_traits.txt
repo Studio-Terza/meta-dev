@@ -2,7 +2,6 @@ test budget, report only:
 corpus: 0 tests in 1 files, 0 of 9 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 a local trait with methods has a consumer in shipped code: a bound (generic, where clause, supertrait), impl Trait, dyn Trait, or a call to one of its provided methods:
 src/lib.rs:1: trait Shape has methods but nothing consumes it; delete the trait and keep its methods inherent, or give it a consumer: a bound, impl Trait, dyn Trait, or a provided method its callers use
 fails

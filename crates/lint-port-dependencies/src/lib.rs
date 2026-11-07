@@ -5,7 +5,7 @@ mod reserved_names;
 use lint_core::{Headline, Lint, Report, SourceFile, WorkspaceLint};
 use lint_effect_sites::EffectSites;
 use lint_file::FileLint;
-use workspace_metadata::{Graph, Metadata};
+use workspace_metadata::Metadata;
 
 use owners::Owners;
 use port_crate::PortCrate;
@@ -13,9 +13,6 @@ use reserved_names::{CountedName, ReservedNames, SqlxName};
 
 #[derive(Debug)]
 pub struct OwnedDependencies;
-
-#[derive(Debug)]
-pub struct DominatedPackages;
 
 #[derive(Debug)]
 pub struct EffectsInFillers;
@@ -33,20 +30,6 @@ impl WorkspaceLint for OwnedDependencies {
                 "a package listed in some [package.metadata.port] owns is depended on directly only by its one owning unit, the declaring crate and the workspace proc-macro crates it depends on, in dependencies and dev-dependencies alike",
             ),
             Owners::declared(files, &workspaces.iter().collect()).foreign(),
-        )
-    }
-}
-
-impl WorkspaceLint for DominatedPackages {
-    fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
-        Report::new(
-            Headline::new(
-                "report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns",
-            ),
-            {
-                let graph: Graph<'file> = workspaces.iter().collect();
-                Owners::declared(files, &graph).undeclared(&graph)
-            },
         )
     }
 }

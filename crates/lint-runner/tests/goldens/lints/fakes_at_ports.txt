@@ -2,7 +2,6 @@ test budget, report only:
 corpus: 0 tests in 6 files, 21 of 25 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-report only, no crate outside a unit depends directly on an undeclared package that is otherwise reached only through the packages that unit owns:
 test doubles stand in for ports:
 tests/beside.rs:7: MockClock implements Ticker, which is neither a port nor a std trait; a test double implements only traits declared in a ports crate or module, besides derives and std traits
 tests/unported.rs:1: StubCalendar is named as a test double but implements no port; implement a trait declared in a ports crate or module, or rename it
