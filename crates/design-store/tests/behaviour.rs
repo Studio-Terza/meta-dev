@@ -253,6 +253,63 @@ fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), Box<dyn
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Untrimmed(char);
+
+static UNTRIMMED: LazyLock<Sqlite> = LazyLock::new(Sqlite::in_memory::<Seeded>);
+
+impl Untrimmed {
+    const LAST: u32 = 12288;
+
+    fn any() -> impl Strategy<Value = Untrimmed> {
+        let spaces: Vec<char> =
+            (32..=Untrimmed::LAST).filter_map(char::from_u32).filter(|point| point.is_whitespace()).collect();
+        prop_oneof![select(spaces), (32..=Untrimmed::LAST).prop_filter_map("a scalar value", char::from_u32)]
+            .prop_map(Untrimmed)
+    }
+
+    fn uuid(self) -> Uuid {
+        Uuid::new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
+    }
+
+    fn session(self) -> String {
+        format!(
+            "{{\"type\":\"user\",\"uuid\":\"{}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"w\\u{:04x}\\u00a0\"}}}}\n",
+            self.uuid(),
+            u32::from(self.0)
+        )
+    }
+
+    fn shown(self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
+        let shown = store.read(ShownMessage::named(self.uuid()))?.ok_or("the message is not stored")?;
+        Ok(shown
+            .segments()
+            .iter()
+            .map(|segment| {
+                format!("{} {} {:?}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment), Body::from(segment))
+            })
+            .collect())
+    }
+
+    fn compared(self) -> Result<[Vec<String>; 2], Box<dyn Error>> {
+        let run = Run::root();
+        let seeded = run.port(UNTRIMMED.clone());
+        let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
+        fresh.write(Recorded::of(&self.session())?.records)?;
+        Ok([self.shown(&seeded)?, self.shown(&fresh)?])
+    }
+}
+
+laws::law!(
+    a_segment_stored_with_trailing_unicode_space_before_trimming_equals_a_fresh_ingest,
+    Untrimmed::any(),
+    untrimmed,
+    {
+        let [seeded, fresh] = untrimmed.compared().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        prop_assert_eq!(seeded, fresh);
+    }
+);
+
 #[derive(Clone, Debug)]
 struct Dag {
     facets: Vec<Facet>,
