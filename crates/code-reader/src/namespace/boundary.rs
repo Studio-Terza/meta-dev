@@ -5,7 +5,7 @@ use std::ops::ControlFlow;
 pub(crate) struct ScopeId(usize);
 
 impl ScopeId {
-    pub(super) fn after<Row>(rows: &[Row]) -> Self {
+    pub(super) const fn after<Row>(rows: &[Row]) -> Self {
         Self(rows.len())
     }
 
@@ -37,7 +37,7 @@ pub(super) struct Reach(usize);
 impl Reach {
     pub(super) const FIRST: Self = Self(0);
 
-    pub(super) fn next(self) -> Self {
+    pub(super) const fn next(self) -> Self {
         Self(self.0 + 1)
     }
 }

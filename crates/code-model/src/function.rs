@@ -28,7 +28,7 @@ pub enum Output {
 
 impl Output {
     #[must_use]
-    pub fn written(&self) -> Option<&TypeRef> {
+    pub const fn written(&self) -> Option<&TypeRef> {
         match self {
             Self::Written(ty) => Some(ty),
             Self::Implicit => None,
@@ -43,7 +43,7 @@ pub enum Input {
 }
 
 impl Input {
-    fn typed(&self) -> Option<&TypeRef> {
+    const fn typed(&self) -> Option<&TypeRef> {
         match self {
             Self::Typed(ty) => Some(ty),
             Self::Receiver => None,
@@ -66,12 +66,12 @@ impl From<Output> for Signature {
 
 impl Signature {
     #[must_use]
-    pub fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Self {
+    pub const fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Self {
         Self { inputs, output, constraints }
     }
 
     #[must_use]
-    pub fn output(&self) -> &Output {
+    pub const fn output(&self) -> &Output {
         &self.output
     }
 
@@ -96,7 +96,7 @@ pub struct Function {
 
 impl Function {
     #[must_use]
-    pub fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Self {
+    pub const fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Self {
         Self { name, owner, entry, signature, seat: Seat::new(Region::SHIPPED, None) }
     }
 
@@ -106,7 +106,7 @@ impl Function {
     }
 
     #[must_use]
-    pub fn signed_here(&self) -> Option<&Signature> {
+    pub const fn signed_here(&self) -> Option<&Signature> {
         match self.owner {
             Owner::Free | Owner::Inherent | Owner::TraitDecl | Owner::Nested => Some(&self.signature),
             Owner::TraitImpl | Owner::Foreign => None,
@@ -114,7 +114,7 @@ impl Function {
     }
 
     #[must_use]
-    pub fn called(&self) -> Option<&Self> {
+    pub const fn called(&self) -> Option<&Self> {
         match self.entry {
             Entry::Called => Some(self),
             Entry::Test | Entry::Main => None,
@@ -122,17 +122,17 @@ impl Function {
     }
 
     #[must_use]
-    pub fn entry(&self) -> Entry {
+    pub const fn entry(&self) -> Entry {
         self.entry
     }
 
     #[must_use]
-    pub fn signature(&self) -> &Signature {
+    pub const fn signature(&self) -> &Signature {
         &self.signature
     }
 
     #[must_use]
-    pub fn owner(&self) -> Owner {
+    pub const fn owner(&self) -> Owner {
         self.owner
     }
 }

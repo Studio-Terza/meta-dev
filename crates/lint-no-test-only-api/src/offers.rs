@@ -43,7 +43,7 @@ impl<'file> Offers<'file> {
             .for_each(|function| self.offered(&function.sig.ident, &function.vis));
     }
 
-    fn function(member: &ImplItem) -> Option<&ImplItemFn> {
+    const fn function(member: &ImplItem) -> Option<&ImplItemFn> {
         match member {
             ImplItem::Fn(function) => Some(function),
             _ => None,

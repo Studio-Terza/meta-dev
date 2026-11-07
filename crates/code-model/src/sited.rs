@@ -11,7 +11,7 @@ pub enum Spelling {
 
 impl Spelling {
     #[must_use]
-    pub fn written(&self) -> Option<&ItemPath> {
+    pub const fn written(&self) -> Option<&ItemPath> {
         match self {
             Self::Written(path, _) => Some(path),
             Self::Implied => None,
@@ -19,7 +19,7 @@ impl Spelling {
     }
 
     #[must_use]
-    pub fn position(&self) -> Option<Position> {
+    pub const fn position(&self) -> Option<Position> {
         match self {
             Self::Written(_, position) => Some(*position),
             Self::Implied => None,
@@ -35,12 +35,12 @@ pub struct Sited {
 
 impl Sited {
     #[must_use]
-    pub fn new(resolved: Resolved, spelling: Spelling) -> Self {
+    pub const fn new(resolved: Resolved, spelling: Spelling) -> Self {
         Self { resolved, spelling }
     }
 
     #[must_use]
-    pub fn implied(resolved: Resolved) -> Self {
+    pub const fn implied(resolved: Resolved) -> Self {
         Self { resolved, spelling: Spelling::Implied }
     }
 }

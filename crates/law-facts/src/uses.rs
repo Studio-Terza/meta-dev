@@ -32,7 +32,7 @@ pub(crate) struct Import {
 }
 
 impl Import {
-    pub(crate) fn name(&self) -> &Name {
+    pub(crate) const fn name(&self) -> &Name {
         &self.name
     }
 }

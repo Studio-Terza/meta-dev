@@ -12,15 +12,15 @@ pub(crate) struct Link<'found> {
 }
 
 impl<'found> Link<'found> {
-    pub(crate) fn new(from: Member<'found>, to: Member<'found>) -> Self {
+    pub(crate) const fn new(from: Member<'found>, to: Member<'found>) -> Self {
         Link { from, to }
     }
 
-    pub(crate) fn ends(&self) -> [Member<'found>; ENDS] {
+    pub(crate) const fn ends(&self) -> [Member<'found>; ENDS] {
         [self.from, self.to]
     }
 
-    pub(crate) fn reversed(self) -> Self {
+    pub(crate) const fn reversed(self) -> Self {
         Link { from: self.to, to: self.from }
     }
 

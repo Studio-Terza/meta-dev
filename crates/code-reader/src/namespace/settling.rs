@@ -18,7 +18,7 @@ pub(super) struct Seed<'space> {
 }
 
 impl<'space> Seed<'space> {
-    pub(super) fn new(key: Key<'space>, layer: Layer, visibility: Visibility, binding: Binding) -> Self {
+    pub(super) const fn new(key: Key<'space>, layer: Layer, visibility: Visibility, binding: Binding) -> Self {
         Seed { key, layer, visibility, binding }
     }
 
@@ -102,7 +102,7 @@ pub(crate) struct ScopeSettling {
 }
 
 impl ScopeSettling {
-    pub(super) fn new(imports: Vec<Resolution>, targets: Vec<Target>) -> Self {
+    pub(super) const fn new(imports: Vec<Resolution>, targets: Vec<Target>) -> Self {
         Self { imports, targets }
     }
 

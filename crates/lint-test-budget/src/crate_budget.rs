@@ -18,7 +18,7 @@ enum TestShare {
 }
 
 impl TestShare {
-    fn test_lines(self, inline: Count, whole: Count) -> Count {
+    const fn test_lines(self, inline: Count, whole: Count) -> Count {
         match self {
             Self::InlineModules => inline,
             Self::WholeFile => whole,

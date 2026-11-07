@@ -12,12 +12,12 @@ pub struct Use<'file> {
 }
 
 impl<'file> Use<'file> {
-    pub(crate) fn new(site: Site<'file>, candidates: Vec<UsePath>, ground: Ground, cover: Cover) -> Self {
+    pub(crate) const fn new(site: Site<'file>, candidates: Vec<UsePath>, ground: Ground, cover: Cover) -> Self {
         Use { site, candidates, ground, cover }
     }
 
     #[must_use]
-    pub fn place(&self) -> Site<'file> {
+    pub const fn place(&self) -> Site<'file> {
         self.site
     }
 
@@ -34,12 +34,12 @@ impl<'file> Use<'file> {
     }
 
     #[must_use]
-    pub fn ground(&self) -> Ground {
+    pub const fn ground(&self) -> Ground {
         self.ground
     }
 
     #[must_use]
-    pub fn cover(&self) -> Cover {
+    pub const fn cover(&self) -> Cover {
         self.cover
     }
 }

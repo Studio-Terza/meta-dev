@@ -15,7 +15,7 @@ pub(crate) struct Origin<'file> {
 }
 
 impl<'file> Origin<'file> {
-    pub(crate) fn new(package: Package<'file>, site: Site<'file>, name: Name) -> Self {
+    pub(crate) const fn new(package: Package<'file>, site: Site<'file>, name: Name) -> Self {
         Origin { package, site, name }
     }
 
@@ -37,7 +37,7 @@ pub struct Law<'file> {
 }
 
 impl<'file> Law<'file> {
-    pub(crate) fn new(origin: Origin<'file>, kind: Kind, mentions: BTreeSet<Name>, routes: Vec<Route>) -> Self {
+    pub(crate) const fn new(origin: Origin<'file>, kind: Kind, mentions: BTreeSet<Name>, routes: Vec<Route>) -> Self {
         Law { origin, kind, mentions, routes }
     }
 
@@ -52,7 +52,7 @@ impl<'file> Law<'file> {
     }
 
     #[must_use]
-    pub fn kind(&self) -> Kind {
+    pub const fn kind(&self) -> Kind {
         self.kind
     }
 
@@ -77,7 +77,7 @@ impl<'file> Law<'file> {
     }
 
     #[must_use]
-    pub fn mentions(&self) -> &BTreeSet<Name> {
+    pub const fn mentions(&self) -> &BTreeSet<Name> {
         &self.mentions
     }
 }

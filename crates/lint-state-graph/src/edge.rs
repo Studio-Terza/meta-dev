@@ -10,11 +10,11 @@ pub struct Edge<'found> {
 }
 
 impl<'found> Edge<'found> {
-    pub fn new(source: &'found TypeName, target: &'found TypeName) -> Self {
+    pub const fn new(source: &'found TypeName, target: &'found TypeName) -> Self {
         Edge { source, target }
     }
 
-    pub fn source(&self) -> &'found TypeName {
+    pub const fn source(&self) -> &'found TypeName {
         self.source
     }
 
@@ -23,7 +23,7 @@ impl<'found> Edge<'found> {
     }
 
     #[must_use]
-    pub fn reversed(self) -> Self {
+    pub const fn reversed(self) -> Self {
         Edge { source: self.target, target: self.source }
     }
 }

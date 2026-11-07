@@ -4,12 +4,12 @@ use crate::endpoint::Endpoint;
 pub struct Output<'found>(&'found Endpoint);
 
 impl<'found> Output<'found> {
-    pub(crate) fn new(endpoint: &'found Endpoint) -> Self {
+    pub(crate) const fn new(endpoint: &'found Endpoint) -> Self {
         Output(endpoint)
     }
 
     #[must_use]
-    pub fn endpoint(self) -> &'found Endpoint {
+    pub const fn endpoint(self) -> &'found Endpoint {
         self.0
     }
 }

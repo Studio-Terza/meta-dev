@@ -24,7 +24,7 @@ impl From<&Pat> for Dispatch {
 }
 
 impl Dispatch {
-    pub fn fault(self) -> Option<Finding> {
+    pub const fn fault(self) -> Option<Finding> {
         match self {
             Self::Variant => None,
             Self::Value => Some(Finding::ValuePattern),

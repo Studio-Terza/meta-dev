@@ -12,12 +12,12 @@ pub struct DeclaredType<'file> {
 
 impl<'file> DeclaredType<'file> {
     #[must_use]
-    pub fn new(home: Home<'file>, name: Name) -> Self {
+    pub const fn new(home: Home<'file>, name: Name) -> Self {
         DeclaredType { home, name }
     }
 
     #[must_use]
-    pub fn home(&self) -> Home<'file> {
+    pub const fn home(&self) -> Home<'file> {
         self.home
     }
 }

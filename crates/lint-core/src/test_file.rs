@@ -19,7 +19,7 @@ impl<'file> TestFile<'file> {
     }
 
     #[must_use]
-    pub fn file(self) -> &'file SourceFile {
+    pub const fn file(self) -> &'file SourceFile {
         self.0
     }
 }

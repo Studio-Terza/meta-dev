@@ -21,7 +21,7 @@ pub(crate) struct Within<'scope> {
 }
 
 impl<'scope> Within<'scope> {
-    pub(crate) fn new(scope: &'scope Scope, traits: &'scope Traits<'scope>, home: &'scope CrateName) -> Self {
+    pub(crate) const fn new(scope: &'scope Scope, traits: &'scope Traits<'scope>, home: &'scope CrateName) -> Self {
         Within { scope, traits, home }
     }
 
@@ -68,11 +68,11 @@ impl<'scope> Routes<'scope> {
             .collect()
     }
 
-    pub(crate) fn scope(&self) -> &Scope {
+    pub(crate) const fn scope(&self) -> &Scope {
         self.within.scope
     }
 
-    pub(crate) fn operand(&self) -> Option<&Owner> {
+    pub(crate) const fn operand(&self) -> Option<&Owner> {
         self.operand.as_ref()
     }
 

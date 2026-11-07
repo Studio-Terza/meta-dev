@@ -19,7 +19,7 @@ impl<Node: Ord + Copy> Cluster<Node> {
         self
     }
 
-    pub(crate) fn first(&self) -> Node {
+    pub(crate) const fn first(&self) -> Node {
         self.first
     }
 
@@ -41,7 +41,7 @@ pub(crate) struct Placing<Node> {
 }
 
 impl<Node: Ord + Copy> Placing<Node> {
-    pub(crate) fn starting_with(node: Node) -> Self {
+    pub(crate) const fn starting_with(node: Node) -> Self {
         Self { clusters: Vec::new(), pending: Some(node) }
     }
 

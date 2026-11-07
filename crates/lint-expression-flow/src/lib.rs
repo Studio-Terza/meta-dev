@@ -47,7 +47,7 @@ impl ExpressionFlow {
         Self::branching(statement).and_then(|semicolon| semicolon.as_ref().map(|_| statement).or(inner))
     }
 
-    fn branching(statement: &Stmt) -> Option<&Option<Token![;]>> {
+    const fn branching(statement: &Stmt) -> Option<&Option<Token![;]>> {
         match statement {
             Stmt::Expr(Expr::If(_) | Expr::Match(_), semicolon) => Some(semicolon),
             _ => None,

@@ -13,7 +13,7 @@ pub(crate) struct Resolving<'ids, 'tables, 'rows> {
 }
 
 impl<'ids, 'tables, 'rows> Resolving<'ids, 'tables, 'rows> {
-    pub(crate) fn new(resolver: Resolver<'tables, 'rows>, ids: &'ids ItemIds) -> Self {
+    pub(crate) const fn new(resolver: Resolver<'tables, 'rows>, ids: &'ids ItemIds) -> Self {
         Resolving { resolver, ids }
     }
 

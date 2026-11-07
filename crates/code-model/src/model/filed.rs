@@ -12,7 +12,7 @@ pub(crate) struct Filed<Entity> {
 }
 
 impl<Entity> Filed<Entity> {
-    pub(crate) fn new(file: FileId, found: Found<Entity>) -> Self {
+    pub(crate) const fn new(file: FileId, found: Found<Entity>) -> Self {
         Self { file, found }
     }
 

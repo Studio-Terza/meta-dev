@@ -65,11 +65,11 @@ impl Build {
     const PAGES: [&'static str; 2] =
         ["clippy/cargo-timings/cargo-timing.html", "test-compile/cargo-timings/cargo-timing.html"];
 
-    pub(super) fn total(&self) -> Seconds {
+    pub(super) const fn total(&self) -> Seconds {
         self.total
     }
 
-    pub(super) fn crates(&self) -> &BTreeMap<OneLine, Seconds> {
+    pub(super) const fn crates(&self) -> &BTreeMap<OneLine, Seconds> {
         &self.crates
     }
 

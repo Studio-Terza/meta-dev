@@ -17,7 +17,7 @@ impl Hidden {
             .and_then(|()| (before == after).then_some(()))
     }
 
-    fn hides(self) -> &'static [Quote] {
+    const fn hides(self) -> &'static [Quote] {
         match self {
             Self::Nothing => &[],
             Self::Singles => &[Quote::Single],

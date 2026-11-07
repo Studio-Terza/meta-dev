@@ -1317,11 +1317,11 @@ struct Case {
 }
 
 impl Case {
-    fn of(changes: &'static str, labels: &'static str) -> Self {
+    const fn of(changes: &'static str, labels: &'static str) -> Self {
         Self { kind: "change", changes, labels }
     }
 
-    fn refactor(changes: &'static str, labels: &'static str) -> Self {
+    const fn refactor(changes: &'static str, labels: &'static str) -> Self {
         Self { kind: "refactor", changes, labels }
     }
 }
@@ -1333,7 +1333,7 @@ struct Verdict {
 }
 
 impl Verdict {
-    fn passing() -> Self {
+    const fn passing() -> Self {
         Self { exit: ExitCode::SUCCESS, out: String::new() }
     }
 

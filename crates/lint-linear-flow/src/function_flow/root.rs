@@ -42,7 +42,7 @@ impl<'ast> Root<'ast> {
         }
     }
 
-    pub fn verdict(self) -> Verdict {
+    pub const fn verdict(self) -> Verdict {
         match self {
             Root::Match(_) | Root::IfLet(_) => Verdict::Router,
             Root::Body(_) => Verdict::Pipeline,

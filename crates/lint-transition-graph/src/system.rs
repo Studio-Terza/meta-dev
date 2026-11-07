@@ -24,12 +24,12 @@ impl<'file> From<&'file [SourceFile]> for Extraction<'file> {
 
 impl<'file> Extraction<'file> {
     #[must_use]
-    pub fn facts(&self) -> &Facts<'file> {
+    pub const fn facts(&self) -> &Facts<'file> {
         &self.facts
     }
 
     #[must_use]
-    pub fn transitions(&self) -> &Transitions<'file> {
+    pub const fn transitions(&self) -> &Transitions<'file> {
         &self.transitions
     }
 }
@@ -72,7 +72,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
     }
 
     #[must_use]
-    pub fn extraction(&self) -> &'found Extraction<'file> {
+    pub const fn extraction(&self) -> &'found Extraction<'file> {
         self.extraction
     }
 
@@ -84,7 +84,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         self.declarations.get_or_init(|| Declarations::from(self.files))
     }
 
-    pub(crate) fn types(&self) -> &WorkspaceTypes<'found> {
+    pub(crate) const fn types(&self) -> &WorkspaceTypes<'found> {
         &self.types
     }
 
@@ -92,15 +92,15 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         &self.edges
     }
 
-    pub(crate) fn files(&self) -> &'file [SourceFile] {
+    pub(crate) const fn files(&self) -> &'file [SourceFile] {
         self.files
     }
 
-    pub(crate) fn facts(&self) -> &'found Facts<'file> {
+    pub(crate) const fn facts(&self) -> &'found Facts<'file> {
         self.facts
     }
 
-    pub(crate) fn transitions(&self) -> &'found Transitions<'file> {
+    pub(crate) const fn transitions(&self) -> &'found Transitions<'file> {
         self.transitions
     }
 }

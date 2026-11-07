@@ -14,7 +14,7 @@ impl<'found> Erasure<'found> {
     const OWN_TYPE: &'static str = "Self";
     const INNER: &'static str = "Inner";
 
-    pub fn around(self_type: &'found Name, inner: Option<&'found Type>) -> Self {
+    pub const fn around(self_type: &'found Name, inner: Option<&'found Type>) -> Self {
         Erasure { self_type, inner }
     }
 

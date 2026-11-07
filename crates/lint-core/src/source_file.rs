@@ -71,7 +71,7 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn crate_file(&self) -> &CrateFile {
+    pub const fn crate_file(&self) -> &CrateFile {
         &self.crate_file
     }
 
@@ -86,7 +86,7 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn located(&self) -> &Located {
+    pub const fn located(&self) -> &Located {
         &self.located
     }
 
@@ -105,7 +105,7 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn placement(&self) -> &Placement {
+    pub const fn placement(&self) -> &Placement {
         &self.placement
     }
 
@@ -115,12 +115,12 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn text(&self) -> &SourceText {
+    pub const fn text(&self) -> &SourceText {
         &self.text
     }
 
     #[must_use]
-    pub fn syntax(&self) -> &syn::File {
+    pub const fn syntax(&self) -> &syn::File {
         &self.syntax
     }
 }

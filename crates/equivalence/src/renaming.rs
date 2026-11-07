@@ -32,7 +32,7 @@ impl<Node: Ord + Copy> Renaming<Node> {
         })
     }
 
-    pub(crate) fn source(&self) -> Node {
+    pub(crate) const fn source(&self) -> Node {
         self.from
     }
 

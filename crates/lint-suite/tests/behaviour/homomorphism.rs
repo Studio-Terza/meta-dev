@@ -15,7 +15,7 @@ impl Mapped {
         Self::of(&[Self::at("crates/x/src/lib.rs", source), Self::at("crates/x/tests/t.rs", law)])
     }
 
-    fn at(path: &'static str, text: &'static str) -> Source {
+    const fn at(path: &'static str, text: &'static str) -> Source {
         Source::new(Located::new(path), Text::new(text))
     }
 }

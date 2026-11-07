@@ -24,7 +24,7 @@ impl Verdict<'_> {
         Ok(self.exit())
     }
 
-    fn exit(self) -> Exit {
+    const fn exit(self) -> Exit {
         match self {
             Verdict::Skipped | Verdict::NoneMissed => Exit::Success,
             Verdict::Missed(_) => Exit::Failure(CargoMutants::MISSED),

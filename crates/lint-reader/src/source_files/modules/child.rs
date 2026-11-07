@@ -10,7 +10,7 @@ pub struct Child {
 
 impl Child {
     #[must_use]
-    pub fn new(path: PathBuf, children_directory: PathBuf) -> Self {
+    pub const fn new(path: PathBuf, children_directory: PathBuf) -> Self {
         Self { path, children_directory }
     }
 

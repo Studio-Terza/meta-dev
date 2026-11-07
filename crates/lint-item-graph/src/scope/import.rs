@@ -13,7 +13,7 @@ pub struct Import<'file> {
 impl<'file> Import<'file> {
     const SELF_IMPORT: &'static str = "self";
 
-    pub fn renamed(path: Vec<&'file Ident>, leaf: &'file Ident, original: &'file Ident) -> Self {
+    pub const fn renamed(path: Vec<&'file Ident>, leaf: &'file Ident, original: &'file Ident) -> Self {
         Import { leaf, path, original }
     }
 
@@ -37,7 +37,7 @@ impl<'file> Import<'file> {
         local_roots.get(&Name::from(root)).map(|_| root)
     }
 
-    pub fn original(&self) -> &'file Ident {
+    pub const fn original(&self) -> &'file Ident {
         self.original
     }
 

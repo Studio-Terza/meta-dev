@@ -5,11 +5,11 @@ pub struct Frame<Index, Pending> {
 }
 
 impl<Index: Copy, Pending: Iterator<Item = Index>> Frame<Index, Pending> {
-    pub fn entering(node: Index, pending: Pending) -> Self {
+    pub const fn entering(node: Index, pending: Pending) -> Self {
         Self { node, pending }
     }
 
-    pub fn node(&self) -> Index {
+    pub const fn node(&self) -> Index {
         self.node
     }
 

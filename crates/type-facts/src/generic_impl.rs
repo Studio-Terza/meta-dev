@@ -16,7 +16,7 @@ pub struct GenericImpl<'file> {
 }
 
 impl<'file> GenericImpl<'file> {
-    pub(crate) fn new(krate: &'file CrateName, site: Site<'file>, target: Name) -> Self {
+    pub(crate) const fn new(krate: &'file CrateName, site: Site<'file>, target: Name) -> Self {
         GenericImpl { krate, site, target, implemented: None, methods: Vec::new() }
     }
 
@@ -27,7 +27,7 @@ impl<'file> GenericImpl<'file> {
     }
 
     #[must_use]
-    pub fn implemented(&self) -> Option<&Name> {
+    pub const fn implemented(&self) -> Option<&Name> {
         self.implemented.as_ref()
     }
 }

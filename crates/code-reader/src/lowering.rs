@@ -50,14 +50,14 @@ enum Enclosure {
 impl Enclosure {
     const MAIN: [Word<'static>; 1] = words!["main"];
 
-    fn of_impl(block: &ItemImpl) -> Self {
+    const fn of_impl(block: &ItemImpl) -> Self {
         match block.trait_ {
             Some(_) => Self::Impl(Owner::TraitImpl),
             None => Self::Impl(Owner::Inherent),
         }
     }
 
-    fn owner(self) -> Owner {
+    const fn owner(self) -> Owner {
         match self {
             Self::BinaryRoot | Self::Module => Owner::Free,
             Self::Body => Owner::Nested,

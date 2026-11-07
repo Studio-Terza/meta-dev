@@ -14,21 +14,21 @@ pub enum Setting {
 }
 
 impl Setting {
-    pub fn function(&self) -> Option<&Path> {
+    pub const fn function(&self) -> Option<&Path> {
         match self {
             Self::Check(function) => Some(function),
             Self::Error(_) | Self::Strategy(_) => None,
         }
     }
 
-    pub fn error(&self) -> Option<&Type> {
+    pub const fn error(&self) -> Option<&Type> {
         match self {
             Self::Error(error) => Some(error),
             Self::Check(_) | Self::Strategy(_) => None,
         }
     }
 
-    pub fn strategy(&self) -> Option<&Expr> {
+    pub const fn strategy(&self) -> Option<&Expr> {
         match self {
             Self::Strategy(strategy) => Some(strategy),
             Self::Check(_) | Self::Error(_) => None,

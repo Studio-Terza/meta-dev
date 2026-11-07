@@ -63,7 +63,7 @@ impl<'tree> Located<'tree> {
 
 impl<'tree> Node<'tree> {
     #[must_use]
-    pub fn located(&self) -> &Located<'tree> {
+    pub const fn located(&self) -> &Located<'tree> {
         &self.located
     }
 

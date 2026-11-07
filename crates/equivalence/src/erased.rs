@@ -13,7 +13,7 @@ pub enum Laws {
 
 impl Laws {
     #[must_use]
-    pub fn kept<Law>(self, laws: &[Law]) -> &[Law] {
+    pub const fn kept<Law>(self, laws: &[Law]) -> &[Law] {
         match self {
             Self::WhereDeclared => &[],
             Self::Matched => laws,
@@ -59,7 +59,7 @@ impl Equivalence {
     }
 
     #[must_use]
-    pub fn laws(&self) -> Option<Laws> {
+    pub const fn laws(&self) -> Option<Laws> {
         self.laws
     }
 }

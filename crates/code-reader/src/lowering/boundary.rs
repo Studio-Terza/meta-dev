@@ -24,7 +24,7 @@ impl SelfType {
         stream.into_iter().flat_map(Piece::lexed).collect()
     }
 
-    fn gap(before: Option<&Piece>, after: &Piece) -> &'static str {
+    const fn gap(before: Option<&Piece>, after: &Piece) -> &'static str {
         match before {
             Some(Piece::Word(_)) => after.spacing(),
             Some(Piece::Mark(_)) | None => "",
@@ -36,7 +36,7 @@ impl SelfType {
 struct Brackets;
 
 impl Brackets {
-    fn around(delimiter: Delimiter) -> [&'static str; 2] {
+    const fn around(delimiter: Delimiter) -> [&'static str; 2] {
         match delimiter {
             Delimiter::Parenthesis => ["(", ")"],
             Delimiter::Brace => ["{", "}"],
@@ -71,7 +71,7 @@ impl Piece {
             .collect()
     }
 
-    fn spacing(&self) -> &'static str {
+    const fn spacing(&self) -> &'static str {
         match self {
             Self::Word(_) => " ",
             Self::Mark(_) => "",

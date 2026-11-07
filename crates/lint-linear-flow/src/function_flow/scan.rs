@@ -17,7 +17,7 @@ pub struct Scan<'file> {
 }
 
 impl<'file> Scan<'file> {
-    pub fn new(path: &'file Path) -> Self {
+    pub const fn new(path: &'file Path) -> Self {
         Scan { path, found: Vec::new() }
     }
 

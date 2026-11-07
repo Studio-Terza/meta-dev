@@ -29,7 +29,7 @@ impl Unnamed {
     const UNIT: Word<'static> = Word::new("()");
     const OPAQUE: Word<'static> = Word::new("_");
 
-    fn word(self) -> Word<'static> {
+    const fn word(self) -> Word<'static> {
         match self {
             Self::Unit => Self::UNIT,
             Self::Opaque => Self::OPAQUE,
@@ -38,7 +38,7 @@ impl Unnamed {
 }
 
 impl Endpoint {
-    pub(crate) fn new(nature: Nature, name: Name) -> Self {
+    pub(crate) const fn new(nature: Nature, name: Name) -> Self {
         Self { nature, name, spelling: None, origin: None }
     }
 
@@ -46,7 +46,7 @@ impl Endpoint {
         Self { spelling, ..self }
     }
 
-    pub(crate) fn spelling(&self) -> Option<&Spelling> {
+    pub(crate) const fn spelling(&self) -> Option<&Spelling> {
         self.spelling.as_ref()
     }
 
@@ -58,12 +58,12 @@ impl Endpoint {
     }
 
     #[must_use]
-    pub fn nature(&self) -> Nature {
+    pub const fn nature(&self) -> Nature {
         self.nature
     }
 
     #[must_use]
-    pub fn origin(&self) -> Option<&CrateName> {
+    pub const fn origin(&self) -> Option<&CrateName> {
         self.origin.as_ref()
     }
 }

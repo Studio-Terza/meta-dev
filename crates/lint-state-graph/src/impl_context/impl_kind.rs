@@ -10,21 +10,21 @@ pub enum ImplKind<'found> {
 }
 
 impl<'found> ImplKind<'found> {
-    pub fn of_trait(name: Name, vertex: Option<&'found TypeName>) -> Self {
+    pub const fn of_trait(name: Name, vertex: Option<&'found TypeName>) -> Self {
         match vertex {
             Some(vertex) => ImplKind::TraitOnVertex(name, vertex),
             None => ImplKind::TraitOnValue(name),
         }
     }
 
-    pub fn trait_name(&self) -> Option<&Name> {
+    pub const fn trait_name(&self) -> Option<&Name> {
         match self {
             ImplKind::TraitOnVertex(name, _) | ImplKind::TraitOnValue(name) => Some(name),
             ImplKind::InherentOnVertex(_) | ImplKind::InherentOnValue => None,
         }
     }
 
-    pub fn edge_source(&self, first_vertex_parameter: Option<&&'found TypeName>) -> Option<&'found TypeName> {
+    pub const fn edge_source(&self, first_vertex_parameter: Option<&&'found TypeName>) -> Option<&'found TypeName> {
         match self {
             ImplKind::InherentOnVertex(vertex) | ImplKind::TraitOnVertex(_, vertex) => Some(vertex),
             ImplKind::TraitOnValue(_) => first_vertex_parameter.copied(),

@@ -15,11 +15,11 @@ pub struct Candidate<'name> {
 }
 
 impl<'name> Candidate<'name> {
-    pub fn new(name: &'name Name, line: LineNumber) -> Self {
+    pub const fn new(name: &'name Name, line: LineNumber) -> Self {
         Candidate { name, line }
     }
 
-    pub fn name(&self) -> &'name Name {
+    pub const fn name(&self) -> &'name Name {
         self.name
     }
 

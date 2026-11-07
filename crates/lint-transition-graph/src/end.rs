@@ -84,7 +84,7 @@ pub(crate) enum Place {
 }
 
 impl Place {
-    fn spelling(self, name: &Name) -> Spelling<'_, '_> {
+    const fn spelling(self, name: &Name) -> Spelling<'_, '_> {
         match self {
             Self::Interface => Spelling::Interface(name),
             Self::Domain | Self::Shared | Self::External | Self::Primitive => Spelling::Plain(name),
@@ -109,20 +109,20 @@ pub struct End<'found> {
 impl<'found> End<'found> {
     const UNIT: Word<'static> = Word::new("()");
 
-    pub(crate) fn placed(place: Place, name: &'found Name) -> Self {
+    pub(crate) const fn placed(place: Place, name: &'found Name) -> Self {
         End { place, name, node: None }
     }
 
-    pub(crate) fn domain(node: Node<'found>) -> Self {
+    pub(crate) const fn domain(node: Node<'found>) -> Self {
         End { place: Place::Domain, name: node.name, node: Some(node) }
     }
 
     #[must_use]
-    pub fn node(&self) -> Option<&Node<'found>> {
+    pub const fn node(&self) -> Option<&Node<'found>> {
         self.node.as_ref()
     }
 
-    fn spelling(&self) -> Spelling<'_, 'found> {
+    const fn spelling(&self) -> Spelling<'_, 'found> {
         match &self.node {
             Some(node) => Spelling::Node(node),
             None => self.place.spelling(self.name),
@@ -158,7 +158,7 @@ pub(crate) struct Ends<'found> {
 }
 
 impl<'found> Ends<'found> {
-    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>) -> Self {
+    pub(crate) const fn new(takes: Vec<End<'found>>, gives: End<'found>) -> Self {
         Ends { takes, gives, implementer: None }
     }
 
@@ -209,7 +209,7 @@ impl<'found> Ends<'found> {
         first.map(|_| Key::new(takes, gives))
     }
 
-    pub(crate) fn applied(&self) -> Applied<'_, 'found> {
+    pub(crate) const fn applied(&self) -> Applied<'_, 'found> {
         Applied(self)
     }
 }

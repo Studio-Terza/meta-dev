@@ -9,7 +9,7 @@ pub struct Share {
 }
 
 impl Share {
-    pub fn new(reached: CrateCount, total: CrateCount) -> Self {
+    pub const fn new(reached: CrateCount, total: CrateCount) -> Self {
         Self { reached, total }
     }
 }

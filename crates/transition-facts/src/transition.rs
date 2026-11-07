@@ -21,7 +21,7 @@ pub struct Transition<'found, 'file> {
 }
 
 impl<'found, 'file> Transition<'found, 'file> {
-    pub(crate) fn new(context: &'found Context<'file>, function: &'found Function<'file>) -> Self {
+    pub(crate) const fn new(context: &'found Context<'file>, function: &'found Function<'file>) -> Self {
         Transition { context, function }
     }
 
@@ -31,22 +31,22 @@ impl<'found, 'file> Transition<'found, 'file> {
     }
 
     #[must_use]
-    pub fn gives(&self) -> Output<'found> {
+    pub const fn gives(&self) -> Output<'found> {
         Output::new(self.function.gives().resolved_with(self.context.selfish()))
     }
 
     #[must_use]
-    pub fn implementer(&self) -> Option<Implementer<'found>> {
+    pub const fn implementer(&self) -> Option<Implementer<'found>> {
         self.context.filler().implementer(self.context.selfish())
     }
 
     #[must_use]
-    pub fn context(&self) -> &'found Context<'file> {
+    pub const fn context(&self) -> &'found Context<'file> {
         self.context
     }
 
     #[must_use]
-    pub fn function(&self) -> &'found Function<'file> {
+    pub const fn function(&self) -> &'found Function<'file> {
         self.function
     }
 }

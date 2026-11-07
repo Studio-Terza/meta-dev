@@ -14,7 +14,7 @@ enum Kind {
 }
 
 impl Kind {
-    fn resolved(found: Option<Self>, path: ItemPath) -> Resolved {
+    const fn resolved(found: Option<Self>, path: ItemPath) -> Resolved {
         match found {
             Some(Self::Trait) => Resolved::StdTrait(path),
             Some(Self::Type) | None => Resolved::Std(path),
@@ -180,7 +180,7 @@ pub(super) enum Table {
 }
 
 impl Table {
-    fn names(self) -> &'static [Canonical] {
+    const fn names(self) -> &'static [Canonical] {
         match self {
             Self::Prelude => &StdNames::PRELUDE,
             Self::Derives => &StdNames::DERIVES,

@@ -51,11 +51,11 @@ impl<'system, 'found, 'file> Method<'system, 'found, 'file> {
         })
     }
 
-    pub(super) fn owner(&self) -> &Owner<'found, 'file> {
+    pub(super) const fn owner(&self) -> &Owner<'found, 'file> {
         &self.owner
     }
 
-    pub(super) fn located(&self) -> Located<'_, 'system, 'found, 'file> {
+    pub(super) const fn located(&self) -> Located<'_, 'system, 'found, 'file> {
         Located(self)
     }
 }

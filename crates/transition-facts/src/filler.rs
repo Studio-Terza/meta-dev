@@ -12,7 +12,7 @@ pub(crate) enum Filler {
 }
 
 impl Filler {
-    pub(crate) fn trait_name<'name>(&'name self, selfish: &'name Name) -> Option<&'name Name> {
+    pub(crate) const fn trait_name<'name>(&'name self, selfish: &'name Name) -> Option<&'name Name> {
         match self {
             Self::Implemented(name) => Some(name),
             Self::Provided => Some(selfish),
@@ -20,14 +20,14 @@ impl Filler {
         }
     }
 
-    pub(crate) fn implementer<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<Implementer<'selfish>> {
+    pub(crate) const fn implementer<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<Implementer<'selfish>> {
         match self {
             Self::Implemented(_) => Some(Implementer::new(selfish)),
             Self::Free | Self::Inherent | Self::Provided => None,
         }
     }
 
-    pub(crate) fn owned(&self) -> Option<&Self> {
+    pub(crate) const fn owned(&self) -> Option<&Self> {
         match self {
             Self::Free => None,
             Self::Inherent | Self::Implemented(_) | Self::Provided => Some(self),

@@ -17,14 +17,14 @@ impl Pointer {
             .find_map(Self::typed)
     }
 
-    fn angled(arguments: &PathArguments) -> Option<&AngleBracketedGenericArguments> {
+    const fn angled(arguments: &PathArguments) -> Option<&AngleBracketedGenericArguments> {
         match arguments {
             PathArguments::AngleBracketed(angled) => Some(angled),
             _ => None,
         }
     }
 
-    fn typed(argument: &GenericArgument) -> Option<&Type> {
+    const fn typed(argument: &GenericArgument) -> Option<&Type> {
         match argument {
             GenericArgument::Type(inner) => Some(inner),
             _ => None,

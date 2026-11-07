@@ -4,11 +4,11 @@ use lint_core::TypeName;
 pub struct Vertex<'declared>(&'declared TypeName);
 
 impl<'declared> Vertex<'declared> {
-    pub(super) fn new(name: &'declared TypeName) -> Self {
+    pub(super) const fn new(name: &'declared TypeName) -> Self {
         Vertex(name)
     }
 
-    pub fn name(self) -> &'declared TypeName {
+    pub const fn name(self) -> &'declared TypeName {
         self.0
     }
 }

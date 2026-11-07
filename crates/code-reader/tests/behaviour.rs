@@ -285,11 +285,11 @@ impl Expect {
         Seen::Resolved(Resolved::Unknown(path.iter().map(|segment| Name::from(*segment)).collect()))
     }
 
-    fn named(path: Seen, arguments: Vec<TypeRef<Seen>>) -> TypeRef<Seen> {
+    const fn named(path: Seen, arguments: Vec<TypeRef<Seen>>) -> TypeRef<Seen> {
         TypeRef::Named(Named::new(path, arguments))
     }
 
-    fn primitive(primitive: Primitive) -> TypeRef<Seen> {
+    const fn primitive(primitive: Primitive) -> TypeRef<Seen> {
         Self::named(Seen::Resolved(Resolved::Primitive(primitive)), Vec::new())
     }
 
@@ -375,7 +375,7 @@ impl Read {
             .collect()
     }
 
-    fn written(function: &Function) -> Option<&TypeRef> {
+    const fn written(function: &Function) -> Option<&TypeRef> {
         function.signature().output().written()
     }
 

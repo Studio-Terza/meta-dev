@@ -11,7 +11,7 @@ impl<'meta> Sources<'meta> {
     const MANIFEST: &'static str = "Cargo.toml";
     const SOURCE_TREE: &'static str = "src/**";
 
-    pub fn new(directories: BTreeSet<&'meta Path>) -> Self {
+    pub const fn new(directories: BTreeSet<&'meta Path>) -> Self {
         Sources { directories }
     }
 }

@@ -56,7 +56,7 @@ impl From<&Stmt> for ArmShape {
 }
 
 impl ArmShape {
-    pub fn fault(self) -> Option<Finding> {
+    pub const fn fault(self) -> Option<Finding> {
         match self {
             Self::Single => None,
             Self::Compound => Some(Finding::ArmLogic),

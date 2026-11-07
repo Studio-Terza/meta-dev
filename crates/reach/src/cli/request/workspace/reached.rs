@@ -38,7 +38,7 @@ pub struct Reached<'meta> {
 impl<'meta> Reached<'meta> {
     const WORKSPACE_FLAG: &'static str = "--workspace";
 
-    pub fn new(crates: BTreeSet<&'meta CrateName>, total: CrateCount) -> Self {
+    pub const fn new(crates: BTreeSet<&'meta CrateName>, total: CrateCount) -> Self {
         Reached { crates, total, cargo: Cargo::Reached }
     }
 

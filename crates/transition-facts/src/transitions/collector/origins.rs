@@ -25,7 +25,7 @@ impl<'file> Origins<'file> {
         origins
     }
 
-    pub(crate) fn own(&self) -> &'file CrateName {
+    pub(crate) const fn own(&self) -> &'file CrateName {
         self.own
     }
 

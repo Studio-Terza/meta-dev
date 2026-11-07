@@ -11,7 +11,7 @@ pub(crate) struct Target<'found> {
 }
 
 impl<'found> Target<'found> {
-    pub(crate) fn new(krate: &'found CrateName, module: Option<Vec<Name>>, here: Option<&'found [Name]>) -> Self {
+    pub(crate) const fn new(krate: &'found CrateName, module: Option<Vec<Name>>, here: Option<&'found [Name]>) -> Self {
         Target { krate, module, here }
     }
 
@@ -19,7 +19,7 @@ impl<'found> Target<'found> {
         Target { module: None, ..self }
     }
 
-    pub(crate) fn krate(&self) -> &'found CrateName {
+    pub(crate) const fn krate(&self) -> &'found CrateName {
         self.krate
     }
 

@@ -13,7 +13,7 @@ pub struct Position {
 
 impl Position {
     #[must_use]
-    pub fn line(self) -> LineNumber {
+    pub const fn line(self) -> LineNumber {
         self.line
     }
 }

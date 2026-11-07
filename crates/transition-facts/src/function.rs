@@ -22,7 +22,7 @@ pub struct Function<'file> {
 }
 
 impl<'file> Function<'file> {
-    pub(crate) fn new(site: Site<'file>, name: Name, takes: Vec<Resolved>, gives: Resolved) -> Self {
+    pub(crate) const fn new(site: Site<'file>, name: Name, takes: Vec<Resolved>, gives: Resolved) -> Self {
         Function {
             site,
             name,
@@ -37,7 +37,7 @@ impl<'file> Function<'file> {
         }
     }
 
-    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, branching: Branching) -> Self {
+    pub(crate) const fn shaped(mut self, mutation: Mutation, body: Body, branching: Branching) -> Self {
         self.mutation = mutation;
         self.body = body;
         self.branching = branching;
@@ -59,17 +59,17 @@ impl<'file> Function<'file> {
         &self.takes
     }
 
-    pub(crate) fn gives(&self) -> &Resolved {
+    pub(crate) const fn gives(&self) -> &Resolved {
         &self.gives
     }
 
     #[must_use]
-    pub fn mutation(&self) -> Mutation {
+    pub const fn mutation(&self) -> Mutation {
         self.mutation
     }
 
     #[must_use]
-    pub fn wrapping(&self) -> Wrapping {
+    pub const fn wrapping(&self) -> Wrapping {
         self.wrapping
     }
 
@@ -79,7 +79,7 @@ impl<'file> Function<'file> {
     }
 
     #[must_use]
-    pub fn body(&self) -> Body {
+    pub const fn body(&self) -> Body {
         self.body
     }
 
@@ -89,7 +89,7 @@ impl<'file> Function<'file> {
     }
 
     #[must_use]
-    pub fn branches(&self) -> Branching {
+    pub const fn branches(&self) -> Branching {
         self.branching
     }
 }

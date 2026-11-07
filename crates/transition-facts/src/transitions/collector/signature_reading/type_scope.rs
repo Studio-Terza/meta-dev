@@ -29,7 +29,7 @@ impl<'outer> TypeScope<'outer> {
     const FN: Word<'static> = Word::new("Fn");
     const ASSOCIATED: Word<'static> = Word::new("Self::Output");
 
-    pub(super) fn root(selfish: Nature) -> Self {
+    pub(super) const fn root(selfish: Nature) -> Self {
         TypeScope { selfish, outer: None, generics: BTreeMap::new(), wrappings: BTreeMap::new() }
     }
 

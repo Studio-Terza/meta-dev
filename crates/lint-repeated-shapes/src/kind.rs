@@ -11,7 +11,7 @@ pub(crate) enum Kind {
 }
 
 impl Kind {
-    pub(crate) fn of_role(role: Role) -> Self {
+    pub(crate) const fn of_role(role: Role) -> Self {
         match role {
             Role::Target => Self::Tests,
             Role::BinaryRoot | Role::LibraryRoot | Role::BuildScript | Role::Other => Self::Shipped,
@@ -22,7 +22,7 @@ impl Kind {
         Some(self).filter(|kind| *kind == other).unwrap_or(Self::Mixed)
     }
 
-    pub(crate) fn fix(self) -> Fix {
+    pub(crate) const fn fix(self) -> Fix {
         match self {
             Self::Tests => Fix::new(
                 "make the copies rows of one laws::table!, or state the property they share with a law macro such as laws::roundtrip! or laws::idempotent!",

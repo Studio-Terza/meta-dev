@@ -20,7 +20,7 @@ impl<'file> Outcome<'file> {
             .map_or(Outcome::Violations { reports, failures }, |_| Outcome::Clean)
     }
 
-    pub(crate) fn violations(&self) -> Option<&Self> {
+    pub(crate) const fn violations(&self) -> Option<&Self> {
         match self {
             Outcome::Clean => None,
             Outcome::Violations { .. } => Some(self),

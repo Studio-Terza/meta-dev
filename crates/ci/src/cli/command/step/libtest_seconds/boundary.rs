@@ -13,7 +13,7 @@ impl Finished {
     const MARK: &'static str = "in";
     const DECIMAL_POINT: char = '.';
 
-    pub fn seconds(self) -> Seconds {
+    pub const fn seconds(self) -> Seconds {
         self.0
     }
 

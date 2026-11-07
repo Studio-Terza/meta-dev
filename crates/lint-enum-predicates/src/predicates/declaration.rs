@@ -18,7 +18,7 @@ pub struct Declaration<'file> {
 }
 
 impl<'file> Declaration<'file> {
-    pub fn new(crate_root: &'file CrateRoot, module: &'file ModulePath) -> Self {
+    pub const fn new(crate_root: &'file CrateRoot, module: &'file ModulePath) -> Self {
         Declaration { crate_root, module: Cow::Borrowed(module), types: Vec::new() }
     }
 

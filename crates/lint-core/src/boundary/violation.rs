@@ -16,7 +16,7 @@ impl<'file> Violation<'file> {
     }
 
     #[must_use]
-    pub fn site(&self) -> &Site<'file> {
+    pub const fn site(&self) -> &Site<'file> {
         &self.site
     }
 }

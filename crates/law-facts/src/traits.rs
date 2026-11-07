@@ -100,7 +100,7 @@ struct Declared {
 }
 
 impl Declared {
-    fn kept(&mut self, visibility: &Visibility) -> &mut Uses {
+    const fn kept(&mut self, visibility: &Visibility) -> &mut Uses {
         match visibility {
             Visibility::Public(_) => &mut self.exports,
             Visibility::Restricted(_) | Visibility::Inherited => &mut self.imports,

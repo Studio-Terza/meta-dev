@@ -7,7 +7,7 @@ use type_facts::{Dependency, Facts, GenericImpl, Method, Shape, TypeFact, Via};
 struct Described;
 
 impl Described {
-    fn file(path: &'static str, text: &'static str) -> Source {
+    const fn file(path: &'static str, text: &'static str) -> Source {
         Source::new(Located::new(path), Text::new(text))
     }
 

@@ -25,7 +25,7 @@ impl<'found> Returns<'found> {
         }
     }
 
-    pub fn vertex(&self) -> Option<&'found TypeName> {
+    pub const fn vertex(&self) -> Option<&'found TypeName> {
         match self {
             Returns::Vertex(name) => Some(name),
             Returns::TupleHoldingVertex | Returns::Other => None,

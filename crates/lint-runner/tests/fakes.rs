@@ -11,7 +11,7 @@ pub struct FakeUnlistable<'memory> {
 }
 
 impl FakeUnlistable<'_> {
-    pub fn new(memory: &Memory, unlistable: PathBuf) -> FakeUnlistable<'_> {
+    pub const fn new(memory: &Memory, unlistable: PathBuf) -> FakeUnlistable<'_> {
         FakeUnlistable { memory, unlistable }
     }
 }
@@ -68,7 +68,7 @@ pub struct FakeLinked<'memory> {
 }
 
 impl FakeLinked<'_> {
-    pub fn new(memory: &Memory, link: PathBuf, target: PathBuf) -> FakeLinked<'_> {
+    pub const fn new(memory: &Memory, link: PathBuf, target: PathBuf) -> FakeLinked<'_> {
         FakeLinked { memory, link, target }
     }
 
@@ -131,7 +131,7 @@ pub struct FakeCounted<'memory> {
 }
 
 impl FakeCounted<'_> {
-    pub fn new(memory: &Memory, counted: PathBuf) -> FakeCounted<'_> {
+    pub const fn new(memory: &Memory, counted: PathBuf) -> FakeCounted<'_> {
         FakeCounted { memory, counted, listings: AtomicUsize::new(0), sources: AtomicUsize::new(0) }
     }
 

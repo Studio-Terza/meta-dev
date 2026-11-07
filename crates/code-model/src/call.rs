@@ -29,7 +29,7 @@ impl AsRef<ItemPath> for MacroCall {
 
 impl Callee {
     #[must_use]
-    pub fn method(&self) -> Option<&Name> {
+    pub const fn method(&self) -> Option<&Name> {
         match self {
             Self::Method(name) => Some(name),
             Self::Path(_) | Self::Macro(_) => None,
@@ -37,7 +37,7 @@ impl Callee {
     }
 
     #[must_use]
-    pub fn path(&self) -> Option<&ItemPath> {
+    pub const fn path(&self) -> Option<&ItemPath> {
         match self {
             Self::Path(written) => Some(written),
             Self::Method(_) | Self::Macro(_) => None,
@@ -45,7 +45,7 @@ impl Callee {
     }
 
     #[must_use]
-    pub fn invoked(&self) -> Option<&MacroCall> {
+    pub const fn invoked(&self) -> Option<&MacroCall> {
         match self {
             Self::Macro(call) => Some(call),
             Self::Method(_) | Self::Path(_) => None,
@@ -61,12 +61,12 @@ pub struct Call {
 
 impl Call {
     #[must_use]
-    pub fn new(callee: Callee, seat: Seat) -> Self {
+    pub const fn new(callee: Callee, seat: Seat) -> Self {
         Self { callee, seat }
     }
 
     #[must_use]
-    pub fn callee(&self) -> &Callee {
+    pub const fn callee(&self) -> &Callee {
         &self.callee
     }
 }

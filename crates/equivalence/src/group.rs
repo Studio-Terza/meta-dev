@@ -9,12 +9,12 @@ pub struct Group<Member: Keyed> {
 }
 
 impl<Member: Keyed> Group<Member> {
-    pub(crate) fn new(key: Member::Key, members: Vec<Member>) -> Self {
+    pub(crate) const fn new(key: Member::Key, members: Vec<Member>) -> Self {
         Self { key, members }
     }
 
     #[must_use]
-    pub fn key(&self) -> &Member::Key {
+    pub const fn key(&self) -> &Member::Key {
         &self.key
     }
 

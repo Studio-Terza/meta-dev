@@ -33,7 +33,7 @@ impl Narrowed {
         Self::named(errors, expanded.named()?)
     }
 
-    pub(crate) fn shown(self) -> Word<'static> {
+    pub(crate) const fn shown(self) -> Word<'static> {
         match self {
             Self::Flag => Word::new("bool"),
             Self::Check => Word::new("Result<(), E>"),

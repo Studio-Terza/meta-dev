@@ -15,7 +15,7 @@ impl Spelling {
         path.segments.first().map(|first| Self::of_head(Name::from(&first.ident), path.segments.iter().nth(1)))
     }
 
-    fn of_head(head: Name, second: Option<&PathSegment>) -> Self {
+    const fn of_head(head: Name, second: Option<&PathSegment>) -> Self {
         match second {
             Some(_) => Self::Pathed(head),
             None => Self::Bare(head),

@@ -56,7 +56,7 @@ impl Kind {
         roundtrip.or(proptest).or(property).or(law.map(|_| Self::Law)).unwrap_or(Self::Other)
     }
 
-    pub(crate) fn titled(self) -> Option<Self> {
+    pub(crate) const fn titled(self) -> Option<Self> {
         match self {
             Self::Roundtrip | Self::Law | Self::Property(_) => Some(self),
             Self::Proptest | Self::Other => None,
@@ -64,7 +64,7 @@ impl Kind {
     }
 
     #[must_use]
-    pub fn property(self) -> Option<Property> {
+    pub const fn property(self) -> Option<Property> {
         match self {
             Self::Property(property) => Some(property),
             Self::Roundtrip | Self::Law | Self::Proptest | Self::Other => None,

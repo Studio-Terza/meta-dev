@@ -54,7 +54,7 @@ impl Query {
         self
     }
 
-    pub(crate) fn with_top(mut self, top: Top) -> Self {
+    pub(crate) const fn with_top(mut self, top: Top) -> Self {
         self.top = Some(top);
         self
     }

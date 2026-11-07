@@ -19,7 +19,7 @@ pub enum Totality {
 }
 
 impl Totality {
-    pub(crate) fn of_wrapping(wrapping: Wrapping) -> Option<Self> {
+    pub(crate) const fn of_wrapping(wrapping: Wrapping) -> Option<Self> {
         match wrapping {
             Wrapping::Optional | Wrapping::Fallible => Some(Self::Partial),
             Wrapping::Plain => Some(Self::Total),
@@ -27,7 +27,7 @@ impl Totality {
         }
     }
 
-    pub(crate) fn shaping(self, acting: Acting<'_>) -> Form<'_> {
+    pub(crate) const fn shaping(self, acting: Acting<'_>) -> Form<'_> {
         match self {
             Self::Partial => Form::Partial(acting),
             Self::Total => Form::Operation(acting),
@@ -56,20 +56,20 @@ impl<'found, 'file> Operation<'found, 'file> {
     }
 
     #[must_use]
-    pub fn transition(&self) -> &Transition<'found, 'file> {
+    pub const fn transition(&self) -> &Transition<'found, 'file> {
         &self.transition
     }
 
     #[must_use]
-    pub fn partial(&self) -> Totality {
+    pub const fn partial(&self) -> Totality {
         self.partial
     }
 
-    pub(crate) fn ordinal(&self) -> Count {
+    pub(crate) const fn ordinal(&self) -> Count {
         self.ordinal
     }
 
-    pub(crate) fn acting(&self) -> &Acting<'found> {
+    pub(crate) const fn acting(&self) -> &Acting<'found> {
         &self.acting
     }
 

@@ -28,7 +28,7 @@ impl<'file> Facets<'file> {
         Facets { site, exposure, facts: facts.into_iter().collect() }
     }
 
-    pub(crate) fn exposure(&self) -> Exposure {
+    pub(crate) const fn exposure(&self) -> Exposure {
         self.exposure
     }
 

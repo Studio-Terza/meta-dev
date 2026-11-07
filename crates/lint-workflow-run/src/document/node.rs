@@ -8,11 +8,11 @@ use crate::document::text::Text;
 pub(crate) struct Node<'node, 'input>(&'node MarkedYaml<'input>);
 
 impl<'node, 'input> Node<'node, 'input> {
-    pub(crate) fn new(node: &'node MarkedYaml<'input>) -> Self {
+    pub(crate) const fn new(node: &'node MarkedYaml<'input>) -> Self {
         Node(node)
     }
 
-    pub(crate) fn structure(self) -> &'node YamlData<'input, MarkedYaml<'input>> {
+    pub(crate) const fn structure(self) -> &'node YamlData<'input, MarkedYaml<'input>> {
         &self.0.data
     }
 

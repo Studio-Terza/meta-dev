@@ -37,7 +37,7 @@ impl ScopeKind {
         }
     }
 
-    fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
+    const fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
         match self {
             Self::Module => parent.nested(scope),
             Self::Block => parent,
@@ -65,7 +65,7 @@ impl ScopeRow {
         Self { anchors: form.anchors(scope), chain: vec![scope], ancestry: vec![scope], entries }
     }
 
-    pub(super) fn anchors(&self) -> Anchors {
+    pub(super) const fn anchors(&self) -> Anchors {
         self.anchors
     }
 
@@ -73,11 +73,11 @@ impl ScopeRow {
         &self.chain
     }
 
-    pub(super) fn entries(&self) -> &Entries {
+    pub(super) const fn entries(&self) -> &Entries {
         &self.entries
     }
 
-    pub(super) fn entries_mut(&mut self) -> &mut Entries {
+    pub(super) const fn entries_mut(&mut self) -> &mut Entries {
         &mut self.entries
     }
 

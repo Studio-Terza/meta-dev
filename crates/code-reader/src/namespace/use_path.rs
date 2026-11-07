@@ -45,7 +45,7 @@ pub(super) enum Reading {
 }
 
 impl Reading {
-    pub(super) fn seen(self, view: View<'_>) -> View<'_> {
+    pub(super) const fn seen(self, view: View<'_>) -> View<'_> {
         match self {
             Self::Written => view,
             Self::Imported => view.undisputed(),

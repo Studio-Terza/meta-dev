@@ -8,7 +8,7 @@ pub struct Target {
 
 impl Target {
     #[must_use]
-    pub fn new(package: PathBuf, files: Vec<PathBuf>) -> Self {
+    pub const fn new(package: PathBuf, files: Vec<PathBuf>) -> Self {
         Self { package, files }
     }
 

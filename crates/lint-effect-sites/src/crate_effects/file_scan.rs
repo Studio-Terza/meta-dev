@@ -33,7 +33,7 @@ impl<'file> FileScan<'file> {
         self.printed
     }
 
-    pub(super) fn tested(&self) -> &BTreeSet<Site<'file>> {
+    pub(super) const fn tested(&self) -> &BTreeSet<Site<'file>> {
         &self.tested
     }
 

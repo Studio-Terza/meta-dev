@@ -9,7 +9,7 @@ impl NestingDepth {
     pub const LEVEL: Self = Self(1);
 
     #[must_use]
-    pub fn beyond(most: Bound) -> Self {
+    pub const fn beyond(most: Bound) -> Self {
         Self(most.limit() + Self::LEVEL.0)
     }
 }

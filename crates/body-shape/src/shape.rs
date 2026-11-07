@@ -30,7 +30,7 @@ pub struct Shape {
 
 impl Shape {
     #[must_use]
-    pub fn size(self) -> TokenCount {
+    pub const fn size(self) -> TokenCount {
         self.size
     }
 
@@ -62,7 +62,7 @@ impl Reading {
     }
 
     #[must_use]
-    pub fn shape(&self) -> Shape {
+    pub const fn shape(&self) -> Shape {
         self.shape
     }
 

@@ -8,7 +8,7 @@ use newtype::{Arbitrary, Newtype};
 pub struct Tangle(Vec<Name>);
 
 impl Tangle {
-    pub fn items(&self) -> Length {
+    pub const fn items(&self) -> Length {
         Length::new(self.0.len())
     }
 }

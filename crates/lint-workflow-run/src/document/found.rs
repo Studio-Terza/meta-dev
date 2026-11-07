@@ -12,7 +12,7 @@ pub(crate) struct Found {
 }
 
 impl Found {
-    pub(crate) fn new(line: LineNumber, finding: Finding) -> Self {
+    pub(crate) const fn new(line: LineNumber, finding: Finding) -> Self {
         Self { line, finding }
     }
 

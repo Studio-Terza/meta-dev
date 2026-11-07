@@ -55,7 +55,7 @@ impl<'body> Verdict<'body> {
         Ok(writeln!(out, "::error::the body has no line starting \"spec: \"; {}", Self::FORMS)?)
     }
 
-    pub(crate) fn exit(&self) -> Exit {
+    pub(crate) const fn exit(&self) -> Exit {
         match self {
             Verdict::Repair | Verdict::Attached(_) => Exit::Success,
             Verdict::Malformed(_) | Verdict::Missing => Exit::Failure(NonZeroU8::MIN),

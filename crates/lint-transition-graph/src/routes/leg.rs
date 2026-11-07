@@ -22,11 +22,11 @@ impl<'walk, 'graph, 'found, 'file> Leg<'walk, 'graph, 'found, 'file> {
         Leg { walk, called: walk.called(from, to), stops: walk.stops(from, to), from, to }
     }
 
-    pub(super) fn called(&self) -> &'walk [&'graph Edge<'found, 'file>] {
+    pub(super) const fn called(&self) -> &'walk [&'graph Edge<'found, 'file>] {
         self.called
     }
 
-    pub(super) fn walk(&self) -> &'walk Walk<'graph, 'found, 'file> {
+    pub(super) const fn walk(&self) -> &'walk Walk<'graph, 'found, 'file> {
         self.walk
     }
 }

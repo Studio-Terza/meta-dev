@@ -155,7 +155,7 @@ mod fixture {
             Ok(fixture)
         }
 
-        pub fn files(&self) -> &Memory {
+        pub const fn files(&self) -> &Memory {
             &self.files
         }
 

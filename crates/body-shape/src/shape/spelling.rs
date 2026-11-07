@@ -52,7 +52,7 @@ pub struct Spelled {
 }
 
 impl Spelled {
-    pub(crate) fn new(sign: Sign, spoken: Spoken) -> Self {
+    pub(crate) const fn new(sign: Sign, spoken: Spoken) -> Self {
         Self { sign, spoken }
     }
 }

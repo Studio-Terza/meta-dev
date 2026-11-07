@@ -6,7 +6,7 @@ pub(crate) enum Position {
 }
 
 impl Position {
-    pub(crate) fn plain(self) -> Option<Self> {
+    pub(crate) const fn plain(self) -> Option<Self> {
         match self {
             Self::Named => None,
             Self::BeforeLiteral | Self::Plain => Some(self),

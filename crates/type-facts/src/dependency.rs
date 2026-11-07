@@ -12,7 +12,7 @@ pub struct Dependency<'file> {
 }
 
 impl<'file> Dependency<'file> {
-    pub(crate) fn new(name: Name, site: Site<'file>, via: Via) -> Self {
+    pub(crate) const fn new(name: Name, site: Site<'file>, via: Via) -> Self {
         Dependency { name, written: Vec::new(), site, via }
     }
 

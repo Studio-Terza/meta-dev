@@ -27,7 +27,7 @@ impl Ground {
             .unwrap_or(self)
     }
 
-    fn gate(self) -> Option<&'static Gate> {
+    const fn gate(self) -> Option<&'static Gate> {
         match self {
             Self::Core => None,
             Self::Ports => Some(&Gate::PORTS),

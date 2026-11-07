@@ -11,7 +11,7 @@ pub struct Taken<'found> {
 }
 
 impl<'found> Taken<'found> {
-    pub(crate) fn new(end: End<'found>, wrapping: Wrapping) -> Self {
+    pub(crate) const fn new(end: End<'found>, wrapping: Wrapping) -> Self {
         Taken { end, wrapping }
     }
 }

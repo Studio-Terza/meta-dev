@@ -32,14 +32,14 @@ impl Finding {
     const COMBINATORS: &'static str = "drive an iterator with combinators (map, filter, fold, try_fold, take_while)";
     const CONDITION: &'static str = "name the condition as an enum or a predicate type";
 
-    pub fn branching(condition: &Expr) -> Self {
+    pub const fn branching(condition: &Expr) -> Self {
         match condition {
             Expr::Let(_) => Self::IfLet,
             _ => Self::If,
         }
     }
 
-    pub fn joining(operator: BinOp) -> Option<Self> {
+    pub const fn joining(operator: BinOp) -> Option<Self> {
         match operator {
             BinOp::And(_) => Some(Self::And),
             BinOp::Or(_) => Some(Self::Or),
@@ -47,14 +47,14 @@ impl Finding {
         }
     }
 
-    pub fn negating(operator: UnOp) -> Option<Self> {
+    pub const fn negating(operator: UnOp) -> Option<Self> {
         match operator {
             UnOp::Not(_) => Some(Self::Not),
             _ => None,
         }
     }
 
-    pub fn rule(self) -> Rule {
+    pub const fn rule(self) -> Rule {
         match self {
             Self::If | Self::IfLet | Self::Match | Self::While | Self::For | Self::Loop | Self::LetElse => {
                 Rule::LinearBodies

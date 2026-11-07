@@ -22,7 +22,7 @@ impl CrateReach {
         self.used = self.used.max(Used::Named);
     }
 
-    pub fn globbed(&mut self) {
+    pub const fn globbed(&mut self) {
         self.used = Used::Globbed;
     }
 

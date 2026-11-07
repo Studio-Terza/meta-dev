@@ -66,7 +66,7 @@ impl Expecting {
 }
 
 impl Item {
-    fn ask(self, name: Name) -> Ask {
+    const fn ask(self, name: Name) -> Ask {
         match self {
             Self::Defined => Ask::Defined(name),
             Self::Uses => Ask::Uses(name),

@@ -31,11 +31,11 @@ impl<'found> ImplContext<'found> {
         ImplContext { self_type, kind }
     }
 
-    pub fn self_type(&self) -> &TypeName {
+    pub const fn self_type(&self) -> &TypeName {
         &self.self_type
     }
 
-    pub fn kind(&self) -> &ImplKind<'found> {
+    pub const fn kind(&self) -> &ImplKind<'found> {
         &self.kind
     }
 

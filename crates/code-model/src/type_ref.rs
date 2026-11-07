@@ -69,12 +69,12 @@ impl<'ty, Bound> Parts<'ty, Bound> {
 
 impl<Bound> Named<Bound> {
     #[must_use]
-    pub fn new(path: Bound, arguments: Vec<TypeRef<Bound>>) -> Self {
+    pub const fn new(path: Bound, arguments: Vec<TypeRef<Bound>>) -> Self {
         Self { path, arguments, bindings: Vec::new() }
     }
 
     #[must_use]
-    pub fn bound(path: Bound, arguments: Vec<TypeRef<Bound>>, bindings: Vec<TypeRef<Bound>>) -> Self {
+    pub const fn bound(path: Bound, arguments: Vec<TypeRef<Bound>>, bindings: Vec<TypeRef<Bound>>) -> Self {
         Self { path, arguments, bindings }
     }
 
@@ -172,7 +172,7 @@ impl<Bound> TypeRef<Bound> {
     }
 
     #[must_use]
-    pub fn named(&self) -> Option<&Named<Bound>> {
+    pub const fn named(&self) -> Option<&Named<Bound>> {
         match self {
             Self::Named(named) => Some(named),
             Self::Tuple(_)

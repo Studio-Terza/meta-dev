@@ -28,7 +28,7 @@ pub struct Move<Node, Label, Law> {
 }
 
 impl<Node: Ord + Copy, Label: Ord, Law: Ord> Move<Node, Label, Law> {
-    pub fn new(label: Label, reached: Option<Node>, with: BTreeSet<Node>, laws: Vec<Law>) -> Self {
+    pub const fn new(label: Label, reached: Option<Node>, with: BTreeSet<Node>, laws: Vec<Law>) -> Self {
         Self { label, reached, with, laws }
     }
 
@@ -89,7 +89,7 @@ pub struct Refinement<Node, Label, Law> {
 
 impl<Node: Ord + Copy, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
     #[must_use]
-    pub fn new(moves: BTreeMap<Node, Vec<Move<Node, Label, Law>>>, laws: Option<Laws>) -> Self {
+    pub const fn new(moves: BTreeMap<Node, Vec<Move<Node, Label, Law>>>, laws: Option<Laws>) -> Self {
         Self { moves, laws }
     }
 

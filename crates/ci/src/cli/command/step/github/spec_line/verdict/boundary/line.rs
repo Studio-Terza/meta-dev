@@ -24,7 +24,7 @@ impl<'body> Line<'body> {
             .unwrap_or(Line::Other)
     }
 
-    pub(crate) fn spec(self) -> Option<&'body str> {
+    pub(crate) const fn spec(self) -> Option<&'body str> {
         match self {
             Line::Spec(value) => Some(value),
             Line::Repair | Line::Other => None,

@@ -16,7 +16,7 @@ pub(crate) struct ImplBlock<'file> {
 }
 
 impl<'file> ImplBlock<'file> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         krate: &'file CrateName,
         target: Name,
         implementation: Option<Implementation<'file>>,

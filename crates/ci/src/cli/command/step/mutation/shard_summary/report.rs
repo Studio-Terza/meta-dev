@@ -12,7 +12,7 @@ pub struct Report {
 impl Report {
     const FENCE: &'static str = "```";
 
-    pub(crate) fn new(tallies: Vec<Tally>, names: Vec<Mutant>) -> Self {
+    pub(crate) const fn new(tallies: Vec<Tally>, names: Vec<Mutant>) -> Self {
         Self { tallies, names }
     }
 }

@@ -28,7 +28,7 @@ pub(super) struct Key<'name> {
 }
 
 impl<'name> Key<'name> {
-    pub(super) fn new(domain: Domain, name: &'name Name) -> Self {
+    pub(super) const fn new(domain: Domain, name: &'name Name) -> Self {
         Key { domain, name }
     }
 
@@ -50,7 +50,7 @@ pub(super) struct Keyed<'rows, Value> {
 }
 
 impl<'rows, Value> Keyed<'rows, Value> {
-    pub(super) fn new(key: Key<'rows>, value: Value) -> Self {
+    pub(super) const fn new(key: Key<'rows>, value: Value) -> Self {
         Keyed { key, value }
     }
 }
@@ -80,7 +80,7 @@ pub(super) struct Row<'rows> {
 }
 
 impl<'rows> Row<'rows> {
-    pub(super) fn new(layer: Layer, visibility: Visibility, view: View<'rows>) -> Self {
+    pub(super) const fn new(layer: Layer, visibility: Visibility, view: View<'rows>) -> Self {
         Row { layer, visibility, view }
     }
 
@@ -159,7 +159,7 @@ pub(super) struct GlobView<'rows> {
 }
 
 impl<'rows> GlobView<'rows> {
-    pub(super) fn new(id: GlobId, visibility: Visibility, exposed: Exposed<'rows>) -> Self {
+    pub(super) const fn new(id: GlobId, visibility: Visibility, exposed: Exposed<'rows>) -> Self {
         GlobView { id, visibility, exposed }
     }
 
@@ -176,7 +176,7 @@ pub(super) struct ModuleGlob<'rows> {
 }
 
 impl<'rows> ModuleGlob<'rows> {
-    pub(super) fn new(glob: GlobView<'rows>, module: ScopeId, sight: Sight) -> Self {
+    pub(super) const fn new(glob: GlobView<'rows>, module: ScopeId, sight: Sight) -> Self {
         ModuleGlob { glob, module, sight }
     }
 
@@ -215,11 +215,11 @@ pub(super) struct Lookup {
 }
 
 impl Lookup {
-    pub(super) fn new(sight: Sight, ignored: Option<GlobId>, reading: Reading) -> Self {
+    pub(super) const fn new(sight: Sight, ignored: Option<GlobId>, reading: Reading) -> Self {
         Self { sight, ignored, reading }
     }
 
-    pub(super) fn outer(self) -> Self {
+    pub(super) const fn outer(self) -> Self {
         Self { sight: self.sight, ignored: None, reading: self.reading }
     }
 
@@ -315,7 +315,7 @@ struct Exposure<'tables, 'rows> {
 }
 
 impl<'tables, 'rows> Exposure<'tables, 'rows> {
-    fn names<'held>(self, modules: &'held [Vec<ModuleGlob<'rows>>]) -> Names<'held, 'rows>
+    const fn names<'held>(self, modules: &'held [Vec<ModuleGlob<'rows>>]) -> Names<'held, 'rows>
     where
         'tables: 'held,
     {

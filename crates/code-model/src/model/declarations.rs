@@ -48,7 +48,7 @@ pub(crate) struct Declarations {
 }
 
 impl Declarations {
-    pub(crate) fn new(items: Vec<Item>, aliases: Aliases) -> Self {
+    pub(crate) const fn new(items: Vec<Item>, aliases: Aliases) -> Self {
         Self { items, aliases }
     }
 
@@ -56,7 +56,7 @@ impl Declarations {
         &self.items
     }
 
-    pub(crate) fn aliases(&self) -> &Aliases {
+    pub(crate) const fn aliases(&self) -> &Aliases {
         &self.aliases
     }
 }

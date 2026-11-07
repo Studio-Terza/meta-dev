@@ -56,7 +56,7 @@ impl Scope {
         Self { uses: self.uses.merged(uses), ..self }
     }
 
-    fn statement_item(statement: &Stmt) -> Option<&Item> {
+    const fn statement_item(statement: &Stmt) -> Option<&Item> {
         if let Stmt::Item(item) = statement { Some(item) } else { None }
     }
 

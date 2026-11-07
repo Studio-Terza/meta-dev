@@ -47,7 +47,7 @@ struct At<'file>(Option<Site<'file>>);
 pub(super) struct Names<'found>(Vec<Member<'found>>);
 
 impl<'view, 'found, 'file> Placed<'view, 'found, 'file> {
-    pub(super) fn new(view: &'view Containment<'found, 'file>, member: Member<'found>, spelled: Spelled) -> Self {
+    pub(super) const fn new(view: &'view Containment<'found, 'file>, member: Member<'found>, spelled: Spelled) -> Self {
         Placed { view, member, spelled }
     }
 

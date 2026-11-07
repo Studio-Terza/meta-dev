@@ -7,7 +7,7 @@ pub(crate) struct Spelled {
 }
 
 impl Spelled {
-    pub(crate) fn new(path: UsePath, started_on: LineNumber) -> Self {
+    pub(crate) const fn new(path: UsePath, started_on: LineNumber) -> Self {
         Self { path, started_on }
     }
 

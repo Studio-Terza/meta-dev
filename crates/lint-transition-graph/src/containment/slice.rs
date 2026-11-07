@@ -41,7 +41,7 @@ impl<'found> Cut<'found> {
         Cut { exports, outgoing }
     }
 
-    pub(crate) fn exports(&self) -> &BTreeSet<Member<'found>> {
+    pub(crate) const fn exports(&self) -> &BTreeSet<Member<'found>> {
         &self.exports
     }
 
@@ -90,15 +90,15 @@ impl<'found> Slice<'found> {
             .collect()
     }
 
-    pub(crate) fn cluster(&self) -> Cluster<'found> {
+    pub(crate) const fn cluster(&self) -> Cluster<'found> {
         self.cluster
     }
 
-    pub(crate) fn members(&self) -> &BTreeSet<Member<'found>> {
+    pub(crate) const fn members(&self) -> &BTreeSet<Member<'found>> {
         &self.members
     }
 
-    pub(crate) fn cut(&self) -> &Cut<'found> {
+    pub(crate) const fn cut(&self) -> &Cut<'found> {
         &self.cut
     }
 

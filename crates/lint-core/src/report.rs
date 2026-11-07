@@ -11,7 +11,7 @@ pub struct Report<'file> {
 
 impl<'file> Report<'file> {
     #[must_use]
-    pub fn new(headline: Headline, violations: Vec<Violation<'file>>) -> Self {
+    pub const fn new(headline: Headline, violations: Vec<Violation<'file>>) -> Self {
         Report { headline, violations }
     }
 

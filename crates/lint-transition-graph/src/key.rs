@@ -9,7 +9,7 @@ pub(crate) struct Key<'found> {
 }
 
 impl<'found> Key<'found> {
-    pub(crate) fn new(takes: Vec<Node<'found>>, gives: Node<'found>) -> Self {
+    pub(crate) const fn new(takes: Vec<Node<'found>>, gives: Node<'found>) -> Self {
         Key { takes, gives }
     }
 

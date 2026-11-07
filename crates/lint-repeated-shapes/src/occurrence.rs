@@ -19,11 +19,11 @@ impl<'file> Occurrence<'file> {
         Occurrence { shape: reading.shape(), literals: reading.into_literals(), site, extent, kind }
     }
 
-    pub(crate) fn literals(&self) -> &Literals {
+    pub(crate) const fn literals(&self) -> &Literals {
         &self.literals
     }
 
-    pub(crate) fn kind(&self) -> Kind {
+    pub(crate) const fn kind(&self) -> Kind {
         self.kind
     }
 }

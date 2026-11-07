@@ -49,7 +49,7 @@ pub(super) struct Context {
 }
 
 impl Context {
-    pub(super) fn outermost(region: Region) -> Self {
+    pub(super) const fn outermost(region: Region) -> Self {
         Self { region, subject: None }
     }
 
@@ -61,19 +61,19 @@ impl Context {
         Self { region: self.region.inside(Self::within(block)), subject: Some(subject) }
     }
 
-    pub(super) fn of_trait(&self) -> Self {
+    pub(super) const fn of_trait(&self) -> Self {
         Self { region: self.region, subject: None }
     }
 
-    pub(super) fn region(&self) -> Region {
+    pub(super) const fn region(&self) -> Region {
         self.region
     }
 
-    pub(super) fn subject(&self) -> Option<SubjectId> {
+    pub(super) const fn subject(&self) -> Option<SubjectId> {
         self.subject
     }
 
-    fn within(block: &ItemImpl) -> Within {
+    const fn within(block: &ItemImpl) -> Within {
         match block.trait_ {
             Some(_) => Within::TraitImpl,
             None => Within::Own,

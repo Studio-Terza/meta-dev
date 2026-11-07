@@ -23,7 +23,7 @@ enum Mark {
 }
 
 impl Mark {
-    fn open(self) -> Option<Visit> {
+    const fn open(self) -> Option<Visit> {
         match self {
             Self::Open(visit) => Some(visit),
             Self::Unseen | Self::Closed => None,

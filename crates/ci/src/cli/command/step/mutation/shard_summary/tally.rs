@@ -10,7 +10,7 @@ pub struct Tally {
 }
 
 impl Tally {
-    pub(crate) fn new(outcome: Outcome, count: Count) -> Self {
+    pub(crate) const fn new(outcome: Outcome, count: Count) -> Self {
         Self { outcome, count }
     }
 }

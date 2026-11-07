@@ -26,7 +26,7 @@ impl<'found, 'file> Edge<'found, 'file> {
         Edge { form: Form::of_edge(&unformed), ..unformed }
     }
 
-    pub(crate) fn form(&self) -> &Form<'found> {
+    pub(crate) const fn form(&self) -> &Form<'found> {
         &self.form
     }
 
@@ -34,11 +34,11 @@ impl<'found, 'file> Edge<'found, 'file> {
         Some(self).filter(|edge| matches!(edge.form, Form::Store))
     }
 
-    pub(crate) fn ends(&self) -> &Ends<'found> {
+    pub(crate) const fn ends(&self) -> &Ends<'found> {
         &self.ends
     }
 
-    pub(crate) fn transition(&self) -> &Transition<'found, 'file> {
+    pub(crate) const fn transition(&self) -> &Transition<'found, 'file> {
         &self.transition
     }
 
@@ -46,7 +46,7 @@ impl<'found, 'file> Edge<'found, 'file> {
         *AsRef::<Site<'file>>::as_ref(&self.transition)
     }
 
-    pub(crate) fn fixed_by(&self) -> Option<&'found Name> {
+    pub(crate) const fn fixed_by(&self) -> Option<&'found Name> {
         self.fixed_by
     }
 

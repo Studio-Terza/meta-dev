@@ -15,7 +15,7 @@ pub(super) struct Exported<'view, 'found, 'file> {
 }
 
 impl<'view, 'found, 'file> Exported<'view, 'found, 'file> {
-    pub(super) fn new(view: &'view Containment<'found, 'file>, name: &'view Name, listed: Listed) -> Self {
+    pub(super) const fn new(view: &'view Containment<'found, 'file>, name: &'view Name, listed: Listed) -> Self {
         Exported { view, name, listed }
     }
 }

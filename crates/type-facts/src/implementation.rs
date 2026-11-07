@@ -23,7 +23,12 @@ pub struct Implementation<'file> {
 }
 
 impl<'file> Implementation<'file> {
-    pub(crate) fn new(implemented: Name, argument: Option<Name>, methods: Vec<Method>, site: Site<'file>) -> Self {
+    pub(crate) const fn new(
+        implemented: Name,
+        argument: Option<Name>,
+        methods: Vec<Method>,
+        site: Site<'file>,
+    ) -> Self {
         Implementation {
             implemented,
             argument,
@@ -46,12 +51,12 @@ impl<'file> Implementation<'file> {
     }
 
     #[must_use]
-    pub fn target_path(&self) -> &TargetPath {
+    pub const fn target_path(&self) -> &TargetPath {
         &self.target_path
     }
 
     #[must_use]
-    pub fn argument(&self) -> Option<&Name> {
+    pub const fn argument(&self) -> Option<&Name> {
         self.argument.as_ref()
     }
 

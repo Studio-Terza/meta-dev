@@ -49,7 +49,7 @@ impl Placement {
     }
 
     #[must_use]
-    pub fn package(&self) -> &PackageRoot {
+    pub const fn package(&self) -> &PackageRoot {
         &self.package
     }
 
@@ -59,12 +59,12 @@ impl Placement {
     }
 
     #[must_use]
-    pub fn module(&self) -> &ModulePath {
+    pub const fn module(&self) -> &ModulePath {
         &self.module
     }
 
     #[must_use]
-    pub fn role(&self) -> Role {
+    pub const fn role(&self) -> Role {
         self.role
     }
 

@@ -152,7 +152,7 @@ impl Language {
     }
 
     #[must_use]
-    pub fn fix(self) -> Fix {
+    pub const fn fix(self) -> Fix {
         match self {
             Self::JavaScript | Self::TypeScript | Self::Html | Self::Css | Self::Vue | Self::Svelte | Self::Astro => {
                 Fix::MoveToAssets
@@ -161,7 +161,7 @@ impl Language {
         }
     }
 
-    fn extensions(self) -> Extensions {
+    const fn extensions(self) -> Extensions {
         match self {
             Self::Python => Extensions::new(&["py", "pyw", "pyi", "pyx"]),
             Self::Shell => Extensions::new(&["sh", "bash", "zsh", "fish", "ksh", "csh", "dash"]),

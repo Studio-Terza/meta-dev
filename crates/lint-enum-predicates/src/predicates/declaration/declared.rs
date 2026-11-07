@@ -9,7 +9,7 @@ pub struct Declared {
 }
 
 impl Declared {
-    pub fn new(name: Name, kind: Kind) -> Self {
+    pub const fn new(name: Name, kind: Kind) -> Self {
         Self { name, kind }
     }
 

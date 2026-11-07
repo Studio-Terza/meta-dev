@@ -25,7 +25,7 @@ pub struct Holding {
 
 impl Holding {
     #[must_use]
-    pub fn new(name: Name, held: Held, ty: TypeRef) -> Self {
+    pub const fn new(name: Name, held: Held, ty: TypeRef) -> Self {
         Self { name, held, region: Region::SHIPPED, declares: None, ty }
     }
 
@@ -35,12 +35,12 @@ impl Holding {
     }
 
     #[must_use]
-    pub fn held(&self) -> Held {
+    pub const fn held(&self) -> Held {
         self.held
     }
 
     #[must_use]
-    pub fn declares(&self) -> Option<ItemId> {
+    pub const fn declares(&self) -> Option<ItemId> {
         self.declares
     }
 }

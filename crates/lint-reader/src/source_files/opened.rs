@@ -14,7 +14,7 @@ pub struct Opened {
 
 impl Opened {
     #[must_use]
-    pub fn new(shown: PathBuf, file: PathBuf, text: SourceText, placement: Placement) -> Self {
+    pub const fn new(shown: PathBuf, file: PathBuf, text: SourceText, placement: Placement) -> Self {
         Self { shown, file, text, placement }
     }
 

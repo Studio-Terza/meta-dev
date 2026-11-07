@@ -20,7 +20,7 @@ impl Case {
     const HASH_DIGITS: usize = 16;
 
     #[must_use]
-    pub fn new(target: Text, role: Text, bytes: Bytes) -> Self {
+    pub const fn new(target: Text, role: Text, bytes: Bytes) -> Self {
         Self { target, role, bytes }
     }
 

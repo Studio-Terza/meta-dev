@@ -11,7 +11,7 @@ pub(crate) struct Declaration<'file> {
 }
 
 impl<'file> Declaration<'file> {
-    pub(crate) fn new(name: Name, provided: Vec<Name>, site: Site<'file>) -> Self {
+    pub(crate) const fn new(name: Name, provided: Vec<Name>, site: Site<'file>) -> Self {
         Declaration { name, provided, site }
     }
 

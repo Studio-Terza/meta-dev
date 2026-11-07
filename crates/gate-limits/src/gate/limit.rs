@@ -57,7 +57,7 @@ pub enum Refusal {
 }
 
 impl Refusal {
-    pub fn refusing(self, stage: Stage, measured: Seconds) -> Failure<'static> {
+    pub const fn refusing(self, stage: Stage, measured: Seconds) -> Failure<'static> {
         match self {
             Self::Levels => Failure::Levels { stage },
             Self::Above { record } => Failure::Above { stage, measured, record },

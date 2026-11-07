@@ -47,7 +47,7 @@ impl Ask {
 }
 
 impl<'view, 'found, 'file> Answer<'view, 'found, 'file> {
-    fn neighbours(&self, name: &'view Name, toward: Toward) -> Neighbours<'view, 'found, 'file> {
+    const fn neighbours(&self, name: &'view Name, toward: Toward) -> Neighbours<'view, 'found, 'file> {
         Neighbours::new(Named::new(self.view, name), toward, self.listed)
     }
 }

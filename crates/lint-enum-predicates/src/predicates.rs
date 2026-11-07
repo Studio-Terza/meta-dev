@@ -80,7 +80,7 @@ pub struct Predicates<'scan, 'file> {
 }
 
 impl<'scan, 'file> Predicates<'scan, 'file> {
-    pub fn new(known: &'scan EnumPredicates<'scan>, file: &'file SourceFile) -> Self {
+    pub const fn new(known: &'scan EnumPredicates<'scan>, file: &'file SourceFile) -> Self {
         Predicates { known, file, module: Cow::Borrowed(file.placement().module()), violations: Vec::new() }
     }
 

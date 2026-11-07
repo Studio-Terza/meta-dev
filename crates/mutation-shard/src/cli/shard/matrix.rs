@@ -16,7 +16,7 @@ pub struct Matrix<'log> {
 }
 
 impl<'log> Matrix<'log> {
-    pub(crate) fn new(baseline: Vec<&'log TestName>, mutants: Vec<MutantResult<'log>>) -> Self {
+    pub(crate) const fn new(baseline: Vec<&'log TestName>, mutants: Vec<MutantResult<'log>>) -> Self {
         Matrix { baseline, mutants }
     }
 

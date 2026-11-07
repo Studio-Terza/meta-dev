@@ -16,7 +16,7 @@ impl<'found> Coloured<'found> {
         Coloured { colours: refinement.coloured() }
     }
 
-    pub(super) fn colours(&self) -> &BTreeMap<Node<'found>, Colour> {
+    pub(super) const fn colours(&self) -> &BTreeMap<Node<'found>, Colour> {
         &self.colours
     }
 

@@ -11,7 +11,7 @@ pub struct Shape<'file> {
 }
 
 impl<'file> Shape<'file> {
-    pub fn new(name: &'file Ident, field: Option<&'file Type>) -> Self {
+    pub const fn new(name: &'file Ident, field: Option<&'file Type>) -> Self {
         Shape { name, field }
     }
 

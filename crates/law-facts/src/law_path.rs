@@ -16,7 +16,7 @@ impl Side {
     const PRESERVED: [Self; 3] = [Self::Input, Self::Output, Self::Edge];
     const SINGLE: [Self; 4] = [Self::Input; 4];
 
-    pub(crate) fn checked_by(kind: Kind) -> &'static [Self] {
+    pub(crate) const fn checked_by(kind: Kind) -> &'static [Self] {
         match kind.property() {
             Some(Property::Preserves) => &Self::PRESERVED,
             Some(_) | None => &Self::SINGLE,
@@ -56,7 +56,7 @@ pub struct LawPath {
 }
 
 impl LawPath {
-    pub(crate) fn new(owner: Owner, member: Name) -> Self {
+    pub(crate) const fn new(owner: Owner, member: Name) -> Self {
         Self { owner, member }
     }
 
@@ -82,7 +82,7 @@ pub struct Route {
 }
 
 impl Route {
-    pub(crate) fn new(side: Side, path: Option<LawPath>) -> Self {
+    pub(crate) const fn new(side: Side, path: Option<LawPath>) -> Self {
         Self { side, path }
     }
 
@@ -115,7 +115,7 @@ pub struct Unresolved<'file> {
 }
 
 impl<'file> Unresolved<'file> {
-    pub(crate) fn new(site: Site<'file>, name: Name) -> Self {
+    pub(crate) const fn new(site: Site<'file>, name: Name) -> Self {
         Unresolved { site, name }
     }
 }

@@ -140,7 +140,7 @@ impl Rule {
         },
     ];
 
-    pub(super) fn language(&self) -> Language {
+    pub(super) const fn language(&self) -> Language {
         self.language
     }
 

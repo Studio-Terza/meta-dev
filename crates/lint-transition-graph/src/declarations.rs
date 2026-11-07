@@ -12,7 +12,7 @@ pub(crate) enum Checked {
 }
 
 impl Checked {
-    fn reporting(kind: Kind) -> Self {
+    const fn reporting(kind: Kind) -> Self {
         match kind.property() {
             Some(Property::Preserves) => Self::Preservation,
             Some(_) | None => Self::Operations,

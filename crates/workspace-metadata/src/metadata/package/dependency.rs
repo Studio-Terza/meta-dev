@@ -8,7 +8,7 @@ pub struct Dependency {
 }
 
 impl Dependency {
-    pub fn name(&self) -> &CrateName {
+    pub const fn name(&self) -> &CrateName {
         &self.name
     }
 }

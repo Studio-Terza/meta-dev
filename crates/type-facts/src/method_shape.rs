@@ -57,7 +57,7 @@ impl MethodShape {
     }
 
     #[must_use]
-    pub fn receiver(&self) -> Receiver {
+    pub const fn receiver(&self) -> Receiver {
         self.receiver
     }
 
@@ -67,7 +67,7 @@ impl MethodShape {
     }
 
     #[must_use]
-    pub fn returned(&self) -> Returned {
+    pub const fn returned(&self) -> Returned {
         self.returned
     }
 

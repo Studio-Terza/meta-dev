@@ -73,7 +73,7 @@ impl<'file, 'run> Walker<'file, 'run> {
             .map_or_else(UsePath::default, |inner| UsePath::from(inner).joined(path.segments()))
     }
 
-    pub(crate) fn type_path(ty: &Type) -> Option<&Path> {
+    pub(crate) const fn type_path(ty: &Type) -> Option<&Path> {
         match ty {
             Type::Path(inner) => Some(&inner.path),
             _ => None,

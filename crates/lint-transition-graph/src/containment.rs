@@ -151,7 +151,7 @@ impl<'found, 'file> Containment<'found, 'file> {
         Report::new(Check::HEADLINE, Check::violations(self))
     }
 
-    fn toward(&self, toward: Toward) -> &BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
+    const fn toward(&self, toward: Toward) -> &BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
         match toward {
             Toward::Used => &self.uses,
             Toward::Users => &self.users,

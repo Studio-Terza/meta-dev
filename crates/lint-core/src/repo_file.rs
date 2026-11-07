@@ -16,7 +16,7 @@ impl RepoFile {
     }
 
     #[must_use]
-    pub fn contents(&self) -> &Contents {
+    pub const fn contents(&self) -> &Contents {
         &self.contents
     }
 

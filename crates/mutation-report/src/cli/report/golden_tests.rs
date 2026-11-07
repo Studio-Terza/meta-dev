@@ -35,7 +35,7 @@ impl GoldenTests {
         })
     }
 
-    pub(crate) fn names(&self) -> &BTreeSet<TestName> {
+    pub(crate) const fn names(&self) -> &BTreeSet<TestName> {
         &self.0
     }
 

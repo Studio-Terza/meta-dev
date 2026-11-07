@@ -40,7 +40,7 @@ impl Parameter {
         args.iter().all(|arg| Self::forwarded(arg, params).is_some()).then_some(())
     }
 
-    pub fn type_name(&self) -> Option<&Name> {
+    pub const fn type_name(&self) -> Option<&Name> {
         self.type_name.as_ref()
     }
 }

@@ -17,7 +17,7 @@ pub enum Resolved {
 
 impl Resolved {
     #[must_use]
-    pub fn std(&self) -> Option<&ItemPath> {
+    pub const fn std(&self) -> Option<&ItemPath> {
         match self {
             Self::Std(path) | Self::StdTrait(path) => Some(path),
             Self::Crate(_) | Self::External(_) | Self::Primitive(_) | Self::Param(_) | Self::Unknown(_) => None,
@@ -25,7 +25,7 @@ impl Resolved {
     }
 
     #[must_use]
-    pub fn crate_item(&self) -> Option<ItemId> {
+    pub const fn crate_item(&self) -> Option<ItemId> {
         match self {
             Self::Crate(item) => Some(*item),
             Self::Std(_)
@@ -38,7 +38,7 @@ impl Resolved {
     }
 
     #[must_use]
-    pub fn primitive(&self) -> Option<Primitive> {
+    pub const fn primitive(&self) -> Option<Primitive> {
         match self {
             Self::Primitive(primitive) => Some(*primitive),
             Self::Std(_)
@@ -50,7 +50,7 @@ impl Resolved {
         }
     }
 
-    pub(crate) fn parameter(&self) -> Option<&Name> {
+    pub(crate) const fn parameter(&self) -> Option<&Name> {
         match self {
             Self::Param(name) => Some(name),
             Self::Std(_)

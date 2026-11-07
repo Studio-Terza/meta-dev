@@ -14,7 +14,7 @@ pub enum Kind {
 
 impl Kind {
     #[must_use]
-    pub fn of_trait(ground: Option<Ground>) -> Self {
+    pub const fn of_trait(ground: Option<Ground>) -> Self {
         match ground {
             Some(Ground::Ports) => Self::PortTrait,
             Some(Ground::Store) => Self::StoreTrait,
@@ -23,7 +23,7 @@ impl Kind {
     }
 
     #[must_use]
-    pub fn implementer(self) -> Option<Self> {
+    pub const fn implementer(self) -> Option<Self> {
         match self {
             Self::PortTrait => Some(Self::Port),
             Self::StoreTrait => Some(Self::Store),
@@ -40,7 +40,7 @@ pub enum Relation {
 
 impl Kind {
     #[must_use]
-    pub fn relation(self) -> Relation {
+    pub const fn relation(self) -> Relation {
         match self {
             Self::Trait | Self::PortTrait | Self::StoreTrait => Relation::ImplementedBy,
             Self::GenericImpl | Self::Port | Self::Store => Relation::Implements,

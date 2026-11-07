@@ -18,7 +18,7 @@ pub struct Context<'file> {
 }
 
 impl<'file> Context<'file> {
-    pub(crate) fn new(krate: &'file CrateName, selfish: Endpoint, ground: Ground, filler: Filler) -> Self {
+    pub(crate) const fn new(krate: &'file CrateName, selfish: Endpoint, ground: Ground, filler: Filler) -> Self {
         Context { krate, selfish, ground, filler, functions: Vec::new() }
     }
 
@@ -27,11 +27,11 @@ impl<'file> Context<'file> {
         self
     }
 
-    pub(crate) fn selfish(&self) -> &Endpoint {
+    pub(crate) const fn selfish(&self) -> &Endpoint {
         &self.selfish
     }
 
-    pub(crate) fn filler(&self) -> &Filler {
+    pub(crate) const fn filler(&self) -> &Filler {
         &self.filler
     }
 

@@ -55,7 +55,7 @@ impl Mode {
         }
     }
 
-    pub(crate) fn refusal(&self) -> Option<&QueryFailure> {
+    pub(crate) const fn refusal(&self) -> Option<&QueryFailure> {
         match self {
             Self::Query(Err(failure)) => Some(failure),
             Self::Gate | Self::Report | Self::Query(Ok(_)) => None,

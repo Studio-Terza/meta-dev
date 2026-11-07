@@ -54,22 +54,22 @@ impl PackageRoot {
     }
 
     #[must_use]
-    pub fn root(&self) -> &CrateRoot {
+    pub const fn root(&self) -> &CrateRoot {
         &self.root
     }
 
     #[must_use]
-    pub fn crate_name(&self) -> &CrateName {
+    pub const fn crate_name(&self) -> &CrateName {
         &self.name
     }
 
     #[must_use]
-    pub fn features(&self) -> &BTreeMap<Name, LineNumber> {
+    pub const fn features(&self) -> &BTreeMap<Name, LineNumber> {
         &self.features
     }
 
     #[must_use]
-    pub fn untested(&self) -> &Untested {
+    pub const fn untested(&self) -> &Untested {
         &self.untested
     }
 }

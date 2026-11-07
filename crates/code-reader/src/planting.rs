@@ -23,7 +23,7 @@ impl<'read> From<&'read SourceFile> for Listed<'read> {
 }
 
 impl<'read> Listed<'read> {
-    pub(crate) fn tested(self) -> Self {
+    pub(crate) const fn tested(self) -> Self {
         Listed { source: self.source, reach: Reach::Test }
     }
 
@@ -47,15 +47,15 @@ pub(crate) struct ReadFile<'read> {
 }
 
 impl<'read> ReadFile<'read> {
-    pub(crate) fn reach(self) -> Reach {
+    pub(crate) const fn reach(self) -> Reach {
         self.reach
     }
 
-    pub(crate) fn source(self) -> &'read SourceFile {
+    pub(crate) const fn source(self) -> &'read SourceFile {
         self.source
     }
 
-    pub(crate) fn file(self) -> FileId {
+    pub(crate) const fn file(self) -> FileId {
         self.file
     }
 

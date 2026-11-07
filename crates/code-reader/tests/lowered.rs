@@ -160,15 +160,15 @@ impl Expect {
         segments.iter().map(|segment| Name::from(*segment)).collect()
     }
 
-    fn named(resolved: Resolved, arguments: Vec<TypeRef<Resolved>>) -> TypeRef<Resolved> {
+    const fn named(resolved: Resolved, arguments: Vec<TypeRef<Resolved>>) -> TypeRef<Resolved> {
         TypeRef::Named(Named::new(resolved, arguments))
     }
 
-    fn integer() -> TypeRef<Resolved> {
+    const fn integer() -> TypeRef<Resolved> {
         Self::named(Resolved::Primitive(Primitive::Integer), Vec::new())
     }
 
-    fn primitive(primitive: Primitive) -> TypeRef<Resolved> {
+    const fn primitive(primitive: Primitive) -> TypeRef<Resolved> {
         Self::named(Resolved::Primitive(primitive), Vec::new())
     }
 

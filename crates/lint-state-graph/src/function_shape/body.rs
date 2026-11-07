@@ -20,14 +20,14 @@ impl Body {
             .map_or(Self::Other, |_| Self::FieldProjection)
     }
 
-    fn field_of(statement: &Stmt) -> Option<&ExprField> {
+    const fn field_of(statement: &Stmt) -> Option<&ExprField> {
         match statement {
             Stmt::Expr(Expr::Field(field), None) => Some(field),
             _ => None,
         }
     }
 
-    fn path_of(base: &Expr) -> Option<&ExprPath> {
+    const fn path_of(base: &Expr) -> Option<&ExprPath> {
         match base {
             Expr::Path(path) => Some(path),
             _ => None,

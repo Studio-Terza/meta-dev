@@ -27,14 +27,14 @@ impl RawPaths {
             .collect()
     }
 
-    fn finding<'path>(used: &Use<'_>, path: &'path UsePath) -> Option<Finding<'path>> {
+    const fn finding<'path>(used: &Use<'_>, path: &'path UsePath) -> Option<Finding<'path>> {
         match used.ground() {
             Ground::Open => Some(Finding::OutsidePorts(path)),
             Ground::Ports => Self::unguarded(used.cover(), path),
         }
     }
 
-    fn unguarded(cover: Cover, path: &UsePath) -> Option<Finding<'_>> {
+    const fn unguarded(cover: Cover, path: &UsePath) -> Option<Finding<'_>> {
         match cover {
             Cover::Bare => Some(Finding::OutsideGuard(path)),
             Cover::Guarded => None,

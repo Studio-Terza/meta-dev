@@ -10,11 +10,11 @@ pub(crate) struct Function<'file> {
 }
 
 impl<'file> Function<'file> {
-    pub(crate) fn new(name: Name, site: Site<'file>, score: Branching) -> Self {
+    pub(crate) const fn new(name: Name, site: Site<'file>, score: Branching) -> Self {
         Function { name, site, score }
     }
 
-    pub(crate) fn score(&self) -> Branching {
+    pub(crate) const fn score(&self) -> Branching {
         self.score
     }
 }

@@ -14,7 +14,7 @@ pub(crate) struct Resolver<'scopes> {
 }
 
 impl<'scopes> Resolver<'scopes> {
-    pub(crate) fn over(scopes: &'scopes Scopes<'scopes>) -> Self {
+    pub(crate) const fn over(scopes: &'scopes Scopes<'scopes>) -> Self {
         Resolver { scopes }
     }
 

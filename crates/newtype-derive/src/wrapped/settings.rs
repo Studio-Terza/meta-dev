@@ -58,7 +58,7 @@ impl Settings {
         }
     }
 
-    pub fn checking(&self) -> Option<&Check> {
+    pub const fn checking(&self) -> Option<&Check> {
         self.check.as_ref()
     }
 }

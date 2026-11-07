@@ -13,11 +13,11 @@ impl<'file> Subject<'file> {
         Subject { package: Package::containing(file), name }
     }
 
-    pub(crate) fn package(&self) -> Package<'file> {
+    pub(crate) const fn package(&self) -> Package<'file> {
         self.package
     }
 
-    pub(crate) fn owner(&self) -> &Name {
+    pub(crate) const fn owner(&self) -> &Name {
         &self.name
     }
 }

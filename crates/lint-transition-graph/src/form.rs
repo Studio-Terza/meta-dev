@@ -61,7 +61,7 @@ impl<'found> Acting<'found> {
     }
 
     #[must_use]
-    pub fn subject(&self) -> &Node<'found> {
+    pub const fn subject(&self) -> &Node<'found> {
         &self.subject
     }
 }
@@ -97,7 +97,7 @@ impl<'found> Form<'found> {
             .unwrap_or_else(|| Form::acted(edge, ground))
     }
 
-    fn lifted(body: Body) -> Option<Self> {
+    const fn lifted(body: Body) -> Option<Self> {
         match body {
             Body::Mapped | Body::Focused | Body::Routed => Some(Form::Lift),
             Body::Written => None,
@@ -114,7 +114,7 @@ impl<'found> Form<'found> {
             .map_or_else(|| Form::beyond(ground), |(totality, acting)| totality.shaping(acting))
     }
 
-    fn beyond(ground: Ground) -> Self {
+    const fn beyond(ground: Ground) -> Self {
         match ground {
             Ground::Ports => Form::Port,
             Ground::Core | Ground::Boundary | Ground::Store => Form::Transition,
@@ -134,7 +134,7 @@ impl<'found> Form<'found> {
         self.sorted(Some(self), None, None)
     }
 
-    pub(crate) fn ported(&self) -> Option<Effect> {
+    pub(crate) const fn ported(&self) -> Option<Effect> {
         match self {
             Form::Port => Some(Effect),
             Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Lift | Form::Store => None,
@@ -142,7 +142,7 @@ impl<'found> Form<'found> {
     }
 
     #[must_use]
-    pub fn algebraic(&self) -> Option<&Acting<'found>> {
+    pub const fn algebraic(&self) -> Option<&Acting<'found>> {
         match self {
             Form::Operation(acting) | Form::Partial(acting) => Some(acting),
             Form::Transition | Form::Port | Form::Lift | Form::Store => None,

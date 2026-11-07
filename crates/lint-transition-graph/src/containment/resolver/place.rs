@@ -12,11 +12,11 @@ pub(crate) struct Place<'found> {
 }
 
 impl<'found> Place<'found> {
-    pub(crate) fn new(krate: &'found CrateName, module: &'found [Name], scope: Scope<'found>) -> Self {
+    pub(crate) const fn new(krate: &'found CrateName, module: &'found [Name], scope: Scope<'found>) -> Self {
         Place { krate, module, scope }
     }
 
-    pub(crate) fn target(&self, module: Option<Vec<Name>>) -> Target<'found> {
+    pub(crate) const fn target(&self, module: Option<Vec<Name>>) -> Target<'found> {
         Target::new(self.krate, module, Some(self.module))
     }
 
@@ -24,15 +24,15 @@ impl<'found> Place<'found> {
         self.target(Some(base.iter().chain(tail).cloned().collect()))
     }
 
-    pub(crate) fn krate(&self) -> &'found CrateName {
+    pub(crate) const fn krate(&self) -> &'found CrateName {
         self.krate
     }
 
-    pub(crate) fn module(&self) -> &'found [Name] {
+    pub(crate) const fn module(&self) -> &'found [Name] {
         self.module
     }
 
-    pub(crate) fn scope(&self) -> &Scope<'found> {
+    pub(crate) const fn scope(&self) -> &Scope<'found> {
         &self.scope
     }
 }

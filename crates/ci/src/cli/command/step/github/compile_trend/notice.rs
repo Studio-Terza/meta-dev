@@ -37,7 +37,7 @@ impl<'builds> Notice<'builds> {
         self.range.and_then(|range| range.below(self.today.total())).map(|_| self)
     }
 
-    pub(super) fn reported<'notice>(&'notice self, merged: &'notice Text) -> Report<'notice> {
+    pub(super) const fn reported<'notice>(&'notice self, merged: &'notice Text) -> Report<'notice> {
         Report { notice: self, merged }
     }
 

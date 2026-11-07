@@ -14,7 +14,7 @@ pub struct Members {
 
 impl Members {
     #[must_use]
-    pub fn new(listed: Vec<Name>, excluded: Vec<Name>) -> Self {
+    pub const fn new(listed: Vec<Name>, excluded: Vec<Name>) -> Self {
         Self { listed, excluded }
     }
 

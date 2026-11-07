@@ -22,7 +22,7 @@ impl TestResult {
         TestName::new(format!("{}{}{}", binary.map(Binary::label).unwrap_or_default(), Self::JOIN, self.name))
     }
 
-    pub fn verdict(&self) -> Verdict {
+    pub const fn verdict(&self) -> Verdict {
         self.verdict
     }
 

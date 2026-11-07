@@ -9,12 +9,12 @@ impl Count {
     pub const SHOWN: Self = Self(300);
 
     #[must_use]
-    pub fn items_in<Counted>(items: &[Counted]) -> Self {
+    pub const fn items_in<Counted>(items: &[Counted]) -> Self {
         Self(items.len())
     }
 
     #[must_use]
-    pub fn beyond(self, limit: Self) -> Self {
+    pub const fn beyond(self, limit: Self) -> Self {
         Self(self.0.saturating_sub(limit.0))
     }
 

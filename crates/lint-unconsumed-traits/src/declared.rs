@@ -24,7 +24,7 @@ impl<'file> Declared<'file> {
         block.items.iter().filter_map(Self::method)
     }
 
-    fn method(item: &TraitItem) -> Option<&TraitItemFn> {
+    const fn method(item: &TraitItem) -> Option<&TraitItemFn> {
         match item {
             TraitItem::Fn(method) => Some(method),
             _ => None,

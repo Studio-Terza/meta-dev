@@ -68,7 +68,7 @@ impl<'item, 'file> Referenced<'item, 'file> {
             .then(|| Dependency::new(resolved, site, self.via).qualified(written))
     }
 
-    fn associated_type(item: &TraitItem) -> Option<&TraitItemType> {
+    const fn associated_type(item: &TraitItem) -> Option<&TraitItemType> {
         match item {
             TraitItem::Type(associated) => Some(associated),
             _ => None,

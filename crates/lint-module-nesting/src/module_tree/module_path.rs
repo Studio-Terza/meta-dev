@@ -31,7 +31,7 @@ impl<'file> ModulePath<'file> {
         }
     }
 
-    pub fn file(&self) -> &'file Path {
+    pub const fn file(&self) -> &'file Path {
         self.file
     }
 

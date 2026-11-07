@@ -27,7 +27,7 @@ impl<'rows> Found<'rows> {
         }
     }
 
-    fn undisputed(self) -> Self {
+    const fn undisputed(self) -> Self {
         match self {
             Found::Conflict => Found::Nothing,
             Found::Nothing | Found::One(_) => self,
@@ -98,7 +98,7 @@ impl View<'_> {
         View { found: self.found.union(other.found), pending: self.pending.max(other.pending) }
     }
 
-    pub(super) fn undisputed(self) -> Self {
+    pub(super) const fn undisputed(self) -> Self {
         View { found: self.found.undisputed(), pending: self.pending }
     }
 

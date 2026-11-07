@@ -105,7 +105,7 @@ pub(crate) struct Resolver<'tables, 'rows> {
 }
 
 impl<'tables, 'rows> Resolver<'tables, 'rows> {
-    pub(crate) fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Self {
+    pub(crate) const fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Self {
         Resolver { space, tables, ignored: None }
     }
 

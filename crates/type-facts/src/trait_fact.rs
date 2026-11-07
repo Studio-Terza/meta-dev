@@ -15,7 +15,7 @@ pub struct TraitFact<'file> {
 }
 
 impl<'file> TraitFact<'file> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         krate: &'file CrateName,
         name: Name,
         site: Site<'file>,

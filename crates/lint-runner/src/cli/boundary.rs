@@ -31,7 +31,7 @@ impl Rendered {
         Self { slot, text: report.to_string() }
     }
 
-    pub(crate) fn slot(&self) -> Slot {
+    pub(crate) const fn slot(&self) -> Slot {
         self.slot
     }
 }
@@ -68,7 +68,7 @@ impl Workers {
         Self(thread::available_parallelism().map_or(1, NonZeroUsize::get).min(Self::MOST_READERS))
     }
 
-    pub(crate) fn helpers(self) -> Range<usize> {
+    pub(crate) const fn helpers(self) -> Range<usize> {
         1..self.0
     }
 }

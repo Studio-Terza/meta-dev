@@ -21,7 +21,7 @@ impl MethodShape {
             .map_or(Self::Logic, |expr| Self::of_expression(expr, self_name))
     }
 
-    fn tail(statement: &Stmt) -> Option<&Expr> {
+    const fn tail(statement: &Stmt) -> Option<&Expr> {
         match statement {
             Stmt::Expr(expr, None) => Some(expr),
             _ => None,

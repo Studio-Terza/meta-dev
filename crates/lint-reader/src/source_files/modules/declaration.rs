@@ -20,7 +20,7 @@ impl<'items> Declaration<'items> {
     const MODULE_FILE: &'static str = "mod.rs";
 
     #[must_use]
-    pub fn new(module: &'items ItemMod, directory: PathBuf) -> Self {
+    pub const fn new(module: &'items ItemMod, directory: PathBuf) -> Self {
         Declaration { module, directory }
     }
 
@@ -73,7 +73,7 @@ impl<'items> Declaration<'items> {
     }
 
     #[must_use]
-    pub fn module(&self) -> &'items ItemMod {
+    pub const fn module(&self) -> &'items ItemMod {
         self.module
     }
 

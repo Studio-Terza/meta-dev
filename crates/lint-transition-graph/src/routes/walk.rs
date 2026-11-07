@@ -19,7 +19,7 @@ impl<'graph, 'found, 'file> Walk<'graph, 'found, 'file> {
     const LEAST_HOPS: usize = 3;
     const LEAST_DISTINCT: usize = 2;
 
-    pub(super) fn new(
+    pub(super) const fn new(
         edge: &'graph Edge<'found, 'file>,
         called: Vec<&'graph Edge<'found, 'file>>,
         stops: Vec<Stop>,
@@ -36,7 +36,7 @@ impl<'graph, 'found, 'file> Walk<'graph, 'found, 'file> {
             .filter(|leg| Self::varied(leg.key()).is_some())
     }
 
-    pub(super) fn edge(&self) -> &'graph Edge<'found, 'file> {
+    pub(super) const fn edge(&self) -> &'graph Edge<'found, 'file> {
         self.edge
     }
 
@@ -48,7 +48,7 @@ impl<'graph, 'found, 'file> Walk<'graph, 'found, 'file> {
         self.stops.get(from.count()..to.count()).unwrap_or_default()
     }
 
-    pub(super) fn resolved(&self) -> Count {
+    pub(super) const fn resolved(&self) -> Count {
         Count::new(self.called.len())
     }
 

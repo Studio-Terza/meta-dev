@@ -8,17 +8,17 @@ pub struct Found<Entity> {
 
 impl<Entity> Found<Entity> {
     #[must_use]
-    pub fn new(line: LineNumber, entity: Entity) -> Self {
+    pub const fn new(line: LineNumber, entity: Entity) -> Self {
         Self { line, entity }
     }
 
     #[must_use]
-    pub fn line(&self) -> LineNumber {
+    pub const fn line(&self) -> LineNumber {
         self.line
     }
 
     #[must_use]
-    pub fn entity(&self) -> &Entity {
+    pub const fn entity(&self) -> &Entity {
         &self.entity
     }
 }

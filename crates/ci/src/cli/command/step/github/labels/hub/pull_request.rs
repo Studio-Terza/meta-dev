@@ -11,7 +11,7 @@ impl PullRequest {
         r#"if (.title | startswith("refactor:")) then "refactor" else "change" end, .labels[].name"#;
     const REFACTOR_KIND: &'static str = "refactor";
 
-    pub(crate) fn listed(kind_then_labels: Text) -> Self {
+    pub(crate) const fn listed(kind_then_labels: Text) -> Self {
         Self(kind_then_labels)
     }
 

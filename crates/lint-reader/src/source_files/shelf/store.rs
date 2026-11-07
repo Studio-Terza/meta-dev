@@ -10,11 +10,11 @@ pub struct Shelved {
 }
 
 impl Shelved {
-    pub fn take_parsed(&mut self) -> Option<Result<SourceFile, Failure>> {
+    pub const fn take_parsed(&mut self) -> Option<Result<SourceFile, Failure>> {
         self.parsed.take()
     }
 
-    pub fn opened(&self) -> Option<&Opened> {
+    pub const fn opened(&self) -> Option<&Opened> {
         self.opened.as_ref()
     }
 

@@ -37,11 +37,11 @@ impl Export {
         Self { name: Name::from(&module.ident), line: LineNumber::from(module.ident.span()) }
     }
 
-    pub fn name(&self) -> &Name {
+    pub const fn name(&self) -> &Name {
         &self.name
     }
 
-    pub fn line(&self) -> LineNumber {
+    pub const fn line(&self) -> LineNumber {
         self.line
     }
 

@@ -31,7 +31,7 @@ pub struct Finding {
 }
 
 impl Finding {
-    pub fn new(port: Port, within: Within) -> Self {
+    pub const fn new(port: Port, within: Within) -> Self {
         Self { port, within }
     }
 }
@@ -87,7 +87,7 @@ pub struct Spot {
 }
 
 impl Spot {
-    pub fn new(line: LineNumber, port: Port) -> Self {
+    pub const fn new(line: LineNumber, port: Port) -> Self {
         Self { line, port }
     }
 

@@ -21,7 +21,7 @@ pub(crate) struct Cluster<'found> {
 impl<'found> Cluster<'found> {
     pub(crate) const WORKSPACE: Cluster<'static> = Cluster { krate: None, segments: &[] };
 
-    pub(crate) fn module(krate: &'found CrateName, segments: &'found [Name]) -> Self {
+    pub(crate) const fn module(krate: &'found CrateName, segments: &'found [Name]) -> Self {
         Cluster { krate: Some(krate), segments }
     }
 
@@ -55,11 +55,11 @@ impl<'found> Cluster<'found> {
         own.filter(|own| *own == name).map(|_| self)
     }
 
-    pub(crate) fn krate(&self) -> Option<&'found CrateName> {
+    pub(crate) const fn krate(&self) -> Option<&'found CrateName> {
         self.krate
     }
 
-    pub(crate) fn segments(&self) -> &'found [Name] {
+    pub(crate) const fn segments(&self) -> &'found [Name] {
         self.segments
     }
 }
@@ -72,14 +72,14 @@ enum Whereabouts<'found> {
 }
 
 impl<'found> Whereabouts<'found> {
-    fn locating(cluster: &Cluster<'found>) -> Self {
+    const fn locating(cluster: &Cluster<'found>) -> Self {
         match cluster.krate {
             None => Whereabouts::Workspace,
             Some(krate) => Whereabouts::within(krate, cluster.segments),
         }
     }
 
-    fn within(krate: &'found CrateName, segments: &'found [Name]) -> Self {
+    const fn within(krate: &'found CrateName, segments: &'found [Name]) -> Self {
         match segments.first() {
             None => Whereabouts::Crate(krate),
             Some(_) => Whereabouts::Module(krate, Segments(segments)),

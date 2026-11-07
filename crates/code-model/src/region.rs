@@ -29,22 +29,22 @@ impl Region {
     pub const SHIPPED: Self = Self { reach: Reach::Shipped, zone: Zone::Open, within: Within::Own };
 
     #[must_use]
-    pub fn new(reach: Reach, zone: Zone, within: Within) -> Self {
+    pub const fn new(reach: Reach, zone: Zone, within: Within) -> Self {
         Self { reach, zone, within }
     }
 
     #[must_use]
-    pub fn reach(self) -> Reach {
+    pub const fn reach(self) -> Reach {
         self.reach
     }
 
     #[must_use]
-    pub fn zone(self) -> Zone {
+    pub const fn zone(self) -> Zone {
         self.zone
     }
 
     #[must_use]
-    pub fn within(self) -> Within {
+    pub const fn within(self) -> Within {
         self.within
     }
 
@@ -72,12 +72,12 @@ pub struct Seat {
 
 impl Seat {
     #[must_use]
-    pub fn new(region: Region, subject: Option<TypeRef>) -> Self {
+    pub const fn new(region: Region, subject: Option<TypeRef>) -> Self {
         Self { region, subject }
     }
 
     #[must_use]
-    pub fn subject(&self) -> Option<&TypeRef> {
+    pub const fn subject(&self) -> Option<&TypeRef> {
         self.subject.as_ref()
     }
 }

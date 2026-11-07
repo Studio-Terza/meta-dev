@@ -21,7 +21,7 @@ impl Package {
     const SOURCE_EXTENSION: &'static str = "rs";
 
     #[must_use]
-    pub fn in_directory(directory: PathBuf, declared: BTreeSet<PathBuf>) -> Self {
+    pub const fn in_directory(directory: PathBuf, declared: BTreeSet<PathBuf>) -> Self {
         Self { directory, declared }
     }
 

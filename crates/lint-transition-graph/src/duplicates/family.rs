@@ -45,7 +45,7 @@ impl<'found, 'file> Family<'found, 'file> {
         first.map(|site| Violation::new(site, self))
     }
 
-    pub(super) fn size(&self) -> Count {
+    pub(super) const fn size(&self) -> Count {
         Count::new(self.members.len())
     }
 

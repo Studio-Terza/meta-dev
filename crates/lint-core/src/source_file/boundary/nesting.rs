@@ -9,7 +9,7 @@ use crate::Bound;
 struct Depth(usize);
 
 impl Depth {
-    fn receded(self) -> Self {
+    const fn receded(self) -> Self {
         Self(self.0.saturating_sub(1))
     }
 

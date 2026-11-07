@@ -2,7 +2,7 @@
 pub struct FileId(usize);
 
 impl FileId {
-    pub(crate) fn next<Row>(rows: &[Row]) -> Self {
+    pub(crate) const fn next<Row>(rows: &[Row]) -> Self {
         Self(rows.len())
     }
 
@@ -15,11 +15,11 @@ impl FileId {
 pub struct ItemId(usize);
 
 impl ItemId {
-    pub(crate) fn next<Row>(rows: &[Row]) -> Self {
+    pub(crate) const fn next<Row>(rows: &[Row]) -> Self {
         Self(rows.len())
     }
 
-    pub(crate) fn index(self) -> usize {
+    pub(crate) const fn index(self) -> usize {
         self.0
     }
 }

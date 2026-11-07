@@ -12,7 +12,7 @@ pub struct CrateRoot {
 
 impl CrateRoot {
     #[must_use]
-    pub fn new(directory: PathBuf) -> Self {
+    pub const fn new(directory: PathBuf) -> Self {
         Self { directory, package: None }
     }
 
@@ -32,7 +32,7 @@ impl CrateRoot {
     }
 
     #[must_use]
-    pub fn package(&self) -> Option<&Name> {
+    pub const fn package(&self) -> Option<&Name> {
         self.package.as_ref()
     }
 }

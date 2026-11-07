@@ -8,7 +8,7 @@ pub struct Inputs<'found> {
 }
 
 impl<'found> Inputs<'found> {
-    pub(crate) fn new(resolved: &'found [Resolved], selfish: &'found Endpoint) -> Self {
+    pub(crate) const fn new(resolved: &'found [Resolved], selfish: &'found Endpoint) -> Self {
         Inputs { resolved, selfish }
     }
 

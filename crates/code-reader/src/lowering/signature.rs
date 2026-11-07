@@ -46,7 +46,7 @@ impl Written {
         Sited::new(self.target.clone().resolved(resolving, scope), self.spelling.clone())
     }
 
-    fn parameter(name: Name, spelling: Spelling) -> TypeRef<Self> {
+    const fn parameter(name: Name, spelling: Spelling) -> TypeRef<Self> {
         TypeRef::Named(Named::new(Self { target: Referent::Param(name), spelling }, Vec::new()))
     }
 

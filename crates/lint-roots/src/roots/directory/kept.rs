@@ -15,7 +15,7 @@ pub struct Kept<'survey> {
 
 impl<'survey> Kept<'survey> {
     #[must_use]
-    pub fn new(survey: &'survey Survey, ignored: &'survey [Ignored]) -> Self {
+    pub const fn new(survey: &'survey Survey, ignored: &'survey [Ignored]) -> Self {
         Kept { survey, ignored }
     }
 

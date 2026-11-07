@@ -25,7 +25,7 @@ struct Frontier<'found> {
 }
 
 impl<'view, 'found, 'file> Route<'view, 'found, 'file> {
-    pub(super) fn new(
+    pub(super) const fn new(
         view: &'view Containment<'found, 'file>,
         from: &'view Name,
         to: &'view Name,

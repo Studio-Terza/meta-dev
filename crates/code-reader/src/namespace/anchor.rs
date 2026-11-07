@@ -21,7 +21,7 @@ impl Anchor {
             .find_map(|(word, anchor)| first.matches::<Whole>(&[*word]).map(|_| anchor))
     }
 
-    pub(super) fn anchored(self, anchors: Anchors) -> Option<ScopeId> {
+    pub(super) const fn anchored(self, anchors: Anchors) -> Option<ScopeId> {
         match self {
             Self::Crate => anchors.root,
             Self::Module => anchors.module,
@@ -48,11 +48,11 @@ pub(crate) struct Anchors {
 }
 
 impl Anchors {
-    pub(super) fn rooted(root: ScopeId) -> Self {
+    pub(super) const fn rooted(root: ScopeId) -> Self {
         Self { module: Some(root), above: None, root: Some(root) }
     }
 
-    pub(super) fn nested(self, module: ScopeId) -> Self {
+    pub(super) const fn nested(self, module: ScopeId) -> Self {
         Self { module: Some(module), above: self.module, root: self.root }
     }
 }

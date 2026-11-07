@@ -12,7 +12,7 @@ pub struct RepeatedShape<'index> {
 }
 
 impl<'index> RepeatedShape<'index> {
-    pub fn new(shape: &'index MethodShape, types: Vec<&'index DeclaredType<'index>>) -> Self {
+    pub const fn new(shape: &'index MethodShape, types: Vec<&'index DeclaredType<'index>>) -> Self {
         RepeatedShape { shape, types }
     }
 }

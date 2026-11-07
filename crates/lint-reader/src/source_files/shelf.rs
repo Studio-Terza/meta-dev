@@ -30,7 +30,7 @@ impl<'tree> Shelf<'tree> {
     }
 
     #[must_use]
-    pub fn survey(&self) -> &Survey {
+    pub const fn survey(&self) -> &Survey {
         &self.survey
     }
 

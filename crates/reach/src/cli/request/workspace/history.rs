@@ -8,7 +8,7 @@ pub struct History<'meta> {
 }
 
 impl<'meta> History<'meta> {
-    pub fn new(reached: Reached<'meta>) -> Self {
+    pub const fn new(reached: Reached<'meta>) -> Self {
         History { reached }
     }
 }

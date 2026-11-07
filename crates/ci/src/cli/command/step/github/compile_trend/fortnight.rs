@@ -44,7 +44,7 @@ impl Fortnight {
     const WORKFLOW: &'static str = "cold-build.yml";
     const BRANCH: &'static str = "main";
 
-    pub(super) fn downloading_to(downloads: PathBuf) -> Self {
+    pub(super) const fn downloading_to(downloads: PathBuf) -> Self {
         Self { downloads }
     }
 

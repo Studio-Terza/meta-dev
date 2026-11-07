@@ -25,11 +25,11 @@ impl OnlyField {
         Error::new_spanned(input, Self::REFUSED)
     }
 
-    pub fn member(&self) -> &Member {
+    pub const fn member(&self) -> &Member {
         &self.member
     }
 
-    pub fn inner(&self) -> &Type {
+    pub const fn inner(&self) -> &Type {
         &self.inner
     }
 

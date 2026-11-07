@@ -40,7 +40,7 @@ impl<'found, 'file> Behaviour<'found, 'file> {
         Behaviour { refinement: Refinement::new(moves, equivalence.laws()), sites }
     }
 
-    pub(super) fn refinement(&self) -> &Refinement<Node<'found>, Step<'found>, Property> {
+    pub(super) const fn refinement(&self) -> &Refinement<Node<'found>, Step<'found>, Property> {
         &self.refinement
     }
 

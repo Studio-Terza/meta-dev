@@ -44,7 +44,7 @@ impl From<&VisRestricted> for Visibility {
 }
 
 impl Visibility {
-    fn seen(self, restricted: Admission) -> Admission {
+    const fn seen(self, restricted: Admission) -> Admission {
         match self {
             Self::Private => Admission::Hidden,
             Self::Visible => Admission::Shown,
@@ -61,7 +61,7 @@ pub(crate) enum Sight {
 }
 
 impl Sight {
-    pub(super) fn admits(self, visibility: Visibility) -> Admission {
+    pub(super) const fn admits(self, visibility: Visibility) -> Admission {
         match self {
             Self::Inside => Admission::Shown,
             Self::ByPath => visibility.seen(Admission::Shown),
@@ -69,7 +69,7 @@ impl Sight {
         }
     }
 
-    pub(super) fn beyond(self, reach: Option<ScopeId>) -> Self {
+    pub(super) const fn beyond(self, reach: Option<ScopeId>) -> Self {
         match reach {
             Some(_) => Self::Inside,
             None => self,
@@ -101,7 +101,7 @@ pub(crate) enum DeclaredKind {
 }
 
 impl DeclaredKind {
-    fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
+    const fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
         match self {
             Self::Module(module) => Binding::Module(module),
             Self::OpaqueModule => Binding::Unknown,
@@ -109,7 +109,7 @@ impl DeclaredKind {
         }
     }
 
-    fn item_kind(self) -> Option<ItemKind> {
+    const fn item_kind(self) -> Option<ItemKind> {
         match self {
             Self::Item(kind) => Some(kind),
             Self::Module(_) | Self::OpaqueModule => None,
@@ -125,7 +125,7 @@ pub(crate) struct Declared {
 }
 
 impl Declared {
-    pub(crate) fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Self {
+    pub(crate) const fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Self {
         Self { name, visibility, kind }
     }
 
@@ -206,7 +206,7 @@ enum GlobSource {
 }
 
 impl GlobSource {
-    fn unsettled(&self) -> Target {
+    const fn unsettled(&self) -> Target {
         match self {
             Self::Path(_) => Target::Waiting,
             Self::Expansion => Target::Opaque,

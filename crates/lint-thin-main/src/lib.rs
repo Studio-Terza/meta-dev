@@ -40,7 +40,7 @@ impl ThinMain {
         items.iter().filter(|item| Self::thin(item).is_some()).filter_map(Self::function)
     }
 
-    fn function(item: &Item) -> Option<&ItemFn> {
+    const fn function(item: &Item) -> Option<&ItemFn> {
         match item {
             Item::Fn(main) => Some(main),
             _ => None,

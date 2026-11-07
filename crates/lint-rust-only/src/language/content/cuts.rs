@@ -10,7 +10,7 @@ pub(super) struct Cuts<'text> {
 }
 
 impl<'text> Cuts<'text> {
-    pub(super) fn new(text: Text<'text>, separator: Text<'static>) -> Self {
+    pub(super) const fn new(text: Text<'text>, separator: Text<'static>) -> Self {
         Cuts { text, separator }
     }
 

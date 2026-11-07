@@ -37,12 +37,12 @@ impl Method {
     }
 
     #[must_use]
-    pub fn returns(&self) -> Option<&Name> {
+    pub const fn returns(&self) -> Option<&Name> {
         self.returns.as_ref()
     }
 
     #[must_use]
-    pub fn shape(&self) -> &MethodShape {
+    pub const fn shape(&self) -> &MethodShape {
         &self.shape
     }
 }

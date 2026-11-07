@@ -18,7 +18,7 @@ pub struct Owed<'change> {
 }
 
 impl<'change> Owed<'change> {
-    pub(crate) fn new(fault: Fault, failing: Vec<&'change Change>) -> Self {
+    pub(crate) const fn new(fault: Fault, failing: Vec<&'change Change>) -> Self {
         Owed { fault, failing }
     }
 

@@ -8,7 +8,7 @@ pub struct Transition {
 }
 
 impl Transition {
-    pub fn target(&self) -> &TypeName {
+    pub const fn target(&self) -> &TypeName {
         &self.target
     }
 }

@@ -26,7 +26,7 @@ impl Resolved {
         )
     }
 
-    pub(crate) fn resolved_with<'found>(&'found self, selfish: &'found Endpoint) -> &'found Endpoint {
+    pub(crate) const fn resolved_with<'found>(&'found self, selfish: &'found Endpoint) -> &'found Endpoint {
         match self {
             Self::Itself => selfish,
             Self::Found(found) => found,
@@ -47,7 +47,7 @@ impl Resolved {
         }
     }
 
-    fn nature(&self, selfish: Nature) -> Nature {
+    const fn nature(&self, selfish: Nature) -> Nature {
         match self {
             Self::Itself => selfish,
             Self::Found(found) => found.nature(),

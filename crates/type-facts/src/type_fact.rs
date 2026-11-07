@@ -16,7 +16,7 @@ pub struct TypeFact<'file> {
 }
 
 impl<'file> TypeFact<'file> {
-    pub(crate) fn declared(krate: &'file CrateName, name: Name, site: Site<'file>, derives: Vec<Name>) -> Self {
+    pub(crate) const fn declared(krate: &'file CrateName, name: Name, site: Site<'file>, derives: Vec<Name>) -> Self {
         TypeFact { krate, name, site, derives, shape: Shape::Other, dependencies: Vec::new() }
     }
 
@@ -25,7 +25,7 @@ impl<'file> TypeFact<'file> {
         self
     }
 
-    pub(crate) fn shaped(mut self, shape: Shape) -> Self {
+    pub(crate) const fn shaped(mut self, shape: Shape) -> Self {
         self.shape = shape;
         self
     }
@@ -35,7 +35,7 @@ impl<'file> TypeFact<'file> {
     }
 
     #[must_use]
-    pub fn shape(&self) -> Shape {
+    pub const fn shape(&self) -> Shape {
         self.shape
     }
 
