@@ -4,6 +4,7 @@ use grammar::ident::Words;
 use grammar::line::Unbroken;
 use grammar::message::{Depth, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
+use grammar::output::{Token, Tokens};
 use grammar::search::Terms;
 use grammar::slug::Letters;
 use laws::proptest::prelude::prop_assert_eq;
@@ -179,5 +180,45 @@ laws::table!(
         "a--b" => None,
         " --reason" => None,
         "" => None,
+    ]
+);
+
+laws::roundtrip!(
+    any_text_is_quoted_and_lexed_back_as_one_quoted_token,
+    "(?s).{0,40}",
+    |text: &String| Tokens::quoting(text),
+    |quoted: &String| Tokens::lexed(quoted).ok(),
+    |text: String| Some(vec![Token::Quoted(text)])
+);
+
+struct Kinds;
+
+impl Kinds {
+    fn of(text: &&str) -> Vec<&'static str> {
+        Tokens::lexed(text).map_or_else(|_stray| vec!["stray"], |tokens| tokens.iter().map(Kinds::kind).collect())
+    }
+
+    fn kind(token: &Token) -> &'static str {
+        match token {
+            Token::Word(_) => "word",
+            Token::Message(_) => "message",
+            Token::Segment(_) => "segment",
+            Token::Node(_) => "node",
+            Token::Quoted(_) => "quoted",
+            Token::Integer(_) => "integer",
+            Token::End => "end",
+        }
+    }
+}
+
+laws::table!(
+    an_output_line_lexes_into_words_refs_ids_quotes_and_numbers,
+    Kinds::of,
+    [
+        "n4 \"demo\" feature terminal core entered apply \"new\"\n" => ["node", "quoted", "word", "word", "word", "word", "word", "quoted", "end"],
+        "placed decides aaaaaaaa.0 owner" => ["word", "word", "segment", "word"],
+        "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b written 12345678" => ["message", "word", "integer"],
+        "deadbeef n01" => ["message", "word"],
+        "bad ( paren" => ["stray"],
     ]
 );

@@ -614,6 +614,7 @@ dependencies = [
  "laws",
  "logos",
  "newtype",
+ "thiserror",
 ]
 
 [[package]]

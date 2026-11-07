@@ -5,6 +5,7 @@ pub mod ident;
 pub mod line;
 pub mod message;
 pub mod node;
+pub mod output;
 pub mod project;
 pub mod search;
 pub mod slug;
