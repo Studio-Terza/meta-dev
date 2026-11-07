@@ -12,7 +12,7 @@ impl Agreement {
     }
 
     fn kept(laws: &[Laws]) -> usize {
-        laws.iter().map(|laws| laws.kept(&[1, 2]).len()).sum()
+        laws.iter().map(|laws| laws.kept(&["first law", "second law"]).len()).sum()
     }
 }
 

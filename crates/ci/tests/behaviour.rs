@@ -12,6 +12,7 @@ use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
+const UNITS_ON_THE_PAGE: usize = 31;
 const LEAF_REPORT: [&str; 3] = ["REACH=1 of 5 crates", "BUILD_SCOPE=-p leaf", "MUTANTS_SCOPE=--test-package=leaf"];
 const TWO_REPORT: [&str; 3] = [
     "REACH=2 of 5 crates",
@@ -571,9 +572,9 @@ fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box
 
 #[test]
 fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(), Box<dyn Error>> {
-    let units: Vec<String> = (0..31).map(|at| Page::unit(&format!("crate{at:02}"), "1.0")).collect();
+    let units: Vec<String> = (0..UNITS_ON_THE_PAGE).map(|at| Page::unit(&format!("crate{at:02}"), "1.0")).collect();
     let answer = Page::timed(&Page::with(&units.join(",")))?.answer;
-    assert_eq!(answer.out.matches(char::from(10)).count(), 31);
+    assert_eq!(answer.out.matches(char::from(10)).count(), UNITS_ON_THE_PAGE);
     assert!(answer.out.contains("compile time per crate, seconds, longest first, 31.00 in all:\n"));
     Ok(())
 }
