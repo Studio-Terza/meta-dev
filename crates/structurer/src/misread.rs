@@ -1,5 +1,11 @@
+use std::fmt;
+
 use grammar::directive::{Lexed, Location};
+use grammar::output::field::{Integer, Phrase, Word};
+use grammar::output::{Fields, Unread};
 use named_derive::Named;
+
+use crate::briefing::Quoting;
 
 use crate::verb::Verb;
 
@@ -45,7 +51,7 @@ pub enum Wanted {
     Distinct,
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Misread {
     #[error("line {}, column {}: expected {wanted}", at.line(), at.column())]
     Expected { at: Location, wanted: Wanted },
@@ -56,5 +62,49 @@ pub enum Misread {
 impl Misread {
     pub(crate) fn expected(lexed: &Lexed, wanted: Wanted) -> Misread {
         Misread::Expected { at: Location::from(lexed), wanted }
+    }
+}
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+enum Missing {
+    #[name("expected")]
+    Expected,
+    #[name("arity")]
+    Arity,
+}
+
+pub(crate) struct Briefed<'misread>(&'misread Misread);
+
+impl fmt::Display for Briefed<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Misread::Expected { at, wanted } => {
+                write!(formatter, "{} {} {} {}", Missing::Expected, at.line(), at.column(), Quoting::from(wanted))
+            }
+            Misread::Arity { at, verb } => write!(formatter, "{} {} {} {verb}", Missing::Arity, at.line(), at.column()),
+        }
+    }
+}
+
+impl Misread {
+    pub(crate) fn read(fields: &mut Fields) -> Result<Misread, Unread> {
+        let missing = fields.field::<Word<Missing>>()?;
+        let at = Location::new(fields.field::<Integer<_>>()?, fields.field::<Integer<_>>()?);
+        missing.misread(at, fields)
+    }
+}
+
+impl Missing {
+    fn misread(self, at: Location, fields: &mut Fields) -> Result<Misread, Unread> {
+        match self {
+            Missing::Expected => fields.field::<Phrase<_>>().map(|wanted| Misread::Expected { at, wanted }),
+            Missing::Arity => fields.field::<Word<_>>().map(|verb| Misread::Arity { at, verb }),
+        }
+    }
+}
+
+impl<'misread> From<&'misread Misread> for Briefed<'misread> {
+    fn from(misread: &'misread Misread) -> Briefed<'misread> {
+        Briefed(misread)
     }
 }

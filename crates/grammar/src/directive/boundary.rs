@@ -267,6 +267,11 @@ impl Piece {
 
 impl Location {
     #[must_use]
+    pub fn new(line: usize, column: usize) -> Location {
+        Location { line: LineNumber(line), column: Column(column) }
+    }
+
+    #[must_use]
     pub fn line(self) -> LineNumber {
         self.line
     }

@@ -1,13 +1,21 @@
+use std::io;
+
 use design_model::{
-    Confidence, Explicitness, Facet, NodeId, Ordinal, Prefix, SegmentRelation, Sense, SenseKind, SpanRelation,
-    Specificity, Title,
+    AnyNode, Confidence, Entered, Entry, Explicitness, Facet, Node, NodeId, Ordinal, Prefix, Project, Provenance,
+    SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Title,
 };
-use laws::proptest::prelude::prop_oneof;
+use dispatch_ports::Reply;
+use laws::proptest::collection::vec;
+use laws::proptest::option;
+use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use newtype::Newtype;
-use structurer::{Directive, Directives, Edge, Label, Misread, NodeRef, Proposal};
+use structurer::{
+    Attempt, Briefing, Directive, Directives, Edge, Job, Label, Lapse, Misread, NodeRef, Proposal, Reading, Said,
+};
 use strum::VariantArray;
+use transcript_ports::Body;
 
 struct Generated;
 
@@ -190,4 +198,88 @@ laws::table!(
         "conversational(85b287b3.0)\r\nlink(85b287b3.0, 85b287b3.1)" => Spot::at(2, 1),
         "propose(new, refines(n1), feature, \"é \\\" ü\")\nsupersede(n1)" => Spot::at(2, 1),
     ]
+);
+
+struct Jobs;
+
+impl Jobs {
+    fn said() -> impl Strategy<Value = Said> {
+        (Generated::segment(), "[^\u{0}]{0,40}").prop_map(|(segment, body)| Said::new(segment, Body::new(body)))
+    }
+
+    fn node() -> impl Strategy<Value = AnyNode> {
+        (0..i64::MAX, select(Facet::VARIANTS), option::of("[^\u{0}]{0,24}"), "[a-z][a-z0-9-]{0,8}").prop_filter_map(
+            "a project name",
+            |(id, facet, title, project)| {
+                let project = project.parse::<Project>().ok()?;
+                let node = Node::new(NodeId::new(id), Entry::new(project, facet, Provenance::from(Entered::Apply)));
+                Some(title.map_or_else(|| node.clone().any(), |title| node.clone().titled(Title::new(title)).any()))
+            },
+        )
+    }
+
+    fn any() -> impl Strategy<Value = Job> {
+        (vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::node(), 0..4)).prop_map(|(said, nodes)| Job::new(said, &nodes))
+    }
+
+    fn lapse() -> impl Strategy<Value = Lapse> {
+        prop_oneof![
+            Just(Lapse::overdue()),
+            "[^\u{0}]{0,30}".prop_map(|refusal| Lapse::refused(&io::Error::other(refusal))),
+            "[ -~]{0,30}"
+                .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
+        ]
+    }
+
+    fn attempt() -> impl Strategy<Value = Attempt> {
+        prop_oneof![Just(Attempt::First), Jobs::lapse().prop_map(Attempt::Retry)]
+    }
+}
+
+laws::roundtrip!(
+    a_briefing_reads_back_as_it_is_rendered,
+    (Jobs::any(), Jobs::attempt()),
+    |drawn: &(Job, Attempt)| drawn.0.briefing(&drawn.1).to_string(),
+    |text: &String| text.parse::<Briefing>().ok(),
+    |drawn: (Job, Attempt)| Some(drawn.0.briefing(&drawn.1))
+);
+
+laws::law!(a_retry_briefs_the_first_briefing_and_the_lapse, (Jobs::any(), Jobs::lapse()), drawn, {
+    let (job, lapse) = drawn;
+    let retried = job.briefing(&Attempt::Retry(lapse.clone()));
+    laws::proptest::prop_assert_eq!(&retried, &job.briefing(&Attempt::First).retried(&lapse));
+    prop_assert_ne!(retried, job.briefing(&Attempt::First));
+});
+
+laws::law!(a_briefing_tells_jobs_apart, (Jobs::any(), Jobs::any()), drawn, {
+    let (one, other) = drawn;
+    laws::proptest::prop_assume!(one != other);
+    prop_assert_ne!(one.briefing(&Attempt::First), other.briefing(&Attempt::First));
+});
+
+laws::law!(a_lapse_retries_a_first_attempt_and_flails_a_retry, (Jobs::lapse(), Jobs::lapse()), drawn, {
+    let (first, second) = drawn;
+    let again = Attempt::First.lapsed(first.clone());
+    laws::proptest::prop_assert_eq!(again, Reading::Again(Attempt::Retry(first.clone())));
+    laws::proptest::prop_assert_eq!(Attempt::Retry(first).lapsed(second.clone()), Reading::Flailed(second));
+});
+
+laws::law!(
+    a_reply_is_read_as_directives_or_lapses_with_its_misread,
+    (Generated::directive(), Jobs::attempt()),
+    drawn,
+    {
+        let (directive, attempt) = drawn;
+        let parsed = attempt.clone().read(&Reply::new(directive.to_string()));
+        let directives: Directives = directive
+            .to_string()
+            .parse()
+            .map_err(|misread: Misread| laws::proptest::test_runner::TestCaseError::fail(misread.to_string()))?;
+        laws::proptest::prop_assert_eq!(parsed, Reading::Parsed { directives, attempt: attempt.clone() });
+        let misread = "place(".parse::<Directives>().err().map(Lapse::from);
+        laws::proptest::prop_assert_eq!(
+            Some(attempt.clone().read(&Reply::new("place(".to_owned()))),
+            misread.map(|lapse| attempt.lapsed(lapse))
+        );
+    }
 );

@@ -2479,12 +2479,15 @@ name = "structurer"
 version = "0.1.0"
 dependencies = [
  "design-model",
+ "dispatch-ports",
  "grammar",
  "laws",
  "named-derive",
  "newtype",
  "strum",
+ "text-lines",
  "thiserror",
+ "transcript-ports",
 ]
 
 [[package]]
