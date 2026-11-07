@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 use super::op::{Op, OpName, Pass};
 use super::run::Run;
@@ -32,38 +33,63 @@ impl<R: Resource> Pass<'_, Released<R>> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Holding {
+    Held,
+    Released,
+}
+
 #[must_use = "a held resource is released when dropped"]
 #[derive(Debug)]
 pub struct Held<'run, R: Release> {
-    resource: Option<R>,
+    resource: R,
+    holding: Holding,
     run: &'run Run,
 }
 
 impl<'run, R: Release> Held<'run, R> {
     pub(crate) fn acquired(resource: R, run: &'run Run) -> Self {
-        Held { resource: Some(resource), run }
+        Held { resource, holding: Holding::Held, run }
     }
 
     pub fn end(mut self) -> Result<ReleaseReceipt, R::Failure> {
-        let run = self.run;
-        self.resource.take().map_or(Ok(ReleaseReceipt(R::RELEASE)), |resource| run.released(resource))
+        match std::mem::replace(&mut self.holding, Holding::Released) {
+            Holding::Held => self.run.released(&mut self.resource),
+            Holding::Released => Ok(ReleaseReceipt(R::RELEASE)),
+        }
+    }
+}
+
+impl<R: Release> Deref for Held<'_, R> {
+    type Target = R;
+
+    fn deref(&self) -> &R {
+        &self.resource
+    }
+}
+
+impl<R: Release> DerefMut for Held<'_, R> {
+    fn deref_mut(&mut self) -> &mut R {
+        &mut self.resource
     }
 }
 
 impl Run {
-    fn released<R: Release>(&self, mut resource: R) -> Result<ReleaseReceipt, R::Failure> {
+    fn released<R: Release>(&self, resource: &mut R) -> Result<ReleaseReceipt, R::Failure> {
         self.count(R::RELEASE);
         resource.release(Pass::minted())
+    }
+
+    fn dropped<R: Release>(&self, resource: &mut R) {
+        self.released(resource).err().into_iter().for_each(|failure| self.fail(R::NAME, Box::new(failure)));
     }
 }
 
 impl<R: Release> Drop for Held<'_, R> {
     fn drop(&mut self) {
-        let run = self.run;
-        self.resource
-            .take()
-            .and_then(|resource| run.released(resource).err())
-            .into_iter()
-            .for_each(|failure| run.fail(R::NAME, Box::new(failure)));
+        match std::mem::replace(&mut self.holding, Holding::Released) {
+            Holding::Held => self.run.dropped(&mut self.resource),
+            Holding::Released => (),
+        }
     }
 }
