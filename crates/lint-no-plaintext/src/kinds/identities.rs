@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use code_model::{Domain, ItemPath, Model, Resolved};
 use lint_layout::{Word, words};
 
@@ -5,43 +7,36 @@ use lint_layout::{Word, words};
 pub(super) enum Role {
     Deserializes,
     DeserializesChecked,
-}
-
-#[derive(Debug)]
-struct Identity {
-    resolved: Resolved,
-    role: Role,
+    Unresolved,
 }
 
 #[derive(Debug)]
 pub(super) struct Identities {
-    known: Vec<Identity>,
+    known: BTreeMap<Resolved, Role>,
 }
 
 impl Identities {
-    const SERDE_DESERIALIZE: [Word<'static>; 2] = words!["serde", "Deserialize"];
-    const SERDE_DERIVE_DESERIALIZE: [Word<'static>; 2] = words!["serde_derive", "Deserialize"];
+    const SERDE_PACKAGES: [Word<'static>; 2] = words!["serde", "serde_derive"];
+    const SERDE_DERIVE: Word<'static> = Word::new("Deserialize");
     const NEWTYPE_DESERIALIZE: [Word<'static>; 2] = words!["newtype", "Deserialize"];
     const NEWTYPE_CHECKED_DESERIALIZE: [Word<'static>; 2] = words!["newtype", "CheckedDeserialize"];
 
     pub(super) fn read(model: &Model) -> Identities {
-        let known = [
-            (Self::SERDE_DESERIALIZE, Role::Deserializes),
-            (Self::SERDE_DERIVE_DESERIALIZE, Role::Deserializes),
+        let serde = Self::SERDE_PACKAGES.into_iter().map(|package| {
+            let derive: ItemPath = [package, Self::SERDE_DERIVE].into_iter().collect();
+            (Resolved::External(derive), Role::Deserializes)
+        });
+        let newtype = [
             (Self::NEWTYPE_DESERIALIZE, Role::Deserializes),
             (Self::NEWTYPE_CHECKED_DESERIALIZE, Role::DeserializesChecked),
         ]
         .into_iter()
-        .map(|(path, role)| Identity { resolved: Self::resolved(model, &path), role })
-        .collect();
-        Identities { known }
+        .map(|(path, role)| (Self::resolved(model, &path), role));
+        Identities { known: serde.chain(newtype).collect() }
     }
 
     pub(super) fn role(&self, implemented: &Resolved) -> Option<Role> {
-        let identified = |known: &Resolved| {
-            self.known.iter().find(|identity| identity.resolved == *known).map(|identity| identity.role)
-        };
-        implemented.known().map_or(Some(Role::Deserializes), identified)
+        implemented.known().map_or(Some(Role::Unresolved), |known| self.known.get(known).copied())
     }
 
     fn resolved(model: &Model, path: &[Word<'static>]) -> Resolved {

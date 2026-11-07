@@ -1,10 +1,16 @@
 mod identities;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use code_model::{Holding, Implementation, ItemId, Model, Origin, Resolved};
 
 use identities::{Identities, Role};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Reading {
+    Plain,
+    Unresolved,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Part {
@@ -21,7 +27,7 @@ struct Played {
 #[derive(Debug)]
 pub(crate) struct Kinds {
     validated: BTreeSet<ItemId>,
-    plain_owners: BTreeSet<ItemId>,
+    owners: BTreeMap<ItemId, Reading>,
 }
 
 impl Kinds {
@@ -29,14 +35,17 @@ impl Kinds {
         let identities = Identities::read(model);
         let played: Vec<Played> =
             model.implementations().filter_map(|placed| Self::played(&identities, placed.entity())).collect();
-        let derived = |role: Role| {
+        let derived = |role: Role| -> BTreeSet<ItemId> {
             let part = Part { role, origin: Origin::Derived };
-            played.iter().filter(move |played| played.part == part).map(|played| played.subject)
+            played.iter().filter(|played| played.part == part).map(|played| played.subject).collect()
         };
-        let deserialized: BTreeSet<ItemId> = derived(Role::Deserializes).collect();
-        let validated: BTreeSet<ItemId> = derived(Role::DeserializesChecked).collect();
-        let plain_owners = deserialized.difference(&validated).copied().collect();
-        Kinds { validated, plain_owners }
+        let validated = derived(Role::DeserializesChecked);
+        let read: BTreeSet<ItemId> = derived(Role::Deserializes).union(&validated).copied().collect();
+        let plain = read.difference(&validated).map(|item| (*item, Reading::Plain));
+        let unresolved = derived(Role::Unresolved);
+        let unread = unresolved.difference(&read).map(|item| (*item, Reading::Unresolved));
+        let owners = plain.chain(unread).collect();
+        Kinds { validated, owners }
     }
 
     pub(crate) fn unvalidated(&self, item: ItemId) -> Option<ItemId> {
@@ -46,8 +55,8 @@ impl Kinds {
         }
     }
 
-    pub(crate) fn plain_owner(&self, holding: &Holding) -> Option<ItemId> {
-        holding.declares().and_then(|item| self.plain_owners.get(&item).copied())
+    pub(crate) fn reading(&self, holding: &Holding) -> Option<Reading> {
+        holding.declares().and_then(|item| self.owners.get(&item).copied())
     }
 
     fn played(identities: &Identities, implementation: &Implementation) -> Option<Played> {

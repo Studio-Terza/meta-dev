@@ -29,21 +29,25 @@ impl ModelLint for NoPlaintext {
 }
 
 impl NoPlaintext {
-    const FIELDS: [Held; 3] = [Held::StructField, Held::EnumField, Held::NewtypeField];
-
     fn flagged<'model>(
         model: &'model Model,
         kinds: &Kinds,
         texts: &Texts,
         placed: Placed<'model, &'model Holding>,
     ) -> Option<Violation<'model>> {
-        let holding = placed.entity();
-        Self::FIELDS.iter().find(|held| **held == holding.held())?;
-        kinds.plain_owner(holding)?;
+        let holding = Self::field(placed.entity())?;
+        let reading = kinds.reading(holding)?;
         let ty: &TypeRef = holding.as_ref();
         texts.text(&model.expanded(ty))?;
         let site = placed.site();
         let spotted = Spots::first(ty).map_or(site, |position| Site::new(site.path(), position.line()));
-        Some(Violation::new(spotted, Finding::new(holding.as_ref())))
+        Some(Violation::new(spotted, Finding::new(reading, holding.as_ref())))
+    }
+
+    fn field(holding: &Holding) -> Option<&Holding> {
+        match holding.held() {
+            Held::StructField | Held::EnumField | Held::NewtypeField => Some(holding),
+            Held::UnionField | Held::StructParameter | Held::Alias => None,
+        }
     }
 }
