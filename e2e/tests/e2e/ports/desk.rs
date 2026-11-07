@@ -31,15 +31,11 @@ impl Scope {
         let value = |key: &str| report.lines().find_map(|line| line.strip_prefix(key)).unwrap_or_default().to_owned();
         let build = value(Self::BUILD);
         Self {
-            build: if build == Self::WORKSPACE {
-                Build::Workspace
-            } else {
-                {
-                    Build::Crates(
-                        build.split_whitespace().filter(|word| *word != Self::PACKAGE).map(str::to_owned).collect(),
-                    )
-                }
-            },
+            build: (build == Self::WORKSPACE).then_some(Build::Workspace).unwrap_or_else(|| {
+                Build::Crates(
+                    build.split_whitespace().filter(|word| *word != Self::PACKAGE).map(str::to_owned).collect(),
+                )
+            }),
             mutated: value(Self::MUTANTS)
                 .split_whitespace()
                 .filter_map(|word| word.strip_prefix(Self::TEST_PACKAGE))
