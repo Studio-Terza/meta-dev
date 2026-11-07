@@ -14,6 +14,6 @@ impl Cursors {
     }
 
     pub(crate) fn resumed(rows: &[CursorRow]) -> Cursors {
-        Cursors(rows.iter().map(|row| (row.session(), row.cursor())).collect())
+        Cursors(rows.iter().map(|row| (row.session().clone(), Cursor::from(row))).collect())
     }
 }

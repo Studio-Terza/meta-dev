@@ -7,7 +7,9 @@ use std::sync::Mutex;
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
 use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
-use design_store::{AppliedId, Linked, Planting, ShownMessage, ShownNode, Stored, StreamSchema};
+use design_store::{
+    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema,
+};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
@@ -283,7 +285,8 @@ impl Links {
             .flat_map(Stored::links)
             .map(|link| {
                 let [source, target] = link.anchors();
-                Link { source: source.to_string(), relation: link.relation().to_string(), target: target.to_string() }
+                let relation: &RelationName = link.as_ref();
+                Link { source: source.to_string(), relation: relation.to_string(), target: target.to_string() }
             })
             .collect())
     }
@@ -920,7 +923,7 @@ fn a_supersession_across_project_roots_is_refused_naming_both_nodes_and_nothing_
     let applying = Applying::ready()?;
     let run = Run::root();
     let entry = Entry::new("other".parse()?, Facet::Project, Entered::Init.into());
-    run.port(applying.store.clone()).write(Planting::new(Some(Node::new(NodeId::new(2), entry)), None))?;
+    run.port(applying.store.clone()).write(Planting::sown(Node::new(NodeId::new(2), entry)))?;
     assert!(matches!(applying.refused("supersede(n1, by(n2))"), Some(Failure::Unresolved(Unresolved::Straddling(_)))));
     assert!(matches!(applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
     assert_eq!(applying.run(&["show", "n2"])?.matches("supersedes").count(), 0);
@@ -1226,17 +1229,17 @@ impl Graph {
             .zip(parents)
             .map(|(child, parent)| {
                 let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
-                let planted = port.write(Planting::new(Some(Node::new(NodeId::new(child), entry)), None))?;
-                let linked = port.write(Linked::new(
-                    NodeId::new(child),
-                    NodeRelation::Refines,
-                    NodeId::new(*parent),
-                    Entered::Init.into(),
-                ))?;
+                let planted = port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
+                let (child, parent) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
+                let linked = port.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
                 Ok(planted.plus(linked))
             })
             .collect::<Result<Vec<Written>, Failure>>()?;
         Ok(Written::total(written.into_iter()))
+    }
+
+    fn resolved(store: &impl Store, id: i64) -> Result<Resolved, Failure> {
+        store.read(Resolving::from(NodeId::new(id)))?.ok_or(Failure::Unplaced(NodeId::new(id)))
     }
 }
 

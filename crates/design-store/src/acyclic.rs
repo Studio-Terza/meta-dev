@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{Inversion, NodeId, NodeRelation, Segment, SegmentRelation};
+use design_model::{Inversion, Misstaged, NodeId, NodeRelation, Segment, SegmentRelation};
 use named_derive::Named;
 use store_ports::{Statements, StoreFailure};
 
@@ -30,6 +30,8 @@ pub enum Refusal {
     Cyclic(Cycle),
     #[error("{0}")]
     Inverted(#[from] Inversion),
+    #[error("{0}")]
+    Misstaged(#[from] Misstaged),
     #[error("{0}")]
     Store(#[from] StoreFailure),
 }

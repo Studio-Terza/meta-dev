@@ -1,13 +1,14 @@
-mod counted_names;
 mod owners;
 mod port_crate;
+mod reserved_names;
 
 use lint_core::{Headline, Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
+use lint_file::FileLint;
 
-use counted_names::CountedNames;
 use owners::Owners;
 use port_crate::PortCrate;
+use reserved_names::{CountedName, ReservedNames, SqlxName};
 
 #[derive(Debug)]
 pub struct OwnedDependencies;
@@ -18,11 +19,14 @@ pub struct EffectsInFillers;
 #[derive(Debug)]
 pub struct CountedCalls;
 
+#[derive(Debug)]
+pub struct HiddenSqlx;
+
 impl Lint for OwnedDependencies {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
-                "a dependency some crate owns through [package.metadata.port] owns is depended on only by its owners, in dependencies and dev-dependencies alike",
+                "a dependency some crate owns through [package.metadata.port] owns has that one owner and is depended on by no other crate, in dependencies and dev-dependencies alike",
             ),
             Owners::declared(files).foreign(),
         )
@@ -50,7 +54,18 @@ impl Lint for CountedCalls {
             Headline::new(
                 "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
             ),
-            files.iter().filter_map(CountedNames::outside_port_core).flat_map(CountedNames::named).collect(),
+            files.iter().flat_map(ReservedNames::<CountedName>::violations).collect(),
+        )
+    }
+}
+
+impl Lint for HiddenSqlx {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        Report::new(
+            Headline::new(
+                "__sqlx is named only in store-ports and store-ports-macros, so every query goes through store_ports::query! and no crate reaches sqlx through the re-export",
+            ),
+            files.iter().flat_map(ReservedNames::<SqlxName>::violations).collect(),
         )
     }
 }

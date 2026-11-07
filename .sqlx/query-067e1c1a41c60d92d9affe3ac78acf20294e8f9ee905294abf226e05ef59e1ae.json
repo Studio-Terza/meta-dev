@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  rowid AS \"key!: i64\"\nFROM\n  segments\nWHERE\n  message = ?1\n  AND ordinal = ?2\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "key!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "rowid"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "067e1c1a41c60d92d9affe3ac78acf20294e8f9ee905294abf226e05ef59e1ae"
+}

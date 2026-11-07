@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  cursors (session, read_to)\nVALUES\n  ('s', 1)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "b752e4655b331ea767137769f96a37fcfe445ba55f3eb93a6b43ce72443ccb1b"
+}

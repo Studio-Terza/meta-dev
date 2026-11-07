@@ -16,13 +16,17 @@ doctest = false
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 sqlx.workspace = true
+store-ports-macros = { path = "../store-ports-macros" }
 thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
 file-ports = { path = "../file-ports" }
+grammar = { path = "../grammar" }
 laws = { path = "../laws" }
+strum.workspace = true
 tempfile.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

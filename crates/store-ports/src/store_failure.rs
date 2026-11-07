@@ -2,6 +2,8 @@ use std::io;
 
 use sqlx::migrate::MigrateError;
 
+use crate::ColumnFailure;
+
 #[derive(Debug, thiserror::Error)]
 pub enum StoreFailure {
     #[error("cannot start the store's runtime: {0}")]
@@ -14,4 +16,6 @@ pub enum StoreFailure {
     Migrate(#[from] MigrateError),
     #[error("a store statement failed: {0}")]
     Statement(#[from] sqlx::Error),
+    #[error("a stored column does not read back as its type: {0}")]
+    Column(#[from] ColumnFailure),
 }

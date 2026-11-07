@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nUPDATE\n  nodes\nSET\n  role = ?2,\n  role_provenance = ?3\nWHERE\n  id = ?1\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "5875e1e24516d8dd28f4bfbaafdeef4caf7c97f20309d02a5c2cb4905ef4789e"
+}

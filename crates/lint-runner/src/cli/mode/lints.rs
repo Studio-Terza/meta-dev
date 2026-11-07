@@ -36,7 +36,7 @@ use lint_no_plaintext::NoPlaintext;
 use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_port_batching::PortBatching;
-use lint_port_dependencies::{CountedCalls, EffectsInFillers, OwnedDependencies};
+use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, OwnedDependencies};
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
@@ -47,6 +47,7 @@ use lint_repeated_methods::RepeatedMethods;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
+use lint_store_queries::StoreQueries;
 use lint_thin_main::ThinMain;
 use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, TypeSystem};
 use lint_type_shape::TypeShape;
@@ -63,7 +64,7 @@ pub struct Lints;
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 impl Lints {
-    const CHECKS: [Check; 48] = [
+    const CHECKS: [Check; 50] = [
         |readout| vec![NoComments::report(readout.files())],
         |readout| vec![NoFreeFns::report(readout.files())],
         |readout| vec![ThinMain::report(readout.files())],
@@ -100,6 +101,8 @@ impl Lints {
         |readout| vec![OwnedDependencies::report(readout.files())],
         |readout| vec![EffectsInFillers::report(readout.files())],
         |readout| vec![CountedCalls::report(readout.files())],
+        |readout| vec![HiddenSqlx::report(readout.files())],
+        |readout| vec![StoreQueries::report(readout.files())],
         |readout| vec![LongExactStrings::report(readout.files())],
         |readout| vec![RepeatedShapes::report(readout.files())],
         |readout| vec![MandatoryLaws::report(readout.files())],

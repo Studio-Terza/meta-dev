@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  COALESCE(MAX(id), 0) + 1 AS \"next!: i64\"\nFROM\n  nodes\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "next!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e30a04be38f2b6dff9c9119dcb4bfb4334679ece79080f7760812fe82f3ec495"
+}

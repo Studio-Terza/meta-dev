@@ -1,3 +1,4 @@
+mod co_owned;
 mod foreign_dependency;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -6,6 +7,7 @@ use lint_core::{Site, SourceFile, Violation};
 use lint_layout::{Dependency, Name};
 use lint_placement::PackageRoot;
 
+use co_owned::CoOwned;
 use foreign_dependency::ForeignDependency;
 
 #[derive(Debug)]
@@ -43,15 +45,12 @@ impl<'file> Owners<'file> {
         file: &'file SourceFile,
         dependency: &'file Dependency,
     ) -> Option<Violation<'file>> {
-        self.owning
-            .get(dependency.as_ref())
-            .filter(|owners| owners.get(package).is_none())
-            .and_then(|owners| owners.first())
-            .map(|owner| {
-                Violation::new(
-                    Site::new(file.manifest_file().as_ref(), dependency.line()),
-                    ForeignDependency::new(dependency.as_ref(), owner.crate_name()),
-                )
-            })
+        let owners = self.owning.get(dependency.as_ref())?;
+        let other = owners.iter().find(|owner| **owner != package)?.crate_name();
+        let site = Site::new(file.manifest_file().as_ref(), dependency.line());
+        Some(owners.get(package).map_or_else(
+            || Violation::new(site, ForeignDependency::new(dependency.as_ref(), other)),
+            |_| Violation::new(site, CoOwned::new(dependency.as_ref(), other)),
+        ))
     }
 }

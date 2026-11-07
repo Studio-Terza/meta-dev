@@ -51,6 +51,7 @@ mod repeated_shapes;
 mod rust_only;
 mod shown;
 mod state_graph;
+mod store_queries;
 mod test_budget;
 mod thin_main;
 mod transition_facts;

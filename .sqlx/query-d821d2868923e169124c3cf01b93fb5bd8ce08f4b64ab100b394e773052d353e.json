@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  senses (\n    message,\n    ordinal,\n    kind,\n    specificity,\n    confidence,\n    explicitness,\n    provenance,\n    supersedes\n  )\nVALUES\n  (\n    ?1,\n    ?2,\n    ?3,\n    ?4,\n    ?5,\n    ?6,\n    ?7,\n    (\n      SELECT\n        earlier.id\n      FROM\n        senses AS earlier\n      WHERE\n        earlier.message = ?1\n        AND earlier.ordinal = ?2\n        AND NOT EXISTS (\n          SELECT\n            1\n          FROM\n            senses AS later\n          WHERE\n            later.supersedes = earlier.id\n        )\n    )\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "d821d2868923e169124c3cf01b93fb5bd8ce08f4b64ab100b394e773052d353e"
+}

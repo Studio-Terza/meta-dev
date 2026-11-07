@@ -1,0 +1,105 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  message,\n  ordinal,\n  kind,\n  specificity,\n  confidence,\n  explicitness,\n  provenance,\n  CASE\n    WHEN EXISTS (\n      SELECT\n        1\n      FROM\n        senses AS later\n      WHERE\n        later.supersedes = senses.id\n    ) THEN ?2\n    ELSE ?3\n  END AS \"standing!: String\"\nFROM\n  senses\nWHERE\n  message = ?1\nORDER BY\n  ordinal,\n  id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "specificity",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "specificity"
+          }
+        }
+      },
+      {
+        "name": "confidence",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "confidence"
+          }
+        }
+      },
+      {
+        "name": "explicitness",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "explicitness"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "name": "standing!: String",
+        "ordinal": 7,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "538336c68bd08f86d40563444542b6e910e163b34e42f121c97ea898c534d397"
+}

@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  uuid,\n  session,\n  parent,\n  at,\n  author,\n  body\nFROM\n  messages\nWHERE\n  uuid = ?1\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "uuid",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "uuid"
+          }
+        }
+      },
+      {
+        "name": "session",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "session"
+          }
+        }
+      },
+      {
+        "name": "parent",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "parent"
+          }
+        }
+      },
+      {
+        "name": "at",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "at"
+          }
+        }
+      },
+      {
+        "name": "author",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "author"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "860daa8340ee5de17a561175f0a8547319cd82368788873ddfa8333058bc4d3a"
+}

@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  message,\n  ordinal,\n  relation,\n  node,\n  provenance\nFROM\n  span_edges\nWHERE\n  message = ?1\nORDER BY\n  ordinal,\n  relation,\n  node\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "relation",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "node",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "node"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "provenance"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0b934b3e5e180a2da83b66007b5924dcf89d24810c4ff806dc33dbc2aba054d7"
+}

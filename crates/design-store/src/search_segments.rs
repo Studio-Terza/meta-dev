@@ -5,7 +5,8 @@ use port_core::Op;
 use store_ports::{Query, Statements, StoreFailure};
 
 use crate::Scope;
-use crate::boundary::{Hit, RankRow};
+use crate::acyclic::Keyed;
+use crate::boundary::{Hit, Rank, RankRow};
 
 #[derive(Clone, Debug, Op)]
 pub struct SearchSegments {
@@ -30,7 +31,7 @@ impl Query for SearchSegments {
             .rest()
             .iter()
             .map(|term| RankRow::matching(term, statements).map(RankRow::ranked))
-            .collect::<Result<Vec<BTreeMap<i64, f64>>, StoreFailure>>()?;
+            .collect::<Result<Vec<BTreeMap<Keyed, Rank>>, StoreFailure>>()?;
         let mut hits: Vec<Hit> = first.into_iter().filter_map(|hit| hit.within(&rest)).collect();
         hits.sort_by(Hit::ranking);
         Ok(hits)

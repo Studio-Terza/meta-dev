@@ -62,9 +62,8 @@ impl Move {
 
     pub fn written(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
         let lock = store.lock()?;
-        let found = Found::find(store, self.node)?;
-        let moved = self.transition.applied(found.placed().node().clone())?;
-        store.write(Restaged::from(moved))?;
+        let node = Found::resolved(store, self.node)?;
+        store.write(Restaged::new(node, self.transition))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
         Printed::shown(out, &Neighbourhood::from(shown.placed()))?;
@@ -80,8 +79,8 @@ impl Recast {
 
     pub fn written(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
         let lock = store.lock()?;
-        Found::find(store, self.node)?;
-        store.write(Cast::new(self.node, Casting::new(self.role, Provenance::from(Entered::Role))))?;
+        let node = Found::resolved(store, self.node)?;
+        store.write(Cast::new(node, Casting::new(self.role, Provenance::from(Entered::Role))))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
         Printed::shown(out, &Neighbourhood::from(shown.placed()))?;

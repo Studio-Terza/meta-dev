@@ -3,7 +3,7 @@ use sqlx::sqlite::SqliteRow;
 use sqlx::{IntoArguments, Sqlite, SqliteConnection};
 use tokio::runtime::Runtime;
 
-use crate::{StoreFailure, Written};
+use crate::{Columns, StoreFailure, Written};
 
 mod boundary;
 
@@ -18,16 +18,28 @@ impl<'run> Statements<'run> {
         Statements { connection, runtime }
     }
 
-    pub fn rows<Mapper, Row, Arguments>(
+    pub fn rows<Row, Mapper, Arguments>(
         &mut self,
         query: Map<'_, Sqlite, Mapper, Arguments>,
     ) -> Result<Vec<Row>, StoreFailure>
     where
+        Row: Columns + Send + Unpin,
         Mapper: FnMut(SqliteRow) -> Result<Row, sqlx::Error> + Send,
-        Row: Send + Unpin,
         Arguments: Send + IntoArguments<Sqlite>,
     {
         Ok(self.runtime.block_on(query.fetch_all(&mut *self.connection))?)
+    }
+
+    pub fn one<Row, Mapper, Arguments>(
+        &mut self,
+        query: Map<'_, Sqlite, Mapper, Arguments>,
+    ) -> Result<Row, StoreFailure>
+    where
+        Row: Columns + Send + Unpin,
+        Mapper: FnMut(SqliteRow) -> Result<Row, sqlx::Error> + Send,
+        Arguments: Send + IntoArguments<Sqlite>,
+    {
+        Ok(self.runtime.block_on(query.fetch_one(&mut *self.connection))?)
     }
 
     pub fn written<Arguments>(&mut self, query: Query<'_, Sqlite, Arguments>) -> Result<Written, StoreFailure>

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO segments (message, ordinal, shape, body)\nVALUES\n  (?1, ?2, ?3, ?4)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "b071a521e54e47fc32c94afb03fcf25f45c47478aa464a57222fdc69f09cf973"
+}

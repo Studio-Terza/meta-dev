@@ -1,0 +1,153 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  CASE\n    WHEN closure.descendant = ?1 THEN ?2\n    ELSE ?3\n  END AS \"kin!: String\",\n  nodes.id,\n  nodes.project,\n  nodes.facet,\n  nodes.stage,\n  nodes.provenance,\n  nodes.title,\n  nodes.role,\n  nodes.role_provenance,\n  nodes.artifact,\n  nodes.condition,\n  nodes.reason\nFROM\n  closure\n  JOIN nodes ON nodes.id = CASE\n    WHEN closure.descendant = ?1 THEN closure.ancestor\n    ELSE closure.descendant\n  END\nWHERE\n  closure.relation = ?4\n  AND (\n    (\n      closure.descendant = ?1\n      AND closure.depth > 0\n    )\n    OR (\n      closure.ancestor = ?1\n      AND closure.depth = 1\n    )\n  )\nORDER BY\n  CASE\n    WHEN closure.descendant = ?1 THEN - closure.depth\n    ELSE nodes.id\n  END,\n  nodes.id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "kin!: String",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "project",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "project"
+          }
+        }
+      },
+      {
+        "name": "facet",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "facet"
+          }
+        }
+      },
+      {
+        "name": "stage",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "stage"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "role",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "name": "role_provenance",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role_provenance"
+          }
+        }
+      },
+      {
+        "name": "artifact",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "artifact"
+          }
+        }
+      },
+      {
+        "name": "condition",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "condition"
+          }
+        }
+      },
+      {
+        "name": "reason",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "reason"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "0b8ec66e6a2fefca05b44a3d484da1798a20f7bc0a878d015c375b98fd6f73ac"
+}

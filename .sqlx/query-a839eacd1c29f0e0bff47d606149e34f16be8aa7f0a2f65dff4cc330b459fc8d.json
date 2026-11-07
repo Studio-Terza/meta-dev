@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO mechanical_links (\n    source,\n    relation,\n    target,\n    source_message,\n    target_message\n  )\nVALUES\n  (?1, ?2, ?3, ?4, ?5)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "a839eacd1c29f0e0bff47d606149e34f16be8aa7f0a2f65dff4cc330b459fc8d"
+}

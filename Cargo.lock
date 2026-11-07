@@ -290,7 +290,6 @@ dependencies = [
  "named-derive",
  "newtype",
  "port-core",
- "sqlx",
  "store-ports",
  "stream",
  "strum",
@@ -1289,6 +1288,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-effect-sites",
+ "lint-file",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -1455,6 +1455,7 @@ dependencies = [
  "lint-repeated-shapes",
  "lint-rust-only",
  "lint-state-graph",
+ "lint-store-queries",
  "lint-test-budget",
  "lint-thin-main",
  "lint-transition-graph",
@@ -1483,6 +1484,17 @@ dependencies = [
  "lint-layout",
  "newtype",
  "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-store-queries"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "proc-macro2",
+ "sqlformat",
  "syn 2.0.119",
 ]
 
@@ -1541,6 +1553,7 @@ dependencies = [
  "lint-repeated-shapes",
  "lint-rust-only",
  "lint-state-graph",
+ "lint-store-queries",
  "lint-test-budget",
  "lint-thin-main",
  "lint-transition-graph",
@@ -2176,6 +2189,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlformat"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0705994df478b895f05b8e290e0d46e53187b26f8d889d37b2a0881234922d94"
+dependencies = [
+ "unicode_categories",
+ "winnow 0.7.15",
+]
+
+[[package]]
 name = "sqlx"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2361,16 +2384,30 @@ dependencies = [
 name = "store-ports"
 version = "0.1.0"
 dependencies = [
+ "design-model",
  "design-store",
  "file-ports",
+ "grammar",
  "laws",
  "newtype",
  "port-core",
  "sqlx",
+ "store-ports-macros",
+ "strum",
  "tempfile",
  "thiserror",
  "tokio",
  "transcript-ports",
+]
+
+[[package]]
+name = "store-ports-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "sqlx-macros-core",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2569,7 +2606,7 @@ dependencies = [
  "toml_datetime",
  "toml_parser",
  "toml_writer",
- "winnow",
+ "winnow 1.0.4",
 ]
 
 [[package]]
@@ -2587,7 +2624,7 @@ version = "1.1.5+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baa693a8032d7e1cada7d0041e96126df243179ff061456783ac7f12bda4744c"
 dependencies = [
- "winnow",
+ "winnow 1.0.4",
 ]
 
 [[package]]
@@ -2705,6 +2742,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993ad287eb20e8ba755312801cfe1413e0f25d604075863acaddca10b04c1833"
 
 [[package]]
+name = "unicode_categories"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39ec24b3121d976906ece63c9daad25b85969647682eee313cb5779fdd69e14e"
+
+[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2768,6 +2811,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
+]
+
+[[package]]
+name = "winnow"
+version = "0.7.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
