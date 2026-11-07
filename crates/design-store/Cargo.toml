@@ -21,6 +21,10 @@ stream = { path = "../stream" }
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
+[build-dependencies]
+console-ports = { path = "../console-ports" }
+exit = { path = "../exit" }
+
 [dev-dependencies]
 laws = { path = "../laws" }
 strum.workspace = true

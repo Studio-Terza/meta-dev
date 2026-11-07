@@ -291,7 +291,9 @@ dependencies = [
 name = "design-store"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
  "design-model",
+ "exit",
  "file-ports",
  "grammar",
  "laws",
