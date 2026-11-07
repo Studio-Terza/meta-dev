@@ -7,15 +7,51 @@ use super::binding::Binding;
 use super::tables::{Key, Keyed};
 use super::view::View;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    Trait,
+    Type,
+}
+
+impl Kind {
+    fn resolved(found: Option<Kind>, path: ItemPath) -> Resolved {
+        match found {
+            Some(Kind::Trait) => Resolved::StdTrait(path),
+            Some(Kind::Type) | None => Resolved::Std(path),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Member {
+    name: Word<'static>,
+    kind: Kind,
+}
+
+impl Member {
+    const fn new(name: Word<'static>, kind: Kind) -> Member {
+        Member { name, kind }
+    }
+
+    fn kind(&self, name: &Name) -> Option<Kind> {
+        name.matches::<Whole>(&[self.name]).map(|_| self.kind)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Canonical {
     module: Word<'static>,
     name: Word<'static>,
+    kind: Kind,
 }
 
 impl Canonical {
-    const fn new(module: Word<'static>, name: Word<'static>) -> Canonical {
-        Canonical { module, name }
+    const fn new(module: Word<'static>, name: Word<'static>, kind: Kind) -> Canonical {
+        Canonical { module, name, kind }
+    }
+
+    fn kind(&self, module: &Name, name: &Name) -> Option<Kind> {
+        module.matches::<Whole>(&[self.module]).and(name.matches::<Whole>(&[self.name])).map(|_| self.kind)
     }
 
     pub(super) fn path(&self) -> ItemPath {
@@ -98,7 +134,7 @@ impl StdAlias {
 #[derive(Clone, Copy, Debug)]
 struct StdGlob {
     module: Word<'static>,
-    names: &'static [Word<'static>],
+    members: &'static [Member],
 }
 
 impl StdGlob {
@@ -106,10 +142,14 @@ impl StdGlob {
         [StdNames::STD, self.module].map(Name::from).into_iter().collect()
     }
 
+    fn kind(&self, module: &Name, name: &Name) -> Option<Kind> {
+        module.matches::<Whole>(&[self.module]).and_then(|_| self.members.iter().find_map(|member| member.kind(name)))
+    }
+
     fn listed(&self, module: &ItemPath) -> Vec<Listed> {
-        self.names
+        self.members
             .iter()
-            .map(|word| Name::from(*word))
+            .map(|member| Name::from(member.name))
             .map(|name| Listed { binding: Binding::Std(module.joined(&name)), name })
             .collect()
     }
@@ -155,55 +195,56 @@ impl StdNames {
     const STD: Word<'static> = Word::new("std");
     const STD_ROOTS: [Word<'static>; 3] = words!["std", "core", "alloc"];
     const PRELUDE: [Canonical; 37] = [
-        Canonical::new(Word::new("marker"), Word::new("Copy")),
-        Canonical::new(Word::new("marker"), Word::new("Send")),
-        Canonical::new(Word::new("marker"), Word::new("Sized")),
-        Canonical::new(Word::new("marker"), Word::new("Sync")),
-        Canonical::new(Word::new("marker"), Word::new("Unpin")),
-        Canonical::new(Word::new("ops"), Word::new("Drop")),
-        Canonical::new(Word::new("ops"), Word::new("Fn")),
-        Canonical::new(Word::new("ops"), Word::new("FnMut")),
-        Canonical::new(Word::new("ops"), Word::new("FnOnce")),
-        Canonical::new(Word::new("ops"), Word::new("AsyncFn")),
-        Canonical::new(Word::new("ops"), Word::new("AsyncFnMut")),
-        Canonical::new(Word::new("ops"), Word::new("AsyncFnOnce")),
-        Canonical::new(Word::new("boxed"), Word::new("Box")),
-        Canonical::new(Word::new("borrow"), Word::new("ToOwned")),
-        Canonical::new(Word::new("clone"), Word::new("Clone")),
-        Canonical::new(Word::new("cmp"), Word::new("PartialEq")),
-        Canonical::new(Word::new("cmp"), Word::new("PartialOrd")),
-        Canonical::new(Word::new("cmp"), Word::new("Eq")),
-        Canonical::new(Word::new("cmp"), Word::new("Ord")),
-        Canonical::new(Word::new("convert"), Word::new("AsRef")),
-        Canonical::new(Word::new("convert"), Word::new("AsMut")),
-        Canonical::new(Word::new("convert"), Word::new("Into")),
-        Canonical::new(Word::new("convert"), Word::new("From")),
-        Canonical::new(Word::new("convert"), Word::new("TryFrom")),
-        Canonical::new(Word::new("convert"), Word::new("TryInto")),
-        Canonical::new(Word::new("default"), Word::new("Default")),
-        Canonical::new(Word::new("iter"), Word::new("Iterator")),
-        Canonical::new(Word::new("iter"), Word::new("Extend")),
-        Canonical::new(Word::new("iter"), Word::new("IntoIterator")),
-        Canonical::new(Word::new("iter"), Word::new("DoubleEndedIterator")),
-        Canonical::new(Word::new("iter"), Word::new("ExactSizeIterator")),
-        Canonical::new(Word::new("iter"), Word::new("FromIterator")),
-        Canonical::new(Word::new("option"), Word::new("Option")),
-        Canonical::new(Word::new("result"), Word::new("Result")),
-        Canonical::new(Word::new("string"), Word::new("String")),
-        Canonical::new(Word::new("string"), Word::new("ToString")),
-        Canonical::new(Word::new("vec"), Word::new("Vec")),
+        Canonical::new(Word::new("marker"), Word::new("Copy"), Kind::Trait),
+        Canonical::new(Word::new("marker"), Word::new("Send"), Kind::Trait),
+        Canonical::new(Word::new("marker"), Word::new("Sized"), Kind::Trait),
+        Canonical::new(Word::new("marker"), Word::new("Sync"), Kind::Trait),
+        Canonical::new(Word::new("marker"), Word::new("Unpin"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Drop"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Fn"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("FnMut"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("FnOnce"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("AsyncFn"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("AsyncFnMut"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("AsyncFnOnce"), Kind::Trait),
+        Canonical::new(Word::new("boxed"), Word::new("Box"), Kind::Type),
+        Canonical::new(Word::new("borrow"), Word::new("ToOwned"), Kind::Trait),
+        Canonical::new(Word::new("clone"), Word::new("Clone"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("PartialEq"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("PartialOrd"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("Eq"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("Ord"), Kind::Trait),
+        Canonical::new(Word::new("convert"), Word::new("AsRef"), Kind::Trait),
+        Canonical::new(Word::new("convert"), Word::new("AsMut"), Kind::Trait),
+        Canonical::new(Word::new("convert"), Word::new("Into"), Kind::Trait),
+        Canonical::new(Word::new("convert"), Word::new("From"), Kind::Trait),
+        Canonical::new(Word::new("convert"), Word::new("TryFrom"), Kind::Trait),
+        Canonical::new(Word::new("convert"), Word::new("TryInto"), Kind::Trait),
+        Canonical::new(Word::new("default"), Word::new("Default"), Kind::Trait),
+        Canonical::new(Word::new("iter"), Word::new("Iterator"), Kind::Trait),
+        Canonical::new(Word::new("iter"), Word::new("Extend"), Kind::Trait),
+        Canonical::new(Word::new("iter"), Word::new("IntoIterator"), Kind::Trait),
+        Canonical::new(Word::new("iter"), Word::new("DoubleEndedIterator"), Kind::Trait),
+        Canonical::new(Word::new("iter"), Word::new("ExactSizeIterator"), Kind::Trait),
+        Canonical::new(Word::new("iter"), Word::new("FromIterator"), Kind::Trait),
+        Canonical::new(Word::new("option"), Word::new("Option"), Kind::Type),
+        Canonical::new(Word::new("result"), Word::new("Result"), Kind::Type),
+        Canonical::new(Word::new("string"), Word::new("String"), Kind::Type),
+        Canonical::new(Word::new("string"), Word::new("ToString"), Kind::Trait),
+        Canonical::new(Word::new("vec"), Word::new("Vec"), Kind::Type),
     ];
     const DERIVES: [Canonical; 9] = [
-        Canonical::new(Word::new("clone"), Word::new("Clone")),
-        Canonical::new(Word::new("marker"), Word::new("Copy")),
-        Canonical::new(Word::new("fmt"), Word::new("Debug")),
-        Canonical::new(Word::new("default"), Word::new("Default")),
-        Canonical::new(Word::new("cmp"), Word::new("Eq")),
-        Canonical::new(Word::new("hash"), Word::new("Hash")),
-        Canonical::new(Word::new("cmp"), Word::new("Ord")),
-        Canonical::new(Word::new("cmp"), Word::new("PartialEq")),
-        Canonical::new(Word::new("cmp"), Word::new("PartialOrd")),
+        Canonical::new(Word::new("clone"), Word::new("Clone"), Kind::Trait),
+        Canonical::new(Word::new("marker"), Word::new("Copy"), Kind::Trait),
+        Canonical::new(Word::new("fmt"), Word::new("Debug"), Kind::Trait),
+        Canonical::new(Word::new("default"), Word::new("Default"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("Eq"), Kind::Trait),
+        Canonical::new(Word::new("hash"), Word::new("Hash"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("Ord"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("PartialEq"), Kind::Trait),
+        Canonical::new(Word::new("cmp"), Word::new("PartialOrd"), Kind::Trait),
     ];
+    const BEYOND_PRELUDE: [Canonical; 1] = [Canonical::new(Word::new("any"), Word::new("Any"), Kind::Trait)];
     const PRIMITIVES: [PrimitiveName; 17] = [
         PrimitiveName::new(Word::new("bool"), Primitive::Bool),
         PrimitiveName::new(Word::new("char"), Primitive::Char),
@@ -261,57 +302,89 @@ impl StdNames {
     const STD_GLOBS: [StdGlob; 4] = [
         StdGlob {
             module: Word::new("fmt"),
-            names: &words![
-                "Result",
-                "Alignment",
-                "Arguments",
-                "Binary",
-                "Debug",
-                "DebugList",
-                "DebugMap",
-                "DebugSet",
-                "DebugStruct",
-                "DebugTuple",
-                "Display",
-                "Error",
-                "Formatter",
-                "LowerExp",
-                "LowerHex",
-                "Octal",
-                "Pointer",
-                "UpperExp",
-                "UpperHex",
-                "Write",
+            members: &[
+                Member::new(Word::new("Result"), Kind::Type),
+                Member::new(Word::new("Alignment"), Kind::Type),
+                Member::new(Word::new("Arguments"), Kind::Type),
+                Member::new(Word::new("Binary"), Kind::Trait),
+                Member::new(Word::new("Debug"), Kind::Trait),
+                Member::new(Word::new("DebugList"), Kind::Type),
+                Member::new(Word::new("DebugMap"), Kind::Type),
+                Member::new(Word::new("DebugSet"), Kind::Type),
+                Member::new(Word::new("DebugStruct"), Kind::Type),
+                Member::new(Word::new("DebugTuple"), Kind::Type),
+                Member::new(Word::new("Display"), Kind::Trait),
+                Member::new(Word::new("Error"), Kind::Type),
+                Member::new(Word::new("Formatter"), Kind::Type),
+                Member::new(Word::new("LowerExp"), Kind::Trait),
+                Member::new(Word::new("LowerHex"), Kind::Trait),
+                Member::new(Word::new("Octal"), Kind::Trait),
+                Member::new(Word::new("Pointer"), Kind::Trait),
+                Member::new(Word::new("UpperExp"), Kind::Trait),
+                Member::new(Word::new("UpperHex"), Kind::Trait),
+                Member::new(Word::new("Write"), Kind::Trait),
             ],
         },
         StdGlob {
             module: Word::new("io"),
-            names: &words![
-                "Result",
-                "BufRead",
-                "BufReader",
-                "BufWriter",
-                "Cursor",
-                "Error",
-                "ErrorKind",
-                "Read",
-                "Seek",
-                "SeekFrom",
-                "Write",
+            members: &[
+                Member::new(Word::new("Result"), Kind::Type),
+                Member::new(Word::new("BufRead"), Kind::Trait),
+                Member::new(Word::new("BufReader"), Kind::Type),
+                Member::new(Word::new("BufWriter"), Kind::Type),
+                Member::new(Word::new("Cursor"), Kind::Type),
+                Member::new(Word::new("Error"), Kind::Type),
+                Member::new(Word::new("ErrorKind"), Kind::Type),
+                Member::new(Word::new("Read"), Kind::Trait),
+                Member::new(Word::new("Seek"), Kind::Trait),
+                Member::new(Word::new("SeekFrom"), Kind::Type),
+                Member::new(Word::new("Write"), Kind::Trait),
             ],
         },
         StdGlob {
             module: Word::new("hash"),
-            names: &words!["BuildHasher", "BuildHasherDefault", "DefaultHasher", "Hash", "Hasher", "RandomState"],
+            members: &[
+                Member::new(Word::new("BuildHasher"), Kind::Trait),
+                Member::new(Word::new("BuildHasherDefault"), Kind::Type),
+                Member::new(Word::new("DefaultHasher"), Kind::Type),
+                Member::new(Word::new("Hash"), Kind::Trait),
+                Member::new(Word::new("Hasher"), Kind::Trait),
+                Member::new(Word::new("RandomState"), Kind::Type),
+            ],
         },
         StdGlob {
             module: Word::new("cmp"),
-            names: &words!["Eq", "Ord", "PartialEq", "PartialOrd", "Ordering", "Reverse"],
+            members: &[
+                Member::new(Word::new("Eq"), Kind::Trait),
+                Member::new(Word::new("Ord"), Kind::Trait),
+                Member::new(Word::new("PartialEq"), Kind::Trait),
+                Member::new(Word::new("PartialOrd"), Kind::Trait),
+                Member::new(Word::new("Ordering"), Kind::Type),
+                Member::new(Word::new("Reverse"), Kind::Type),
+            ],
         },
     ];
 
     pub(crate) fn aliased(building: Building) -> Building {
         Self::STD_ALIASES.iter().fold(building, |building, alias| alias.declared(building))
+    }
+
+    pub(super) fn resolved(path: ItemPath) -> Resolved {
+        let found = match path.as_ref() {
+            [_, module, name] => Self::kind(module, name),
+            _ => None,
+        };
+        Kind::resolved(found, path)
+    }
+
+    fn kind(module: &Name, name: &Name) -> Option<Kind> {
+        let listed = Self::STD_GLOBS.iter().find_map(|glob| glob.kind(module, name));
+        Self::PRELUDE
+            .iter()
+            .chain(&Self::DERIVES)
+            .chain(&Self::BEYOND_PRELUDE)
+            .find_map(|canonical| canonical.kind(module, name))
+            .or(listed)
     }
 
     pub(super) fn primitive(only: &Name) -> Option<Primitive> {

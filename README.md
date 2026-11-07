@@ -60,7 +60,8 @@ field only inside a module named `boundary` or a crate whose name ends in the wo
 (a struct with one unnamed field) and its own `new`, `try_new` and `into_inner` with one input, and trait impls, since the
 trait fixes the signature (`Display`, `FromStr`, `From`, `TryFrom`, `Debug`, `Hash`, `Ord` and the like); the trait
 declaration is read instead. A unit return is not flagged, nor are consts, statics and types inside bodies. Wire forms such
-as `serde_json::Value` and `toml::Value` are flagged the same way. Text handling (`trim`, `format!`, `to_string` and the like)
+as `serde_json::Value` and `toml::Value` are flagged the same way; a std trait such as `std::any::Any` is never a primitive
+or wire form, whether written as `dyn`, `impl` or a bound. Text handling (`trim`, `format!`, `to_string` and the like)
 is allowed in a door impl (`FromStr`, `TryFrom`, `Display`, `AsRef`, `Borrow`, `Deref`), on a type that has one, and in a
 boundary. The message names the fix: take and return a domain type, or move the code into a module named `boundary`.
 

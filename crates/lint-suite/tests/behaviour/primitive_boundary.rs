@@ -57,10 +57,16 @@ const MACRO_TEXT: &str =
 const BESIDE_MACRO: &str = "m! {\n    fn f(x: &str) {}\n}\nfn g(y: u8) {}\n";
 const SAME_NAME_DOOR: &str = "mod m {\n    pub struct A;\n    impl std::fmt::Display for A {\n        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {\n            g(f)\n        }\n    }\n}\nmod n {\n    pub struct A;\n    impl A {\n        fn f(x: Name) {\n            x.trim();\n        }\n    }\n}\n";
 const SAME_NAME_NEWTYPE: &str = "pub struct Id(u64);\nmod other {\n    pub struct Id {\n        v: V,\n    }\n    impl Id {\n        pub fn new(v: u64) -> Id {\n            g(v)\n        }\n    }\n}\n";
+const ANY_TRAIT: &str = "use std::any::Any;\npub fn f(a: &dyn Any, b: impl core::any::Any) {}\npub fn g<T: std::any::Any>(t: T, c: u32) {}\n";
 const MODULE_ALIAS: &str =
     "pub type Count = usize;\nmod inner {\n    use super::Count;\n    fn c(x: Count) {}\n}\nfn d(x: Count) {}\n";
 
-const CASES: [Case; 55] = [
+const CASES: [Case; 56] = [
+    Case::new(
+        Title::new("std's Any is a trait, so dyn, impl and bound uses of it are not primitives"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ANY_TRAIT))],
+        Flagged::new(&["crates/x/src/lib.rs:3"]),
+    ),
     Case::new(
         Title::new("a door on another same-named type exempts nothing"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME_NAME_DOOR))],

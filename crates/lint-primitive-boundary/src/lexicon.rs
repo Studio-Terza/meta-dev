@@ -94,8 +94,6 @@ impl Lexicon {
         "bool", "char", "str", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128", "isize",
         "f32", "f64"
     ];
-    const ANY: [Word<'static>; 3] = words!["std", "any", "Any"];
-    const CORE_ANY: [Word<'static>; 3] = words!["core", "any", "Any"];
     const WIRE_CRATES: [&'static [Word<'static>]; 7] = [
         &words!["serde_json", "Value"],
         &words!["toml", "Value"],
@@ -111,11 +109,7 @@ impl Lexicon {
         Lexicon {
             owned: Lexicon::OWNED.into_iter().collect(),
             owned_spellings: Lexicon::OWNED_SPELLINGS.iter().map(|owned| owned.iter().copied().collect()).collect(),
-            wires: Lexicon::WIRE_CRATES
-                .iter()
-                .map(|wire| Wire::rooted(wire, Resolved::External))
-                .chain([Wire::rooted(&Lexicon::ANY, Resolved::Std), Wire::rooted(&Lexicon::CORE_ANY, Resolved::Std)])
-                .collect(),
+            wires: Lexicon::WIRE_CRATES.iter().map(|wire| Wire::rooted(wire, Resolved::External)).collect(),
         }
     }
 

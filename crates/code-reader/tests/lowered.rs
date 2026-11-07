@@ -173,8 +173,8 @@ impl Expect {
         Expect::named(Resolved::Primitive(primitive), Vec::new())
     }
 
-    fn std(segments: &[&str]) -> Resolved {
-        Resolved::Std(Expect::path(segments))
+    fn std_trait(segments: &[&str]) -> Resolved {
+        Resolved::StdTrait(Expect::path(segments))
     }
 
     fn referenced(pointee: TypeRef<Resolved>) -> TypeRef<Resolved> {
@@ -205,16 +205,16 @@ laws::table!(a_type_is_lowered_into_its_structured_form, |text: &&str| Read::wri
     ARRAY => [TypeRef::Array(Arrayed::new(Expect::integer(), Vec::new()))],
     MEASURED => [TypeRef::Array(Arrayed::new(Expect::integer(), vec![Expect::integer()]))],
     IMPLEMENTING => [TypeRef::Bounded(Bounds::from(vec![Named::new(
-        Expect::std(&["std", "convert", "Into"]),
+        Expect::std_trait(&["std", "convert", "Into"]),
         vec![Expect::integer()],
     )]))],
     DYNAMIC => [Expect::referenced(TypeRef::Bounded(Bounds::from(vec![Named::bound(
-        Expect::std(&["std", "ops", "Fn"]),
+        Expect::std_trait(&["std", "ops", "Fn"]),
         vec![Expect::primitive(Primitive::Char)],
         vec![Expect::primitive(Primitive::Bool)],
     )])))],
     BOUND_ITEM => [TypeRef::Bounded(Bounds::from(vec![Named::bound(
-        Expect::std(&["std", "iter", "Iterator"]),
+        Expect::std_trait(&["std", "iter", "Iterator"]),
         Vec::new(),
         vec![Expect::integer()],
     )]))],
@@ -236,13 +236,13 @@ fn a_signature_reads_its_generic_constraints_inputs_and_output() {
         Read::written(CONSTRAINED),
         [
             TypeRef::Bounded(Bounds::from(vec![Named::new(
-                Expect::std(&["std", "convert", "Into"]),
+                Expect::std_trait(&["std", "convert", "Into"]),
                 vec![Expect::integer()]
             )])),
             Expect::integer(),
             Expect::primitive(Primitive::Bool),
             parameter("T"),
-            TypeRef::Bounded(Bounds::from(vec![Named::new(Expect::std(&["std", "marker", "Copy"]), Vec::new())])),
+            TypeRef::Bounded(Bounds::from(vec![Named::new(Expect::std_trait(&["std", "marker", "Copy"]), Vec::new())])),
             parameter("T"),
             parameter("U"),
         ]
