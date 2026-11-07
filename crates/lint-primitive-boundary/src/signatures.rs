@@ -2,7 +2,7 @@ use std::path::Path;
 
 use code_model::{ItemPath, Model, Named, Resolved, Site, Sited, Spelling, TypeRef, TypeUses};
 use lint_core::Violation;
-use lint_layout::{LineNumber, Name};
+use lint_layout::{Name, Position};
 
 use crate::lexicon::{Identity, Lexicon, Lone};
 use crate::scope::Scope;
@@ -10,12 +10,18 @@ use crate::scope::Scope;
 #[derive(Debug)]
 struct Candidate {
     identity: Identity,
-    line: LineNumber,
+    position: Position,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Spot<'model> {
+    path: &'model Path,
+    position: Position,
 }
 
 #[derive(Debug)]
 struct Ranked<'model> {
-    row: Site<'model>,
+    spot: Spot<'model>,
     violation: Violation<'model>,
 }
 
@@ -28,14 +34,14 @@ struct TypeWalk<'walk, 'model> {
 }
 
 impl TypeWalk<'_, '_> {
-    fn spelled(&mut self, named: &Named<Sited>, written: &ItemPath, line: LineNumber) {
+    fn spelled(&mut self, named: &Named<Sited>, written: &ItemPath, position: Position) {
         let resolved: &Resolved = named.as_ref();
         let solo = Lone::within(written);
         let identity = self.lexicon.identity(resolved, written);
         let direct = identity.and_then(|identity| identity.direct(solo));
         let target = solo.and(self.scope.local_alias(resolved, self.file)).and_then(TypeRef::named);
         let aliased = target.and_then(|target| self.aliased(target));
-        self.found.extend(direct.into_iter().chain(aliased).map(|identity| Candidate { identity, line }));
+        self.found.extend(direct.into_iter().chain(aliased).map(|identity| Candidate { identity, position }));
         named.each_inner_use(self);
     }
 
@@ -50,8 +56,8 @@ impl TypeWalk<'_, '_> {
 impl TypeUses for TypeWalk<'_, '_> {
     fn named(&mut self, named: &Named<Sited>) {
         let spelling: &Spelling = AsRef::<Sited>::as_ref(named).as_ref();
-        spelling.written().zip(spelling.line()).into_iter().fold(self, |walk, (written, line)| {
-            walk.spelled(named, written, line);
+        spelling.written().zip(spelling.position()).into_iter().fold(self, |walk, (written, position)| {
+            walk.spelled(named, written, position);
             walk
         });
     }
@@ -78,7 +84,7 @@ impl<'read, 'model> Signatures<'read, 'model> {
             holding.map(|holding| self.ranked(placed.site(), holding.as_ref(), [holding.as_ref()].into_iter()))
         });
         let mut ranked: Vec<Ranked<'model>> = functions.chain(holdings).flatten().collect();
-        ranked.sort_by(|left, right| left.row.cmp(&right.row));
+        ranked.sort_by_key(|ranked| ranked.spot);
         ranked.into_iter().map(|ranked| ranked.violation).collect()
     }
 
@@ -93,8 +99,11 @@ impl<'read, 'model> Signatures<'read, 'model> {
         walk.found
             .into_iter()
             .map(|found| Ranked {
-                row: site,
-                violation: Violation::new(Site::new(site.path(), found.line), found.identity.finding(context.clone())),
+                spot: Spot { path: site.path(), position: found.position },
+                violation: Violation::new(
+                    Site::new(site.path(), found.position.line()),
+                    found.identity.finding(context.clone()),
+                ),
             })
             .collect()
     }

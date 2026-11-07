@@ -21,7 +21,7 @@ impl ModelLint for PrimitiveBoundary {
         let scope = Scope::read(model);
         let mut found: Vec<Violation<'_>> =
             Signatures::new(&lexicon, &scope).found(model).into_iter().chain(Texts::new(&scope).found(model)).collect();
-        found.sort();
+        found.sort_by(|left, right| left.site().path().cmp(right.site().path()));
         Report::new(Headline::new("primitives appear in signatures and fields only inside a boundary"), found)
     }
 }

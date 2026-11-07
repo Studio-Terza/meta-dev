@@ -72,7 +72,18 @@ const WIRE_THROUGH_SUPER_GLOB: &str =
     "use serde_json::Value;\nmod inner {\n    use super::*;\n    fn c(x: Value) {}\n}\n";
 const LOCAL_STRING: &str = "pub struct String;\npub fn f(x: String) -> A {}\n";
 
-const CASES: [Case; 66] = [
+const OTHER_CRATE_NEWTYPE: &str = "pub struct Capture(Sink);\n";
+const OTHER_CRATE_CONSTRUCTOR: &str = "pub struct Capture {\n    sink: Sink,\n    yields: Yields,\n}\nimpl Capture {\n    pub fn new(v: u64) -> Capture {\n        g(v)\n    }\n}\n";
+
+const CASES: [Case; 67] = [
+    Case::new(
+        Title::new("a constructor on a struct with fields beside a same-named newtype in another crate"),
+        &[
+            Source::new(Located::new("crates/a/src/lib.rs"), Text::new(OTHER_CRATE_NEWTYPE)),
+            Source::new(Located::new("crates/b/src/lib.rs"), Text::new(OTHER_CRATE_CONSTRUCTOR)),
+        ],
+        Flagged::new(&["crates/b/src/lib.rs:6"]),
+    ),
     Case::new(
         Title::new("an inner struct shadows an outer alias of a primitive, as rustc resolves it"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SHADOWED_ALIAS))],

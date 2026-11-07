@@ -3,7 +3,7 @@ use syn::{Attribute, Field, Generics, Ident, ItemStruct};
 
 use code_model::{Building, Held, Holding, ItemId};
 use lint_core::Syntax;
-use lint_layout::{LineNumber, Name};
+use lint_layout::{Name, Position};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
@@ -14,18 +14,18 @@ use code_model::{Region, TypeRef};
 
 #[derive(Clone, Debug)]
 pub(super) struct Holder {
-    line: LineNumber,
+    position: Position,
     name: Name,
     held: Held,
 }
 
 impl Holder {
     pub(super) fn named(ident: &Ident, held: Held) -> Holder {
-        Holder { line: LineNumber::from(ident.span()), name: Name::from(ident), held }
+        Holder { position: Position::from(ident.span()), name: Name::from(ident), held }
     }
 
     fn field(&self, field: &Field) -> Holder {
-        Holder { line: LineNumber::from(field.span()), name: self.field_name(field), held: self.held }
+        Holder { position: Position::from(field.span()), name: self.field_name(field), held: self.held }
     }
 
     fn field_name(&self, field: &Field) -> Name {
@@ -72,7 +72,7 @@ impl Built for HoldingRow {
 
 impl Lowering<'_, '_> {
     pub(super) fn hold(&mut self, holder: Holder, link: Link, ty: TypeRef<Written>) {
-        let located = self.here.located(holder.line);
+        let located = self.here.located(holder.position);
         self.lowered.holdings.push(HoldingRow { located, holder, region: self.context.region(), link, ty });
     }
 

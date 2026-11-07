@@ -21,7 +21,7 @@ use code_model::{
     Alias, Building, Entry, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Region, Signature,
     Sited, Spelling, Subject, TypeRef,
 };
-use lint_layout::{LineNumber, Name, TestMarks, Whole, Word, words};
+use lint_layout::{Name, Position, TestMarks, Whole, Word, words};
 
 use crate::namespace::{
     CrateForm, Declared, DeclaredKind, Domain, Entries, Namespace, Resolver, Resolving, ScopeId, ScopeKind, Seeds,
@@ -95,7 +95,7 @@ impl ImplRow {
 
     fn written(seat: &Seat, region: Region, block: &ItemImpl, ty: TypeRef<Written>) -> ImplRow {
         ImplRow {
-            located: seat.located(LineNumber::from(block.impl_token.span)),
+            located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),
             ty,
             implemented: block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path)),
@@ -106,11 +106,11 @@ impl ImplRow {
     }
 
     fn derived(seat: &Seat, region: Region, path: &syn::Path, subject: &Ident) -> ImplRow {
-        let line = LineNumber::from(path.span());
+        let position = Position::from(path.span());
         ImplRow {
-            located: seat.located(line),
+            located: seat.located(position),
             subject: Name::from(subject),
-            ty: TypeRef::Named(Named::new(Written::path(UsePath::from(subject), line), Vec::new())),
+            ty: TypeRef::Named(Named::new(Written::path(UsePath::from(subject), position), Vec::new())),
             implemented: Some(UsePath::from(path)),
             domain: Domain::Macros,
             origin: Origin::Derived,
@@ -135,7 +135,7 @@ impl Built for ImplRow {
     fn built(self, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
         let located = self.located;
         let implemented = self.implemented.map(|path| {
-            let spelling = Spelling::Written(path.written(), located.line());
+            let spelling = Spelling::Written(path.written(), located.position());
             Sited::new(resolving.path(located.scope(), &path, self.domain), spelling)
         });
         let subject = Subject::new(self.subject, Written::typed(&self.ty, resolving, located.scope()));
@@ -374,7 +374,7 @@ impl Lowering<'_, '_> {
         let generics = self.generics.extended(&signature.generics);
         let name = Name::from(&signature.ident);
         self.lowered.functions.push(FnRow {
-            located: self.here.located(LineNumber::from(signature.ident.span())),
+            located: self.here.located(Position::from(signature.ident.span())),
             owner: self.enclosure.owner(),
             entry: self.enclosure.entry(attributes, &name),
             inputs: generics.inputs(signature),
