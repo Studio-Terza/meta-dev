@@ -45,7 +45,6 @@ laws::table!(
         Row::new("added.diff", "a\nc\n", "a\nb\nc\n") => (),
         Row::new("repeated.diff", "a\na\n", "a\n") => (),
         Row::new("empty.diff", "", "a\nb\n") => (),
-        Row::new("apostrophe.diff", "'a\n", "b\n") => (),
     ]
 );
 

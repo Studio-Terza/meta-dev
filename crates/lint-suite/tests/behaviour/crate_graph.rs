@@ -5,7 +5,7 @@ use lint_fixtures::{Lines, Sources, Text};
 const ONE: &str = "crates/one/src/lib.rs";
 const TWO: &str = "crates/two/src/lib.rs";
 const FLAGGED: [&str; 1] = ["crates/one/src/lib.rs:1"];
-const BIG_RING: usize = 41;
+const BIG_RING: usize = LINKS_IN_ROOT * 2 + 1;
 const SMALL_RING: usize = 6;
 const LINKS_IN_ROOT: usize = 20;
 const LONG_CHAIN: usize = 20_000;

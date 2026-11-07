@@ -21,6 +21,6 @@ impl<const WANTED: usize> From<[&str; WANTED]> for Lines {
 
 impl fmt::Display for Lines {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.iter().try_for_each(|line| write!(formatter, "{line} "))
+        write!(formatter, "{:?}", self.0)
     }
 }
