@@ -63,13 +63,9 @@ impl<'model> Kinds<'model> {
                 played
             });
         let derives = |role: Role| played.get(&role).cloned().unwrap_or_default();
-        let validated: BTreeSet<ItemId> =
-            derives(Role::DeserializesChecked).iter().map(|derive| derive.subject).collect();
-        let plain = derives(Role::Deserializes)
-            .iter()
-            .map(|derive| derive.subject)
-            .filter(|subject| validated.get(subject).is_none())
-            .collect();
+        let subjects = |role: Role| -> BTreeSet<ItemId> { derives(role).iter().map(|derive| derive.subject).collect() };
+        let validated = subjects(Role::DeserializesChecked);
+        let plain = subjects(Role::Deserializes).difference(&validated).copied().collect();
         Kinds { validated, plain, unresolved: derives(Role::Unresolved) }
     }
 

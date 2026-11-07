@@ -314,21 +314,24 @@ impl Packaged {
         }
     }
 
-    fn mismatches(cases: &[Case]) -> Vec<String> {
+    fn flagged(cases: &[Case]) -> Vec<String> {
         let manifests = Self::manifests();
         cases
             .iter()
-            .filter_map(|case| {
+            .map(|case| {
                 let files: Vec<SourceFile> =
                     case.sources().iter().map(|source| Self::parsed(&manifests, source)).collect();
-                let found = Queried::<NoPlaintext>::flagged(&files);
-                Some(format!("{} flagged {found}", case.name())).filter(|_| found != Lines::from(case.flagged()))
+                format!("{} flagged {}", case.name(), Queried::<NoPlaintext>::flagged(&files))
             })
             .collect()
+    }
+
+    fn wanted(cases: &[Case]) -> Vec<String> {
+        cases.iter().map(|case| format!("{} flagged {}", case.name(), Lines::from(case.flagged()))).collect()
     }
 }
 
 #[test]
 fn deserialized_data_holds_no_free_text() {
-    assert_eq!(Packaged::mismatches(&CASES), Vec::<String>::new());
+    assert_eq!(Packaged::flagged(&CASES), Packaged::wanted(&CASES));
 }

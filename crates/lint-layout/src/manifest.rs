@@ -1,8 +1,10 @@
 mod members;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::convert::Infallible;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use file_ports::{FileFailure, Files, Text};
 use newtype::Wrapping;
@@ -20,6 +22,19 @@ use crate::source_text::SourceText;
 use crate::untested::Untested;
 use crate::word::Word;
 use members::Members;
+
+#[derive(Debug)]
+struct CrateKey(Name);
+
+impl FromStr for CrateKey {
+    type Err = Infallible;
+
+    fn from_str(key: &str) -> Result<CrateKey, Infallible> {
+        let underscored: String =
+            key.chars().map(|letter| Some(letter).filter(|letter| *letter != '-').unwrap_or('_')).collect();
+        Ok(CrateKey(Name::from(underscored.as_str())))
+    }
+}
 
 #[derive(Debug)]
 pub struct Manifest {
@@ -91,11 +106,11 @@ impl Manifest {
             .flat_map(|section| Self::DEPENDENCIES.iter().filter_map(|kind| section.get(*kind)))
             .filter_map(Value::as_table)
             .flat_map(Table::iter)
-            .map(|(key, declared)| {
+            .filter_map(|(key, declared)| {
                 let source =
                     declared.get(Self::WORKSPACE).and(inherited.and_then(|table| table.get(key))).unwrap_or(declared);
                 let package = source.get(Self::PACKAGE).and_then(Value::as_str).unwrap_or(key);
-                (Name::from(key.replace('-', "_").as_str()), PackageName::from(&Name::from(package)))
+                Some((key.parse::<CrateKey>().ok()?.0, PackageName::from(&Name::from(package))))
             })
             .collect()
     }
