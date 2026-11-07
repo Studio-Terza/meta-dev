@@ -798,7 +798,7 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
             ),
             1,
         ),
-        (format!("fn render_page(a: {angle}{}) {{}}\n", ">".repeat(SHALLOW_NESTING) + &angle), 1),
+        (format!("fn render_page(a: {angle}{}{angle}) {{}}\n", ">".repeat(SHALLOW_NESTING)), 1),
     ];
     cases.iter().try_for_each(|(source, failures)| {
         let root = Scratch::package()?;
