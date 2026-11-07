@@ -18,6 +18,8 @@ const TRY_FROM_UNWRITTEN: &str =
     "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\n";
 const TRY_FROM_ELSEWHERE: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\nstruct B;\nimpl TryFrom<String> for B {\n    type Error = u8;\n    fn try_from(text: String) -> Result<B, u8> { Ok(B) }\n}\n";
 
+const TRY_FROM_UNASKED: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A(String);\nimpl TryFrom<String> for A {\n    type Error = u8;\n    fn try_from(text: String) -> Result<A, u8> { Ok(A(text)) }\n}\n";
+
 const NEWTYPES: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct Id(String);\nstruct Plain(String);\nstruct Named {\n    text: String,\n}\nstruct Key(Plain);\nstruct C(B);\nstruct B(Z);\nstruct Z(String);\nmod inner {\n    pub struct Hidden(String);\n}\n#[derive(Deserialize)]\nstruct U {\n    id: Id,\n    plain: Plain,\n    named: Named,\n    nested: Vec<Option<Plain>>,\n    key: Key,\n    deep: C,\n    hidden: inner::Hidden,\n}\n";
 const NOT_NEWTYPES: &str = "use serde::Deserialize;\nstruct Pair(String, String);\nstruct Unit;\nstruct Count(u32);\nstruct Two {\n    a: String,\n    b: String,\n}\n#[derive(Deserialize)]\nstruct U {\n    pair: Pair,\n    unit: Unit,\n    count: Count,\n    two: Two,\n}\n";
 const ROOT: &str = "mod a;\nmod b;\nmod c;\n";
@@ -39,7 +41,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 22] = [
+const CASES: [Case; 23] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("a.rs"), Text::new(TEXT_FIELDS))],
@@ -94,6 +96,11 @@ const CASES: [Case; 22] = [
         Title::new("serde try_from with a TryFrom impl for another type"),
         &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM_ELSEWHERE))],
         Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a TryFrom impl without serde try_from"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM_UNASKED))],
+        Flagged::new(&["a.rs:3"]),
     ),
     Case::new(
         Title::new("an unvalidated newtype of text is text, through newtypes and containers"),
