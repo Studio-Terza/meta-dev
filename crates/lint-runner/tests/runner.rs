@@ -578,7 +578,10 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    let ring: Vec<String> = (0..RING).map(|index| format!("pub struct R{index}(R{});\n", (index + 1) % RING)).collect();
+    let ring: Vec<String> = (0..RING)
+        .zip((0..RING).cycle().skip(1))
+        .map(|(index, next)| format!("pub struct R{index}(R{next});\n"))
+        .collect();
     let ring = ring.concat();
     root.write("code/lib.rs", &format!("pub mod a;\n{ring}"))?;
     root.write("code/a.rs", CHAIN_A)?;

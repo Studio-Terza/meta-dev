@@ -13,9 +13,13 @@ const LONG_CHAIN: usize = 20_000;
 struct Items;
 
 impl Items {
+    fn links(size: usize) -> impl Iterator<Item = (usize, usize)> {
+        (0..size).zip((0..size).cycle().skip(1))
+    }
+
     fn ring(prefix: &str, size: usize) -> String {
         let lines: Vec<String> =
-            (0..size).map(|index| format!("pub struct {prefix}{index}({prefix}{});\n", (index + 1) % size)).collect();
+            Self::links(size).map(|(index, next)| format!("pub struct {prefix}{index}({prefix}{next});\n")).collect();
         lines.concat()
     }
 
@@ -29,7 +33,7 @@ impl Items {
 
     fn ring_with_first_item_in(before: &str, after: &str, size: usize) -> String {
         let rest: Vec<String> =
-            (1..size).map(|index| format!("pub struct A{index}(A{});\n", (index + 1) % size)).collect();
+            Items::links(size).skip(1).map(|(index, next)| format!("pub struct A{index}(A{next});\n")).collect();
         format!("{before}pub struct A0(A1);\n{after}{}", rest.concat())
     }
 
@@ -67,14 +71,11 @@ fn a_long_chain_is_judged_without_exhausting_the_stack() {
 
 #[test]
 fn a_cycle_closed_through_impl_bodies_across_files_is_flagged() {
-    let link = |index: usize| {
-        format!(
-            "pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        R{}::f();\n    }}\n}}\n",
-            (index + 1) % BIG_RING
-        )
+    let link = |(index, next): (usize, usize)| {
+        format!("pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        R{next}::f();\n    }}\n}}\n")
     };
-    let first: Vec<String> = (0..LINKS_IN_ROOT).map(link).collect();
-    let second: Vec<String> = (LINKS_IN_ROOT..BIG_RING).map(link).collect();
+    let first: Vec<String> = Items::links(BIG_RING).take(LINKS_IN_ROOT).map(link).collect();
+    let second: Vec<String> = Items::links(BIG_RING).skip(LINKS_IN_ROOT).map(link).collect();
     let root = Sources::file(ONE, Text::new(&format!("mod other;\n{}", first.concat())));
     let other = Sources::file("crates/one/src/other.rs", Text::new(&second.concat()));
     assert_eq!(Items::flagged(&[root, other]), Lines::from(FLAGGED));
@@ -109,14 +110,13 @@ fn a_link_closed_only_in_a_test_impl_does_not_count() {
 
 #[test]
 fn a_cycle_closed_through_a_type_alias_path_is_flagged() {
-    let link = |index: usize| {
-        let next = (index + 1) % BIG_RING;
+    let link = |(index, next): (usize, usize)| {
         let called = Some(next)
             .filter(|next| *next != 0)
             .map_or_else(|| "crate::L".to_owned(), |next| format!("crate::R{next}"));
         format!("pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        {called}::f();\n    }}\n}}\n")
     };
-    let links: Vec<String> = (0..BIG_RING).map(link).collect();
+    let links: Vec<String> = Items::links(BIG_RING).map(link).collect();
     let source = format!("pub type L = R0;\n{}", links.concat());
     assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&source))]), Lines::from(FLAGGED));
 }

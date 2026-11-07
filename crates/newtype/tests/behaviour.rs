@@ -148,7 +148,7 @@ laws::law!(a_formatted_string_with_its_own_strategy_generates, any::<Digest>(), 
 });
 
 laws::law!(a_plain_newtype_takes_its_own_strategy, any::<Even>(), even, {
-    prop_assert_eq!(even.into_inner() % 2, 0);
+    prop_assert!(even.into_inner().is_multiple_of(2));
 });
 
 laws::law!(a_generic_field_that_is_not_the_bare_parameter_generates, any::<Many<u8>>(), many, {
