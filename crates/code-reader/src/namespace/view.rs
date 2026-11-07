@@ -66,6 +66,13 @@ impl Determinacy {
         }
     }
 
+    fn deferring<'rows>(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
+        match self {
+            Determinacy::Determined => disputed,
+            Determinacy::Weak | Determinacy::Strong => deferred(),
+        }
+    }
+
     fn absent(self, absent: impl FnOnce() -> Outer) -> Resolution {
         match self {
             Determinacy::Determined => Resolution::Bound(absent().binding()),
@@ -93,6 +100,25 @@ impl<'rows> View<'rows> {
 
     pub(super) fn undisputed(self) -> View<'rows> {
         View { found: self.found.undisputed(), pending: self.pending }
+    }
+
+    pub(super) fn disputed(
+        self,
+        explicit: impl FnOnce() -> View<'rows>,
+        deferred: impl FnOnce() -> View<'rows>,
+    ) -> View<'rows> {
+        match self.found {
+            Found::Conflict => explicit().deferring(self, deferred),
+            Found::Nothing | Found::One(_) => self,
+        }
+    }
+
+    fn deferring(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
+        match self.found {
+            Found::One(_) => deferred(),
+            Found::Conflict => disputed,
+            Found::Nothing => self.pending.deferring(disputed, deferred),
+        }
     }
 
     pub(super) fn admitted(admission: Admission, shown: impl FnOnce() -> View<'rows>) -> View<'rows> {

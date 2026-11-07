@@ -215,6 +215,10 @@ impl Lookup {
         Lookup { sight, ignored, reading }
     }
 
+    pub(super) fn outer(self) -> Lookup {
+        Lookup { sight: self.sight, ignored: None, reading: self.reading }
+    }
+
     fn found<'rows>(self, level: Level<'_, 'rows>, sought: Sought<'_>) -> View<'rows> {
         let globbed = || {
             level

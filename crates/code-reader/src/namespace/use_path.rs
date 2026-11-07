@@ -41,6 +41,7 @@ impl Leading {
 pub(super) enum Reading {
     Written,
     Imported,
+    Explicit,
 }
 
 impl Reading {
@@ -48,12 +49,13 @@ impl Reading {
         match self {
             Reading::Written => view,
             Reading::Imported => view.undisputed(),
+            Reading::Explicit => View::ABSENT,
         }
     }
 
     fn lone(self, first: &Name) -> Binding {
         match self {
-            Reading::Written => Binding::Unknown,
+            Reading::Written | Reading::Explicit => Binding::Unknown,
             Reading::Imported => Binding::External(ItemPath::default().joined(first)),
         }
     }

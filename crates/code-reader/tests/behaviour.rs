@@ -99,6 +99,10 @@ const STD_RENAMED: &str = "use core as c;\nimpl c::clone::Clone for R {}\n";
 const IMPORT_BESIDE_STD_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\nimpl Value for R {}\n";
 const IMPORT_BESIDE_OTHER_GLOB: &str = "use other::*;\nuse rust_decimal::Decimal;\nimpl Decimal for R {}\n";
 const IMPORT_BESIDE_CRATE_GLOB: &str = "mod rejection {\n    pub use axum_core::extract::rejection::*;\n}\nuse crate::rejection::*;\nuse serde_json::Value;\nimpl Value for R {}\n";
+const IMPORT_BESIDE_BLOCK_MACRO: &str =
+    "use rust_decimal::Decimal;\nfn f() {\n    make!();\n    impl Decimal for R {}\n}\n";
+const IMPORT_BESIDE_BLOCK_GLOB: &str =
+    "use rust_decimal::Decimal;\nfn f() {\n    use other::*;\n    impl Decimal for R {}\n}\n";
 const GLOB_STILL_HIDES_UNIMPORTED: &str = "use std::collections::*;\nuse serde_json::Value;\nimpl Clone for R {}\n";
 
 const DERIVE_SHADOWED: &str = "trait Clone {}\n#[derive(Clone, Debug)]\nstruct A;\n";
@@ -549,6 +553,8 @@ laws::table!(an_explicit_import_shadows_every_glob_beside_it, |text: &&str| Read
     IMPORT_BESIDE_STD_GLOB => [Expect::external(&["serde_json", "Value"])],
     IMPORT_BESIDE_OTHER_GLOB => [Expect::external(&["rust_decimal", "Decimal"])],
     IMPORT_BESIDE_CRATE_GLOB => [Expect::external(&["serde_json", "Value"])],
+    IMPORT_BESIDE_BLOCK_MACRO => [Expect::external(&["rust_decimal", "Decimal"])],
+    IMPORT_BESIDE_BLOCK_GLOB => [Expect::external(&["rust_decimal", "Decimal"])],
     GLOB_STILL_HIDES_UNIMPORTED => [Expect::unknown(&["Clone"])],
 ]);
 

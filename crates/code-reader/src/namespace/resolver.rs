@@ -160,9 +160,19 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
-        let ignored = iter::once(self.ignored).chain(iter::repeat(None));
-        self.space.chain(scope).iter().zip(ignored).fold(View::ABSENT, |found, (level, ignored)| {
-            found.or_else(|| self.tables.found(*level, key, Lookup::new(Sight::Inside, ignored, reading)))
-        })
+        let levels = self.space.chain(scope);
+        let first = |reading: Reading| Lookup::new(Sight::Inside, self.ignored, reading);
+        self.walked(levels, key, first(reading)).disputed(
+            || self.walked(levels, key, first(Reading::Explicit)),
+            || self.walked(levels, key, first(Reading::Imported)),
+        )
+    }
+
+    fn walked(&self, levels: &[ScopeId], key: Key<'_>, first: Lookup) -> View<'rows> {
+        let lookups = iter::once(first).chain(iter::repeat(first.outer()));
+        levels
+            .iter()
+            .zip(lookups)
+            .fold(View::ABSENT, |found, (level, lookup)| found.or_else(|| self.tables.found(*level, key, lookup)))
     }
 }
