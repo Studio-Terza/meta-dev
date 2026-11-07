@@ -49,7 +49,7 @@ impl Difference {
     }
 
     fn marked(formatter: &mut fmt::Formatter<'_>, mark: Mark, lines: &[Line]) -> fmt::Result {
-        lines.iter().try_for_each(|line| writeln!(formatter, "{mark} \"{}\"", line.as_ref().escape_debug()))
+        lines.iter().try_for_each(|line| writeln!(formatter, "{mark} {line}"))
     }
 }
 
