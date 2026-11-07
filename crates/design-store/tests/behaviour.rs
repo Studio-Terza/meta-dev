@@ -2,6 +2,7 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use design_model::{
     AnyNode, Casting, Entered, Entry, Facet, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix,
@@ -21,7 +22,7 @@ use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::{Counter, Newtype};
 use port_core::{Port, Run};
-use store_ports::{Sqlite, Store, Written};
+use store_ports::{Migrator, Schema, Sqlite, Store, Written};
 use stream::Stream;
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
@@ -209,6 +210,46 @@ fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> 
     let lines = [Said::owner("o1", 1, "omega"), Said::lead("l1", "omega")];
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Owner)?, ["o1 owner 2026-01-01T00:00:01Z omega"]);
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Everyone)?.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_stem_finds_its_inflected_forms() -> Result<(), Box<dyn Error>> {
+    let lines = [Said::owner("o1", 1, "banning dyn seems desirable"), Said::owner("o2", 2, "we decided")];
+    assert_eq!(Said::found(&lines, &["ban", "dyn"])?, ["o1 owner 2026-01-01T00:00:01Z banning dyn seems desirable"]);
+    assert_eq!(Said::found(&lines, &["decide"])?, ["o2 owner 2026-01-01T00:00:02Z we decided"]);
+    Ok(())
+}
+
+#[test]
+fn an_unrelated_word_finds_nothing() -> Result<(), Box<dyn Error>> {
+    let lines = [Said::owner("o1", 1, "banning dyn seems desirable"), Said::owner("o2", 2, "we decided")];
+    assert_eq!(Said::found(&lines, &["kettle"])?, Vec::<String>::new());
+    Ok(())
+}
+
+static SEEDS: Migrator = store_ports::migrate!("tests/seeded");
+
+static SEEDED: LazyLock<Migrator> =
+    LazyLock::new(|| Migrator::with_migrations(StreamSchema::migrator().iter().chain(SEEDS.iter()).cloned().collect()));
+
+#[derive(Clone, Copy, Debug)]
+struct Seeded;
+
+impl Schema for Seeded {
+    fn migrator() -> &'static Migrator {
+        &SEEDED
+    }
+}
+
+#[test]
+fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<Seeded>());
+    let terms = Terms::lexed(["ban", "dyn"]).ok_or("no terms")?;
+    let hits = store.read(SearchSegments::matching(terms, Scope::Owner))?;
+    let found: Vec<String> = hits.iter().map(|hit| Body::from(hit).to_string()).collect();
+    assert_eq!(found, ["banning dyn seems desirable"]);
     Ok(())
 }
 
