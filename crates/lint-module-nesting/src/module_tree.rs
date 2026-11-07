@@ -72,9 +72,9 @@ impl<'file> ModuleTree<'file> {
         let used = target.as_ref().and_then(|target| target.deepest_in(&self.modules));
         self.users.record(used, module);
         let crossed = target.as_ref().and_then(|target| target.crossed_directory(&module, &self.modules));
-        self.deep_uses.extend(
-            crossed.map(|target| Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target })),
-        );
+        self.deep_uses.extend(crossed.map(|crossing| {
+            Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: crossing })
+        }));
     }
 
     fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {

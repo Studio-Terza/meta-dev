@@ -63,12 +63,12 @@ fn a_run_within_every_warn_level_is_ok_and_does_not_block() -> io::Result<()> {
 
 #[test]
 fn above_warn_warns_and_above_block_blocks() -> io::Result<()> {
-    let run = Run::judged("warns", "test-run = 4\nclippy = 10")?;
-    assert!(run.out.contains("WARN: test-run took 4s, warn above 3s, block above 5s\n"));
-    assert_eq!(run.exit, ExitCode::SUCCESS);
-    let run = Run::judged("blocks", "test-run = 5.1\nclippy = 1")?;
-    assert!(run.out.contains("BLOCK: test-run took 5.1s, warn above 3s, block above 5s\n"));
-    assert_eq!(run.exit, ExitCode::FAILURE);
+    let warned = Run::judged("warns", "test-run = 4\nclippy = 10")?;
+    assert!(warned.out.contains("WARN: test-run took 4s, warn above 3s, block above 5s\n"));
+    assert_eq!(warned.exit, ExitCode::SUCCESS);
+    let blocked = Run::judged("blocks", "test-run = 5.1\nclippy = 1")?;
+    assert!(blocked.out.contains("BLOCK: test-run took 5.1s, warn above 3s, block above 5s\n"));
+    assert_eq!(blocked.exit, ExitCode::FAILURE);
     Ok(())
 }
 
@@ -107,12 +107,18 @@ fn every_unusable_input_fails_closed_and_says_why() -> io::Result<()> {
 #[test]
 fn a_run_fails_only_above_its_block_level() -> io::Result<()> {
     let fixture = Fixture::default();
-    let limits = fixture.stored("within-limits.toml", LIMIT)?;
-    let measured = fixture.stored("within-measured.toml", "test-run = 0.5\n")?;
-    assert_eq!(Run::cli(&limits, &measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()), ExitCode::SUCCESS);
-    let limits = fixture.stored("blocked-limits.toml", LIMIT)?;
-    let measured = fixture.stored("blocked-measured.toml", "test-run = 3\n")?;
-    assert_eq!(Run::cli(&limits, &measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()), ExitCode::FAILURE);
+    let within_limits = fixture.stored("within-limits.toml", LIMIT)?;
+    let within_measured = fixture.stored("within-measured.toml", "test-run = 0.5\n")?;
+    assert_eq!(
+        Run::cli(&within_limits, &within_measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()),
+        ExitCode::SUCCESS
+    );
+    let blocked_limits = fixture.stored("blocked-limits.toml", LIMIT)?;
+    let blocked_measured = fixture.stored("blocked-measured.toml", "test-run = 3\n")?;
+    assert_eq!(
+        Run::cli(&blocked_limits, &blocked_measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()),
+        ExitCode::FAILURE
+    );
     Ok(())
 }
 

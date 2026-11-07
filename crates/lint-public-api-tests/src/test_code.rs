@@ -71,8 +71,7 @@ impl<'ast> Visit<'ast> for TestCode<'_> {
         let law = TestMarks::law(invocation).map(|_| line);
         let called = Some(invocation)
             .filter(|invocation| invocation.path.get_ident().is_none_or(|name| name != Self::DEFINITION));
-        let marked =
-            called.and_then(|invocation| Macros::attributes(invocation).iter().find_map(TestMarks::test).map(|_| line));
+        let marked = called.and_then(|call| Macros::attributes(call).iter().find_map(TestMarks::test).map(|_| line));
         let emitted =
             invocation.path.get_ident().filter(|name| self.emitters.contains(&Name::from(*name))).map(|_| line);
         self.lines.extend(law.or(marked).or(emitted));

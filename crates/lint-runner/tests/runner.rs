@@ -386,16 +386,16 @@ fn a_parse_failure_names_its_line() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn files_outside_crate_targets_and_fixture_trees_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", CLEAN)?;
-    root.write("tests/ui/bad.rs", "fn (")?;
-    root.write("tooling/corpus/dirty.rs", DIRTY)?;
-    assert_eq!(root.reported(), Reported::clean());
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", CLEAN)?;
-    root.write("tooling/corpus/case/src/lib.rs", DIRTY)?;
-    root.write("tests/fixtures/bad/src/lib.rs", "fn (")?;
-    assert_eq!(root.reported(), Reported::clean());
+    let outside = Scratch::package()?;
+    outside.write("src/lib.rs", CLEAN)?;
+    outside.write("tests/ui/bad.rs", "fn (")?;
+    outside.write("tooling/corpus/dirty.rs", DIRTY)?;
+    assert_eq!(outside.reported(), Reported::clean());
+    let fixtures = Scratch::package()?;
+    fixtures.write("src/lib.rs", CLEAN)?;
+    fixtures.write("tooling/corpus/case/src/lib.rs", DIRTY)?;
+    fixtures.write("tests/fixtures/bad/src/lib.rs", "fn (")?;
+    assert_eq!(fixtures.reported(), Reported::clean());
     Ok(())
 }
 
@@ -457,14 +457,14 @@ fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Erro
 
 #[test]
 fn bin_roots_and_modules_named_like_build_directories_are_read() -> Result<(), Box<dyn Error>> {
-    let root = Scratch::package()?;
-    root.write("src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
-    root.write("src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
-    assert_eq!(root.reported().violations(), 2);
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", "pub mod target;\n")?;
-    root.write("src/target/mod.rs", DIRTY)?;
-    assert_eq!(root.reported().violations(), 2);
+    let bins = Scratch::package()?;
+    bins.write("src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
+    bins.write("src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
+    assert_eq!(bins.reported().violations(), 2);
+    let build_named = Scratch::package()?;
+    build_named.write("src/lib.rs", "pub mod target;\n")?;
+    build_named.write("src/target/mod.rs", DIRTY)?;
+    assert_eq!(build_named.reported().violations(), 2);
     Ok(())
 }
 
@@ -661,16 +661,16 @@ fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Bo
 
 #[test]
 fn conditional_paths_and_nested_packages_are_read() -> Result<(), Box<dyn Error>> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
-    root.write("src/a.rs", CLEAN)?;
-    root.write("src/b.rs", DIRTY)?;
-    assert_eq!(root.reported().violations(), 2);
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", CLEAN)?;
-    root.write("inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
-    root.write("inner/src/lib.rs", DIRTY)?;
-    assert_eq!(root.reported().violations(), 2);
+    let conditional = Scratch::package()?;
+    conditional.write("src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
+    conditional.write("src/a.rs", CLEAN)?;
+    conditional.write("src/b.rs", DIRTY)?;
+    assert_eq!(conditional.reported().violations(), 2);
+    let nested = Scratch::package()?;
+    nested.write("src/lib.rs", CLEAN)?;
+    nested.write("inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
+    nested.write("inner/src/lib.rs", DIRTY)?;
+    assert_eq!(nested.reported().violations(), 2);
     Ok(())
 }
 

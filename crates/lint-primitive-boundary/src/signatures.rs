@@ -41,7 +41,7 @@ impl TypeWalk<'_, '_> {
         let direct = identity.and_then(|identity| identity.direct(solo));
         let target = solo.and(self.scope.local_alias(resolved, self.file)).and_then(TypeRef::named);
         let aliased = target.and_then(|target| self.aliased(target));
-        self.found.extend(direct.into_iter().chain(aliased).map(|identity| Candidate { identity, position }));
+        self.found.extend(direct.into_iter().chain(aliased).map(|found| Candidate { identity: found, position }));
         named.each_inner_use(self);
     }
 

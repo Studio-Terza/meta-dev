@@ -11,7 +11,7 @@ pub(crate) struct Scope {
 impl Scope {
     pub(crate) fn import(&mut self, local: Option<Name>, target: UsePath) {
         let named = local.zip(target.segments().first()).map(|(local, _)| local);
-        self.imports.extend(named.map(|local| (local, target)));
+        self.imports.extend(named.map(|alias| (alias, target)));
     }
 
     pub(crate) fn glob(&mut self, prefix: UsePath) {

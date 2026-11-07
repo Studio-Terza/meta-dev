@@ -30,9 +30,9 @@ impl Packages {
             .iter()
             .zip(groups)
             .map(|(tree, group)| {
-                let packages = group?;
-                let settled = Self::checked(&mut survey, &packages)?;
-                Ok(packages.into_iter().filter_map(|package| package.into_target(settled, tree)).collect())
+                let members = group?;
+                let settled = Self::checked(&mut survey, &members)?;
+                Ok(members.into_iter().filter_map(|package| package.into_target(settled, tree)).collect())
             })
             .collect()
     }

@@ -117,8 +117,9 @@ impl<'scan> Shapes<'scan> {
         self.depth += NestingDepth::LEVEL;
         let first_past = NestingDepth::beyond(FnShape::NESTING);
         let deepest = (self.depth == first_past).then_some(span);
-        self.violations
-            .extend(deepest.map(|span| Self::found(self.path, span, Finding::DeepNesting { most: FnShape::NESTING })));
+        self.violations.extend(
+            deepest.map(|nested| Self::found(self.path, nested, Finding::DeepNesting { most: FnShape::NESTING })),
+        );
         visit(self);
         self.depth -= NestingDepth::LEVEL;
     }

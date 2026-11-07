@@ -34,7 +34,7 @@ impl Exports<'_> {
 
     fn through(&self, uses: Option<&Uses>, owner: &CrateName, name: &Name, hops: Hops) -> Option<&Name> {
         uses.into_iter().flat_map(|uses| uses.sources(name)).find_map(|place| {
-            place.routed(|name| self.exported(owner, name, hops), |source, name| self.exported(source, name, hops))
+            place.routed(|used| self.exported(owner, used, hops), |source, used| self.exported(source, used, hops))
         })
     }
 

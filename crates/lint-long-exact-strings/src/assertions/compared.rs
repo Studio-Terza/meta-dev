@@ -59,7 +59,7 @@ impl<'run> Compared<'run> {
     fn bound(&self, name: Name, seen: &RefCell<BTreeSet<Name>>) -> Option<Pinning> {
         let value = self.locals.bound(&name).or_else(|| self.constants.bound(&name))?;
         let unseen = seen.borrow_mut().insert(name).then_some(value);
-        unseen.and_then(|value| self.traced(value, seen))
+        unseen.and_then(|fresh| self.traced(fresh, seen))
     }
 
     fn built(&self, invocation: &Macro, seen: &RefCell<BTreeSet<Name>>) -> Option<Pinning> {

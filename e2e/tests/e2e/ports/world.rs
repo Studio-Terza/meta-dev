@@ -82,7 +82,8 @@ impl World {
             .members
             .iter()
             .map(|(name, member)| {
-                let dependencies: Vec<Json> = member.dependencies.iter().map(|name| json!({ "name": name })).collect();
+                let dependencies: Vec<Json> =
+                    member.dependencies.iter().map(|dependency| json!({ "name": dependency })).collect();
                 let metadata =
                     member.reads.first().map_or(Json::Null, |_| json!({ "reach": { "reads": member.reads } }));
                 json!({
