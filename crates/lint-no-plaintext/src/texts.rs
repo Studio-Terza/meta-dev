@@ -82,7 +82,7 @@ impl Texts {
             let wrapped = known.crate_item().and_then(|item| self.wrappers.get(&item));
             owned.map(|_| ()).or(borrowed.map(|_| ())).or(wrapped.map(|_| ())).map(|()| known)
         };
-        resolved.known().map_or(Some(resolved), text)
+        resolved.known().and_then(text)
     }
 }
 
