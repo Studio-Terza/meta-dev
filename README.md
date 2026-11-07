@@ -173,16 +173,19 @@ a process in test code still also needs what `process_starters` asks for.
 `owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` (crate `lint-port-dependencies`) keep the
 port framework the only way to an effect. Ownership is declared, never guessed: a crate owns a package by naming it in
 `[package.metadata.port] owns = ["logos"]` in its `Cargo.toml` (`grammar` owns `logos`, `logos-codegen` and
-`logos-derive`; `store-ports` owns `sqlx`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros` owns `sqlx-macros`
-and `sqlx-macros-core`). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
+`logos-derive`; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
+owns `sqlx-macros-core`). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
 proc-macro crate it depends on, so `store-ports` and `store-ports-macros` own jointly, and a proc-macro crate two ports
 depend on belongs to both units. The gate reads the dependency graph from `cargo metadata --format-version 1 --locked`,
 through the `Cargo` port of `cargo-ports`, and refuses to run when that fails; packages are told apart by their resolved
-identities. The closure rule: every package reachable from a package a unit owns, the owned package included, belongs to
-that unit, and `owned_dependencies` fails each workspace crate outside every unit whose closure holds the package where it
-depends on it directly, in `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]` or their `[target.*]` forms,
-also when renamed with `package =`. It points at the manifest line and names the crate whose `owns` reaches the package.
-So a direct `libsqlite3-sys` dependency outside `store-ports` fails although no crate names it in `owns`. A package of the
+identities. A package named in `owns` belongs to the declaring unit alone: `owned_dependencies` fails every other crate
+that depends on it directly, another unit whose closure holds it included, and names the declaring crate. An `owns` entry
+that resolves to no package the declaring unit depends on, directly or not, fails at its manifest line. The closure rule
+covers the rest: every package reachable from a package a unit owns belongs to that unit, and a package no unit names is
+depended on directly only by the units whose closure holds it; every other workspace crate fails where it depends on it,
+in `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]` or their `[target.*]` forms, also when renamed with
+`package =`. It points at the manifest line and names every unit whose closure holds the package. So a direct
+`libsqlite3-sys` dependency outside `store-ports` fails although no crate names it in `owns`. A package of the
 closure that other crates may depend on directly is declared by the unit in `[package.metadata.port] shared = [...]`:
 `store-ports` shares `proc-macro2`, `quote`, `serde`, `serde_core`, `serde_json`, `syn` and `thiserror`, and `grammar`
 shares `proc-macro2`, `quote` and `syn`. Nothing else is shared: a crate that needs an unshared package calls an owner's
