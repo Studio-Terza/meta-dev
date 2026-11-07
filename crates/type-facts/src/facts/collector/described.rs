@@ -19,10 +19,16 @@ impl Described<'_> {
             other => Name::try_from(Described(other)).ok(),
         }
     }
+}
 
-    fn listed<Item: fmt::Display>(separator: Separator, items: impl Iterator<Item = Item>) -> Name {
-        let texts: Vec<String> = items.map(|item| item.to_string()).collect();
-        Name::from(texts.join(&separator.to_string()).as_str())
+struct Listed<Item> {
+    separator: Separator,
+    items: Vec<Item>,
+}
+
+impl<Item> Listed<Item> {
+    fn new(separator: Separator, items: impl Iterator<Item = Item>) -> Listed<Item> {
+        Listed { separator, items: items.collect() }
     }
 }
 
@@ -44,6 +50,15 @@ impl fmt::Display for Separator {
     }
 }
 
+impl<Item: fmt::Display> fmt::Display for Listed<Item> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.items.split_first().into_iter().try_for_each(|(first, rest)| {
+            write!(formatter, "{first}")?;
+            rest.iter().try_for_each(|item| write!(formatter, "{}{item}", self.separator))
+        })
+    }
+}
+
 impl fmt::Display for Returned<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
@@ -59,19 +74,19 @@ impl fmt::Display for Described<'_> {
             Type::Slice(slice) => write!(formatter, "[{}]", Described(&slice.elem)),
             Type::Array(array) => write!(formatter, "[{}; _]", Described(&array.elem)),
             Type::Tuple(tuple) => {
-                write!(formatter, "({})", Self::listed(Separator::Comma, tuple.elems.iter().map(Described)))
+                write!(formatter, "({})", Listed::new(Separator::Comma, tuple.elems.iter().map(Described)))
             }
             Type::TraitObject(object) => {
                 write!(
                     formatter,
                     "dyn {}",
-                    Self::listed(Separator::Plus, object.bounds.iter().filter_map(Spelled::bound_of))
+                    Listed::new(Separator::Plus, object.bounds.iter().filter_map(Spelled::bound_of))
                 )
             }
             Type::BareFn(function) => write!(
                 formatter,
                 "fn({}){}",
-                Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty))),
+                Listed::new(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty))),
                 Returned(Spelled::returned_by(&function.output))
             ),
             Type::Ptr(pointer) => {
