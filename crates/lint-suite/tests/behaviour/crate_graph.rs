@@ -10,16 +10,22 @@ const SMALL_RING: usize = 6;
 const LINKS_IN_ROOT: usize = 20;
 const LONG_CHAIN: usize = 20_000;
 
+struct Link {
+    index: usize,
+    next: usize,
+}
+
 struct Items;
 
 impl Items {
-    fn links(size: usize) -> impl Iterator<Item = (usize, usize)> {
-        (0..size).zip((0..size).cycle().skip(1))
+    fn links(size: usize) -> impl Iterator<Item = Link> {
+        (0..size).zip((0..size).cycle().skip(1)).map(|(index, next)| Link { index, next })
     }
 
     fn ring(prefix: &str, size: usize) -> String {
-        let lines: Vec<String> =
-            Self::links(size).map(|(index, next)| format!("pub struct {prefix}{index}({prefix}{next});\n")).collect();
+        let lines: Vec<String> = Self::links(size)
+            .map(|Link { index, next }| format!("pub struct {prefix}{index}({prefix}{next});\n"))
+            .collect();
         lines.concat()
     }
 
@@ -33,7 +39,7 @@ impl Items {
 
     fn ring_with_first_item_in(before: &str, after: &str, size: usize) -> String {
         let rest: Vec<String> =
-            Items::links(size).skip(1).map(|(index, next)| format!("pub struct A{index}(A{next});\n")).collect();
+            Items::links(size).skip(1).map(|Link { index, next }| format!("pub struct A{index}(A{next});\n")).collect();
         format!("{before}pub struct A0(A1);\n{after}{}", rest.concat())
     }
 
@@ -71,7 +77,7 @@ fn a_long_chain_is_judged_without_exhausting_the_stack() {
 
 #[test]
 fn a_cycle_closed_through_impl_bodies_across_files_is_flagged() {
-    let link = |(index, next): (usize, usize)| {
+    let link = |Link { index, next }: Link| {
         format!("pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        R{next}::f();\n    }}\n}}\n")
     };
     let first: Vec<String> = Items::links(BIG_RING).take(LINKS_IN_ROOT).map(link).collect();
@@ -110,7 +116,7 @@ fn a_link_closed_only_in_a_test_impl_does_not_count() {
 
 #[test]
 fn a_cycle_closed_through_a_type_alias_path_is_flagged() {
-    let link = |(index, next): (usize, usize)| {
+    let link = |Link { index, next }: Link| {
         let called = Some(next)
             .filter(|next| *next != 0)
             .map_or_else(|| "crate::L".to_owned(), |next| format!("crate::R{next}"));
