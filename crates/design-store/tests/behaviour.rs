@@ -9,13 +9,13 @@ use design_model::{
     Prefix, Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, FlailedSegments, JobFlailed, JobOpened,
-    JobRepeated, Linked, LiveRuns, NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed, ProjectRoot, Ran,
-    Refusal, RelationName, Remit, Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope,
-    SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun,
-    StreamSchema, UnplacedSegments, Unseen, Unstructured,
+    AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Excerpt, FlailedSegments, JobFlailed,
+    JobOpened, JobRepeated, Linked, LiveRuns, NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed,
+    ProjectRoot, Ran, Refusal, RelationName, Remit, Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState,
+    RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned,
+    StoredRun, StreamSchema, UnplacedSegments, Unseen, Unstructured,
 };
-use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
+use dispatch_ports::{Deadline, Finished, Pid, Reply, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
 use grammar::message::Lexemes;
 use grammar::search::Terms;
@@ -1357,6 +1357,7 @@ struct Spawning {
     deadline: Wall,
     state: RunState,
     usage: Option<Usage>,
+    reply: Option<Reply>,
 }
 
 impl Spawning {
@@ -1369,13 +1370,15 @@ impl Spawning {
             any::<Wall>(),
             select(RunState::VARIANTS),
             option::of((any::<Tokens>(), any::<Tokens>(), any::<Tokens>(), any::<Tokens>())),
+            option::of(("[a-z\"\n€]{1,8}", 0..6000_usize).prop_map(|(unit, times)| Reply::new(unit.repeat(times)))),
         )
-            .prop_map(|(pid, started, deadline, state, usage)| Spawning {
+            .prop_map(|(pid, started, deadline, state, usage, reply)| Spawning {
                 pid,
                 started,
                 deadline,
                 state,
                 usage: usage.map(|(input, output, written, read)| Usage::new(input, output, written, read)),
+                reply,
             })
     }
 
@@ -1389,7 +1392,10 @@ impl Spawning {
         let spawned = Spawned::new(self.pid, self.started.clone(), Deadline::new(self.deadline));
         store.write(RunSpawned::new(id, job, spawned))?;
         let live = store.read(LiveRuns)?;
-        store.write(RunEnded::new(id, self.state, self.usage))?;
+        let finished = self.reply.clone().map(|reply| Finished::new(reply, self.usage.unwrap_or_default()));
+        store.write(
+            finished.map_or(RunEnded::new(id, self.state, self.usage), |finished| RunEnded::finished(id, &finished)),
+        )?;
         Ok(Lived { live, ran: store.read(RunsOf::from(job))?, after: store.read(LiveRuns)? })
     }
 }
@@ -1401,16 +1407,30 @@ struct Lived {
     after: Vec<StoredRun>,
 }
 
-laws::law!(a_spawned_run_is_live_until_it_ends_with_its_state_and_usage, Spawning::any(), spawning, {
-    let lived = spawning.stored().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let spawned: Vec<Spawned> = lived.live.iter().map(|stored| stored.spawned().clone()).collect();
-    let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
-    prop_assert_eq!(spawned, vec![wanted]);
-    let ran: Vec<Ran> = lived.ran;
-    prop_assert_eq!(ran.iter().map(|ran| [ran.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
-    prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![spawning.state]);
-    prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![spawning.usage]);
-    let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
-    let running = [spawning.state].into_iter().filter(|state| *state == RunState::Running).map(|_| RunId::new(1));
-    prop_assert_eq!(still, running.collect::<Vec<RunId>>());
-});
+laws::law!(
+    a_spawned_run_is_live_until_it_ends_with_its_state_usage_and_reply_bounded_to_sixteen_kibibytes,
+    Spawning::any(),
+    spawning,
+    {
+        let lived = spawning.stored().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let spawned: Vec<Spawned> = lived.live.iter().map(|stored| stored.spawned().clone()).collect();
+        let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
+        prop_assert_eq!(spawned, vec![wanted]);
+        let ran: Vec<Ran> = lived.ran;
+        prop_assert_eq!(ran.iter().map(|ran| [ran.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
+        let replied = spawning.reply.as_ref().map(|_reply| RunState::Replied);
+        let state = replied.unwrap_or(spawning.state);
+        let usage = replied.map_or(spawning.usage, |_replied| Some(spawning.usage.unwrap_or_default()));
+        let kept = spawning.reply.as_ref().map(|reply| {
+            let told = reply.clone().into_inner();
+            let within = told.char_indices().take_while(|(at, letter)| at + letter.len_utf8() <= 16 * 1024);
+            Excerpt::new(within.map(|(_at, letter)| letter).collect())
+        });
+        prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![state]);
+        prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![usage]);
+        prop_assert_eq!(ran.iter().map(|ran| ran.reply().cloned()).collect::<Vec<Option<Excerpt>>>(), vec![kept]);
+        let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
+        let running = [state].into_iter().filter(|state| *state == RunState::Running).map(|_| RunId::new(1));
+        prop_assert_eq!(still, running.collect::<Vec<RunId>>());
+    }
+);

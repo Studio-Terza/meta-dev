@@ -22,8 +22,8 @@ use design_model::{
     RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
 };
 use design_store::{
-    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage, ShownNode,
-    Stored, StreamSchema,
+    AppliedId, Excerpt, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage,
+    ShownNode, Stored, StreamSchema,
 };
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
@@ -2128,9 +2128,13 @@ impl Generated {
             (0..i64::MAX, select(RunState::VARIANTS))
                 .prop_map(|(run, state)| Line::Reaped { run: RunId::new(run), state }),
             (0..i64::MAX).prop_map(|job| Line::Interrupted(JobId::new(job))),
-            (0..i64::MAX, 0..i64::MAX, select(RunState::VARIANTS), proptest::option::of(Generated::usage())).prop_map(
-                |(run, job, state, usage)| Line::Ran(Attempted::new(RunId::new(run), JobId::new(job), state, usage))
-            ),
+            (
+                (0..i64::MAX, 0..i64::MAX, select(RunState::VARIANTS)),
+                (proptest::option::of(Generated::usage()), proptest::option::of(Generated::text()))
+            )
+                .prop_map(|((run, job, state), (usage, reply))| Line::Ran(
+                    Attempted::new(RunId::new(run), JobId::new(job), state, usage).replied(reply.map(Excerpt::new))
+                )),
             (0..i64::MAX, Generated::lapse())
                 .prop_map(|(job, lapse)| Line::Retried(Lapsed::new(JobId::new(job), lapse))),
             (0..i64::MAX, Generated::lapse())

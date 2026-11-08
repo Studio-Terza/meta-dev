@@ -17,7 +17,7 @@ use transcript_ports::Body;
 use super::Printed;
 use super::apply::{Application, Parsed};
 use crate::Outcome;
-use crate::cli::failure::Failure;
+use crate::cli::failure::{Failure, Flail, Flails};
 use crate::cli::output::{Attempted, Count, Flailing, Lapsed, Line};
 
 #[derive(Debug)]
@@ -60,6 +60,12 @@ enum Ending {
 enum Halt {
     Flailed(Lapse),
     Stalled(Stall),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Course {
+    Onward,
+    Halting,
 }
 
 #[derive(Debug)]
@@ -242,7 +248,7 @@ impl Reaped {
 impl Ending {
     fn ended(run: RunId, watched: &Watched) -> RunEnded {
         match watched {
-            Watched::Finished(finished) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
+            Watched::Finished(finished) => RunEnded::finished(run, finished),
             Watched::Stalled(stall) => RunEnded::new(run, RunState::from(stall), stall.usage()),
         }
     }
@@ -267,14 +273,7 @@ impl Ending {
 
 impl Halt {
     fn halted(&self, job: JobId) -> JobHalted {
-        match self {
-            Halt::Flailed(_) => JobHalted::new(job, Halted::Flailed, self.account(job)),
-            Halt::Stalled(_) => JobHalted::new(job, Halted::Stalled, self.account(job)),
-        }
-    }
-
-    fn account(&self, job: JobId) -> Account {
-        Account::told(&self.clone().failure(job))
+        JobHalted::new(job, Halted::from(self), Account::told(&self.clone().failure(job)))
     }
 
     fn flailed(&self) -> Option<&Lapse> {
@@ -284,10 +283,26 @@ impl Halt {
         }
     }
 
+    fn course(&self) -> Course {
+        match self {
+            Halt::Flailed(_) => Course::Onward,
+            Halt::Stalled(_) => Course::Halting,
+        }
+    }
+
     fn failure(self, job: JobId) -> Failure {
         match self {
-            Halt::Flailed(lapse) => Failure::Flailed { job, lapse },
+            Halt::Flailed(lapse) => Failure::Flailed(Flails::new(Flail::new(job, lapse), Vec::new())),
             Halt::Stalled(stall) => Failure::Stalled { job, stall },
+        }
+    }
+}
+
+impl From<&Halt> for Halted {
+    fn from(halt: &Halt) -> Halted {
+        match halt {
+            Halt::Flailed(_) => Halted::Flailed,
+            Halt::Stalled(_) => Halted::Stalled,
         }
     }
 }
@@ -322,13 +337,22 @@ impl Progress {
     }
 
     fn after(worked: Vec<Worked>, done: Worked) -> Progress {
-        let ended: fn(Vec<Worked>) -> Progress = done.halt.as_ref().map_or(Progress::Going, |_halt| Progress::Halted);
-        ended(worked.into_iter().chain([done]).collect())
+        let course = done.halt.as_ref().map_or(Course::Onward, Halt::course);
+        course.progress(worked.into_iter().chain([done]).collect())
     }
 
     fn worked(self) -> Vec<Worked> {
         match self {
             Progress::Going(worked) | Progress::Halted(worked) => worked,
+        }
+    }
+}
+
+impl Course {
+    fn progress(self, worked: Vec<Worked>) -> Progress {
+        match self {
+            Course::Onward => Progress::Going(worked),
+            Course::Halting => Progress::Halted(worked),
         }
     }
 }
@@ -355,7 +379,19 @@ impl Structured {
 
     pub(crate) fn concluded(self) -> Result<Count, Failure> {
         let jobs = Count::new(self.worked.len());
-        let halted = self.worked.into_iter().find_map(|worked| worked.halt.map(|halt| halt.failure(worked.job)));
-        halted.map_or(Ok(jobs), Err)
+        let stalled = self.worked.iter().find_map(|worked| {
+            let halting = worked.halt.clone().filter(|halt| halt.course() == Course::Halting);
+            halting.map(|halt| halt.failure(worked.job))
+        });
+        let flails: Vec<Flail> = self
+            .worked
+            .iter()
+            .filter_map(|worked| {
+                worked.halt.as_ref().and_then(Halt::flailed).map(|lapse| Flail::new(worked.job, lapse.clone()))
+            })
+            .collect();
+        let flailed =
+            flails.split_first().map(|(first, rest)| Failure::Flailed(Flails::new(first.clone(), rest.to_vec())));
+        stalled.or(flailed).map_or(Ok(jobs), Err)
     }
 }

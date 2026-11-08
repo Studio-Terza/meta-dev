@@ -2,6 +2,8 @@ use std::str::FromStr;
 
 use design_model::{NodeId, Unnumbered};
 
+use crate::briefing::Sample;
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Label(String);
 
@@ -51,6 +53,12 @@ impl FromStr for Label {
             .and_then(|unnumbered| unnumbered.unspelled().ok())
             .map(Label)
             .ok_or_else(|| Unlabelled(text.to_owned()))
+    }
+}
+
+impl From<Sample> for Label {
+    fn from(sample: Sample) -> Label {
+        Label(sample.to_string())
     }
 }
 

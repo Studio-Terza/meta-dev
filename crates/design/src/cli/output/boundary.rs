@@ -5,7 +5,7 @@ use design_model::{
     AnyNode, Artifact, Condition, Facet, JobId, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason, Role,
     RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
 };
-use design_store::{AppliedId, RelationName, RunState, ShapeName};
+use design_store::{AppliedId, Excerpt, RelationName, RunState, ShapeName};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
 use grammar::cited::Cited;
@@ -158,6 +158,7 @@ pub struct Attempted {
     job: JobId,
     state: RunState,
     usage: Option<Usage>,
+    reply: Option<Excerpt>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -261,6 +262,12 @@ enum Spend {
     Job,
     #[name("tokens")]
     Tokens,
+}
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+enum Replying {
+    #[name("reply")]
+    Reply,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -607,7 +614,12 @@ impl Remark {
 impl Attempted {
     #[must_use]
     pub fn new(run: RunId, job: JobId, state: RunState, usage: Option<Usage>) -> Attempted {
-        Attempted { run, job, state, usage }
+        Attempted { run, job, state, usage, reply: None }
+    }
+
+    #[must_use]
+    pub fn replied(self, reply: Option<Excerpt>) -> Attempted {
+        Attempted { reply, ..self }
     }
 
     fn read(fields: &mut Fields) -> Result<Attempted, Unread> {
@@ -616,6 +628,10 @@ impl Attempted {
             job: JobId::new(fields.past(&[Spend::Job])?.field::<Integer<_>>()?),
             state: fields.field::<Word<_>>()?,
             usage: Attempted::usage(fields.optional::<Word<Spend>>(), fields)?,
+            reply: fields
+                .optional::<Word<Replying>>()
+                .map(|Replying::Reply| fields.field::<Quoted<_>>())
+                .transpose()?,
         })
     }
 
@@ -643,7 +659,8 @@ impl fmt::Display for Attempted {
         self.usage.iter().try_for_each(|usage| {
             let [input, output, written, read] = usage.spent();
             write!(formatter, " {} {input} {output} {written} {read}", Spend::Tokens)
-        })
+        })?;
+        self.reply.iter().try_for_each(|reply| write!(formatter, " {} {}", Replying::Reply, Line::quoted(reply)))
     }
 }
 

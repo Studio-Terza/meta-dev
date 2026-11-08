@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  id,\n  state,\n  input_tokens,\n  output_tokens,\n  cache_written_tokens,\n  cache_read_tokens\nFROM\n  runs\nWHERE\n  job = ?1\nORDER BY\n  id\n",
+  "query": "\nSELECT\n  id,\n  state,\n  input_tokens,\n  output_tokens,\n  cache_written_tokens,\n  cache_read_tokens,\n  reply\nFROM\n  runs\nWHERE\n  job = ?1\nORDER BY\n  id\n",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,17 @@
             "name": "cache_read_tokens"
           }
         }
+      },
+      {
+        "name": "reply",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "reply"
+          }
+        }
       }
     ],
     "parameters": {
@@ -79,8 +90,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "2b7233f1d83c2ffffde54eb866e84b07704b2e392548b6d09690063d7ea107a4"
+  "hash": "cac23a63b8489a62d584d5cf1ad1639910079b8a5ba365328526fe6e32a074e8"
 }
