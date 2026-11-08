@@ -84,6 +84,10 @@ pub enum Failure {
         "STALLED: job {job} could not be run: {stall}; structure halted, and its segments are sent again on the next run"
     )]
     Stalled { job: JobId, stall: Stall },
+    #[error("cannot hear the hook input: {0}")]
+    Deaf(#[source] io::Error),
+    #[error("cannot read the hook input: {0}")]
+    Unheard(#[source] serde_json::Error),
     #[error("cannot render the hook settings: {0}")]
     Render(#[from] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]

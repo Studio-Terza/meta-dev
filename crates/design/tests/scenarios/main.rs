@@ -19,7 +19,7 @@ fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Bo
 
 #[test]
 fn ingest_of_a_workspace_exits_successfully_with_its_report() -> Result<(), Box<dyn Error>> {
-    let output = Design::with_a_session_in_work()?.in_work(&["ingest"])?;
+    let output = Design::with_a_session_in_work()?.in_work(&["ingest"], "")?;
     assert_eq!(output.status.code(), Some(0));
     assert!(String::from_utf8(output.stdout)?.contains("authorship owner 1\n"));
     Ok(())
@@ -28,9 +28,9 @@ fn ingest_of_a_workspace_exits_successfully_with_its_report() -> Result<(), Box<
 #[test]
 fn a_store_kept_on_disk_answers_show_and_a_second_ingest_writes_nothing() -> Result<(), Box<dyn Error>> {
     let design = Design::with_a_session_in_work()?;
-    let first = design.in_work(&["ingest"])?;
-    let second = design.in_work(&["ingest"])?;
-    let shown = design.in_work(&["show", "o1"])?;
+    let first = design.in_work(&["ingest"], "")?;
+    let second = design.in_work(&["ingest"], "")?;
+    let shown = design.in_work(&["show", "o1"], "")?;
     assert!(String::from_utf8(first.stdout)?.contains("written 4\n"));
     assert!(String::from_utf8(second.stdout)?.contains("written 0\n"));
     assert!(String::from_utf8(shown.stdout)?.contains("o1 owner session \"s\" at \"2026-01-01T00:00:00Z\"\n"));
@@ -57,24 +57,31 @@ fn the_hook_settings_are_json_naming_for_every_event_a_command_that_runs_its_hoo
 #[test]
 fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<(), Box<dyn Error>> {
     let design = Design::with_a_session_in_work()?;
-    let hooked = design.in_work(&["hook", "user-prompt-submit"])?;
-    let shown = design.in_work(&["show", "o1"])?;
+    let hooked = design.in_work(&["hook", "user-prompt-submit"], "")?;
+    let shown = design.in_work(&["show", "o1"], "")?;
     assert_eq!((hooked.status.code(), hooked.stdout, hooked.stderr), (Some(0), Vec::new(), Vec::new()));
     assert_eq!(shown.status.code(), Some(0));
     Ok(())
 }
 
 #[test]
-fn a_stop_whose_agent_flails_blocks_with_a_json_decision_at_exit_zero_and_the_next_stop_passes_silently()
+fn a_stop_whose_agent_flails_blocks_once_with_a_json_decision_at_exit_zero_and_a_stop_already_continuing_only_notices()
 -> Result<(), Box<dyn Error>> {
+    let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
+    let continuing = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":true}";
     let design = Design::with_a_session_in_work()?;
-    let blocked = design.in_work(&["hook", "stop"])?;
-    let passed = design.in_work(&["hook", "stop"])?;
+    let blocked = design.in_work(&["hook", "stop"], stopping)?;
+    let passed = design.in_work(&["hook", "stop"], stopping)?;
+    let noticed = Design::with_a_session_in_work()?.in_work(&["hook", "stop"], continuing)?;
     let decision: Value = serde_json::from_slice(&blocked.stdout)?;
+    let notice: Value = serde_json::from_slice(&noticed.stdout)?;
     assert_eq!((blocked.status.code(), blocked.stderr), (Some(0), Vec::new()));
     assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
     assert!(decision.get("reason").is_some_and(Value::is_string));
     assert_eq!((passed.status.code(), passed.stdout, passed.stderr), (Some(0), Vec::new(), Vec::new()));
+    assert_eq!((noticed.status.code(), noticed.stderr), (Some(0), Vec::new()));
+    assert_eq!(notice.get("decision"), None);
+    assert_eq!(notice.get("systemMessage"), decision.get("reason"));
     Ok(())
 }
 
@@ -87,7 +94,7 @@ struct Answer {
 
 impl Answer {
     fn given(arguments: &&[&str]) -> Option<Answer> {
-        let output = Design::with_a_session_in_work().ok()?.in_work(arguments).ok()?;
+        let output = Design::with_a_session_in_work().ok()?.in_work(arguments, "").ok()?;
         let stdout = String::from_utf8(output.stdout).ok()?;
         let unparsed = Lines::from(stdout.as_str()).filter(|line| line.parse::<Line>().is_err()).map(str::to_owned);
         Some(Answer {

@@ -1,10 +1,10 @@
 use std::env;
 use std::ffi::OsString;
 use std::fs::{self, Permissions};
-use std::io;
+use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 use file_ports::Bytes;
 use tempfile::TempDir;
@@ -34,10 +34,19 @@ impl Home {
         Ok(self)
     }
 
-    pub fn run(&self, program: &Path, arguments: &[OsString]) -> io::Result<Output> {
+    pub fn run(&self, program: &Path, arguments: &[OsString], input: &Bytes) -> io::Result<Output> {
         let inherited = env::var_os("PATH").unwrap_or_default();
         let searched = [self.directory.path().join("bin")].into_iter().chain(env::split_paths(&inherited));
         let path = env::join_paths(searched).map_err(io::Error::other)?;
-        Command::new(program).env("HOME", self.directory.path()).env("PATH", path).args(arguments).output()
+        let mut child = Command::new(program)
+            .env("HOME", self.directory.path())
+            .env("PATH", path)
+            .args(arguments)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        child.stdin.take().map(|mut stdin| stdin.write_all(input.as_ref())).transpose()?;
+        child.wait_with_output()
     }
 }

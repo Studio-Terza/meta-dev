@@ -13,6 +13,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use console_ports::Environment;
 use design_store::Scope;
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
@@ -139,6 +140,7 @@ impl Command {
 
     pub fn written<F: Files, S: Store, D: Dispatch, C: Clock>(
         self,
+        environment: &impl Environment,
         ground: Ground<'_, F, S>,
         crew: &Crew<'_, D, C>,
         out: &mut impl Write,
@@ -163,7 +165,7 @@ impl Command {
             Command::Structure => {
                 Structure::new(ground.store(), crew).worked().and_then(|structured| structured.reported(out))
             }
-            Command::Hook(hook) => hook.answered(ground, crew, out),
+            Command::Hook(hook) => hook.answered(environment, ground, crew, out),
         }
     }
 }

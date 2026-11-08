@@ -2,6 +2,7 @@ mod boundary;
 
 use std::io::Write;
 
+use console_ports::Environment;
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
 use store_ports::Store;
@@ -12,7 +13,7 @@ use super::ingest::Ingest;
 use super::structure::{Crew, Structure};
 use crate::cli::failure::Failure;
 use crate::{HookEvent, Outcome};
-use boundary::{Decision, Settings};
+use boundary::{Settings, Stopping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hook {
@@ -23,6 +24,7 @@ pub enum Hook {
 impl Hook {
     pub fn answered<F: Files, S: Store, D: Dispatch, C: Clock>(
         self,
+        environment: &impl Environment,
         ground: Ground<'_, F, S>,
         crew: &Crew<'_, D, C>,
         out: &mut impl Write,
@@ -30,7 +32,9 @@ impl Hook {
         match self {
             Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(out),
             Hook::On(HookEvent::UserPromptSubmit) => Hook::prompted(ground),
-            Hook::On(HookEvent::Stop) => Hook::stopped(ground, crew, out),
+            Hook::On(HookEvent::Stop) => {
+                Hook::stopped(&Stopping::heard(environment.input().map_err(Failure::Deaf)?)?, ground, crew, out)
+            }
         }
     }
 
@@ -40,6 +44,7 @@ impl Hook {
     }
 
     fn stopped<F: Files, S: Store, D: Dispatch, C: Clock>(
+        stopping: &Stopping,
         ground: Ground<'_, F, S>,
         crew: &Crew<'_, D, C>,
         out: &mut impl Write,
@@ -49,6 +54,6 @@ impl Hook {
         Structure::new(store, crew)
             .worked()?
             .concluded()
-            .map_or_else(|halt| Decision::blocking(&halt).written(out), |_jobs| Ok(Outcome::Hooked(HookEvent::Stop)))
+            .map_or_else(|halt| stopping.decided(&halt).written(out), |_jobs| Ok(Outcome::Hooked(HookEvent::Stop)))
     }
 }

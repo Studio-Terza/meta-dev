@@ -36,15 +36,15 @@ impl Design {
 
     pub fn run(&self, arguments: &[&str]) -> io::Result<Output> {
         let words: Vec<OsString> = arguments.iter().map(OsString::from).collect();
-        self.home.run(Path::new(env!("CARGO_BIN_EXE_design")), &words)
+        self.home.run(Path::new(env!("CARGO_BIN_EXE_design")), &words, &Bytes::default())
     }
 
-    pub fn in_work(&self, arguments: &[&str]) -> io::Result<Output> {
+    pub fn in_work(&self, arguments: &[&str], input: &str) -> io::Result<Output> {
         let words: Vec<OsString> = arguments
             .iter()
             .map(OsString::from)
             .chain([OsString::from("--workspace"), self.workspace.clone().into_os_string()])
             .collect();
-        self.home.run(Path::new(env!("CARGO_BIN_EXE_design")), &words)
+        self.home.run(Path::new(env!("CARGO_BIN_EXE_design")), &words, &Bytes::from(input))
     }
 }

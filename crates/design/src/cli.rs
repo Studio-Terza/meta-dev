@@ -77,6 +77,11 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         let store = run.port(request.opened(&located, self.opened));
         let dispatch = run.port((self.agents.hired)(located.kept(Kept::Agents)));
         let clock = run.port(self.agents.clock);
-        request.command().written(Ground::new(run, self.files, located, &store), &Crew::new(&dispatch, &clock), out)
+        request.command().written(
+            self.environment,
+            Ground::new(run, self.files, located, &store),
+            &Crew::new(&dispatch, &clock),
+            out,
+        )
     }
 }

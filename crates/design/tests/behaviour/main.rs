@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 use std::str::FromStr;
 
-use console_ports::Variables;
+use console_ports::{Heard, Variables};
 
 use design::{
     Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved,
@@ -234,7 +234,8 @@ impl Invocation {
         [("HOME", HOME), ("PWD", directory)]
             .map(|(name, value)| (OsString::from(name), OsString::from(value)))
             .into_iter()
-            .collect()
+            .collect::<Variables>()
+            .hearing(Heard::new("{\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}".to_owned()))
     }
 
     fn output(session: &Session, arguments: &[&str]) -> Result<String, Failure> {
