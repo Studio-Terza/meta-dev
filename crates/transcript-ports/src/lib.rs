@@ -1,3 +1,4 @@
+#![deny(clippy::wildcard_enum_match_arm)]
 mod authorship;
 mod blank;
 mod body;

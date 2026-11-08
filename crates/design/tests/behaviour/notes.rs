@@ -221,6 +221,25 @@ laws::table!(
         "RULING (owner, \"agreed\"): we don't change Ann's plan" => Some("unanchored"),
         "RULING (owner): \"rows turn into a map" => Some("unanchored"),
         "- LEAD 2026-11-08: the RULING stands" => Some("imported"),
+        "* RULING (owner): nothing to anchor" => Some("unanchored"),
+        "+ RULING (owner): nothing to anchor" => Some("unanchored"),
+        "**RULING** (owner): nothing to anchor" => Some("unanchored"),
+        "2026-11-05: RULING (owner): nothing to anchor" => Some("unanchored"),
+        "- 2026-11-05: **RULING** (owner, c3c3c3c3): approved" => Some("imported"),
+        "1. RULING (owner): nothing to anchor" => Some("unanchored"),
+        "> __RULING__ (owner): nothing to anchor" => Some("unanchored"),
+        "- [x] _RULING_ (owner): nothing to anchor" => Some("unanchored"),
+    ]
+);
+
+laws::table!(
+    a_quoted_kind_word_is_a_remark,
+    |line: &&str| Noting::outcome(line),
+    [
+        "\"RULING\" lines must quote the owner." => Some("imported"),
+        "| RULING | count |" => Some("imported"),
+        "`RULING` is a kind word" => Some("imported"),
+        "~~RULING (owner): nothing to anchor~~ withdrawn" => Some("imported"),
     ]
 );
 
@@ -370,8 +389,17 @@ fn an_unanchored_ruling_refuses_the_whole_import_reporting_it_and_writing_nothin
 }
 
 #[test]
-fn notes_import_into_a_project_once() -> Result<(), Failure> {
+fn notes_import_into_a_project_once_and_an_empty_import_holds_nothing() -> Result<(), Failure> {
     let applying = Noting::ready()?;
+    let empty = [Line::Noted(Noted::Reconciled(Reconciliation::new(
+        Count::new(0),
+        Count::new(0),
+        Count::new(0),
+        Count::new(0),
+    )))];
+    assert_eq!(Spread::parsed(&Noting::imported(&applying, "")?), empty);
+    assert_eq!(Spread::parsed(&Noting::imported(&applying, "\n \t\n\r\n")?), empty);
+    assert_eq!(applying.run(&["view", "notes"])?, "");
     Noting::imported(&applying, EXCERPT)?;
     let viewed = applying.run(&["view", "notes"])?;
     assert!(matches!(Noting::imported(&applying, EXCERPT), Err(Failure::Reimported(_))));

@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 use console_ports::Process;
 use design::{Agents, Cli, Failure, Outcome};
 use design_store::StreamSchema;
