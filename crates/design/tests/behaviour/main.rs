@@ -29,7 +29,7 @@ use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof
 use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
-use newtype::{Counter, Newtype};
+use newtype::{Counter, Wrapping};
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use store_ports::{Busy, Sqlite, Store, Written};
 use stream::{Relation, Shape};
@@ -1842,7 +1842,7 @@ impl Rendered {
 #[test]
 fn show_renders_every_stage_edge_role_and_placement_of_a_small_tree() -> Result<(), Box<dyn std::error::Error>> {
     let rendered = Rendered::tree()?;
-    golden::golden!("show.txt", &rendered)?;
+    golden::golden!("show.txt", &rendered);
     Ok(())
 }
 
@@ -1859,7 +1859,7 @@ fn apply_echoes_every_directive_kind_and_show_cites_every_remarked_segment() -> 
     .join("\n");
     let applied = applying.applied(&directives)?;
     let shown = applying.run(&["show", "abcd0001"])?;
-    golden::golden!("apply.txt", &format!("design apply notes/directives\n{applied}design show abcd0001\n{shown}"))?;
+    golden::golden!("apply.txt", &format!("design apply notes/directives\n{applied}design show abcd0001\n{shown}"));
     Ok(())
 }
 

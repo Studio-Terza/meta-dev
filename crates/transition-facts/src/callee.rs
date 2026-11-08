@@ -33,8 +33,8 @@ impl Callee {
             Callee::Method { receiver, .. } => receiver.owner(caller, earlier),
             Callee::Path { owner, .. } => owner
                 .as_ref()
-                .filter(|owner| owner.casing() != Casing::Lower)
-                .map_or(Owner::Free, |owner| Owner::typed(owner, caller)),
+                .filter(|candidate| candidate.casing() != Casing::Lower)
+                .map_or(Owner::Free, |type_name| Owner::typed(type_name, caller)),
         }
     }
 }
@@ -58,7 +58,7 @@ impl<'name> Owner<'name> {
     #[must_use]
     pub fn admits(self, subject: Option<&Name>) -> Option<Owner<'name>> {
         match self {
-            Owner::Type(owner) => subject.filter(|subject| *subject == owner).map(|_| self),
+            Owner::Type(owner) => subject.filter(|candidate| *candidate == owner).map(|_| self),
             Owner::Free => subject.map_or(Some(self), |_| None),
             Owner::Unknown => None,
         }

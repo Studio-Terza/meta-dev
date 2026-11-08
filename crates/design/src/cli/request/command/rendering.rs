@@ -4,7 +4,7 @@ use design_model::{
 use design_store::{
     Annotation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest, Stored,
 };
-use newtype::Newtype;
+use newtype::Wrapping;
 use store_ports::{Store, StoreFailure};
 use stream::{Anchors, SegmentId};
 use structurer::SegmentRef;

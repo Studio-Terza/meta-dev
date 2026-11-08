@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::thread::Scope;
 
 use cargo_ports::Cargo;
+use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;
@@ -15,16 +16,23 @@ use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
-use super::boundary::Helpers;
-use super::{Outcome, Refusal, Sources, Workspaces};
+use super::boundary::Queue;
+use super::{Outcome, Sources};
 use elegance::Elegance;
-use lints::Lints;
+use lints::{Crew, Lints};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
     Gate,
     Report,
     Query(Result<Query, QueryFailure>),
+}
+
+#[derive(Debug)]
+pub(crate) enum Run<'scope, 'mode> {
+    Gate(Crew<'scope>),
+    Report,
+    Query(Option<&'mode Query>),
 }
 
 impl Mode {
@@ -39,7 +47,7 @@ impl Mode {
                     .find(|argument| argument.as_os_str() == Self::REPORT_FLAG)
                     .map_or(Mode::Gate, |_| Mode::Report)
             },
-            |(_, rest)| Mode::Query(Query::try_from(rest)),
+            |(_, rest)| Mode::Query(Query::read(rest)),
         )
     }
 
@@ -55,46 +63,48 @@ impl Mode {
         }
     }
 
-    pub(crate) fn workspaces(&self, cargo: &impl Cargo, roots: &[PathBuf]) -> Result<Workspaces, Refusal<'_>> {
+    pub(crate) fn refusal(&self) -> Option<&QueryFailure> {
         match self {
-            Mode::Gate => Workspaces::described(cargo, roots).map_err(Refusal::Workspace),
-            Mode::Report | Mode::Query(Ok(_)) => Ok(Workspaces::default()),
-            Mode::Query(Err(failure)) => Err(Refusal::Query(failure)),
+            Mode::Query(Err(failure)) => Some(failure),
+            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) => None,
         }
     }
 
-    pub(crate) fn helpers<'scope, F: Files + Sync>(
+    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync>(
         &self,
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F>,
-    ) -> Helpers<'scope> {
+        sources: &'scope Sources<F, C>,
+    ) -> Run<'scope, '_> {
         match self {
-            Mode::Gate => Lints::started(scope, sources),
-            Mode::Report | Mode::Query(_) => Vec::new(),
+            Mode::Gate => Run::Gate(Lints::started(scope, sources)),
+            Mode::Report => Run::Report,
+            Mode::Query(found) => Run::Query(found.as_ref().ok()),
         }
     }
+}
 
+impl Run<'_, '_> {
     pub(crate) fn outcome_of<'file>(
-        &self,
+        self,
         readout: &'file Readout,
-        helpers: Helpers<'_>,
+        queue: &Queue,
         out: &mut impl Write,
     ) -> Outcome<'file> {
         match self {
-            Mode::Gate => Self::gated(readout, helpers, out),
-            Mode::Report => Self::reported(readout.files(), out),
-            Mode::Query(found) => Self::queried(found.as_ref().ok(), readout.files(), out),
+            Run::Gate(crew) => Self::gated(readout, queue, crew, out),
+            Run::Report => Self::reported(readout.files(), out),
+            Run::Query(found) => Self::queried(found, readout.files(), out),
         }
     }
 
-    fn gated<'file>(readout: &'file Readout, helpers: Helpers<'_>, out: &mut impl Write) -> Outcome<'file> {
+    fn gated<'file>(readout: &'file Readout, queue: &Queue, crew: Crew<'_>, out: &mut impl Write) -> Outcome<'file> {
         let files = readout.files();
         write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)).ok();
-        Lints::checked(readout, helpers)
+        crew.checked(readout, queue)
     }
-
     fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
-        Elegance::reports(files).iter().try_for_each(|report| write!(out, "{report}")).ok();
+        let model = Reader::read_files(files);
+        Elegance::reports(files, &model).iter().try_for_each(|report| write!(out, "{report}")).ok();
         Outcome::Clean
     }
 

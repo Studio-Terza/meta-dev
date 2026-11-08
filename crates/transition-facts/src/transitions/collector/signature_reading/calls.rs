@@ -36,7 +36,7 @@ impl Calls {
     fn binding(input: &FnArg) -> Option<Binding> {
         Syntax::typed(input).and_then(|typed| {
             let name = Syntax::pat_ident(&typed.pat).map(|ident| Name::from(&ident.ident));
-            name.zip(Self::type_name(&typed.ty)).map(|(name, type_name)| Binding { name, type_name })
+            name.zip(Self::type_name(&typed.ty)).map(|(bound, type_name)| Binding { name: bound, type_name })
         })
     }
 

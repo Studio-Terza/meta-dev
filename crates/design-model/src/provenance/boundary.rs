@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar::provenance::Agents;
-use newtype::{Newtype, Spelled};
+use newtype::{Spelled, Wrapping};
 
 use crate::{Entered, RunId};
 

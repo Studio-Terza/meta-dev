@@ -49,7 +49,7 @@ impl Binary {
         let leading: usize = rest.chars().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
         let name = rest.get(leading..)?;
         let end = name.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(name.len(), |(at, _)| at);
-        name.get(..end).filter(|_| end > 0).map(|name| format!("{}{name}", Self::DOCTEST_PREFIX))
+        name.get(..end).filter(|_| end > 0).map(|word| format!("{}{word}", Self::DOCTEST_PREFIX))
     }
 }
 

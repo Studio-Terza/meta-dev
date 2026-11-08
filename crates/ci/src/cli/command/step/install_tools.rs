@@ -38,14 +38,14 @@ impl InstallTools {
         built
             .into_iter()
             .zip(copied)
-            .try_for_each(|(from, copied)| copied.map_err(|failure| Failure::unusable(from, failure)))
+            .try_for_each(|(from, outcome)| outcome.map_err(|failure| Failure::unusable(from, failure)))
             .map(|()| Exit::Success)
     }
 }
 
 impl Step for InstallTools {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<InstallTools, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<InstallTools, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let built = &arguments.taken()?;
         let destination = &arguments.taken()?;
         arguments.ended()?;

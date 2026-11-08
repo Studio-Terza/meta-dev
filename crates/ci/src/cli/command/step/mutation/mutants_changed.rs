@@ -63,8 +63,8 @@ impl MutantsChanged {
 }
 
 impl Step for MutantsChanged {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<MutantsChanged, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<MutantsChanged, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let diff = &arguments.taken()?;
         let output = &arguments.taken()?;
         let scope = arguments.rest();

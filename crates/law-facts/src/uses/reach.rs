@@ -12,8 +12,8 @@ impl Reach {
 
     pub(super) fn of_root(root: &Name) -> Reach {
         Some(root)
-            .filter(|root| Self::HOME_ROOTS.iter().all(|home_root| **root != *home_root))
-            .map_or(Reach::Home, |root| Reach::Crate(CrateName::from(root)))
+            .filter(|candidate| Self::HOME_ROOTS.iter().all(|home_root| **candidate != Name::from(*home_root)))
+            .map_or(Reach::Home, |foreign| Reach::Crate(CrateName::from(foreign)))
     }
 
     pub(super) fn routed<T>(&self, home: impl FnOnce() -> T, owned: impl FnOnce(&CrateName) -> T) -> T {

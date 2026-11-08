@@ -44,7 +44,7 @@ impl<'file> Collector<'file> {
         let path = self.path;
         self.functions.extend(
             body.filter(|_| signature.constness.is_none())
-                .map(|body| FunctionFlow::judged(path, signature.ident.span(), body)),
+                .map(|block| FunctionFlow::judged(path, signature.ident.span(), block)),
         );
     }
 }

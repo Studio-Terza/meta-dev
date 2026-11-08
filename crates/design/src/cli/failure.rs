@@ -9,7 +9,7 @@ use design_store::{Refusal, Unpaid};
 use dispatch_ports::{DispatchFailure, Stall};
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
-use newtype::Newtype;
+use newtype::Wrapping;
 use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::ReadFailure;

@@ -1,40 +1,27 @@
 mod finding;
-mod newtypes;
-mod owner;
-mod signature_sites;
-mod text_sites;
+mod lexicon;
+mod scope;
+mod signatures;
+mod texts;
 
-use lint_core::{Headline, Lint};
-use lint_file::FileLint;
-use std::path::PathBuf;
+use code_model::Model;
+use lint_core::{Headline, ModelLint, Report, Violation};
 
-use newtypes::Newtypes;
-use signature_sites::SignatureSites;
-use text_sites::TextSites;
-
-use lint_core::Gate;
-use lint_core::Report;
-use lint_core::SourceFile;
-use lint_core::SupportModules;
+use lexicon::Lexicon;
+use scope::Scope;
+use signatures::Signatures;
+use texts::Texts;
 
 #[derive(Debug)]
 pub struct PrimitiveBoundary;
 
-impl Lint for PrimitiveBoundary {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
-        let newtypes = Newtypes::in_files(files);
-        Report::new(
-            Headline::new("primitives appear in signatures and fields only inside a boundary"),
-            files
-                .iter()
-                .filter_map(SourceFile::shipped)
-                .filter(|file| support.iter().all(|path| path != file.path()))
-                .filter(|file| Gate::BOUNDARY.admits(file).is_none())
-                .flat_map(|file| {
-                    SignatureSites::violations(file, &newtypes).into_iter().chain(TextSites::violations(file))
-                })
-                .collect(),
-        )
+impl ModelLint for PrimitiveBoundary {
+    fn report(model: &Model) -> Report<'_> {
+        let lexicon = Lexicon::new();
+        let scope = Scope::read(model);
+        let mut found: Vec<Violation<'_>> =
+            Signatures::new(&lexicon, &scope).found(model).into_iter().chain(Texts::new(&scope).found(model)).collect();
+        found.sort_by(|left, right| left.site().path().cmp(right.site().path()));
+        Report::new(Headline::new("primitives appear in signatures and fields only inside a boundary"), found)
     }
 }

@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 use boundary::GoldenTest;
 use file_ports::Files;
-use newtype::Newtype;
+use newtype::Wrapping;
 use rust_files::RustFiles;
 use text_lines::LossyText;
 
@@ -28,9 +28,9 @@ impl GoldenTests {
     pub fn under(files: &impl Files, sources: &Path) -> Result<GoldenTests, Failure<'static>> {
         let found = RustFiles::below(files, &sources.join(Self::CRATES))?;
         let read = files.read_many(&found);
-        found.into_iter().zip(read).try_fold(GoldenTests::default(), |tests, (file, bytes)| {
+        found.into_iter().zip(read).try_fold(GoldenTests::default(), |tests, (file, outcome)| {
             let bytes =
-                bytes.map_err(|failure| Failure::Io { path: Cow::Owned(file), source: io::Error::from(failure) })?;
+                outcome.map_err(|failure| Failure::Io { path: Cow::Owned(file), source: io::Error::from(failure) })?;
             Ok(tests.merged(LossyText::from(bytes.as_ref()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
         })
     }

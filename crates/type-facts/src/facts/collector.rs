@@ -121,13 +121,13 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         let walk = Walk::outside_tests(&found.attrs);
         let generic =
             found.generics.type_params().next().and(target.clone()).filter(|_| walk == Walk::Entered).map(|spelled| {
-                let implemented = implementation.as_ref().map(|each| AsRef::<Name>::as_ref(each).clone());
-                let methods = implementation.as_ref().map_or(inherent.as_slice(), Implementation::methods).to_vec();
-                GenericImpl::new(self.krate, site, spelled).filled(implemented, methods)
+                let trait_name = implementation.as_ref().map(|each| AsRef::<Name>::as_ref(each).clone());
+                let carried = implementation.as_ref().map_or(inherent.as_slice(), Implementation::methods).to_vec();
+                GenericImpl::new(self.krate, site, spelled).filled(trait_name, carried)
             });
         self.facts.add_generic(generic);
         let block = target
-            .map(|target| ImplBlock::new(self.krate, target, implementation, inherent))
+            .map(|named| ImplBlock::new(self.krate, named, implementation, inherent))
             .filter(|_| walk == Walk::Entered);
         self.facts.add_block(block);
     }

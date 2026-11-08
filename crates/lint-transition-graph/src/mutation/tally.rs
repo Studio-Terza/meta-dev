@@ -20,9 +20,10 @@ pub(super) struct Tally {
 
 impl Tally {
     pub(super) fn counts<'edge, 'found, 'file>(edge: &'edge Edge<'found, 'file>) -> Option<&'edge Edge<'found, 'file>> {
-        let mutating =
-            Some(edge).filter(|edge| *AsRef::<Ground>::as_ref(edge.transition()) == Ground::Core).filter(|edge| {
-                matches!(edge.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
+        let mutating = Some(edge)
+            .filter(|candidate| *AsRef::<Ground>::as_ref(candidate.transition()) == Ground::Core)
+            .filter(|core| {
+                matches!(core.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
             });
         edge.stored().or(mutating)
     }

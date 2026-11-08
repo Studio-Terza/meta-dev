@@ -56,8 +56,8 @@ impl EnumPredicates<'_> {
     fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
         let crate_root = file.placement().crate_root();
         let local = Some(path)
-            .filter(|path| path.qself.is_none())
-            .filter(|path| path.path.segments.len() == 1)
+            .filter(|candidate| candidate.qself.is_none())
+            .filter(|unqualified| unqualified.path.segments.len() == 1)
             .and_then(|_| {
                 self.declarations
                     .iter()
@@ -119,8 +119,8 @@ impl<'ast> Visit<'ast> for Predicates<'_, '_> {
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
         let found = Syntax::inherent(block)
-            .filter(|block| self.known.kind(self.file, &self.module, &block.self_ty) == Kind::Enum)
-            .map(|block| self.predicates(block))
+            .filter(|candidate| self.known.kind(self.file, &self.module, &candidate.self_ty) == Kind::Enum)
+            .map(|enum_impl| self.predicates(enum_impl))
             .unwrap_or_default();
         self.violations.extend(found);
         syn::visit::visit_item_impl(self, block);

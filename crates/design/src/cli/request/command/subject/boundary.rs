@@ -4,7 +4,7 @@ use design_model::{NodeId, Prefix};
 use grammar::cited::Cited;
 use grammar::output::Fields;
 use grammar::output::field::{Bare, Checked};
-use newtype::Newtype;
+use newtype::Wrapping;
 use structurer::SegmentRef;
 
 use super::Subject;

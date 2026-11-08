@@ -6,7 +6,7 @@ use grammar::cited::Cited;
 use grammar::output::field::{Id, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use strum::VariantArray;
 use text_lines::Lines;
 

@@ -24,8 +24,8 @@ impl Lint for CrateGraph {
             Headline::new("a crate whose items form one big cycle is split"),
             crates
                 .into_iter()
-                .flat_map(|(crate_file, files)| {
-                    CrateSummary::of_graph(crate_file, &ItemGraph::of_files(&files)).violations()
+                .flat_map(|(crate_file, members)| {
+                    CrateSummary::of_graph(crate_file, &ItemGraph::of_files(&members)).violations()
                 })
                 .collect(),
         )

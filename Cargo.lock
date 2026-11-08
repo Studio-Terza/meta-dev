@@ -109,6 +109,7 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "port-core",
+ "thiserror",
 ]
 
 [[package]]
@@ -161,6 +162,27 @@ name = "cmov"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
+
+[[package]]
+name = "code-model"
+version = "0.1.0"
+dependencies = [
+ "lint-layout",
+]
+
+[[package]]
+name = "code-reader"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "laws",
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "console-ports"
@@ -579,7 +601,6 @@ dependencies = [
  "cargo-ports",
  "file-ports",
  "lint-runner",
- "port-core",
  "proptest",
 ]
 
@@ -653,6 +674,7 @@ dependencies = [
  "newtype",
  "syn 2.0.119",
  "text-lines",
+ "thiserror",
  "transition-facts",
  "type-facts",
 ]
@@ -954,6 +976,7 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "file-ports",
  "lint-layout",
  "lint-placement",
@@ -1040,11 +1063,13 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
+ "code-reader",
  "file-ports",
  "laws",
  "lint-core",
  "lint-placement",
  "newtype",
+ "text-lines",
  "workspace-metadata",
 ]
 
@@ -1072,6 +1097,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-hand-impls"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "lint-core",
+ "lint-layout",
+]
+
+[[package]]
 name = "lint-item-graph"
 version = "0.1.0"
 dependencies = [
@@ -1092,6 +1126,7 @@ dependencies = [
  "proc-macro2",
  "serde_core",
  "syn 2.0.119",
+ "text-lines",
  "thiserror",
  "toml",
  "workspace-metadata",
@@ -1179,6 +1214,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-narrowed-returns"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "lint-core",
+ "lint-layout",
+]
+
+[[package]]
 name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
@@ -1251,9 +1295,9 @@ dependencies = [
 name = "lint-no-plaintext"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1334,6 +1378,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "text-lines",
  "workspace-metadata",
 ]
 
@@ -1341,10 +1386,9 @@ dependencies = [
 name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
- "lint-file",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1397,13 +1441,17 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "file-ports",
  "lint-core",
  "lint-layout",
  "lint-placement",
  "lint-roots",
  "newtype",
+ "serde_json",
  "syn 2.0.119",
+ "thiserror",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1446,6 +1494,8 @@ name = "lint-runner"
 version = "0.1.0"
 dependencies = [
  "cargo-ports",
+ "code-model",
+ "code-reader",
  "file-ports",
  "golden",
  "graph-query",
@@ -1464,6 +1514,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-hand-impls",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",
@@ -1473,6 +1524,7 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-narrowed-returns",
  "lint-no-comments",
  "lint-no-early-exits",
  "lint-no-forwarders",
@@ -1507,7 +1559,6 @@ dependencies = [
  "lint-workflow-run",
  "port-core",
  "text-lines",
- "thiserror",
  "workspace-metadata",
 ]
 
@@ -1548,6 +1599,7 @@ dependencies = [
 name = "lint-suite"
 version = "0.1.0"
 dependencies = [
+ "code-reader",
  "file-ports",
  "laws",
  "lint-arbitrary-newtypes",
@@ -1565,6 +1617,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-hand-impls",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",
@@ -1574,6 +1627,7 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-narrowed-returns",
  "lint-no-early-exits",
  "lint-no-forwarders",
  "lint-no-free-fns",
@@ -1838,6 +1892,9 @@ dependencies = [
  "laws",
  "newtype-derive",
  "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -2580,8 +2637,7 @@ name = "text-lines"
 version = "0.1.0"
 dependencies = [
  "laws",
- "proptest",
- "serde",
+ "newtype",
  "serde_json",
  "thiserror",
 ]
@@ -2885,6 +2941,7 @@ checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 name = "workspace-metadata"
 version = "0.1.0"
 dependencies = [
+ "golden",
  "newtype",
  "serde",
  "serde_json",

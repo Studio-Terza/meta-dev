@@ -16,7 +16,7 @@ impl Start {
     const NAMED: [(&'static str, Start); 2] = [("crate", Start::Crate), ("super", Start::Super)];
 
     fn spelled(name: &Name) -> Start {
-        Self::NAMED.iter().find(|(word, _)| *name == *word).map_or(Start::Relative, |(_, start)| *start)
+        Self::NAMED.iter().find(|(word, _)| *name == Name::from(*word)).map_or(Start::Relative, |(_, start)| *start)
     }
 
     fn advance<'path>(self, mut segments: Vec<&'path Name>, segment: &'path Name) -> Option<Vec<&'path Name>> {
@@ -72,8 +72,8 @@ impl<'path> Target<'path> {
     }
 
     fn enclosing<'user>(&self, boundary: &[&Name], user: &'user ModulePath<'_>) -> Option<&'user ModulePath<'user>> {
-        Some(user).filter(|user| self.crate_root == user.crate_root).filter(|user| {
-            user.segments.get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
+        Some(user).filter(|candidate| self.crate_root == candidate.crate_root).filter(|in_crate| {
+            in_crate.segments.get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
         })
     }
 

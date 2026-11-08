@@ -37,7 +37,7 @@ impl Literal {
     fn shown(pinning: Pinning, reading: Reading) -> Option<Pinning> {
         match pinning {
             Pinning::LineBreak => Some(Pinning::LineBreak),
-            Pinning::Debug => Some(reading).filter(|reading| *reading == Reading::Format).map(|_| Pinning::Debug),
+            Pinning::Debug => Some(reading).filter(|candidate| *candidate == Reading::Format).map(|_| Pinning::Debug),
             Pinning::Plain => None,
         }
     }

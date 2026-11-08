@@ -31,6 +31,6 @@ impl Operators {
 
     #[must_use]
     pub fn named(name: &Name) -> Option<&Name> {
-        Some(name).filter(|name| name.matches::<Whole>(&Self::NAMES).is_some())
+        Some(name).filter(|candidate| candidate.matches::<Whole>(&Self::NAMES).is_some())
     }
 }

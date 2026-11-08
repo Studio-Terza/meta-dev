@@ -1,6 +1,6 @@
 use std::iter::once;
 
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::text::Text;
 

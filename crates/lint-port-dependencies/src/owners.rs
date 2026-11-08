@@ -1,11 +1,11 @@
 mod foreign_dependency;
 mod stale_owns;
 
-use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
+use text_lines::OneLine;
 use workspace_metadata::{Bypass, Bypasses, CrateName as PackageName, Stale};
 
 use foreign_dependency::ForeignDependency;
@@ -23,7 +23,12 @@ impl<'file> Owners<'file> {
                 .iter()
                 .rev()
                 .filter_map(|file| {
-                    Some((PackageName::try_from(file.placement().package().root().package()?.borrow()).ok()?, file))
+                    Some((
+                        PackageName::new(
+                            OneLine::try_new(file.placement().package().root().package()?.to_string()).ok()?,
+                        ),
+                        file,
+                    ))
                 })
                 .collect(),
         }
@@ -65,7 +70,7 @@ impl<'file> Owners<'file> {
     }
 
     fn sites(file: &SourceFile, bypass: &Bypass<'_>) -> BTreeSet<LineNumber> {
-        let dependencies = file.placement().package().dependencies();
+        let dependencies = file.placement().package().dependency_sites();
         Some(dependencies.sites(bypass.keys()))
             .filter(|found| found.first().is_some())
             .unwrap_or_else(|| BTreeSet::from([dependencies.header()]))

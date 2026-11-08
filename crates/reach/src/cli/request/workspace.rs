@@ -91,6 +91,6 @@ impl<'meta> Workspace<'meta> {
     fn closure(&self, crates: BTreeSet<&'meta CrateName>) -> BTreeSet<&'meta CrateName> {
         let grown: BTreeSet<&CrateName> =
             crates.iter().filter_map(|name| self.dependents.get(name)).flatten().chain(&crates).copied().collect();
-        Some(grown).filter(|grown| grown.len() > crates.len()).map_or(crates, |grown| self.closure(grown))
+        Some(grown).filter(|candidate| candidate.len() > crates.len()).map_or(crates, |larger| self.closure(larger))
     }
 }

@@ -51,6 +51,8 @@ impl TokenPaths {
 impl Parse for TokenPaths {
     fn parse(input: ParseStream) -> syn::Result<TokenPaths> {
         let steps = iter::from_fn(|| input.cursor().token_tree().map(|_| Self::attempted(input, &input.fork())));
-        steps.collect::<syn::Result<Vec<Vec<Spelled>>>>().map(|steps| TokenPaths(steps.into_iter().flatten().collect()))
+        steps
+            .collect::<syn::Result<Vec<Vec<Spelled>>>>()
+            .map(|parsed| TokenPaths(parsed.into_iter().flatten().collect()))
     }
 }

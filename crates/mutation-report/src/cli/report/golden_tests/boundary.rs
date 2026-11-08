@@ -18,8 +18,8 @@ impl NameLetter {
 
     fn within_name(letter: char) -> Option<char> {
         Some(letter)
-            .filter(|letter| letter.is_alphanumeric())
-            .or_else(|| Some(letter).filter(|letter| *letter == Self::UNDERSCORE))
+            .filter(|candidate| candidate.is_alphanumeric())
+            .or_else(|| Some(letter).filter(|candidate| *candidate == Self::UNDERSCORE))
     }
 }
 
@@ -42,7 +42,7 @@ impl GoldenTest {
     }
 
     fn opens(rest: Option<&str>) -> Option<&str> {
-        rest.filter(|rest| rest.chars().skip_while(|letter| letter.is_whitespace()).take(1).eq([Self::OPEN]))
+        rest.filter(|candidate| candidate.chars().skip_while(|letter| letter.is_whitespace()).take(1).eq([Self::OPEN]))
     }
 
     fn function_name(text: &str) -> Option<GoldenTest> {

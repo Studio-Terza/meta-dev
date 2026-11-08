@@ -8,9 +8,9 @@ pub struct Module<'file> {
     path: Vec<Name>,
 }
 
-static UNPLACED: CrateFile = CrateFile::UNPLACED;
-
 impl<'file> Module<'file> {
+    pub const UNPLACED: Module<'static> = Module { crate_file: &CrateFile::UNPLACED, path: Vec::new() };
+
     #[must_use]
     pub fn of_file(file: &'file SourceFile) -> Module<'file> {
         Module { crate_file: file.crate_file(), path: file.placement().module().segments().to_vec() }
@@ -44,11 +44,5 @@ impl<'file> From<&Module<'file>> for &'file CrateFile {
 impl<'file> From<&'file CrateFile> for Module<'file> {
     fn from(crate_file: &'file CrateFile) -> Module<'file> {
         Module { crate_file, path: Vec::new() }
-    }
-}
-
-impl Default for Module<'_> {
-    fn default() -> Self {
-        Module { crate_file: &UNPLACED, path: Vec::new() }
     }
 }

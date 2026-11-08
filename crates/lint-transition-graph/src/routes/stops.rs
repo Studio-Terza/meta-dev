@@ -51,7 +51,7 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
         });
         let called: Vec<&'graph Edge<'found, 'file>> =
             resolved.into_iter().flatten().filter(|called| self.stop(called).is_some()).collect();
-        let stops = called.iter().filter_map(|called| self.stop(called)).collect();
+        let stops = called.iter().filter_map(|callee| self.stop(callee)).collect();
         Walk::new(edge, called, stops)
     }
 

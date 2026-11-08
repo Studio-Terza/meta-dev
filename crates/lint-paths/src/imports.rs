@@ -10,8 +10,8 @@ pub struct Imports<'file>(Scopes<'file>);
 
 impl<'file> Imports<'file> {
     #[must_use]
-    pub fn across(files: impl IntoIterator<Item = &'file SourceFile>) -> Imports<'file> {
-        let files: Vec<&SourceFile> = files.into_iter().collect();
+    pub fn across(sources: impl IntoIterator<Item = &'file SourceFile>) -> Imports<'file> {
+        let files: Vec<&SourceFile> = sources.into_iter().collect();
         Imports(Collector::collect(&files))
     }
 

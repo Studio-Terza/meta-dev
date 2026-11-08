@@ -6,7 +6,7 @@ use std::iter::Sum;
 use design_model::{Ordinal, Segment};
 use file_ports::Offset;
 use grammar::search::Term;
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 use stream::{Anchor, MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};

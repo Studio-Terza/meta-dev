@@ -3,17 +3,20 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Memory};
 use lint_runner::Cli;
+use text_lines::Lines;
 
-use crate::fakes::{FakeCargo, FakeLinked};
+use crate::fakes::FakeLinked;
 
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 const CLEAN: &str = "struct A;\n";
 const HEADLINE: &str = "logic is Rust; web assets live under a directory named assets:\n";
 const FINDING: &str = " source outside assets; ";
-const REWRITE: &str = "rewrite it in Rust\n";
-const MOVE: &str = "if it is a web asset, move it under a directory named assets; otherwise rewrite it in Rust\n";
+const REWRITE: &str = "rewrite it in Rust";
+const MOVE: &str = "if it is a web asset, move it under a directory named assets; otherwise rewrite it in Rust";
+const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[derive(Debug, PartialEq)]
 struct Run {
@@ -22,8 +25,13 @@ struct Run {
 }
 
 impl Run {
-    fn names(&self, path: &str, language: &str, fix: &str) -> bool {
-        self.err.contains(&format!("{path}:1: {language}{FINDING}{fix}"))
+    fn finding(path: &str, language: &str, fix: &str) -> String {
+        format!("{path}:1: {language}{FINDING}{fix}")
+    }
+
+    fn lines_at(&self, path: &str) -> Vec<String> {
+        let site = format!("{path}:1: ");
+        Lines::from(self.err.as_str()).filter(|line| line.contains(&site)).map(str::to_owned).collect()
     }
 
     fn findings(&self) -> usize {
@@ -50,16 +58,21 @@ impl Checkout {
         Checkout { root: self.root.join(directory), files: self.files }
     }
 
-    fn write(&self, path: &str, text: &str) -> Result<(), FileFailure> {
+    fn write(&self, path: &str, text: &str) -> Result<PathBuf, FileFailure> {
         let file = self.root.join(path);
         file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
-        self.files.write(&file, Bytes::from(text))
+        self.files.write(&file, Bytes::from(text))?;
+        Ok(file)
     }
 
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit =
-            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, FakeCargo::empty(), &mut out, &mut err);
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(
+            files,
+            [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            &mut out,
+            &mut err,
+        );
         Run { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 
@@ -83,7 +96,10 @@ fn a_shell_script_fails_the_run_and_names_the_fix() -> Result<(), Box<dyn Error>
     let run = checkout.checked();
     assert_eq!(run.exit, ExitCode::FAILURE);
     assert!(run.err.contains(HEADLINE));
-    assert!(run.names(&checkout.shown("run.sh"), "shell", REWRITE));
+    assert_eq!(
+        run.lines_at(&checkout.shown("run.sh")),
+        vec![Run::finding(&checkout.shown("run.sh"), "shell", REWRITE)]
+    );
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -118,7 +134,10 @@ fn hidden_directories_are_read() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write(".github/scripts/matrix.py", "print(1)\n")?;
     let run = checkout.checked();
-    assert!(run.names(&checkout.shown(".github/scripts/matrix.py"), "Python", REWRITE));
+    assert_eq!(
+        run.lines_at(&checkout.shown(".github/scripts/matrix.py")),
+        vec![Run::finding(&checkout.shown(".github/scripts/matrix.py"), "Python", REWRITE)]
+    );
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -136,18 +155,26 @@ fn version_control_and_build_output_are_not_read() -> Result<(), Box<dyn Error>>
 fn a_directory_named_target_without_a_manifest_beside_it_is_read() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write("docs/target/run.sh", "x\n")?;
-    assert!(checkout.checked().names(&checkout.shown("docs/target/run.sh"), "shell", REWRITE));
+    assert_eq!(
+        checkout.checked().lines_at(&checkout.shown("docs/target/run.sh")),
+        vec![Run::finding(&checkout.shown("docs/target/run.sh"), "shell", REWRITE)]
+    );
     Ok(())
 }
 
 #[test]
 fn files_below_assets_are_web_assets_and_pass() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    ["site/assets/app.js", "assets/css/site.css", "site/app.js"]
+    let written: Vec<PathBuf> = ["site/assets/app.js", "assets/css/site.css", "site/app.js"]
         .iter()
-        .try_for_each(|path| checkout.write(path, "x\n"))?;
+        .map(|path| checkout.write(path, "x\n"))
+        .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
     let run = checkout.checked();
-    assert!(run.names(&checkout.shown("site/app.js"), "JavaScript", MOVE));
+    let found: Vec<Vec<String>> = written.iter().map(|file| run.lines_at(&file.display().to_string())).collect();
+    assert_eq!(
+        found,
+        vec![Vec::new(), Vec::new(), vec![Run::finding(&checkout.shown("site/app.js"), "JavaScript", MOVE)]]
+    );
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -160,7 +187,7 @@ fn a_checkout_below_a_directory_named_assets_is_judged_by_its_own_paths() -> Res
     nested.write("run.sh", "x\n")?;
     let run = nested.checked();
     assert_eq!(run.exit, ExitCode::FAILURE);
-    assert!(run.names(&nested.shown("run.sh"), "shell", REWRITE));
+    assert_eq!(run.lines_at(&nested.shown("run.sh")), vec![Run::finding(&nested.shown("run.sh"), "shell", REWRITE)]);
     Ok(())
 }
 

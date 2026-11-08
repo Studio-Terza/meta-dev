@@ -90,9 +90,9 @@ impl Build {
         let read = files.read_text_many(&sources.iter().flatten().collect::<Vec<&Source>>());
         sources
             .into_iter()
-            .scan(read.into_iter(), |read, group| {
+            .scan(read.into_iter(), |unread, group| {
                 let size = group.len();
-                Some(Build::tallied(group, read.take(size).collect()))
+                Some(Build::tallied(group, unread.take(size).collect()))
             })
             .collect()
     }

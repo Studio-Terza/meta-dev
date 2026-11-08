@@ -64,10 +64,10 @@ impl<'ast> Visit<'ast> for Scan<'_> {
     fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
         let interface =
             found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
-        let filled = interface.zip(Name::of_type(&found.self_ty)).map(|(interface, filler)| Filled {
+        let filled = interface.zip(Name::of_type(&found.self_ty)).map(|(trait_name, filler)| Filled {
             krate: self.krate,
             filler,
-            interface,
+            interface: trait_name,
         });
         let methods = found
             .items
@@ -80,8 +80,8 @@ impl<'ast> Visit<'ast> for Scan<'_> {
                 )
             })
             .collect();
-        self.fillers.bodies.extend(
-            filled.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered).map(|filled| (filled, methods)),
-        );
+        self.fillers
+            .bodies
+            .extend(filled.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered).map(|kept| (kept, methods)));
     }
 }

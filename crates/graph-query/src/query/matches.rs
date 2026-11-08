@@ -2,7 +2,7 @@ use std::cmp::Reverse;
 use std::fmt;
 
 use lint_layout::Name;
-use newtype::Newtype;
+use newtype::Wrapping;
 use type_facts::{Method, MethodShape};
 
 use crate::query::candidate::Candidate;
@@ -47,7 +47,7 @@ impl<'facts, 'file> Matches<'facts, 'file> {
             .map(|candidate| Ranked::scored(candidate, terms, roles))
             .filter(|ranked| ranked.score > Score::default())
             .collect();
-        ranked.sort_by_key(|ranked| Reverse(ranked.score));
+        ranked.sort_by_key(|entry| Reverse(entry.score));
         ranked.truncate(top.into_inner());
         Matches(ranked)
     }

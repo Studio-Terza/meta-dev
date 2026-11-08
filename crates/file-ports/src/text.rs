@@ -19,6 +19,6 @@ impl TryFrom<&Bytes> for Text {
     fn try_from(bytes: &Bytes) -> Result<Text, FileFailure> {
         String::from_utf8(bytes.as_ref().to_vec())
             .map(Text::new)
-            .map_err(|_| FileFailure::Failed(io::Error::from(io::ErrorKind::InvalidData)))
+            .map_err(|error| FileFailure::Failed(io::Error::new(io::ErrorKind::InvalidData, error)))
     }
 }

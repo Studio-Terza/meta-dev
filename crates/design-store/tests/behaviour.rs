@@ -25,7 +25,7 @@ use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
-use newtype::{Counter, Newtype};
+use newtype::{Counter, Wrapping};
 use port_core::{Op, Port, Run};
 use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
 use stream::Stream;

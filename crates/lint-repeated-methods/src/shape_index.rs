@@ -33,10 +33,10 @@ impl<'file> ShapeIndex<'file> {
             owners: BTreeMap::new(),
             inners: Inners::gathered_from(files),
             homes: TypeHomes::declared_in(files),
-            home: Home::default(),
+            home: Home::NOWHERE,
             file: Path::new(""),
         };
-        files.iter().fold(index, |index, file| index.reading(file))
+        files.iter().fold(index, |gathered, file| gathered.reading(file))
     }
 
     #[must_use]
@@ -74,7 +74,7 @@ impl<'file> ShapeIndex<'file> {
         let erasure = Erasure::around(self_type.as_ref(), self.inners.inner_of(&self_type.home(), self_type.as_ref()));
         let shapes = Syntax::inherent(item)
             .into_iter()
-            .flat_map(|item| item.items.iter().filter_map(Syntax::impl_fn))
+            .flat_map(|inherent| inherent.items.iter().filter_map(Syntax::impl_fn))
             .filter(|function| matches!(function.vis, Visibility::Public(_) | Visibility::Restricted(_)))
             .filter(|function| function.sig.constness.is_none())
             .fold(BTreeMap::new(), |mut shapes, function| {
@@ -93,9 +93,9 @@ impl<'ast> Visit<'ast> for ShapeIndex<'_> {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let self_type = Name::of_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
-        let placed = self_type.map(|self_type| self.placed(item, self_type));
-        placed.into_iter().fold(&mut self.owners, |owners, placed| {
-            placed.recorded_in(owners);
+        let placed = self_type.map(|named| self.placed(item, named));
+        placed.into_iter().fold(&mut self.owners, |owners, found| {
+            found.recorded_in(owners);
             owners
         });
     }

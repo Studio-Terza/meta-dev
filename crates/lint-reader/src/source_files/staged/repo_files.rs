@@ -20,7 +20,7 @@ impl RepoFiles {
             .iter()
             .zip(listed)
             .zip(contents)
-            .map(|((tree, listed), contents)| listed.map(|listed| Self::found(tree, &listed, contents)))
+            .map(|((tree, listing), read)| listing.map(|entries| Self::found(tree, &entries, read)))
             .collect()
     }
 

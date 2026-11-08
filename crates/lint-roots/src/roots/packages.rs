@@ -3,12 +3,12 @@ mod package;
 use std::path::{Path, PathBuf};
 
 use super::target::Target;
-use crate::survey::{Fact, Survey};
+use crate::survey::{Fact, Settled, Survey};
 use crate::tree::Tree;
 use file_ports::{Files, Kind};
 use lint_layout::Failure;
 use lint_layout::Manifest;
-use newtype::Newtype;
+use newtype::Wrapping;
 use package::Package;
 
 #[derive(Debug)]
@@ -20,8 +20,8 @@ impl Packages {
         trees: &[&Tree<'_>],
         admitted: Vec<Result<Vec<Manifest>, Failure>>,
     ) -> Vec<Result<Vec<Target>, Failure>> {
-        let named: Vec<PathBuf> = admitted.iter().flatten().flatten().flat_map(Manifest::named_paths).collect();
-        let named = Survey::default().learn(files, Fact::Canonical, &named);
+        let named_paths: Vec<PathBuf> = admitted.iter().flatten().flatten().flat_map(Manifest::named_paths).collect();
+        let named = Survey::default().learn(files, Fact::Canonical, &named_paths);
         let groups: Vec<Result<Vec<Package>, Failure>> =
             admitted.into_iter().map(|group| group.map(|manifests| Self::packages(&named, &manifests))).collect();
         let packages: Vec<&Package> = groups.iter().flatten().flatten().collect();
@@ -30,9 +30,9 @@ impl Packages {
             .iter()
             .zip(groups)
             .map(|(tree, group)| {
-                let packages = group?;
-                Self::checked(&mut survey, &packages)?;
-                Ok(packages.into_iter().filter_map(|package| package.into_target(&survey, tree)).collect())
+                let members = group?;
+                let settled = Self::checked(&mut survey, &members)?;
+                Ok(members.into_iter().filter_map(|package| package.into_target(settled, tree)).collect())
             })
             .collect()
     }
@@ -50,13 +50,14 @@ impl Packages {
     fn surveyed(files: &impl Files, packages: &[&Package]) -> Survey {
         let candidates: Vec<PathBuf> = packages.iter().flat_map(|package| package.candidates()).collect();
         let directories: Vec<PathBuf> =
-            packages.iter().flat_map(|package| package.target_directories()).map(Newtype::into_inner).collect();
-        let survey = Survey::default().learn(files, Fact::Followed, &candidates).learn(files, Fact::Kind, &directories);
+            packages.iter().flat_map(|package| package.target_directories()).map(Wrapping::into_inner).collect();
+        let followed =
+            Survey::default().learn(files, Fact::Followed, &candidates).learn(files, Fact::Kind, &directories);
         let real: Vec<PathBuf> =
-            directories.into_iter().filter(|directory| survey.kind(directory) == Kind::Directory).collect();
-        let survey = survey.learn(files, Fact::Listed, &real);
-        let entries: Vec<PathBuf> = real.iter().flat_map(|directory| survey.entries(directory)).cloned().collect();
-        let survey = survey.learn(files, Fact::Kind, &entries);
+            directories.into_iter().filter(|directory| followed.kind(directory) == Kind::Directory).collect();
+        let listed = followed.learn(files, Fact::Listed, &real);
+        let entries: Vec<PathBuf> = real.iter().flat_map(|directory| listed.entries(directory)).cloned().collect();
+        let survey = listed.learn(files, Fact::Kind, &entries);
         let mains: Vec<PathBuf> = entries
             .iter()
             .filter(|entry| survey.kind(entry) == Kind::Directory)
@@ -65,13 +66,13 @@ impl Packages {
         survey.learn(files, Fact::Followed, &mains)
     }
 
-    fn checked(survey: &mut Survey, packages: &[Package]) -> Result<(), Failure> {
+    fn checked<'survey>(survey: &'survey mut Survey, packages: &[Package]) -> Result<Settled<'survey>, Failure> {
         let real: Vec<PathBuf> = packages
             .iter()
             .flat_map(Package::target_directories)
-            .map(Newtype::into_inner)
+            .map(Wrapping::into_inner)
             .filter(|directory| survey.kind(directory) == Kind::Directory)
             .collect();
-        survey.failure(&real).map_or(Ok(()), Err)
+        survey.settled(&real)
     }
 }

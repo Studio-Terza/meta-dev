@@ -46,9 +46,9 @@ impl<'walk> Keyed for Leg<'walk, '_, '_, '_> {
 impl Nested for Leg<'_, '_, '_, '_> {
     fn lies_within<'outer>(&self, outer: &'outer Self) -> Option<&'outer Self> {
         Some(outer)
-            .filter(|outer| ptr::eq(self.walk, outer.walk))
-            .filter(|outer| outer.from <= self.from)
-            .filter(|outer| self.to <= outer.to)
+            .filter(|candidate| ptr::eq(self.walk, candidate.walk))
+            .filter(|same_walk| same_walk.from <= self.from)
+            .filter(|starting| self.to <= starting.to)
     }
 }
 
