@@ -3,9 +3,7 @@ use std::fmt::Display;
 use std::num::TryFromIntError;
 use std::str::FromStr;
 
-use newtype::serde::de::value::Error as Unread;
-use newtype::serde::de::{DeserializeOwned, IntoDeserializer};
-use newtype::{Inner, Newtype, Optional, Spelled, Validated, Wrapping};
+use newtype::{Guarded, Inner, Newtype, Optional, Spelled, Validated};
 
 use super::Column;
 
@@ -18,7 +16,7 @@ pub enum ColumnFailure {
     #[error("a stored column its row needs is null")]
     Absent,
     #[error("a stored value fails its column type's check: {0}")]
-    Refused(#[source] Unread),
+    Refused(#[source] Box<dyn Error + Send + Sync>),
 }
 
 pub trait Encoding<Value> {
@@ -51,7 +49,7 @@ impl<Value: Newtype<Inner: Primitive> + Clone> Encoding<Value> for Inner {
 
 impl<Value> Encoding<Value> for Validated
 where
-    Value: Wrapping<Inner: Primitive + IntoDeserializer<'static, Unread>> + DeserializeOwned + Clone,
+    Value: Guarded<Inner: Primitive, Error: Error + Send + Sync + 'static> + Clone,
 {
     type Raw = <Value::Inner as Primitive>::Raw;
 
@@ -61,7 +59,7 @@ where
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
         Value::Inner::from_raw(raw)
-            .and_then(|inner| Value::deserialize(inner.into_deserializer()).map_err(ColumnFailure::Refused))
+            .and_then(|inner| Value::try_new(inner).map_err(|refused| ColumnFailure::Refused(Box::new(refused))))
     }
 }
 

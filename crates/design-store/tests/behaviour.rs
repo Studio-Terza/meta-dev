@@ -31,7 +31,7 @@ use port_core::{Op, Port, Run};
 use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
 use stream::Stream;
 use strum::VariantArray;
-use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Transcripts, Uuid};
+use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
 
@@ -63,7 +63,7 @@ impl Recorded {
         let read = port.read_from(session, Cursor::default())?;
         let cursor = read.cursor();
         let stream: Stream = read.into_iter().collect();
-        Ok(Recorded { records: SessionRecords::read(session.stem(), cursor, &stream), cursor })
+        Ok(Recorded { records: SessionRecords::read(session.stem(), cursor, &stream)?, cursor })
     }
 }
 
@@ -310,8 +310,8 @@ impl Around {
         self.shown(&fresh)
     }
 
-    fn kept(self) -> Result<Body, Nul> {
-        Body::try_new(format!("{}w{}", self.0, self.0))
+    fn kept(self) -> Result<Body, Box<dyn Error>> {
+        Ok(Body::try_new(format!("{}w{}", self.0, self.0))?)
     }
 }
 
@@ -365,7 +365,7 @@ fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kep
         .collect();
     let kept: Vec<Option<&Body>> =
         inked.iter().map(|point| Ok(migrated.get(&point.uuid()?))).collect::<Result<_, Box<dyn Error>>>()?;
-    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect::<Result<_, Nul>>()?;
+    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect::<Result<_, Box<dyn Error>>>()?;
     assert_eq!(kept, both_sides.iter().map(Some).collect::<Vec<Option<&Body>>>());
     Ok(())
 }
@@ -927,10 +927,17 @@ laws::law!(an_edge_is_refused_exactly_where_the_closure_holds_its_reverse_path, 
 });
 
 #[test]
-fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() {
+fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() -> Result<(), Box<dyn Error>> {
     let refused = Closed::ALL
-        .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused().ok().flatten());
-    assert_eq!(refused, Closed::ALL.map(|closed| closed.ends().cycle(Probe::closing()).ok()));
+        .into_iter()
+        .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused())
+        .collect::<Result<Vec<Option<Cycle>>, Box<dyn Error>>>()?;
+    let cycles = Closed::ALL
+        .into_iter()
+        .map(|closed| Ok(Some(closed.ends().cycle(Probe::closing())?)))
+        .collect::<Result<Vec<Option<Cycle>>, Box<dyn Error>>>()?;
+    assert_eq!(refused, cycles);
+    Ok(())
 }
 
 #[derive(Clone, Debug)]

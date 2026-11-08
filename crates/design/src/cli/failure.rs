@@ -12,7 +12,7 @@ use local_config::ConfigFailure;
 use newtype::Wrapping;
 use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
-use transcript_ports::ReadFailure;
+use transcript_ports::{ReadFailure, Unbare};
 
 use structurer::{Lapse, Misread, SegmentRef, Uncovered};
 
@@ -35,6 +35,8 @@ pub enum Failure {
     Files(#[from] FileFailure),
     #[error("cannot read the transcripts: {0}")]
     Read(#[from] ReadFailure),
+    #[error("a transcript cites a message by a word that is not a message uuid: {0}")]
+    Cited(#[from] Unbare),
     #[error("cannot write the report: {0}")]
     Write(#[from] io::Error),
     #[error("{0}")]

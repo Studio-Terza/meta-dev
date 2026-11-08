@@ -119,8 +119,8 @@ impl Fixture {
 
     fn related(relation: Relation, said: &[Say<'_>]) -> Vec<String> {
         Self::stream(said)
-            .map(|stream| {
-                stream.links().iter().filter(|link| link.relation() == relation).map(ToString::to_string).collect()
+            .and_then(|stream| {
+                Ok(stream.links()?.iter().filter(|link| link.relation() == relation).map(ToString::to_string).collect())
             })
             .unwrap_or_default()
     }
@@ -158,14 +158,7 @@ impl Cases {
 
     fn bodies(text: &&str) -> Vec<String> {
         Fixture::first(text)
-            .map(|message| {
-                message
-                    .segments()
-                    .iter()
-                    .filter_map(|segment| segment.text(&message).ok())
-                    .map(|body| body.to_string())
-                    .collect()
-            })
+            .map(|message| message.segments().iter().map(|segment| segment.text(&message).to_string()).collect())
             .unwrap_or_default()
     }
 
@@ -226,17 +219,14 @@ impl Touching {
             Say::new("l1", Some("o1"), Authorship::Lead, "1. reply"),
             Say::new("o2", Some("l1"), Authorship::Owner, "1. yes"),
         ])
-        .map(|stream| {
-            stream
-                .links()
+        .and_then(|stream| {
+            let uuid = Uuid::try_new((*touched).to_owned())?;
+            Ok(stream
+                .links()?
                 .iter()
-                .filter(|link| {
-                    link.anchors()
-                        .into_iter()
-                        .any(|anchor| Uuid::try_new((*touched).to_owned()).ok().as_ref() == Some(anchor.message()))
-                })
+                .filter(|link| link.anchors().into_iter().any(|anchor| *anchor.message() == uuid))
                 .map(ToString::to_string)
-                .collect()
+                .collect())
         })
         .unwrap_or_default()
     }
@@ -255,12 +245,7 @@ laws::table!(
 
 laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace, "[ -~\n\t•]{0,80}", text, {
     let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let bodies: Vec<String> = message
-        .segments()
-        .iter()
-        .filter_map(|segment| segment.text(&message).ok())
-        .map(|body| body.to_string())
-        .collect();
+    let bodies: Vec<String> = message.segments().iter().map(|segment| segment.text(&message).to_string()).collect();
     let inked = |text: &str| text.chars().filter(|letter| !letter.is_whitespace()).collect::<String>();
     prop_assert_eq!(inked(&bodies.concat()), inked(&text));
     let ends = |body: &String| [body.chars().next(), body.chars().last()].into_iter().flatten().collect::<Vec<char>>();

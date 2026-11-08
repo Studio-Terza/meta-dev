@@ -1,5 +1,5 @@
 use grammar::message::Span;
-use transcript_ports::{Body, Nul};
+use transcript_ports::Body;
 
 use crate::Message;
 use crate::form::Form;
@@ -27,7 +27,8 @@ impl Segment {
         self.form
     }
 
-    pub fn text(&self, message: &Message) -> Result<Body, Nul> {
-        Body::try_new(self.range.slice(message.record().text().as_ref()).to_owned())
+    #[must_use]
+    pub fn text(&self, message: &Message) -> Body {
+        message.record().text().sliced(self.range)
     }
 }

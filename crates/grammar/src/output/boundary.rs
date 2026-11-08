@@ -3,9 +3,7 @@ use std::str::FromStr;
 use std::vec::IntoIter;
 
 use logos::{Lexer, Logos};
-use newtype::serde::de::value::Error as Unwrapped;
-use newtype::serde::de::{DeserializeOwned, IntoDeserializer};
-use newtype::{Inner, Newtype, Stored, Validated, Wrapping};
+use newtype::{Guarded, Inner, Newtype, Stored, Validated};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(skip r"[ \t]+")]
@@ -113,9 +111,9 @@ impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
     }
 }
 
-impl<T: Wrapping<Inner = String> + DeserializeOwned> Unwrapping<T> for Validated {
+impl<T: Guarded<Inner = String>> Unwrapping<T> for Validated {
     fn unwrapped(text: String) -> Option<T> {
-        T::deserialize(IntoDeserializer::<Unwrapped>::into_deserializer(text)).ok()
+        T::try_new(text).ok()
     }
 }
 

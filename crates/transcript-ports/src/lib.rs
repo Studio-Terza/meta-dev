@@ -17,7 +17,7 @@ mod unrecognised;
 mod uuid;
 
 pub use authorship::Authorship;
-pub use body::{Body, Nul};
+pub use body::Body;
 pub use claude_code_dir::ClaudeCodeDir;
 pub use cursor::Cursor;
 pub use instant::Instant;
@@ -31,4 +31,4 @@ pub use session_id::SessionId;
 pub use skipped::Skipped;
 pub use transcripts::{Transcripts, transcripts_ops};
 pub use unrecognised::Unrecognised;
-pub use uuid::Uuid;
+pub use uuid::{Unbare, Uuid};

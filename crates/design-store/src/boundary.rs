@@ -190,13 +190,11 @@ impl SegmentRow {
         message
             .segments()
             .iter()
-            .filter_map(|segment| {
-                Some(SegmentRow {
-                    message: uuid.clone(),
-                    ordinal: Ordinal::new(segment.identity().ordinal().into_inner()),
-                    shape: ShapeName::new(Shape::from(segment.form()).to_string()),
-                    body: segment.text(message).ok()?,
-                })
+            .map(|segment| SegmentRow {
+                message: uuid.clone(),
+                ordinal: Ordinal::new(segment.identity().ordinal().into_inner()),
+                shape: ShapeName::new(Shape::from(segment.form()).to_string()),
+                body: segment.text(message),
             })
             .collect()
     }

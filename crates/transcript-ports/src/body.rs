@@ -1,3 +1,4 @@
+use grammar::message::Span;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]
@@ -16,6 +17,18 @@ impl Checked for Body {
             Some(_) => Err(Nul),
             None => Ok(text),
         }
+    }
+}
+
+impl Body {
+    #[must_use]
+    pub fn sliced(&self, span: Span) -> Body {
+        Body(span.slice(&self.0).to_owned())
+    }
+
+    #[must_use]
+    pub fn joined(&self, after: &Body) -> Body {
+        Body(format!("{self} {after}"))
     }
 }
 

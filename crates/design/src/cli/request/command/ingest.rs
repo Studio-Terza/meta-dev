@@ -3,8 +3,8 @@ mod count;
 use design_store::{Cursors, EarlierLines, SessionCursors, SessionRecords};
 use newtype::Counter;
 use store_ports::{Store, Written};
-use stream::{Message, Relation, Shape, Stream};
-use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts, Unrecognised};
+use stream::{MechanicalLink, Message, Relation, Shape, Stream};
+use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts, Unbare, Unrecognised};
 
 use crate::cli::failure::Failure;
 use crate::cli::output::{self, Count};
@@ -53,7 +53,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
             .map(|(session, cursor)| ingest.session(session, cursor))
             .collect::<Result<Vec<_>, Failure>>()?;
         lock.end()?;
-        Ok(Tally::counted(ingested))
+        Ok(Tally::counted(ingested)?)
     }
 
     fn session(&self, session: &Session, cursor: Cursor) -> Result<Ingested, Failure> {
@@ -62,7 +62,7 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
         let lines: Vec<Line> = read.into_iter().collect();
         let earlier = lines.first().map(|_| self.store.read(EarlierLines::within(end.session.clone()))).transpose()?;
         let stream = earlier.unwrap_or_default().resumed(lines);
-        let written = self.store.write(SessionRecords::read(&end.session, end.cursor, &stream))?;
+        let written = self.store.write(SessionRecords::read(&end.session, end.cursor, &stream)?)?;
         Ok(Ingested { end, stream, written })
     }
 }
@@ -74,19 +74,20 @@ impl ReadTo {
 }
 
 impl Tally {
-    fn counted(ingested: Vec<Ingested>) -> Tally {
+    fn counted(ingested: Vec<Ingested>) -> Result<Tally, Unbare> {
         let written = Written::total(ingested.iter().map(|session| session.written));
         let (ends, streams): (Vec<ReadTo>, Vec<Stream>) =
             ingested.into_iter().map(|session| (session.end, session.stream)).unzip();
         let messages = || streams.iter().flat_map(|stream| stream.as_ref().iter());
-        Tally {
+        let links = streams.iter().map(Stream::links).collect::<Result<Vec<_>, Unbare>>()?;
+        Ok(Tally {
             authorship: messages().map(|message| message.record().author()).collect(),
             unrecognised: streams.iter().flat_map(Stream::unrecognised).map(Unrecognised::kind).cloned().collect(),
             forms: messages().flat_map(Message::segments).map(|segment| Shape::from(segment.form())).collect(),
-            relations: streams.iter().flat_map(Stream::links).map(|link| link.relation()).collect(),
+            relations: links.iter().flatten().map(MechanicalLink::relation).collect(),
             written,
             ends,
-        }
+        })
     }
 }
 
