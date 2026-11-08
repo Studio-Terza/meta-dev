@@ -12,6 +12,7 @@ unresolved line 9 quote "water again later" unheard
 imported line 10 n10
 unresolved line 10 quote "agreed" ambiguous
 imported line 12 n11
+unresolved line 12 quote "planned" unheard
 imported line 13 n12
 unresolved line 13 quote "onward" unheard
 reconciled lines 11 nodes 11 rulings 3 anchored 3
@@ -27,7 +28,7 @@ Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and
 - 2026-11-07 lead: the timer printed "water again later" and stopped.
 Owner said "agreed" on two days.
 
-## Later
+## Later, as d4d4d4d4 "planned"
 (Owner moved on with "onward": not a ruling.)
 design show n2
 node n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
@@ -56,8 +57,7 @@ node n4 "demo" feature vague core entered import-4 "Owner's plan: \"every bed ne
   ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
   edge n4 refines n2 entered import-4
   role core entered import-4
-  placed mentions a1a1a1a1.1 owner entered import-4 "every bed needs a label; labels carry their rows."
-  placed mentions a1a1a1a1.2 owner entered import-4 "rows turn into a map."
+  cites a1a1a1a1 owner entered import-4
 design show n5
 node n5 "demo" feature vague core entered import-5 "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\" (new purchase)"
   ancestor n1 "demo" project vague core entered init
@@ -88,9 +88,10 @@ node n8 "demo" feature vague core entered import-8 "- 2026-11-07 RULING (owner):
   role core entered import-8
   placed decides e5e5e5e5.0 owner decision specific firm explicit entered import-8 "agreed"
 design show n11
-node n11 "demo" feature vague core entered import-12 "## Later"
+node n11 "demo" feature vague core entered import-12 "## Later, as d4d4d4d4 \"planned\""
   ancestor n1 "demo" project vague core entered init
   child n12 "demo" feature vague core entered import-13 "(Owner moved on with \"onward\": not a ruling.)"
   edge n11 refines n1 entered import-12
   edge n12 refines n11 entered import-13
   role core entered import-12
+  cites d4d4d4d4 owner entered import-12

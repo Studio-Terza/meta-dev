@@ -458,7 +458,7 @@ impl Reading for Shaped {
         "layout"
     }
 
-    fn heading(self, _line: &Line) -> &'static str {
+    fn heading(self, _line: &Line, _entry: &Entry) -> &'static str {
         "heading"
     }
 
@@ -501,8 +501,8 @@ impl Reading for Named {
         Ok(<[Vec<String>; 3]>::default())
     }
 
-    fn heading(self, _line: &Line) -> Said {
-        Ok(<[Vec<String>; 3]>::default())
+    fn heading(self, _line: &Line, entry: &Entry) -> Said {
+        Named::words(entry)
     }
 
     fn ruling(self, _line: &Line, entry: &Entry) -> Said {
@@ -589,7 +589,7 @@ laws::table!(
             vec!["2026-11-07".to_owned()],
         ]),
         "an \"unclosed quote and a 'stray" => Err(Unclosed::new(Quote::new("unclosed quote and a 'stray".to_owned()))),
-        "# Notes \"quoted\" 1f2e3d4c" => Ok(<[Vec<String>; 3]>::default()),
+        "# Notes \"quoted\" 1f2e3d4c" => Ok([vec!["quoted".to_owned()], vec!["1f2e3d4c".to_owned()], vec![]]),
     ]
 );
 

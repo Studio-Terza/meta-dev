@@ -48,7 +48,7 @@ pub trait Reading {
 
     fn layout(self, line: &Line) -> Self::Output;
 
-    fn heading(self, line: &Line) -> Self::Output;
+    fn heading(self, line: &Line, entry: &Entry) -> Self::Output;
 
     fn ruling(self, line: &Line, entry: &Entry) -> Self::Output;
 
@@ -83,9 +83,6 @@ enum Piece {
 struct Pieces(Vec<Piece>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Heading(String);
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
     kind: Kind,
     pieces: Pieces,
@@ -99,7 +96,7 @@ enum Form {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Content {
-    Heading(Heading),
+    Heading(Entry),
     Entry(Entry),
 }
 
@@ -212,7 +209,7 @@ impl Line {
     pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Reader::Output {
         match &self.form {
             Form::Layout(_) => reader.layout(self),
-            Form::Content(Content::Heading(_)) => reader.heading(self),
+            Form::Content(Content::Heading(entry)) => reader.heading(self, entry),
             Form::Content(Content::Entry(entry)) => entry.kind.reading(reader, self, entry),
         }
     }
@@ -233,14 +230,14 @@ impl Content {
             .spanned()
             .map(|(lexeme, range)| Lexed { lexeme: lexeme.ok(), text: text.get(range).unwrap_or_default() })
             .collect();
-        lexed.first().map_or(Opening::Prose, |first| first.opening()).content(text, &lexed)
+        lexed.first().map_or(Opening::Prose, |first| first.opening()).content(&lexed)
     }
 }
 
 impl Opening {
-    fn content(self, text: &str, lexed: &[Lexed<'_>]) -> Content {
+    fn content(self, lexed: &[Lexed<'_>]) -> Content {
         match self {
-            Opening::Heading => Content::Heading(Heading(text.to_owned())),
+            Opening::Heading => Content::Heading(Entry { kind: Kind::Remark, pieces: Pieces::parsed(lexed) }),
             Opening::Prose => Content::Entry(Entry { kind: Kind::opened(lexed), pieces: Pieces::parsed(lexed) }),
         }
     }
@@ -444,15 +441,8 @@ impl fmt::Display for Form {
 impl fmt::Display for Content {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Content::Heading(heading) => write!(formatter, "{heading}"),
-            Content::Entry(entry) => write!(formatter, "{entry}"),
+            Content::Heading(entry) | Content::Entry(entry) => write!(formatter, "{entry}"),
         }
-    }
-}
-
-impl fmt::Display for Heading {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
     }
 }
 

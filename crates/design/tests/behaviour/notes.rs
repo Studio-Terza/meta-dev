@@ -40,7 +40,7 @@ Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and
 - 2026-11-07 lead: the timer printed \"water again later\" and stopped.
 Owner said \"agreed\" on two days.
 \t
-## Later
+## Later, as d4d4d4d4 \"planned\"
 (Owner moved on with \"onward\": not a ruling.)
 ";
 
@@ -87,7 +87,7 @@ impl Noting {
 
     fn placed(remark: &str) -> Option<Result<Vec<String>, Miss>> {
         let applying = Noting::ready().ok()?;
-        let imported = Noting::imported(&applying, &format!("# Notes\nOwner: {remark}\n")).ok()?;
+        let imported = Noting::imported(&applying, &format!("# Notes\nRULING (owner c3c3c3c3): {remark}\n")).ok()?;
         let shown = applying.run(&["show", "n3"]).ok()?;
         Some(Spread::parsed(&format!("{imported}{shown}")).into_iter().filter_map(Noting::found).collect())
     }
@@ -209,7 +209,7 @@ laws::table!(
         "\"Fine.\" (f6f6f6f6, 2026-11-08)" => Some(Err(Miss::Ambiguous)),
         "\"Fine. Fine\"" => Some(Err(Miss::Unheard)),
         "\"Sow the peas\" isn't Ann's call" => Some(Ok(vec!["f6f6f6f6.1".to_owned()])),
-        "'Sow the peas' isn't Ann's call" => Some(Ok(vec![])),
+        "'Sow the peas' isn't Ann's call" => Some(Ok(vec!["c3c3c3c3.0".to_owned()])),
         "\"Sow the peas" => Some(Err(Miss::Unclosed)),
     ]
 );
@@ -219,7 +219,7 @@ fn an_imported_ruling_leaves_its_segment_to_the_structurer_or_reaches_current_de
     let applying = Noting::ready()?;
     Noting::imported(
         &applying,
-        "# Notes\nRULING (owner, explicit): \"yes the new trellis is approved.\"\nOwner: \"rows turn into a map.\"\n",
+        "# Notes\nRULING (owner, explicit): \"yes the new trellis is approved.\"\nOwner: \"rows turn into a map.\"\n- LEAD 2026-11-05: \"every bed needs a label; labels carry their rows.\"\n",
     )?;
     let decided = applying.run(&["view", "current-decision"])?;
     let deciding: Vec<NodeId> = Spread::parsed(&decided).iter().filter_map(Viewing::node).collect();
@@ -228,9 +228,13 @@ fn an_imported_ruling_leaves_its_segment_to_the_structurer_or_reaches_current_de
     let unplaced: Vec<String> = Spread::parsed(&applying.run(&["view", "unplaced"])?)
         .into_iter()
         .filter_map(Viewing::unplaced)
-        .filter(|segment| segment.contains("c3c3c3c3"))
+        .filter(|segment| ["c3c3c3c3", "a1a1a1a1"].iter().any(|message| segment.contains(message)))
         .collect();
-    assert_eq!(unplaced, Vec::<String>::new());
+    assert_eq!(unplaced, ["a1a1a1a1.0", "a1a1a1a1.1", "a1a1a1a1.2", "a1a1a1a1.3"]);
+    assert_eq!(decided.matches("a1a1a1a1").count(), 0);
+    let cites =
+        ["n4", "n5"].map(|node| applying.run(&["show", node]).map(|shown| shown.contains("cites a1a1a1a1 owner")));
+    assert!(matches!(cites, [Ok(true), Ok(true)]));
     Ok(())
 }
 

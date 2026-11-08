@@ -236,8 +236,9 @@ impl Answers {
         let anchors = Count::new(quoted.len().saturating_add(owned.len()));
         let spoken: BTreeSet<&Segment> = owned.iter().flat_map(|author| &author.segments).collect();
         let placed = voice.placed(quoted, spoken);
+        let referenced: BTreeSet<Uuid> = cited.iter().cloned().chain(voice.referenced(&placed)).collect();
         Findings {
-            directed: cited
+            directed: referenced
                 .iter()
                 .map(|message| Directed::Cited { node, message: message.clone() })
                 .chain(placed.iter().flat_map(|segment| voice.directed((*segment).clone(), node)))
@@ -319,8 +320,8 @@ impl Reading for Entries {
         None
     }
 
-    fn heading(self, _line: &notes::Line) -> Option<notes::Entry> {
-        None
+    fn heading(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
+        Some(entry.clone())
     }
 
     fn ruling(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
@@ -365,18 +366,12 @@ impl Reading for Taking<'_> {
         self.draft
     }
 
-    fn heading(self, line: &notes::Line) -> Draft {
-        let root = self.heard.root;
-        let node = self.node(root, line);
+    fn heading(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
+        let Taking { draft, heard, project } = self;
+        let rooted = Taking { draft: Draft { section: heard.root, ..draft }, heard, project };
+        let node = rooted.node(heard.root, line);
         let section = Parent { node: node.identity(), casting: node.casting() };
-        let drafted = Drafted {
-            line: NotesLine::new(line.number()),
-            node: node.identity(),
-            directed: vec![Directed::Proposed { node, parent: root.node }],
-            misses: Vec::new(),
-            ruled: Ruled::Remark,
-        };
-        self.draft.after(drafted, section)
+        Draft { section, ..rooted.entered(line, entry, Voice::Remark) }
     }
 
     fn ruling(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
@@ -493,7 +488,20 @@ impl Voice {
                     ),
                 },
             ],
-            Voice::Remark => vec![Directed::Placed { segment, node, relation: SpanRelation::Mentions }],
+            Voice::Remark => Vec::new(),
+        }
+    }
+
+    fn referenced(self, placed: &BTreeSet<&Segment>) -> BTreeSet<Uuid> {
+        match self {
+            Voice::Ruling => BTreeSet::new(),
+            Voice::Remark => placed
+                .iter()
+                .map(|segment| {
+                    let message: &Uuid = (*segment).as_ref();
+                    message.clone()
+                })
+                .collect(),
         }
     }
 
