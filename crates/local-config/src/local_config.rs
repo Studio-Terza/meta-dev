@@ -34,11 +34,6 @@ impl LocalConfig {
     }
 
     #[must_use]
-    pub fn project(&self) -> &Project {
-        &self.project
-    }
-
-    #[must_use]
     pub fn workspace(&self) -> &Path {
         &self.workspace
     }

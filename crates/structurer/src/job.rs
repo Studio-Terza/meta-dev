@@ -1,4 +1,4 @@
-use design_model::{AnyNode, Facet, NodeId, Stage, Title};
+use design_model::{AnyNode, Facet, NodeId, Project, Stage, Title};
 use transcript_ports::Body;
 
 use crate::{Owed, SegmentRef};
@@ -12,6 +12,7 @@ pub struct Said {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Context {
     node: NodeId,
+    project: Project,
     facet: Facet,
     stage: Stage,
     title: Option<Title>,
@@ -39,12 +40,20 @@ impl Said {
 }
 
 impl Context {
-    pub(crate) fn new(node: NodeId, facet: Facet, stage: Stage, title: Option<Title>) -> Context {
-        Context { node, facet, stage, title }
+    pub(crate) fn new(node: NodeId, project: Project, facet: Facet, stage: Stage) -> Context {
+        Context { node, project, facet, stage, title: None }
+    }
+
+    pub(crate) fn titled(self, title: Option<Title>) -> Context {
+        Context { title, ..self }
     }
 
     pub(crate) fn node(&self) -> NodeId {
         self.node
+    }
+
+    pub(crate) fn project(&self) -> &Project {
+        &self.project
     }
 
     pub(crate) fn facet(&self) -> Facet {
@@ -62,7 +71,9 @@ impl Context {
 
 impl From<&AnyNode> for Context {
     fn from(node: &AnyNode) -> Context {
-        Context::new(node.identity(), node.entry().facet(), node.stage().stage(), node.title().cloned())
+        let entry = node.entry();
+        Context::new(node.identity(), entry.project().clone(), entry.facet(), node.stage().stage())
+            .titled(node.title().cloned())
     }
 }
 

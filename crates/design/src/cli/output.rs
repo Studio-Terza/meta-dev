@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Anchored, Attempted, Count, Lapsed, Line, Remark, Summary};
+pub use boundary::{Anchored, Attempted, Count, Flailing, Lapsed, Line, Remark, Summary};

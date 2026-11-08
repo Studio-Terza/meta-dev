@@ -15,8 +15,8 @@ pub struct Resolved(NodeId);
 #[derive(Clone, Copy, Debug, Op)]
 pub struct Resolving(NodeId);
 
-#[derive(Clone, Debug, Op)]
-pub struct ContextNodes(Project);
+#[derive(Clone, Copy, Debug, Op)]
+pub struct ContextNodes;
 
 #[derive(Clone, Debug, Op)]
 pub struct Planting {
@@ -670,17 +670,13 @@ ORDER BY
     }
 }
 
-impl From<Project> for ContextNodes {
-    fn from(project: Project) -> ContextNodes {
-        ContextNodes(project)
-    }
-}
-
 impl Query for ContextNodes {
     type Rows = Vec<AnyNode>;
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
-        let project = self.0;
+        let vague = Stage::Vague;
+        let refining = Stage::Refining;
+        let root = Facet::Project;
         let dropped = Stage::Dropped;
         let rows = statements.rows(store_ports::query!(
             NodeRow,
@@ -698,33 +694,20 @@ SELECT
   condition,
   reason
 FROM
-  (
-    SELECT
-      id,
-      project,
-      facet,
-      stage,
-      provenance,
-      title,
-      role,
-      role_provenance,
-      artifact,
-      condition,
-      reason
-    FROM
-      nodes
-    WHERE
-      project = ?1
-      AND stage != ?2
-    ORDER BY
-      id DESC
-    LIMIT
-      200
+  nodes
+WHERE
+  stage IN (?1, ?2)
+  OR (
+    facet = ?3
+    AND stage != ?4
   )
 ORDER BY
+  project,
   id
 "#,
-            project: Project,
+            vague: Stage,
+            refining: Stage,
+            root: Facet,
             dropped: Stage
         ))?;
         Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)

@@ -51,6 +51,12 @@ pub struct RunEnded {
     usage: Option<Usage>,
 }
 
+#[derive(Clone, Debug, Op)]
+pub struct JobFlailed {
+    run: RunId,
+    segments: Vec<Segment>,
+}
+
 #[derive(Clone, Copy, Debug, Op)]
 pub struct NextJob;
 
@@ -66,6 +72,9 @@ pub struct Unstructured;
 #[derive(Clone, Copy, Debug, Op)]
 pub struct RunsOf(JobId);
 
+#[derive(Clone, Copy, Debug, Op)]
+pub struct FlailedSegments;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ran {
     run: RunId,
@@ -77,6 +86,13 @@ pub struct Ran {
 pub struct StoredRun {
     run: RunId,
     spawned: Spawned,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Flailed {
+    segment: Segment,
+    job: JobId,
+    run: RunId,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -128,6 +144,13 @@ impl RunEnded {
     }
 }
 
+impl JobFlailed {
+    #[must_use]
+    pub fn new(run: RunId, segments: Vec<Segment>) -> JobFlailed {
+        JobFlailed { run, segments }
+    }
+}
+
 impl From<JobId> for RunsOf {
     fn from(job: JobId) -> RunsOf {
         RunsOf(job)
@@ -160,6 +183,24 @@ impl StoredRun {
     #[must_use]
     pub fn spawned(&self) -> &Spawned {
         &self.spawned
+    }
+}
+
+impl Flailed {
+    #[must_use]
+    pub fn job(&self) -> JobId {
+        self.job
+    }
+
+    #[must_use]
+    pub fn run(&self) -> RunId {
+        self.run
+    }
+}
+
+impl AsRef<Segment> for Flailed {
+    fn as_ref(&self) -> &Segment {
+        &self.segment
     }
 }
 

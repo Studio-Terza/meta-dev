@@ -10,7 +10,9 @@ use std::str::FromStr;
 
 use console_ports::Variables;
 
-use design::{Anchored, Attempted, Cli, Count, Failure, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
+use design::{
+    Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved,
+};
 use design_model::{
     AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId, Kin, Node,
     NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, RunId,
@@ -2135,6 +2137,9 @@ impl Generated {
                 .prop_map(|(job, lapse)| Line::Retried(Lapsed::new(JobId::new(job), lapse))),
             (0..i64::MAX, Generated::lapse())
                 .prop_map(|(job, lapse)| Line::Flailed(Lapsed::new(JobId::new(job), lapse))),
+            (Generated::segment(), 0..i64::MAX, 0..i64::MAX).prop_map(|(segment, job, run)| Line::FlailedSegment(
+                Flailing::new(segment, JobId::new(job), RunId::new(run))
+            )),
         ]
         .boxed()
     }

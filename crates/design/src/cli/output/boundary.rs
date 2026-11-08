@@ -144,6 +144,7 @@ pub enum Line {
     Ran(Attempted),
     Retried(Lapsed),
     Flailed(Lapsed),
+    FlailedSegment(Flailing),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -152,6 +153,13 @@ pub struct Attempted {
     job: JobId,
     state: RunState,
     usage: Option<Usage>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Flailing {
+    segment: SegmentRef,
+    job: JobId,
+    run: RunId,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -236,6 +244,8 @@ enum Key {
     Retried,
     #[name("flailed")]
     Flailed,
+    #[name("flailed-segment")]
+    FlailedSegment,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -370,6 +380,7 @@ impl fmt::Display for Line {
             Line::Ran(attempted) => write!(formatter, "{} {attempted}", Key::Run),
             Line::Retried(lapsed) => write!(formatter, "{} {lapsed}", Key::Retried),
             Line::Flailed(lapsed) => write!(formatter, "{} {lapsed}", Key::Flailed),
+            Line::FlailedSegment(flailing) => write!(formatter, "{} {flailing}", Key::FlailedSegment),
         }
     }
 }
@@ -470,6 +481,7 @@ impl Line {
             Key::Run => Attempted::read(fields).map(Line::Ran),
             Key::Retried => Lapsed::read(fields).map(Line::Retried),
             Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
+            Key::FlailedSegment => Flailing::read(fields).map(Line::FlailedSegment),
             Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
         }
     }
@@ -609,6 +621,35 @@ impl fmt::Display for Attempted {
             let [input, output, written, read] = usage.spent();
             write!(formatter, " {} {input} {output} {written} {read}", Spend::Tokens)
         })
+    }
+}
+
+impl Flailing {
+    #[must_use]
+    pub fn new(segment: SegmentRef, job: JobId, run: RunId) -> Flailing {
+        Flailing { segment, job, run }
+    }
+
+    fn read(fields: &mut Fields) -> Result<Flailing, Unread> {
+        Ok(Flailing {
+            segment: SegmentRef::from(&fields.field::<Cited>()?),
+            job: JobId::new(fields.past(&[Spend::Job])?.field::<Integer<_>>()?),
+            run: RunId::new(fields.past(&[Key::Run])?.field::<Integer<_>>()?),
+        })
+    }
+}
+
+impl fmt::Display for Flailing {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{} {} {} {} {}",
+            self.segment,
+            Spend::Job,
+            self.job.into_inner(),
+            Key::Run,
+            self.run.into_inner()
+        )
     }
 }
 

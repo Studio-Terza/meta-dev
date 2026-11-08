@@ -1,12 +1,12 @@
 use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
-use newtype::Newtype;
+use newtype::{Counter, Newtype};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::{Authorship, Body, Uuid};
 
 use super::{
-    JobOpened, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
-    Unstructured,
+    Flailed, FlailedSegments, JobFlailed, JobOpened, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState,
+    RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
 };
 
 #[derive(Debug, Columns)]
@@ -32,6 +32,14 @@ struct UnplacedRow {
     message: Uuid,
     ordinal: Ordinal,
     body: Body,
+}
+
+#[derive(Debug, Columns)]
+struct FlailedRow {
+    message: Uuid,
+    ordinal: Ordinal,
+    job: JobId,
+    run: RunId,
 }
 
 #[derive(Debug, Columns)]
@@ -68,6 +76,12 @@ impl From<LiveRow> for StoredRun {
 impl From<UnplacedRow> for Unplaced {
     fn from(row: UnplacedRow) -> Unplaced {
         Unplaced { segment: Segment::new(row.message, row.ordinal), body: row.body }
+    }
+}
+
+impl From<FlailedRow> for Flailed {
+    fn from(row: FlailedRow) -> Flailed {
+        Flailed { segment: Segment::new(row.message, row.ordinal), job: row.job, run: row.run }
     }
 }
 
@@ -151,6 +165,59 @@ WHERE
             cache_written: Option<Tokens>,
             cache_read: Option<Tokens>
         ))
+    }
+}
+
+impl Batch for JobFlailed {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let JobFlailed { run, segments } = self;
+        let written = segments
+            .iter()
+            .map(|segment| {
+                let message = AsRef::<Uuid>::as_ref(segment).clone();
+                let ordinal = Ordinal::from(segment);
+                statements.written(store_ports::query!(
+                    r#"
+INSERT INTO
+  flailed (message, ordinal, run)
+VALUES
+  (?1, ?2, ?3)
+"#,
+                    message: Uuid,
+                    ordinal: Ordinal,
+                    run: RunId
+                ))
+            })
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
+}
+
+impl Query for FlailedSegments {
+    type Rows = Vec<Flailed>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Flailed>, StoreFailure> {
+        let rows = statements.rows(store_ports::query!(
+            FlailedRow,
+            r#"
+SELECT
+  flailed.message,
+  flailed.ordinal,
+  runs.job,
+  flailed.run
+FROM
+  flailed
+  JOIN runs ON runs.id = flailed.run
+  JOIN messages ON messages.uuid = flailed.message
+ORDER BY
+  messages.at,
+  flailed.message,
+  flailed.ordinal
+"#
+        ))?;
+        Ok(rows.into_iter().map(Flailed::from).collect())
     }
 }
 
@@ -285,6 +352,15 @@ WHERE
     WHERE
       conversational.message = segments.message
       AND conversational.ordinal = segments.ordinal
+  )
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      flailed
+    WHERE
+      flailed.message = segments.message
+      AND flailed.ordinal = segments.ordinal
   )
   AND NOT EXISTS (
     SELECT

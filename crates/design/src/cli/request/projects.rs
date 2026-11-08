@@ -27,7 +27,6 @@ pub struct Located {
     workspace: PathBuf,
     repo: PathBuf,
     working: PathBuf,
-    project: Option<Project>,
 }
 
 impl Located {
@@ -49,10 +48,6 @@ impl Located {
 
     pub fn repo(&self) -> &Path {
         &self.repo
-    }
-
-    pub fn project(&self) -> Option<&Project> {
-        self.project.as_ref()
     }
 
     pub fn within(&self, path: &Path) -> PathBuf {
@@ -81,8 +76,7 @@ impl Projects {
         let current = environment.variable(OsStr::new("PWD")).map(PathBuf::from);
         let working = Self::resolved(&current.clone().unwrap_or_default());
         let repo = Self::repository(files, &working);
-        let config = LocalConfig::found(files, &repo)?;
-        let recorded = config.as_ref().map(|config| config.workspace().to_path_buf());
+        let recorded = LocalConfig::found(files, &repo)?.map(|config| config.workspace().to_path_buf());
         let chosen = workspace
             .map(|workspace| current.clone().unwrap_or_default().join(workspace))
             .or(recorded)
@@ -95,7 +89,6 @@ impl Projects {
             workspace: root,
             repo,
             working,
-            project: config.map(|config| config.project().clone()),
         })
     }
 

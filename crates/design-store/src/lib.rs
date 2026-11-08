@@ -41,8 +41,8 @@ pub use prefixes::{Prefixes, Shortest};
 pub use project_root::ProjectRoot;
 use relative::Relative;
 pub use runs::{
-    JobOpened, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
-    Unstructured,
+    Flailed, FlailedSegments, JobFlailed, JobOpened, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState,
+    RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
 };
 pub use scope::Scope;
 pub use search_segments::SearchSegments;

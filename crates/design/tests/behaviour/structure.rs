@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
 use design::{Agents, Attempted, Cli, Count, Failure, Lapsed, Line, Outcome};
-use design_model::{JobId, Provenance, RunId};
-use design_store::{JobOpened, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
+use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Provenance, RunId};
+use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
     Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, HeadlessClaude,
     Job, Output, Pause, Pid, Prompt, Reply, Started, SystemClock, Tokens, Told, Usage, Wall, clock_ops, dispatch_ops,
@@ -230,6 +230,22 @@ fn a_reply_is_applied_with_agent_provenance_its_usage_recorded_and_the_unstructu
 }
 
 #[test]
+fn a_flailed_job_is_not_redispatched_by_the_next_run() -> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u, u, u]), Pause::new(0))?;
+    let first = structuring.structured();
+    assert!(matches!(first.outcome, Err(Failure::Flailed { .. })));
+    let second = structuring.structured();
+    assert_eq!(structuring.script.prompts().len(), 2, "the second run re-sent the flailed job's segments");
+    golden::golden!(
+        "structure-flailed.txt",
+        &format!("design structure\n{}design structure\n{}", first.text, second.text)
+    )?;
+    assert_eq!(second.outcome?, Outcome::Structured { jobs: Count::new(0) });
+    Ok(())
+}
+
+#[test]
 fn a_deadline_passed_during_a_sleep_kills_the_run_which_counts_as_a_failure_and_is_retried() -> Result<(), Failure> {
     let structuring = Structuring::over(Script::replying(&[None, Some(Script::COVERING)]), Pause::new(3600))?;
     let structured = structuring.structured();
@@ -298,10 +314,13 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
 -> Result<(), Box<dyn Error>> {
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::UNCOVERING), Some(Script::COVERING)]), Pause::new(0))?;
+    let run = Run::root();
+    let entry = Entry::new("other".parse()?, Facet::Project, Entered::Init.into());
+    run.port(structuring.applying.store.clone()).write(Planting::sown(Node::new(NodeId::new(2), entry)))?;
     golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured().text))?;
     let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
     golden::golden!("structure-briefs.txt", &briefs)?;
-    assert!(matches!(structuring.applying.run(&["show", "n2"]), Err(Failure::Unplaced(_))));
+    assert!(matches!(structuring.applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
     Ok(())
 }
 

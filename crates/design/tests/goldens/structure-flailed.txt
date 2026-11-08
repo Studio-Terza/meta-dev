@@ -1,0 +1,14 @@
+design structure
+retried 1 "uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0"
+flailed 1 "uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0"
+run 1 job 1 replied tokens 10 20 3 4
+run 2 job 1 replied tokens 10 20 3 4
+flailed-segment aaaaaaaa-0000-4000-8000-000000000001.0 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000003.0 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000003.1 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000005.0 job 1 run 2
+design structure
+flailed-segment aaaaaaaa-0000-4000-8000-000000000001.0 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000003.0 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000003.1 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000005.0 job 1 run 2

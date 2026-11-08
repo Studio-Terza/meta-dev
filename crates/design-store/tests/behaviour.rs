@@ -9,10 +9,10 @@ use design_model::{
     Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, JobOpened, Linked, LiveRuns, NextJob,
-    NextNode, NextRun, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Resolved, Resolving,
-    Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords,
-    ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
+    AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, FlailedSegments, JobFlailed, JobOpened,
+    Linked, LiveRuns, NextJob, NextNode, NextRun, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName,
+    Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors,
+    SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
 };
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -1261,16 +1261,43 @@ fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(
 }
 
 #[test]
-fn the_structurer_s_context_is_the_newest_live_nodes_of_its_project_alone() -> Result<(), Box<dyn Error>> {
+fn the_structurer_s_context_keeps_the_project_root_past_200_nodes() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Dag::planting(&store, Entry::new("q".parse()?, Facet::Project, Provenance::from(Entered::Init)))?)?;
+    store.write(Dag::node(&store, Facet::Project)?)?;
     (0..=200)
         .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
         .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
-    let context: Vec<NodeId> =
-        store.read(ContextNodes::from("p".parse::<Project>()?))?.iter().map(AnyNode::identity).collect();
-    assert_eq!(context, (3..=202).map(NodeId::new).collect::<Vec<NodeId>>());
+    let [specified, dropped] = [NodeId::new(203), NodeId::new(202)];
+    [Step::Refine, Step::Specify]
+        .into_iter()
+        .map(|step| Ok(store.write(Restaged::new(Dag::resolved(&store, specified)?, Staging::transition(step)?))?))
+        .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+    store.write(Restaged::new(Dag::resolved(&store, dropped)?, Staging::transition(Step::Drop)?))?;
+    let context: Vec<NodeId> = store.read(ContextNodes)?.iter().map(AnyNode::identity).collect();
+    assert_eq!(context, (2..=201).chain([1]).map(NodeId::new).collect::<Vec<NodeId>>());
+    Ok(())
+}
+
+#[test]
+fn a_flailed_segment_leaves_the_unstructured_stream_and_is_listed_with_its_job_and_run() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(Recorded::session()?.records)?;
+    let job = store.read(NextJob)?;
+    store.write(JobOpened::from(job))?;
+    let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
+    store.write(RunSpawned::new(RunId::new(1), job, spawned))?;
+    store.write(JobFlailed::new(RunId::new(1), vec![Proposals::segment("o1", 1)]))?;
+    let flailed: Vec<(Segment, RunId)> = store
+        .read(FlailedSegments)?
+        .iter()
+        .filter(|flailed| flailed.job() == job)
+        .map(|flailed| (AsRef::<Segment>::as_ref(flailed).clone(), flailed.run()))
+        .collect();
+    assert_eq!(Unstructuring::listed(&store)?, vec![Proposals::segment("o1", 0)]);
+    assert_eq!(flailed, vec![(Proposals::segment("o1", 1), RunId::new(1))]);
     Ok(())
 }
 

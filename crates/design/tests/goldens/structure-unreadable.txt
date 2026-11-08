@@ -3,3 +3,7 @@ retried 1 "errored \"Invalid API key - Please run /login\""
 flailed 1 "unreadable \"the agent's output is not its JSON result: EOF while parsing a value at line 1 column 0; on stderr it wrote \\\"error: unknown option --tools\\\\n\\\"\""
 run 1 job 1 errored tokens 1 2 0 0
 run 2 job 1 unreadable
+flailed-segment aaaaaaaa-0000-4000-8000-000000000001.0 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000003.0 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000003.1 job 1 run 2
+flailed-segment aaaaaaaa-0000-4000-8000-000000000005.0 job 1 run 2
