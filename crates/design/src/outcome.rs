@@ -19,4 +19,6 @@ pub enum Outcome {
     Blocked,
     Noticed,
     Told,
+    Viewed,
+    Imported,
 }

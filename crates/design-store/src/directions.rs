@@ -3,11 +3,11 @@ mod boundary;
 use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Supersession, Vague};
 use port_core::Op;
 use store_ports::Written;
+use transcript_ports::Uuid;
 
 use crate::{Refusal, Remit, Unseen};
 
-use boundary::Annotating;
-pub(crate) use boundary::Columns;
+pub(crate) use boundary::{Annotating, Columns};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Directed {
@@ -17,6 +17,7 @@ pub enum Directed {
     Proposed { node: Node<Vague>, parent: NodeId },
     Superseded(Supersession),
     Conversational { segment: Segment },
+    Cited { node: NodeId, message: Uuid },
 }
 
 #[derive(Debug, Op)]
@@ -43,11 +44,12 @@ impl Directed {
             | Directed::Sensed { .. }
             | Directed::Related { .. }
             | Directed::Superseded(_)
-            | Directed::Conversational { .. } => None,
+            | Directed::Conversational { .. }
+            | Directed::Cited { .. } => None,
         }
     }
 
-    fn written(&self, annotating: &mut Annotating<'_, '_>) -> Result<Written, Refusal> {
+    pub(crate) fn written(&self, annotating: &mut Annotating<'_, '_>) -> Result<Written, Refusal> {
         match self {
             Directed::Placed { segment, node, relation } => annotating.placed(segment, *node, *relation),
             Directed::Sensed { segment, sense } => annotating.sensed(segment, *sense),
@@ -55,6 +57,7 @@ impl Directed {
             Directed::Proposed { node, parent } => annotating.proposed(node, *parent),
             Directed::Superseded(supersession) => annotating.superseded(*supersession),
             Directed::Conversational { segment } => annotating.conversational(segment),
+            Directed::Cited { node, message } => annotating.cited(*node, message),
         }
     }
 }

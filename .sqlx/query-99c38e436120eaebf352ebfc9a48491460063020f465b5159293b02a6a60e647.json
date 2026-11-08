@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  node_cites.message,\n  messages.author,\n  node_cites.provenance\nFROM\n  node_cites\n  JOIN messages ON messages.uuid = node_cites.message\nWHERE\n  node_cites.node = ?1\nORDER BY\n  node_cites.message\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "node_cites",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "author",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "author"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "node_cites",
+            "name": "provenance"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "99c38e436120eaebf352ebfc9a48491460063020f465b5159293b02a6a60e647"
+}

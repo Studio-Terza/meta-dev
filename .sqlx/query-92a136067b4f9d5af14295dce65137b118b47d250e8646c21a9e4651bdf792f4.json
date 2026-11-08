@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO node_cites (node, message, provenance)\nVALUES\n  (?1, ?2, ?3)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "92a136067b4f9d5af14295dce65137b118b47d250e8646c21a9e4651bdf792f4"
+}

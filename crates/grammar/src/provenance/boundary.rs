@@ -4,34 +4,57 @@ use logos::{Lexer, Logos};
 enum Spelling {
     #[regex("agent-(0|-?[1-9][0-9]*)", Spelling::counted)]
     Agent(Option<i64>),
+    #[regex("import-[1-9][0-9]*", Spelling::lined)]
+    Import(Option<usize>),
+}
+
+pub trait Originating {
+    type Output;
+
+    fn agent(self, run: i64) -> Self::Output;
+
+    fn import(self, line: usize) -> Self::Output;
 }
 
 #[derive(Debug)]
-pub struct Agents;
+pub struct Origins;
 
-impl Agents {
-    const PREFIX: &'static str = "agent-";
+impl Origins {
+    const AGENT: &'static str = "agent-";
+    const IMPORT: &'static str = "import-";
 
-    #[must_use]
-    pub fn numbered(text: &str) -> Option<i64> {
+    pub fn read<Origin: Originating>(text: &str, origin: Origin) -> Option<Origin::Output> {
         let spelled: Vec<Result<Spelling, ()>> = Spelling::lexer(text).collect();
-        <[Result<Spelling, ()>; 1]>::try_from(spelled).ok().and_then(|[only]| only.ok()).and_then(Spelling::run)
+        <[Result<Spelling, ()>; 1]>::try_from(spelled)
+            .ok()
+            .and_then(|[only]| only.ok())
+            .and_then(|spelling| spelling.originated(origin))
     }
 
     #[must_use]
-    pub fn spelled(run: i64) -> String {
-        format!("{}{run}", Agents::PREFIX)
+    pub fn agent(run: i64) -> String {
+        format!("{}{run}", Origins::AGENT)
+    }
+
+    #[must_use]
+    pub fn import(line: usize) -> String {
+        format!("{}{line}", Origins::IMPORT)
     }
 }
 
 impl Spelling {
     fn counted(lexer: &Lexer<'_, Spelling>) -> Option<i64> {
-        lexer.slice().get(Agents::PREFIX.len()..).and_then(|digits| digits.parse::<i64>().ok())
+        lexer.slice().get(Origins::AGENT.len()..).and_then(|digits| digits.parse::<i64>().ok())
     }
 
-    fn run(self) -> Option<i64> {
+    fn lined(lexer: &Lexer<'_, Spelling>) -> Option<usize> {
+        lexer.slice().get(Origins::IMPORT.len()..).and_then(|digits| digits.parse::<usize>().ok())
+    }
+
+    fn originated<Origin: Originating>(self, origin: Origin) -> Option<Origin::Output> {
         match self {
-            Spelling::Agent(run) => run,
+            Spelling::Agent(run) => run.map(|run| origin.agent(run)),
+            Spelling::Import(line) => line.map(|line| origin.import(line)),
         }
     }
 }

@@ -48,6 +48,8 @@ pub enum Unresolved {
         to.into_inner()
     )]
     Cyclic { from: NodeId, relation: NodeRelation, to: NodeId },
+    #[error("n{} cannot supersede n{}, which it refines, directly or through a chain", by.into_inner(), old.into_inner())]
+    Ancestral { old: NodeId, by: NodeId },
     #[error("segment {0} cannot be linked to itself")]
     Looped(SegmentRef),
     #[error(
@@ -145,7 +147,7 @@ struct Heard {
 
 impl Application {
     pub fn read<F: Files, S: Store>(ground: &Ground<'_, F, S>, path: &Path) -> Result<Application, Failure> {
-        let contents = ground.read(path)?;
+        let contents = ground.read(path).map_err(Failure::Directives)?;
         let store = ground.store();
         let lock = store.lock()?;
         let application = store.read(AppliedFile::from(contents))?.seen(Fresh(ground))?;

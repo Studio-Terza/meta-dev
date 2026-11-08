@@ -1,0 +1,97 @@
+design import-notes notes/postmortem.md
+imported line 1 n2
+imported line 3 n3
+imported line 4 n4
+imported line 5 n5
+imported line 6 n6
+unresolved line 6 cite ae0e9ace unheard
+imported line 7 n7
+imported line 8 n8
+imported line 9 n9
+unresolved line 9 quote "water again later" unheard
+imported line 10 n10
+unresolved line 10 quote "agreed" ambiguous
+imported line 12 n11
+unresolved line 12 quote "planned" unheard
+imported line 13 n12
+unresolved line 13 quote "onward" unheard
+reconciled lines 11 nodes 11 rulings 3 anchored 3
+design view notes
+# Garden notes (2026-11-05, draft)
+
+Convention (owner, 2026-11-05): a line counts once it is written down.
+Owner's plan: "every bed needs a label; labels carry their rows. rows turn into a map." and the rest follows.
+RULING (owner, explicit, 2026-11-05): "yes the new trellis is approved." (new purchase)
+Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and ae0e9ace landed.
+- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to the planting order.
+- 2026-11-07 RULING (owner): "agreed" again, on the compost.
+- 2026-11-07 lead: the timer printed "water again later" and stopped.
+Owner said "agreed" on two days.
+
+## Later, as c3c3c3c3 "planned"
+(Owner moved on with "onward": not a ruling.)
+design show n2
+node n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
+  ancestor n1 "demo" project vague core entered init
+  child n3 "demo" feature vague core entered import-3 "Convention (owner, 2026-11-05): a line counts once it is written down."
+  child n4 "demo" feature vague core entered import-4 "Owner's plan: \"every bed needs a label; labels carry their rows. rows turn into a map.\" and the rest follows."
+  child n5 "demo" feature vague core entered import-5 "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\" (new purchase)"
+  child n6 "demo" feature vague core entered import-6 "Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and ae0e9ace landed."
+  child n7 "demo" feature vague core entered import-7 "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to the planting order."
+  child n8 "demo" feature vague core entered import-8 "- 2026-11-07 RULING (owner): \"agreed\" again, on the compost."
+  child n9 "demo" feature vague core entered import-9 "- 2026-11-07 lead: the timer printed \"water again later\" and stopped."
+  child n10 "demo" feature vague core entered import-10 "Owner said \"agreed\" on two days."
+  edge n2 refines n1 entered import-1
+  edge n3 refines n2 entered import-3
+  edge n4 refines n2 entered import-4
+  edge n5 refines n2 entered import-5
+  edge n6 refines n2 entered import-6
+  edge n7 refines n2 entered import-7
+  edge n8 refines n2 entered import-8
+  edge n9 refines n2 entered import-9
+  edge n10 refines n2 entered import-10
+  role core entered import-1
+design show n4
+node n4 "demo" feature vague core entered import-4 "Owner's plan: \"every bed needs a label; labels carry their rows. rows turn into a map.\" and the rest follows."
+  ancestor n1 "demo" project vague core entered init
+  ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
+  edge n4 refines n2 entered import-4
+  role core entered import-4
+  cites a1a1a1a1 owner entered import-4
+design show n5
+node n5 "demo" feature vague core entered import-5 "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\" (new purchase)"
+  ancestor n1 "demo" project vague core entered init
+  ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
+  edge n5 refines n2 entered import-5
+  role core entered import-5
+  placed decides c3c3c3c3.0 owner decision specific firm explicit entered import-5 "yes the new trellis is approved."
+design show n6
+node n6 "demo" feature vague core entered import-6 "Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and ae0e9ace landed."
+  ancestor n1 "demo" project vague core entered init
+  ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
+  edge n6 refines n2 entered import-6
+  role core entered import-6
+  cites b2b2b2b2 lead entered import-6
+design show n7
+node n7 "demo" feature vague core entered import-7 "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to the planting order."
+  ancestor n1 "demo" project vague core entered init
+  ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
+  edge n7 refines n2 entered import-7
+  role core entered import-7
+  placed decides d4d4d4d4.0 owner decision specific firm explicit entered import-7 "agreed"
+  cites d4d4d4d4 owner entered import-7
+design show n8
+node n8 "demo" feature vague core entered import-8 "- 2026-11-07 RULING (owner): \"agreed\" again, on the compost."
+  ancestor n1 "demo" project vague core entered init
+  ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
+  edge n8 refines n2 entered import-8
+  role core entered import-8
+  placed decides e5e5e5e5.0 owner decision specific firm explicit entered import-8 "agreed"
+design show n11
+node n11 "demo" feature vague core entered import-12 "## Later, as c3c3c3c3 \"planned\""
+  ancestor n1 "demo" project vague core entered init
+  child n12 "demo" feature vague core entered import-13 "(Owner moved on with \"onward\": not a ruling.)"
+  edge n11 refines n1 entered import-12
+  edge n12 refines n11 entered import-13
+  role core entered import-12
+  cites c3c3c3c3 owner entered import-12

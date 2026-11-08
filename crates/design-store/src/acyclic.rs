@@ -30,6 +30,8 @@ pub enum Cycle {
 pub enum Refusal {
     #[error("the edge would close a cycle of its relation")]
     Cyclic(Cycle),
+    #[error("the superseding node refines the node it would supersede")]
+    Ancestral { old: NodeId, by: NodeId },
     #[error("{0}")]
     Inverted(#[from] Inversion),
     #[error("{0}")]

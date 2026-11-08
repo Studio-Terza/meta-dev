@@ -309,6 +309,7 @@ dependencies = [
  "named-derive",
  "newtype",
  "port-core",
+ "serde_json",
  "store-ports",
  "stream",
  "strum",
@@ -636,6 +637,7 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "logos",
+ "named-derive",
  "newtype",
  "thiserror",
 ]

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  segments.message,\n  segments.ordinal,\n  segments.body\nFROM\n  segments\n  JOIN messages ON messages.uuid = segments.message\nWHERE\n  messages.author = ?1\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      structured\n    WHERE\n      structured.message = segments.message\n      AND structured.ordinal = segments.ordinal\n  )\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      flailed\n    WHERE\n      flailed.message = segments.message\n      AND flailed.ordinal = segments.ordinal\n  )\nORDER BY\n  messages.at,\n  segments.message,\n  segments.ordinal\n",
+  "query": "\nSELECT\n  segments.message,\n  segments.ordinal,\n  segments.body,\n  flailed.run AS \"run?: i64\"\nFROM\n  unplaced\n  JOIN segments ON segments.message = unplaced.message\n  AND segments.ordinal = unplaced.ordinal\n  JOIN messages ON messages.uuid = unplaced.message\n  LEFT JOIN flailed ON flailed.message = unplaced.message\n  AND flailed.ordinal = unplaced.ordinal\nORDER BY\n  messages.at,\n  segments.message,\n  segments.ordinal\n",
   "describe": {
     "columns": [
       {
@@ -35,16 +35,28 @@
             "name": "body"
           }
         }
+      },
+      {
+        "name": "run?: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flailed",
+            "name": "run"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "a9f032a4cff00c2cb432cd13aa1c6d39607ffae99159a97388fab2caef13a683"
+  "hash": "92bac29caf1f4131e374601f271f420ab75869d50cb63c06761daa8b85778de3"
 }

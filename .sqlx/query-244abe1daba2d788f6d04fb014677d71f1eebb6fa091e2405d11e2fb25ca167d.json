@@ -1,0 +1,57 @@
+{
+  "db_name": "SQLite",
+  "query": "\nWITH\nsought (prefix) AS (\n  SELECT\n    CAST(json_each.value AS TEXT)\n  FROM\n    json_each(?1)\n)\nSELECT\n  sought.prefix AS \"prefix!: String\",\n  messages.uuid AS \"uuid!: String\",\n  messages.author AS \"author!: String\",\n  segments.ordinal AS \"ordinal!: i64\"\nFROM\n  sought\n  JOIN messages ON substr(messages.uuid, 1, length(sought.prefix)) = sought.prefix\n  JOIN segments ON segments.message = messages.uuid\nORDER BY\n  sought.prefix,\n  messages.uuid,\n  segments.ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "prefix!: String",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "uuid!: String",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "uuid"
+          }
+        }
+      },
+      {
+        "name": "author!: String",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "author"
+          }
+        }
+      },
+      {
+        "name": "ordinal!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "244abe1daba2d788f6d04fb014677d71f1eebb6fa091e2405d11e2fb25ca167d"
+}

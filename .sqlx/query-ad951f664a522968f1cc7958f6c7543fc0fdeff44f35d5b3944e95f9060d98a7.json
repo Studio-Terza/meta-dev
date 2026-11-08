@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  ending AS \"ending!: String\"\nFROM\n  ended_subtrees\nWHERE\n  id = ?1\nORDER BY\n  ending\nLIMIT\n  1\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "ending!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ad951f664a522968f1cc7958f6c7543fc0fdeff44f35d5b3944e95f9060d98a7"
+}

@@ -17,6 +17,7 @@ grammar = { path = "../grammar" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
+serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 strum.workspace = true
