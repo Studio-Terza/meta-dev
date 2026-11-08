@@ -134,17 +134,18 @@ impl Watching {
 
     fn watched(self) -> Result<Observed, Box<dyn Error>> {
         let run = Run::root();
-        let slept = Pause::new(self.timeout.saturating_add(1));
-        let clock = run.port(FakeClock {
-            now: Mutex::new(Watching::START),
-            sleep: Sleep { after: self.sleeping_after, slept },
-            waits: Mutex::new(0),
-        });
-        let dispatch = run.port(FakeDispatch { finishing: self.finishing, polls: Mutex::new(0) });
-        let deadline = Deadline::after(Watching::START, Timeout::new(self.timeout));
-        let held = dispatch.dispatch(&Job::due_by(deadline), &Prompt::new(String::new()))?;
-        let watched = Watch::over(&dispatch, &clock).watched(held)?;
-        drop((dispatch, clock));
+        let watched = {
+            let slept = Pause::new(self.timeout.saturating_add(1));
+            let clock = run.port(FakeClock {
+                now: Mutex::new(Watching::START),
+                sleep: Sleep { after: self.sleeping_after, slept },
+                waits: Mutex::new(0),
+            });
+            let dispatch = run.port(FakeDispatch { finishing: self.finishing, polls: Mutex::new(0) });
+            let deadline = Deadline::after(Watching::START, Timeout::new(self.timeout));
+            let held = dispatch.dispatch(&Job::due_by(deadline), &Prompt::new(String::new()))?;
+            Watch::over(&dispatch, &clock).watched(held)?
+        };
         let measured = run.finish();
         let snapshot = measured.snapshot();
         Ok(Observed {
