@@ -35,7 +35,7 @@ impl Artifacts {
         kind.zip(name)
             .zip(colon)
             .filter(|_spelled| rest.is_empty())
-            .map(|((kind, name), _colon)| Spelled { kind, name })
+            .map(|((spelled_kind, spelled_name), _colon)| Spelled { kind: spelled_kind, name: spelled_name })
     }
 }
 

@@ -59,8 +59,8 @@ impl AnyNode {
     pub fn narrowed<S: TryFrom<AnyStage, Error = AnyStage>>(self) -> Result<Node<S>, Misstaged> {
         let Node { identity, entry, title, casting, stage } = self;
         S::try_from(stage)
-            .map(|stage| Node { identity, entry, title, casting, stage })
-            .map_err(|stage| Misstaged::new(identity, stage.stage()))
+            .map(|narrowed| Node { identity, entry, title, casting, stage: narrowed })
+            .map_err(|refused| Misstaged::new(identity, refused.stage()))
     }
 }
 
@@ -104,7 +104,7 @@ impl<S> Node<S> {
     }
 
     fn staged<T>(self, stage: T) -> Node<T> {
-        let Node { identity, entry, title, casting, stage: _ } = self;
+        let Node { identity, entry, title, casting, .. } = self;
         Node { identity, entry, title, casting, stage }
     }
 }

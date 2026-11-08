@@ -148,10 +148,10 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
         let halted = ended.ending.halt().map(|halt| halt.halted(id));
-        halted.map(|halted| self.store.write(halted)).transpose()?;
+        halted.map(|ended_job| self.store.write(ended_job)).transpose()?;
         let flailed = ended.ending.halt().and_then(Halt::flailed);
         let held = flailed.map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
-        held.map(|flailed| self.store.write(flailed)).transpose()?;
+        held.map(|flailing| self.store.write(flailing)).transpose()?;
         let retried = ended.retried.iter().map(|lapse| Line::Retried(Lapsed::new(id, lapse.clone())));
         let closing = ended.ending.lines(id, self.store)?;
         let runs = self.store.read(RunsOf::from(id))?;
@@ -211,7 +211,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
                 Parsed::new(self.structure.store, directives, Provenance::Agent(run), self.remit.clone())
                     .replied(finished.reply()),
             ),
-            reading @ (Reading::Again(_) | Reading::Flailed(_)) => Ok(Step::from(reading)),
+            unfinished @ (Reading::Again(_) | Reading::Flailed(_)) => Ok(Step::from(unfinished)),
         }
     }
 }

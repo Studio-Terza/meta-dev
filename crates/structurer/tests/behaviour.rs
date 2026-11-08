@@ -126,7 +126,7 @@ struct Spot {
 
 impl Spot {
     fn at(line: usize, column: usize) -> Option<Spot> {
-        Some(line).zip(Some(column)).map(|(line, column)| Spot { line, column })
+        Some(line).zip(Some(column)).map(|(row, place)| Spot { line: row, column: place })
     }
 
     fn of_one(text: &str) -> Option<Spot> {
@@ -141,7 +141,7 @@ impl Spot {
         match parsed {
             Ok(_) => None,
             Err(Misread::Expected { at, .. } | Misread::Arity { at, .. }) => {
-                Spot::at(at.line().into_inner(), at.column().into_inner())
+                Spot::at(at.as_ref().into_inner(), at.column().into_inner())
             }
         }
     }

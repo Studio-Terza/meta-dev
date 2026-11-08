@@ -15,7 +15,7 @@ impl Anchor {
     fn anchored(message: Uuid, ordinal: Option<usize>) -> Anchor {
         match ordinal {
             None => Anchor::Message(message),
-            Some(ordinal) => Anchor::Segment(SegmentId::new(message, Ordinal::new(ordinal))),
+            Some(counted) => Anchor::Segment(SegmentId::new(message, Ordinal::new(counted))),
         }
     }
 }

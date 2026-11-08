@@ -34,8 +34,8 @@ impl Exchange {
         mut replies: PipeReader,
         complaints: PipeReader,
     ) -> Exchange {
-        let prompt = prompt.clone();
-        let writing = thread::spawn(move || prompting.write_all(prompt.as_ref()));
+        let sent = prompt.clone();
+        let writing = thread::spawn(move || prompting.write_all(sent.as_ref()));
         let complaining = thread::spawn(move || Stderr::heard(complaints));
         Exchange(thread::spawn(move || {
             let mut read = String::new();

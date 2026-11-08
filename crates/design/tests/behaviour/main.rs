@@ -304,8 +304,8 @@ impl Links {
         let port = run.port(store.clone());
         let shown = Session::SAID
             .iter()
-            .map(|uuid| {
-                let uuid = Uuid::new((*uuid).to_owned());
+            .map(|spelled| {
+                let uuid = Uuid::new((*spelled).to_owned());
                 port.read(ShownMessage::named(uuid.clone()))?
                     .ok_or(Failure::Unmatched(Unmatched::NoMatch(Prefix::new(uuid.into_inner()))))
             })
@@ -732,7 +732,7 @@ fn only_ingest_has_a_dry_run() {
         Invocation::against(&store, &Session::typical(), &["--dry-run", "ingest"]),
         Invocation::against(&store, &Session::typical(), &["ingest", "--dry-run", "--dry-run"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
 }
 
 #[test]
@@ -1086,12 +1086,12 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     ];
     assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
     let node = applying.run(&["show", "n3"])?;
-    let wanted = [
+    let edges = [
         "n3 \"demo\" feature vague core entered apply \"b\"",
         "  edge n3 refines n2 entered apply",
         "  edge n3 supersedes n2 entered apply",
     ];
-    assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());
+    assert_eq!(Lines::missing(&node, &edges), Vec::<&&str>::new());
     Ok(())
 }
 
@@ -1133,9 +1133,7 @@ fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Re
         "place(aaaaaaaa-0000-4000-8000-000000000003.0, c, defines)",
         "propose(new first, refines(n1), feature, \"again\")",
     ]
-    .map(|directives| {
-        applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{directives}")).err()
-    });
+    .map(|refused| applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{refused}")).err());
     assert!(matches!(
         refusals,
         [Some(Failure::Unresolved(Unresolved::Unbound(_))), Some(Failure::Unresolved(Unresolved::Rebound(_)))]
@@ -1241,7 +1239,7 @@ fn only_init_consumes_a_project() {
         Invocation::against(&store, &session, &["--consumes", "demo", "init", "other"]),
         Invocation::against(&store, &session, &["init", "other", "--consumes", "demo", "--consumes", "demo"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
 }
 
 laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VARIANTS), facet, {
@@ -1275,8 +1273,8 @@ impl Graph {
             .map(|(child, parent)| {
                 let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
                 let planted = port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
-                let (child, parent) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
-                let linked = port.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
+                let (refining, refined) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
+                let linked = port.write(Linked::new(refining, NodeRelation::Refines, refined, Entered::Init.into()))?;
                 Ok(planted.plus(linked))
             })
             .collect::<Result<Vec<Written>, Failure>>()?;
@@ -1393,7 +1391,7 @@ fn specify_without_both_an_artifact_and_a_condition_fails_to_parse() -> Result<(
         applying.run(&["specify", "n2", "--artifact", "lint:no-comments", "--condition"]),
         applying.run(&["specify", "--artifact", "lint:no-comments", "--condition", "every comment is refused"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
     assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining core entered apply"));
     Ok(())
 }
@@ -1429,7 +1427,7 @@ fn each_lifecycle_option_belongs_to_its_own_command() -> Result<(), Failure> {
         applying.run(&["search", "thanks", "--condition", "it holds"]),
         applying.run(&["refine", "n2", "--dry-run"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
     assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature vague core entered apply"));
     Ok(())
 }
@@ -1507,9 +1505,9 @@ fn a_secondary_parent_never_takes_a_core_child_and_the_refusal_names_the_edge() 
     assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
     let child = applying.run(&["role", "n2", "core"]);
     assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
-    let child = applying.run(&["show", "n2"])?;
-    assert!(child.contains("n2 \"demo\" feature vague secondary entered apply"));
-    assert!(child.contains("  role secondary entered role\n"));
+    let shown = applying.run(&["show", "n2"])?;
+    assert!(shown.contains("n2 \"demo\" feature vague secondary entered apply"));
+    assert!(shown.contains("  role secondary entered role\n"));
     Ok(())
 }
 
@@ -1559,7 +1557,7 @@ impl Applying {
     fn role(&self, node: NodeId) -> Option<Role> {
         let run = Run::root();
         let placed = run.port(self.store.clone()).read(ShownNode::from(node)).ok().flatten();
-        placed.map(|placed| placed.node().casting().role())
+        placed.map(|shown| shown.node().casting().role())
     }
 }
 
@@ -1973,7 +1971,7 @@ impl Generated {
             .prop_map(|((node, project, facet, entered), (role, cast, stage), title)| {
                 let entry = Entry::new(project, facet, entered);
                 let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
-                Summary::from(&title.into_iter().fold(loaded, |node, title| node.titled(Title::new(title))))
+                Summary::from(&title.into_iter().fold(loaded, |titled, text| titled.titled(Title::new(text))))
             })
             .boxed()
     }
@@ -2238,7 +2236,7 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
         hit("abcdef01-1", 0, "fourth thought"),
     ];
     assert_eq!(found.len(), hits.len());
-    assert!(hits.iter().all(|hit| found.contains(hit)));
+    assert!(hits.iter().all(|expected| found.contains(expected)));
     let refs = ["12345678.0", "12345678.1", "abcdef01-0.0", "abcdef01-1.0"];
     let directives: Vec<String> = refs.iter().map(|reference| format!("conversational({reference})")).collect();
     let applied = Spread::parsed(&applying.applied(&directives.join("\n"))?);

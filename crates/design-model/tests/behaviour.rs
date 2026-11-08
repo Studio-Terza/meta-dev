@@ -176,7 +176,7 @@ laws::roundtrip!(
     a_project_is_serialized_and_deserialized_back,
     Projects::any(),
     |project: &Project| serde_json::to_string(project).ok(),
-    |text: &Option<String>| text.as_deref().and_then(|text| serde_json::from_str::<Project>(text).ok()),
+    |text: &Option<String>| text.as_deref().and_then(|written| serde_json::from_str::<Project>(written).ok()),
     Some
 );
 

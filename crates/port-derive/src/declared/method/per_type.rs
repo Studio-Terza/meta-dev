@@ -17,7 +17,7 @@ impl PerType {
 
     fn listed(attribute: &Attribute) -> Option<&MetaList> {
         match &attribute.meta {
-            Meta::List(list) => Some(list).filter(|list| list.path.is_ident(Self::ATTRIBUTE)),
+            Meta::List(list) => Some(list).filter(|candidate| candidate.path.is_ident(Self::ATTRIBUTE)),
             Meta::Path(_) | Meta::NameValue(_) => None,
         }
     }

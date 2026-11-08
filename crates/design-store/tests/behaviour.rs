@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -391,7 +392,7 @@ impl Dag {
                 .collect();
             Just(edges.into_iter().collect::<Vec<Edge>>())
                 .prop_shuffle()
-                .prop_map(move |edges| Dag { facets: facets.clone(), edges })
+                .prop_map(move |shuffled| Dag { facets: facets.clone(), edges: shuffled })
         })
     }
 
@@ -416,13 +417,13 @@ impl Dag {
         [source, target]: [NodeId; 2],
         relation: NodeRelation,
     ) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
-        let (source, target) = (Dag::resolved(store, source)?, Dag::resolved(store, target)?);
-        Ok(store.write(Linked::new(source, relation, target, Entered::Init.into())))
+        let (from, to) = (Dag::resolved(store, source)?, Dag::resolved(store, target)?);
+        Ok(store.write(Linked::new(from, relation, to, Entered::Init.into())))
     }
 
     fn cast(store: &Port<'_, Sqlite>, node: NodeId, role: Role) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
-        let node = Dag::resolved(store, node)?;
-        Ok(store.write(Cast::new(node, Casting::new(role, Entered::Role.into()))))
+        let resolved = Dag::resolved(store, node)?;
+        Ok(store.write(Cast::new(resolved, Casting::new(role, Entered::Role.into()))))
     }
 
     fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, Box<dyn Error>> {
@@ -711,9 +712,9 @@ fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), B
     let root = Projects::rooted(&store, "p")?;
     Proposals::written(&store, vec![Proposals::child(root, 2)?, Proposals::child(root, 3)?])?;
     Proposals::written(&store, vec![Proposals::superseded(2, 3)?])?;
-    let successor = store.read(ShownNode::from(NodeId::new(3)))?.ok_or("no successor")?;
+    let shown = store.read(ShownNode::from(NodeId::new(3)))?.ok_or("no successor")?;
     let links: Vec<(NodeEdge, Provenance)> =
-        successor.links().iter().map(|link| (link.edge(), link.provenance())).collect();
+        shown.links().iter().map(|link| (link.edge(), link.provenance())).collect();
     let applied = Provenance::from(Entered::Apply);
     let successor = NodeId::new(3);
     assert_eq!(
@@ -735,7 +736,7 @@ fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dy
     store.write(records)?;
     let heard = |prefix: &str| -> Result<Vec<(Segment, Authorship)>, Box<dyn Error>> {
         let spoken = store.read(Prefixed::from(Prefix::new(prefix.to_owned())))?;
-        Ok(spoken.iter().map(|spoken| (spoken.segment().clone(), spoken.author())).collect())
+        Ok(spoken.iter().map(|said| (said.segment().clone(), said.author())).collect())
     };
     let owner = [(Proposals::segment("o1", 0), Authorship::Owner), (Proposals::segment("o1", 1), Authorship::Owner)];
     assert_eq!(heard("o")?, owner);
@@ -754,8 +755,8 @@ fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(),
     let [asked, answered, said] =
         [("o1", 0), ("o1", 1), ("l1", 0)].map(|(message, ordinal)| Proposals::segment(message, ordinal));
     let covered = |messages: &[&str]| -> Result<Vec<Segment>, Box<dyn Error>> {
-        let messages = messages.iter().map(|message| Uuid::new((*message).to_owned()));
-        Ok(store.read(messages.collect::<Covered>())?.into_iter().collect())
+        let uuids = messages.iter().map(|message| Uuid::new((*message).to_owned()));
+        Ok(store.read(uuids.collect::<Covered>())?.into_iter().collect())
     };
     assert_eq!(covered(&["o1", "l1"])?, []);
     let related = Directed::Related { source: said.clone(), target: answered, relation: SegmentRelation::Answers };
@@ -865,8 +866,8 @@ impl Probe {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(records)?;
-        (0..ENDS)
-            .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+        iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+            .take(ENDS)
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let ends = self.closed.ends();
         let mut files = (0..=self.edges.len())
@@ -1153,8 +1154,8 @@ impl Changes {
     fn written(&self) -> Result<Settled, Box<dyn Error>> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        (0..ENDS)
-            .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+        iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+            .take(ENDS)
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let refused = self
             .0
@@ -1261,8 +1262,8 @@ fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>>
     assert_eq!(store.read(ShownNode::from(eating))?.ok_or("no eating")?.links().len(), 0);
     Dag::cast(&store, eating, Role::Secondary)??;
     Dag::linked(&store, [eating, consumed], NodeRelation::Consumes)??;
-    let refused = Changes::inverted(Dag::cast(&store, eating, Role::Core)?)?;
-    assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
+    let inverted = Changes::inverted(Dag::cast(&store, eating, Role::Core)?)?;
+    assert_eq!(inverted, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     Ok(())
 }
 
@@ -1295,8 +1296,8 @@ fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() 
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Dag::planting(&store, Entry::new("q".parse()?, Facet::Project, Provenance::from(Entered::Init)))?)?;
     store.write(Dag::node(&store, Facet::Project)?)?;
-    (0..=200)
-        .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+    iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+        .take(201)
         .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
     let [specified, dropped] = [NodeId::new(203), NodeId::new(202)];
     [Step::Refine, Step::Specify]
@@ -1398,7 +1399,7 @@ laws::law!(a_spawned_run_is_live_until_it_ends_with_its_state_and_usage, Spawnin
     let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
     prop_assert_eq!(spawned, vec![wanted]);
     let ran: Vec<Ran> = lived.ran;
-    prop_assert_eq!(ran.iter().map(|ran| [ran.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
+    prop_assert_eq!(ran.iter().map(|one| [one.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
     prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![spawning.state]);
     prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![spawning.usage]);
     let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();

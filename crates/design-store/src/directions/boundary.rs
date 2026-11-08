@@ -427,16 +427,16 @@ VALUES
     pub(super) fn proposed(&mut self, node: &Node<Vague>, parent: NodeId) -> Result<Written, Refusal> {
         let planted = NodeRow::proposed(node, self.statements)?;
         let child = Resolved::read(node.identity(), self.statements)?;
-        let parent = Resolved::read(parent, self.statements)?;
-        let linked = Linked::new(child, NodeRelation::Refines, parent, self.provenance).written(self.statements)?;
+        let refined = Resolved::read(parent, self.statements)?;
+        let linked = Linked::new(child, NodeRelation::Refines, refined, self.provenance).written(self.statements)?;
         Ok(planted.plus(linked))
     }
 
     pub(super) fn superseded(&mut self, supersession: Supersession) -> Result<Written, Refusal> {
         let [old, by] = supersession.ends();
-        let old = Resolved::read(old, self.statements)?;
-        let by = Resolved::read(by, self.statements)?;
-        Linked::new(by, NodeRelation::Supersedes, old, self.provenance).written(self.statements)
+        let replaced = Resolved::read(old, self.statements)?;
+        let replacing = Resolved::read(by, self.statements)?;
+        Linked::new(replacing, NodeRelation::Supersedes, replaced, self.provenance).written(self.statements)
     }
 
     pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, Refusal> {

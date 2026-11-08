@@ -1,5 +1,5 @@
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use newtype::Wrapping;
@@ -22,7 +22,7 @@ impl Files for Disk {
         let mut file = File::open(path)?;
         file.seek(SeekFrom::Start(offset.into_inner()))?;
         let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
+        io::copy(&mut file, &mut bytes)?;
         Ok(Bytes::new(bytes))
     }
 

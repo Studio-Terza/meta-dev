@@ -245,9 +245,9 @@ impl Linked {
     }
 
     fn upheld(self, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {
-        let source = RoleRow::read(self.source, statements)?;
-        let target = RoleRow::read(self.target, statements)?;
-        let edge = NodeEdge::new(self.source.0, self.relation, self.target.0).upheld(source, target)?;
+        let source_role = RoleRow::read(self.source, statements)?;
+        let target_role = RoleRow::read(self.target, statements)?;
+        let edge = NodeEdge::new(self.source.0, self.relation, self.target.0).upheld(source_role, target_role)?;
         let [source, target] = edge.ends();
         Ok(EdgeColumns { source, relation: edge.relation(), target, provenance: self.provenance })
     }

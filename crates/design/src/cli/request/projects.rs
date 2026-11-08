@@ -78,7 +78,7 @@ impl Projects {
         let repo = Self::repository(files, &working);
         let recorded = LocalConfig::found(files, &repo)?.map(|config| config.workspace().to_path_buf());
         let chosen = workspace
-            .map(|workspace| current.clone().unwrap_or_default().join(workspace))
+            .map(|named| current.clone().unwrap_or_default().join(named))
             .or(recorded)
             .or(current)
             .ok_or(Failure::Unset(OsString::from("PWD")))?;

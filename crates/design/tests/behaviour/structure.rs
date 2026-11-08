@@ -124,15 +124,15 @@ impl Script {
     fn replying(replies: &[Option<&str>]) -> Script {
         Script {
             replies: Mutex::new(
-                replies.iter().map(|reply| reply.map(|reply| Output::Finished(Script::finished(reply)))).collect(),
+                replies.iter().map(|reply| reply.map(|text| Output::Finished(Script::finished(text)))).collect(),
             ),
             ..Script::default()
         }
     }
 
     fn living(self, pid: u32, started: &str) -> Script {
-        let started = started.parse::<Started>().ok();
-        Script { living: started.map(|started| Living { pid: Pid::new(pid), started }).into_iter().collect(), ..self }
+        let parsed = started.parse::<Started>().ok();
+        Script { living: parsed.map(|at| Living { pid: Pid::new(pid), started: at }).into_iter().collect(), ..self }
     }
 
     fn finished(reply: &str) -> Finished {
@@ -294,7 +294,7 @@ fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() 
     let structured = structuring.structured(&["structure"]);
     let lapse = Script::MISREAD.parse::<Directives>().err().map(Lapse::from);
     let prompts = structuring.script.prompts();
-    let retried = prompts.first().cloned().flatten().zip(lapse.clone()).map(|(first, lapse)| first.retried(&lapse));
+    let retried = prompts.first().cloned().flatten().zip(lapse.clone()).map(|(first, lapsed)| first.retried(&lapsed));
     assert_eq!(prompts.get(1).cloned().flatten(), retried);
     assert_eq!(prompts.len(), 2);
     assert!(
@@ -384,7 +384,7 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
     let run = Run::root();
     let store = run.port(structuring.applying.store.clone());
     let jobs = [1, 2, 3, 4].map(|job| store.read(RunsOf::from(JobId::new(job))));
-    let states = jobs.map(|ran| ran.map(|ran| ran.iter().map(Ran::state).collect::<Vec<RunState>>()));
+    let states = jobs.map(|read| read.map(|ran| ran.iter().map(Ran::state).collect::<Vec<RunState>>()));
     let [errored, unreadable, unstarted, failed] = states;
     assert_eq!(
         [errored?, unreadable?, unstarted?, failed?],
@@ -398,14 +398,14 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
 fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled() -> Result<(), Box<dyn Error>> {
     let structuring = Structuring::over(Script::default(), Pause::new(0))?;
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let stopped = [1, 2].map(|_stop| {
+    let stopped = [(); 2].map(|()| {
         let missing = Agent::new("/nonexistent/claude", &[]);
         structuring.structured_by(
             Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), missing), SystemClock),
             &["hook", "stop"],
         )
     });
-    let [first, second] = stopped.map(|stopped| (serde_json::from_str::<Value>(&stopped.text), stopped.outcome));
+    let [first, second] = stopped.map(|stop| (serde_json::from_str::<Value>(&stop.text), stop.outcome));
     let reasons =
         [first.0?, second.0?].map(|decision| decision.get("reason").and_then(Value::as_str).map(str::to_owned));
     let stalled = [1, 2].map(|job| {

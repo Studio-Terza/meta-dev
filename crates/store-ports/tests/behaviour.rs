@@ -170,7 +170,7 @@ fn a_held_memory_lock_refuses_a_second_lock_until_it_is_dropped() -> Result<(), 
 }
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
-#[newtype(strategy = -1.0e300..1.0e300)]
+#[newtype(strategy = -1.0e300_f64..1.0e300_f64)]
 struct Score(f64);
 
 struct Stored;

@@ -87,6 +87,6 @@ laws::roundtrip!(
     a_local_config_is_serialized_and_deserialized_back,
     Configs::any(),
     |config: &LocalConfig| toml::to_string(config).ok(),
-    |text: &Option<String>| text.as_deref().and_then(|text| toml::from_str::<LocalConfig>(text).ok()),
+    |text: &Option<String>| text.as_deref().and_then(|written| toml::from_str::<LocalConfig>(written).ok()),
     Some
 );

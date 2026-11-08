@@ -59,11 +59,20 @@ impl Cli {
         err: &mut (impl Write + Send),
     ) -> Verdict {
         let run = Run::root();
-        let metered = run.port(cargo);
+        self.metered(files, &run.port(cargo), out, err)
+    }
+
+    fn metered(
+        &self,
+        files: &(impl Files + Sync),
+        metered: &(impl Cargo + Sync),
+        out: &mut (impl Write + Send),
+        err: &mut (impl Write + Send),
+    ) -> Verdict {
         match self.mode.refusal() {
             Some(refused) => Self::refused(refused, err),
             None => StackSize::LINT
-                .ran(|| self.linted(SourceFiles::staged(files, &self.roots), Ports::new(files, &metered), out, err))
+                .ran(|| self.linted(SourceFiles::staged(files, &self.roots), Ports::new(files, metered), out, err))
                 .unwrap_or_else(|failure| Self::refused(&failure, err)),
         }
     }

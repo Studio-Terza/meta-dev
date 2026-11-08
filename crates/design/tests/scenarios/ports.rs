@@ -25,12 +25,12 @@ impl Design {
     );
 
     pub fn with_a_session_in_work() -> io::Result<Design> {
-        let home = Home::new()?;
-        let workspace = home.path().join("work");
+        let fresh = Home::new()?;
+        let workspace = AsRef::<Path>::as_ref(&fresh).join("work");
         let slug = Letters::slugged(&workspace.to_string_lossy());
         let session = Path::new(".claude/projects").join(slug).join("s.jsonl");
         let agent = Path::new("bin/claude");
-        let home = home.holding(&session, &Bytes::from(Self::SESSION))?.holding(agent, &Bytes::from(Self::AGENT))?;
+        let home = fresh.holding(&session, &Bytes::from(Self::SESSION))?.holding(agent, &Bytes::from(Self::AGENT))?;
         Ok(Design { home, workspace })
     }
 

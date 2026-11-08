@@ -173,12 +173,12 @@ impl Job {
     fn examples(&self) -> Vec<Directive> {
         let segment = self.segments().first().map(Said::segment);
         let node = self.context().first().map(|outline| NodeRef::Stored(outline.node()));
-        let placed = segment.cloned().zip(node).map(|(segment, node)| Directive::Place {
-            segment,
-            node,
+        let placed = segment.cloned().zip(node).map(|(said, outlined)| Directive::Place {
+            segment: said,
+            node: outlined,
             relation: SpanRelation::Mentions,
         });
-        let conversational = segment.cloned().map(|segment| Directive::Conversational { segment });
+        let conversational = segment.cloned().map(|said| Directive::Conversational { segment: said });
         placed.into_iter().chain(conversational).collect()
     }
 }
