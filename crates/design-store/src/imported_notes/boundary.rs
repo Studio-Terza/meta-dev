@@ -1,12 +1,36 @@
 use design_model::{Project, Provenance, Title};
+use grammar::notes::Ending;
 use store_ports::{Columns, Query, Statements, StoreFailure};
 
-use super::{ImportedNotes, Noted};
+use super::{ImportedEnding, ImportedNotes, Noted};
 
 #[derive(Debug, Columns)]
 struct NotedRow {
     provenance: Provenance,
     title: Option<Title>,
+}
+
+#[derive(Debug, Columns)]
+struct EndedRow {
+    ending: Ending,
+}
+
+impl EndedRow {
+    fn read(project: &Project, statements: &mut Statements<'_>) -> Result<Option<Ending>, StoreFailure> {
+        let rows = statements.rows(store_ports::query!(
+            EndedRow,
+            r#"
+SELECT
+  ending
+FROM
+  notes_endings
+WHERE
+  project = ?1
+"#,
+            project: Project
+        ))?;
+        Ok(rows.into_iter().next().map(|row| row.ending))
+    }
 }
 
 impl NotedRow {
@@ -37,5 +61,13 @@ ORDER BY
             project: Project
         ))?;
         Ok(rows.into_iter().filter_map(NotedRow::noted).collect())
+    }
+}
+
+impl Query for ImportedEnding {
+    type Rows = Option<Ending>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Ending>, StoreFailure> {
+        EndedRow::read(&self.0, statements)
     }
 }

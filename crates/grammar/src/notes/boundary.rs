@@ -4,7 +4,7 @@ use std::iter;
 
 use logos::Logos;
 
-use super::{Cite, Date, Layout, Quote, Unclosed};
+use super::{Cite, Date, Ending, Layout, Quote, Unclosed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
@@ -37,8 +37,11 @@ enum Lexeme {
     Cite,
     #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")]
     Date,
-    #[regex(r"[\p{L}\p{N}_]+('[\p{L}\p{N}]+)*")]
+    #[regex(r"[\p{L}\p{N}_]+")]
+    #[regex(r"[\p{L}\p{N}_]*[\p{L}\p{N}_&&[^0-9a-f]][\p{L}\p{N}_]*('[\p{L}\p{N}]+)+")]
     Word,
+    #[token("'s")]
+    Possessive,
     #[regex(r"[ \t]+")]
     Space,
 }
@@ -106,13 +109,6 @@ pub struct Line {
     form: Form,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum Ending {
-    #[default]
-    Break,
-    Open,
-}
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Notes {
     lines: Vec<Line>,
@@ -152,7 +148,7 @@ impl Notes {
     }
 
     #[must_use]
-    pub fn gathered(lines: impl IntoIterator<Item = Line>) -> Notes {
+    pub fn gathered(lines: impl IntoIterator<Item = Line>, ending: Ending) -> Notes {
         let numbered: BTreeMap<usize, Line> = lines.into_iter().map(|line| (line.number, line)).collect();
         let last = numbered.keys().next_back().copied().unwrap_or_default();
         Notes {
@@ -161,13 +157,30 @@ impl Notes {
                     numbered.get(&number).cloned().unwrap_or(Line { number, form: Form::Layout(Layout::default()) })
                 })
                 .collect(),
-            ending: Ending::Break,
+            ending,
         }
     }
 
     #[must_use]
     pub fn lines(&self) -> &[Line] {
         &self.lines
+    }
+
+    #[must_use]
+    pub fn ending(&self) -> Ending {
+        match self.lines.last().map(|line| &line.form) {
+            Some(Form::Content(_)) => self.ending,
+            Some(Form::Layout(_)) | None => Ending::Break,
+        }
+    }
+}
+
+impl Ending {
+    fn closed(self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Ending::Break => writeln!(formatter),
+            Ending::Open => Ok(()),
+        }
     }
 }
 
@@ -280,9 +293,13 @@ impl Lexeme {
             Lexeme::Dash | Lexeme::Date | Lexeme::Space => None,
             Lexeme::Ruling => Some(Kind::Ruling),
             Lexeme::Lead => Some(Kind::Lead),
-            Lexeme::Hash | Lexeme::Open | Lexeme::Close | Lexeme::Double | Lexeme::Cite | Lexeme::Word => {
-                Some(Kind::Remark)
-            }
+            Lexeme::Hash
+            | Lexeme::Open
+            | Lexeme::Close
+            | Lexeme::Double
+            | Lexeme::Cite
+            | Lexeme::Word
+            | Lexeme::Possessive => Some(Kind::Remark),
         }
     }
 }
@@ -301,6 +318,7 @@ impl<'text> Lexed<'text> {
                 | Lexeme::Cite
                 | Lexeme::Date
                 | Lexeme::Word
+                | Lexeme::Possessive
                 | Lexeme::Space,
             )
             | None => Opening::Prose,
@@ -320,6 +338,7 @@ impl<'text> Lexed<'text> {
                 | Lexeme::Cite
                 | Lexeme::Date
                 | Lexeme::Word
+                | Lexeme::Possessive
                 | Lexeme::Space,
             )
             | None => Step::after(Piece::read(self), rest),
@@ -376,6 +395,7 @@ impl Piece {
                 | Lexeme::Close
                 | Lexeme::Double
                 | Lexeme::Word
+                | Lexeme::Possessive
                 | Lexeme::Space,
             )
             | None => Piece::Text(lexed.text.to_owned()),
@@ -409,17 +429,9 @@ impl fmt::Display for Notes {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.lines.split_last().map_or(Ok(()), |(last, earlier)| {
             earlier.iter().try_for_each(|line| writeln!(formatter, "{line}"))?;
-            write!(formatter, "{last}{}", self.ending)
+            write!(formatter, "{last}")?;
+            self.ending.closed(formatter)
         })
-    }
-}
-
-impl fmt::Display for Ending {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Ending::Break => writeln!(formatter),
-            Ending::Open => Ok(()),
-        }
     }
 }
 

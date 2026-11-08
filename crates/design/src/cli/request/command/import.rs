@@ -10,7 +10,7 @@ use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
 };
 use file_ports::{Files, Text};
-use grammar::notes::{self, Cite, Date, Notes, Quote, Reading, Unclosed};
+use grammar::notes::{self, Cite, Date, Ending, Notes, Quote, Reading, Unclosed};
 use newtype::{Counter, Newtype};
 use store_ports::Store;
 use transcript_ports::{Authorship, Uuid};
@@ -50,6 +50,7 @@ struct Draft {
     next: NodeId,
     section: Parent,
     drafted: Vec<Drafted>,
+    ending: Ending,
 }
 
 #[derive(Debug)]
@@ -199,7 +200,8 @@ impl<S: Store> Sheet<'_, S> {
     fn written(&self, draft: Draft) -> Result<Report, Failure> {
         let tally = Census::counted(&draft.drafted);
         let lines: Vec<Line> = draft.drafted.iter().flat_map(|drafted| drafted.lines(Landing::Written)).collect();
-        self.store.write(draft.drafted.into_iter().map(Drafted::imported).collect::<Imports>())?;
+        let imported = draft.drafted.into_iter().map(Drafted::imported).collect();
+        self.store.write(Imports::new(self.project.clone(), draft.ending, imported))?;
         let nodes = Count::new(self.store.read(ImportedNotes::from(self.project.clone()))?.len());
         Ok(tally.reconciled(nodes, lines))
     }
@@ -207,7 +209,7 @@ impl<S: Store> Sheet<'_, S> {
 
 impl Answers {
     fn drafted(&self, notes: &Notes, project: &Project) -> Draft {
-        let start = Draft { next: self.next, section: self.root, drafted: Vec::new() };
+        let start = Draft { next: self.next, section: self.root, drafted: Vec::new(), ending: notes.ending() };
         notes.lines().iter().fold(start, |draft, line| line.read_by(Taking { draft, heard: self, project }))
     }
 
@@ -393,6 +395,7 @@ impl Draft {
             next: NodeId::new(self.next.into_inner().saturating_add(1)),
             section,
             drafted: self.drafted.into_iter().chain([drafted]).collect(),
+            ending: self.ending,
         }
     }
 

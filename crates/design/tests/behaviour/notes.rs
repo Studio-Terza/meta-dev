@@ -128,38 +128,42 @@ fn import_notes_makes_a_node_of_every_content_line_anchors_each_ruling_and_view_
 
 laws::law!(
     importing_notes_and_viewing_them_gives_the_content_back_with_as_many_nodes_as_content_lines,
-    vec(
-        select(vec![
-            ("", ""),
-            ("# Notes (2026-11-05)", "# Notes (2026-11-05)"),
-            ("## Later", "## Later"),
-            ("Owner: \"rows turn into a map.\" and more", "Owner: \"rows turn into a map.\" and more"),
-            (
-                "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\"",
-                "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\""
-            ),
-            (
-                "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that",
-                "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that"
-            ),
-            (
-                "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)",
-                "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)"
-            ),
-            ("(Owner moved on: not a ruling)", "(Owner moved on: not a ruling)"),
-            ("  indented: prose with Rust's 'quotes' in it", "  indented: prose with Rust's 'quotes' in it"),
-            ("  ", ""),
-            ("\r", ""),
-            ("  \r", ""),
-            ("\t", ""),
-            (" \t ", ""),
-        ]),
-        0..8
+    (
+        vec(
+            select(vec![
+                ("", ""),
+                ("# Notes (2026-11-05)", "# Notes (2026-11-05)"),
+                ("## Later", "## Later"),
+                ("Owner: \"rows turn into a map.\" and more", "Owner: \"rows turn into a map.\" and more"),
+                (
+                    "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\"",
+                    "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\""
+                ),
+                (
+                    "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that",
+                    "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that"
+                ),
+                (
+                    "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)",
+                    "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)"
+                ),
+                ("(Owner moved on: not a ruling)", "(Owner moved on: not a ruling)"),
+                ("  indented: prose with Rust's 'quotes' in it", "  indented: prose with Rust's 'quotes' in it"),
+                ("  ", ""),
+                ("\r", ""),
+                ("  \r", ""),
+                ("\t", ""),
+                (" \t ", ""),
+            ]),
+            0..8
+        ),
+        select(vec!["\n", ""]),
     ),
-    lines,
+    file,
     {
+        let (lines, ending) = file;
         let body: String = lines.iter().flat_map(|(line, _viewed)| [*line, "\n"]).collect();
-        let notes = format!("{body}last line\n");
+        let notes = format!("{body}last line{ending}");
         let applying = Noting::ready().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
         let imported =
             Noting::imported(&applying, &notes).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
@@ -168,7 +172,7 @@ laws::law!(
         let inked = lines.iter().filter(|(_line, viewed)| !viewed.is_empty()).count() + 1;
         let nodes =
             Spread::parsed(&imported).iter().filter(|line| matches!(line, Line::Noted(Noted::Imported { .. }))).count();
-        prop_assert_eq!(viewed, format!("{laid}last line\n"));
+        prop_assert_eq!(viewed, format!("{laid}last line{ending}"));
         prop_assert_eq!(nodes, inked);
         let reconciled = format!("reconciled lines {inked} nodes {inked} ");
         prop_assert!(imported.contains(&reconciled));
@@ -181,6 +185,8 @@ laws::table!(
     [
         "RULING (owner): \"yes the new trellis is approved.\"" => Some("imported"),
         "RULING (owner, c3c3c3c3): approved" => Some("imported"),
+        "RULING (owner): as c3c3c3c3's reply says" => Some("imported"),
+        "RULING (owner): as b2b2b2b2's reply says" => Some("unanchored"),
         "RULING (owner): 'rows turn into a map.'" => Some("unanchored"),
         "RULING 'yes' (c3c3c3c3), the owners' call" => Some("imported"),
         "RULING (owner, b2b2b2b2): the lead proposed it" => Some("unanchored"),
@@ -204,6 +210,7 @@ laws::table!(
         "\"Sow the peas. Fine\"" => Some(Ok(vec!["f6f6f6f6.1".to_owned(), "f6f6f6f6.2".to_owned()])),
         "\"Fine. Sow\"" => Some(Ok(vec!["f6f6f6f6.0".to_owned(), "f6f6f6f6.1".to_owned()])),
         "\"the peas\"" => Some(Ok(vec!["f6f6f6f6.1".to_owned()])),
+        "\"the peas\", as ae0e9ace's note says" => Some(Err(Miss::Unheard)),
         "\"peas. Fine.\"" => Some(Ok(vec!["f6f6f6f6.1".to_owned(), "f6f6f6f6.2".to_owned()])),
         "\"Fine\"" => Some(Err(Miss::Ambiguous)),
         "\"Fine.\" (f6f6f6f6, 2026-11-08)" => Some(Err(Miss::Ambiguous)),
@@ -291,6 +298,15 @@ fn a_whitespace_line_is_layout_so_it_imports_as_no_node_and_views_back_empty() -
     let laid: String =
         ["# Notes", "", "first", "", "", "", "last line"].iter().flat_map(|line| [*line, "\n"]).collect();
     assert_eq!(applying.run(&["view", "notes"])?, laid);
+    Ok(())
+}
+
+#[test]
+fn view_notes_gives_back_a_file_without_a_final_newline() -> Result<(), Failure> {
+    let applying = Noting::ready()?;
+    let notes = ["# Notes", "", "RULING (owner): as c3c3c3c3's reply says", "last line"].join("\n");
+    Noting::imported(&applying, &notes)?;
+    assert_eq!(applying.run(&["view", "notes"])?, notes);
     Ok(())
 }
 

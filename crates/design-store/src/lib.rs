@@ -40,7 +40,7 @@ pub use cursors::Cursors;
 pub use directions::{Directed, Directions};
 pub use earlier_lines::EarlierLines;
 pub use graph::{Cast, ContextNodes, Ended, Linked, Planting, Resolved, Resolving, Restaged};
-pub use imported_notes::{ImportedNotes, Noted};
+pub use imported_notes::{ImportedEnding, ImportedNotes, Noted};
 pub use imports::{Imported, Imports};
 use link::Link;
 use listed::Listed;

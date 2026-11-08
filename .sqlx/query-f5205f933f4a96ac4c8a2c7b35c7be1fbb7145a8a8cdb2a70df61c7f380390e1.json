@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  ending\nFROM\n  notes_endings\nWHERE\n  project = ?1\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "ending",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notes_endings",
+            "name": "ending"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f5205f933f4a96ac4c8a2c7b35c7be1fbb7145a8a8cdb2a70df61c7f380390e1"
+}

@@ -7,7 +7,7 @@ use grammar::line::Unbroken;
 use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
-use grammar::notes::{Entry, Line, Notes, Quote, Reading, Unclosed};
+use grammar::notes::{Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
 use grammar::reply::Inked;
@@ -431,20 +431,51 @@ laws::law!(
 );
 
 laws::law!(
-    the_content_lines_of_a_notes_file_gathered_by_number_give_the_file_back_with_layout_lines_empty,
-    vec(prop_oneof![INKED.prop_map(|text| (text.clone(), text)), LAID.prop_map(|text| (text, String::new())),], 0..8),
-    lines,
+    a_cite_before_a_possessive_is_named,
+    vec(
+        (
+            "[a-z]{1,6}('s|n't)?",
+            "[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "('s|'|:|,|\\.|\\))?",
+        ),
+        0..5
+    ),
+    said,
     {
+        let words: String = said.iter().flat_map(|(word, cite, after)| [" ", word, " ", cite, after]).collect();
+        let cites: Vec<String> = said.into_iter().map(|(_word, cite, _after)| cite).collect();
+        let line = Line::read(1, &format!("RULING (owner):{words}"));
+        prop_assert_eq!(line.read_by(Shaped), "ruling");
+        prop_assert_eq!(line.read_by(Named), Ok([vec![], cites, vec![]]));
+    }
+);
+
+laws::law!(
+    the_content_lines_of_a_notes_file_gathered_by_number_give_the_file_back_with_layout_lines_empty,
+    (
+        vec(
+            prop_oneof![INKED.prop_map(|text| (text.clone(), text)), LAID.prop_map(|text| (text, String::new())),],
+            0..8
+        ),
+        select(vec![(Ending::Break, "\n"), (Ending::Open, "")]),
+    ),
+    file,
+    {
+        let (lines, (ending, ended)) = file;
         let lines: Vec<(String, String)> = lines.into_iter().chain([("x".to_owned(), "x".to_owned())]).collect();
-        let text: String = lines.iter().flat_map(|(line, _laid)| [line.as_str(), "\n"]).collect();
-        let laid: String = lines.iter().flat_map(|(_line, laid)| [laid.as_str(), "\n"]).collect();
-        let content = Notes::read(&text)
+        let text = [lines.iter().map(|(line, _laid)| line.as_str()).collect::<Vec<&str>>().join("\n").as_str(), ended]
+            .concat();
+        let laid = [lines.iter().map(|(_line, laid)| laid.as_str()).collect::<Vec<&str>>().join("\n").as_str(), ended]
+            .concat();
+        let notes = Notes::read(&text);
+        prop_assert_eq!(notes.ending(), ending);
+        let content = notes
             .lines()
             .iter()
             .filter(|line| line.read_by(Shaped) != "layout")
             .map(|line| Line::read(line.number(), &line.to_string()))
             .collect::<Vec<Line>>();
-        prop_assert_eq!(Notes::gathered(content).to_string(), laid);
+        prop_assert_eq!(Notes::gathered(content, ending).to_string(), laid);
     }
 );
 
@@ -541,6 +572,8 @@ laws::table!(
         "Lead: the RULING above stands" => "remark",
         "(Owner moved on with \"next\": RULING aside)" => "remark",
         "RULINGS (owner): plural" => "remark",
+        "RULING's scope (owner): possessive" => "remark",
+        "RULING (owner): as c3c3c3c3's reply says" => "ruling",
         "(RULING: aside) and more" => "remark",
         "(owner) RULING: approved" => "remark",
         "(a (b) c) RULING: nested" => "remark",
@@ -590,6 +623,11 @@ laws::table!(
         ]),
         "an \"unclosed quote and a 'stray" => Err(Unclosed::new(Quote::new("unclosed quote and a 'stray".to_owned()))),
         "# Notes \"quoted\" 1f2e3d4c" => Ok([vec!["quoted".to_owned()], vec!["1f2e3d4c".to_owned()], vec![]]),
+        "Lead: see ae0e9ace's note, c3c3c3c3's reply and Ann's" => Ok([
+            vec![],
+            vec!["ae0e9ace".to_owned(), "c3c3c3c3".to_owned()],
+            vec![],
+        ]),
     ]
 );
 
@@ -642,6 +680,20 @@ laws::table!(
         "first\r\n \t \r\nlast" => (vec!["remark", "layout", "remark"], true),
         "\r\n" => (vec!["layout"], true),
         "x\ry\r\n" => (vec!["remark"], true),
+    ]
+);
+
+laws::table!(
+    a_notes_file_ends_as_its_last_content_line_ends,
+    |text: &&str| Notes::read(text).ending(),
+    [
+        "# Notes\nlast line" => Ending::Open,
+        "# Notes\nlast line\n" => Ending::Break,
+        "# Notes\nlast line\r\n" => Ending::Break,
+        "# Notes\nlast line\n  " => Ending::Break,
+        "# Notes\nlast line\n\n" => Ending::Break,
+        "  " => Ending::Break,
+        "" => Ending::Break,
     ]
 );
 

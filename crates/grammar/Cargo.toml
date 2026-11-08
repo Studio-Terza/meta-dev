@@ -15,6 +15,7 @@ doctest = false
 
 [dependencies]
 logos.workspace = true
+named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 thiserror.workspace = true
 

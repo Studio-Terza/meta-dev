@@ -6,6 +6,9 @@ use port_core::Op;
 #[derive(Clone, Debug, Op)]
 pub struct ImportedNotes(Project);
 
+#[derive(Clone, Debug, Op)]
+pub struct ImportedEnding(Project);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Noted {
     line: NotesLine,
@@ -15,6 +18,12 @@ pub struct Noted {
 impl From<Project> for ImportedNotes {
     fn from(project: Project) -> ImportedNotes {
         ImportedNotes(project)
+    }
+}
+
+impl From<Project> for ImportedEnding {
+    fn from(project: Project) -> ImportedEnding {
+        ImportedEnding(project)
     }
 }
 

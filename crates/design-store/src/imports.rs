@@ -1,4 +1,5 @@
-use design_model::Provenance;
+use design_model::{Project, Provenance};
+use grammar::notes::Ending;
 use newtype::Counter;
 use port_core::Op;
 use store_ports::{Batch, Statements, Written};
@@ -7,7 +8,11 @@ use crate::directions::Annotating;
 use crate::{Directed, Refusal};
 
 #[derive(Debug, Op)]
-pub struct Imports(Vec<Imported>);
+pub struct Imports {
+    project: Project,
+    ending: Ending,
+    lines: Vec<Imported>,
+}
 
 #[derive(Debug)]
 pub struct Imported {
@@ -32,9 +37,10 @@ impl Imported {
     }
 }
 
-impl FromIterator<Imported> for Imports {
-    fn from_iter<Lines: IntoIterator<Item = Imported>>(lines: Lines) -> Imports {
-        Imports(lines.into_iter().collect())
+impl Imports {
+    #[must_use]
+    pub fn new(project: Project, ending: Ending, lines: Vec<Imported>) -> Imports {
+        Imports { project, ending, lines }
     }
 }
 
@@ -42,9 +48,20 @@ impl Batch for Imports {
     type Failure = Refusal;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        let Imports { project, ending, lines } = self;
         let written =
-            self.0.iter().map(|imported| imported.written(statements)).collect::<Result<Vec<Written>, Refusal>>()?;
+            lines.iter().map(|imported| imported.written(statements)).collect::<Result<Vec<Written>, Refusal>>()?;
         let unflailed = Annotating::unflailed(statements)?;
-        Ok(Written::total(written.into_iter().chain([unflailed])))
+        let ended = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  notes_endings (project, ending)
+VALUES
+  (?1, ?2)
+"#,
+            project: Project,
+            ending: Ending
+        ))?;
+        Ok(Written::total(written.into_iter().chain([unflailed, ended])))
     }
 }

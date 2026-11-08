@@ -4,7 +4,8 @@ use std::iter;
 
 use design_model::{NodeId, Outline, Segment, SpanRelation};
 use design_store::{
-    ContextNodes, CurrentSpans, Ended, ImportedNotes, Noted, Placement, ProjectRoot, Resolved, UnplacedSegments,
+    ContextNodes, CurrentSpans, Ended, ImportedEnding, ImportedNotes, Noted, Placement, ProjectRoot, Resolved,
+    UnplacedSegments,
 };
 use file_ports::Files;
 use grammar::notes::{self, Notes};
@@ -120,8 +121,10 @@ impl View {
     fn notes<F: Files, S: Store>(ground: &Ground<'_, F, S>) -> Result<Notes, Failure> {
         let project = ground.located().project().ok_or(Failure::Unconfigured)?;
         let noted: Vec<Noted> = ground.store().read(ImportedNotes::from(project.clone()))?;
+        let ending = ground.store().read(ImportedEnding::from(project.clone()))?;
         Ok(Notes::gathered(
             noted.iter().map(|noted| notes::Line::read(noted.line().into_inner(), &noted.title().clone().into_inner())),
+            ending.unwrap_or_default(),
         ))
     }
 
