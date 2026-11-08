@@ -58,7 +58,7 @@ impl RootFile {
     }
 
     fn parsed(source: &CrateSource) -> Option<Root> {
-        let exports = Self::exports(&syn::parse_file(source.root()?.as_ref()).ok()?, source.dependencies());
+        let exports = Self::exports(&syn::parse_file(source.root().as_ref()).ok()?, source.dependencies());
         Some(Root::formed(source.form(), exports))
     }
 

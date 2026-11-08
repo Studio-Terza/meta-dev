@@ -16,6 +16,7 @@ const HEADLINE: &str = "logic is Rust; web assets live under a directory named a
 const FINDING: &str = " source outside assets; ";
 const REWRITE: &str = "rewrite it in Rust";
 const MOVE: &str = "if it is a web asset, move it under a directory named assets; otherwise rewrite it in Rust";
+const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[derive(Debug, PartialEq)]
 struct Run {
@@ -66,8 +67,12 @@ impl Checkout {
 
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit =
-            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &Recorded::default(), &mut out, &mut err);
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(
+            files,
+            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            &mut out,
+            &mut err,
+        );
         Run { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 

@@ -85,21 +85,14 @@ impl Cli {
         err: &mut impl Write,
     ) -> Verdict {
         thread::scope(|scope| {
-            let helpers = self.mode.helpers(scope, sources);
+            let run = self.mode.started(scope, sources);
             let readout = SourceFiles::read_staged(sources.ports().files(), sources.stage());
-            let outcome = self.mode.outcome_of(&readout, sources.queue(), helpers, out);
-            let written = outcome.violations().map(|violations| Self::written(violations, err));
-            written.unwrap_or(Verdict::Clean)
+            run.outcome_of(&readout, sources.queue(), out).written(err)
         })
     }
 
     fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> Verdict {
         writeln!(err, "{failure}").ok();
         Verdict::Refused
-    }
-
-    fn written(violations: &Outcome<'_>, err: &mut impl Write) -> Verdict {
-        write!(err, "{violations}").ok();
-        Verdict::Violations
     }
 }

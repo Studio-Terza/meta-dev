@@ -1,7 +1,7 @@
 use cargo_ports::Cargo;
 use file_ports::Files;
 use lint_layout::Crates;
-use lint_reader::{CrateSources, Stage};
+use lint_reader::{CrateSources, Stage, Unlocated};
 
 use super::boundary::Queue;
 
@@ -27,7 +27,7 @@ impl<'run, F: Files, C: Cargo> Ports<'run, F, C> {
         self.files
     }
 
-    pub(crate) fn located(&self, stage: &Stage<'_>) -> Crates {
+    pub(crate) fn located(&self, stage: &Stage<'_>) -> Result<Crates, Unlocated> {
         CrateSources::read(self.files, self.cargo, &stage.package_directories())
     }
 }

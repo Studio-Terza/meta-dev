@@ -14,6 +14,7 @@ const MANIFEST: &str = "Cargo.toml";
 const SITE_END: &str = ": ";
 const LINE_START: &str = ":";
 const FIX_START: &str = "; ";
+const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
 fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Box<dyn Error>> {
@@ -86,7 +87,12 @@ impl Corpus {
             .map(|copied| (copied.path, copied.bytes))
             .collect();
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(std::iter::empty()).report_to(&root, &Recorded::default(), &mut printed, &mut failed);
+        let exit = Cli::from_args(std::iter::empty()).report_to(
+            &root,
+            &[(PathBuf::from(""), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            &mut printed,
+            &mut failed,
+        );
         let verdict = Some(exit).filter(|code| *code == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }

@@ -13,14 +13,14 @@ pub enum LibraryForm {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CrateSource {
-    root: Option<SourceText>,
+    root: SourceText,
     form: LibraryForm,
     dependencies: Dependencies,
 }
 
 impl CrateSource {
     #[must_use]
-    pub fn new(root: Option<SourceText>, form: LibraryForm, dependencies: Dependencies) -> CrateSource {
+    pub fn new(root: SourceText, form: LibraryForm, dependencies: Dependencies) -> CrateSource {
         CrateSource { root, form, dependencies }
     }
 
@@ -30,8 +30,8 @@ impl CrateSource {
     }
 
     #[must_use]
-    pub fn root(&self) -> Option<&SourceText> {
-        self.root.as_ref()
+    pub fn root(&self) -> &SourceText {
+        &self.root
     }
 
     #[must_use]
@@ -40,7 +40,7 @@ impl CrateSource {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Crates(Arc<BTreeMap<PackageName, CrateSource>>);
 
 impl Crates {

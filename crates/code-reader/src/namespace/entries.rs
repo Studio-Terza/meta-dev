@@ -486,7 +486,6 @@ impl Entries {
             .imports
             .iter()
             .filter(|import| shown(import.visibility))
-            .filter(|import| import.domain == Domain::Types)
             .map(|import| (import.name.clone(), import.path.reexport(dependencies, &declared)));
         let externs = self.externs.iter().flat_map(|(name, externs)| {
             externs

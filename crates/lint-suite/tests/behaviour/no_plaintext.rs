@@ -479,7 +479,7 @@ impl Packaged {
                     .iter()
                     .map(|linked| (Name::from(linked.krate), PackageName::from(&Name::from(linked.package))))
                     .collect();
-                let source = CrateSource::new(Some(SourceText::new(root.text.to_owned())), root.form, dependencies);
+                let source = CrateSource::new(SourceText::new(root.text.to_owned()), root.form, dependencies);
                 (PackageName::from(&Name::from(root.package)), source)
             })
             .collect()

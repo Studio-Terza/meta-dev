@@ -128,7 +128,9 @@ impl Globs {
 impl CrateExports {
     #[must_use]
     pub fn with_named(mut self, name: Name, reexport: Reexport) -> CrateExports {
-        self.named.entry(name).or_default().push(reexport);
+        let bound = self.named.entry(name).or_default();
+        bound.retain(|seen| *seen != reexport);
+        bound.push(reexport);
         self
     }
 
@@ -187,12 +189,6 @@ impl Root {
             Root::ProcMacro(_) => Some(self),
             Root::Read(_) | Root::Unread => None,
         }
-    }
-}
-
-impl FromIterator<(PackageName, Root)> for CrateRoots {
-    fn from_iter<Read: IntoIterator<Item = (PackageName, Root)>>(read: Read) -> CrateRoots {
-        CrateRoots(read.into_iter().collect())
     }
 }
 

@@ -6,6 +6,7 @@ mod scope;
 mod shelf;
 mod staged;
 mod test_modules;
+mod unlocated;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -21,6 +22,7 @@ use scope::Scope;
 use shelf::Shelf;
 use staged::Staged;
 use test_modules::TestModules;
+pub use unlocated::Unlocated;
 
 #[derive(Debug)]
 pub struct Stage<'given> {

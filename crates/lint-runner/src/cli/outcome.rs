@@ -1,18 +1,22 @@
 use std::fmt;
+use std::io::Write;
 
 use lint_layout::Failure;
+use lint_reader::Unlocated;
 
+use super::Verdict;
 use super::boundary::Rendered;
 
 #[derive(Debug)]
-pub enum Outcome<'file> {
+pub enum Outcome<'run> {
     Clean,
-    Violations { reports: Vec<Rendered>, failures: &'file [Failure] },
+    Violations { reports: Vec<Rendered>, failures: &'run [Failure] },
+    Unlocated(Unlocated),
 }
 
-impl<'file> Outcome<'file> {
+impl<'run> Outcome<'run> {
     #[must_use]
-    pub fn from_rendered(reports: Vec<Rendered>, failures: &'file [Failure]) -> Outcome<'file> {
+    pub fn from_rendered(reports: Vec<Rendered>, failures: &'run [Failure]) -> Outcome<'run> {
         reports
             .is_empty()
             .then_some(failures)
@@ -20,20 +24,22 @@ impl<'file> Outcome<'file> {
             .map_or(Outcome::Violations { reports, failures }, |_| Outcome::Clean)
     }
 
-    pub(crate) fn violations(&self) -> Option<&Outcome<'file>> {
+    pub(crate) fn written(&self, err: &mut impl Write) -> Verdict {
         match self {
-            Outcome::Clean => None,
-            Outcome::Violations { .. } => Some(self),
+            Outcome::Clean => Verdict::Clean,
+            Outcome::Violations { reports, failures } => Self::listed(reports, failures, err),
+            Outcome::Unlocated(failure) => Self::refused(failure, err),
         }
     }
-}
 
-impl fmt::Display for Outcome<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Outcome::Clean => formatter.write_str("all lints pass"),
-            Outcome::Violations { reports, failures } => write!(formatter, "{}{}", Listed(reports), Failed(failures)),
-        }
+    fn listed(reports: &[Rendered], failures: &[Failure], err: &mut impl Write) -> Verdict {
+        write!(err, "{}{}", Listed(reports), Failed(failures)).ok();
+        Verdict::Violations
+    }
+
+    fn refused(failure: &Unlocated, err: &mut impl Write) -> Verdict {
+        writeln!(err, "{failure}").ok();
+        Verdict::Refused
     }
 }
 

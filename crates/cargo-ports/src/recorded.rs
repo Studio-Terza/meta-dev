@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use file_ports::Bytes;
 
-use crate::Cargo;
+use crate::{Cargo, CargoFailure};
 
 #[derive(Clone, Debug, Default)]
 pub struct Recorded(BTreeMap<PathBuf, Bytes>);
@@ -15,7 +15,11 @@ impl FromIterator<(PathBuf, Bytes)> for Recorded {
 }
 
 impl Cargo for Recorded {
-    fn metadata(&self, manifest: &Path) -> Option<Bytes> {
-        self.0.get(manifest).cloned()
+    fn metadata(&self, manifest: &Path) -> Result<Bytes, CargoFailure> {
+        manifest
+            .ancestors()
+            .find_map(|recorded| self.0.get(recorded))
+            .cloned()
+            .ok_or_else(|| CargoFailure::Unrecorded { manifest: manifest.to_path_buf() })
     }
 }

@@ -16,16 +16,23 @@ use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
-use super::boundary::{Helpers, Queue};
+use super::boundary::Queue;
 use super::{Outcome, Sources};
 use elegance::Elegance;
-use lints::Lints;
+use lints::{Crew, Lints};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
     Gate,
     Report,
     Query(Result<Query, QueryFailure>),
+}
+
+#[derive(Debug)]
+pub(crate) enum Run<'scope, 'mode> {
+    Gate(Crew<'scope>),
+    Report,
+    Query(Option<&'mode Query>),
 }
 
 impl Mode {
@@ -63,42 +70,38 @@ impl Mode {
         }
     }
 
-    pub(crate) fn helpers<'scope, F: Files + Sync, C: Cargo + Sync>(
+    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync>(
         &self,
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C>,
-    ) -> Helpers<'scope> {
+    ) -> Run<'scope, '_> {
         match self {
-            Mode::Gate => Lints::started(scope, sources),
-            Mode::Report | Mode::Query(_) => Vec::new(),
+            Mode::Gate => Run::Gate(Lints::started(scope, sources)),
+            Mode::Report => Run::Report,
+            Mode::Query(found) => Run::Query(found.as_ref().ok()),
         }
     }
+}
 
+impl Run<'_, '_> {
     pub(crate) fn outcome_of<'file>(
-        &self,
+        self,
         readout: &'file Readout,
         queue: &Queue,
-        helpers: Helpers<'_>,
         out: &mut impl Write,
     ) -> Outcome<'file> {
         match self {
-            Mode::Gate => Self::gated(readout, queue, helpers, out),
-            Mode::Report => Self::reported(readout.files(), out),
-            Mode::Query(found) => Self::queried(found.as_ref().ok(), readout.files(), out),
+            Run::Gate(crew) => Self::gated(readout, queue, crew, out),
+            Run::Report => Self::reported(readout.files(), out),
+            Run::Query(found) => Self::queried(found, readout.files(), out),
         }
     }
 
-    fn gated<'file>(
-        readout: &'file Readout,
-        queue: &Queue,
-        helpers: Helpers<'_>,
-        out: &mut impl Write,
-    ) -> Outcome<'file> {
+    fn gated<'file>(readout: &'file Readout, queue: &Queue, crew: Crew<'_>, out: &mut impl Write) -> Outcome<'file> {
         let files = readout.files();
         write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)).ok();
-        Lints::checked(readout, queue, helpers)
+        crew.checked(readout, queue)
     }
-
     fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
         let model = Reader::read_files(files);
         Elegance::reports(files, &model).iter().try_for_each(|report| write!(out, "{report}")).ok();

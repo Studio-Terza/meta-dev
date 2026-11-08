@@ -7,34 +7,40 @@ use lint_layout::{CrateSource, Crates, Dependencies, LibraryForm, Manifest, Name
 use newtype::Wrapping;
 use workspace_metadata::{CrateName, Form, Library, Metadata};
 
+use super::Unlocated;
+
 #[derive(Debug)]
 pub struct CrateSources;
 
 impl CrateSources {
     const MANIFEST: &'static str = "Cargo.toml";
 
-    pub fn read(files: &impl Files, cargo: &impl Cargo, packages: &[&Path]) -> Crates {
+    pub fn read(files: &impl Files, cargo: &impl Cargo, packages: &[&Path]) -> Result<Crates, Unlocated> {
         let manifests: Vec<PathBuf> =
             Self::workspaces(files, packages).iter().map(|workspace| workspace.join(Self::MANIFEST)).collect();
-        let read: Vec<Metadata> = cargo
-            .metadata_many(&manifests)
-            .into_iter()
-            .flatten()
-            .filter_map(|answer| serde_json::from_slice::<Metadata>(answer.as_ref()).ok())
-            .collect();
+        let read: Vec<Metadata> = manifests
+            .iter()
+            .zip(cargo.metadata_many(&manifests))
+            .map(|(manifest, answer)| {
+                serde_json::from_slice::<Metadata>(answer?.as_ref())
+                    .map_err(|source| Unlocated::Unparsed { manifest: manifest.clone(), source })
+            })
+            .collect::<Result<_, _>>()?;
         let libraries: Vec<Library<'_>> = read.iter().flat_map(Metadata::libraries).collect();
         let roots: Vec<&Path> = libraries.iter().map(Library::root).collect();
         libraries
             .iter()
-            .zip(files.read_text_many(&roots))
-            .map(|(library, text)| {
+            .zip(roots.iter().zip(files.read_text_many(&roots)))
+            .map(|(library, (root, text))| {
                 let dependencies: Dependencies = library
                     .dependencies()
                     .iter()
                     .map(|(krate, package)| (Name::from(krate.as_ref()), Self::package(package)))
                     .collect();
-                let root = text.ok().map(|found| SourceText::new(found.into_inner()));
-                (Self::package(library.name()), CrateSource::new(root, Self::form(library.form()), dependencies))
+                let found = text.map_err(|source| Unlocated::Root { root: root.to_path_buf(), source })?;
+                let source =
+                    CrateSource::new(SourceText::new(found.into_inner()), Self::form(library.form()), dependencies);
+                Ok((Self::package(library.name()), source))
             })
             .collect()
     }

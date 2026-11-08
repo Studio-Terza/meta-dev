@@ -19,6 +19,7 @@ lint-placement = { path = "../lint-placement" }
 lint-roots = { path = "../lint-roots" }
 serde_json.workspace = true
 syn.workspace = true
+thiserror.workspace = true
 workspace-metadata = { path = "../workspace-metadata" }
 
 [lints]

@@ -59,11 +59,28 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Helpers, Locator, Queue, Rendered, Slot, Workers};
+use crate::cli::boundary::{Helper, Helpers, Located, Queue, Rendered, Slot, Workers};
 use crate::cli::{Outcome, Sources};
 
 #[derive(Debug)]
 pub struct Lints;
+
+#[derive(Debug)]
+pub(crate) struct Crew<'scope> {
+    located: Located<'scope>,
+    helpers: Helpers<'scope>,
+}
+
+impl Crew<'_> {
+    #[must_use]
+    pub(crate) fn checked<'file>(self, readout: &'file Readout, queue: &Queue) -> Outcome<'file> {
+        let modelled = self.located.joined().map(|crates| Lints::modelled(readout, &crates));
+        let mine = Lints::worked(readout, queue);
+        let rendered: Vec<Rendered> =
+            iter::once(mine).chain(self.helpers.into_iter().map(Helper::joined)).flatten().collect();
+        modelled.map_or_else(Outcome::Unlocated, |found| Lints::gathered(readout, rendered, found))
+    }
+}
 
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
@@ -129,23 +146,18 @@ impl Lints {
         Entry::Modelled(<NoPlaintext as ModelLint>::report),
     ];
 
-    pub fn started<'scope, F: Files + Sync, C: Cargo + Sync>(
+    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync>(
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C>,
-    ) -> Helpers<'scope> {
-        let locate = move || sources.queue().locate(sources.ports().located(sources.stage()));
-        Locator::spawned(scope, locate);
-        Workers::available()
-            .helpers()
-            .filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok())
-            .collect()
+    ) -> Crew<'scope> {
+        let located = Located::spawned(scope, move || sources.ports().located(sources.stage()));
+        let helpers =
+            Workers::available().helpers().filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok());
+        Crew { located, helpers: helpers.collect() }
     }
 
-    #[must_use]
-    pub fn checked<'file>(readout: &'file Readout, queue: &Queue, helpers: Helpers<'_>) -> Outcome<'file> {
-        let mine = Self::worked(readout, queue);
-        let mut rendered: Vec<Rendered> =
-            iter::once(mine).chain(helpers.into_iter().map(Helper::joined)).flatten().collect();
+    fn gathered(readout: &Readout, checked: Vec<Rendered>, modelled: Vec<Rendered>) -> Outcome<'_> {
+        let mut rendered: Vec<Rendered> = checked.into_iter().chain(modelled).collect();
         rendered.sort_by_key(Rendered::slot);
         Outcome::from_rendered(rendered, readout.failures())
     }
@@ -158,11 +170,10 @@ impl Lints {
         let jobs: Vec<Job> = Self::LINTS
             .into_iter()
             .enumerate()
-            .filter_map(|(index, entry)| entry.checked().map(|check| Job::Check { slot: Slot::from(index), check }))
-            .chain(iter::once(Job::Modelled))
+            .filter_map(|(index, entry)| entry.checked().map(|check| Job { slot: Slot::from(index), check }))
             .rev()
             .collect();
-        queue.claimed(&jobs).flat_map(|job| job.done(readout, queue)).collect()
+        queue.claimed(&jobs).flat_map(|job| job.done(readout)).collect()
     }
 
     fn modelled(readout: &Readout, crates: &Crates) -> Vec<Rendered> {
@@ -203,20 +214,17 @@ impl Entry {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Job {
-    Check { slot: Slot, check: Check },
-    Modelled,
+struct Job {
+    slot: Slot,
+    check: Check,
 }
 
 impl Job {
-    fn done(self, readout: &Readout, queue: &Queue) -> Vec<Rendered> {
-        match self {
-            Job::Check { slot, check } => check(readout)
-                .into_iter()
-                .filter_map(Report::dirty)
-                .map(|report| Rendered::render(slot, &report))
-                .collect(),
-            Job::Modelled => Lints::modelled(readout, queue.crates()),
-        }
+    fn done(self, readout: &Readout) -> Vec<Rendered> {
+        (self.check)(readout)
+            .into_iter()
+            .filter_map(Report::dirty)
+            .map(|report| Rendered::render(self.slot, &report))
+            .collect()
     }
 }
