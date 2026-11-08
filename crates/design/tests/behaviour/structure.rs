@@ -7,7 +7,10 @@ use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
-use design::{Agents, Attempted, Cli, Count, Failure, Flail, Flails, HookEvent, Lapsed, Line, Outcome, Unresolved};
+use design::{
+    Agents, Attempted, Cli, Count, Failure, Flail, Flailing, Flails, HookEvent, Lapsed, Line, Outcome, Sequel,
+    Unresolved,
+};
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, Provenance, RunId};
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
@@ -274,10 +277,13 @@ fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_no
     };
     let first = structuring.structured(&["structure"]);
     let told = first.outcome.as_ref().err().map(ToString::to_string).unwrap_or_default();
-    assert!(matches!(first.outcome, Err(Failure::Flailed(_))));
+    assert!(matches!(first.outcome, Err(Failure::Flailed { sequel: Sequel::WentOn, .. })));
     let second = structuring.structured(&["structure"]);
     assert_eq!(structuring.script.prompts().len(), 3, "the second run re-sent the flailed job's segments");
     let shown = structuring.applying.run(&["show", "job", "1"])?;
+    assert!(
+        matches!(structuring.applying.run(&["show", "job", "3"]), Err(Failure::Unrun(job)) if job == JobId::new(3))
+    );
     golden::golden!(
         "structure-flailed.txt",
         &format!("design structure\n{}{told}\ndesign structure\n{}design show job 1\n{shown}", first.text, second.text)
@@ -318,6 +324,33 @@ fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_before_its_next_job_an
 }
 
 #[test]
+fn a_flail_then_a_stall_in_one_run_halts_it_on_the_stall_and_still_reports_the_flail() -> Result<(), Failure> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring {
+        applying: Applying::over(&Session::working(Session::line(
+            Speaker::Owner,
+            Script::LISTED,
+            "null",
+            Script::NINE,
+        )))?,
+        script: Script::replying(&[u, u, None]),
+        sleep: Pause::new(3600),
+    };
+    let structured = structuring.structured(&["structure"]);
+    let segment = |ordinal| SegmentRef::new(Prefix::new(Script::LISTED.to_owned()), Ordinal::new(ordinal));
+    let lapse = Lapse::from(Uncovered::new(segment(0), (1..8).map(segment).collect()));
+    let reported = [
+        Line::Flailed(Lapsed::new(JobId::new(1), lapse)),
+        Line::FlailedSegment(Flailing::new(segment(7), JobId::new(1), RunId::new(2))),
+        Line::Ran(Attempted::new(RunId::new(3), JobId::new(2), RunState::Overdue, None)),
+    ];
+    assert_eq!(structured.has(&reported), []);
+    assert!(matches!(structured.outcome, Err(Failure::Stalled { job, stall: Stall::Overdue }) if job == JobId::new(2)));
+    assert_eq!((structuring.unstructured()?, structuring.script.prompts().len()), (1, 3));
+    Ok(())
+}
+
+#[test]
 fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() -> Result<(), Failure> {
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::MISREAD), Some(Script::MISREAD)]), Pause::new(0))?;
@@ -328,7 +361,10 @@ fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() 
     assert_eq!(prompts.get(1).cloned().flatten(), retried);
     assert_eq!(prompts.len(), 2);
     let flailed = lapse.map(|lapse| Flails::new(Flail::new(JobId::new(1), lapse), Vec::new()));
-    assert!(matches!(structured.outcome, Err(Failure::Flailed(flails)) if flailed.as_ref() == Some(&flails)));
+    assert!(matches!(
+        structured.outcome,
+        Err(Failure::Flailed { flails, sequel: Sequel::NoMoreJobs }) if flailed.as_ref() == Some(&flails)
+    ));
     Ok(())
 }
 
@@ -494,8 +530,14 @@ fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segmen
     let flailed = structuring.structured(&["hook", "stop"]);
     let again = structuring.structured(&["hook", "stop"]);
     let decision: Value = serde_json::from_str(&flailed.text)?;
+    let segment = |message, ordinal| {
+        SegmentRef::new(Prefix::new(format!("aaaaaaaa-0000-4000-8000-00000000000{message}")), Ordinal::new(ordinal))
+    };
+    let uncovered = Uncovered::new(segment(1, 0), vec![segment(3, 0), segment(3, 1), segment(5, 0)]);
+    let flails = Flails::new(Flail::new(JobId::new(1), Lapse::from(uncovered)), Vec::new());
+    let told = Failure::Flailed { flails, sequel: Sequel::NoMoreJobs }.to_string();
     assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
-    assert!(decision.get("reason").is_some_and(Value::is_string));
+    assert_eq!(decision.get("reason").and_then(Value::as_str), Some(told.as_str()));
     assert_eq!(flailed.outcome?, Outcome::Blocked);
     assert_eq!((again.outcome?, again.text.as_str()), (Outcome::Hooked(HookEvent::Stop), ""));
     Ok(())
