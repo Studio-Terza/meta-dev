@@ -25,7 +25,10 @@ impl FromStr for Anchor {
 
     fn from_str(written: &str) -> Result<Anchor, Unanchored> {
         Anchoring::read(written)
-            .map(|anchoring| Anchor::anchored(Uuid::new(anchoring.message().to_owned()), anchoring.ordinal()))
+            .and_then(|anchoring| {
+                let message = Uuid::try_new(anchoring.message().to_owned()).ok()?;
+                Some(Anchor::anchored(message, anchoring.ordinal()))
+            })
             .ok_or_else(|| Unanchored(written.to_owned()))
     }
 }

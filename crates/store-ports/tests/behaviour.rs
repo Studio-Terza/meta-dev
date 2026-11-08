@@ -131,7 +131,7 @@ fn reopening_a_store_keeps_its_rows_and_runs_no_migration_again() -> Result<(), 
     run.port(place.opened()).write(Resumed)?;
     let reopened = run.port(place.opened());
     let cursors = reopened.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::new(Offset::new(7)));
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), Cursor::new(Offset::new(7)));
     assert_eq!(reopened.read(Applied)?.len(), StreamSchema::migrator().iter().count());
     Ok(())
 }
@@ -142,7 +142,7 @@ fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Box<dyn Error>
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     assert!(store.write(HalfWritten).is_err());
     let cursors = store.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::default());
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), Cursor::default());
     Ok(())
 }
 

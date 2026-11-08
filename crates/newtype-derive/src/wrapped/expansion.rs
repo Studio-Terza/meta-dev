@@ -97,9 +97,11 @@ impl Expansion for Constructors {
         let (implemented, arguments, bounds) = wrapped.generics.split_for_impl();
         let member = wrapped.field.member();
         let inner = wrapped.field.inner();
-        let stored = Marked::new(name, &wrapped.generics).stored(&quote!(::newtype::Inner));
+        let marked = Marked::new(name, &wrapped.generics);
+        let opened_store = marked.stored(&quote!(::newtype::Inner));
+        let guarded_store = marked.stored(&quote!(::newtype::Validated));
         let opened = quote! {
-            #stored
+            #opened_store
 
             impl #implemented #name #arguments #bounds {
                 #[must_use]
@@ -115,6 +117,8 @@ impl Expansion for Constructors {
             }
         };
         let guarded = quote! {
+            #guarded_store
+
             impl #implemented #name #arguments #bounds {
                 pub fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error>
                 where

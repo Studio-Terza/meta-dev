@@ -31,7 +31,7 @@ use port_core::{Op, Port, Run};
 use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
 use stream::Stream;
 use strum::VariantArray;
-use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
+use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
 
@@ -73,7 +73,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
-    let shown = store.read(ShownMessage::named(Uuid::new("o1".to_owned())))?.ok_or("o1 was not stored")?;
+    let shown = store.read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?.ok_or("o1 was not stored")?;
     let message = shown.message();
     assert_eq!(
         [
@@ -102,7 +102,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
         .collect();
     assert_eq!(links, ["l1 replies-to o1"]);
     let cursors = store.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), cursor);
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), cursor);
     Ok(())
 }
 
@@ -122,7 +122,7 @@ fn an_unknown_message_is_not_shown() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Recorded::session()?.records)?;
-    assert!(store.read(ShownMessage::named(Uuid::new("nobody".to_owned())))?.is_none());
+    assert!(store.read(ShownMessage::named(Uuid::try_new("nobody".to_owned())?))?.is_none());
     Ok(())
 }
 
@@ -271,25 +271,25 @@ static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
 struct Around(char);
 
 impl Around {
-    fn uuid(self) -> Uuid {
-        Uuid::new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
+    fn uuid(self) -> Result<Uuid, Box<dyn Error>> {
+        Ok(Uuid::try_new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))?)
     }
 
     fn escaped(self) -> String {
         self.0.encode_utf16(&mut [0; 2]).iter().map(|unit| format!("\\u{unit:04x}")).collect::<Vec<String>>().concat()
     }
 
-    fn session(self) -> String {
-        format!(
+    fn session(self) -> Result<String, Box<dyn Error>> {
+        Ok(format!(
             "{{\"type\":\"user\",\"uuid\":\"{}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"{}w{}\"}}}}\n",
-            self.uuid(),
+            self.uuid()?,
             self.escaped(),
             self.escaped()
-        )
+        ))
     }
 
     fn shown(self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
-        let shown = store.read(ShownMessage::named(self.uuid()))?.ok_or("the message is not stored")?;
+        let shown = store.read(ShownMessage::named(self.uuid()?))?.ok_or("the message is not stored")?;
         Ok(shown
             .segments()
             .iter()
@@ -306,12 +306,12 @@ impl Around {
     fn fresh(self) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
         let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
-        fresh.write(Recorded::of(&self.session())?.records)?;
+        fresh.write(Recorded::of(&self.session()?)?.records)?;
         self.shown(&fresh)
     }
 
-    fn kept(self) -> Body {
-        Body::new(format!("{}w{}", self.0, self.0))
+    fn kept(self) -> Result<Body, Nul> {
+        Body::try_new(format!("{}w{}", self.0, self.0))
     }
 }
 
@@ -358,10 +358,14 @@ WHERE
 fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
 -> Result<(), Box<dyn Error>> {
     let migrated = Run::root().port(OLD_STORE.clone()).read(Bodies)?;
-    let inked: Vec<Around> =
-        (char::MIN..=char::MAX).filter(|point| BLANKS.binary_search(point).is_err()).map(Around).collect();
-    let kept: Vec<Option<&Body>> = inked.iter().map(|point| migrated.get(&point.uuid())).collect();
-    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect();
+    let inked: Vec<Around> = (char::MIN..=char::MAX)
+        .filter(|point| BLANKS.binary_search(point).is_err())
+        .filter(|point| Body::try_new(point.to_string()).is_ok())
+        .map(Around)
+        .collect();
+    let kept: Vec<Option<&Body>> =
+        inked.iter().map(|point| Ok(migrated.get(&point.uuid()?))).collect::<Result<_, Box<dyn Error>>>()?;
+    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect::<Result<_, Nul>>()?;
     assert_eq!(kept, both_sides.iter().map(Some).collect::<Vec<Option<&Body>>>());
     Ok(())
 }
@@ -612,8 +616,8 @@ impl Proposals {
         }
     }
 
-    fn segment(message: &str, ordinal: usize) -> Segment {
-        Segment::new(Uuid::new(message.to_owned()), Ordinal::new(ordinal))
+    fn segment(message: &str, ordinal: usize) -> Result<Segment, Box<dyn Error>> {
+        Ok(Segment::new(Uuid::try_new(message.to_owned())?, Ordinal::new(ordinal)))
     }
 }
 
@@ -650,7 +654,7 @@ fn directions_are_written_whole_or_not_at_all() -> Result<(), Box<dyn Error>> {
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
     let root = Projects::rooted(&store, "p")?;
-    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
+    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0)? };
     assert!(Proposals::written(&store, vec![Proposals::child(root, 2)?, stray]).is_err());
     assert!(store.read(ShownNode::from(NodeId::new(2)))?.is_none());
     Ok(())
@@ -663,12 +667,12 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
     let root = Projects::rooted(&store, "p")?;
-    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
+    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0)? };
     let refused = Proposals::unseen(&store, "refused")?;
     assert!(
         store.write(Directions::new(Provenance::from(Entered::Apply), refused, vec![stray], Remit::Unbounded)).is_err()
     );
-    let [asked, answered] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    let [asked, answered] = [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?];
     let [first, second] = [JobId::new(1), JobId::new(2)];
     store.write(JobOpened::from(first))?;
     store.write(JobOpened::from(second))?;
@@ -738,10 +742,10 @@ fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dy
         let spoken = store.read(Prefixed::from(Prefix::new(prefix.to_owned())))?;
         Ok(spoken.iter().map(|said| (said.segment().clone(), said.author())).collect())
     };
-    let owner = [(Proposals::segment("o1", 0), Authorship::Owner), (Proposals::segment("o1", 1), Authorship::Owner)];
+    let owner = [(Proposals::segment("o1", 0)?, Authorship::Owner), (Proposals::segment("o1", 1)?, Authorship::Owner)];
     assert_eq!(heard("o")?, owner);
     assert_eq!(heard("o1")?, owner);
-    assert_eq!(heard("l1")?, [(Proposals::segment("l1", 0), Authorship::Lead)]);
+    assert_eq!(heard("l1")?, [(Proposals::segment("l1", 0)?, Authorship::Lead)]);
     assert_eq!(heard("1")?, []);
     Ok(())
 }
@@ -753,10 +757,13 @@ fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(),
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
     let [asked, answered, said] =
-        [("o1", 0), ("o1", 1), ("l1", 0)].map(|(message, ordinal)| Proposals::segment(message, ordinal));
+        [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?, Proposals::segment("l1", 0)?];
     let covered = |messages: &[&str]| -> Result<Vec<Segment>, Box<dyn Error>> {
-        let uuids = messages.iter().map(|message| Uuid::new((*message).to_owned()));
-        Ok(store.read(uuids.collect::<Covered>())?.into_iter().collect())
+        let uuids = messages
+            .iter()
+            .map(|message| Ok(Uuid::try_new((*message).to_owned())?))
+            .collect::<Result<Vec<Uuid>, Box<dyn Error>>>()?;
+        Ok(store.read(uuids.into_iter().collect::<Covered>())?.into_iter().collect())
     };
     assert_eq!(covered(&["o1", "l1"])?, []);
     let related = Directed::Related { source: said.clone(), target: answered, relation: SegmentRelation::Answers };
@@ -822,8 +829,8 @@ impl Ends {
                 Provenance::from(Entered::Apply),
                 file,
                 vec![Directed::Related {
-                    source: Proposals::segment("o1", edge.child),
-                    target: Proposals::segment("o1", edge.parent),
+                    source: Proposals::segment("o1", edge.child)?,
+                    target: Proposals::segment("o1", edge.parent)?,
                     relation,
                 }],
                 Remit::Unbounded,
@@ -831,16 +838,16 @@ impl Ends {
         }
     }
 
-    fn cycle(self, edge: Edge) -> Cycle {
+    fn cycle(self, edge: Edge) -> Result<Cycle, Box<dyn Error>> {
         match self {
             Ends::Nodes(relation) => {
-                Cycle::Nodes { source: Dag::id(edge.child), relation, target: Dag::id(edge.parent) }
+                Ok(Cycle::Nodes { source: Dag::id(edge.child), relation, target: Dag::id(edge.parent) })
             }
-            Ends::Segments(relation) => Cycle::Segments {
-                source: Proposals::segment("o1", edge.child),
+            Ends::Segments(relation) => Ok(Cycle::Segments {
+                source: Proposals::segment("o1", edge.child)?,
                 relation,
-                target: Proposals::segment("o1", edge.parent),
-            },
+                target: Proposals::segment("o1", edge.parent)?,
+            }),
         }
     }
 }
@@ -909,21 +916,21 @@ impl Probe {
         Edge { child: 0, parent: 2 }
     }
 
-    fn wanted(&self) -> Option<Cycle> {
-        self.reached().get(&self.tried.child).map(|_reached| self.closed.ends().cycle(self.tried))
+    fn wanted(&self) -> Result<Option<Cycle>, Box<dyn Error>> {
+        self.reached().get(&self.tried.child).map(|_reached| self.closed.ends().cycle(self.tried)).transpose()
     }
 }
 
 laws::law!(an_edge_is_refused_exactly_where_the_closure_holds_its_reverse_path, Probe::any(), probe, {
     let refused = probe.refused().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    prop_assert_eq!(refused, probe.wanted());
+    prop_assert_eq!(refused, probe.wanted().map_err(|failure| TestCaseError::fail(failure.to_string()))?);
 });
 
 #[test]
 fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() {
     let refused = Closed::ALL
         .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused().ok().flatten());
-    assert_eq!(refused, Closed::ALL.map(|closed| Some(closed.ends().cycle(Probe::closing()))));
+    assert_eq!(refused, Closed::ALL.map(|closed| closed.ends().cycle(Probe::closing()).ok()));
 }
 
 #[derive(Clone, Debug)]
@@ -1281,11 +1288,11 @@ fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Recorded::session()?.records)?;
     let before = Unstructuring::listed(&store)?;
-    Proposals::written(&store, vec![Directed::Conversational { segment: Proposals::segment("o1", 0) }])?;
+    Proposals::written(&store, vec![Directed::Conversational { segment: Proposals::segment("o1", 0)? }])?;
     let after = Unstructuring::listed(&store)?;
     assert_eq!(
         (before, after),
-        (vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)], vec![Proposals::segment("o1", 1)])
+        (vec![Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?], vec![Proposals::segment("o1", 1)?])
     );
     Ok(())
 }
@@ -1326,7 +1333,7 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
     store.write(JobOpened::from(job))?;
     let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
     store.write(RunSpawned::new(RunId::new(1), job, spawned))?;
-    let [structured, unstructured] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    let [structured, unstructured] = [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?];
     Proposals::written(&store, vec![Directed::Conversational { segment: structured.clone() }])?;
     store.write(JobFlailed::new(RunId::new(1), vec![structured, unstructured.clone()]))?;
     let flailed: Vec<(Segment, RunId)> = store

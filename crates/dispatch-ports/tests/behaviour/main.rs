@@ -34,7 +34,8 @@ impl Envelope {
     }
 
     fn errored(told: &str) -> Envelope {
-        Envelope::Read(Output::Errored(Errored::new(Told::new(told.to_owned()), Usage::default())))
+        Told::try_new(told.to_owned())
+            .map_or(Envelope::Garbled, |inked| Envelope::Read(Output::Errored(Errored::new(inked, Usage::default()))))
     }
 
     fn unsuccessful() -> Envelope {

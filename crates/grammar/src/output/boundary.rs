@@ -3,7 +3,9 @@ use std::str::FromStr;
 use std::vec::IntoIter;
 
 use logos::{Lexer, Logos};
-use newtype::Newtype;
+use newtype::serde::de::value::Error as Unwrapped;
+use newtype::serde::de::{DeserializeOwned, IntoDeserializer};
+use newtype::{Inner, Newtype, Stored, Validated, Wrapping};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(skip r"[ \t]+")]
@@ -101,6 +103,22 @@ pub trait Field {
     fn taken(token: Token) -> Result<Self::Value, Token>;
 }
 
+pub trait Unwrapping<T> {
+    fn unwrapped(text: String) -> Option<T>;
+}
+
+impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
+    fn unwrapped(text: String) -> Option<T> {
+        Some(T::new(text))
+    }
+}
+
+impl<T: Wrapping<Inner = String> + DeserializeOwned> Unwrapping<T> for Validated {
+    fn unwrapped(text: String) -> Option<T> {
+        T::deserialize(IntoDeserializer::<Unwrapped>::into_deserializer(text)).ok()
+    }
+}
+
 impl Fields {
     pub fn lexed(text: &str) -> Result<Fields, Stray> {
         let tokens = Lexeme::lexer(text)
@@ -111,6 +129,13 @@ impl Fields {
             })
             .collect::<Result<Vec<Token>, Stray>>()?;
         Ok(Fields(tokens.into_iter().peekable()))
+    }
+
+    #[must_use]
+    pub fn bare(text: &str) -> Option<&str> {
+        let mut lexer = Lexeme::lexer(text);
+        let whole = lexer.next().filter(|lexed| *lexed == Ok(Lexeme::Bare)).map(|_bare| lexer.span());
+        whole.filter(|span| *span == (0..text.len())).map(|_whole| text)
     }
 
     #[must_use]
@@ -162,8 +187,9 @@ impl Token {
         self.expected(kind).and_then(|text| text.parse().map_err(|_unparsed| kept))
     }
 
-    pub(crate) fn wrapped<T: Newtype<Inner = String>>(self, kind: Kind) -> Result<T, Token> {
-        self.expected(kind).map(T::new)
+    pub(crate) fn wrapped<T: Stored<Kind: Unwrapping<T>>>(self, kind: Kind) -> Result<T, Token> {
+        let kept = self.clone();
+        self.expected(kind).and_then(|text| T::Kind::unwrapped(text).ok_or(kept))
     }
 }
 

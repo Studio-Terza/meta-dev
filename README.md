@@ -213,7 +213,9 @@ rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one
 writes for `Statements::written`; sqlx checks the SQL against the schema as its own `query!` does. Every bound argument and
 every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
-`FromStr`, or an `Option` of one. A bare `i64`, `&str` or `String` is not a column and does not compile.
+`FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
+back through its `CheckedDeserialize`, so a stored value its check refuses fails the read; grammar's `Bare` and
+`Quoted` output fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
 

@@ -17,7 +17,7 @@ mod unrecognised;
 mod uuid;
 
 pub use authorship::Authorship;
-pub use body::Body;
+pub use body::{Body, Nul};
 pub use claude_code_dir::ClaudeCodeDir;
 pub use cursor::Cursor;
 pub use instant::Instant;

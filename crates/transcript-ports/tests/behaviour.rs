@@ -234,7 +234,7 @@ fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
 fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
     let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
-    assert_eq!(stamps, [Instant::new("2026-01-01T00:00:01Z".to_owned())]);
+    assert_eq!(stamps, [Instant::try_new("2026-01-01T00:00:01Z".to_owned())?]);
     Ok(())
 }
 
@@ -271,6 +271,23 @@ fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
     assert_eq!(texts, ["abc"]);
     Ok(())
 }
+
+laws::table!(
+    a_message_uuid_is_read_only_when_it_is_one_bare_word,
+    |uuid: &&str| {
+        Transcript::holding(&Lines::typed(uuid)).read(Cursor::default()).ok().map(|read| {
+            Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect::<Vec<String>>()
+        })
+    },
+    [
+        "abc" => Some(vec![String::from("abc")]),
+        "_a-9" => Some(vec![String::from("_a-9")]),
+        "msg:1" => None,
+        "a b" => None,
+        "-a" => None,
+        "" => None,
+    ]
+);
 
 #[test]
 fn a_session_is_listed_by_its_file_stem() {

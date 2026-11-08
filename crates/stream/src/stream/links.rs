@@ -58,11 +58,16 @@ impl<'stream> Links<'stream> {
     }
 
     fn cited_by(&self, segment: &Segment, message: &Message) -> Vec<MechanicalLink> {
-        let text = segment.text(message);
-        Lexemes::scanned(&text)
+        segment
+            .text(message)
             .into_iter()
-            .filter(|lexeme| matches!(lexeme.mark(), Mark::Uuid))
-            .map(|lexeme| Uuid::new(lexeme.span().slice(text.as_ref()).to_owned()))
+            .flat_map(|text| {
+                Lexemes::scanned(&text)
+                    .into_iter()
+                    .filter(|lexeme| matches!(lexeme.mark(), Mark::Uuid))
+                    .filter_map(|lexeme| Uuid::try_new(lexeme.span().slice(text.as_ref()).to_owned()).ok())
+                    .collect::<Vec<Uuid>>()
+            })
             .filter(|cited| cited != message.record().uuid())
             .filter_map(|cited| self.chain.known(&cited))
             .map(|known| {

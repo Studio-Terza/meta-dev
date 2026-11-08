@@ -1,21 +1,20 @@
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]
 #[error("message text holds a NUL character")]
 pub struct Nul;
 
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(try_from = "String")]
+#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(checked)]
 pub struct Body(String);
 
-impl TryFrom<String> for Body {
+impl Checked for Body {
     type Error = Nul;
 
-    fn try_from(text: String) -> Result<Body, Nul> {
+    fn checked(text: &String) -> Result<&String, Nul> {
         match text.chars().find(|letter| *letter == '\0') {
             Some(_) => Err(Nul),
-            None => Ok(Body::new(text)),
+            None => Ok(text),
         }
     }
 }

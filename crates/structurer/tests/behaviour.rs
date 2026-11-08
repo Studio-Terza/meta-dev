@@ -5,6 +5,7 @@ use design_model::{
     SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
+use laws::proptest::arbitrary::any;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
@@ -205,7 +206,7 @@ struct Jobs;
 
 impl Jobs {
     fn said() -> impl Strategy<Value = Said> {
-        (Generated::segment(), "[^\u{0}]{0,40}").prop_map(|(segment, body)| Said::new(segment, Body::new(body)))
+        (Generated::segment(), any::<Body>()).prop_map(|(segment, body)| Said::new(segment, body))
     }
 
     fn node() -> impl Strategy<Value = Outline> {
