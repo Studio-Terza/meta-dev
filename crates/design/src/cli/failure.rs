@@ -3,7 +3,7 @@ use std::io;
 use std::path::PathBuf;
 
 use design_model::{
-    JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated,
+    Ending, JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated,
 };
 use design_store::{Refusal, Unpaid};
 use dispatch_ports::{DispatchFailure, Stall};
@@ -46,6 +46,8 @@ pub enum Failure {
     Unnumbered(#[from] Unnumbered),
     #[error("no node n{} in the design store", .0.into_inner())]
     Unplaced(NodeId),
+    #[error("node n{} is {ending}, itself or through a node it refines; view a current node", node.into_inner())]
+    Ended { node: NodeId, ending: Ending },
     #[error("no project {0} in the design store; run design init {0} in its repository first")]
     Unrooted(Project),
     #[error("no project is configured here; name a node, or run design init <project> in its repository first")]
@@ -121,6 +123,7 @@ impl From<Refusal> for Failure {
     fn from(refusal: Refusal) -> Failure {
         match refusal {
             Refusal::Cyclic(cycle) => Failure::Unresolved(Unresolved::from(cycle)),
+            Refusal::Ancestral { old, by } => Failure::Unresolved(Unresolved::Ancestral { old, by }),
             Refusal::Inverted(inversion) => Failure::Inverted { edge: inversion.edge() },
             Refusal::Misstaged(misstaged) => Failure::from(misstaged),
             Refusal::Unpaid(unpaid) => Failure::from(unpaid),

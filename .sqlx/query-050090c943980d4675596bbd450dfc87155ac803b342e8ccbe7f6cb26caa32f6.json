@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  descendant AS id\nFROM\n  closure\nWHERE\n  relation = ?1\n  AND ancestor = ?2\n  AND descendant = ?3\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "closure",
+            "name": "descendant"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "050090c943980d4675596bbd450dfc87155ac803b342e8ccbe7f6cb26caa32f6"
+}

@@ -1,7 +1,7 @@
 use design_model::{
-    AnyNode, AnyStage, Artifact, Casting, Condition, Dropped, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId,
-    NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal, Title, Transition,
-    Vague,
+    AnyNode, AnyStage, Artifact, Casting, Condition, Dropped, Ending, Entered, Entry, Facet, Kin, Node, NodeEdge,
+    NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal, Title,
+    Transition, Vague,
 };
 use newtype::Counter;
 use port_core::Op;
@@ -18,6 +18,9 @@ pub struct Resolving(NodeId);
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct ContextNodes;
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct Ended(Resolved);
 
 #[derive(Clone, Debug, Op)]
 pub struct Planting {
@@ -62,6 +65,11 @@ struct EdgeColumns {
 #[derive(Debug, Columns)]
 struct IdRow {
     id: NodeId,
+}
+
+#[derive(Debug, Columns)]
+struct EndingRow {
+    ending: Ending,
 }
 
 #[derive(Debug, Columns)]
@@ -239,9 +247,32 @@ impl Linked {
             NodeRelation::Refines => Closing::<Refines>::new(self.source.0, self.target.0)
                 .written(statements, |edged| upheld.inserted(edged)),
             NodeRelation::Supersedes => Closing::<Supersedes>::new(self.source.0, self.target.0)
-                .written(statements, |edged| upheld.inserted(edged)),
+                .written(statements, |edged| Ok::<Written, Refusal>(self.succeeding(upheld, edged)?.inserted(edged)?)),
             NodeRelation::Consumes => Ok(upheld.inserted(statements)?),
         }
+    }
+
+    fn succeeding(self, upheld: EdgeColumns, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {
+        let relation = Closed::Refines;
+        let old = self.target.0;
+        let by = self.source.0;
+        let lineage = statements.rows(store_ports::query!(
+            IdRow,
+            r#"
+SELECT
+  descendant AS id
+FROM
+  closure
+WHERE
+  relation = ?1
+  AND ancestor = ?2
+  AND descendant = ?3
+"#,
+            relation: Closed,
+            old: NodeId,
+            by: NodeId
+        ))?;
+        lineage.into_iter().next().map_or(Ok(upheld), |_descended| Err(Refusal::Ancestral { old, by }))
     }
 
     fn upheld(self, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {
@@ -684,6 +715,37 @@ ORDER BY
 
     pub(crate) fn links(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Link>, StoreFailure> {
         Ok(EdgeRow::around(node, statements)?.into_iter().map(Link::from).collect())
+    }
+}
+
+impl From<Resolved> for Ended {
+    fn from(node: Resolved) -> Ended {
+        Ended(node)
+    }
+}
+
+impl Query for Ended {
+    type Rows = Option<Ending>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Ending>, StoreFailure> {
+        let node = self.0.0;
+        let rows = statements.rows(store_ports::query!(
+            EndingRow,
+            r#"
+SELECT
+  ending AS "ending!: String"
+FROM
+  ended_subtrees
+WHERE
+  id = ?1
+ORDER BY
+  ending
+LIMIT
+  1
+"#,
+            node: NodeId
+        ))?;
+        Ok(rows.into_iter().next().map(|row| row.ending))
     }
 }
 

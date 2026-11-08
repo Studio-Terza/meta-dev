@@ -17,9 +17,9 @@ use stream::{Relation, Shape};
 use structurer::{Directive, Lapse, Retried, SegmentRef};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
 
+use crate::cli::Viewed;
 use crate::cli::count::Count;
-use crate::cli::noted::{Noted, Noting};
-use crate::cli::{Looked, Viewed};
+use crate::cli::noted::Noted;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
@@ -173,7 +173,7 @@ pub struct Lapsed {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-enum Key {
+pub(crate) enum Key {
     #[name("session")]
     Session,
     #[name("read")]
@@ -252,6 +252,22 @@ enum Key {
     Flailed,
     #[name("flailed-segment")]
     FlailedSegment,
+    #[name("outline")]
+    Outline,
+    #[name("standing")]
+    Standing,
+    #[name("unplaced")]
+    Unplaced,
+    #[name("imported")]
+    Imported,
+    #[name("unresolved")]
+    Unresolved,
+    #[name("unanchored")]
+    Unanchored,
+    #[name("reconciled")]
+    Reconciled,
+    #[name("cites")]
+    Cites,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -394,9 +410,9 @@ impl fmt::Display for Line {
     }
 }
 
-impl Key {
-    fn line(self, fields: &mut Fields) -> Result<Line, Unread> {
-        match self {
+impl Line {
+    fn read(fields: &mut Fields) -> Result<Line, Unread> {
+        match fields.field::<Word<Key>>()? {
             Key::Session => Ok(Line::Read {
                 session: fields.field::<Quoted<_>>()?,
                 cursor: Cursor::new(Offset::new(fields.past(&[Key::Read, Key::To])?.field::<Integer<_>>()?)),
@@ -492,16 +508,8 @@ impl Key {
             Key::Retried => Lapsed::read(fields).map(Line::Retried),
             Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
             Key::FlailedSegment => Flailing::read(fields).map(Line::FlailedSegment),
-            Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
-        }
-    }
-}
-
-impl Line {
-    fn read(fields: &mut Fields) -> Result<Line, Unread> {
-        match fields.optional::<Word<Looked>>() {
-            Some(looked) => looked.viewed(fields).map(Line::Viewed),
-            None => Noting::line(fields.optional::<Word<Noting>>(), fields),
+            key @ (Key::Outline | Key::Standing | Key::Unplaced) => Viewed::read(key, fields).map(Line::Viewed),
+            noted => Noted::read(noted, fields).map(Line::Noted),
         }
     }
 
@@ -515,15 +523,6 @@ impl Line {
 
     fn sensed(sense: Sense) -> String {
         format!(" {} {} {} {}", sense.kind(), sense.specificity(), sense.confidence(), sense.explicitness())
-    }
-}
-
-impl Noting {
-    fn line(noting: Option<Noting>, fields: &mut Fields) -> Result<Line, Unread> {
-        match noting {
-            Some(noting) => noting.noted(fields).map(Line::Noted),
-            None => fields.field::<Word<Key>>().and_then(|key| key.line(fields)),
-        }
     }
 }
 

@@ -3,7 +3,7 @@ use design_model::{
 };
 use design_store::{
     Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest,
-    Stored, Unplaced, Uttered,
+    Stored, Unplaced,
 };
 use newtype::Newtype;
 use store_ports::{Store, StoreFailure};
@@ -145,20 +145,19 @@ impl Refs {
         segments.iter().map(|segment| Line::Uncovered(self.reference(segment))).collect()
     }
 
-    pub fn standing(&self, spans: &[Uttered]) -> Vec<Line> {
+    pub fn standing(&self, spans: &[Placement]) -> Vec<Line> {
         spans
             .iter()
             .map(|span| {
                 let author: &Authorship = span.as_ref();
                 let provenance: &Provenance = span.as_ref();
-                let body: &Body = span.as_ref();
                 Line::Viewed(Viewed::Standing {
                     node: span.node(),
                     relation: span.relation(),
                     segment: self.reference(&span.segment()),
                     author: *author,
                     entered: *provenance,
-                    body: body.clone(),
+                    body: span.body().clone(),
                 })
             })
             .collect()

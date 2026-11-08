@@ -1,10 +1,15 @@
 mod boundary;
 
-use design_model::{Ordinal, Provenance, Segment, Sense, SpanRelation};
+use design_model::{NodeId, Ordinal, Provenance, Segment, Sense, SpanRelation};
+use port_core::Op;
 use transcript_ports::{Authorship, Body, Uuid};
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct CurrentSpans(SpanRelation);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Placement {
+    node: NodeId,
     relation: SpanRelation,
     message: Uuid,
     ordinal: Ordinal,
@@ -14,7 +19,18 @@ pub struct Placement {
     provenance: Provenance,
 }
 
+impl From<SpanRelation> for CurrentSpans {
+    fn from(relation: SpanRelation) -> CurrentSpans {
+        CurrentSpans(relation)
+    }
+}
+
 impl Placement {
+    #[must_use]
+    pub fn node(&self) -> NodeId {
+        self.node
+    }
+
     #[must_use]
     pub fn relation(&self) -> SpanRelation {
         self.relation

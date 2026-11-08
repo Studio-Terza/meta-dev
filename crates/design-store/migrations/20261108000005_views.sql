@@ -1,36 +1,65 @@
+CREATE VIEW ended_nodes (id, ending) AS
+SELECT
+  nodes.id,
+  'dropped'
+FROM
+  nodes
+WHERE
+  nodes.stage = 'dropped'
+UNION ALL
+SELECT
+  node_edges.target,
+  'superseded'
+FROM
+  node_edges
+WHERE
+  node_edges.relation = 'supersedes';
+
+CREATE VIEW ended_subtrees (id, ending) AS
+SELECT
+  ended_nodes.id,
+  ended_nodes.ending
+FROM
+  ended_nodes
+UNION ALL
+SELECT
+  closure.descendant,
+  ended_nodes.ending
+FROM
+  closure
+  JOIN ended_nodes ON ended_nodes.id = closure.ancestor
+WHERE
+  closure.relation = 'refines';
+
 CREATE VIEW live_nodes (id) AS
 SELECT
   nodes.id
 FROM
   nodes
 WHERE
-  nodes.stage != 'dropped'
-  AND NOT EXISTS (
+  NOT EXISTS (
     SELECT
       1
     FROM
-      closure
-      JOIN nodes AS above ON above.id = closure.ancestor
+      ended_subtrees
     WHERE
-      closure.relation = 'refines'
-      AND closure.descendant = nodes.id
-      AND above.stage = 'dropped'
+      ended_subtrees.id = nodes.id
+      AND ended_subtrees.ending = 'dropped'
   );
 
 CREATE VIEW current_nodes (id) AS
 SELECT
-  live_nodes.id
+  nodes.id
 FROM
-  live_nodes
+  nodes
 WHERE
   NOT EXISTS (
     SELECT
       1
     FROM
-      node_edges
+      ended_subtrees
     WHERE
-      node_edges.relation = 'supersedes'
-      AND node_edges.target = live_nodes.id
+      ended_subtrees.id = nodes.id
   );
 
 CREATE VIEW current_decision (node, relation, message, ordinal, provenance) AS
