@@ -84,9 +84,10 @@ struct Sought<Found> {
 }
 
 #[derive(Clone, Debug)]
-struct Author {
+struct Speech {
     message: Uuid,
     author: Authorship,
+    segments: Vec<Segment>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -211,12 +212,12 @@ impl Answers {
     }
 
     fn resolved(&self, entry: &notes::Entry, node: NodeId, voice: Voice) -> Findings {
-        let citations: Vec<Sought<Author>> = entry
+        let citations: Vec<Sought<Speech>> = entry
             .cites()
             .into_iter()
             .map(|cite| Sought { reference: Reference::Cite(cite.clone()), found: self.cite(cite) })
             .collect();
-        let authors: Vec<&Author> = citations.iter().filter_map(|cited| cited.found.as_ref().ok()).collect();
+        let authors: Vec<&Speech> = citations.iter().filter_map(|cited| cited.found.as_ref().ok()).collect();
         let cited: BTreeSet<Uuid> = authors.iter().map(|author| author.message.clone()).collect();
         let dates = entry.dates();
         let quotations: Vec<Sought<Vec<Segment>>> = entry
@@ -229,9 +230,12 @@ impl Answers {
                 })
             })
             .collect();
-        let placed: BTreeSet<&Segment> =
+        let quoted: BTreeSet<&Segment> =
             quotations.iter().filter_map(|quoted| quoted.found.as_ref().ok()).flatten().collect();
-        let owned = authors.iter().filter(|author| author.author == Authorship::Owner).count();
+        let owned: Vec<&Speech> = authors.iter().copied().filter(|author| author.author == Authorship::Owner).collect();
+        let anchors = Count::new(quoted.len().saturating_add(owned.len()));
+        let spoken: BTreeSet<&Segment> = owned.iter().flat_map(|author| &author.segments).collect();
+        let placed = voice.placed(quoted, spoken);
         Findings {
             directed: cited
                 .iter()
@@ -243,19 +247,21 @@ impl Answers {
                 .filter_map(Sought::missed)
                 .chain(quotations.iter().filter_map(Sought::missed))
                 .collect(),
-            anchors: Count::new(placed.len().saturating_add(owned)),
+            anchors,
         }
     }
 
-    fn cite(&self, cite: &Cite) -> Result<Author, Miss> {
+    fn cite(&self, cite: &Cite) -> Result<Speech, Miss> {
         let spoken = self.cited.get(&Prefix::new(cite.clone().into_inner())).map(Vec::as_slice).unwrap_or_default();
-        let authors: BTreeMap<Uuid, Author> = spoken
-            .iter()
-            .map(|spoken| {
-                let message: &Uuid = spoken.segment().as_ref();
-                (message.clone(), Author { message: message.clone(), author: spoken.author() })
-            })
-            .collect();
+        let authors = spoken.iter().fold(BTreeMap::<Uuid, Speech>::new(), |mut authors, spoken| {
+            let message: &Uuid = spoken.segment().as_ref();
+            authors
+                .entry(message.clone())
+                .or_insert_with(|| Speech { message: message.clone(), author: spoken.author(), segments: Vec::new() })
+                .segments
+                .push(spoken.segment().clone());
+            authors
+        });
         Miss::only(authors)
     }
 
@@ -488,6 +494,17 @@ impl Voice {
                 },
             ],
             Voice::Remark => vec![Directed::Placed { segment, node, relation: SpanRelation::Mentions }],
+        }
+    }
+
+    fn placed<'heard>(
+        self,
+        quoted: BTreeSet<&'heard Segment>,
+        spoken: BTreeSet<&'heard Segment>,
+    ) -> BTreeSet<&'heard Segment> {
+        match self {
+            Voice::Ruling => Some(quoted).filter(|quoted| quoted.first().is_some()).unwrap_or(spoken),
+            Voice::Remark => quoted,
         }
     }
 

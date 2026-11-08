@@ -149,6 +149,8 @@ laws::law!(
             ("(Owner moved on: not a ruling)", "(Owner moved on: not a ruling)"),
             ("  indented: prose with Rust's 'quotes' in it", "  indented: prose with Rust's 'quotes' in it"),
             ("  ", ""),
+            ("\r", ""),
+            ("  \r", ""),
             ("\t", ""),
             (" \t ", ""),
         ]),
@@ -179,7 +181,8 @@ laws::table!(
     [
         "RULING (owner): \"yes the new trellis is approved.\"" => Some("imported"),
         "RULING (owner, c3c3c3c3): approved" => Some("imported"),
-        "RULING (owner): 'rows turn into a map.'" => Some("imported"),
+        "RULING (owner): 'rows turn into a map.'" => Some("unanchored"),
+        "RULING 'yes' (c3c3c3c3), the owners' call" => Some("imported"),
         "RULING (owner, b2b2b2b2): the lead proposed it" => Some("unanchored"),
         "RULING (owner): \"one shed for every tool\"" => Some("unanchored"),
         "RULING (owner, 2026-11-05): nothing quoted" => Some("unanchored"),
@@ -187,9 +190,9 @@ laws::table!(
         "RULING (owner): \"\" says nothing" => Some("unanchored"),
         "Lead: the RULING stands" => Some("imported"),
         "(aside: RULING) prose" => Some("imported"),
-        "RULING (owner, 'rows turn into a map.'): we don't change Ann's plan" => Some("imported"),
-        "RULING (owner, 'agreed'): we don't change Ann's plan" => Some("unanchored"),
-        "RULING (owner): 'rows turn into a map" => Some("unanchored"),
+        "RULING (owner, \"rows turn into a map.\"): we don't change Ann's plan" => Some("imported"),
+        "RULING (owner, \"agreed\"): we don't change Ann's plan" => Some("unanchored"),
+        "RULING (owner): \"rows turn into a map" => Some("unanchored"),
         "- LEAD 2026-11-08: the RULING stands" => Some("imported"),
     ]
 );
@@ -205,8 +208,9 @@ laws::table!(
         "\"Fine\"" => Some(Err(Miss::Ambiguous)),
         "\"Fine.\" (f6f6f6f6, 2026-11-08)" => Some(Err(Miss::Ambiguous)),
         "\"Fine. Fine\"" => Some(Err(Miss::Unheard)),
-        "'Sow the peas' isn't Ann's call" => Some(Ok(vec!["f6f6f6f6.1".to_owned()])),
-        "'Sow the peas" => Some(Err(Miss::Unclosed)),
+        "\"Sow the peas\" isn't Ann's call" => Some(Ok(vec!["f6f6f6f6.1".to_owned()])),
+        "'Sow the peas' isn't Ann's call" => Some(Ok(vec![])),
+        "\"Sow the peas" => Some(Err(Miss::Unclosed)),
     ]
 );
 
@@ -231,17 +235,32 @@ fn an_imported_ruling_leaves_its_segment_to_the_structurer_or_reaches_current_de
 }
 
 #[test]
-fn a_ruling_whose_head_quote_meets_later_contractions_and_possessives_is_imported_as_an_anchored_ruling()
--> Result<(), Failure> {
+fn a_ruling_anchored_only_by_an_owner_cite_is_the_current_decision() -> Result<(), Failure> {
     let applying = Noting::ready()?;
     let imported = Noting::imported(
         &applying,
-        "# Notes\n- 2026-11-05 RULING (owner, 'yes the new trellis is approved.'): we don't move Ann's trellis, it's the owner's call\n",
+        "# Notes\n- 2026-11-05 RULING (owner c3c3c3c3): we don't move Ann's trellis, it's the owner's call\nRULING (owner a1a1a1a1): labels\nRULING (owner a1a1a1a1): \"rows turn into a map.\"\n",
     )?;
-    let reconciled = Reconciliation::new(Count::new(2), Count::new(2), Count::new(1), Count::new(1));
+    let reconciled = Reconciliation::new(Count::new(4), Count::new(4), Count::new(3), Count::new(3));
     assert!(Spread::parsed(&imported).contains(&Line::Noted(Noted::Reconciled(reconciled))));
     let decided = applying.run(&["view", "current-decision"])?;
-    assert!(decided.contains("standing n3 decides c3c3c3c3.0 owner entered import-2 "));
+    let deciding: Vec<NodeId> = Spread::parsed(&decided).iter().filter_map(Viewing::node).collect();
+    assert_eq!(deciding, [3, 4, 4, 4, 4, 5].map(NodeId::new));
+    let standing = [
+        "standing n3 decides c3c3c3c3.0 owner entered import-2 ",
+        "standing n4 decides a1a1a1a1.0 owner entered import-3 ",
+        "standing n4 decides a1a1a1a1.1 owner entered import-3 ",
+        "standing n4 decides a1a1a1a1.2 owner entered import-3 ",
+        "standing n4 decides a1a1a1a1.3 owner entered import-3 ",
+        "standing n5 decides a1a1a1a1.2 owner entered import-4 ",
+    ];
+    assert!(standing.iter().all(|part| decided.contains(part)));
+    let unplaced: Vec<String> = Spread::parsed(&applying.run(&["view", "unplaced"])?)
+        .into_iter()
+        .filter_map(Viewing::unplaced)
+        .filter(|segment| ["c3c3c3c3", "a1a1a1a1"].iter().any(|message| segment.contains(message)))
+        .collect();
+    assert_eq!(unplaced, Vec::<String>::new());
     Ok(())
 }
 

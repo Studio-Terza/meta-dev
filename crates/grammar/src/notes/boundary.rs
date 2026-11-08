@@ -8,7 +8,7 @@ use super::{Cite, Date, Layout, Quote, Unclosed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
-    #[regex(r"[ \t]+", priority = 3)]
+    #[regex(r"[ \t\r]+", priority = 3)]
     Layout,
     #[regex(r"[^\n]+", allow_greedy = true)]
     Text,
@@ -32,8 +32,6 @@ enum Lexeme {
     Close,
     #[token("\"")]
     Double,
-    #[token("'")]
-    Single,
     #[regex(r"[0-9a-f]{8}")]
     #[regex(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
     Cite,
@@ -60,12 +58,6 @@ pub trait Reading {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Mark {
-    Double,
-    Single,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
     Ruling,
     Lead,
@@ -78,35 +70,11 @@ enum Opening {
     Prose,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Follow {
-    End,
-    Gap,
-    Word,
-    Mark,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Role {
-    Opening,
-    Closing,
-    Plain,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Inside {
-    Opening,
-    Closing,
-    Nested,
-    Unnested,
-    Plain,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Piece {
     Text(String),
-    Quoted(Mark, Quote),
-    Unclosed(Mark, Unclosed),
+    Quoted(Quote),
+    Unclosed(Unclosed),
     Cited(Cite),
     Dated(Date),
 }
@@ -162,7 +130,6 @@ struct Lexed<'text> {
 
 #[derive(Clone, Copy, Debug)]
 struct Cursor<'lexed, 'text> {
-    prior: Option<Lexed<'text>>,
     rest: &'lexed [Lexed<'text>],
 }
 
@@ -170,12 +137,6 @@ struct Cursor<'lexed, 'text> {
 struct Step<'lexed, 'text> {
     piece: Piece,
     cursor: Cursor<'lexed, 'text>,
-}
-
-#[derive(Debug)]
-struct Deepened {
-    depth: usize,
-    inside: Inside,
 }
 
 #[derive(Debug, Default)]
@@ -322,56 +283,9 @@ impl Lexeme {
             Lexeme::Dash | Lexeme::Date | Lexeme::Space => None,
             Lexeme::Ruling => Some(Kind::Ruling),
             Lexeme::Lead => Some(Kind::Lead),
-            Lexeme::Hash
-            | Lexeme::Open
-            | Lexeme::Close
-            | Lexeme::Double
-            | Lexeme::Single
-            | Lexeme::Cite
-            | Lexeme::Word => Some(Kind::Remark),
-        }
-    }
-
-    fn candidate(self) -> Role {
-        match self {
-            Lexeme::Space | Lexeme::Open => Role::Opening,
-            Lexeme::Hash
-            | Lexeme::Dash
-            | Lexeme::Ruling
-            | Lexeme::Lead
-            | Lexeme::Close
-            | Lexeme::Double
-            | Lexeme::Single
-            | Lexeme::Cite
-            | Lexeme::Date
-            | Lexeme::Word => Role::Closing,
-        }
-    }
-
-    fn follow(self) -> Follow {
-        match self {
-            Lexeme::Space => Follow::Gap,
-            Lexeme::Ruling | Lexeme::Lead | Lexeme::Cite | Lexeme::Date | Lexeme::Word => Follow::Word,
-            Lexeme::Hash | Lexeme::Dash | Lexeme::Open | Lexeme::Close | Lexeme::Double | Lexeme::Single => {
-                Follow::Mark
+            Lexeme::Hash | Lexeme::Open | Lexeme::Close | Lexeme::Double | Lexeme::Cite | Lexeme::Word => {
+                Some(Kind::Remark)
             }
-        }
-    }
-
-    fn inside(self, role: Role) -> Inside {
-        match self {
-            Lexeme::Single => Inside::from(role),
-            Lexeme::Open => Inside::Nested,
-            Lexeme::Close => Inside::Unnested,
-            Lexeme::Hash
-            | Lexeme::Dash
-            | Lexeme::Ruling
-            | Lexeme::Lead
-            | Lexeme::Double
-            | Lexeme::Cite
-            | Lexeme::Date
-            | Lexeme::Word
-            | Lexeme::Space => Inside::Plain,
         }
     }
 }
@@ -387,7 +301,6 @@ impl<'text> Lexed<'text> {
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Double
-                | Lexeme::Single
                 | Lexeme::Cite
                 | Lexeme::Date
                 | Lexeme::Word
@@ -397,10 +310,9 @@ impl<'text> Lexed<'text> {
         }
     }
 
-    fn taken<'lexed>(self, prior: Option<Lexed<'text>>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
+    fn taken<'lexed>(self, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         match self.lexeme {
-            Some(Lexeme::Double) => Mark::Double.quoted(self, rest),
-            Some(Lexeme::Single) => Role::around(prior, rest.first().copied()).single(self, rest),
+            Some(Lexeme::Double) => Step::quoted(rest),
             Some(
                 Lexeme::Hash
                 | Lexeme::Dash
@@ -413,12 +325,8 @@ impl<'text> Lexed<'text> {
                 | Lexeme::Word
                 | Lexeme::Space,
             )
-            | None => Step::after(Piece::read(self), self, rest),
+            | None => Step::after(Piece::read(self), rest),
         }
-    }
-
-    fn inside(self, prior: Lexed<'text>, later: Option<Lexed<'text>>) -> Inside {
-        self.lexeme.map_or(Inside::Plain, |lexeme| lexeme.inside(Role::around(Some(prior), later)))
     }
 
     fn joined(lexed: &[Lexed<'text>]) -> String {
@@ -428,108 +336,31 @@ impl<'text> Lexed<'text> {
 
 impl<'lexed, 'text> Cursor<'lexed, 'text> {
     fn step(self) -> Option<Step<'lexed, 'text>> {
-        self.rest.split_first().map(|(first, rest)| first.taken(self.prior, rest))
+        self.rest.split_first().map(|(first, rest)| first.taken(rest))
     }
 }
 
 impl<'lexed, 'text> Step<'lexed, 'text> {
-    fn after(piece: Piece, lexed: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
-        Step { piece, cursor: Cursor { prior: Some(lexed), rest } }
-    }
-}
-
-impl Role {
-    fn around(prior: Option<Lexed<'_>>, later: Option<Lexed<'_>>) -> Role {
-        let candidate = prior.map_or(Role::Opening, |prior| prior.lexeme.map_or(Role::Closing, Lexeme::candidate));
-        candidate.standing(later.map_or(Follow::End, |later| later.lexeme.map_or(Follow::Mark, Lexeme::follow)))
+    fn after(piece: Piece, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
+        Step { piece, cursor: Cursor { rest } }
     }
 
-    fn standing(self, follow: Follow) -> Role {
-        match follow {
-            Follow::End | Follow::Gap => Some(self).filter(|role| *role != Role::Opening).unwrap_or(Role::Plain),
-            Follow::Word => Some(self).filter(|role| *role != Role::Closing).unwrap_or(Role::Plain),
-            Follow::Mark => self,
-        }
-    }
-
-    fn single<'lexed, 'text>(self, mark: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
-        match self {
-            Role::Opening => Mark::Single.quoted(mark, rest),
-            Role::Closing | Role::Plain => Step::after(Piece::read(mark), mark, rest),
-        }
-    }
-}
-
-impl From<Role> for Inside {
-    fn from(role: Role) -> Inside {
-        match role {
-            Role::Opening => Inside::Opening,
-            Role::Closing => Inside::Closing,
-            Role::Plain => Inside::Plain,
-        }
-    }
-}
-
-impl Inside {
-    fn deepened(self, depth: usize) -> Option<Deepened> {
-        match self {
-            Inside::Opening => None,
-            Inside::Nested => Some(Deepened { depth: depth.saturating_add(1), inside: self }),
-            Inside::Unnested => depth.checked_sub(1).map(|depth| Deepened { depth, inside: self }),
-            Inside::Closing | Inside::Plain => Some(Deepened { depth, inside: self }),
-        }
-    }
-
-    fn last_closing(opener: Lexed<'_>, rest: &[Lexed<'_>]) -> Option<usize> {
-        let priors = iter::once(opener).chain(rest.iter().copied());
-        let laters = rest.iter().copied().skip(1).map(Some).chain(iter::once(None));
-        rest.iter()
-            .zip(priors)
-            .zip(laters)
-            .map(|((lexed, prior), later)| lexed.inside(prior, later))
-            .scan(0, |depth, inside| {
-                inside.deepened(*depth).map(|deepened| {
-                    *depth = deepened.depth;
-                    deepened.inside
-                })
-            })
-            .enumerate()
-            .filter(|(_at, inside)| *inside == Inside::Closing)
-            .map(|(at, _inside)| at)
-            .last()
-    }
-}
-
-impl Mark {
-    fn quoted<'lexed, 'text>(self, opener: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
-        let closed = self
-            .closing(opener, rest)
-            .and_then(|at| rest.get(..at).zip(rest.get(at..)))
-            .and_then(|(inner, from)| from.split_first().map(|(closer, after)| (inner, *closer, after)));
+    fn quoted(rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
+        let closed = rest
+            .iter()
+            .position(|lexed| lexed.lexeme == Some(Lexeme::Double))
+            .and_then(|at| rest.split_at_checked(at))
+            .and_then(|(inner, from)| from.split_first().map(|(_closer, after)| (inner, after)));
         closed.map_or_else(
-            || Step::after(Piece::Unclosed(self, Unclosed::new(Quote::new(Lexed::joined(rest)))), opener, rest),
-            |(inner, closer, after)| Step::after(Piece::Quoted(self, Quote::new(Lexed::joined(inner))), closer, after),
+            || Step::after(Piece::Unclosed(Unclosed::new(Quote::new(Lexed::joined(rest)))), rest),
+            |(inner, after)| Step::after(Piece::Quoted(Quote::new(Lexed::joined(inner))), after),
         )
-    }
-
-    fn closing(self, opener: Lexed<'_>, rest: &[Lexed<'_>]) -> Option<usize> {
-        match self {
-            Mark::Double => rest.iter().position(|lexed| lexed.lexeme == Some(Lexeme::Double)),
-            Mark::Single => Inside::last_closing(opener, rest),
-        }
-    }
-
-    const fn sign(self) -> char {
-        match self {
-            Mark::Double => '"',
-            Mark::Single => '\'',
-        }
     }
 }
 
 impl Pieces {
     fn parsed(lexed: &[Lexed<'_>]) -> Pieces {
-        let start = Cursor { prior: None, rest: lexed };
+        let start = Cursor { rest: lexed };
         Pieces(iter::successors(start.step(), |step| step.cursor.step()).map(|step| step.piece).collect())
     }
 }
@@ -547,7 +378,6 @@ impl Piece {
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Double
-                | Lexeme::Single
                 | Lexeme::Word
                 | Lexeme::Space,
             )
@@ -557,8 +387,8 @@ impl Piece {
 
     fn quote(&self) -> Option<Result<&Quote, &Unclosed>> {
         match self {
-            Piece::Quoted(_, quote) => Some(Ok(quote)),
-            Piece::Unclosed(_, unclosed) => Some(Err(unclosed)),
+            Piece::Quoted(quote) => Some(Ok(quote)),
+            Piece::Unclosed(unclosed) => Some(Err(unclosed)),
             Piece::Text(_) | Piece::Cited(_) | Piece::Dated(_) => None,
         }
     }
@@ -566,14 +396,14 @@ impl Piece {
     fn cite(&self) -> Option<&Cite> {
         match self {
             Piece::Cited(cite) => Some(cite),
-            Piece::Text(_) | Piece::Quoted(..) | Piece::Unclosed(..) | Piece::Dated(_) => None,
+            Piece::Text(_) | Piece::Quoted(_) | Piece::Unclosed(_) | Piece::Dated(_) => None,
         }
     }
 
     fn date(&self) -> Option<&Date> {
         match self {
             Piece::Dated(date) => Some(date),
-            Piece::Text(_) | Piece::Quoted(..) | Piece::Unclosed(..) | Piece::Cited(_) => None,
+            Piece::Text(_) | Piece::Quoted(_) | Piece::Unclosed(_) | Piece::Cited(_) => None,
         }
     }
 }
@@ -642,9 +472,9 @@ impl fmt::Display for Piece {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Piece::Text(text) => formatter.write_str(text),
-            Piece::Quoted(mark, quote) => write!(formatter, "{0}{quote}{0}", mark.sign()),
+            Piece::Quoted(quote) => write!(formatter, "\"{quote}\""),
             Piece::Cited(cite) => write!(formatter, "{cite}"),
-            Piece::Unclosed(mark, _) => write!(formatter, "{}", mark.sign()),
+            Piece::Unclosed(_) => formatter.write_str("\""),
             Piece::Dated(date) => write!(formatter, "{date}"),
         }
     }
