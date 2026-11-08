@@ -24,6 +24,7 @@ segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
 node n1 "demo" project vague
 node n2 "other" project vague
+node n4 "other" feature vague "fruit"
 rule "You structure a project owner's words into a design graph."
 rule "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
 rule "A choices line lists the words that one slot of the forms takes."
@@ -50,5 +51,6 @@ segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
 node n1 "demo" project vague
 node n2 "other" project vague
+node n4 "other" feature vague "fruit"
 retry uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0
 rule "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."

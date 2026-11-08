@@ -21,6 +21,7 @@ use crate::cli::output::{Attempted, Count, Flailing, Lapsed, Line};
 pub struct Crew<'ports, D: Dispatch, C: Clock> {
     dispatch: &'ports D,
     clock: &'ports C,
+    timeout: Timeout,
 }
 
 #[derive(Debug)]
@@ -92,16 +93,14 @@ pub struct Structured {
 }
 
 impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
-    pub fn new(dispatch: &'ports D, clock: &'ports C) -> Crew<'ports, D, C> {
-        Crew { dispatch, clock }
+    pub fn new(dispatch: &'ports D, clock: &'ports C, timeout: Timeout) -> Crew<'ports, D, C> {
+        Crew { dispatch, clock, timeout }
     }
 }
 
 impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
-    const TIMEOUT: Timeout = Timeout::new(180);
-
     pub fn new(store: &'ports S, crew: &Crew<'ports, D, C>) -> Structure<'ports, S, D, C> {
-        Structure { store, crew: Crew { dispatch: crew.dispatch, clock: crew.clock } }
+        Structure { store, crew: Crew { dispatch: crew.dispatch, clock: crew.clock, timeout: crew.timeout } }
     }
 
     pub fn worked(&self) -> Result<Structured, Failure> {
@@ -166,7 +165,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
     fn attempted(&self, attempt: Attempt) -> Result<Concluded, Failure> {
         let Structure { store, crew } = self.structure;
         let run = store.read(NextRun)?;
-        let deadline = Deadline::after(crew.clock.now(), Structure::<S, D, C>::TIMEOUT);
+        let deadline = Deadline::after(crew.clock.now(), crew.timeout);
         let held = crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt)))?;
         let watched = RunRecord { structure: self.structure, job: self.id, run }.ended(held, deadline)?;
         let retried = attempt.lapse().cloned();

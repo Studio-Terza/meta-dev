@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use console_ports::Environment;
-use dispatch_ports::{ClockFiller, DispatchFiller};
+use dispatch_ports::{ClockFiller, DispatchFiller, Timeout};
 use file_ports::Files;
 use port_core::Run;
 use store_ports::Sqlite;
@@ -22,6 +22,7 @@ use request::{Crew, Ground, Kept, Request};
 pub struct Agents<H, C> {
     hired: H,
     clock: C,
+    timeout: Timeout,
 }
 
 #[derive(Debug)]
@@ -33,8 +34,8 @@ pub struct Cli<'environment, E: Environment, F: Files, O, H, C> {
 }
 
 impl<H, C: ClockFiller> Agents<H, C> {
-    pub fn new(hired: H, clock: C) -> Agents<H, C> {
-        Agents { hired, clock }
+    pub fn new(hired: H, clock: C, timeout: Timeout) -> Agents<H, C> {
+        Agents { hired, clock, timeout }
     }
 }
 
@@ -77,6 +78,10 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         let store = run.port(request.opened(&located, self.opened));
         let dispatch = run.port((self.agents.hired)(located.kept(Kept::Agents)));
         let clock = run.port(self.agents.clock);
-        request.command().written(Ground::new(run, self.files, located, &store), &Crew::new(&dispatch, &clock), out)
+        request.command().written(
+            Ground::new(run, self.files, located, &store),
+            &Crew::new(&dispatch, &clock, self.agents.timeout),
+            out,
+        )
     }
 }

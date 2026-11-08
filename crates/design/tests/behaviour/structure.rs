@@ -9,7 +9,8 @@ use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Provenance, RunId
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
     Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, HeadlessClaude,
-    Job, Output, Pause, Pid, Prompt, Reply, Started, SystemClock, Tokens, Told, Usage, Wall, clock_ops, dispatch_ops,
+    Job, Output, Pause, Pid, Prompt, Reply, Started, SystemClock, Timeout, Tokens, Told, Usage, Wall, clock_ops,
+    dispatch_ops,
 };
 use newtype::Newtype;
 use port_core::{Pass, Run};
@@ -52,7 +53,7 @@ impl Staff {
     const START: Wall = Wall::new(1_800_000_000);
 
     pub fn idle() -> Agents<impl FnOnce(PathBuf) -> FakeDispatch<'static>, FakeClock> {
-        Agents::new(|_scratch| FakeDispatch(&IDLE), FakeClock::asleep_for(Pause::new(0)))
+        Agents::new(|_scratch| FakeDispatch(&IDLE), FakeClock::asleep_for(Pause::new(0)), Timeout::CLAUDE)
     }
 }
 
@@ -165,7 +166,11 @@ impl Structuring {
     }
 
     fn structured(&self) -> Structured {
-        self.structured_by(Agents::new(|_scratch| FakeDispatch(&self.script), FakeClock::asleep_for(self.sleep)))
+        self.structured_by(Agents::new(
+            |_scratch| FakeDispatch(&self.script),
+            FakeClock::asleep_for(self.sleep),
+            Timeout::CLAUDE,
+        ))
     }
 
     fn structured_by<D: DispatchFiller>(
@@ -329,12 +334,14 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
     ];
     store.write(Planting::sown(Node::new(NodeId::new(2), other)))?;
     store.write(Planting::sown(Node::new(NodeId::new(3), gone)))?;
-    structuring.applying.applied("propose(new g, refines(n3), feature, \"g\")")?;
+    structuring
+        .applying
+        .applied("propose(new f, refines(n2), feature, \"fruit\")\npropose(new g, refines(n3), feature, \"g\")")?;
     structuring.applying.run(&["drop", "n3", "--reason", "abandoned"])?;
     golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured().text))?;
     let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
     golden::golden!("structure-briefs.txt", &briefs)?;
-    assert!(matches!(structuring.applying.run(&["show", "n5"]), Err(Failure::Unplaced(_))));
+    assert!(matches!(structuring.applying.run(&["show", "n6"]), Err(Failure::Unplaced(_))));
     Ok(())
 }
 
@@ -350,8 +357,11 @@ fn an_agent_that_errs_is_retried_with_its_error_in_the_prompt_then_flails_with_w
         ],
     );
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let structured =
-        structuring.structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock));
+    let structured = structuring.structured_by(Agents::new(
+        |_scratch| HeadlessClaude::new(scratch, agent),
+        SystemClock,
+        Timeout::new(5),
+    ));
     let run = Run::root();
     let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
     golden::golden!("structure-unreadable.txt", &format!("design structure\n{}", structured.text))?;
@@ -368,8 +378,11 @@ fn an_agent_whose_output_cannot_be_collected_fails_structure_and_its_run_ends_fa
     let structuring = Structuring::over(Script::default(), Pause::new(0))?;
     let agent = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let structured =
-        structuring.structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock));
+    let structured = structuring.structured_by(Agents::new(
+        |_scratch| HeadlessClaude::new(scratch, agent),
+        SystemClock,
+        Timeout::new(5),
+    ));
     let run = Run::root();
     let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
     assert!(matches!(structured.outcome, Err(Failure::Dispatch(DispatchFailure::Collect(_)))));
