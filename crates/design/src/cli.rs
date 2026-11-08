@@ -17,7 +17,7 @@ use store_ports::Sqlite;
 
 use crate::Outcome;
 
-pub use failure::{Failure, Unmatched};
+pub use failure::{Failure, Flail, Flails, Unmatched};
 pub use request::Unresolved;
 use request::{Crew, Ground, Kept, Request};
 pub use viewed::Viewed;

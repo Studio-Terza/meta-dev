@@ -9,7 +9,7 @@ use super::{
     JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf,
     Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
-use crate::Account;
+use crate::{Account, Excerpt};
 
 #[derive(Debug, Columns)]
 struct UnreportedRow {
@@ -64,6 +64,7 @@ struct RanRow {
     output_tokens: Option<Tokens>,
     cache_written_tokens: Option<Tokens>,
     cache_read_tokens: Option<Tokens>,
+    reply: Option<Excerpt>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -112,7 +113,7 @@ impl From<RanRow> for Ran {
             .zip(row.output_tokens)
             .zip(row.cache_written_tokens.zip(row.cache_read_tokens))
             .map(|((input, output), (written, read))| Usage::new(input, output, written, read));
-        Ran { run: row.id, state: row.state, usage }
+        Ran { run: row.id, state: row.state, usage, reply: row.reply }
     }
 }
 
@@ -303,7 +304,7 @@ impl Batch for RunEnded {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let RunEnded { run, state, usage } = self;
+        let RunEnded { run, state, usage, reply } = self;
         let Spent { input, output, cache_written, cache_read } = Spent::from(usage);
         statements.written(store_ports::query!(
             r#"
@@ -314,7 +315,8 @@ SET
   input_tokens = ?3,
   output_tokens = ?4,
   cache_written_tokens = ?5,
-  cache_read_tokens = ?6
+  cache_read_tokens = ?6,
+  reply = ?7
 WHERE
   id = ?1
 "#,
@@ -323,7 +325,8 @@ WHERE
             input: Option<Tokens>,
             output: Option<Tokens>,
             cache_written: Option<Tokens>,
-            cache_read: Option<Tokens>
+            cache_read: Option<Tokens>,
+            reply: Option<Excerpt>
         ))
     }
 }
@@ -467,7 +470,8 @@ SELECT
   input_tokens,
   output_tokens,
   cache_written_tokens,
-  cache_read_tokens
+  cache_read_tokens,
+  reply
 FROM
   runs
 WHERE

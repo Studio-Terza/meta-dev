@@ -1,7 +1,9 @@
 use std::fmt;
 use std::str::FromStr;
 
-use design_model::{Confidence, Explicitness, Facet, Outline, SegmentRelation, SenseKind, SpanRelation, Specificity};
+use design_model::{
+    Confidence, Explicitness, Facet, Outline, SegmentRelation, SenseKind, SpanRelation, Specificity, Title,
+};
 use grammar::cited::Cited;
 use grammar::output::field::{Id, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
@@ -12,7 +14,7 @@ use text_lines::Lines;
 
 use crate::lapse::Retried;
 use crate::verb::Form;
-use crate::{Attempt, Directive, Job, Lapse, NodeRef, Said, SegmentRef};
+use crate::{Attempt, Directive, Edge, Job, Label, Lapse, NodeRef, Proposal, Said, SegmentRef};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Briefing(Vec<Brief>);
@@ -68,6 +70,14 @@ enum Rule {
         "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."
     )]
     Again,
+}
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Sample {
+    #[name("topic")]
+    Label,
+    #[name("what the segment is about")]
+    Title,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -163,27 +173,36 @@ impl Job {
                 .chain(Form::ALL.into_iter().map(Brief::Form))
                 .chain(Choice::ALL.into_iter().map(Brief::Choices))
                 .chain(Rule::CLOSING.into_iter().map(Brief::Rule))
-                .chain(self.examples().into_iter().map(Brief::Example))
+                .chain(Briefing::examples(self).into_iter().map(Brief::Example))
                 .chain(self.segments().iter().cloned().map(Brief::Segment))
                 .chain(self.context().iter().cloned().map(Brief::Node))
                 .collect(),
         ))
     }
+}
 
-    fn examples(&self) -> Vec<Directive> {
-        let segment = self.segments().first().map(Said::segment);
-        let node = self.context().first().map(|outline| NodeRef::Stored(outline.node()));
-        let placed = segment.cloned().zip(node).map(|(segment, node)| Directive::Place {
+impl Briefing {
+    fn examples(job: &Job) -> Vec<Directive> {
+        let segment = job.segments().first().map(Said::segment);
+        let node = job.context().first().map(|outline| NodeRef::Stored(outline.node()));
+        let placed = segment.cloned().zip(node.clone()).map(|(segment, node)| Directive::Place {
             segment,
             node,
             relation: SpanRelation::Mentions,
         });
+        let label = Label::from(Sample::Label);
+        let proposed = node.and_then(|refines| Edge::new(label.clone(), refines).ok()).map(|edge| Directive::Propose {
+            proposal: Proposal::Labelled(edge),
+            facet: Facet::Feature,
+            title: Title::new(Sample::Title.to_string()),
+        });
+        let labelled = segment.cloned().zip(proposed).map(|(segment, proposed)| {
+            [proposed, Directive::Place { segment, node: NodeRef::from(label), relation: SpanRelation::Mentions }]
+        });
         let conversational = segment.cloned().map(|segment| Directive::Conversational { segment });
-        placed.into_iter().chain(conversational).collect()
+        placed.into_iter().chain(labelled.into_iter().flatten()).chain(conversational).collect()
     }
-}
 
-impl Briefing {
     #[must_use]
     pub fn retried(self, lapse: &Lapse) -> Briefing {
         Briefing(self.0.into_iter().chain([Brief::Retry(lapse.clone()), Brief::Rule(Rule::Again)]).collect())
