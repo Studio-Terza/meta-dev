@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use syn::punctuated::Punctuated;
 use syn::{
@@ -6,8 +6,8 @@ use syn::{
     VisRestricted,
 };
 
-use code_model::{Building, Domain, Item as ModelItem, ItemId, ItemKind, Unresolved};
-use lint_layout::{Name, Whole, Word, words};
+use code_model::{Building, CrateExports, Domain, Item as ModelItem, ItemId, ItemKind, Reexport, Unresolved};
+use lint_layout::{Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
 use super::anchor::Anchor;
@@ -259,6 +259,13 @@ impl GlobSource {
         }
     }
 
+    fn reexport(&self, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
+        match self {
+            GlobSource::Path(path) => path.reexport(dependencies, declared),
+            GlobSource::Expansion => Reexport::Opaque,
+        }
+    }
+
     fn target(&self, resolver: &Resolver<'_, '_>, scope: ScopeId, glob: GlobId) -> Target {
         match self {
             GlobSource::Path(path) => resolver.glob_target(path, scope, glob),
@@ -464,6 +471,39 @@ impl Entries {
     pub(super) fn modules<'rows>(&self, targets: &'rows [Target]) -> Vec<ModuleGlob<'rows>> {
         let globs = self.globs.iter().zip(GlobId::ids(&self.globs)).zip(targets);
         globs.filter_map(|((glob, id), target)| target.module(id, glob.visibility)).collect()
+    }
+
+    pub(crate) fn crate_exports(&self, dependencies: &Dependencies, modules: &[Name]) -> CrateExports {
+        let shown = |visibility: Visibility| visibility == Visibility::Visible;
+        let declared: BTreeSet<&Name> = self
+            .declared
+            .iter()
+            .filter(|declared| shown(declared.visibility))
+            .map(|declared| &declared.name)
+            .chain(modules)
+            .collect();
+        let imported = self
+            .imports
+            .iter()
+            .filter(|import| shown(import.visibility))
+            .filter(|import| import.domain == Domain::Types)
+            .map(|import| (import.name.clone(), import.path.reexport(dependencies, &declared)));
+        let externs = self.externs.iter().flat_map(|(name, externs)| {
+            externs
+                .iter()
+                .filter(|external| shown(external.visibility))
+                .map(|external| (name.clone(), UsePath::global(&external.krate).reexport(dependencies, &declared)))
+        });
+        let globs = self
+            .globs
+            .iter()
+            .filter(|glob| shown(glob.visibility))
+            .map(|glob| glob.source.reexport(dependencies, &declared));
+        let with_declared =
+            declared.iter().fold(CrateExports::default(), |exports, name| exports.with_declared((*name).clone()));
+        let with_named =
+            imported.chain(externs).fold(with_declared, |exports, (name, reexport)| exports.with_named(name, reexport));
+        globs.fold(with_named, CrateExports::with_glob)
     }
 
     fn merged(mut self, other: Entries) -> Entries {

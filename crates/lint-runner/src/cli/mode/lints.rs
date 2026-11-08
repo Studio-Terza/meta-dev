@@ -1,6 +1,7 @@
 use std::iter;
 use std::thread::Scope;
 
+use cargo_ports::Cargo;
 use code_model::Model;
 use code_reader::Reader;
 
@@ -8,6 +9,7 @@ use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
 use lint_core::{Lint, ModelLint, Readout, Report};
+use lint_layout::Crates;
 use lint_reader::SourceFiles;
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
@@ -57,7 +59,7 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Helpers, Queue, Rendered, Slot, Workers};
+use crate::cli::boundary::{Helper, Helpers, Locator, Queue, Rendered, Slot, Workers};
 use crate::cli::{Outcome, Sources};
 
 #[derive(Debug)]
@@ -127,10 +129,12 @@ impl Lints {
         Entry::Modelled(<NoPlaintext as ModelLint>::report),
     ];
 
-    pub fn started<'scope, F: Files + Sync>(
+    pub fn started<'scope, F: Files + Sync, C: Cargo + Sync>(
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F>,
+        sources: &'scope Sources<F, C>,
     ) -> Helpers<'scope> {
+        let locate = move || sources.queue().locate(sources.ports().located(sources.stage()));
+        Locator::spawned(scope, locate);
         Workers::available()
             .helpers()
             .filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok())
@@ -146,8 +150,8 @@ impl Lints {
         Outcome::from_rendered(rendered, readout.failures())
     }
 
-    fn helped(sources: &Sources<impl Files>) -> Vec<Rendered> {
-        Self::worked(&SourceFiles::read_staged(sources.files(), sources.stage()), sources.queue())
+    fn helped(sources: &Sources<impl Files, impl Cargo>) -> Vec<Rendered> {
+        Self::worked(&SourceFiles::read_staged(sources.ports().files(), sources.stage()), sources.queue())
     }
 
     fn worked(readout: &Readout, queue: &Queue) -> Vec<Rendered> {
@@ -158,11 +162,11 @@ impl Lints {
             .chain(iter::once(Job::Modelled))
             .rev()
             .collect();
-        queue.claimed(&jobs).flat_map(|job| job.done(readout)).collect()
+        queue.claimed(&jobs).flat_map(|job| job.done(readout, queue)).collect()
     }
 
-    fn modelled(readout: &Readout) -> Vec<Rendered> {
-        let model = Reader::read(readout);
+    fn modelled(readout: &Readout, crates: &Crates) -> Vec<Rendered> {
+        let model = Reader::read(readout, crates);
         Self::LINTS
             .into_iter()
             .enumerate()
@@ -205,14 +209,14 @@ enum Job {
 }
 
 impl Job {
-    fn done(self, readout: &Readout) -> Vec<Rendered> {
+    fn done(self, readout: &Readout, queue: &Queue) -> Vec<Rendered> {
         match self {
             Job::Check { slot, check } => check(readout)
                 .into_iter()
                 .filter_map(Report::dirty)
                 .map(|report| Rendered::render(slot, &report))
                 .collect(),
-            Job::Modelled => Lints::modelled(readout),
+            Job::Modelled => Lints::modelled(readout, queue.crates()),
         }
     }
 }

@@ -29,9 +29,13 @@ struct Played<'model> {
 }
 
 impl<'model> Played<'model> {
-    fn recognised(identities: &Identities, placed: Placed<'model, &'model Implementation>) -> Option<Played<'model>> {
+    fn recognised(
+        model: &Model,
+        identities: &Identities,
+        placed: Placed<'model, &'model Implementation>,
+    ) -> Option<Played<'model>> {
         let derived = Self::derived(placed.entity())?;
-        let role = identities.role(derived.implemented()?)?;
+        let role = identities.role(model, derived.implemented()?)?;
         let subject: &Resolved = derived.subject_type().named()?.as_ref();
         let derive = Derive { subject: subject.crate_item()?, name: derived.subject(), site: placed.site() };
         Some(Played { role, derive })
@@ -57,7 +61,7 @@ impl<'model> Kinds<'model> {
         let identities = Identities::read(model);
         let played: BTreeMap<Role, Vec<Derive<'model>>> = model
             .implementations()
-            .filter_map(|placed| Played::recognised(&identities, placed))
+            .filter_map(|placed| Played::recognised(model, &identities, placed))
             .fold(BTreeMap::new(), |mut played, play| {
                 played.entry(play.role).or_default().push(play.derive);
                 played

@@ -6,6 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::thread::Scope;
 
+use cargo_ports::Cargo;
 use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
@@ -62,10 +63,10 @@ impl Mode {
         }
     }
 
-    pub(crate) fn helpers<'scope, F: Files + Sync>(
+    pub(crate) fn helpers<'scope, F: Files + Sync, C: Cargo + Sync>(
         &self,
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F>,
+        sources: &'scope Sources<F, C>,
     ) -> Helpers<'scope> {
         match self {
             Mode::Gate => Lints::started(scope, sources),

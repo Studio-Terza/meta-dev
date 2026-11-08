@@ -3,6 +3,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Memory};
 use lint_runner::Cli;
 use text_lines::Lines;
@@ -65,7 +66,8 @@ impl Checkout {
 
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &mut out, &mut err);
+        let exit =
+            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &Recorded::default(), &mut out, &mut err);
         Run { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 

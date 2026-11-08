@@ -1,7 +1,9 @@
 use syn::{Ident, ItemUse, Path, Token, UseTree};
 
-use code_model::{Domain, ItemPath, Primitive};
-use lint_layout::{Name, Whole, Word, words};
+use std::collections::BTreeSet;
+
+use code_model::{Domain, ItemPath, Primitive, Reexport};
+use lint_layout::{Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
 use super::anchor::Anchor;
@@ -125,6 +127,13 @@ pub(super) struct Relative<'path> {
 }
 
 impl Relative<'_> {
+    fn reexported(self, written: &ItemPath, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
+        declared.get(self.first).map_or_else(
+            || Reexport::dependency(dependencies.package(self.first), written),
+            |_| Reexport::own(written.as_ref(), declared),
+        )
+    }
+
     fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
         match self.shape.looked(domain) {
             Domain::Types => resolver.named(self.first, self.shape, self.reading, viewer),
@@ -150,6 +159,15 @@ impl Head<'_> {
             }
             Head::Anchored(anchor) => resolver.anchored(anchor, viewer),
             Head::Named(relative) => relative.started(resolver, viewer, domain),
+        }
+    }
+
+    fn reexported(self, written: &ItemPath, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
+        match self {
+            Head::Empty => Reexport::Opaque,
+            Head::Global(first) => Reexport::dependency(dependencies.package(first), written),
+            Head::Anchored(anchor) => anchor.reexported(written, declared),
+            Head::Named(relative) => relative.reexported(written, dependencies, declared),
         }
     }
 
@@ -235,6 +253,14 @@ impl UsePath {
 
     pub(crate) fn written(&self) -> ItemPath {
         self.segments.iter().cloned().collect()
+    }
+
+    pub(super) fn global(krate: &Name) -> UsePath {
+        UsePath { leading: Leading::Global, reading: Reading::Written, segments: vec![krate.clone()] }
+    }
+
+    pub(super) fn reexport(&self, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
+        self.head().reexported(&self.written(), dependencies, declared)
     }
 
     fn joined(&self, segment: Name) -> UsePath {

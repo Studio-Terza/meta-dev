@@ -75,6 +75,7 @@ impl Building {
             holdings: model.holdings,
             calls: model.calls,
             declarations: Declarations::new(self.items, self.aliases, self.exports),
+            roots: model.roots,
         }
     }
 }

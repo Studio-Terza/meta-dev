@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::thread;
 
+use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
@@ -245,7 +246,7 @@ impl Trees {
     fn flagged(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(files, &mut out, &mut err);
+        let exit = Cli::from_args(arguments).report_to(files, &Recorded::default(), &mut out, &mut err);
         Printed {
             exit,
             out: String::from_utf8(out).unwrap_or_default(),
@@ -255,13 +256,14 @@ impl Trees {
 
     fn verdict(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Verdict {
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        Cli::from_args(arguments).verdict(files, &mut Vec::new(), &mut Vec::new())
+        Cli::from_args(arguments).verdict(files, &Recorded::default(), &mut Vec::new(), &mut Vec::new())
     }
 
     fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &mut out, &mut err);
+        let exit =
+            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &Recorded::default(), &mut out, &mut err);
         Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
     }
 }

@@ -8,6 +8,7 @@ pub(crate) enum Finding<'model> {
     Plain(&'model Name),
     UnresolvedDerive(&'model Name),
     UnresolvedType(&'model Name),
+    MacroDeclaredType(&'model Name),
 }
 
 impl lint_core::Finding for Finding<'_> {
@@ -17,11 +18,14 @@ impl lint_core::Finding for Finding<'_> {
                 "split it into typed parts, or use a newtype that validates (derive newtype::CheckedDeserialize, which reads through its impl of newtype::Checked)",
             ),
             Finding::UnresolvedDerive(_) => Fix::new(
-                "import it explicitly, by a path or a named use rather than a glob, so the lint can tell whether it reads the type from a file",
+                "import it explicitly, by a path or a named use rather than a glob, from a crate whose root source cargo metadata locates, so the lint can tell whether it reads the type from a file",
             ),
             Finding::UnresolvedType(_) => Fix::new(
                 "import it explicitly, by a path or a named use rather than a glob, so the lint can tell whether the field holds text",
             ),
+            Finding::MacroDeclaredType(_) => {
+                Fix::new("declare it directly, outside the macro, so the lint can tell whether the field holds text")
+            }
         }
     }
 }
@@ -32,6 +36,7 @@ impl fmt::Display for Finding<'_> {
             Finding::Plain(context) => write!(formatter, "free text in {context}"),
             Finding::UnresolvedDerive(subject) => write!(formatter, "derive not resolvable on {subject}"),
             Finding::UnresolvedType(field) => write!(formatter, "type not resolvable in {field}"),
+            Finding::MacroDeclaredType(field) => write!(formatter, "type declared by a macro in {field}"),
         }
     }
 }

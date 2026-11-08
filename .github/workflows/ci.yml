@@ -115,6 +115,8 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/tools
+      - name: dependency sources
+        run: cargo fetch --locked
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" .'
       - name: budget

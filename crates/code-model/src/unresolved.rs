@@ -2,4 +2,5 @@
 pub enum Unresolved {
     Unbound,
     PossiblyMacroDeclared,
+    Unread,
 }

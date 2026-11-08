@@ -1,5 +1,6 @@
 mod boundary;
 mod call;
+mod crate_root;
 mod domain;
 mod external;
 mod found;
@@ -20,6 +21,7 @@ mod unresolved;
 
 pub use boundary::{FileId, ItemId};
 pub use call::{Call, Callee, MacroCall};
+pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
 pub use domain::Domain;
 pub use external::External;
 pub use found::Found;

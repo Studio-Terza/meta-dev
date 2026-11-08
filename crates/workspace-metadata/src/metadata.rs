@@ -1,4 +1,7 @@
+mod library;
 mod package;
+mod package_id;
+mod resolve;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -8,22 +11,32 @@ use serde::Deserialize;
 use crate::crate_name::CrateName;
 use crate::outside::Outside;
 use crate::readers::Readers;
+pub use library::Library;
+pub use package::Form;
 use package::Package;
+use package_id::PackageId;
+use resolve::{Node, NodeDependency, Resolve};
 
 #[derive(Debug, Deserialize)]
 pub struct Metadata {
     workspace_root: PathBuf,
     packages: Vec<Package>,
+    #[serde(default)]
+    workspace_members: Vec<PackageId>,
+    resolve: Option<Resolve>,
 }
 
 impl Metadata {
     pub fn checked(self) -> Result<Metadata, Outside> {
-        let Metadata { workspace_root, packages } = self;
+        let Metadata { workspace_root, packages, workspace_members, resolve } = self;
         let (inside, outside): (Vec<Package>, Vec<Package>) =
             packages.into_iter().partition(|package| package.directory_under(&workspace_root).is_some());
-        outside.into_iter().next().map_or(Ok(Metadata { workspace_root, packages: inside }), |package| {
-            Err(Outside::new(package.into_manifest()))
-        })
+        outside
+            .into_iter()
+            .next()
+            .map_or(Ok(Metadata { workspace_root, packages: inside, workspace_members, resolve }), |package| {
+                Err(Outside::new(package.into_manifest()))
+            })
     }
 
     #[must_use]
@@ -31,6 +44,39 @@ impl Metadata {
         self.packages
             .iter()
             .filter_map(|package| Some((package.name(), package.directory_under(&self.workspace_root)?)))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn libraries(&self) -> Vec<Library<'_>> {
+        let members: BTreeSet<&PackageId> = self.workspace_members.iter().collect();
+        let named: BTreeMap<&PackageId, &CrateName> =
+            self.packages.iter().filter_map(|package| Some((package.package_id()?, package.name()))).collect();
+        let nodes: BTreeMap<&PackageId, &Node> =
+            self.resolve.iter().flat_map(Resolve::as_ref).map(|node| (node.package_id(), node)).collect();
+        let direct: BTreeSet<&PackageId> = members
+            .iter()
+            .filter_map(|member| nodes.get(member))
+            .flat_map(|node| node.normal().map(NodeDependency::package_id))
+            .collect();
+        let (near, far): (Vec<&Package>, Vec<&Package>) = self
+            .packages
+            .iter()
+            .filter(|package| package.package_id().and_then(|id| members.get(id)).is_none())
+            .partition(|package| package.package_id().and_then(|id| direct.get(id)).is_some());
+        near.into_iter()
+            .chain(far)
+            .filter_map(|package| {
+                let dependencies = package
+                    .package_id()
+                    .and_then(|id| nodes.get(id))
+                    .into_iter()
+                    .flat_map(|node| node.normal())
+                    .filter_map(|dependency| Some((dependency.krate(), *named.get(dependency.package_id())?)))
+                    .collect();
+                let library = package.library()?;
+                Some(Library::new(package.name(), library.root(), library.form()?, dependencies))
+            })
             .collect()
     }
 

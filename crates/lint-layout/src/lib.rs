@@ -1,4 +1,5 @@
 mod crate_key;
+mod crates;
 mod dependencies;
 mod failure;
 mod line_number;
@@ -16,6 +17,7 @@ mod use_edges;
 mod use_path;
 mod word;
 
+pub use crates::{CrateSource, Crates, LibraryForm};
 pub use dependencies::Dependencies;
 pub use failure::Failure;
 pub use line_number::LineNumber;

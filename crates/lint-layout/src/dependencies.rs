@@ -13,6 +13,12 @@ impl FromIterator<(CrateKey, PackageName)> for Dependencies {
     }
 }
 
+impl FromIterator<(Name, PackageName)> for Dependencies {
+    fn from_iter<Declared: IntoIterator<Item = (Name, PackageName)>>(declared: Declared) -> Dependencies {
+        declared.into_iter().map(|(krate, package)| (CrateKey::new(krate.words()), package)).collect()
+    }
+}
+
 impl Dependencies {
     #[must_use]
     pub fn package(&self, krate: &Name) -> Option<&PackageName> {

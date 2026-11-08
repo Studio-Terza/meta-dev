@@ -50,6 +50,7 @@ impl Wrapper {
 pub(crate) enum Content {
     Text,
     Unresolved,
+    MacroDeclared,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -92,13 +93,13 @@ impl Texts {
             let wrapped = known.crate_item().and_then(|item| self.wrappers.get(&item)).copied();
             owned.or(borrowed).or(wrapped)
         };
-        resolved.unresolved().map_or_else(|| text(resolved), Self::unresolved)
+        resolved.unresolved().map_or_else(|| text(resolved), |cause| Some(Self::unresolved(cause)))
     }
 
-    fn unresolved(cause: Unresolved) -> Option<Content> {
+    fn unresolved(cause: Unresolved) -> Content {
         match cause {
-            Unresolved::Unbound => Some(Content::Unresolved),
-            Unresolved::PossiblyMacroDeclared => None,
+            Unresolved::Unbound | Unresolved::Unread => Content::Unresolved,
+            Unresolved::PossiblyMacroDeclared => Content::MacroDeclared,
         }
     }
 }

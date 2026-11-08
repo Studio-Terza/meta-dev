@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
+use code_reader::Reader;
 use file_ports::{Bytes, Memory};
-use lint_core::SourceFile;
-use lint_fixtures::{Case, Checks, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
-use lint_layout::Failure;
+use lint_core::{ModelLint, Readout, SourceFile};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_layout::{CrateSource, Crates, Dependencies, Failure, LibraryForm, Name, PackageName, SourceText};
 use lint_no_plaintext::NoPlaintext;
 use lint_placement::Placement;
 
@@ -12,10 +13,95 @@ struct Manifest {
     text: &'static str,
 }
 
+struct Linked {
+    krate: &'static str,
+    package: &'static str,
+}
+
+struct CrateRoot {
+    package: &'static str,
+    form: LibraryForm,
+    text: &'static str,
+    dependencies: &'static [Linked],
+}
+
+const CRATE_ROOTS: [CrateRoot; 12] = [
+    CrateRoot {
+        package: "serde",
+        form: LibraryForm::Rust,
+        text: "crate_root!();\n#[cfg(feature = \"serde_derive\")]\npub use serde_derive::{Deserialize, Serialize};\n",
+        dependencies: &[Linked { krate: "serde_derive", package: "serde_derive" }],
+    },
+    CrateRoot {
+        package: "serde_derive",
+        form: LibraryForm::ProcMacro,
+        text: "#[proc_macro_derive(Serialize, attributes(serde))]\npub fn derive_serialize(input: TokenStream) -> TokenStream {\n    input\n}\n#[proc_macro_derive(Deserialize, attributes(serde))]\npub fn derive_deserialize(input: TokenStream) -> TokenStream {\n    input\n}\n",
+        dependencies: &[],
+    },
+    CrateRoot {
+        package: "thiserror",
+        form: LibraryForm::Rust,
+        text: "compile_error!(\"probe\");\npub use thiserror_impl::*;\ninclude!(concat!(env!(\"OUT_DIR\"), \"/private.rs\"));\n",
+        dependencies: &[Linked { krate: "thiserror_impl", package: "thiserror-impl" }],
+    },
+    CrateRoot {
+        package: "thiserror-impl",
+        form: LibraryForm::ProcMacro,
+        text: "#[proc_macro_derive(Error, attributes(backtrace, error, from, source))]\npub fn derive_error(input: TokenStream) -> TokenStream {\n    input\n}\n",
+        dependencies: &[],
+    },
+    CrateRoot {
+        package: "newtype",
+        form: LibraryForm::Rust,
+        text: "mod boundary;\npub use boundary::{Checked, Newtype, Wrapping, kind};\npub use newtype_derive::{Arbitrary, CheckedDeserialize, Deserialize, Display, Newtype, Serialize};\npub use proptest;\npub use serde;\n",
+        dependencies: &[
+            Linked { krate: "newtype_derive", package: "newtype-derive" },
+            Linked { krate: "serde", package: "serde" },
+        ],
+    },
+    CrateRoot {
+        package: "newtype-derive",
+        form: LibraryForm::ProcMacro,
+        text: "#[proc_macro_derive(Newtype, attributes(newtype))]\npub fn newtype(input: TokenStream) -> TokenStream {\n    input\n}\n",
+        dependencies: &[],
+    },
+    CrateRoot { package: "diesel", form: LibraryForm::Rust, text: "pub mod prelude {}\n", dependencies: &[] },
+    CrateRoot {
+        package: "not-serde",
+        form: LibraryForm::ProcMacro,
+        text: "#[proc_macro_derive(Deserialize)]\npub fn derive_deserialize(input: TokenStream) -> TokenStream {\n    input\n}\n",
+        dependencies: &[],
+    },
+    CrateRoot {
+        package: "facade",
+        form: LibraryForm::Rust,
+        text: "pub use serde::Deserialize;\n",
+        dependencies: &[Linked { krate: "serde", package: "serde" }],
+    },
+    CrateRoot {
+        package: "twice",
+        form: LibraryForm::Rust,
+        text: "pub use serde::Deserialize;\npub use facade::Deserialize;\n",
+        dependencies: &[Linked { krate: "serde", package: "serde" }, Linked { krate: "facade", package: "facade" }],
+    },
+    CrateRoot {
+        package: "globby",
+        form: LibraryForm::Rust,
+        text: "mod inner;\npub use self::inner::*;\n",
+        dependencies: &[],
+    },
+    CrateRoot {
+        package: "loopy",
+        form: LibraryForm::Rust,
+        text: "pub use loopy::Thing;\n",
+        dependencies: &[Linked { krate: "loopy", package: "loopy" }],
+    },
+];
+
 const MANIFESTS: [Manifest; 12] = [
     Manifest {
         path: "Cargo.toml",
-        text: "[package]\nname = \"fixture\"\n[dependencies]\ndiesel = \"2\"\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\nbitflags = \"2\"\n",
+        text: "[package]\nname = \"fixture\"\n[dependencies]\ndiesel = \"2\"\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\nbitflags = \"2\"\nfacade = \"1\"\ntwice = \"1\"\nglobby = \"1\"\nloopy = \"1\"\nunread = \"1\"\n",
     },
     Manifest {
         path: "a/Cargo.toml",
@@ -84,6 +170,8 @@ const BITFLAGS_TYPE: &str = "use serde::Deserialize;\nbitflags::bitflags! {\n   
 const MISSING_BESIDE_MACROS: &str = "mod expanded {\n    use serde::Deserialize;\n    declare!(Present);\n    #[derive(Deserialize)]\n    pub struct A {\n        present: Present,\n        note: String,\n    }\n}\nmod plain {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    pub struct B {\n        missing: Missing,\n    }\n}\n";
 const REEXPORTED_ROOT: &str = "pub use serde;\npub mod de {\n    pub use serde::Deserialize;\n}\n";
 const REEXPORTED_USER: &str = "#[derive(newtype::serde::Deserialize)]\npub struct A {\n    a: String,\n}\n#[derive(newtype::de::Deserialize)]\npub struct B {\n    b: String,\n}\n";
+const REEXPORTING_CRATES: &str = "#[derive(facade::Deserialize)]\npub struct A {\n    a: String,\n}\n#[derive(newtype::serde::Deserialize)]\npub struct B {\n    b: String,\n}\n#[derive(diesel::prelude::Insertable)]\npub struct C {\n    c: String,\n}\n";
+const UNSETTLED_CRATES: &str = "#[derive(unread::Deserialize)]\npub struct A {\n    a: String,\n}\n#[derive(twice::Deserialize)]\npub struct B {\n    b: String,\n}\n#[derive(globby::Thing)]\npub struct C {\n    c: String,\n}\n#[derive(loopy::Thing)]\npub struct D {\n    d: String,\n}\n";
 const LOCAL_STRING: &str =
     "use serde::Deserialize;\nstruct String;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const ALIASED_STRING: &str =
@@ -118,7 +206,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 40] = [
+const CASES: [Case; 42] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_FIELDS))],
@@ -160,10 +248,22 @@ const CASES: [Case; 40] = [
     ),
     Case::new(
         Title::new(
-            "a derive from an external crate's submodule is that crate's, not serde's, even serde's own re-exported there: the known escape #1113",
+            "a derive through an external crate's module is that crate's, and serde's own re-exported by its crate root is serde's",
         ),
         &[Source::new(Located::new("src/lib.rs"), Text::new(SUBMODULE_DERIVES))],
-        Flagged::new(&["src/lib.rs:13"]),
+        Flagged::new(&["src/lib.rs:9", "src/lib.rs:13"]),
+    ),
+    Case::new(
+        Title::new("serde's derive re-exported by a dependency's crate root is serde's, a declared module is not"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(REEXPORTING_CRATES))],
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:7"]),
+    ),
+    Case::new(
+        Title::new(
+            "a derive whose crate root is unread, binds it twice, hides it in an unread glob or re-exports it in a loop is not resolvable",
+        ),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(UNSETTLED_CRATES))],
+        Flagged::new(&["src/lib.rs:1", "src/lib.rs:5", "src/lib.rs:9", "src/lib.rs:13"]),
     ),
     Case::new(
         Title::new("a resolved derive that is not serde's"),
@@ -176,21 +276,21 @@ const CASES: [Case; 40] = [
         Flagged::new(&["src/lib.rs:3", "src/lib.rs:9"]),
     ),
     Case::new(
-        Title::new("a type a macro_rules item may declare is no finding, by name, imported or by path"),
+        Title::new("a type a macro_rules item may declare is declared by a macro, by name, imported or by path"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(MACRO_RULES_TYPE))],
-        Flagged::new(&[]),
+        Flagged::new(&["src/lib.rs:11", "src/lib.rs:18", "src/lib.rs:19"]),
     ),
     Case::new(
-        Title::new("a type a bitflags item may declare is no finding"),
+        Title::new("a type a bitflags item may declare is declared by a macro"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(BITFLAGS_TYPE))],
-        Flagged::new(&[]),
+        Flagged::new(&["src/lib.rs:9"]),
     ),
     Case::new(
         Title::new(
-            "a type missing from a module without item macros is not resolvable, and so is a String an import would settle beside one",
+            "a type beside an item macro is declared by a macro, a String an import would settle beside one and a type missing from a module without item macros are not resolvable",
         ),
         &[Source::new(Located::new("src/lib.rs"), Text::new(MISSING_BESIDE_MACROS))],
-        Flagged::new(&["src/lib.rs:7", "src/lib.rs:14"]),
+        Flagged::new(&["src/lib.rs:6", "src/lib.rs:7", "src/lib.rs:14"]),
     ),
     Case::new(
         Title::new("a glob-imported NaiveDate field and a String beside it are not resolvable"),
@@ -370,6 +470,21 @@ impl Packaged {
         MANIFESTS.iter().map(|manifest| (PathBuf::from(manifest.path), Bytes::from(manifest.text))).collect()
     }
 
+    fn crates() -> Crates {
+        CRATE_ROOTS
+            .iter()
+            .map(|root| {
+                let dependencies: Dependencies = root
+                    .dependencies
+                    .iter()
+                    .map(|linked| (Name::from(linked.krate), PackageName::from(&Name::from(linked.package))))
+                    .collect();
+                let source = CrateSource::new(Some(SourceText::new(root.text.to_owned())), root.form, dependencies);
+                (PackageName::from(&Name::from(root.package)), source)
+            })
+            .collect()
+    }
+
     fn parsed(manifests: &Memory, source: &Source) -> SourceFile {
         let shown = Sources::file(source.path(), source.text());
         let path = source.path().to_path_buf();
@@ -386,12 +501,20 @@ impl Packaged {
 
     fn flagged(cases: &[Case]) -> Vec<String> {
         let manifests = Self::manifests();
+        let crates = Self::crates();
         cases
             .iter()
             .map(|case| {
-                let files: Vec<SourceFile> =
-                    case.sources().iter().map(|source| Self::parsed(&manifests, source)).collect();
-                format!("{} flagged {}", case.name(), Queried::<NoPlaintext>::flagged(&files))
+                let readout = case
+                    .sources()
+                    .iter()
+                    .map(|source| Self::parsed(&manifests, source))
+                    .fold(Readout::default(), Readout::with_file);
+                format!(
+                    "{} flagged {}",
+                    case.name(),
+                    Sources::lines(&NoPlaintext::report(&Reader::read(&readout, &crates)))
+                )
             })
             .collect()
     }

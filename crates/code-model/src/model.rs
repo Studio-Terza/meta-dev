@@ -5,6 +5,7 @@ mod filed;
 
 use crate::boundary::ItemId;
 use crate::call::Call;
+use crate::crate_root::CrateRoots;
 use crate::domain::Domain;
 use crate::function::Function;
 use crate::holding::Holding;
@@ -27,6 +28,7 @@ pub struct Model {
     holdings: Vec<Filed<Holding>>,
     calls: Vec<Filed<Call>>,
     declarations: Declarations,
+    roots: CrateRoots,
 }
 
 #[derive(Debug)]
@@ -118,6 +120,16 @@ impl Model {
     #[must_use]
     pub fn exported(&self, domain: Domain, path: &ItemPath) -> Option<&Resolved> {
         self.declarations.exports().get(&domain).and_then(|paths| paths.get(path))
+    }
+
+    #[must_use]
+    pub fn with_roots(self, roots: CrateRoots) -> Model {
+        Model { roots, ..self }
+    }
+
+    #[must_use]
+    pub fn roots(&self) -> &CrateRoots {
+        &self.roots
     }
 
     #[must_use]

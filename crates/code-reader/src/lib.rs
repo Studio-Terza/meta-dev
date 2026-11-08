@@ -1,20 +1,25 @@
 mod lowering;
 mod namespace;
 mod planting;
+mod root_reading;
 
 use code_model::{Building, Model};
 use lint_core::{Readout, SourceFile};
+use lint_layout::Crates;
 
 use lowering::Lowered;
 use planting::{Listed, Planting, ReadFile};
+use root_reading::RootReading;
 
 #[derive(Debug)]
 pub struct Reader;
 
 impl Reader {
     #[must_use]
-    pub fn read(readout: &Readout) -> Model {
-        Self::read_files(readout.files())
+    pub fn read(readout: &Readout, crates: &Crates) -> Model {
+        let model = Self::read_files(readout.files());
+        let roots = RootReading::read(&model, crates);
+        model.with_roots(roots)
     }
 
     #[must_use]

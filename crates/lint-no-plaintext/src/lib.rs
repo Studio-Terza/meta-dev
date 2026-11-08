@@ -32,6 +32,7 @@ impl<'model> Texted<'model> {
         match self.content {
             Content::Text => Finding::Plain(self.name),
             Content::Unresolved => Finding::UnresolvedType(self.name),
+            Content::MacroDeclared => Finding::MacroDeclaredType(self.name),
         }
     }
 }

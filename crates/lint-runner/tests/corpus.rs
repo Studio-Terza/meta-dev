@@ -3,6 +3,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use lint_runner::Cli;
 use text_lines::Lines;
@@ -85,7 +86,7 @@ impl Corpus {
             .map(|copied| (copied.path, copied.bytes))
             .collect();
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
+        let exit = Cli::from_args(std::iter::empty()).report_to(&root, &Recorded::default(), &mut printed, &mut failed);
         let verdict = Some(exit).filter(|code| *code == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use code_model::{Domain, External, ItemPath, Model, Resolved};
 use lint_layout::{PackageName, Word, words};
@@ -42,9 +42,22 @@ impl Identities {
         Identities { exported: exported.collect(), packaged: packaged.collect() }
     }
 
-    pub(super) fn role(&self, implemented: &Resolved) -> Option<Role> {
-        implemented.known().map_or(Some(Role::Unresolved), |known| {
-            self.exported.get(known).copied().or_else(|| self.packaged(known.external()?))
+    pub(super) fn role(&self, model: &Model, implemented: &Resolved) -> Option<Role> {
+        self.traced(model, implemented, &BTreeSet::new())
+    }
+
+    fn traced(&self, model: &Model, resolved: &Resolved, seen: &BTreeSet<Resolved>) -> Option<Role> {
+        resolved.known().map_or(Some(Role::Unresolved), |known| {
+            self.exported.get(known).copied().or_else(|| self.reexported(model, known.external()?, seen))
+        })
+    }
+
+    fn reexported(&self, model: &Model, external: &External, seen: &BTreeSet<Resolved>) -> Option<Role> {
+        self.packaged(external).or_else(|| {
+            let next = model.roots().followed(external)?;
+            let deeper: BTreeSet<Resolved> =
+                seen.iter().cloned().chain([Resolved::External(external.clone())]).collect();
+            deeper.get(&next).map_or_else(|| self.traced(model, &next, &deeper), |_| Some(Role::Unresolved))
         })
     }
 
