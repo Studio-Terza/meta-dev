@@ -2,7 +2,6 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar::assignment::Emptied;
-use newtype::Wrapping;
 use text_lines::Lines;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -18,9 +17,7 @@ impl FromStr for Skipped {
     type Err = NotSkipped;
 
     fn from_str(line: &str) -> Result<Skipped, NotSkipped> {
-        Emptied::try_from(line)
-            .map(|emptied| Skipped(emptied.into_inner().to_owned()))
-            .map_err(|_unassigned| NotSkipped)
+        line.parse::<Emptied>().map(|emptied| Skipped(emptied.into_inner())).map_err(|_unassigned| NotSkipped)
     }
 }
 

@@ -1,5 +1,7 @@
 use grammar::anchor::Anchoring;
 use grammar::artifact::Artifacts;
+use grammar::assignment::Emptied;
+use grammar::banner::Banner;
 use grammar::cited::Cited;
 use grammar::flag::Flags;
 use grammar::ident::Words;
@@ -10,13 +12,14 @@ use grammar::node::{Ids, Spelled};
 use grammar::notes::{Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
+use grammar::program::Program;
 use grammar::reply::Inked;
 use grammar::search::Term;
 use grammar::search::Terms;
 use grammar::shard::Sharding;
 use grammar::slug::Letters;
 use laws::proptest::collection::vec;
-use laws::proptest::prelude::{Strategy, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 
 struct Marks;
@@ -841,4 +844,32 @@ laws::table!(
         &[" \t"][..] => true,
         &[""][..] => true,
     ]
+);
+
+laws::roundtrip!(
+    a_command_s_program_is_its_first_word_whatever_follows,
+    (any::<Program>(), "[ \t]{0,3}", "([ \t][ -~]{0,20})?"),
+    |(program, lead, rest): &(Program, String, String)| format!("{lead}{}{rest}", program.clone().into_inner()),
+    |text: &String| text.parse::<Program>().ok(),
+    |(program, _lead, _rest): (Program, String, String)| Some(program)
+);
+
+laws::roundtrip!(
+    an_emptied_assignment_reads_back_its_name,
+    any::<Emptied>(),
+    |emptied: &Emptied| format!("{}=", emptied.clone().into_inner()),
+    |text: &String| text.parse::<Emptied>().ok(),
+    Some
+);
+
+laws::law!(
+    a_test_binary_banner_is_labelled_by_its_binary_and_a_doctest_banner_by_its_crate,
+    "[a-z_][a-z0-9_-]{0,12}",
+    name,
+    {
+        let running = format!("     Running unittests src/lib.rs (target/debug/deps/{name})").parse::<Banner>();
+        let documented = format!("   Doc-tests {name}").parse::<Banner>();
+        prop_assert_eq!(running.map(Banner::into_inner), Ok(name.clone()));
+        prop_assert_eq!(documented.map(Banner::into_inner), Ok(format!("doc-{name}")));
+    }
 );

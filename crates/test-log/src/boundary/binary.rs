@@ -17,6 +17,6 @@ impl FromStr for Binary {
     type Err = Unmatched;
 
     fn from_str(line: &str) -> Result<Binary, Unmatched> {
-        Banner::try_from(line).map(|banner| Binary(banner.to_string())).map_err(|_unbannered| Unmatched)
+        line.parse::<Banner>().map(|banner| Binary(banner.into_inner())).map_err(|_unbannered| Unmatched)
     }
 }

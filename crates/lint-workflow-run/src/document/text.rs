@@ -36,12 +36,13 @@ impl<'text> Text<'text> {
             .map(|_| Self::EXPANSION)
     }
 
-    pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Text<'text>> {
-        Program::try_from(self.0)
+    pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Excerpt> {
+        self.0
+            .parse::<Program>()
             .ok()
             .map(Program::into_inner)
             .filter(|word| known.iter().all(|shell| shell.into_inner() != *word))
-            .map(Text)
+            .map(Excerpt::new)
     }
 
     pub(crate) fn count(self) -> Characters {

@@ -22,7 +22,7 @@ use grammar::message::Lexemes;
 use grammar::search::Terms;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
-use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
@@ -1435,14 +1435,20 @@ laws::law!(
         let replied = spawning.reply.as_ref().map(|_reply| RunState::Replied);
         let state = replied.unwrap_or(spawning.state);
         let usage = replied.map_or(spawning.usage, |_replied| Some(spawning.usage.unwrap_or_default()));
-        let kept = spawning.reply.as_ref().map(|reply| {
-            let told = reply.clone().into_inner();
-            let within = (0..=told.len().min(16 * 1024)).rev().find_map(|end| told.get(..end)).unwrap_or_default();
-            Excerpt::new(within.to_owned())
-        });
         prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![state]);
         prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![usage]);
-        prop_assert_eq!(ran.iter().map(|one| one.reply().cloned()).collect::<Vec<Option<Excerpt>>>(), vec![kept]);
+        let told = spawning.reply.map(Reply::into_inner);
+        let kept = ran.first().and_then(Ran::reply).cloned().map(Excerpt::into_inner);
+        prop_assert_eq!(kept.is_some(), told.is_some());
+        let rest: Option<String> =
+            told.as_ref().zip(kept.as_ref()).map(|(whole, part)| whole.chars().skip(part.chars().count()).collect());
+        let rebuilt = kept.as_ref().zip(rest.as_ref()).map(|(part, after)| format!("{part}{after}"));
+        prop_assert_eq!(rebuilt, told);
+        let bytes = kept.as_ref().map_or(0, String::len);
+        prop_assert!(bytes <= 16 * 1024);
+        prop_assert!(
+            rest.and_then(|after| after.chars().next()).is_none_or(|next| bytes + next.len_utf8() > 16 * 1024)
+        );
         let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
         let running = [state].into_iter().filter(|now| *now == RunState::Running).map(|_| RunId::new(1));
         prop_assert_eq!(still, running.collect::<Vec<RunId>>());

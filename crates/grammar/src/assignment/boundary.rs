@@ -1,5 +1,7 @@
+use std::str::FromStr;
+
 use logos::Logos;
-use newtype::Newtype;
+use newtype::{Arbitrary, Checked, Newtype};
 
 use crate::unspelled::Unspelled;
 
@@ -11,17 +13,16 @@ enum Spelling<'text> {
     Assign,
 }
 
-#[derive(Newtype, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Emptied<'text>(&'text str);
-
-impl<'text> Emptied<'text> {
-    fn spelled([name, assign]: [Spelling<'text>; 2]) -> Option<Emptied<'text>> {
-        Some(assign).filter(|spelling| *spelling == Spelling::Assign)?;
-        name.name().map(Emptied)
-    }
-}
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(checked, strategy = "[A-Za-z_][A-Za-z0-9_]{0,12}")]
+pub struct Emptied(String);
 
 impl<'text> Spelling<'text> {
+    fn emptied([name, assign]: [Spelling<'text>; 2]) -> Option<&'text str> {
+        Some(assign).filter(|spelling| *spelling == Spelling::Assign)?;
+        name.name()
+    }
+
     fn name(self) -> Option<&'text str> {
         match self {
             Spelling::Name(name) => Some(name),
@@ -30,15 +31,30 @@ impl<'text> Spelling<'text> {
     }
 }
 
-impl<'text> TryFrom<&'text str> for Emptied<'text> {
+impl Checked for Emptied {
     type Error = Unspelled;
 
-    fn try_from(line: &'text str) -> Result<Emptied<'text>, Unspelled> {
-        let spelled: Result<Vec<Spelling<'text>>, ()> = Spelling::lexer(line).collect();
+    fn checked(name: &String) -> Result<&String, Unspelled> {
+        let spelled: Vec<Result<Spelling<'_>, ()>> = Spelling::lexer(name).collect();
+        <[Result<Spelling<'_>, ()>; 1]>::try_from(spelled)
+            .ok()
+            .and_then(|[only]| only.ok())
+            .and_then(Spelling::name)
+            .map(|_name| name)
+            .ok_or(Unspelled)
+    }
+}
+
+impl FromStr for Emptied {
+    type Err = Unspelled;
+
+    fn from_str(line: &str) -> Result<Emptied, Unspelled> {
+        let spelled: Result<Vec<Spelling<'_>>, ()> = Spelling::lexer(line).collect();
         spelled
             .ok()
-            .and_then(|lexed| <[Spelling<'text>; 2]>::try_from(lexed).ok())
-            .and_then(Emptied::spelled)
+            .and_then(|lexed| <[Spelling<'_>; 2]>::try_from(lexed).ok())
+            .and_then(Spelling::emptied)
             .ok_or(Unspelled)
+            .and_then(|name| Emptied::try_new(name.to_owned()))
     }
 }
