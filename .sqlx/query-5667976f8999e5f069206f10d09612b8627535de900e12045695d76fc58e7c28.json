@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  id,\n  project,\n  facet,\n  stage,\n  provenance,\n  title,\n  role,\n  role_provenance,\n  artifact,\n  condition,\n  reason\nFROM\n  nodes\nWHERE\n  stage != ?1\nORDER BY\n  id\nLIMIT\n  200\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "project",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "project"
+          }
+        }
+      },
+      {
+        "name": "facet",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "facet"
+          }
+        }
+      },
+      {
+        "name": "stage",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "stage"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "role",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "name": "role_provenance",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role_provenance"
+          }
+        }
+      },
+      {
+        "name": "artifact",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "artifact"
+          }
+        }
+      },
+      {
+        "name": "condition",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "condition"
+          }
+        }
+      },
+      {
+        "name": "reason",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "reason"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5667976f8999e5f069206f10d09612b8627535de900e12045695d76fc58e7c28"
+}
