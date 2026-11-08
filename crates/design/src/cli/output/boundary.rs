@@ -17,6 +17,8 @@ use stream::{Relation, Shape};
 use structurer::{Directive, Lapse, Retried, SegmentRef};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
 
+use crate::cli::{Looked, Viewed};
+
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Count(usize);
 
@@ -146,6 +148,7 @@ pub enum Line {
     Retried(Lapsed),
     Flailed(Lapsed),
     FlailedSegment(Flailing),
+    Viewed(Viewed),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -385,13 +388,14 @@ impl fmt::Display for Line {
             Line::Retried(lapsed) => write!(formatter, "{} {lapsed}", Key::Retried),
             Line::Flailed(lapsed) => write!(formatter, "{} {lapsed}", Key::Flailed),
             Line::FlailedSegment(flailing) => write!(formatter, "{} {flailing}", Key::FlailedSegment),
+            Line::Viewed(viewed) => write!(formatter, "{viewed}"),
         }
     }
 }
 
-impl Line {
-    fn read(fields: &mut Fields) -> Result<Line, Unread> {
-        match fields.field::<Word<Key>>()? {
+impl Key {
+    fn line(self, fields: &mut Fields) -> Result<Line, Unread> {
+        match self {
             Key::Session => Ok(Line::Read {
                 session: fields.field::<Quoted<_>>()?,
                 cursor: Cursor::new(Offset::new(fields.past(&[Key::Read, Key::To])?.field::<Integer<_>>()?)),
@@ -488,6 +492,15 @@ impl Line {
             Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
             Key::FlailedSegment => Flailing::read(fields).map(Line::FlailedSegment),
             Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
+        }
+    }
+}
+
+impl Line {
+    fn read(fields: &mut Fields) -> Result<Line, Unread> {
+        match fields.optional::<Word<Looked>>() {
+            Some(looked) => looked.viewed(fields).map(Line::Viewed),
+            None => fields.field::<Word<Key>>().and_then(|key| key.line(fields)),
         }
     }
 

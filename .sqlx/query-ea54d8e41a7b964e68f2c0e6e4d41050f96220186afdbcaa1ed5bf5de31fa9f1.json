@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  current_spans.node AS \"node!: i64\",\n  current_spans.relation AS \"relation!: String\",\n  current_spans.message AS \"message!: String\",\n  current_spans.ordinal AS \"ordinal!: i64\",\n  messages.author,\n  current_spans.provenance AS \"provenance!: String\",\n  segments.body\nFROM\n  current_spans\n  JOIN segments ON segments.message = current_spans.message\n  AND segments.ordinal = current_spans.ordinal\n  JOIN messages ON messages.uuid = current_spans.message\nWHERE\n  current_spans.relation = ?1\nORDER BY\n  current_spans.node,\n  messages.at,\n  current_spans.message,\n  current_spans.ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "node!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "node"
+          }
+        }
+      },
+      {
+        "name": "relation!: String",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "message!: String",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "author",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "author"
+          }
+        }
+      },
+      {
+        "name": "provenance!: String",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ea54d8e41a7b964e68f2c0e6e4d41050f96220186afdbcaa1ed5bf5de31fa9f1"
+}

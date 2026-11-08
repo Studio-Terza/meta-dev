@@ -1,4 +1,5 @@
 mod structure;
+mod view;
 
 use std::collections::BTreeSet;
 use std::ffi::OsString;
@@ -12,10 +13,11 @@ use console_ports::{Heard, Variables};
 
 use design::{
     Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved,
+    Viewed,
 };
 use design_model::{
     AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId, Kin, Node,
-    NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, RunId,
+    NodeEdge, NodeId, NodeRelation, Ordinal, Outline, Prefix, Project, Provenance, Reason, Refining, Role, RunId,
     SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
 };
 use design_store::{
@@ -2133,13 +2135,42 @@ impl Generated {
         .boxed()
     }
 
+    fn viewed() -> BoxedStrategy<Line> {
+        prop_oneof![
+            (
+                (Generated::node(), Generated::project(), select(Facet::VARIANTS), select(Stage::VARIANTS)),
+                (proptest::option::of(Generated::node()), proptest::option::of(Generated::text()))
+            )
+                .prop_map(|((node, project, facet, stage), (parent, title))| Viewed::Outlined(
+                    Outline::new(node, project, facet, stage).parented(parent).titled(title.map(Title::new))
+                )),
+            (
+                (Generated::node(), select(SpanRelation::VARIANTS), Generated::segment()),
+                (Generated::author(), Generated::entered(), Generated::text())
+            )
+                .prop_map(|((node, relation, segment), (author, entered, body))| Viewed::Standing {
+                    node,
+                    relation,
+                    segment,
+                    author,
+                    entered,
+                    body: Body::new(body)
+                }),
+            (Generated::segment(), Generated::text())
+                .prop_map(|(segment, body)| Viewed::Unplaced { segment, body: Body::new(body) }),
+        ]
+        .prop_map(Line::Viewed)
+        .boxed()
+    }
+
     fn line() -> BoxedStrategy<Line> {
         prop_oneof![
             Generated::counted(),
             Generated::shown_node(),
             Generated::shown_message(),
             Generated::applied(),
-            Generated::structured()
+            Generated::structured(),
+            Generated::viewed()
         ]
         .boxed()
     }

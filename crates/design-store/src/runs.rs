@@ -129,6 +129,9 @@ pub struct LiveRuns;
 pub struct Unstructured;
 
 #[derive(Clone, Copy, Debug, Op)]
+pub struct UnplacedSegments;
+
+#[derive(Clone, Copy, Debug, Op)]
 pub struct RunsOf(JobId);
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -164,6 +167,7 @@ pub struct Unreported {
 pub struct Unplaced {
     segment: Segment,
     body: Body,
+    flailed: Option<RunId>,
 }
 
 impl Spawned {

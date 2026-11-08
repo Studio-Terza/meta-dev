@@ -13,7 +13,7 @@ use design_store::{
     JobRepeated, Linked, LiveRuns, NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed, ProjectRoot, Ran,
     Refusal, RelationName, Remit, Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope,
     SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun,
-    StreamSchema, Unseen, Unstructured,
+    StreamSchema, UnplacedSegments, Unseen, Unstructured,
 };
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -1316,7 +1316,7 @@ fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() 
 }
 
 #[test]
-fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and_run_and_lifts_once_structured()
+fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and_run_stays_unplaced_and_lifts_once_structured()
 -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
@@ -1335,9 +1335,12 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
         .map(|flailed| (AsRef::<Segment>::as_ref(flailed).clone(), flailed.run()))
         .collect();
     assert_eq!(Unstructuring::listed(&store)?, Vec::<Segment>::new());
+    let unplaced = store.read(UnplacedSegments)?;
+    assert_eq!(unplaced.iter().map(AsRef::<Segment>::as_ref).collect::<Vec<&Segment>>(), vec![&unstructured]);
     assert_eq!(flailed, vec![(unstructured.clone(), RunId::new(1))]);
     Proposals::written(&store, vec![Directed::Conversational { segment: unstructured }])?;
     assert_eq!(store.read(FlailedSegments)?, Vec::new());
+    assert_eq!(store.read(UnplacedSegments)?, Vec::new());
     Ok(())
 }
 

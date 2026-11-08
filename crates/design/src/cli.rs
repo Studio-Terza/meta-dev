@@ -1,6 +1,7 @@
 mod failure;
 pub(crate) mod output;
 mod request;
+mod viewed;
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -17,6 +18,8 @@ use crate::Outcome;
 pub use failure::{Failure, Unmatched};
 pub use request::Unresolved;
 use request::{Crew, Ground, Kept, Request};
+pub(crate) use viewed::Looked;
+pub use viewed::Viewed;
 
 #[derive(Debug)]
 pub struct Agents<H, C> {

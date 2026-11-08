@@ -96,7 +96,7 @@ pub(crate) struct Quoting<'text, Text: fmt::Display>(&'text Text);
 struct Listed(Choice);
 
 #[derive(Clone, Copy, Debug)]
-struct Outlined<'outline>(&'outline Outline);
+pub struct Outlined<'outline>(&'outline Outline);
 
 impl Rule {
     const OPENING: [Rule; 3] = [Rule::Role, Rule::Reply, Rule::Choose];
@@ -214,7 +214,7 @@ impl fmt::Display for Brief {
             Brief::Segment(said) => {
                 write!(formatter, "{} {} {}", Key::Segment, said.segment(), Quoting::from(said.body()))
             }
-            Brief::Node(outline) => write!(formatter, "{} {}", Key::Node, Outlined(outline)),
+            Brief::Node(outline) => write!(formatter, "{} {}", Key::Node, Outlined::from(outline)),
             Brief::Retry(lapse) => write!(formatter, "{} {}", Key::Retry, Retried::from(lapse)),
         }
     }
@@ -251,7 +251,7 @@ impl Said {
 }
 
 impl Outlined<'_> {
-    fn read(fields: &mut Fields) -> Result<Outline, Unread> {
+    pub fn read(fields: &mut Fields) -> Result<Outline, Unread> {
         let outline = Outline::new(
             fields.field::<Id<_>>()?,
             fields.field::<Phrase<_>>()?,
@@ -281,6 +281,12 @@ impl fmt::Display for Outlined<'_> {
         )?;
         outline.parent().iter().try_for_each(|parent| write!(formatter, " n{}", parent.into_inner()))?;
         outline.title().iter().try_for_each(|title| write!(formatter, " {}", Quoting::from(*title)))
+    }
+}
+
+impl<'outline> From<&'outline Outline> for Outlined<'outline> {
+    fn from(outline: &'outline Outline) -> Outlined<'outline> {
+        Outlined(outline)
     }
 }
 

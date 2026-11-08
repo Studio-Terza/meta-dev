@@ -691,7 +691,6 @@ impl Query for ContextNodes {
     type Rows = Vec<Outline>;
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Outline>, StoreFailure> {
-        let dropped = Stage::Dropped;
         let relation = Closed::Refines;
         let rows = statements.rows(store_ports::query!(
             OutlineRow,
@@ -708,30 +707,17 @@ SELECT
     FROM
       closure
     WHERE
-      closure.relation = ?2
+      closure.relation = ?1
       AND closure.descendant = nodes.id
       AND closure.depth = 1
   ) AS "parent?: i64"
 FROM
   nodes
-WHERE
-  nodes.stage != ?1
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      closure
-      JOIN nodes AS above ON above.id = closure.ancestor
-    WHERE
-      closure.relation = ?2
-      AND closure.descendant = nodes.id
-      AND above.stage = ?1
-  )
+  JOIN live_nodes ON live_nodes.id = nodes.id
 ORDER BY
   nodes.project,
   nodes.id
 "#,
-            dropped: Stage,
             relation: Closed
         ))?;
         Ok(rows.into_iter().map(Outline::from).collect())

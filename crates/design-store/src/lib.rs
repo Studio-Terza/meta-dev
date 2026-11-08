@@ -24,6 +24,7 @@ mod shown_message;
 mod shown_node;
 mod stored;
 mod stream_schema;
+mod views;
 
 pub use acyclic::{Closes, Cycle, Refusal};
 pub use annotation::{Annotation, Remarking};
@@ -44,8 +45,8 @@ use relative::Relative;
 pub use remit::{JobRepeated, Remit, Unpaid};
 pub use runs::{
     FailuresReported, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns,
-    NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unreported,
-    UnreportedFailures, Unstructured,
+    NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
+    UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
 use runs::{JobClosed, JobState};
 pub use scope::Scope;
@@ -56,3 +57,4 @@ pub use shown_message::ShownMessage;
 pub use shown_node::ShownNode;
 pub use stored::Stored;
 pub use stream_schema::StreamSchema;
+pub use views::{CurrentSpans, Uttered};

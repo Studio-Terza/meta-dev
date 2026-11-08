@@ -8,6 +8,7 @@ mod rendering;
 mod search;
 mod structure;
 mod subject;
+mod view;
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -34,6 +35,7 @@ use search::Search;
 pub use structure::Crew;
 use structure::Structure;
 use subject::Subject;
+use view::View;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
@@ -46,6 +48,7 @@ pub enum Command {
     Recast(Recast),
     Structure,
     Hook(Hook),
+    View(View),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +62,7 @@ pub enum Verb {
     Role,
     Structure,
     Hook,
+    View,
 }
 
 impl FromStr for Verb {
@@ -70,7 +74,7 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 12] = [
+    const NAMED: [(&'static str, Verb); 13] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
@@ -83,6 +87,7 @@ impl Verb {
         ("role", Verb::Role),
         ("structure", Verb::Structure),
         ("hook", Verb::Hook),
+        ("view", Verb::View),
     ];
 
     pub fn options(self) -> &'static [Flag] {
@@ -93,9 +98,12 @@ impl Verb {
             Verb::Move(Moving::Specify) => &[Flag::Valued(Valued::Artifact), Flag::Valued(Valued::Condition)],
             Verb::Move(Moving::Drop) => &[Flag::Valued(Valued::Reason)],
             Verb::Hook => &[Flag::Settings],
-            Verb::Show | Verb::Apply | Verb::Move(Moving::Refine | Moving::Reopen) | Verb::Role | Verb::Structure => {
-                &[]
-            }
+            Verb::Show
+            | Verb::Apply
+            | Verb::Move(Moving::Refine | Moving::Reopen)
+            | Verb::Role
+            | Verb::Structure
+            | Verb::View => &[],
         }
     }
 
@@ -119,6 +127,7 @@ impl Verb {
                 .map_err(|_count| Failure::Usage)
                 .and_then(|[token]| token.hook())
                 .map(Command::Hook),
+            Verb::View => View::read(rest).map(Command::View),
         }
     }
 }
@@ -134,7 +143,8 @@ impl Command {
             | Command::Move(_)
             | Command::Recast(_)
             | Command::Structure
-            | Command::Hook(_) => opened(path),
+            | Command::Hook(_)
+            | Command::View(_) => opened(path),
         }
     }
 
@@ -166,6 +176,7 @@ impl Command {
                 Structure::new(ground.store(), crew).worked().and_then(|structured| structured.reported(out))
             }
             Command::Hook(hook) => hook.answered(environment, ground, crew, out),
+            Command::View(view) => view.written(&ground, out),
         }
     }
 }

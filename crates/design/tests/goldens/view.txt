@@ -1,0 +1,17 @@
+design view outline
+outline n1 "demo" project vague
+outline n2 "demo" feature vague n1 "kept"
+outline n3 "demo" feature vague n2 "detail"
+outline n4 "demo" feature vague n1 "older"
+outline n5 "demo" feature vague n1 "newer"
+design view outline n2
+outline n2 "demo" feature vague n1 "kept"
+outline n3 "demo" feature vague n2 "detail"
+design view current-decision
+standing n2 decides aaaaaaaa-0000-4000-8000-000000000003.0 owner entered apply "1. yes"
+design view open-questions
+standing n3 questions aaaaaaaa-0000-4000-8000-000000000003.1 owner entered apply "2. no"
+standing n5 questions aaaaaaaa-0000-4000-8000-000000000003.1 owner entered apply "2. no"
+design view unplaced
+unplaced aaaaaaaa-0000-4000-8000-000000000001.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
+unplaced aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
