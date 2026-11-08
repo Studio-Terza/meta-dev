@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod acyclic;
 mod annotation;
 mod applied_file;

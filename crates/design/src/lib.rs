@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod cli;
 mod hook_event;
 mod outcome;
