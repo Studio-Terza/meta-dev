@@ -21,11 +21,12 @@ impl EndedRow {
             EndedRow,
             r#"
 SELECT
-  ending
+  notes_endings.ending
 FROM
   notes_endings
+  JOIN nodes ON nodes.id = notes_endings.node
 WHERE
-  project = ?1
+  nodes.project = ?1
 "#,
             project: Project
         ))?;

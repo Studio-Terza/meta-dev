@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  notes_endings (node, ending)\nVALUES\n  (?1, ?2)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "29de0b8d74439970b75b54480f2163f2a7458562d77afe3271d37a503b859050"
+}

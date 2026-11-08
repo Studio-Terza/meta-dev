@@ -19,7 +19,8 @@ use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid}
 
 use crate::cli::Viewed;
 use crate::cli::count::Count;
-use crate::cli::noted::Noted;
+use crate::cli::noted::{Note, Noted};
+use crate::cli::viewed::Seen;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
@@ -252,22 +253,6 @@ pub(crate) enum Key {
     Flailed,
     #[name("flailed-segment")]
     FlailedSegment,
-    #[name("outline")]
-    Outline,
-    #[name("standing")]
-    Standing,
-    #[name("unplaced")]
-    Unplaced,
-    #[name("imported")]
-    Imported,
-    #[name("unresolved")]
-    Unresolved,
-    #[name("unanchored")]
-    Unanchored,
-    #[name("reconciled")]
-    Reconciled,
-    #[name("cites")]
-    Cites,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -412,7 +397,17 @@ impl fmt::Display for Line {
 
 impl Line {
     fn read(fields: &mut Fields) -> Result<Line, Unread> {
-        match fields.field::<Word<Key>>()? {
+        fields
+            .optional::<Word<Seen>>()
+            .map(|seen| Viewed::read(seen, fields).map(Line::Viewed))
+            .or_else(|| fields.optional::<Word<Note>>().map(|note| Noted::read(note, fields).map(Line::Noted)))
+            .unwrap_or_else(|| fields.field::<Word<Key>>().and_then(|key| key.line(fields)))
+    }
+}
+
+impl Key {
+    fn line(self, fields: &mut Fields) -> Result<Line, Unread> {
+        match self {
             Key::Session => Ok(Line::Read {
                 session: fields.field::<Quoted<_>>()?,
                 cursor: Cursor::new(Offset::new(fields.past(&[Key::Read, Key::To])?.field::<Integer<_>>()?)),
@@ -508,11 +503,12 @@ impl Line {
             Key::Retried => Lapsed::read(fields).map(Line::Retried),
             Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
             Key::FlailedSegment => Flailing::read(fields).map(Line::FlailedSegment),
-            key @ (Key::Outline | Key::Standing | Key::Unplaced) => Viewed::read(key, fields).map(Line::Viewed),
-            noted => Noted::read(noted, fields).map(Line::Noted),
+            Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
         }
     }
+}
 
+impl Line {
     fn quoted(text: &impl fmt::Display) -> String {
         Fields::quoting(&text.to_string())
     }

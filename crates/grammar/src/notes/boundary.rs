@@ -21,7 +21,13 @@ enum Lexeme {
     #[regex(r"#+[ \t]+")]
     Hash,
     #[token("-")]
-    Dash,
+    #[token("*")]
+    #[token("+")]
+    Bullet,
+    #[token("**")]
+    Emphasis,
+    #[token(":")]
+    Colon,
     #[token("RULING")]
     Ruling,
     #[token("LEAD")]
@@ -258,7 +264,12 @@ impl Opening {
 
 impl Kind {
     fn opened(lexed: &[Lexed<'_>]) -> Kind {
-        lexed.iter().find_map(|lexed| lexed.lexeme.map_or(Some(Kind::Remark), Lexeme::kind)).unwrap_or(Kind::Remark)
+        let before = iter::once(None).chain(lexed.iter().map(|lexed| lexed.lexeme));
+        lexed
+            .iter()
+            .zip(before)
+            .find_map(|(lexed, before)| lexed.lexeme.map_or(Some(Kind::Remark), |lexeme| lexeme.kind(before)))
+            .unwrap_or(Kind::Remark)
     }
 
     fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
@@ -288,9 +299,10 @@ impl Entry {
 }
 
 impl Lexeme {
-    fn kind(self) -> Option<Kind> {
+    fn kind(self, before: Option<Lexeme>) -> Option<Kind> {
         match self {
-            Lexeme::Dash | Lexeme::Date | Lexeme::Space => None,
+            Lexeme::Bullet | Lexeme::Emphasis | Lexeme::Date | Lexeme::Space => None,
+            Lexeme::Colon => (before != Some(Lexeme::Date)).then_some(Kind::Remark),
             Lexeme::Ruling => Some(Kind::Ruling),
             Lexeme::Lead => Some(Kind::Lead),
             Lexeme::Hash
@@ -309,7 +321,9 @@ impl<'text> Lexed<'text> {
         match self.lexeme {
             Some(Lexeme::Hash) => Opening::Heading,
             Some(
-                Lexeme::Dash
+                Lexeme::Bullet
+                | Lexeme::Emphasis
+                | Lexeme::Colon
                 | Lexeme::Ruling
                 | Lexeme::Lead
                 | Lexeme::Open
@@ -330,7 +344,9 @@ impl<'text> Lexed<'text> {
             Some(Lexeme::Double) => Step::quoted(rest),
             Some(
                 Lexeme::Hash
-                | Lexeme::Dash
+                | Lexeme::Bullet
+                | Lexeme::Emphasis
+                | Lexeme::Colon
                 | Lexeme::Ruling
                 | Lexeme::Lead
                 | Lexeme::Open
@@ -388,7 +404,9 @@ impl Piece {
             Some(Lexeme::Date) => Piece::Dated(Date::new(lexed.text.to_owned())),
             Some(
                 Lexeme::Hash
-                | Lexeme::Dash
+                | Lexeme::Bullet
+                | Lexeme::Emphasis
+                | Lexeme::Colon
                 | Lexeme::Ruling
                 | Lexeme::Lead
                 | Lexeme::Open

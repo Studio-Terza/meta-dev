@@ -66,7 +66,8 @@ struct Entries;
 #[derive(Debug)]
 struct Drafted {
     line: NotesLine,
-    node: NodeId,
+    node: Node<Vague>,
+    parent: NodeId,
     directed: Vec<Directed>,
     misses: Vec<Missed>,
     ruled: Ruled,
@@ -201,7 +202,7 @@ impl<S: Store> Sheet<'_, S> {
         let tally = Census::counted(&draft.drafted);
         let lines: Vec<Line> = draft.drafted.iter().flat_map(|drafted| drafted.lines(Landing::Written)).collect();
         let imported = draft.drafted.into_iter().map(Drafted::imported).collect();
-        self.store.write(Imports::new(self.project.clone(), draft.ending, imported))?;
+        self.store.write(Imports::new(draft.ending, imported))?;
         let nodes = Count::new(self.store.read(ImportedNotes::from(self.project.clone()))?.len());
         Ok(tally.reconciled(nodes, lines))
     }
@@ -348,12 +349,12 @@ impl Taking<'_> {
     fn entered(self, line: &notes::Line, entry: &notes::Entry, voice: Voice) -> Draft {
         let parent = self.draft.section;
         let node = self.node(parent, line);
-        let id = node.identity();
-        let Findings { directed, misses, anchors } = self.heard.resolved(entry, id, voice);
+        let Findings { directed, misses, anchors } = self.heard.resolved(entry, node.identity(), voice);
         let drafted = Drafted {
             line: NotesLine::new(line.number()),
-            node: id,
-            directed: [Directed::Proposed { node, parent: parent.node }].into_iter().chain(directed).collect(),
+            node,
+            parent: parent.node,
+            directed,
             misses,
             ruled: voice.judged(anchors),
         };
@@ -415,14 +416,14 @@ impl Draft {
 
 impl Drafted {
     fn lines(&self, landing: Landing) -> Vec<Line> {
-        let imported = landing.imported(self.line, self.node);
+        let imported = landing.imported(self.line, self.node.identity());
         let unresolved = self.misses.iter().map(|missed| missed.line(self.line));
         let unanchored = landing.unanchored(self.line, self.ruled);
         imported.into_iter().chain(unresolved).chain(unanchored).map(Line::Noted).collect()
     }
 
     fn imported(self) -> Imported {
-        Imported::new(Provenance::Import(self.line), self.directed)
+        Imported::new(Provenance::Import(self.line), self.node, self.parent, self.directed)
     }
 }
 

@@ -375,7 +375,7 @@ laws::table!(
     ]
 );
 
-const NOTED: &str = "(- |-|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
+const NOTED: &str = "(- |-|\\* |\\*|\\*\\*|\\+ |\\+|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
 
 const INKED: &str =
     "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
@@ -405,7 +405,15 @@ laws::law!(
 laws::law!(
     a_double_quote_keeps_its_contractions_and_possessives_and_the_line_keeps_the_kind_its_opening_word_gives,
     (
-        select(vec![("RULING ", "ruling"), ("- RULING ", "ruling"), ("- LEAD ", "lead"), ("Lead ", "remark")]),
+        select(vec![
+            ("RULING ", "ruling"),
+            ("- RULING ", "ruling"),
+            ("* RULING ", "ruling"),
+            ("+ **RULING** ", "ruling"),
+            ("- LEAD ", "lead"),
+            ("**LEAD** ", "lead"),
+            ("Lead ", "remark"),
+        ]),
         "[a-z]{1,6}('s|s'|n't)?( '?[a-z]{1,6}('s|s'|n't)?'?){0,3}",
         "( '?[a-z]{1,6}('s|s'|n't)?'?){0,4}",
     ),
@@ -550,7 +558,7 @@ impl Reading for Named {
 }
 
 laws::table!(
-    a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_word_after_any_bullet_date_and_space,
+    a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_word_after_any_bullet_emphasis_dated_colon_and_space,
     |text: &&str| Line::read(1, text).read_by(Shaped),
     [
         "" => "layout",
@@ -587,6 +595,17 @@ laws::table!(
         "- 2026-11-08 lead: the beds are dug" => "remark",
         " RULING (owner): indented" => "ruling",
         "- 2026-11-06 RULING (owner, 'yes'): we don't change Ann's plan" => "ruling",
+        "* RULING (owner): starred" => "ruling",
+        "+ RULING (owner): plussed" => "ruling",
+        "**RULING** (owner): bold" => "ruling",
+        "*RULING*: leaning" => "ruling",
+        "2026-11-05: RULING (owner): dated" => "ruling",
+        "- 2026-11-05: **RULING** (owner): every prefix" => "ruling",
+        "+ **LEAD** 2026-11-08: the beds are dug" => "lead",
+        ": RULING (owner): a bare colon" => "remark",
+        "2026-11-05 : RULING (owner): a spaced colon" => "remark",
+        "* note: RULING aside" => "remark",
+        "**Lead**: the beds are dug" => "remark",
     ]
 );
 
