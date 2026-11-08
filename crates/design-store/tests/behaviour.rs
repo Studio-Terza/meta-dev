@@ -961,7 +961,11 @@ impl Mixed {
         self.edges
             .iter()
             .zip(files)
-            .map(|(edge, file)| Ok(ends.linked(&store, *edge, file)??))
+            .map(|(edge, file)| {
+                Ok(ends.linked(&store, *edge, file)?.or_else(|refusal| {
+                    matches!(refusal, Refusal::Ancestral { .. }).then_some(Written::zero()).ok_or(refusal)
+                })?)
+            })
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         (0..self.dag.facets.len())
             .map(|node| {
@@ -1054,9 +1058,11 @@ impl Staging {
     fn misstaged(refusal: Refusal) -> Result<Misstaged, Box<dyn Error>> {
         match refusal {
             Refusal::Misstaged(misstaged) => Ok(misstaged),
-            other @ (Refusal::Cyclic(_) | Refusal::Inverted(_) | Refusal::Unpaid(_) | Refusal::Store(_)) => {
-                Err(other.into())
-            }
+            other @ (Refusal::Cyclic(_)
+            | Refusal::Ancestral { .. }
+            | Refusal::Inverted(_)
+            | Refusal::Unpaid(_)
+            | Refusal::Store(_)) => Err(other.into()),
         }
     }
 }

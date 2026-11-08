@@ -112,6 +112,7 @@ impl From<Refusal> for Failure {
     fn from(refusal: Refusal) -> Failure {
         match refusal {
             Refusal::Cyclic(cycle) => Failure::Unresolved(Unresolved::from(cycle)),
+            Refusal::Ancestral { old, by } => Failure::Unresolved(Unresolved::Ancestral { old, by }),
             Refusal::Inverted(inversion) => Failure::Inverted { edge: inversion.edge() },
             Refusal::Misstaged(misstaged) => Failure::from(misstaged),
             Refusal::Unpaid(unpaid) => Failure::from(unpaid),

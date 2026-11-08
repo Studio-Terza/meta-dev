@@ -247,9 +247,32 @@ impl Linked {
             NodeRelation::Refines => Closing::<Refines>::new(self.source.0, self.target.0)
                 .written(statements, |edged| upheld.inserted(edged)),
             NodeRelation::Supersedes => Closing::<Supersedes>::new(self.source.0, self.target.0)
-                .written(statements, |edged| upheld.inserted(edged)),
+                .written(statements, |edged| Ok::<Written, Refusal>(self.succeeding(upheld, edged)?.inserted(edged)?)),
             NodeRelation::Consumes => Ok(upheld.inserted(statements)?),
         }
+    }
+
+    fn succeeding(self, upheld: EdgeColumns, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {
+        let relation = Closed::Refines;
+        let old = self.target.0;
+        let by = self.source.0;
+        let lineage = statements.rows(store_ports::query!(
+            IdRow,
+            r#"
+SELECT
+  descendant AS id
+FROM
+  closure
+WHERE
+  relation = ?1
+  AND ancestor = ?2
+  AND descendant = ?3
+"#,
+            relation: Closed,
+            old: NodeId,
+            by: NodeId
+        ))?;
+        lineage.into_iter().next().map_or(Ok(upheld), |_descended| Err(Refusal::Ancestral { old, by }))
     }
 
     fn upheld(self, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {

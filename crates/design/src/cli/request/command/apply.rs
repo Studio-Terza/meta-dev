@@ -48,6 +48,8 @@ pub enum Unresolved {
         to.into_inner()
     )]
     Cyclic { from: NodeId, relation: NodeRelation, to: NodeId },
+    #[error("n{} cannot supersede n{}, which it refines, directly or through a chain", by.into_inner(), old.into_inner())]
+    Ancestral { old: NodeId, by: NodeId },
     #[error("segment {0} cannot be linked to itself")]
     Looped(SegmentRef),
     #[error(

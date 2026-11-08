@@ -1070,7 +1070,7 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     let answer = Applying::answer(0);
     let directives = [
         "propose(new x, refines(n1), feature, \"a\")".to_owned(),
-        "propose(new y, refines(x), feature, \"b\")".to_owned(),
+        "propose(new y, refines(n1), feature, \"b\")".to_owned(),
         "supersede(x, by(y))".to_owned(),
         format!("place({answer}, y, defines)"),
         format!("sense({answer}, decision, specific, firm, explicit)"),
@@ -1090,7 +1090,7 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     let node = applying.run(&["show", "n3"])?;
     let wanted = [
         "n3 \"demo\" feature vague core entered apply \"b\"",
-        "  edge n3 refines n2 entered apply",
+        "  edge n3 refines n1 entered apply",
         "  edge n3 supersedes n2 entered apply",
     ];
     assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());

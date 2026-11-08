@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use design::{Failure, Line, Viewed};
+use design::{Failure, Line, Unresolved, Viewed};
 use design_model::{Ending, NodeId, Segment};
 use design_store::{StreamSchema, Unstructured};
 use laws::proptest::prelude::prop_assert_eq;
@@ -41,6 +41,7 @@ enum Assent {
     Corrected,
     Replaced,
     Inherited,
+    Ancestral,
     Dropped,
     Orphaned,
     Mentioned,
@@ -56,6 +57,7 @@ enum Asking {
     Referred,
     Replaced,
     Inherited,
+    Ancestral,
     Dropped,
     Orphaned,
     Led,
@@ -83,7 +85,14 @@ impl Viewing {
     fn listed(view: &str, files: &[String], dropped: &[&str]) -> Option<Vec<NodeId>> {
         let applying = Applying::ready().ok()?;
         applying.applied(PLANTED).ok()?;
-        files.iter().try_for_each(|file| applying.applied(file).map(drop)).ok()?;
+        files
+            .iter()
+            .try_for_each(|file| {
+                applying.applied(file).map(drop).or_else(|failure| {
+                    matches!(failure, Failure::Unresolved(Unresolved::Ancestral { .. })).then_some(()).ok_or(failure)
+                })
+            })
+            .ok()?;
         dropped.iter().try_for_each(|node| applying.run(&["drop", node, "--reason", "gone"]).map(drop)).ok()?;
         let lines = Spread::parsed(&applying.run(&["view", view]).ok()?);
         Some(lines.iter().filter_map(Viewing::node).collect())
@@ -116,6 +125,7 @@ impl Assent {
             Assent::Corrected => vec![format!("{DECIDED}\n{STATED}"), format!("link({OTHER}, {OWNER}, corrects)")],
             Assent::Replaced => vec![format!("{DECIDED}\n{STATED}"), "supersede(n3, by(n4))".to_owned()],
             Assent::Inherited => vec![format!("{DECIDED}\n{STATED}"), "supersede(n2, by(n4))".to_owned()],
+            Assent::Ancestral => vec![format!("{DECIDED}\n{STATED}"), "supersede(n2, by(n3))".to_owned()],
             Assent::Mentioned => vec![format!("place({OWNER}, n3, mentions)\n{STATED}")],
             Assent::Led => {
                 vec![format!("place({LEAD}, n3, decides)\nsense({LEAD}, decision, specific, firm, explicit)")]
@@ -136,6 +146,7 @@ impl Assent {
             | Assent::Corrected
             | Assent::Replaced
             | Assent::Inherited
+            | Assent::Ancestral
             | Assent::Mentioned
             | Assent::Led => &[],
         }
@@ -159,6 +170,7 @@ laws::table!(
         Assent::Corrected => Some(vec![]),
         Assent::Replaced => Some(vec![]),
         Assent::Inherited => Some(vec![]),
+        Assent::Ancestral => Some(vec![NodeId::new(3)]),
         Assent::Dropped => Some(vec![]),
         Assent::Orphaned => Some(vec![]),
         Assent::Mentioned => Some(vec![]),
@@ -176,6 +188,7 @@ impl Asking {
             Asking::Referred => vec![ASKED.to_owned(), format!("link({OWNER}, {OTHER}, refers-to)")],
             Asking::Replaced => vec![ASKED.to_owned(), "supersede(n3, by(n4))".to_owned()],
             Asking::Inherited => vec![ASKED.to_owned(), "supersede(n2, by(n4))".to_owned()],
+            Asking::Ancestral => vec![ASKED.to_owned(), "supersede(n2, by(n3))".to_owned()],
             Asking::Led => vec![format!("place({LEAD}, n3, questions)")],
         }
     }
@@ -191,6 +204,7 @@ impl Asking {
             | Asking::Referred
             | Asking::Replaced
             | Asking::Inherited
+            | Asking::Ancestral
             | Asking::Led => &[],
         }
     }
@@ -211,6 +225,7 @@ laws::table!(
         Asking::Referred => Some(vec![NodeId::new(3)]),
         Asking::Replaced => Some(vec![]),
         Asking::Inherited => Some(vec![]),
+        Asking::Ancestral => Some(vec![NodeId::new(3)]),
         Asking::Dropped => Some(vec![]),
         Asking::Orphaned => Some(vec![]),
         Asking::Led => Some(vec![NodeId::new(3)]),
