@@ -7,7 +7,7 @@ use grammar::line::Unbroken;
 use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
-use grammar::notes::{Entry, Line, Notes, Reading};
+use grammar::notes::{Entry, Layout, Line, Notes, Reading};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
 use grammar::reply::Inked;
@@ -15,7 +15,7 @@ use grammar::search::Term;
 use grammar::search::Terms;
 use grammar::slug::Letters;
 use laws::proptest::collection::vec;
-use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::prelude::{Strategy, prop_assert_eq, prop_oneof};
 
 struct Marks;
 
@@ -376,7 +376,10 @@ laws::table!(
 
 const NOTED: &str = "(- |-|# |#|RULING|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,6}| |\t|[.,;~é]){0,14}";
 
-const INKED: &str = "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]|[ \t]{1,3}";
+const INKED: &str =
+    "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
+
+const LAID: &str = "[ \t]{0,3}";
 
 laws::law!(a_notes_line_is_rendered_back_to_its_exact_text, NOTED, text, {
     prop_assert_eq!(Line::read(1, &text).to_string(), text);
@@ -388,22 +391,20 @@ laws::law!(a_notes_file_is_rendered_back_to_its_exact_text, vec(NOTED, 0..8), li
 });
 
 laws::law!(
-    the_inked_lines_of_a_notes_file_gathered_by_number_give_the_file_back,
-    vec(laws::proptest::option::of(INKED), 0..8),
+    the_content_lines_of_a_notes_file_gathered_by_number_give_the_file_back_with_layout_lines_empty,
+    vec(prop_oneof![INKED.prop_map(|text| (text.clone(), text)), LAID.prop_map(|text| (text, String::new())),], 0..8),
     lines,
     {
-        let text: String = lines
-            .into_iter()
-            .chain([Some("x".to_owned())])
-            .flat_map(|line| [line.unwrap_or_default(), "\n".to_owned()])
-            .collect();
-        let inked = Notes::read(&text)
+        let lines: Vec<(String, String)> = lines.into_iter().chain([("x".to_owned(), "x".to_owned())]).collect();
+        let text: String = lines.iter().flat_map(|(line, _laid)| [line.as_str(), "\n"]).collect();
+        let laid: String = lines.iter().flat_map(|(_line, laid)| [laid.as_str(), "\n"]).collect();
+        let content = Notes::read(&text)
             .lines()
             .iter()
-            .filter(|line| line.read_by(Shaped) != "blank")
+            .filter(|line| line.read_by(Shaped) != "layout")
             .map(|line| Line::read(line.number(), &line.to_string()))
             .collect::<Vec<Line>>();
-        prop_assert_eq!(Notes::gathered(inked).to_string(), text);
+        prop_assert_eq!(Notes::gathered(content).to_string(), laid);
     }
 );
 
@@ -413,8 +414,8 @@ struct Shaped;
 impl Reading for Shaped {
     type Output = &'static str;
 
-    fn blank(self, _line: &Line) -> &'static str {
-        "blank"
+    fn layout(self, _line: &Line, _layout: &Layout) -> &'static str {
+        "layout"
     }
 
     fn heading(self, _line: &Line) -> &'static str {
@@ -446,7 +447,7 @@ impl Named {
 impl Reading for Named {
     type Output = [Vec<String>; 3];
 
-    fn blank(self, _line: &Line) -> [Vec<String>; 3] {
+    fn layout(self, _line: &Line, _layout: &Layout) -> [Vec<String>; 3] {
         Default::default()
     }
 
@@ -464,11 +465,15 @@ impl Reading for Named {
 }
 
 laws::table!(
-    a_notes_line_is_blank_a_heading_or_an_entry_and_an_entry_rules_when_its_head_says_ruling,
+    a_notes_line_is_layout_a_heading_or_an_entry_and_an_entry_rules_when_its_head_says_ruling,
     |text: &&str| Line::read(1, text).read_by(Shaped),
     [
-        "" => "blank",
-        "  \t" => "remark",
+        "" => "layout",
+        "  \t" => "layout",
+        " " => "layout",
+        "\t" => "layout",
+        " x" => "remark",
+        "\t# Notes" => "remark",
         "# Notes" => "heading",
         "## Later notes (RULING)" => "heading",
         "#443 merged" => "remark",

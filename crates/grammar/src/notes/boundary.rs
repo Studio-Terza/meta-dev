@@ -3,10 +3,12 @@ use std::fmt;
 
 use logos::Logos;
 
-use super::{Cite, Date, Quote};
+use super::{Cite, Date, Layout, Quote};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
+    #[regex(r"[ \t]+", priority = 3)]
+    Layout,
     #[regex(r"[^\n]+", allow_greedy = true)]
     Text,
     #[token("\n")]
@@ -43,7 +45,7 @@ enum Lexeme {
 pub trait Reading {
     type Output;
 
-    fn blank(self, line: &Line) -> Self::Output;
+    fn layout(self, line: &Line, layout: &Layout) -> Self::Output;
 
     fn heading(self, line: &Line) -> Self::Output;
 
@@ -102,7 +104,12 @@ pub struct Entry {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Form {
-    Blank,
+    Layout(Layout),
+    Content(Content),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Content {
     Heading(Heading),
     Entry(Entry),
 }
@@ -143,7 +150,9 @@ impl Notes {
         let last = numbered.keys().next_back().copied().unwrap_or_default();
         Notes(
             (1..=last)
-                .map(|number| numbered.get(&number).cloned().unwrap_or(Line { number, form: Form::Blank }))
+                .map(|number| {
+                    numbered.get(&number).cloned().unwrap_or(Line { number, form: Form::Layout(Layout::default()) })
+                })
                 .collect(),
         )
     }
@@ -158,7 +167,7 @@ impl<'text> Rows<'text> {
     fn taking(self, row: Result<Row, ()>, slice: &'text str) -> Rows<'text> {
         match row {
             Ok(Row::Break) => self.closed(),
-            Ok(Row::Text) | Err(()) => Rows { open: Some(slice), ..self },
+            Ok(Row::Layout | Row::Text) | Err(()) => Rows { open: Some(slice), ..self },
         }
     }
 
@@ -178,11 +187,10 @@ impl<'text> Rows<'text> {
 impl Line {
     #[must_use]
     pub fn read(number: usize, text: &str) -> Line {
-        let lexed: Vec<Lexed<'_>> = Lexeme::lexer(text)
-            .spanned()
-            .map(|(lexeme, range)| Lexed { lexeme: lexeme.ok(), text: text.get(range).unwrap_or_default() })
-            .collect();
-        Line { number, form: Form::opened(&lexed) }
+        Line {
+            number,
+            form: Row::lexer(text).next().map_or(Form::Layout(Layout::default()), |row| Form::read(row, text)),
+        }
     }
 
     #[must_use]
@@ -192,24 +200,41 @@ impl Line {
 
     pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Reader::Output {
         match &self.form {
-            Form::Blank => reader.blank(self),
-            Form::Heading(_) => reader.heading(self),
-            Form::Entry(entry) => entry.kind().reading(reader, self, entry),
+            Form::Layout(layout) => reader.layout(self, layout),
+            Form::Content(Content::Heading(_)) => reader.heading(self),
+            Form::Content(Content::Entry(entry)) => entry.kind().reading(reader, self, entry),
         }
     }
 }
 
 impl Form {
-    fn opened(lexed: &[Lexed<'_>]) -> Form {
-        lexed.split_first().map_or(Form::Blank, |(first, rest)| first.opening().form(*first, rest, lexed))
+    fn read(row: Result<Row, ()>, text: &str) -> Form {
+        match row {
+            Ok(Row::Layout) => Form::Layout(Layout::new(text.to_owned())),
+            Ok(Row::Text | Row::Break) | Err(()) => Form::Content(Content::read(text)),
+        }
+    }
+}
+
+impl Content {
+    fn read(text: &str) -> Content {
+        let lexed: Vec<Lexed<'_>> = Lexeme::lexer(text)
+            .spanned()
+            .map(|(lexeme, range)| Lexed { lexeme: lexeme.ok(), text: text.get(range).unwrap_or_default() })
+            .collect();
+        lexed
+            .split_first()
+            .map_or(Content::Entry(Entry::read(&lexed)), |(first, rest)| first.opening().content(*first, rest, &lexed))
     }
 }
 
 impl Opening {
-    fn form(self, first: Lexed<'_>, rest: &[Lexed<'_>], lexed: &[Lexed<'_>]) -> Form {
+    fn content(self, first: Lexed<'_>, rest: &[Lexed<'_>], lexed: &[Lexed<'_>]) -> Content {
         match self {
-            Opening::Heading => Form::Heading(Heading { marker: first.text.to_owned(), title: Pieces::gathered(rest) }),
-            Opening::Prose => Form::Entry(Entry::read(lexed)),
+            Opening::Heading => {
+                Content::Heading(Heading { marker: first.text.to_owned(), title: Pieces::gathered(rest) })
+            }
+            Opening::Prose => Content::Entry(Entry::read(lexed)),
         }
     }
 }
@@ -376,9 +401,17 @@ impl fmt::Display for Line {
 impl fmt::Display for Form {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Form::Blank => Ok(()),
-            Form::Heading(heading) => write!(formatter, "{heading}"),
-            Form::Entry(entry) => write!(formatter, "{entry}"),
+            Form::Layout(layout) => write!(formatter, "{layout}"),
+            Form::Content(content) => write!(formatter, "{content}"),
+        }
+    }
+}
+
+impl fmt::Display for Content {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Content::Heading(heading) => write!(formatter, "{heading}"),
+            Content::Entry(entry) => write!(formatter, "{entry}"),
         }
     }
 }

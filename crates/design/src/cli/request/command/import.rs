@@ -10,7 +10,7 @@ use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
 };
 use file_ports::{Files, Text};
-use grammar::notes::{self, Cite, Date, Notes, Quote, Reading};
+use grammar::notes::{self, Cite, Date, Layout, Notes, Quote, Reading};
 use newtype::{Counter, Newtype};
 use store_ports::Store;
 use transcript_ports::{Authorship, Uuid};
@@ -302,7 +302,7 @@ impl<Found> Sought<Found> {
 impl Reading for Entries {
     type Output = Option<notes::Entry>;
 
-    fn blank(self, _line: &notes::Line) -> Option<notes::Entry> {
+    fn layout(self, _line: &notes::Line, _layout: &Layout) -> Option<notes::Entry> {
         None
     }
 
@@ -344,7 +344,7 @@ impl Taking<'_> {
 impl Reading for Taking<'_> {
     type Output = Draft;
 
-    fn blank(self, _line: &notes::Line) -> Draft {
+    fn layout(self, _line: &notes::Line, _layout: &Layout) -> Draft {
         self.draft
     }
 
