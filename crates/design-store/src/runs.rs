@@ -1,7 +1,7 @@
 mod boundary;
 
 use design_model::{JobId, RunId, Segment};
-use dispatch_ports::{Deadline, Pid, Started, Usage};
+use dispatch_ports::{Deadline, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
 use strum::VariantArray;
@@ -27,6 +27,22 @@ pub enum RunState {
     Failed,
 }
 
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JobState {
+    #[name("open")]
+    Open,
+    #[name("applied")]
+    Applied,
+    #[name("repeated")]
+    Repeated,
+    #[name("flailed")]
+    Flailed,
+    #[name("stalled")]
+    Stalled,
+    #[name("interrupted")]
+    Interrupted,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spawned {
     pid: Pid,
@@ -36,6 +52,18 @@ pub struct Spawned {
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct JobOpened(JobId);
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct JobClosed {
+    job: JobId,
+    state: JobState,
+}
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct OpenJobs;
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct JobsInterrupted;
 
 #[derive(Clone, Debug, Op)]
 pub struct RunSpawned {
@@ -124,9 +152,26 @@ impl AsRef<Deadline> for Spawned {
     }
 }
 
+impl From<&Stall> for RunState {
+    fn from(stall: &Stall) -> RunState {
+        match stall {
+            Stall::Errored(_) => RunState::Errored,
+            Stall::Unreadable(_) => RunState::Unreadable,
+            Stall::Overdue => RunState::Overdue,
+        }
+    }
+}
+
 impl From<JobId> for JobOpened {
     fn from(job: JobId) -> JobOpened {
         JobOpened(job)
+    }
+}
+
+impl JobClosed {
+    #[must_use]
+    pub fn new(job: JobId, state: JobState) -> JobClosed {
+        JobClosed { job, state }
     }
 }
 

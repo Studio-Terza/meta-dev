@@ -1,0 +1,81 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  nodes.id,\n  nodes.project,\n  nodes.facet,\n  nodes.stage,\n  nodes.title,\n  (\n    SELECT\n      MIN(closure.ancestor)\n    FROM\n      closure\n    WHERE\n      closure.relation = ?2\n      AND closure.descendant = nodes.id\n      AND closure.depth = 1\n  ) AS \"parent?: i64\"\nFROM\n  nodes\nWHERE\n  nodes.stage != ?1\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      closure\n      JOIN nodes AS above ON above.id = closure.ancestor\n    WHERE\n      closure.relation = ?2\n      AND closure.descendant = nodes.id\n      AND above.stage = ?1\n  )\nORDER BY\n  nodes.project,\n  nodes.id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "project",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "project"
+          }
+        }
+      },
+      {
+        "name": "facet",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "facet"
+          }
+        }
+      },
+      {
+        "name": "stage",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "stage"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "parent?: i64",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "932868377902473b124e0bf549763a3478bfc2c9b4ee3a3094c3caeeaeae71c4"
+}

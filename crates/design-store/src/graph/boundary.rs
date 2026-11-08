@@ -1,6 +1,7 @@
 use design_model::{
     AnyNode, AnyStage, Artifact, Casting, Condition, Dropped, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId,
-    NodeRelation, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal, Title, Transition, Vague,
+    NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal, Title, Transition,
+    Vague,
 };
 use newtype::Counter;
 use port_core::Op;
@@ -86,6 +87,16 @@ pub(crate) struct NodeRow {
     artifact: Option<Artifact>,
     condition: Option<Condition>,
     reason: Option<Reason>,
+}
+
+#[derive(Debug, Columns)]
+struct OutlineRow {
+    id: NodeId,
+    project: Project,
+    facet: Facet,
+    stage: Stage,
+    title: Option<Title>,
+    parent: Option<NodeId>,
 }
 
 #[derive(Debug, Columns)]
@@ -419,6 +430,12 @@ impl TryFrom<NodeRow> for AnyNode {
     }
 }
 
+impl From<OutlineRow> for Outline {
+    fn from(row: OutlineRow) -> Outline {
+        Outline::new(row.id, row.project, row.facet, row.stage).titled(row.title).parented(row.parent)
+    }
+}
+
 impl TryFrom<RelativeRow> for Relative {
     type Error = ColumnFailure;
 
@@ -671,39 +688,34 @@ ORDER BY
 }
 
 impl Query for ContextNodes {
-    type Rows = Vec<AnyNode>;
+    type Rows = Vec<Outline>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
-        let vague = Stage::Vague;
-        let refining = Stage::Refining;
-        let root = Facet::Project;
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Outline>, StoreFailure> {
         let dropped = Stage::Dropped;
         let relation = Closed::Refines;
         let rows = statements.rows(store_ports::query!(
-            NodeRow,
+            OutlineRow,
             r#"
 SELECT
-  id,
-  project,
-  facet,
-  stage,
-  provenance,
-  title,
-  role,
-  role_provenance,
-  artifact,
-  condition,
-  reason
+  nodes.id,
+  nodes.project,
+  nodes.facet,
+  nodes.stage,
+  nodes.title,
+  (
+    SELECT
+      MIN(closure.ancestor)
+    FROM
+      closure
+    WHERE
+      closure.relation = ?2
+      AND closure.descendant = nodes.id
+      AND closure.depth = 1
+  ) AS "parent?: i64"
 FROM
   nodes
 WHERE
-  (
-    stage IN (?1, ?2)
-    OR (
-      facet = ?3
-      AND stage != ?4
-    )
-  )
+  nodes.stage != ?1
   AND NOT EXISTS (
     SELECT
       1
@@ -711,20 +723,17 @@ WHERE
       closure
       JOIN nodes AS above ON above.id = closure.ancestor
     WHERE
-      closure.relation = ?5
+      closure.relation = ?2
       AND closure.descendant = nodes.id
-      AND above.stage = ?4
+      AND above.stage = ?1
   )
 ORDER BY
-  project,
-  id
+  nodes.project,
+  nodes.id
 "#,
-            vague: Stage,
-            refining: Stage,
-            root: Facet,
             dropped: Stage,
             relation: Closed
         ))?;
-        Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)
+        Ok(rows.into_iter().map(Outline::from).collect())
     }
 }

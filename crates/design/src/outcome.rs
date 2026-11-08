@@ -1,7 +1,7 @@
 use design_model::{Role, Stage};
 use design_store::Earlier;
 
-use crate::Count;
+use crate::{Count, HookEvent};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -14,4 +14,8 @@ pub enum Outcome {
     Moved(Stage),
     Recast(Role),
     Structured { jobs: Count },
+    Settings,
+    Hooked(HookEvent),
+    Blocked,
+    Noticed,
 }

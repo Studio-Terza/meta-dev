@@ -1,7 +1,7 @@
 use console_ports::Process;
 use design::{Agents, Cli, Failure, Outcome};
 use design_store::StreamSchema;
-use dispatch_ports::{Agent, HeadlessClaude, SystemClock, Timeout};
+use dispatch_ports::{Agent, HeadlessClaude, SystemClock};
 use exit::Exit;
 use file_ports::Disk;
 use store_ports::Sqlite;
@@ -12,7 +12,7 @@ fn main() -> Exit<Outcome, Failure> {
             &Process,
             Disk,
             Sqlite::file::<StreamSchema>,
-            Agents::new(|scratch| HeadlessClaude::new(scratch, Agent::CLAUDE), SystemClock, Timeout::CLAUDE),
+            Agents::new(|scratch| HeadlessClaude::new(scratch, Agent::CLAUDE), SystemClock),
         )
         .rooted(arguments.into_iter(), out)
     }))

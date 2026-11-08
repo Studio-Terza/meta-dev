@@ -9,5 +9,8 @@ publish.workspace = true
 test = false
 doctest = false
 
+[dependencies]
+newtype = { path = "../newtype" }
+
 [lints]
 workspace = true

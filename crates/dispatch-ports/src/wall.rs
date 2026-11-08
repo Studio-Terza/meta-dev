@@ -22,10 +22,6 @@ pub enum Due {
     Passed,
 }
 
-impl Timeout {
-    pub const CLAUDE: Timeout = Timeout(180);
-}
-
 impl Deadline {
     #[must_use]
     pub fn due(self, now: Wall) -> Due {

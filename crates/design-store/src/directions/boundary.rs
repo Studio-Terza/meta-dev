@@ -10,7 +10,7 @@ use super::Directions;
 use crate::acyclic::{Closing, Keyed, Refusal, SegmentCorrects, SegmentSupersedes};
 use crate::annotation::Remark;
 use crate::graph::{NodeRow, Resolved};
-use crate::{Annotation, Linked};
+use crate::{Annotation, JobState, Linked};
 
 #[derive(Debug)]
 pub(super) struct Annotating<'held, 'run> {
@@ -107,51 +107,13 @@ WHERE
         let rows = statements.rows(store_ports::query!(
             Columns,
             r#"
-SELECT
+SELECT DISTINCT
   message AS "message!: String",
   ordinal AS "ordinal!: i64"
 FROM
-  (
-    SELECT
-      message,
-      ordinal
-    FROM
-      span_edges
-    WHERE
-      message = ?1
-    UNION
-    SELECT
-      message,
-      ordinal
-    FROM
-      senses
-    WHERE
-      message = ?1
-    UNION
-    SELECT
-      message,
-      ordinal
-    FROM
-      conversational
-    WHERE
-      message = ?1
-    UNION
-    SELECT
-      source_message,
-      source_ordinal
-    FROM
-      segment_links
-    WHERE
-      source_message = ?1
-    UNION
-    SELECT
-      target_message,
-      target_ordinal
-    FROM
-      segment_links
-    WHERE
-      target_message = ?1
-  )
+  structured
+WHERE
+  message = ?1
 ORDER BY
   ordinal
 "#,
@@ -346,8 +308,9 @@ impl Batch for Directions {
             .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, Refusal>>()?;
         let recorded = self.file.written(annotating.provenance, annotating.statements)?;
+        let closed = self.remit.paid(annotating.statements)?.closed(JobState::Applied, annotating.statements)?;
         let unflailed = annotating.unflailed()?;
-        Ok(Written::total(written.into_iter().chain([recorded, unflailed])))
+        Ok(Written::total(written.into_iter().chain([recorded, closed, unflailed])))
     }
 }
 

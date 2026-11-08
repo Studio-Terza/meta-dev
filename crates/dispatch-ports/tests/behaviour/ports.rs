@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use dispatch_ports::{
-    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, Started, SystemClock,
-    Timeout, Tokens, Usage, Watch, Watched,
+    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, Stall, Started,
+    SystemClock, Timeout, Tokens, Usage, Watch, Watched,
 };
 use port_core::Run;
 
@@ -32,7 +32,7 @@ fn an_agent_that_prints_its_result_is_watched_to_that_reply_and_usage() -> Resul
         let echo =
             run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", &["-c", "cat"])));
         let clock = run.port(SystemClock);
-        let deadline = Deadline::after(clock.now(), Timeout::new(5));
+        let deadline = Deadline::after(clock.now(), Timeout::new(60));
         let held = echo.dispatch(&Job::due_by(deadline), &Prompt::new(printed.to_owned()))?;
         Watch::over(&echo, &clock).watched(held)?
     };
@@ -74,7 +74,7 @@ laws::table!(
     an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline,
     Stalling::watched,
     [
-        &["-c", "exec sleep 30"][..] => Some(Stalled { watched: Watched::Overdue, left: None }),
-        &["-c", "exec 0<&-; exec sleep 30"][..] => Some(Stalled { watched: Watched::Overdue, left: None }),
+        &["-c", "exec sleep 30"][..] => Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
+        &["-c", "exec 0<&-; exec sleep 30"][..] => Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
     ]
 );

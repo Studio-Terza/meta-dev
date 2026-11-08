@@ -4,6 +4,8 @@ use design_model::{Inversion, Misstaged, NodeId, NodeRelation, Segment, SegmentR
 use named_derive::Named;
 use store_ports::{Statements, StoreFailure};
 
+use crate::Unpaid;
+
 pub(crate) use boundary::{Closing, Keyed};
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,6 +34,8 @@ pub enum Refusal {
     Inverted(#[from] Inversion),
     #[error("{0}")]
     Misstaged(#[from] Misstaged),
+    #[error("{0}")]
+    Unpaid(#[from] Unpaid),
     #[error("{0}")]
     Store(#[from] StoreFailure),
 }
