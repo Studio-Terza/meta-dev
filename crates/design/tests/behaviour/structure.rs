@@ -2,11 +2,12 @@ use std::collections::VecDeque;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
-use design::{Agents, Attempted, Cli, Count, Failure, HookEvent, Lapsed, Line, Outcome, Unresolved};
+use design::{Agents, Attempted, Cli, Count, Failure, Flail, Flails, HookEvent, Lapsed, Line, Outcome, Unresolved};
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, Provenance, RunId};
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
@@ -120,6 +121,7 @@ impl Script {
     const FORWARD: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.6)\nlink(bbbbbbbb-0000-4000-8000-000000000001.7, bbbbbbbb-0000-4000-8000-000000000001.8, refers-to)";
     const UNCOVERING: &str = "propose(new a, refines(n1), feature, \"x\")";
     const MISREAD: &str = "place(";
+    const NINE: &str = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i";
 
     fn replying(replies: &[Option<&str>]) -> Script {
         Script {
@@ -226,7 +228,7 @@ impl Structured {
 #[test]
 fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_linking_to_an_earlier_job_applies()
 -> Result<(), Failure> {
-    let said = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i";
+    let said = Script::NINE;
     let later = format!("link({}.8, {}.0, refers-to)", Script::LISTED, Script::LISTED);
     let structuring = Structuring {
         applying: Applying::over(&Session::working(Session::line(Speaker::Owner, Script::LISTED, "null", said)))?,
@@ -256,34 +258,62 @@ fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_lin
 }
 
 #[test]
-fn a_flailed_job_is_not_redispatched_by_the_next_run() -> Result<(), Box<dyn Error>> {
+fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_not_redispatch_them()
+-> Result<(), Box<dyn Error>> {
     let u = Some(Script::UNCOVERING);
-    let structuring = Structuring::over(Script::replying(&[u, u, u, u]), Pause::new(0))?;
+    let last = format!("conversational({}.8)", Script::LISTED);
+    let structuring = Structuring {
+        applying: Applying::over(&Session::working(Session::line(
+            Speaker::Owner,
+            Script::LISTED,
+            "null",
+            Script::NINE,
+        )))?,
+        script: Script::replying(&[u, u, Some(&last), u]),
+        sleep: Pause::new(0),
+    };
     let first = structuring.structured(&["structure"]);
-    assert!(matches!(first.outcome, Err(Failure::Flailed { .. })));
+    let told = first.outcome.as_ref().err().map(ToString::to_string).unwrap_or_default();
+    assert!(matches!(first.outcome, Err(Failure::Flailed(_))));
     let second = structuring.structured(&["structure"]);
-    assert_eq!(structuring.script.prompts().len(), 2, "the second run re-sent the flailed job's segments");
+    assert_eq!(structuring.script.prompts().len(), 3, "the second run re-sent the flailed job's segments");
+    let shown = structuring.applying.run(&["show", "job", "1"])?;
     golden::golden!(
         "structure-flailed.txt",
-        &format!("design structure\n{}design structure\n{}", first.text, second.text)
+        &format!("design structure\n{}{told}\ndesign structure\n{}design show job 1\n{shown}", first.text, second.text)
     );
     assert_eq!(second.outcome?, Outcome::Structured { jobs: Count::new(0) });
     Ok(())
 }
 
 #[test]
-fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_and_the_next_run_sends_its_segments_again()
+fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_before_its_next_job_and_the_next_run_sends_its_segments_again()
 -> Result<(), Failure> {
-    let structuring = Structuring::over(Script::replying(&[None, Some(Script::COVERING)]), Pause::new(3600))?;
+    let chatter = |ordinals: Range<usize>| {
+        ordinals.map(|ordinal| format!("conversational({}.{ordinal})", Script::LISTED)).collect::<Vec<String>>()
+    };
+    let [first, last] = [0..8, 8..9].map(|ordinals| chatter(ordinals).join("\n"));
+    let structuring = Structuring {
+        applying: Applying::over(&Session::working(Session::line(
+            Speaker::Owner,
+            Script::LISTED,
+            "null",
+            Script::NINE,
+        )))?,
+        script: Script::replying(&[None, Some(&first), Some(&last)]),
+        sleep: Pause::new(3600),
+    };
     let stalled = structuring.structured(&["structure"]);
-    let owed = structuring.unstructured()?;
+    let owed = (structuring.unstructured()?, structuring.script.prompts().len());
     let again = structuring.structured(&["structure"]);
     let overdue = Line::Ran(Attempted::new(RunId::new(1), JobId::new(1), RunState::Overdue, None));
-    let replied = Line::Ran(Attempted::new(RunId::new(2), JobId::new(2), RunState::Replied, Some(Script::usage())));
-    assert_eq!([stalled.has(&[overdue]), again.has(&[replied])], [[], []]);
+    let replied = [(2, 2), (3, 3)].map(|(run, job)| {
+        Line::Ran(Attempted::new(RunId::new(run), JobId::new(job), RunState::Replied, Some(Script::usage())))
+    });
+    assert_eq!([stalled.has(&[overdue]), again.has(&replied)], [[], []]);
     assert!(matches!(stalled.outcome, Err(Failure::Stalled { stall: Stall::Overdue, .. })));
-    assert_eq!((owed, structuring.script.prompts().len()), (4, 2));
-    assert_eq!(again.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!((owed, structuring.script.prompts().len()), ((9, 1), 3));
+    assert_eq!(again.outcome?, Outcome::Structured { jobs: Count::new(2) });
     Ok(())
 }
 
@@ -297,9 +327,8 @@ fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() 
     let retried = prompts.first().cloned().flatten().zip(lapse.clone()).map(|(first, lapsed)| first.retried(&lapsed));
     assert_eq!(prompts.get(1).cloned().flatten(), retried);
     assert_eq!(prompts.len(), 2);
-    assert!(
-        matches!(structured.outcome, Err(Failure::Flailed { lapse: flailed, .. }) if lapse.as_ref() == Some(&flailed))
-    );
+    let flailed = lapse.map(|misread| Flails::new(Flail::new(JobId::new(1), misread), Vec::new()));
+    assert!(matches!(structured.outcome, Err(Failure::Flailed(flails)) if flailed.as_ref() == Some(&flails)));
     Ok(())
 }
 

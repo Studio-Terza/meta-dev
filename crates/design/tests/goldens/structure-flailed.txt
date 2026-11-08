@@ -1,14 +1,37 @@
 design structure
-retried 1 "uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0"
-flailed 1 "uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0"
+retried 1 "uncovered bbbbbbbb-0000-4000-8000-000000000001.0 bbbbbbbb-0000-4000-8000-000000000001.1 bbbbbbbb-0000-4000-8000-000000000001.2 bbbbbbbb-0000-4000-8000-000000000001.3 bbbbbbbb-0000-4000-8000-000000000001.4 bbbbbbbb-0000-4000-8000-000000000001.5 bbbbbbbb-0000-4000-8000-000000000001.6 bbbbbbbb-0000-4000-8000-000000000001.7"
+flailed 1 "uncovered bbbbbbbb-0000-4000-8000-000000000001.0 bbbbbbbb-0000-4000-8000-000000000001.1 bbbbbbbb-0000-4000-8000-000000000001.2 bbbbbbbb-0000-4000-8000-000000000001.3 bbbbbbbb-0000-4000-8000-000000000001.4 bbbbbbbb-0000-4000-8000-000000000001.5 bbbbbbbb-0000-4000-8000-000000000001.6 bbbbbbbb-0000-4000-8000-000000000001.7"
 run 1 job 1 replied tokens 10 20 3 4
 run 2 job 1 replied tokens 10 20 3 4
-flailed-segment aaaaaaaa-0000-4000-8000-000000000001.0 job 1 run 2
-flailed-segment aaaaaaaa-0000-4000-8000-000000000003.0 job 1 run 2
-flailed-segment aaaaaaaa-0000-4000-8000-000000000003.1 job 1 run 2
-flailed-segment aaaaaaaa-0000-4000-8000-000000000005.0 job 1 run 2
+applied "conversational(bbbbbbbb-0000-4000-8000-000000000001.8)"
+uncovered bbbbbbbb.0
+uncovered bbbbbbbb.1
+uncovered bbbbbbbb.2
+uncovered bbbbbbbb.3
+uncovered bbbbbbbb.4
+uncovered bbbbbbbb.5
+uncovered bbbbbbbb.6
+uncovered bbbbbbbb.7
+written 3
+run 3 job 2 replied tokens 10 20 3 4
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.0 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.1 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.2 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.3 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.4 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.5 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.6 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.7 job 1 run 2
+FLAILED: job 1 failed twice, the second time because the reply gives no directive to segment bbbbbbbb-0000-4000-8000-000000000001.0 and 7 more of its job's segments (design show job 1 prints its replies); the flailed segments are held for triage, and structure went on with the next job
 design structure
-flailed-segment aaaaaaaa-0000-4000-8000-000000000001.0 job 1 run 2
-flailed-segment aaaaaaaa-0000-4000-8000-000000000003.0 job 1 run 2
-flailed-segment aaaaaaaa-0000-4000-8000-000000000003.1 job 1 run 2
-flailed-segment aaaaaaaa-0000-4000-8000-000000000005.0 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.0 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.1 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.2 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.3 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.4 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.5 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.6 job 1 run 2
+flailed-segment bbbbbbbb-0000-4000-8000-000000000001.7 job 1 run 2
+design show job 1
+run 1 job 1 replied tokens 10 20 3 4 reply "propose(new a, refines(n1), feature, \"x\")"
+run 2 job 1 replied tokens 10 20 3 4 reply "propose(new a, refines(n1), feature, \"x\")"

@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
@@ -22,7 +23,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings))"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref | job <job-id>> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings))"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -78,8 +79,8 @@ pub enum Failure {
     Unlock(#[from] Unlock),
     #[error("the structuring agent could not be run: {0}")]
     Dispatch(#[from] DispatchFailure),
-    #[error("FLAILED: job {job} failed twice, the second time because {lapse}; structure halted, triage it")]
-    Flailed { job: JobId, lapse: Lapse },
+    #[error("FLAILED: {0}; the flailed segments are held for triage, and structure went on with the next job")]
+    Flailed(Flails),
     #[error(
         "STALLED: job {job} could not be run: {stall}; structure halted, and its segments are sent again on the next run"
     )]
@@ -96,12 +97,46 @@ pub enum Failure {
     Unreleased { command: Box<Failure>, released: ReleaseFailures },
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("job {job} failed twice, the second time because {lapse} (design show job {job} prints its replies)")]
+pub struct Flail {
+    job: JobId,
+    lapse: Lapse,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Flails {
+    first: Flail,
+    rest: Vec<Flail>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Unmatched {
     #[error("no message in the design store starts with {0}; run design ingest first")]
     NoMatch(Prefix),
     #[error("several messages start with {0}; write more of the message id")]
     Ambiguous(Prefix),
+}
+
+impl Flail {
+    #[must_use]
+    pub fn new(job: JobId, lapse: Lapse) -> Flail {
+        Flail { job, lapse }
+    }
+}
+
+impl Flails {
+    #[must_use]
+    pub fn new(first: Flail, rest: Vec<Flail>) -> Flails {
+        Flails { first, rest }
+    }
+}
+
+impl fmt::Display for Flails {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.first)?;
+        self.rest.iter().try_for_each(|flail| write!(formatter, "; {flail}"))
+    }
 }
 
 impl From<Refusal> for Failure {

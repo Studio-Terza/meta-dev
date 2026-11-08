@@ -1,14 +1,21 @@
 use std::str::FromStr;
 
-use design_model::{NodeId, Prefix};
+use design_model::{JobId, NodeId, Prefix};
 use grammar::cited::Cited;
 use grammar::output::Fields;
-use grammar::output::field::{Bare, Checked};
+use grammar::output::field::{Bare, Checked, Integer, Word};
+use named_derive::Named;
 use newtype::Wrapping;
 use structurer::SegmentRef;
 
 use super::Subject;
 use crate::cli::failure::Failure;
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+enum Keyed {
+    #[name("job")]
+    Job,
+}
 
 impl FromStr for Subject {
     type Err = Failure;
@@ -16,8 +23,11 @@ impl FromStr for Subject {
     fn from_str(word: &str) -> Result<Subject, Failure> {
         let mut fields = Fields::lexed(word).map_err(|_stray| Failure::Usage)?;
         let subject = fields
-            .optional::<Checked<NodeId>>()
-            .map(|node| Ok(Subject::Node(node?)))
+            .optional::<Word<Keyed>>()
+            .map(|Keyed::Job| {
+                fields.field::<Integer<_>>().map(|job| Subject::Job(JobId::new(job))).map_err(|_unread| Failure::Usage)
+            })
+            .or_else(|| fields.optional::<Checked<NodeId>>().map(|node| Ok(Subject::Node(node?))))
             .or_else(|| fields.optional::<Cited>().map(|cited| Ok(Subject::Segment(SegmentRef::from(&cited)))))
             .or_else(|| fields.optional::<Bare<Prefix>>().map(Subject::prefixed))
             .ok_or(Failure::Usage)??;
