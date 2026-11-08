@@ -1,5 +1,5 @@
 use std::fmt;
-use std::io::Write;
+use std::io::{self, Write};
 
 use lint_layout::Failure;
 use lint_reader::Unlocated;
@@ -29,6 +29,13 @@ impl<'run> Outcome<'run> {
             Outcome::Clean => Verdict::Clean,
             Outcome::Violations { reports, failures } => Self::listed(reports, failures, err),
             Outcome::Unlocated(failure) => Self::refused(failure, err),
+        }
+    }
+
+    pub(crate) fn surveyed(&self, survey: fmt::Arguments<'_>, out: &mut impl Write) -> io::Result<()> {
+        match self {
+            Outcome::Unlocated(_) => Ok(()),
+            Outcome::Clean | Outcome::Violations { .. } => write!(out, "{survey}"),
         }
     }
 

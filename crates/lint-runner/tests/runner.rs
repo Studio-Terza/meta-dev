@@ -205,11 +205,11 @@ fn the_query_command_refuses_a_malformed_role() {
 fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
-    let mut err = Vec::new();
+    let (mut out, mut err) = (Vec::new(), Vec::new());
     let gate = Cli::from_args([OsString::from(&root.root)].into_iter()).report_to(
         &root.files,
         [(PathBuf::from("/"), Bytes::from("not json"))].into_iter().collect::<Recorded>(),
-        &mut Vec::new(),
+        &mut out,
         &mut err,
     );
     let (mut report_out, mut report_err) = (Vec::new(), Vec::new());
@@ -221,6 +221,7 @@ fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Box<dyn Er
     );
     assert_eq!(gate, ExitCode::FAILURE);
     assert_ne!(err, Vec::<u8>::new());
+    assert_eq!(out, Vec::<u8>::new());
     assert_eq!(report, ExitCode::SUCCESS);
     Ok(())
 }
