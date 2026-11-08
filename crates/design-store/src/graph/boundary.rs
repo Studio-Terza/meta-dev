@@ -678,6 +678,7 @@ impl Query for ContextNodes {
         let refining = Stage::Refining;
         let root = Facet::Project;
         let dropped = Stage::Dropped;
+        let relation = Closed::Refines;
         let rows = statements.rows(store_ports::query!(
             NodeRow,
             r#"
@@ -696,10 +697,23 @@ SELECT
 FROM
   nodes
 WHERE
-  stage IN (?1, ?2)
-  OR (
-    facet = ?3
-    AND stage != ?4
+  (
+    stage IN (?1, ?2)
+    OR (
+      facet = ?3
+      AND stage != ?4
+    )
+  )
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      closure
+      JOIN nodes AS above ON above.id = closure.ancestor
+    WHERE
+      closure.relation = ?5
+      AND closure.descendant = nodes.id
+      AND above.stage = ?4
   )
 ORDER BY
   project,
@@ -708,7 +722,8 @@ ORDER BY
             vague: Stage,
             refining: Stage,
             root: Facet,
-            dropped: Stage
+            dropped: Stage,
+            relation: Closed
         ))?;
         Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)
     }

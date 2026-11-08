@@ -123,6 +123,11 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         Ok(Structured { reaped, worked: progress.worked(), flailed })
     }
 
+    fn owed(&self, chunk: &[Unplaced]) -> Result<Vec<Unplaced>, Failure> {
+        let unplaced = self.store.read(Unstructured)?;
+        Ok(chunk.iter().filter(|segment| unplaced.contains(segment)).cloned().collect())
+    }
+
     fn job(&self, chunk: &[Unplaced]) -> Result<Worked, Failure> {
         let id = self.store.read(NextJob)?;
         let context = self.store.read(ContextNodes)?;
@@ -277,15 +282,25 @@ impl Progress {
         chunk: &[Unplaced],
     ) -> Result<Progress, Failure> {
         match self {
-            Progress::Going(worked) => structure.job(chunk).map(|done| Progress::after(worked, done)),
+            Progress::Going(worked) => Progress::owing(worked, structure, chunk),
             Progress::Halted(worked) => Ok(Progress::Halted(worked)),
         }
     }
 
-    fn after(worked: Vec<Worked>, done: Worked) -> Progress {
+    fn owing<S: Store, D: Dispatch, C: Clock>(
+        worked: Vec<Worked>,
+        structure: &Structure<'_, S, D, C>,
+        chunk: &[Unplaced],
+    ) -> Result<Progress, Failure> {
+        let owed = structure.owed(chunk)?;
+        let done = owed.first().map(|_first| structure.job(&owed)).transpose()?;
+        Ok(Progress::after(worked, done))
+    }
+
+    fn after(worked: Vec<Worked>, done: Option<Worked>) -> Progress {
         let ended: fn(Vec<Worked>) -> Progress =
-            done.flailed.as_ref().map_or(Progress::Going, |_lapse| Progress::Halted);
-        ended(worked.into_iter().chain([done]).collect())
+            done.as_ref().and_then(|done| done.flailed.as_ref()).map_or(Progress::Going, |_lapse| Progress::Halted);
+        ended(worked.into_iter().chain(done).collect())
     }
 
     fn worked(self) -> Vec<Worked> {

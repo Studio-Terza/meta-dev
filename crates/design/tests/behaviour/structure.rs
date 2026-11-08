@@ -17,7 +17,7 @@ use store_ports::{Store, Written};
 use structurer::{Briefing, Directives, Lapse};
 use text_lines::Lines;
 
-use super::{Applying, FakeLent, Invocation};
+use super::{Applying, FakeLent, Invocation, Session, Speaker};
 
 #[derive(Debug, Default)]
 pub struct Script {
@@ -109,6 +109,8 @@ impl DispatchFiller for FakeDispatch<'_> {
 
 impl Script {
     const COVERING: &str = "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)\nsense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, specific, firm, explicit)\nlink(aaaaaaaa-0000-4000-8000-000000000003.1, aaaaaaaa-0000-4000-8000-000000000005.0, answers)";
+    const LISTED: &str = "bbbbbbbb-0000-4000-8000-000000000001";
+    const SPANNING: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.6)\nlink(bbbbbbbb-0000-4000-8000-000000000001.7, bbbbbbbb-0000-4000-8000-000000000001.8, refers-to)";
     const UNCOVERING: &str = "propose(new a, refines(n1), feature, \"x\")";
     const MISREAD: &str = "place(";
 
@@ -209,23 +211,28 @@ impl Structured {
 }
 
 #[test]
-fn a_reply_is_applied_with_agent_provenance_its_usage_recorded_and_the_unstructured_set_shrinks() -> Result<(), Failure>
-{
-    let structuring = Structuring::over(Script::replying(&[Some(Script::COVERING)]), Pause::new(0))?;
+fn a_reply_is_applied_with_agent_provenance_its_usage_recorded_and_what_it_covers_of_later_chunks_is_not_sent_again()
+-> Result<(), Failure> {
+    let said = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i";
+    let structuring = Structuring {
+        applying: Applying::over(&Session::working(Session::line(Speaker::Owner, Script::LISTED, "null", said)))?,
+        script: Script::replying(&[Some(Script::SPANNING)]),
+        sleep: Pause::new(0),
+    };
     let before = structuring.unstructured()?;
     let structured = structuring.structured();
     let after = structuring.unstructured()?;
     let ran = Line::Ran(Attempted::new(RunId::new(1), JobId::new(1), RunState::Replied, Some(Script::usage())));
     assert_eq!(structured.has(&[ran]), []);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
-    assert_eq!((before, after), (4, 0));
-    let shown = structuring.applying.run(&["show", "aaaaaaaa-0000-4000-8000-000000000003"])?;
+    assert_eq!((before, after), (9, 0));
+    let shown = structuring.applying.run(&["show", Script::LISTED])?;
     let agent = Provenance::Agent(RunId::new(1));
     let entered = Structured::parsed(&shown)
         .into_iter()
         .filter(|line| matches!(line, Line::Annotated { entered, .. } if *entered == agent))
         .count();
-    assert_eq!(entered, 2);
+    assert_eq!(entered, 8);
     Ok(())
 }
 
@@ -315,12 +322,19 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::UNCOVERING), Some(Script::COVERING)]), Pause::new(0))?;
     let run = Run::root();
-    let entry = Entry::new("other".parse()?, Facet::Project, Entered::Init.into());
-    run.port(structuring.applying.store.clone()).write(Planting::sown(Node::new(NodeId::new(2), entry)))?;
+    let store = run.port(structuring.applying.store.clone());
+    let [other, gone] = [
+        Entry::new("other".parse()?, Facet::Project, Entered::Init.into()),
+        Entry::new("gone".parse()?, Facet::Project, Entered::Init.into()),
+    ];
+    store.write(Planting::sown(Node::new(NodeId::new(2), other)))?;
+    store.write(Planting::sown(Node::new(NodeId::new(3), gone)))?;
+    structuring.applying.applied("propose(new g, refines(n3), feature, \"g\")")?;
+    structuring.applying.run(&["drop", "n3", "--reason", "abandoned"])?;
     golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured().text))?;
     let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
     golden::golden!("structure-briefs.txt", &briefs)?;
-    assert!(matches!(structuring.applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
+    assert!(matches!(structuring.applying.run(&["show", "n5"]), Err(Failure::Unplaced(_))));
     Ok(())
 }
 

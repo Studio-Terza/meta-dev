@@ -1281,7 +1281,8 @@ fn the_structurer_s_context_keeps_the_project_root_past_200_nodes() -> Result<()
 }
 
 #[test]
-fn a_flailed_segment_leaves_the_unstructured_stream_and_is_listed_with_its_job_and_run() -> Result<(), Box<dyn Error>> {
+fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and_run_and_lifts_once_structured()
+-> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Recorded::session()?.records)?;
@@ -1289,15 +1290,19 @@ fn a_flailed_segment_leaves_the_unstructured_stream_and_is_listed_with_its_job_a
     store.write(JobOpened::from(job))?;
     let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
     store.write(RunSpawned::new(RunId::new(1), job, spawned))?;
-    store.write(JobFlailed::new(RunId::new(1), vec![Proposals::segment("o1", 1)]))?;
+    let [structured, unstructured] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    Proposals::written(&store, vec![Directed::Conversational { segment: structured.clone() }])?;
+    store.write(JobFlailed::new(RunId::new(1), vec![structured, unstructured.clone()]))?;
     let flailed: Vec<(Segment, RunId)> = store
         .read(FlailedSegments)?
         .iter()
         .filter(|flailed| flailed.job() == job)
         .map(|flailed| (AsRef::<Segment>::as_ref(flailed).clone(), flailed.run()))
         .collect();
-    assert_eq!(Unstructuring::listed(&store)?, vec![Proposals::segment("o1", 0)]);
-    assert_eq!(flailed, vec![(Proposals::segment("o1", 1), RunId::new(1))]);
+    assert_eq!(Unstructuring::listed(&store)?, Vec::<Segment>::new());
+    assert_eq!(flailed, vec![(unstructured.clone(), RunId::new(1))]);
+    Proposals::written(&store, vec![Directed::Conversational { segment: unstructured }])?;
+    assert_eq!(store.read(FlailedSegments)?, Vec::new());
     Ok(())
 }
 

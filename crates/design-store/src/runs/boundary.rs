@@ -182,8 +182,20 @@ impl Batch for JobFlailed {
                     r#"
 INSERT INTO
   flailed (message, ordinal, run)
-VALUES
-  (?1, ?2, ?3)
+SELECT
+  ?1,
+  ?2,
+  ?3
+WHERE
+  NOT EXISTS (
+    SELECT
+      1
+    FROM
+      structured
+    WHERE
+      structured.message = ?1
+      AND structured.ordinal = ?2
+  )
 "#,
                     message: Uuid,
                     ordinal: Ordinal,
@@ -330,28 +342,10 @@ WHERE
     SELECT
       1
     FROM
-      span_edges
+      structured
     WHERE
-      span_edges.message = segments.message
-      AND span_edges.ordinal = segments.ordinal
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      senses
-    WHERE
-      senses.message = segments.message
-      AND senses.ordinal = segments.ordinal
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      conversational
-    WHERE
-      conversational.message = segments.message
-      AND conversational.ordinal = segments.ordinal
+      structured.message = segments.message
+      AND structured.ordinal = segments.ordinal
   )
   AND NOT EXISTS (
     SELECT
@@ -361,21 +355,6 @@ WHERE
     WHERE
       flailed.message = segments.message
       AND flailed.ordinal = segments.ordinal
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      segment_links
-    WHERE
-      (
-        segment_links.source_message = segments.message
-        AND segment_links.source_ordinal = segments.ordinal
-      )
-      OR (
-        segment_links.target_message = segments.message
-        AND segment_links.target_ordinal = segments.ordinal
-      )
   )
 ORDER BY
   messages.at,

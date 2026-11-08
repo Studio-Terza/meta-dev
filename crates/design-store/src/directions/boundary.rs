@@ -346,11 +346,31 @@ impl Batch for Directions {
             .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, Refusal>>()?;
         let recorded = self.file.written(annotating.provenance, annotating.statements)?;
-        Ok(Written::total(written.into_iter().chain([recorded])))
+        let unflailed = annotating.unflailed()?;
+        Ok(Written::total(written.into_iter().chain([recorded, unflailed])))
     }
 }
 
 impl Annotating<'_, '_> {
+    fn unflailed(&mut self) -> Result<Written, StoreFailure> {
+        self.statements.written(store_ports::query!(
+            r#"
+DELETE FROM
+  flailed
+WHERE
+  EXISTS (
+    SELECT
+      1
+    FROM
+      structured
+    WHERE
+      structured.message = flailed.message
+      AND structured.ordinal = flailed.ordinal
+  )
+"#
+        ))
+    }
+
     pub(super) fn placed(
         &mut self,
         segment: &Segment,
