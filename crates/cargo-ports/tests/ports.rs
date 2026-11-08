@@ -21,7 +21,7 @@ fn recorded_metadata_answers_for_its_manifests_only() {
 fn the_toolchain_describes_a_workspace_and_refuses_a_manifest_that_is_not_there() {
     let run = Run::root();
     let described = run.port(Toolchain).metadata(&[
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/.workspace/Cargo.toml"),
         Path::new("/no/such/workspace/Cargo.toml").to_path_buf(),
     ]);
     let lengths: Vec<Option<usize>> =
