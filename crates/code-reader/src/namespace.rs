@@ -62,7 +62,7 @@ impl<'read> Namespace<'read> {
     ) -> ScopeId {
         let root = ScopeId::after(&self.scopes);
         self.scopes.push(ScopeRow::root(root, form, entries));
-        self.crates.extend(name.map(|name| (name, root)));
+        self.crates.extend(name.map(|crate_name| (crate_name, root)));
         self.dependencies.insert(root, dependencies);
         root
     }
@@ -80,7 +80,7 @@ impl<'read> Namespace<'read> {
             .map(ScopeRow::entries_mut)
             .zip(Some(declared))
             .into_iter()
-            .for_each(|(entries, declared)| entries.declare(declared));
+            .for_each(|(entries, item)| entries.declare(item));
     }
 
     pub(crate) fn exports(&self) -> Vec<Export> {

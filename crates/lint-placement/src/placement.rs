@@ -44,7 +44,7 @@ impl Placement {
         file.strip_prefix(package)
             .ok()
             .zip(root.cloned())
-            .and_then(|(inside, root)| Self::in_package(root, package, inside))
+            .and_then(|(inside, package_root)| Self::in_package(package_root, package, inside))
             .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
     }
 
@@ -70,7 +70,9 @@ impl Placement {
 
     #[must_use]
     pub fn executable_root<'file>(&self, file: &'file Path) -> Option<&'file Path> {
-        Some(file).filter(|file| self.role.roots(self.crate_root().directory(), file).iter().any(|root| root == file))
+        Some(file).filter(|candidate| {
+            self.role.roots(self.crate_root().directory(), candidate).iter().any(|root| root == candidate)
+        })
     }
 
     #[must_use]
@@ -147,7 +149,7 @@ impl PackageDirectory {
         match self {
             PackageDirectory::Source => Some(SourceDirectory::place(root, rest)),
             PackageDirectory::Build => {
-                Some(rest).filter(|rest| rest.as_os_str().is_empty()).map(|_| BuildScript::place(root))
+                Some(rest).filter(|candidate| candidate.as_os_str().is_empty()).map(|_| BuildScript::place(root))
             }
             PackageDirectory::Target => TargetDirectory::place(root, directory, rest),
             PackageDirectory::Other => None,

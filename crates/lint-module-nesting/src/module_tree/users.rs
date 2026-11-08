@@ -9,8 +9,8 @@ pub struct Users<'file>(BTreeMap<ModulePath<'file>, BTreeSet<ModulePath<'file>>>
 
 impl<'file> Users<'file> {
     pub fn record(&mut self, home: Option<ModulePath<'file>>, caller: ModulePath<'file>) {
-        home.into_iter().fold(&mut self.0, |users, home| {
-            users.entry(home).or_default().insert(caller);
+        home.into_iter().fold(&mut self.0, |users, module| {
+            users.entry(module).or_default().insert(caller);
             users
         });
     }

@@ -18,14 +18,15 @@ impl Golden {
     const MANIFEST: &'static str = "Cargo.toml";
 
     pub fn in_package(package: impl AsRef<Path>, name: impl AsRef<Path>) -> Result<Self, Failure> {
-        let name = name.as_ref();
-        name.components()
+        let relative = name.as_ref();
+        relative
+            .components()
             .all(|part| matches!(part, Component::Normal(_)))
             .then(|| Self {
                 package: package.as_ref().to_path_buf(),
-                path: package.as_ref().join(Self::DIRECTORY).join(name),
+                path: package.as_ref().join(Self::DIRECTORY).join(relative),
             })
-            .ok_or_else(|| Failure::Escapes { name: name.to_path_buf() })
+            .ok_or_else(|| Failure::Escapes { name: relative.to_path_buf() })
     }
 
     pub fn verify(self, environment: &impl Environment, files: &impl Files, actual: Output<'_>) -> Result<(), Failure> {
@@ -48,8 +49,8 @@ impl Golden {
 
     fn recorded(self, written: Option<Result<(), FileFailure>>) -> Result<(), Failure> {
         match written {
-            Some(written) => {
-                written.map_err(|failure| Failure::Unwritable { path: self.path, source: io::Error::from(failure) })
+            Some(outcome) => {
+                outcome.map_err(|failure| Failure::Unwritable { path: self.path, source: io::Error::from(failure) })
             }
             None => Err(Failure::NotChosen { path: self.path }),
         }

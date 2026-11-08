@@ -38,18 +38,17 @@ impl TypeWalk<'_, '_> {
         let resolved: &Resolved = named.as_ref();
         let solo = Lone::within(written);
         let identity = self.lexicon.identity(resolved, written);
-        let direct = identity.and_then(|identity| identity.direct(solo));
+        let direct = identity.and_then(|known| known.direct(solo));
         let target = solo.and(self.scope.local_alias(resolved, self.file)).and_then(TypeRef::named);
-        let aliased = target.and_then(|target| self.aliased(target));
-        self.found.extend(direct.into_iter().chain(aliased).map(|identity| Candidate { identity, position }));
+        let aliased = target.and_then(|local| self.aliased(local));
+        self.found.extend(direct.into_iter().chain(aliased).map(|found| Candidate { identity: found, position }));
         named.each_inner_use(self);
     }
 
     fn aliased(&self, target: &Named<Sited>) -> Option<Identity> {
         let written = AsRef::<Spelling>::as_ref(AsRef::<Sited>::as_ref(target)).written();
-        written.and_then(|written| {
-            self.lexicon.identity(target.as_ref(), written).and_then(|identity| identity.aliased(written))
-        })
+        written
+            .and_then(|path| self.lexicon.identity(target.as_ref(), path).and_then(|identity| identity.aliased(path)))
     }
 }
 
@@ -77,15 +76,15 @@ impl<'read, 'model> Signatures<'read, 'model> {
     pub fn found(&self, model: &'model Model) -> Vec<Violation<'model>> {
         let functions = model.functions().filter_map(|placed| {
             let function = self.scope.function(placed.entity());
-            function.map(|function| self.ranked(placed.site(), function.as_ref(), function.signature().written()))
+            function.map(|found| self.ranked(placed.site(), found.as_ref(), found.signature().written()))
         });
         let holdings = model.holdings().filter_map(|placed| {
             let holding = self.scope.holding(placed.entity());
-            holding.map(|holding| self.ranked(placed.site(), holding.as_ref(), [holding.as_ref()].into_iter()))
+            holding.map(|held| self.ranked(placed.site(), held.as_ref(), [held.as_ref()].into_iter()))
         });
         let mut ranked: Vec<Ranked<'model>> = functions.chain(holdings).flatten().collect();
-        ranked.sort_by_key(|ranked| ranked.spot);
-        ranked.into_iter().map(|ranked| ranked.violation).collect()
+        ranked.sort_by_key(|entry| entry.spot);
+        ranked.into_iter().map(|entry| entry.violation).collect()
     }
 
     fn ranked<'ty>(

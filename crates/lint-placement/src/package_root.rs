@@ -40,17 +40,11 @@ impl PackageRoot {
                 let root = CrateRoot::of_manifest(directory.as_ref(), manifest.as_ref());
                 let workspace = Self::workspace(&workspaces, directory.as_ref(), manifest.as_ref());
                 PackageRoot {
-                    dependencies: manifest
-                        .as_ref()
-                        .map(|manifest| manifest.dependencies(workspace))
-                        .unwrap_or_default(),
+                    dependencies: manifest.as_ref().map(|present| present.dependencies(workspace)).unwrap_or_default(),
                     name: CrateName::from(&root),
                     root,
                     features: manifest.as_ref().map(Manifest::features).unwrap_or_default(),
-                    untested: manifest
-                        .as_ref()
-                        .map(|manifest| manifest.untested_targets(canonical))
-                        .unwrap_or_default(),
+                    untested: manifest.as_ref().map(|present| present.untested_targets(canonical)).unwrap_or_default(),
                 }
             })
             .collect()
@@ -78,7 +72,7 @@ impl PackageRoot {
         directory: &Path,
         manifest: Option<&'read Manifest>,
     ) -> Option<&'read Manifest> {
-        let own = manifest.filter(|manifest| manifest.workspace().is_some());
+        let own = manifest.filter(|candidate| candidate.workspace().is_some());
         own.or_else(|| directory.ancestors().skip(1).find_map(|enclosing| workspaces.get(enclosing)))
     }
 

@@ -14,7 +14,7 @@ impl<'body> Line<'body> {
     pub(crate) fn read(text: &'body str) -> Line<'body> {
         let line = Self::trimmed(text);
         Some(line)
-            .filter(|line| *line == Self::REPAIR)
+            .filter(|candidate| *candidate == Self::REPAIR)
             .map(|_| Line::Repair)
             .or_else(|| {
                 line.split_at_checked(Self::SPEC.len())

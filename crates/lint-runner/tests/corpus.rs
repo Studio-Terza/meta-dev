@@ -53,7 +53,7 @@ struct Violation<'line> {
 impl Corpus {
     fn renamed(path: &Path) -> &OsStr {
         let name = path.file_name().unwrap_or_default();
-        Some(name).filter(|name| *name == STORED_MANIFEST).map_or(name, |_| MANIFEST.as_ref())
+        Some(name).filter(|candidate| *candidate == STORED_MANIFEST).map_or(name, |_| MANIFEST.as_ref())
     }
 
     fn copied(corpus: &Memory, found: &Path, target: &Path) -> Result<Vec<Copied>, FileFailure> {
@@ -86,7 +86,7 @@ impl Corpus {
             .collect();
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
-        let verdict = Some(exit).filter(|exit| *exit == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
+        let verdict = Some(exit).filter(|code| *code == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }
 

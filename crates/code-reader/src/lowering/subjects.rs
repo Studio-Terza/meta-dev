@@ -28,7 +28,7 @@ pub(super) struct Subjects(Vec<TypeRef>);
 
 impl Subjects {
     pub(super) fn seat(&self, region: Region, subject: Option<SubjectId>) -> Seat {
-        Seat::new(region, subject.and_then(|subject| self.0.get(subject.0)).cloned())
+        Seat::new(region, subject.and_then(|id| self.0.get(id.0)).cloned())
     }
 }
 

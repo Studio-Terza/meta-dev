@@ -31,17 +31,17 @@ impl Staged {
             .iter()
             .zip(targets)
             .zip(repo_files)
-            .map(|((tree, targets), repo_files)| {
-                let targets = targets?;
-                targets.first().ok_or_else(|| tree.without_sources())?;
-                Ok(Staged { targets, repo_files: repo_files? })
+            .map(|((tree, rooted), listed)| {
+                let found = rooted?;
+                found.first().ok_or_else(|| tree.without_sources())?;
+                Ok(Staged { targets: found, repo_files: listed? })
             })
             .collect()
     }
 
     fn listed(listing: io::Result<ScopedJoinHandle<'_, Listed>>, files: &impl Files, trees: &[&Tree<'_>]) -> Listed {
         match listing {
-            Ok(listing) => listing.join().unwrap_or_else(|payload| panic::resume_unwind(payload)),
+            Ok(handle) => handle.join().unwrap_or_else(|payload| panic::resume_unwind(payload)),
             Err(_) => RepoFiles::under(files, trees),
         }
     }

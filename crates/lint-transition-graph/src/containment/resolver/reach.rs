@@ -32,7 +32,7 @@ impl<'place, 'found> Reach<'place, 'found> {
             || {
                 origin.map_or_else(
                     || Some(self.place.target(None)),
-                    |origin| self.pathed(std::slice::from_ref(origin)).map(Target::unhinted),
+                    |named| self.pathed(std::slice::from_ref(named)).map(Target::unhinted),
                 )
             },
             |_| self.pathed(&spelled),

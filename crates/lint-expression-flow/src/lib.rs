@@ -65,9 +65,9 @@ impl ExpressionFlow {
     }
 
     fn compound(op: BinOp) -> Option<BinOp> {
-        Some(op).filter(|op| {
+        Some(op).filter(|candidate| {
             matches!(
-                op,
+                candidate,
                 BinOp::AddAssign(_)
                     | BinOp::SubAssign(_)
                     | BinOp::MulAssign(_)
@@ -242,7 +242,7 @@ impl MutableLocals {
 
     fn declared_mutable(local: &Local) -> Option<&PatIdent> {
         match &local.pat {
-            Pat::Ident(binding) => Some(binding).filter(|binding| binding.mutability.is_some()),
+            Pat::Ident(binding) => Some(binding).filter(|candidate| candidate.mutability.is_some()),
             _ => None,
         }
     }
@@ -252,8 +252,8 @@ impl MutableLocals {
             Expr::MethodCall(call) => ExpressionFlow::assigned_local(&call.receiver),
             Expr::Call(call) => ExpressionFlow::assigned_local(&call.func),
             Expr::Reference(reference) => Some(reference)
-                .filter(|reference| reference.mutability.is_some())
-                .and_then(|reference| ExpressionFlow::assigned_local(&reference.expr)),
+                .filter(|candidate| candidate.mutability.is_some())
+                .and_then(|mutable| ExpressionFlow::assigned_local(&mutable.expr)),
             _ => None,
         }
     }

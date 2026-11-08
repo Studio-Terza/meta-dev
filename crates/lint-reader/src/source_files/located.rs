@@ -53,11 +53,11 @@ impl<'tree> Located<'tree> {
 
     fn opened(&self, text: Result<Text, FileFailure>, placement: Placement) -> Result<Opened, Failure> {
         text.map_err(|failure| Failure::Io { path: self.tree.display(&self.file), source: failure.into() }).map(
-            |text| {
+            |read| {
                 Opened::new(
                     self.tree.display(&self.file),
                     self.file.clone(),
-                    SourceText::new(text.into_inner()),
+                    SourceText::new(read.into_inner()),
                     placement,
                 )
             },

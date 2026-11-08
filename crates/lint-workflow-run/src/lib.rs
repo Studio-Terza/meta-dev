@@ -28,7 +28,7 @@ impl WorkflowRun {
             .and_then(|bytes| String::from_utf8(bytes.clone().into_inner()).map_err(Excerpt::from));
         text.map_or_else(
             |reason| vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { reason })],
-            |text| Self::violations_in(file, text.parse(), actions),
+            |decoded| Self::violations_in(file, decoded.parse(), actions),
         )
     }
 

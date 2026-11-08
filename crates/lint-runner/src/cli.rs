@@ -3,6 +3,7 @@ mod mode;
 mod outcome;
 mod sources;
 mod stack_size;
+mod verdict;
 
 use std::ffi::OsString;
 use std::fmt;
@@ -19,6 +20,7 @@ use mode::Mode;
 use outcome::Outcome;
 use sources::Sources;
 use stack_size::StackSize;
+pub use verdict::Verdict;
 
 #[derive(Debug)]
 pub struct Cli {
@@ -30,8 +32,8 @@ impl Cli {
     pub fn from_args(arguments: impl Iterator<Item = OsString>) -> Cli {
         let given: Vec<OsString> = arguments.collect();
         let mode = Mode::of_arguments(&given);
-        let roots = mode.roots(&given);
-        let roots = roots.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| roots);
+        let named = mode.roots(&given);
+        let roots = named.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| named);
         Cli { roots, mode }
     }
 
@@ -42,6 +44,16 @@ impl Cli {
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> ExitCode {
+        self.verdict(files, out, err).into()
+    }
+
+    #[must_use]
+    pub fn verdict(
+        &self,
+        files: &(impl Files + Sync),
+        out: &mut (impl Write + Send),
+        err: &mut (impl Write + Send),
+    ) -> Verdict {
         match self.mode.refusal() {
             Some(refused) => Self::refused(refused, err),
             None => StackSize::LINT
@@ -56,30 +68,30 @@ impl Cli {
         files: &(impl Files + Sync),
         out: &mut impl Write,
         err: &mut impl Write,
-    ) -> ExitCode {
+    ) -> Verdict {
         match staged {
             Ok(stage) => self.staged(&Sources::new(files, &stage), out, err),
             Err(failure) => Self::refused(&failure, err),
         }
     }
 
-    fn staged(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+    fn staged(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> Verdict {
         thread::scope(|scope| {
             let helpers = self.mode.helpers(scope, sources);
             let readout = SourceFiles::read_staged(sources.files(), sources.stage());
             let outcome = self.mode.outcome_of(&readout, sources.queue(), helpers, out);
             let written = outcome.violations().map(|violations| Self::written(violations, err));
-            written.unwrap_or(ExitCode::SUCCESS)
+            written.unwrap_or(Verdict::Clean)
         })
     }
 
-    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> ExitCode {
+    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> Verdict {
         writeln!(err, "{failure}").ok();
-        ExitCode::FAILURE
+        Verdict::Refused
     }
 
-    fn written(violations: &Outcome<'_>, err: &mut impl Write) -> ExitCode {
+    fn written(violations: &Outcome<'_>, err: &mut impl Write) -> Verdict {
         write!(err, "{violations}").ok();
-        ExitCode::FAILURE
+        Verdict::Violations
     }
 }

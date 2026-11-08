@@ -28,7 +28,7 @@ impl From<&CrateRoot> for CrateName {
             ToString::to_string,
         );
         let underscored: String =
-            spelled.chars().map(|letter| Some(letter).filter(|letter| *letter != '-').unwrap_or('_')).collect();
+            spelled.chars().map(|letter| Some(letter).filter(|candidate| *candidate != '-').unwrap_or('_')).collect();
         CrateName(Name::from(underscored.as_str()))
     }
 }

@@ -4,7 +4,7 @@ use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
 use lint_fixtures::{Lines, Sources};
 use lint_reader::SourceFiles;
-use lint_runner::Cli;
+use lint_runner::{Cli, Verdict};
 
 use std::ffi::OsString;
 use std::num::NonZeroUsize;
@@ -192,6 +192,20 @@ fn the_query_command_refuses_a_malformed_role() {
 }
 
 #[test]
+fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "pub struct A;\n")?;
+    let clean = root.verdict(&[]);
+    root.write("src/lib.rs", DIRTY)?;
+    let unreadable = Trees::verdict(&Memory::default(), Path::new("/no/such/root"), &[]);
+    assert_eq!(
+        [clean, root.verdict(&[]), root.verdict(&["query", "--role", "nonsense", "--in"]), unreadable],
+        [Verdict::Clean, Verdict::Violations, Verdict::Refused, Verdict::Refused]
+    );
+    Ok(())
+}
+
+#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
@@ -237,6 +251,11 @@ impl Trees {
             out: String::from_utf8(out).unwrap_or_default(),
             err: String::from_utf8(err).unwrap_or_default(),
         }
+    }
+
+    fn verdict(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Verdict {
+        let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
+        Cli::from_args(arguments).verdict(files, &mut Vec::new(), &mut Vec::new())
     }
 
     fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
@@ -298,6 +317,10 @@ impl Scratch {
 
     fn flagged(&self, flags: &[&str]) -> Printed {
         Trees::flagged(&self.files, &self.root, flags)
+    }
+
+    fn verdict(&self, flags: &[&str]) -> Verdict {
+        Trees::verdict(&self.files, &self.root, flags)
     }
 
     fn crate_graph_lines(&self) -> Result<Lines, Box<dyn Error>> {
@@ -363,16 +386,16 @@ fn a_parse_failure_names_its_line() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn files_outside_crate_targets_and_fixture_trees_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", CLEAN)?;
-    root.write("tests/ui/bad.rs", "fn (")?;
-    root.write("tooling/corpus/dirty.rs", DIRTY)?;
-    assert_eq!(root.reported(), Reported::clean());
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", CLEAN)?;
-    root.write("tooling/corpus/case/src/lib.rs", DIRTY)?;
-    root.write("tests/fixtures/bad/src/lib.rs", "fn (")?;
-    assert_eq!(root.reported(), Reported::clean());
+    let outside = Scratch::package()?;
+    outside.write("src/lib.rs", CLEAN)?;
+    outside.write("tests/ui/bad.rs", "fn (")?;
+    outside.write("tooling/corpus/dirty.rs", DIRTY)?;
+    assert_eq!(outside.reported(), Reported::clean());
+    let fixtures = Scratch::package()?;
+    fixtures.write("src/lib.rs", CLEAN)?;
+    fixtures.write("tooling/corpus/case/src/lib.rs", DIRTY)?;
+    fixtures.write("tests/fixtures/bad/src/lib.rs", "fn (")?;
+    assert_eq!(fixtures.reported(), Reported::clean());
     Ok(())
 }
 
@@ -434,14 +457,14 @@ fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Erro
 
 #[test]
 fn bin_roots_and_modules_named_like_build_directories_are_read() -> Result<(), Box<dyn Error>> {
-    let root = Scratch::package()?;
-    root.write("src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
-    root.write("src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
-    assert_eq!(root.reported().violations(), 2);
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", "pub mod target;\n")?;
-    root.write("src/target/mod.rs", DIRTY)?;
-    assert_eq!(root.reported().violations(), 2);
+    let bins = Scratch::package()?;
+    bins.write("src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
+    bins.write("src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
+    assert_eq!(bins.reported().violations(), 2);
+    let build_named = Scratch::package()?;
+    build_named.write("src/lib.rs", "pub mod target;\n")?;
+    build_named.write("src/target/mod.rs", DIRTY)?;
+    assert_eq!(build_named.reported().violations(), 2);
     Ok(())
 }
 
@@ -578,8 +601,11 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    let ring: Vec<String> = (0..RING).map(|index| format!("pub struct R{index}(R{});\n", (index + 1) % RING)).collect();
-    let ring = ring.concat();
+    let links: Vec<String> = (0..RING)
+        .zip((0..RING).cycle().skip(1))
+        .map(|(index, next)| format!("pub struct R{index}(R{next});\n"))
+        .collect();
+    let ring = links.concat();
     root.write("code/lib.rs", &format!("pub mod a;\n{ring}"))?;
     root.write("code/a.rs", CHAIN_A)?;
     let named = format!("{}:1", root.at("code/lib.rs").display());
@@ -635,16 +661,16 @@ fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Bo
 
 #[test]
 fn conditional_paths_and_nested_packages_are_read() -> Result<(), Box<dyn Error>> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
-    root.write("src/a.rs", CLEAN)?;
-    root.write("src/b.rs", DIRTY)?;
-    assert_eq!(root.reported().violations(), 2);
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", CLEAN)?;
-    root.write("inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
-    root.write("inner/src/lib.rs", DIRTY)?;
-    assert_eq!(root.reported().violations(), 2);
+    let conditional = Scratch::package()?;
+    conditional.write("src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
+    conditional.write("src/a.rs", CLEAN)?;
+    conditional.write("src/b.rs", DIRTY)?;
+    assert_eq!(conditional.reported().violations(), 2);
+    let nested = Scratch::package()?;
+    nested.write("src/lib.rs", CLEAN)?;
+    nested.write("inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
+    nested.write("inner/src/lib.rs", DIRTY)?;
+    assert_eq!(nested.reported().violations(), 2);
     Ok(())
 }
 
@@ -729,8 +755,8 @@ fn a_directory_that_cannot_be_listed_fails_closed_wherever_it_is_reached() -> Re
         scratch.write(&format!("{root}/{directory}/kept.txt"), "x")?;
         let unlistable = scratch.files.canonical(&scratch.at(&format!("{root}/{directory}")))?;
         assert_eq!(scratch.reported_at(&format!("{root}/{given}")), Reported::clean(), "{directory}");
-        let given = [scratch.at(&format!("{root}/{given}"))];
-        let run = Trees::reported_through(&FakeUnlistable::new(&scratch.files, unlistable.clone()), &given);
+        let trees = [scratch.at(&format!("{root}/{given}"))];
+        let run = Trees::reported_through(&FakeUnlistable::new(&scratch.files, unlistable.clone()), &trees);
         assert_eq!(run.exit, ExitCode::FAILURE, "{directory}");
         assert!(run.err.contains(&format!("cannot read {}", unlistable.display())), "{directory}: {}", run.err);
         Ok(())
@@ -798,17 +824,12 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
             ),
             1,
         ),
-        (format!("fn render_page(a: {angle}{}) {{}}\n", ">".repeat(SHALLOW_NESTING) + &angle), 1),
+        (format!("fn render_page(a: {angle}{}{angle}) {{}}\n", ">".repeat(SHALLOW_NESTING)), 1),
     ];
     cases.iter().try_for_each(|(source, failures)| {
         let root = Scratch::package()?;
         root.write("src/lib.rs", source)?;
-        assert_eq!(
-            root.reported().err.matches("nested more than").count(),
-            *failures,
-            "{}",
-            &source[..source.len().min(40)]
-        );
+        assert_eq!(root.reported().err.matches("nested more than").count(), *failures, "{source}");
         Ok(())
     })
 }

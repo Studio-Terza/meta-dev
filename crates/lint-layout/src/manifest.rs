@@ -187,10 +187,10 @@ impl Manifest {
 
     fn default_files(name: Option<Name>) -> Vec<PathBuf> {
         name.into_iter()
-            .flat_map(|name| {
+            .flat_map(|crate_name| {
                 Self::TARGET_DIRECTORIES
                     .iter()
-                    .map(move |directory| PathBuf::from(directory).join(&name))
+                    .map(move |directory| PathBuf::from(directory).join(&crate_name))
                     .flat_map(|target| [target.with_extension(Self::SOURCE_EXTENSION), target.join(Self::MAIN_FILE)])
             })
             .collect()

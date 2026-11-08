@@ -19,8 +19,8 @@ pub struct Summarize {
 }
 
 impl Step for Summarize {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Summarize, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<Summarize, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let report = &arguments.taken()?;
         let summary = &arguments.taken()?;
         arguments.ended()?;

@@ -45,12 +45,12 @@ impl<'tree> SourceFiles<'tree> {
 
     pub fn staged<'given>(files: &(impl Files + Sync), roots: &'given [PathBuf]) -> Result<Stage<'given>, Failure> {
         let opened = Tree::open_many(files, roots);
-        let shape: Vec<Vec<&Tree<'_>>> = opened.iter().map(|opened| opened.iter().collect()).collect();
-        let staged = Regrouped::like(&shape, Staged::under(files, &shape.concat()));
+        let shape: Vec<Vec<&Tree<'_>>> = opened.iter().map(|group| group.iter().collect()).collect();
+        let regrouped = Regrouped::like(&shape, Staged::under(files, &shape.concat()));
         let (trees, staged): (Vec<Tree<'_>>, Vec<Vec<Staged>>) = opened
             .into_iter()
-            .zip(staged)
-            .map(|(opened, staged)| Ok((opened?, staged.into_iter().collect::<Result<Vec<Staged>, Failure>>()?)))
+            .zip(regrouped)
+            .map(|(attempt, stages)| Ok((attempt?, stages.into_iter().collect::<Result<Vec<Staged>, Failure>>()?)))
             .collect::<Result<Vec<(Tree<'_>, Vec<Staged>)>, Failure>>()?
             .into_iter()
             .unzip();
@@ -64,7 +64,7 @@ impl<'tree> SourceFiles<'tree> {
             .trees
             .iter()
             .zip(&stage.staged)
-            .flat_map(|(tree, staged)| staged.iter().flat_map(|staged| staged.starts(tree)));
+            .flat_map(|(tree, staged)| staged.iter().flat_map(|entry| entry.starts(tree)));
         let started = SourceFiles {
             seen: BTreeSet::new(),
             readout: Readout::default(),
@@ -74,16 +74,16 @@ impl<'tree> SourceFiles<'tree> {
             .trees
             .iter()
             .zip(&stage.staged)
-            .flat_map(|(tree, staged)| staged.iter().map(move |staged| (tree, staged)));
+            .flat_map(|(tree, staged)| staged.iter().map(move |entry| (tree, entry)));
         read.fold(started, |reading, (tree, staged)| reading.tree(tree, staged)).readout.sorted()
     }
 
     fn tree(self, tree: &'tree Tree<'tree>, staged: &Staged) -> SourceFiles<'tree> {
         let read = staged.targets().iter().fold(self, |reading, target| {
-            target.files().iter().fold(reading, |reading, file| {
+            target.files().iter().fold(reading, |in_target, file| {
                 let scope = Scope::new(tree, target.package(), CrateFile::from(tree.display(file)));
                 let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
-                reading.file(&scope, file, &children)
+                in_target.file(&scope, file, &children)
             })
         });
         SourceFiles { readout: read.readout.with_repo_files(staged.repo_files().to_vec()), ..read }
@@ -91,7 +91,7 @@ impl<'tree> SourceFiles<'tree> {
 
     fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> SourceFiles<'tree> {
         let source =
-            self.seen.insert(file.to_path_buf()).then_some(file).and_then(|file| self.shelf.source(scope, file));
+            self.seen.insert(file.to_path_buf()).then_some(file).and_then(|unseen| self.shelf.source(scope, unseen));
         self.opened(scope, file, children_directory, source)
     }
 

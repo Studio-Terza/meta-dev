@@ -34,7 +34,7 @@ impl<'file> Facets<'file> {
 
     pub(crate) fn after(self, earlier: Option<Facets<'file>>) -> Facets<'file> {
         match earlier {
-            Some(earlier) => earlier.merged(self),
+            Some(previous) => previous.merged(self),
             None => self,
         }
     }
@@ -77,8 +77,10 @@ impl<'file> Facets<'file> {
         let [encode, decode] = Self::METHOD_PAIR;
         let coded = self.known(encode).zip(self.known(decode)).map(|(left, right)| Pair::new(left, right));
         let from = self.forms(Self::FROM);
-        let formed =
-            self.forms(Self::TO).into_iter().filter_map(|(rest, to)| from.get(&rest).map(|from| Pair::new(to, from)));
+        let formed = self
+            .forms(Self::TO)
+            .into_iter()
+            .filter_map(|(rest, to)| from.get(&rest).map(|source| Pair::new(to, source)));
         coded.into_iter().chain(formed).collect()
     }
 

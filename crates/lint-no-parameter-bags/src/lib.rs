@@ -47,6 +47,6 @@ impl NoParameterBags {
             .filter_map(|file_uses| file_uses.sharing_crate(own))
             .filter_map(|file_uses| file_uses.mentions(name).map(|_| file_uses))
             .collect();
-        Some(consumers).filter(|consumers| consumers.len() == 1).and_then(|consumers| consumers.into_iter().next())
+        Some(consumers).filter(|candidates| candidates.len() == 1).and_then(|sole| sole.into_iter().next())
     }
 }

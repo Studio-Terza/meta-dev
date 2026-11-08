@@ -64,11 +64,11 @@ impl Deserializing {
     fn reading(
         wrapped: Wrapped,
         required: impl IntoIterator<Item = WherePredicate>,
-        built: impl FnOnce(&Member) -> TokenStream,
+        finish: impl FnOnce(&Member) -> TokenStream,
     ) -> TokenStream {
         let Wrapped { ident, generics, field, .. } = wrapped;
         let inner = field.inner();
-        let built = built(field.member());
+        let built = finish(field.member());
         let (_, arguments, _) = generics.split_for_impl();
         let named = quote!(#ident #arguments);
         let mut borrowing = generics;

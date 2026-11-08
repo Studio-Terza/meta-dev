@@ -13,8 +13,8 @@ pub struct StageIssues {
 }
 
 impl Step for StageIssues {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<StageIssues, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<StageIssues, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let limits = arguments.taken()?;
         let measured = arguments.taken()?;
         Ok(StageIssues { limits: gate_limits::Cli::from_args([limits, measured].into_iter().chain(arguments.rest())) })

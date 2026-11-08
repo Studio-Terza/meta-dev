@@ -44,7 +44,7 @@ impl<'model> Door<'model> {
         let subject = implementation.subject_type().named().map(AsRef::<Resolved>::as_ref);
         let written = implementation.interface().and_then(|interface| AsRef::<Spelling>::as_ref(interface).written());
         let named = written.and_then(ItemPath::last).and_then(|word| word.matches::<Whole>(&Lexicon::DOOR_WORDS));
-        open.and(named).and(subject).map(|subject| Door { path: placed.site().path(), subject })
+        open.and(named).and(subject).map(|opened| Door { path: placed.site().path(), subject: opened })
     }
 
     fn opening(&self, path: &Path, subject: &Resolved) -> Option<&Door<'model>> {
@@ -70,7 +70,7 @@ impl Newtypes {
     }
 
     fn newtype(&self, item: Option<ItemId>) -> Option<ItemId> {
-        item.and_then(|item| self.0.iter().find(|newtype| **newtype == item).copied())
+        item.and_then(|id| self.0.iter().find(|newtype| **newtype == id).copied())
     }
 
     fn edge(&self, function: &Function) -> Option<ItemId> {
@@ -122,13 +122,13 @@ impl<'model> Scope<'model> {
         let open = Scope::open(*AsRef::<Region>::as_ref(call));
         let seat: &Seat = call.as_ref();
         let subject = seat.subject().and_then(TypeRef::named).map(AsRef::<Resolved>::as_ref);
-        let door = subject.and_then(|subject| self.doors.iter().find_map(|door| door.opening(path, subject)));
+        let door = subject.and_then(|named| self.doors.iter().find_map(|door| door.opening(path, named)));
         open.and_then(|_| Scope::unexempted(door.as_ref(), call))
     }
 
     pub fn local_alias(&self, resolved: &Resolved, file: &Path) -> Option<&'model TypeRef> {
         let alias = resolved.crate_item().and_then(|item| self.aliases.iter().find(|alias| alias.item == item));
-        alias.and_then(|alias| alias.local(file))
+        alias.and_then(|found| found.local(file))
     }
 
     fn own(region: Region) -> Option<Region> {

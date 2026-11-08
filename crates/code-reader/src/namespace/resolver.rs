@@ -196,7 +196,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
 
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
         let levels = Importing(self.importing).levels(self.space.chain(scope), key);
-        let first = |reading: Reading| Lookup::new(Sight::Inside, self.ignored, reading);
+        let first = |asked: Reading| Lookup::new(Sight::Inside, self.ignored, asked);
         self.walked(levels, key, first(reading)).disputed(
             || self.walked(levels, key, first(Reading::Explicit)),
             || self.walked(levels, key, first(Reading::Imported)),

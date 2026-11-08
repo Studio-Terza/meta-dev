@@ -31,15 +31,15 @@ impl Matrix {
         let mut refusal = Vec::new();
         let answered = mutation_report::Cli::answer(&arguments, files, &mut refusal);
         Some(answered)
-            .filter(|answered| *answered == ExitCode::SUCCESS)
+            .filter(|code| *code == ExitCode::SUCCESS)
             .map(|_| &self.markdown)
             .ok_or_else(|| Failure::Matrix(Refusal::from(refusal)))
     }
 }
 
 impl Step for Matrix {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Matrix, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<Matrix, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let shards = &arguments.taken()?;
         let sources = &arguments.taken()?;
         let directory = &arguments.taken()?;

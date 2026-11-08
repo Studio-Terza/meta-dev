@@ -72,8 +72,8 @@ impl<'path> Target<'path> {
     }
 
     fn enclosing<'user>(&self, boundary: &[&Name], user: &'user ModulePath<'_>) -> Option<&'user ModulePath<'user>> {
-        Some(user).filter(|user| self.crate_root == user.crate_root).filter(|user| {
-            user.segments.get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
+        Some(user).filter(|candidate| self.crate_root == candidate.crate_root).filter(|in_crate| {
+            in_crate.segments.get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
         })
     }
 

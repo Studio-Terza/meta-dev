@@ -44,12 +44,12 @@ impl Directory {
             .collect()
     }
 
-    fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored], survey: Survey) -> Survey {
-        let survey = survey.learn(files, Fact::Listed, level);
-        let entries: Vec<PathBuf> = level.iter().flat_map(|directory| survey.entries(directory)).cloned().collect();
-        let survey = survey.learn(files, Fact::Kind, &entries);
+    fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored], known: Survey) -> Survey {
+        let listed = known.learn(files, Fact::Listed, level);
+        let entries: Vec<PathBuf> = level.iter().flat_map(|directory| listed.entries(directory)).cloned().collect();
+        let with_kinds = listed.learn(files, Fact::Kind, &entries);
         let manifests = Ignored::manifests(level);
-        let survey = survey.learn(files, Fact::Followed, &manifests);
+        let survey = with_kinds.learn(files, Fact::Followed, &manifests);
         let kept = Kept::new(&survey, ignored);
         let next: Vec<Directory> = level.iter().flat_map(|directory| kept.below(directory)).collect();
         Self::descended(files, next, ignored, survey)

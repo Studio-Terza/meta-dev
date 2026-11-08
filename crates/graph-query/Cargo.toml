@@ -16,6 +16,7 @@ lint-placement = { path = "../lint-placement" }
 lint-transition-graph = { path = "../lint-transition-graph" }
 newtype = { path = "../newtype" }
 syn.workspace = true
+thiserror.workspace = true
 transition-facts = { path = "../transition-facts" }
 type-facts = { path = "../type-facts" }
 

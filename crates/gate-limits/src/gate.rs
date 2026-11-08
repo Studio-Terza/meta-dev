@@ -27,11 +27,15 @@ pub struct Gate {
 }
 
 impl Gate {
-    pub fn judge(limits: Contents, measured: Contents, only: &[OsString]) -> Result<Gate, Failure<'_>> {
-        let limits: BTreeMap<Stage, Limit> =
-            toml::from_str(&limits.into_inner()).map_err(|source| Failure::Parse { file: Document::Limits, source })?;
-        let limits = Self::sliced(limits, only)?;
-        let measured: BTreeMap<Stage, Seconds> = toml::from_str(&measured.into_inner())
+    pub fn judge(
+        limits_contents: Contents,
+        measured_contents: Contents,
+        only: &[OsString],
+    ) -> Result<Gate, Failure<'_>> {
+        let all_limits: BTreeMap<Stage, Limit> = toml::from_str(&limits_contents.into_inner())
+            .map_err(|source| Failure::Parse { file: Document::Limits, source })?;
+        let limits = Self::sliced(all_limits, only)?;
+        let measured: BTreeMap<Stage, Seconds> = toml::from_str(&measured_contents.into_inner())
             .map_err(|source| Failure::Parse { file: Document::Measured, source })?;
         Pairing::joined(limits, measured)
             .into_iter()

@@ -24,7 +24,7 @@ pub struct Sources(&'static [Source]);
 impl Sources {
     #[must_use]
     pub fn file(path: impl Into<PathBuf>, text: Text<'_>) -> SourceFile {
-        match SourceFile::parse(path, SourceText::new(text.into_inner().to_string())) {
+        match SourceFile::parse(path, SourceText::new(text.into_inner().to_owned())) {
             Ok(file) => file,
             Err(failure) => unreachable!("fixture source parses: {failure}"),
         }

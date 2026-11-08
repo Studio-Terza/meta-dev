@@ -38,7 +38,7 @@ impl Checked for Small {
     type Error = Empty;
 
     fn checked(number: &u128) -> Result<&u128, Empty> {
-        Some(number).filter(|number| **number < 1000).ok_or(Empty)
+        Some(number).filter(|candidate| **candidate < 1000).ok_or(Empty)
     }
 }
 
@@ -50,7 +50,7 @@ impl Checked for Digest {
     type Error = Empty;
 
     fn checked(text: &String) -> Result<&String, Empty> {
-        Some(text).filter(|text| text.len() == 40).ok_or(Empty)
+        Some(text).filter(|candidate| candidate.len() == 40).ok_or(Empty)
     }
 }
 
@@ -85,7 +85,7 @@ impl Json {
     }
 
     fn read<Read: newtype::serde::de::DeserializeOwned>(text: Option<&str>) -> Option<Read> {
-        text.and_then(|text| serde_json::from_str(text).ok())
+        text.and_then(|json| serde_json::from_str(json).ok())
     }
 
     fn word(text: &String) -> Option<Word> {
@@ -213,7 +213,7 @@ laws::law!(a_formatted_string_with_its_own_strategy_generates, any::<Digest>(), 
 });
 
 laws::law!(a_plain_newtype_takes_its_own_strategy, any::<Even>(), even, {
-    prop_assert_eq!(even.into_inner() % 2, 0);
+    prop_assert!(even.into_inner().is_multiple_of(2));
 });
 
 laws::law!(a_generic_field_that_is_not_the_bare_parameter_generates, any::<Many<u8>>(), many, {

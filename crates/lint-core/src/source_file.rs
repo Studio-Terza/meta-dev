@@ -32,9 +32,9 @@ impl SourceFile {
     const MANIFEST: &'static str = "Cargo.toml";
 
     pub fn parse(path: impl Into<PathBuf>, text: SourceText) -> Result<Self, Failure> {
-        let path = path.into();
-        let placement = Placement::locate(&Absent, &path);
-        Self::parsed(path, Located::Shown, placement, text)
+        let file_path = path.into();
+        let placement = Placement::locate(&Absent, &file_path);
+        Self::parsed(file_path, Located::Shown, placement, text)
     }
 
     pub fn parse_at(path: PathBuf, located: PathBuf, placement: Placement, text: SourceText) -> Result<Self, Failure> {
@@ -44,7 +44,7 @@ impl SourceFile {
     fn parsed(path: PathBuf, located: Located, placement: Placement, text: SourceText) -> Result<Self, Failure> {
         match Nesting::within_limit(&text)
             .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), Nesting))
-            .and_then(|text| syn::parse_file(text.as_ref()))
+            .and_then(|bounded| syn::parse_file(bounded.as_ref()))
         {
             Ok(syntax) => Ok(Self {
                 crate_file: placement.crate_file(&path),
@@ -99,7 +99,7 @@ impl SourceFile {
     pub fn manifest_file(&self) -> &ManifestFile {
         self.manifest.get_or_init(|| {
             let inside = self.located.within(&self.path).strip_prefix(self.placement.package().root().directory()).ok();
-            let depth = inside.map_or(0, |inside| inside.components().count());
+            let depth = inside.map_or(0, |relative| relative.components().count());
             ManifestFile::from(self.path.ancestors().nth(depth).unwrap_or(&self.path).join(Self::MANIFEST))
         })
     }

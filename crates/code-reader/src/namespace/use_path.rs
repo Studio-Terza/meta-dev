@@ -250,7 +250,7 @@ impl UsePath {
             UseTree::Path(path) => self.joined(Name::from(&path.ident)).under(&path.tree),
             UseTree::Name(named) => self.named(Name::from(&named.ident), Name::from(&named.ident)),
             UseTree::Rename(renamed) => self.named(Name::from(&renamed.ident), Name::from(&renamed.rename)),
-            UseTree::Group(group) => group.items.iter().flat_map(|tree| self.under(tree)).collect(),
+            UseTree::Group(group) => group.items.iter().flat_map(|member| self.under(member)).collect(),
             UseTree::Glob(_) => vec![Imported::Glob(self.clone())],
         }
     }

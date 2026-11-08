@@ -61,8 +61,8 @@ impl ManualIteration {
     fn accumulating(statement: &Stmt) -> Option<&ExprMethodCall> {
         match statement {
             Stmt::Expr(Expr::If(branch), _) => Some(branch)
-                .filter(|branch| branch.else_branch.is_none())
-                .and_then(|branch| Self::accumulator(&branch.then_branch)),
+                .filter(|candidate| candidate.else_branch.is_none())
+                .and_then(|bare_if| Self::accumulator(&bare_if.then_branch)),
             Stmt::Expr(Expr::MethodCall(call), _) => Self::accumulated(call),
             _ => None,
         }
@@ -70,8 +70,8 @@ impl ManualIteration {
 
     fn accumulated(call: &ExprMethodCall) -> Option<&ExprMethodCall> {
         Some(call)
-            .filter(|call| matches!(*call.receiver, Expr::Path(_) | Expr::Field(_)))
-            .and_then(|call| Name::from(&call.method).matches::<Whole>(&Self::ACCUMULATORS).map(|_| call))
+            .filter(|candidate| matches!(*candidate.receiver, Expr::Path(_) | Expr::Field(_)))
+            .and_then(|on_place| Name::from(&on_place.method).matches::<Whole>(&Self::ACCUMULATORS).map(|_| on_place))
     }
 }
 
@@ -121,8 +121,8 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
 
     fn visit_local(&mut self, local: &'ast Local) {
         let finding = Some(local)
-            .filter(|local| matches!(&local.pat, Pat::Ident(binding) if binding.mutability.is_some()))
-            .and_then(|local| local.init.as_ref())
+            .filter(|candidate| matches!(&candidate.pat, Pat::Ident(binding) if binding.mutability.is_some()))
+            .and_then(|mutable| mutable.init.as_ref())
             .filter(|init| {
                 let mut calls = IteratorCalls::default();
                 calls.visit_expr(&init.expr);

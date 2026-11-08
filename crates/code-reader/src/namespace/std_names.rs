@@ -367,7 +367,7 @@ impl StdNames {
     ];
 
     pub(crate) fn aliased(building: Building) -> Building {
-        Self::STD_ALIASES.iter().fold(building, |building, alias| alias.declared(building))
+        Self::STD_ALIASES.iter().fold(building, |built, alias| alias.declared(built))
     }
 
     pub(super) fn resolved(path: ItemPath) -> Resolved {

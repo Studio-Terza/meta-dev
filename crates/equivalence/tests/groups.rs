@@ -28,8 +28,8 @@ impl Keyed for Span {
 impl Nested for Span {
     fn lies_within<'outer>(&self, outer: &'outer Span) -> Option<&'outer Span> {
         Some(outer)
-            .filter(|outer| outer.from <= self.from)
-            .filter(|outer| self.from + self.length <= outer.from + outer.length)
+            .filter(|starting| starting.from <= self.from)
+            .filter(|covering| self.from + self.length <= covering.from + covering.length)
     }
 }
 

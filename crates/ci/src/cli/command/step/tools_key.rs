@@ -29,8 +29,8 @@ impl ToolsKey {
 }
 
 impl Step for ToolsKey {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ToolsKey, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<ToolsKey, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let metadata = &arguments.taken()?;
         let output = &arguments.taken()?;
         arguments.ended()?;

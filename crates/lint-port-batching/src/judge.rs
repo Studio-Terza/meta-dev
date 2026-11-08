@@ -47,20 +47,22 @@ impl<'run> Judge<'run> {
 
     fn param(&self, module: &Module<'_>, param: &GenericParam) -> Option<Name> {
         match param {
-            GenericParam::Type(param) => {
-                param.bounds.iter().find_map(|bound| self.bound(module, bound)).map(|_| Name::from(&param.ident))
-            }
+            GenericParam::Type(type_param) => type_param
+                .bounds
+                .iter()
+                .find_map(|bound| self.bound(module, bound))
+                .map(|_| Name::from(&type_param.ident)),
             GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         }
     }
 
     fn predicate(&self, module: &Module<'_>, predicate: &WherePredicate) -> Option<Name> {
         match predicate {
-            WherePredicate::Type(predicate) => predicate
+            WherePredicate::Type(typed) => typed
                 .bounds
                 .iter()
                 .find_map(|bound| self.bound(module, bound))
-                .and(Spelling::ident(&predicate.bounded_ty))
+                .and(Spelling::ident(&typed.bounded_ty))
                 .map(Name::from),
             _ => None,
         }

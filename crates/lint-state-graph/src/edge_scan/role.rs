@@ -24,7 +24,7 @@ impl<'scan, 'item> Role<'scan, 'item> {
     ) -> Role<'scan, 'item> {
         match receiver {
             None => Self::associated(context, shape),
-            Some(receiver) => Self::received(receiver, context, shape),
+            Some(declared) => Self::received(declared, context, shape),
         }
     }
 

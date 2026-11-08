@@ -44,10 +44,10 @@ impl Package {
             .filter_map(|entry| Self::crate_root(survey, entry))
             .collect();
         let Package { directory, declared } = self;
-        let declared = declared.into_iter().filter(|file| survey.file(file).is_some());
+        let present = declared.into_iter().filter(|file| survey.file(file).is_some());
         let roots = Self::ROOT_FILES.iter().map(|file| directory.join(file)).filter(|file| survey.file(file).is_some());
         let files: Vec<PathBuf> =
-            declared.chain(roots).chain(crates).filter(|file| file.starts_with(tree.canonical())).collect();
+            present.chain(roots).chain(crates).filter(|file| file.starts_with(tree.canonical())).collect();
         files.first().map(|_| ()).map(|()| Target::new(directory, files))
     }
 

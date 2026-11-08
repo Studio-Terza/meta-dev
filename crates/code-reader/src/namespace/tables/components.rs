@@ -58,7 +58,7 @@ impl Marks {
     fn inherited(mut self, parent: ScopeId, child: ScopeId) -> Marks {
         let low = self.visit(child).map(|visit| visit.low);
         let row = parent.row_mut(&mut self.marks);
-        row.zip(low).into_iter().for_each(|(mark, low)| *mark = mark.lowered(low));
+        row.zip(low).into_iter().for_each(|(mark, child_low)| *mark = mark.lowered(child_low));
         self
     }
 
@@ -96,14 +96,14 @@ impl<'graph> Walk<'graph> {
         let scope = descent.scope;
         let open = self.open.into_iter().chain([scope]).collect();
         let marks = self.marks.opened(scope);
-        let walk = Walk { successors: self.successors, marks, open, components: self.components };
-        let walk = descent.successors.iter().fold(walk, |walk, next| {
-            let walk = walk.reached(*next);
+        let opened = Walk { successors: self.successors, marks, open, components: self.components };
+        let walk = descent.successors.iter().fold(opened, |walking, next| {
+            let reached = walking.reached(*next);
             Walk {
-                successors: walk.successors,
-                marks: walk.marks.inherited(scope, *next),
-                open: walk.open,
-                components: walk.components,
+                successors: reached.successors,
+                marks: reached.marks.inherited(scope, *next),
+                open: reached.open,
+                components: reached.components,
             }
         });
         let root = walk.marks.visit(scope).and_then(Visit::root);
@@ -146,7 +146,7 @@ impl Shape {
     ) -> ControlFlow<State, State> {
         match self {
             Shape::Acyclic => settling.round(state, scopes),
-            Shape::Cyclic => iter::repeat(()).try_fold(state, |state, ()| settling.round(state, scopes)),
+            Shape::Cyclic => iter::repeat(()).try_fold(state, |settled, ()| settling.round(settled, scopes)),
         }
     }
 }
@@ -176,11 +176,11 @@ impl Components {
     pub(super) fn ordered(successors: &[Vec<ScopeId>]) -> Components {
         let marks = Marks { marks: vec![Mark::Unseen; successors.len()], visited: Reach::FIRST };
         let walk = Walk { successors, marks, open: Vec::new(), components: Vec::new() };
-        let walk = ScopeId::ids(successors).fold(walk, Walk::reached);
-        Components(walk.components)
+        let walked = ScopeId::ids(successors).fold(walk, Walk::reached);
+        Components(walked.components)
     }
 
     pub(super) fn settled<State>(&self, state: State, settling: &impl Settling<State>) -> State {
-        self.0.iter().fold(state, |state, component| component.settled(state, settling))
+        self.0.iter().fold(state, |settled, component| component.settled(settled, settling))
     }
 }

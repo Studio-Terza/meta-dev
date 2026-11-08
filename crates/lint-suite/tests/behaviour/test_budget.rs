@@ -19,8 +19,8 @@ struct Budgets;
 
 impl Budgets {
     fn of_crate(files: &[SourceFile], name: &str) -> Option<String> {
-        let name = CrateName::from(&CrateRoot::new(PathBuf::from(name)));
-        TestBudget::measured(files).of_crate(&name).map(|budget| budget.to_string())
+        let crate_name = CrateName::from(&CrateRoot::new(PathBuf::from(name)));
+        TestBudget::measured(files).of_crate(&crate_name).map(|budget| budget.to_string())
     }
 
     fn of_test_file(text: &&str) -> Option<String> {
@@ -49,26 +49,26 @@ laws::table!(
 
 #[test]
 fn only_test_modules_count_as_test_lines_and_only_once() {
-    let files = [Sources::file("crates/a/src/lib.rs", Text::new(SHIPPED))];
-    assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(0, 1, 2, 0)));
-    let files = [Sources::file("crates/a/src/lib.rs", Text::new(WITH_MODULE))];
-    assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(1, 1, 6, 5)));
-    let files = [Sources::file("crates/a/src/lib.rs", Text::new(NESTED))];
-    assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(1, 1, 7, 7)));
+    let shipped = [Sources::file("crates/a/src/lib.rs", Text::new(SHIPPED))];
+    assert_eq!(Budgets::of_crate(&shipped, "a"), Some(Budgets::counted(0, 1, 2, 0)));
+    let with_module = [Sources::file("crates/a/src/lib.rs", Text::new(WITH_MODULE))];
+    assert_eq!(Budgets::of_crate(&with_module, "a"), Some(Budgets::counted(1, 1, 6, 5)));
+    let nested = [Sources::file("crates/a/src/lib.rs", Text::new(NESTED))];
+    assert_eq!(Budgets::of_crate(&nested, "a"), Some(Budgets::counted(1, 1, 7, 7)));
 }
 
 #[test]
 fn build_scripts_and_process_starts_belong_to_their_own_package() {
-    let files = [
+    let with_build = [
         Sources::file("crates/a/src/lib.rs", Text::new(SHIPPED)),
         Sources::file("crates/a/build.rs", Text::new(SHIPPED)),
     ];
-    assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(0, 2, 4, 0)));
-    let files = [
+    assert_eq!(Budgets::of_crate(&with_build, "a"), Some(Budgets::counted(0, 2, 4, 0)));
+    let starting = [
         Sources::file("crates/a/src/lib.rs", Text::new(STARTS)),
         Sources::file("crates/b/src/lib.rs", Text::new(SHIPPED)),
     ];
-    assert_eq!(Budgets::of_crate(&files, "b"), Some(Budgets::counted(0, 1, 2, 0)));
+    assert_eq!(Budgets::of_crate(&starting, "b"), Some(Budgets::counted(0, 1, 2, 0)));
 }
 
 #[test]
