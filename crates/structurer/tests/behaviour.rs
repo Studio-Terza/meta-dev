@@ -1,10 +1,11 @@
+use std::collections::BTreeSet;
 use std::io;
 
 use design_model::{
     AnyNode, Confidence, Entered, Entry, Explicitness, Facet, Node, NodeId, Ordinal, Prefix, Project, Provenance,
     SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Title,
 };
-use dispatch_ports::{Reply, Unreadable};
+use dispatch_ports::{Errored, Reply, Stderr, Told, Unreadable, Usage};
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
@@ -226,8 +227,15 @@ impl Jobs {
         prop_oneof![
             Just(Lapse::overdue()),
             "[^\u{0}]{0,30}".prop_map(|refusal| Lapse::refused(&io::Error::other(refusal))),
-            Just(Lapse::from(&Unreadable::Unsuccessful)),
-            "[^\u{0}]{0,30}".prop_map(|garbled| Lapse::from(&Unreadable::Json(garbled))),
+            Just(Lapse::from(&Unreadable::Unsuccessful { stderr: Stderr::Silent })),
+            ("[^\u{0}]{0,30}", "[^\u{0}]{0,30}").prop_map(|(garbled, said)| Lapse::from(&Unreadable::Json {
+                failure: garbled,
+                stderr: Stderr::Wrote(said)
+            })),
+            "[^\u{0}]{1,30}".prop_map(|told| Lapse::from(&Errored::new(Told::new(told), Usage::default()))),
+            vec(Jobs::said(), 1..=Job::SEGMENTS).prop_filter_map("a job owes its segments", |said| {
+                Job::new(said, &[]).owed().paid(&BTreeSet::new()).err().map(Lapse::from)
+            }),
             "[ -~]{0,30}"
                 .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
         ]

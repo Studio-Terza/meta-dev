@@ -14,7 +14,7 @@ use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::ReadFailure;
 
-use structurer::{Lapse, Misread};
+use structurer::{Lapse, Misread, Uncovered};
 
 use super::request::Unresolved;
 use crate::Outcome;
@@ -55,6 +55,8 @@ pub enum Failure {
     Misread(#[from] Misread),
     #[error("{0}; nothing was written")]
     Unresolved(#[from] Unresolved),
+    #[error("{0}; nothing was written")]
+    Uncovered(#[from] Uncovered),
     #[error("{0}")]
     Unspecified(#[from] Unspecified),
     #[error("{0}")]
@@ -113,6 +115,7 @@ impl Failure {
     pub(crate) fn refusal(self) -> Result<Lapse, Failure> {
         match self {
             Failure::Unresolved(unresolved) => Ok(Lapse::refused(&unresolved)),
+            Failure::Uncovered(uncovered) => Ok(Lapse::from(uncovered)),
             other => Err(other),
         }
     }

@@ -14,7 +14,7 @@ use dispatch_ports::Reply;
 use file_ports::{Bytes, Files, Text};
 use newtype::{Counter, Newtype};
 use store_ports::{Store, Written};
-use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
+use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, Owed, SegmentRef, Visit};
 use transcript_ports::{Authorship, Uuid};
 
 use super::Printed;
@@ -83,6 +83,7 @@ pub struct Parsed<'store, S: Store> {
     store: &'store S,
     directives: Directives,
     provenance: Provenance,
+    owed: Owed,
 }
 
 #[derive(Debug)]
@@ -169,13 +170,13 @@ impl<F: Files, S: Store> Sees for Fresh<'_, '_, F, S> {
     fn unseen(self, unseen: Unseen) -> Result<Application, Failure> {
         let text = Text::try_from(unseen.as_ref()).map_err(Failure::Directives)?;
         let directives: Directives = text.as_ref().parse()?;
-        Parsed::new(self.0.store(), directives, Provenance::from(Entered::Apply)).unseen(unseen)
+        Parsed::new(self.0.store(), directives, Provenance::from(Entered::Apply), Owed::default()).unseen(unseen)
     }
 }
 
 impl<'store, S: Store> Parsed<'store, S> {
-    pub fn new(store: &'store S, directives: Directives, provenance: Provenance) -> Parsed<'store, S> {
-        Parsed { store, directives, provenance }
+    pub fn new(store: &'store S, directives: Directives, provenance: Provenance, owed: Owed) -> Parsed<'store, S> {
+        Parsed { store, directives, provenance, owed }
     }
 }
 
@@ -190,6 +191,7 @@ impl<S: Store> Sees for Parsed<'_, S> {
     type Output = Result<Application, Failure>;
 
     fn before(self, earlier: Earlier) -> Result<Application, Failure> {
+        self.owed.paid(&BTreeSet::new())?;
         Ok(Application::Repeated(earlier))
     }
 
@@ -209,11 +211,12 @@ impl From<Application> for Outcome {
 
 impl Applied {
     fn resolved<S: Store>(parsed: Parsed<'_, S>, unseen: Unseen) -> Result<Applied, Failure> {
-        let Parsed { store, directives, provenance } = parsed;
+        let Parsed { store, directives, provenance, owed } = parsed;
         let started = Folded { resolved: Vec::new(), batch: Batch::starting(store.read(NextNode)?) };
         let folded = directives
             .into_iter()
             .try_fold(started, |folded, directive| folded.resolving(store, provenance, directive))?;
+        owed.paid(&folded.covering())?;
         let directed: Vec<Directed> =
             folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
         let written = store.write(Directions::new(provenance, unseen, directed))?;
@@ -267,6 +270,10 @@ impl Folded {
         let batch = self.batch.after(&grounded.effect);
         let resolved = self.resolved.into_iter().chain([Resolved { directive, grounded }]).collect();
         Ok(Folded { resolved, batch })
+    }
+
+    fn covering(&self) -> BTreeSet<SegmentRef> {
+        self.resolved.iter().flat_map(|resolved| resolved.grounded.directed.covered()).map(SegmentRef::from).collect()
     }
 }
 

@@ -46,6 +46,19 @@ impl Directed {
         }
     }
 
+    #[must_use]
+    pub fn covered(&self) -> Vec<&Segment> {
+        match self {
+            Directed::Placed { segment, .. }
+            | Directed::Sensed { segment, .. }
+            | Directed::Conversational { segment } => {
+                vec![segment]
+            }
+            Directed::Related { source, target, .. } => vec![source, target],
+            Directed::Proposed { .. } | Directed::Superseded(_) => Vec::new(),
+        }
+    }
+
     fn written(&self, annotating: &mut Annotating<'_, '_>) -> Result<Written, Refusal> {
         match self {
             Directed::Placed { segment, node, relation } => annotating.placed(segment, *node, *relation),

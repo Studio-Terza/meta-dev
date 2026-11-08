@@ -1,17 +1,19 @@
 mod boundary;
 
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
 
-use dispatch_ports::Unreadable;
+use dispatch_ports::{Errored, Unreadable};
 use grammar::output::field::{Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
 
-use crate::Misread;
 use crate::briefing::Quoting;
 use crate::misread::Briefed;
+use crate::owed::Listed;
+use crate::{Misread, Owed, Uncovered};
 use boundary::Reason;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -28,6 +30,10 @@ enum Lapsed {
     Refused(Reason),
     #[error("the agent's output was unreadable: {0}")]
     Unreadable(Reason),
+    #[error("the agent's run ended in error: {0}")]
+    Errored(Reason),
+    #[error("{0}")]
+    Uncovered(Uncovered),
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,6 +46,10 @@ enum Lapsing {
     Refused,
     #[name("unreadable")]
     Unreadable,
+    #[name("errored")]
+    Errored,
+    #[name("uncovered")]
+    Uncovered,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -64,6 +74,8 @@ impl Lapse {
             Lapsing::Unreadable => {
                 fields.field::<Quoted<Reason>>().map(|unreadable| Lapse(Lapsed::Unreadable(unreadable)))
             }
+            Lapsing::Errored => fields.field::<Quoted<Reason>>().map(|errored| Lapse(Lapsed::Errored(errored))),
+            Lapsing::Uncovered => Owed::from(fields).paid(&BTreeSet::new()).err().map(Lapse::from).ok_or(Unread::Ended),
         }
     }
 }
@@ -71,6 +83,18 @@ impl Lapse {
 impl From<&Unreadable> for Lapse {
     fn from(unreadable: &Unreadable) -> Lapse {
         Lapse(Lapsed::Unreadable(Reason::told(unreadable)))
+    }
+}
+
+impl From<&Errored> for Lapse {
+    fn from(errored: &Errored) -> Lapse {
+        Lapse(Lapsed::Errored(Reason::told(errored)))
+    }
+}
+
+impl From<Uncovered> for Lapse {
+    fn from(uncovered: Uncovered) -> Lapse {
+        Lapse(Lapsed::Uncovered(uncovered))
     }
 }
 
@@ -89,6 +113,8 @@ impl fmt::Display for Retried<'_> {
             Lapsed::Unreadable(unreadable) => {
                 write!(formatter, "{} {}", Lapsing::Unreadable, Quoting::from(unreadable))
             }
+            Lapsed::Errored(errored) => write!(formatter, "{} {}", Lapsing::Errored, Quoting::from(errored)),
+            Lapsed::Uncovered(uncovered) => write!(formatter, "{}{}", Lapsing::Uncovered, Listed::from(uncovered)),
         }
     }
 }

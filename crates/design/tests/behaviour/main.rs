@@ -10,7 +10,9 @@ use std::str::FromStr;
 
 use console_ports::Variables;
 
-use design::{Anchored, Attempted, Cli, Count, Failure, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
+use design::{
+    Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved,
+};
 use design_model::{
     AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId, Kin, Node,
     NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, RunId,
@@ -20,7 +22,7 @@ use design_store::{
     AppliedId, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage, ShownNode,
     Stored, StreamSchema,
 };
-use dispatch_ports::{Tokens, Unreadable, Usage};
+use dispatch_ports::{Errored, Stderr, Tokens, Told, Unreadable, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
@@ -32,7 +34,7 @@ use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, po
 use store_ports::{Busy, Sqlite, Store, Written};
 use stream::{Relation, Shape};
 use structure::Staff;
-use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef};
+use structurer::{Directive, Directives, Job, Lapse, NodeRef, Proposal, SegmentRef};
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
@@ -2098,8 +2100,20 @@ impl Generated {
         prop_oneof![
             Just(Lapse::overdue()),
             "[^\u{0}]{0,20}".prop_map(|refusal| Lapse::refused(&std::io::Error::other(refusal))),
-            Just(Lapse::from(&Unreadable::Unsuccessful)),
-            "[^\u{0}]{0,20}".prop_map(|garbled| Lapse::from(&Unreadable::Json(garbled))),
+            Just(Lapse::from(&Unreadable::Unsuccessful { stderr: Stderr::Silent })),
+            ("[^\u{0}]{0,20}", "[^\u{0}]{0,20}").prop_map(|(garbled, said)| Lapse::from(&Unreadable::Json {
+                failure: garbled,
+                stderr: Stderr::Wrote(said)
+            })),
+            "[^\u{0}]{1,20}".prop_map(|told| Lapse::from(&Errored::new(Told::new(told), Usage::default()))),
+            proptest::collection::vec(Generated::segment(), 1..4).prop_filter_map(
+                "a job owes its segments",
+                |segments| {
+                    let said =
+                        segments.into_iter().map(|segment| structurer::Said::new(segment, Body::new(String::new())));
+                    Job::new(said.collect(), &[]).owed().paid(&BTreeSet::new()).err().map(Lapse::from)
+                }
+            ),
             "[ -~]{0,20}"
                 .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
         ]
@@ -2123,6 +2137,9 @@ impl Generated {
                 .prop_map(|(job, lapse)| Line::Retried(Lapsed::new(JobId::new(job), lapse))),
             (0..i64::MAX, Generated::lapse())
                 .prop_map(|(job, lapse)| Line::Flailed(Lapsed::new(JobId::new(job), lapse))),
+            (Generated::segment(), 0..i64::MAX, 0..i64::MAX).prop_map(|(segment, job, run)| Line::FlailedSegment(
+                Flailing::new(segment, JobId::new(job), RunId::new(run))
+            )),
         ]
         .boxed()
     }

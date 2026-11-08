@@ -14,7 +14,7 @@ choices specificity general specific exact
 choices confidence tentative leaning firm
 choices explicitness explicit implicit
 choices facet project feature smell
-rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it."
+rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
 rule "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
 example "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)"
 example "conversational(aaaaaaaa-0000-4000-8000-000000000001.0)"
@@ -22,7 +22,9 @@ segment aaaaaaaa-0000-4000-8000-000000000001.0 "what of aaaaaaaa-0000-4000-8000-
 segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
 segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
-node n1 project vague
+node n1 "demo" project vague
+node n2 "other" project vague
+node n4 "other" feature vague "fruit"
 rule "You structure a project owner's words into a design graph."
 rule "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
 rule "A choices line lists the words that one slot of the forms takes."
@@ -39,7 +41,7 @@ choices specificity general specific exact
 choices confidence tentative leaning firm
 choices explicitness explicit implicit
 choices facet project feature smell
-rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it."
+rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
 rule "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
 example "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)"
 example "conversational(aaaaaaaa-0000-4000-8000-000000000001.0)"
@@ -47,6 +49,8 @@ segment aaaaaaaa-0000-4000-8000-000000000001.0 "what of aaaaaaaa-0000-4000-8000-
 segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
 segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
-node n1 project vague
-retry misread expected 1 7 "an argument"
+node n1 "demo" project vague
+node n2 "other" project vague
+node n4 "other" feature vague "fruit"
+retry uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0
 rule "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."

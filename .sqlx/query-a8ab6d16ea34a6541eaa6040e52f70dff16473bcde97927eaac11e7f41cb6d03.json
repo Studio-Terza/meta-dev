@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  id,\n  project,\n  facet,\n  stage,\n  provenance,\n  title,\n  role,\n  role_provenance,\n  artifact,\n  condition,\n  reason\nFROM\n  nodes\nWHERE\n  stage != ?1\nORDER BY\n  id\nLIMIT\n  200\n",
+  "query": "\nSELECT\n  id,\n  project,\n  facet,\n  stage,\n  provenance,\n  title,\n  role,\n  role_provenance,\n  artifact,\n  condition,\n  reason\nFROM\n  nodes\nWHERE\n  (\n    stage IN (?1, ?2)\n    OR (\n      facet = ?3\n      AND stage != ?4\n    )\n  )\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      closure\n      JOIN nodes AS above ON above.id = closure.ancestor\n    WHERE\n      closure.relation = ?5\n      AND closure.descendant = nodes.id\n      AND above.stage = ?4\n  )\nORDER BY\n  project,\n  id\n",
   "describe": {
     "columns": [
       {
@@ -126,7 +126,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 5
     },
     "nullable": [
       false,
@@ -142,5 +142,5 @@
       true
     ]
   },
-  "hash": "5667976f8999e5f069206f10d09612b8627535de900e12045695d76fc58e7c28"
+  "hash": "a8ab6d16ea34a6541eaa6040e52f70dff16473bcde97927eaac11e7f41cb6d03"
 }

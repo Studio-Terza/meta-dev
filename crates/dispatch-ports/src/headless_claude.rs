@@ -36,14 +36,15 @@ impl DispatchFiller for HeadlessClaude {
         fs::create_dir_all(&self.scratch).map_err(DispatchFailure::Scratch)?;
         let (agent_in, prompting) = io::pipe().map_err(DispatchFailure::Pipe)?;
         let (replies, agent_out) = io::pipe().map_err(DispatchFailure::Pipe)?;
-        let exchange = Exchange::begun(prompt, prompting, replies);
+        let (complaints, agent_err) = io::pipe().map_err(DispatchFailure::Pipe)?;
+        let exchange = Exchange::begun(prompt, prompting, replies, complaints);
         Command::new(self.agent.program())
             .args(self.agent.arguments())
             .current_dir(&self.scratch)
             .process_group(0)
             .stdin(agent_in)
             .stdout(agent_out)
-            .stderr(Stdio::null())
+            .stderr(agent_err)
             .spawn()
             .map(|child| AgentRun::spawned(child, exchange, *job.as_ref()))
             .map_err(DispatchFailure::Spawn)
@@ -54,7 +55,7 @@ impl DispatchFiller for HeadlessClaude {
         _pass: Pass<'_, dispatch_ops::Output>,
         run: &mut AgentRun,
     ) -> Result<Option<Output>, DispatchFailure> {
-        run.read_out().map(|exchange| Ok(Output::read(&exchange.joined()?))).transpose()
+        run.read_out().map(Exchange::joined).transpose()
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, pid: Pid) -> Result<Option<Started>, DispatchFailure> {

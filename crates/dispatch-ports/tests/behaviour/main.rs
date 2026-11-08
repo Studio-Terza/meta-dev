@@ -4,46 +4,57 @@ use std::error::Error;
 use std::sync::{Mutex, PoisonError};
 
 use dispatch_ports::{
-    AgentRun, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Finished, Job, Output, Pause,
-    Pid, Prompt, Reply, Started, Timeout, Tokens, Usage, Wall, Watch, Watched, clock_ops, dispatch_ops,
+    AgentRun, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job, Output,
+    Pause, Pid, Prompt, Reply, Started, Stderr, Timeout, Tokens, Told, Unreadable, Usage, Wall, Watch, Watched,
+    clock_ops, dispatch_ops,
 };
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
-use newtype::Newtype;
 use port_core::{Calls, Pass, Released, Run};
 
 #[derive(Debug, PartialEq, Eq)]
-struct Envelope {
-    reply: String,
-    spent: [u32; 4],
+enum Envelope {
+    Read(Output),
+    Garbled,
 }
 
 impl Envelope {
-    fn read(text: &str) -> Option<Envelope> {
-        text.parse::<Finished>().ok().map(|finished| Envelope {
-            reply: finished.reply().clone().into_inner(),
-            spent: finished.usage().spent().map(Tokens::into_inner),
-        })
+    fn read(text: &str) -> Envelope {
+        match Output::read(text, Stderr::Silent) {
+            Output::Unreadable(Unreadable::Json { .. }) => Envelope::Garbled,
+            output => Envelope::Read(output),
+        }
     }
 
-    fn of(reply: &str, spent: [u32; 4]) -> Envelope {
-        Envelope { reply: reply.to_owned(), spent }
+    fn replied(reply: &str, [input, output, written, read]: [u32; 4]) -> Envelope {
+        let usage = Usage::new(Tokens::new(input), Tokens::new(output), Tokens::new(written), Tokens::new(read));
+        Envelope::Read(Output::Finished(Finished::new(Reply::new(reply.to_owned()), usage)))
+    }
+
+    fn errored(told: &str) -> Envelope {
+        Envelope::Read(Output::Errored(Errored::new(Told::new(told.to_owned()), Usage::default())))
+    }
+
+    fn unsuccessful() -> Envelope {
+        Envelope::Read(Output::Unreadable(Unreadable::Unsuccessful { stderr: Stderr::Silent }))
     }
 }
 
 laws::table!(
-    an_agent_result_is_read_as_its_reply_and_usage,
+    an_agent_result_is_read_as_its_reply_and_usage_or_its_error,
     |text: &&'static str| Envelope::read(text),
     [
-        r#"{"type":"result","subtype":"success","is_error":false,"result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7,"service_tier":"standard"}}"# => Some(Envelope::of("conversational(a.0)", [4, 9, 2, 7])),
-        r#"{"subtype":"success","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"# => Some(Envelope::of("x", [1, 2, 0, 0])),
-        r#"{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}"# => None,
-        r#"{"subtype":"error_max_turns","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"# => None,
-        r#"{"subtype":"success","usage":{"input_tokens":1,"output_tokens":2}}"# => None,
-        r#"{"subtype":"success","result":"x"}"# => None,
-        "not json" => None,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7,"service_tier":"standard"}}"# => Envelope::replied("conversational(a.0)", [4, 9, 2, 7]),
+        r#"{"subtype":"success","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::replied("x", [1, 2, 0, 0]),
+        r#"{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key","usage":{"input_tokens":0,"output_tokens":0}}"# => Envelope::errored("Invalid API key"),
+        r#"{"subtype":"error_during_execution","is_error":true,"usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::unsuccessful(),
+        r#"{"subtype":"error_max_turns","result":"x","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::unsuccessful(),
+        r#"{"subtype":"success","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::unsuccessful(),
+        r#"{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}"# => Envelope::Garbled,
+        r#"{"subtype":"success","result":"x"}"# => Envelope::Garbled,
+        "not json" => Envelope::Garbled,
     ]
 );
 
