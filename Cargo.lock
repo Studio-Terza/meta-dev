@@ -146,6 +146,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "gate-limits",
+ "grammar",
  "laws",
  "mutation-report",
  "newtype",
@@ -1746,6 +1747,7 @@ name = "lint-workflow-run"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "grammar",
  "lint-core",
  "lint-layout",
  "newtype",
@@ -2630,6 +2632,7 @@ dependencies = [
 name = "test-log"
 version = "0.1.0"
 dependencies = [
+ "grammar",
  "laws",
  "serde",
  "text-lines",

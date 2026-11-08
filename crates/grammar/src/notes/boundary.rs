@@ -65,6 +65,14 @@ enum Lexeme {
     Possessive,
 }
 
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+enum Moment<'text> {
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")]
+    Day,
+    #[regex(r"[T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?", |lexer| lexer.slice())]
+    Clock(&'text str),
+}
+
 pub trait Reading {
     type Output;
 
@@ -390,7 +398,9 @@ impl<'lexed, 'text> Step<'lexed, 'text> {
     }
 
     fn dated(lexed: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
-        let (day, clock) = lexed.text.split_at_checked(10).unwrap_or((lexed.text, ""));
+        let mut moments = Moment::lexer(lexed.text);
+        let day = moments.next().map_or(lexed.text, |_day| moments.slice());
+        let clock = moments.next().and_then(Result::ok).and_then(Moment::clock).unwrap_or_default();
         Step::after(Piece::Dated(Date::new(day.to_owned()), Clock::new(clock.to_owned())), rest)
     }
 
@@ -404,6 +414,15 @@ impl<'lexed, 'text> Step<'lexed, 'text> {
             || Step::after(Piece::Unclosed(Unclosed::new(Quote::new(Lexed::joined(rest)))), rest),
             |(inner, after)| Step::after(Piece::Quoted(Quote::new(Lexed::joined(inner))), after),
         )
+    }
+}
+
+impl<'text> Moment<'text> {
+    fn clock(self) -> Option<&'text str> {
+        match self {
+            Moment::Clock(clock) => Some(clock),
+            Moment::Day => None,
+        }
     }
 }
 

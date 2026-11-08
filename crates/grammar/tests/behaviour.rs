@@ -13,6 +13,7 @@ use grammar::output::{Fields, Unread};
 use grammar::reply::Inked;
 use grammar::search::Term;
 use grammar::search::Terms;
+use grammar::shard::Sharding;
 use grammar::slug::Letters;
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{Strategy, prop_assert_eq, prop_oneof};
@@ -326,6 +327,14 @@ laws::table!(
         "\u{2003}one\u{85}two\u{2029}" => "onetwo".to_owned(),
         "\u{200b}kept" => "\u{200b}kept".to_owned(),
     ]
+);
+
+laws::roundtrip!(
+    a_sharding_is_displayed_and_parsed_back,
+    (1..=u16::MAX).prop_flat_map(|count| (0..count).prop_map(move |index| (index, count))),
+    |(index, count): &(u16, u16)| format!("{index}/{count}"),
+    |text: &String| text.parse::<Sharding>().ok().map(|sharding| sharding.to_string()),
+    |(index, count): (u16, u16)| Some(format!("{index}/{count}"))
 );
 
 laws::table!(

@@ -13,6 +13,8 @@ disallowed-methods = [
   "str::split_ascii_whitespace",
   "str::split_once",
   "str::rsplit_once",
+  "str::split_at_checked",
+  "str::char_indices",
   "str::trim",
   "str::trim_start",
   "str::trim_end",

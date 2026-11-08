@@ -1437,8 +1437,8 @@ laws::law!(
         let usage = replied.map_or(spawning.usage, |_replied| Some(spawning.usage.unwrap_or_default()));
         let kept = spawning.reply.as_ref().map(|reply| {
             let told = reply.clone().into_inner();
-            let within = told.char_indices().take_while(|(at, letter)| at + letter.len_utf8() <= 16 * 1024);
-            Excerpt::new(within.map(|(_at, letter)| letter).collect())
+            let within = (0..=told.len().min(16 * 1024)).rev().find_map(|end| told.get(..end)).unwrap_or_default();
+            Excerpt::new(within.to_owned())
         });
         prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![state]);
         prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![usage]);
