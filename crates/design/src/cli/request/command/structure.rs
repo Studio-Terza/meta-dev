@@ -147,7 +147,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let remit = Remit::job(id, segments.clone());
         self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
-        let halted = ended.ending.halt().map(|halt| halt.halted(id, ended.run));
+        let halted = ended.ending.halt().map(|halt| halt.halted(id));
         halted.map(|halted| self.store.write(halted)).transpose()?;
         let flailed = ended.ending.halt().and_then(Halt::flailed);
         let held = flailed.map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
@@ -266,10 +266,10 @@ impl Ending {
 }
 
 impl Halt {
-    fn halted(&self, job: JobId, run: RunId) -> JobHalted {
+    fn halted(&self, job: JobId) -> JobHalted {
         match self {
-            Halt::Flailed(_) => JobHalted::new(job, Some(run), Halted::Flailed, self.account(job)),
-            Halt::Stalled(stall) => JobHalted::new(job, stall.ran(run), Halted::Stalled, self.account(job)),
+            Halt::Flailed(_) => JobHalted::new(job, Halted::Flailed, self.account(job)),
+            Halt::Stalled(_) => JobHalted::new(job, Halted::Stalled, self.account(job)),
         }
     }
 

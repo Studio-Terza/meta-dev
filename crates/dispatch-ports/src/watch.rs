@@ -38,14 +38,6 @@ impl Stall {
             Stall::Unreadable(_) | Stall::Overdue | Stall::Unspawned(_) | Stall::Failed(_) => None,
         }
     }
-
-    #[must_use]
-    pub fn ran<Run>(&self, run: Run) -> Option<Run> {
-        match self {
-            Stall::Unspawned(_) => None,
-            Stall::Errored(_) | Stall::Unreadable(_) | Stall::Overdue | Stall::Failed(_) => Some(run),
-        }
-    }
 }
 
 impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {

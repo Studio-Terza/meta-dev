@@ -80,7 +80,6 @@ pub(crate) struct JobClosed {
 #[derive(Clone, Debug, Op)]
 pub struct JobHalted {
     job: JobId,
-    run: Option<RunId>,
     halted: Halted,
     account: Account,
 }
@@ -215,8 +214,8 @@ impl JobClosed {
 
 impl JobHalted {
     #[must_use]
-    pub fn new(job: JobId, run: Option<RunId>, halted: Halted, account: Account) -> JobHalted {
-        JobHalted { job, run, halted, account }
+    pub fn new(job: JobId, halted: Halted, account: Account) -> JobHalted {
+        JobHalted { job, halted, account }
     }
 }
 

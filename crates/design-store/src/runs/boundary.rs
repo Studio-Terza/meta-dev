@@ -158,18 +158,17 @@ impl Batch for JobHalted {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobHalted { job, run, halted, account } = self;
+        let JobHalted { job, halted, account } = self;
         let closed = JobClosed::new(job, JobState::from(halted)).written(statements)?;
         let unreported = Delivery::Unreported;
         let recorded = statements.written(store_ports::query!(
             r#"
 INSERT INTO
-  failures (job, run, halted, account, delivery)
+  failures (job, halted, account, delivery)
 VALUES
-  (?1, ?2, ?3, ?4, ?5)
+  (?1, ?2, ?3, ?4)
 "#,
             job: JobId,
-            run: Option<RunId>,
             halted: Halted,
             account: Account,
             unreported: Delivery
