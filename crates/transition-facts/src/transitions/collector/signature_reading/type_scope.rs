@@ -75,8 +75,8 @@ impl<'outer> TypeScope<'outer> {
                 Resolved::tupled(tuple.elems.iter().map(|element| self.endpoint(element)).collect(), self.selfish)
             }
             Type::Path(path) => self.named(path),
-            Type::ImplTrait(found) => self.bounded(found.bounds.iter()),
-            Type::TraitObject(found) => self.bounded(found.bounds.iter()),
+            Type::ImplTrait(opaque) => self.bounded(opaque.bounds.iter()),
+            Type::TraitObject(object) => self.bounded(object.bounds.iter()),
             Type::BareFn(_) => Resolved::interface(Self::FN),
             _ => Resolved::Found(Endpoint::from(Unnamed::Opaque)),
         }

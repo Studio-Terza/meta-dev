@@ -141,6 +141,6 @@ impl fmt::Display for Candidate<'_, '_> {
         let shown: Vec<String> = self.related.iter().take(Self::SHOWN).map(ToString::to_string).collect();
         let more = self.related.len().saturating_sub(Self::SHOWN);
         shown.first().map_or(Ok(()), |_| write!(formatter, "; {} {}", self.kind.relation(), shown.join(", ")))?;
-        NonZeroUsize::new(more).map_or(Ok(()), |more| write!(formatter, " and {more} more"))
+        NonZeroUsize::new(more).map_or(Ok(()), |hidden| write!(formatter, " and {hidden} more"))
     }
 }

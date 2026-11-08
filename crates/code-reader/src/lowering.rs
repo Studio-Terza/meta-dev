@@ -192,7 +192,7 @@ impl Built for AliasRow {
         let parameters =
             self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, self.scope)).collect();
         let alias = Alias::new(parameters, Written::typed(&self.target, resolving, self.scope));
-        declared.into_iter().zip([alias]).for_each(|(item, alias)| building.alias(item, alias));
+        declared.into_iter().zip([alias]).for_each(|(item, aliased)| building.alias(item, aliased));
         building
     }
 }
@@ -306,16 +306,17 @@ impl<'read> Lowered<'read> {
         let tables = seeds.tables(&settled);
         let ids = self.space.issued(&mut building);
         let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids);
-        let building = Self::each_built(self.aliases, &resolving, StdNames::aliased(building));
-        let building = Self::each_built(self.rows, &resolving, building);
+        let with_aliases = Self::each_built(self.aliases, &resolving, StdNames::aliased(building));
+        let with_rows = Self::each_built(self.rows, &resolving, with_aliases);
         let subjects = self.subjects.settled(&resolving);
-        let building = self.functions.into_iter().fold(building, |built, row| row.built(&resolving, &subjects, built));
-        let building = Self::each_built(self.holdings, &resolving, building);
-        self.calls.into_iter().fold(building, |built, row| row.built(&subjects, built)).built()
+        let with_functions =
+            self.functions.into_iter().fold(with_rows, |built, row| row.built(&resolving, &subjects, built));
+        let with_holdings = Self::each_built(self.holdings, &resolving, with_functions);
+        self.calls.into_iter().fold(with_holdings, |built, row| row.built(&subjects, built)).built()
     }
 
     fn each_built<Row: Built>(rows: Vec<Row>, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
-        rows.into_iter().fold(building, |building, row| row.built(resolving, building))
+        rows.into_iter().fold(building, |built, row| row.built(resolving, built))
     }
 
     fn root_lowered(
@@ -418,7 +419,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
         let subjected = self.subjected(subject);
         let context = self.context.of_impl(block, subjected);
         self.contextual(context, |lowering| {
-            lowering.enclosed(Enclosure::of_impl(block), generics, |lowering| visit::visit_item_impl(lowering, block));
+            lowering.enclosed(Enclosure::of_impl(block), generics, |enclosed| visit::visit_item_impl(enclosed, block));
         });
     }
 
@@ -426,7 +427,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
         let generics = self.generics.subjectless().extended(&item.generics);
         let context = self.context.of_trait();
         self.contextual(context, |lowering| {
-            lowering.enclosed(Enclosure::Trait, generics, |lowering| visit::visit_item_trait(lowering, item));
+            lowering.enclosed(Enclosure::Trait, generics, |enclosed| visit::visit_item_trait(enclosed, item));
         });
     }
 

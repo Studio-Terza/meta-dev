@@ -247,22 +247,22 @@ fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Box<d
 #[test]
 fn shards_or_sources_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    let answer = checkout.report_of("absent", "sources");
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("absent"));
+    let absent = checkout.report_of("absent", "sources");
+    assert_eq!(absent.exit, ExitCode::FAILURE);
+    assert!(absent.err.contains("cannot use"));
+    assert!(absent.err.contains("absent"));
     checkout.directory("bare")?;
-    let answer = checkout.report_of("shards", "bare");
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("crates"));
+    let bare = checkout.report_of("shards", "bare");
+    assert_eq!(bare.exit, ExitCode::FAILURE);
+    assert!(bare.err.contains("cannot use"));
+    assert!(bare.err.contains("crates"));
     Ok(())
 }
 
 #[test]
 fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    let answer = Answer::to(
+    let unwritable_markdown = Answer::to(
         &checkout.files,
         &[
             checkout.path("shards").as_os_str(),
@@ -271,9 +271,9 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
             checkout.path("report.json").as_os_str(),
         ],
     );
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use /no/such/dir/report.md"));
-    let answer = Answer::to(
+    assert_eq!(unwritable_markdown.exit, ExitCode::FAILURE);
+    assert!(unwritable_markdown.err.contains("cannot use /no/such/dir/report.md"));
+    let unwritable_json = Answer::to(
         &checkout.files,
         &[
             checkout.path("shards").as_os_str(),
@@ -282,8 +282,8 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
             "/no/such/dir/report.json".as_ref(),
         ],
     );
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use /no/such/dir/report.json"));
+    assert_eq!(unwritable_json.exit, ExitCode::FAILURE);
+    assert!(unwritable_json.err.contains("cannot use /no/such/dir/report.json"));
     Ok(())
 }
 

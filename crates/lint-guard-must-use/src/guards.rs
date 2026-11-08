@@ -58,7 +58,7 @@ impl MustUse {
     const CONDITIONAL: &str = "cfg_attr";
 
     fn mark(attribute: &Attribute) -> Option<&Attribute> {
-        Some(attribute).filter(|attribute| attribute.path().is_ident(Self::MUST_USE)).or_else(|| {
+        Some(attribute).filter(|candidate| candidate.path().is_ident(Self::MUST_USE)).or_else(|| {
             attribute
                 .meta
                 .require_list()
@@ -82,9 +82,9 @@ impl<'ast> Visit<'ast> for Guards<'_> {
         let outer = mem::replace(&mut self.module, inner);
         let around = mem::take(&mut self.members);
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        let inner = mem::replace(&mut self.module, outer);
+        let visited = mem::replace(&mut self.module, outer);
         let within = mem::replace(&mut self.members, around);
-        self.modules.file(inner, within);
+        self.modules.file(visited, within);
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {

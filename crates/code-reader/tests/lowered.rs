@@ -17,10 +17,10 @@ impl Read {
     }
 
     fn supported(root: &str, module: &str) -> Result<SourceFile, Failure> {
-        let support = SourceFile::parse("src/support.rs", SourceText::new(module.to_owned()));
-        support.and_then(|support| {
+        let parsed = SourceFile::parse("src/support.rs", SourceText::new(module.to_owned()));
+        parsed.and_then(|support| {
             SourceFile::parse("src/lib.rs", SourceText::new(root.to_owned()))
-                .map(|root| root.with_test_modules(vec![support]))
+                .map(|lib| lib.with_test_modules(vec![support]))
         })
     }
 

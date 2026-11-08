@@ -37,7 +37,7 @@ impl Binding {
     }
 
     pub(super) fn agreed(&self, found: Binding) -> Binding {
-        match [found].into_iter().find(|found| found == self) {
+        match [found].into_iter().find(|candidate| candidate == self) {
             Some(agreed) => agreed,
             None => Binding::Unknown,
         }
@@ -57,7 +57,7 @@ impl Binding {
 impl Binding {
     fn issued(item: Option<ItemId>, written: ItemPath) -> Resolved {
         match item {
-            Some(item) => Resolved::Crate(item),
+            Some(issued) => Resolved::Crate(issued),
             None => Resolved::Unknown(written),
         }
     }
@@ -66,7 +66,7 @@ impl Binding {
 impl From<Option<ScopeId>> for Binding {
     fn from(module: Option<ScopeId>) -> Binding {
         match module {
-            Some(module) => Binding::Module(module),
+            Some(scope) => Binding::Module(scope),
             None => Binding::Unknown,
         }
     }

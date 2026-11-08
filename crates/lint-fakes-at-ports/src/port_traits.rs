@@ -25,9 +25,9 @@ impl PortTraits {
             let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
             let mut reader = Reader { ground, found, traits: BTreeSet::new() };
             reader.visit_file(file.syntax());
-            let mut found = reader.found;
-            found.declared.entry(CrateName::from(file.placement().crate_root())).or_default().extend(reader.traits);
-            found
+            let mut gathered = reader.found;
+            gathered.declared.entry(CrateName::from(file.placement().crate_root())).or_default().extend(reader.traits);
+            gathered
         })
     }
 

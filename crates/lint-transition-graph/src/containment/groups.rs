@@ -15,9 +15,9 @@ pub(crate) struct Groups<'found>(Vec<Vec<Member<'found>>>);
 impl<'found> Groups<'found> {
     pub(crate) fn linked(
         members: &BTreeSet<Member<'found>>,
-        links: impl Iterator<Item = Link<'found>>,
+        directed: impl Iterator<Item = Link<'found>>,
     ) -> Groups<'found> {
-        let links = Containment::adjacency(links.flat_map(|link| [link, link.reversed()]));
+        let links = Containment::adjacency(directed.flat_map(|link| [link, link.reversed()]));
         let mut groups: Vec<Vec<Member<'found>>> =
             Traversal::trees(members.iter().copied(), |member: Member<'found>| {
                 links.get(&member).into_iter().flatten().copied()

@@ -11,7 +11,7 @@ pub enum ImplTarget<'ast> {
 impl<'ast> ImplTarget<'ast> {
     pub fn describe(item: &'ast ItemImpl) -> ImplTarget<'ast> {
         Syntax::inherent(item)
-            .and_then(|item| Syntax::type_path(&item.self_ty))
+            .and_then(|inherent| Syntax::type_path(&inherent.self_ty))
             .and_then(|path| path.path.segments.last())
             .map_or(ImplTarget::Skipped, ImplTarget::Inherent)
     }

@@ -56,7 +56,7 @@ impl<'ast> Visit<'ast> for Declared<'_> {
         let declaration = Declaration::new(Name::from(&block.ident), Self::provided(block), site);
         self.found.extend(
             Self::with_methods(block)
-                .filter(|block| Walk::outside_tests(&block.attrs) == Walk::Entered)
+                .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
                 .map(|_| declaration),
         );
     }

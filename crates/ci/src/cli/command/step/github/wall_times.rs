@@ -45,8 +45,8 @@ impl fmt::Display for WallTimes {
 }
 
 impl Step for WallTimes {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<WallTimes, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<WallTimes, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let repository = &arguments.taken()?;
         let run = &arguments.taken()?;
         let job = &arguments.taken()?;

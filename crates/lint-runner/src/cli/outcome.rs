@@ -16,7 +16,7 @@ impl<'file> Outcome<'file> {
         reports
             .is_empty()
             .then_some(failures)
-            .filter(|failures| failures.is_empty())
+            .filter(|candidate| candidate.is_empty())
             .map_or(Outcome::Violations { reports, failures }, |_| Outcome::Clean)
     }
 

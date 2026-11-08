@@ -28,7 +28,7 @@ impl Mode {
 
     fn recording(value: &OsStr, ci: Option<&OsStr>) -> Result<Self, Failure> {
         Some(value)
-            .filter(|value| **value == *Self::ON)
+            .filter(|candidate| **candidate == *Self::ON)
             .ok_or_else(|| Failure::UnknownValue { value: value.to_owned() })
             .and_then(|_| ci.map_or(Ok(Self::Record), |_| Err(Failure::RecordInCi)))
     }

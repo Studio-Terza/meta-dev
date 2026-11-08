@@ -118,7 +118,7 @@ impl Lexicon {
         let owned = resolved.std().into_iter().find(|path| **path == self.owned).map(|_| Identity::Owned);
         let wire =
             self.wires.iter().find(|wire| wire.resolved == *resolved).map(|wire| Identity::Wire(wire.path.clone()));
-        let unresolved = [resolved].into_iter().find(|resolved| **resolved == Resolved::Unknown(written.clone()));
+        let unresolved = [resolved].into_iter().find(|candidate| **candidate == Resolved::Unknown(written.clone()));
         primitive.or(owned).or(wire).or_else(|| unresolved.and_then(|_| self.spelled(written)))
     }
 

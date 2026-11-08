@@ -57,7 +57,7 @@ impl<'file> Scope<'file> {
     }
 
     fn kept_ident(&self, token: &TokenTree, root: &TokenTree, ident: &Ident, name: Name) -> Option<Name> {
-        match Some(root).filter(|root| ptr::eq(*root, token)) {
+        match Some(root).filter(|candidate| ptr::eq(*candidate, token)) {
             Some(_) => self
                 .imports
                 .local_item(&name, &self.local_roots)
@@ -67,7 +67,8 @@ impl<'file> Scope<'file> {
     }
 
     pub(crate) fn spelled(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Vec<Name> {
-        let imported = Some(root).filter(|root| ptr::eq(*root, token)).and_then(|_| self.imports.path_of(&name));
+        let imported =
+            Some(root).filter(|candidate| ptr::eq(*candidate, token)).and_then(|_| self.imports.path_of(&name));
         imported.unwrap_or_else(|| vec![name])
     }
 

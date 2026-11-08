@@ -335,7 +335,7 @@ impl<'tables, 'rows> Exposure<'tables, 'rows> {
     ) -> ControlFlow<Vec<Vec<ModuleGlob<'rows>>>, Vec<Vec<ModuleGlob<'rows>>>> {
         match moved {
             Some(_) => {
-                ControlFlow::Continue(exposed.into_iter().fold(modules, |modules, exposing| exposing.written(modules)))
+                ControlFlow::Continue(exposed.into_iter().fold(modules, |written, exposing| exposing.written(written)))
             }
             None => ControlFlow::Break(modules),
         }
@@ -368,9 +368,9 @@ impl<'rows> Tables<'rows> {
     pub(super) fn new(
         explicit: Vec<Explicit<'rows>>,
         fixed: Vec<Vec<GlobView<'rows>>>,
-        modules: Vec<Vec<ModuleGlob<'rows>>>,
+        unsettled: Vec<Vec<ModuleGlob<'rows>>>,
     ) -> Tables<'rows> {
-        let modules = Exposure { explicit: &explicit, fixed: &fixed }.settled(modules);
+        let modules = Exposure { explicit: &explicit, fixed: &fixed }.settled(unsettled);
         Tables { explicit, fixed, modules }
     }
 

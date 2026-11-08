@@ -31,8 +31,8 @@ impl<'ty> Visit<'ty> for TextMention<'ty> {
     fn visit_type_path(&mut self, path: &'ty TypePath) {
         self.named.extend(
             Some(path)
-                .filter(|path| path.qself.is_none())
-                .and_then(|path| path.path.segments.last())
+                .filter(|candidate| candidate.qself.is_none())
+                .and_then(|unqualified| unqualified.path.segments.last())
                 .map(|segment| &segment.ident),
         );
         syn::visit::visit_type_path(self, path);

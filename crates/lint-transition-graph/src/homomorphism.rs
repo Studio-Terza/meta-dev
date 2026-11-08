@@ -34,7 +34,7 @@ impl GraphLint for Homomorphisms {
             ),
             in_scope
                 .into_iter()
-                .filter_map(|in_scope| in_scope.measured(algebras, declarations).reported())
+                .filter_map(|scoped| scoped.measured(algebras, declarations).reported())
                 .chain(unresolved)
                 .collect(),
         )

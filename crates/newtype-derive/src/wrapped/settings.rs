@@ -30,7 +30,7 @@ impl Settings {
         partial.map_or_else(
             || {
                 Ok(Settings {
-                    check: function.zip(error).map(|(function, error)| Check::new(function, error)),
+                    check: function.zip(error).map(|(path, error_type)| Check::new(path, error_type)),
                     strategy,
                 })
             },

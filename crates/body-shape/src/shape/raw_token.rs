@@ -62,7 +62,7 @@ impl RawToken {
 
     fn marked<'raw>(mark: Mark, position: Position, equivalence: Equivalence) -> Option<ShapeToken<'raw>> {
         Some(mark)
-            .filter(|mark| *mark == Mark::MINUS)
+            .filter(|candidate| *candidate == Mark::MINUS)
             .filter(|_| position == Position::BeforeLiteral)
             .filter(|_| equivalence.erases(Erased::Literals).is_some())
             .map_or(Some(ShapeToken::Mark(mark)), |_| None)

@@ -40,8 +40,8 @@ impl<'run> Compared<'run> {
             Expr::Reference(reference) => self.traced(&reference.expr, seen),
             Expr::Paren(inner) => self.traced(&inner.expr, seen),
             Expr::MethodCall(call) => Some(call)
-                .filter(|call| Name::from(&call.method).matches::<Whole>(&Self::PEELED).is_some())
-                .and_then(|call| self.traced(&call.receiver, seen)),
+                .filter(|candidate| Name::from(&candidate.method).matches::<Whole>(&Self::PEELED).is_some())
+                .and_then(|peeled| self.traced(&peeled.receiver, seen)),
             Expr::Call(call) => Literal::called(&call.func)
                 .filter(|last| last.matches::<Whole>(&Self::WRAPPERS).is_some())
                 .into_iter()
@@ -59,7 +59,7 @@ impl<'run> Compared<'run> {
     fn bound(&self, name: Name, seen: &RefCell<BTreeSet<Name>>) -> Option<Pinning> {
         let value = self.locals.bound(&name).or_else(|| self.constants.bound(&name))?;
         let unseen = seen.borrow_mut().insert(name).then_some(value);
-        unseen.and_then(|value| self.traced(value, seen))
+        unseen.and_then(|fresh| self.traced(fresh, seen))
     }
 
     fn built(&self, invocation: &Macro, seen: &RefCell<BTreeSet<Name>>) -> Option<Pinning> {
@@ -74,6 +74,6 @@ impl<'run> Compared<'run> {
             .into_iter()
             .flat_map(|_| arguments.iter())
             .find_map(|argument| self.traced(argument, seen));
-        formatted.map_or(listed, |literal| literal.and_then(|literal| Literal::pinning(literal, Reading::Format)))
+        formatted.map_or(listed, |literal| literal.and_then(|present| Literal::pinning(present, Reading::Format)))
     }
 }

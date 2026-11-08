@@ -75,10 +75,10 @@ impl Kind {
         let first = modules.first();
         let named = modules.iter().find(|module| **module == Name::from(Self::PORTS)).map(|_| Kind::Port);
         let suffixed = first
-            .filter(|first| first.words().last().is_some_and(|word| *word == Name::from(Self::PORTS)))
+            .filter(|module| module.words().last().is_some_and(|word| *word == Name::from(Self::PORTS)))
             .map(|_| Kind::Port);
-        let declared = first.filter(|first| ports.declares(first, last).is_some()).map(|_| Kind::Port);
-        let standard = first.filter(|first| first.matches::<Whole>(&Self::STD).is_some()).map(|_| Kind::Std);
+        let declared = first.filter(|module| ports.declares(module, last).is_some()).map(|_| Kind::Port);
+        let standard = first.filter(|module| module.matches::<Whole>(&Self::STD).is_some()).map(|_| Kind::Std);
         named.or(suffixed).or(declared).or(standard).unwrap_or(Kind::Other)
     }
 }

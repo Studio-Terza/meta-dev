@@ -8,7 +8,7 @@ impl Ancestor {
         other: &'other ModulePath<'file>,
     ) -> Option<&'other ModulePath<'file>> {
         Some(other)
-            .filter(|other| this.crate_root == other.crate_root)
-            .filter(|other| other.segments.get(..this.segments.len()) == Some(this.segments))
+            .filter(|candidate| this.crate_root == candidate.crate_root)
+            .filter(|in_crate| in_crate.segments.get(..this.segments.len()) == Some(this.segments))
     }
 }

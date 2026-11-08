@@ -48,7 +48,7 @@ impl Scope {
     fn places_of<'scope>(&'scope self, first: &'scope Name, last: Option<&'scope Name>) -> Vec<Place<'scope>> {
         match last {
             None => self.uses.sources(first),
-            Some(last) => Vec::from([self.uses.qualified(first, last)]),
+            Some(tail) => Vec::from([self.uses.qualified(first, tail)]),
         }
     }
 

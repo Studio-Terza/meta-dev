@@ -43,7 +43,7 @@ impl<'file> Arms<'file> {
     }
 
     fn located(self, span: Span, finding: Option<Finding>) -> Option<Found<'file>> {
-        finding.map(|finding| Found::new(Site::new(self.path, LineNumber::from(span)), finding))
+        finding.map(|flagged| Found::new(Site::new(self.path, LineNumber::from(span)), flagged))
     }
 
     fn arm_faults(self, arm: &Arm) -> Vec<Found<'file>> {
