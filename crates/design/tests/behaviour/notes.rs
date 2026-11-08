@@ -40,7 +40,7 @@ Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and
 - 2026-11-07 lead: the timer printed \"water again later\" and stopped.
 Owner said \"agreed\" on two days.
 \t
-## Later, as d4d4d4d4 \"planned\"
+## Later, as c3c3c3c3 \"planned\"
 (Owner moved on with \"onward\": not a ruling.)
 ";
 
@@ -297,7 +297,7 @@ fn a_whitespace_line_is_layout_so_it_imports_as_no_node_and_views_back_empty() -
 #[test]
 fn an_unanchored_ruling_refuses_the_whole_import_reporting_it_and_writing_nothing() -> Result<(), Failure> {
     let applying = Noting::ready()?;
-    let notes = "# Notes\nOwner: \"no such words\"\nRULING (owner): nothing to anchor\nRULING (owner): \"agreed\"\n";
+    let notes = "# Notes\nOwner: \"no such words\"\nRULING (owner): nothing to anchor\nRULING (owner): \"agreed\"\nRULING (owner, c3c3c3c3): approved\n";
     applying.files.create_directories(Path::new("/work/notes")).ok();
     applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
     let mut out = Vec::new();

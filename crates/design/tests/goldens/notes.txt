@@ -28,7 +28,7 @@ Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and
 - 2026-11-07 lead: the timer printed "water again later" and stopped.
 Owner said "agreed" on two days.
 
-## Later, as d4d4d4d4 "planned"
+## Later, as c3c3c3c3 "planned"
 (Owner moved on with "onward": not a ruling.)
 design show n2
 node n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
@@ -88,10 +88,10 @@ node n8 "demo" feature vague core entered import-8 "- 2026-11-07 RULING (owner):
   role core entered import-8
   placed decides e5e5e5e5.0 owner decision specific firm explicit entered import-8 "agreed"
 design show n11
-node n11 "demo" feature vague core entered import-12 "## Later, as d4d4d4d4 \"planned\""
+node n11 "demo" feature vague core entered import-12 "## Later, as c3c3c3c3 \"planned\""
   ancestor n1 "demo" project vague core entered init
   child n12 "demo" feature vague core entered import-13 "(Owner moved on with \"onward\": not a ruling.)"
   edge n11 refines n1 entered import-12
   edge n12 refines n11 entered import-13
   role core entered import-12
-  cites d4d4d4d4 owner entered import-12
+  cites c3c3c3c3 owner entered import-12
