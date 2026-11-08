@@ -1,4 +1,8 @@
+mod boundary;
+
 use std::io;
+
+pub use boundary::Fault;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchFailure {

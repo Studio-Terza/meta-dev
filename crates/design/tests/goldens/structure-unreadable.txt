@@ -4,3 +4,8 @@ STALLED: job 1 could not be run: the agent's run ended in error: Invalid API key
 design structure
 run 2 job 2 unreadable
 STALLED: job 2 could not be run: the agent's output was unreadable: the agent's output is not its JSON result: EOF while parsing a value at line 1 column 0; on stderr it wrote "error: unknown option --tools\n"; structure halted, and its segments are sent again on the next run
+design structure
+STALLED: job 3 could not be run: cannot start the agent: No such file or directory (os error 2); structure halted, and its segments are sent again on the next run
+design structure
+run 3 job 4 failed
+STALLED: job 4 could not be run: cannot read the agent's output: stream did not contain valid UTF-8; structure halted, and its segments are sent again on the next run

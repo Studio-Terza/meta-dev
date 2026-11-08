@@ -1,15 +1,17 @@
 use std::collections::VecDeque;
 use std::error::Error;
 use std::ffi::OsString;
+use std::io;
 use std::path::{Path, PathBuf};
+use std::slice;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
 use design::{Agents, Attempted, Cli, Count, Failure, HookEvent, Lapsed, Line, Outcome, Unresolved};
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, Provenance, RunId};
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
-    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Finished, HeadlessClaude, Job,
-    Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, clock_ops, dispatch_ops,
+    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished, HeadlessClaude,
+    Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, clock_ops, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
 use newtype::Newtype;
@@ -112,10 +114,10 @@ impl DispatchFiller for FakeDispatch<'_> {
 }
 
 impl Script {
-    const COVERING: &str = "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)\nsense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, specific, firm, explicit)\nlink(aaaaaaaa-0000-4000-8000-000000000003.1, aaaaaaaa-0000-4000-8000-000000000005.0, answers)";
+    const COVERING: &str = "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)\nsense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, specific, firm, explicit)\nlink(aaaaaaaa-0000-4000-8000-000000000003.1, aaaaaaaa-0000-4000-8000-000000000005.0, answers)\nsense(aaaaaaaa-0000-4000-8000-000000000005.0, question, specific, firm, explicit)";
     const LISTED: &str = "bbbbbbbb-0000-4000-8000-000000000001";
-    const SPANNING: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.6)\nlink(bbbbbbbb-0000-4000-8000-000000000001.7, bbbbbbbb-0000-4000-8000-000000000001.8, refers-to)";
-    const WITHIN: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nlink(bbbbbbbb-0000-4000-8000-000000000001.7, bbbbbbbb-0000-4000-8000-000000000001.6, refers-to)";
+    const SPANNING: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.6)\nlink(bbbbbbbb-0000-4000-8000-000000000001.8, bbbbbbbb-0000-4000-8000-000000000001.7, refers-to)";
+    const FORWARD: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.6)\nlink(bbbbbbbb-0000-4000-8000-000000000001.7, bbbbbbbb-0000-4000-8000-000000000001.8, refers-to)";
     const UNCOVERING: &str = "propose(new a, refines(n1), feature, \"x\")";
     const MISREAD: &str = "place(";
 
@@ -222,13 +224,13 @@ impl Structured {
 }
 
 #[test]
-fn a_reply_naming_a_segment_outside_its_job_or_repeating_another_job_is_retried_and_the_run_reads_once()
+fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_linking_to_an_earlier_job_applies()
 -> Result<(), Failure> {
     let said = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i";
-    let later = format!("conversational({}.8)", Script::LISTED);
+    let later = format!("link({}.8, {}.0, refers-to)", Script::LISTED, Script::LISTED);
     let structuring = Structuring {
         applying: Applying::over(&Session::working(Session::line(Speaker::Owner, Script::LISTED, "null", said)))?,
-        script: Script::replying(&[Some(Script::SPANNING), Some(Script::WITHIN), Some(Script::WITHIN), Some(&later)]),
+        script: Script::replying(&[Some(Script::SPANNING), Some(Script::FORWARD), Some(Script::FORWARD), Some(&later)]),
         sleep: Pause::new(0),
     };
     let before = structuring.unstructured()?;
@@ -249,7 +251,7 @@ fn a_reply_naming_a_segment_outside_its_job_or_repeating_another_job_is_retried_
             .filter(|line| matches!(line, Line::Annotated { entered, .. } if *entered == Provenance::Agent(run)))
             .count()
     });
-    assert_eq!(entered, [7, 1]);
+    assert_eq!(entered, [8, 1]);
     Ok(())
 }
 
@@ -356,7 +358,7 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
 }
 
 #[test]
-fn an_agent_that_errs_or_writes_no_result_stalls_the_run_with_what_it_said_and_leaves_its_segments_owed()
+fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the_run_and_leaves_its_segments_owed()
 -> Result<(), Box<dyn Error>> {
     let structuring = Structuring::over(Script::default(), Pause::new(0))?;
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -368,7 +370,9 @@ fn an_agent_that_errs_or_writes_no_result_stalls_the_run_with_what_it_said_and_l
         ],
     );
     let refuses = Agent::new("sh", &["-c", "cat >/dev/null; echo 'error: unknown option --tools' >&2; exit 1"]);
-    let reported = [errs, refuses].map(|agent| {
+    let missing = Agent::new("/nonexistent/claude", &[]);
+    let garbled = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
+    let reported = [errs, refuses, missing, garbled].map(|agent| {
         let structured = structuring.structured_by(
             Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent), SystemClock),
             &["structure"],
@@ -379,24 +383,40 @@ fn an_agent_that_errs_or_writes_no_result_stalls_the_run_with_what_it_said_and_l
     golden::golden!("structure-unreadable.txt", &reported.concat())?;
     let run = Run::root();
     let store = run.port(structuring.applying.store.clone());
-    let [errored, unreadable] = [JobId::new(1), JobId::new(2)].map(|job| store.read(RunsOf::from(job)));
-    let states = [errored?, unreadable?].map(|ran| ran.iter().map(Ran::state).collect::<Vec<RunState>>());
-    assert_eq!(states, [[RunState::Errored], [RunState::Unreadable]]);
+    let jobs = [1, 2, 3, 4].map(|job| store.read(RunsOf::from(JobId::new(job))));
+    let states = jobs.map(|ran| ran.map(|ran| ran.iter().map(Ran::state).collect::<Vec<RunState>>()));
+    let [errored, unreadable, unstarted, failed] = states;
+    assert_eq!(
+        [errored?, unreadable?, unstarted?, failed?],
+        [vec![RunState::Errored], vec![RunState::Unreadable], Vec::new(), vec![RunState::Failed]]
+    );
     assert_eq!(structuring.unstructured()?, 4);
     Ok(())
 }
 
 #[test]
-fn an_agent_whose_output_cannot_be_collected_fails_structure_and_its_run_ends_failed() -> Result<(), Failure> {
+fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled() -> Result<(), Box<dyn Error>> {
     let structuring = Structuring::over(Script::default(), Pause::new(0))?;
-    let agent = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let structured = structuring
-        .structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock), &["structure"]);
-    let run = Run::root();
-    let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
-    assert!(matches!(structured.outcome, Err(Failure::Dispatch(DispatchFailure::Collect(_)))));
-    assert_eq!(ran.iter().map(Ran::state).collect::<Vec<_>>(), [RunState::Failed]);
+    let stopped = [1, 2].map(|_stop| {
+        let missing = Agent::new("/nonexistent/claude", &[]);
+        structuring.structured_by(
+            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), missing), SystemClock),
+            &["hook", "stop"],
+        )
+    });
+    let [first, second] = stopped.map(|stopped| (serde_json::from_str::<Value>(&stopped.text), stopped.outcome));
+    let reasons =
+        [first.0?, second.0?].map(|decision| decision.get("reason").and_then(Value::as_str).map(str::to_owned));
+    let stalled = [1, 2].map(|job| {
+        let unstarted = Stall::Unspawned(Fault::from(DispatchFailure::Spawn(io::Error::from_raw_os_error(2))));
+        Some(Failure::Stalled { job: JobId::new(job), stall: unstarted }.to_string())
+    });
+    let interrupted = Line::Interrupted(JobId::new(1));
+    assert_eq!(reasons, stalled);
+    assert_eq!([first.1?, second.1?], [Outcome::Blocked, Outcome::Blocked]);
+    assert_eq!(structuring.structured(&["structure"]).has(slice::from_ref(&interrupted)), [interrupted]);
+    assert_eq!(structuring.unstructured()?, 4);
     Ok(())
 }
 

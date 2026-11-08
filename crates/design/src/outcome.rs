@@ -18,4 +18,5 @@ pub enum Outcome {
     Hooked(HookEvent),
     Blocked,
     Noticed,
+    Told,
 }

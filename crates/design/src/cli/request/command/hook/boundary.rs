@@ -2,10 +2,13 @@ use std::collections::BTreeMap;
 use std::io::Write;
 
 use console_ports::Heard;
+use design_store::{Account, FailuresReported, Unreported, UnreportedFailures};
 use newtype::Newtype;
 use serde::{Deserialize, Serialize};
+use store_ports::Store;
 
 use crate::cli::failure::Failure;
+use crate::cli::output::Count;
 use crate::{HookEvent, Outcome};
 
 #[derive(Debug, Serialize)]
@@ -50,6 +53,18 @@ pub enum Decision {
         #[serde(rename = "systemMessage")]
         system_message: String,
     },
+    Context {
+        #[serde(rename = "hookSpecificOutput")]
+        specific: Specific,
+    },
+}
+
+#[derive(Debug, Serialize)]
+pub struct Specific {
+    #[serde(rename = "hookEventName")]
+    event: HookEvent,
+    #[serde(rename = "additionalContext")]
+    context: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -88,10 +103,18 @@ impl Stopping {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn decided(&self, halt: &Failure) -> Decision {
+    pub fn decided(
+        &self,
+        concluded: Result<Count, Failure>,
+        store: &impl Store,
+        out: &mut impl Write,
+    ) -> Result<Outcome, Failure> {
         match self.continuation.0 {
-            Some(Continuing) => Decision::Notice { system_message: halt.to_string() },
-            None => Decision::Block { decision: Verdict::Block, reason: halt.to_string() },
+            Some(Continuing) => concluded.map_or_else(
+                |halt| Decision::Notice { system_message: halt.to_string() }.written(out),
+                |_jobs| Ok(Outcome::Hooked(HookEvent::Stop)),
+            ),
+            None => Decision::told(store, HookEvent::Stop, out),
         }
     }
 }
@@ -103,7 +126,25 @@ impl From<bool> for Continuation {
 }
 
 impl Decision {
-    pub fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
+    pub fn told(store: &impl Store, event: HookEvent, out: &mut impl Write) -> Result<Outcome, Failure> {
+        let unreported = store.read(UnreportedFailures)?;
+        let accounts: Vec<String> =
+            unreported.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string()).collect();
+        unreported.first().map(|_first| accounts.join("\n")).map_or(Ok(Outcome::Hooked(event)), |told| {
+            let outcome = Decision::telling(event, told).written(out)?;
+            store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>())?;
+            Ok(outcome)
+        })
+    }
+
+    fn telling(event: HookEvent, told: String) -> Decision {
+        match event {
+            HookEvent::Stop => Decision::Block { decision: Verdict::Block, reason: told },
+            HookEvent::UserPromptSubmit => Decision::Context { specific: Specific { event, context: told } },
+        }
+    }
+
+    fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
         serde_json::to_writer(&mut *out, self)?;
         writeln!(out)?;
         Ok(self.outcome())
@@ -113,6 +154,7 @@ impl Decision {
         match self {
             Decision::Block { .. } => Outcome::Blocked,
             Decision::Notice { .. } => Outcome::Noticed,
+            Decision::Context { .. } => Outcome::Told,
         }
     }
 }

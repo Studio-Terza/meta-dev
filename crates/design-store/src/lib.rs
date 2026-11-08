@@ -28,7 +28,7 @@ mod stream_schema;
 pub use acyclic::{Closes, Cycle, Refusal};
 pub use annotation::{Annotation, Remarking};
 pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
-pub use boundary::{Hit, RelationName, ShapeName};
+pub use boundary::{Account, Hit, RelationName, ShapeName};
 pub use covered::Covered;
 pub use cursors::Cursors;
 pub use directions::{Directed, Directions};
@@ -43,9 +43,11 @@ pub use project_root::ProjectRoot;
 use relative::Relative;
 pub use remit::{JobRepeated, Remit, Unpaid};
 pub use runs::{
-    Flailed, FlailedSegments, JobClosed, JobFlailed, JobOpened, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun,
-    OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    FailuresReported, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns,
+    NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unreported,
+    UnreportedFailures, Unstructured,
 };
+use runs::{JobClosed, JobState};
 pub use scope::Scope;
 pub use search_segments::SearchSegments;
 pub use session_cursors::SessionCursors;

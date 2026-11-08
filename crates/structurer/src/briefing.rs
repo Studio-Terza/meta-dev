@@ -57,7 +57,7 @@ enum Rule {
     #[name("A choices line lists the words that one slot of the forms takes.")]
     Choose,
     #[name(
-        "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
+        "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment it links to needs its own. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
     )]
     Cover,
     #[name(

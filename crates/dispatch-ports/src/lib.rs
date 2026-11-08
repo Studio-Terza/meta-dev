@@ -18,7 +18,7 @@ pub use agent::Agent;
 pub use agent_run::AgentRun;
 pub use clock::{Clock, ClockFiller, clock_ops};
 pub use dispatch::{Dispatch, DispatchFiller, dispatch_ops};
-pub use dispatch_failure::DispatchFailure;
+pub use dispatch_failure::{DispatchFailure, Fault};
 pub use finished::{Errored, Finished, Output, Reply, Tokens, Told, Unreadable, Usage};
 pub use headless_claude::HeadlessClaude;
 pub use job::Job;

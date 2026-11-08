@@ -2,12 +2,12 @@ use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
-    ContextNodes, Flailed, FlailedSegments, JobClosed, JobFlailed, JobOpened, JobState, JobsInterrupted, LiveRuns,
-    NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
+    Account, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted,
+    LiveRuns, NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
     Unstructured,
 };
 use dispatch_ports::{
-    AgentRun, Clock, Deadline, Dispatch, Due, Ended, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
+    AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
 };
 use port_core::Held;
 use store_ports::Store;
@@ -147,8 +147,8 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let remit = Remit::job(id, segments.clone());
         self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
-        let closed = ended.ending.halt().map(|halt| JobClosed::new(id, halt.state()));
-        closed.map(|closed| self.store.write(closed)).transpose()?;
+        let halted = ended.ending.halt().map(|halt| halt.halted(id));
+        halted.map(|halted| self.store.write(halted)).transpose()?;
         let flailed = ended.ending.halt().and_then(Halt::flailed);
         let held = flailed.map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
         held.map(|flailed| self.store.write(flailed)).transpose()?;
@@ -179,8 +179,12 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         let Structure { store, crew } = self.structure;
         let run = store.read(NextRun)?;
         let deadline = Deadline::after(crew.clock.now(), Structure::<S, D, C>::TIMEOUT);
-        let held = crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt)))?;
-        let watched = RunRecord { structure: self.structure, job: self.id, run }.ended(held, deadline)?;
+        let record = RunRecord { structure: self.structure, job: self.id, run };
+        let watched =
+            crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt))).map_or_else(
+                |failure| Ok(Watched::Stalled(Stall::Unspawned(Fault::from(failure)))),
+                |held| record.ended(held, deadline),
+            )?;
         let retried = attempt.lapse().cloned();
         let step = self.stepped(run, attempt, watched)?;
         self.continued(run, retried, step)
@@ -215,19 +219,14 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
 impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
     fn ended(&self, held: Held<'_, AgentRun>, deadline: Deadline) -> Result<Watched, Failure> {
         let Structure { store, crew } = self.structure;
-        let spawned = self.spawned(&held, deadline);
-        let watched = spawned.and_then(|()| Ok(Watch::over(crew.dispatch, crew.clock).watched(held)?));
-        store.write(Ending::ended(self.run, &watched))?;
-        watched
-    }
-
-    fn spawned(&self, held: &AgentRun, deadline: Deadline) -> Result<(), Failure> {
-        let Structure { store, crew } = self.structure;
         let looked = crew.dispatch.started(held.pid());
         let started = looked.as_ref().ok().cloned().flatten();
         store.write(RunSpawned::new(self.run, self.job, Spawned::new(held.pid(), started, deadline)))?;
-        looked?;
-        Ok(())
+        let watched = looked
+            .and_then(|_started| Watch::over(crew.dispatch, crew.clock).watched(held))
+            .unwrap_or_else(|failure| Watched::Stalled(Stall::Failed(Fault::from(failure))));
+        store.write(Ending::ended(self.run, &watched))?;
+        Ok(watched)
     }
 }
 
@@ -241,11 +240,10 @@ impl Reaped {
 }
 
 impl Ending {
-    fn ended(run: RunId, watched: &Result<Watched, Failure>) -> RunEnded {
+    fn ended(run: RunId, watched: &Watched) -> RunEnded {
         match watched {
-            Ok(Watched::Finished(finished)) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
-            Ok(Watched::Stalled(stall)) => RunEnded::new(run, RunState::from(stall), stall.usage()),
-            Err(_failure) => RunEnded::new(run, RunState::Failed, None),
+            Watched::Finished(finished) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
+            Watched::Stalled(stall) => RunEnded::new(run, RunState::from(stall), stall.usage()),
         }
     }
 
@@ -268,11 +266,15 @@ impl Ending {
 }
 
 impl Halt {
-    fn state(&self) -> JobState {
+    fn halted(&self, job: JobId) -> JobHalted {
         match self {
-            Halt::Flailed(_) => JobState::Flailed,
-            Halt::Stalled(_) => JobState::Stalled,
+            Halt::Flailed(_) => JobHalted::new(job, Halted::Flailed, self.account(job)),
+            Halt::Stalled(_) => JobHalted::new(job, Halted::Stalled, self.account(job)),
         }
+    }
+
+    fn account(&self, job: JobId) -> Account {
+        Account::told(&self.clone().failure(job))
     }
 
     fn flailed(&self) -> Option<&Lapse> {
