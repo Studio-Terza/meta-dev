@@ -29,7 +29,7 @@ pub enum Form {
     Sense,
     #[name("link(<segment>, <segment>, <segment-relation>)")]
     Link,
-    #[name("propose(new [<label>], refines(<node>), <facet>, \"<title>\")")]
+    #[name("propose(new <label>, refines(<node>), <facet>, \"<title>\")")]
     Propose,
     #[name("supersede(<node>, by(<node>))")]
     Supersede,

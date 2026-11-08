@@ -102,7 +102,13 @@ impl Verb {
     pub fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
         match self {
             Verb::Ingest => Persistence::try_from(rest).map(Command::Ingest),
-            Verb::Show => Token::only(rest).and_then(str::parse).map(Command::Show),
+            Verb::Show => rest
+                .iter()
+                .map(Token::text)
+                .collect::<Option<Vec<&str>>>()
+                .ok_or(Failure::Usage)
+                .and_then(|words| words.join(" ").parse())
+                .map(Command::Show),
             Verb::Search => rest
                 .iter()
                 .map(Token::text)

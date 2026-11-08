@@ -1,13 +1,13 @@
 mod boundary;
 
 use design_model::{JobId, RunId, Segment};
-use dispatch_ports::{Deadline, Pid, Stall, Started, Usage};
+use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
 use strum::VariantArray;
 use transcript_ports::Body;
 
-use crate::Account;
+use crate::{Account, Excerpt};
 
 #[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunState {
@@ -103,11 +103,12 @@ pub struct RunSpawned {
     spawned: Spawned,
 }
 
-#[derive(Clone, Copy, Debug, Op)]
+#[derive(Clone, Debug, Op)]
 pub struct RunEnded {
     run: RunId,
     state: RunState,
     usage: Option<Usage>,
+    reply: Option<Excerpt>,
 }
 
 #[derive(Clone, Debug, Op)]
@@ -134,11 +135,12 @@ pub struct RunsOf(JobId);
 #[derive(Clone, Copy, Debug, Op)]
 pub struct FlailedSegments;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ran {
     run: RunId,
     state: RunState,
     usage: Option<Usage>,
+    reply: Option<Excerpt>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -257,7 +259,17 @@ impl RunSpawned {
 impl RunEnded {
     #[must_use]
     pub fn new(run: RunId, state: RunState, usage: Option<Usage>) -> RunEnded {
-        RunEnded { run, state, usage }
+        RunEnded { run, state, usage, reply: None }
+    }
+
+    #[must_use]
+    pub fn finished(run: RunId, finished: &Finished) -> RunEnded {
+        RunEnded {
+            run,
+            state: RunState::Replied,
+            usage: Some(finished.usage()),
+            reply: Some(Excerpt::from(finished.reply())),
+        }
     }
 }
 
@@ -288,6 +300,11 @@ impl Ran {
     #[must_use]
     pub fn usage(&self) -> Option<Usage> {
         self.usage
+    }
+
+    #[must_use]
+    pub fn reply(&self) -> Option<&Excerpt> {
+        self.reply.as_ref()
     }
 }
 
