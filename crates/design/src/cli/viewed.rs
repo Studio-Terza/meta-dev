@@ -4,10 +4,11 @@ use design_model::{NodeId, Outline, Provenance, SpanRelation};
 use grammar::cited::Cited;
 use grammar::output::field::{Id, Quoted, Word};
 use grammar::output::{Fields, Unread};
-use named_derive::Named;
 use newtype::Newtype;
 use structurer::{Outlined, SegmentRef};
 use transcript_ports::{Authorship, Body};
+
+use crate::cli::output::Key;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Viewed {
@@ -26,35 +27,23 @@ pub enum Viewed {
     },
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Looked {
-    #[name("outline")]
-    Outline,
-    #[name("standing")]
-    Standing,
-    #[name("unplaced")]
-    Unplaced,
-    #[name("entered")]
-    Entered,
-}
-
-impl Looked {
-    pub(crate) fn viewed(self, fields: &mut Fields) -> Result<Viewed, Unread> {
-        match self {
-            Looked::Outline => Outlined::read(fields).map(Viewed::Outlined),
-            Looked::Standing => Ok(Viewed::Standing {
+impl Viewed {
+    pub(crate) fn read(key: Key, fields: &mut Fields) -> Result<Viewed, Unread> {
+        match key {
+            Key::Outline => Outlined::read(fields).map(Viewed::Outlined),
+            Key::Standing => Ok(Viewed::Standing {
                 node: fields.field::<Id<_>>()?,
                 relation: fields.field::<Word<_>>()?,
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
                 author: fields.field::<Word<_>>()?,
-                entered: fields.past(&[Looked::Entered])?.field::<Word<_>>()?,
+                entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
                 body: fields.field::<Quoted<_>>()?,
             }),
-            Looked::Unplaced => Ok(Viewed::Unplaced {
+            Key::Unplaced => Ok(Viewed::Unplaced {
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
                 body: fields.field::<Quoted<_>>()?,
             }),
-            Looked::Entered => Err(Unread::Unkeyed),
+            _unviewed => Err(Unread::Unkeyed),
         }
     }
 }
@@ -62,17 +51,17 @@ impl Looked {
 impl fmt::Display for Viewed {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Viewed::Outlined(outline) => write!(formatter, "{} {}", Looked::Outline, Outlined::from(outline)),
+            Viewed::Outlined(outline) => write!(formatter, "{} {}", Key::Outline, Outlined::from(outline)),
             Viewed::Standing { node, relation, segment, author, entered, body } => write!(
                 formatter,
                 "{} n{} {relation} {segment} {author} {} {entered} {}",
-                Looked::Standing,
+                Key::Standing,
                 node.into_inner(),
-                Looked::Entered,
+                Key::Entered,
                 Fields::quoting(body.as_ref())
             ),
             Viewed::Unplaced { segment, body } => {
-                write!(formatter, "{} {segment} {}", Looked::Unplaced, Fields::quoting(body.as_ref()))
+                write!(formatter, "{} {segment} {}", Key::Unplaced, Fields::quoting(body.as_ref()))
             }
         }
     }

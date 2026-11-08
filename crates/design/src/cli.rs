@@ -18,7 +18,6 @@ use crate::Outcome;
 pub use failure::{Failure, Unmatched};
 pub use request::Unresolved;
 use request::{Crew, Ground, Kept, Request};
-pub(crate) use viewed::Looked;
 pub use viewed::Viewed;
 
 #[derive(Debug)]

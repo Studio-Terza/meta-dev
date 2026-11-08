@@ -3,7 +3,7 @@ use std::io::Write;
 use std::iter;
 
 use design_model::{NodeId, Outline, Segment, SpanRelation};
-use design_store::{ContextNodes, CurrentSpans, ProjectRoot, Resolved, UnplacedSegments, Uttered};
+use design_store::{ContextNodes, CurrentSpans, Ended, Placement, ProjectRoot, Resolved, UnplacedSegments};
 use file_ports::Files;
 use named_derive::Named;
 use store_ports::Store;
@@ -119,17 +119,17 @@ impl Root {
         Subtree::read(ground.store(), root)
     }
 
-    fn resolved<F: Files, S: Store>(self, ground: &Ground<'_, F, S>) -> Result<NodeId, Failure> {
+    fn resolved<F: Files, S: Store>(self, ground: &Ground<'_, F, S>) -> Result<Resolved, Failure> {
         match self {
-            Root::Node(node) => Found::resolved(ground.store(), node).map(Resolved::identity),
+            Root::Node(node) => Found::resolved(ground.store(), node),
             Root::Configured => Root::configured(ground),
         }
     }
 
-    fn configured<F: Files, S: Store>(ground: &Ground<'_, F, S>) -> Result<NodeId, Failure> {
+    fn configured<F: Files, S: Store>(ground: &Ground<'_, F, S>) -> Result<Resolved, Failure> {
         let project = ground.located().project().ok_or(Failure::Unconfigured)?;
         let root = ground.store().read(ProjectRoot::from(project.clone()))?;
-        root.map(Resolved::identity).ok_or_else(|| Failure::Unrooted(project.clone()))
+        root.ok_or_else(|| Failure::Unrooted(project.clone()))
     }
 }
 
@@ -144,13 +144,15 @@ impl Tree {
 }
 
 impl Subtree {
-    fn read(store: &impl Store, root: NodeId) -> Result<Subtree, Failure> {
+    fn read(store: &impl Store, root: Resolved) -> Result<Subtree, Failure> {
+        let node = root.identity();
+        store.read(Ended::from(root))?.map(|ending| Failure::Ended { node, ending }).map_or(Ok(()), Err)?;
         let live = store.read(ContextNodes)?;
         let children = live.iter().fold(BTreeMap::<NodeId, Vec<&Outline>>::new(), |mut children, outline| {
             outline.parent().into_iter().for_each(|parent| children.entry(parent).or_default().push(outline));
             children
         });
-        let mut pending: Vec<&Outline> = live.iter().filter(|outline| outline.node() == root).collect();
+        let mut pending: Vec<&Outline> = live.iter().filter(|outline| outline.node() == node).collect();
         let ordered = iter::from_fn(|| {
             let next = pending.pop()?;
             pending.extend(children.get(&next.node()).into_iter().flatten().rev());
@@ -166,7 +168,7 @@ impl Subtree {
     fn standing(&self, store: &impl Store, relation: SpanRelation) -> Result<Vec<Line>, Failure> {
         let nodes: BTreeSet<NodeId> = self.0.iter().map(Outline::node).collect();
         let current = store.read(CurrentSpans::from(relation))?;
-        let spans: Vec<Uttered> = current.into_iter().filter(|span| nodes.contains(&span.node())).collect();
-        Ok(Refs::read(store, spans.iter().map(Uttered::segment))?.standing(&spans))
+        let spans: Vec<Placement> = current.into_iter().filter(|span| nodes.contains(&span.node())).collect();
+        Ok(Refs::read(store, spans.iter().map(Placement::segment))?.standing(&spans))
     }
 }

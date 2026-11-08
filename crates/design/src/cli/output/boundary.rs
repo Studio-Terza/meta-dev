@@ -17,7 +17,7 @@ use stream::{Relation, Shape};
 use structurer::{Directive, Lapse, Retried, SegmentRef};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
 
-use crate::cli::{Looked, Viewed};
+use crate::cli::Viewed;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Count(usize);
@@ -173,7 +173,7 @@ pub struct Lapsed {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-enum Key {
+pub(crate) enum Key {
     #[name("session")]
     Session,
     #[name("read")]
@@ -252,6 +252,12 @@ enum Key {
     Flailed,
     #[name("flailed-segment")]
     FlailedSegment,
+    #[name("outline")]
+    Outline,
+    #[name("standing")]
+    Standing,
+    #[name("unplaced")]
+    Unplaced,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -393,9 +399,9 @@ impl fmt::Display for Line {
     }
 }
 
-impl Key {
-    fn line(self, fields: &mut Fields) -> Result<Line, Unread> {
-        match self {
+impl Line {
+    fn read(fields: &mut Fields) -> Result<Line, Unread> {
+        match fields.field::<Word<Key>>()? {
             Key::Session => Ok(Line::Read {
                 session: fields.field::<Quoted<_>>()?,
                 cursor: Cursor::new(Offset::new(fields.past(&[Key::Read, Key::To])?.field::<Integer<_>>()?)),
@@ -491,16 +497,8 @@ impl Key {
             Key::Retried => Lapsed::read(fields).map(Line::Retried),
             Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
             Key::FlailedSegment => Flailing::read(fields).map(Line::FlailedSegment),
+            key @ (Key::Outline | Key::Standing | Key::Unplaced) => Viewed::read(key, fields).map(Line::Viewed),
             Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
-        }
-    }
-}
-
-impl Line {
-    fn read(fields: &mut Fields) -> Result<Line, Unread> {
-        match fields.optional::<Word<Looked>>() {
-            Some(looked) => looked.viewed(fields).map(Line::Viewed),
-            None => fields.field::<Word<Key>>().and_then(|key| key.line(fields)),
         }
     }
 
