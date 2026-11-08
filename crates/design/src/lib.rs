@@ -4,6 +4,6 @@ mod outcome;
 
 pub use cli::noted::{Miss, Noted, Reconciliation, Reference};
 pub use cli::output::{Anchored, Attempted, Count, Flailing, Lapsed, Line, Remark, Summary};
-pub use cli::{Agents, Cli, Failure, Flail, Flails, Unmatched, Unresolved, Viewed};
+pub use cli::{Agents, Cli, Failure, Flail, Flails, Sequel, Unmatched, Unresolved, Viewed};
 pub use hook_event::HookEvent;
 pub use outcome::Outcome;
