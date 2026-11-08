@@ -2,7 +2,7 @@ mod boundary;
 
 use std::collections::BTreeSet;
 
-use design_model::Segment;
+use design_model::{Ordinal, Segment};
 use grammar::notes::{Date, Quote};
 use port_core::Op;
 
@@ -12,6 +12,7 @@ pub struct QuotedSegments(BTreeSet<Quote>);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Quoted {
     segment: Segment,
+    occurrence: Ordinal,
     day: Date,
 }
 
@@ -25,6 +26,11 @@ impl Quoted {
     #[must_use]
     pub fn day(&self) -> &Date {
         &self.day
+    }
+
+    #[must_use]
+    pub fn occurrence(&self) -> Ordinal {
+        self.occurrence
     }
 }
 

@@ -102,7 +102,7 @@ pub struct Entry {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Form {
-    Blank(String),
+    Blank,
     Heading(Heading),
     Entry(Entry),
 }
@@ -143,9 +143,7 @@ impl Notes {
         let last = numbered.keys().next_back().copied().unwrap_or_default();
         Notes(
             (1..=last)
-                .map(|number| {
-                    numbered.get(&number).cloned().unwrap_or(Line { number, form: Form::Blank(String::new()) })
-                })
+                .map(|number| numbered.get(&number).cloned().unwrap_or(Line { number, form: Form::Blank }))
                 .collect(),
         )
     }
@@ -184,8 +182,7 @@ impl Line {
             .spanned()
             .map(|(lexeme, range)| Lexed { lexeme: lexeme.ok(), text: text.get(range).unwrap_or_default() })
             .collect();
-        let inked = lexed.iter().find(|lexed| lexed.lexeme != Some(Lexeme::Space));
-        Line { number, form: inked.map_or_else(|| Form::Blank(text.to_owned()), |_inked| Form::opened(&lexed)) }
+        Line { number, form: Form::opened(&lexed) }
     }
 
     #[must_use]
@@ -195,7 +192,7 @@ impl Line {
 
     pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Reader::Output {
         match &self.form {
-            Form::Blank(_) => reader.blank(self),
+            Form::Blank => reader.blank(self),
             Form::Heading(_) => reader.heading(self),
             Form::Entry(entry) => entry.kind().reading(reader, self, entry),
         }
@@ -204,9 +201,7 @@ impl Line {
 
 impl Form {
     fn opened(lexed: &[Lexed<'_>]) -> Form {
-        lexed
-            .split_first()
-            .map_or(Form::Blank(String::new()), |(first, rest)| first.opening().form(*first, rest, lexed))
+        lexed.split_first().map_or(Form::Blank, |(first, rest)| first.opening().form(*first, rest, lexed))
     }
 }
 
@@ -381,7 +376,7 @@ impl fmt::Display for Line {
 impl fmt::Display for Form {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Form::Blank(text) => formatter.write_str(text),
+            Form::Blank => Ok(()),
             Form::Heading(heading) => write!(formatter, "{heading}"),
             Form::Entry(entry) => write!(formatter, "{entry}"),
         }

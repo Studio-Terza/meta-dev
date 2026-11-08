@@ -10,13 +10,14 @@ use super::{Quoted, QuotedSegments};
 #[derive(Debug, Columns)]
 struct QuotedRow {
     message: Uuid,
+    occurrence: Ordinal,
     ordinal: Ordinal,
     day: Date,
 }
 
 impl From<QuotedRow> for Quoted {
     fn from(row: QuotedRow) -> Quoted {
-        Quoted { segment: Segment::new(row.message, row.ordinal), day: row.day }
+        Quoted { segment: Segment::new(row.message, row.ordinal), occurrence: row.occurrence, day: row.day }
     }
 }
 
@@ -35,23 +36,95 @@ impl QuotedRow {
         let rows = statements.rows(store_ports::query!(
             QuotedRow,
             r#"
+WITH
+RECURSIVE spoken (uuid, body, day) AS (
+  SELECT
+    uuid,
+    body,
+    substr(at, 1, 10)
+  FROM
+    messages
+  WHERE
+    author = ?2
+    AND length(?1) > 0
+    AND instr(body, ?1) > 0
+),
+found (message, occurrence, start) AS (
+  SELECT
+    uuid,
+    0,
+    instr(body, ?1)
+  FROM
+    spoken
+  UNION ALL
+  SELECT
+    found.message,
+    found.occurrence + 1,
+    found.start + instr(substr(spoken.body, found.start + 1), ?1)
+  FROM
+    found
+    JOIN spoken ON spoken.uuid = found.message
+  WHERE
+    instr(substr(spoken.body, found.start + 1), ?1) > 0
+),
+placed (message, ordinal, start, finish) AS (
+  SELECT
+    uuid,
+    -1,
+    1,
+    1
+  FROM
+    spoken
+  UNION ALL
+  SELECT
+    segments.message,
+    segments.ordinal,
+    CASE
+      instr(
+        substr(spoken.body, placed.finish),
+        segments.body
+      )
+      WHEN 0 THEN 0
+      ELSE placed.finish + instr(
+        substr(spoken.body, placed.finish),
+        segments.body
+      ) - 1
+    END,
+    CASE
+      instr(
+        substr(spoken.body, placed.finish),
+        segments.body
+      )
+      WHEN 0 THEN placed.finish
+      ELSE placed.finish + instr(
+        substr(spoken.body, placed.finish),
+        segments.body
+      ) - 1 + length(segments.body)
+    END
+  FROM
+    placed
+    JOIN spoken ON spoken.uuid = placed.message
+    JOIN segments ON segments.message = placed.message
+    AND segments.ordinal = placed.ordinal + 1
+)
 SELECT
-  segments.message,
-  segments.ordinal,
-  substr(messages.at, 1, 10) AS "day!: String"
+  found.message AS "message!: String",
+  found.occurrence AS "occurrence!: i64",
+  placed.ordinal AS "ordinal!: i64",
+  spoken.day AS "day!: String"
 FROM
-  messages
-  JOIN segments ON segments.message = messages.uuid
+  found
+  JOIN placed ON placed.message = found.message
+  JOIN spoken ON spoken.uuid = found.message
 WHERE
-  messages.author = ?2
-  AND length(?1) > 0
-  AND length(segments.body) > 0
-  AND instr(messages.body, ?1) > 0
-  AND instr(messages.body, segments.body) < instr(messages.body, ?1) + length(?1)
-  AND instr(messages.body, segments.body) + length(segments.body) > instr(messages.body, ?1)
+  placed.start > 0
+  AND placed.finish > placed.start
+  AND placed.start < found.start + length(?1)
+  AND placed.finish > found.start
 ORDER BY
-  segments.message,
-  segments.ordinal
+  found.message,
+  found.occurrence,
+  placed.ordinal
 "#,
             quote: Quote,
             owner: Authorship

@@ -376,8 +376,7 @@ laws::table!(
 
 const NOTED: &str = "(- |-|# |#|RULING|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,6}| |\t|[.,;~é]){0,14}";
 
-const INKED: &str =
-    "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
+const INKED: &str = "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]|[ \t]{1,3}";
 
 laws::law!(a_notes_line_is_rendered_back_to_its_exact_text, NOTED, text, {
     prop_assert_eq!(Line::read(1, &text).to_string(), text);
@@ -469,7 +468,7 @@ laws::table!(
     |text: &&str| Line::read(1, text).read_by(Shaped),
     [
         "" => "blank",
-        "  \t" => "blank",
+        "  \t" => "remark",
         "# Notes" => "heading",
         "## Later notes (RULING)" => "heading",
         "#443 merged" => "remark",

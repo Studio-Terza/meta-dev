@@ -3,7 +3,8 @@ use std::io::Write;
 use std::path::Path;
 
 use design_model::{
-    Casting, Entry, Facet, Node, NodeId, NotesLine, Prefix, Project, Provenance, Segment, SpanRelation, Title, Vague,
+    Casting, Entry, Facet, Node, NodeId, NotesLine, Ordinal, Prefix, Project, Provenance, Segment, SpanRelation, Title,
+    Vague,
 };
 use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
@@ -86,6 +87,12 @@ struct Sought<Found> {
 struct Author {
     message: Uuid,
     author: Authorship,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Occurrence {
+    message: Uuid,
+    ordinal: Ordinal,
 }
 
 #[derive(Debug)]
@@ -251,10 +258,10 @@ impl Answers {
 
     fn quote(&self, quote: &Quote, cited: &BTreeSet<Uuid>, dates: &[&Date]) -> Result<Vec<Segment>, Miss> {
         let found = self.quoted.get(quote).map(Vec::as_slice).unwrap_or_default();
-        let said = found.iter().fold(BTreeMap::<Uuid, Utterance>::new(), |mut said, quoted| {
+        let said = found.iter().fold(BTreeMap::<Occurrence, Utterance>::new(), |mut said, quoted| {
             let segment: &Segment = quoted.as_ref();
             let message: &Uuid = segment.as_ref();
-            said.entry(message.clone())
+            said.entry(Occurrence { message: message.clone(), ordinal: quoted.occurrence() })
                 .or_insert_with(|| Utterance { day: quoted.day().clone(), segments: Vec::new() })
                 .segments
                 .push(segment.clone());
@@ -263,17 +270,17 @@ impl Answers {
         let narrowed = Utterance::narrowed(said, cited);
         let same_day: BTreeSet<Uuid> = narrowed
             .iter()
-            .filter(|(_message, said)| dates.contains(&&said.day))
-            .map(|(message, _said)| message.clone())
+            .filter(|(_occurrence, said)| dates.contains(&&said.day))
+            .map(|(occurrence, _said)| occurrence.message.clone())
             .collect();
         Miss::only(Utterance::narrowed(narrowed, &same_day)).map(|said| said.segments)
     }
 }
 
 impl Utterance {
-    fn narrowed(said: BTreeMap<Uuid, Utterance>, chosen: &BTreeSet<Uuid>) -> BTreeMap<Uuid, Utterance> {
-        let (kept, rest): (BTreeMap<Uuid, Utterance>, BTreeMap<Uuid, Utterance>) =
-            said.into_iter().partition(|(message, _said)| chosen.contains(message));
+    fn narrowed(said: BTreeMap<Occurrence, Utterance>, chosen: &BTreeSet<Uuid>) -> BTreeMap<Occurrence, Utterance> {
+        let (kept, rest): (BTreeMap<Occurrence, Utterance>, BTreeMap<Occurrence, Utterance>) =
+            said.into_iter().partition(|(occurrence, _said)| chosen.contains(&occurrence.message));
         [kept, rest].into_iter().find(|said| said.first_key_value().is_some()).unwrap_or_default()
     }
 }

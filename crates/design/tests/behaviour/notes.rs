@@ -26,6 +26,8 @@ const AGREED: &str = "d4d4d4d4-0000-4000-8000-000000000004";
 
 const AGAIN: &str = "e5e5e5e5-0000-4000-8000-000000000005";
 
+const REPEATED: &str = "f6f6f6f6-0000-4000-8000-000000000006";
+
 const EXCERPT: &str = "# Garden notes (2026-11-05, draft)
 
 Convention (owner, 2026-11-05): a line counts once it is written down.
@@ -58,6 +60,7 @@ impl Noting {
             (Speaker::Owner, APPROVED, "yes the new trellis is approved.", "2026-11-05"),
             (Speaker::Owner, AGREED, "agreed", "2026-11-06"),
             (Speaker::Owner, AGAIN, "agreed", "2026-11-07"),
+            (Speaker::Owner, REPEATED, "Fine. Sow the peas. Fine.", "2026-11-08"),
         ];
         Session::working(
             said.iter().map(|(speaker, uuid, text, day)| Session::stamped(*speaker, uuid, "null", text, day)).collect(),
@@ -79,6 +82,21 @@ impl Noting {
             .ok()
             .map(|applying| Noting::imported(&applying, &format!("# Notes\n{line}\n")))
             .and_then(Noting::sorted)
+    }
+
+    fn placed(remark: &str) -> Option<Result<Vec<String>, Miss>> {
+        let applying = Noting::ready().ok()?;
+        let imported = Noting::imported(&applying, &format!("# Notes\nOwner: {remark}\n")).ok()?;
+        let shown = applying.run(&["show", "n3"]).ok()?;
+        Some(Spread::parsed(&format!("{imported}{shown}")).into_iter().filter_map(Noting::found).collect())
+    }
+
+    fn found(line: Line) -> Option<Result<String, Miss>> {
+        match line {
+            Line::Placed { segment, .. } => Some(Ok(segment.to_string())),
+            Line::Noted(Noted::Unresolved { miss, .. }) => Some(Err(miss)),
+            _other => None,
+        }
     }
 
     fn sorted(imported: Result<String, Failure>) -> Option<&'static str> {
@@ -120,6 +138,9 @@ laws::law!(
             "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)",
             "(Owner moved on: not a ruling)",
             "  indented: prose with Rust's 'quotes' in it",
+            "  ",
+            "\t",
+            " \t ",
         ]),
         0..8
     ),
@@ -157,6 +178,31 @@ laws::table!(
         "(aside: RULING) prose" => Some("imported"),
     ]
 );
+
+laws::table!(
+    a_quote_places_only_the_segments_it_overlaps,
+    |remark: &&str| Noting::placed(remark),
+    [
+        "\"Sow the peas. Fine\"" => Some(Ok(vec!["f6f6f6f6.1".to_owned(), "f6f6f6f6.2".to_owned()])),
+        "\"Fine. Sow\"" => Some(Ok(vec!["f6f6f6f6.0".to_owned(), "f6f6f6f6.1".to_owned()])),
+        "\"the peas\"" => Some(Ok(vec!["f6f6f6f6.1".to_owned()])),
+        "\"peas. Fine.\"" => Some(Ok(vec!["f6f6f6f6.1".to_owned(), "f6f6f6f6.2".to_owned()])),
+        "\"Fine\"" => Some(Err(Miss::Ambiguous)),
+        "\"Fine.\" (f6f6f6f6, 2026-11-08)" => Some(Err(Miss::Ambiguous)),
+        "\"Fine. Fine\"" => Some(Err(Miss::Unheard)),
+    ]
+);
+
+#[test]
+fn a_whitespace_line_views_back() -> Result<(), Failure> {
+    let applying = Noting::ready()?;
+    let notes: String =
+        ["# Notes", "  ", "first", "\t", "", " \t ", "last line"].iter().flat_map(|line| [*line, "\n"]).collect();
+    let imported = Noting::imported(&applying, &notes)?;
+    assert!(imported.contains("reconciled lines 6 nodes 6 "));
+    assert_eq!(applying.run(&["view", "notes"])?, notes);
+    Ok(())
+}
 
 #[test]
 fn an_unanchored_ruling_refuses_the_whole_import_reporting_it_and_writing_nothing() -> Result<(), Failure> {
