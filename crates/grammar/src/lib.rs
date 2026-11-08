@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 pub mod anchor;
 pub mod artifact;
 pub mod cited;

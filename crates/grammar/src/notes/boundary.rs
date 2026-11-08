@@ -24,6 +24,8 @@ enum Lexeme {
     #[token("*")]
     #[token("+")]
     Bullet,
+    #[regex(r"\[[ xX]\]")]
+    Task,
     #[token("**")]
     Emphasis,
     #[token(":")]
@@ -264,12 +266,7 @@ impl Opening {
 
 impl Kind {
     fn opened(lexed: &[Lexed<'_>]) -> Kind {
-        let before = iter::once(None).chain(lexed.iter().map(|lexed| lexed.lexeme));
-        lexed
-            .iter()
-            .zip(before)
-            .find_map(|(lexed, before)| lexed.lexeme.map_or(Some(Kind::Remark), |lexeme| lexeme.kind(before)))
-            .unwrap_or(Kind::Remark)
+        lexed.iter().find_map(|lexed| lexed.kind()).unwrap_or(Kind::Remark)
     }
 
     fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
@@ -299,29 +296,37 @@ impl Entry {
 }
 
 impl Lexeme {
-    fn kind(self, before: Option<Lexeme>) -> Option<Kind> {
+    fn kind(self, text: &str) -> Option<Kind> {
         match self {
-            Lexeme::Bullet | Lexeme::Emphasis | Lexeme::Date | Lexeme::Space => None,
-            Lexeme::Colon => (before != Some(Lexeme::Date)).then_some(Kind::Remark),
             Lexeme::Ruling => Some(Kind::Ruling),
             Lexeme::Lead => Some(Kind::Lead),
+            Lexeme::Word | Lexeme::Possessive => text.chars().any(char::is_alphabetic).then_some(Kind::Remark),
             Lexeme::Hash
+            | Lexeme::Bullet
+            | Lexeme::Task
+            | Lexeme::Emphasis
+            | Lexeme::Colon
             | Lexeme::Open
             | Lexeme::Close
             | Lexeme::Double
             | Lexeme::Cite
-            | Lexeme::Word
-            | Lexeme::Possessive => Some(Kind::Remark),
+            | Lexeme::Date
+            | Lexeme::Space => None,
         }
     }
 }
 
 impl<'text> Lexed<'text> {
+    fn kind(self) -> Option<Kind> {
+        self.lexeme.and_then(|lexeme| lexeme.kind(self.text))
+    }
+
     fn opening(self) -> Opening {
         match self.lexeme {
             Some(Lexeme::Hash) => Opening::Heading,
             Some(
                 Lexeme::Bullet
+                | Lexeme::Task
                 | Lexeme::Emphasis
                 | Lexeme::Colon
                 | Lexeme::Ruling
@@ -345,6 +350,7 @@ impl<'text> Lexed<'text> {
             Some(
                 Lexeme::Hash
                 | Lexeme::Bullet
+                | Lexeme::Task
                 | Lexeme::Emphasis
                 | Lexeme::Colon
                 | Lexeme::Ruling
@@ -405,6 +411,7 @@ impl Piece {
             Some(
                 Lexeme::Hash
                 | Lexeme::Bullet
+                | Lexeme::Task
                 | Lexeme::Emphasis
                 | Lexeme::Colon
                 | Lexeme::Ruling

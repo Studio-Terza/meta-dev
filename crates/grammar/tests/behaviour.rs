@@ -427,6 +427,61 @@ laws::law!(
 );
 
 laws::law!(
+    any_markup_before_the_first_word_leaves_the_line_the_kind_that_word_gives,
+    (
+        vec(
+            select(vec![
+                "- ",
+                "* ",
+                "+ ",
+                "-",
+                "**",
+                "*",
+                "1. ",
+                "12) ",
+                "3.",
+                "> ",
+                ">",
+                "[ ] ",
+                "[x] ",
+                "[X]",
+                "2026-11-05",
+                "2026-11-05: ",
+                ": ",
+                ":",
+                "(",
+                ")",
+                "[",
+                "]",
+                "{",
+                "}",
+                "`",
+                "~",
+                "|",
+                ".",
+                ",",
+                "0a1b2c3d ",
+                "\t",
+            ]),
+            0..8
+        ),
+        select(vec![
+            ("RULING", "ruling"),
+            ("LEAD", "lead"),
+            ("plan", "remark"),
+            ("Ruling", "remark"),
+            ("RULINGS", "remark")
+        ]),
+    ),
+    said,
+    {
+        let (markup, (word, kind)) = said;
+        let line = Line::read(1, &format!("{} {word} (owner): x", markup.concat()));
+        prop_assert_eq!(line.read_by(Shaped), kind);
+    }
+);
+
+laws::law!(
     a_single_quote_names_no_quote_and_hides_no_cite_or_date,
     ("( '?[a-z]{1,6}('s|s'|n't)?'?| '){0,5}", "( '?[a-z]{1,6}('s|s'|n't)?'?| '){0,5}",),
     said,
@@ -558,7 +613,7 @@ impl Reading for Named {
 }
 
 laws::table!(
-    a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_word_after_any_bullet_emphasis_dated_colon_and_space,
+    a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_alphabetic_word,
     |text: &&str| Line::read(1, text).read_by(Shaped),
     [
         "" => "layout",
@@ -582,7 +637,7 @@ laws::table!(
         "RULINGS (owner): plural" => "remark",
         "RULING's scope (owner): possessive" => "remark",
         "RULING (owner): as c3c3c3c3's reply says" => "ruling",
-        "(RULING: aside) and more" => "remark",
+        "(RULING: aside) and more" => "ruling",
         "(owner) RULING: approved" => "remark",
         "(a (b) c) RULING: nested" => "remark",
         "a) RULING: unbalanced" => "remark",
@@ -602,8 +657,14 @@ laws::table!(
         "2026-11-05: RULING (owner): dated" => "ruling",
         "- 2026-11-05: **RULING** (owner): every prefix" => "ruling",
         "+ **LEAD** 2026-11-08: the beds are dug" => "lead",
-        ": RULING (owner): a bare colon" => "remark",
-        "2026-11-05 : RULING (owner): a spaced colon" => "remark",
+        ": RULING (owner): a bare colon" => "ruling",
+        "2026-11-05 : RULING (owner): a spaced colon" => "ruling",
+        "1. RULING (owner): numbered" => "ruling",
+        "> RULING (owner): quoted" => "ruling",
+        "**2026-11-05**: RULING (owner): a bold date" => "ruling",
+        "- [x] RULING (owner): a task" => "ruling",
+        "- [ ] LEAD: an open task" => "lead",
+        "- [x] done: RULING aside" => "remark",
         "* note: RULING aside" => "remark",
         "**Lead**: the beds are dug" => "remark",
     ]
