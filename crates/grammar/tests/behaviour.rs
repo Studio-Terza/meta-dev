@@ -18,8 +18,10 @@ use grammar::search::Term;
 use grammar::search::Terms;
 use grammar::shard::Sharding;
 use grammar::slug::Letters;
+use grammar::spec_line;
+use grammar::spec_line::Attachment;
 use laws::proptest::collection::vec;
-use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 
 struct Marks;
@@ -860,6 +862,60 @@ laws::roundtrip!(
     |emptied: &Emptied| format!("{}=", emptied.clone().into_inner()),
     |text: &String| text.parse::<Emptied>().ok(),
     Some
+);
+
+laws::roundtrip!(
+    a_spec_line_reads_back_from_its_rendering,
+    prop_oneof![
+        Just(spec_line::Line::Repair),
+        any::<Attachment>().prop_map(|attachment| spec_line::Line::Spec(attachment.into_inner())),
+        "[!-~]([ -~]{0,20}[!-~])?".prop_map(spec_line::Line::Spec),
+    ],
+    |line: &spec_line::Line| line.to_string(),
+    |text: &String| text.parse::<spec_line::Line>().ok(),
+    Some
+);
+
+laws::table!(
+    a_program_holds_exactly_one_word_with_no_space_around_it,
+    |word: &&str| Program::try_new((*word).to_owned()).ok().map(Program::into_inner),
+    [
+        "cargo" => Some("cargo".to_owned()),
+        "./run.sh" => Some("./run.sh".to_owned()),
+        "" => None,
+        "cargo test" => None,
+        " cargo" => None,
+        "cargo\n" => None,
+    ]
+);
+
+laws::table!(
+    an_emptied_name_is_exactly_one_identifier,
+    |name: &&str| Emptied::try_new((*name).to_owned()).ok().map(Emptied::into_inner),
+    [
+        "RUSTFLAGS" => Some("RUSTFLAGS".to_owned()),
+        "_cache9" => Some("_cache9".to_owned()),
+        "" => None,
+        "=" => None,
+        "A=" => None,
+        "9A" => None,
+        "a b" => None,
+    ]
+);
+
+laws::table!(
+    a_banner_label_is_exactly_one_plain_word,
+    |label: &&str| Banner::try_new((*label).to_owned()).ok().map(Banner::into_inner),
+    [
+        "grammar" => Some("grammar".to_owned()),
+        "doc-test_log" => Some("doc-test_log".to_owned()),
+        "" => None,
+        "Running" => None,
+        "Doc-tests" => None,
+        "a b" => None,
+        "a/b" => None,
+        "(" => None,
+    ]
 );
 
 laws::law!(

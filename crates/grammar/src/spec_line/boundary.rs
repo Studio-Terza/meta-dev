@@ -1,7 +1,8 @@
 use std::fmt;
+use std::str::FromStr;
 
 use logos::Logos;
-use newtype::Checked;
+use newtype::{Arbitrary, Checked, Newtype};
 
 use crate::unspelled::Unspelled;
 
@@ -31,39 +32,41 @@ enum Form {
     Labels,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Line<'body> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Line {
     Repair,
-    Spec(&'body str),
-    Other,
+    Spec(String),
 }
 
-#[derive(newtype::Newtype, Debug, PartialEq, Eq)]
-#[newtype(checked)]
-pub struct Attachment<'line>(&'line str);
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(
+    checked,
+    strategy = "none|owner [0-9a-f]{8}[0-9a-f-]{0,8}|[a-z0-9-]{1,8}#[DL][0-9]{1,3}(, ?[a-z0-9-]{1,8}#[DL][0-9]{1,3}){0,2}"
+)]
+pub struct Attachment(String);
 
-impl<'body> Line<'body> {
+impl Line {
     const SPEC: &'static str = "spec: ";
     const REPAIR: &'static str = "repair: main";
 
     #[must_use]
-    pub fn spec(self) -> Option<&'body str> {
+    pub fn attachment(&self) -> Option<Attachment> {
         match self {
-            Line::Spec(value) => Some(value),
-            Line::Repair | Line::Other => None,
+            Line::Spec(value) => Attachment::try_new(value.clone()).ok(),
+            Line::Repair => None,
         }
     }
 
-    fn repaired(value: Option<&'body str>) -> Option<Line<'body>> {
+    fn repaired(value: Option<&str>) -> Option<Line> {
         value.map_or(Some(Line::Repair), |_trailing| None)
     }
 }
 
 impl Head {
-    fn line(self, value: Option<&str>) -> Option<Line<'_>> {
+    fn line(self, value: Option<&str>) -> Option<Line> {
         match self {
             Head::Repair => Line::repaired(value),
-            Head::Spec => value.map(Line::Spec),
+            Head::Spec => value.map(|written| Line::Spec(written.to_owned())),
         }
     }
 }
@@ -77,36 +80,37 @@ impl<'text> Tail<'text> {
     }
 }
 
-impl<'body> From<&'body str> for Line<'body> {
-    fn from(text: &'body str) -> Line<'body> {
+impl FromStr for Line {
+    type Err = Unspelled;
+
+    fn from_str(text: &str) -> Result<Line, Unspelled> {
         let mut head = Head::lexer(text);
         let opened = head.next().and_then(Result::ok);
-        let value = head.morph::<Tail<'body>>().next().and_then(Result::ok).and_then(Tail::written);
-        opened.and_then(|lexed| lexed.line(value)).unwrap_or(Line::Other)
+        let value = head.morph::<Tail<'_>>().next().and_then(Result::ok).and_then(Tail::written);
+        opened.and_then(|lexed| lexed.line(value)).ok_or(Unspelled)
     }
 }
 
-impl fmt::Display for Line<'_> {
+impl fmt::Display for Line {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Line::Repair => formatter.write_str(Self::REPAIR),
             Line::Spec(value) => write!(formatter, "{}{value}", Self::SPEC),
-            Line::Other => Ok(()),
         }
     }
 }
 
-impl<'line> Checked for Attachment<'line> {
+impl Checked for Attachment {
     type Error = Unspelled;
 
-    fn checked<'held>(value: &'held &'line str) -> Result<&'held &'line str, Unspelled> {
+    fn checked(value: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Form, ()>> = Form::lexer(value).collect();
         <[Result<Form, ()>; 1]>::try_from(spelled).ok().and_then(|[only]| only.ok()).map(|_form| value).ok_or(Unspelled)
     }
 }
 
-impl fmt::Display for Attachment<'_> {
+impl fmt::Display for Attachment {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.0)
+        formatter.write_str(&self.0)
     }
 }
