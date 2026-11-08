@@ -1,5 +1,6 @@
 mod apply;
 mod hook;
+mod import;
 mod ingest;
 mod init;
 mod lifecycle;
@@ -27,6 +28,7 @@ use crate::Outcome;
 use crate::cli::failure::Failure;
 pub use apply::{Application, Unresolved};
 pub use hook::Hook;
+use import::Import;
 use ingest::Ingest;
 use init::Init;
 use lifecycle::{Move, Moving, Recast};
@@ -49,6 +51,7 @@ pub enum Command {
     Structure,
     Hook(Hook),
     View(View),
+    Import(PathBuf),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,6 +66,7 @@ pub enum Verb {
     Structure,
     Hook,
     View,
+    Import,
 }
 
 impl FromStr for Verb {
@@ -74,7 +78,7 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 13] = [
+    const NAMED: [(&'static str, Verb); 14] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
@@ -88,6 +92,7 @@ impl Verb {
         ("structure", Verb::Structure),
         ("hook", Verb::Hook),
         ("view", Verb::View),
+        ("import-notes", Verb::Import),
     ];
 
     pub fn options(self) -> &'static [Flag] {
@@ -103,7 +108,8 @@ impl Verb {
             | Verb::Move(Moving::Refine | Moving::Reopen)
             | Verb::Role
             | Verb::Structure
-            | Verb::View => &[],
+            | Verb::View
+            | Verb::Import => &[],
         }
     }
 
@@ -128,6 +134,7 @@ impl Verb {
                 .and_then(|[token]| token.hook())
                 .map(Command::Hook),
             Verb::View => View::read(rest).map(Command::View),
+            Verb::Import => Token::only(rest).map(PathBuf::from).map(Command::Import),
         }
     }
 }
@@ -144,7 +151,8 @@ impl Command {
             | Command::Recast(_)
             | Command::Structure
             | Command::Hook(_)
-            | Command::View(_) => opened(path),
+            | Command::View(_)
+            | Command::Import(_) => opened(path),
         }
     }
 
@@ -177,6 +185,7 @@ impl Command {
             }
             Command::Hook(hook) => hook.answered(environment, ground, crew, out),
             Command::View(view) => view.written(&ground, out),
+            Command::Import(path) => Import::written(&ground, &path, out),
         }
     }
 }

@@ -12,15 +12,14 @@ use grammar::cited::Cited;
 use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::Newtype;
 use stream::{Relation, Shape};
 use structurer::{Directive, Lapse, Retried, SegmentRef};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
 
+use crate::cli::count::Count;
+use crate::cli::noted::{Noted, Noting};
 use crate::cli::{Looked, Viewed};
-
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Count(usize);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
@@ -149,6 +148,7 @@ pub enum Line {
     Flailed(Lapsed),
     FlailedSegment(Flailing),
     Viewed(Viewed),
+    Noted(Noted),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -389,6 +389,7 @@ impl fmt::Display for Line {
             Line::Flailed(lapsed) => write!(formatter, "{} {lapsed}", Key::Flailed),
             Line::FlailedSegment(flailing) => write!(formatter, "{} {flailing}", Key::FlailedSegment),
             Line::Viewed(viewed) => write!(formatter, "{viewed}"),
+            Line::Noted(noted) => write!(formatter, "{noted}"),
         }
     }
 }
@@ -500,7 +501,7 @@ impl Line {
     fn read(fields: &mut Fields) -> Result<Line, Unread> {
         match fields.optional::<Word<Looked>>() {
             Some(looked) => looked.viewed(fields).map(Line::Viewed),
-            None => fields.field::<Word<Key>>().and_then(|key| key.line(fields)),
+            None => Noting::line(fields.optional::<Word<Noting>>(), fields),
         }
     }
 
@@ -514,6 +515,15 @@ impl Line {
 
     fn sensed(sense: Sense) -> String {
         format!(" {} {} {} {}", sense.kind(), sense.specificity(), sense.confidence(), sense.explicitness())
+    }
+}
+
+impl Noting {
+    fn line(noting: Option<Noting>, fields: &mut Fields) -> Result<Line, Unread> {
+        match noting {
+            Some(noting) => noting.noted(fields).map(Line::Noted),
+            None => fields.field::<Word<Key>>().and_then(|key| key.line(fields)),
+        }
     }
 }
 

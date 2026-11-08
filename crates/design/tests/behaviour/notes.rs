@@ -1,0 +1,224 @@
+use std::error::Error;
+use std::ffi::OsString;
+use std::path::Path;
+
+use design::{Cli, Count, Failure, Line, Miss, Noted, Reference};
+use design_model::NotesLine;
+use design_store::StreamSchema;
+use file_ports::{Bytes, Files};
+use grammar::notes::Quote;
+use laws::proptest::collection::vec;
+use laws::proptest::prelude::{prop_assert, prop_assert_eq};
+use laws::proptest::sample::select;
+use laws::proptest::test_runner::TestCaseError;
+use port_core::Run;
+use store_ports::Sqlite;
+
+use super::{Applying, FakeLent, Invocation, Session, Speaker, Spread, Staff};
+
+const FOUND: &str = "a1a1a1a1-0000-4000-8000-000000000001";
+
+const PROPOSED: &str = "b2b2b2b2-0000-4000-8000-000000000002";
+
+const APPROVED: &str = "c3c3c3c3-0000-4000-8000-000000000003";
+
+const AGREED: &str = "d4d4d4d4-0000-4000-8000-000000000004";
+
+const AGAIN: &str = "e5e5e5e5-0000-4000-8000-000000000005";
+
+const EXCERPT: &str = "# Garden notes (2026-11-05, draft)
+
+Convention (owner, 2026-11-05): a line counts once it is written down.
+Owner's plan: \"every bed needs a label; labels carry their rows. rows turn into a map.\" and the rest follows.
+RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\" (new purchase)
+Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and ae0e9ace landed.
+- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to the planting order.
+- 2026-11-07 RULING (owner): \"agreed\" again, on the compost.
+- 2026-11-07 lead: the timer printed \"water again later\" and stopped.
+Owner said \"agreed\" on two days.
+
+## Later
+(Owner moved on with \"onward\": not a ruling.)
+";
+
+const NOTES: &str = "notes/postmortem.md";
+
+struct Noting;
+
+impl Noting {
+    fn session() -> Session {
+        let said = [
+            (
+                Speaker::Owner,
+                FOUND,
+                "so the plan is labels. every bed needs a label; labels carry their rows. rows turn into a map. that is all",
+                "2026-11-05",
+            ),
+            (Speaker::Lead, PROPOSED, "one shed for every tool", "2026-11-05"),
+            (Speaker::Owner, APPROVED, "yes the new trellis is approved.", "2026-11-05"),
+            (Speaker::Owner, AGREED, "agreed", "2026-11-06"),
+            (Speaker::Owner, AGAIN, "agreed", "2026-11-07"),
+        ];
+        Session::working(
+            said.iter().map(|(speaker, uuid, text, day)| Session::stamped(*speaker, uuid, "null", text, day)).collect(),
+        )
+    }
+
+    fn ready() -> Result<Applying, Failure> {
+        Applying::over(&Noting::session())
+    }
+
+    fn imported(applying: &Applying, notes: &str) -> Result<String, Failure> {
+        applying.files.create_directories(Path::new("/work/notes")).ok();
+        applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
+        applying.run(&["import-notes", NOTES])
+    }
+
+    fn outcome(line: &str) -> Option<&'static str> {
+        Noting::ready()
+            .ok()
+            .map(|applying| Noting::imported(&applying, &format!("# Notes\n{line}\n")))
+            .and_then(Noting::sorted)
+    }
+
+    fn sorted(imported: Result<String, Failure>) -> Option<&'static str> {
+        match imported {
+            Ok(_out) => Some("imported"),
+            Err(Failure::Unanchored { .. }) => Some("unanchored"),
+            Err(_other) => None,
+        }
+    }
+}
+
+#[test]
+fn import_notes_makes_a_node_of_every_line_anchors_each_ruling_and_view_notes_gives_the_file_back()
+-> Result<(), Box<dyn Error>> {
+    let applying = Noting::ready()?;
+    let imported = Noting::imported(&applying, EXCERPT)?;
+    let viewed = applying.run(&["view", "notes"])?;
+    let shown = ["n2", "n4", "n5", "n6", "n7", "n8", "n11"]
+        .iter()
+        .map(|node| applying.run(&["show", node]).map(|out| format!("design show {node}\n{out}")))
+        .collect::<Result<String, Failure>>()?;
+    golden::golden!(
+        "notes.txt",
+        &format!("design import-notes {NOTES}\n{imported}design view notes\n{viewed}{shown}")
+    )?;
+    Ok(())
+}
+
+laws::law!(
+    importing_notes_and_viewing_them_gives_the_file_back_with_as_many_nodes_as_lines,
+    vec(
+        select(vec![
+            "",
+            "# Notes (2026-11-05)",
+            "## Later",
+            "Owner: \"rows turn into a map.\" and more",
+            "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\"",
+            "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that",
+            "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)",
+            "(Owner moved on: not a ruling)",
+            "  indented: prose with Rust's 'quotes' in it",
+        ]),
+        0..8
+    ),
+    lines,
+    {
+        let body: String = lines.iter().flat_map(|line| [*line, "\n"]).collect();
+        let notes = format!("{body}last line\n");
+        let applying = Noting::ready().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let imported =
+            Noting::imported(&applying, &notes).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let viewed = applying.run(&["view", "notes"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let inked = lines.iter().filter(|line| !line.is_empty()).count() + 1;
+        let nodes =
+            Spread::parsed(&imported).iter().filter(|line| matches!(line, Line::Noted(Noted::Imported { .. }))).count();
+        prop_assert_eq!(viewed, notes);
+        prop_assert_eq!(nodes, inked);
+        let reconciled = format!("reconciled lines {inked} nodes {inked} ");
+        prop_assert!(imported.contains(&reconciled));
+    }
+);
+
+laws::table!(
+    a_ruling_line_is_imported_only_when_it_quotes_owner_words_or_cites_an_owner_message,
+    |line: &&str| Noting::outcome(line),
+    [
+        "RULING (owner): \"yes the new trellis is approved.\"" => Some("imported"),
+        "RULING (owner, c3c3c3c3): approved" => Some("imported"),
+        "RULING (owner): 'rows turn into a map.'" => Some("imported"),
+        "RULING (owner, b2b2b2b2): the lead proposed it" => Some("unanchored"),
+        "RULING (owner): \"one shed for every tool\"" => Some("unanchored"),
+        "RULING (owner, 2026-11-05): nothing quoted" => Some("unanchored"),
+        "RULING (owner, ae0e9ace): an unknown message" => Some("unanchored"),
+        "RULING (owner): \"\" says nothing" => Some("unanchored"),
+        "Lead: the RULING stands" => Some("imported"),
+        "(aside: RULING) prose" => Some("imported"),
+    ]
+);
+
+#[test]
+fn an_unanchored_ruling_refuses_the_whole_import_reporting_it_and_writing_nothing() -> Result<(), Failure> {
+    let applying = Noting::ready()?;
+    let notes = "# Notes\nOwner: \"no such words\"\nRULING (owner): nothing to anchor\nRULING (owner): \"agreed\"\n";
+    applying.files.create_directories(Path::new("/work/notes")).ok();
+    applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
+    let mut out = Vec::new();
+    let refused = Cli::new(
+        &Invocation::environment(),
+        FakeLent::new(&applying.files),
+        |_path| applying.store.clone(),
+        Staff::idle(),
+    )
+    .report(&Run::root(), ["import-notes", NOTES].iter().map(OsString::from), &mut out);
+    let quoted = |line: usize, quote: &str, miss: Miss| {
+        Line::Noted(Noted::Unresolved {
+            line: NotesLine::new(line),
+            reference: Reference::Quote(Quote::new(quote.to_owned())),
+            miss,
+        })
+    };
+    assert!(matches!(refused, Err(Failure::Unanchored { rulings }) if rulings == Count::new(2)));
+    assert_eq!(
+        Spread::parsed(&String::from_utf8(out).unwrap_or_default()),
+        [
+            quoted(2, "no such words", Miss::Unheard),
+            Line::Noted(Noted::Unanchored(NotesLine::new(3))),
+            quoted(4, "agreed", Miss::Ambiguous),
+            Line::Noted(Noted::Unanchored(NotesLine::new(4))),
+        ]
+    );
+    assert_eq!(applying.run(&["view", "notes"])?, "");
+    assert!(matches!(applying.run(&["show", "n2"]), Err(Failure::Unplaced(_))));
+    Ok(())
+}
+
+#[test]
+fn notes_import_into_a_project_once() -> Result<(), Failure> {
+    let applying = Noting::ready()?;
+    Noting::imported(&applying, EXCERPT)?;
+    let viewed = applying.run(&["view", "notes"])?;
+    assert!(matches!(Noting::imported(&applying, EXCERPT), Err(Failure::Reimported(_))));
+    assert!(matches!(Noting::imported(&applying, "# Other\nsecond\n"), Err(Failure::Reimported(_))));
+    assert_eq!(applying.run(&["view", "notes"])?, viewed);
+    Ok(())
+}
+
+#[test]
+fn notes_are_refused_without_a_project_a_readable_file_or_the_right_words() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Invocation::against(&store, &Noting::session(), &["ingest"])?;
+    assert!(matches!(Invocation::against(&store, &Noting::session(), &["view", "notes"]), Err(Failure::Unconfigured)));
+    let files = Noting::session().files();
+    files.create_directories(Path::new("/work/notes")).ok();
+    files.write(&Path::new("/work").join(NOTES), Bytes::from("# Notes\n")).ok();
+    assert!(matches!(Invocation::within(&store, files, &["import-notes", NOTES]), Err(Failure::Unconfigured)));
+    let applying = Noting::ready()?;
+    assert!(matches!(applying.run(&["import-notes", "notes/absent.md"]), Err(Failure::Notes(_))));
+    let strays: [&[&str]; 3] = [&["import-notes"], &["import-notes", NOTES, NOTES], &["view", "notes", "n1"]];
+    let usages: Vec<&[&str]> =
+        strays.into_iter().filter(|arguments| matches!(applying.run(arguments), Err(Failure::Usage))).collect();
+    assert_eq!(usages, strays);
+    Ok(())
+}

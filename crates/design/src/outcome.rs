@@ -20,4 +20,5 @@ pub enum Outcome {
     Noticed,
     Told,
     Viewed,
+    Imported,
 }

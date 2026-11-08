@@ -1,4 +1,6 @@
+mod count;
 mod failure;
+pub(crate) mod noted;
 pub(crate) mod output;
 mod request;
 mod viewed;

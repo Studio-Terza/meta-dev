@@ -1,6 +1,6 @@
 use design_model::AnyNode;
 
-use crate::{Link, Placement, Relative};
+use crate::{Citation, Link, Placement, Relative};
 
 #[derive(Debug)]
 pub struct Placed {
@@ -8,11 +8,16 @@ pub struct Placed {
     relatives: Vec<Relative>,
     links: Vec<Link>,
     placements: Vec<Placement>,
+    citations: Vec<Citation>,
 }
 
 impl Placed {
     pub(crate) fn new(node: AnyNode, relatives: Vec<Relative>, links: Vec<Link>, placements: Vec<Placement>) -> Placed {
-        Placed { node, relatives, links, placements }
+        Placed { node, relatives, links, placements, citations: Vec::new() }
+    }
+
+    pub(crate) fn cited(self, citations: Vec<Citation>) -> Placed {
+        Placed { citations, ..self }
     }
 
     #[must_use]
@@ -33,5 +38,10 @@ impl Placed {
     #[must_use]
     pub fn placements(&self) -> &[Placement] {
         &self.placements
+    }
+
+    #[must_use]
+    pub fn citations(&self) -> &[Citation] {
+        &self.citations
     }
 }

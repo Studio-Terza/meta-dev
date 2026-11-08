@@ -145,7 +145,7 @@ struct Heard {
 
 impl Application {
     pub fn read<F: Files, S: Store>(ground: &Ground<'_, F, S>, path: &Path) -> Result<Application, Failure> {
-        let contents = ground.read(path)?;
+        let contents = ground.read(path).map_err(Failure::Directives)?;
         let store = ground.store();
         let lock = store.lock()?;
         let application = store.read(AppliedFile::from(contents))?.seen(Fresh(ground))?;

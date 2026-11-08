@@ -16,13 +16,14 @@ use transcript_ports::ReadFailure;
 
 use structurer::{Lapse, Misread, SegmentRef, Uncovered};
 
+use super::output::Count;
 use super::request::Unresolved;
 use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings) | view (current-decision | open-questions | outline) [<node-id>] | view unplaced)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings) | view (current-decision | open-questions | outline) [<node-id>] | view (unplaced | notes) | import-notes <file>)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -55,6 +56,16 @@ pub enum Failure {
     Directives(#[source] FileFailure),
     #[error("cannot read the directives: {0}")]
     Misread(#[from] Misread),
+    #[error("cannot read the notes file: {0}")]
+    Notes(#[source] FileFailure),
+    #[error("project {0} already holds imported notes; nothing was written")]
+    Reimported(Project),
+    #[error(
+        "{rulings} RULING lines resolve no owner words, neither a quote nor a cited owner message; quote or cite the owner on each and import again; nothing was written"
+    )]
+    Unanchored { rulings: Count },
+    #[error("{lines} notes lines came in but {nodes} nodes came out")]
+    Unreconciled { lines: Count, nodes: Count },
     #[error("{0}; nothing was written")]
     Unresolved(#[from] Unresolved),
     #[error("{0}; nothing was written")]

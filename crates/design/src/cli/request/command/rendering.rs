@@ -2,8 +2,8 @@ use design_model::{
     Dropped, NodeId, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Staging, Terminal,
 };
 use design_store::{
-    Annotation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest, Stored,
-    Unplaced, Uttered,
+    Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest,
+    Stored, Unplaced, Uttered,
 };
 use newtype::Newtype;
 use store_ports::{Store, StoreFailure};
@@ -12,6 +12,7 @@ use structurer::SegmentRef;
 use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
 
 use crate::cli::Viewed;
+use crate::cli::noted::Noted;
 use crate::cli::output::{Anchored, Line, Remark, Summary};
 
 #[derive(Debug)]
@@ -33,8 +34,11 @@ impl Refs {
     }
 
     pub fn placed(store: &impl Store, placed: &Placed) -> Result<Vec<Line>, StoreFailure> {
-        let refs = Refs::read(store, placed.placements().iter().map(Placement::segment))?;
-        Ok(refs.neighbourhood(placed))
+        let segments =
+            placed.placements().iter().map(Placement::segment).map(|segment| AsRef::<Uuid>::as_ref(&segment).clone());
+        let cited = placed.citations().iter().map(|citation: &Citation| AsRef::<Uuid>::as_ref(citation).clone());
+        let messages: Prefixes = segments.chain(cited).collect();
+        Ok(Refs(store.read(messages)?).neighbourhood(placed))
     }
 
     pub fn stored(store: &impl Store, stored: &Stored) -> Result<Vec<Line>, StoreFailure> {
@@ -76,6 +80,15 @@ impl Refs {
                     entered: *provenance,
                     body: placement.body().clone(),
                 }
+            }))
+            .chain(placed.citations().iter().map(|citation| {
+                let author: &Authorship = citation.as_ref();
+                let provenance: &Provenance = citation.as_ref();
+                Line::Noted(Noted::Cites {
+                    message: self.0.prefix(citation.as_ref()),
+                    author: *author,
+                    entered: *provenance,
+                })
             }))
             .collect()
     }

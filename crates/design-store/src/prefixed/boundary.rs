@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
+
 use design_model::{NodeId, Ordinal, Prefix, Segment};
 use store_ports::{Columns, Query, Statements, StoreFailure};
 use transcript_ports::{Authorship, Uuid};
 
-use super::{NextNode, Prefixed, Spoken, Started};
+use super::{Cited, NextNode, Prefixed, Spoken, Started};
 use crate::graph::NodeRow;
 
 #[derive(Debug, Columns)]
@@ -47,6 +49,17 @@ ORDER BY
             prefix: Prefix
         ))?;
         Ok(rows.into_iter().map(Spoken::from).collect())
+    }
+}
+
+impl Query for Cited {
+    type Rows = BTreeMap<Prefix, Vec<Spoken>>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Prefix, Vec<Spoken>>, StoreFailure> {
+        self.0
+            .into_iter()
+            .map(|prefix| Prefixed(prefix.clone()).rows(statements).map(|spoken| (prefix, spoken)))
+            .collect()
     }
 }
 

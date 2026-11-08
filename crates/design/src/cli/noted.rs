@@ -1,0 +1,171 @@
+use std::fmt;
+
+use design_model::{NodeId, NotesLine, Prefix, Provenance};
+use grammar::notes::{Cite, Quote};
+use grammar::output::field::{Bare, Id, Integer, Quoted, Word};
+use grammar::output::{Fields, Unread};
+use named_derive::Named;
+use newtype::Newtype;
+use strum::VariantArray;
+use transcript_ports::Authorship;
+
+use crate::cli::count::Count;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Noted {
+    Imported { line: NotesLine, node: NodeId },
+    Unresolved { line: NotesLine, reference: Reference, miss: Miss },
+    Unanchored(NotesLine),
+    Reconciled(Reconciliation),
+    Cites { message: Prefix, author: Authorship, entered: Provenance },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reference {
+    Quote(Quote),
+    Cite(Cite),
+}
+
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Miss {
+    #[name("unheard")]
+    Unheard,
+    #[name("ambiguous")]
+    Ambiguous,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Reconciliation {
+    lines: Count,
+    nodes: Count,
+    rulings: Count,
+    anchored: Count,
+}
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Noting {
+    #[name("imported")]
+    Imported,
+    #[name("unresolved")]
+    Unresolved,
+    #[name("unanchored")]
+    Unanchored,
+    #[name("reconciled")]
+    Reconciled,
+    #[name("cites")]
+    Cites,
+}
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+enum Part {
+    #[name("line")]
+    Line,
+    #[name("quote")]
+    Quote,
+    #[name("cite")]
+    Cite,
+    #[name("lines")]
+    Lines,
+    #[name("nodes")]
+    Nodes,
+    #[name("rulings")]
+    Rulings,
+    #[name("anchored")]
+    Anchored,
+    #[name("entered")]
+    Entered,
+}
+
+impl Noting {
+    pub(crate) fn noted(self, fields: &mut Fields) -> Result<Noted, Unread> {
+        match self {
+            Noting::Imported => Ok(Noted::Imported {
+                line: NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?),
+                node: fields.field::<Id<_>>()?,
+            }),
+            Noting::Unresolved => Ok(Noted::Unresolved {
+                line: NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?),
+                reference: Reference::read(fields)?,
+                miss: fields.field::<Word<_>>()?,
+            }),
+            Noting::Unanchored => {
+                Ok(Noted::Unanchored(NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?)))
+            }
+            Noting::Reconciled => Reconciliation::read(fields).map(Noted::Reconciled),
+            Noting::Cites => Ok(Noted::Cites {
+                message: fields.field::<Bare<_>>()?,
+                author: fields.field::<Word<_>>()?,
+                entered: fields.past(&[Part::Entered])?.field::<Word<_>>()?,
+            }),
+        }
+    }
+}
+
+impl Reference {
+    fn read(fields: &mut Fields) -> Result<Reference, Unread> {
+        match fields.field::<Word<Part>>()? {
+            Part::Quote => Ok(Reference::Quote(fields.field::<Quoted<_>>()?)),
+            Part::Cite => Ok(Reference::Cite(fields.field::<Bare<_>>()?)),
+            Part::Line | Part::Lines | Part::Nodes | Part::Rulings | Part::Anchored | Part::Entered => {
+                Err(Unread::Unkeyed)
+            }
+        }
+    }
+}
+
+impl Reconciliation {
+    #[must_use]
+    pub fn new(lines: Count, nodes: Count, rulings: Count, anchored: Count) -> Reconciliation {
+        Reconciliation { lines, nodes, rulings, anchored }
+    }
+
+    fn read(fields: &mut Fields) -> Result<Reconciliation, Unread> {
+        Ok(Reconciliation {
+            lines: Count::new(fields.past(&[Part::Lines])?.field::<Integer<_>>()?),
+            nodes: Count::new(fields.past(&[Part::Nodes])?.field::<Integer<_>>()?),
+            rulings: Count::new(fields.past(&[Part::Rulings])?.field::<Integer<_>>()?),
+            anchored: Count::new(fields.past(&[Part::Anchored])?.field::<Integer<_>>()?),
+        })
+    }
+}
+
+impl fmt::Display for Noted {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Noted::Imported { line, node } => {
+                write!(formatter, "{} {} {line} n{}", Noting::Imported, Part::Line, node.into_inner())
+            }
+            Noted::Unresolved { line, reference, miss } => {
+                write!(formatter, "{} {} {line} {reference} {miss}", Noting::Unresolved, Part::Line)
+            }
+            Noted::Unanchored(line) => write!(formatter, "{} {} {line}", Noting::Unanchored, Part::Line),
+            Noted::Reconciled(reconciliation) => write!(formatter, "{} {reconciliation}", Noting::Reconciled),
+            Noted::Cites { message, author, entered } => {
+                write!(formatter, "  {} {message} {author} {} {entered}", Noting::Cites, Part::Entered)
+            }
+        }
+    }
+}
+
+impl fmt::Display for Reference {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Reference::Quote(quote) => write!(formatter, "{} {}", Part::Quote, Fields::quoting(&quote.to_string())),
+            Reference::Cite(cite) => write!(formatter, "{} {cite}", Part::Cite),
+        }
+    }
+}
+
+impl fmt::Display for Reconciliation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Reconciliation { lines, nodes, rulings, anchored } = self;
+        write!(
+            formatter,
+            "{} {lines} {} {nodes} {} {rulings} {} {anchored}",
+            Part::Lines,
+            Part::Nodes,
+            Part::Rulings,
+            Part::Anchored
+        )
+    }
+}

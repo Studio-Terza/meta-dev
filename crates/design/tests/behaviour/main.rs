@@ -1,3 +1,4 @@
+mod notes;
 mod structure;
 mod view;
 
@@ -12,13 +13,13 @@ use std::str::FromStr;
 use console_ports::{Heard, Variables};
 
 use design::{
-    Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved,
-    Viewed,
+    Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Miss, Noted, Outcome, Reconciliation, Reference,
+    Remark, Summary, Unmatched, Unresolved, Viewed,
 };
 use design_model::{
     AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId, Kin, Node,
-    NodeEdge, NodeId, NodeRelation, Ordinal, Outline, Prefix, Project, Provenance, Reason, Refining, Role, RunId,
-    SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
+    NodeEdge, NodeId, NodeRelation, NotesLine, Ordinal, Outline, Prefix, Project, Provenance, Reason, Refining, Role,
+    RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
 };
 use design_store::{
     AppliedId, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage, ShownNode,
@@ -26,6 +27,7 @@ use design_store::{
 };
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
+use grammar::notes::{Cite, Quote};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
@@ -82,10 +84,14 @@ impl Session {
     }
 
     fn line(speaker: Speaker, uuid: &str, parent: &str, text: &str) -> String {
+        Session::stamped(speaker, uuid, parent, text, "2026-01-01")
+    }
+
+    fn stamped(speaker: Speaker, uuid: &str, parent: &str, text: &str, day: &str) -> String {
         let Wire { kind, origin } = speaker.wire();
         let content = speaker.content(text);
         format!(
-            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
+            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"{day}T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
         )
     }
 
@@ -1904,6 +1910,7 @@ impl Generated {
         prop_oneof![
             select(Entered::VARIANTS).prop_map(Provenance::from),
             any::<i64>().prop_map(|run| Provenance::Agent(RunId::new(run))),
+            (1..=usize::MAX).prop_map(|line| Provenance::Import(NotesLine::new(line))),
         ]
         .boxed()
     }
@@ -2163,6 +2170,32 @@ impl Generated {
         .boxed()
     }
 
+    fn noted() -> BoxedStrategy<Line> {
+        let reference = prop_oneof![
+            Generated::text().prop_map(|quote| Reference::Quote(Quote::new(quote))),
+            "[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8}".prop_map(|cite| Reference::Cite(Cite::new(cite))),
+        ];
+        prop_oneof![
+            (any::<usize>(), Generated::node())
+                .prop_map(|(line, node)| Noted::Imported { line: NotesLine::new(line), node }),
+            (any::<usize>(), reference, select(Miss::VARIANTS)).prop_map(|(line, reference, miss)| Noted::Unresolved {
+                line: NotesLine::new(line),
+                reference,
+                miss
+            }),
+            any::<usize>().prop_map(|line| Noted::Unanchored(NotesLine::new(line))),
+            (Generated::count(), Generated::count(), Generated::count(), Generated::count()).prop_map(
+                |(lines, nodes, rulings, anchored)| Noted::Reconciled(Reconciliation::new(
+                    lines, nodes, rulings, anchored
+                ))
+            ),
+            (Generated::message(), Generated::author(), Generated::entered())
+                .prop_map(|(message, author, entered)| Noted::Cites { message: Prefix::new(message), author, entered }),
+        ]
+        .prop_map(Line::Noted)
+        .boxed()
+    }
+
     fn line() -> BoxedStrategy<Line> {
         prop_oneof![
             Generated::counted(),
@@ -2170,7 +2203,8 @@ impl Generated {
             Generated::shown_message(),
             Generated::applied(),
             Generated::structured(),
-            Generated::viewed()
+            Generated::viewed(),
+            Generated::noted()
         ]
         .boxed()
     }

@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::Agents;
+pub use boundary::{Originating, Origins};

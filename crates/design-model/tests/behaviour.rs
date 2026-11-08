@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 use design_model::{
     AnyNode, AnyStage, Artifact, ArtifactKind, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet,
-    Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance, Reason, Role, RunId,
-    SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title, Transition,
+    Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Project, Provenance, Reason, Role,
+    RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title, Transition,
 };
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq, prop_oneof};
@@ -129,6 +129,7 @@ impl Provenances {
         prop_oneof![
             select(Entered::VARIANTS).prop_map(Provenance::from),
             any::<i64>().prop_map(|run| Provenance::Agent(RunId::new(run))),
+            (1..=usize::MAX).prop_map(|line| Provenance::Import(NotesLine::new(line))),
         ]
     }
 }
@@ -142,7 +143,7 @@ laws::roundtrip!(
 );
 
 laws::table!(
-    a_provenance_is_a_way_of_entering_or_an_agent_run,
+    a_provenance_is_a_way_of_entering_an_agent_run_or_a_notes_line,
     |text: &&'static str| text.parse::<Provenance>().ok(),
     [
         "apply" => Some(Provenance::from(Entered::Apply)),
@@ -155,6 +156,13 @@ laws::table!(
         "agent-7 " => None,
         "agent 7" => None,
         "agent-99999999999999999999" => None,
+        "import-12" => Some(Provenance::Import(NotesLine::new(12))),
+        "import-1" => Some(Provenance::Import(NotesLine::new(1))),
+        "import-0" => None,
+        "import-012" => None,
+        "import--1" => None,
+        "import" => None,
+        "import-99999999999999999999999" => None,
     ]
 );
 

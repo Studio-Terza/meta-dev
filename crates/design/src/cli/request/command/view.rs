@@ -3,9 +3,13 @@ use std::io::Write;
 use std::iter;
 
 use design_model::{NodeId, Outline, Segment, SpanRelation};
-use design_store::{ContextNodes, CurrentSpans, ProjectRoot, Resolved, UnplacedSegments, Uttered};
+use design_store::{
+    ContextNodes, CurrentSpans, ImportedNotes, Noted, ProjectRoot, Resolved, UnplacedSegments, Uttered,
+};
 use file_ports::Files;
+use grammar::notes::{self, Notes};
 use named_derive::Named;
+use newtype::Newtype;
 use store_ports::Store;
 
 use super::printed::Printed;
@@ -21,6 +25,7 @@ use crate::cli::request::{Ground, Token};
 pub enum View {
     Tree(Tree, Root),
     Unplaced,
+    Notes,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +51,8 @@ enum Lens {
     Outline,
     #[name("unplaced")]
     Unplaced,
+    #[name("notes")]
+    Notes,
 }
 
 #[derive(Debug)]
@@ -56,21 +63,22 @@ impl Lens {
         token.text().and_then(|word| word.parse().ok()).ok_or(Failure::Usage)
     }
 
-    fn tree(self) -> Option<Tree> {
+    fn tree(self) -> Result<Tree, View> {
         match self {
-            Lens::CurrentDecision => Some(Tree::CurrentDecision),
-            Lens::OpenQuestions => Some(Tree::OpenQuestions),
-            Lens::Outline => Some(Tree::Outline),
-            Lens::Unplaced => None,
+            Lens::CurrentDecision => Ok(Tree::CurrentDecision),
+            Lens::OpenQuestions => Ok(Tree::OpenQuestions),
+            Lens::Outline => Ok(Tree::Outline),
+            Lens::Unplaced => Err(View::Unplaced),
+            Lens::Notes => Err(View::Notes),
         }
     }
 
     fn configured(self) -> View {
-        self.tree().map_or(View::Unplaced, |tree| View::Tree(tree, Root::Configured))
+        self.tree().map_or_else(|whole| whole, |tree| View::Tree(tree, Root::Configured))
     }
 
     fn rooted(self, node: &Token) -> Result<View, Failure> {
-        let tree = self.tree().ok_or(Failure::Usage)?;
+        let tree = self.tree().map_err(|_whole| Failure::Usage)?;
         let node = node.text().ok_or(Failure::Usage)?.parse()?;
         Ok(View::Tree(tree, Root::Node(node)))
     }
@@ -95,15 +103,26 @@ impl View {
         ground: &Ground<'_, F, S>,
         out: &mut impl Write,
     ) -> Result<Outcome, Failure> {
-        let lines = self.lines(ground)?;
-        Printed::lines(out, &lines).map(|_printed| Outcome::Viewed)
+        self.printed(ground, out).map(|_printed| Outcome::Viewed)
     }
 
-    fn lines<F: Files, S: Store>(self, ground: &Ground<'_, F, S>) -> Result<Vec<Line>, Failure> {
+    fn printed<F: Files, S: Store>(self, ground: &Ground<'_, F, S>, out: &mut impl Write) -> Result<Printed, Failure> {
         match self {
-            View::Unplaced => View::unplaced(ground.store()),
-            View::Tree(tree, root) => root.subtree(ground).and_then(|subtree| tree.lines(ground.store(), &subtree)),
+            View::Unplaced => View::unplaced(ground.store()).and_then(|lines| Printed::lines(out, &lines)),
+            View::Tree(tree, root) => root
+                .subtree(ground)
+                .and_then(|subtree| tree.lines(ground.store(), &subtree))
+                .and_then(|lines| Printed::lines(out, &lines)),
+            View::Notes => View::notes(ground).and_then(|notes| Printed::rendered(out, &notes)),
         }
+    }
+
+    fn notes<F: Files, S: Store>(ground: &Ground<'_, F, S>) -> Result<Notes, Failure> {
+        let project = ground.located().project().ok_or(Failure::Unconfigured)?;
+        let noted: Vec<Noted> = ground.store().read(ImportedNotes::from(project.clone()))?;
+        Ok(Notes::gathered(
+            noted.iter().map(|noted| notes::Line::read(noted.line().into_inner(), &noted.title().clone().into_inner())),
+        ))
     }
 
     fn unplaced(store: &impl Store) -> Result<Vec<Line>, Failure> {
