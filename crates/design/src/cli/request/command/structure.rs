@@ -1,8 +1,9 @@
+use std::collections::BTreeSet;
 use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
-    Account, AskedEarlier, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened,
+    Account, Asked, AskedEarlier, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened,
     JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned,
     StoredRun, Unplaced, Unstructured,
 };
@@ -10,9 +11,9 @@ use dispatch_ports::{
     AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
 };
 use port_core::Held;
-use store_ports::Store;
+use store_ports::{Store, StoreFailure};
 use structurer::{Attempt, Lapse, Reading, Said, SegmentRef};
-use transcript_ports::Body;
+use transcript_ports::{Body, SessionId};
 
 use super::Printed;
 use super::apply::{Application, Parsed};
@@ -149,8 +150,14 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
     fn job(&self, chunk: &[Unplaced], sequel: Sequel) -> Result<Worked, Failure> {
         let id = self.store.read(NextJob)?;
         let context = self.store.read(ContextNodes)?;
-        let first = chunk.first().map(|unplaced| AskedEarlier::from(AsRef::<Segment>::as_ref(unplaced)));
-        let asked = first.map(|earlier| self.store.read(earlier)).transpose()?.unwrap_or_default();
+        let sessions = chunk.iter().map(AsRef::<SessionId>::as_ref).collect::<BTreeSet<&SessionId>>();
+        let firsts = sessions
+            .iter()
+            .filter_map(|session| chunk.iter().find(|unplaced| AsRef::<SessionId>::as_ref(unplaced) == *session));
+        let asked = firsts
+            .map(|first| self.store.read(AskedEarlier::from(AsRef::<Segment>::as_ref(first))))
+            .collect::<Result<Vec<Vec<Asked>>, StoreFailure>>()?
+            .concat();
         let job = structurer::Job::new(Structure::<S, D, C>::said(chunk), Structure::<S, D, C>::said(&asked), context);
         let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
         let remit = Remit::job(id, segments.clone());

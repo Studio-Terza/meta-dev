@@ -5,7 +5,7 @@ use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
 use strum::VariantArray;
-use transcript_ports::Body;
+use transcript_ports::{Body, SessionId};
 
 use crate::{Account, Excerpt};
 
@@ -169,6 +169,7 @@ pub struct Unreported {
 pub struct Unplaced {
     segment: Segment,
     body: Body,
+    session: SessionId,
     flailed: Option<RunId>,
 }
 
@@ -345,6 +346,12 @@ impl AsRef<Segment> for Flailed {
 impl AsRef<Segment> for Unplaced {
     fn as_ref(&self) -> &Segment {
         &self.segment
+    }
+}
+
+impl AsRef<SessionId> for Unplaced {
+    fn as_ref(&self) -> &SessionId {
+        &self.session
     }
 }
 

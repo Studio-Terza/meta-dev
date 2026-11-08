@@ -89,10 +89,14 @@ impl Session {
     }
 
     fn stamped(speaker: Speaker, uuid: &str, parent: &str, text: &str, day: &str) -> String {
+        Session::recorded("s", speaker, uuid, [parent, text, day])
+    }
+
+    fn recorded(session: &str, speaker: Speaker, uuid: &str, [parent, text, day]: [&str; 3]) -> String {
         let Wire { kind, origin } = speaker.wire();
         let content = speaker.content(text);
         format!(
-            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"{day}T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
+            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"{session}\",\"timestamp\":\"{day}T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
         )
     }
 

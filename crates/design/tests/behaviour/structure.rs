@@ -288,6 +288,35 @@ fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_a
 }
 
 #[test]
+fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() -> Result<(), Box<dyn Error>> {
+    let [first, second] = ["aaaaaaaa-0000-4000-8000-000000000011", "aaaaaaaa-0000-4000-8000-000000000012"];
+    let [first_answer, second_answer] =
+        ["aaaaaaaa-0000-4000-8000-000000000013", "aaaaaaaa-0000-4000-8000-000000000014"];
+    let lines = [
+        Session::recorded("x", Speaker::Owner, first, ["null", "which crate", "2026-01-01"]),
+        Session::recorded("y", Speaker::Owner, second, ["null", "which store", "2026-01-02"]),
+        Session::recorded("x", Speaker::Owner, first_answer, ["null", "the first", "2026-01-03"]),
+        Session::recorded("y", Speaker::Owner, second_answer, ["null", "the second", "2026-01-04"]),
+    ];
+    let applying = Applying::over(&Session::working(lines.concat()))?;
+    let questions = [first, second]
+        .map(|asked| format!("place({asked}.0, n1, questions)\nsense({asked}.0, question, specific, firm, explicit)"))
+        .join("\n");
+    applying.applied(&questions)?;
+    let covering = [first_answer, second_answer].map(|said| format!("conversational({said}.0)")).join("\n");
+    let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let shown =
+        [(first, "which crate"), (second, "which store")].map(|(asked, body)| format!("asked {asked}.0 \"{body}\"\n"));
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    let counts =
+        briefs.iter().map(|brief| shown.iter().map(|line| brief.matches(line).count()).collect::<Vec<usize>>());
+    assert_eq!(counts.collect::<Vec<Vec<usize>>>(), [[1, 1]]);
+    Ok(())
+}
+
+#[test]
 fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_not_redispatch_them()
 -> Result<(), Box<dyn Error>> {
     let u = Some(Script::UNCOVERING);

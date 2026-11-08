@@ -36,7 +36,7 @@ mod stream_schema;
 pub use acyclic::{Closes, Cycle, Refusal};
 pub use annotation::{Annotation, Remarking};
 pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
-pub use asked_earlier::AskedEarlier;
+pub use asked_earlier::{Asked, AskedEarlier};
 pub use boundary::{Account, Excerpt, Hit, RelationName, ShapeName};
 pub use citation::Citation;
 pub use covered::Covered;
