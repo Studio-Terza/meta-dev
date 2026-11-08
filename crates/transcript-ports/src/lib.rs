@@ -31,4 +31,4 @@ pub use session_id::SessionId;
 pub use skipped::Skipped;
 pub use transcripts::{Transcripts, transcripts_ops};
 pub use unrecognised::Unrecognised;
-pub use uuid::{Unbare, Uuid};
+pub use uuid::Uuid;

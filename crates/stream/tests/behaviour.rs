@@ -119,8 +119,8 @@ impl Fixture {
 
     fn related(relation: Relation, said: &[Say<'_>]) -> Vec<String> {
         Self::stream(said)
-            .and_then(|stream| {
-                Ok(stream.links()?.iter().filter(|link| link.relation() == relation).map(ToString::to_string).collect())
+            .map(|stream| {
+                stream.links().iter().filter(|link| link.relation() == relation).map(ToString::to_string).collect()
             })
             .unwrap_or_default()
     }
@@ -222,7 +222,7 @@ impl Touching {
         .and_then(|stream| {
             let uuid = Uuid::try_new((*touched).to_owned())?;
             Ok(stream
-                .links()?
+                .links()
                 .iter()
                 .filter(|link| link.anchors().into_iter().any(|anchor| *anchor.message() == uuid))
                 .map(ToString::to_string)

@@ -2,7 +2,7 @@ use newtype::Counter;
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Written};
 use stream::Stream;
-use transcript_ports::{Cursor, SessionId, Unbare};
+use transcript_ports::{Cursor, SessionId};
 
 use crate::boundary::{CursorRow, EdgeRow, LinkRow, MessageRow, Row, SegmentRow};
 
@@ -16,19 +16,20 @@ pub struct SessionRecords {
 }
 
 impl SessionRecords {
-    pub fn read(session: &SessionId, cursor: Cursor, stream: &Stream) -> Result<SessionRecords, Unbare> {
+    #[must_use]
+    pub fn read(session: &SessionId, cursor: Cursor, stream: &Stream) -> SessionRecords {
         let messages = stream.as_ref();
-        Ok(SessionRecords {
+        SessionRecords {
             messages: messages.iter().map(MessageRow::from).collect(),
             segments: messages.iter().flat_map(SegmentRow::within).collect(),
-            links: stream.links()?.iter().map(LinkRow::from).collect(),
+            links: stream.links().iter().map(LinkRow::from).collect(),
             edges: messages
                 .iter()
                 .map(|message| EdgeRow::said(session, message))
                 .chain(stream.skipped().iter().map(|skipped| EdgeRow::skipped(session, skipped)))
                 .collect(),
             cursor: CursorRow::reached(session, cursor),
-        })
+        }
     }
 
     fn all(rows: &[impl Row], statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {

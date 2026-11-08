@@ -1,3 +1,4 @@
+use grammar::message::BareWord;
 use grammar::output::Fields;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
@@ -14,5 +15,11 @@ impl Checked for Uuid {
 
     fn checked(text: &String) -> Result<&String, Unbare> {
         Fields::bare(text).map(|_bare| text).ok_or_else(|| Unbare(text.clone()))
+    }
+}
+
+impl From<BareWord> for Uuid {
+    fn from(word: BareWord) -> Uuid {
+        Uuid(word.into_inner())
     }
 }

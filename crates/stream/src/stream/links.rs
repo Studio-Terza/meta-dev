@@ -5,8 +5,8 @@ mod turn;
 
 use std::collections::BTreeSet;
 
-use grammar::message::{Lexemes, Mark};
-use transcript_ports::{Authorship, Skipped, Unbare, Uuid};
+use grammar::message::Lexemes;
+use transcript_ports::{Authorship, Skipped, Uuid};
 
 use crate::anchor::Anchor;
 use crate::segment::Segment;
@@ -26,17 +26,16 @@ impl<'stream> Links<'stream> {
         Links { messages, chain: Chain::over(messages, skipped) }
     }
 
-    pub fn all(&self) -> Result<Vec<MechanicalLink>, Unbare> {
+    pub fn all(&self) -> Vec<MechanicalLink> {
         let replies = self.replies();
-        let cites = self.messages.iter().map(|message| self.cites(message)).collect::<Result<Vec<_>, Unbare>>()?;
         let links: BTreeSet<MechanicalLink> = replies
             .iter()
             .map(Reply::link)
             .chain(self.turns().iter().flat_map(|turn| turn.answers().links()))
-            .chain(cites.into_iter().flatten())
+            .chain(self.messages.iter().flat_map(|message| self.cites(message)))
             .chain(Resends::links(self.messages))
             .collect();
-        Ok(links.into_iter().collect())
+        links.into_iter().collect()
     }
 
     fn replies(&self) -> Vec<Reply<'stream>> {
@@ -54,24 +53,15 @@ impl<'stream> Links<'stream> {
             .collect()
     }
 
-    fn cites(&self, message: &Message) -> Result<Vec<MechanicalLink>, Unbare> {
-        let cited = message
-            .segments()
-            .iter()
-            .map(|segment| self.cited_by(segment, message))
-            .collect::<Result<Vec<_>, Unbare>>()?;
-        Ok(cited.into_iter().flatten().collect())
+    fn cites(&self, message: &Message) -> Vec<MechanicalLink> {
+        message.segments().iter().flat_map(|segment| self.cited_by(segment, message)).collect()
     }
 
-    fn cited_by(&self, segment: &Segment, message: &Message) -> Result<Vec<MechanicalLink>, Unbare> {
+    fn cited_by(&self, segment: &Segment, message: &Message) -> Vec<MechanicalLink> {
         let text = segment.text(message);
-        let uuids = Lexemes::scanned(&text)
+        Lexemes::uuids(&text)
             .into_iter()
-            .filter(|lexeme| matches!(lexeme.mark(), Mark::Uuid))
-            .map(|lexeme| Uuid::try_new(lexeme.span().slice(text.as_ref()).to_owned()))
-            .collect::<Result<Vec<Uuid>, Unbare>>()?;
-        Ok(uuids
-            .into_iter()
+            .map(Uuid::from)
             .filter(|cited| cited != message.record().uuid())
             .filter_map(|cited| self.chain.known(&cited))
             .map(|known| {
@@ -81,6 +71,6 @@ impl<'stream> Links<'stream> {
                     Anchor::Message(known.record().uuid().clone()),
                 )
             })
-            .collect())
+            .collect()
     }
 }

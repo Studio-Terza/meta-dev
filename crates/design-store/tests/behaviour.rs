@@ -63,7 +63,7 @@ impl Recorded {
         let read = port.read_from(session, Cursor::default())?;
         let cursor = read.cursor();
         let stream: Stream = read.into_iter().collect();
-        Ok(Recorded { records: SessionRecords::read(session.stem(), cursor, &stream)?, cursor })
+        Ok(Recorded { records: SessionRecords::read(session.stem(), cursor, &stream), cursor })
     }
 }
 

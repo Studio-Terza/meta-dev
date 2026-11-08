@@ -3,7 +3,7 @@ mod links;
 use std::collections::BTreeSet;
 
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
-use transcript_ports::{Gather, Line, Record, Skipped, Unbare, Unrecognised, Uuid};
+use transcript_ports::{Gather, Line, Record, Skipped, Unrecognised, Uuid};
 
 use crate::{Earlier, MechanicalLink, Message};
 use links::Links;
@@ -61,13 +61,14 @@ impl Stream {
         Stream { messages, skipped, unrecognised: Vec::new(), resumed }
     }
 
-    pub fn links(&self) -> Result<Vec<MechanicalLink>, Unbare> {
+    #[must_use]
+    pub fn links(&self) -> Vec<MechanicalLink> {
         let fresh: BTreeSet<&Uuid> = self.as_ref().iter().map(|message| message.record().uuid()).collect();
-        Ok(Links::over(&self.messages, &self.skipped)
-            .all()?
+        Links::over(&self.messages, &self.skipped)
+            .all()
             .into_iter()
             .filter(|link| link.anchors().iter().any(|anchor| fresh.contains(anchor.message())))
-            .collect())
+            .collect()
     }
 
     #[must_use]

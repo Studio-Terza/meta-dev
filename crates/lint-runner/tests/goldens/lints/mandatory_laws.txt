@@ -2,6 +2,6 @@ test budget, report only:
 corpus: 1 tests in 4 files, 1 of 8 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-a hand impl of a derivable std trait is prone to subtle bugs; derive it:
+a hand impl of a derivable trait is prone to subtle bugs; derive it:
 src/order.rs:2: hand impl of Ord for B; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
 fails

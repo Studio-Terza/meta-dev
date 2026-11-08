@@ -56,7 +56,10 @@ const OPAQUE_ROOT: &str = "mod topic;\nmod head;\n";
 const OPAQUE_TOPIC: &str = "pub use other::*;\n";
 const BESIDE_OPAQUE_GLOB: &str = "use crate::topic::*;\nuse std::fmt;\npub struct Head;\nimpl fmt::Debug for Head {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.finish() }\n}\n";
 
-const CASES: [Case; 31] = [
+const HAND_GUARDED: &str = "use newtype::Guarded;\nstruct A(String);\nimpl Guarded for A {\n    fn try_new(inner: String) -> Result<A, Unbare> { Ok(A(inner)) }\n}\nstruct B(String);\nimpl newtype::Guarded for B {\n    fn try_new(inner: String) -> Result<B, Unbare> { Ok(B(inner)) }\n}\n";
+const DERIVED_GUARDED: &str = "use newtype::{Checked, Newtype};\n#[derive(Newtype, Clone, Debug)]\n#[newtype(checked)]\nstruct A(String);\nimpl Checked for A {\n    type Error = Unbare;\n    fn checked(inner: &String) -> Result<&String, Unbare> { Ok(inner) }\n}\n";
+
+const CASES: [Case; 33] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -226,9 +229,19 @@ const CASES: [Case; 31] = [
         ],
         Flagged::new(&["src/head.rs:4"]),
     ),
+    Case::new(
+        Title::new("a hand impl of newtype's Guarded"),
+        &[Source::new(Located::new("a.rs"), Text::new(HAND_GUARDED))],
+        Flagged::new(&["a.rs:3", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("Guarded from the Newtype derive"),
+        &[Source::new(Located::new("a.rs"), Text::new(DERIVED_GUARDED))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
-fn every_hand_impl_of_a_derivable_std_trait_is_flagged() {
+fn every_hand_impl_of_a_derivable_trait_is_flagged() {
     assert_eq!(Sources::mismatches::<Queried<HandImpls>>(&CASES), Lines::default());
 }
