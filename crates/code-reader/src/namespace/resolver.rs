@@ -1,6 +1,6 @@
 use std::iter;
 
-use code_model::Domain;
+use code_model::{Domain, Unresolved};
 use lint_layout::Name;
 
 use super::Namespace;
@@ -34,6 +34,13 @@ impl Outer {
         }
     }
 
+    pub(super) fn unresolved(self, expanded: impl FnOnce() -> Unresolved) -> Unresolved {
+        match self {
+            Outer::Known(_) => Unresolved::Unbound,
+            Outer::Assumed(_) => expanded(),
+        }
+    }
+
     pub(super) fn known(self) -> Resolution {
         match self {
             Outer::Known(binding) => Resolution::Bound(binding),
@@ -46,7 +53,7 @@ impl From<Option<&Canonical>> for Outer {
     fn from(canonical: Option<&Canonical>) -> Outer {
         match canonical {
             Some(found) => Outer::Known(Binding::Std(found.path())),
-            None => Outer::Assumed(Binding::Unknown),
+            None => Outer::Assumed(Binding::UNBOUND),
         }
     }
 }
@@ -67,7 +74,7 @@ impl Resolution {
 
     pub(super) fn forced(self) -> Binding {
         match self {
-            Resolution::Waiting => Binding::Unknown,
+            Resolution::Waiting => Binding::UNBOUND,
             Resolution::Bound(binding) => binding,
         }
     }
@@ -160,15 +167,19 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
 
     pub(super) fn macro_named(&self, first: &Name, viewer: ScopeId) -> Resolution {
         let derive = StdNames::canonical(Table::Derives, first);
-        self.chained(viewer, Key::new(Domain::Macros, first), Reading::Written)
-            .contested(derive.map(|found| Binding::Std(found.path())), || Outer::from(derive))
+        self.chained(viewer, Key::new(Domain::Macros, first), Reading::Written).contested(
+            derive.map(|found| Binding::Std(found.path())),
+            || Outer::from(derive),
+            || self.space.expanded(viewer),
+        )
     }
 
     pub(super) fn named(&self, first: &Name, shape: Shape, reading: Reading, viewer: ScopeId) -> Resolution {
-        self.chained(viewer, Key::new(Domain::Types, first), reading)
-            .contested(shape.primitive(first).map(Binding::Primitive), || {
-                shape.fallback(first, reading, self.space, viewer)
-            })
+        self.chained(viewer, Key::new(Domain::Types, first), reading).contested(
+            shape.primitive(first).map(Binding::Primitive),
+            || shape.fallback(first, reading, self.space, viewer),
+            || self.space.expanded(viewer),
+        )
     }
 
     fn entered(&self, module: ScopeId, segment: &Name, viewer: ScopeId, domain: Domain) -> Resolution {
@@ -181,7 +192,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
                     Key::new(domain, segment),
                     Lookup::new(Sight::ByPath.beyond(self.space.within_reach(module, viewer)), None, Reading::Written),
                 )
-                .settled(|| Outer::Assumed(Binding::Absent)),
+                .settled(|| Outer::Assumed(Binding::Absent), || self.space.expanded(module)),
         }
     }
 

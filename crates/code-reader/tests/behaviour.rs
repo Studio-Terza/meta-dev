@@ -1,6 +1,6 @@
 use code_model::{
     Domain, Entry, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited,
-    TypeRef,
+    TypeRef, Unresolved,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -55,6 +55,10 @@ const MACRO_CALL: &str = "make!();\nimpl Clone for R {}\n";
 const MACRO_STATEMENT: &str = "fn f() {\n    make!();\n    impl Clone for R {}\n}\n";
 const MACRO_DEFINED: &str = "macro_rules! make {\n    () => {};\n}\nimpl Clone for R {}\n";
 const MACRO_DEFINED_CALLED: &str = "macro_rules! make {\n    () => {};\n}\nmake!();\nimpl Clone for R {}\n";
+const MACRO_MAY_DECLARE: &str = "make!(Mark);\nimpl Mark for R {}\n";
+const MACRO_MAY_DECLARE_BY_PATH: &str = "make!(Mark);\nimpl crate::Mark for R {}\n";
+const MACRO_MAY_DECLARE_IMPORTED: &str = "mod m {\n    make!(Mark);\n}\nuse m::Mark;\nimpl Mark for R {}\n";
+const MACRO_ELSEWHERE: &str = "mod m {\n    make!(Mark);\n}\nmod n {}\nimpl n::Mark for R {}\nimpl Mark for R {}\n";
 const MACRO_ASSERT: &str = "struct R;\nfn f() {\n    assert!(true);\n    impl Clone for R {}\n}\n";
 const MACRO_STD_STATEMENTS: &str =
     "fn f() {\n    println!(\"a\");\n    let v = vec![1];\n    debug_assert_eq!(v, v);\n    impl Clone for R {}\n}\n";
@@ -300,7 +304,17 @@ impl Expect {
     }
 
     fn unknown(path: &[&str]) -> Seen {
-        Seen::Resolved(Resolved::Unknown(path.iter().map(|segment| Name::from(*segment)).collect()))
+        Seen::Resolved(Resolved::Unknown(
+            path.iter().map(|segment| Name::from(*segment)).collect(),
+            Unresolved::Unbound,
+        ))
+    }
+
+    fn possibly_macro_declared(path: &[&str]) -> Seen {
+        Seen::Resolved(Resolved::Unknown(
+            path.iter().map(|segment| Name::from(*segment)).collect(),
+            Unresolved::PossiblyMacroDeclared,
+        ))
     }
 
     fn named(path: Seen, arguments: Vec<TypeRef<Seen>>) -> TypeRef<Seen> {
@@ -703,6 +717,13 @@ laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| 
     MACRO_DEFINED => [Expect::std_trait(&["std", "clone", "Clone"])],
     MACRO_DEFINED_CALLED => [Expect::unknown(&["Clone"])],
     MACRO_PATHED_STATEMENT => [Expect::unknown(&["Clone"])],
+]);
+
+laws::table!(a_name_no_outer_scope_supplies_may_be_one_an_item_macro_in_its_module_declares, |text: &&str| Read::resolved(text), [
+    MACRO_MAY_DECLARE => [Expect::possibly_macro_declared(&["Mark"])],
+    MACRO_MAY_DECLARE_BY_PATH => [Expect::possibly_macro_declared(&["crate", "Mark"])],
+    MACRO_MAY_DECLARE_IMPORTED => [Expect::possibly_macro_declared(&["Mark"])],
+    MACRO_ELSEWHERE => [Expect::unknown(&["n", "Mark"]), Expect::unknown(&["Mark"])],
 ]);
 
 laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(text), [

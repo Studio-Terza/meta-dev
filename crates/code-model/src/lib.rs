@@ -16,6 +16,7 @@ mod resolved;
 mod site;
 mod sited;
 mod type_ref;
+mod unresolved;
 
 pub use boundary::{FileId, ItemId};
 pub use call::{Call, Callee, MacroCall};
@@ -35,3 +36,4 @@ pub use resolved::Resolved;
 pub use site::Site;
 pub use sited::{Sited, Spelling};
 pub use type_ref::{Arrayed, Callable, Named, Projection, TypeRef, TypeUses};
+pub use unresolved::Unresolved;

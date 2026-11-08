@@ -14,7 +14,7 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use code_model::Building;
+use code_model::{Building, Unresolved};
 use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
@@ -113,6 +113,15 @@ impl<'read> Namespace<'read> {
         Anchor::Crate
             .anchored(self.anchors(viewer))
             .and_then(|root| root.row(&self.scopes).and_then(|row| row.entries().prelude(name, self, root)))
+    }
+
+    pub(super) fn expanded(&self, viewer: ScopeId) -> Unresolved {
+        self.chain(viewer)
+            .iter()
+            .filter_map(|scope| scope.row(&self.scopes))
+            .map(|row| row.entries().unresolved())
+            .max()
+            .unwrap_or(Unresolved::Unbound)
     }
 
     pub(super) fn within_reach(&self, level: ScopeId, from: ScopeId) -> Option<ScopeId> {

@@ -15,7 +15,7 @@ struct Manifest {
 const MANIFESTS: [Manifest; 12] = [
     Manifest {
         path: "Cargo.toml",
-        text: "[package]\nname = \"fixture\"\n[dependencies]\ndiesel = \"2\"\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
+        text: "[package]\nname = \"fixture\"\n[dependencies]\ndiesel = \"2\"\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\nbitflags = \"2\"\n",
     },
     Manifest {
         path: "a/Cargo.toml",
@@ -79,6 +79,9 @@ const GLOBBED_WRAPPER: &str = "mod symbol {\n    use other::*;\n    pub struct S
 const RESOLVED_STRING: &str =
     "use serde::Deserialize;\n#[derive(Deserialize)]\npub struct Entry {\n    note: String,\n}\n";
 const UNKNOWN_FIELD_TYPE: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    id: Id,\n}\n#[derive(Debug)]\nstruct B {\n    id: Id,\n}\n#[derive(Unimported)]\nstruct C {\n    id: Id,\n}\n";
+const MACRO_RULES_TYPE: &str = "mod ids {\n    use serde::Deserialize;\n    macro_rules! id {\n        ($name:ident) => {\n            pub struct $name(u64);\n        };\n    }\n    id!(UserId);\n    #[derive(Deserialize)]\n    pub struct Account {\n        user: UserId,\n    }\n}\nuse serde::Deserialize;\nuse ids::UserId;\n#[derive(Deserialize)]\npub struct Session {\n    user: UserId,\n    owner: crate::ids::UserId,\n}\n";
+const BITFLAGS_TYPE: &str = "use serde::Deserialize;\nbitflags::bitflags! {\n    pub struct Flags: u32 {\n        const A = 1;\n    }\n}\n#[derive(Deserialize)]\npub struct Settings {\n    flags: Flags,\n}\n";
+const MISSING_BESIDE_MACROS: &str = "mod expanded {\n    use serde::Deserialize;\n    declare!(Present);\n    #[derive(Deserialize)]\n    pub struct A {\n        present: Present,\n        note: String,\n    }\n}\nmod plain {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    pub struct B {\n        missing: Missing,\n    }\n}\n";
 const REEXPORTED_ROOT: &str = "pub use serde;\npub mod de {\n    pub use serde::Deserialize;\n}\n";
 const REEXPORTED_USER: &str = "#[derive(newtype::serde::Deserialize)]\npub struct A {\n    a: String,\n}\n#[derive(newtype::de::Deserialize)]\npub struct B {\n    b: String,\n}\n";
 const LOCAL_STRING: &str =
@@ -115,7 +118,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 37] = [
+const CASES: [Case; 40] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_FIELDS))],
@@ -156,7 +159,9 @@ const CASES: [Case; 37] = [
         Flagged::new(&["src/lib.rs:3", "src/lib.rs:8", "src/lib.rs:14"]),
     ),
     Case::new(
-        Title::new("a derive from an external crate's submodule is that crate's, not serde's"),
+        Title::new(
+            "a derive from an external crate's submodule is that crate's, not serde's, even serde's own re-exported there: the known escape #1113",
+        ),
         &[Source::new(Located::new("src/lib.rs"), Text::new(SUBMODULE_DERIVES))],
         Flagged::new(&["src/lib.rs:13"]),
     ),
@@ -169,6 +174,23 @@ const CASES: [Case; 37] = [
         Title::new("an unresolvable field type of serde's derive is not resolvable, and so is an unresolvable derive"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(UNKNOWN_FIELD_TYPE))],
         Flagged::new(&["src/lib.rs:3", "src/lib.rs:9"]),
+    ),
+    Case::new(
+        Title::new("a type a macro_rules item may declare is no finding, by name, imported or by path"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(MACRO_RULES_TYPE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a type a bitflags item may declare is no finding"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(BITFLAGS_TYPE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new(
+            "a type missing from a module without item macros is not resolvable, and so is a String an import would settle beside one",
+        ),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(MISSING_BESIDE_MACROS))],
+        Flagged::new(&["src/lib.rs:7", "src/lib.rs:14"]),
     ),
     Case::new(
         Title::new("a glob-imported NaiveDate field and a String beside it are not resolvable"),

@@ -4,6 +4,7 @@ use crate::boundary::ItemId;
 use crate::external::External;
 use crate::item_path::ItemPath;
 use crate::primitive::Primitive;
+use crate::unresolved::Unresolved;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Resolved {
@@ -13,7 +14,7 @@ pub enum Resolved {
     External(External),
     Primitive(Primitive),
     Param(Name),
-    Unknown(ItemPath),
+    Unknown(ItemPath, Unresolved),
 }
 
 impl Resolved {
@@ -25,7 +26,7 @@ impl Resolved {
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
-            | Resolved::Unknown(_) => None,
+            | Resolved::Unknown(..) => None,
         }
     }
 
@@ -38,7 +39,7 @@ impl Resolved {
             | Resolved::Crate(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
-            | Resolved::Unknown(_) => None,
+            | Resolved::Unknown(..) => None,
         }
     }
 
@@ -51,7 +52,7 @@ impl Resolved {
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
-            | Resolved::Unknown(_) => None,
+            | Resolved::Unknown(..) => None,
         }
     }
 
@@ -64,20 +65,33 @@ impl Resolved {
             | Resolved::Crate(_)
             | Resolved::External(_)
             | Resolved::Param(_)
-            | Resolved::Unknown(_) => None,
+            | Resolved::Unknown(..) => None,
         }
     }
 
     #[must_use]
     pub fn known(&self) -> Option<&Resolved> {
         match self {
-            Resolved::Unknown(_) => None,
+            Resolved::Unknown(..) => None,
             Resolved::Std(_)
             | Resolved::StdTrait(_)
             | Resolved::Crate(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_) => Some(self),
+        }
+    }
+
+    #[must_use]
+    pub fn unresolved(&self) -> Option<Unresolved> {
+        match self {
+            Resolved::Unknown(_, cause) => Some(*cause),
+            Resolved::Std(_)
+            | Resolved::StdTrait(_)
+            | Resolved::Crate(_)
+            | Resolved::External(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_) => None,
         }
     }
 
@@ -89,7 +103,7 @@ impl Resolved {
             | Resolved::Crate(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
-            | Resolved::Unknown(_) => None,
+            | Resolved::Unknown(..) => None,
         }
     }
 }

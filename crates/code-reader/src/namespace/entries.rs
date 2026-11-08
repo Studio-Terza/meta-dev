@@ -6,7 +6,7 @@ use syn::{
     VisRestricted,
 };
 
-use code_model::{Building, Domain, Item as ModelItem, ItemId, ItemKind};
+use code_model::{Building, Domain, Item as ModelItem, ItemId, ItemKind, Unresolved};
 use lint_layout::{Name, Whole, Word, words};
 
 use super::Namespace;
@@ -110,7 +110,7 @@ impl DeclaredKind {
     fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
         match self {
             DeclaredKind::Module(module) => Binding::Module(module),
-            DeclaredKind::OpaqueModule => Binding::Unknown,
+            DeclaredKind::OpaqueModule => Binding::UNBOUND,
             DeclaredKind::Item(_) => Binding::Item(level, item),
         }
     }
@@ -252,6 +252,13 @@ impl GlobSource {
         }
     }
 
+    fn unresolved(&self) -> Unresolved {
+        match self {
+            GlobSource::Path(_) => Unresolved::Unbound,
+            GlobSource::Expansion => Unresolved::PossiblyMacroDeclared,
+        }
+    }
+
     fn target(&self, resolver: &Resolver<'_, '_>, scope: ScopeId, glob: GlobId) -> Target {
         match self {
             GlobSource::Path(path) => resolver.glob_target(path, scope, glob),
@@ -385,6 +392,10 @@ impl Entries {
             self.declared.iter().map(|declared| (Key::new(declared.domain, &declared.name), declared.visibility));
         let imported = self.imports.iter().map(|import| (Key::new(import.domain, &import.name), import.visibility));
         declared.chain(imported).filter(|(_, visibility)| *visibility == Visibility::Visible).map(|(key, _)| key)
+    }
+
+    pub(super) fn unresolved(&self) -> Unresolved {
+        self.globs.iter().map(|glob| glob.source.unresolved()).max().unwrap_or(Unresolved::Unbound)
     }
 
     pub(super) fn prelude(&self, name: &Name, space: &Namespace, root: ScopeId) -> Option<Binding> {

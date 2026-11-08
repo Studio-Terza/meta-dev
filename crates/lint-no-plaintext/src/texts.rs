@@ -3,6 +3,7 @@ use std::iter;
 
 use code_model::{
     Held, Holding, ItemId, ItemPath, Model, Named, Placed, Primitive, Resolved, Sited, Spelling, TypeRef, TypeUses,
+    Unresolved,
 };
 use lint_layout::{Position, Word, words};
 
@@ -91,7 +92,14 @@ impl Texts {
             let wrapped = known.crate_item().and_then(|item| self.wrappers.get(&item)).copied();
             owned.or(borrowed).or(wrapped)
         };
-        resolved.known().map_or(Some(Content::Unresolved), text)
+        resolved.unresolved().map_or_else(|| text(resolved), Self::unresolved)
+    }
+
+    fn unresolved(cause: Unresolved) -> Option<Content> {
+        match cause {
+            Unresolved::Unbound => Some(Content::Unresolved),
+            Unresolved::PossiblyMacroDeclared => None,
+        }
     }
 }
 

@@ -54,7 +54,7 @@ impl Reading {
 
     fn lone(self, external: Binding) -> Binding {
         match self {
-            Reading::Written | Reading::Explicit => Binding::Unknown,
+            Reading::Written | Reading::Explicit => Binding::UNBOUND,
             Reading::Imported => external,
         }
     }
@@ -144,7 +144,7 @@ pub(super) enum Head<'path> {
 impl Head<'_> {
     pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
         match self {
-            Head::Empty => Resolution::Bound(Binding::Unknown),
+            Head::Empty => Resolution::Bound(Binding::UNBOUND),
             Head::Global(first) => {
                 Resolution::Bound(resolver.space().global(first, resolver.space().dependencies(viewer)))
             }

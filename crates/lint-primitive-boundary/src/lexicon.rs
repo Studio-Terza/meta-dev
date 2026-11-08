@@ -109,7 +109,10 @@ impl Lexicon {
             .and_then(|path| self.wires.iter().find(|wire| *wire == path))
             .cloned()
             .map(Identity::Wire);
-        let unresolved = [resolved].into_iter().find(|candidate| **candidate == Resolved::Unknown(written.clone()));
+        let unresolved = resolved
+            .unresolved()
+            .map(|cause| Resolved::Unknown(written.clone(), cause))
+            .filter(|unknown| unknown == resolved);
         primitive.or(owned).or(wire).or_else(|| unresolved.and_then(|_| self.spelled(written)))
     }
 
