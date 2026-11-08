@@ -7,6 +7,15 @@ SET
       SELECT
         1
       FROM
+        flailed
+        JOIN runs ON runs.id = flailed.run
+      WHERE
+        runs.job = jobs.id
+    ) THEN 'flailed'
+    WHEN EXISTS (
+      SELECT
+        1
+      FROM
         runs
       WHERE
         runs.job = jobs.id

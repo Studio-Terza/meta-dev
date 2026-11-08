@@ -7,8 +7,8 @@ use design_model::{
     Sense, SpanRelation, Straddling, Supersession, Title, Vague,
 };
 use design_store::{
-    AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, NextNode, Prefixed, Remit, Sees, ShownNode,
-    Spoken, Unseen,
+    AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, JobRepeated, NextNode, Prefixed, Remit, Sees,
+    ShownNode, Spoken, Unseen,
 };
 use dispatch_ports::Reply;
 use file_ports::{Bytes, Files, Text};
@@ -198,7 +198,7 @@ impl<S: Store> Sees for Parsed<'_, S> {
 
     fn before(self, earlier: Earlier) -> Result<Application, Failure> {
         let Grounds { store, remit, .. } = self.grounds;
-        remit.paid(&store.read(remit.covered())?)?;
+        store.write(JobRepeated::from(remit))?;
         Ok(Application::Repeated(earlier))
     }
 

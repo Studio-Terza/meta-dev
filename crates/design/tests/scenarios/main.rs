@@ -64,6 +64,20 @@ fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<()
     Ok(())
 }
 
+#[test]
+fn a_stop_whose_agent_flails_blocks_with_a_json_decision_at_exit_zero_and_the_next_stop_passes_silently()
+-> Result<(), Box<dyn Error>> {
+    let design = Design::with_a_session_in_work()?;
+    let blocked = design.in_work(&["hook", "stop"])?;
+    let passed = design.in_work(&["hook", "stop"])?;
+    let decision: Value = serde_json::from_slice(&blocked.stdout)?;
+    assert_eq!((blocked.status.code(), blocked.stderr), (Some(0), Vec::new()));
+    assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
+    assert!(decision.get("reason").is_some_and(Value::is_string));
+    assert_eq!((passed.status.code(), passed.stdout, passed.stderr), (Some(0), Vec::new(), Vec::new()));
+    Ok(())
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct Answer {
     code: Option<i32>,

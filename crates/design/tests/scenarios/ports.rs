@@ -19,12 +19,19 @@ impl Design {
         "\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{\"kind\":\"human\"},\"message\":{\"content\":\"go\"}}\n"
     );
 
+    const AGENT: &'static str = concat!(
+        "#!/bin/sh\ncat >/dev/null\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,",
+        "\"result\":\"place(\",\"usage\":{\"input_tokens\":1,\"output_tokens\":2}}'\n"
+    );
+
     pub fn with_a_session_in_work() -> io::Result<Design> {
         let home = Home::new()?;
         let workspace = home.path().join("work");
         let slug = Letters::slugged(&workspace.to_string_lossy());
         let session = Path::new(".claude/projects").join(slug).join("s.jsonl");
-        home.holding(&session, &Bytes::from(Self::SESSION)).map(|home| Design { home, workspace })
+        let agent = Path::new("bin/claude");
+        let home = home.holding(&session, &Bytes::from(Self::SESSION))?.holding(agent, &Bytes::from(Self::AGENT))?;
+        Ok(Design { home, workspace })
     }
 
     pub fn run(&self, arguments: &[&str]) -> io::Result<Output> {

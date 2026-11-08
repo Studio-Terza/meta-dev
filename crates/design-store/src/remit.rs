@@ -1,15 +1,26 @@
 use std::collections::BTreeSet;
 
-use design_model::Segment;
+use design_model::{JobId, Segment};
+use port_core::Op;
+use store_ports::{Batch, Query, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
-use crate::Covered;
+use crate::{Covered, JobClosed, JobState, Refusal};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Remit {
     Unbounded,
-    Job(BTreeSet<Segment>),
+    Job { job: JobId, segments: BTreeSet<Segment> },
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Paid {
+    Unbounded,
+    Job(JobId),
+}
+
+#[derive(Debug, Op)]
+pub struct JobRepeated(Remit);
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("the directives leave segments of their job unstructured")]
@@ -20,31 +31,67 @@ pub struct Unpaid {
 
 impl Remit {
     #[must_use]
-    pub fn admitted(&self, segment: Segment) -> Option<Segment> {
-        Some(segment).filter(|segment| self.job().is_none_or(|job| job.contains(segment)))
+    pub fn job(job: JobId, segments: impl IntoIterator<Item = Segment>) -> Remit {
+        Remit::Job { job, segments: segments.into_iter().collect() }
     }
 
     #[must_use]
-    pub fn covered(&self) -> Covered {
-        self.job().into_iter().flatten().map(|segment| AsRef::<Uuid>::as_ref(segment).clone()).collect()
+    pub fn admitted(&self, segment: Segment) -> Option<Segment> {
+        Some(segment).filter(|segment| self.segments().is_none_or(|segments| segments.contains(segment)))
     }
 
-    pub fn paid(&self, covered: &BTreeSet<Segment>) -> Result<(), Unpaid> {
-        let left: Vec<Segment> = self.job().into_iter().flat_map(|job| job.difference(covered)).cloned().collect();
-        left.split_first().map(|(first, rest)| Unpaid { first: first.clone(), rest: rest.to_vec() }).map_or(Ok(()), Err)
+    fn covered(&self) -> Covered {
+        self.segments().into_iter().flatten().map(|segment| AsRef::<Uuid>::as_ref(segment).clone()).collect()
     }
 
-    fn job(&self) -> Option<&BTreeSet<Segment>> {
+    pub(crate) fn paid(&self, statements: &mut Statements<'_>) -> Result<Paid, Refusal> {
+        let covered = self.covered().rows(statements)?;
+        self.settled(&covered)
+    }
+
+    fn settled(&self, covered: &BTreeSet<Segment>) -> Result<Paid, Refusal> {
+        match self {
+            Remit::Unbounded => Ok(Paid::Unbounded),
+            Remit::Job { job, segments } => {
+                Paid::owing(*job, &segments.difference(covered).cloned().collect::<Vec<_>>())
+            }
+        }
+    }
+
+    fn segments(&self) -> Option<&BTreeSet<Segment>> {
         match self {
             Remit::Unbounded => None,
-            Remit::Job(segments) => Some(segments),
+            Remit::Job { segments, .. } => Some(segments),
         }
     }
 }
 
-impl FromIterator<Segment> for Remit {
-    fn from_iter<Segments: IntoIterator<Item = Segment>>(segments: Segments) -> Remit {
-        Remit::Job(segments.into_iter().collect())
+impl Paid {
+    fn owing(job: JobId, left: &[Segment]) -> Result<Paid, Refusal> {
+        left.split_first().map_or(Ok(Paid::Job(job)), |(first, rest)| {
+            Err(Refusal::Unpaid(Unpaid { first: first.clone(), rest: rest.to_vec() }))
+        })
+    }
+
+    pub(crate) fn closed(self, state: JobState, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        match self {
+            Paid::Unbounded => Ok(Written::default()),
+            Paid::Job(job) => JobClosed::new(job, state).written(statements),
+        }
+    }
+}
+
+impl From<Remit> for JobRepeated {
+    fn from(remit: Remit) -> JobRepeated {
+        JobRepeated(remit)
+    }
+}
+
+impl Batch for JobRepeated {
+    type Failure = Refusal;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        Ok(self.0.paid(statements)?.closed(JobState::Repeated, statements)?)
     }
 }
 

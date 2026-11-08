@@ -3,8 +3,8 @@ use std::io::Write;
 
 use serde::Serialize;
 
-use crate::HookEvent;
 use crate::cli::failure::Failure;
+use crate::{HookEvent, Outcome};
 
 #[derive(Debug, Serialize)]
 pub struct Settings {
@@ -22,6 +22,13 @@ struct Handler {
     kind: &'static str,
     command: String,
     timeout: u32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "decision")]
+pub enum Decision {
+    #[serde(rename = "block")]
+    Block { reason: String },
 }
 
 impl Settings {
@@ -42,8 +49,21 @@ impl Settings {
         }
     }
 
-    pub fn written(&self, out: &mut impl Write) -> Result<(), Failure> {
+    pub fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
         serde_json::to_writer_pretty(&mut *out, self)?;
-        Ok(writeln!(out)?)
+        writeln!(out)?;
+        Ok(Outcome::Settings)
+    }
+}
+
+impl Decision {
+    pub fn blocking(halt: &Failure) -> Decision {
+        Decision::Block { reason: halt.to_string() }
+    }
+
+    pub fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
+        serde_json::to_writer(&mut *out, self)?;
+        writeln!(out)?;
+        Ok(Outcome::Blocked)
     }
 }

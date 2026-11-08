@@ -1,3 +1,3 @@
 mod exit;
 
-pub use exit::{Exit, Severe, Severity};
+pub use exit::Exit;

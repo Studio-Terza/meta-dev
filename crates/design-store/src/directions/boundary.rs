@@ -3,14 +3,14 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Standing, Supersession, Vague,
 };
 use newtype::Counter;
-use store_ports::{Batch, Columns as Row, Query, Statements, StoreFailure, Written};
+use store_ports::{Batch, Columns as Row, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
 use super::Directions;
 use crate::acyclic::{Closing, Keyed, Refusal, SegmentCorrects, SegmentSupersedes};
 use crate::annotation::Remark;
 use crate::graph::{NodeRow, Resolved};
-use crate::{Annotation, Linked};
+use crate::{Annotation, JobState, Linked};
 
 #[derive(Debug)]
 pub(super) struct Annotating<'held, 'run> {
@@ -308,10 +308,9 @@ impl Batch for Directions {
             .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, Refusal>>()?;
         let recorded = self.file.written(annotating.provenance, annotating.statements)?;
-        let covered = self.remit.covered().rows(annotating.statements)?;
-        self.remit.paid(&covered)?;
+        let closed = self.remit.paid(annotating.statements)?.closed(JobState::Applied, annotating.statements)?;
         let unflailed = annotating.unflailed()?;
-        Ok(Written::total(written.into_iter().chain([recorded, unflailed])))
+        Ok(Written::total(written.into_iter().chain([recorded, closed, unflailed])))
     }
 }
 

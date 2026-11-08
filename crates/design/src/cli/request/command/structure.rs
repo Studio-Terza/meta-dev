@@ -143,11 +143,12 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
             Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)), AsRef::<Body>::as_ref(unplaced).clone())
         });
         let job = structurer::Job::new(said.collect(), context);
-        let remit: Remit = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone()).collect();
+        let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
+        let remit = Remit::job(id, segments.clone());
         self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
-        self.store.write(JobClosed::new(id, ended.ending.state()))?;
-        let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
+        let closed = ended.ending.halt().map(|halt| JobClosed::new(id, halt.state()));
+        closed.map(|closed| self.store.write(closed)).transpose()?;
         let flailed = ended.ending.halt().and_then(Halt::flailed);
         let held = flailed.map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
         held.map(|flailed| self.store.write(flailed)).transpose()?;
@@ -258,15 +259,6 @@ impl Ending {
 }
 
 impl Ending {
-    fn state(&self) -> JobState {
-        match self {
-            Ending::Applied(Application::Fresh(_)) => JobState::Applied,
-            Ending::Applied(Application::Repeated(_)) => JobState::Repeated,
-            Ending::Halted(Halt::Flailed(_)) => JobState::Flailed,
-            Ending::Halted(Halt::Stalled(_)) => JobState::Stalled,
-        }
-    }
-
     fn halt(&self) -> Option<&Halt> {
         match self {
             Ending::Halted(halt) => Some(halt),
@@ -276,6 +268,13 @@ impl Ending {
 }
 
 impl Halt {
+    fn state(&self) -> JobState {
+        match self {
+            Halt::Flailed(_) => JobState::Flailed,
+            Halt::Stalled(_) => JobState::Stalled,
+        }
+    }
+
     fn flailed(&self) -> Option<&Lapse> {
         match self {
             Halt::Flailed(lapse) => Some(lapse),
@@ -349,8 +348,12 @@ impl Structured {
         let lines: Vec<Line> =
             reaped.chain(self.worked.iter().flat_map(|worked| worked.lines.iter().cloned())).chain(held).collect();
         Printed::lines(out, &lines)?;
+        self.concluded().map(|jobs| Outcome::Structured { jobs })
+    }
+
+    pub(crate) fn concluded(self) -> Result<Count, Failure> {
         let jobs = Count::new(self.worked.len());
         let halted = self.worked.into_iter().find_map(|worked| worked.halt.map(|halt| halt.failure(worked.job)));
-        halted.map_or(Ok(Outcome::Structured { jobs }), Err)
+        halted.map_or(Ok(jobs), Err)
     }
 }

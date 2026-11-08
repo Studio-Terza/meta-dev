@@ -5,15 +5,15 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use design_model::{
-    AnyNode, Casting, Entered, Entry, Facet, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix,
-    Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
+    AnyNode, Casting, Entered, Entry, Facet, JobId, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal,
+    Prefix, Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
     AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, FlailedSegments, JobFlailed, JobOpened,
-    Linked, LiveRuns, NextJob, NextNode, NextRun, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName,
-    Remit, Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen,
-    SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen,
-    Unstructured,
+    JobRepeated, Linked, LiveRuns, NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed, ProjectRoot, Ran,
+    Refusal, RelationName, Remit, Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope,
+    SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun,
+    StreamSchema, Unseen, Unstructured,
 };
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -668,13 +668,26 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
         store.write(Directions::new(Provenance::from(Entered::Apply), refused, vec![stray], Remit::Unbounded)).is_err()
     );
     let [asked, answered] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
-    let job: Remit = [asked.clone(), answered].into_iter().collect();
+    let [first, second] = [JobId::new(1), JobId::new(2)];
+    store.write(JobOpened::from(first))?;
+    store.write(JobOpened::from(second))?;
+    let job = Remit::job(first, [asked.clone(), answered.clone()]);
     let unpaid = Proposals::unseen(&store, "unpaid")?;
     let directed = vec![Proposals::child(root, 2)?, Directed::Conversational { segment: asked.clone() }];
     let refusal = store.write(Directions::new(Provenance::from(Entered::Apply), unpaid, directed.clone(), job)).err();
     assert!(matches!(refusal, Some(Refusal::Unpaid(_))));
+    assert_eq!(store.read(OpenJobs)?, [first, second]);
     let kept = Proposals::unseen(&store, "kept")?;
-    store.write(Directions::new(Provenance::from(Entered::Apply), kept, directed, [asked].into_iter().collect()))?;
+    store.write(Directions::new(
+        Provenance::from(Entered::Apply),
+        kept,
+        directed,
+        Remit::job(first, [asked.clone()]),
+    ))?;
+    assert!(matches!(store.write(JobRepeated::from(Remit::job(second, [answered]))), Err(Refusal::Unpaid(_))));
+    assert_eq!(store.read(OpenJobs)?, [second]);
+    store.write(JobRepeated::from(Remit::job(second, [asked])))?;
+    assert_eq!(store.read(OpenJobs)?, []);
     let other = Proposals::unseen(&store, "other")?;
     store.write(Directions::new(Provenance::from(Entered::Apply), other, Vec::new(), Remit::Unbounded))?;
     let seen = [

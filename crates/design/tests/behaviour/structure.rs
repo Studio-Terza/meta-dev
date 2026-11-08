@@ -11,11 +11,11 @@ use dispatch_ports::{
     Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Finished, HeadlessClaude, Job,
     Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, clock_ops, dispatch_ops,
 };
-use exit::{Severe, Severity};
 use file_ports::{Bytes, Files};
 use newtype::Newtype;
 use port_core::{Calls, Snapshot};
 use port_core::{Pass, Run};
+use serde_json::Value;
 use store_ports::{Store, Written};
 use structurer::{Briefing, Directives, Lapse, SegmentRef, Uncovered};
 use text_lines::Lines;
@@ -280,7 +280,6 @@ fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_and_the_next_run_sends
     let replied = Line::Ran(Attempted::new(RunId::new(2), JobId::new(2), RunState::Replied, Some(Script::usage())));
     assert_eq!([stalled.has(&[overdue]), again.has(&[replied])], [[], []]);
     assert!(matches!(stalled.outcome, Err(Failure::Stalled { stall: Stall::Overdue, .. })));
-    assert_eq!(stalled.outcome.map_err(|failure| failure.severity()).err(), Some(Severity::Failed));
     assert_eq!((owed, structuring.script.prompts().len()), (4, 2));
     assert_eq!(again.outcome?, Outcome::Structured { jobs: Count::new(1) });
     Ok(())
@@ -439,12 +438,31 @@ fn a_prompt_ingests_silently_and_leaves_what_it_ingested_to_the_stop() -> Result
 }
 
 #[test]
-fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segments_held() -> Result<(), Failure> {
+fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segments_held() -> Result<(), Box<dyn Error>>
+{
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u]), Pause::new(0))?;
-    let flailed = structuring.structured(&["hook", "stop"]).outcome.map_err(|failure| failure.severity());
+    let flailed = structuring.structured(&["hook", "stop"]);
     let again = structuring.structured(&["hook", "stop"]);
-    assert_eq!(flailed, Err(Severity::Blocking));
+    let decision: Value = serde_json::from_str(&flailed.text)?;
+    assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
+    assert!(decision.get("reason").is_some_and(Value::is_string));
+    assert_eq!(flailed.outcome?, Outcome::Blocked);
+    assert_eq!((again.outcome?, again.text.as_str()), (Outcome::Hooked(HookEvent::Stop), ""));
+    Ok(())
+}
+
+#[test]
+fn a_stop_whose_agent_stalls_blocks_loudly_and_the_stop_after_it_sends_the_segments_again() -> Result<(), Box<dyn Error>>
+{
+    let structuring = Structuring::over(Script::replying(&[None, Some(Script::COVERING)]), Pause::new(3600))?;
+    let stalled = structuring.structured(&["hook", "stop"]);
+    let owed = structuring.unstructured()?;
+    let again = structuring.structured(&["hook", "stop"]);
+    let decision: Value = serde_json::from_str(&stalled.text)?;
+    assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
+    assert_eq!(stalled.outcome?, Outcome::Blocked);
+    assert_eq!((owed, structuring.unstructured()?), (4, 0));
     assert_eq!(again.outcome?, Outcome::Hooked(HookEvent::Stop));
     Ok(())
 }

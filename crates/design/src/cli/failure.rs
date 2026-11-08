@@ -7,7 +7,6 @@ use design_model::{
 };
 use design_store::{Refusal, Unpaid};
 use dispatch_ports::{DispatchFailure, Stall};
-use exit::{Severe, Severity};
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
 use newtype::Newtype;
@@ -19,7 +18,6 @@ use structurer::{Lapse, Misread, SegmentRef, Uncovered};
 
 use super::request::Unresolved;
 use crate::Outcome;
-use crate::cli::output::Count;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
@@ -86,10 +84,6 @@ pub enum Failure {
         "STALLED: job {job} could not be run: {stall}; structure halted, and its segments are sent again on the next run"
     )]
     Stalled { job: JobId, stall: Stall },
-    #[error(
-        "UNSTRUCTURED: {owed} owner segments are neither structured nor held as flailed after structure ran; run design structure and triage what it reports"
-    )]
-    Unstructured { owed: Count },
     #[error("cannot render the hook settings: {0}")]
     Render(#[from] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]
@@ -130,16 +124,6 @@ impl From<Unpaid> for Failure {
 impl From<Misstaged> for Failure {
     fn from(misstaged: Misstaged) -> Failure {
         Failure::Misstaged { node: misstaged.node(), stage: misstaged.stage() }
-    }
-}
-
-impl Severe for Failure {
-    fn severity(&self) -> Severity {
-        match self {
-            Failure::Flailed { .. } | Failure::Unstructured { .. } => Severity::Blocking,
-            Failure::Unreleased { command, .. } => command.severity(),
-            _ => Severity::Failed,
-        }
     }
 }
 

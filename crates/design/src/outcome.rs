@@ -16,4 +16,5 @@ pub enum Outcome {
     Structured { jobs: Count },
     Settings,
     Hooked(HookEvent),
+    Blocked,
 }
