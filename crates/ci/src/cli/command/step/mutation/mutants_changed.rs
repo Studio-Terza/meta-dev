@@ -8,6 +8,7 @@ use file_ports::Files;
 
 use super::super::journal::Journal;
 use super::Step;
+use super::boundary::Shard;
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
@@ -19,6 +20,7 @@ pub struct MutantsChanged {
     diff: Journal,
     missed: Journal,
     output: PathBuf,
+    shard: Shard,
     scope: Vec<OsString>,
 }
 
@@ -32,13 +34,14 @@ impl MutantsChanged {
         ports.output(&invocation).map_err(Failure::starting(&invocation))
     }
 
-    fn new(diff: PathBuf, output: PathBuf, scope: Vec<OsString>) -> MutantsChanged {
+    fn new(diff: PathBuf, output: PathBuf, shard: Shard, scope: Vec<OsString>) -> MutantsChanged {
         MutantsChanged {
             missed: Journal::from(
                 [output.as_path()].into_iter().chain(Self::MISSED_LIST.map(Path::new)).collect::<PathBuf>(),
             ),
             diff: Journal::from(diff),
             output,
+            shard,
             scope,
         }
     }
@@ -52,8 +55,10 @@ impl MutantsChanged {
         let changed = Self::changed_lines(ports)?;
         self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
+        let shard = self.shard.arguments();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
             .into_iter()
+            .chain(shard.iter().map(OsString::as_os_str))
             .chain(self.scope.iter().map(OsString::as_os_str))
             .collect();
         let invocation = CargoMutants::invocation(&self.output, &selection, &[]);
@@ -67,8 +72,9 @@ impl Step for MutantsChanged {
         let mut arguments = Arguments::from(given);
         let diff = &arguments.taken()?;
         let output = &arguments.taken()?;
+        let shard = arguments.taken()?.to_str().ok_or(Failure::Usage)?.parse()?;
         let scope = arguments.rest();
-        Ok(MutantsChanged::new(PathBuf::from(diff), PathBuf::from(output), scope))
+        Ok(MutantsChanged::new(PathBuf::from(diff), PathBuf::from(output), shard, scope))
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

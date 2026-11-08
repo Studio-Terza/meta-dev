@@ -324,7 +324,7 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
     ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
     ci tools <built directory> <tools directory>                build (dev profile) and copy reach, lint and ci
-    ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
+    ci mutants-changed <diff> <output> <shard> [<scope>...]     one shard of the mutants on the changed lines, or say it skipped
     ci mutants-shard <shard> <output>                           one weekly shard of all mutants
     ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
     ci compile-trend <cold build> <downloads>                   the trend issue when the cold build is slowest
@@ -555,6 +555,9 @@ reach a `terminal` state, and a terminal state has no outgoing edges. A graph it
 The `mutants` job in `ci.yml` runs on each pull request. It applies `cargo mutants` to the lines the pull
 request changes, and tests each mutant with the crates the pull request reaches, because shared crates are
 tested through the crates that use them. A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
+The mutants run in eight `mutants-shard` jobs, each taking every eighth mutant (`--shard k/8 --sharding round-robin`),
+so a pull request that changes most of the workspace still fits GitHub's six-hour job limit. The `mutants` job
+waits for all of them and passes only if every shard succeeded, so a failed or cancelled shard fails it.
 
 `mutants.yml` runs every mutant once a week, in eight shards, or on request, each against the whole
 workspace (`.cargo/mutants.toml`). It reports in the run
