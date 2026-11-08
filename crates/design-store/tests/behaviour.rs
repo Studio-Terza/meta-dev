@@ -1047,8 +1047,11 @@ impl Staging {
                     |misstaged| Restaging { refused: Some(misstaged), node: before },
                     |moved| Restaging { refused: None, node: moved },
                 );
-                let refused =
-                    store.write(Restaged::new(resolved, transition)).err().map(Staging::misstaged).transpose()?;
+                let refused = store
+                    .write(Restaged::new(resolved, transition, Provenance::from(Entered::Stage)))
+                    .err()
+                    .map(Staging::misstaged)
+                    .transpose()?;
                 Ok(Mismatch { wanted, stored: Restaging { refused, node: Staging::stored(&store, root)? } })
             })
             .collect::<Result<Vec<Mismatch>, Box<dyn Error>>>()?;
@@ -1083,7 +1086,11 @@ fn a_dropped_node_stays_shown_under_its_parent() -> Result<(), Box<dyn Error>> {
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
     Proposals::written(&store, vec![Proposals::child(root, 2)?])?;
-    store.write(Restaged::new(Dag::resolved(&store, NodeId::new(2))?, Staging::transition(Step::Drop)?))?;
+    store.write(Restaged::new(
+        Dag::resolved(&store, NodeId::new(2))?,
+        Staging::transition(Step::Drop)?,
+        Provenance::from(Entered::Stage),
+    ))?;
     assert_eq!(Staging::stored(&store, NodeId::new(2))?.stage().stage(), Stage::Dropped);
     assert_eq!(Ids::kin(&store.read(ShownNode::from(root))?.ok_or("no root")?, Kin::Child), [NodeId::new(2)]);
     Ok(())
@@ -1094,7 +1101,11 @@ fn a_vague_node_is_refused_a_specification_and_keeps_its_stage() -> Result<(), B
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
-    let specified = store.write(Restaged::new(Dag::resolved(&store, root)?, Staging::transition(Step::Specify)?));
+    let specified = store.write(Restaged::new(
+        Dag::resolved(&store, root)?,
+        Staging::transition(Step::Specify)?,
+        Provenance::from(Entered::Stage),
+    ));
     let refused = specified.err().map(Staging::misstaged).transpose()?;
     assert_eq!(refused.map(Misstaged::stage), Some(Stage::Vague));
     assert_eq!(Staging::stored(&store, root)?.stage().stage(), Stage::Vague);
@@ -1307,9 +1318,19 @@ fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() 
     let [specified, dropped] = [NodeId::new(203), NodeId::new(202)];
     [Step::Refine, Step::Specify]
         .into_iter()
-        .map(|step| Ok(store.write(Restaged::new(Dag::resolved(&store, specified)?, Staging::transition(step)?))?))
+        .map(|step| {
+            Ok(store.write(Restaged::new(
+                Dag::resolved(&store, specified)?,
+                Staging::transition(step)?,
+                Provenance::from(Entered::Stage),
+            ))?)
+        })
         .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
-    store.write(Restaged::new(Dag::resolved(&store, dropped)?, Staging::transition(Step::Drop)?))?;
+    store.write(Restaged::new(
+        Dag::resolved(&store, dropped)?,
+        Staging::transition(Step::Drop)?,
+        Provenance::from(Entered::Stage),
+    ))?;
     let child = Dag::node(&store, Facet::Feature)?;
     store.write(child)?;
     Dag::linked(&store, [NodeId::new(204), specified], NodeRelation::Refines)??;

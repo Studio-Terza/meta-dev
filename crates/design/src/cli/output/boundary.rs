@@ -2,8 +2,8 @@ use std::fmt;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, Artifact, Condition, Facet, JobId, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason, Role,
-    RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
+    AnyNode, Artifact, Basis, Condition, Facet, JobId, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason,
+    Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
 };
 use design_store::{AppliedId, Excerpt, RelationName, RunState, ShapeName};
 use dispatch_ports::{Tokens, Usage};
@@ -28,6 +28,7 @@ pub struct Summary {
     project: Project,
     facet: Facet,
     stage: Stage,
+    basis: Basis,
     role: Role,
     entered: Provenance,
     title: Option<Title>,
@@ -290,6 +291,7 @@ impl From<&AnyNode> for Summary {
             project: entry.project().clone(),
             facet: entry.facet(),
             stage: node.stage().stage(),
+            basis: node.basis(),
             role: node.casting().role(),
             entered: entry.provenance(),
             title: node.title().cloned(),
@@ -554,6 +556,7 @@ impl Summary {
             project: fields.field::<Phrase<_>>()?,
             facet: fields.field::<Word<_>>()?,
             stage: fields.field::<Word<_>>()?,
+            basis: fields.field::<Word<_>>()?,
             role: fields.field::<Word<_>>()?,
             entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
             title: fields.optional::<Quoted<_>>(),
@@ -561,10 +564,10 @@ impl Summary {
     }
 
     fn rendered(&self) -> String {
-        let Summary { node, project, facet, stage, role, entered, title } = self;
+        let Summary { node, project, facet, stage, basis, role, entered, title } = self;
         let titled = title.as_ref().map(|title| format!(" {}", Line::quoted(title))).unwrap_or_default();
         format!(
-            "{} {} {facet} {stage} {role} {} {entered}{titled}",
+            "{} {} {facet} {stage} {basis} {role} {} {entered}{titled}",
             Line::numbered(*node),
             Line::quoted(project),
             Key::Entered

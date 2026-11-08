@@ -1,8 +1,8 @@
 use std::io;
 
 use design_model::{
-    Confidence, Explicitness, Facet, NodeId, Ordinal, Outline, Prefix, Project, SegmentRelation, Sense, SenseKind,
-    SpanRelation, Specificity, Stage, Title,
+    Basis, Confidence, Explicitness, Facet, NodeId, Ordinal, Outline, Prefix, Project, SegmentRelation, Sense,
+    SenseKind, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
 use laws::proptest::collection::vec;
@@ -210,17 +210,19 @@ impl Jobs {
 
     fn node() -> impl Strategy<Value = Outline> {
         (
-            (0..i64::MAX, select(Facet::VARIANTS), select(Stage::VARIANTS)),
+            (0..i64::MAX, select(Facet::VARIANTS), select(Stage::VARIANTS), select(Basis::VARIANTS)),
             (option::of("[^\u{0}]{0,24}"), option::of(0..i64::MAX), "[a-z][a-z0-9-]{0,8}"),
         )
-            .prop_filter_map("a project name", |((id, facet, stage), (title, parent, project))| {
-                let outline = Outline::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage);
+            .prop_filter_map("a project name", |((id, facet, stage, basis), (title, parent, project))| {
+                let outline =
+                    Outline::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage).based(basis);
                 Some(outline.titled(title.map(Title::new)).parented(parent.map(NodeId::new)))
             })
     }
 
     fn any() -> impl Strategy<Value = Job> {
-        (vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::node(), 0..4)).prop_map(|(said, nodes)| Job::new(said, nodes))
+        (vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::node(), 0..4))
+            .prop_map(|(said, asked, nodes)| Job::new(said, asked, nodes))
     }
 
     fn lapse() -> impl Strategy<Value = Lapse> {

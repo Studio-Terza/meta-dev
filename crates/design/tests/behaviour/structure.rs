@@ -261,6 +261,33 @@ fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_lin
 }
 
 #[test]
+fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_an_answer_to_one_but_not_place_one()
+-> Result<(), Box<dyn Error>> {
+    let asked = format!("{}.0", Session::ASKED);
+    let [decided, other] = [Applying::answer(0), Applying::answer(1)];
+    let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
+    let rest = format!("conversational({other})\nconversational({later})");
+    let placing = format!("place({asked}, n1, mentions)\nconversational({decided})\n{rest}");
+    let answering = format!("link({decided}, {asked}, answers)\n{rest}");
+    let structuring = Structuring::over(Script::replying(&[Some(&placing), Some(&answering)]), Pause::new(0))?;
+    structuring
+        .applying
+        .applied(&format!("place({asked}, n1, questions)\nsense({asked}, question, specific, firm, explicit)"))?;
+    let open = structuring.applying.run(&["view", "open-questions"])?;
+    let structured = structuring.structured(&["structure"]);
+    let outside = SegmentRef::new(Prefix::new(Session::ASKED.to_owned()), Ordinal::new(0));
+    let retried = Line::Retried(Lapsed::new(JobId::new(1), Lapse::refused(&Unresolved::Outside(outside))));
+    let shown = format!("asked {asked} \"what of aaaaaaaa-0000-4000-8000-000000000004\"\n");
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    assert_eq!(Lines::from(open.as_str()).count(), 1);
+    assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1, 1]);
+    assert_eq!(structured.has(&[retried]), []);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!(structuring.applying.run(&["view", "open-questions"])?, "");
+    Ok(())
+}
+
+#[test]
 fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_not_redispatch_them()
 -> Result<(), Box<dyn Error>> {
     let u = Some(Script::UNCOVERING);

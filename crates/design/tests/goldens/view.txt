@@ -1,12 +1,12 @@
 design view outline
-outline n1 "demo" project vague
-outline n2 "demo" feature vague n1 "kept"
-outline n3 "demo" feature vague n2 "detail"
-outline n4 "demo" feature vague n1 "older"
-outline n5 "demo" feature vague n1 "newer"
+outline n1 "demo" project refining decided
+outline n2 "demo" feature refining decided n1 "kept"
+outline n3 "demo" feature vague vague n2 "detail"
+outline n4 "demo" feature vague vague n1 "older"
+outline n5 "demo" feature vague vague n1 "newer"
 design view outline n2
-outline n2 "demo" feature vague n1 "kept"
-outline n3 "demo" feature vague n2 "detail"
+outline n2 "demo" feature refining decided n1 "kept"
+outline n3 "demo" feature vague vague n2 "detail"
 design view current-decision
 standing n2 decides aaaaaaaa-0000-4000-8000-000000000003.0 owner entered apply "1. yes"
 design view open-questions

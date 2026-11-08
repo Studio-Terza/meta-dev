@@ -1,7 +1,7 @@
 use crate::lifecycle::{Live, Refinable};
 use crate::{
-    AnyStage, Artifact, Casting, Condition, Dropped, Entry, Misstaged, NodeId, Reason, Refining, Role, Terminal, Title,
-    Vague,
+    AnyStage, Artifact, Basis, Casting, Condition, Dropped, Entry, Misstaged, NodeId, Reason, Refining, Role, Terminal,
+    Title, Vague,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -11,6 +11,7 @@ pub struct Node<S> {
     title: Option<Title>,
     casting: Casting,
     stage: S,
+    basis: Basis,
 }
 
 pub type AnyNode = Node<AnyStage>;
@@ -19,13 +20,13 @@ impl Node<Vague> {
     #[must_use]
     pub fn new(identity: NodeId, entry: Entry) -> Node<Vague> {
         let casting = Casting::new(Role::Core, entry.provenance());
-        Node { identity, entry, title: None, casting, stage: Vague }
+        Node { identity, entry, title: None, casting, stage: Vague, basis: Basis::Vague }
     }
 
     #[must_use]
     pub fn proposed(identity: NodeId, entry: Entry, parent: Casting) -> Node<Vague> {
         let casting = parent.inherited(entry.provenance());
-        Node { identity, entry, title: None, casting, stage: Vague }
+        Node { identity, entry, title: None, casting, stage: Vague, basis: Basis::Vague }
     }
 }
 
@@ -53,13 +54,13 @@ impl Node<Live> {
 impl AnyNode {
     #[must_use]
     pub fn loaded(identity: NodeId, entry: Entry, casting: Casting, stage: AnyStage) -> AnyNode {
-        Node { identity, entry, title: None, casting, stage }
+        Node { identity, entry, title: None, casting, stage, basis: Basis::Vague }
     }
 
     pub fn narrowed<S: TryFrom<AnyStage, Error = AnyStage>>(self) -> Result<Node<S>, Misstaged> {
-        let Node { identity, entry, title, casting, stage } = self;
+        let Node { identity, entry, title, casting, stage, basis } = self;
         S::try_from(stage)
-            .map(|stage| Node { identity, entry, title, casting, stage })
+            .map(|stage| Node { identity, entry, title, casting, stage, basis })
             .map_err(|stage| Misstaged::new(identity, stage.stage()))
     }
 }
@@ -67,8 +68,8 @@ impl AnyNode {
 impl<S: Into<AnyStage>> Node<S> {
     #[must_use]
     pub fn any(self) -> AnyNode {
-        let Node { identity, entry, title, casting, stage } = self;
-        Node { identity, entry, title, casting, stage: stage.into() }
+        let Node { identity, entry, title, casting, stage, basis } = self;
+        Node { identity, entry, title, casting, stage: stage.into(), basis }
     }
 }
 
@@ -99,12 +100,22 @@ impl<S> Node<S> {
     }
 
     #[must_use]
+    pub fn based(self, basis: Basis) -> Node<S> {
+        Node { basis, ..self }
+    }
+
+    #[must_use]
     pub fn stage(&self) -> &S {
         &self.stage
     }
 
+    #[must_use]
+    pub fn basis(&self) -> Basis {
+        self.basis
+    }
+
     fn staged<T>(self, stage: T) -> Node<T> {
-        let Node { identity, entry, title, casting, stage: _ } = self;
-        Node { identity, entry, title, casting, stage }
+        let Node { identity, entry, title, casting, stage: _, basis: _ } = self;
+        Node { identity, entry, title, casting, stage, basis: Basis::Set }
     }
 }

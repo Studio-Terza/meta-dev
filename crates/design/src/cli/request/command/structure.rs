@@ -2,9 +2,9 @@ use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
-    Account, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted,
-    LiveRuns, NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
-    Unstructured,
+    Account, AskedEarlier, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened,
+    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned,
+    StoredRun, Unplaced, Unstructured,
 };
 use dispatch_ports::{
     AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
@@ -149,10 +149,9 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
     fn job(&self, chunk: &[Unplaced], sequel: Sequel) -> Result<Worked, Failure> {
         let id = self.store.read(NextJob)?;
         let context = self.store.read(ContextNodes)?;
-        let said = chunk.iter().map(|unplaced| {
-            Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)), AsRef::<Body>::as_ref(unplaced).clone())
-        });
-        let job = structurer::Job::new(said.collect(), context);
+        let first = chunk.first().map(|unplaced| AskedEarlier::from(AsRef::<Segment>::as_ref(unplaced)));
+        let asked = first.map(|earlier| self.store.read(earlier)).transpose()?.unwrap_or_default();
+        let job = structurer::Job::new(Structure::<S, D, C>::said(chunk), Structure::<S, D, C>::said(&asked), context);
         let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
         let remit = Remit::job(id, segments.clone());
         self.store.write(JobOpened::from(id))?;
@@ -168,6 +167,17 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let ran = runs.iter().map(|ran| Line::Ran(Attempted::new(ran.identity(), id, ran.state(), ran.usage())));
         let lines = retried.chain(closing).chain(ran).collect();
         Ok(Worked { job: id, sequel, halt: ended.ending.halt().cloned(), lines })
+    }
+}
+
+impl<S: Store, D: Dispatch, C: Clock> Structure<'_, S, D, C> {
+    fn said<Spoken: AsRef<Segment> + AsRef<Body>>(spoken: &[Spoken]) -> Vec<Said> {
+        spoken
+            .iter()
+            .map(|spoken| {
+                Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(spoken)), AsRef::<Body>::as_ref(spoken).clone())
+            })
+            .collect()
     }
 }
 

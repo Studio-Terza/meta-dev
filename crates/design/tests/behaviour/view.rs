@@ -6,6 +6,7 @@ use design_store::{StreamSchema, Unstructured};
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
+use newtype::Newtype;
 use port_core::Run;
 use store_ports::{Sqlite, Store};
 use structurer::SegmentRef;
@@ -26,7 +27,13 @@ const STATED: &str = "sense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, sp
 
 const HINTED: &str = "sense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, specific, firm, implicit)";
 
-const ASKED: &str = "place(aaaaaaaa-0000-4000-8000-000000000003.1, n3, questions)";
+const ASKED: &str = "place(aaaaaaaa-0000-4000-8000-000000000003.1, n3, questions)\nsense(aaaaaaaa-0000-4000-8000-000000000003.1, question, specific, firm, explicit)";
+
+const PLACED: &str = "place(aaaaaaaa-0000-4000-8000-000000000003.1, n3, questions)";
+
+const BEGUN: &str = "place(aaaaaaaa-0000-4000-8000-000000000001.0, n3, questions)\nsense(aaaaaaaa-0000-4000-8000-000000000001.0, question, specific, firm, explicit)";
+
+const CHILD: &str = "place(aaaaaaaa-0000-4000-8000-000000000003.0, n3, decides)";
 
 const PLANTED: &str = "propose(new, refines(n1), feature, \"parent\")\npropose(new, refines(n2), feature, \"placed\")\npropose(new, refines(n1), feature, \"successor\")";
 
@@ -51,7 +58,17 @@ enum Assent {
 #[derive(Clone, Copy, Debug)]
 enum Asking {
     Asked,
+    Unsensed,
+    Requested,
+    Rhetorical,
+    Resensed,
+    Reasked,
     Answered,
+    LeadAnswered,
+    DecidedInTurn,
+    DecidedElsewhere,
+    DecidedLater,
+    HintedInTurn,
     Superseded,
     Corrected,
     Referred,
@@ -61,6 +78,20 @@ enum Asking {
     Dropped,
     Orphaned,
     Led,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Derivation {
+    Bare,
+    Own,
+    Child,
+    Hinted,
+    Revised,
+    Sibling,
+    Questioned,
+    Led,
+    Specified,
+    Refined,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -101,6 +132,15 @@ impl Viewing {
     pub(super) fn node(line: &Line) -> Option<NodeId> {
         match line {
             Line::Viewed(Viewed::Standing { node, .. }) => Some(*node),
+            _ => None,
+        }
+    }
+
+    fn outlined(line: Line) -> Option<String> {
+        match line {
+            Line::Viewed(Viewed::Outlined(outline)) => {
+                Some(format!("n{} {} {}", outline.node().into_inner(), outline.stage(), outline.basis()))
+            }
             _ => None,
         }
     }
@@ -182,14 +222,34 @@ impl Asking {
     fn files(self) -> Vec<String> {
         match self {
             Asking::Asked | Asking::Dropped | Asking::Orphaned => vec![ASKED.to_owned()],
+            Asking::Unsensed => vec![PLACED.to_owned()],
+            Asking::Requested => vec![format!("{PLACED}\nsense({OTHER}, ask, specific, firm, explicit)")],
+            Asking::Rhetorical => vec![format!("{PLACED}\nsense({OTHER}, opinion, specific, firm, explicit)")],
+            Asking::Resensed => vec![ASKED.to_owned(), format!("sense({OTHER}, ask, specific, firm, explicit)")],
+            Asking::Reasked => vec![
+                format!("{PLACED}\nsense({OTHER}, ask, specific, firm, explicit)"),
+                format!("sense({OTHER}, question, specific, firm, explicit)"),
+            ],
             Asking::Answered => vec![ASKED.to_owned(), format!("link({OWNER}, {OTHER}, answers)")],
+            Asking::LeadAnswered => vec![ASKED.to_owned(), format!("link({LEAD}, {OTHER}, answers)")],
+            Asking::DecidedInTurn => vec![BEGUN.to_owned(), format!("{DECIDED}\n{STATED}")],
+            Asking::DecidedElsewhere => {
+                vec![BEGUN.to_owned(), format!("place({OWNER}, n2, decides)\n{STATED}")]
+            }
+            Asking::DecidedLater => vec![
+                BEGUN.to_owned(),
+                format!("place({LATER}, n3, decides)\nsense({LATER}, decision, specific, firm, explicit)"),
+            ],
+            Asking::HintedInTurn => vec![BEGUN.to_owned(), format!("{DECIDED}\n{HINTED}")],
             Asking::Superseded => vec![ASKED.to_owned(), format!("link({OWNER}, {OTHER}, supersedes)")],
             Asking::Corrected => vec![ASKED.to_owned(), format!("link({OWNER}, {OTHER}, corrects)")],
             Asking::Referred => vec![ASKED.to_owned(), format!("link({OWNER}, {OTHER}, refers-to)")],
             Asking::Replaced => vec![ASKED.to_owned(), "supersede(n3, by(n4))".to_owned()],
             Asking::Inherited => vec![ASKED.to_owned(), "supersede(n2, by(n4))".to_owned()],
             Asking::Ancestral => vec![ASKED.to_owned(), "supersede(n2, by(n3))".to_owned()],
-            Asking::Led => vec![format!("place({LEAD}, n3, questions)")],
+            Asking::Led => {
+                vec![format!("place({LEAD}, n3, questions)\nsense({LEAD}, question, specific, firm, explicit)")]
+            }
         }
     }
 
@@ -198,7 +258,17 @@ impl Asking {
             Asking::Dropped => &["n3"],
             Asking::Orphaned => &["n2"],
             Asking::Asked
+            | Asking::Unsensed
+            | Asking::Requested
+            | Asking::Rhetorical
+            | Asking::Resensed
+            | Asking::Reasked
             | Asking::Answered
+            | Asking::LeadAnswered
+            | Asking::DecidedInTurn
+            | Asking::DecidedElsewhere
+            | Asking::DecidedLater
+            | Asking::HintedInTurn
             | Asking::Superseded
             | Asking::Corrected
             | Asking::Referred
@@ -215,11 +285,21 @@ impl Asking {
 }
 
 laws::table!(
-    a_question_stays_open_on_a_current_node_until_a_segment_answers_supersedes_or_corrects_it,
+    a_question_sensed_as_one_stays_open_on_a_current_node_until_an_owner_segment_answers_supersedes_or_corrects_it_or_the_owner_s_next_message_decides_its_node,
     |asking: &Asking| asking.asked(),
     [
         Asking::Asked => Some(vec![NodeId::new(3)]),
+        Asking::Unsensed => Some(vec![]),
+        Asking::Requested => Some(vec![]),
+        Asking::Rhetorical => Some(vec![]),
+        Asking::Resensed => Some(vec![]),
+        Asking::Reasked => Some(vec![NodeId::new(3)]),
         Asking::Answered => Some(vec![]),
+        Asking::LeadAnswered => Some(vec![NodeId::new(3)]),
+        Asking::DecidedInTurn => Some(vec![]),
+        Asking::DecidedElsewhere => Some(vec![NodeId::new(3)]),
+        Asking::DecidedLater => Some(vec![NodeId::new(3)]),
+        Asking::HintedInTurn => Some(vec![NodeId::new(3)]),
         Asking::Superseded => Some(vec![]),
         Asking::Corrected => Some(vec![]),
         Asking::Referred => Some(vec![NodeId::new(3)]),
@@ -229,6 +309,116 @@ laws::table!(
         Asking::Dropped => Some(vec![]),
         Asking::Orphaned => Some(vec![]),
         Asking::Led => Some(vec![NodeId::new(3)]),
+    ]
+);
+
+impl Derivation {
+    fn files(self) -> Vec<String> {
+        match self {
+            Derivation::Bare | Derivation::Refined => Vec::new(),
+            Derivation::Own => vec![format!("place({OWNER}, n2, decides)\n{STATED}")],
+            Derivation::Child | Derivation::Specified => vec![format!("{CHILD}\n{STATED}")],
+            Derivation::Hinted => vec![format!("{CHILD}\n{HINTED}")],
+            Derivation::Revised => vec![format!("{CHILD}\n{STATED}"), HINTED.to_owned()],
+            Derivation::Sibling => vec![format!("place({OWNER}, n4, decides)\n{STATED}")],
+            Derivation::Questioned => vec![ASKED.to_owned()],
+            Derivation::Led => {
+                vec![format!("place({LEAD}, n3, decides)\nsense({LEAD}, decision, specific, firm, explicit)")]
+            }
+        }
+    }
+
+    fn moves(self) -> &'static [&'static [&'static str]] {
+        match self {
+            Derivation::Specified => {
+                &[&["refine", "n2"], &["specify", "n2", "--artifact", "behaviour:p", "--condition", "p holds"]]
+            }
+            Derivation::Refined => &[&["refine", "n2"]],
+            Derivation::Bare
+            | Derivation::Own
+            | Derivation::Child
+            | Derivation::Hinted
+            | Derivation::Revised
+            | Derivation::Sibling
+            | Derivation::Questioned
+            | Derivation::Led => &[],
+        }
+    }
+
+    fn staged(self) -> Option<Vec<String>> {
+        let applying = Applying::ready().ok()?;
+        applying.applied(PLANTED).ok()?;
+        self.moves().iter().try_for_each(|arguments| applying.run(arguments).map(drop)).ok()?;
+        self.files().iter().try_for_each(|file| applying.applied(file).map(drop)).ok()?;
+        let lines = Spread::parsed(&applying.run(&["view", "outline"]).ok()?);
+        Some(lines.into_iter().filter_map(Viewing::outlined).collect())
+    }
+}
+
+laws::table!(
+    a_node_refines_while_an_owner_decision_stands_on_it_or_beneath_it_unless_the_lead_staged_it,
+    |derivation: &Derivation| derivation.staged(),
+    [
+        Derivation::Bare => Some(vec![
+            "n1 vague vague".to_owned(),
+            "n2 vague vague".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Own => Some(vec![
+            "n1 refining decided".to_owned(),
+            "n2 refining decided".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Child => Some(vec![
+            "n1 refining decided".to_owned(),
+            "n2 refining decided".to_owned(),
+            "n3 refining decided".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Hinted => Some(vec![
+            "n1 vague vague".to_owned(),
+            "n2 vague vague".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Revised => Some(vec![
+            "n1 vague vague".to_owned(),
+            "n2 vague vague".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Sibling => Some(vec![
+            "n1 refining decided".to_owned(),
+            "n2 vague vague".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 refining decided".to_owned(),
+        ]),
+        Derivation::Questioned => Some(vec![
+            "n1 vague vague".to_owned(),
+            "n2 vague vague".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Led => Some(vec![
+            "n1 vague vague".to_owned(),
+            "n2 vague vague".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Specified => Some(vec![
+            "n1 refining decided".to_owned(),
+            "n2 terminal set".to_owned(),
+            "n3 refining decided".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
+        Derivation::Refined => Some(vec![
+            "n1 vague vague".to_owned(),
+            "n2 refining set".to_owned(),
+            "n3 vague vague".to_owned(),
+            "n4 vague vague".to_owned(),
+        ]),
     ]
 );
 
