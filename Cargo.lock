@@ -1559,6 +1559,7 @@ dependencies = [
  "lint-workflow-run",
  "port-core",
  "text-lines",
+ "thiserror",
  "workspace-metadata",
 ]
 

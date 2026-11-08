@@ -6,7 +6,6 @@ mod stack_size;
 mod verdict;
 
 use std::ffi::OsString;
-use std::fmt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -70,10 +69,10 @@ impl Cli {
         err: &mut (impl Write + Send),
     ) -> Verdict {
         match self.mode.refusal() {
-            Some(refused) => Self::refused(refused, err),
+            Some(refused) => Verdict::refused(refused, err),
             None => StackSize::LINT
                 .ran(|| self.linted(SourceFiles::staged(files, &self.roots), Ports::new(files, metered), out, err))
-                .unwrap_or_else(|failure| Self::refused(&failure, err)),
+                .unwrap_or_else(|failure| Verdict::refused(&failure, err)),
         }
     }
 
@@ -86,7 +85,7 @@ impl Cli {
     ) -> Verdict {
         match staged {
             Ok(stage) => self.staged(&Sources::new(ports, &stage), out, err),
-            Err(failure) => Self::refused(&failure, err),
+            Err(failure) => Verdict::refused(&failure, err),
         }
     }
 
@@ -101,10 +100,5 @@ impl Cli {
             let readout = SourceFiles::read_staged(sources.ports().files(), sources.stage());
             run.verdict_of(&readout, sources.queue(), out, err)
         })
-    }
-
-    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> Verdict {
-        writeln!(err, "{failure}").ok();
-        Verdict::Refused
     }
 }

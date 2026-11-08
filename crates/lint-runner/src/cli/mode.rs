@@ -93,32 +93,26 @@ impl Run<'_, '_> {
     ) -> Verdict {
         match self {
             Run::Gate(crew) => Self::gated(&crew.checked(readout, queue), readout.files(), out, err),
-            Run::Report => Self::reported(readout.files(), out).written(err),
-            Run::Query(found) => Self::queried(found, readout.files(), out).written(err),
+            Run::Report => Self::reported(readout.files(), out, err),
+            Run::Query(found) => Self::queried(found, readout.files(), out, err),
         }
     }
 
     fn gated(outcome: &Outcome<'_>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
         outcome.surveyed(
-            format_args!("{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)),
+            &[format_args!("{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files))],
             out,
             err,
         )
     }
-    fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
+    fn reported(files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
         let model = Reader::read_files(files);
-        Elegance::reports(files, &model).iter().try_for_each(|report| write!(out, "{report}")).ok();
-        Outcome::Clean
+        Outcome::Clean.surveyed(&Elegance::reports(files, &model), out, err)
     }
 
-    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
-        found
-            .iter()
-            .try_for_each(|query| {
-                let extraction = Extraction::from(files);
-                write!(out, "{}", query.reply(&TypeSystem::built_from(files, &extraction)))
-            })
-            .ok();
-        Outcome::Clean
+    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
+        let extraction = Extraction::from(files);
+        let system = TypeSystem::built_from(files, &extraction);
+        Outcome::Clean.surveyed(found.map(|query| query.reply(&system)).as_slice(), out, err)
     }
 }
