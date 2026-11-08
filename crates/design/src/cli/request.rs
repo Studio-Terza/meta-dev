@@ -15,12 +15,12 @@ use grammar::flag::Flags;
 use store_ports::Sqlite;
 
 use super::failure::Failure;
-pub use command::Unresolved;
 use command::{Command, Verb};
+pub use command::{Crew, Unresolved};
 pub use ground::Ground;
 use persistence::Persistence;
-use projects::Located;
 use projects::Projects;
+pub use projects::{Kept, Located};
 pub use token::{Shaped, Token, Valued};
 
 #[derive(Debug)]
@@ -186,7 +186,7 @@ impl Request {
     }
 
     pub fn opened(&self, located: &Located, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
-        self.command.opened(located.store(), opened)
+        self.command.opened(located.kept(Kept::Store), opened)
     }
 
     pub fn command(self) -> Command {

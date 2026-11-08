@@ -15,6 +15,9 @@ pub struct Resolved(NodeId);
 #[derive(Clone, Copy, Debug, Op)]
 pub struct Resolving(NodeId);
 
+#[derive(Clone, Copy, Debug, Op)]
+pub struct ContextNodes;
+
 #[derive(Clone, Debug, Op)]
 pub struct Planting {
     root: Root,
@@ -52,7 +55,7 @@ struct EdgeColumns {
     source: NodeId,
     relation: NodeRelation,
     target: NodeId,
-    provenance: Entered,
+    provenance: Provenance,
 }
 
 #[derive(Debug, Columns)]
@@ -76,10 +79,10 @@ pub(crate) struct NodeRow {
     project: Project,
     facet: Facet,
     stage: Stage,
-    provenance: Entered,
+    provenance: Provenance,
     title: Option<Title>,
     role: Role,
-    role_provenance: Entered,
+    role_provenance: Provenance,
     artifact: Option<Artifact>,
     condition: Option<Condition>,
     reason: Option<Reason>,
@@ -92,10 +95,10 @@ pub(crate) struct RelativeRow {
     project: Project,
     facet: Facet,
     stage: Stage,
-    provenance: Entered,
+    provenance: Provenance,
     title: Option<Title>,
     role: Role,
-    role_provenance: Entered,
+    role_provenance: Provenance,
     artifact: Option<Artifact>,
     condition: Option<Condition>,
     reason: Option<Reason>,
@@ -114,7 +117,7 @@ pub(crate) struct EdgeRow {
     source: NodeId,
     relation: NodeRelation,
     target: NodeId,
-    provenance: Entered,
+    provenance: Provenance,
 }
 
 impl Resolved {
@@ -235,7 +238,7 @@ impl Linked {
         let target = RoleRow::read(self.target, statements)?;
         let edge = NodeEdge::new(self.source.0, self.relation, self.target.0).upheld(source, target)?;
         let [source, target] = edge.ends();
-        Ok(EdgeColumns { source, relation: edge.relation(), target, provenance: Entered::from(self.provenance) })
+        Ok(EdgeColumns { source, relation: edge.relation(), target, provenance: self.provenance })
     }
 }
 
@@ -271,7 +274,7 @@ VALUES
             source: NodeId,
             relation: NodeRelation,
             target: NodeId,
-            provenance: Entered
+            provenance: Provenance
         ))
     }
 }
@@ -335,7 +338,7 @@ impl Batch for Cast {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         let id = self.node.0;
         let role = self.casting.role();
-        let provenance = Entered::from(self.casting.provenance());
+        let provenance = self.casting.provenance();
         let written = statements.written(store_ports::query!(
             r#"
 UPDATE
@@ -348,7 +351,7 @@ WHERE
 "#,
             id: NodeId,
             role: Role,
-            provenance: Entered
+            provenance: Provenance
         ))?;
         let relinked = EdgeRow::around(id, statements)?
             .into_iter()
@@ -407,10 +410,10 @@ impl TryFrom<NodeRow> for AnyNode {
     type Error = ColumnFailure;
 
     fn try_from(row: NodeRow) -> Result<AnyNode, ColumnFailure> {
-        let entry = Entry::new(row.project, row.facet, Provenance::from(row.provenance));
+        let entry = Entry::new(row.project, row.facet, row.provenance);
         let columns =
             StageColumns { stage: row.stage, artifact: row.artifact, condition: row.condition, reason: row.reason };
-        let casting = Casting::new(row.role, Provenance::from(row.role_provenance));
+        let casting = Casting::new(row.role, row.role_provenance);
         let node = AnyNode::loaded(row.id, entry, casting, columns.try_into()?);
         Ok(row.title.into_iter().fold(node, Node::titled))
     }
@@ -439,13 +442,13 @@ impl TryFrom<RelativeRow> for Relative {
 
 impl From<EdgeRow> for Linked {
     fn from(row: EdgeRow) -> Linked {
-        Linked::new(Resolved(row.source), row.relation, Resolved(row.target), Provenance::from(row.provenance))
+        Linked::new(Resolved(row.source), row.relation, Resolved(row.target), row.provenance)
     }
 }
 
 impl From<EdgeRow> for Link {
     fn from(row: EdgeRow) -> Link {
-        Link::new(NodeEdge::new(row.source, row.relation, row.target), Provenance::from(row.provenance))
+        Link::new(NodeEdge::new(row.source, row.relation, row.target), row.provenance)
     }
 }
 
@@ -545,10 +548,10 @@ FROM
         let project = entry.project();
         let facet = entry.facet();
         let stage = Stage::Vague;
-        let provenance = Entered::from(entry.provenance());
+        let provenance = entry.provenance();
         let title = node.title().cloned();
         let role = node.casting().role();
-        let cast = Entered::from(node.casting().provenance());
+        let cast = node.casting().provenance();
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
@@ -569,10 +572,10 @@ VALUES
             project: Project,
             facet: Facet,
             stage: Stage,
-            provenance: Entered,
+            provenance: Provenance,
             title: Option<Title>,
             role: Role,
-            cast: Entered
+            cast: Provenance
         ))
     }
 }
@@ -664,5 +667,40 @@ ORDER BY
 
     pub(crate) fn links(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Link>, StoreFailure> {
         Ok(EdgeRow::around(node, statements)?.into_iter().map(Link::from).collect())
+    }
+}
+
+impl Query for ContextNodes {
+    type Rows = Vec<AnyNode>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
+        let dropped = Stage::Dropped;
+        let rows = statements.rows(store_ports::query!(
+            NodeRow,
+            r#"
+SELECT
+  id,
+  project,
+  facet,
+  stage,
+  provenance,
+  title,
+  role,
+  role_provenance,
+  artifact,
+  condition,
+  reason
+FROM
+  nodes
+WHERE
+  stage != ?1
+ORDER BY
+  id
+LIMIT
+  200
+"#,
+            dropped: Stage
+        ))?;
+        Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)
     }
 }

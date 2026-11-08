@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  segments.message,\n  segments.ordinal,\n  segments.body\nFROM\n  segments\n  JOIN messages ON messages.uuid = segments.message\nWHERE\n  messages.author = ?1\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      span_edges\n    WHERE\n      span_edges.message = segments.message\n      AND span_edges.ordinal = segments.ordinal\n  )\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      senses\n    WHERE\n      senses.message = segments.message\n      AND senses.ordinal = segments.ordinal\n  )\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      conversational\n    WHERE\n      conversational.message = segments.message\n      AND conversational.ordinal = segments.ordinal\n  )\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      segment_links\n    WHERE\n      (\n        segment_links.source_message = segments.message\n        AND segment_links.source_ordinal = segments.ordinal\n      )\n      OR (\n        segment_links.target_message = segments.message\n        AND segment_links.target_ordinal = segments.ordinal\n      )\n  )\nORDER BY\n  messages.at,\n  segments.message,\n  segments.ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "68782ba475afbabf09143883f6254f44482017ea39df707bdbb0acfd9d29e0be"
+}

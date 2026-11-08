@@ -1,0 +1,5 @@
+design structure
+retried 1 "unreadable \"the agent ended without a successful result\""
+flailed 1 "unreadable \"the agent's output is not its JSON result: \\\"  \\\" is no reply: it holds no ink or holds a NUL at line 1 column 34\""
+run 1 job 1 unreadable
+run 2 job 1 unreadable

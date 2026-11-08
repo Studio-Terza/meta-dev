@@ -4,10 +4,12 @@ use grammar::cited::Cited;
 use grammar::flag::Flags;
 use grammar::ident::Words;
 use grammar::line::Unbroken;
+use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
+use grammar::reply::Inked;
 use grammar::search::Term;
 use grammar::search::Terms;
 use grammar::slug::Letters;
@@ -335,5 +337,37 @@ laws::table!(
         "o1#2#3" => None,
         "#2" => None,
         "" => None,
+    ]
+);
+
+laws::table!(
+    a_process_start_time_is_read_as_two_words_and_five_numbers,
+    |text: &&'static str| Stamp::read(text).map(|stamp| (stamp.words(), stamp.numbers())),
+    [
+        "Fri Nov  6 01:16:00 2026    \n" => Some((["Fri", "Nov"], [6, 1, 16, 0, 2026])),
+        "Wed Sep 30 22:11:39 2026" => Some((["Wed", "Sep"], [30, 22, 11, 39, 2026])),
+        "Fri Nov  6 01:16 2026" => None,
+        "Fri Nov  6 01:16:00" => None,
+        "Fri Nov  6 01:16:00 2026 2027" => None,
+        "Fri Nov  6 01:16 00:2026" => None,
+        "Fri Nov  6 01:16:00 Sat" => None,
+        "Fri 11  6 01:16:00 2026" => None,
+        "fri Nov  6 01:16:00 2026" => None,
+        "Fri Nov  6 01:16:00 99999" => None,
+        "" => None,
+    ]
+);
+
+laws::table!(
+    a_reply_is_text_with_ink_and_no_nul,
+    |text: &&'static str| Inked::read(text).map(|inked| inked.as_ref().len()),
+    [
+        "place(a.0, n1, about)" => Some(21),
+        "  x  " => Some(5),
+        "x\ny" => Some(3),
+        "" => None,
+        " \n\t" => None,
+        "x\0y" => None,
+        "\0" => None,
     ]
 );

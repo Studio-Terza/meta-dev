@@ -10,7 +10,8 @@ use design_store::{
     AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, NextNode, Prefixed, Sees, ShownNode, Spoken,
     Unseen,
 };
-use file_ports::{Files, Text};
+use dispatch_ports::Reply;
+use file_ports::{Bytes, Files, Text};
 use newtype::{Counter, Newtype};
 use store_ports::{Store, Written};
 use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
@@ -78,9 +79,17 @@ pub struct Applied {
 struct Fresh<'ground, 'run, F: Files, S: Store>(&'ground Ground<'run, F, S>);
 
 #[derive(Debug)]
+pub struct Parsed<'store, S: Store> {
+    store: &'store S,
+    directives: Directives,
+    provenance: Provenance,
+}
+
+#[derive(Debug)]
 struct Resolution<'store, S: Store> {
     store: &'store S,
     batch: &'store Batch,
+    provenance: Provenance,
 }
 
 #[derive(Debug)]
@@ -142,7 +151,7 @@ impl Application {
         Printed::lines(out, &lines).map(|_printed| Outcome::from(self))
     }
 
-    fn lines(&self, store: &impl Store) -> Result<Vec<Line>, Failure> {
+    pub(crate) fn lines(&self, store: &impl Store) -> Result<Vec<Line>, Failure> {
         match self {
             Application::Fresh(applied) => applied.lines(store),
             Application::Repeated(earlier) => Ok(vec![Line::from(earlier)]),
@@ -158,7 +167,34 @@ impl<F: Files, S: Store> Sees for Fresh<'_, '_, F, S> {
     }
 
     fn unseen(self, unseen: Unseen) -> Result<Application, Failure> {
-        Applied::fresh(self.0, unseen).map(Application::Fresh)
+        let text = Text::try_from(unseen.as_ref()).map_err(Failure::Directives)?;
+        let directives: Directives = text.as_ref().parse()?;
+        Parsed::new(self.0.store(), directives, Provenance::from(Entered::Apply)).unseen(unseen)
+    }
+}
+
+impl<'store, S: Store> Parsed<'store, S> {
+    pub fn new(store: &'store S, directives: Directives, provenance: Provenance) -> Parsed<'store, S> {
+        Parsed { store, directives, provenance }
+    }
+}
+
+impl<S: Store> Parsed<'_, S> {
+    pub(crate) fn replied(self, reply: &Reply) -> Result<Application, Failure> {
+        let store = self.store;
+        store.read(AppliedFile::from(Bytes::from(reply.clone().into_inner().as_str())))?.seen(self)
+    }
+}
+
+impl<S: Store> Sees for Parsed<'_, S> {
+    type Output = Result<Application, Failure>;
+
+    fn before(self, earlier: Earlier) -> Result<Application, Failure> {
+        Ok(Application::Repeated(earlier))
+    }
+
+    fn unseen(self, unseen: Unseen) -> Result<Application, Failure> {
+        Applied::resolved(self, unseen).map(Application::Fresh)
     }
 }
 
@@ -172,16 +208,15 @@ impl From<Application> for Outcome {
 }
 
 impl Applied {
-    fn fresh<F: Files, S: Store>(ground: &Ground<'_, F, S>, unseen: Unseen) -> Result<Applied, Failure> {
-        let store = ground.store();
-        let text = Text::try_from(unseen.as_ref()).map_err(Failure::Directives)?;
-        let directives: Directives = text.as_ref().parse()?;
+    fn resolved<S: Store>(parsed: Parsed<'_, S>, unseen: Unseen) -> Result<Applied, Failure> {
+        let Parsed { store, directives, provenance } = parsed;
         let started = Folded { resolved: Vec::new(), batch: Batch::starting(store.read(NextNode)?) };
-        let folded =
-            directives.into_iter().try_fold(started, |folded, directive| folded.resolving(store, directive))?;
+        let folded = directives
+            .into_iter()
+            .try_fold(started, |folded, directive| folded.resolving(store, provenance, directive))?;
         let directed: Vec<Directed> =
             folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
-        let written = store.write(Directions::new(Provenance::from(Entered::Apply), unseen, directed))?;
+        let written = store.write(Directions::new(provenance, unseen, directed))?;
         Applied::covered(store, folded.resolved, written)
     }
 
@@ -227,8 +262,8 @@ impl From<Resolved> for Echo {
 }
 
 impl Folded {
-    fn resolving<S: Store>(self, store: &S, directive: Directive) -> Result<Folded, Failure> {
-        let grounded = directive.visited(&Resolution { store, batch: &self.batch })?;
+    fn resolving<S: Store>(self, store: &S, provenance: Provenance, directive: Directive) -> Result<Folded, Failure> {
+        let grounded = directive.visited(&Resolution { store, batch: &self.batch, provenance })?;
         let batch = self.batch.after(&grounded.effect);
         let resolved = self.resolved.into_iter().chain([Resolved { directive, grounded }]).collect();
         Ok(Folded { resolved, batch })
@@ -363,7 +398,7 @@ impl<S: Store> Visit for &Resolution<'_, S> {
     ) -> Result<Grounded, Failure> {
         let fresh = fresh.map(|label| self.batch.unbound(label)).transpose()?;
         let parent = self.node(refines)?;
-        let entry = Entry::new(parent.entry().project().clone(), facet, Provenance::from(Entered::Apply));
+        let entry = Entry::new(parent.entry().project().clone(), facet, self.provenance);
         let node = Node::proposed(self.batch.next, entry, parent.casting()).titled(title.clone());
         let effect = Effect::Proposed { node: node.clone(), fresh };
         Ok(Grounded { directed: Directed::Proposed { node, parent: parent.identity() }, heard: Vec::new(), effect })

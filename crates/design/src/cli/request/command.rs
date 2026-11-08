@@ -5,6 +5,7 @@ mod lifecycle;
 mod printed;
 mod rendering;
 mod search;
+mod structure;
 mod subject;
 
 use std::io::Write;
@@ -12,6 +13,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use design_store::Scope;
+use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
 use grammar::search::Terms;
 use store_ports::{Sqlite, Store};
@@ -26,6 +28,8 @@ use init::Init;
 use lifecycle::{Move, Moving, Recast};
 use printed::Printed;
 use search::Search;
+pub use structure::Crew;
+use structure::Structure;
 use subject::Subject;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,6 +41,7 @@ pub enum Command {
     Apply(PathBuf),
     Move(Move),
     Recast(Recast),
+    Structure,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,6 +53,7 @@ pub enum Verb {
     Apply,
     Move(Moving),
     Role,
+    Structure,
 }
 
 impl FromStr for Verb {
@@ -59,7 +65,7 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 10] = [
+    const NAMED: [(&'static str, Verb); 11] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
@@ -70,6 +76,7 @@ impl Verb {
         ("reopen", Verb::Move(Moving::Reopen)),
         ("drop", Verb::Move(Moving::Drop)),
         ("role", Verb::Role),
+        ("structure", Verb::Structure),
     ];
 
     pub fn options(self) -> &'static [Flag] {
@@ -79,7 +86,9 @@ impl Verb {
             Verb::Init => &[Flag::Valued(Valued::Consumes)],
             Verb::Move(Moving::Specify) => &[Flag::Valued(Valued::Artifact), Flag::Valued(Valued::Condition)],
             Verb::Move(Moving::Drop) => &[Flag::Valued(Valued::Reason)],
-            Verb::Show | Verb::Apply | Verb::Move(Moving::Refine | Moving::Reopen) | Verb::Role => &[],
+            Verb::Show | Verb::Apply | Verb::Move(Moving::Refine | Moving::Reopen) | Verb::Role | Verb::Structure => {
+                &[]
+            }
         }
     }
 
@@ -98,6 +107,7 @@ impl Verb {
             Verb::Apply => Token::only(rest).map(PathBuf::from).map(Command::Apply),
             Verb::Move(moving) => Move::read(moving, rest).map(Command::Move),
             Verb::Role => Recast::read(rest).map(Command::Recast),
+            Verb::Structure => rest.first().map_or(Ok(Command::Structure), |_extra| Err(Failure::Usage)),
         }
     }
 }
@@ -111,13 +121,15 @@ impl Command {
             | Command::Init(_)
             | Command::Apply(_)
             | Command::Move(_)
-            | Command::Recast(_) => opened(path),
+            | Command::Recast(_)
+            | Command::Structure => opened(path),
         }
     }
 
-    pub fn written<F: Files, S: Store>(
+    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock>(
         self,
         ground: Ground<'_, F, S>,
+        crew: &Crew<'_, D, C>,
         out: &mut impl Write,
     ) -> Result<Outcome, Failure> {
         match self {
@@ -137,6 +149,9 @@ impl Command {
             }
             Command::Move(moving) => moving.written(ground.store(), out),
             Command::Recast(recast) => recast.written(ground.store(), out),
+            Command::Structure => {
+                Structure::new(ground.store(), crew).worked().and_then(|structured| structured.reported(out))
+            }
         }
     }
 }

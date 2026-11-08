@@ -1,6 +1,6 @@
 use design_model::{
-    Confidence, Entered, Explicitness, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation,
-    Sense, SenseKind, SpanRelation, Specificity, Standing, Supersession, Vague,
+    Confidence, Explicitness, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation, Sense,
+    SenseKind, SpanRelation, Specificity, Standing, Supersession, Vague,
 };
 use newtype::Counter;
 use store_ports::{Batch, Columns as Row, Statements, StoreFailure, Written};
@@ -14,7 +14,7 @@ use crate::{Annotation, Linked};
 
 #[derive(Debug)]
 pub(super) struct Annotating<'held, 'run> {
-    provenance: Entered,
+    provenance: Provenance,
     statements: &'held mut Statements<'run>,
 }
 
@@ -23,7 +23,7 @@ struct Linking<'ends> {
     source: &'ends Segment,
     target: &'ends Segment,
     relation: SegmentRelation,
-    provenance: Entered,
+    provenance: Provenance,
 }
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ struct LinkColumns {
     source: Columns,
     relation: SegmentRelation,
     target: Columns,
-    provenance: Entered,
+    provenance: Provenance,
 }
 
 #[derive(Debug, Row)]
@@ -51,7 +51,7 @@ pub(crate) struct PlacedRow {
     ordinal: Ordinal,
     relation: SpanRelation,
     node: NodeId,
-    provenance: Entered,
+    provenance: Provenance,
 }
 
 #[derive(Debug, Row)]
@@ -62,7 +62,7 @@ pub(crate) struct SensedRow {
     specificity: Specificity,
     confidence: Confidence,
     explicitness: Explicitness,
-    provenance: Entered,
+    provenance: Provenance,
     standing: Standing,
 }
 
@@ -73,14 +73,14 @@ pub(crate) struct RelatedRow {
     relation: SegmentRelation,
     target_message: Uuid,
     target_ordinal: Ordinal,
-    provenance: Entered,
+    provenance: Provenance,
 }
 
 #[derive(Debug, Row)]
 pub(crate) struct ConversationalRow {
     message: Uuid,
     ordinal: Ordinal,
-    provenance: Entered,
+    provenance: Provenance,
 }
 
 impl Columns {
@@ -171,7 +171,7 @@ impl From<PlacedRow> for Annotation {
     fn from(row: PlacedRow) -> Annotation {
         let segment = Segment::new(row.message, row.ordinal);
         let remark = Remark::Placed { segment, node: row.node, relation: row.relation };
-        Annotation::new(remark, Provenance::from(row.provenance), Standing::Current)
+        Annotation::new(remark, row.provenance, Standing::Current)
     }
 }
 
@@ -179,7 +179,7 @@ impl From<SensedRow> for Annotation {
     fn from(row: SensedRow) -> Annotation {
         let segment = Segment::new(row.message, row.ordinal);
         let sense = Sense::new(row.kind, row.specificity, row.confidence, row.explicitness);
-        Annotation::new(Remark::Sensed { segment, sense }, Provenance::from(row.provenance), row.standing)
+        Annotation::new(Remark::Sensed { segment, sense }, row.provenance, row.standing)
     }
 }
 
@@ -188,14 +188,14 @@ impl From<RelatedRow> for Annotation {
         let source = Segment::new(row.source_message, row.source_ordinal);
         let target = Segment::new(row.target_message, row.target_ordinal);
         let remark = Remark::Related { source, target, relation: row.relation };
-        Annotation::new(remark, Provenance::from(row.provenance), Standing::Current)
+        Annotation::new(remark, row.provenance, Standing::Current)
     }
 }
 
 impl From<ConversationalRow> for Annotation {
     fn from(row: ConversationalRow) -> Annotation {
         let segment = Segment::new(row.message, row.ordinal);
-        Annotation::new(Remark::Conversational { segment }, Provenance::from(row.provenance), Standing::Current)
+        Annotation::new(Remark::Conversational { segment }, row.provenance, Standing::Current)
     }
 }
 
@@ -339,7 +339,7 @@ impl Batch for Directions {
     type Failure = Refusal;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
-        let mut annotating = Annotating { provenance: Entered::from(self.provenance), statements };
+        let mut annotating = Annotating { provenance: self.provenance, statements };
         let written = self
             .directed
             .iter()
@@ -370,7 +370,7 @@ VALUES
             ordinal: Ordinal,
             relation: SpanRelation,
             node: NodeId,
-            provenance: Entered
+            provenance: Provenance
         ))?)
     }
 
@@ -428,7 +428,7 @@ VALUES
             specificity: Specificity,
             confidence: Confidence,
             explicitness: Explicitness,
-            provenance: Entered
+            provenance: Provenance
         ))?)
     }
 
@@ -445,8 +445,7 @@ VALUES
         let planted = NodeRow::proposed(node, self.statements)?;
         let child = Resolved::read(node.identity(), self.statements)?;
         let parent = Resolved::read(parent, self.statements)?;
-        let linked = Linked::new(child, NodeRelation::Refines, parent, Provenance::from(self.provenance))
-            .written(self.statements)?;
+        let linked = Linked::new(child, NodeRelation::Refines, parent, self.provenance).written(self.statements)?;
         Ok(planted.plus(linked))
     }
 
@@ -454,7 +453,7 @@ VALUES
         let [old, by] = supersession.ends();
         let old = Resolved::read(old, self.statements)?;
         let by = Resolved::read(by, self.statements)?;
-        Linked::new(by, NodeRelation::Supersedes, old, Provenance::from(self.provenance)).written(self.statements)
+        Linked::new(by, NodeRelation::Supersedes, old, self.provenance).written(self.statements)
     }
 
     pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, Refusal> {
@@ -469,7 +468,7 @@ VALUES
 "#,
             message: Uuid,
             ordinal: Ordinal,
-            provenance: Entered
+            provenance: Provenance
         ))?)
     }
 }
@@ -521,7 +520,7 @@ VALUES
             relation: SegmentRelation,
             target_message: Uuid,
             target_ordinal: Ordinal,
-            provenance: Entered
+            provenance: Provenance
         ))
     }
 }

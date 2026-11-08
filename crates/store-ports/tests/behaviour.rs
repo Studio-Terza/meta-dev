@@ -3,13 +3,15 @@ use std::path::PathBuf;
 
 use design_model::{
     Artifact, ArtifactKind, Condition, Confidence, Entered, Explicitness, Facet, Kin, NodeId, NodeRelation, Ordinal,
-    Prefix, Project, Reason, Role, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Standing, Title,
+    Prefix, Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage,
+    Standing, Title,
 };
-use design_store::{SessionCursors, StreamSchema};
+use design_store::{RunState, SessionCursors, StreamSchema};
+use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar::search::Term;
 use laws::proptest::option;
-use laws::proptest::prelude::{any, prop_assert};
+use laws::proptest::prelude::{any, prop_assert, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use newtype::{Arbitrary, Newtype};
@@ -284,7 +286,40 @@ fn every_named_column_reads_back_as_its_variant() {
     assert_eq!(Stored::unread::<Explicitness>(), []);
     assert_eq!(Stored::unread::<Standing>(), []);
     assert_eq!(Stored::unread::<ArtifactKind>(), []);
+    assert_eq!(Stored::unread::<RunState>(), []);
 }
+
+laws::roundtrip!(a_pid_column_reads_back, any::<Pid>(), Column::raw, Stored::back::<Pid>, Some);
+
+laws::roundtrip!(a_token_count_column_reads_back, any::<Tokens>(), Column::raw, Stored::back::<Tokens>, Some);
+
+laws::roundtrip!(a_wall_time_column_reads_back, any::<Wall>(), Column::raw, Stored::back::<Wall>, Some);
+
+laws::roundtrip!(
+    a_provenance_column_reads_back,
+    prop_oneof![
+        select(Entered::VARIANTS).prop_map(Provenance::from),
+        any::<i64>().prop_map(|run| Provenance::Agent(RunId::new(run))),
+    ],
+    Column::raw,
+    Stored::back::<Provenance>,
+    Some
+);
+
+laws::roundtrip!(
+    a_start_time_column_reads_back,
+    (select(vec!["Mon", "Sun"]), select(vec!["Jan", "Dec"]), 1..32_u8, 0..24_u8, 0..60_u8, 1970..2200_u16)
+        .prop_filter_map("a start time", |(weekday, month, day, hour, minute, year)| {
+            format!("{weekday} {month} {day:>2} {hour:02}:{minute:02}:{minute:02} {year}").parse::<Started>().ok()
+        }),
+    Column::raw,
+    Stored::back::<Started>,
+    Some
+);
+
+laws::law!(a_count_beyond_a_pid_is_refused_as_unfit, i64::from(u32::MAX) + 1..i64::MAX, number, {
+    prop_assert!(matches!(Pid::from_raw(number), Err(ColumnFailure::Unfit(_))));
+});
 
 laws::law!(an_unknown_spelling_is_refused_as_misspelled, "[a-z]{0,3}[A-Z ]{1,3}", text, {
     prop_assert!(matches!(Stage::from_raw(text.clone()), Err(ColumnFailure::Misspelled(_))));

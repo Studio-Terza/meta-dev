@@ -1,0 +1,7 @@
+design structure
+retried 1 "misread expected 1 7 \"an argument\""
+applied "conversational(aaaaaaaa-0000-4000-8000-000000000003.0)"
+uncovered aaaaaaaa-0000-4000-8000-000000000003.1
+written 2
+run 1 job 1 replied tokens 10 20 3 4
+run 2 job 1 replied tokens 10 20 3 4

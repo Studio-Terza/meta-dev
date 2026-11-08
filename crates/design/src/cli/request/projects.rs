@@ -15,6 +15,12 @@ use slug::Slug;
 #[derive(Debug)]
 pub struct Projects;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kept {
+    Store,
+    Agents,
+}
+
 #[derive(Debug)]
 pub struct Located {
     transcripts: PathBuf,
@@ -26,13 +32,14 @@ pub struct Located {
 impl Located {
     const META: &'static str = ".meta";
     const STORE: &'static str = "design.sqlite";
+    const AGENTS: &'static str = "agents";
 
     pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
     }
 
-    pub fn store(&self) -> PathBuf {
-        self.workspace.join(Self::META).join(Self::STORE)
+    pub fn kept(&self, kept: Kept) -> PathBuf {
+        self.workspace.join(Self::META).join(kept.name())
     }
 
     pub fn configured(&self, project: Project) -> LocalConfig {
@@ -45,6 +52,15 @@ impl Located {
 
     pub fn within(&self, path: &Path) -> PathBuf {
         Projects::resolved(&self.working.join(path))
+    }
+}
+
+impl Kept {
+    fn name(self) -> &'static Path {
+        match self {
+            Kept::Store => Path::new(Located::STORE),
+            Kept::Agents => Path::new(Located::AGENTS),
+        }
     }
 }
 

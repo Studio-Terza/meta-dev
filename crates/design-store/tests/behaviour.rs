@@ -6,24 +6,27 @@ use std::sync::LazyLock;
 
 use design_model::{
     AnyNode, Casting, Entered, Entry, Facet, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix,
-    Project, Provenance, Role, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
+    Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, Covered, Cycle, Directed, Directions, Linked, NextNode, Placed, Planting, Prefixed, ProjectRoot,
-    Refusal, RelationName, Resolved, Resolving, Restaged, Scope, SearchSegments, Seen, SessionCursors, SessionRecords,
-    ShapeName, ShownMessage, ShownNode, StreamSchema, Unseen,
+    AppliedFile, Cast, Covered, Cycle, Directed, Directions, JobOpened, Linked, LiveRuns, NextJob, NextNode, NextRun,
+    Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Resolved, Resolving, Restaged, RunEnded,
+    RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage,
+    ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
 };
+use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
 use grammar::message::Lexemes;
 use grammar::search::Terms;
 use laws::proptest::collection::vec;
+use laws::proptest::option;
 use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::{Counter, Newtype};
-use port_core::{Port, Run};
-use store_ports::{Migrator, Schema, Sqlite, Store, Written};
+use port_core::{Op, Port, Run};
+use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
 use stream::Stream;
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
@@ -266,12 +269,6 @@ static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
 struct Around(char);
 
 impl Around {
-    fn inked() -> impl Strategy<Value = Around> {
-        any::<char>().prop_filter_map("a point the segmenter inks", |point| {
-            BLANKS.binary_search(&point).err().map(|_| Around(point))
-        })
-    }
-
     fn uuid(self) -> Uuid {
         Uuid::new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
     }
@@ -311,8 +308,8 @@ impl Around {
         self.shown(&fresh)
     }
 
-    fn kept(self) -> Vec<String> {
-        vec![format!("0 sentence {:?}", Body::new(format!("{}w{}", self.0, self.0)))]
+    fn kept(self) -> Body {
+        Body::new(format!("{}w{}", self.0, self.0))
     }
 }
 
@@ -326,10 +323,46 @@ fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_sh
     Ok(())
 }
 
-laws::law!(a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept, Around::inked(), inked, {
-    let migrated = inked.migrated().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    prop_assert_eq!(migrated, inked.kept());
-});
+#[derive(Op)]
+struct Bodies;
+
+#[derive(Columns)]
+struct BodyRow {
+    message: Uuid,
+    body: Body,
+}
+
+impl Query for Bodies {
+    type Rows = BTreeMap<Uuid, Body>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Uuid, Body>, StoreFailure> {
+        let rows = statements.rows(store_ports::query!(
+            BodyRow,
+            r#"
+SELECT
+  message,
+  body
+FROM
+  segments
+WHERE
+  ordinal = 0
+"#
+        ))?;
+        Ok(rows.into_iter().map(|row| (row.message, row.body)).collect())
+    }
+}
+
+#[test]
+fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
+-> Result<(), Box<dyn Error>> {
+    let migrated = Run::root().port(OLD_STORE.clone()).read(Bodies)?;
+    let inked: Vec<Around> =
+        (char::MIN..=char::MAX).filter(|point| BLANKS.binary_search(point).is_err()).map(Around).collect();
+    let kept: Vec<Option<&Body>> = inked.iter().map(|point| migrated.get(&point.uuid())).collect();
+    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect();
+    assert_eq!(kept, both_sides.iter().map(Some).collect::<Vec<Option<&Body>>>());
+    Ok(())
+}
 
 #[derive(Clone, Debug)]
 struct Dag {
@@ -1203,3 +1236,91 @@ fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>>
     assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     Ok(())
 }
+
+struct Unstructuring;
+
+impl Unstructuring {
+    fn listed(store: &Port<'_, Sqlite>) -> Result<Vec<Segment>, Box<dyn Error>> {
+        Ok(store.read(Unstructured)?.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone()).collect())
+    }
+}
+
+#[test]
+fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(Recorded::session()?.records)?;
+    let before = Unstructuring::listed(&store)?;
+    Proposals::written(&store, vec![Directed::Conversational { segment: Proposals::segment("o1", 0) }])?;
+    let after = Unstructuring::listed(&store)?;
+    assert_eq!(
+        (before, after),
+        (vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)], vec![Proposals::segment("o1", 1)])
+    );
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct Spawning {
+    pid: Pid,
+    started: Option<Started>,
+    deadline: Wall,
+    state: RunState,
+    usage: Option<Usage>,
+}
+
+impl Spawning {
+    fn any() -> impl Strategy<Value = Spawning> {
+        (
+            any::<Pid>(),
+            option::of(
+                Just("Sat Nov  7 10:00:00 2026").prop_filter_map("a start time", |text| text.parse::<Started>().ok()),
+            ),
+            any::<Wall>(),
+            select(RunState::VARIANTS),
+            option::of((any::<Tokens>(), any::<Tokens>(), any::<Tokens>(), any::<Tokens>())),
+        )
+            .prop_map(|(pid, started, deadline, state, usage)| Spawning {
+                pid,
+                started,
+                deadline,
+                state,
+                usage: usage.map(|(input, output, written, read)| Usage::new(input, output, written, read)),
+            })
+    }
+
+    fn stored(&self) -> Result<Lived, Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        store.write(Recorded::session()?.records)?;
+        let job = store.read(NextJob)?;
+        store.write(JobOpened::from(job))?;
+        let id = store.read(NextRun)?;
+        let spawned = Spawned::new(self.pid, self.started.clone(), Deadline::new(self.deadline));
+        store.write(RunSpawned::new(id, job, spawned))?;
+        let live = store.read(LiveRuns)?;
+        store.write(RunEnded::new(id, self.state, self.usage))?;
+        Ok(Lived { live, ran: store.read(RunsOf::from(job))?, after: store.read(LiveRuns)? })
+    }
+}
+
+#[derive(Debug)]
+struct Lived {
+    live: Vec<StoredRun>,
+    ran: Vec<Ran>,
+    after: Vec<StoredRun>,
+}
+
+laws::law!(a_spawned_run_is_live_until_it_ends_with_its_state_and_usage, Spawning::any(), spawning, {
+    let lived = spawning.stored().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let spawned: Vec<Spawned> = lived.live.iter().map(|stored| stored.spawned().clone()).collect();
+    let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
+    prop_assert_eq!(spawned, vec![wanted]);
+    let ran: Vec<Ran> = lived.ran;
+    prop_assert_eq!(ran.iter().map(|ran| [ran.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
+    prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![spawning.state]);
+    prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![spawning.usage]);
+    let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
+    let running = [spawning.state].into_iter().filter(|state| *state == RunState::Running).map(|_| RunId::new(1));
+    prop_assert_eq!(still, running.collect::<Vec<RunId>>());
+});

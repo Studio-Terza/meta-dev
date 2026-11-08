@@ -1,4 +1,4 @@
-use design_model::Entered;
+use design_model::Provenance;
 use file_ports::Bytes;
 use store_ports::{Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::Instant;
@@ -42,7 +42,7 @@ WHERE
 impl Unseen {
     pub(crate) fn written(
         &self,
-        provenance: Entered,
+        provenance: Provenance,
         statements: &mut Statements<'_>,
     ) -> Result<Written, StoreFailure> {
         let content = &self.0;
@@ -54,7 +54,7 @@ VALUES
   (?1, ?2)
 "#,
             content: Bytes,
-            provenance: Entered
+            provenance: Provenance
         ))
     }
 }

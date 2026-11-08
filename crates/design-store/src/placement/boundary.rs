@@ -1,5 +1,5 @@
 use design_model::{
-    Confidence, Entered, Explicitness, NodeId, Ordinal, Provenance, Sense, SenseKind, SpanRelation, Specificity,
+    Confidence, Explicitness, NodeId, Ordinal, Provenance, Sense, SenseKind, SpanRelation, Specificity,
 };
 use store_ports::{Columns, Statements, StoreFailure};
 use transcript_ports::{Authorship, Body, Uuid};
@@ -13,7 +13,7 @@ struct PlacementRow {
     ordinal: Ordinal,
     author: Authorship,
     body: Body,
-    provenance: Entered,
+    provenance: Provenance,
     kind: Option<SenseKind>,
     specificity: Option<Specificity>,
     confidence: Option<Confidence>,
@@ -32,7 +32,7 @@ impl From<PlacementRow> for Placement {
             author: row.author,
             body: row.body,
             sense,
-            provenance: Provenance::from(row.provenance),
+            provenance: row.provenance,
         }
     }
 }

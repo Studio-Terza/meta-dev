@@ -372,3 +372,16 @@ fn a_two_word_trait_names_its_ops_module_in_snake_case() {
     drop(port);
     assert_eq!(Tally::names(run.finish().snapshot()), ["laws::session_cache_ops::SessionCache::clear"]);
 }
+
+#[test]
+fn a_held_resource_is_reached_and_changed_through_its_hold_and_released_once() {
+    let run = Run::root();
+    let port = run.port(Memory::default());
+    let mut held = port.lock_bare(&Session("a".to_owned()));
+    let reached = held.lockable;
+    held.lockable = Lockable::Broken;
+    assert_eq!((reached, held.end()), (Lockable::Intact, Err(Gone)));
+    let measured = run.finish();
+    assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
+    assert!(measured.settled().is_ok());
+}

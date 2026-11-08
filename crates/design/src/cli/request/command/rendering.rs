@@ -1,5 +1,5 @@
 use design_model::{
-    Dropped, Entered, NodeId, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Staging, Terminal,
+    Dropped, NodeId, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Staging, Terminal,
 };
 use design_store::{
     Annotation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest, Stored,
@@ -61,13 +61,8 @@ impl Refs {
                     .iter()
                     .map(|relative| Line::Relative { kin: relative.kin(), node: Summary::from(relative.node()) }),
             )
-            .chain(
-                placed
-                    .links()
-                    .iter()
-                    .map(|link| Line::Edge { edge: link.edge(), entered: Entered::from(link.provenance()) }),
-            )
-            .chain([Line::Role { role: casting.role(), entered: Entered::from(casting.provenance()) }])
+            .chain(placed.links().iter().map(|link| Line::Edge { edge: link.edge(), entered: link.provenance() }))
+            .chain([Line::Role { role: casting.role(), entered: casting.provenance() }])
             .chain(placed.placements().iter().map(|placement| {
                 let author: &Authorship = placement.as_ref();
                 let provenance: &Provenance = placement.as_ref();
@@ -76,7 +71,7 @@ impl Refs {
                     segment: self.reference(&placement.segment()),
                     author: *author,
                     sense: placement.sense(),
-                    entered: Entered::from(*provenance),
+                    entered: *provenance,
                     body: placement.body().clone(),
                 }
             }))
@@ -111,7 +106,7 @@ impl Refs {
             .chain(stored.annotations().iter().map(|annotation: &Annotation| Line::Annotated {
                 remark: annotation.remark().visited(Remarks(self)),
                 standing: annotation.standing(),
-                entered: Entered::from(annotation.provenance()),
+                entered: annotation.provenance(),
             }))
             .collect()
     }

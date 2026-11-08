@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 design-model = { path = "../design-model" }
+dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 named-derive = { path = "../named-derive" }
@@ -18,6 +19,7 @@ newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
+strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
@@ -27,7 +29,6 @@ exit = { path = "../exit" }
 
 [dev-dependencies]
 laws = { path = "../laws" }
-strum.workspace = true
 
 [lints]
 workspace = true

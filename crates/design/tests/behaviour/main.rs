@@ -1,3 +1,5 @@
+mod structure;
+
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -8,16 +10,17 @@ use std::str::FromStr;
 
 use console_ports::Variables;
 
-use design::{Anchored, Cli, Count, Failure, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
+use design::{Anchored, Attempted, Cli, Count, Failure, Lapsed, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
 use design_model::{
-    AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, Kin, Node,
-    NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, SegmentRelation,
-    Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
+    AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId, Kin, Node,
+    NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, RunId,
+    SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
 };
 use design_store::{
-    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShapeName, ShownMessage, ShownNode, Stored,
-    StreamSchema,
+    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage, ShownNode,
+    Stored, StreamSchema,
 };
+use dispatch_ports::{Tokens, Unreadable, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
@@ -28,7 +31,8 @@ use newtype::{Counter, Newtype};
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use store_ports::{Busy, Sqlite, Store, Written};
 use stream::{Relation, Shape};
-use structurer::{Directive, NodeRef, Proposal, SegmentRef};
+use structure::Staff;
+use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef};
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
@@ -242,7 +246,7 @@ impl Invocation {
     fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Self::environment(), files, |_path| store.clone()).report(
+        Cli::new(&Self::environment(), files, |_path| store.clone(), Staff::idle()).report(
             &run,
             arguments.iter().map(OsString::from),
             &mut out,
@@ -338,7 +342,7 @@ struct Rooted;
 impl Rooted {
     fn outcome(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
         let mut out = Vec::new();
-        let outcome = Cli::new(&Invocation::environment(), session.files(), |_path| store.clone())
+        let outcome = Cli::new(&Invocation::environment(), session.files(), |_path| store.clone(), Staff::idle())
             .rooted(arguments.iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
@@ -426,10 +430,15 @@ impl Opened {
         let opened = Mutex::new(Vec::new());
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Invocation::at(directory), files, |path: PathBuf| {
-            opened.lock().map(|mut paths| paths.push(path)).ok();
-            Sqlite::in_memory::<StreamSchema>()
-        })
+        Cli::new(
+            &Invocation::at(directory),
+            files,
+            |path: PathBuf| {
+                opened.lock().map(|mut paths| paths.push(path)).ok();
+                Sqlite::in_memory::<StreamSchema>()
+            },
+            Staff::idle(),
+        )
         .report(&run, arguments.iter().map(OsString::from), &mut out)?;
         Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out: String::from_utf8(out).unwrap_or_default() })
     }
@@ -1137,8 +1146,13 @@ fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Re
     applying.files.create_directories(Path::new("/work/notes"))?;
     applying.files.write(Path::new("/work/notes/directives"), Bytes::default())?;
     assert!(matches!(applying.run(&["apply", "directives"]), Err(Failure::Directives(_))));
-    let lent = Cli::new(&Invocation::environment(), FakeLent::new(&applying.files), |_path| applying.store.clone())
-        .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
+    let lent = Cli::new(
+        &Invocation::environment(),
+        FakeLent::new(&applying.files),
+        |_path| applying.store.clone(),
+        Staff::idle(),
+    )
+    .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
     assert_eq!(lent, Outcome::Applied);
     Ok(())
 }
@@ -1148,8 +1162,9 @@ impl Applying {
         self.files.create_directories(Path::new("/work/notes")).ok();
         self.files.write(Path::new("/work/notes/directives"), directives).ok();
         let mut out = Vec::new();
-        let outcome = Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone())
-            .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
+        let outcome =
+            Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
+                .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
 
@@ -1327,7 +1342,7 @@ impl Lifecycle {
 
 impl Applying {
     fn outcome(&self, arguments: &[&str]) -> Result<Outcome, Failure> {
-        Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone())
+        Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
             .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
     }
 }
@@ -1609,11 +1624,8 @@ impl Workspace {
     fn run(&self, directory: &str, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Invocation::at(directory), FakeLent::new(&self.files), |_path| self.store.clone()).report(
-            &run,
-            arguments.iter().map(OsString::from),
-            &mut out,
-        )?;
+        Cli::new(&Invocation::at(directory), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
+            .report(&run, arguments.iter().map(OsString::from), &mut out)?;
         Ok(String::from_utf8(out).unwrap_or_default())
     }
 
@@ -1883,8 +1895,12 @@ impl Generated {
         select(vec![Authorship::Owner, Authorship::Lead]).boxed()
     }
 
-    fn entered() -> BoxedStrategy<Entered> {
-        select(Entered::VARIANTS).boxed()
+    fn entered() -> BoxedStrategy<Provenance> {
+        prop_oneof![
+            select(Entered::VARIANTS).prop_map(Provenance::from),
+            any::<i64>().prop_map(|run| Provenance::Agent(RunId::new(run))),
+        ]
+        .boxed()
     }
 
     fn segment() -> BoxedStrategy<SegmentRef> {
@@ -1952,8 +1968,8 @@ impl Generated {
             proptest::option::of(Generated::text()),
         )
             .prop_map(|((node, project, facet, entered), (role, cast, stage), title)| {
-                let entry = Entry::new(project, facet, Provenance::from(entered));
-                let loaded = Node::loaded(node, entry, Casting::new(role, Provenance::from(cast)), stage);
+                let entry = Entry::new(project, facet, entered);
+                let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
                 Summary::from(&title.into_iter().fold(loaded, |node, title| node.titled(Title::new(title))))
             })
             .boxed()
@@ -2078,9 +2094,48 @@ impl Generated {
         .boxed()
     }
 
-    fn line() -> BoxedStrategy<Line> {
-        prop_oneof![Generated::counted(), Generated::shown_node(), Generated::shown_message(), Generated::applied()]
+    fn lapse() -> BoxedStrategy<Lapse> {
+        prop_oneof![
+            Just(Lapse::overdue()),
+            "[^\u{0}]{0,20}".prop_map(|refusal| Lapse::refused(&std::io::Error::other(refusal))),
+            Just(Lapse::from(&Unreadable::Unsuccessful)),
+            "[^\u{0}]{0,20}".prop_map(|garbled| Lapse::from(&Unreadable::Json(garbled))),
+            "[ -~]{0,20}"
+                .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
+        ]
+        .boxed()
+    }
+
+    fn usage() -> BoxedStrategy<Usage> {
+        (any::<Tokens>(), any::<Tokens>(), any::<Tokens>(), any::<Tokens>())
+            .prop_map(|(input, output, written, read)| Usage::new(input, output, written, read))
             .boxed()
+    }
+
+    fn structured() -> BoxedStrategy<Line> {
+        prop_oneof![
+            (0..i64::MAX, select(RunState::VARIANTS))
+                .prop_map(|(run, state)| Line::Reaped { run: RunId::new(run), state }),
+            (0..i64::MAX, 0..i64::MAX, select(RunState::VARIANTS), proptest::option::of(Generated::usage())).prop_map(
+                |(run, job, state, usage)| Line::Ran(Attempted::new(RunId::new(run), JobId::new(job), state, usage))
+            ),
+            (0..i64::MAX, Generated::lapse())
+                .prop_map(|(job, lapse)| Line::Retried(Lapsed::new(JobId::new(job), lapse))),
+            (0..i64::MAX, Generated::lapse())
+                .prop_map(|(job, lapse)| Line::Flailed(Lapsed::new(JobId::new(job), lapse))),
+        ]
+        .boxed()
+    }
+
+    fn line() -> BoxedStrategy<Line> {
+        prop_oneof![
+            Generated::counted(),
+            Generated::shown_node(),
+            Generated::shown_message(),
+            Generated::applied(),
+            Generated::structured()
+        ]
+        .boxed()
     }
 }
 

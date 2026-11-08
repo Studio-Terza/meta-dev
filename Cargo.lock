@@ -255,6 +255,7 @@ dependencies = [
  "console-ports",
  "design-model",
  "design-store",
+ "dispatch-ports",
  "e2e",
  "exit",
  "file-ports",
@@ -269,6 +270,7 @@ dependencies = [
  "stream",
  "structurer",
  "strum",
+ "text-lines",
  "thiserror",
  "transcript-ports",
 ]
@@ -294,6 +296,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "design-model",
+ "dispatch-ports",
  "exit",
  "file-ports",
  "grammar",
@@ -327,6 +330,20 @@ dependencies = [
  "block-buffer 0.12.1",
  "crypto-common 0.2.2",
  "ctutils",
+]
+
+[[package]]
+name = "dispatch-ports"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+ "named-derive",
+ "newtype",
+ "port-core",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -2410,6 +2427,7 @@ version = "0.1.0"
 dependencies = [
  "design-model",
  "design-store",
+ "dispatch-ports",
  "file-ports",
  "grammar",
  "laws",
@@ -2465,12 +2483,15 @@ name = "structurer"
 version = "0.1.0"
 dependencies = [
  "design-model",
+ "dispatch-ports",
  "grammar",
  "laws",
  "named-derive",
  "newtype",
  "strum",
+ "text-lines",
  "thiserror",
+ "transcript-ports",
 ]
 
 [[package]]
