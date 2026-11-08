@@ -746,7 +746,7 @@ fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dy
 }
 
 #[test]
-fn a_message_is_covered_where_any_annotation_names_its_segments() -> Result<(), Box<dyn Error>> {
+fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(), Box<dyn Error>> {
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
@@ -758,12 +758,11 @@ fn a_message_is_covered_where_any_annotation_names_its_segments() -> Result<(), 
         Ok(store.read(messages.collect::<Covered>())?.into_iter().collect())
     };
     assert_eq!(covered(&["o1", "l1"])?, []);
-    let related =
-        Directed::Related { source: said.clone(), target: answered.clone(), relation: SegmentRelation::Answers };
+    let related = Directed::Related { source: said.clone(), target: answered, relation: SegmentRelation::Answers };
     Proposals::written(&store, vec![Directed::Conversational { segment: asked.clone() }, related])?;
-    assert_eq!(covered(&["o1"])?, [asked.clone(), answered.clone()]);
+    assert_eq!(covered(&["o1"])?, std::slice::from_ref(&asked));
     assert_eq!(covered(&["l1"])?, std::slice::from_ref(&said));
-    assert_eq!(covered(&["o1", "l1"])?, [said, asked, answered]);
+    assert_eq!(covered(&["o1", "l1"])?, [said, asked]);
     Ok(())
 }
 

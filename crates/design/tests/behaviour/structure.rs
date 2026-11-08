@@ -114,10 +114,10 @@ impl DispatchFiller for FakeDispatch<'_> {
 }
 
 impl Script {
-    const COVERING: &str = "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)\nsense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, specific, firm, explicit)\nlink(aaaaaaaa-0000-4000-8000-000000000003.1, aaaaaaaa-0000-4000-8000-000000000005.0, answers)";
+    const COVERING: &str = "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)\nsense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, specific, firm, explicit)\nlink(aaaaaaaa-0000-4000-8000-000000000003.1, aaaaaaaa-0000-4000-8000-000000000005.0, answers)\nsense(aaaaaaaa-0000-4000-8000-000000000005.0, question, specific, firm, explicit)";
     const LISTED: &str = "bbbbbbbb-0000-4000-8000-000000000001";
     const SPANNING: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.6)\nlink(bbbbbbbb-0000-4000-8000-000000000001.8, bbbbbbbb-0000-4000-8000-000000000001.7, refers-to)";
-    const WITHIN: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nlink(bbbbbbbb-0000-4000-8000-000000000001.7, bbbbbbbb-0000-4000-8000-000000000001.6, refers-to)";
+    const FORWARD: &str = "conversational(bbbbbbbb-0000-4000-8000-000000000001.0)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.1)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.2)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.3)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.4)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.5)\nconversational(bbbbbbbb-0000-4000-8000-000000000001.6)\nlink(bbbbbbbb-0000-4000-8000-000000000001.7, bbbbbbbb-0000-4000-8000-000000000001.8, refers-to)";
     const UNCOVERING: &str = "propose(new a, refines(n1), feature, \"x\")";
     const MISREAD: &str = "place(";
 
@@ -230,7 +230,7 @@ fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_lin
     let later = format!("link({}.8, {}.0, refers-to)", Script::LISTED, Script::LISTED);
     let structuring = Structuring {
         applying: Applying::over(&Session::working(Session::line(Speaker::Owner, Script::LISTED, "null", said)))?,
-        script: Script::replying(&[Some(Script::SPANNING), Some(Script::WITHIN), Some(Script::WITHIN), Some(&later)]),
+        script: Script::replying(&[Some(Script::SPANNING), Some(Script::FORWARD), Some(Script::FORWARD), Some(&later)]),
         sleep: Pause::new(0),
     };
     let before = structuring.unstructured()?;
@@ -251,7 +251,7 @@ fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_lin
             .filter(|line| matches!(line, Line::Annotated { entered, .. } if *entered == Provenance::Agent(run)))
             .count()
     });
-    assert_eq!(entered, [7, 1]);
+    assert_eq!(entered, [8, 1]);
     Ok(())
 }
 
