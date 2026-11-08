@@ -33,6 +33,8 @@ pub enum Miss {
     Unheard,
     #[name("ambiguous")]
     Ambiguous,
+    #[name("unclosed")]
+    Unclosed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

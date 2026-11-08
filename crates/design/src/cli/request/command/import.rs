@@ -10,7 +10,7 @@ use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
 };
 use file_ports::{Files, Text};
-use grammar::notes::{self, Cite, Date, Layout, Notes, Quote, Reading};
+use grammar::notes::{self, Cite, Date, Notes, Quote, Reading, Unclosed};
 use newtype::{Counter, Newtype};
 use store_ports::Store;
 use transcript_ports::{Authorship, Uuid};
@@ -180,7 +180,8 @@ impl<S: Store> Sheet<'_, S> {
             .flat_map(notes::Entry::cites)
             .map(|cite: &Cite| Prefix::new(cite.clone().into_inner()))
             .collect();
-        let quoted: QuotedSegments = entries.iter().flat_map(notes::Entry::quotes).cloned().collect();
+        let quoted: QuotedSegments =
+            entries.iter().flat_map(notes::Entry::quotes).filter_map(Result::ok).cloned().collect();
         Ok(Answers { root, next, cited: self.store.read(cited)?, quoted: self.store.read(quoted)? })
     }
 
@@ -221,9 +222,11 @@ impl Answers {
         let quotations: Vec<Sought<Vec<Segment>>> = entry
             .quotes()
             .into_iter()
-            .map(|quote| Sought {
-                reference: Reference::Quote(quote.clone()),
-                found: self.quote(quote, &cited, &dates),
+            .map(|quote| {
+                quote.map_or_else(Sought::unclosed, |quote| Sought {
+                    reference: Reference::Quote(quote.clone()),
+                    found: self.quote(quote, &cited, &dates),
+                })
             })
             .collect();
         let placed: BTreeSet<&Segment> =
@@ -294,6 +297,10 @@ impl Miss {
 }
 
 impl<Found> Sought<Found> {
+    fn unclosed(unclosed: &Unclosed) -> Sought<Found> {
+        Sought { reference: Reference::Quote(unclosed.clone().into_inner()), found: Err(Miss::Unclosed) }
+    }
+
     fn missed(&self) -> Option<Missed> {
         self.found.as_ref().err().map(|miss| Missed { reference: self.reference.clone(), miss: *miss })
     }
@@ -302,7 +309,7 @@ impl<Found> Sought<Found> {
 impl Reading for Entries {
     type Output = Option<notes::Entry>;
 
-    fn layout(self, _line: &notes::Line, _layout: &Layout) -> Option<notes::Entry> {
+    fn layout(self, _line: &notes::Line) -> Option<notes::Entry> {
         None
     }
 
@@ -311,6 +318,10 @@ impl Reading for Entries {
     }
 
     fn ruling(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
+        Some(entry.clone())
+    }
+
+    fn lead(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
         Some(entry.clone())
     }
 
@@ -344,7 +355,7 @@ impl Taking<'_> {
 impl Reading for Taking<'_> {
     type Output = Draft;
 
-    fn layout(self, _line: &notes::Line, _layout: &Layout) -> Draft {
+    fn layout(self, _line: &notes::Line) -> Draft {
         self.draft
     }
 
@@ -364,6 +375,10 @@ impl Reading for Taking<'_> {
 
     fn ruling(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
         self.entered(line, entry, Voice::Ruling)
+    }
+
+    fn lead(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
+        self.entered(line, entry, Voice::Remark)
     }
 
     fn remark(self, line: &notes::Line, entry: &notes::Entry) -> Draft {

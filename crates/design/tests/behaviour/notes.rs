@@ -187,6 +187,10 @@ laws::table!(
         "RULING (owner): \"\" says nothing" => Some("unanchored"),
         "Lead: the RULING stands" => Some("imported"),
         "(aside: RULING) prose" => Some("imported"),
+        "RULING (owner, 'rows turn into a map.'): we don't change Ann's plan" => Some("imported"),
+        "RULING (owner, 'agreed'): we don't change Ann's plan" => Some("unanchored"),
+        "RULING (owner): 'rows turn into a map" => Some("unanchored"),
+        "- LEAD 2026-11-08: the RULING stands" => Some("imported"),
     ]
 );
 
@@ -201,6 +205,8 @@ laws::table!(
         "\"Fine\"" => Some(Err(Miss::Ambiguous)),
         "\"Fine.\" (f6f6f6f6, 2026-11-08)" => Some(Err(Miss::Ambiguous)),
         "\"Fine. Fine\"" => Some(Err(Miss::Unheard)),
+        "'Sow the peas' isn't Ann's call" => Some(Ok(vec!["f6f6f6f6.1".to_owned()])),
+        "'Sow the peas" => Some(Err(Miss::Unclosed)),
     ]
 );
 
@@ -221,6 +227,21 @@ fn an_imported_ruling_leaves_its_segment_to_the_structurer_or_reaches_current_de
         .filter(|segment| segment.contains("c3c3c3c3"))
         .collect();
     assert_eq!(unplaced, Vec::<String>::new());
+    Ok(())
+}
+
+#[test]
+fn a_ruling_whose_head_quote_meets_later_contractions_and_possessives_is_imported_as_an_anchored_ruling()
+-> Result<(), Failure> {
+    let applying = Noting::ready()?;
+    let imported = Noting::imported(
+        &applying,
+        "# Notes\n- 2026-11-05 RULING (owner, 'yes the new trellis is approved.'): we don't move Ann's trellis, it's the owner's call\n",
+    )?;
+    let reconciled = Reconciliation::new(Count::new(2), Count::new(2), Count::new(1), Count::new(1));
+    assert!(Spread::parsed(&imported).contains(&Line::Noted(Noted::Reconciled(reconciled))));
+    let decided = applying.run(&["view", "current-decision"])?;
+    assert!(decided.contains("standing n3 decides c3c3c3c3.0 owner entered import-2 "));
     Ok(())
 }
 

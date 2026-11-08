@@ -7,7 +7,7 @@ use grammar::line::Unbroken;
 use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
-use grammar::notes::{Entry, Layout, Line, Notes, Reading};
+use grammar::notes::{Entry, Line, Notes, Quote, Reading, Unclosed};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
 use grammar::reply::Inked;
@@ -16,6 +16,7 @@ use grammar::search::Terms;
 use grammar::slug::Letters;
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{Strategy, prop_assert_eq, prop_oneof};
+use laws::proptest::sample::select;
 
 struct Marks;
 
@@ -374,7 +375,7 @@ laws::table!(
     ]
 );
 
-const NOTED: &str = "(- |-|# |#|RULING|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|[.,;~é]){0,14}";
+const NOTED: &str = "(- |-|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|[.,;~é]){0,14}";
 
 const INKED: &str =
     "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
@@ -397,7 +398,34 @@ laws::law!(
     quote,
     {
         let line = format!("RULING (owner): '{quote}', as said");
-        prop_assert_eq!(Line::read(1, &line).read_by(Named), [vec![quote], vec![], vec![]]);
+        prop_assert_eq!(Line::read(1, &line).read_by(Named), Ok([vec![quote], vec![], vec![]]));
+    }
+);
+
+laws::law!(
+    a_single_quote_keeps_its_contractions_and_possessives_and_the_line_keeps_the_kind_its_opening_word_gives,
+    (
+        select(vec![("RULING ", "ruling"), ("- RULING ", "ruling"), ("- LEAD ", "lead"), ("Lead ", "remark")]),
+        "[a-z]{1,6}('s|s'|n't)?( [a-z]{1,6}('s|s'|n't)?){0,3}",
+        "( [a-z]{1,6}('s|n't)?){0,4}",
+    ),
+    said,
+    {
+        let ((opening, kind), quote, after) = said;
+        let line = Line::read(1, &format!("{opening}(owner, 0a1b2c3d): '{quote}'{after}"));
+        prop_assert_eq!(line.read_by(Shaped), kind);
+        prop_assert_eq!(line.read_by(Named), Ok([vec![quote], vec!["0a1b2c3d".to_owned()], vec![]]));
+    }
+);
+
+laws::law!(
+    apostrophes_inside_words_outside_any_quote_name_no_quote,
+    "RULING: [a-z]{1,6}('s|s'|n't)?( [a-z]{1,6}('s|s'|n't)?){0,5}",
+    text,
+    {
+        let line = Line::read(1, &text);
+        prop_assert_eq!(line.read_by(Shaped), "ruling");
+        prop_assert_eq!(line.read_by(Named), Ok(<[Vec<String>; 3]>::default()));
     }
 );
 
@@ -425,7 +453,7 @@ struct Shaped;
 impl Reading for Shaped {
     type Output = &'static str;
 
-    fn layout(self, _line: &Line, _layout: &Layout) -> &'static str {
+    fn layout(self, _line: &Line) -> &'static str {
         "layout"
     }
 
@@ -437,6 +465,10 @@ impl Reading for Shaped {
         "ruling"
     }
 
+    fn lead(self, _line: &Line, _entry: &Entry) -> &'static str {
+        "lead"
+    }
+
     fn remark(self, _line: &Line, _entry: &Entry) -> &'static str {
         "remark"
     }
@@ -445,38 +477,48 @@ impl Reading for Shaped {
 #[derive(Clone, Copy)]
 struct Named;
 
+type Said = Result<[Vec<String>; 3], Unclosed>;
+
 impl Named {
-    fn words(entry: &Entry) -> [Vec<String>; 3] {
-        [
-            entry.quotes().iter().map(ToString::to_string).collect(),
-            entry.cites().iter().map(ToString::to_string).collect(),
-            entry.dates().iter().map(ToString::to_string).collect(),
-        ]
+    fn words(entry: &Entry) -> Said {
+        let quotes: Result<Vec<String>, Unclosed> =
+            entry.quotes().into_iter().map(|quote| quote.map(ToString::to_string).map_err(Clone::clone)).collect();
+        quotes.map(|quotes| {
+            [
+                quotes,
+                entry.cites().iter().map(ToString::to_string).collect(),
+                entry.dates().iter().map(ToString::to_string).collect(),
+            ]
+        })
     }
 }
 
 impl Reading for Named {
-    type Output = [Vec<String>; 3];
+    type Output = Said;
 
-    fn layout(self, _line: &Line, _layout: &Layout) -> [Vec<String>; 3] {
-        Default::default()
+    fn layout(self, _line: &Line) -> Said {
+        Ok(<[Vec<String>; 3]>::default())
     }
 
-    fn heading(self, _line: &Line) -> [Vec<String>; 3] {
-        Default::default()
+    fn heading(self, _line: &Line) -> Said {
+        Ok(<[Vec<String>; 3]>::default())
     }
 
-    fn ruling(self, _line: &Line, entry: &Entry) -> [Vec<String>; 3] {
+    fn ruling(self, _line: &Line, entry: &Entry) -> Said {
         Named::words(entry)
     }
 
-    fn remark(self, _line: &Line, entry: &Entry) -> [Vec<String>; 3] {
+    fn lead(self, _line: &Line, entry: &Entry) -> Said {
+        Named::words(entry)
+    }
+
+    fn remark(self, _line: &Line, entry: &Entry) -> Said {
         Named::words(entry)
     }
 }
 
 laws::table!(
-    a_notes_line_is_layout_a_heading_or_an_entry_and_an_entry_rules_when_its_head_says_ruling,
+    a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_word_after_any_bullet_date_and_space,
     |text: &&str| Line::read(1, text).read_by(Shaped),
     [
         "" => "layout",
@@ -499,9 +541,18 @@ laws::table!(
         "(Owner moved on with \"next\": RULING aside)" => "remark",
         "RULINGS (owner): plural" => "remark",
         "(RULING: aside) and more" => "remark",
-        "(owner) RULING: approved" => "ruling",
-        "(a (b) c) RULING: nested" => "ruling",
-        "a) RULING: unbalanced" => "ruling",
+        "(owner) RULING: approved" => "remark",
+        "(a (b) c) RULING: nested" => "remark",
+        "a) RULING: unbalanced" => "remark",
+        "RULING" => "ruling",
+        "- LEAD 2026-11-08: the beds are dug" => "lead",
+        "- 2026-11-08 LEAD (east bed): dug" => "lead",
+        "- LEAD 2026-11-08 review (an imported RULING kept apart): the beds are dug" => "lead",
+        "LEADS (the rows): plural" => "remark",
+        "Lead: the beds are dug" => "remark",
+        "- 2026-11-08 lead: the beds are dug" => "remark",
+        " RULING (owner): indented" => "ruling",
+        "- 2026-11-06 RULING (owner, 'yes'): we don't change Ann's plan" => "ruling",
     ]
 );
 
@@ -509,29 +560,29 @@ laws::table!(
     an_entry_names_its_quotes_cites_and_dates,
     |text: &&str| Line::read(1, text).read_by(Named),
     [
-        "RULING (owner, explicit, 2026-11-05): \"the new trellis is approved.\" (approved)" => [
+        "RULING (owner, explicit, 2026-11-05): \"the new trellis is approved.\" (approved)" => Ok([
             vec!["the new trellis is approved.".to_owned()],
             vec![],
             vec!["2026-11-05".to_owned()],
-        ],
-        "- 2026-11-06 RULING (owner, 0a1b2c3d): 'every bed gets a label.'" => [
+        ]),
+        "- 2026-11-06 RULING (owner, 0a1b2c3d): 'every bed gets a label.'" => Ok([
             vec!["every bed gets a label.".to_owned()],
             vec!["0a1b2c3d".to_owned()],
             vec!["2026-11-06".to_owned()],
-        ],
-        "Owner's note: keep it tidy, using Ann's tools, as 'don't guess' says" => [
+        ]),
+        "Owner's note: keep it tidy, using Ann's tools, as 'don't guess' says" => Ok([
             vec!["don't guess".to_owned()],
             vec![],
             vec![],
-        ],
-        "- gardeners' reach and the workers' \"rain delay\" notes" => [vec!["rain delay".to_owned()], vec![], vec![]],
-        "cited 1f2e3d4c-1234-4abc-8def-0123456789ab, deadbeef1 and 0123abcd:42 on 2026-11-07T21:09" => [
+        ]),
+        "- gardeners' reach and the workers' \"rain delay\" notes" => Ok([vec!["rain delay".to_owned()], vec![], vec![]]),
+        "cited 1f2e3d4c-1234-4abc-8def-0123456789ab, deadbeef1 and 0123abcd:42 on 2026-11-07T21:09" => Ok([
             vec![],
             vec!["1f2e3d4c-1234-4abc-8def-0123456789ab".to_owned(), "0123abcd".to_owned()],
             vec!["2026-11-07".to_owned()],
-        ],
-        "an \"unclosed quote and a 'stray" => <[Vec<String>; 3]>::default(),
-        "# Notes \"quoted\" 1f2e3d4c" => <[Vec<String>; 3]>::default(),
+        ]),
+        "an \"unclosed quote and a 'stray" => Err(Unclosed::new(Quote::new("unclosed quote and a 'stray".to_owned()))),
+        "# Notes \"quoted\" 1f2e3d4c" => Ok(<[Vec<String>; 3]>::default()),
     ]
 );
 
@@ -539,28 +590,63 @@ laws::table!(
     a_single_quote_keeps_a_plural_possessive_inside_it,
     |text: &&str| Line::read(1, text).read_by(Named),
     [
-        "RULING (owner): 'keep the owners' rules as they are'" => [
+        "RULING (owner): 'keep the owners' rules as they are'" => Ok([
             vec!["keep the owners' rules as they are".to_owned()],
             vec![],
             vec![],
-        ],
-        "RULING (owner): 'the gardeners' tools stay', then 'the workers' sheds go'." => [
+        ]),
+        "RULING (owner): 'the gardeners' tools stay', then 'the workers' sheds go'." => Ok([
             vec!["the gardeners' tools stay".to_owned(), "the workers' sheds go".to_owned()],
             vec![],
             vec![],
-        ],
-        "RULING (owner): 'it's the owners' call' (0a1b2c3d)" => [
+        ]),
+        "RULING (owner): 'it's the owners' call' (0a1b2c3d)" => Ok([
             vec!["it's the owners' call".to_owned()],
             vec!["0a1b2c3d".to_owned()],
             vec![],
-        ],
-        "RULING (owner): \"the owners' rules\" and 'beds' rows'" => [
+        ]),
+        "RULING (owner): \"the owners' rules\" and 'beds' rows'" => Ok([
             vec!["the owners' rules".to_owned(), "beds' rows".to_owned()],
             vec![],
             vec![],
-        ],
-        "RULING (owner): 'rock'n roll" => <[Vec<String>; 3]>::default(),
-        "RULING (owner): 'a 'b c'" => [vec!["b c".to_owned()], vec![], vec![]],
+        ]),
+        "RULING (owner): 'rock'n roll" => Err(Unclosed::new(Quote::new("rock'n roll".to_owned()))),
+        "RULING (owner): 'a 'b c'" => Err(Unclosed::new(Quote::new("a 'b c'".to_owned()))),
+    ]
+);
+
+laws::table!(
+    a_single_quote_closes_before_a_later_apostrophe_in_a_word,
+    |text: &&str| Line::read(1, text).read_by(Named),
+    [
+        "'keep it' isn't optional" => Ok([vec!["keep it".to_owned()], vec![], vec![]]),
+        "- 2026-11-06 lead (owner 0a1b2c3d: 'dig where you need... the rows wait'): the beds can't wait" => Ok([
+            vec!["dig where you need... the rows wait".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec!["2026-11-06".to_owned()],
+        ]),
+        "the 'tall fence' (east side) is the gardener's call" => Ok([vec!["tall fence".to_owned()], vec![], vec![]]),
+        "a parent under 'shade' can't take a sunny child" => Ok([vec!["shade".to_owned()], vec![], vec![]]),
+        "a stray ' mark beside Ann's rake and the owners' sheds" => Ok(<[Vec<String>; 3]>::default()),
+    ]
+);
+
+laws::table!(
+    a_ruling_stays_a_ruling_when_its_head_quote_meets_a_later_apostrophe,
+    |text: &&str| {
+        let line = Line::read(1, text);
+        (line.read_by(Shaped), line.read_by(Named))
+    },
+    [
+        "RULING (owner, 'yes'): we don't change it" => ("ruling", Ok([vec!["yes".to_owned()], vec![], vec![]])),
+        "- 2026-11-06 RULING (owner, 0a1b2c3d): 'keep it' and the bed's label isn't moved" => (
+            "ruling",
+            Ok([vec!["keep it".to_owned()], vec!["0a1b2c3d".to_owned()], vec!["2026-11-06".to_owned()]]),
+        ),
+        "- RULING 2026-11-07 (0f1e2d3c): 'rock'n roll, and Ann's rake" => (
+            "ruling",
+            Err(Unclosed::new(Quote::new("rock'n roll, and Ann's rake".to_owned()))),
+        ),
     ]
 );
 

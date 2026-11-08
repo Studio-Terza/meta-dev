@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::iter;
 
 use logos::Logos;
 
-use super::{Cite, Date, Layout, Quote};
+use super::{Cite, Date, Layout, Quote, Unclosed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
@@ -19,24 +20,26 @@ enum Row {
 enum Lexeme {
     #[regex(r"#+[ \t]+")]
     Hash,
+    #[token("-")]
+    Dash,
     #[token("RULING")]
     Ruling,
-    #[regex(r":[ \t]+")]
-    Separator,
+    #[token("LEAD")]
+    Lead,
     #[token("(")]
     Open,
     #[token(")")]
     Close,
-    #[regex(r#""[^"\n]*""#)]
+    #[token("\"")]
     Double,
-    #[regex(r"'(([^'\n]*[^\s'])?')+", |lex| !lex.remainder().chars().next().is_some_and(|letter| letter.is_alphanumeric() || letter == '_'))]
+    #[token("'")]
     Single,
     #[regex(r"[0-9a-f]{8}")]
     #[regex(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
     Cite,
     #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")]
     Date,
-    #[regex(r"[\p{L}\p{N}_]+('[\p{L}\p{N}]+)*'?")]
+    #[regex(r"[\p{L}\p{N}_]+('[\p{L}\p{N}]+)*")]
     Word,
     #[regex(r"[ \t]+")]
     Space,
@@ -45,11 +48,13 @@ enum Lexeme {
 pub trait Reading {
     type Output;
 
-    fn layout(self, line: &Line, layout: &Layout) -> Self::Output;
+    fn layout(self, line: &Line) -> Self::Output;
 
     fn heading(self, line: &Line) -> Self::Output;
 
     fn ruling(self, line: &Line, entry: &Entry) -> Self::Output;
+
+    fn lead(self, line: &Line, entry: &Entry) -> Self::Output;
 
     fn remark(self, line: &Line, entry: &Entry) -> Self::Output;
 }
@@ -63,6 +68,7 @@ enum Mark {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
     Ruling,
+    Lead,
     Remark,
 }
 
@@ -72,34 +78,49 @@ enum Opening {
     Prose,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Follow {
+    End,
+    Gap,
+    Word,
+    Mark,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Role {
+    Opening,
+    Closing,
+    Plain,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Inside {
+    Opening,
+    Closing,
+    Nested,
+    Unnested,
+    Plain,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Piece {
     Text(String),
     Quoted(Mark, Quote),
+    Unclosed(Mark, Unclosed),
     Cited(Cite),
     Dated(Date),
-    Ruling,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Pieces(Vec<Piece>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Head {
-    pieces: Pieces,
-    separator: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Heading {
-    marker: String,
-    title: Pieces,
-}
+struct Heading(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
-    head: Option<Head>,
-    body: Pieces,
+    kind: Kind,
+    pieces: Pieces,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -137,6 +158,24 @@ pub struct Notes {
 struct Lexed<'text> {
     lexeme: Option<Lexeme>,
     text: &'text str,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Cursor<'lexed, 'text> {
+    prior: Option<Lexed<'text>>,
+    rest: &'lexed [Lexed<'text>],
+}
+
+#[derive(Debug)]
+struct Step<'lexed, 'text> {
+    piece: Piece,
+    cursor: Cursor<'lexed, 'text>,
+}
+
+#[derive(Debug)]
+struct Deepened {
+    depth: usize,
+    inside: Inside,
 }
 
 #[derive(Debug, Default)]
@@ -211,9 +250,9 @@ impl Line {
 
     pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Reader::Output {
         match &self.form {
-            Form::Layout(layout) => reader.layout(self, layout),
+            Form::Layout(_) => reader.layout(self),
             Form::Content(Content::Heading(_)) => reader.heading(self),
-            Form::Content(Content::Entry(entry)) => entry.kind().reading(reader, self, entry),
+            Form::Content(Content::Entry(entry)) => entry.kind.reading(reader, self, entry),
         }
     }
 }
@@ -233,102 +272,118 @@ impl Content {
             .spanned()
             .map(|(lexeme, range)| Lexed { lexeme: lexeme.ok(), text: text.get(range).unwrap_or_default() })
             .collect();
-        lexed
-            .split_first()
-            .map_or(Content::Entry(Entry::read(&lexed)), |(first, rest)| first.opening().content(*first, rest, &lexed))
+        lexed.first().map_or(Opening::Prose, |first| first.opening()).content(text, &lexed)
     }
 }
 
 impl Opening {
-    fn content(self, first: Lexed<'_>, rest: &[Lexed<'_>], lexed: &[Lexed<'_>]) -> Content {
+    fn content(self, text: &str, lexed: &[Lexed<'_>]) -> Content {
         match self {
-            Opening::Heading => {
-                Content::Heading(Heading { marker: first.text.to_owned(), title: Pieces::gathered(rest) })
-            }
-            Opening::Prose => Content::Entry(Entry::read(lexed)),
+            Opening::Heading => Content::Heading(Heading(text.to_owned())),
+            Opening::Prose => Content::Entry(Entry { kind: Kind::opened(lexed), pieces: Pieces::parsed(lexed) }),
         }
     }
 }
 
 impl Kind {
+    fn opened(lexed: &[Lexed<'_>]) -> Kind {
+        lexed.iter().find_map(|lexed| lexed.lexeme.map_or(Some(Kind::Remark), Lexeme::kind)).unwrap_or(Kind::Remark)
+    }
+
     fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
         match self {
             Kind::Ruling => reader.ruling(line, entry),
+            Kind::Lead => reader.lead(line, entry),
             Kind::Remark => reader.remark(line, entry),
         }
     }
 }
 
 impl Entry {
-    fn read(lexed: &[Lexed<'_>]) -> Entry {
-        let split = lexed
-            .iter()
-            .scan(0, |depth, lexed| {
-                let level = *depth;
-                *depth = lexed.deepened(level);
-                Some((level, lexed.lexeme))
-            })
-            .position(|step| step == (0, Some(Lexeme::Separator)));
-        let parted = split.and_then(|at| lexed.get(..at).zip(lexed.get(at)).zip(lexed.get(at.saturating_add(1)..)));
-        let head = parted.map(|((head, separator), _body)| Head {
-            pieces: Pieces::gathered(head),
-            separator: separator.text.to_owned(),
-        });
-        let body = parted.map_or(lexed, |(_head, body)| body);
-        Entry { head, body: Pieces::gathered(body) }
-    }
-
     #[must_use]
-    pub fn quotes(&self) -> Vec<&Quote> {
-        self.pieces().filter_map(Piece::quote).collect()
+    pub fn quotes(&self) -> Vec<Result<&Quote, &Unclosed>> {
+        self.pieces.0.iter().filter_map(Piece::quote).collect()
     }
 
     #[must_use]
     pub fn cites(&self) -> Vec<&Cite> {
-        self.pieces().filter_map(Piece::cite).collect()
+        self.pieces.0.iter().filter_map(Piece::cite).collect()
     }
 
     #[must_use]
     pub fn dates(&self) -> Vec<&Date> {
-        self.pieces().filter_map(Piece::date).collect()
-    }
-
-    fn kind(&self) -> Kind {
-        let headed = self.head.iter().flat_map(|head| &head.pieces.0);
-        headed.filter(|piece| **piece == Piece::Ruling).map(|_ruling| Kind::Ruling).next().unwrap_or(Kind::Remark)
-    }
-
-    fn pieces(&self) -> impl Iterator<Item = &Piece> {
-        self.head.iter().flat_map(|head| &head.pieces.0).chain(&self.body.0)
+        self.pieces.0.iter().filter_map(Piece::date).collect()
     }
 }
 
-impl Lexed<'_> {
-    fn deepened(self, level: usize) -> usize {
-        match self.lexeme {
-            Some(Lexeme::Open) => level.saturating_add(1),
-            Some(Lexeme::Close) => level.saturating_sub(1),
-            Some(
-                Lexeme::Hash
-                | Lexeme::Ruling
-                | Lexeme::Separator
-                | Lexeme::Double
-                | Lexeme::Single
-                | Lexeme::Cite
-                | Lexeme::Date
-                | Lexeme::Word
-                | Lexeme::Space,
-            )
-            | None => level,
+impl Lexeme {
+    fn kind(self) -> Option<Kind> {
+        match self {
+            Lexeme::Dash | Lexeme::Date | Lexeme::Space => None,
+            Lexeme::Ruling => Some(Kind::Ruling),
+            Lexeme::Lead => Some(Kind::Lead),
+            Lexeme::Hash
+            | Lexeme::Open
+            | Lexeme::Close
+            | Lexeme::Double
+            | Lexeme::Single
+            | Lexeme::Cite
+            | Lexeme::Word => Some(Kind::Remark),
         }
     }
 
+    fn candidate(self) -> Role {
+        match self {
+            Lexeme::Space | Lexeme::Open => Role::Opening,
+            Lexeme::Hash
+            | Lexeme::Dash
+            | Lexeme::Ruling
+            | Lexeme::Lead
+            | Lexeme::Close
+            | Lexeme::Double
+            | Lexeme::Single
+            | Lexeme::Cite
+            | Lexeme::Date
+            | Lexeme::Word => Role::Closing,
+        }
+    }
+
+    fn follow(self) -> Follow {
+        match self {
+            Lexeme::Space => Follow::Gap,
+            Lexeme::Ruling | Lexeme::Lead | Lexeme::Cite | Lexeme::Date | Lexeme::Word => Follow::Word,
+            Lexeme::Hash | Lexeme::Dash | Lexeme::Open | Lexeme::Close | Lexeme::Double | Lexeme::Single => {
+                Follow::Mark
+            }
+        }
+    }
+
+    fn inside(self, role: Role) -> Inside {
+        match self {
+            Lexeme::Single => Inside::from(role),
+            Lexeme::Open => Inside::Nested,
+            Lexeme::Close => Inside::Unnested,
+            Lexeme::Hash
+            | Lexeme::Dash
+            | Lexeme::Ruling
+            | Lexeme::Lead
+            | Lexeme::Double
+            | Lexeme::Cite
+            | Lexeme::Date
+            | Lexeme::Word
+            | Lexeme::Space => Inside::Plain,
+        }
+    }
+}
+
+impl<'text> Lexed<'text> {
     fn opening(self) -> Opening {
         match self.lexeme {
             Some(Lexeme::Hash) => Opening::Heading,
             Some(
-                Lexeme::Ruling
-                | Lexeme::Separator
+                Lexeme::Dash
+                | Lexeme::Ruling
+                | Lexeme::Lead
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Double
@@ -342,57 +397,183 @@ impl Lexed<'_> {
         }
     }
 
-    fn piece(self) -> Piece {
+    fn taken<'lexed>(self, prior: Option<Lexed<'text>>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         match self.lexeme {
-            Some(Lexeme::Double) => Piece::Quoted(Mark::Double, Mark::unquoted(self.text)),
-            Some(Lexeme::Single) => Piece::Quoted(Mark::Single, Mark::unquoted(self.text)),
-            Some(Lexeme::Cite) => Piece::Cited(Cite::new(self.text.to_owned())),
-            Some(Lexeme::Date) => Piece::Dated(Date::new(self.text.to_owned())),
-            Some(Lexeme::Ruling) => Piece::Ruling,
-            Some(Lexeme::Hash | Lexeme::Separator | Lexeme::Open | Lexeme::Close | Lexeme::Word | Lexeme::Space)
-            | None => Piece::Text(self.text.to_owned()),
+            Some(Lexeme::Double) => Mark::Double.quoted(self, rest),
+            Some(Lexeme::Single) => Role::around(prior, rest.first().copied()).single(self, rest),
+            Some(
+                Lexeme::Hash
+                | Lexeme::Dash
+                | Lexeme::Ruling
+                | Lexeme::Lead
+                | Lexeme::Open
+                | Lexeme::Close
+                | Lexeme::Cite
+                | Lexeme::Date
+                | Lexeme::Word
+                | Lexeme::Space,
+            )
+            | None => Step::after(Piece::read(self), self, rest),
+        }
+    }
+
+    fn inside(self, prior: Lexed<'text>, later: Option<Lexed<'text>>) -> Inside {
+        self.lexeme.map_or(Inside::Plain, |lexeme| lexeme.inside(Role::around(Some(prior), later)))
+    }
+
+    fn joined(lexed: &[Lexed<'text>]) -> String {
+        lexed.iter().map(|lexed| lexed.text).collect()
+    }
+}
+
+impl<'lexed, 'text> Cursor<'lexed, 'text> {
+    fn step(self) -> Option<Step<'lexed, 'text>> {
+        self.rest.split_first().map(|(first, rest)| first.taken(self.prior, rest))
+    }
+}
+
+impl<'lexed, 'text> Step<'lexed, 'text> {
+    fn after(piece: Piece, lexed: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
+        Step { piece, cursor: Cursor { prior: Some(lexed), rest } }
+    }
+}
+
+impl Role {
+    fn around(prior: Option<Lexed<'_>>, later: Option<Lexed<'_>>) -> Role {
+        let candidate = prior.map_or(Role::Opening, |prior| prior.lexeme.map_or(Role::Closing, Lexeme::candidate));
+        candidate.standing(later.map_or(Follow::End, |later| later.lexeme.map_or(Follow::Mark, Lexeme::follow)))
+    }
+
+    fn standing(self, follow: Follow) -> Role {
+        match follow {
+            Follow::End | Follow::Gap => Some(self).filter(|role| *role != Role::Opening).unwrap_or(Role::Plain),
+            Follow::Word => Some(self).filter(|role| *role != Role::Closing).unwrap_or(Role::Plain),
+            Follow::Mark => self,
+        }
+    }
+
+    fn single<'lexed, 'text>(self, mark: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
+        match self {
+            Role::Opening => Mark::Single.quoted(mark, rest),
+            Role::Closing | Role::Plain => Step::after(Piece::read(mark), mark, rest),
         }
     }
 }
 
-impl Pieces {
-    fn gathered(lexed: &[Lexed<'_>]) -> Pieces {
-        Pieces(lexed.iter().map(|lexed| lexed.piece()).collect())
+impl From<Role> for Inside {
+    fn from(role: Role) -> Inside {
+        match role {
+            Role::Opening => Inside::Opening,
+            Role::Closing => Inside::Closing,
+            Role::Plain => Inside::Plain,
+        }
     }
 }
 
-impl Piece {
-    fn quote(&self) -> Option<&Quote> {
+impl Inside {
+    fn deepened(self, depth: usize) -> Option<Deepened> {
         match self {
-            Piece::Quoted(_, quote) => Some(quote),
-            Piece::Text(_) | Piece::Cited(_) | Piece::Dated(_) | Piece::Ruling => None,
+            Inside::Opening => None,
+            Inside::Nested => Some(Deepened { depth: depth.saturating_add(1), inside: self }),
+            Inside::Unnested => depth.checked_sub(1).map(|depth| Deepened { depth, inside: self }),
+            Inside::Closing | Inside::Plain => Some(Deepened { depth, inside: self }),
         }
     }
 
-    fn cite(&self) -> Option<&Cite> {
-        match self {
-            Piece::Cited(cite) => Some(cite),
-            Piece::Text(_) | Piece::Quoted(..) | Piece::Dated(_) | Piece::Ruling => None,
-        }
-    }
-
-    fn date(&self) -> Option<&Date> {
-        match self {
-            Piece::Dated(date) => Some(date),
-            Piece::Text(_) | Piece::Quoted(..) | Piece::Cited(_) | Piece::Ruling => None,
-        }
+    fn last_closing(opener: Lexed<'_>, rest: &[Lexed<'_>]) -> Option<usize> {
+        let priors = iter::once(opener).chain(rest.iter().copied());
+        let laters = rest.iter().copied().skip(1).map(Some).chain(iter::once(None));
+        rest.iter()
+            .zip(priors)
+            .zip(laters)
+            .map(|((lexed, prior), later)| lexed.inside(prior, later))
+            .scan(0, |depth, inside| {
+                inside.deepened(*depth).map(|deepened| {
+                    *depth = deepened.depth;
+                    deepened.inside
+                })
+            })
+            .enumerate()
+            .filter(|(_at, inside)| *inside == Inside::Closing)
+            .map(|(at, _inside)| at)
+            .last()
     }
 }
 
 impl Mark {
-    fn unquoted(quoted: &str) -> Quote {
-        Quote::new(quoted.get(1..quoted.len().saturating_sub(1)).unwrap_or_default().to_owned())
+    fn quoted<'lexed, 'text>(self, opener: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
+        let closed = self
+            .closing(opener, rest)
+            .and_then(|at| rest.get(..at).zip(rest.get(at..)))
+            .and_then(|(inner, from)| from.split_first().map(|(closer, after)| (inner, *closer, after)));
+        closed.map_or_else(
+            || Step::after(Piece::Unclosed(self, Unclosed::new(Quote::new(Lexed::joined(rest)))), opener, rest),
+            |(inner, closer, after)| Step::after(Piece::Quoted(self, Quote::new(Lexed::joined(inner))), closer, after),
+        )
+    }
+
+    fn closing(self, opener: Lexed<'_>, rest: &[Lexed<'_>]) -> Option<usize> {
+        match self {
+            Mark::Double => rest.iter().position(|lexed| lexed.lexeme == Some(Lexeme::Double)),
+            Mark::Single => Inside::last_closing(opener, rest),
+        }
     }
 
     const fn sign(self) -> char {
         match self {
             Mark::Double => '"',
             Mark::Single => '\'',
+        }
+    }
+}
+
+impl Pieces {
+    fn parsed(lexed: &[Lexed<'_>]) -> Pieces {
+        let start = Cursor { prior: None, rest: lexed };
+        Pieces(iter::successors(start.step(), |step| step.cursor.step()).map(|step| step.piece).collect())
+    }
+}
+
+impl Piece {
+    fn read(lexed: Lexed<'_>) -> Piece {
+        match lexed.lexeme {
+            Some(Lexeme::Cite) => Piece::Cited(Cite::new(lexed.text.to_owned())),
+            Some(Lexeme::Date) => Piece::Dated(Date::new(lexed.text.to_owned())),
+            Some(
+                Lexeme::Hash
+                | Lexeme::Dash
+                | Lexeme::Ruling
+                | Lexeme::Lead
+                | Lexeme::Open
+                | Lexeme::Close
+                | Lexeme::Double
+                | Lexeme::Single
+                | Lexeme::Word
+                | Lexeme::Space,
+            )
+            | None => Piece::Text(lexed.text.to_owned()),
+        }
+    }
+
+    fn quote(&self) -> Option<Result<&Quote, &Unclosed>> {
+        match self {
+            Piece::Quoted(_, quote) => Some(Ok(quote)),
+            Piece::Unclosed(_, unclosed) => Some(Err(unclosed)),
+            Piece::Text(_) | Piece::Cited(_) | Piece::Dated(_) => None,
+        }
+    }
+
+    fn cite(&self) -> Option<&Cite> {
+        match self {
+            Piece::Cited(cite) => Some(cite),
+            Piece::Text(_) | Piece::Quoted(..) | Piece::Unclosed(..) | Piece::Dated(_) => None,
+        }
+    }
+
+    fn date(&self) -> Option<&Date> {
+        match self {
+            Piece::Dated(date) => Some(date),
+            Piece::Text(_) | Piece::Quoted(..) | Piece::Unclosed(..) | Piece::Cited(_) => None,
         }
     }
 }
@@ -441,20 +622,13 @@ impl fmt::Display for Content {
 
 impl fmt::Display for Heading {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}{}", self.marker, self.title)
+        formatter.write_str(&self.0)
     }
 }
 
 impl fmt::Display for Entry {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.head.iter().try_for_each(|head| write!(formatter, "{head}"))?;
-        write!(formatter, "{}", self.body)
-    }
-}
-
-impl fmt::Display for Head {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}{}", self.pieces, self.separator)
+        write!(formatter, "{}", self.pieces)
     }
 }
 
@@ -470,8 +644,8 @@ impl fmt::Display for Piece {
             Piece::Text(text) => formatter.write_str(text),
             Piece::Quoted(mark, quote) => write!(formatter, "{0}{quote}{0}", mark.sign()),
             Piece::Cited(cite) => write!(formatter, "{cite}"),
+            Piece::Unclosed(mark, _) => write!(formatter, "{}", mark.sign()),
             Piece::Dated(date) => write!(formatter, "{date}"),
-            Piece::Ruling => formatter.write_str("RULING"),
         }
     }
 }
