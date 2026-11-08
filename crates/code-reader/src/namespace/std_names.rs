@@ -155,7 +155,7 @@ impl StdGlob {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Listed {
     name: Name,
     binding: Binding,

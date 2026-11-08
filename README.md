@@ -214,7 +214,7 @@ writes for `Statements::written`; sqlx checks the SQL against the schema as its 
 every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
 `FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
-back through its `CheckedDeserialize`, so a stored value its check refuses fails the read; grammar's `Bare` and
+back through `newtype::Guarded`, so a stored value its check refuses fails the read; grammar's `Bare` and
 `Quoted` output fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
@@ -462,8 +462,9 @@ tuple or named, generic or not. It also writes exactly one `impl newtype::kind::
     pub struct Rounds(usize);
 
 A validated newtype has no `new`. With `#[newtype(checked)]` the same derive implements `Wrapping` and
-inherent `try_new` and `into_inner` instead, and `try_new` is the only way in; it requires
-`Self: Validity<Kind = Checked> + Checked`. The rule lives on the type, in an `impl Checked`: a function from `&Inner`
+`newtype::Guarded` instead. `Guarded::try_new` is the single checked way in: the inherent `try_new`, `CheckedDeserialize`,
+the store's reads and `Arbitrary` all go through it. `Guarded` is only ever derived; `hand_impls` fails a hand-written
+`impl Guarded`, so no constructor skips the check. The rule lives on the type, in an `impl Checked`: a function from `&Inner`
 to `Result<&Inner, Error>`.
 
     #[derive(Newtype, Arbitrary, Debug)]
@@ -478,9 +479,8 @@ to `Result<&Inner, Error>`.
 
 `#[derive(Serialize, Deserialize)]` (`newtype::Serialize`, `newtype::Deserialize`) write and read a newtype as its inner
 value; `Deserialize` reads through `Newtype::new`, so only an unchecked newtype can derive it. A validated newtype
-derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through the type's `impl Checked` and is
-bounded by `Self: Validity<Kind = Checked> + Checked`, so it does not compile without the check or on a newtype that is
-not `#[newtype(checked)]`. A value the check refuses is a deserialization
+derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through `Guarded::try_new` and is
+bounded by `Self: Guarded`, so it does not compile without the check or on a newtype that is not `#[newtype(checked)]`. A value the check refuses is a deserialization
 error carrying the check's message, so `Checked::Error` implements `Display`. They reach serde through `newtype::serde`,
 so the using crate needs only `newtype`.
 

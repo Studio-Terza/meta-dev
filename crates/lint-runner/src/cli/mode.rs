@@ -99,14 +99,10 @@ impl Run<'_, '_> {
 
     fn gated<'file>(readout: &'file Readout, queue: &Queue, crew: Crew<'_>, out: &mut impl Write) -> Outcome<'file> {
         let files = readout.files();
-        let outcome = crew.checked(readout, queue);
-        outcome
-            .surveyed(
-                format_args!("{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)),
-                out,
-            )
-            .ok();
-        outcome
+        crew.checked(readout, queue).surveyed(
+            format_args!("{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)),
+            out,
+        )
     }
     fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
         let model = Reader::read_files(files);
