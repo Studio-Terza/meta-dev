@@ -2188,6 +2188,13 @@ impl Generated {
                 miss
             }),
             any::<usize>().prop_map(|line| Noted::Unanchored(NotesLine::new(line))),
+            (any::<usize>(), "[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8}", Generated::count()).prop_map(
+                |(line, cite, segments)| Noted::Ambiguous {
+                    line: NotesLine::new(line),
+                    cite: Cite::new(cite),
+                    segments
+                }
+            ),
             (Generated::count(), Generated::count(), Generated::count(), Generated::count()).prop_map(
                 |(lines, nodes, rulings, anchored)| Noted::Reconciled(Reconciliation::new(
                     lines, nodes, rulings, anchored

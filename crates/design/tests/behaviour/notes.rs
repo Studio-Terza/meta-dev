@@ -2,11 +2,11 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::path::Path;
 
-use design::{Cli, Count, Failure, Line, Miss, Noted, Reconciliation, Reference};
+use design::{Cli, Count, Failure, Line, Miss, Noted, Outcome, Reconciliation, Reference};
 use design_model::{NodeId, NotesLine};
 use design_store::StreamSchema;
 use file_ports::{Bytes, Files};
-use grammar::notes::Quote;
+use grammar::notes::{Cite, Quote};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
@@ -48,6 +48,11 @@ const NOTES: &str = "notes/postmortem.md";
 
 struct Noting;
 
+struct Reported {
+    landed: Result<Outcome, Failure>,
+    lines: Vec<Line>,
+}
+
 impl Noting {
     fn session() -> Session {
         let said = [
@@ -87,9 +92,9 @@ impl Noting {
 
     fn placed(remark: &str) -> Option<Result<Vec<String>, Miss>> {
         let applying = Noting::ready().ok()?;
-        let imported = Noting::imported(&applying, &format!("# Notes\nRULING (owner c3c3c3c3): {remark}\n")).ok()?;
-        let shown = applying.run(&["show", "n3"]).ok()?;
-        Some(Spread::parsed(&format!("{imported}{shown}")).into_iter().filter_map(Noting::found).collect())
+        let reported = Noting::reported(&applying, &format!("# Notes\nRULING (owner c3c3c3c3): {remark}\n"));
+        let shown = applying.run(&["show", "n3"]).map(|shown| Spread::parsed(&shown)).unwrap_or_default();
+        Some(reported.lines.into_iter().chain(shown).filter_map(Noting::found).collect())
     }
 
     fn found(line: Line) -> Option<Result<String, Miss>> {
@@ -98,6 +103,20 @@ impl Noting {
             Line::Noted(Noted::Unresolved { miss, .. }) => Some(Err(miss)),
             _other => None,
         }
+    }
+
+    fn reported(applying: &Applying, notes: &str) -> Reported {
+        applying.files.create_directories(Path::new("/work/notes")).ok();
+        applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
+        let mut out = Vec::new();
+        let landed = Cli::new(
+            &Invocation::environment(),
+            FakeLent::new(&applying.files),
+            |_path| applying.store.clone(),
+            Staff::idle(),
+        )
+        .report(&Run::root(), ["import-notes", NOTES].iter().map(OsString::from), &mut out);
+        Reported { landed, lines: Spread::parsed(&String::from_utf8(out).unwrap_or_default()) }
     }
 
     fn sorted(imported: Result<String, Failure>) -> Option<&'static str> {
@@ -185,6 +204,8 @@ laws::table!(
     [
         "RULING (owner): \"yes the new trellis is approved.\"" => Some("imported"),
         "RULING (owner, c3c3c3c3): approved" => Some("imported"),
+        "RULING (owner, a1a1a1a1): labels" => Some("unanchored"),
+        "RULING (owner, a1a1a1a1): \"rows turn into a map.\"" => Some("imported"),
         "RULING (owner): as c3c3c3c3's reply says" => Some("imported"),
         "RULING (owner): as b2b2b2b2's reply says" => Some("unanchored"),
         "RULING (owner): 'rows turn into a map.'" => Some("unanchored"),
@@ -246,24 +267,35 @@ fn an_imported_ruling_leaves_its_segment_to_the_structurer_or_reaches_current_de
 }
 
 #[test]
-fn a_ruling_anchored_only_by_an_owner_cite_is_the_current_decision() -> Result<(), Failure> {
+fn a_ruling_cited_only_by_uuid_decides_a_one_segment_message_and_a_longer_one_only_through_a_quote()
+-> Result<(), Failure> {
     let applying = Noting::ready()?;
+    let Reported { landed: refused, lines: reported } = Noting::reported(
+        &applying,
+        "# Notes\n- 2026-11-05 RULING (owner c3c3c3c3): we don't move Ann's trellis\nRULING (owner a1a1a1a1): labels\n",
+    );
+    assert!(matches!(refused, Err(Failure::Unanchored { rulings }) if rulings == Count::new(1)));
+    assert_eq!(
+        reported,
+        [Line::Noted(Noted::Ambiguous {
+            line: NotesLine::new(3),
+            cite: Cite::new("a1a1a1a1".to_owned()),
+            segments: Count::new(4)
+        })]
+    );
+    assert_eq!(applying.run(&["view", "notes"])?, "");
     let imported = Noting::imported(
         &applying,
-        "# Notes\n- 2026-11-05 RULING (owner c3c3c3c3): we don't move Ann's trellis, it's the owner's call\nRULING (owner a1a1a1a1): labels\nRULING (owner a1a1a1a1): \"rows turn into a map.\"\n",
+        "# Notes\n- 2026-11-05 RULING (owner c3c3c3c3): we don't move Ann's trellis\nRULING (owner a1a1a1a1): \"rows turn into a map.\"\n",
     )?;
-    let reconciled = Reconciliation::new(Count::new(4), Count::new(4), Count::new(3), Count::new(3));
+    let reconciled = Reconciliation::new(Count::new(3), Count::new(3), Count::new(2), Count::new(2));
     assert!(Spread::parsed(&imported).contains(&Line::Noted(Noted::Reconciled(reconciled))));
     let decided = applying.run(&["view", "current-decision"])?;
     let deciding: Vec<NodeId> = Spread::parsed(&decided).iter().filter_map(Viewing::node).collect();
-    assert_eq!(deciding, [3, 4, 4, 4, 4, 5].map(NodeId::new));
+    assert_eq!(deciding, [3, 4].map(NodeId::new));
     let standing = [
         "standing n3 decides c3c3c3c3.0 owner entered import-2 ",
-        "standing n4 decides a1a1a1a1.0 owner entered import-3 ",
-        "standing n4 decides a1a1a1a1.1 owner entered import-3 ",
         "standing n4 decides a1a1a1a1.2 owner entered import-3 ",
-        "standing n4 decides a1a1a1a1.3 owner entered import-3 ",
-        "standing n5 decides a1a1a1a1.2 owner entered import-4 ",
     ];
     assert!(standing.iter().all(|part| decided.contains(part)));
     let unplaced: Vec<String> = Spread::parsed(&applying.run(&["view", "unplaced"])?)
@@ -271,7 +303,7 @@ fn a_ruling_anchored_only_by_an_owner_cite_is_the_current_decision() -> Result<(
         .filter_map(Viewing::unplaced)
         .filter(|segment| ["c3c3c3c3", "a1a1a1a1"].iter().any(|message| segment.contains(message)))
         .collect();
-    assert_eq!(unplaced, Vec::<String>::new());
+    assert_eq!(unplaced, ["a1a1a1a1.0", "a1a1a1a1.1", "a1a1a1a1.3"]);
     Ok(())
 }
 
@@ -314,16 +346,7 @@ fn view_notes_gives_back_a_file_without_a_final_newline() -> Result<(), Failure>
 fn an_unanchored_ruling_refuses_the_whole_import_reporting_it_and_writing_nothing() -> Result<(), Failure> {
     let applying = Noting::ready()?;
     let notes = "# Notes\nOwner: \"no such words\"\nRULING (owner): nothing to anchor\nRULING (owner): \"agreed\"\nRULING (owner, c3c3c3c3): approved\n";
-    applying.files.create_directories(Path::new("/work/notes")).ok();
-    applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
-    let mut out = Vec::new();
-    let refused = Cli::new(
-        &Invocation::environment(),
-        FakeLent::new(&applying.files),
-        |_path| applying.store.clone(),
-        Staff::idle(),
-    )
-    .report(&Run::root(), ["import-notes", NOTES].iter().map(OsString::from), &mut out);
+    let Reported { landed: refused, lines: reported } = Noting::reported(&applying, notes);
     let quoted = |line: usize, quote: &str, miss: Miss| {
         Line::Noted(Noted::Unresolved {
             line: NotesLine::new(line),
@@ -333,7 +356,7 @@ fn an_unanchored_ruling_refuses_the_whole_import_reporting_it_and_writing_nothin
     };
     assert!(matches!(refused, Err(Failure::Unanchored { rulings }) if rulings == Count::new(2)));
     assert_eq!(
-        Spread::parsed(&String::from_utf8(out).unwrap_or_default()),
+        reported,
         [
             quoted(2, "no such words", Miss::Unheard),
             Line::Noted(Noted::Unanchored(NotesLine::new(3))),

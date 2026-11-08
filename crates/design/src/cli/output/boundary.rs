@@ -265,6 +265,8 @@ pub(crate) enum Key {
     Unresolved,
     #[name("unanchored")]
     Unanchored,
+    #[name("ambiguous-anchor")]
+    AmbiguousAnchor,
     #[name("reconciled")]
     Reconciled,
     #[name("cites")]
