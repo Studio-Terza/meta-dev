@@ -17,6 +17,7 @@ pub enum Noted {
     Imported { line: NotesLine, node: NodeId },
     Unresolved { line: NotesLine, reference: Reference, miss: Miss },
     Unanchored(NotesLine),
+    Ambiguous { line: NotesLine, cite: Cite, segments: Count },
     Reconciled(Reconciliation),
     Cites { message: Prefix, author: Authorship, entered: Provenance },
 }
@@ -61,6 +62,8 @@ enum Part {
     Rulings,
     #[name("anchored")]
     Anchored,
+    #[name("segments")]
+    Segments,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,6 +74,8 @@ pub(crate) enum Note {
     Unresolved,
     #[name("unanchored")]
     Unanchored,
+    #[name("ambiguous-anchor")]
+    AmbiguousAnchor,
     #[name("reconciled")]
     Reconciled,
     #[name("cites")]
@@ -92,6 +97,11 @@ impl Noted {
             Note::Unanchored => {
                 Ok(Noted::Unanchored(NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?)))
             }
+            Note::AmbiguousAnchor => Ok(Noted::Ambiguous {
+                line: NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?),
+                cite: fields.past(&[Part::Cite])?.field::<Bare<_>>()?,
+                segments: Count::new(fields.past(&[Part::Segments])?.field::<Integer<_>>()?),
+            }),
             Note::Reconciled => Reconciliation::read(fields).map(Noted::Reconciled),
             Note::Cites => Ok(Noted::Cites {
                 message: fields.field::<Bare<_>>()?,
@@ -107,7 +117,9 @@ impl Reference {
         match fields.field::<Word<Part>>()? {
             Part::Quote => Ok(Reference::Quote(fields.field::<Quoted<_>>()?)),
             Part::Cite => Ok(Reference::Cite(fields.field::<Bare<_>>()?)),
-            Part::Line | Part::Lines | Part::Nodes | Part::Rulings | Part::Anchored => Err(Unread::Unkeyed),
+            Part::Line | Part::Lines | Part::Nodes | Part::Rulings | Part::Anchored | Part::Segments => {
+                Err(Unread::Unkeyed)
+            }
         }
     }
 }
@@ -138,6 +150,14 @@ impl fmt::Display for Noted {
                 write!(formatter, "{} {} {line} {reference} {miss}", Note::Unresolved, Part::Line)
             }
             Noted::Unanchored(line) => write!(formatter, "{} {} {line}", Note::Unanchored, Part::Line),
+            Noted::Ambiguous { line, cite, segments } => write!(
+                formatter,
+                "{} {} {line} {} {cite} {} {segments}",
+                Note::AmbiguousAnchor,
+                Part::Line,
+                Part::Cite,
+                Part::Segments
+            ),
             Noted::Reconciled(reconciliation) => write!(formatter, "{} {reconciliation}", Note::Reconciled),
             Noted::Cites { message, author, entered } => {
                 write!(formatter, "  {} {message} {author} {} {entered}", Note::Cites, Key::Entered)

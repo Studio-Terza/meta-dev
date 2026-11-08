@@ -87,9 +87,23 @@ struct Sought<Found> {
 
 #[derive(Clone, Debug)]
 struct Speech {
+    cite: Cite,
     message: Uuid,
     author: Authorship,
     segments: Vec<Segment>,
+}
+
+#[derive(Debug)]
+enum Anchor<'heard> {
+    Whole(&'heard Segment),
+    Narrowed(BTreeSet<&'heard Segment>),
+    Ambiguous(Ambiguity),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Ambiguity {
+    cite: Cite,
+    segments: Count,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -109,6 +123,7 @@ struct Findings {
     directed: Vec<Directed>,
     misses: Vec<Missed>,
     anchors: Count,
+    ambiguities: Vec<Ambiguity>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -130,11 +145,12 @@ enum Voice {
     Remark,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Ruled {
     Remark,
     Anchored,
     Unanchored,
+    Ambiguous(Vec<Ambiguity>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -144,7 +160,7 @@ enum Settlement {
     Unreconciled { lines: Count, nodes: Count },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Landing {
     Written,
     Refused,
@@ -237,8 +253,9 @@ impl Answers {
             quotations.iter().filter_map(|quoted| quoted.found.as_ref().ok()).flatten().collect();
         let owned: Vec<&Speech> = authors.iter().copied().filter(|author| author.author == Authorship::Owner).collect();
         let anchors = Count::new(quoted.len().saturating_add(owned.len()));
-        let spoken: BTreeSet<&Segment> = owned.iter().flat_map(|author| &author.segments).collect();
-        let placed = voice.placed(quoted, spoken);
+        let resolved = voice.anchored(quoted, &owned);
+        let placed: BTreeSet<&Segment> = resolved.iter().flat_map(Anchor::segments).collect();
+        let ambiguities: Vec<Ambiguity> = resolved.into_iter().filter_map(Anchor::ambiguity).collect();
         let referenced: BTreeSet<Uuid> = cited.iter().cloned().chain(voice.referenced(&placed)).collect();
         Findings {
             directed: referenced
@@ -252,6 +269,7 @@ impl Answers {
                 .chain(quotations.iter().filter_map(Sought::missed))
                 .collect(),
             anchors,
+            ambiguities,
         }
     }
 
@@ -261,7 +279,12 @@ impl Answers {
             let message: &Uuid = spoken.segment().as_ref();
             authors
                 .entry(message.clone())
-                .or_insert_with(|| Speech { message: message.clone(), author: spoken.author(), segments: Vec::new() })
+                .or_insert_with(|| Speech {
+                    cite: cite.clone(),
+                    message: message.clone(),
+                    author: spoken.author(),
+                    segments: Vec::new(),
+                })
                 .segments
                 .push(spoken.segment().clone());
             authors
@@ -287,6 +310,44 @@ impl Answers {
             .map(|(occurrence, _said)| occurrence.message.clone())
             .collect();
         Miss::only(Utterance::narrowed(narrowed, &same_day)).map(|said| said.segments)
+    }
+}
+
+impl Speech {
+    fn anchor(&self) -> Anchor<'_> {
+        <&[Segment; 1]>::try_from(self.segments.as_slice()).map_or_else(
+            |_several| {
+                Anchor::Ambiguous(Ambiguity { cite: self.cite.clone(), segments: Count::new(self.segments.len()) })
+            },
+            |[whole]| Anchor::Whole(whole),
+        )
+    }
+
+    fn anchors<'heard>(owned: &[&'heard Speech]) -> Vec<Anchor<'heard>> {
+        owned.iter().map(|speech| speech.anchor()).collect()
+    }
+}
+
+impl<'heard> Anchor<'heard> {
+    fn segments(&self) -> Vec<&'heard Segment> {
+        match self {
+            Anchor::Whole(segment) => vec![*segment],
+            Anchor::Narrowed(segments) => segments.iter().copied().collect(),
+            Anchor::Ambiguous(_ambiguity) => Vec::new(),
+        }
+    }
+
+    fn ambiguity(self) -> Option<Ambiguity> {
+        match self {
+            Anchor::Ambiguous(ambiguity) => Some(ambiguity),
+            Anchor::Whole(_) | Anchor::Narrowed(_) => None,
+        }
+    }
+}
+
+impl Ambiguity {
+    fn line(&self, line: NotesLine) -> Noted {
+        Noted::Ambiguous { line, cite: self.cite.clone(), segments: self.segments }
     }
 }
 
@@ -349,14 +410,14 @@ impl Taking<'_> {
     fn entered(self, line: &notes::Line, entry: &notes::Entry, voice: Voice) -> Draft {
         let parent = self.draft.section;
         let node = self.node(parent, line);
-        let Findings { directed, misses, anchors } = self.heard.resolved(entry, node.identity(), voice);
+        let Findings { directed, misses, anchors, ambiguities } = self.heard.resolved(entry, node.identity(), voice);
         let drafted = Drafted {
             line: NotesLine::new(line.number()),
             node,
             parent: parent.node,
             directed,
             misses,
-            ruled: voice.judged(anchors),
+            ruled: voice.judged(anchors, ambiguities),
         };
         self.draft.after(drafted, parent)
     }
@@ -401,12 +462,12 @@ impl Draft {
     }
 
     fn landing(&self) -> Landing {
-        let unanchored = self.drafted.iter().find(|drafted| drafted.ruled == Ruled::Unanchored);
-        unanchored.map_or(Landing::Written, |_unanchored| Landing::Refused)
+        self.drafted.iter().map(|drafted| drafted.ruled.landing()).max().unwrap_or(Landing::Written)
     }
 
     fn refused(self) -> Report {
-        let rulings = Count::new(self.drafted.iter().filter(|drafted| drafted.ruled == Ruled::Unanchored).count());
+        let rulings =
+            Count::new(self.drafted.iter().filter(|drafted| drafted.ruled.landing() == Landing::Refused).count());
         Report {
             lines: self.drafted.iter().flat_map(|drafted| drafted.lines(Landing::Refused)).collect(),
             settlement: Settlement::Unanchored(rulings),
@@ -418,8 +479,8 @@ impl Drafted {
     fn lines(&self, landing: Landing) -> Vec<Line> {
         let imported = landing.imported(self.line, self.node.identity());
         let unresolved = self.misses.iter().map(|missed| missed.line(self.line));
-        let unanchored = landing.unanchored(self.line, self.ruled);
-        imported.into_iter().chain(unresolved).chain(unanchored).map(Line::Noted).collect()
+        let refusals = landing.refusals(self.line, &self.ruled);
+        imported.into_iter().chain(unresolved).chain(refusals).map(Line::Noted).collect()
     }
 
     fn imported(self) -> Imported {
@@ -469,10 +530,10 @@ impl Landing {
         }
     }
 
-    fn unanchored(self, line: NotesLine, ruled: Ruled) -> Option<Noted> {
+    fn refusals(self, line: NotesLine, ruled: &Ruled) -> Vec<Noted> {
         match self {
-            Landing::Written => None,
-            Landing::Refused => ruled.unanchored(line),
+            Landing::Written => Vec::new(),
+            Landing::Refused => ruled.refusals(line),
         }
     }
 }
@@ -509,20 +570,18 @@ impl Voice {
         }
     }
 
-    fn placed<'heard>(
-        self,
-        quoted: BTreeSet<&'heard Segment>,
-        spoken: BTreeSet<&'heard Segment>,
-    ) -> BTreeSet<&'heard Segment> {
+    fn anchored<'heard>(self, quoted: BTreeSet<&'heard Segment>, owned: &[&'heard Speech]) -> Vec<Anchor<'heard>> {
         match self {
-            Voice::Ruling => Some(quoted).filter(|quoted| quoted.first().is_some()).unwrap_or(spoken),
-            Voice::Remark => quoted,
+            Voice::Ruling => Some(quoted)
+                .filter(|quoted| quoted.first().is_some())
+                .map_or_else(|| Speech::anchors(owned), |quoted| vec![Anchor::Narrowed(quoted)]),
+            Voice::Remark => vec![Anchor::Narrowed(quoted)],
         }
     }
 
-    fn judged(self, anchors: Count) -> Ruled {
+    fn judged(self, anchors: Count, ambiguities: Vec<Ambiguity>) -> Ruled {
         match self {
-            Voice::Ruling => Ruled::anchoring(anchors),
+            Voice::Ruling => Ruled::anchoring(anchors, ambiguities),
             Voice::Remark => Ruled::Remark,
         }
     }
@@ -539,14 +598,27 @@ impl Settlement {
 }
 
 impl Ruled {
-    fn unanchored(self, line: NotesLine) -> Option<Noted> {
+    fn refusals(&self, line: NotesLine) -> Vec<Noted> {
         match self {
-            Ruled::Unanchored => Some(Noted::Unanchored(line)),
-            Ruled::Remark | Ruled::Anchored => None,
+            Ruled::Unanchored => vec![Noted::Unanchored(line)],
+            Ruled::Ambiguous(ambiguities) => ambiguities.iter().map(|ambiguity| ambiguity.line(line)).collect(),
+            Ruled::Remark | Ruled::Anchored => Vec::new(),
         }
     }
 
-    fn anchoring(anchors: Count) -> Ruled {
-        Some(anchors).filter(|anchors| *anchors != Count::zero()).map_or(Ruled::Unanchored, |_anchored| Ruled::Anchored)
+    fn landing(&self) -> Landing {
+        match self {
+            Ruled::Unanchored | Ruled::Ambiguous(_) => Landing::Refused,
+            Ruled::Remark | Ruled::Anchored => Landing::Written,
+        }
+    }
+
+    fn anchoring(anchors: Count, ambiguities: Vec<Ambiguity>) -> Ruled {
+        match ambiguities.first() {
+            Some(_ambiguous) => Ruled::Ambiguous(ambiguities),
+            None => Some(anchors)
+                .filter(|anchors| *anchors != Count::zero())
+                .map_or(Ruled::Unanchored, |_anchored| Ruled::Anchored),
+        }
     }
 }

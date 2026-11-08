@@ -67,7 +67,7 @@ pub enum Failure {
     #[error("project {0} already holds imported notes; nothing was written")]
     Reimported(Project),
     #[error(
-        "{rulings} RULING lines resolve no owner words, neither a quote nor a cited owner message; quote or cite the owner on each and import again; nothing was written"
+        "{rulings} RULING lines resolve no owner words, neither a quote nor a cited owner message, or cite an owner message of several segments without quoting the decided words (an ambiguous anchor); quote or cite the owner on each and import again; nothing was written"
     )]
     Unanchored { rulings: Count },
     #[error("{lines} notes lines came in but {nodes} nodes came out")]
