@@ -3,6 +3,7 @@ mod failure;
 pub(crate) mod noted;
 pub(crate) mod output;
 mod request;
+mod sequel;
 mod viewed;
 
 use std::ffi::OsString;
@@ -20,6 +21,7 @@ use crate::Outcome;
 pub use failure::{Failure, Flail, Flails, Unmatched};
 pub use request::Unresolved;
 use request::{Crew, Ground, Kept, Request};
+pub use sequel::Sequel;
 pub use viewed::Viewed;
 
 #[derive(Debug)]

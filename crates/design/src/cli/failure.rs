@@ -19,6 +19,7 @@ use structurer::{Lapse, Misread, SegmentRef, Uncovered};
 
 use super::output::Count;
 use super::request::Unresolved;
+use super::sequel::Sequel;
 use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
@@ -49,6 +50,8 @@ pub enum Failure {
     Unplaced(NodeId),
     #[error("node n{} is {ending}, itself or through a node it refines; view a current node", node.into_inner())]
     Ended { node: NodeId, ending: Ending },
+    #[error("no run of job {0} in the design store")]
+    Unrun(JobId),
     #[error("no project {0} in the design store; run design init {0} in its repository first")]
     Unrooted(Project),
     #[error("no project is configured here; name a node, or run design init <project> in its repository first")]
@@ -94,8 +97,8 @@ pub enum Failure {
     Unlock(#[from] Unlock),
     #[error("the structuring agent could not be run: {0}")]
     Dispatch(#[from] DispatchFailure),
-    #[error("FLAILED: {0}; the flailed segments are held for triage, and structure went on with the next job")]
-    Flailed(Flails),
+    #[error("FLAILED: {flails}; the flailed segments are held for triage, and {sequel}")]
+    Flailed { flails: Flails, sequel: Sequel },
     #[error(
         "STALLED: job {job} could not be run: {stall}; structure halted, and its segments are sent again on the next run"
     )]
