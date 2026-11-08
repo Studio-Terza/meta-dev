@@ -1,14 +1,5 @@
 CREATE TABLE jobs (
-    id INTEGER PRIMARY KEY NOT NULL,
-    state TEXT NOT NULL
-) STRICT;
-
-CREATE TABLE job_segments (
-    job INTEGER NOT NULL REFERENCES jobs (id),
-    message TEXT NOT NULL,
-    ordinal INTEGER NOT NULL,
-    PRIMARY KEY (job, message, ordinal),
-    FOREIGN KEY (message, ordinal) REFERENCES segments (message, ordinal)
+    id INTEGER PRIMARY KEY NOT NULL
 ) STRICT;
 
 CREATE TABLE runs (

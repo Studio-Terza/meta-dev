@@ -32,7 +32,7 @@ pub use covered::Covered;
 pub use cursors::Cursors;
 pub use directions::{Directed, Directions};
 pub use earlier_lines::EarlierLines;
-pub use graph::{Cast, Linked, Planting, Resolved, Resolving, Restaged};
+pub use graph::{Cast, ContextNodes, Linked, Planting, Resolved, Resolving, Restaged};
 use link::Link;
 pub use placed::Placed;
 pub use placement::Placement;
@@ -41,8 +41,8 @@ pub use prefixes::{Prefixes, Shortest};
 pub use project_root::ProjectRoot;
 use relative::Relative;
 pub use runs::{
-    ContextNodes, JobClosed, JobOpened, JobState, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState,
-    RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    JobOpened, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
+    Unstructured,
 };
 pub use scope::Scope;
 pub use search_segments::SearchSegments;

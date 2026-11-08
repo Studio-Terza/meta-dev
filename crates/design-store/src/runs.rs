@@ -21,18 +21,6 @@ pub enum RunState {
     Gone,
 }
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum JobState {
-    #[name("open")]
-    Open,
-    #[name("applied")]
-    Applied,
-    #[name("repeated")]
-    Repeated,
-    #[name("flailed")]
-    Flailed,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spawned {
     pid: Pid,
@@ -40,17 +28,8 @@ pub struct Spawned {
     deadline: Deadline,
 }
 
-#[derive(Clone, Debug, Op)]
-pub struct JobOpened {
-    job: JobId,
-    segments: Vec<Segment>,
-}
-
 #[derive(Clone, Copy, Debug, Op)]
-pub struct JobClosed {
-    job: JobId,
-    state: JobState,
-}
+pub struct JobOpened(JobId);
 
 #[derive(Clone, Debug, Op)]
 pub struct RunSpawned {
@@ -77,9 +56,6 @@ pub struct LiveRuns;
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct Unstructured;
-
-#[derive(Clone, Copy, Debug, Op)]
-pub struct ContextNodes;
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct RunsOf(JobId);
@@ -126,17 +102,9 @@ impl AsRef<Deadline> for Spawned {
     }
 }
 
-impl JobOpened {
-    #[must_use]
-    pub fn new(job: JobId, segments: Vec<Segment>) -> JobOpened {
-        JobOpened { job, segments }
-    }
-}
-
-impl JobClosed {
-    #[must_use]
-    pub fn new(job: JobId, state: JobState) -> JobClosed {
-        JobClosed { job, state }
+impl From<JobId> for JobOpened {
+    fn from(job: JobId) -> JobOpened {
+        JobOpened(job)
     }
 }
 

@@ -15,6 +15,9 @@ pub struct Resolved(NodeId);
 #[derive(Clone, Copy, Debug, Op)]
 pub struct Resolving(NodeId);
 
+#[derive(Clone, Copy, Debug, Op)]
+pub struct ContextNodes;
+
 #[derive(Clone, Debug, Op)]
 pub struct Planting {
     root: Root,
@@ -526,37 +529,6 @@ WHERE
         Ok(AnyNode::try_from(row)?)
     }
 
-    pub(crate) fn context(statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
-        let dropped = Stage::Dropped;
-        let rows = statements.rows(store_ports::query!(
-            NodeRow,
-            r#"
-SELECT
-  id,
-  project,
-  facet,
-  stage,
-  provenance,
-  title,
-  role,
-  role_provenance,
-  artifact,
-  condition,
-  reason
-FROM
-  nodes
-WHERE
-  stage != ?1
-ORDER BY
-  id
-LIMIT
-  200
-"#,
-            dropped: Stage
-        ))?;
-        Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)
-    }
-
     pub(crate) fn next(statements: &mut Statements<'_>) -> Result<NodeId, StoreFailure> {
         let row = statements.one(store_ports::query!(
             NextRow,
@@ -695,5 +667,40 @@ ORDER BY
 
     pub(crate) fn links(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Link>, StoreFailure> {
         Ok(EdgeRow::around(node, statements)?.into_iter().map(Link::from).collect())
+    }
+}
+
+impl Query for ContextNodes {
+    type Rows = Vec<AnyNode>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
+        let dropped = Stage::Dropped;
+        let rows = statements.rows(store_ports::query!(
+            NodeRow,
+            r#"
+SELECT
+  id,
+  project,
+  facet,
+  stage,
+  provenance,
+  title,
+  role,
+  role_provenance,
+  artifact,
+  condition,
+  reason
+FROM
+  nodes
+WHERE
+  stage != ?1
+ORDER BY
+  id
+LIMIT
+  200
+"#,
+            dropped: Stage
+        ))?;
+        Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)
     }
 }

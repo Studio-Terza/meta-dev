@@ -1,14 +1,13 @@
-use design_model::{AnyNode, JobId, Ordinal, RunId, Segment};
+use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
-use newtype::{Counter, Newtype};
+use newtype::Newtype;
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::{Authorship, Body, Uuid};
 
 use super::{
-    ContextNodes, JobClosed, JobOpened, JobState, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState,
-    RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    JobOpened, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
+    Unstructured,
 };
-use crate::graph::NodeRow;
 
 #[derive(Debug, Columns)]
 struct NextJobRow {
@@ -87,61 +86,15 @@ impl Batch for JobOpened {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let job = self.job;
-        let open = JobState::Open;
-        let opened = statements.written(store_ports::query!(
-            r#"
-INSERT INTO
-  jobs (id, state)
-VALUES
-  (?1, ?2)
-"#,
-            job: JobId,
-            open: JobState
-        ))?;
-        let assigned = self
-            .segments
-            .iter()
-            .map(|segment| JobOpened::assigned(job, segment, statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total([opened].into_iter().chain(assigned)))
-    }
-}
-
-impl JobOpened {
-    fn assigned(job: JobId, segment: &Segment, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let message: &Uuid = segment.as_ref();
-        let ordinal = Ordinal::from(segment);
+        let job = self.0;
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
-  job_segments (job, message, ordinal)
+  jobs (id)
 VALUES
-  (?1, ?2, ?3)
+  (?1)
 "#,
-            job: JobId,
-            message: Uuid,
-            ordinal: Ordinal
-        ))
-    }
-}
-
-impl Batch for JobClosed {
-    type Failure = StoreFailure;
-
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobClosed { job, state } = self;
-        statements.written(store_ports::query!(
-            r#"
-UPDATE
-  jobs
-SET
-  state = ?2
-WHERE
-  id = ?1
-"#,
-            job: JobId,
-            state: JobState
+            job: JobId
         ))
     }
 }
@@ -356,13 +309,5 @@ ORDER BY
             owner: Authorship
         ))?;
         Ok(rows.into_iter().map(Unplaced::from).collect())
-    }
-}
-
-impl Query for ContextNodes {
-    type Rows = Vec<AnyNode>;
-
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
-        NodeRow::context(statements)
     }
 }

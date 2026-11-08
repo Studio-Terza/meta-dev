@@ -183,7 +183,7 @@ impl Structuring {
     fn stored_run(&self, pid: u32, started: &str) -> Result<Written, Failure> {
         let run = Run::root();
         let store = run.port(self.applying.store.clone());
-        store.write(JobOpened::new(JobId::new(1), Vec::new()))?;
+        store.write(JobOpened::from(JobId::new(1)))?;
         let spawned = Spawned::new(Pid::new(pid), started.parse::<Started>().ok(), Deadline::new(Wall::new(0)));
         Ok(store.write(RunSpawned::new(RunId::new(1), JobId::new(1), spawned))?)
     }
@@ -289,5 +289,7 @@ fn a_retried_and_applied_structure_prints_its_lines() -> Result<(), Box<dyn Erro
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::MISREAD), Some(Script::COVERING)]), Pause::new(0))?;
     golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured().text))?;
+    let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
+    golden::golden!("structure-briefs.txt", &briefs)?;
     Ok(())
 }

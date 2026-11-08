@@ -6,7 +6,7 @@ use design_model::{
     Prefix, Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage,
     Standing, Title,
 };
-use design_store::{JobState, RunState, SessionCursors, StreamSchema};
+use design_store::{RunState, SessionCursors, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar::search::Term;
@@ -287,7 +287,6 @@ fn every_named_column_reads_back_as_its_variant() {
     assert_eq!(Stored::unread::<Standing>(), []);
     assert_eq!(Stored::unread::<ArtifactKind>(), []);
     assert_eq!(Stored::unread::<RunState>(), []);
-    assert_eq!(Stored::unread::<JobState>(), []);
 }
 
 laws::roundtrip!(a_pid_column_reads_back, any::<Pid>(), Column::raw, Stored::back::<Pid>, Some);

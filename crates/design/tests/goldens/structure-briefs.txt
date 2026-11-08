@@ -1,0 +1,52 @@
+rule "You structure a project owner's words into a design graph."
+rule "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
+rule "A choices line lists the words that one slot of the forms takes."
+form "place(<segment>, <node>, <span-relation>)"
+form "sense(<segment>, <kind>, <specificity>, <confidence>, <explicitness>)"
+form "link(<segment>, <segment>, <segment-relation>)"
+form "propose(new [<label>], refines(<node>), <facet>, \"<title>\")"
+form "supersede(<node>, by(<node>))"
+form "conversational(<segment>)"
+choices span-relation defines decides questions revises mentions
+choices segment-relation answers refers-to supersedes corrects
+choices kind decision opinion question instruction control remark smell
+choices specificity general specific exact
+choices confidence tentative leaning firm
+choices explicitness explicit implicit
+choices facet project feature smell
+rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it."
+rule "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
+example "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)"
+example "conversational(aaaaaaaa-0000-4000-8000-000000000001.0)"
+segment aaaaaaaa-0000-4000-8000-000000000001.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
+segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
+segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
+segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
+node n1 project vague
+rule "You structure a project owner's words into a design graph."
+rule "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
+rule "A choices line lists the words that one slot of the forms takes."
+form "place(<segment>, <node>, <span-relation>)"
+form "sense(<segment>, <kind>, <specificity>, <confidence>, <explicitness>)"
+form "link(<segment>, <segment>, <segment-relation>)"
+form "propose(new [<label>], refines(<node>), <facet>, \"<title>\")"
+form "supersede(<node>, by(<node>))"
+form "conversational(<segment>)"
+choices span-relation defines decides questions revises mentions
+choices segment-relation answers refers-to supersedes corrects
+choices kind decision opinion question instruction control remark smell
+choices specificity general specific exact
+choices confidence tentative leaning firm
+choices explicitness explicit implicit
+choices facet project feature smell
+rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it."
+rule "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
+example "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)"
+example "conversational(aaaaaaaa-0000-4000-8000-000000000001.0)"
+segment aaaaaaaa-0000-4000-8000-000000000001.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
+segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
+segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
+segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
+node n1 project vague
+retry misread expected 1 7 "an argument"
+rule "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."

@@ -9,10 +9,10 @@ use design_model::{
     Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, Covered, Cycle, Directed, Directions, JobClosed, JobOpened, JobState, Linked, LiveRuns, NextJob,
-    NextNode, NextRun, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Resolved, Resolving,
-    Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords,
-    ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
+    AppliedFile, Cast, Covered, Cycle, Directed, Directions, JobOpened, Linked, LiveRuns, NextJob, NextNode, NextRun,
+    Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Resolved, Resolving, Restaged, RunEnded,
+    RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage,
+    ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
 };
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -1294,13 +1294,12 @@ impl Spawning {
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(Recorded::session()?.records)?;
         let job = store.read(NextJob)?;
-        store.write(JobOpened::new(job, vec![Proposals::segment("o1", 0)]))?;
+        store.write(JobOpened::from(job))?;
         let id = store.read(NextRun)?;
         let spawned = Spawned::new(self.pid, self.started.clone(), Deadline::new(self.deadline));
         store.write(RunSpawned::new(id, job, spawned))?;
         let live = store.read(LiveRuns)?;
         store.write(RunEnded::new(id, self.state, self.usage))?;
-        store.write(JobClosed::new(job, JobState::Applied))?;
         Ok(Lived { live, ran: store.read(RunsOf::from(job))?, after: store.read(LiveRuns)? })
     }
 }

@@ -2,8 +2,8 @@ use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
-    ContextNodes, JobClosed, JobOpened, JobState, LiveRuns, NextJob, NextRun, RunEnded, RunSpawned, RunState, RunsOf,
-    Spawned, StoredRun, Unplaced, Unstructured,
+    ContextNodes, JobOpened, LiveRuns, NextJob, NextRun, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun,
+    Unplaced, Unstructured,
 };
 use dispatch_ports::{Clock, Deadline, Dispatch, Due, Ended, Finished, Job, Prompt, Timeout, Watch, Watched};
 use store_ports::Store;
@@ -119,10 +119,8 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
             Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)), AsRef::<Body>::as_ref(unplaced).clone())
         });
         let job = structurer::Job::new(said.collect(), &context);
-        let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
-        self.store.write(JobOpened::new(id, segments.collect()))?;
+        self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job }.attempted(Attempt::First)?;
-        self.store.write(JobClosed::new(id, ended.ending.state()))?;
         let retried = ended.retried.iter().map(|lapse| Line::Retried(Lapsed::new(id, lapse.clone())));
         let closing = ended.ending.lines(id, self.store)?;
         let runs = self.store.read(RunsOf::from(id))?;
@@ -199,14 +197,6 @@ impl Ending {
         match watched {
             Watched::Finished(finished) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
             Watched::Overdue => RunEnded::new(run, RunState::Overdue, None),
-        }
-    }
-
-    fn state(&self) -> JobState {
-        match self {
-            Ending::Applied(Application::Fresh(_)) => JobState::Applied,
-            Ending::Applied(Application::Repeated(_)) => JobState::Repeated,
-            Ending::Flailed(_) => JobState::Flailed,
         }
     }
 
