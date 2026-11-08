@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod attempt;
 mod briefing;
 mod directive;
@@ -15,7 +17,7 @@ mod uncovered;
 mod verb;
 
 pub use attempt::{Attempt, Reading};
-pub use briefing::Briefing;
+pub use briefing::{Briefing, Outlined};
 pub use directive::{Directive, Visit};
 pub use directives::Directives;
 pub use edge::Edge;

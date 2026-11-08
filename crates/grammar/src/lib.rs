@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 pub mod anchor;
 pub mod artifact;
 pub mod cited;
@@ -8,6 +10,7 @@ pub mod line;
 pub mod lstart;
 pub mod message;
 pub mod node;
+pub mod notes;
 pub mod output;
 pub mod project;
 pub mod provenance;

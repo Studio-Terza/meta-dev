@@ -2,7 +2,8 @@ use design_model::{
     Dropped, NodeId, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Staging, Terminal,
 };
 use design_store::{
-    Annotation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest, Stored,
+    Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest,
+    Stored, Unplaced,
 };
 use newtype::Wrapping;
 use store_ports::{Store, StoreFailure};
@@ -10,6 +11,8 @@ use stream::{Anchors, SegmentId};
 use structurer::SegmentRef;
 use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
 
+use crate::cli::Viewed;
+use crate::cli::noted::Noted;
 use crate::cli::output::{Anchored, Line, Remark, Summary};
 
 #[derive(Debug)]
@@ -31,8 +34,11 @@ impl Refs {
     }
 
     pub fn placed(store: &impl Store, placed: &Placed) -> Result<Vec<Line>, StoreFailure> {
-        let refs = Refs::read(store, placed.placements().iter().map(Placement::segment))?;
-        Ok(refs.neighbourhood(placed))
+        let segments =
+            placed.placements().iter().map(Placement::segment).map(|segment| AsRef::<Uuid>::as_ref(&segment).clone());
+        let cited = placed.citations().iter().map(|citation: &Citation| AsRef::<Uuid>::as_ref(citation).clone());
+        let messages: Prefixes = segments.chain(cited).collect();
+        Ok(Refs(store.read(messages)?).neighbourhood(placed))
     }
 
     pub fn stored(store: &impl Store, stored: &Stored) -> Result<Vec<Line>, StoreFailure> {
@@ -74,6 +80,15 @@ impl Refs {
                     entered: *provenance,
                     body: placement.body().clone(),
                 }
+            }))
+            .chain(placed.citations().iter().map(|citation| {
+                let author: &Authorship = citation.as_ref();
+                let provenance: &Provenance = citation.as_ref();
+                Line::Noted(Noted::Cites {
+                    message: self.0.prefix(citation.as_ref()),
+                    author: *author,
+                    entered: *provenance,
+                })
             }))
             .collect()
     }
@@ -128,6 +143,36 @@ impl Refs {
 
     pub fn uncovered(&self, segments: &[Segment]) -> Vec<Line> {
         segments.iter().map(|segment| Line::Uncovered(self.reference(segment))).collect()
+    }
+
+    pub fn standing(&self, spans: &[Placement]) -> Vec<Line> {
+        spans
+            .iter()
+            .map(|span| {
+                let author: &Authorship = span.as_ref();
+                let provenance: &Provenance = span.as_ref();
+                Line::Viewed(Viewed::Standing {
+                    node: span.node(),
+                    relation: span.relation(),
+                    segment: self.reference(&span.segment()),
+                    author: *author,
+                    entered: *provenance,
+                    body: span.body().clone(),
+                })
+            })
+            .collect()
+    }
+
+    pub fn unplaced(&self, unplaced: &[Unplaced]) -> Vec<Line> {
+        unplaced
+            .iter()
+            .map(|segment| {
+                Line::Viewed(Viewed::Unplaced {
+                    segment: self.reference(segment.as_ref()),
+                    body: AsRef::<Body>::as_ref(segment).clone(),
+                })
+            })
+            .collect()
     }
 }
 

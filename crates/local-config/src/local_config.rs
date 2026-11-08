@@ -14,6 +14,12 @@ pub struct LocalConfig {
     workspace: PathBuf,
 }
 
+impl AsRef<Project> for LocalConfig {
+    fn as_ref(&self) -> &Project {
+        &self.project
+    }
+}
+
 impl FromStr for LocalConfig {
     type Err = ConfigFailure;
 

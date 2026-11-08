@@ -1,7 +1,10 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod artifact;
 mod artifact_kind;
 mod casting;
 mod confidence;
+mod ending;
 mod entered;
 mod entry;
 mod explicitness;
@@ -13,6 +16,7 @@ mod node;
 mod node_edge;
 mod node_id;
 mod node_relation;
+mod notes_line;
 mod outline;
 mod prefix;
 mod project;
@@ -36,6 +40,7 @@ pub use artifact::{Artifact, Unspecified};
 pub use artifact_kind::ArtifactKind;
 pub use casting::Casting;
 pub use confidence::Confidence;
+pub use ending::Ending;
 pub use entered::Entered;
 pub use entry::Entry;
 pub use explicitness::Explicitness;
@@ -47,6 +52,7 @@ pub use node::{AnyNode, Node};
 pub use node_edge::{Inversion, NodeEdge};
 pub use node_id::{NodeId, Unnumbered};
 pub use node_relation::NodeRelation;
+pub use notes_line::NotesLine;
 pub use outline::Outline;
 pub use prefix::Prefix;
 pub use project::{Project, Unnamed};

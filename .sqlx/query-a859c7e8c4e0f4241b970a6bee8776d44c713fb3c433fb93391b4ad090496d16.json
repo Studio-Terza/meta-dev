@@ -1,0 +1,64 @@
+{
+  "db_name": "SQLite",
+  "query": "\nWITH\nRECURSIVE found (message, quote, occurrence, start) AS (\n  SELECT\n    messages.uuid,\n    CAST(json_each.value AS TEXT),\n    0,\n    instr(messages.body, json_each.value)\n  FROM\n    messages\n    JOIN json_each(?1) ON instr(messages.body, json_each.value) > 0\n  WHERE\n    messages.author = ?2\n    AND length(json_each.value) > 0\n  UNION ALL\n  SELECT\n    found.message,\n    found.quote,\n    found.occurrence + 1,\n    found.start + instr(\n      substr(messages.body, found.start + 1),\n      found.quote\n    )\n  FROM\n    found\n    JOIN messages ON messages.uuid = found.message\n  WHERE\n    instr(\n      substr(messages.body, found.start + 1),\n      found.quote\n    ) > 0\n),\nplaced (message, ordinal, start, finish) AS (\n  SELECT DISTINCT\n    message,\n    -1,\n    1,\n    1\n  FROM\n    found\n  UNION ALL\n  SELECT\n    segments.message,\n    segments.ordinal,\n    CASE\n      instr(\n        substr(messages.body, placed.finish),\n        segments.body\n      )\n      WHEN 0 THEN 0\n      ELSE placed.finish + instr(\n        substr(messages.body, placed.finish),\n        segments.body\n      ) - 1\n    END,\n    CASE\n      instr(\n        substr(messages.body, placed.finish),\n        segments.body\n      )\n      WHEN 0 THEN placed.finish\n      ELSE placed.finish + instr(\n        substr(messages.body, placed.finish),\n        segments.body\n      ) - 1 + length(segments.body)\n    END\n  FROM\n    placed\n    JOIN messages ON messages.uuid = placed.message\n    JOIN segments ON segments.message = placed.message\n    AND segments.ordinal = placed.ordinal + 1\n)\nSELECT\n  found.quote AS \"quote!: String\",\n  found.message AS \"message!: String\",\n  found.occurrence AS \"occurrence!: i64\",\n  placed.ordinal AS \"ordinal!: i64\",\n  substr(messages.at, 1, 10) AS \"day!: String\"\nFROM\n  found\n  JOIN placed ON placed.message = found.message\n  JOIN messages ON messages.uuid = found.message\nWHERE\n  placed.start > 0\n  AND placed.finish > placed.start\n  AND placed.start < found.start + length(found.quote)\n  AND placed.finish > found.start\nORDER BY\n  found.message,\n  found.occurrence,\n  placed.ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "quote!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "found",
+            "name": "quote"
+          }
+        }
+      },
+      {
+        "name": "message!: String",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "found",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "occurrence!: i64",
+        "ordinal": 2,
+        "type_info": "Null",
+        "origin": "Expression"
+      },
+      {
+        "name": "ordinal!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "day!: String",
+        "ordinal": 4,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "a859c7e8c4e0f4241b970a6bee8776d44c713fb3c433fb93391b4ad090496d16"
+}

@@ -1,12 +1,23 @@
+use std::collections::BTreeMap;
+
 use design_model::{NodeId, Ordinal, Prefix, Segment};
 use store_ports::{Columns, Query, Statements, StoreFailure};
 use transcript_ports::{Authorship, Uuid};
 
-use super::{NextNode, Prefixed, Spoken, Started};
+use super::{Cited, NextNode, Prefixed, Spoken, Started};
+use crate::Listed;
 use crate::graph::NodeRow;
 
 #[derive(Debug, Columns)]
 struct SpokenRow {
+    uuid: Uuid,
+    author: Authorship,
+    ordinal: Ordinal,
+}
+
+#[derive(Debug, Columns)]
+struct CitedRow {
+    prefix: Prefix,
     uuid: Uuid,
     author: Authorship,
     ordinal: Ordinal,
@@ -47,6 +58,48 @@ ORDER BY
             prefix: Prefix
         ))?;
         Ok(rows.into_iter().map(Spoken::from).collect())
+    }
+}
+
+impl Query for Cited {
+    type Rows = BTreeMap<Prefix, Vec<Spoken>>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Prefix, Vec<Spoken>>, StoreFailure> {
+        let prefixes: Listed = self.0.iter().collect();
+        let rows = statements.rows(store_ports::query!(
+            CitedRow,
+            r#"
+WITH
+sought (prefix) AS (
+  SELECT
+    CAST(json_each.value AS TEXT)
+  FROM
+    json_each(?1)
+)
+SELECT
+  sought.prefix AS "prefix!: String",
+  messages.uuid AS "uuid!: String",
+  messages.author AS "author!: String",
+  segments.ordinal AS "ordinal!: i64"
+FROM
+  sought
+  JOIN messages ON substr(messages.uuid, 1, length(sought.prefix)) = sought.prefix
+  JOIN segments ON segments.message = messages.uuid
+ORDER BY
+  sought.prefix,
+  messages.uuid,
+  segments.ordinal
+"#,
+            prefixes: Listed
+        ))?;
+        let empty = self.0.into_iter().map(|prefix| (prefix, Vec::new())).collect();
+        Ok(rows.into_iter().fold(empty, |mut cited: BTreeMap<Prefix, Vec<Spoken>>, row| {
+            cited
+                .entry(row.prefix)
+                .or_default()
+                .push(Spoken { segment: Segment::new(row.uuid, row.ordinal), author: row.author });
+            cited
+        }))
     }
 }
 

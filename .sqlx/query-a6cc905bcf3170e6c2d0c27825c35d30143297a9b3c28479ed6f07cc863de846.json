@@ -10,7 +10,7 @@
         "origin": {
           "Table": {
             "table": "segment_links",
-            "name": "target_message"
+            "name": "source_message"
           }
         }
       },
@@ -21,7 +21,7 @@
         "origin": {
           "Table": {
             "table": "segment_links",
-            "name": "target_ordinal"
+            "name": "source_ordinal"
           }
         }
       }

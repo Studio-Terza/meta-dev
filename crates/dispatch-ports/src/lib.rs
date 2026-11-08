@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod agent;
 mod agent_run;
 mod clock;

@@ -12,13 +12,15 @@ use grammar::cited::Cited;
 use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
-use newtype::{Arbitrary, Display, Newtype, Wrapping};
+use newtype::Wrapping;
 use stream::{Relation, Shape};
 use structurer::{Directive, Lapse, Retried, SegmentRef};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
 
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Count(usize);
+use crate::cli::Viewed;
+use crate::cli::count::Count;
+use crate::cli::noted::{Note, Noted};
+use crate::cli::viewed::Seen;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Summary {
@@ -146,6 +148,8 @@ pub enum Line {
     Retried(Lapsed),
     Flailed(Lapsed),
     FlailedSegment(Flailing),
+    Viewed(Viewed),
+    Noted(Noted),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -171,7 +175,7 @@ pub struct Lapsed {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-enum Key {
+pub(crate) enum Key {
     #[name("session")]
     Session,
     #[name("read")]
@@ -392,13 +396,25 @@ impl fmt::Display for Line {
             Line::Retried(lapsed) => write!(formatter, "{} {lapsed}", Key::Retried),
             Line::Flailed(lapsed) => write!(formatter, "{} {lapsed}", Key::Flailed),
             Line::FlailedSegment(flailing) => write!(formatter, "{} {flailing}", Key::FlailedSegment),
+            Line::Viewed(viewed) => write!(formatter, "{viewed}"),
+            Line::Noted(noted) => write!(formatter, "{noted}"),
         }
     }
 }
 
 impl Line {
     fn read(fields: &mut Fields) -> Result<Line, Unread> {
-        match fields.field::<Word<Key>>()? {
+        fields
+            .optional::<Word<Seen>>()
+            .map(|seen| Viewed::read(seen, fields).map(Line::Viewed))
+            .or_else(|| fields.optional::<Word<Note>>().map(|note| Noted::read(note, fields).map(Line::Noted)))
+            .unwrap_or_else(|| fields.field::<Word<Key>>().and_then(|key| key.line(fields)))
+    }
+}
+
+impl Key {
+    fn line(self, fields: &mut Fields) -> Result<Line, Unread> {
+        match self {
             Key::Session => Ok(Line::Read {
                 session: fields.field::<Quoted<_>>()?,
                 cursor: Cursor::new(Offset::new(fields.past(&[Key::Read, Key::To])?.field::<Integer<_>>()?)),
@@ -497,7 +513,9 @@ impl Line {
             Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
         }
     }
+}
 
+impl Line {
     fn quoted(text: &impl fmt::Display) -> String {
         Fields::quoting(&text.to_string())
     }

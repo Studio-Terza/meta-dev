@@ -2,12 +2,12 @@ use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Wrapping};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
-use transcript_ports::{Authorship, Body, Uuid};
+use transcript_ports::{Body, Uuid};
 
 use super::{
     Delivery, FailuresReported, Flailed, FlailedSegments, Halted, JobClosed, JobFlailed, JobHalted, JobOpened,
     JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf,
-    Spawned, StoredRun, Unplaced, Unreported, UnreportedFailures, Unstructured,
+    Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
 use crate::{Account, Excerpt};
 
@@ -45,6 +45,7 @@ struct UnplacedRow {
     message: Uuid,
     ordinal: Ordinal,
     body: Body,
+    run: Option<RunId>,
 }
 
 #[derive(Debug, Columns)]
@@ -90,7 +91,7 @@ impl From<LiveRow> for StoredRun {
 
 impl From<UnplacedRow> for Unplaced {
     fn from(row: UnplacedRow) -> Unplaced {
-        Unplaced { segment: Segment::new(row.message, row.ordinal), body: row.body }
+        Unplaced { segment: Segment::new(row.message, row.ordinal), body: row.body, flailed: row.run }
     }
 }
 
@@ -489,43 +490,35 @@ impl Query for Unstructured {
     type Rows = Vec<Unplaced>;
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Unplaced>, StoreFailure> {
-        let owner = Authorship::Owner;
+        let unplaced = UnplacedSegments.rows(statements)?;
+        Ok(unplaced.into_iter().filter(|segment| segment.flailed.is_none()).collect())
+    }
+}
+
+impl Query for UnplacedSegments {
+    type Rows = Vec<Unplaced>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Unplaced>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             UnplacedRow,
             r#"
 SELECT
   segments.message,
   segments.ordinal,
-  segments.body
+  segments.body,
+  flailed.run AS "run?: i64"
 FROM
-  segments
-  JOIN messages ON messages.uuid = segments.message
-WHERE
-  messages.author = ?1
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      structured
-    WHERE
-      structured.message = segments.message
-      AND structured.ordinal = segments.ordinal
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      flailed
-    WHERE
-      flailed.message = segments.message
-      AND flailed.ordinal = segments.ordinal
-  )
+  unplaced
+  JOIN segments ON segments.message = unplaced.message
+  AND segments.ordinal = unplaced.ordinal
+  JOIN messages ON messages.uuid = unplaced.message
+  LEFT JOIN flailed ON flailed.message = unplaced.message
+  AND flailed.ordinal = unplaced.ordinal
 ORDER BY
   messages.at,
   segments.message,
   segments.ordinal
-"#,
-            owner: Authorship
+"#
         ))?;
         Ok(rows.into_iter().map(Unplaced::from).collect())
     }

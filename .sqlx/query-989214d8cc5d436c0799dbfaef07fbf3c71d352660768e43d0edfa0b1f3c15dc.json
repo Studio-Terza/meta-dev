@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  nodes.id,\n  nodes.project,\n  nodes.facet,\n  nodes.stage,\n  nodes.title,\n  (\n    SELECT\n      MIN(closure.ancestor)\n    FROM\n      closure\n    WHERE\n      closure.relation = ?2\n      AND closure.descendant = nodes.id\n      AND closure.depth = 1\n  ) AS \"parent?: i64\"\nFROM\n  nodes\nWHERE\n  nodes.stage != ?1\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      closure\n      JOIN nodes AS above ON above.id = closure.ancestor\n    WHERE\n      closure.relation = ?2\n      AND closure.descendant = nodes.id\n      AND above.stage = ?1\n  )\nORDER BY\n  nodes.project,\n  nodes.id\n",
+  "query": "\nSELECT\n  nodes.id,\n  nodes.project,\n  nodes.facet,\n  nodes.stage,\n  nodes.title,\n  (\n    SELECT\n      MIN(closure.ancestor)\n    FROM\n      closure\n    WHERE\n      closure.relation = ?1\n      AND closure.descendant = nodes.id\n      AND closure.depth = 1\n  ) AS \"parent?: i64\"\nFROM\n  nodes\n  JOIN live_nodes ON live_nodes.id = nodes.id\nORDER BY\n  nodes.project,\n  nodes.id\n",
   "describe": {
     "columns": [
       {
@@ -66,7 +66,7 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -77,5 +77,5 @@
       true
     ]
   },
-  "hash": "932868377902473b124e0bf549763a3478bfc2c9b4ee3a3094c3caeeaeae71c4"
+  "hash": "989214d8cc5d436c0799dbfaef07fbf3c71d352660768e43d0edfa0b1f3c15dc"
 }

@@ -13,7 +13,7 @@ use crate::graph::{NodeRow, Resolved};
 use crate::{Annotation, JobState, Linked};
 
 #[derive(Debug)]
-pub(super) struct Annotating<'held, 'run> {
+pub(crate) struct Annotating<'held, 'run> {
     provenance: Provenance,
     statements: &'held mut Statements<'run>,
 }
@@ -309,14 +309,18 @@ impl Batch for Directions {
             .collect::<Result<Vec<Written>, Refusal>>()?;
         let recorded = self.file.written(annotating.provenance, annotating.statements)?;
         let closed = self.remit.paid(annotating.statements)?.closed(JobState::Applied, annotating.statements)?;
-        let unflailed = annotating.unflailed()?;
+        let unflailed = Annotating::unflailed(annotating.statements)?;
         Ok(Written::total(written.into_iter().chain([recorded, closed, unflailed])))
     }
 }
 
-impl Annotating<'_, '_> {
-    fn unflailed(&mut self) -> Result<Written, StoreFailure> {
-        self.statements.written(store_ports::query!(
+impl<'held, 'run> Annotating<'held, 'run> {
+    pub(crate) fn new(provenance: Provenance, statements: &'held mut Statements<'run>) -> Annotating<'held, 'run> {
+        Annotating { provenance, statements }
+    }
+
+    pub(crate) fn unflailed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(store_ports::query!(
             r#"
 DELETE FROM
   flailed
@@ -437,6 +441,22 @@ VALUES
         let replaced = Resolved::read(old, self.statements)?;
         let replacing = Resolved::read(by, self.statements)?;
         Linked::new(replacing, NodeRelation::Supersedes, replaced, self.provenance).written(self.statements)
+    }
+
+    pub(super) fn cited(&mut self, node: NodeId, uuid: &Uuid) -> Result<Written, Refusal> {
+        let message = uuid.clone();
+        let provenance = self.provenance;
+        Ok(self.statements.written(store_ports::query!(
+            r#"
+INSERT
+  OR IGNORE INTO node_cites (node, message, provenance)
+VALUES
+  (?1, ?2, ?3)
+"#,
+            node: NodeId,
+            message: Uuid,
+            provenance: Provenance
+        ))?)
     }
 
     pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, Refusal> {

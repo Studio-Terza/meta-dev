@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  provenance,\n  title\nFROM\n  nodes\nWHERE\n  project = ?1\nORDER BY\n  id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "provenance",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "title"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "1a1c67a1ac17fa441c6f515722ad2ba6f667274a7ba75c4d0e8394e40ccd5a15"
+}

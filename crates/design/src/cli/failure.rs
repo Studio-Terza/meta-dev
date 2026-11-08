@@ -4,7 +4,7 @@ use std::io;
 use std::path::PathBuf;
 
 use design_model::{
-    JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated,
+    Ending, JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated,
 };
 use design_store::{Refusal, Unpaid};
 use dispatch_ports::{DispatchFailure, Stall};
@@ -17,6 +17,7 @@ use transcript_ports::ReadFailure;
 
 use structurer::{Lapse, Misread, SegmentRef, Uncovered};
 
+use super::output::Count;
 use super::request::Unresolved;
 use super::sequel::Sequel;
 use crate::Outcome;
@@ -24,7 +25,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref | job <job-id>> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings))"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref | job <job-id>> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings) | view (current-decision | open-questions | outline) [<node-id>] | view (unplaced | notes) | import-notes <file>)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -47,16 +48,30 @@ pub enum Failure {
     Unnumbered(#[from] Unnumbered),
     #[error("no node n{} in the design store", .0.into_inner())]
     Unplaced(NodeId),
+    #[error("node n{} is {ending}, itself or through a node it refines; view a current node", node.into_inner())]
+    Ended { node: NodeId, ending: Ending },
     #[error("no run of job {0} in the design store")]
     Unrun(JobId),
     #[error("no project {0} in the design store; run design init {0} in its repository first")]
     Unrooted(Project),
+    #[error("no project is configured here; name a node, or run design init <project> in its repository first")]
+    Unconfigured,
     #[error("cannot keep the local config: {0}")]
     Config(#[from] ConfigFailure),
     #[error("cannot read the directives file: {0}")]
     Directives(#[source] FileFailure),
     #[error("cannot read the directives: {0}")]
     Misread(#[from] Misread),
+    #[error("cannot read the notes file: {0}")]
+    Notes(#[source] FileFailure),
+    #[error("project {0} already holds imported notes; nothing was written")]
+    Reimported(Project),
+    #[error(
+        "{rulings} RULING lines resolve no owner words, neither a quote nor a cited owner message, or cite an owner message of several segments without quoting the decided words (an ambiguous anchor); quote or cite the owner on each and import again; nothing was written"
+    )]
+    Unanchored { rulings: Count },
+    #[error("{lines} notes lines came in but {nodes} nodes came out")]
+    Unreconciled { lines: Count, nodes: Count },
     #[error("{0}; nothing was written")]
     Unresolved(#[from] Unresolved),
     #[error("{0}; nothing was written")]
@@ -146,6 +161,7 @@ impl From<Refusal> for Failure {
     fn from(refusal: Refusal) -> Failure {
         match refusal {
             Refusal::Cyclic(cycle) => Failure::Unresolved(Unresolved::from(cycle)),
+            Refusal::Ancestral { old, by } => Failure::Unresolved(Unresolved::Ancestral { old, by }),
             Refusal::Inverted(inversion) => Failure::Inverted { edge: inversion.edge() },
             Refusal::Misstaged(misstaged) => Failure::from(misstaged),
             Refusal::Unpaid(unpaid) => Failure::from(unpaid),
@@ -174,7 +190,43 @@ impl Failure {
         match self {
             Failure::Unresolved(unresolved) => Ok(Lapse::refused(&unresolved)),
             Failure::Uncovered(uncovered) => Ok(Lapse::from(uncovered)),
-            other => Err(other),
+            other @ (Failure::Usage
+            | Failure::SelfConsuming(..)
+            | Failure::Unset(..)
+            | Failure::Unreadable(..)
+            | Failure::Files(..)
+            | Failure::Read(..)
+            | Failure::Write(..)
+            | Failure::Unmatched(..)
+            | Failure::Project(..)
+            | Failure::Unnumbered(..)
+            | Failure::Unplaced(..)
+            | Failure::Ended { .. }
+            | Failure::Unrun(..)
+            | Failure::Unrooted(..)
+            | Failure::Unconfigured
+            | Failure::Config(..)
+            | Failure::Directives(..)
+            | Failure::Misread(..)
+            | Failure::Notes(..)
+            | Failure::Reimported(..)
+            | Failure::Unanchored { .. }
+            | Failure::Unreconciled { .. }
+            | Failure::Unspecified(..)
+            | Failure::Unstated(..)
+            | Failure::Misstaged { .. }
+            | Failure::Inverted { .. }
+            | Failure::Busy(..)
+            | Failure::Store(..)
+            | Failure::Unlock(..)
+            | Failure::Dispatch(..)
+            | Failure::Flailed { .. }
+            | Failure::Stalled { .. }
+            | Failure::Deaf(..)
+            | Failure::Unheard(..)
+            | Failure::Render(..)
+            | Failure::Released(..)
+            | Failure::Unreleased { .. }) => Err(other),
         }
     }
 

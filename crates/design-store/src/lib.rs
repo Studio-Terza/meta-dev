@@ -1,18 +1,25 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod acyclic;
 mod annotation;
 mod applied_file;
 mod boundary;
+mod citation;
 mod covered;
 mod cursors;
 mod directions;
 mod earlier_lines;
 mod graph;
+mod imported_notes;
+mod imports;
 mod link;
+mod listed;
 mod placed;
 mod placement;
 mod prefixed;
 mod prefixes;
 mod project_root;
+mod quoted;
 mod relative;
 mod remit;
 mod runs;
@@ -29,23 +36,28 @@ pub use acyclic::{Closes, Cycle, Refusal};
 pub use annotation::{Annotation, Remarking};
 pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
 pub use boundary::{Account, Excerpt, Hit, RelationName, ShapeName};
+pub use citation::Citation;
 pub use covered::Covered;
 pub use cursors::Cursors;
 pub use directions::{Directed, Directions};
 pub use earlier_lines::EarlierLines;
-pub use graph::{Cast, ContextNodes, Linked, Planting, Resolved, Resolving, Restaged};
+pub use graph::{Cast, ContextNodes, Ended, Linked, Planting, Resolved, Resolving, Restaged};
+pub use imported_notes::{ImportedEnding, ImportedNotes, Noted};
+pub use imports::{Imported, Imports};
 use link::Link;
+use listed::Listed;
 pub use placed::Placed;
-pub use placement::Placement;
-pub use prefixed::{NextNode, Prefixed, Spoken, Started};
+pub use placement::{CurrentSpans, Placement};
+pub use prefixed::{Cited, NextNode, Prefixed, Spoken, Started};
 pub use prefixes::{Prefixes, Shortest};
 pub use project_root::ProjectRoot;
+pub use quoted::{Quoted, QuotedSegments};
 use relative::Relative;
 pub use remit::{JobRepeated, Remit, Unpaid};
 pub use runs::{
     FailuresReported, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns,
-    NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unreported,
-    UnreportedFailures, Unstructured,
+    NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
+    UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
 use runs::{JobClosed, JobState};
 pub use scope::Scope;
