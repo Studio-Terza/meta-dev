@@ -29,7 +29,7 @@ enum Lexeme {
     Close,
     #[regex(r#""[^"\n]*""#)]
     Double,
-    #[regex(r"'([^'\n]|'\p{L})*'")]
+    #[regex(r"'(([^'\n]*[^\s'])?')+", |lex| !lex.remainder().chars().next().is_some_and(|letter| letter.is_alphanumeric() || letter == '_'))]
     Single,
     #[regex(r"[0-9a-f]{8}")]
     #[regex(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
@@ -120,8 +120,18 @@ pub struct Line {
     form: Form,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Ending {
+    #[default]
+    Break,
+    Open,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Notes(Vec<Line>);
+pub struct Notes {
+    lines: Vec<Line>,
+    ending: Ending,
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Lexed<'text> {
@@ -141,25 +151,26 @@ impl Notes {
         let rows = Row::lexer(text)
             .spanned()
             .fold(Rows::default(), |rows, (row, range)| rows.taking(row, text.get(range).unwrap_or_default()));
-        Notes(rows.finished())
+        rows.finished()
     }
 
     #[must_use]
     pub fn gathered(lines: impl IntoIterator<Item = Line>) -> Notes {
         let numbered: BTreeMap<usize, Line> = lines.into_iter().map(|line| (line.number, line)).collect();
         let last = numbered.keys().next_back().copied().unwrap_or_default();
-        Notes(
-            (1..=last)
+        Notes {
+            lines: (1..=last)
                 .map(|number| {
                     numbered.get(&number).cloned().unwrap_or(Line { number, form: Form::Layout(Layout::default()) })
                 })
                 .collect(),
-        )
+            ending: Ending::Break,
+        }
     }
 
     #[must_use]
     pub fn lines(&self) -> &[Line] {
-        &self.0
+        &self.lines
     }
 }
 
@@ -171,10 +182,10 @@ impl<'text> Rows<'text> {
         }
     }
 
-    fn finished(self) -> Vec<Line> {
+    fn finished(self) -> Notes {
         match self.open {
-            Some(_) => self.closed().lines,
-            None => self.lines,
+            Some(_) => Notes { lines: self.closed().lines, ending: Ending::Open },
+            None => Notes { lines: self.lines, ending: Ending::Break },
         }
     }
 
@@ -388,7 +399,19 @@ impl Mark {
 
 impl fmt::Display for Notes {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.iter().try_for_each(|line| writeln!(formatter, "{line}"))
+        self.lines.split_last().map_or(Ok(()), |(last, earlier)| {
+            earlier.iter().try_for_each(|line| writeln!(formatter, "{line}"))?;
+            write!(formatter, "{last}{}", self.ending)
+        })
+    }
+}
+
+impl fmt::Display for Ending {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Ending::Break => writeln!(formatter),
+            Ending::Open => Ok(()),
+        }
     }
 }
 

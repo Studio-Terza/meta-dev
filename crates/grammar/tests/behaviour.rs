@@ -374,7 +374,7 @@ laws::table!(
     ]
 );
 
-const NOTED: &str = "(- |-|# |#|RULING|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,6}| |\t|[.,;~é]){0,14}";
+const NOTED: &str = "(- |-|# |#|RULING|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|[.,;~é]){0,14}";
 
 const INKED: &str =
     "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
@@ -385,10 +385,21 @@ laws::law!(a_notes_line_is_rendered_back_to_its_exact_text, NOTED, text, {
     prop_assert_eq!(Line::read(1, &text).to_string(), text);
 });
 
-laws::law!(a_notes_file_is_rendered_back_to_its_exact_text, vec(NOTED, 0..8), lines, {
-    let text: String = lines.iter().flat_map(|line| [line.as_str(), "\n"]).collect();
+laws::law!(a_notes_file_is_rendered_back_to_its_exact_text, (vec(NOTED, 0..8), "\n?"), file, {
+    let (lines, ending) = file;
+    let text = [lines.join("\n"), ending].concat();
     prop_assert_eq!(Notes::read(&text).to_string(), text);
 });
+
+laws::law!(
+    a_single_quoted_quote_keeps_every_apostrophe_inside_it,
+    "[a-z]{1,6}('s|s')?( [a-z]{1,6}('s|s')?){0,3}",
+    quote,
+    {
+        let line = format!("RULING (owner): '{quote}', as said");
+        prop_assert_eq!(Line::read(1, &line).read_by(Named), [vec![quote], vec![], vec![]]);
+    }
+);
 
 laws::law!(
     the_content_lines_of_a_notes_file_gathered_by_number_give_the_file_back_with_layout_lines_empty,
@@ -521,5 +532,49 @@ laws::table!(
         ],
         "an \"unclosed quote and a 'stray" => <[Vec<String>; 3]>::default(),
         "# Notes \"quoted\" 1f2e3d4c" => <[Vec<String>; 3]>::default(),
+    ]
+);
+
+laws::table!(
+    a_single_quote_keeps_a_plural_possessive_inside_it,
+    |text: &&str| Line::read(1, text).read_by(Named),
+    [
+        "RULING (owner): 'keep the owners' rules as they are'" => [
+            vec!["keep the owners' rules as they are".to_owned()],
+            vec![],
+            vec![],
+        ],
+        "RULING (owner): 'the gardeners' tools stay', then 'the workers' sheds go'." => [
+            vec!["the gardeners' tools stay".to_owned(), "the workers' sheds go".to_owned()],
+            vec![],
+            vec![],
+        ],
+        "RULING (owner): 'it's the owners' call' (0a1b2c3d)" => [
+            vec!["it's the owners' call".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec![],
+        ],
+        "RULING (owner): \"the owners' rules\" and 'beds' rows'" => [
+            vec!["the owners' rules".to_owned(), "beds' rows".to_owned()],
+            vec![],
+            vec![],
+        ],
+        "RULING (owner): 'rock'n roll" => <[Vec<String>; 3]>::default(),
+        "RULING (owner): 'a 'b c'" => [vec!["b c".to_owned()], vec![], vec![]],
+    ]
+);
+
+laws::table!(
+    a_notes_file_without_a_final_newline_renders_back_to_its_exact_text,
+    |lines: &&[&str]| {
+        let text = lines.join("\n");
+        Notes::read(&text).to_string() == text
+    },
+    [
+        &["a", "b"][..] => true,
+        &["# Notes", "last"][..] => true,
+        &["RULING (owner): 'the owners' rules'", "  "][..] => true,
+        &[" \t"][..] => true,
+        &[""][..] => true,
     ]
 );
