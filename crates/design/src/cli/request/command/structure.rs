@@ -19,6 +19,7 @@ use super::apply::{Application, Parsed};
 use crate::Outcome;
 use crate::cli::failure::{Failure, Flail, Flails};
 use crate::cli::output::{Attempted, Count, Flailing, Lapsed, Line};
+use crate::cli::sequel::Sequel;
 
 #[derive(Debug)]
 pub struct Crew<'ports, D: Dispatch, C: Clock> {
@@ -78,6 +79,7 @@ struct Concluded {
 #[derive(Debug)]
 struct Worked {
     job: JobId,
+    sequel: Sequel,
     halt: Option<Halt>,
     lines: Vec<Line>,
 }
@@ -134,15 +136,17 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let interrupted = self.store.read(OpenJobs)?;
         self.store.write(JobsInterrupted)?;
         let unplaced = self.store.read(Unstructured)?;
-        let progress = unplaced
-            .chunks(structurer::Job::SEGMENTS)
-            .try_fold(Progress::Going(Vec::new()), |progress, chunk| progress.next(self, chunk))?;
+        let chunks = unplaced.chunks(structurer::Job::SEGMENTS);
+        let sequels = chunks.clone().skip(1).map(|_later| Sequel::WentOn).chain([Sequel::NoMoreJobs]);
+        let progress = chunks
+            .zip(sequels)
+            .try_fold(Progress::Going(Vec::new()), |progress, (chunk, sequel)| progress.next(self, chunk, sequel))?;
         let flailed = self.store.read(FlailedSegments)?;
         lock.end()?;
         Ok(Structured { reaped, interrupted, worked: progress.worked(), flailed })
     }
 
-    fn job(&self, chunk: &[Unplaced]) -> Result<Worked, Failure> {
+    fn job(&self, chunk: &[Unplaced], sequel: Sequel) -> Result<Worked, Failure> {
         let id = self.store.read(NextJob)?;
         let context = self.store.read(ContextNodes)?;
         let said = chunk.iter().map(|unplaced| {
@@ -153,7 +157,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let remit = Remit::job(id, segments.clone());
         self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
-        let halted = ended.ending.halt().map(|halt| halt.halted(id));
+        let halted = ended.ending.halt().map(|halt| halt.halted(id, sequel));
         halted.map(|halted| self.store.write(halted)).transpose()?;
         let flailed = ended.ending.halt().and_then(Halt::flailed);
         let held = flailed.map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
@@ -163,7 +167,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let runs = self.store.read(RunsOf::from(id))?;
         let ran = runs.iter().map(|ran| Line::Ran(Attempted::new(ran.identity(), id, ran.state(), ran.usage())));
         let lines = retried.chain(closing).chain(ran).collect();
-        Ok(Worked { job: id, halt: ended.ending.halt().cloned(), lines })
+        Ok(Worked { job: id, sequel, halt: ended.ending.halt().cloned(), lines })
     }
 }
 
@@ -272,8 +276,8 @@ impl Ending {
 }
 
 impl Halt {
-    fn halted(&self, job: JobId) -> JobHalted {
-        JobHalted::new(job, Halted::from(self), Account::told(&self.clone().failure(job)))
+    fn halted(&self, job: JobId, sequel: Sequel) -> JobHalted {
+        JobHalted::new(job, Halted::from(self), Account::told(&self.clone().failure(job, sequel)))
     }
 
     fn flailed(&self) -> Option<&Lapse> {
@@ -290,9 +294,11 @@ impl Halt {
         }
     }
 
-    fn failure(self, job: JobId) -> Failure {
+    fn failure(self, job: JobId, sequel: Sequel) -> Failure {
         match self {
-            Halt::Flailed(lapse) => Failure::Flailed(Flails::new(Flail::new(job, lapse), Vec::new())),
+            Halt::Flailed(lapse) => {
+                Failure::Flailed { flails: Flails::new(Flail::new(job, lapse), Vec::new()), sequel }
+            }
             Halt::Stalled(stall) => Failure::Stalled { job, stall },
         }
     }
@@ -329,9 +335,10 @@ impl Progress {
         self,
         structure: &Structure<'_, S, D, C>,
         chunk: &[Unplaced],
+        sequel: Sequel,
     ) -> Result<Progress, Failure> {
         match self {
-            Progress::Going(worked) => Ok(Progress::after(worked, structure.job(chunk)?)),
+            Progress::Going(worked) => Ok(Progress::after(worked, structure.job(chunk, sequel)?)),
             Progress::Halted(worked) => Ok(Progress::Halted(worked)),
         }
     }
@@ -381,7 +388,7 @@ impl Structured {
         let jobs = Count::new(self.worked.len());
         let stalled = self.worked.iter().find_map(|worked| {
             let halting = worked.halt.clone().filter(|halt| halt.course() == Course::Halting);
-            halting.map(|halt| halt.failure(worked.job))
+            halting.map(|halt| halt.failure(worked.job, worked.sequel))
         });
         let flails: Vec<Flail> = self
             .worked
@@ -390,8 +397,15 @@ impl Structured {
                 worked.halt.as_ref().and_then(Halt::flailed).map(|lapse| Flail::new(worked.job, lapse.clone()))
             })
             .collect();
-        let flailed =
-            flails.split_first().map(|(first, rest)| Failure::Flailed(Flails::new(first.clone(), rest.to_vec())));
+        let sequel = self
+            .worked
+            .iter()
+            .rev()
+            .find_map(|worked| worked.halt.as_ref().and_then(Halt::flailed).map(|_lapse| worked.sequel));
+        let flailed = flails.split_first().zip(sequel).map(|((first, rest), sequel)| Failure::Flailed {
+            flails: Flails::new(first.clone(), rest.to_vec()),
+            sequel,
+        });
         stalled.or(flailed).map_or(Ok(jobs), Err)
     }
 }
