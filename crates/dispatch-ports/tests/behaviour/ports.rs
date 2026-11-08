@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use dispatch_ports::{
-    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, Started, SystemClock,
-    Timeout, Tokens, Usage, Watch, Watched,
+    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, Stall, Started,
+    SystemClock, Timeout, Tokens, Usage, Watch, Watched,
 };
 use port_core::Run;
 
@@ -74,7 +74,7 @@ laws::table!(
     an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline,
     Stalling::watched,
     [
-        &["-c", "exec sleep 30"][..] => Some(Stalled { watched: Watched::Overdue, left: None }),
-        &["-c", "exec 0<&-; exec sleep 30"][..] => Some(Stalled { watched: Watched::Overdue, left: None }),
+        &["-c", "exec sleep 30"][..] => Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
+        &["-c", "exec 0<&-; exec sleep 30"][..] => Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
     ]
 );

@@ -4,7 +4,7 @@ use grammar::reply::Inked;
 use serde::{Deserialize, Deserializer, de};
 
 use super::{Finished, Reply, Told, Usage};
-use crate::{Stderr, Watched};
+use crate::{Stall, Stderr, Watched};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Unreadable {
@@ -100,8 +100,8 @@ impl From<Output> for Watched {
     fn from(output: Output) -> Watched {
         match output {
             Output::Finished(finished) => Watched::Finished(finished),
-            Output::Errored(errored) => Watched::Errored(errored),
-            Output::Unreadable(unreadable) => Watched::Unreadable(unreadable),
+            Output::Errored(errored) => Watched::Stalled(Stall::Errored(errored)),
+            Output::Unreadable(unreadable) => Watched::Stalled(Stall::Unreadable(unreadable)),
         }
     }
 }

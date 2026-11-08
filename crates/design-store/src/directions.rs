@@ -4,7 +4,7 @@ use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, Sp
 use port_core::Op;
 use store_ports::Written;
 
-use crate::{Refusal, Unseen};
+use crate::{Refusal, Remit, Unseen};
 
 use boundary::Annotating;
 pub(crate) use boundary::Columns;
@@ -24,12 +24,13 @@ pub struct Directions {
     provenance: Provenance,
     file: Unseen,
     directed: Vec<Directed>,
+    remit: Remit,
 }
 
 impl Directions {
     #[must_use]
-    pub fn new(provenance: Provenance, file: Unseen, directed: Vec<Directed>) -> Directions {
-        Directions { provenance, file, directed }
+    pub fn new(provenance: Provenance, file: Unseen, directed: Vec<Directed>, remit: Remit) -> Directions {
+        Directions { provenance, file, directed, remit }
     }
 }
 
@@ -43,19 +44,6 @@ impl Directed {
             | Directed::Related { .. }
             | Directed::Superseded(_)
             | Directed::Conversational { .. } => None,
-        }
-    }
-
-    #[must_use]
-    pub fn covered(&self) -> Vec<&Segment> {
-        match self {
-            Directed::Placed { segment, .. }
-            | Directed::Sensed { segment, .. }
-            | Directed::Conversational { segment } => {
-                vec![segment]
-            }
-            Directed::Related { source, target, .. } => vec![source, target],
-            Directed::Proposed { .. } | Directed::Superseded(_) => Vec::new(),
         }
     }
 

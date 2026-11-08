@@ -5,7 +5,7 @@ use std::sync::{Mutex, PoisonError};
 
 use dispatch_ports::{
     AgentRun, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job, Output,
-    Pause, Pid, Prompt, Reply, Started, Stderr, Timeout, Tokens, Told, Unreadable, Usage, Wall, Watch, Watched,
+    Pause, Pid, Prompt, Reply, Stall, Started, Stderr, Timeout, Tokens, Told, Unreadable, Usage, Wall, Watch, Watched,
     clock_ops, dispatch_ops,
 };
 use laws::proptest::prelude::prop_assert_eq;
@@ -175,7 +175,10 @@ laws::law!(a_deadline_that_passes_during_a_sleep_kills_the_run_on_the_next_check
     let watching = Watching { timeout, sleeping_after, finishing: None };
     let checks = Calls::new(sleeping_after.saturating_add(1));
     let watched = watching.watched().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    prop_assert_eq!(watched, Observed { watched: Watched::Overdue, calls: [checks, checks, Calls::new(1)] });
+    prop_assert_eq!(
+        watched,
+        Observed { watched: Watched::Stalled(Stall::Overdue), calls: [checks, checks, Calls::new(1)] }
+    );
 });
 
 laws::law!(a_run_that_replies_before_its_deadline_is_finished_and_released_once, (20..200_u32, 1..9_usize), drawn, {

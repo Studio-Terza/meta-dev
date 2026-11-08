@@ -11,8 +11,9 @@ use design_model::{
 use design_store::{
     AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, FlailedSegments, JobFlailed, JobOpened,
     Linked, LiveRuns, NextJob, NextNode, NextRun, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName,
-    Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors,
-    SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
+    Remit, Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen,
+    SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen,
+    Unstructured,
 };
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -598,7 +599,7 @@ impl Proposals {
 
     fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, Box<dyn Error>> {
         let file = Proposals::unseen(store, &format!("{directed:?}"))?;
-        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), file, directed))?)
+        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), file, directed, Remit::Unbounded))?)
     }
 
     fn unseen(store: &Port<'_, Sqlite>, contents: &str) -> Result<Unseen, Box<dyn Error>> {
@@ -663,17 +664,30 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
     let root = Projects::rooted(&store, "p")?;
     let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
     let refused = Proposals::unseen(&store, "refused")?;
-    assert!(store.write(Directions::new(Provenance::from(Entered::Apply), refused, vec![stray])).is_err());
-    assert!(matches!(store.read(AppliedFile::from(Bytes::from("refused")))?, Seen::Unseen(_)));
+    assert!(
+        store.write(Directions::new(Provenance::from(Entered::Apply), refused, vec![stray], Remit::Unbounded)).is_err()
+    );
+    let [asked, answered] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    let job: Remit = [asked.clone(), answered].into_iter().collect();
+    let unpaid = Proposals::unseen(&store, "unpaid")?;
+    let directed = vec![Proposals::child(root, 2)?, Directed::Conversational { segment: asked.clone() }];
+    let refusal = store.write(Directions::new(Provenance::from(Entered::Apply), unpaid, directed.clone(), job)).err();
+    assert!(matches!(refusal, Some(Refusal::Unpaid(_))));
     let kept = Proposals::unseen(&store, "kept")?;
-    store.write(Directions::new(Provenance::from(Entered::Apply), kept, vec![Proposals::child(root, 2)?]))?;
+    store.write(Directions::new(Provenance::from(Entered::Apply), kept, directed, [asked].into_iter().collect()))?;
     let other = Proposals::unseen(&store, "other")?;
-    store.write(Directions::new(Provenance::from(Entered::Apply), other, Vec::new()))?;
-    let seen = [Bytes::from("kept"), Bytes::from("other"), Bytes::from("kept ")]
-        .map(|contents| store.read(AppliedFile::from(contents)).map(|seen| Ids::earlier(&seen)))
-        .into_iter()
-        .collect::<Result<Vec<Option<i64>>, _>>()?;
-    assert_eq!(seen, [Some(1), Some(2), None]);
+    store.write(Directions::new(Provenance::from(Entered::Apply), other, Vec::new(), Remit::Unbounded))?;
+    let seen = [
+        Bytes::from("kept"),
+        Bytes::from("other"),
+        Bytes::from("kept "),
+        Bytes::from("refused"),
+        Bytes::from("unpaid"),
+    ]
+    .map(|contents| store.read(AppliedFile::from(contents)).map(|seen| Ids::earlier(&seen)))
+    .into_iter()
+    .collect::<Result<Vec<Option<i64>>, _>>()?;
+    assert_eq!(seen, [Some(1), Some(2), None, None, None]);
     Ok(())
 }
 
@@ -799,6 +813,7 @@ impl Ends {
                     target: Proposals::segment("o1", edge.parent),
                     relation,
                 }],
+                Remit::Unbounded,
             ))),
         }
     }
@@ -1027,7 +1042,9 @@ impl Staging {
     fn misstaged(refusal: Refusal) -> Result<Misstaged, Box<dyn Error>> {
         match refusal {
             Refusal::Misstaged(misstaged) => Ok(misstaged),
-            other @ (Refusal::Cyclic(_) | Refusal::Inverted(_) | Refusal::Store(_)) => Err(other.into()),
+            other @ (Refusal::Cyclic(_) | Refusal::Inverted(_) | Refusal::Unpaid(_) | Refusal::Store(_)) => {
+                Err(other.into())
+            }
         }
     }
 }
@@ -1261,7 +1278,7 @@ fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(
 }
 
 #[test]
-fn the_structurer_s_context_keeps_the_project_root_past_200_nodes() -> Result<(), Box<dyn Error>> {
+fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Dag::planting(&store, Entry::new("q".parse()?, Facet::Project, Provenance::from(Entered::Init)))?)?;
@@ -1275,8 +1292,14 @@ fn the_structurer_s_context_keeps_the_project_root_past_200_nodes() -> Result<()
         .map(|step| Ok(store.write(Restaged::new(Dag::resolved(&store, specified)?, Staging::transition(step)?))?))
         .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
     store.write(Restaged::new(Dag::resolved(&store, dropped)?, Staging::transition(Step::Drop)?))?;
-    let context: Vec<NodeId> = store.read(ContextNodes)?.iter().map(AnyNode::identity).collect();
-    assert_eq!(context, (2..=201).chain([1]).map(NodeId::new).collect::<Vec<NodeId>>());
+    let child = Dag::node(&store, Facet::Feature)?;
+    store.write(child)?;
+    Dag::linked(&store, [NodeId::new(204), specified], NodeRelation::Refines)??;
+    let context: Vec<(NodeId, Option<NodeId>)> =
+        store.read(ContextNodes)?.iter().map(|outline| (outline.node(), outline.parent())).collect();
+    let live = (2..=201).chain([203, 204, 1]).map(NodeId::new);
+    let parents = live.map(|node| (node, (node == NodeId::new(204)).then_some(specified)));
+    assert_eq!(context, parents.collect::<Vec<(NodeId, Option<NodeId>)>>());
     Ok(())
 }
 

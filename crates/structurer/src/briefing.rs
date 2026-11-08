@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use design_model::{Confidence, Explicitness, Facet, SegmentRelation, SenseKind, SpanRelation, Specificity};
+use design_model::{Confidence, Explicitness, Facet, Outline, SegmentRelation, SenseKind, SpanRelation, Specificity};
 use grammar::cited::Cited;
 use grammar::output::field::{Id, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
@@ -10,7 +10,6 @@ use newtype::Newtype;
 use strum::VariantArray;
 use text_lines::Lines;
 
-use crate::job::Context;
 use crate::lapse::Retried;
 use crate::verb::Form;
 use crate::{Attempt, Directive, Job, Lapse, NodeRef, Said, SegmentRef};
@@ -25,7 +24,7 @@ enum Brief {
     Choices(Choice),
     Example(Directive),
     Segment(Said),
-    Node(Context),
+    Node(Outline),
     Retry(Lapse),
 }
 
@@ -95,6 +94,9 @@ pub(crate) struct Quoting<'text, Text: fmt::Display>(&'text Text);
 
 #[derive(Clone, Copy, Debug)]
 struct Listed(Choice);
+
+#[derive(Clone, Copy, Debug)]
+struct Outlined<'outline>(&'outline Outline);
 
 impl Rule {
     const OPENING: [Rule; 3] = [Rule::Role, Rule::Reply, Rule::Choose];
@@ -170,7 +172,7 @@ impl Job {
 
     fn examples(&self) -> Vec<Directive> {
         let segment = self.segments().first().map(Said::segment);
-        let node = self.context().first().map(|context| NodeRef::Stored(context.node()));
+        let node = self.context().first().map(|outline| NodeRef::Stored(outline.node()));
         let placed = segment.cloned().zip(node).map(|(segment, node)| Directive::Place {
             segment,
             node,
@@ -212,7 +214,7 @@ impl fmt::Display for Brief {
             Brief::Segment(said) => {
                 write!(formatter, "{} {} {}", Key::Segment, said.segment(), Quoting::from(said.body()))
             }
-            Brief::Node(context) => write!(formatter, "{} {context}", Key::Node),
+            Brief::Node(outline) => write!(formatter, "{} {}", Key::Node, Outlined(outline)),
             Brief::Retry(lapse) => write!(formatter, "{} {}", Key::Retry, Retried::from(lapse)),
         }
     }
@@ -236,7 +238,7 @@ impl Brief {
             Key::Choices => fields.field::<Word<Choice>>()?.read(fields).map(Brief::Choices),
             Key::Example => Ok(Brief::Example(fields.field::<Phrase<_>>()?)),
             Key::Segment => Said::read(fields).map(Brief::Segment),
-            Key::Node => Context::read(fields).map(Brief::Node),
+            Key::Node => Outlined::read(fields).map(Brief::Node),
             Key::Retry => Lapse::read(fields).map(Brief::Retry),
         }
     }
@@ -248,15 +250,15 @@ impl Said {
     }
 }
 
-impl Context {
-    fn read(fields: &mut Fields) -> Result<Context, Unread> {
-        Ok(Context::new(
+impl Outlined<'_> {
+    fn read(fields: &mut Fields) -> Result<Outline, Unread> {
+        let outline = Outline::new(
             fields.field::<Id<_>>()?,
             fields.field::<Phrase<_>>()?,
             fields.field::<Word<_>>()?,
             fields.field::<Word<_>>()?,
-        )
-        .titled(fields.optional::<Quoted<_>>()))
+        );
+        Ok(outline.parented(fields.optional::<Id<_>>()).titled(fields.optional::<Quoted<_>>()))
     }
 }
 
@@ -266,17 +268,19 @@ impl fmt::Display for Listed {
     }
 }
 
-impl fmt::Display for Context {
+impl fmt::Display for Outlined<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let outline = self.0;
         write!(
             formatter,
             "n{} {} {} {}",
-            self.node().into_inner(),
-            Quoting::from(self.project()),
-            self.facet(),
-            self.stage()
+            outline.node().into_inner(),
+            Quoting::from(outline.project()),
+            outline.facet(),
+            outline.stage()
         )?;
-        self.title().iter().try_for_each(|title| write!(formatter, " {}", Quoting::from(*title)))
+        outline.parent().iter().try_for_each(|parent| write!(formatter, " n{}", parent.into_inner()))?;
+        outline.title().iter().try_for_each(|title| write!(formatter, " {}", Quoting::from(*title)))
     }
 }
 

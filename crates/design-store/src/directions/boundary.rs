@@ -3,7 +3,7 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Standing, Supersession, Vague,
 };
 use newtype::Counter;
-use store_ports::{Batch, Columns as Row, Statements, StoreFailure, Written};
+use store_ports::{Batch, Columns as Row, Query, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
 use super::Directions;
@@ -107,51 +107,13 @@ WHERE
         let rows = statements.rows(store_ports::query!(
             Columns,
             r#"
-SELECT
+SELECT DISTINCT
   message AS "message!: String",
   ordinal AS "ordinal!: i64"
 FROM
-  (
-    SELECT
-      message,
-      ordinal
-    FROM
-      span_edges
-    WHERE
-      message = ?1
-    UNION
-    SELECT
-      message,
-      ordinal
-    FROM
-      senses
-    WHERE
-      message = ?1
-    UNION
-    SELECT
-      message,
-      ordinal
-    FROM
-      conversational
-    WHERE
-      message = ?1
-    UNION
-    SELECT
-      source_message,
-      source_ordinal
-    FROM
-      segment_links
-    WHERE
-      source_message = ?1
-    UNION
-    SELECT
-      target_message,
-      target_ordinal
-    FROM
-      segment_links
-    WHERE
-      target_message = ?1
-  )
+  structured
+WHERE
+  message = ?1
 ORDER BY
   ordinal
 "#,
@@ -346,6 +308,8 @@ impl Batch for Directions {
             .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, Refusal>>()?;
         let recorded = self.file.written(annotating.provenance, annotating.statements)?;
+        let covered = self.remit.covered().rows(annotating.statements)?;
+        self.remit.paid(&covered)?;
         let unflailed = annotating.unflailed()?;
         Ok(Written::total(written.into_iter().chain([recorded, unflailed])))
     }

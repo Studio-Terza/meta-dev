@@ -1,6 +1,6 @@
 use port_core::Held;
 
-use crate::{AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Finished, Pause, Unreadable};
+use crate::{AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Finished, Pause, Unreadable, Usage};
 
 #[derive(Debug)]
 pub struct Watch<'ports, D: Dispatch, C: Clock> {
@@ -11,9 +11,27 @@ pub struct Watch<'ports, D: Dispatch, C: Clock> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Watched {
     Finished(Finished),
+    Stalled(Stall),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Stall {
+    #[error("the agent's run ended in error: {0}")]
     Errored(Errored),
+    #[error("the agent's output was unreadable: {0}")]
     Unreadable(Unreadable),
+    #[error("the run passed its deadline and was killed")]
     Overdue,
+}
+
+impl Stall {
+    #[must_use]
+    pub fn usage(&self) -> Option<Usage> {
+        match self {
+            Stall::Errored(errored) => Some(errored.usage()),
+            Stall::Unreadable(_) | Stall::Overdue => None,
+        }
+    }
 }
 
 impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
@@ -29,14 +47,14 @@ impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
             .checks(self.clock.now(), Self::PAUSE)
             .map(|_planned| self.checked(&mut run))
             .find_map(Result::transpose)
-            .unwrap_or(Ok(Watched::Overdue))?;
+            .unwrap_or(Ok(Watched::Stalled(Stall::Overdue)))?;
         run.end()?;
         Ok(watched)
     }
 
     fn checked(&self, run: &mut AgentRun) -> Result<Option<Watched>, DispatchFailure> {
         match AsRef::<Deadline>::as_ref(run).due(self.clock.now()) {
-            Due::Passed => Ok(Some(Watched::Overdue)),
+            Due::Passed => Ok(Some(Watched::Stalled(Stall::Overdue))),
             Due::Pending => Ok(self.dispatch.output(run)?.map(Watched::from).or_else(|| self.slept())),
         }
     }

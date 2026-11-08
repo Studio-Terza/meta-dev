@@ -1,7 +1,7 @@
 mod boundary;
 
 use design_model::{JobId, RunId, Segment};
-use dispatch_ports::{Deadline, Pid, Started, Usage};
+use dispatch_ports::{Deadline, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
 use strum::VariantArray;
@@ -37,6 +37,8 @@ pub enum JobState {
     Repeated,
     #[name("flailed")]
     Flailed,
+    #[name("stalled")]
+    Stalled,
     #[name("interrupted")]
     Interrupted,
 }
@@ -147,6 +149,16 @@ impl Spawned {
 impl AsRef<Deadline> for Spawned {
     fn as_ref(&self) -> &Deadline {
         &self.deadline
+    }
+}
+
+impl From<&Stall> for RunState {
+    fn from(stall: &Stall) -> RunState {
+        match stall {
+            Stall::Errored(_) => RunState::Errored,
+            Stall::Unreadable(_) => RunState::Unreadable,
+            Stall::Overdue => RunState::Overdue,
+        }
     }
 }
 

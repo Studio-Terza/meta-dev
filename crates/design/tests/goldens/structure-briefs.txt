@@ -23,6 +23,7 @@ segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
 segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
 node n1 "demo" project vague
+node n5 "demo" feature terminal n1 "h"
 node n2 "other" project vague
 rule "You structure a project owner's words into a design graph."
 rule "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
@@ -49,6 +50,7 @@ segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
 segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
 node n1 "demo" project vague
+node n5 "demo" feature terminal n1 "h"
 node n2 "other" project vague
 retry uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0
 rule "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."

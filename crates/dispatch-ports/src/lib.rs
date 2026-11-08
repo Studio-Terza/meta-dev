@@ -28,4 +28,4 @@ pub use started::Started;
 pub use stderr::Stderr;
 pub use system_clock::SystemClock;
 pub use wall::{Deadline, Due, Pause, Timeout, Wall};
-pub use watch::{Watch, Watched};
+pub use watch::{Stall, Watch, Watched};

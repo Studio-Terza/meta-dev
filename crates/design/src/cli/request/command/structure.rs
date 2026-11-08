@@ -3,9 +3,12 @@ use std::io::Write;
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
     ContextNodes, Flailed, FlailedSegments, JobClosed, JobFlailed, JobOpened, JobState, JobsInterrupted, LiveRuns,
-    NextJob, NextRun, OpenJobs, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
+    Unstructured,
 };
-use dispatch_ports::{AgentRun, Clock, Deadline, Dispatch, Due, Ended, Finished, Job, Prompt, Timeout, Watch, Watched};
+use dispatch_ports::{
+    AgentRun, Clock, Deadline, Dispatch, Due, Ended, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
+};
 use port_core::Held;
 use store_ports::Store;
 use structurer::{Attempt, Lapse, Reading, Said, SegmentRef};
@@ -37,6 +40,7 @@ struct Attempts<'structure, 'ports, S: Store, D: Dispatch, C: Clock> {
     structure: &'structure Structure<'ports, S, D, C>,
     id: JobId,
     job: &'structure structurer::Job,
+    remit: &'structure Remit,
 }
 
 #[derive(Debug)]
@@ -49,7 +53,13 @@ struct RunRecord<'structure, 'ports, S: Store, D: Dispatch, C: Clock> {
 #[derive(Debug)]
 enum Ending {
     Applied(Application),
+    Halted(Halt),
+}
+
+#[derive(Clone, Debug)]
+enum Halt {
     Flailed(Lapse),
+    Stalled(Stall),
 }
 
 #[derive(Debug)]
@@ -62,7 +72,7 @@ struct Concluded {
 #[derive(Debug)]
 struct Worked {
     job: JobId,
-    flailed: Option<Lapse>,
+    halt: Option<Halt>,
     lines: Vec<Line>,
 }
 
@@ -126,30 +136,27 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         Ok(Structured { reaped, interrupted, worked: progress.worked(), flailed })
     }
 
-    fn owed(&self, chunk: &[Unplaced]) -> Result<Vec<Unplaced>, Failure> {
-        let unplaced = self.store.read(Unstructured)?;
-        Ok(chunk.iter().filter(|segment| unplaced.contains(segment)).cloned().collect())
-    }
-
     fn job(&self, chunk: &[Unplaced]) -> Result<Worked, Failure> {
         let id = self.store.read(NextJob)?;
         let context = self.store.read(ContextNodes)?;
         let said = chunk.iter().map(|unplaced| {
             Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)), AsRef::<Body>::as_ref(unplaced).clone())
         });
-        let job = structurer::Job::new(said.collect(), &context);
+        let job = structurer::Job::new(said.collect(), context);
+        let remit: Remit = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone()).collect();
         self.store.write(JobOpened::from(id))?;
-        let ended = Attempts { structure: self, id, job: &job }.attempted(Attempt::First)?;
+        let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
         self.store.write(JobClosed::new(id, ended.ending.state()))?;
         let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
-        let held = ended.ending.flailed().map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
+        let flailed = ended.ending.halt().and_then(Halt::flailed);
+        let held = flailed.map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
         held.map(|flailed| self.store.write(flailed)).transpose()?;
         let retried = ended.retried.iter().map(|lapse| Line::Retried(Lapsed::new(id, lapse.clone())));
         let closing = ended.ending.lines(id, self.store)?;
         let runs = self.store.read(RunsOf::from(id))?;
         let ran = runs.iter().map(|ran| Line::Ran(Attempted::new(ran.identity(), id, ran.state(), ran.usage())));
         let lines = retried.chain(closing).chain(ran).collect();
-        Ok(Worked { job: id, flailed: ended.ending.flailed().cloned(), lines })
+        Ok(Worked { job: id, halt: ended.ending.halt().cloned(), lines })
     }
 }
 
@@ -187,9 +194,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
 
     fn stepped(&self, run: RunId, attempt: Attempt, watched: Watched) -> Result<Step, Failure> {
         match watched {
-            Watched::Overdue => Ok(Step::from(attempt.lapsed(Lapse::overdue()))),
-            Watched::Unreadable(unreadable) => Ok(Step::from(attempt.lapsed(Lapse::from(&unreadable)))),
-            Watched::Errored(errored) => Ok(Step::from(attempt.lapsed(Lapse::from(&errored)))),
+            Watched::Stalled(stall) => Ok(Step::Ended(Ending::Halted(Halt::Stalled(stall)))),
             Watched::Finished(finished) => self.read(run, attempt.read(finished.reply()), &finished),
         }
     }
@@ -198,7 +203,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         match reading {
             Reading::Parsed { directives, attempt } => Step::settled(
                 attempt,
-                Parsed::new(self.structure.store, directives, Provenance::Agent(run), self.job.owed())
+                Parsed::new(self.structure.store, directives, Provenance::Agent(run), self.remit.clone())
                     .replied(finished.reply()),
             ),
             reading @ (Reading::Again(_) | Reading::Flailed(_)) => Ok(Step::from(reading)),
@@ -238,9 +243,7 @@ impl Ending {
     fn ended(run: RunId, watched: &Result<Watched, Failure>) -> RunEnded {
         match watched {
             Ok(Watched::Finished(finished)) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
-            Ok(Watched::Unreadable(_unreadable)) => RunEnded::new(run, RunState::Unreadable, None),
-            Ok(Watched::Errored(errored)) => RunEnded::new(run, RunState::Errored, Some(errored.usage())),
-            Ok(Watched::Overdue) => RunEnded::new(run, RunState::Overdue, None),
+            Ok(Watched::Stalled(stall)) => RunEnded::new(run, RunState::from(stall), stall.usage()),
             Err(_failure) => RunEnded::new(run, RunState::Failed, None),
         }
     }
@@ -248,7 +251,8 @@ impl Ending {
     fn lines(&self, job: JobId, store: &impl Store) -> Result<Vec<Line>, Failure> {
         match self {
             Ending::Applied(application) => application.lines(store),
-            Ending::Flailed(lapse) => Ok(vec![Line::Flailed(Lapsed::new(job, lapse.clone()))]),
+            Ending::Halted(Halt::Flailed(lapse)) => Ok(vec![Line::Flailed(Lapsed::new(job, lapse.clone()))]),
+            Ending::Halted(Halt::Stalled(_stall)) => Ok(Vec::new()),
         }
     }
 }
@@ -258,14 +262,31 @@ impl Ending {
         match self {
             Ending::Applied(Application::Fresh(_)) => JobState::Applied,
             Ending::Applied(Application::Repeated(_)) => JobState::Repeated,
-            Ending::Flailed(_) => JobState::Flailed,
+            Ending::Halted(Halt::Flailed(_)) => JobState::Flailed,
+            Ending::Halted(Halt::Stalled(_)) => JobState::Stalled,
         }
     }
 
+    fn halt(&self) -> Option<&Halt> {
+        match self {
+            Ending::Halted(halt) => Some(halt),
+            Ending::Applied(_) => None,
+        }
+    }
+}
+
+impl Halt {
     fn flailed(&self) -> Option<&Lapse> {
         match self {
-            Ending::Flailed(lapse) => Some(lapse),
-            Ending::Applied(_) => None,
+            Halt::Flailed(lapse) => Some(lapse),
+            Halt::Stalled(_) => None,
+        }
+    }
+
+    fn failure(self, job: JobId) -> Failure {
+        match self {
+            Halt::Flailed(lapse) => Failure::Flailed { job, lapse },
+            Halt::Stalled(stall) => Failure::Stalled { job, stall },
         }
     }
 }
@@ -282,7 +303,7 @@ impl From<Reading> for Step {
     fn from(reading: Reading) -> Step {
         match reading {
             Reading::Parsed { attempt, .. } | Reading::Again(attempt) => Step::Again(attempt),
-            Reading::Flailed(lapse) => Step::Ended(Ending::Flailed(lapse)),
+            Reading::Flailed(lapse) => Step::Ended(Ending::Halted(Halt::Flailed(lapse))),
         }
     }
 }
@@ -294,25 +315,14 @@ impl Progress {
         chunk: &[Unplaced],
     ) -> Result<Progress, Failure> {
         match self {
-            Progress::Going(worked) => Progress::owing(worked, structure, chunk),
+            Progress::Going(worked) => Ok(Progress::after(worked, structure.job(chunk)?)),
             Progress::Halted(worked) => Ok(Progress::Halted(worked)),
         }
     }
 
-    fn owing<S: Store, D: Dispatch, C: Clock>(
-        worked: Vec<Worked>,
-        structure: &Structure<'_, S, D, C>,
-        chunk: &[Unplaced],
-    ) -> Result<Progress, Failure> {
-        let owed = structure.owed(chunk)?;
-        let done = owed.first().map(|_first| structure.job(&owed)).transpose()?;
-        Ok(Progress::after(worked, done))
-    }
-
-    fn after(worked: Vec<Worked>, done: Option<Worked>) -> Progress {
-        let ended: fn(Vec<Worked>) -> Progress =
-            done.as_ref().and_then(|done| done.flailed.as_ref()).map_or(Progress::Going, |_lapse| Progress::Halted);
-        ended(worked.into_iter().chain(done).collect())
+    fn after(worked: Vec<Worked>, done: Worked) -> Progress {
+        let ended: fn(Vec<Worked>) -> Progress = done.halt.as_ref().map_or(Progress::Going, |_halt| Progress::Halted);
+        ended(worked.into_iter().chain([done]).collect())
     }
 
     fn worked(self) -> Vec<Worked> {
@@ -340,10 +350,7 @@ impl Structured {
             reaped.chain(self.worked.iter().flat_map(|worked| worked.lines.iter().cloned())).chain(held).collect();
         Printed::lines(out, &lines)?;
         let jobs = Count::new(self.worked.len());
-        let flailed = self
-            .worked
-            .into_iter()
-            .find_map(|worked| worked.flailed.map(|lapse| Failure::Flailed { job: worked.job, lapse }));
-        flailed.map_or(Ok(Outcome::Structured { jobs }), Err)
+        let halted = self.worked.into_iter().find_map(|worked| worked.halt.map(|halt| halt.failure(worked.job)));
+        halted.map_or(Ok(Outcome::Structured { jobs }), Err)
     }
 }

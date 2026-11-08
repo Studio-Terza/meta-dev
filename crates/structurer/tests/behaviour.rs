@@ -1,11 +1,10 @@
-use std::collections::BTreeSet;
 use std::io;
 
 use design_model::{
-    AnyNode, Confidence, Entered, Entry, Explicitness, Facet, Node, NodeId, Ordinal, Prefix, Project, Provenance,
-    SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Title,
+    Confidence, Explicitness, Facet, NodeId, Ordinal, Outline, Prefix, Project, SegmentRelation, Sense, SenseKind,
+    SpanRelation, Specificity, Stage, Title,
 };
-use dispatch_ports::{Errored, Reply, Stderr, Told, Unreadable, Usage};
+use dispatch_ports::Reply;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
@@ -14,6 +13,7 @@ use laws::proptest::strategy::Strategy;
 use newtype::Newtype;
 use structurer::{
     Attempt, Briefing, Directive, Directives, Edge, Job, Label, Lapse, Misread, NodeRef, Proposal, Reading, Said,
+    Uncovered,
 };
 use strum::VariantArray;
 use transcript_ports::Body;
@@ -208,34 +208,26 @@ impl Jobs {
         (Generated::segment(), "[^\u{0}]{0,40}").prop_map(|(segment, body)| Said::new(segment, Body::new(body)))
     }
 
-    fn node() -> impl Strategy<Value = AnyNode> {
-        (0..i64::MAX, select(Facet::VARIANTS), option::of("[^\u{0}]{0,24}"), "[a-z][a-z0-9-]{0,8}").prop_filter_map(
-            "a project name",
-            |(id, facet, title, project)| {
-                let project = project.parse::<Project>().ok()?;
-                let node = Node::new(NodeId::new(id), Entry::new(project, facet, Provenance::from(Entered::Apply)));
-                Some(title.map_or_else(|| node.clone().any(), |title| node.clone().titled(Title::new(title)).any()))
-            },
+    fn node() -> impl Strategy<Value = Outline> {
+        (
+            (0..i64::MAX, select(Facet::VARIANTS), select(Stage::VARIANTS)),
+            (option::of("[^\u{0}]{0,24}"), option::of(0..i64::MAX), "[a-z][a-z0-9-]{0,8}"),
         )
+            .prop_filter_map("a project name", |((id, facet, stage), (title, parent, project))| {
+                let outline = Outline::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage);
+                Some(outline.titled(title.map(Title::new)).parented(parent.map(NodeId::new)))
+            })
     }
 
     fn any() -> impl Strategy<Value = Job> {
-        (vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::node(), 0..4)).prop_map(|(said, nodes)| Job::new(said, &nodes))
+        (vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::node(), 0..4)).prop_map(|(said, nodes)| Job::new(said, nodes))
     }
 
     fn lapse() -> impl Strategy<Value = Lapse> {
         prop_oneof![
-            Just(Lapse::overdue()),
             "[^\u{0}]{0,30}".prop_map(|refusal| Lapse::refused(&io::Error::other(refusal))),
-            Just(Lapse::from(&Unreadable::Unsuccessful { stderr: Stderr::Silent })),
-            ("[^\u{0}]{0,30}", "[^\u{0}]{0,30}").prop_map(|(garbled, said)| Lapse::from(&Unreadable::Json {
-                failure: garbled,
-                stderr: Stderr::Wrote(said)
-            })),
-            "[^\u{0}]{1,30}".prop_map(|told| Lapse::from(&Errored::new(Told::new(told), Usage::default()))),
-            vec(Jobs::said(), 1..=Job::SEGMENTS).prop_filter_map("a job owes its segments", |said| {
-                Job::new(said, &[]).owed().paid(&BTreeSet::new()).err().map(Lapse::from)
-            }),
+            (Generated::segment(), vec(Generated::segment(), 0..Job::SEGMENTS))
+                .prop_map(|(first, rest)| Lapse::from(Uncovered::new(first, rest))),
             "[ -~]{0,30}"
                 .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
         ]

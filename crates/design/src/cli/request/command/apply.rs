@@ -7,14 +7,14 @@ use design_model::{
     Sense, SpanRelation, Straddling, Supersession, Title, Vague,
 };
 use design_store::{
-    AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, NextNode, Prefixed, Sees, ShownNode, Spoken,
-    Unseen,
+    AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, NextNode, Prefixed, Remit, Sees, ShownNode,
+    Spoken, Unseen,
 };
 use dispatch_ports::Reply;
 use file_ports::{Bytes, Files, Text};
 use newtype::{Counter, Newtype};
 use store_ports::{Store, Written};
-use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, Owed, SegmentRef, Visit};
+use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
 use transcript_ports::{Authorship, Uuid};
 
 use super::Printed;
@@ -32,6 +32,8 @@ pub enum Unresolved {
     Ambiguous(SegmentRef),
     #[error("the message of segment {0} has no segment at that index")]
     Unsegmented(SegmentRef),
+    #[error("segment {0} is not one of this job's segments")]
+    Outside(SegmentRef),
     #[error("no node n{} in the design store", .0.into_inner())]
     Unplaced(NodeId),
     #[error("no node labelled {0} is proposed earlier in the file")]
@@ -80,17 +82,21 @@ struct Fresh<'ground, 'run, F: Files, S: Store>(&'ground Ground<'run, F, S>);
 
 #[derive(Debug)]
 pub struct Parsed<'store, S: Store> {
-    store: &'store S,
     directives: Directives,
-    provenance: Provenance,
-    owed: Owed,
+    grounds: Grounds<'store, S>,
 }
 
 #[derive(Debug)]
-struct Resolution<'store, S: Store> {
+struct Grounds<'store, S: Store> {
     store: &'store S,
-    batch: &'store Batch,
     provenance: Provenance,
+    remit: Remit,
+}
+
+#[derive(Debug)]
+struct Resolution<'fold, 'store, S: Store> {
+    grounds: &'fold Grounds<'store, S>,
+    batch: &'fold Batch,
 }
 
 #[derive(Debug)]
@@ -170,19 +176,19 @@ impl<F: Files, S: Store> Sees for Fresh<'_, '_, F, S> {
     fn unseen(self, unseen: Unseen) -> Result<Application, Failure> {
         let text = Text::try_from(unseen.as_ref()).map_err(Failure::Directives)?;
         let directives: Directives = text.as_ref().parse()?;
-        Parsed::new(self.0.store(), directives, Provenance::from(Entered::Apply), Owed::default()).unseen(unseen)
+        Parsed::new(self.0.store(), directives, Provenance::from(Entered::Apply), Remit::Unbounded).unseen(unseen)
     }
 }
 
 impl<'store, S: Store> Parsed<'store, S> {
-    pub fn new(store: &'store S, directives: Directives, provenance: Provenance, owed: Owed) -> Parsed<'store, S> {
-        Parsed { store, directives, provenance, owed }
+    pub fn new(store: &'store S, directives: Directives, provenance: Provenance, remit: Remit) -> Parsed<'store, S> {
+        Parsed { directives, grounds: Grounds { store, provenance, remit } }
     }
 }
 
 impl<S: Store> Parsed<'_, S> {
     pub(crate) fn replied(self, reply: &Reply) -> Result<Application, Failure> {
-        let store = self.store;
+        let store = self.grounds.store;
         store.read(AppliedFile::from(Bytes::from(reply.clone().into_inner().as_str())))?.seen(self)
     }
 }
@@ -191,7 +197,8 @@ impl<S: Store> Sees for Parsed<'_, S> {
     type Output = Result<Application, Failure>;
 
     fn before(self, earlier: Earlier) -> Result<Application, Failure> {
-        self.owed.paid(&BTreeSet::new())?;
+        let Grounds { store, remit, .. } = self.grounds;
+        remit.paid(&store.read(remit.covered())?)?;
         Ok(Application::Repeated(earlier))
     }
 
@@ -211,15 +218,14 @@ impl From<Application> for Outcome {
 
 impl Applied {
     fn resolved<S: Store>(parsed: Parsed<'_, S>, unseen: Unseen) -> Result<Applied, Failure> {
-        let Parsed { store, directives, provenance, owed } = parsed;
+        let Parsed { directives, grounds } = parsed;
+        let store = grounds.store;
         let started = Folded { resolved: Vec::new(), batch: Batch::starting(store.read(NextNode)?) };
-        let folded = directives
-            .into_iter()
-            .try_fold(started, |folded, directive| folded.resolving(store, provenance, directive))?;
-        owed.paid(&folded.covering())?;
+        let folded =
+            directives.into_iter().try_fold(started, |folded, directive| folded.resolving(&grounds, directive))?;
         let directed: Vec<Directed> =
             folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
-        let written = store.write(Directions::new(provenance, unseen, directed))?;
+        let written = store.write(Directions::new(grounds.provenance, unseen, directed, grounds.remit))?;
         Applied::covered(store, folded.resolved, written)
     }
 
@@ -265,15 +271,11 @@ impl From<Resolved> for Echo {
 }
 
 impl Folded {
-    fn resolving<S: Store>(self, store: &S, provenance: Provenance, directive: Directive) -> Result<Folded, Failure> {
-        let grounded = directive.visited(&Resolution { store, batch: &self.batch, provenance })?;
+    fn resolving<S: Store>(self, grounds: &Grounds<'_, S>, directive: Directive) -> Result<Folded, Failure> {
+        let grounded = directive.visited(&Resolution { grounds, batch: &self.batch })?;
         let batch = self.batch.after(&grounded.effect);
         let resolved = self.resolved.into_iter().chain([Resolved { directive, grounded }]).collect();
         Ok(Folded { resolved, batch })
-    }
-
-    fn covering(&self) -> BTreeSet<SegmentRef> {
-        self.resolved.iter().flat_map(|resolved| resolved.grounded.directed.covered()).map(SegmentRef::from).collect()
     }
 }
 
@@ -310,10 +312,10 @@ impl Bind for Labels<'_> {
     }
 }
 
-impl<S: Store> Resolution<'_, S> {
+impl<S: Store> Resolution<'_, '_, S> {
     fn heard(&self, reference: &SegmentRef) -> Result<Heard, Failure> {
         let prefix: &Prefix = reference.as_ref();
-        let spoken = self.store.read(Prefixed::from(prefix.clone()))?;
+        let spoken = self.grounds.store.read(Prefixed::from(prefix.clone()))?;
         let messages: BTreeSet<&Uuid> = spoken.iter().map(|spoken| spoken.segment().as_ref()).collect();
         let message = Heard::only(reference, messages)?;
         let wanted = Segment::new(message, Ordinal::from(reference));
@@ -323,7 +325,8 @@ impl<S: Store> Resolution<'_, S> {
             .find(|segment| **segment == wanted)
             .cloned()
             .ok_or_else(|| Unresolved::Unsegmented(reference.clone()))?;
-        Ok(Heard { segment, message: spoken })
+        let admitted = self.grounds.remit.admitted(segment).ok_or_else(|| Unresolved::Outside(reference.clone()))?;
+        Ok(Heard { segment: admitted, message: spoken })
     }
 
     fn node(&self, reference: &NodeRef) -> Result<AnyNode, Failure> {
@@ -332,7 +335,7 @@ impl<S: Store> Resolution<'_, S> {
     }
 
     fn stored(&self, id: NodeId) -> Result<AnyNode, Failure> {
-        let placed = self.store.read(ShownNode::from(id))?;
+        let placed = self.grounds.store.read(ShownNode::from(id))?;
         Ok(placed.map(|placed| placed.node().clone()).ok_or(Unresolved::Unplaced(id))?)
     }
 }
@@ -367,7 +370,7 @@ impl Heard {
     }
 }
 
-impl<S: Store> Visit for &Resolution<'_, S> {
+impl<S: Store> Visit for &Resolution<'_, '_, S> {
     type Output = Result<Grounded, Failure>;
 
     fn place(self, segment: &SegmentRef, node: &NodeRef, relation: SpanRelation) -> Result<Grounded, Failure> {
@@ -405,7 +408,7 @@ impl<S: Store> Visit for &Resolution<'_, S> {
     ) -> Result<Grounded, Failure> {
         let fresh = fresh.map(|label| self.batch.unbound(label)).transpose()?;
         let parent = self.node(refines)?;
-        let entry = Entry::new(parent.entry().project().clone(), facet, self.provenance);
+        let entry = Entry::new(parent.entry().project().clone(), facet, self.grounds.provenance);
         let node = Node::proposed(self.batch.next, entry, parent.casting()).titled(title.clone());
         let effect = Effect::Proposed { node: node.clone(), fresh };
         Ok(Grounded { directed: Directed::Proposed { node, parent: parent.identity() }, heard: Vec::new(), effect })
