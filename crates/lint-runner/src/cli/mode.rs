@@ -17,7 +17,7 @@ use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
 use super::boundary::Queue;
-use super::{Outcome, Sources};
+use super::{Outcome, Sources, Verdict};
 use elegance::Elegance;
 use lints::{Crew, Lints};
 
@@ -84,24 +84,25 @@ impl Mode {
 }
 
 impl Run<'_, '_> {
-    pub(crate) fn outcome_of<'file>(
+    pub(crate) fn verdict_of(
         self,
-        readout: &'file Readout,
+        readout: &Readout,
         queue: &Queue,
         out: &mut impl Write,
-    ) -> Outcome<'file> {
+        err: &mut impl Write,
+    ) -> Verdict {
         match self {
-            Run::Gate(crew) => Self::gated(readout, queue, crew, out),
-            Run::Report => Self::reported(readout.files(), out),
-            Run::Query(found) => Self::queried(found, readout.files(), out),
+            Run::Gate(crew) => Self::gated(&crew.checked(readout, queue), readout.files(), out, err),
+            Run::Report => Self::reported(readout.files(), out).written(err),
+            Run::Query(found) => Self::queried(found, readout.files(), out).written(err),
         }
     }
 
-    fn gated<'file>(readout: &'file Readout, queue: &Queue, crew: Crew<'_>, out: &mut impl Write) -> Outcome<'file> {
-        let files = readout.files();
-        crew.checked(readout, queue).surveyed(
+    fn gated(outcome: &Outcome<'_>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
+        outcome.surveyed(
             format_args!("{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)),
             out,
+            err,
         )
     }
     fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {

@@ -99,7 +99,7 @@ impl Cli {
         thread::scope(|scope| {
             let run = self.mode.started(scope, sources);
             let readout = SourceFiles::read_staged(sources.ports().files(), sources.stage());
-            run.outcome_of(&readout, sources.queue(), out).written(err)
+            run.verdict_of(&readout, sources.queue(), out, err)
         })
     }
 

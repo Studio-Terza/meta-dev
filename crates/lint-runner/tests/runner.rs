@@ -231,12 +231,20 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\n")?;
     let clean = root.verdict(&[]);
+    let mut err = Vec::new();
+    let unsurveyed = Cli::from_args([OsString::from(&root.root)].into_iter()).verdict(
+        &root.files,
+        [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+        &mut <&mut [u8]>::default(),
+        &mut err,
+    );
     root.write("src/lib.rs", DIRTY)?;
     let unreadable = Trees::verdict(&Memory::default(), Path::new("/no/such/root"), &[]);
     assert_eq!(
-        [clean, root.verdict(&[]), root.verdict(&["query", "--role", "nonsense", "--in"]), unreadable],
-        [Verdict::Clean, Verdict::Violations, Verdict::Refused, Verdict::Refused]
+        [clean, root.verdict(&[]), root.verdict(&["query", "--role", "nonsense", "--in"]), unreadable, unsurveyed],
+        [Verdict::Clean, Verdict::Violations, Verdict::Refused, Verdict::Refused, Verdict::Refused]
     );
+    assert!(String::from_utf8(err)?.contains("cannot write the survey"));
     Ok(())
 }
 

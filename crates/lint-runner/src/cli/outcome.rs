@@ -1,5 +1,5 @@
 use std::fmt;
-use std::io::Write;
+use std::io::{self, Write};
 
 use lint_layout::Failure;
 use lint_reader::Unlocated;
@@ -32,9 +32,10 @@ impl<'run> Outcome<'run> {
         }
     }
 
-    pub(crate) fn surveyed(self, survey: fmt::Arguments<'_>, out: &mut impl Write) -> Outcome<'run> {
-        self.survey(survey).iter().try_for_each(|shown| write!(out, "{shown}")).ok();
-        self
+    pub(crate) fn surveyed(&self, survey: fmt::Arguments<'_>, out: &mut impl Write, err: &mut impl Write) -> Verdict {
+        let surveyed = self.survey(survey).iter().try_for_each(|shown| write!(out, "{shown}"));
+        let verdict = self.written(err);
+        surveyed.map_or_else(|failure| Self::refused(&Unsurveyed(failure), err), |()| verdict)
     }
 
     fn survey<'args>(&self, survey: fmt::Arguments<'args>) -> Option<fmt::Arguments<'args>> {
@@ -49,7 +50,7 @@ impl<'run> Outcome<'run> {
         Verdict::Violations
     }
 
-    fn refused(failure: &Unlocated, err: &mut impl Write) -> Verdict {
+    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> Verdict {
         writeln!(err, "{failure}").ok();
         Verdict::Refused
     }
@@ -68,5 +69,13 @@ struct Failed<'failures>(&'failures [Failure]);
 impl fmt::Display for Failed<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.iter().try_for_each(|failure| writeln!(formatter, "{failure}"))
+    }
+}
+
+struct Unsurveyed(io::Error);
+
+impl fmt::Display for Unsurveyed {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "cannot write the survey: {}", self.0)
     }
 }
