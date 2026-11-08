@@ -1,4 +1,4 @@
-use design_model::{JobId, Ordinal, RunId, Segment};
+use design_model::{JobId, Ordinal, Provenance, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Newtype};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
@@ -6,8 +6,8 @@ use transcript_ports::{Body, Uuid};
 
 use super::{
     Delivery, FailuresReported, Flailed, FlailedSegments, Halted, JobClosed, JobFlailed, JobHalted, JobOpened,
-    JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf,
-    Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
+    JobRetried, JobState, JobsHalted, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned,
+    RunState, RunsOf, Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
 use crate::{Account, Excerpt};
 
@@ -176,6 +176,19 @@ VALUES
             unreported: Delivery
         ))?;
         Ok(Written::total([closed, recorded].into_iter()))
+    }
+}
+
+impl Batch for JobsHalted {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let written = self
+            .0
+            .into_iter()
+            .map(|halted| halted.written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
     }
 }
 
@@ -367,6 +380,41 @@ WHERE
             })
             .collect::<Result<Vec<Written>, StoreFailure>>()?;
         Ok(Written::total(written.into_iter()))
+    }
+}
+
+impl Batch for JobRetried {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let JobRetried { job, provenance } = self;
+        let recorded = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  retries (job, provenance)
+VALUES
+  (?1, ?2)
+"#,
+            job: JobId,
+            provenance: Provenance
+        ))?;
+        let cleared = statements.written(store_ports::query!(
+            r#"
+DELETE FROM
+  flailed
+WHERE
+  run IN (
+    SELECT
+      id
+    FROM
+      runs
+    WHERE
+      job = ?1
+  )
+"#,
+            job: JobId
+        ))?;
+        Ok(Written::total([recorded, cleared].into_iter()))
     }
 }
 

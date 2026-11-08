@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod notes;
 mod structure;
 mod view;
@@ -1340,13 +1342,51 @@ impl Lifecycle {
 
     fn moved(Asked(stage, command): Asked) -> Result<Outcome, Option<Refused>> {
         let applying = Lifecycle::reached(stage).map_err(|_unreached| None)?;
-        applying.outcome(command.words()).map_err(Lifecycle::refused)
+        applying.outcome(command.words()).map_err(|failure| Lifecycle::refused(&failure))
     }
 
-    fn refused(failure: Failure) -> Option<Refused> {
+    fn refused(failure: &Failure) -> Option<Refused> {
         match failure {
-            Failure::Misstaged { node, stage } => Some(Refused(node, stage)),
-            _other => None,
+            Failure::Misstaged { node, stage } => Some(Refused(*node, *stage)),
+            Failure::Usage
+            | Failure::SelfConsuming(_)
+            | Failure::Unset(_)
+            | Failure::Unreadable(_)
+            | Failure::Files(_)
+            | Failure::Read(_)
+            | Failure::Write(_)
+            | Failure::Unmatched(_)
+            | Failure::Project(_)
+            | Failure::Unnumbered(_)
+            | Failure::Unplaced(_)
+            | Failure::Ended { .. }
+            | Failure::Unrun(_)
+            | Failure::Unflailed(_)
+            | Failure::Unrooted(_)
+            | Failure::Unconfigured
+            | Failure::Config(_)
+            | Failure::Directives(_)
+            | Failure::Misread(_)
+            | Failure::Notes(_)
+            | Failure::Reimported(_)
+            | Failure::Unanchored { .. }
+            | Failure::Unreconciled { .. }
+            | Failure::Unresolved(_)
+            | Failure::Uncovered(_)
+            | Failure::Unspecified(_)
+            | Failure::Unstated(_)
+            | Failure::Inverted { .. }
+            | Failure::Busy(_)
+            | Failure::Store(_)
+            | Failure::Unlock(_)
+            | Failure::Dispatch(_)
+            | Failure::Flailed { .. }
+            | Failure::Stalled { .. }
+            | Failure::Deaf(_)
+            | Failure::Unheard(_)
+            | Failure::Render(_)
+            | Failure::Released(_)
+            | Failure::Unreleased { .. } => None,
         }
     }
 }
@@ -1545,14 +1585,52 @@ impl Ruled {
         applying.outcome(&["role", "n1", self.parent.name()]).map_err(|_unrecast| None)?;
         applying.applied("propose(new, refines(n1), feature, \"metering\")").map_err(|_unproposed| None)?;
         let proposed = applying.role(NodeId::new(2)).ok_or(None)?;
-        applying.outcome(&["role", "n2", self.child.name()]).map_err(Ruled::inverted)?;
+        applying.outcome(&["role", "n2", self.child.name()]).map_err(|failure| Ruled::inverted(&failure))?;
         applying.role(NodeId::new(2)).map(|recast| Roles { proposed, recast }).ok_or(None)
     }
 
-    fn inverted(failure: Failure) -> Option<NodeEdge> {
+    fn inverted(failure: &Failure) -> Option<NodeEdge> {
         match failure {
-            Failure::Inverted { edge } => Some(edge),
-            _other => None,
+            Failure::Inverted { edge } => Some(*edge),
+            Failure::Usage
+            | Failure::SelfConsuming(_)
+            | Failure::Unset(_)
+            | Failure::Unreadable(_)
+            | Failure::Files(_)
+            | Failure::Read(_)
+            | Failure::Write(_)
+            | Failure::Unmatched(_)
+            | Failure::Project(_)
+            | Failure::Unnumbered(_)
+            | Failure::Unplaced(_)
+            | Failure::Ended { .. }
+            | Failure::Unrun(_)
+            | Failure::Unflailed(_)
+            | Failure::Unrooted(_)
+            | Failure::Unconfigured
+            | Failure::Config(_)
+            | Failure::Directives(_)
+            | Failure::Misread(_)
+            | Failure::Notes(_)
+            | Failure::Reimported(_)
+            | Failure::Unanchored { .. }
+            | Failure::Unreconciled { .. }
+            | Failure::Unresolved(_)
+            | Failure::Uncovered(_)
+            | Failure::Unspecified(_)
+            | Failure::Unstated(_)
+            | Failure::Misstaged { .. }
+            | Failure::Busy(_)
+            | Failure::Store(_)
+            | Failure::Unlock(_)
+            | Failure::Dispatch(_)
+            | Failure::Flailed { .. }
+            | Failure::Stalled { .. }
+            | Failure::Deaf(_)
+            | Failure::Unheard(_)
+            | Failure::Render(_)
+            | Failure::Released(_)
+            | Failure::Unreleased { .. } => None,
         }
     }
 }
@@ -2142,6 +2220,11 @@ impl Generated {
             (Generated::segment(), 0..i64::MAX, 0..i64::MAX).prop_map(|(segment, job, run)| Line::FlailedSegment(
                 Flailing::new(segment, JobId::new(job), RunId::new(run))
             )),
+            (Generated::segment(), 0..i64::MAX, 0..i64::MAX).prop_map(|(segment, job, run)| Line::Owed(Flailing::new(
+                segment,
+                JobId::new(job),
+                RunId::new(run)
+            ))),
         ]
         .boxed()
     }
@@ -2352,7 +2435,39 @@ impl Ends {
     fn of(line: Line) -> Vec<Anchored> {
         match line {
             Line::Link { source, target, .. } => vec![source, target],
-            _ => Vec::new(),
+            Line::Read { .. }
+            | Line::Authored { .. }
+            | Line::Unrecognised { .. }
+            | Line::Formed { .. }
+            | Line::Related { .. }
+            | Line::Written(_)
+            | Line::Hit { .. }
+            | Line::Root { .. }
+            | Line::Consumes { .. }
+            | Line::Node(_)
+            | Line::Artifact(_)
+            | Line::Condition(_)
+            | Line::Reason(_)
+            | Line::Relative { .. }
+            | Line::Edge { .. }
+            | Line::Role { .. }
+            | Line::Placed { .. }
+            | Line::Message { .. }
+            | Line::Segment { .. }
+            | Line::Annotated { .. }
+            | Line::Applied(_)
+            | Line::Proposed { .. }
+            | Line::Uncovered(_)
+            | Line::Repeated { .. }
+            | Line::Reaped { .. }
+            | Line::Interrupted(_)
+            | Line::Ran(_)
+            | Line::Retried(_)
+            | Line::Flailed(_)
+            | Line::FlailedSegment(_)
+            | Line::Owed(_)
+            | Line::Viewed(_)
+            | Line::Noted(_) => Vec::new(),
         }
     }
 
@@ -2456,7 +2571,36 @@ impl Echoes {
             Line::Message { uuid, .. } => vec![uuid.to_string()],
             Line::Segment { segment, .. } | Line::Hit { segment, .. } => vec![segment.to_string()],
             Line::Link { source, target, .. } => vec![source.to_string(), target.to_string()],
-            _ => Vec::new(),
+            Line::Read { .. }
+            | Line::Authored { .. }
+            | Line::Unrecognised { .. }
+            | Line::Formed { .. }
+            | Line::Related { .. }
+            | Line::Written(_)
+            | Line::Root { .. }
+            | Line::Consumes { .. }
+            | Line::Node(_)
+            | Line::Artifact(_)
+            | Line::Condition(_)
+            | Line::Reason(_)
+            | Line::Relative { .. }
+            | Line::Edge { .. }
+            | Line::Role { .. }
+            | Line::Placed { .. }
+            | Line::Annotated { .. }
+            | Line::Applied(_)
+            | Line::Proposed { .. }
+            | Line::Uncovered(_)
+            | Line::Repeated { .. }
+            | Line::Reaped { .. }
+            | Line::Interrupted(_)
+            | Line::Ran(_)
+            | Line::Retried(_)
+            | Line::Flailed(_)
+            | Line::FlailedSegment(_)
+            | Line::Owed(_)
+            | Line::Viewed(_)
+            | Line::Noted(_) => Vec::new(),
         }
     }
 }

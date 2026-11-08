@@ -2,9 +2,9 @@ use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
-    Account, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted,
-    LiveRuns, NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
-    Unstructured,
+    Account, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsHalted,
+    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Remit, RunEnded, RunSpawned, RunState, RunsOf, Spawned,
+    StoredRun, Unplaced, Unstructured,
 };
 use dispatch_ports::{
     AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
@@ -141,9 +141,13 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let progress = chunks
             .zip(sequels)
             .try_fold(Progress::Going(Vec::new()), |progress, (chunk, sequel)| progress.next(self, chunk, sequel))?;
+        let worked = progress.worked();
+        let stalled = worked.iter().find(|worked| worked.course() == Course::Halting).map(|worked| worked.job);
+        let worked: Vec<Worked> = worked.into_iter().map(|worked| worked.followed(stalled)).collect();
+        self.store.write(worked.iter().filter_map(Worked::halted).collect::<JobsHalted>())?;
         let flailed = self.store.read(FlailedSegments)?;
         lock.end()?;
-        Ok(Structured { reaped, interrupted, worked: progress.worked(), flailed })
+        Ok(Structured { reaped, interrupted, worked, flailed })
     }
 
     fn job(&self, chunk: &[Unplaced], sequel: Sequel) -> Result<Worked, Failure> {
@@ -157,8 +161,6 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let remit = Remit::job(id, segments.clone());
         self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
-        let halted = ended.ending.halt().map(|halt| halt.halted(id, sequel));
-        halted.map(|halted| self.store.write(halted)).transpose()?;
         let flailed = ended.ending.halt().and_then(Halt::flailed);
         let held = flailed.map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
         held.map(|flailed| self.store.write(flailed)).transpose()?;
@@ -344,14 +346,28 @@ impl Progress {
     }
 
     fn after(worked: Vec<Worked>, done: Worked) -> Progress {
-        let course = done.halt.as_ref().map_or(Course::Onward, Halt::course);
-        course.progress(worked.into_iter().chain([done]).collect())
+        done.course().progress(worked.into_iter().chain([done]).collect())
     }
 
     fn worked(self) -> Vec<Worked> {
         match self {
             Progress::Going(worked) | Progress::Halted(worked) => worked,
         }
+    }
+}
+
+impl Worked {
+    fn course(&self) -> Course {
+        self.halt.as_ref().map_or(Course::Onward, Halt::course)
+    }
+
+    fn followed(self, stalled: Option<JobId>) -> Worked {
+        let sequel = stalled.map_or(self.sequel, |job| Sequel::Halted { job });
+        Worked { sequel, ..self }
+    }
+
+    fn halted(&self) -> Option<JobHalted> {
+        self.halt.as_ref().map(|halt| halt.halted(self.job, self.sequel))
     }
 }
 

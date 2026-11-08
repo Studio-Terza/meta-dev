@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{JobId, RunId, Segment};
+use design_model::{JobId, Provenance, RunId, Segment};
 use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
@@ -84,6 +84,9 @@ pub struct JobHalted {
     account: Account,
 }
 
+#[derive(Clone, Debug, Op)]
+pub struct JobsHalted(Vec<JobHalted>);
+
 #[derive(Clone, Copy, Debug, Op)]
 pub struct UnreportedFailures;
 
@@ -115,6 +118,12 @@ pub struct RunEnded {
 pub struct JobFlailed {
     run: RunId,
     segments: Vec<Segment>,
+}
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct JobRetried {
+    job: JobId,
+    provenance: Provenance,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -234,6 +243,12 @@ impl From<Halted> for JobState {
     }
 }
 
+impl FromIterator<JobHalted> for JobsHalted {
+    fn from_iter<Halts: IntoIterator<Item = JobHalted>>(halts: Halts) -> JobsHalted {
+        JobsHalted(halts.into_iter().collect())
+    }
+}
+
 impl FromIterator<JobId> for FailuresReported {
     fn from_iter<Jobs: IntoIterator<Item = JobId>>(jobs: Jobs) -> FailuresReported {
         FailuresReported(jobs.into_iter().collect())
@@ -281,6 +296,13 @@ impl JobFlailed {
     #[must_use]
     pub fn new(run: RunId, segments: Vec<Segment>) -> JobFlailed {
         JobFlailed { run, segments }
+    }
+}
+
+impl JobRetried {
+    #[must_use]
+    pub fn new(job: JobId, provenance: Provenance) -> JobRetried {
+        JobRetried { job, provenance }
     }
 }
 

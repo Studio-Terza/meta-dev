@@ -53,9 +53,9 @@ pub use quoted::{Quoted, QuotedSegments};
 use relative::Relative;
 pub use remit::{JobRepeated, Remit, Unpaid};
 pub use runs::{
-    FailuresReported, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns,
-    NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
-    UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
+    FailuresReported, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobRetried, JobsHalted,
+    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned,
+    StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
 use runs::{JobClosed, JobState};
 pub use scope::Scope;
