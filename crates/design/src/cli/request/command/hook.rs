@@ -13,7 +13,7 @@ use super::ingest::Ingest;
 use super::structure::{Crew, Structure};
 use crate::cli::failure::Failure;
 use crate::{HookEvent, Outcome};
-use boundary::{Settings, Stopping};
+use boundary::{Decision, Settings, Stopping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hook {
@@ -31,16 +31,17 @@ impl Hook {
     ) -> Result<Outcome, Failure> {
         match self {
             Hook::Settings => Settings::listed(HookEvent::VARIANTS).written(out),
-            Hook::On(HookEvent::UserPromptSubmit) => Hook::prompted(ground),
+            Hook::On(HookEvent::UserPromptSubmit) => Hook::prompted(ground, out),
             Hook::On(HookEvent::Stop) => {
                 Hook::stopped(&Stopping::heard(environment.input().map_err(Failure::Deaf)?)?, ground, crew, out)
             }
         }
     }
 
-    fn prompted<F: Files, S: Store>(ground: Ground<'_, F, S>) -> Result<Outcome, Failure> {
+    fn prompted<F: Files, S: Store>(ground: Ground<'_, F, S>, out: &mut impl Write) -> Result<Outcome, Failure> {
         let store = ground.store();
-        Ingest::read(store, &ground.transcripts()).map(|_tally| Outcome::Hooked(HookEvent::UserPromptSubmit))
+        Ingest::read(store, &ground.transcripts())?;
+        Decision::told(store, HookEvent::UserPromptSubmit, out)
     }
 
     fn stopped<F: Files, S: Store, D: Dispatch, C: Clock>(
@@ -51,9 +52,7 @@ impl Hook {
     ) -> Result<Outcome, Failure> {
         let store = ground.store();
         Ingest::read(store, &ground.transcripts())?;
-        Structure::new(store, crew)
-            .worked()?
-            .concluded()
-            .map_or_else(|halt| stopping.decided(&halt).written(out), |_jobs| Ok(Outcome::Hooked(HookEvent::Stop)))
+        let concluded = Structure::new(store, crew).worked()?.concluded();
+        stopping.decided(concluded, store, out)
     }
 }

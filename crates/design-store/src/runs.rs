@@ -7,6 +7,8 @@ use port_core::Op;
 use strum::VariantArray;
 use transcript_ports::Body;
 
+use crate::Account;
+
 #[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunState {
     #[name("running")]
@@ -28,7 +30,7 @@ pub enum RunState {
 }
 
 #[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum JobState {
+pub(crate) enum JobState {
     #[name("open")]
     Open,
     #[name("applied")]
@@ -43,6 +45,22 @@ pub enum JobState {
     Interrupted,
 }
 
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Halted {
+    #[name("flailed")]
+    Flailed,
+    #[name("stalled")]
+    Stalled,
+}
+
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Delivery {
+    #[name("unreported")]
+    Unreported,
+    #[name("reported")]
+    Reported,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spawned {
     pid: Pid,
@@ -54,10 +72,24 @@ pub struct Spawned {
 pub struct JobOpened(JobId);
 
 #[derive(Clone, Copy, Debug, Op)]
-pub struct JobClosed {
+pub(crate) struct JobClosed {
     job: JobId,
     state: JobState,
 }
+
+#[derive(Clone, Debug, Op)]
+pub struct JobHalted {
+    job: JobId,
+    run: Option<RunId>,
+    halted: Halted,
+    account: Account,
+}
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct UnreportedFailures;
+
+#[derive(Clone, Debug, Op)]
+pub struct FailuresReported(Vec<JobId>);
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct OpenJobs;
@@ -124,6 +156,12 @@ pub struct Flailed {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unreported {
+    job: JobId,
+    account: Account,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unplaced {
     segment: Segment,
     body: Body,
@@ -158,6 +196,7 @@ impl From<&Stall> for RunState {
             Stall::Errored(_) => RunState::Errored,
             Stall::Unreadable(_) => RunState::Unreadable,
             Stall::Overdue => RunState::Overdue,
+            Stall::Unspawned(_) | Stall::Failed(_) => RunState::Failed,
         }
     }
 }
@@ -169,9 +208,43 @@ impl From<JobId> for JobOpened {
 }
 
 impl JobClosed {
-    #[must_use]
-    pub fn new(job: JobId, state: JobState) -> JobClosed {
+    pub(crate) fn new(job: JobId, state: JobState) -> JobClosed {
         JobClosed { job, state }
+    }
+}
+
+impl JobHalted {
+    #[must_use]
+    pub fn new(job: JobId, run: Option<RunId>, halted: Halted, account: Account) -> JobHalted {
+        JobHalted { job, run, halted, account }
+    }
+}
+
+impl From<Halted> for JobState {
+    fn from(halted: Halted) -> JobState {
+        match halted {
+            Halted::Flailed => JobState::Flailed,
+            Halted::Stalled => JobState::Stalled,
+        }
+    }
+}
+
+impl FromIterator<JobId> for FailuresReported {
+    fn from_iter<Jobs: IntoIterator<Item = JobId>>(jobs: Jobs) -> FailuresReported {
+        FailuresReported(jobs.into_iter().collect())
+    }
+}
+
+impl Unreported {
+    #[must_use]
+    pub fn job(&self) -> JobId {
+        self.job
+    }
+}
+
+impl AsRef<Account> for Unreported {
+    fn as_ref(&self) -> &Account {
+        &self.account
     }
 }
 

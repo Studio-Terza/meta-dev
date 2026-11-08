@@ -5,9 +5,17 @@ use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::{Authorship, Body, Uuid};
 
 use super::{
-    Flailed, FlailedSegments, JobClosed, JobFlailed, JobOpened, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun,
-    OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    Delivery, FailuresReported, Flailed, FlailedSegments, Halted, JobClosed, JobFlailed, JobHalted, JobOpened,
+    JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf,
+    Spawned, StoredRun, Unplaced, Unreported, UnreportedFailures, Unstructured,
 };
+use crate::Account;
+
+#[derive(Debug, Columns)]
+struct UnreportedRow {
+    job: JobId,
+    account: Account,
+}
 
 #[derive(Debug, Columns)]
 struct NextJobRow {
@@ -90,6 +98,12 @@ impl From<FlailedRow> for Flailed {
     }
 }
 
+impl From<UnreportedRow> for Unreported {
+    fn from(row: UnreportedRow) -> Unreported {
+        Unreported { job: row.job, account: row.account }
+    }
+}
+
 impl From<RanRow> for Ran {
     fn from(row: RanRow) -> Ran {
         let usage = row
@@ -137,6 +151,81 @@ WHERE
             job: JobId,
             state: JobState
         ))
+    }
+}
+
+impl Batch for JobHalted {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let JobHalted { job, run, halted, account } = self;
+        let closed = JobClosed::new(job, JobState::from(halted)).written(statements)?;
+        let unreported = Delivery::Unreported;
+        let recorded = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  failures (job, run, halted, account, delivery)
+VALUES
+  (?1, ?2, ?3, ?4, ?5)
+"#,
+            job: JobId,
+            run: Option<RunId>,
+            halted: Halted,
+            account: Account,
+            unreported: Delivery
+        ))?;
+        Ok(Written::total([closed, recorded].into_iter()))
+    }
+}
+
+impl Query for UnreportedFailures {
+    type Rows = Vec<Unreported>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Unreported>, StoreFailure> {
+        let unreported = Delivery::Unreported;
+        let rows = statements.rows(store_ports::query!(
+            UnreportedRow,
+            r#"
+SELECT
+  job,
+  account
+FROM
+  failures
+WHERE
+  delivery = ?1
+ORDER BY
+  job
+"#,
+            unreported: Delivery
+        ))?;
+        Ok(rows.into_iter().map(Unreported::from).collect())
+    }
+}
+
+impl Batch for FailuresReported {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let reported = Delivery::Reported;
+        let written = self
+            .0
+            .into_iter()
+            .map(|job| {
+                statements.written(store_ports::query!(
+                    r#"
+UPDATE
+  failures
+SET
+  delivery = ?2
+WHERE
+  job = ?1
+"#,
+                    job: JobId,
+                    reported: Delivery
+                ))
+            })
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
     }
 }
 

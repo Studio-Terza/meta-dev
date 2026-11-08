@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  job,\n  account\nFROM\n  failures\nWHERE\n  delivery = ?1\nORDER BY\n  job\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "job",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "job"
+          }
+        }
+      },
+      {
+        "name": "account",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "account"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "98df61440d9e8a707e464afbeee70767aa6f8af43d6d39388e08270d6bdfe18b"
+}

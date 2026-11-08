@@ -1,6 +1,8 @@
 use port_core::Held;
 
-use crate::{AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Finished, Pause, Unreadable, Usage};
+use crate::{
+    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Fault, Finished, Pause, Unreadable, Usage,
+};
 
 #[derive(Debug)]
 pub struct Watch<'ports, D: Dispatch, C: Clock> {
@@ -22,6 +24,10 @@ pub enum Stall {
     Unreadable(Unreadable),
     #[error("the run passed its deadline and was killed")]
     Overdue,
+    #[error("{0}")]
+    Unspawned(Fault),
+    #[error("{0}")]
+    Failed(Fault),
 }
 
 impl Stall {
@@ -29,7 +35,15 @@ impl Stall {
     pub fn usage(&self) -> Option<Usage> {
         match self {
             Stall::Errored(errored) => Some(errored.usage()),
-            Stall::Unreadable(_) | Stall::Overdue => None,
+            Stall::Unreadable(_) | Stall::Overdue | Stall::Unspawned(_) | Stall::Failed(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn ran<Run>(&self, run: Run) -> Option<Run> {
+        match self {
+            Stall::Unspawned(_) => None,
+            Stall::Errored(_) | Stall::Unreadable(_) | Stall::Overdue | Stall::Failed(_) => Some(run),
         }
     }
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  failures (job, run, halted, account, delivery)\nVALUES\n  (?1, ?2, ?3, ?4, ?5)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "095a28327c6118bf8120162cb700061b9056b53cf97881356933a5f56efec287"
+}
