@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use code_model::{Implementation, ItemId, ItemPath, Model, Placed, Resolved, TypeRef};
+use code_model::{External, Implementation, ItemId, ItemPath, Model, Placed, Resolved, TypeRef};
 use lint_layout::{Word, words};
 
 #[derive(Debug)]
@@ -11,10 +11,8 @@ pub(crate) struct ErrorTypes {
 
 impl From<&Model> for ErrorTypes {
     fn from(model: &Model) -> ErrorTypes {
-        let traits = BTreeSet::from([
-            Resolved::Std(Self::STD_ERROR.into_iter().collect()),
-            Resolved::External(Self::THISERROR.into_iter().collect()),
-        ]);
+        let traits: BTreeSet<ItemPath> =
+            BTreeSet::from([Self::STD_ERROR.into_iter().collect(), Self::THISERROR.into_iter().collect()]);
         let implemented = model
             .implementations()
             .map(Placed::entity)
@@ -52,11 +50,12 @@ impl ErrorTypes {
     }
 
     fn implementing<'model>(
-        traits: &BTreeSet<Resolved>,
+        traits: &BTreeSet<ItemPath>,
         implementation: &'model Implementation,
     ) -> Option<&'model TypeRef> {
         let implemented = implementation.implemented()?;
-        traits.get(implemented).map(|_| implementation.subject_type())
+        let path = implemented.std().or_else(|| implemented.external().map(External::path))?;
+        traits.get(path).map(|_| implementation.subject_type())
     }
 
     fn failure(result: &ItemPath, output: &TypeRef) -> Option<TypeRef> {

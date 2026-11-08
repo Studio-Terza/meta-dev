@@ -65,7 +65,7 @@ impl Asked {
     }
 
     fn query(words: &[&str]) -> Result<Query, QueryFailure> {
-        Query::try_from(words.iter().map(OsString::from).collect::<Vec<_>>().as_slice())
+        Query::read(words.iter().map(OsString::from).collect::<Vec<_>>().as_slice())
     }
 
     fn answered(words: &&[&str]) -> Vec<String> {

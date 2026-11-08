@@ -66,6 +66,8 @@ const CALLABLE_BOUNDS: &str = "pub fn f(x: impl Fn(u16) -> char, y: Box<dyn Fn(&
 const COMPOUNDS: &str = "pub fn f(x: [u64; 4], y: (A, i32), z: &&mut u128, w: *const isize) {}\npub struct A {\n    pub b: [u16; 2],\n    pub c: (B, i64),\n}\n";
 const CONST_ARGUMENT: &str = "pub fn f(x: A<{ size_of::<u64>() }>) {}\n";
 const WIRE_BESIDE_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\npub fn f(v: Value) -> Z {}\n";
+const SPELLED_BESIDE_GLOB: &str =
+    "use other::*;\npub fn f(x: String) -> Z {}\npub fn g(v: serde_json::Value) -> Z {}\n";
 const WIRE_RENAMED_CRATE: &str = "use toml as t;\npub fn f(v: t::Value) -> Z {}\n";
 const SHADOWED_ALIAS: &str = "type Count = usize;\nmod inner {\n    struct Count;\n    fn c(x: Count) {}\n}\n";
 const WIRE_THROUGH_SUPER_GLOB: &str =
@@ -75,7 +77,7 @@ const LOCAL_STRING: &str = "pub struct String;\npub fn f(x: String) -> A {}\n";
 const OTHER_CRATE_NEWTYPE: &str = "pub struct Capture(Sink);\n";
 const OTHER_CRATE_CONSTRUCTOR: &str = "pub struct Capture {\n    sink: Sink,\n    yields: Yields,\n}\nimpl Capture {\n    pub fn new(v: u64) -> Capture {\n        g(v)\n    }\n}\n";
 
-const CASES: [Case; 67] = [
+const CASES: [Case; 68] = [
     Case::new(
         Title::new("a constructor on a struct with fields beside a same-named newtype in another crate"),
         &[
@@ -398,6 +400,11 @@ const CASES: [Case; 67] = [
         Title::new("an explicitly imported wire type beside a glob from outside the crate"),
         &[Source::new(Located::new("a.rs"), Text::new(WIRE_BESIDE_GLOB))],
         Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a text or wire type a glob may shadow is read by its spelling"),
+        &[Source::new(Located::new("a.rs"), Text::new(SPELLED_BESIDE_GLOB))],
+        Flagged::new(&["a.rs:2", "a.rs:3"]),
     ),
     Case::new(
         Title::new("a wire type reached through a renamed crate import"),

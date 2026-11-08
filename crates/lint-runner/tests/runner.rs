@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::thread;
 
+use cargo_ports::{Recorded, Toolchain};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
@@ -33,6 +34,7 @@ const DEEP_NESTING: usize = 5_000;
 const SHALLOW_NESTING: usize = 100;
 const MIDDLING_NESTING: usize = 200;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
+const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
 fn every_lint_reports_over_the_same_files() -> Result<(), Box<dyn Error>> {
@@ -206,6 +208,29 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_derive() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "#[derive(serde::Deserialize)]\npub struct A {\n    a: Title,\n}\n")?;
+    let mut err = Vec::new();
+    let arguments = [OsString::from(&root.root)].into_iter();
+    let verdict = Cli::from_args(arguments).verdict(&root.files, &Recorded::default(), &mut Vec::new(), &mut err);
+    assert_eq!((verdict, text_lines::Lines::from(String::from_utf8(err)?.as_str()).count()), (Verdict::Refused, 1));
+    Ok(())
+}
+
+#[test]
+fn a_workspace_located_through_cargo_resolves_a_derive_through_its_dependencies_crate_roots()
+-> Result<(), Box<dyn Error>> {
+    let workspace = golden::fixtures!("tests/.workspace")?;
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let arguments = [Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/.workspace").into_os_string()].into_iter();
+    let exit = Cli::from_args(arguments).report_to(&workspace, &Toolchain, &mut out, &mut err);
+    let said = String::from_utf8(err)?;
+    assert_eq!((exit, said.matches("app/src/lib.rs:3: free text in title;").count()), (ExitCode::FAILURE, 1));
+    Ok(())
+}
+
+#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
@@ -245,7 +270,12 @@ impl Trees {
     fn flagged(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(files, &mut out, &mut err);
+        let exit = Cli::from_args(arguments).report_to(
+            files,
+            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            &mut out,
+            &mut err,
+        );
         Printed {
             exit,
             out: String::from_utf8(out).unwrap_or_default(),
@@ -255,13 +285,23 @@ impl Trees {
 
     fn verdict(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Verdict {
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        Cli::from_args(arguments).verdict(files, &mut Vec::new(), &mut Vec::new())
+        Cli::from_args(arguments).verdict(
+            files,
+            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+        )
     }
 
     fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &mut out, &mut err);
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(
+            files,
+            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            &mut out,
+            &mut err,
+        );
         Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
     }
 }

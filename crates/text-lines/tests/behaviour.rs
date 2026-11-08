@@ -52,7 +52,7 @@ struct Read;
 
 impl Read {
     fn line(text: &&str) -> Result<String, NotOneLine> {
-        OneLine::try_from((*text).to_owned()).map(|line| line.to_string())
+        OneLine::try_new((*text).to_owned()).map(|line| line.to_string())
     }
 
     fn deserialized(json: &&str) -> Result<String, Category> {

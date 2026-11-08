@@ -41,6 +41,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-ports"
+version = "0.1.0"
+dependencies = [
+ "file-ports",
+ "thiserror",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -185,6 +193,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "file-ports",
  "lint-runner",
  "proptest",
@@ -307,6 +316,7 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 name = "lint"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "console-ports",
  "file-ports",
  "lint-runner",
@@ -679,9 +689,9 @@ dependencies = [
 name = "lint-no-plaintext"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -809,13 +819,17 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "file-ports",
  "lint-core",
  "lint-layout",
  "lint-placement",
  "lint-roots",
  "newtype",
+ "serde_json",
  "syn 2.0.119",
+ "thiserror",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -857,6 +871,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "code-model",
  "code-reader",
  "file-ports",
@@ -946,6 +961,7 @@ dependencies = [
 name = "lint-suite"
 version = "0.1.0"
 dependencies = [
+ "code-reader",
  "file-ports",
  "laws",
  "lint-arbitrary-newtypes",
@@ -1141,6 +1157,9 @@ dependencies = [
  "laws",
  "newtype-derive",
  "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -1417,8 +1436,7 @@ name = "text-lines"
 version = "0.1.0"
 dependencies = [
  "laws",
- "proptest",
- "serde",
+ "newtype",
  "serde_json",
  "thiserror",
 ]
@@ -1549,8 +1567,10 @@ checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 name = "workspace-metadata"
 version = "0.1.0"
 dependencies = [
+ "golden",
  "newtype",
  "serde",
+ "serde_json",
  "text-lines",
  "thiserror",
 ]

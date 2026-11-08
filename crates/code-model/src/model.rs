@@ -5,11 +5,15 @@ mod filed;
 
 use crate::boundary::ItemId;
 use crate::call::Call;
+use crate::crate_root::CrateRoots;
+use crate::domain::Domain;
 use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::Item;
+use crate::item_path::ItemPath;
 use crate::placed::Placed;
+use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
 pub use building::Building;
 pub(crate) use declarations::{Aliases, Declarations};
@@ -24,6 +28,7 @@ pub struct Model {
     holdings: Vec<Filed<Holding>>,
     calls: Vec<Filed<Call>>,
     declarations: Declarations,
+    roots: CrateRoots,
 }
 
 #[derive(Debug)]
@@ -110,6 +115,21 @@ impl Model {
     #[must_use]
     pub fn declared(&self, item: ItemId) -> Option<&Item> {
         self.declarations.items().get(item.index())
+    }
+
+    #[must_use]
+    pub fn exported(&self, domain: Domain, path: &ItemPath) -> Option<&Resolved> {
+        self.declarations.exports().get(&domain).and_then(|paths| paths.get(path))
+    }
+
+    #[must_use]
+    pub fn with_roots(self, roots: CrateRoots) -> Model {
+        Model { roots, ..self }
+    }
+
+    #[must_use]
+    pub fn roots(&self) -> &CrateRoots {
+        &self.roots
     }
 
     #[must_use]

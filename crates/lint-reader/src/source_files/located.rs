@@ -5,7 +5,7 @@ use lint_core::SourceText;
 use lint_layout::Failure;
 use lint_placement::{Packages, Placement};
 use lint_roots::Tree;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::opened::Opened;
 

@@ -15,5 +15,9 @@ text-lines = { path = "../text-lines" }
 serde.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+golden = { path = "../golden" }
+serde_json.workspace = true
+
 [lints]
 workspace = true

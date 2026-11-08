@@ -1,7 +1,22 @@
-pub trait Newtype: Sized {
+use super::checked::Checked;
+pub mod kind;
+
+use kind::Validity;
+
+pub trait Wrapping: Sized {
     type Inner;
 
-    fn new(inner: Self::Inner) -> Self;
-
     fn into_inner(self) -> Self::Inner;
+
+    fn admitted(inner: Self::Inner, built: impl FnOnce(Self::Inner) -> Self) -> Result<Self, Self::Error>
+    where
+        Self: Checked + Validity<Kind = kind::Checked>,
+    {
+        Self::checked(&inner)?;
+        Ok(built(inner))
+    }
+}
+
+pub trait Newtype: Wrapping + Validity<Kind = kind::Unchecked> {
+    fn new(inner: Self::Inner) -> Self;
 }

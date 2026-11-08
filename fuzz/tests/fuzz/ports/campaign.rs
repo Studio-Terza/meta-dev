@@ -4,6 +4,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
 use std::time::Instant;
 
+use cargo_ports::Recorded;
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
 use lint_runner::{Cli, Verdict};
@@ -47,7 +48,12 @@ impl Campaign {
 
     fn ran(files: &Memory) -> Run {
         let mut err = Vec::new();
-        let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(files, &mut Vec::new(), &mut err);
+        let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(
+            files,
+            &Recorded::default(),
+            &mut Vec::new(),
+            &mut err,
+        );
         Run { verdict, outcome: Outcome::from(err) }
     }
 

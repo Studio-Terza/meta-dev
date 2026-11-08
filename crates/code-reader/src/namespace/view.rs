@@ -1,3 +1,5 @@
+use code_model::Unresolved;
+
 use super::binding::Binding;
 use super::entries::Admission;
 use super::resolver::{Outer, Resolution};
@@ -136,11 +138,23 @@ impl<'rows> View<'rows> {
         }
     }
 
-    pub(super) fn settled(self, absent: impl FnOnce() -> Outer) -> Resolution {
+    pub(super) fn contested(
+        self,
+        builtin: Option<Binding>,
+        absent: impl FnOnce() -> Outer,
+        expanded: impl FnOnce() -> Unresolved,
+    ) -> Resolution {
+        match self.found {
+            Found::Conflict => builtin.map_or_else(|| self.settled(absent, expanded), Resolution::Bound),
+            Found::Nothing | Found::One(_) => self.settled(absent, expanded),
+        }
+    }
+
+    pub(super) fn settled(self, absent: impl FnOnce() -> Outer, expanded: impl FnOnce() -> Unresolved) -> Resolution {
         match self.found {
             Found::Nothing => self.pending.absent(absent),
             Found::One(binding) => self.pending.bound(binding),
-            Found::Conflict => Resolution::Bound(Binding::Unknown),
+            Found::Conflict => Resolution::Bound(Binding::Unknown(absent().unresolved(expanded))),
         }
     }
 }

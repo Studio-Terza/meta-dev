@@ -5,7 +5,7 @@ use syn::Path;
 use crate::name::Name;
 use crate::path_tail::PathTail;
 use crate::word::Word;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UsePath(Vec<Name>);

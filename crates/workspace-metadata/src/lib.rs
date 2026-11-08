@@ -4,6 +4,6 @@ mod outside;
 mod readers;
 
 pub use crate_name::CrateName;
-pub use metadata::Metadata;
+pub use metadata::{Form, Library, Metadata};
 pub use outside::Outside;
 pub use readers::Readers;

@@ -1,12 +1,15 @@
 use std::iter;
 use std::thread::Scope;
 
+use cargo_ports::Cargo;
 use code_model::Model;
+use code_reader::Reader;
 
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
 use lint_core::{Lint, ModelLint, Readout, Report};
+use lint_layout::Crates;
 use lint_reader::SourceFiles;
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
@@ -56,134 +59,172 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Helpers, Queue, Rendered, Slot, Workers};
+use crate::cli::boundary::{Helper, Helpers, Located, Queue, Rendered, Slot, Workers};
 use crate::cli::{Outcome, Sources};
 
 #[derive(Debug)]
 pub struct Lints;
 
-type Check = for<'file> fn(&'file Readout, &'file Queue) -> Vec<Report<'file>>;
+#[derive(Debug)]
+pub(crate) struct Crew<'scope> {
+    located: Located<'scope>,
+    helpers: Helpers<'scope>,
+}
+
+impl Crew<'_> {
+    #[must_use]
+    pub(crate) fn checked<'file>(self, readout: &'file Readout, queue: &Queue) -> Outcome<'file> {
+        let modelled = self.located.joined().map(|crates| Lints::modelled(readout, &crates));
+        let mine = Lints::worked(readout, queue);
+        let rendered: Vec<Rendered> =
+            iter::once(mine).chain(self.helpers.into_iter().map(Helper::joined)).flatten().collect();
+        modelled.map_or_else(Outcome::Unlocated, |found| Lints::gathered(readout, rendered, found))
+    }
+}
+
+type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
 impl Lints {
-    const CHECKS: [Check; 45] = [
-        |readout, _| vec![NoComments::report(readout.files())],
-        |readout, _| vec![NoFreeFns::report(readout.files())],
-        |readout, _| vec![ThinMain::report(readout.files())],
-        |readout, _| vec![VecOutParams::report(readout.files())],
-        |readout, _| vec![NamedLifetimes::report(readout.files())],
-        |readout, _| vec![EnumPredicates::report(readout.files())],
-        |readout, _| vec![ConstShape::report(readout.files())],
-        |readout, _| vec![TypeShape::report(readout.files())],
-        |readout, _| vec![ExpressionFlow::report(readout.files())],
-        |readout, _| vec![FnShape::report(readout.files())],
-        |readout, _| vec![LiteralNames::report(readout.files())],
-        |readout, _| vec![ManualIteration::report(readout.files())],
-        |readout, _| vec![ModuleNesting::report(readout.files())],
-        |readout, _| vec![NamedNumbers::report(readout.files())],
-        |readout, _| vec![NoForwarders::report(readout.files())],
-        |readout, _| vec![NoNumbersInBinaries::report(readout.files())],
-        |readout, _| vec![NoParameterBags::report(readout.files())],
-        |readout, _| vec![NoPlaintext::report(readout.files())],
-        |readout, queue| vec![<PrimitiveBoundary as ModelLint>::report(queue.model(readout))],
-        |readout, _| vec![PrivateFns::report(readout.files())],
-        |readout, _| vec![ProcessStarters::report(readout.files())],
-        |readout, _| vec![RawResources::report(readout.files())],
-        |readout, _| vec![PublicSurface::report(readout.files())],
-        |readout, _| vec![RepeatedMethods::report(readout.files())],
-        |readout, _| vec![StateGraph::report(readout.files())],
-        |readout, _| vec![GuardMustUse::report(readout.files())],
-        |readout, _| vec![CrateGraph::report(readout.files())],
-        |readout, _| vec![PublicApiTests::report(readout.files())],
-        |readout, _| vec![NoTestOnlyApi::report(readout.files())],
-        |readout, _| vec![NoIgnoredTests::report(readout.files())],
-        |readout, _| vec![NoTestIo::report(readout.files())],
-        |readout, _| vec![FakesAtPorts::report(readout.files())],
-        |readout, _| vec![PortBatching::report(readout.files())],
-        |readout, _| vec![LongExactStrings::report(readout.files())],
-        |readout, _| vec![RepeatedShapes::report(readout.files())],
-        |readout, _| vec![MandatoryLaws::report(readout.files())],
-        |readout, _| vec![ArbitraryNewtypes::report(readout.files())],
-        |readout, _| vec![BoolMethods::report(readout.files())],
-        |readout, _| vec![EffectsInPorts::report(readout.files())],
-        |readout, _| vec![NoEarlyExits::report(readout.files())],
-        |readout, _| {
+    const LINTS: [Entry; 46] = [
+        Entry::Checked(|readout| vec![NoComments::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoFreeFns::report(readout.files())]),
+        Entry::Checked(|readout| vec![ThinMain::report(readout.files())]),
+        Entry::Checked(|readout| vec![VecOutParams::report(readout.files())]),
+        Entry::Checked(|readout| vec![NamedLifetimes::report(readout.files())]),
+        Entry::Checked(|readout| vec![EnumPredicates::report(readout.files())]),
+        Entry::Checked(|readout| vec![ConstShape::report(readout.files())]),
+        Entry::Checked(|readout| vec![TypeShape::report(readout.files())]),
+        Entry::Checked(|readout| vec![ExpressionFlow::report(readout.files())]),
+        Entry::Checked(|readout| vec![FnShape::report(readout.files())]),
+        Entry::Checked(|readout| vec![LiteralNames::report(readout.files())]),
+        Entry::Checked(|readout| vec![ManualIteration::report(readout.files())]),
+        Entry::Checked(|readout| vec![ModuleNesting::report(readout.files())]),
+        Entry::Checked(|readout| vec![NamedNumbers::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoForwarders::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoNumbersInBinaries::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoParameterBags::report(readout.files())]),
+        Entry::Modelled(<PrimitiveBoundary as ModelLint>::report),
+        Entry::Checked(|readout| vec![PrivateFns::report(readout.files())]),
+        Entry::Checked(|readout| vec![ProcessStarters::report(readout.files())]),
+        Entry::Checked(|readout| vec![RawResources::report(readout.files())]),
+        Entry::Checked(|readout| vec![PublicSurface::report(readout.files())]),
+        Entry::Checked(|readout| vec![RepeatedMethods::report(readout.files())]),
+        Entry::Checked(|readout| vec![StateGraph::report(readout.files())]),
+        Entry::Checked(|readout| vec![GuardMustUse::report(readout.files())]),
+        Entry::Checked(|readout| vec![CrateGraph::report(readout.files())]),
+        Entry::Checked(|readout| vec![PublicApiTests::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoTestOnlyApi::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoIgnoredTests::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoTestIo::report(readout.files())]),
+        Entry::Checked(|readout| vec![FakesAtPorts::report(readout.files())]),
+        Entry::Checked(|readout| vec![PortBatching::report(readout.files())]),
+        Entry::Checked(|readout| vec![LongExactStrings::report(readout.files())]),
+        Entry::Checked(|readout| vec![RepeatedShapes::report(readout.files())]),
+        Entry::Checked(|readout| vec![MandatoryLaws::report(readout.files())]),
+        Entry::Checked(|readout| vec![ArbitraryNewtypes::report(readout.files())]),
+        Entry::Checked(|readout| vec![BoolMethods::report(readout.files())]),
+        Entry::Checked(|readout| vec![EffectsInPorts::report(readout.files())]),
+        Entry::Checked(|readout| vec![NoEarlyExits::report(readout.files())]),
+        Entry::Checked(|readout| {
             let flows = Flows::from(readout.files());
             vec![flows.report::<LinearBodies>(), flows.report::<PureRouters>(), flows.report::<PlainConditions>()]
-        },
-        |readout, _| {
+        }),
+        Entry::Checked(|readout| {
             let extraction = Extraction::from(readout.files());
             let system = TypeSystem::built_from(readout.files(), &extraction);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
                 .collect()
-        },
-        |readout, _| vec![UnconsumedTraits::report(readout.files())],
-        |readout, _| vec![RustOnly::report(readout.repo_files())],
-        |readout, _| vec![WorkflowRun::report(readout.repo_files())],
+        }),
+        Entry::Checked(|readout| vec![UnconsumedTraits::report(readout.files())]),
+        Entry::Checked(|readout| vec![RustOnly::report(readout.repo_files())]),
+        Entry::Checked(|readout| vec![WorkflowRun::report(readout.repo_files())]),
+        Entry::Modelled(<HandImpls as ModelLint>::report),
+        Entry::Modelled(<NoPlaintext as ModelLint>::report),
     ];
 
-    const QUERIES: [Query; 1] = [<HandImpls as ModelLint>::report];
-
-    pub fn started<'scope, F: Files + Sync>(
+    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync>(
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F>,
-    ) -> Helpers<'scope> {
-        Workers::available()
-            .helpers()
-            .filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok())
-            .collect()
+        sources: &'scope Sources<F, C>,
+    ) -> Crew<'scope> {
+        let located = Located::spawned(scope, move || sources.ports().located(sources.stage()));
+        let helpers =
+            Workers::available().helpers().filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok());
+        Crew { located, helpers: helpers.collect() }
     }
 
-    #[must_use]
-    pub fn checked<'file>(readout: &'file Readout, queue: &Queue, helpers: Helpers<'_>) -> Outcome<'file> {
-        let mine = Self::worked(readout, queue);
-        let mut rendered: Vec<Rendered> =
-            iter::once(mine).chain(helpers.into_iter().map(Helper::joined)).flatten().collect();
+    fn gathered(readout: &Readout, checked: Vec<Rendered>, modelled: Vec<Rendered>) -> Outcome<'_> {
+        let mut rendered: Vec<Rendered> = checked.into_iter().chain(modelled).collect();
         rendered.sort_by_key(Rendered::slot);
         Outcome::from_rendered(rendered, readout.failures())
     }
 
-    fn helped(sources: &Sources<impl Files>) -> Vec<Rendered> {
-        Self::worked(&SourceFiles::read_staged(sources.files(), sources.stage()), sources.queue())
+    fn helped(sources: &Sources<impl Files, impl Cargo>) -> Vec<Rendered> {
+        Self::worked(&SourceFiles::read_staged(sources.ports().files(), sources.stage()), sources.queue())
     }
 
     fn worked(readout: &Readout, queue: &Queue) -> Vec<Rendered> {
-        let jobs: Vec<Job> = Self::CHECKS
+        let jobs: Vec<Job> = Self::LINTS
             .into_iter()
             .enumerate()
-            .map(|(index, check)| Job::Check { slot: Slot::Check(index), check })
-            .chain(
-                Self::QUERIES
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, query)| Job::Query { slot: Slot::Query(index), query }),
-            )
+            .filter_map(|(index, entry)| entry.checked().map(|check| Job { slot: Slot::from(index), check }))
             .rev()
             .collect();
-        queue.claimed(&jobs).flat_map(|job| job.done(readout, queue)).collect()
+        queue.claimed(&jobs).flat_map(|job| job.done(readout)).collect()
+    }
+
+    fn modelled(readout: &Readout, crates: &Crates) -> Vec<Rendered> {
+        let model = Reader::read(readout, crates);
+        Self::LINTS
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                entry
+                    .modelled()
+                    .and_then(|query| query(&model).dirty())
+                    .map(|report| Rendered::render(Slot::from(index), &report))
+            })
+            .collect()
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Job {
-    Check { slot: Slot, check: Check },
-    Query { slot: Slot, query: Query },
+enum Entry {
+    Checked(Check),
+    Modelled(Query),
+}
+
+impl Entry {
+    fn checked(self) -> Option<Check> {
+        match self {
+            Entry::Checked(check) => Some(check),
+            Entry::Modelled(_) => None,
+        }
+    }
+
+    fn modelled(self) -> Option<Query> {
+        match self {
+            Entry::Modelled(query) => Some(query),
+            Entry::Checked(_) => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Job {
+    slot: Slot,
+    check: Check,
 }
 
 impl Job {
-    fn done(self, readout: &Readout, queue: &Queue) -> Vec<Rendered> {
-        match self {
-            Job::Check { slot, check } => check(readout, queue)
-                .into_iter()
-                .filter_map(Report::dirty)
-                .map(|report| Rendered::render(slot, &report))
-                .collect(),
-            Job::Query { slot, query } => {
-                query(queue.model(readout)).dirty().map(|report| Rendered::render(slot, &report)).into_iter().collect()
-            }
-        }
+    fn done(self, readout: &Readout) -> Vec<Rendered> {
+        (self.check)(readout)
+            .into_iter()
+            .filter_map(Report::dirty)
+            .map(|report| Rendered::render(self.slot, &report))
+            .collect()
     }
 }

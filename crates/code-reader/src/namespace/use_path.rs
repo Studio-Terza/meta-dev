@@ -1,7 +1,9 @@
 use syn::{Ident, ItemUse, Path, Token, UseTree};
 
-use code_model::{ItemPath, Primitive};
-use lint_layout::{Name, Whole, Word, words};
+use std::collections::BTreeSet;
+
+use code_model::{Domain, ItemPath, Primitive, Reexport};
+use lint_layout::{Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
 use super::anchor::Anchor;
@@ -10,7 +12,6 @@ use super::boundary::ScopeId;
 use super::entries::Imported;
 use super::resolver::{Outer, Resolution, Resolver};
 use super::std_names::{Canonical, StdNames, Table};
-use super::tables::Domain;
 use super::view::View;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,10 +54,10 @@ impl Reading {
         }
     }
 
-    fn lone(self, first: &Name) -> Binding {
+    fn lone(self, external: Binding) -> Binding {
         match self {
-            Reading::Written | Reading::Explicit => Binding::Unknown,
-            Reading::Imported => Binding::External(ItemPath::default().joined(first)),
+            Reading::Written | Reading::Explicit => Binding::UNBOUND,
+            Reading::Imported => external,
         }
     }
 }
@@ -77,7 +78,8 @@ impl From<&[Name]> for Shape {
 }
 
 impl Shape {
-    pub(super) fn fallback(self, first: &Name, reading: Reading, prelude: Option<Binding>, space: &Namespace) -> Outer {
+    pub(super) fn fallback(self, first: &Name, reading: Reading, space: &Namespace, viewer: ScopeId) -> Outer {
+        let prelude = space.prelude(first, viewer);
         let known = self
             .primitive(first)
             .map(Binding::Primitive)
@@ -85,10 +87,10 @@ impl Shape {
             .or_else(|| space.workspace(first).map(Binding::Module))
             .or_else(|| StdNames::root(first))
             .or_else(|| self.prelude(first).map(Binding::Std));
-        Outer::known_or(known, || self.unbound(first, reading))
+        Outer::known_or(known, || self.unbound(reading, Binding::external(first, space.dependencies(viewer))))
     }
 
-    fn primitive(self, first: &Name) -> Option<Primitive> {
+    pub(super) fn primitive(self, first: &Name) -> Option<Primitive> {
         match self {
             Shape::Single => StdNames::primitive(first),
             Shape::Multiple => None,
@@ -102,17 +104,40 @@ impl Shape {
         }
     }
 
-    fn derived(self, first: &Name, resolver: &Resolver<'_, '_>, path: &UsePath, viewer: ScopeId) -> Resolution {
+    fn looked(self, domain: Domain) -> Domain {
         match self {
-            Shape::Single => resolver.macro_named(first, viewer),
-            Shape::Multiple => resolver.path(path, viewer),
+            Shape::Single => domain,
+            Shape::Multiple => Domain::Types,
         }
     }
 
-    fn unbound(self, first: &Name, reading: Reading) -> Binding {
+    fn unbound(self, reading: Reading, external: Binding) -> Binding {
         match self {
-            Shape::Single => reading.lone(first),
-            Shape::Multiple => Binding::External(ItemPath::default().joined(first)),
+            Shape::Single => reading.lone(external),
+            Shape::Multiple => external,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Relative<'path> {
+    first: &'path Name,
+    shape: Shape,
+    reading: Reading,
+}
+
+impl Relative<'_> {
+    fn reexported(self, written: &ItemPath, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
+        declared.get(self.first).map_or_else(
+            || Reexport::dependency(dependencies.package(self.first), written),
+            |_| Reexport::own(written.as_ref(), declared),
+        )
+    }
+
+    fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
+        match self.shape.looked(domain) {
+            Domain::Types => resolver.named(self.first, self.shape, self.reading, viewer),
+            Domain::Macros => resolver.macro_named(self.first, viewer),
         }
     }
 }
@@ -122,30 +147,34 @@ pub(super) enum Head<'path> {
     Empty,
     Global(&'path Name),
     Anchored(Anchor),
-    Named(&'path Name, Shape, Reading),
+    Named(Relative<'path>),
 }
 
 impl Head<'_> {
-    pub(super) fn derived(self, resolver: &Resolver<'_, '_>, path: &UsePath, viewer: ScopeId) -> Resolution {
+    pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
         match self {
-            Head::Named(first, shape, _) => shape.derived(first, resolver, path, viewer),
-            Head::Empty | Head::Global(_) | Head::Anchored(_) => resolver.path(path, viewer),
+            Head::Empty => Resolution::Bound(Binding::UNBOUND),
+            Head::Global(first) => {
+                Resolution::Bound(resolver.space().global(first, resolver.space().dependencies(viewer)))
+            }
+            Head::Anchored(anchor) => resolver.anchored(anchor, viewer),
+            Head::Named(relative) => relative.started(resolver, viewer, domain),
         }
     }
 
-    pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId) -> Resolution {
+    fn reexported(self, written: &ItemPath, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
         match self {
-            Head::Empty => Resolution::Bound(Binding::Unknown),
-            Head::Global(first) => resolver.global(first),
-            Head::Anchored(anchor) => resolver.anchored(anchor, viewer),
-            Head::Named(first, shape, reading) => resolver.named(first, shape, reading, viewer),
+            Head::Empty => Reexport::Opaque,
+            Head::Global(first) => Reexport::dependency(dependencies.package(first), written),
+            Head::Anchored(anchor) => anchor.reexported(written, declared),
+            Head::Named(relative) => relative.reexported(written, dependencies, declared),
         }
     }
 
     fn relative<'path>(first: &'path Name, rest: &[Name], reading: Reading) -> Head<'path> {
         match Anchor::spelled(first) {
             Some(anchor) => Head::Anchored(anchor),
-            None => Head::Named(first, Shape::from(rest), reading),
+            None => Head::Named(Relative { first, shape: Shape::from(rest), reading }),
         }
     }
 }
@@ -218,15 +247,20 @@ impl UsePath {
         self.segments.get(1..).unwrap_or_default()
     }
 
-    pub(super) fn bound(&self, domain: Domain, resolver: &Resolver<'_, '_>, viewer: ScopeId) -> Resolution {
-        match domain {
-            Domain::Types => resolver.path(self, viewer),
-            Domain::Macros => self.head().derived(resolver, self, viewer),
-        }
+    pub(super) fn exported(krate: &Name, entry: &Name) -> UsePath {
+        UsePath { leading: Leading::Global, reading: Reading::Written, segments: vec![krate.clone(), entry.clone()] }
     }
 
     pub(crate) fn written(&self) -> ItemPath {
         self.segments.iter().cloned().collect()
+    }
+
+    pub(super) fn global(krate: &Name) -> UsePath {
+        UsePath { leading: Leading::Global, reading: Reading::Written, segments: vec![krate.clone()] }
+    }
+
+    pub(super) fn reexport(&self, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
+        self.head().reexported(&self.written(), dependencies, declared)
     }
 
     fn joined(&self, segment: Name) -> UsePath {

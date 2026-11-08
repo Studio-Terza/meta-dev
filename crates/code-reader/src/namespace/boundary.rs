@@ -1,7 +1,7 @@
 use std::iter;
 use std::ops::ControlFlow;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ScopeId(usize);
 
 impl ScopeId {

@@ -1,4 +1,4 @@
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::Language;
 use super::text::Text;

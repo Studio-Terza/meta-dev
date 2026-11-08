@@ -1,3 +1,6 @@
+use std::collections::BTreeSet;
+
+use code_model::{ItemPath, Reexport};
 use lint_layout::{Name, Whole, Word};
 
 use super::boundary::ScopeId;
@@ -19,6 +22,13 @@ impl Anchor {
             .iter()
             .zip(Self::ANCHORS)
             .find_map(|(word, anchor)| first.matches::<Whole>(&[*word]).map(|_| anchor))
+    }
+
+    pub(super) fn reexported(self, written: &ItemPath, declared: &BTreeSet<&Name>) -> Reexport {
+        match self {
+            Anchor::Crate | Anchor::Module => Reexport::own(written.as_ref().get(1..).unwrap_or_default(), declared),
+            Anchor::Super => Reexport::Opaque,
+        }
     }
 
     pub(super) fn anchored(self, anchors: Anchors) -> Option<ScopeId> {

@@ -1,3 +1,3 @@
 mod source_files;
 
-pub use source_files::{SourceFiles, Stage};
+pub use source_files::{CrateSources, SourceFiles, Stage, Unlocated};

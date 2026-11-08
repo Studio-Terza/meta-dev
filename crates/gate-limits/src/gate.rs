@@ -16,7 +16,7 @@ use crate::seconds::Seconds;
 use crate::stage::Stage;
 pub use finding::Finding;
 use limit::Limit;
-use newtype::Newtype;
+use newtype::Wrapping;
 use pairing::Pairing;
 pub use record::Record;
 use verdict::Verdict;

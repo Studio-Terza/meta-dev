@@ -11,6 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
+cargo-ports = { path = "../cargo-ports" }
 file-ports = { path = "../file-ports" }
 graph-query = { path = "../graph-query" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
@@ -76,6 +77,7 @@ name = "behaviour"
 path = "tests/behaviour.rs"
 
 [dev-dependencies]
+cargo-ports = { path = "../cargo-ports" }
 golden = { path = "../golden" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }

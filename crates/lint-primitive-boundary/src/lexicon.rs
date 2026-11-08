@@ -1,4 +1,4 @@
-use code_model::{ItemPath, Resolved};
+use code_model::{External, ItemPath, Resolved};
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::finding::Finding;
@@ -62,23 +62,10 @@ impl<'path> Lone<'path> {
 }
 
 #[derive(Debug)]
-struct Wire {
-    resolved: Resolved,
-    path: ItemPath,
-}
-
-impl Wire {
-    fn rooted(words: &[Word<'_>], root: fn(ItemPath) -> Resolved) -> Wire {
-        let path: ItemPath = words.iter().copied().collect();
-        Wire { resolved: root(path.clone()), path }
-    }
-}
-
-#[derive(Debug)]
 pub struct Lexicon {
     owned: ItemPath,
     owned_spellings: Vec<ItemPath>,
-    wires: Vec<Wire>,
+    wires: Vec<ItemPath>,
 }
 
 impl Lexicon {
@@ -109,23 +96,30 @@ impl Lexicon {
         Lexicon {
             owned: Lexicon::OWNED.into_iter().collect(),
             owned_spellings: Lexicon::OWNED_SPELLINGS.iter().map(|owned| owned.iter().copied().collect()).collect(),
-            wires: Lexicon::WIRE_CRATES.iter().map(|wire| Wire::rooted(wire, Resolved::External)).collect(),
+            wires: Lexicon::WIRE_CRATES.iter().map(|wire| wire.iter().copied().collect()).collect(),
         }
     }
 
     pub fn identity(&self, resolved: &Resolved, written: &ItemPath) -> Option<Identity> {
         let primitive = resolved.primitive().and(written.last()).cloned().map(Identity::Primitive);
         let owned = resolved.std().into_iter().find(|path| **path == self.owned).map(|_| Identity::Owned);
-        let wire =
-            self.wires.iter().find(|wire| wire.resolved == *resolved).map(|wire| Identity::Wire(wire.path.clone()));
-        let unresolved = [resolved].into_iter().find(|candidate| **candidate == Resolved::Unknown(written.clone()));
+        let wire = resolved
+            .external()
+            .map(External::path)
+            .and_then(|path| self.wires.iter().find(|wire| *wire == path))
+            .cloned()
+            .map(Identity::Wire);
+        let unresolved = resolved
+            .unresolved()
+            .map(|cause| Resolved::Unknown(written.clone(), cause))
+            .filter(|unknown| unknown == resolved);
         primitive.or(owned).or(wire).or_else(|| unresolved.and_then(|_| self.spelled(written)))
     }
 
     fn spelled(&self, written: &ItemPath) -> Option<Identity> {
         let builtin = Lone::within(written).and_then(Lone::builtin);
         let owned = self.owned_spellings.iter().find(|owned| *owned == written).map(|_| Identity::Owned);
-        let wire = self.wires.iter().find(|wire| wire.path == *written).map(|wire| Identity::Wire(wire.path.clone()));
+        let wire = self.wires.iter().find(|wire| *wire == written).cloned().map(Identity::Wire);
         builtin.or(owned).or(wire)
     }
 }

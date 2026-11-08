@@ -1,3 +1,4 @@
+mod crate_sources;
 mod located;
 mod modules;
 mod opened;
@@ -5,10 +6,12 @@ mod scope;
 mod shelf;
 mod staged;
 mod test_modules;
+mod unlocated;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+pub use crate_sources::CrateSources;
 use file_ports::Files;
 use lint_core::{Readout, SourceFile};
 use lint_layout::Failure;
@@ -19,12 +22,20 @@ use scope::Scope;
 use shelf::Shelf;
 use staged::Staged;
 use test_modules::TestModules;
+pub use unlocated::Unlocated;
 
 #[derive(Debug)]
 pub struct Stage<'given> {
     trees: Vec<Tree<'given>>,
     staged: Vec<Vec<Staged>>,
     packages: Packages,
+}
+
+impl Stage<'_> {
+    #[must_use]
+    pub fn package_directories(&self) -> Vec<&Path> {
+        self.staged.iter().flatten().flat_map(Staged::targets).map(Target::package).collect()
+    }
 }
 
 #[derive(Debug)]

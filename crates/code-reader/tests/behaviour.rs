@@ -1,5 +1,6 @@
 use code_model::{
-    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
+    Domain, Entry, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited,
+    TypeRef, Unresolved,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -54,6 +55,10 @@ const MACRO_CALL: &str = "make!();\nimpl Clone for R {}\n";
 const MACRO_STATEMENT: &str = "fn f() {\n    make!();\n    impl Clone for R {}\n}\n";
 const MACRO_DEFINED: &str = "macro_rules! make {\n    () => {};\n}\nimpl Clone for R {}\n";
 const MACRO_DEFINED_CALLED: &str = "macro_rules! make {\n    () => {};\n}\nmake!();\nimpl Clone for R {}\n";
+const MACRO_MAY_DECLARE: &str = "make!(Mark);\nimpl Mark for R {}\n";
+const MACRO_MAY_DECLARE_BY_PATH: &str = "make!(Mark);\nimpl crate::Mark for R {}\n";
+const MACRO_MAY_DECLARE_IMPORTED: &str = "mod m {\n    make!(Mark);\n}\nuse m::Mark;\nimpl Mark for R {}\n";
+const MACRO_ELSEWHERE: &str = "mod m {\n    make!(Mark);\n}\nmod n {}\nimpl n::Mark for R {}\nimpl Mark for R {}\n";
 const MACRO_ASSERT: &str = "struct R;\nfn f() {\n    assert!(true);\n    impl Clone for R {}\n}\n";
 const MACRO_STD_STATEMENTS: &str =
     "fn f() {\n    println!(\"a\");\n    let v = vec![1];\n    debug_assert_eq!(v, v);\n    impl Clone for R {}\n}\n";
@@ -110,6 +115,13 @@ const DERIVE_IMPORTED: &str =
     "use serde::Serialize;\nuse std::fmt::Debug as Clone;\n#[derive(Serialize, Clone, Hash)]\nstruct A;\n";
 const DERIVE_UNLISTED: &str = "#[derive(Serialize)]\nstruct A;\n";
 const DERIVE_GLOBBED: &str = "use std::hash::*;\nuse other::*;\n#[derive(Hash, Debug)]\nstruct A;\n";
+const DERIVE_PAST_EXPANSION: &str = "make!();\n#[derive(Clone)]\nstruct A;\n";
+const DERIVE_THROUGH_UNREAD: &str = "#[derive(newtype::serde::Deserialize, serde_derive::Deserialize)]\nstruct A;\n";
+const DERIVE_FROM_SUBMODULE: &str =
+    "use diesel::prelude::Queryable;\n#[derive(Queryable, diesel::prelude::Insertable)]\nstruct A;\n";
+const PRIMITIVE_PAST_GLOB: &str = "use other::*;\nfn f() -> u8 {}\n";
+const PRIMITIVE_PAST_EXPANSION: &str = "make!();\nfn f() -> bool {}\n";
+const DERIVE_CONDITIONAL: &str = "#[cfg_attr(feature = \"serde\", derive(Clone), derive(Debug))]\n#[cfg_attr(unix, cfg_attr(test, derive(Hash)))]\n#[cfg_attr(windows, allow(dead_code))]\nstruct A;\n";
 
 const RENAMED_ACROSS: [Fixture; 2] = [
     Fixture::new("src/lib.rs", "pub use std::clone::Clone as Dup;\nmod x;\n"),
@@ -172,6 +184,13 @@ const GLOB_THROUGH_A_LATER_SIBLING: [Fixture; 6] = [
 const WORKSPACE: [Fixture; 2] = [
     Fixture::new("crates/a/src/lib.rs", "pub use std::clone::Clone as Dup;\n"),
     Fixture::new("crates/b/src/lib.rs", "impl a::Dup for R {}\nimpl ::a::Dup for R {}\n"),
+];
+const WORKSPACE_CRATE_REEXPORTED: [Fixture; 2] = [
+    Fixture::new("crates/a/src/lib.rs", "pub use serde;\npub mod de {\n    pub use serde::Deserialize;\n}\n"),
+    Fixture::new(
+        "crates/b/src/lib.rs",
+        "#[derive(a::serde::Deserialize, a::de::Deserialize)]\nstruct A;\nimpl a::serde::Serialize for R {}\n",
+    ),
 ];
 const ISLAND: [Fixture; 1] = [Fixture::new("src/x.rs", "trait T {}\nimpl crate::T for R {}\nimpl super::T for R {}\n")];
 const ISLAND_OWN: [Fixture; 1] = [Fixture::new(
@@ -278,11 +297,24 @@ impl Expect {
     }
 
     fn external(path: &[&str]) -> Seen {
-        Seen::Resolved(Resolved::External(path.iter().map(|segment| Name::from(*segment)).collect()))
+        Seen::Resolved(Resolved::External(External::new(
+            None,
+            path.iter().map(|segment| Name::from(*segment)).collect(),
+        )))
     }
 
     fn unknown(path: &[&str]) -> Seen {
-        Seen::Resolved(Resolved::Unknown(path.iter().map(|segment| Name::from(*segment)).collect()))
+        Seen::Resolved(Resolved::Unknown(
+            path.iter().map(|segment| Name::from(*segment)).collect(),
+            Unresolved::Unbound,
+        ))
+    }
+
+    fn possibly_macro_declared(path: &[&str]) -> Seen {
+        Seen::Resolved(Resolved::Unknown(
+            path.iter().map(|segment| Name::from(*segment)).collect(),
+            Unresolved::PossiblyMacroDeclared,
+        ))
     }
 
     fn named(path: Seen, arguments: Vec<TypeRef<Seen>>) -> TypeRef<Seen> {
@@ -334,6 +366,16 @@ impl Read {
     fn across(fixtures: &[Fixture]) -> Vec<Seen> {
         let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
         Read::implemented(&files)
+    }
+
+    fn exported(fixtures: &[Fixture], domain: Domain, paths: &[&[&str]]) -> Vec<Option<Seen>> {
+        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+        let model = Reader::read_files(&files);
+        paths
+            .iter()
+            .map(|path| path.iter().map(|segment| Name::from(*segment)).collect())
+            .map(|path| model.exported(domain, &path).cloned().map(|resolved| Seen::of(&model, resolved)))
+            .collect()
     }
 
     fn implemented(files: &[SourceFile]) -> Vec<Seen> {
@@ -398,6 +440,84 @@ laws::table!(only_impl_blocks_are_written, |text: &&str| Read::written_sites(&[R
     WRITTEN => ["a.rs:2", "a.rs:5"],
     MIXED => ["a.rs:3"],
 ]);
+
+const EXPORTING: [Fixture; 2] = [
+    Fixture::new(
+        "crates/a/src/lib.rs",
+        "mod m {\n    pub trait T {}\n}\npub use m::T;\npub use std::clone::Clone as Dup;\npub use other::Far;\nuse std::fmt::Debug;\npub struct S;\nstruct Hidden;\npub use missing::*;\n",
+    ),
+    Fixture::new("crates/b/src/lib.rs", "pub use a::T as U;\n"),
+];
+
+#[test]
+fn a_crate_root_exports_each_public_name_as_it_resolves() {
+    assert_eq!(
+        Read::exported(
+            &EXPORTING,
+            Domain::Types,
+            &[
+                &["a", "T"],
+                &["a", "Dup"],
+                &["a", "Far"],
+                &["a", "Debug"],
+                &["a", "S"],
+                &["a", "Hidden"],
+                &["b", "U"],
+                &["a", "Missing"]
+            ]
+        ),
+        [
+            Some(Expect::item("T", ItemKind::Trait)),
+            Some(Expect::std_trait(&["std", "clone", "Clone"])),
+            Some(Expect::external(&["other", "Far"])),
+            None,
+            Some(Expect::item("S", ItemKind::Struct)),
+            None,
+            Some(Expect::item("T", ItemKind::Trait)),
+            None,
+        ]
+    );
+}
+
+const DERIVE_MACROS: [Fixture; 3] = [
+    Fixture::new(
+        "crates/d/src/lib.rs",
+        "#[proc_macro_derive(Shown, attributes(shown))]\npub fn derive_shown(input: TokenStream) -> TokenStream {\n    input\n}\npub fn shown() {}\n",
+    ),
+    Fixture::new("crates/e/src/lib.rs", "mod m {\n    pub trait Shown {}\n}\npub use m::Shown;\npub use d::Shown;\n"),
+    Fixture::new(
+        "crates/f/src/lib.rs",
+        "use e::Shown as Show;\n#[derive(e::Shown, Show)]\nstruct S;\nimpl e::Shown for S {}\nimpl Show for S {}\n",
+    ),
+];
+
+#[test]
+fn a_derive_macro_is_exported_beside_a_trait_of_its_name() {
+    assert_eq!(
+        [Domain::Types, Domain::Macros].map(|domain| Read::exported(
+            &DERIVE_MACROS,
+            domain,
+            &[&["e", "Shown"], &["d", "Shown"]]
+        )),
+        [
+            [Some(Expect::item("Shown", ItemKind::Trait)), None],
+            [Some(Expect::item("Shown", ItemKind::Derive)), Some(Expect::item("Shown", ItemKind::Derive))],
+        ]
+    );
+}
+
+#[test]
+fn a_derive_resolves_to_its_macro_and_an_impl_to_its_trait() {
+    assert_eq!(
+        Read::across(&DERIVE_MACROS),
+        [
+            Expect::item("Shown", ItemKind::Derive),
+            Expect::item("Shown", ItemKind::Derive),
+            Expect::item("Shown", ItemKind::Trait),
+            Expect::item("Shown", ItemKind::Trait),
+        ]
+    );
+}
 
 #[test]
 fn each_implementation_is_placed_in_its_own_file() {
@@ -574,7 +694,21 @@ laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resol
         Expect::std_trait(&["std", "hash", "Hash"]),
     ],
     DERIVE_UNLISTED => [Expect::unknown(&["Serialize"])],
-    DERIVE_GLOBBED => [Expect::unknown(&["Hash"]), Expect::unknown(&["Debug"])],
+    DERIVE_GLOBBED => [Expect::std_trait(&["std", "hash", "Hash"]), Expect::std_trait(&["std", "fmt", "Debug"])],
+    DERIVE_PAST_EXPANSION => [Expect::std_trait(&["std", "clone", "Clone"])],
+    DERIVE_THROUGH_UNREAD => [
+        Expect::external(&["newtype", "serde", "Deserialize"]),
+        Expect::external(&["serde_derive", "Deserialize"]),
+    ],
+    DERIVE_FROM_SUBMODULE => [
+        Expect::external(&["diesel", "prelude", "Queryable"]),
+        Expect::external(&["diesel", "prelude", "Insertable"]),
+    ],
+    DERIVE_CONDITIONAL => [
+        Expect::std_trait(&["std", "clone", "Clone"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "hash", "Hash"]),
+    ],
 ]);
 
 laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| Read::resolved(text), [
@@ -583,6 +717,13 @@ laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| 
     MACRO_DEFINED => [Expect::std_trait(&["std", "clone", "Clone"])],
     MACRO_DEFINED_CALLED => [Expect::unknown(&["Clone"])],
     MACRO_PATHED_STATEMENT => [Expect::unknown(&["Clone"])],
+]);
+
+laws::table!(a_name_no_outer_scope_supplies_may_be_one_an_item_macro_in_its_module_declares, |text: &&str| Read::resolved(text), [
+    MACRO_MAY_DECLARE => [Expect::possibly_macro_declared(&["Mark"])],
+    MACRO_MAY_DECLARE_BY_PATH => [Expect::possibly_macro_declared(&["crate", "Mark"])],
+    MACRO_MAY_DECLARE_IMPORTED => [Expect::possibly_macro_declared(&["Mark"])],
+    MACRO_ELSEWHERE => [Expect::unknown(&["n", "Mark"]), Expect::unknown(&["Mark"])],
 ]);
 
 laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(text), [
@@ -602,6 +743,11 @@ laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     GLOB_THROUGH_A_LATER_SIBLING => [Expect::krate(&["crate", "e", "Far"])],
     WORKSPACE => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "clone", "Clone"])],
     NESTED_FILES => [Expect::krate(&["crate", "Mark"]), Expect::krate(&["crate", "Mark"])],
+    WORKSPACE_CRATE_REEXPORTED => [
+        Expect::external(&["serde", "Deserialize"]),
+        Expect::external(&["serde", "Deserialize"]),
+        Expect::external(&["serde", "Serialize"]),
+    ],
 ]);
 
 laws::table!(a_path_through_an_unplanted_module_is_unknown, Read::across, [
@@ -705,6 +851,11 @@ laws::table!(a_parenthesised_output_reads_as_the_type_inside, |text: &&str| Read
     PAREN_PATH => Read::outputs(PLAIN_PATH),
     PAREN_GENERIC => Read::outputs(PLAIN_GENERIC),
     PAREN_REFERENCE => Read::outputs(PLAIN_REFERENCE),
+]);
+
+laws::table!(a_primitive_is_read_past_an_opaque_glob, |text: &&str| Read::expanded(text), [
+    PRIMITIVE_PAST_GLOB => [Expect::primitive(Primitive::Integer)],
+    PRIMITIVE_PAST_EXPANSION => [Expect::primitive(Primitive::Bool)],
 ]);
 
 laws::table!(an_alias_expands_to_its_target_with_its_arguments, |text: &&str| Read::expanded(text), [

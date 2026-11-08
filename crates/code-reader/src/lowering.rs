@@ -1,3 +1,4 @@
+mod attributes;
 mod boundary;
 mod calls;
 mod held;
@@ -9,12 +10,11 @@ mod subjects;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
     Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, File, ForeignItemFn, Ident, ImplItemFn, ItemEnum, ItemFn,
-    ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Signature as SynSignature, Token, TraitItemFn,
+    ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Signature as SynSignature, TraitItemFn,
 };
 
 use code_model::{
@@ -28,6 +28,7 @@ use crate::namespace::{
     StdNames, UsePath, Visibility,
 };
 use crate::planting::{Files, ReadFile};
+use attributes::Attributes;
 use boundary::SelfType;
 use calls::CallRow;
 use held::{Holder, HoldingRow, Link};
@@ -91,8 +92,6 @@ struct ImplRow {
 }
 
 impl ImplRow {
-    const DERIVE: &'static str = "derive";
-
     fn written(seat: &Seat, region: Region, block: &ItemImpl, ty: TypeRef<Written>) -> ImplRow {
         ImplRow {
             located: seat.located(Position::from(block.impl_token.span)),
@@ -118,16 +117,8 @@ impl ImplRow {
         }
     }
 
-    fn derives(seat: &Seat, region: Region, attributes: &[Attribute], subject: &Ident) -> Vec<ImplRow> {
-        attributes
-            .iter()
-            .filter(|attribute| attribute.path().is_ident(Self::DERIVE))
-            .filter_map(|attribute| {
-                attribute.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated).ok()
-            })
-            .flatten()
-            .map(|path| ImplRow::derived(seat, region, &path, subject))
-            .collect()
+    fn derives(seat: &Seat, region: Region, attributes: &Attributes, subject: &Ident) -> Vec<ImplRow> {
+        attributes.derived().iter().map(|path| ImplRow::derived(seat, region, path, subject)).collect()
     }
 }
 
@@ -269,7 +260,7 @@ pub(crate) struct Lowered<'read> {
 }
 
 impl<'read> Lowered<'read> {
-    pub(crate) fn rooted(&mut self, read: ReadFile<'_>, name: Option<&'read Name>, form: CrateForm) -> Vec<Slot> {
+    pub(crate) fn rooted(&mut self, read: ReadFile<'read>, name: Option<&'read Name>, form: CrateForm) -> Vec<Slot> {
         let enclosure = read
             .source()
             .placement()
@@ -292,7 +283,7 @@ impl<'read> Lowered<'read> {
         self.space.declare(slot.scope, Declared::new(slot.name, slot.visibility, DeclaredKind::OpaqueModule));
     }
 
-    pub(crate) fn island(&mut self, read: ReadFile<'_>) {
+    pub(crate) fn island(&mut self, read: ReadFile<'read>) {
         let slots = self.root_lowered(read, None, CrateForm::Island, Enclosure::Module);
         slots.into_iter().fold(self, |lowered, slot| {
             lowered.opaque(slot);
@@ -306,7 +297,10 @@ impl<'read> Lowered<'read> {
         let tables = seeds.tables(&settled);
         let ids = self.space.issued(&mut building);
         let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids);
-        let with_aliases = Self::each_built(self.aliases, &resolving, StdNames::aliased(building));
+        let exports = self.space.exports();
+        let with_exports =
+            exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
+        let with_aliases = Self::each_built(self.aliases, &resolving, with_exports);
         let with_rows = Self::each_built(self.rows, &resolving, with_aliases);
         let subjects = self.subjects.settled(&resolving);
         let with_functions =
@@ -321,13 +315,14 @@ impl<'read> Lowered<'read> {
 
     fn root_lowered(
         &mut self,
-        read: ReadFile<'_>,
+        read: ReadFile<'read>,
         name: Option<&'read Name>,
         form: CrateForm,
         enclosure: Enclosure,
     ) -> Vec<Slot> {
         let syntax = read.source().syntax();
-        let scope = self.space.planted(form, name, Entries::of_items(&syntax.items));
+        let dependencies = read.source().placement().package().dependencies();
+        let scope = self.space.planted(form, name, dependencies, Entries::of_items(&syntax.items));
         let children = Rc::from(read.source().path().parent().unwrap_or_else(|| Path::new("")));
         let context = Context::outermost(Regions::of_file(read));
         self.lowered(Seat::new(read.file(), scope, children), context, enclosure, syntax)
@@ -456,7 +451,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_type(&mut self, item: &'ast ItemType) {
         let generics = InScope::outside().extended(&item.generics);
         let target = generics.lowered(&item.ty);
-        self.hold(Holder::named(&item.ident, Held::Alias), Link::Declares(UsePath::from(&item.ident)), target.clone());
+        self.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
         self.lowered.aliases.push(AliasRow {
             scope: self.here.scope(),
             name: UsePath::from(&item.ident),
@@ -467,27 +462,31 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        self.derived(&item.attrs, &item.ident);
-        let link = Link::Declares(UsePath::from(&item.ident));
+        let scope = self.generics.extended(&item.generics);
+        let link = Link::declaring(&item.ident);
+        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
-        self.struct_held(item, &self.generics.extended(&item.generics), link);
+        self.struct_held(item, &scope, link);
         visit::visit_item_struct(self, item);
     }
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        self.derived(&item.attrs, &item.ident);
         let scope = self.generics.extended(&item.generics);
+        let link = Link::declaring(&item.ident);
+        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         item.variants.iter().fold(&mut *self, |lowering, variant| {
-            lowering.fields_held(&Holder::named(&variant.ident, Held::EnumField), variant.fields.iter(), &scope);
+            let holder = Holder::named(&variant.ident, Held::EnumField);
+            lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
             lowering
         });
         visit::visit_item_enum(self, item);
     }
 
     fn visit_item_union(&mut self, item: &'ast ItemUnion) {
-        self.derived(&item.attrs, &item.ident);
         let scope = self.generics.extended(&item.generics);
-        self.fields_held(&Holder::named(&item.ident, Held::UnionField), item.fields.named.iter(), &scope);
+        let link = Link::declaring(&item.ident);
+        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
+        self.fields_held(&Holder::named(&item.ident, Held::UnionField), &link, item.fields.named.iter(), &scope);
         visit::visit_item_union(self, item);
     }
 

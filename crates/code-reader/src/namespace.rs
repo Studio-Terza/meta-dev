@@ -14,12 +14,13 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use code_model::{Building, ItemPath};
-use lint_layout::Name;
+use code_model::{Building, Unresolved};
+use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::ScopeId;
+pub(crate) use code_model::Domain;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Visibility};
 pub(crate) use items::ItemIds;
 pub(crate) use resolver::Resolver;
@@ -28,20 +29,41 @@ use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;
 pub(crate) use std_names::StdNames;
-pub(crate) use tables::Domain;
 pub(crate) use use_path::UsePath;
+
+#[derive(Debug)]
+pub(crate) struct Export {
+    root: ScopeId,
+    path: UsePath,
+    domain: Domain,
+}
+
+impl Export {
+    pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>, mut building: Building) -> Building {
+        building.export(self.domain, self.path.written(), &resolving.path(self.root, &self.path, self.domain));
+        building
+    }
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct Namespace<'read> {
     scopes: Vec<ScopeRow>,
     crates: BTreeMap<&'read Name, ScopeId>,
+    dependencies: BTreeMap<ScopeId, &'read Dependencies>,
 }
 
 impl<'read> Namespace<'read> {
-    pub(crate) fn planted(&mut self, form: CrateForm, name: Option<&'read Name>, entries: Entries) -> ScopeId {
+    pub(crate) fn planted(
+        &mut self,
+        form: CrateForm,
+        name: Option<&'read Name>,
+        dependencies: &'read Dependencies,
+        entries: Entries,
+    ) -> ScopeId {
         let root = ScopeId::after(&self.scopes);
         self.scopes.push(ScopeRow::root(root, form, entries));
         self.crates.extend(name.map(|crate_name| (crate_name, root)));
+        self.dependencies.insert(root, dependencies);
         root
     }
 
@@ -59,6 +81,20 @@ impl<'read> Namespace<'read> {
             .zip(Some(declared))
             .into_iter()
             .for_each(|(entries, item)| entries.declare(item));
+    }
+
+    pub(crate) fn exports(&self) -> Vec<Export> {
+        self.crates
+            .iter()
+            .filter_map(|(krate, root)| Some((*krate, *root, root.row(&self.scopes)?)))
+            .flat_map(|(krate, root, row)| {
+                row.entries().exported().map(move |key| Export {
+                    root,
+                    path: UsePath::exported(krate, key.name()),
+                    domain: key.domain(),
+                })
+            })
+            .collect()
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {
@@ -79,6 +115,15 @@ impl<'read> Namespace<'read> {
             .and_then(|root| root.row(&self.scopes).and_then(|row| row.entries().prelude(name, self, root)))
     }
 
+    pub(super) fn expanded(&self, viewer: ScopeId) -> Unresolved {
+        self.chain(viewer)
+            .iter()
+            .filter_map(|scope| scope.row(&self.scopes))
+            .map(|row| row.entries().unresolved())
+            .max()
+            .unwrap_or(Unresolved::Unbound)
+    }
+
     pub(super) fn within_reach(&self, level: ScopeId, from: ScopeId) -> Option<ScopeId> {
         from.row(&self.scopes).and_then(|row| row.ancestor(level))
     }
@@ -87,9 +132,13 @@ impl<'read> Namespace<'read> {
         self.crates.get(name).copied()
     }
 
-    pub(super) fn global(&self, first: &Name) -> Binding {
+    pub(super) fn global(&self, first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         StdNames::root(first)
             .or_else(|| self.workspace(first).map(Binding::Module))
-            .unwrap_or_else(|| Binding::External(ItemPath::default().joined(first)))
+            .unwrap_or_else(|| Binding::external(first, dependencies))
+    }
+
+    pub(super) fn dependencies(&self, viewer: ScopeId) -> Option<&'read Dependencies> {
+        viewer.row(&self.scopes).and_then(ScopeRow::outermost).and_then(|root| self.dependencies.get(&root)).copied()
     }
 }

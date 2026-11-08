@@ -81,6 +81,10 @@ impl ScopeRow {
         &mut self.entries
     }
 
+    pub(super) fn outermost(&self) -> Option<ScopeId> {
+        self.ancestry.last().copied()
+    }
+
     pub(super) fn ancestor(&self, level: ScopeId) -> Option<ScopeId> {
         self.ancestry.iter().copied().find(|ancestor| *ancestor == level)
     }

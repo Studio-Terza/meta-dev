@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 
 use console_ports::Environment;
 use file_ports::{Bytes, FileFailure, Files, Kind};
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::{Difference, Failure, Mode, Output};
 

@@ -5,7 +5,7 @@ use std::num::NonZeroUsize;
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use newtype::Newtype;
+use newtype::Wrapping;
 use type_facts::{Facts, GenericImpl, Implementation, Method, TraitFact, TypeFact};
 
 use crate::query::kind::Kind;

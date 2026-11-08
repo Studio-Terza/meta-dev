@@ -8,7 +8,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use lint_core::{Report, SourceFile, SourceText};
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::checks::Checks;
 

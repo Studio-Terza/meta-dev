@@ -1,5 +1,6 @@
 mod declared;
 mod dependency;
+mod target;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -7,12 +8,18 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
+use crate::metadata::package_id::PackageId;
 use declared::Declared;
 use dependency::Dependency;
+pub use target::Form;
+use target::Target;
 
 #[derive(Debug, Deserialize)]
 pub struct Package {
     name: CrateName,
+    id: Option<PackageId>,
+    #[serde(default)]
+    targets: Vec<Target>,
     manifest_path: PathBuf,
     dependencies: Vec<Dependency>,
     metadata: Option<Declared>,
@@ -21,6 +28,14 @@ pub struct Package {
 impl Package {
     pub fn name(&self) -> &CrateName {
         &self.name
+    }
+
+    pub fn package_id(&self) -> Option<&PackageId> {
+        self.id.as_ref()
+    }
+
+    pub fn library(&self) -> Option<&Target> {
+        self.targets.iter().find(|target| target.form().is_some())
     }
 
     pub fn readings(&self) -> &[PathBuf] {
