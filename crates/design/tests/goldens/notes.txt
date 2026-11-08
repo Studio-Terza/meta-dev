@@ -64,7 +64,7 @@ node n5 "demo" feature vague core entered import-5 "RULING (owner, explicit, 202
   ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
   edge n5 refines n2 entered import-5
   role core entered import-5
-  placed decides c3c3c3c3.0 owner entered import-5 "yes the new trellis is approved."
+  placed decides c3c3c3c3.0 owner decision specific firm explicit entered import-5 "yes the new trellis is approved."
 design show n6
 node n6 "demo" feature vague core entered import-6 "Lead summary: one shed for every tool, as b2b2b2b2 proposed; commits 78c6b13 and ae0e9ace landed."
   ancestor n1 "demo" project vague core entered init
@@ -78,7 +78,7 @@ node n7 "demo" feature vague core entered import-7 "- 2026-11-06 RULING (owner, 
   ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
   edge n7 refines n2 entered import-7
   role core entered import-7
-  placed decides d4d4d4d4.0 owner entered import-7 "agreed"
+  placed decides d4d4d4d4.0 owner decision specific firm explicit entered import-7 "agreed"
   cites d4d4d4d4 owner entered import-7
 design show n8
 node n8 "demo" feature vague core entered import-8 "- 2026-11-07 RULING (owner): \"agreed\" again, on the compost."
@@ -86,7 +86,7 @@ node n8 "demo" feature vague core entered import-8 "- 2026-11-07 RULING (owner):
   ancestor n2 "demo" feature vague core entered import-1 "# Garden notes (2026-11-05, draft)"
   edge n8 refines n2 entered import-8
   role core entered import-8
-  placed decides e5e5e5e5.0 owner entered import-8 "agreed"
+  placed decides e5e5e5e5.0 owner decision specific firm explicit entered import-8 "agreed"
 design show n11
 node n11 "demo" feature vague core entered import-12 "## Later"
   ancestor n1 "demo" project vague core entered init

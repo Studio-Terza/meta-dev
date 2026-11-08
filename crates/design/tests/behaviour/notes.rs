@@ -14,6 +14,7 @@ use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
 use store_ports::Sqlite;
 
+use super::view::Viewing;
 use super::{Applying, FakeLent, Invocation, Session, Speaker, Spread, Staff};
 
 const FOUND: &str = "a1a1a1a1-0000-4000-8000-000000000001";
@@ -202,6 +203,26 @@ laws::table!(
         "\"Fine. Fine\"" => Some(Err(Miss::Unheard)),
     ]
 );
+
+#[test]
+fn an_imported_ruling_leaves_its_segment_to_the_structurer_or_reaches_current_decision() -> Result<(), Failure> {
+    let applying = Noting::ready()?;
+    Noting::imported(
+        &applying,
+        "# Notes\nRULING (owner, explicit): \"yes the new trellis is approved.\"\nOwner: \"rows turn into a map.\"\n",
+    )?;
+    let decided = applying.run(&["view", "current-decision"])?;
+    let deciding: Vec<NodeId> = Spread::parsed(&decided).iter().filter_map(Viewing::node).collect();
+    assert_eq!(deciding, [NodeId::new(3)]);
+    assert!(decided.contains("standing n3 decides c3c3c3c3.0 owner entered import-2 "));
+    let unplaced: Vec<String> = Spread::parsed(&applying.run(&["view", "unplaced"])?)
+        .into_iter()
+        .filter_map(Viewing::unplaced)
+        .filter(|segment| segment.contains("c3c3c3c3"))
+        .collect();
+    assert_eq!(unplaced, Vec::<String>::new());
+    Ok(())
+}
 
 #[test]
 fn a_whitespace_line_is_layout_so_it_imports_as_no_node_and_views_back_empty() -> Result<(), Failure> {

@@ -79,7 +79,7 @@ enum Owed {
     Covered,
 }
 
-struct Viewing;
+pub(super) struct Viewing;
 
 impl Viewing {
     fn listed(view: &str, files: &[String], dropped: &[&str]) -> Option<Vec<NodeId>> {
@@ -98,14 +98,14 @@ impl Viewing {
         Some(lines.iter().filter_map(Viewing::node).collect())
     }
 
-    fn node(line: &Line) -> Option<NodeId> {
+    pub(super) fn node(line: &Line) -> Option<NodeId> {
         match line {
             Line::Viewed(Viewed::Standing { node, .. }) => Some(*node),
             _ => None,
         }
     }
 
-    fn unplaced(line: Line) -> Option<String> {
+    pub(super) fn unplaced(line: Line) -> Option<String> {
         match line {
             Line::Viewed(Viewed::Unplaced { segment, .. }) => Some(segment.to_string()),
             _ => None,

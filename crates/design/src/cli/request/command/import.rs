@@ -3,8 +3,8 @@ use std::io::Write;
 use std::path::Path;
 
 use design_model::{
-    Casting, Entry, Facet, Node, NodeId, NotesLine, Ordinal, Prefix, Project, Provenance, Segment, SpanRelation, Title,
-    Vague,
+    Casting, Confidence, Entry, Explicitness, Facet, Node, NodeId, NotesLine, Ordinal, Prefix, Project, Provenance,
+    Segment, Sense, SenseKind, SpanRelation, Specificity, Title, Vague,
 };
 use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
@@ -209,7 +209,7 @@ impl Answers {
         notes.lines().iter().fold(start, |draft, line| line.read_by(Taking { draft, heard: self, project }))
     }
 
-    fn resolved(&self, entry: &notes::Entry, node: NodeId, relation: SpanRelation) -> Findings {
+    fn resolved(&self, entry: &notes::Entry, node: NodeId, voice: Voice) -> Findings {
         let citations: Vec<Sought<Author>> = entry
             .cites()
             .into_iter()
@@ -233,7 +233,7 @@ impl Answers {
             directed: cited
                 .iter()
                 .map(|message| Directed::Cited { node, message: message.clone() })
-                .chain(placed.iter().map(|segment| Directed::Placed { segment: (*segment).clone(), node, relation }))
+                .chain(placed.iter().flat_map(|segment| voice.directed((*segment).clone(), node)))
                 .collect(),
             misses: citations
                 .iter()
@@ -329,7 +329,7 @@ impl Taking<'_> {
         let parent = self.draft.section;
         let node = self.node(parent, line);
         let id = node.identity();
-        let Findings { directed, misses, anchors } = self.heard.resolved(entry, id, voice.relation());
+        let Findings { directed, misses, anchors } = self.heard.resolved(entry, id, voice);
         let drafted = Drafted {
             line: NotesLine::new(line.number()),
             node: id,
@@ -458,10 +458,21 @@ impl Landing {
 }
 
 impl Voice {
-    fn relation(self) -> SpanRelation {
+    fn directed(self, segment: Segment, node: NodeId) -> Vec<Directed> {
         match self {
-            Voice::Ruling => SpanRelation::Decides,
-            Voice::Remark => SpanRelation::Mentions,
+            Voice::Ruling => vec![
+                Directed::Placed { segment: segment.clone(), node, relation: SpanRelation::Decides },
+                Directed::Sensed {
+                    segment,
+                    sense: Sense::new(
+                        SenseKind::Decision,
+                        Specificity::Specific,
+                        Confidence::Firm,
+                        Explicitness::Explicit,
+                    ),
+                },
+            ],
+            Voice::Remark => vec![Directed::Placed { segment, node, relation: SpanRelation::Mentions }],
         }
     }
 
