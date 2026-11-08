@@ -7,6 +7,7 @@ use design_model::{
 };
 use design_store::Refusal;
 use dispatch_ports::DispatchFailure;
+use exit::{Severe, Severity};
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
 use newtype::Newtype;
@@ -18,11 +19,12 @@ use structurer::{Lapse, Misread, Uncovered};
 
 use super::request::Unresolved;
 use crate::Outcome;
+use crate::cli::output::Count;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings))"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -80,6 +82,12 @@ pub enum Failure {
     Dispatch(#[from] DispatchFailure),
     #[error("FLAILED: job {job} failed twice, the second time because {lapse}; structure halted, triage it")]
     Flailed { job: JobId, lapse: Lapse },
+    #[error(
+        "UNSTRUCTURED: {owed} owner segments are neither structured nor held as flailed after structure ran; run design structure and triage what it reports"
+    )]
+    Unstructured { owed: Count },
+    #[error("cannot render the hook settings: {0}")]
+    Render(#[from] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
@@ -108,6 +116,16 @@ impl From<Refusal> for Failure {
 impl From<Misstaged> for Failure {
     fn from(misstaged: Misstaged) -> Failure {
         Failure::Misstaged { node: misstaged.node(), stage: misstaged.stage() }
+    }
+}
+
+impl Severe for Failure {
+    fn severity(&self) -> Severity {
+        match self {
+            Failure::Flailed { .. } | Failure::Unstructured { .. } => Severity::Blocking,
+            Failure::Unreleased { command, .. } => command.severity(),
+            _ => Severity::Failed,
+        }
     }
 }
 

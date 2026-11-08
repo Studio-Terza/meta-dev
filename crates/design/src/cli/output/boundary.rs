@@ -141,6 +141,7 @@ pub enum Line {
         run: RunId,
         state: RunState,
     },
+    Interrupted(JobId),
     Ran(Attempted),
     Retried(Lapsed),
     Flailed(Lapsed),
@@ -238,6 +239,8 @@ enum Key {
     File,
     #[name("reaped")]
     Reaped,
+    #[name("interrupted")]
+    Interrupted,
     #[name("run")]
     Run,
     #[name("retried")]
@@ -377,6 +380,7 @@ impl fmt::Display for Line {
                 Line::quoted(stamp)
             ),
             Line::Reaped { run, state } => write!(formatter, "{} {} {state}", Key::Reaped, run.into_inner()),
+            Line::Interrupted(job) => write!(formatter, "{} {} {}", Key::Interrupted, Spend::Job, job.into_inner()),
             Line::Ran(attempted) => write!(formatter, "{} {attempted}", Key::Run),
             Line::Retried(lapsed) => write!(formatter, "{} {lapsed}", Key::Retried),
             Line::Flailed(lapsed) => write!(formatter, "{} {lapsed}", Key::Flailed),
@@ -478,6 +482,7 @@ impl Line {
             Key::Reaped => {
                 Ok(Line::Reaped { run: RunId::new(fields.field::<Integer<_>>()?), state: fields.field::<Word<_>>()? })
             }
+            Key::Interrupted => Ok(Line::Interrupted(JobId::new(fields.past(&[Spend::Job])?.field::<Integer<_>>()?))),
             Key::Run => Attempted::read(fields).map(Line::Ran),
             Key::Retried => Lapsed::read(fields).map(Line::Retried),
             Key::Flailed => Lapsed::read(fields).map(Line::Flailed),

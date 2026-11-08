@@ -1,4 +1,5 @@
 mod apply;
+mod hook;
 mod ingest;
 mod init;
 mod lifecycle;
@@ -23,6 +24,7 @@ use super::{Flag, Ground, Token, Valued};
 use crate::Outcome;
 use crate::cli::failure::Failure;
 pub use apply::{Application, Unresolved};
+pub use hook::Hook;
 use ingest::Ingest;
 use init::Init;
 use lifecycle::{Move, Moving, Recast};
@@ -42,6 +44,7 @@ pub enum Command {
     Move(Move),
     Recast(Recast),
     Structure,
+    Hook(Hook),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,6 +57,7 @@ pub enum Verb {
     Move(Moving),
     Role,
     Structure,
+    Hook,
 }
 
 impl FromStr for Verb {
@@ -65,7 +69,7 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 11] = [
+    const NAMED: [(&'static str, Verb); 12] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
@@ -77,6 +81,7 @@ impl Verb {
         ("drop", Verb::Move(Moving::Drop)),
         ("role", Verb::Role),
         ("structure", Verb::Structure),
+        ("hook", Verb::Hook),
     ];
 
     pub fn options(self) -> &'static [Flag] {
@@ -86,6 +91,7 @@ impl Verb {
             Verb::Init => &[Flag::Valued(Valued::Consumes)],
             Verb::Move(Moving::Specify) => &[Flag::Valued(Valued::Artifact), Flag::Valued(Valued::Condition)],
             Verb::Move(Moving::Drop) => &[Flag::Valued(Valued::Reason)],
+            Verb::Hook => &[Flag::Settings],
             Verb::Show | Verb::Apply | Verb::Move(Moving::Refine | Moving::Reopen) | Verb::Role | Verb::Structure => {
                 &[]
             }
@@ -108,6 +114,10 @@ impl Verb {
             Verb::Move(moving) => Move::read(moving, rest).map(Command::Move),
             Verb::Role => Recast::read(rest).map(Command::Recast),
             Verb::Structure => rest.first().map_or(Ok(Command::Structure), |_extra| Err(Failure::Usage)),
+            Verb::Hook => <&[Token; 1]>::try_from(rest)
+                .map_err(|_count| Failure::Usage)
+                .and_then(|[token]| token.hook())
+                .map(Command::Hook),
         }
     }
 }
@@ -122,7 +132,8 @@ impl Command {
             | Command::Apply(_)
             | Command::Move(_)
             | Command::Recast(_)
-            | Command::Structure => opened(path),
+            | Command::Structure
+            | Command::Hook(_) => opened(path),
         }
     }
 
@@ -152,6 +163,7 @@ impl Command {
             Command::Structure => {
                 Structure::new(ground.store(), crew).worked().and_then(|structured| structured.reported(out))
             }
+            Command::Hook(hook) => hook.answered(ground, crew, out),
         }
     }
 }

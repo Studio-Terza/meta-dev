@@ -45,13 +45,19 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
         let lock = store.lock()?;
         let ingest = Ingest { transcripts, store, cursors: store.read(SessionCursors)? };
         let sessions = transcripts.sessions()?;
-        let ingested = sessions.iter().map(|session| ingest.session(session)).collect::<Result<Vec<_>, Failure>>()?;
+        let ingested = sessions
+            .iter()
+            .filter_map(|session| {
+                session.unread(ingest.cursors.resuming(session.stem())).map(|cursor| (session, cursor))
+            })
+            .map(|(session, cursor)| ingest.session(session, cursor))
+            .collect::<Result<Vec<_>, Failure>>()?;
         lock.end()?;
         Ok(Tally::counted(ingested))
     }
 
-    fn session(&self, session: &Session) -> Result<Ingested, Failure> {
-        let read = self.transcripts.read_from(session, self.cursors.resuming(session.stem()))?;
+    fn session(&self, session: &Session, cursor: Cursor) -> Result<Ingested, Failure> {
+        let read = self.transcripts.read_from(session, cursor)?;
         let end = ReadTo::ending(session, read.cursor());
         let lines: Vec<Line> = read.into_iter().collect();
         let earlier = lines.first().map(|_| self.store.read(EarlierLines::within(end.session.clone()))).transpose()?;

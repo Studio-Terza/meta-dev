@@ -2,7 +2,12 @@ mod ports;
 
 use std::error::Error;
 
+use design::{Failure, HookEvent, Line, Unmatched};
+use design_model::Prefix;
 use ports::Design;
+use serde_json::Value;
+use strum::VariantArray;
+use text_lines::Lines;
 
 #[test]
 fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Box<dyn Error>> {
@@ -31,3 +36,71 @@ fn a_store_kept_on_disk_answers_show_and_a_second_ingest_writes_nothing() -> Res
     assert!(String::from_utf8(shown.stdout)?.contains("o1 owner session \"s\" at \"2026-01-01T00:00:00Z\"\n"));
     Ok(())
 }
+
+#[test]
+fn the_hook_settings_are_json_naming_for_every_event_a_command_that_runs_its_hook() -> Result<(), Box<dyn Error>> {
+    let output = Design::with_a_session_in_work()?.run(&["hook", "--settings"])?;
+    let settings: Value = serde_json::from_slice(&output.stdout)?;
+    let commanded = HookEvent::VARIANTS
+        .iter()
+        .filter_map(|event| {
+            let named = serde_json::to_value(event).ok()?;
+            let command = settings.get("hooks")?.get(named.as_str()?)?.get(0)?.get("hooks")?.get(0)?.get("command")?;
+            command.as_str()?.contains(&format!(" hook {event}")).then_some(*event)
+        })
+        .collect::<Vec<HookEvent>>();
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(commanded, HookEvent::VARIANTS);
+    Ok(())
+}
+
+#[test]
+fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<(), Box<dyn Error>> {
+    let design = Design::with_a_session_in_work()?;
+    let hooked = design.in_work(&["hook", "user-prompt-submit"])?;
+    let shown = design.in_work(&["show", "o1"])?;
+    assert_eq!((hooked.status.code(), hooked.stdout, hooked.stderr), (Some(0), Vec::new(), Vec::new()));
+    assert_eq!(shown.status.code(), Some(0));
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Answer {
+    code: Option<i32>,
+    stderr: String,
+    unparsed: Vec<String>,
+}
+
+impl Answer {
+    fn given(arguments: &&[&str]) -> Option<Answer> {
+        let output = Design::with_a_session_in_work().ok()?.in_work(arguments).ok()?;
+        let stdout = String::from_utf8(output.stdout).ok()?;
+        let unparsed = Lines::from(stdout.as_str()).filter(|line| line.parse::<Line>().is_err()).map(str::to_owned);
+        Some(Answer {
+            code: output.status.code(),
+            stderr: String::from_utf8(output.stderr).ok()?,
+            unparsed: unparsed.collect(),
+        })
+    }
+
+    fn failed(failure: &Failure) -> Answer {
+        Answer { code: Some(1), stderr: format!("{failure}\n"), unparsed: Vec::new() }
+    }
+
+    fn printed() -> Answer {
+        Answer { code: Some(0), stderr: String::new(), unparsed: Vec::new() }
+    }
+}
+
+laws::table!(
+    the_binary_writes_failures_as_their_message_and_output_only_as_lines_its_parser_reads,
+    Answer::given,
+    [
+        &["frobnicate"][..] => Some(Answer::failed(&Failure::Usage)),
+        &["hook"][..] => Some(Answer::failed(&Failure::Usage)),
+        &["hook", "stop", "--settings"][..] => Some(Answer::failed(&Failure::Usage)),
+        &["show", "nobody"][..] => Some(Answer::failed(&Failure::Unmatched(Unmatched::NoMatch(Prefix::new("nobody".to_owned()))))),
+        &["ingest"][..] => Some(Answer::printed()),
+        &["search", "go"][..] => Some(Answer::printed()),
+    ]
+);

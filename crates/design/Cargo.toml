@@ -21,9 +21,12 @@ local-config = { path = "../local-config" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
+serde.workspace = true
+serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 structurer = { path = "../structurer" }
+strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
@@ -31,7 +34,6 @@ transcript-ports = { path = "../transcript-ports" }
 e2e = { path = "../../e2e" }
 golden = { path = "../golden" }
 laws = { path = "../laws" }
-strum.workspace = true
 text-lines = { path = "../text-lines" }
 
 [lints]

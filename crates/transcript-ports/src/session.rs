@@ -1,16 +1,20 @@
 use std::path::{Path, PathBuf};
 
-use crate::SessionId;
+use file_ports::Size;
+use newtype::Newtype;
+
+use crate::{Cursor, SessionId};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Session {
     stem: SessionId,
     file: PathBuf,
+    size: Size,
 }
 
 impl Session {
-    pub(crate) fn found(stem: SessionId, file: PathBuf) -> Session {
-        Session { stem, file }
+    pub(crate) fn found(stem: SessionId, file: PathBuf, size: Size) -> Session {
+        Session { stem, file, size }
     }
 
     #[must_use]
@@ -21,5 +25,10 @@ impl Session {
     #[must_use]
     pub fn file(&self) -> &Path {
         &self.file
+    }
+
+    #[must_use]
+    pub fn unread(&self, cursor: Cursor) -> Option<Cursor> {
+        (self.size.into_inner() > cursor.into_inner().into_inner()).then_some(cursor)
     }
 }

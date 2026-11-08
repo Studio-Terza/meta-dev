@@ -27,6 +27,20 @@ pub enum RunState {
     Failed,
 }
 
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JobState {
+    #[name("open")]
+    Open,
+    #[name("applied")]
+    Applied,
+    #[name("repeated")]
+    Repeated,
+    #[name("flailed")]
+    Flailed,
+    #[name("interrupted")]
+    Interrupted,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spawned {
     pid: Pid,
@@ -36,6 +50,18 @@ pub struct Spawned {
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct JobOpened(JobId);
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct JobClosed {
+    job: JobId,
+    state: JobState,
+}
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct OpenJobs;
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct JobsInterrupted;
 
 #[derive(Clone, Debug, Op)]
 pub struct RunSpawned {
@@ -127,6 +153,13 @@ impl AsRef<Deadline> for Spawned {
 impl From<JobId> for JobOpened {
     fn from(job: JobId) -> JobOpened {
         JobOpened(job)
+    }
+}
+
+impl JobClosed {
+    #[must_use]
+    pub fn new(job: JobId, state: JobState) -> JobClosed {
+        JobClosed { job, state }
     }
 }
 

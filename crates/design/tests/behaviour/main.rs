@@ -2130,6 +2130,7 @@ impl Generated {
         prop_oneof![
             (0..i64::MAX, select(RunState::VARIANTS))
                 .prop_map(|(run, state)| Line::Reaped { run: RunId::new(run), state }),
+            (0..i64::MAX).prop_map(|job| Line::Interrupted(JobId::new(job))),
             (0..i64::MAX, 0..i64::MAX, select(RunState::VARIANTS), proptest::option::of(Generated::usage())).prop_map(
                 |(run, job, state, usage)| Line::Ran(Attempted::new(RunId::new(run), JobId::new(job), state, usage))
             ),

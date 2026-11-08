@@ -2,8 +2,8 @@ use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
-    ContextNodes, Flailed, FlailedSegments, JobFlailed, JobOpened, LiveRuns, NextJob, NextRun, RunEnded, RunSpawned,
-    RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    ContextNodes, Flailed, FlailedSegments, JobClosed, JobFlailed, JobOpened, JobState, JobsInterrupted, LiveRuns,
+    NextJob, NextRun, OpenJobs, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
 };
 use dispatch_ports::{AgentRun, Clock, Deadline, Dispatch, Due, Ended, Finished, Job, Prompt, Timeout, Watch, Watched};
 use port_core::Held;
@@ -87,6 +87,7 @@ struct Reaped {
 #[derive(Debug)]
 pub struct Structured {
     reaped: Vec<Reaped>,
+    interrupted: Vec<JobId>,
     worked: Vec<Worked>,
     flailed: Vec<Flailed>,
 }
@@ -114,13 +115,15 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
             .filter(|stored| AsRef::<Deadline>::as_ref(stored.spawned()).due(now) == Due::Passed)
             .map(|stored| Reaper(self).reaped(stored))
             .collect::<Result<Vec<Reaped>, Failure>>()?;
+        let interrupted = self.store.read(OpenJobs)?;
+        self.store.write(JobsInterrupted)?;
         let unplaced = self.store.read(Unstructured)?;
         let progress = unplaced
             .chunks(structurer::Job::SEGMENTS)
             .try_fold(Progress::Going(Vec::new()), |progress, chunk| progress.next(self, chunk))?;
         let flailed = self.store.read(FlailedSegments)?;
         lock.end()?;
-        Ok(Structured { reaped, worked: progress.worked(), flailed })
+        Ok(Structured { reaped, interrupted, worked: progress.worked(), flailed })
     }
 
     fn owed(&self, chunk: &[Unplaced]) -> Result<Vec<Unplaced>, Failure> {
@@ -137,6 +140,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let job = structurer::Job::new(said.collect(), &context);
         self.store.write(JobOpened::from(id))?;
         let ended = Attempts { structure: self, id, job: &job }.attempted(Attempt::First)?;
+        self.store.write(JobClosed::new(id, ended.ending.state()))?;
         let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
         let held = ended.ending.flailed().map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
         held.map(|flailed| self.store.write(flailed)).transpose()?;
@@ -250,6 +254,14 @@ impl Ending {
 }
 
 impl Ending {
+    fn state(&self) -> JobState {
+        match self {
+            Ending::Applied(Application::Fresh(_)) => JobState::Applied,
+            Ending::Applied(Application::Repeated(_)) => JobState::Repeated,
+            Ending::Flailed(_) => JobState::Flailed,
+        }
+    }
+
     fn flailed(&self) -> Option<&Lapse> {
         match self {
             Ending::Flailed(lapse) => Some(lapse),
@@ -312,7 +324,11 @@ impl Progress {
 
 impl Structured {
     pub(crate) fn reported(self, out: &mut impl Write) -> Result<Outcome, Failure> {
-        let reaped = self.reaped.iter().map(|reaped| Line::Reaped { run: reaped.run, state: reaped.state });
+        let reaped = self
+            .reaped
+            .iter()
+            .map(|reaped| Line::Reaped { run: reaped.run, state: reaped.state })
+            .chain(self.interrupted.iter().copied().map(Line::Interrupted));
         let held = self.flailed.iter().map(|flailed| {
             Line::FlailedSegment(Flailing::new(
                 SegmentRef::from(AsRef::<Segment>::as_ref(flailed)),

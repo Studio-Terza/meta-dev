@@ -1,21 +1,25 @@
 use std::collections::VecDeque;
 use std::error::Error;
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, PoisonError};
 
-use design::{Agents, Attempted, Cli, Count, Failure, Lapsed, Line, Outcome};
+use design::{Agents, Attempted, Cli, Count, Failure, HookEvent, Lapsed, Line, Outcome};
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Provenance, RunId};
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
     Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, HeadlessClaude,
     Job, Output, Pause, Pid, Prompt, Reply, Started, SystemClock, Tokens, Told, Usage, Wall, clock_ops, dispatch_ops,
 };
+use exit::{Severe, Severity};
+use file_ports::{Bytes, Files};
 use newtype::Newtype;
+use port_core::{Calls, Snapshot};
 use port_core::{Pass, Run};
 use store_ports::{Store, Written};
 use structurer::{Briefing, Directives, Lapse};
 use text_lines::Lines;
+use transcript_ports::transcripts_ops::ReadFrom;
 
 use super::{Applying, FakeLent, Invocation, Session, Speaker};
 
@@ -157,6 +161,7 @@ struct Structured {
     outcome: Result<Outcome, Failure>,
     lines: Vec<Line>,
     text: String,
+    counted: Snapshot,
 }
 
 impl Structuring {
@@ -164,13 +169,17 @@ impl Structuring {
         Ok(Structuring { applying: Applying::ready()?, script, sleep })
     }
 
-    fn structured(&self) -> Structured {
-        self.structured_by(Agents::new(|_scratch| FakeDispatch(&self.script), FakeClock::asleep_for(self.sleep)))
+    fn structured(&self, arguments: &[&str]) -> Structured {
+        self.structured_by(
+            Agents::new(|_scratch| FakeDispatch(&self.script), FakeClock::asleep_for(self.sleep)),
+            arguments,
+        )
     }
 
     fn structured_by<D: DispatchFiller>(
         &self,
         agents: Agents<impl FnOnce(PathBuf) -> D, impl ClockFiller>,
+        arguments: &[&str],
     ) -> Structured {
         let run = Run::root();
         let mut out = Vec::new();
@@ -180,10 +189,11 @@ impl Structuring {
             |_path| self.applying.store.clone(),
             agents,
         )
-        .report(&run, ["structure"].iter().map(OsString::from), &mut out);
+        .report(&run, arguments.iter().map(OsString::from), &mut out);
+        let counted = run.finish().settled().unwrap_or_default();
         let text = String::from_utf8(out).unwrap_or_default();
         let lines = Structured::parsed(&text);
-        Structured { outcome, lines, text }
+        Structured { outcome, lines, text, counted }
     }
 
     fn unstructured(&self) -> Result<usize, Failure> {
@@ -220,7 +230,7 @@ fn a_reply_is_applied_with_agent_provenance_its_usage_recorded_and_what_it_cover
         sleep: Pause::new(0),
     };
     let before = structuring.unstructured()?;
-    let structured = structuring.structured();
+    let structured = structuring.structured(&["structure"]);
     let after = structuring.unstructured()?;
     let ran = Line::Ran(Attempted::new(RunId::new(1), JobId::new(1), RunState::Replied, Some(Script::usage())));
     assert_eq!(structured.has(&[ran]), []);
@@ -240,9 +250,9 @@ fn a_reply_is_applied_with_agent_provenance_its_usage_recorded_and_what_it_cover
 fn a_flailed_job_is_not_redispatched_by_the_next_run() -> Result<(), Box<dyn Error>> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u, u, u]), Pause::new(0))?;
-    let first = structuring.structured();
+    let first = structuring.structured(&["structure"]);
     assert!(matches!(first.outcome, Err(Failure::Flailed { .. })));
-    let second = structuring.structured();
+    let second = structuring.structured(&["structure"]);
     assert_eq!(structuring.script.prompts().len(), 2, "the second run re-sent the flailed job's segments");
     golden::golden!(
         "structure-flailed.txt",
@@ -255,7 +265,7 @@ fn a_flailed_job_is_not_redispatched_by_the_next_run() -> Result<(), Box<dyn Err
 #[test]
 fn a_deadline_passed_during_a_sleep_kills_the_run_which_counts_as_a_failure_and_is_retried() -> Result<(), Failure> {
     let structuring = Structuring::over(Script::replying(&[None, Some(Script::COVERING)]), Pause::new(3600))?;
-    let structured = structuring.structured();
+    let structured = structuring.structured(&["structure"]);
     let wanted = [
         Line::Retried(Lapsed::new(JobId::new(1), Lapse::overdue())),
         Line::Ran(Attempted::new(RunId::new(1), JobId::new(1), RunState::Overdue, None)),
@@ -269,7 +279,7 @@ fn a_deadline_passed_during_a_sleep_kills_the_run_which_counts_as_a_failure_and_
 #[test]
 fn a_second_kill_flails_the_job_loudly() -> Result<(), Failure> {
     let structuring = Structuring::over(Script::replying(&[None, None]), Pause::new(3600))?;
-    let structured = structuring.structured();
+    let structured = structuring.structured(&["structure"]);
     assert_eq!(structured.has(&[Line::Flailed(Lapsed::new(JobId::new(1), Lapse::overdue()))]), []);
     assert!(matches!(structured.outcome, Err(Failure::Flailed { lapse, .. }) if lapse == Lapse::overdue()));
     Ok(())
@@ -279,7 +289,7 @@ fn a_second_kill_flails_the_job_loudly() -> Result<(), Failure> {
 fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() -> Result<(), Failure> {
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::MISREAD), Some(Script::MISREAD)]), Pause::new(0))?;
-    let structured = structuring.structured();
+    let structured = structuring.structured(&["structure"]);
     let lapse = Script::MISREAD.parse::<Directives>().err().map(Lapse::from);
     let prompts = structuring.script.prompts();
     let retried = prompts.first().cloned().flatten().zip(lapse.clone()).map(|(first, lapse)| first.retried(&lapse));
@@ -297,8 +307,11 @@ fn a_restarted_structure_kills_a_stored_run_past_its_deadline_whose_pid_and_star
     let structuring =
         Structuring::over(Script::replying(&[Some(Script::COVERING)]).living(41, started), Pause::new(0))?;
     structuring.stored_run(41, started)?;
-    let structured = structuring.structured();
-    assert_eq!(structured.has(&[Line::Reaped { run: RunId::new(1), state: RunState::Killed }]), []);
+    let structured = structuring.structured(&["structure"]);
+    let again = structuring.structured(&["structure"]);
+    let reaped = [Line::Reaped { run: RunId::new(1), state: RunState::Killed }, Line::Interrupted(JobId::new(1))];
+    assert_eq!(structured.has(&reaped), []);
+    assert_eq!(again.has(&reaped), reaped);
     assert_eq!(structuring.script.kills(), [Pid::new(41)]);
     Ok(())
 }
@@ -310,7 +323,7 @@ fn a_reused_pid_with_another_start_time_is_not_killed() -> Result<(), Failure> {
         Pause::new(0),
     )?;
     structuring.stored_run(41, "Sat Nov  7 10:00:00 2026")?;
-    let structured = structuring.structured();
+    let structured = structuring.structured(&["structure"]);
     assert_eq!(structured.has(&[Line::Reaped { run: RunId::new(1), state: RunState::Gone }]), []);
     assert_eq!(structuring.script.kills(), Vec::<Pid>::new());
     Ok(())
@@ -331,7 +344,7 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
     store.write(Planting::sown(Node::new(NodeId::new(3), gone)))?;
     structuring.applying.applied("propose(new g, refines(n3), feature, \"g\")")?;
     structuring.applying.run(&["drop", "n3", "--reason", "abandoned"])?;
-    golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured().text))?;
+    golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured(&["structure"]).text))?;
     let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
     golden::golden!("structure-briefs.txt", &briefs)?;
     assert!(matches!(structuring.applying.run(&["show", "n5"]), Err(Failure::Unplaced(_))));
@@ -350,8 +363,8 @@ fn an_agent_that_errs_is_retried_with_its_error_in_the_prompt_then_flails_with_w
         ],
     );
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let structured =
-        structuring.structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock));
+    let structured = structuring
+        .structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock), &["structure"]);
     let run = Run::root();
     let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
     golden::golden!("structure-unreadable.txt", &format!("design structure\n{}", structured.text))?;
@@ -368,11 +381,59 @@ fn an_agent_whose_output_cannot_be_collected_fails_structure_and_its_run_ends_fa
     let structuring = Structuring::over(Script::default(), Pause::new(0))?;
     let agent = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let structured =
-        structuring.structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock));
+    let structured = structuring
+        .structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock), &["structure"]);
     let run = Run::root();
     let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
     assert!(matches!(structured.outcome, Err(Failure::Dispatch(DispatchFailure::Collect(_)))));
     assert_eq!(ran.iter().map(Ran::state).collect::<Vec<_>>(), [RunState::Failed]);
+    Ok(())
+}
+
+#[test]
+fn a_stop_ingests_what_was_said_since_and_structures_it_and_a_stop_after_it_reads_and_dispatches_nothing()
+-> Result<(), Box<dyn Error>> {
+    let later = "aaaaaaaa-0000-4000-8000-000000000006";
+    let covering = format!("{}\nconversational({later}.0)", Script::COVERING);
+    let structuring = Structuring::over(Script::replying(&[Some(&covering)]), Pause::new(0))?;
+    let linked = Session::linked();
+    let said = [linked.lines, Session::line(Speaker::Owner, later, "null", "and later")].concat();
+    structuring.applying.files.write(&Path::new(linked.directory).join("s.jsonl"), Bytes::from(&said))?;
+    let stopped = structuring.structured(&["hook", "stop"]);
+    let again = structuring.structured(&["hook", "stop"]);
+    let counted = [&stopped, &again]
+        .map(|hooked| [hooked.counted.calls::<ReadFrom>(), hooked.counted.calls::<dispatch_ops::Dispatch>()]);
+    assert_eq!(counted, [[Calls::new(1), Calls::new(1)], [Calls::new(0), Calls::new(0)]]);
+    assert_eq!(structuring.unstructured()?, 0);
+    assert_eq!(again.text, "");
+    assert_eq!(
+        [stopped.outcome?, again.outcome?],
+        [Outcome::Hooked(HookEvent::Stop), Outcome::Hooked(HookEvent::Stop)]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_prompt_ingests_silently_and_leaves_what_it_ingested_to_the_stop() -> Result<(), Box<dyn Error>> {
+    let structuring = Structuring::over(Script::default(), Pause::new(0))?;
+    let before = structuring.unstructured()?;
+    let linked = Session::linked();
+    let said = [linked.lines, Session::line(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000006", "null", "more")];
+    structuring.applying.files.write(&Path::new(linked.directory).join("s.jsonl"), Bytes::from(&said.concat()))?;
+    let prompted = structuring.structured(&["hook", "user-prompt-submit"]);
+    assert_eq!(prompted.counted.calls::<dispatch_ops::Dispatch>(), Calls::new(0));
+    assert_eq!((prompted.text.as_str(), structuring.unstructured()?), ("", before + 1));
+    assert_eq!(prompted.outcome?, Outcome::Hooked(HookEvent::UserPromptSubmit));
+    Ok(())
+}
+
+#[test]
+fn a_stop_that_flails_blocks_loudly_and_the_stop_after_it_passes_with_the_segments_held() -> Result<(), Failure> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u]), Pause::new(0))?;
+    let flailed = structuring.structured(&["hook", "stop"]).outcome.map_err(|failure| failure.severity());
+    let again = structuring.structured(&["hook", "stop"]);
+    assert_eq!(flailed, Err(Severity::Blocking));
+    assert_eq!(again.outcome?, Outcome::Hooked(HookEvent::Stop));
     Ok(())
 }

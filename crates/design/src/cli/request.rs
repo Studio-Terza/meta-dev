@@ -57,6 +57,7 @@ enum Flag {
     Workspace,
     DryRun,
     All,
+    Settings,
     Valued(Valued),
 }
 
@@ -69,10 +70,11 @@ impl FromStr for Flag {
 }
 
 impl Flag {
-    const NAMED: [(&'static str, Flag); 7] = [
+    const NAMED: [(&'static str, Flag); 8] = [
         ("--workspace", Flag::Workspace),
         ("--dry-run", Flag::DryRun),
         ("--all", Flag::All),
+        ("--settings", Flag::Settings),
         ("--consumes", Flag::Valued(Valued::Consumes)),
         ("--artifact", Flag::Valued(Valued::Artifact)),
         ("--condition", Flag::Valued(Valued::Condition)),
@@ -92,14 +94,14 @@ impl Flag {
         match self {
             Flag::Workspace => Expecting::Path,
             Flag::Valued(valued) => Expecting::Value(valued),
-            Flag::DryRun | Flag::All => Expecting::Word,
+            Flag::DryRun | Flag::All | Flag::Settings => Expecting::Word,
         }
     }
 
     fn scope(self, current: Scope) -> Scope {
         match self {
             Flag::All => Scope::Everyone,
-            Flag::Workspace | Flag::DryRun | Flag::Valued(_) => current,
+            Flag::Workspace | Flag::DryRun | Flag::Settings | Flag::Valued(_) => current,
         }
     }
 
@@ -107,6 +109,7 @@ impl Flag {
         match self {
             Flag::Workspace | Flag::All | Flag::Valued(_) => None,
             Flag::DryRun => Some(Token::Persisted(Persistence::DryRun)),
+            Flag::Settings => Some(Token::Settings),
         }
     }
 }

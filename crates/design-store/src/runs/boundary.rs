@@ -5,13 +5,18 @@ use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::{Authorship, Body, Uuid};
 
 use super::{
-    Flailed, FlailedSegments, JobFlailed, JobOpened, LiveRuns, NextJob, NextRun, Ran, RunEnded, RunSpawned, RunState,
-    RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    Flailed, FlailedSegments, JobClosed, JobFlailed, JobOpened, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun,
+    OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
 };
 
 #[derive(Debug, Columns)]
 struct NextJobRow {
     next: JobId,
+}
+
+#[derive(Debug, Columns)]
+struct OpenJobRow {
+    id: JobId,
 }
 
 #[derive(Debug, Columns)]
@@ -101,15 +106,81 @@ impl Batch for JobOpened {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let job = self.0;
+        let open = JobState::Open;
         statements.written(store_ports::query!(
             r#"
 INSERT INTO
-  jobs (id)
+  jobs (id, state)
 VALUES
-  (?1)
+  (?1, ?2)
 "#,
-            job: JobId
+            job: JobId,
+            open: JobState
         ))
+    }
+}
+
+impl Batch for JobClosed {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let JobClosed { job, state } = self;
+        statements.written(store_ports::query!(
+            r#"
+UPDATE
+  jobs
+SET
+  state = ?2
+WHERE
+  id = ?1
+"#,
+            job: JobId,
+            state: JobState
+        ))
+    }
+}
+
+impl Batch for JobsInterrupted {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let open = JobState::Open;
+        let interrupted = JobState::Interrupted;
+        statements.written(store_ports::query!(
+            r#"
+UPDATE
+  jobs
+SET
+  state = ?2
+WHERE
+  state = ?1
+"#,
+            open: JobState,
+            interrupted: JobState
+        ))
+    }
+}
+
+impl Query for OpenJobs {
+    type Rows = Vec<JobId>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<JobId>, StoreFailure> {
+        let open = JobState::Open;
+        let rows = statements.rows(store_ports::query!(
+            OpenJobRow,
+            r#"
+SELECT
+  id
+FROM
+  jobs
+WHERE
+  state = ?1
+ORDER BY
+  id
+"#,
+            open: JobState
+        ))?;
+        Ok(rows.into_iter().map(|row| row.id).collect())
     }
 }
 
