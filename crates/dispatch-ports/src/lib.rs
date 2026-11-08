@@ -1,3 +1,4 @@
+mod agent;
 mod agent_run;
 mod clock;
 mod dispatch;
@@ -12,6 +13,7 @@ mod system_clock;
 mod wall;
 mod watch;
 
+pub use agent::Agent;
 pub use agent_run::AgentRun;
 pub use clock::{Clock, ClockFiller, clock_ops};
 pub use dispatch::{Dispatch, DispatchFiller, dispatch_ops};

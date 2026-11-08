@@ -1,5 +1,3 @@
-use std::iter;
-
 use port_core::Held;
 
 use crate::{AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Finished, Pause};
@@ -24,8 +22,12 @@ impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
     }
 
     pub fn watched(&self, mut run: Held<'_, AgentRun>) -> Result<Watched, DispatchFailure> {
-        let watched =
-            iter::repeat_with(|| self.checked(&mut run)).find_map(Result::transpose).unwrap_or(Ok(Watched::Overdue))?;
+        let deadline = *AsRef::<Deadline>::as_ref(&*run);
+        let watched = deadline
+            .checks(self.clock.now(), Self::PAUSE)
+            .map(|_planned| self.checked(&mut run))
+            .find_map(Result::transpose)
+            .unwrap_or(Ok(Watched::Overdue))?;
         run.end()?;
         Ok(watched)
     }

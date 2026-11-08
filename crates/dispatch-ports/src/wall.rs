@@ -1,5 +1,7 @@
 mod boundary;
 
+use std::iter;
+
 use newtype::{Arbitrary, Newtype};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -27,5 +29,10 @@ impl Deadline {
             std::cmp::Ordering::Less => Due::Pending,
             std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => Due::Passed,
         }
+    }
+
+    pub(crate) fn checks(self, start: Wall, pause: Pause) -> impl Iterator<Item = Wall> {
+        iter::successors(Some(start), move |planned| Some(planned.after(pause)))
+            .take_while(move |planned| self.due(*planned) == Due::Pending)
     }
 }

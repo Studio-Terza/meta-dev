@@ -7,25 +7,24 @@ use std::thread;
 
 use port_core::Pass;
 
-use crate::{AgentRun, DispatchFailure, DispatchFiller, Ended, Finished, Job, Pid, Prompt, Started, dispatch_ops};
+use crate::{
+    Agent, AgentRun, DispatchFailure, DispatchFiller, Ended, Finished, Job, Pid, Prompt, Started, dispatch_ops,
+};
 
 #[derive(Clone, Debug)]
 pub struct HeadlessClaude {
     scratch: PathBuf,
+    agent: Agent,
 }
 
 impl HeadlessClaude {
-    const PROGRAM: &'static str = "claude";
-    const ARGUMENTS: [&'static str; 9] =
-        ["-p", "--model", "haiku", "--output-format", "json", "--setting-sources", "user", "--tools", ""];
     const LISTER: &'static str = "ps";
     const LISTING: [&'static str; 3] = ["-o", "lstart=", "-p"];
     const LOCALE: [&'static str; 2] = ["LC_ALL", "C"];
-}
 
-impl From<PathBuf> for HeadlessClaude {
-    fn from(scratch: PathBuf) -> HeadlessClaude {
-        HeadlessClaude { scratch }
+    #[must_use]
+    pub fn new(scratch: PathBuf, agent: Agent) -> HeadlessClaude {
+        HeadlessClaude { scratch, agent }
     }
 }
 
@@ -37,8 +36,8 @@ impl DispatchFiller for HeadlessClaude {
         prompt: &Prompt,
     ) -> Result<AgentRun, DispatchFailure> {
         fs::create_dir_all(&self.scratch).map_err(DispatchFailure::Scratch)?;
-        let mut child = Command::new(Self::PROGRAM)
-            .args(Self::ARGUMENTS)
+        let mut child = Command::new(self.agent.program())
+            .args(self.agent.arguments())
             .current_dir(&self.scratch)
             .process_group(0)
             .stdin(Stdio::piped())
