@@ -5,7 +5,7 @@ use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 #[error("message text holds a NUL character")]
 pub struct Nul;
 
-#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[newtype(checked)]
 pub struct Body(String);
 
@@ -21,14 +21,17 @@ impl Checked for Body {
 }
 
 impl Body {
-    #[must_use]
-    pub fn sliced(&self, span: Span) -> Body {
-        Body(span.slice(&self.0).to_owned())
+    pub fn sliced(&self, span: Span) -> Result<Body, Nul> {
+        Body::try_new(span.slice(&self.0).to_owned())
     }
 
     #[must_use]
-    pub fn joined(&self, after: &Body) -> Body {
-        Body(format!("{self} {after}"))
+    pub fn written(&self) -> Option<&Body> {
+        self.0.chars().next().map(|_| self)
+    }
+
+    pub fn joined(&self, after: &Body) -> Result<Body, Nul> {
+        Body::try_new(format!("{self} {after}"))
     }
 }
 

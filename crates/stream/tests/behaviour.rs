@@ -158,7 +158,13 @@ impl Cases {
 
     fn bodies(text: &&str) -> Vec<String> {
         Fixture::first(text)
-            .map(|message| message.segments().iter().map(|segment| segment.text(&message).to_string()).collect())
+            .map(|message| {
+                message
+                    .segments()
+                    .iter()
+                    .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -245,7 +251,11 @@ laws::table!(
 
 laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace, "[ -~\n\t•]{0,80}", text, {
     let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let bodies: Vec<String> = message.segments().iter().map(|segment| segment.text(&message).to_string()).collect();
+    let bodies: Vec<String> = message
+        .segments()
+        .iter()
+        .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
+        .collect();
     let inked = |text: &str| text.chars().filter(|letter| !letter.is_whitespace()).collect::<String>();
     prop_assert_eq!(inked(&bodies.concat()), inked(&text));
     let ends = |body: &String| [body.chars().next(), body.chars().last()].into_iter().flatten().collect::<Vec<char>>();
