@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use dispatch_ports::{
-    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, SystemClock, Timeout,
-    Tokens, Usage, Watch, Watched,
+    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, Started, SystemClock,
+    Timeout, Tokens, Usage, Watch, Watched,
 };
 use port_core::Run;
 
@@ -41,3 +41,40 @@ fn an_agent_that_prints_its_result_is_watched_to_that_reply_and_usage() -> Resul
     assert_eq!(watched, Watched::Finished(Finished::new(Reply::new("conversational(a.0)".to_owned()), usage)));
     Ok(())
 }
+
+struct Stalling;
+
+#[derive(Debug, PartialEq, Eq)]
+struct Stalled {
+    watched: Watched,
+    left: Option<Started>,
+}
+
+impl Stalling {
+    const PROMPT: usize = 256 * 1024;
+
+    fn watched(arguments: &&'static [&'static str]) -> Option<Stalled> {
+        let run = Run::root();
+        let ended = {
+            let agent =
+                run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", arguments)));
+            let clock = run.port(SystemClock);
+            let deadline = Deadline::after(clock.now(), Timeout::new(1));
+            let held = agent.dispatch(&Job::due_by(deadline), &Prompt::new("x".repeat(Stalling::PROMPT))).ok()?;
+            let pid = held.pid();
+            let watched = Watch::over(&agent, &clock).watched(held).ok()?;
+            Some(Stalled { watched, left: agent.started(pid).ok()? })
+        };
+        run.finish().settled().ok()?;
+        ended
+    }
+}
+
+laws::table!(
+    an_agent_that_leaves_a_large_prompt_unread_is_killed_and_reaped_at_its_deadline,
+    Stalling::watched,
+    [
+        &["-c", "exec sleep 30"][..] => Some(Stalled { watched: Watched::Overdue, left: None }),
+        &["-c", "exec 0<&-; exec sleep 30"][..] => Some(Stalled { watched: Watched::Overdue, left: None }),
+    ]
+);

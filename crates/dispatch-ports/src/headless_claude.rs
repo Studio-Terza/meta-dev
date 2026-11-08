@@ -1,15 +1,13 @@
 use std::fs;
-use std::io::{Read, Write};
+use std::io;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::thread;
 
 use port_core::Pass;
 
-use crate::{
-    Agent, AgentRun, DispatchFailure, DispatchFiller, Ended, Finished, Job, Pid, Prompt, Started, dispatch_ops,
-};
+use crate::agent_run::Exchange;
+use crate::{Agent, AgentRun, DispatchFailure, DispatchFiller, Ended, Job, Output, Pid, Prompt, Started, dispatch_ops};
 
 #[derive(Clone, Debug)]
 pub struct HeadlessClaude {
@@ -36,39 +34,27 @@ impl DispatchFiller for HeadlessClaude {
         prompt: &Prompt,
     ) -> Result<AgentRun, DispatchFailure> {
         fs::create_dir_all(&self.scratch).map_err(DispatchFailure::Scratch)?;
-        let mut child = Command::new(self.agent.program())
+        let (agent_in, prompting) = io::pipe().map_err(DispatchFailure::Pipe)?;
+        let (replies, agent_out) = io::pipe().map_err(DispatchFailure::Pipe)?;
+        let exchange = Exchange::begun(prompt, prompting, replies);
+        Command::new(self.agent.program())
             .args(self.agent.arguments())
             .current_dir(&self.scratch)
             .process_group(0)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
+            .stdin(agent_in)
+            .stdout(agent_out)
             .stderr(Stdio::null())
             .spawn()
-            .map_err(DispatchFailure::Spawn)?;
-        let run = AgentRun::new(Pid::new(child.id()), *job.as_ref());
-        let streams = child.stdin.take().zip(child.stdout.take());
-        let (mut stdin, mut stdout) = streams.ok_or(DispatchFailure::Unpiped)?;
-        let reading = thread::spawn(move || {
-            let mut read = String::new();
-            stdout.read_to_string(&mut read).map(|_length| read)
-        });
-        let held = run.holding(child, reading);
-        stdin.write_all(prompt.as_ref()).map_err(DispatchFailure::Prompt)?;
-        drop(stdin);
-        Ok(held)
+            .map(|child| AgentRun::spawned(child, exchange, *job.as_ref()))
+            .map_err(DispatchFailure::Spawn)
     }
 
     fn output(
         &self,
         _pass: Pass<'_, dispatch_ops::Output>,
         run: &mut AgentRun,
-    ) -> Result<Option<Finished>, DispatchFailure> {
-        run.read_out()
-            .map(|reading| {
-                let read = reading.join().map_err(|_panicked| DispatchFailure::Unjoined)?;
-                Ok(read.map_err(DispatchFailure::Collect)?.parse::<Finished>()?)
-            })
-            .transpose()
+    ) -> Result<Option<Output>, DispatchFailure> {
+        run.read_out().map(|exchange| Ok(Output::read(&exchange.joined()?))).transpose()
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, pid: Pid) -> Result<Option<Started>, DispatchFailure> {

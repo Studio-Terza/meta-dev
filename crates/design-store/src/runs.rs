@@ -13,12 +13,16 @@ pub enum RunState {
     Running,
     #[name("replied")]
     Replied,
+    #[name("unreadable")]
+    Unreadable,
     #[name("overdue")]
     Overdue,
     #[name("killed")]
     Killed,
     #[name("gone")]
     Gone,
+    #[name("failed")]
+    Failed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

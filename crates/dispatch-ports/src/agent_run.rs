@@ -1,10 +1,13 @@
-use std::io;
+mod boundary;
+
 use std::process::{Child, Command, Stdio};
-use std::thread::JoinHandle;
 
 use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 
 use crate::{Deadline, DispatchFailure, Pid};
+use boundary::Process;
+
+pub(crate) use boundary::Exchange;
 
 #[derive(Debug, Resource)]
 pub struct AgentRun {
@@ -13,26 +16,18 @@ pub struct AgentRun {
     process: Option<Process>,
 }
 
-#[derive(Debug)]
-pub(crate) struct Process {
-    child: Child,
-    reading: Option<Reading>,
-}
-
-pub(crate) type Reading = JoinHandle<io::Result<String>>;
-
 impl AgentRun {
     #[must_use]
     pub fn new(pid: Pid, deadline: Deadline) -> AgentRun {
         AgentRun { pid, deadline, process: None }
     }
 
-    pub(crate) fn holding(self, child: Child, reading: Reading) -> AgentRun {
-        AgentRun { process: Some(Process { child, reading: Some(reading) }), ..self }
+    pub(crate) fn spawned(child: Child, exchange: Exchange, deadline: Deadline) -> AgentRun {
+        AgentRun { pid: Pid::new(child.id()), deadline, process: Some(Process::new(child, exchange)) }
     }
 
-    pub(crate) fn read_out(&mut self) -> Option<Reading> {
-        self.process.as_mut().and_then(|process| process.reading.take_if(|reading| reading.is_finished()))
+    pub(crate) fn read_out(&mut self) -> Option<Exchange> {
+        self.process.as_mut().and_then(Process::read_out)
     }
 
     #[must_use]
@@ -60,7 +55,7 @@ impl Release for AgentRun {
                     .stderr(Stdio::null())
                     .arg(&group)
                     .status()
-                    .and_then(|_signalled| process.child.wait())
+                    .and_then(|_signalled| process.child().wait())
             })
             .transpose()
             .map(|_reaped| pass.released())

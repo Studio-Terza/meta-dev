@@ -20,7 +20,7 @@ use design_store::{
     AppliedId, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage, ShownNode,
     Stored, StreamSchema,
 };
-use dispatch_ports::{Tokens, Usage};
+use dispatch_ports::{Tokens, Unreadable, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
@@ -2098,6 +2098,8 @@ impl Generated {
         prop_oneof![
             Just(Lapse::overdue()),
             "[^\u{0}]{0,20}".prop_map(|refusal| Lapse::refused(&std::io::Error::other(refusal))),
+            Just(Lapse::from(&Unreadable::Unsuccessful)),
+            "[^\u{0}]{0,20}".prop_map(|garbled| Lapse::from(&Unreadable::Json(garbled))),
             "[ -~]{0,20}"
                 .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
         ]

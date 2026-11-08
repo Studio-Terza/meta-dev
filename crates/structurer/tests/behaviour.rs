@@ -4,7 +4,7 @@ use design_model::{
     AnyNode, Confidence, Entered, Entry, Explicitness, Facet, Node, NodeId, Ordinal, Prefix, Project, Provenance,
     SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Title,
 };
-use dispatch_ports::Reply;
+use dispatch_ports::{Reply, Unreadable};
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
@@ -226,6 +226,8 @@ impl Jobs {
         prop_oneof![
             Just(Lapse::overdue()),
             "[^\u{0}]{0,30}".prop_map(|refusal| Lapse::refused(&io::Error::other(refusal))),
+            Just(Lapse::from(&Unreadable::Unsuccessful)),
+            "[^\u{0}]{0,30}".prop_map(|garbled| Lapse::from(&Unreadable::Json(garbled))),
             "[ -~]{0,30}"
                 .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
         ]

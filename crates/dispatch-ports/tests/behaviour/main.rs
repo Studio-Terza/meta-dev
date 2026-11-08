@@ -4,8 +4,8 @@ use std::error::Error;
 use std::sync::{Mutex, PoisonError};
 
 use dispatch_ports::{
-    AgentRun, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Finished, Job, Pause, Pid,
-    Prompt, Reply, Started, Timeout, Tokens, Usage, Wall, Watch, Watched, clock_ops, dispatch_ops,
+    AgentRun, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Finished, Job, Output, Pause,
+    Pid, Prompt, Reply, Started, Timeout, Tokens, Usage, Wall, Watch, Watched, clock_ops, dispatch_ops,
 };
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::sample::select;
@@ -101,10 +101,10 @@ impl DispatchFiller for FakeDispatch {
         &self,
         _pass: Pass<'_, dispatch_ops::Output>,
         _run: &mut AgentRun,
-    ) -> Result<Option<Finished>, DispatchFailure> {
+    ) -> Result<Option<Output>, DispatchFailure> {
         let mut polls = self.polls.lock().unwrap_or_else(PoisonError::into_inner);
         *polls = polls.saturating_add(1);
-        Ok(self.finishing.filter(|finishing| *finishing == *polls).map(|_| FakeDispatch::finished()))
+        Ok(self.finishing.filter(|finishing| *finishing == *polls).map(|_| Output::Finished(FakeDispatch::finished())))
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, _pid: Pid) -> Result<Option<Started>, DispatchFailure> {

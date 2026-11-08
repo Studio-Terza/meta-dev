@@ -5,7 +5,8 @@ use design_store::{
     ContextNodes, JobOpened, LiveRuns, NextJob, NextRun, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun,
     Unplaced, Unstructured,
 };
-use dispatch_ports::{Clock, Deadline, Dispatch, Due, Ended, Finished, Job, Prompt, Timeout, Watch, Watched};
+use dispatch_ports::{AgentRun, Clock, Deadline, Dispatch, Due, Ended, Finished, Job, Prompt, Timeout, Watch, Watched};
+use port_core::Held;
 use store_ports::Store;
 use structurer::{Attempt, Lapse, Reading, Said, SegmentRef};
 use transcript_ports::Body;
@@ -36,6 +37,13 @@ struct Attempts<'structure, 'ports, S: Store, D: Dispatch, C: Clock> {
     structure: &'structure Structure<'ports, S, D, C>,
     id: JobId,
     job: &'structure structurer::Job,
+}
+
+#[derive(Debug)]
+struct RunRecord<'structure, 'ports, S: Store, D: Dispatch, C: Clock> {
+    structure: &'structure Structure<'ports, S, D, C>,
+    job: JobId,
+    run: RunId,
 }
 
 #[derive(Debug)]
@@ -149,10 +157,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         let run = store.read(NextRun)?;
         let deadline = Deadline::after(crew.clock.now(), Structure::<S, D, C>::TIMEOUT);
         let held = crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt)))?;
-        let started = crew.dispatch.started(held.pid())?;
-        store.write(RunSpawned::new(run, self.id, Spawned::new(held.pid(), started, deadline)))?;
-        let watched = Watch::over(crew.dispatch, crew.clock).watched(held)?;
-        store.write(Ending::ended(run, &watched))?;
+        let watched = RunRecord { structure: self.structure, job: self.id, run }.ended(held, deadline)?;
         let retried = attempt.lapse().cloned();
         let step = self.stepped(run, attempt, watched)?;
         self.continued(retried, step)
@@ -168,6 +173,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
     fn stepped(&self, run: RunId, attempt: Attempt, watched: Watched) -> Result<Step, Failure> {
         match watched {
             Watched::Overdue => Ok(Step::from(attempt.lapsed(Lapse::overdue()))),
+            Watched::Unreadable(unreadable) => Ok(Step::from(attempt.lapsed(Lapse::from(&unreadable)))),
             Watched::Finished(finished) => self.read(run, attempt.read(finished.reply()), &finished),
         }
     }
@@ -183,6 +189,25 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
     }
 }
 
+impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
+    fn ended(&self, held: Held<'_, AgentRun>, deadline: Deadline) -> Result<Watched, Failure> {
+        let Structure { store, crew } = self.structure;
+        let spawned = self.spawned(&held, deadline);
+        let watched = spawned.and_then(|()| Ok(Watch::over(crew.dispatch, crew.clock).watched(held)?));
+        store.write(Ending::ended(self.run, &watched))?;
+        watched
+    }
+
+    fn spawned(&self, held: &AgentRun, deadline: Deadline) -> Result<(), Failure> {
+        let Structure { store, crew } = self.structure;
+        let looked = crew.dispatch.started(held.pid());
+        let started = looked.as_ref().ok().cloned().flatten();
+        store.write(RunSpawned::new(self.run, self.job, Spawned::new(held.pid(), started, deadline)))?;
+        looked?;
+        Ok(())
+    }
+}
+
 impl Reaped {
     fn state(ended: Ended) -> RunState {
         match ended {
@@ -193,10 +218,12 @@ impl Reaped {
 }
 
 impl Ending {
-    fn ended(run: RunId, watched: &Watched) -> RunEnded {
+    fn ended(run: RunId, watched: &Result<Watched, Failure>) -> RunEnded {
         match watched {
-            Watched::Finished(finished) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
-            Watched::Overdue => RunEnded::new(run, RunState::Overdue, None),
+            Ok(Watched::Finished(finished)) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
+            Ok(Watched::Unreadable(_unreadable)) => RunEnded::new(run, RunState::Unreadable, None),
+            Ok(Watched::Overdue) => RunEnded::new(run, RunState::Overdue, None),
+            Err(_failure) => RunEnded::new(run, RunState::Failed, None),
         }
     }
 

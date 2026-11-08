@@ -6,10 +6,10 @@ use std::sync::{LazyLock, Mutex, PoisonError};
 
 use design::{Agents, Attempted, Cli, Count, Failure, Lapsed, Line, Outcome};
 use design_model::{JobId, Provenance, RunId};
-use design_store::{JobOpened, RunSpawned, RunState, Spawned, Unstructured};
+use design_store::{JobOpened, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
-    AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Finished, Job, Pause, Pid, Prompt, Reply,
-    Started, Tokens, Usage, Wall, clock_ops, dispatch_ops,
+    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Finished, HeadlessClaude, Job,
+    Output, Pause, Pid, Prompt, Reply, Started, SystemClock, Tokens, Unreadable, Usage, Wall, clock_ops, dispatch_ops,
 };
 use newtype::Newtype;
 use port_core::{Pass, Run};
@@ -21,8 +21,8 @@ use super::{Applying, FakeLent, Invocation};
 
 #[derive(Debug, Default)]
 pub struct Script {
-    replies: Mutex<VecDeque<Option<Finished>>>,
-    current: Mutex<Option<Finished>>,
+    replies: Mutex<VecDeque<Option<Output>>>,
+    current: Mutex<Option<Output>>,
     prompts: Mutex<Vec<Prompt>>,
     living: Vec<Living>,
     kills: Mutex<Vec<Pid>>,
@@ -93,7 +93,7 @@ impl DispatchFiller for FakeDispatch<'_> {
         &self,
         _pass: Pass<'_, dispatch_ops::Output>,
         _run: &mut AgentRun,
-    ) -> Result<Option<Finished>, DispatchFailure> {
+    ) -> Result<Option<Output>, DispatchFailure> {
         Ok(self.0.current.lock().unwrap_or_else(PoisonError::into_inner).take())
     }
 
@@ -113,7 +113,9 @@ impl Script {
 
     fn replying(replies: &[Option<&str>]) -> Script {
         Script {
-            replies: Mutex::new(replies.iter().map(|reply| reply.map(Script::finished)).collect()),
+            replies: Mutex::new(
+                replies.iter().map(|reply| reply.map(|reply| Output::Finished(Script::finished(reply)))).collect(),
+            ),
             ..Script::default()
         }
     }
@@ -160,9 +162,15 @@ impl Structuring {
     }
 
     fn structured(&self) -> Structured {
+        self.structured_by(Agents::new(|_scratch| FakeDispatch(&self.script), FakeClock::asleep_for(self.sleep)))
+    }
+
+    fn structured_by<D: DispatchFiller>(
+        &self,
+        agents: Agents<impl FnOnce(PathBuf) -> D, impl ClockFiller>,
+    ) -> Structured {
         let run = Run::root();
         let mut out = Vec::new();
-        let agents = Agents::new(|_scratch| FakeDispatch(&self.script), FakeClock::asleep_for(self.sleep));
         let outcome = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&self.applying.files),
@@ -291,5 +299,43 @@ fn a_retried_and_applied_structure_prints_its_lines() -> Result<(), Box<dyn Erro
     golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured().text))?;
     let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
     golden::golden!("structure-briefs.txt", &briefs)?;
+    Ok(())
+}
+
+#[test]
+fn an_agent_without_a_successful_result_is_retried_once_with_the_reason_in_its_prompt_then_flails()
+-> Result<(), Box<dyn Error>> {
+    let structuring = Structuring::over(Script::default(), Pause::new(0))?;
+    let agent = Agent::new(
+        "sh",
+        &[
+            "-c",
+            r#"if grep -c '^retry unreadable' >/dev/null; then echo '{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}'; else echo '{"subtype":"error_during_execution","usage":{"input_tokens":1,"output_tokens":2}}'; fi"#,
+        ],
+    );
+    let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let structured =
+        structuring.structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock));
+    let run = Run::root();
+    let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
+    golden::golden!("structure-unreadable.txt", &format!("design structure\n{}", structured.text))?;
+    let first = Lapse::from(&Unreadable::Unsuccessful);
+    assert_eq!(structured.has(&[Line::Retried(Lapsed::new(JobId::new(1), first))]), []);
+    assert!(matches!(structured.outcome, Err(Failure::Flailed { .. })));
+    assert_eq!(ran.iter().map(Ran::state).collect::<Vec<_>>(), [RunState::Unreadable, RunState::Unreadable]);
+    Ok(())
+}
+
+#[test]
+fn an_agent_whose_output_cannot_be_collected_fails_structure_and_its_run_ends_failed() -> Result<(), Failure> {
+    let structuring = Structuring::over(Script::default(), Pause::new(0))?;
+    let agent = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
+    let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let structured =
+        structuring.structured_by(Agents::new(|_scratch| HeadlessClaude::new(scratch, agent), SystemClock));
+    let run = Run::root();
+    let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
+    assert!(matches!(structured.outcome, Err(Failure::Dispatch(DispatchFailure::Collect(_)))));
+    assert_eq!(ran.iter().map(Ran::state).collect::<Vec<_>>(), [RunState::Failed]);
     Ok(())
 }

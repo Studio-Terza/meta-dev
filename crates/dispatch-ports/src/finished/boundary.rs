@@ -4,13 +4,20 @@ use grammar::reply::Inked;
 use serde::{Deserialize, Deserializer, de};
 
 use super::{Finished, Reply, Usage};
+use crate::Watched;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Unreadable {
     #[error("the agent's output is not its JSON result: {0}")]
-    Json(#[source] serde_json::Error),
+    Json(String),
     #[error("the agent ended without a successful result")]
     Unsuccessful,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Output {
+    Finished(Finished),
+    Unreadable(Unreadable),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -36,13 +43,28 @@ impl FromStr for Finished {
     type Err = Unreadable;
 
     fn from_str(text: &str) -> Result<Finished, Unreadable> {
-        let envelope: Envelope = serde_json::from_str(text).map_err(Unreadable::Json)?;
+        let envelope: Envelope = serde_json::from_str(text).map_err(|failure| Unreadable::Json(failure.to_string()))?;
         let usage = envelope.usage;
         Some(envelope.subtype)
             .filter(|subtype| *subtype == Subtype::Success)
             .and(envelope.result)
             .map(|reply| Finished { reply, usage })
             .ok_or(Unreadable::Unsuccessful)
+    }
+}
+
+impl Output {
+    pub(crate) fn read(text: &str) -> Output {
+        text.parse::<Finished>().map_or_else(Output::Unreadable, Output::Finished)
+    }
+}
+
+impl From<Output> for Watched {
+    fn from(output: Output) -> Watched {
+        match output {
+            Output::Finished(finished) => Watched::Finished(finished),
+            Output::Unreadable(unreadable) => Watched::Unreadable(unreadable),
+        }
     }
 }
 

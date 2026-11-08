@@ -7,7 +7,18 @@ pub struct Agent {
 impl Agent {
     pub const CLAUDE: Agent = Agent {
         program: "claude",
-        arguments: &["-p", "--model", "haiku", "--output-format", "json", "--setting-sources", "user", "--tools", ""],
+        arguments: &[
+            "-p",
+            "--model",
+            "haiku",
+            "--output-format",
+            "json",
+            "--setting-sources",
+            "user",
+            "--strict-mcp-config",
+            "--tools",
+            "",
+        ],
     };
 
     #[must_use]
