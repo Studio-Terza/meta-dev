@@ -11,6 +11,7 @@ mod graph;
 mod imported_notes;
 mod imports;
 mod link;
+mod listed;
 mod placed;
 mod placement;
 mod prefixed;
@@ -42,6 +43,7 @@ pub use graph::{Cast, ContextNodes, Ended, Linked, Planting, Resolved, Resolving
 pub use imported_notes::{ImportedNotes, Noted};
 pub use imports::{Imported, Imports};
 use link::Link;
+use listed::Listed;
 pub use placed::Placed;
 pub use placement::{CurrentSpans, Placement};
 pub use prefixed::{Cited, NextNode, Prefixed, Spoken, Started};

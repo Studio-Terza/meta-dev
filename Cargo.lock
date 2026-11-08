@@ -309,6 +309,7 @@ dependencies = [
  "named-derive",
  "newtype",
  "port-core",
+ "serde_json",
  "store-ports",
  "stream",
  "strum",
