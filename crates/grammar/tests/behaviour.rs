@@ -426,7 +426,7 @@ laws::law!(
     }
 );
 
-const MARKUP: [&str; 22] = [
+const MARKUP: [&str; 24] = [
     "- ",
     "* ",
     "+ ",
@@ -445,9 +445,11 @@ const MARKUP: [&str; 22] = [
     "[X]",
     "2026-11-05",
     "2026-11-05: ",
+    "2026-11-05 04:07 ",
+    "2026-11-05T04:07",
+    "2026-11-05T04:07:00Z: ",
     ": ",
     ":",
-    "7 ",
     "\t",
 ];
 
@@ -482,6 +484,17 @@ laws::law!(
     {
         let (before, opener, after) = said;
         let line = Line::read(1, &format!("{} {opener}{} RULING (owner): \"yes\"", before.concat(), after.concat()));
+        prop_assert_eq!(line.read_by(Shaped), "remark");
+    }
+);
+
+laws::law!(
+    a_bare_number_before_ruling_makes_the_line_a_remark,
+    (vec(select(MARKUP.to_vec()), 0..4), "[0-9]{1,12}", vec(select(MARKUP.to_vec()), 0..4)),
+    said,
+    {
+        let (before, number, after) = said;
+        let line = Line::read(1, &format!("{} {number} {} RULING (owner): \"yes\"", before.concat(), after.concat()));
         prop_assert_eq!(line.read_by(Shaped), "remark");
     }
 );
@@ -673,6 +686,16 @@ laws::table!(
         "__RULING__ (owner): underlined" => "ruling",
         "_LEAD_: the beds are dug" => "lead",
         "12) RULING (owner): numbered" => "ruling",
+        "3 RULING rows still lack labels." => "remark",
+        "- 3 RULING rows still lack labels." => "remark",
+        "1234567 RULING (owner): seven digits" => "remark",
+        "12345678 RULING (owner): eight digits" => "remark",
+        "1234567. RULING (owner): numbered" => "ruling",
+        "2026-11-05 04:07 RULING (owner): timed" => "ruling",
+        "2026-11-05T04:07 RULING (owner): timed" => "ruling",
+        "- 2026-11-05T04:07:00Z: RULING (owner): timed" => "ruling",
+        "04:07 RULING (owner): a bare time" => "remark",
+        "2026-11 RULING (owner): a bare month" => "remark",
         "\"RULING\" lines must quote the owner." => "remark",
         "| RULING | count |" => "remark",
         "~~RULING (owner): \"yes the new trellis is approved.\"~~ withdrawn" => "remark",
@@ -713,6 +736,11 @@ laws::table!(
             vec![],
             vec!["1f2e3d4c-1234-4abc-8def-0123456789ab".to_owned(), "0123abcd".to_owned()],
             vec!["2026-11-07".to_owned()],
+        ]),
+        "RULING (owner, 2026-11-05T04:07): \"dig the beds\" and 2026-11-06 08:15:30 too" => Ok([
+            vec!["dig the beds".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned(), "2026-11-06".to_owned()],
         ]),
         "an \"unclosed quote and a 'stray" => Err(Unclosed::new(Quote::new("unclosed quote and a 'stray".to_owned()))),
         "# Notes \"quoted\" 1f2e3d4c" => Ok([vec!["quoted".to_owned()], vec!["1f2e3d4c".to_owned()], vec![]]),

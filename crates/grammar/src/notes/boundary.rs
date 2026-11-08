@@ -4,7 +4,7 @@ use std::iter;
 
 use logos::Logos;
 
-use super::{Cite, Date, Ending, Layout, Quote, Unclosed};
+use super::{Cite, Clock, Date, Ending, Layout, Quote, Unclosed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
@@ -23,7 +23,6 @@ enum Marker {
     Quote,
     Emphasis,
     Date,
-    Digits,
     Colon,
     Task,
     Space,
@@ -41,8 +40,7 @@ enum Lexeme {
     #[token("**", |_| Marker::Emphasis)]
     #[token("_", |_| Marker::Emphasis)]
     #[token("__", |_| Marker::Emphasis)]
-    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", |_| Marker::Date)]
-    #[regex(r"[0-9]+", |_| Marker::Digits, priority = 3)]
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?)?", |_| Marker::Date)]
     #[token(":", |_| Marker::Colon)]
     #[regex(r"\[[ xX]\]", |_| Marker::Task)]
     #[regex(r"[ \t]+", |_| Marker::Space)]
@@ -100,7 +98,7 @@ enum Piece {
     Quoted(Quote),
     Unclosed(Unclosed),
     Cited(Cite),
-    Dated(Date),
+    Dated(Date, Clock),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -351,9 +349,18 @@ impl<'text> Lexed<'text> {
     fn taken<'lexed>(self, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         match self.lexeme {
             Some(Lexeme::Double) => Step::quoted(rest),
+            Some(Lexeme::Marker(Marker::Date)) => Step::dated(self, rest),
             Some(
                 Lexeme::Hash
-                | Lexeme::Marker(_)
+                | Lexeme::Marker(
+                    Marker::Bullet
+                    | Marker::Numbered
+                    | Marker::Quote
+                    | Marker::Emphasis
+                    | Marker::Colon
+                    | Marker::Task
+                    | Marker::Space,
+                )
                 | Lexeme::Ruling
                 | Lexeme::Lead
                 | Lexeme::Open
@@ -382,6 +389,11 @@ impl<'lexed, 'text> Step<'lexed, 'text> {
         Step { piece, cursor: Cursor { rest } }
     }
 
+    fn dated(lexed: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
+        let (day, clock) = lexed.text.split_at_checked(10).unwrap_or((lexed.text, ""));
+        Step::after(Piece::Dated(Date::new(day.to_owned()), Clock::new(clock.to_owned())), rest)
+    }
+
     fn quoted(rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         let closed = rest
             .iter()
@@ -406,7 +418,6 @@ impl Piece {
     fn read(lexed: Lexed<'_>) -> Piece {
         match lexed.lexeme {
             Some(Lexeme::Cite) => Piece::Cited(Cite::new(lexed.text.to_owned())),
-            Some(Lexeme::Marker(Marker::Date)) => Piece::Dated(Date::new(lexed.text.to_owned())),
             Some(
                 Lexeme::Hash
                 | Lexeme::Marker(
@@ -414,7 +425,7 @@ impl Piece {
                     | Marker::Numbered
                     | Marker::Quote
                     | Marker::Emphasis
-                    | Marker::Digits
+                    | Marker::Date
                     | Marker::Colon
                     | Marker::Task
                     | Marker::Space,
@@ -435,20 +446,20 @@ impl Piece {
         match self {
             Piece::Quoted(quote) => Some(Ok(quote)),
             Piece::Unclosed(unclosed) => Some(Err(unclosed)),
-            Piece::Text(_) | Piece::Cited(_) | Piece::Dated(_) => None,
+            Piece::Text(_) | Piece::Cited(_) | Piece::Dated(..) => None,
         }
     }
 
     fn cite(&self) -> Option<&Cite> {
         match self {
             Piece::Cited(cite) => Some(cite),
-            Piece::Text(_) | Piece::Quoted(_) | Piece::Unclosed(_) | Piece::Dated(_) => None,
+            Piece::Text(_) | Piece::Quoted(_) | Piece::Unclosed(_) | Piece::Dated(..) => None,
         }
     }
 
     fn date(&self) -> Option<&Date> {
         match self {
-            Piece::Dated(date) => Some(date),
+            Piece::Dated(date, _clock) => Some(date),
             Piece::Text(_) | Piece::Quoted(_) | Piece::Unclosed(_) | Piece::Cited(_) => None,
         }
     }
@@ -506,7 +517,7 @@ impl fmt::Display for Piece {
             Piece::Quoted(quote) => write!(formatter, "\"{quote}\""),
             Piece::Cited(cite) => write!(formatter, "{cite}"),
             Piece::Unclosed(_) => formatter.write_str("\""),
-            Piece::Dated(date) => write!(formatter, "{date}"),
+            Piece::Dated(date, clock) => write!(formatter, "{date}{clock}"),
         }
     }
 }
