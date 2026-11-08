@@ -426,45 +426,35 @@ laws::law!(
     }
 );
 
+const MARKUP: [&str; 22] = [
+    "- ",
+    "* ",
+    "+ ",
+    "-",
+    "**",
+    "*",
+    "_",
+    "__",
+    "1. ",
+    "12) ",
+    "3.",
+    "> ",
+    ">",
+    "[ ] ",
+    "[x] ",
+    "[X]",
+    "2026-11-05",
+    "2026-11-05: ",
+    ": ",
+    ":",
+    "7 ",
+    "\t",
+];
+
 laws::law!(
-    any_markup_before_the_first_word_leaves_the_line_the_kind_that_word_gives,
+    any_allowed_markup_before_the_first_word_leaves_the_line_the_kind_that_word_gives,
     (
-        vec(
-            select(vec![
-                "- ",
-                "* ",
-                "+ ",
-                "-",
-                "**",
-                "*",
-                "1. ",
-                "12) ",
-                "3.",
-                "> ",
-                ">",
-                "[ ] ",
-                "[x] ",
-                "[X]",
-                "2026-11-05",
-                "2026-11-05: ",
-                ": ",
-                ":",
-                "(",
-                ")",
-                "[",
-                "]",
-                "{",
-                "}",
-                "`",
-                "~",
-                "|",
-                ".",
-                ",",
-                "0a1b2c3d ",
-                "\t",
-            ]),
-            0..8
-        ),
+        vec(select(MARKUP.to_vec()), 0..8),
         select(vec![
             ("RULING", "ruling"),
             ("LEAD", "lead"),
@@ -478,6 +468,21 @@ laws::law!(
         let (markup, (word, kind)) = said;
         let line = Line::read(1, &format!("{} {word} (owner): x", markup.concat()));
         prop_assert_eq!(line.read_by(Shaped), kind);
+    }
+);
+
+laws::law!(
+    any_other_opener_before_ruling_makes_the_line_a_remark,
+    (
+        vec(select(MARKUP.to_vec()), 0..4),
+        select(vec!["\"", "~~", "~", "|", "`", "(", "{", ".", ",", "#", "<", "0a1b2c3d", "note"]),
+        vec(select(MARKUP.to_vec()), 0..4),
+    ),
+    said,
+    {
+        let (before, opener, after) = said;
+        let line = Line::read(1, &format!("{} {opener}{} RULING (owner): \"yes\"", before.concat(), after.concat()));
+        prop_assert_eq!(line.read_by(Shaped), "remark");
     }
 );
 
@@ -637,7 +642,7 @@ laws::table!(
         "RULINGS (owner): plural" => "remark",
         "RULING's scope (owner): possessive" => "remark",
         "RULING (owner): as c3c3c3c3's reply says" => "ruling",
-        "(RULING: aside) and more" => "ruling",
+        "(RULING: aside) and more" => "remark",
         "(owner) RULING: approved" => "remark",
         "(a (b) c) RULING: nested" => "remark",
         "a) RULING: unbalanced" => "remark",
@@ -665,6 +670,14 @@ laws::table!(
         "- [x] RULING (owner): a task" => "ruling",
         "- [ ] LEAD: an open task" => "lead",
         "- [x] done: RULING aside" => "remark",
+        "__RULING__ (owner): underlined" => "ruling",
+        "_LEAD_: the beds are dug" => "lead",
+        "12) RULING (owner): numbered" => "ruling",
+        "\"RULING\" lines must quote the owner." => "remark",
+        "| RULING | count |" => "remark",
+        "~~RULING (owner): \"yes the new trellis is approved.\"~~ withdrawn" => "remark",
+        "`RULING` is a kind word" => "remark",
+        "snake_case RULING" => "remark",
         "* note: RULING aside" => "remark",
         "**Lead**: the beds are dug" => "remark",
     ]

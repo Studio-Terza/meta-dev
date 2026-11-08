@@ -226,6 +226,20 @@ laws::table!(
         "**RULING** (owner): nothing to anchor" => Some("unanchored"),
         "2026-11-05: RULING (owner): nothing to anchor" => Some("unanchored"),
         "- 2026-11-05: **RULING** (owner, c3c3c3c3): approved" => Some("imported"),
+        "1. RULING (owner): nothing to anchor" => Some("unanchored"),
+        "> __RULING__ (owner): nothing to anchor" => Some("unanchored"),
+        "- [x] _RULING_ (owner): nothing to anchor" => Some("unanchored"),
+    ]
+);
+
+laws::table!(
+    a_quoted_kind_word_is_a_remark,
+    |line: &&str| Noting::outcome(line),
+    [
+        "\"RULING\" lines must quote the owner." => Some("imported"),
+        "| RULING | count |" => Some("imported"),
+        "`RULING` is a kind word" => Some("imported"),
+        "~~RULING (owner): nothing to anchor~~ withdrawn" => Some("imported"),
     ]
 );
 
