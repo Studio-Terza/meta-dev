@@ -67,7 +67,42 @@ impl Carried {
     fn line(self, stamp: Stamp) -> Line {
         match self {
             Carried::QueuedCommand { prompt, origin } => Said::from(prompt).heard(Listener::new(stamp, origin)),
-            _ => Line::Skipped(Skipped::from(stamp)),
+            Carried::AgentListingDelta
+            | Carried::AutoMode
+            | Carried::BashOutputAudienceNote
+            | Carried::BatchingReminderSent
+            | Carried::CommandPermissions
+            | Carried::CompactFileReference
+            | Carried::CredentialOrg
+            | Carried::Date
+            | Carried::DeferredToolsDelta
+            | Carried::DeferredToolsRecord
+            | Carried::EditedTextFile
+            | Carried::Environment
+            | Carried::File
+            | Carried::HookAdditionalContext
+            | Carried::HookBlockingError
+            | Carried::HookNonBlockingError
+            | Carried::HookPermissionDecision
+            | Carried::HookSuccess
+            | Carried::HookSystemMessage
+            | Carried::Instructions
+            | Carried::InvokedSkills
+            | Carried::McpInstructionsDelta
+            | Carried::Model
+            | Carried::NestedMemory
+            | Carried::PromptSnapshot
+            | Carried::ReadTruncationNotice
+            | Carried::RemoteSessionChange
+            | Carried::SessionContext
+            | Carried::SessionCronCarry
+            | Carried::SilentTurnReminder
+            | Carried::SkillListing
+            | Carried::TaskReminder
+            | Carried::TaskStatus
+            | Carried::ThinkingDrop
+            | Carried::TotalTokensReminder
+            | Carried::UltrathinkEffort => Line::Skipped(Skipped::from(stamp)),
         }
     }
 }
