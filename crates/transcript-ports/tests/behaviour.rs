@@ -23,6 +23,12 @@ impl Lines {
         )
     }
 
+    fn in_session(session: &str) -> String {
+        format!(
+            "{{\"type\":\"user\",\"uuid\":\"1\",\"parentUuid\":null,\"sessionId\":\"{session}\",\"timestamp\":\"2026-01-01T00:00:01Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"typed words\"}}}}\n"
+        )
+    }
+
     fn typed(uuid: &str) -> String {
         Self::entry("user", uuid, "{\"kind\":\"human\"}", "\"typed words\"")
     }
@@ -286,6 +292,20 @@ laws::table!(
         "a b" => None,
         "-a" => None,
         "" => None,
+    ]
+);
+
+laws::table!(
+    a_line_whose_session_is_blank_yields_no_record,
+    |session: &&str| {
+        Transcript::holding(&Lines::in_session(session)).read(Cursor::default()).ok().map(|read| {
+            Views::records(read).into_iter().map(|record| record.session().to_string()).collect::<Vec<String>>()
+        })
+    },
+    [
+        "s1" => Some(vec![String::from("s1")]),
+        "a b" => Some(vec![String::from("a b")]),
+        "" => Some(Vec::new()),
     ]
 );
 

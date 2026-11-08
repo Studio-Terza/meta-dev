@@ -2,7 +2,7 @@ use code_model::ItemPath;
 
 use super::Namespace;
 use super::binding::Binding;
-use super::boundary::{GlobId, Lattice, ScopeId};
+use super::boundary::{GlobId, Lattice, Rounds, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::resolver::{Resolution, Resolver};
 use super::std_names::{Listed, StdNames};
@@ -102,6 +102,8 @@ pub(crate) struct ScopeSettling {
 }
 
 impl ScopeSettling {
+    const ASCENTS: usize = 2;
+
     pub(super) fn new(imports: Vec<Resolution>, targets: Vec<Target>) -> ScopeSettling {
         ScopeSettling { imports, targets }
     }
@@ -132,7 +134,10 @@ impl Lattice for ScopeSettling {
 impl Seeds<'_> {
     pub(crate) fn settled(&self) -> Vec<ScopeSettling> {
         let unsettled: Vec<ScopeSettling> = self.space.scopes.iter().map(|row| row.entries().unsettled()).collect();
-        unsettled.settled(|settling| self.advanced(settling)).into_iter().map(ScopeSettling::forced).collect()
+        let entries: usize =
+            unsettled.iter().map(|scope| scope.imports.len().saturating_add(scope.targets.len())).sum();
+        let rounds = Rounds::ascending(entries, ScopeSettling::ASCENTS);
+        unsettled.settled(rounds, |settling| self.advanced(settling)).into_iter().map(ScopeSettling::forced).collect()
     }
 
     pub(crate) fn tables<'rows>(&'rows self, settling: &'rows [ScopeSettling]) -> Tables<'rows> {

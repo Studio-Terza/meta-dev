@@ -6,7 +6,7 @@ use std::ops::ControlFlow;
 use code_model::Domain;
 use lint_layout::Name;
 
-use super::boundary::{GlobId, Lattice, ScopeId};
+use super::boundary::{GlobId, Lattice, Rounds, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::use_path::Reading;
 use super::view::View;
@@ -314,6 +314,8 @@ struct Exposure<'tables, 'rows> {
 }
 
 impl<'tables, 'rows> Exposure<'tables, 'rows> {
+    const ASCENTS: usize = 5;
+
     fn names<'held>(self, modules: &'held [Vec<ModuleGlob<'rows>>]) -> Names<'held, 'rows>
     where
         'tables: 'held,
@@ -324,7 +326,16 @@ impl<'tables, 'rows> Exposure<'tables, 'rows> {
     fn settled(self, modules: Vec<Vec<ModuleGlob<'rows>>>) -> Vec<Vec<ModuleGlob<'rows>>> {
         let successors: Vec<Vec<ScopeId>> =
             modules.iter().map(|globs| globs.iter().map(|glob| glob.module).collect()).collect();
-        Components::ordered(&successors).settled(modules, &self)
+        let rounds = self.rounds(&modules);
+        Components::ordered(&successors).settled(modules, rounds, &self)
+    }
+
+    fn rounds(&self, modules: &[Vec<ModuleGlob<'rows>>]) -> Rounds {
+        let explicit = self.explicit.iter().map(|placed| placed.0.len());
+        let fixed = self.fixed.iter().flatten().map(|glob| glob.exposed.names.len());
+        let keys: usize = explicit.chain(fixed).sum();
+        let globs: usize = modules.iter().map(Vec::len).sum();
+        Rounds::ascending(globs.saturating_mul(keys.saturating_add(1)), Exposure::ASCENTS)
     }
 
     fn advanced(

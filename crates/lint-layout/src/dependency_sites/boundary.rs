@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
 use text_lines::OneLine;
+use toml::Spanned;
 use toml::de::{DeTable, DeValue};
 use workspace_metadata::CrateName;
 
@@ -42,6 +43,6 @@ impl DependencySites {
         table: &'table DeTable<'text>,
         wanted: &str,
     ) -> impl Iterator<Item = &'table DeValue<'text>> {
-        table.iter().filter(move |(key, _)| key.get_ref() == wanted).map(|(_, value)| value.get_ref())
+        table.get(wanted).map(Spanned::get_ref).into_iter()
     }
 }

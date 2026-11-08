@@ -1,7 +1,6 @@
-use std::iter;
 use std::ops::ControlFlow;
 
-use super::super::boundary::{Reach, ScopeId};
+use super::super::boundary::{Reach, Rounds, ScopeId};
 
 #[derive(Clone, Copy, Debug)]
 struct Visit {
@@ -142,11 +141,12 @@ impl Shape {
         self,
         state: State,
         scopes: &[ScopeId],
+        rounds: Rounds,
         settling: &impl Settling<State>,
     ) -> ControlFlow<State, State> {
         match self {
             Shape::Acyclic => settling.round(state, scopes),
-            Shape::Cyclic => iter::repeat(()).try_fold(state, |settled, ()| settling.round(settled, scopes)),
+            Shape::Cyclic => rounds.each().try_fold(state, |settled, ()| settling.round(settled, scopes)),
         }
     }
 }
@@ -162,9 +162,9 @@ impl Component {
         Component { scopes, shape }
     }
 
-    fn settled<State>(&self, state: State, settling: &impl Settling<State>) -> State {
+    fn settled<State>(&self, state: State, rounds: Rounds, settling: &impl Settling<State>) -> State {
         let (ControlFlow::Break(settled) | ControlFlow::Continue(settled)) =
-            self.shape.rounds(state, &self.scopes, settling);
+            self.shape.rounds(state, &self.scopes, rounds, settling);
         settled
     }
 }
@@ -180,7 +180,7 @@ impl Components {
         Components(walked.components)
     }
 
-    pub(super) fn settled<State>(&self, state: State, settling: &impl Settling<State>) -> State {
-        self.0.iter().fold(state, |settled, component| component.settled(settled, settling))
+    pub(super) fn settled<State>(&self, state: State, rounds: Rounds, settling: &impl Settling<State>) -> State {
+        self.0.iter().fold(state, |settled, component| component.settled(settled, rounds, settling))
     }
 }

@@ -42,11 +42,24 @@ impl Reach {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Rounds(usize);
+
+impl Rounds {
+    pub(super) fn ascending(entries: usize, ascents: usize) -> Rounds {
+        Rounds(entries.saturating_mul(ascents).saturating_add(1))
+    }
+
+    pub(super) fn each(self) -> iter::RepeatN<()> {
+        iter::repeat_n((), self.0)
+    }
+}
+
 pub(super) trait Lattice: PartialEq + Sized {
     fn joined(&self, computed: Self) -> Self;
 
-    fn settled(self, advanced: impl Fn(&Self) -> Self) -> Self {
-        Self::reached(iter::repeat(()).try_fold(self, |state, ()| {
+    fn settled(self, rounds: Rounds, advanced: impl Fn(&Self) -> Self) -> Self {
+        Self::reached(rounds.each().try_fold(self, |state, ()| {
             let next = state.joined(advanced(&state));
             state.stepped(next)
         }))
