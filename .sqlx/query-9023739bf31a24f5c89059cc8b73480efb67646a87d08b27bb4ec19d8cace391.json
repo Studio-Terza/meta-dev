@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  id,\n  project,\n  facet,\n  stage,\n  provenance,\n  title,\n  role,\n  role_provenance,\n  artifact,\n  condition,\n  reason\nFROM\n  nodes\nWHERE\n  stage != ?1\nORDER BY\n  id\nLIMIT\n  200\n",
+  "query": "\nSELECT\n  id,\n  project,\n  facet,\n  stage,\n  provenance,\n  title,\n  role,\n  role_provenance,\n  artifact,\n  condition,\n  reason\nFROM\n  (\n    SELECT\n      id,\n      project,\n      facet,\n      stage,\n      provenance,\n      title,\n      role,\n      role_provenance,\n      artifact,\n      condition,\n      reason\n    FROM\n      nodes\n    WHERE\n      project = ?1\n      AND stage != ?2\n    ORDER BY\n      id DESC\n    LIMIT\n      200\n  )\nORDER BY\n  id\n",
   "describe": {
     "columns": [
       {
@@ -126,7 +126,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -142,5 +142,5 @@
       true
     ]
   },
-  "hash": "5667976f8999e5f069206f10d09612b8627535de900e12045695d76fc58e7c28"
+  "hash": "9023739bf31a24f5c89059cc8b73480efb67646a87d08b27bb4ec19d8cace391"
 }

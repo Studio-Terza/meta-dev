@@ -15,6 +15,8 @@ pub enum RunState {
     Replied,
     #[name("unreadable")]
     Unreadable,
+    #[name("errored")]
+    Errored,
     #[name("overdue")]
     Overdue,
     #[name("killed")]

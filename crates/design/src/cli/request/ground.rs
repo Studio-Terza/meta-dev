@@ -35,6 +35,10 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         self.files.read(&self.located.within(path)).map_err(Failure::Directives)
     }
 
+    pub fn project(&self) -> Result<Project, Failure> {
+        self.located.project().cloned().ok_or(Failure::Unprojected)
+    }
+
     pub fn configured(&self, project: Project) -> Result<Kept, Failure> {
         Ok(self.located.configured(project).kept(&self.files, self.located.repo())?)
     }

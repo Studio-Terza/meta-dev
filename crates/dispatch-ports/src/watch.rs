@@ -1,6 +1,6 @@
 use port_core::Held;
 
-use crate::{AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Finished, Pause, Unreadable};
+use crate::{AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Finished, Pause, Unreadable};
 
 #[derive(Debug)]
 pub struct Watch<'ports, D: Dispatch, C: Clock> {
@@ -11,6 +11,7 @@ pub struct Watch<'ports, D: Dispatch, C: Clock> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Watched {
     Finished(Finished),
+    Errored(Errored),
     Unreadable(Unreadable),
     Overdue,
 }

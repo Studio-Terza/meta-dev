@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use design_model::{JobId, Provenance, RunId, Segment};
+use design_model::{JobId, Project, Provenance, RunId, Segment};
 use design_store::{
     ContextNodes, JobOpened, LiveRuns, NextJob, NextRun, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun,
     Unplaced, Unstructured,
@@ -27,6 +27,7 @@ pub struct Crew<'ports, D: Dispatch, C: Clock> {
 pub struct Structure<'ports, S: Store, D: Dispatch, C: Clock> {
     store: &'ports S,
     crew: Crew<'ports, D, C>,
+    project: Project,
 }
 
 #[derive(Debug)]
@@ -98,8 +99,8 @@ impl<'ports, D: Dispatch, C: Clock> Crew<'ports, D, C> {
 impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
     const TIMEOUT: Timeout = Timeout::new(180);
 
-    pub fn new(store: &'ports S, crew: &Crew<'ports, D, C>) -> Structure<'ports, S, D, C> {
-        Structure { store, crew: Crew { dispatch: crew.dispatch, clock: crew.clock } }
+    pub fn new(store: &'ports S, crew: &Crew<'ports, D, C>, project: Project) -> Structure<'ports, S, D, C> {
+        Structure { store, crew: Crew { dispatch: crew.dispatch, clock: crew.clock }, project }
     }
 
     pub fn worked(&self) -> Result<Structured, Failure> {
@@ -122,7 +123,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
 
     fn job(&self, chunk: &[Unplaced]) -> Result<Worked, Failure> {
         let id = self.store.read(NextJob)?;
-        let context = self.store.read(ContextNodes)?;
+        let context = self.store.read(ContextNodes::from(self.project.clone()))?;
         let said = chunk.iter().map(|unplaced| {
             Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)), AsRef::<Body>::as_ref(unplaced).clone())
         });
@@ -140,7 +141,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
 
 impl<S: Store, D: Dispatch, C: Clock> Reaper<'_, '_, S, D, C> {
     fn reaped(&self, stored: &StoredRun) -> Result<Reaped, Failure> {
-        let Structure { store, crew } = self.0;
+        let Structure { store, crew, .. } = self.0;
         let spawned = stored.spawned();
         let current = crew.dispatch.started(spawned.pid())?;
         let same = spawned.started().filter(|recorded| current.as_ref() == Some(*recorded));
@@ -153,7 +154,7 @@ impl<S: Store, D: Dispatch, C: Clock> Reaper<'_, '_, S, D, C> {
 
 impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
     fn attempted(&self, attempt: Attempt) -> Result<Concluded, Failure> {
-        let Structure { store, crew } = self.structure;
+        let Structure { store, crew, .. } = self.structure;
         let run = store.read(NextRun)?;
         let deadline = Deadline::after(crew.clock.now(), Structure::<S, D, C>::TIMEOUT);
         let held = crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt)))?;
@@ -174,6 +175,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         match watched {
             Watched::Overdue => Ok(Step::from(attempt.lapsed(Lapse::overdue()))),
             Watched::Unreadable(unreadable) => Ok(Step::from(attempt.lapsed(Lapse::from(&unreadable)))),
+            Watched::Errored(errored) => Ok(Step::from(attempt.lapsed(Lapse::from(&errored)))),
             Watched::Finished(finished) => self.read(run, attempt.read(finished.reply()), &finished),
         }
     }
@@ -182,7 +184,8 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         match reading {
             Reading::Parsed { directives, attempt } => Step::settled(
                 attempt,
-                Parsed::new(self.structure.store, directives, Provenance::Agent(run)).replied(finished.reply()),
+                Parsed::new(self.structure.store, directives, Provenance::Agent(run), self.job.owed())
+                    .replied(finished.reply()),
             ),
             reading @ (Reading::Again(_) | Reading::Flailed(_)) => Ok(Step::from(reading)),
         }
@@ -191,7 +194,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
 
 impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
     fn ended(&self, held: Held<'_, AgentRun>, deadline: Deadline) -> Result<Watched, Failure> {
-        let Structure { store, crew } = self.structure;
+        let Structure { store, crew, .. } = self.structure;
         let spawned = self.spawned(&held, deadline);
         let watched = spawned.and_then(|()| Ok(Watch::over(crew.dispatch, crew.clock).watched(held)?));
         store.write(Ending::ended(self.run, &watched))?;
@@ -199,7 +202,7 @@ impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
     }
 
     fn spawned(&self, held: &AgentRun, deadline: Deadline) -> Result<(), Failure> {
-        let Structure { store, crew } = self.structure;
+        let Structure { store, crew, .. } = self.structure;
         let looked = crew.dispatch.started(held.pid());
         let started = looked.as_ref().ok().cloned().flatten();
         store.write(RunSpawned::new(self.run, self.job, Spawned::new(held.pid(), started, deadline)))?;
@@ -222,6 +225,7 @@ impl Ending {
         match watched {
             Ok(Watched::Finished(finished)) => RunEnded::new(run, RunState::Replied, Some(finished.usage())),
             Ok(Watched::Unreadable(_unreadable)) => RunEnded::new(run, RunState::Unreadable, None),
+            Ok(Watched::Errored(errored)) => RunEnded::new(run, RunState::Errored, Some(errored.usage())),
             Ok(Watched::Overdue) => RunEnded::new(run, RunState::Overdue, None),
             Err(_failure) => RunEnded::new(run, RunState::Failed, None),
         }

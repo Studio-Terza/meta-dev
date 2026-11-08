@@ -1,7 +1,7 @@
 use design_model::{AnyNode, Facet, NodeId, Stage, Title};
 use transcript_ports::Body;
 
-use crate::SegmentRef;
+use crate::{Owed, SegmentRef};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Said {
@@ -72,6 +72,11 @@ impl Job {
     #[must_use]
     pub fn new(segments: Vec<Said>, nodes: &[AnyNode]) -> Job {
         Job { segments, context: nodes.iter().map(Context::from).collect() }
+    }
+
+    #[must_use]
+    pub fn owed(&self) -> Owed {
+        self.segments.iter().map(|said| said.segment.clone()).collect()
     }
 
     pub(crate) fn segments(&self) -> &[Said] {

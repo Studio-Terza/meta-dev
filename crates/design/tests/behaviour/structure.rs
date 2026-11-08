@@ -8,8 +8,8 @@ use design::{Agents, Attempted, Cli, Count, Failure, Lapsed, Line, Outcome};
 use design_model::{JobId, Provenance, RunId};
 use design_store::{JobOpened, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
-    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Finished, HeadlessClaude, Job,
-    Output, Pause, Pid, Prompt, Reply, Started, SystemClock, Tokens, Unreadable, Usage, Wall, clock_ops, dispatch_ops,
+    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Errored, Finished, HeadlessClaude,
+    Job, Output, Pause, Pid, Prompt, Reply, Started, SystemClock, Tokens, Told, Usage, Wall, clock_ops, dispatch_ops,
 };
 use newtype::Newtype;
 use port_core::{Pass, Run};
@@ -108,7 +108,8 @@ impl DispatchFiller for FakeDispatch<'_> {
 }
 
 impl Script {
-    const COVERING: &str = "conversational(aaaaaaaa-0000-4000-8000-000000000003.0)";
+    const COVERING: &str = "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)\nsense(aaaaaaaa-0000-4000-8000-000000000003.0, decision, specific, firm, explicit)\nlink(aaaaaaaa-0000-4000-8000-000000000003.1, aaaaaaaa-0000-4000-8000-000000000005.0, answers)";
+    const UNCOVERING: &str = "propose(new a, refines(n1), feature, \"x\")";
     const MISREAD: &str = "place(";
 
     fn replying(replies: &[Option<&str>]) -> Script {
@@ -217,14 +218,14 @@ fn a_reply_is_applied_with_agent_provenance_its_usage_recorded_and_the_unstructu
     let ran = Line::Ran(Attempted::new(RunId::new(1), JobId::new(1), RunState::Replied, Some(Script::usage())));
     assert_eq!(structured.has(&[ran]), []);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
-    assert_eq!(after, before.saturating_sub(1));
+    assert_eq!((before, after), (4, 0));
     let shown = structuring.applying.run(&["show", "aaaaaaaa-0000-4000-8000-000000000003"])?;
     let agent = Provenance::Agent(RunId::new(1));
     let entered = Structured::parsed(&shown)
         .into_iter()
         .filter(|line| matches!(line, Line::Annotated { entered, .. } if *entered == agent))
         .count();
-    assert_eq!(entered, 1);
+    assert_eq!(entered, 2);
     Ok(())
 }
 
@@ -293,24 +294,26 @@ fn a_reused_pid_with_another_start_time_is_not_killed() -> Result<(), Failure> {
 }
 
 #[test]
-fn a_retried_and_applied_structure_prints_its_lines() -> Result<(), Box<dyn Error>> {
+fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_them_in_the_prompt()
+-> Result<(), Box<dyn Error>> {
     let structuring =
-        Structuring::over(Script::replying(&[Some(Script::MISREAD), Some(Script::COVERING)]), Pause::new(0))?;
+        Structuring::over(Script::replying(&[Some(Script::UNCOVERING), Some(Script::COVERING)]), Pause::new(0))?;
     golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured().text))?;
     let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
     golden::golden!("structure-briefs.txt", &briefs)?;
+    assert!(matches!(structuring.applying.run(&["show", "n2"]), Err(Failure::Unplaced(_))));
     Ok(())
 }
 
 #[test]
-fn an_agent_without_a_successful_result_is_retried_once_with_the_reason_in_its_prompt_then_flails()
+fn an_agent_that_errs_is_retried_with_its_error_in_the_prompt_then_flails_with_what_it_said_on_stderr()
 -> Result<(), Box<dyn Error>> {
     let structuring = Structuring::over(Script::default(), Pause::new(0))?;
     let agent = Agent::new(
         "sh",
         &[
             "-c",
-            r#"if grep -c '^retry unreadable' >/dev/null; then echo '{"subtype":"success","result":"  ","usage":{"input_tokens":1,"output_tokens":2}}'; else echo '{"subtype":"error_during_execution","usage":{"input_tokens":1,"output_tokens":2}}'; fi"#,
+            r#"if grep -c '^retry errored' >/dev/null; then echo 'error: unknown option --tools' >&2; exit 1; else echo '{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key - Please run /login","usage":{"input_tokens":1,"output_tokens":2}}'; fi"#,
         ],
     );
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -319,10 +322,11 @@ fn an_agent_without_a_successful_result_is_retried_once_with_the_reason_in_its_p
     let run = Run::root();
     let ran = run.port(structuring.applying.store).read(RunsOf::from(JobId::new(1)))?;
     golden::golden!("structure-unreadable.txt", &format!("design structure\n{}", structured.text))?;
-    let first = Lapse::from(&Unreadable::Unsuccessful);
+    let first =
+        Lapse::from(&Errored::new(Told::new("Invalid API key - Please run /login".to_owned()), Usage::default()));
     assert_eq!(structured.has(&[Line::Retried(Lapsed::new(JobId::new(1), first))]), []);
     assert!(matches!(structured.outcome, Err(Failure::Flailed { .. })));
-    assert_eq!(ran.iter().map(Ran::state).collect::<Vec<_>>(), [RunState::Unreadable, RunState::Unreadable]);
+    assert_eq!(ran.iter().map(Ran::state).collect::<Vec<_>>(), [RunState::Errored, RunState::Unreadable]);
     Ok(())
 }
 

@@ -20,7 +20,7 @@ use design_store::{
     AppliedId, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage, ShownNode,
     Stored, StreamSchema,
 };
-use dispatch_ports::{Tokens, Unreadable, Usage};
+use dispatch_ports::{Errored, Stderr, Tokens, Told, Unreadable, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
@@ -32,7 +32,7 @@ use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, po
 use store_ports::{Busy, Sqlite, Store, Written};
 use stream::{Relation, Shape};
 use structure::Staff;
-use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef};
+use structurer::{Directive, Directives, Job, Lapse, NodeRef, Proposal, SegmentRef};
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
@@ -2098,8 +2098,20 @@ impl Generated {
         prop_oneof![
             Just(Lapse::overdue()),
             "[^\u{0}]{0,20}".prop_map(|refusal| Lapse::refused(&std::io::Error::other(refusal))),
-            Just(Lapse::from(&Unreadable::Unsuccessful)),
-            "[^\u{0}]{0,20}".prop_map(|garbled| Lapse::from(&Unreadable::Json(garbled))),
+            Just(Lapse::from(&Unreadable::Unsuccessful { stderr: Stderr::Silent })),
+            ("[^\u{0}]{0,20}", "[^\u{0}]{0,20}").prop_map(|(garbled, said)| Lapse::from(&Unreadable::Json {
+                failure: garbled,
+                stderr: Stderr::Wrote(said)
+            })),
+            "[^\u{0}]{1,20}".prop_map(|told| Lapse::from(&Errored::new(Told::new(told), Usage::default()))),
+            proptest::collection::vec(Generated::segment(), 1..4).prop_filter_map(
+                "a job owes its segments",
+                |segments| {
+                    let said =
+                        segments.into_iter().map(|segment| structurer::Said::new(segment, Body::new(String::new())));
+                    Job::new(said.collect(), &[]).owed().paid(&BTreeSet::new()).err().map(Lapse::from)
+                }
+            ),
             "[ -~]{0,20}"
                 .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
         ]

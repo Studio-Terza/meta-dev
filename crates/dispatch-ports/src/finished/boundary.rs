@@ -3,25 +3,33 @@ use std::str::FromStr;
 use grammar::reply::Inked;
 use serde::{Deserialize, Deserializer, de};
 
-use super::{Finished, Reply, Usage};
-use crate::Watched;
+use super::{Finished, Reply, Told, Usage};
+use crate::{Stderr, Watched};
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Unreadable {
-    #[error("the agent's output is not its JSON result: {0}")]
-    Json(String),
-    #[error("the agent ended without a successful result")]
-    Unsuccessful,
+    #[error("the agent's output is not its JSON result: {failure}; {stderr}")]
+    Json { failure: String, stderr: Stderr },
+    #[error("the agent ended without a successful result; {stderr}")]
+    Unsuccessful { stderr: Stderr },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("{told}")]
+pub struct Errored {
+    told: Told,
+    usage: Usage,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Output {
     Finished(Finished),
+    Errored(Errored),
     Unreadable(Unreadable),
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("{0:?} is no reply: it holds no ink or holds a NUL")]
+#[error("{0:?} holds no ink or holds a NUL")]
 pub struct Uninked(String);
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,30 +40,59 @@ enum Subtype {
     Other,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Erred;
+
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(from = "bool")]
+struct Verdict(Option<Erred>);
+
 #[derive(Deserialize, Debug)]
 struct Envelope {
     subtype: Subtype,
-    result: Option<Reply>,
+    #[serde(rename = "is_error", default)]
+    verdict: Verdict,
+    result: Option<Told>,
     usage: Usage,
 }
 
-impl FromStr for Finished {
-    type Err = Unreadable;
+impl Errored {
+    #[must_use]
+    pub fn new(told: Told, usage: Usage) -> Errored {
+        Errored { told, usage }
+    }
 
-    fn from_str(text: &str) -> Result<Finished, Unreadable> {
-        let envelope: Envelope = serde_json::from_str(text).map_err(|failure| Unreadable::Json(failure.to_string()))?;
-        let usage = envelope.usage;
-        Some(envelope.subtype)
-            .filter(|subtype| *subtype == Subtype::Success)
-            .and(envelope.result)
-            .map(|reply| Finished { reply, usage })
-            .ok_or(Unreadable::Unsuccessful)
+    #[must_use]
+    pub fn usage(&self) -> Usage {
+        self.usage
+    }
+}
+
+impl From<bool> for Verdict {
+    fn from(errored: bool) -> Verdict {
+        Verdict(errored.then_some(Erred))
+    }
+}
+
+impl Envelope {
+    fn output(self) -> Option<Output> {
+        match self.verdict.0 {
+            Some(Erred) => self.result.map(|told| Output::Errored(Errored { told, usage: self.usage })),
+            None => Some(self.subtype)
+                .filter(|subtype| *subtype == Subtype::Success)
+                .and(self.result)
+                .map(|told| Output::Finished(Finished { reply: Reply::from(told), usage: self.usage })),
+        }
     }
 }
 
 impl Output {
-    pub(crate) fn read(text: &str) -> Output {
-        text.parse::<Finished>().map_or_else(Output::Unreadable, Output::Finished)
+    #[must_use]
+    pub fn read(text: &str, stderr: Stderr) -> Output {
+        match serde_json::from_str::<Envelope>(text) {
+            Ok(envelope) => envelope.output().unwrap_or(Output::Unreadable(Unreadable::Unsuccessful { stderr })),
+            Err(failure) => Output::Unreadable(Unreadable::Json { failure: failure.to_string(), stderr }),
+        }
     }
 }
 
@@ -63,21 +100,22 @@ impl From<Output> for Watched {
     fn from(output: Output) -> Watched {
         match output {
             Output::Finished(finished) => Watched::Finished(finished),
+            Output::Errored(errored) => Watched::Errored(errored),
             Output::Unreadable(unreadable) => Watched::Unreadable(unreadable),
         }
     }
 }
 
-impl FromStr for Reply {
+impl FromStr for Told {
     type Err = Uninked;
 
-    fn from_str(text: &str) -> Result<Reply, Uninked> {
-        Inked::read(text).map(|inked| Reply(inked.as_ref().to_owned())).ok_or_else(|| Uninked(text.to_owned()))
+    fn from_str(text: &str) -> Result<Told, Uninked> {
+        Inked::read(text).map(|inked| Told::new(inked.as_ref().to_owned())).ok_or_else(|| Uninked(text.to_owned()))
     }
 }
 
-impl<'de> Deserialize<'de> for Reply {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Reply, D::Error> {
+impl<'de> Deserialize<'de> for Told {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Told, D::Error> {
         String::deserialize(deserializer)?.parse().map_err(de::Error::custom)
     }
 }

@@ -149,9 +149,10 @@ impl Command {
             }
             Command::Move(moving) => moving.written(ground.store(), out),
             Command::Recast(recast) => recast.written(ground.store(), out),
-            Command::Structure => {
-                Structure::new(ground.store(), crew).worked().and_then(|structured| structured.reported(out))
-            }
+            Command::Structure => ground
+                .project()
+                .and_then(|project| Structure::new(ground.store(), crew, project).worked())
+                .and_then(|structured| structured.reported(out)),
         }
     }
 }

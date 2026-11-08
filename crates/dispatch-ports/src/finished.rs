@@ -3,7 +3,10 @@ mod boundary;
 use newtype::{Arbitrary, Display, Newtype};
 use serde::Deserialize;
 
-pub use boundary::{Output, Unreadable};
+pub use boundary::{Errored, Output, Unreadable};
+
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+pub struct Told(String);
 
 #[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]
@@ -28,6 +31,12 @@ pub struct Reply(String);
 pub struct Finished {
     reply: Reply,
     usage: Usage,
+}
+
+impl From<Told> for Reply {
+    fn from(told: Told) -> Reply {
+        Reply(told.0)
+    }
 }
 
 impl Usage {

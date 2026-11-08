@@ -9,10 +9,10 @@ use design_model::{
     Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, Covered, Cycle, Directed, Directions, JobOpened, Linked, LiveRuns, NextJob, NextNode, NextRun,
-    Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Resolved, Resolving, Restaged, RunEnded,
-    RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage,
-    ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
+    AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, JobOpened, Linked, LiveRuns, NextJob,
+    NextNode, NextRun, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Resolved, Resolving,
+    Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords,
+    ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
 };
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -1257,6 +1257,20 @@ fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(
         (before, after),
         (vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)], vec![Proposals::segment("o1", 1)])
     );
+    Ok(())
+}
+
+#[test]
+fn the_structurer_s_context_is_the_newest_live_nodes_of_its_project_alone() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(Dag::planting(&store, Entry::new("q".parse()?, Facet::Project, Provenance::from(Entered::Init)))?)?;
+    (0..=200)
+        .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+        .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+    let context: Vec<NodeId> =
+        store.read(ContextNodes::from("p".parse::<Project>()?))?.iter().map(AnyNode::identity).collect();
+    assert_eq!(context, (3..=202).map(NodeId::new).collect::<Vec<NodeId>>());
     Ok(())
 }
 
