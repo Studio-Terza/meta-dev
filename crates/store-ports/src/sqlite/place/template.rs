@@ -33,7 +33,7 @@ impl Template {
     pub(super) fn opened(&self, migrations: Migrations) -> Result<Opened, StoreFailure> {
         let spare = self.spare.lock().unwrap_or_else(PoisonError::into_inner).pop();
         spare.map_or_else(
-            || self.image.lock().unwrap_or_else(PoisonError::into_inner).opened(migrations).and_then(Opened::rewound),
+            || self.image.lock().unwrap_or_else(PoisonError::into_inner).opened(migrations).and_then(Opened::begun),
             Ok,
         )
     }

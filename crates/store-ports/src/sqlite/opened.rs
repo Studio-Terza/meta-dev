@@ -28,18 +28,18 @@ impl Opened {
         Ok(Opened { runtime, connection })
     }
 
-    pub(super) fn rewound(mut self) -> Result<Opened, StoreFailure> {
-        let depth = <Sqlite as Database>::TransactionManager::get_transaction_depth(&self.connection);
-        let runtime = &self.runtime;
-        let connection = &mut self.connection;
-        (depth > 0)
-            .then(|| runtime.block_on(<Sqlite as Database>::TransactionManager::rollback(connection)))
-            .transpose()
-            .map_err(StoreFailure::Open)?;
-        runtime
-            .block_on(<Sqlite as Database>::TransactionManager::begin(connection, None))
+    pub(super) fn begun(mut self) -> Result<Opened, StoreFailure> {
+        self.runtime
+            .block_on(<Sqlite as Database>::TransactionManager::begin(&mut self.connection, None))
             .map_err(StoreFailure::Open)?;
         Ok(self)
+    }
+
+    pub(super) fn rewound(mut self) -> Result<Opened, StoreFailure> {
+        self.runtime
+            .block_on(<Sqlite as Database>::TransactionManager::rollback(&mut self.connection))
+            .map_err(StoreFailure::Open)?;
+        self.begun()
     }
 
     pub(super) fn image(&mut self) -> Result<SqliteOwnedBuf, StoreFailure> {
