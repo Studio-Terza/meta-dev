@@ -8,7 +8,7 @@ use design_model::{
     Prefix, Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage,
     Standing, Title,
 };
-use design_store::{RunState, SessionCursors, ShapeName, ShownMessage, StreamSchema};
+use design_store::{RelationName, RunState, SessionCursors, ShapeName, ShownMessage, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar::search::Term;
@@ -156,7 +156,7 @@ impl Place {
         Ok(shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect())
     }
 
-    const REANNOTATED: &str = "the store's rewrite refuses to open it: re-deriving the stored segments would change these annotated segments: o1#0";
+    const REFERENCED: &str = "the store's rewrite refuses to open it: re-deriving the stored segments would change these segments that stored rows refer to: o1#0";
 
     fn shown(&self, message: &str) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
@@ -185,7 +185,22 @@ impl Place {
 
     fn refused(remark: Remark) -> Refusal {
         let stored = vec!["0 question First point. Second point.".to_owned()];
-        Refusal { remark, refused: Some(Place::REANNOTATED.to_owned()), applied: Older::versions(), stored }
+        Refusal { remark, refused: Some(Place::REFERENCED.to_owned()), applied: Older::versions(), stored }
+    }
+
+    fn linked(&self, message: &str) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(self.opened_as::<Untouched>());
+        let shown =
+            store.read(ShownMessage::named(Uuid::new(message.to_owned())))?.ok_or("the message is not stored")?;
+        Ok(shown
+            .links()
+            .iter()
+            .map(|link| {
+                let [source, target] = link.anchors();
+                format!("{source} {} {target}", AsRef::<RelationName>::as_ref(link))
+            })
+            .collect())
     }
 
     fn applied(&self) -> Result<BTreeSet<Version>, Box<dyn Error>> {
@@ -487,6 +502,8 @@ enum Remark {
     LinkFrom,
     LinkTo,
     Flailed,
+    Cites,
+    Answered,
 }
 
 #[derive(Debug, PartialEq)]
@@ -582,6 +599,36 @@ VALUES
                 on: Uuid
             )),
             Remark::Flailed => Remarked::flailed(on, statements),
+            Remark::Cites => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  mechanical_links (
+    source,
+    relation,
+    target,
+    source_message,
+    target_message
+  )
+VALUES
+  (?1 || '#0', 'cites', 'o2', ?1, 'o2')
+"#,
+                on: Uuid
+            )),
+            Remark::Answered => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  mechanical_links (
+    source,
+    relation,
+    target,
+    source_message,
+    target_message
+  )
+VALUES
+  ('o2#0', 'answers', ?1 || '#0', 'o2', ?1)
+"#,
+                on: Uuid
+            )),
         }
     }
 }
@@ -635,6 +682,104 @@ VALUES
             on: Uuid
         ))?;
         Ok(job.plus(ran).plus(flailed))
+    }
+}
+
+struct Glossed;
+
+static GLOSSES: Migrator = store_ports::migrate!("tests/glossed");
+
+static GLOSSED: LazyLock<Migrator> = LazyLock::new(|| {
+    Migrator::with_migrations(StreamSchema::migrator().iter().chain(GLOSSES.iter()).cloned().collect())
+});
+
+impl Schema for Glossed {
+    type Rewrite = <StreamSchema as Schema>::Rewrite;
+
+    fn migrator() -> &'static Migrator {
+        &GLOSSED
+    }
+
+    fn rewrite(pending: Version) -> Option<Self::Rewrite> {
+        StreamSchema::rewrite(pending)
+    }
+}
+
+#[derive(Op)]
+struct Cited;
+
+impl Cited {
+    const CITED: &str = "00000000-0000-4000-8000-000000000001";
+    const CITING: &str = "00000000-0000-4000-8000-000000000002";
+}
+
+impl Batch for Cited {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let messages = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  messages (uuid, session, parent, at, author, body)
+VALUES
+  (
+    '00000000-0000-4000-8000-000000000001',
+    's',
+    NULL,
+    '2026-01-01T00:00:00Z',
+    'owner',
+    'Only one.'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000002',
+    's',
+    '00000000-0000-4000-8000-000000000001',
+    '2026-01-01T00:00:01Z',
+    'owner',
+    'First point. See 00000000-0000-4000-8000-000000000001.'
+  )
+"#
+        ))?;
+        let segments = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  (
+    '00000000-0000-4000-8000-000000000001',
+    0,
+    'sentence',
+    'Only one.'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000002',
+    0,
+    'question',
+    'First point. See 00000000-0000-4000-8000-000000000001.'
+  )
+"#
+        ))?;
+        let link = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  mechanical_links (
+    source,
+    relation,
+    target,
+    source_message,
+    target_message
+  )
+VALUES
+  (
+    '00000000-0000-4000-8000-000000000002#0',
+    'cites',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000001'
+  )
+"#
+        ))?;
+        Ok(messages.plus(segments).plus(link))
     }
 }
 
@@ -728,7 +873,7 @@ fn a_rederivation_that_would_drop_an_annotated_segment_refuses_and_leaves_the_st
     assert!(matches!(&refused, StoreFailure::Refused(_)));
     assert_eq!(
         refused.to_string(),
-        "the store's rewrite refuses to open it: re-deriving the stored segments would change these annotated segments: o1#1"
+        "the store's rewrite refuses to open it: re-deriving the stored segments would change these segments that stored rows refer to: o1#1"
     );
     assert_eq!(place.applied()?, Older::versions());
     assert_eq!(place.bodies()?, ["kept forever", "gone"]);
@@ -767,6 +912,41 @@ fn a_rederivation_opens_a_store_whose_annotated_segments_it_does_not_change() ->
     remarks.map(|remarked| older.write(remarked)).collect::<Result<Vec<Written>, StoreFailure>>()?;
     assert_eq!(run.port(place.opened()).read(Applied)?.len(), StreamSchema::migrator().iter().count());
     assert_eq!(place.shown("o1")?, ["0 sentence First point.", "1 sentence Second point."]);
+    Ok(())
+}
+
+#[test]
+fn a_rederivation_that_would_renumber_a_cited_segment_refuses_and_leaves_the_link_on_the_text_it_was_made_on()
+-> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened_as::<Older>()).write(Cited)?;
+    let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
+    assert!(matches!(&refused, StoreFailure::Refused(_)));
+    assert_eq!(
+        refused.to_string(),
+        format!(
+            "the store's rewrite refuses to open it: re-deriving the stored segments would change these segments that stored rows refer to: {}#0",
+            Cited::CITING
+        )
+    );
+    assert_eq!(place.applied()?, Older::versions());
+    assert_eq!(place.shown(Cited::CITING)?, [format!("0 question First point. See {}.", Cited::CITED)]);
+    assert_eq!(place.linked(Cited::CITING)?, [format!("{}#0 cites {}", Cited::CITING, Cited::CITED)]);
+    Ok(())
+}
+
+#[test]
+fn a_rederivation_refuses_to_change_a_segment_that_a_table_added_later_refers_to_by_foreign_key()
+-> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened_as::<Older>()).write(Told::Stale)?;
+    let refused = run.port(place.opened_as::<Glossed>()).read(Applied).err().ok_or("the open was not refused")?;
+    assert!(matches!(&refused, StoreFailure::Refused(_)));
+    assert_eq!(refused.to_string(), Place::REFERENCED);
+    assert_eq!(place.applied()?, Older::versions());
+    assert_eq!(place.shown("o1")?, ["0 question First point. Second point."]);
     Ok(())
 }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nDELETE FROM\n  segments\nWHERE\n  message = ?1\n  AND ordinal = ?2\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ebe157532a2ff08eda275cadb1b7c9bfdc2f8b9685dff92341c2426f0e0bc8f9"
+}

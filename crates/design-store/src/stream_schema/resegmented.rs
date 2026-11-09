@@ -8,53 +8,60 @@ use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Version, Written};
 use transcript_ports::Uuid;
 
-use crate::boundary::{MessageRow, Rederived, Row, SegmentRow};
+use crate::boundary::{MessageRow, Row, SegmentRow};
 
 #[derive(Debug, Op)]
 pub struct Resegmented;
 
 #[derive(Debug)]
-struct Reannotated {
+struct Referenced {
     segments: Vec<Segment>,
 }
 
 impl Resegmented {
     pub(super) const PENDING: Version = Version::new(20_261_108_000_012);
-}
 
-impl Reannotated {
-    fn refused(rederived: &[Rederived], annotated: Vec<SegmentRow>) -> Result<(), StoreFailure> {
-        let derived: BTreeMap<Segment, &SegmentRow> =
-            rederived.iter().flat_map(Rederived::rows).map(|row| (row.segment(), row)).collect();
-        let segments: Vec<Segment> = annotated
-            .into_iter()
-            .filter(|stored| derived.get(&stored.segment()) != Some(&stored))
-            .map(|stored| stored.segment())
-            .collect();
-        segments.is_empty().then_some(()).ok_or_else(|| StoreFailure::Refused(Box::new(Reannotated { segments })))
+    fn stale(derived: &[SegmentRow], stored: Vec<SegmentRow>) -> Vec<SegmentRow> {
+        let derived: BTreeMap<Segment, &SegmentRow> = derived.iter().map(|row| (row.segment(), row)).collect();
+        stored.into_iter().filter(|row| derived.get(&row.segment()) != Some(&row)).collect()
     }
 }
 
-impl fmt::Display for Reannotated {
+impl Referenced {
+    fn refused(released: Vec<(Segment, Option<Written>)>) -> Result<Written, StoreFailure> {
+        let segments: Vec<Segment> =
+            released.iter().filter(|(_, written)| written.is_none()).map(|(segment, _)| segment.clone()).collect();
+        segments
+            .is_empty()
+            .then(|| Written::total(released.into_iter().filter_map(|(_, written)| written)))
+            .ok_or_else(|| StoreFailure::Refused(Box::new(Referenced { segments })))
+    }
+}
+
+impl fmt::Display for Referenced {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("re-deriving the stored segments would change these annotated segments:")?;
+        formatter.write_str("re-deriving the stored segments would change these segments that stored rows refer to:")?;
         self.segments
             .iter()
             .try_for_each(|segment| write!(formatter, " {}#{}", AsRef::<Uuid>::as_ref(segment), Ordinal::from(segment)))
     }
 }
 
-impl Error for Reannotated {}
+impl Error for Referenced {}
 
 impl Batch for Resegmented {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let messages = MessageRow::every(statements)?;
-        let rederived: Vec<Rederived> = messages.iter().map(Rederived::from).collect();
-        Reannotated::refused(&rederived, SegmentRow::annotated(statements)?)?;
+        let derived: Vec<SegmentRow> = messages.iter().flat_map(SegmentRow::within).collect();
+        let released = Resegmented::stale(&derived, SegmentRow::every(statements)?)
+            .iter()
+            .map(|row| row.released(statements).map(|written| (row.segment(), written)))
+            .collect::<Result<Vec<_>, StoreFailure>>()?;
+        let dropped = Referenced::refused(released)?;
         let written =
-            rederived.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+            derived.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter().chain([dropped])))
     }
 }

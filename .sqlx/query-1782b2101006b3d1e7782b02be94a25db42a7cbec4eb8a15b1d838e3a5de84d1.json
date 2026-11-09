@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  mechanical_links (\n    source,\n    relation,\n    target,\n    source_message,\n    target_message\n  )\nVALUES\n  (\n    '00000000-0000-4000-8000-000000000002#0',\n    'cites',\n    '00000000-0000-4000-8000-000000000001',\n    '00000000-0000-4000-8000-000000000002',\n    '00000000-0000-4000-8000-000000000001'\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "1782b2101006b3d1e7782b02be94a25db42a7cbec4eb8a15b1d838e3a5de84d1"
+}

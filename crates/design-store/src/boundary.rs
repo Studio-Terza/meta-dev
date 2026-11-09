@@ -7,7 +7,7 @@ use design_model::{Ordinal, Segment};
 use dispatch_ports::Reply;
 use file_ports::Offset;
 use grammar::search::Term;
-use newtype::{Arbitrary, Counter, Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 use stream::{Anchor, MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
@@ -51,15 +51,6 @@ pub struct SegmentRow {
     shape: ShapeName,
     body: Body,
 }
-
-#[derive(Debug)]
-pub(crate) struct Rederived {
-    message: Uuid,
-    segments: Vec<Replaced>,
-}
-
-#[derive(Debug)]
-pub(crate) struct Replaced(SegmentRow);
 
 #[derive(Debug, Columns)]
 pub struct LinkRow {
@@ -250,7 +241,7 @@ ORDER BY
         ))
     }
 
-    pub(crate) fn annotated(statements: &mut Statements<'_>) -> Result<Vec<SegmentRow>, StoreFailure> {
+    pub(crate) fn every(statements: &mut Statements<'_>) -> Result<Vec<SegmentRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             SegmentRow,
             r#"
@@ -261,48 +252,25 @@ SELECT
   body
 FROM
   segments
-WHERE
-  (message, ordinal) IN (
-    SELECT
-      message,
-      ordinal
-    FROM
-      span_edges
-    UNION
-    SELECT
-      message,
-      ordinal
-    FROM
-      senses
-    UNION
-    SELECT
-      source_message,
-      source_ordinal
-    FROM
-      segment_links
-    UNION
-    SELECT
-      target_message,
-      target_ordinal
-    FROM
-      segment_links
-    UNION
-    SELECT
-      message,
-      ordinal
-    FROM
-      conversational
-    UNION
-    SELECT
-      message,
-      ordinal
-    FROM
-      flailed
-  )
 ORDER BY
   message,
   ordinal
 "#
+        ))
+    }
+
+    pub(crate) fn released(&self, statements: &mut Statements<'_>) -> Result<Option<Written>, StoreFailure> {
+        let SegmentRow { message, ordinal, .. } = self;
+        statements.written_unless_referenced(store_ports::query!(
+            r#"
+DELETE FROM
+  segments
+WHERE
+  message = ?1
+  AND ordinal = ?2
+"#,
+            message: Uuid,
+            ordinal: Ordinal
         ))
     }
 
@@ -336,6 +304,13 @@ ORDER BY
 "#,
             uuid: Uuid
         ))
+    }
+
+    fn ordinal(anchor: &Anchor) -> Option<Ordinal> {
+        match anchor {
+            Anchor::Message(_) => None,
+            Anchor::Segment(id) => Some(Ordinal::new(id.ordinal().into_inner())),
+        }
     }
 
     #[must_use]
@@ -523,72 +498,11 @@ VALUES
     }
 }
 
-impl From<&Message> for Rederived {
-    fn from(message: &Message) -> Rederived {
-        let segments = SegmentRow::within(message).into_iter().map(Replaced).collect();
-        Rederived { message: message.record().uuid().clone(), segments }
-    }
-}
-
-impl Rederived {
-    pub(crate) fn rows(&self) -> impl Iterator<Item = &SegmentRow> {
-        self.segments.iter().map(|Replaced(row)| row)
-    }
-}
-
-impl Row for Replaced {
-    fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let Replaced(SegmentRow { message, ordinal, shape, body }) = self;
-        statements.written(store_ports::query!(
-            r#"
-INSERT INTO
-  segments (message, ordinal, shape, body)
-VALUES
-  (?1, ?2, ?3, ?4)
-ON CONFLICT
-  (message, ordinal)
-DO UPDATE SET
-  shape = excluded.shape,
-  body = excluded.body
-WHERE
-  shape <> excluded.shape
-  OR body <> excluded.body
-"#,
-            message: Uuid,
-            ordinal: Ordinal,
-            shape: ShapeName,
-            body: Body
-        ))
-    }
-}
-
-impl Row for Rederived {
-    fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let replaced = self
-            .segments
-            .iter()
-            .map(|segment| segment.written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        let message = &self.message;
-        let surplus = Ordinal::new(self.segments.len());
-        let dropped = statements.written(store_ports::query!(
-            r#"
-DELETE FROM
-  segments
-WHERE
-  message = ?1
-  AND ordinal >= ?2
-"#,
-            message: Uuid,
-            surplus: Ordinal
-        ))?;
-        Ok(Written::total(replaced.into_iter().chain([dropped])))
-    }
-}
-
 impl Row for LinkRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let LinkRow { source, relation, target, source_message, target_message } = self;
+        let source_ordinal = LinkRow::ordinal(source);
+        let target_ordinal = LinkRow::ordinal(target);
         statements.written(store_ports::query!(
             r#"
 INSERT
@@ -597,16 +511,20 @@ INSERT
     relation,
     target,
     source_message,
-    target_message
+    source_ordinal,
+    target_message,
+    target_ordinal
   )
 VALUES
-  (?1, ?2, ?3, ?4, ?5)
+  (?1, ?2, ?3, ?4, ?5, ?6, ?7)
 "#,
             source: Anchor,
             relation: RelationName,
             target: Anchor,
             source_message: Uuid,
-            target_message: Uuid
+            source_ordinal: Option<Ordinal>,
+            target_message: Uuid,
+            target_ordinal: Option<Ordinal>
         ))
     }
 }

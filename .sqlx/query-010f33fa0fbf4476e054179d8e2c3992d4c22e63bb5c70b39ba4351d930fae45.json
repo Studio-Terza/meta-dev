@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  source,\n  relation,\n  target,\n  source_message,\n  target_message\nFROM\n  mechanical_links\nWHERE\n  ?1 IN (source_message, target_message)\nORDER BY\n  rowid\n",
+  "query": "\nSELECT\n  source,\n  relation,\n  target,\n  source_message,\n  source_ordinal,\n  target_message,\n  target_ordinal\nFROM\n  mechanical_links\nWHERE\n  ?1 IN (source_message, target_message)\nORDER BY\n  rowid\n",
   "describe": {
     "columns": [
       {
@@ -48,13 +48,35 @@
         }
       },
       {
-        "name": "target_message",
+        "name": "source_ordinal",
         "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "source_ordinal"
+          }
+        }
+      },
+      {
+        "name": "target_message",
+        "ordinal": 5,
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "mechanical_links",
             "name": "target_message"
+          }
+        }
+      },
+      {
+        "name": "target_ordinal",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "target_ordinal"
           }
         }
       }
@@ -67,8 +89,10 @@
       false,
       false,
       false,
-      false
+      true,
+      false,
+      true
     ]
   },
-  "hash": "5bbd0de14075223631bb490d39b27dc1ead23a53e7580f0ef08f390d707b71b1"
+  "hash": "010f33fa0fbf4476e054179d8e2c3992d4c22e63bb5c70b39ba4351d930fae45"
 }
