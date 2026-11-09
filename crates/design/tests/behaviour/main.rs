@@ -769,7 +769,7 @@ fn only_ingest_has_a_dry_run() {
         Invocation::against(&store, &Session::typical(), &["--dry-run", "ingest"]),
         Invocation::against(&store, &Session::typical(), &["ingest", "--dry-run", "--dry-run"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
 }
 
 #[test]
@@ -1123,12 +1123,12 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     ];
     assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
     let node = applying.run(&["show", "n3"])?;
-    let wanted = [
+    let described = [
         "n3 \"demo\" feature vague vague core entered apply \"b\"",
         "  edge n3 refines n1 entered apply",
         "  edge n3 supersedes n2 entered apply",
     ];
-    assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());
+    assert_eq!(Lines::missing(&node, &described), Vec::<&&str>::new());
     Ok(())
 }
 
@@ -1170,9 +1170,7 @@ fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Re
         "place(aaaaaaaa-0000-4000-8000-000000000003.0, c, defines)",
         "propose(new first, refines(n1), feature, \"again\")",
     ]
-    .map(|directives| {
-        applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{directives}")).err()
-    });
+    .map(|refusal| applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{refusal}")).err());
     assert!(matches!(
         refusals,
         [Some(Failure::Unresolved(Unresolved::Unbound(_))), Some(Failure::Unresolved(Unresolved::Rebound(_)))]
@@ -1278,7 +1276,7 @@ fn only_init_consumes_a_project() {
         Invocation::against(&store, &session, &["--consumes", "demo", "init", "other"]),
         Invocation::against(&store, &session, &["init", "other", "--consumes", "demo", "--consumes", "demo"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
 }
 
 laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VARIANTS), facet, {
@@ -1309,10 +1307,10 @@ impl Graph {
         let port = run.port(store.clone());
         let written = (2_i64..)
             .zip(parents)
-            .map(|(child, parent)| {
+            .map(|(child_id, parent_id)| {
                 let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
-                let planted = port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
-                let (child, parent) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
+                let planted = port.write(Planting::sown(Node::new(NodeId::new(child_id), entry)))?;
+                let (child, parent) = (Graph::resolved(&port, child_id)?, Graph::resolved(&port, *parent_id)?);
                 let linked = port.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
                 Ok(planted.plus(linked))
             })
@@ -1468,7 +1466,7 @@ fn specify_without_both_an_artifact_and_a_condition_fails_to_parse() -> Result<(
         applying.run(&["specify", "n2", "--artifact", "lint:no-comments", "--condition"]),
         applying.run(&["specify", "--artifact", "lint:no-comments", "--condition", "every comment is refused"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
     assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining set core entered apply"));
     Ok(())
 }
@@ -1504,7 +1502,7 @@ fn each_lifecycle_option_belongs_to_its_own_command() -> Result<(), Failure> {
         applying.run(&["search", "thanks", "--condition", "it holds"]),
         applying.run(&["refine", "n2", "--dry-run"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
     assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature vague vague core entered apply"));
     Ok(())
 }
@@ -1582,8 +1580,8 @@ fn a_secondary_parent_never_takes_a_core_child_and_the_refusal_names_the_edge() 
     assert!(applying.run(&["show", "n1"])?.contains("n1 \"demo\" project vague vague core entered init\n"));
     assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
     assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
-    let child = applying.run(&["role", "n2", "core"]);
-    assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
+    let recast = applying.run(&["role", "n2", "core"]);
+    assert!(matches!(recast, Err(Failure::Inverted { edge: inverted }) if inverted == edge));
     let child = applying.run(&["show", "n2"])?;
     assert!(child.contains("n2 \"demo\" feature vague vague secondary entered apply"));
     assert!(child.contains("  role secondary entered role\n"));
@@ -1674,7 +1672,7 @@ impl Applying {
     fn role(&self, node: NodeId) -> Option<Role> {
         let run = Run::root();
         let placed = run.port(self.store.clone()).read(ShownNode::from(node)).ok().flatten();
-        placed.map(|placed| placed.node().casting().role())
+        placed.map(|shown| shown.node().casting().role())
     }
 }
 
@@ -2090,7 +2088,7 @@ impl Generated {
                 let entry = Entry::new(project, facet, entered);
                 let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
                 Summary::from(
-                    &title.into_iter().fold(loaded.based(basis), |node, title| node.titled(Title::new(title))),
+                    &title.into_iter().fold(loaded.based(basis), |built, given| built.titled(Title::new(given))),
                 )
             })
             .boxed()
@@ -2281,18 +2279,15 @@ impl Generated {
     }
 
     fn noted() -> BoxedStrategy<Line> {
-        let reference = prop_oneof![
+        let references = prop_oneof![
             Generated::text().prop_map(|quote| Reference::Quote(Quote::new(quote))),
             "[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8}".prop_map(|cite| Reference::Cite(Cite::new(cite))),
         ];
         prop_oneof![
             (any::<usize>(), Generated::node())
                 .prop_map(|(line, node)| Noted::Imported { line: NotesLine::new(line), node }),
-            (any::<usize>(), reference, select(Miss::VARIANTS)).prop_map(|(line, reference, miss)| Noted::Unresolved {
-                line: NotesLine::new(line),
-                reference,
-                miss
-            }),
+            (any::<usize>(), references, select(Miss::VARIANTS))
+                .prop_map(|(line, reference, miss)| Noted::Unresolved { line: NotesLine::new(line), reference, miss }),
             any::<usize>().prop_map(|line| Noted::Unanchored(NotesLine::new(line))),
             (any::<usize>(), "[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8}", Generated::count()).prop_map(
                 |(line, cite, segments)| Noted::Ambiguous {
@@ -2422,7 +2417,7 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
         hit("abcdef01-1", 0, "fourth thought")?,
     ];
     assert_eq!(found.len(), hits.len());
-    assert!(hits.iter().all(|hit| found.contains(hit)));
+    assert!(hits.iter().all(|expected| found.contains(expected)));
     let refs = ["12345678.0", "12345678.1", "abcdef01-0.0", "abcdef01-1.0"];
     let directives: Vec<String> = refs.iter().map(|reference| format!("conversational({reference})")).collect();
     let applied = Spread::parsed(&applying.applied(&directives.join("\n"))?);

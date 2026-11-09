@@ -222,8 +222,8 @@ laws::law!(
         let imported =
             Noting::imported(&applying, &notes).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
         let viewed = applying.run(&["view", "notes"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        let laid: String = lines.iter().flat_map(|(_line, viewed)| [*viewed, "\n"]).collect();
-        let inked = lines.iter().filter(|(_line, viewed)| !viewed.is_empty()).count() + 1;
+        let laid: String = lines.iter().flat_map(|(_line, shown)| [*shown, "\n"]).collect();
+        let inked = lines.iter().filter(|(_line, shown)| !shown.is_empty()).count() + 1;
         let nodes =
             Spread::parsed(&imported).iter().filter(|line| matches!(line, Line::Noted(Noted::Imported { .. }))).count();
         prop_assert_eq!(viewed, format!("{laid}last line{ending}"));
