@@ -1,10 +1,13 @@
 test budget, report only:
-corpus: 6 tests in 5 files, 14 of 14 lines, 0 process starts
+corpus: 6 tests in 5 files, 16 of 16 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+tests go through public APIs:
+src/lib.rs:2: test code in src; move it to the package's tests directory and call the public API from there
 every test runs:
 tests/ignored.rs:2: test skipped by an attribute; remove the attribute and make the test pass, or delete the test
 tests/ignored.rs:5: test skipped by an attribute; remove the attribute and make the test pass, or delete the test
 tests/off.rs:1: test target switched off in Cargo.toml; remove `test = false` and make the tests pass
 tests/other.rs:1: test target switched off in Cargo.toml; remove `test = false` and make the tests pass
+src/lib.rs:1: #[cfg(test)] code in a crate whose library sets `test = false`, so it never runs; move the tests into the crate's tests directory and test through the public API
 fails
