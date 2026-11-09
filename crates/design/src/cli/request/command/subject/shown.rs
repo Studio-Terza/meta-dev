@@ -17,7 +17,8 @@ pub struct Shown(Stored);
 
 impl Shown {
     pub fn message(store: &impl Store, prefix: &Prefix) -> Result<Shown, Failure> {
-        let exact = store.read(ShownMessage::named(Uuid::new(prefix.clone().into_inner())))?;
+        let named = Uuid::try_new(prefix.clone().into_inner()).ok().map(ShownMessage::named);
+        let exact = named.map(|whole| store.read(whole)).transpose()?.flatten();
         let stored = exact.map_or_else(|| Shown::prefixed(store, prefix), Ok)?;
         Ok(Shown(stored))
     }

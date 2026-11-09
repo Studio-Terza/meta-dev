@@ -236,7 +236,7 @@ fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
 fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
     let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
-    assert_eq!(stamps, [Instant::new("2026-01-01T00:00:01Z".to_owned())]);
+    assert_eq!(stamps, ["2026-01-01T00:00:01Z".parse::<Instant>()?]);
     Ok(())
 }
 

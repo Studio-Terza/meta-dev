@@ -28,7 +28,7 @@ impl<F: Files> ClaudeCodeDir<F> {
             .and_then(OsStr::to_str)
             .and_then(|named| named.parse::<Extension>().ok())
             .and(path.file_stem())
-            .map(|stem| SessionId::new(stem.to_string_lossy().into_owned()))
+            .and_then(|stem| SessionId::try_new(stem.to_string_lossy().into_owned()).ok())
             .map(|id| self.files.size(&path).map(|size| Session::found(id, path, size)))
     }
 }

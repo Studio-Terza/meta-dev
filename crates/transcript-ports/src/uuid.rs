@@ -1,19 +1,30 @@
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
+use std::str::FromStr;
+
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Spelled};
 
 use crate::blank::Blank;
 
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[serde(try_from = "String")]
+#[derive(
+    Newtype, Arbitrary, Display, Spelled, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
+#[newtype(checked)]
 pub struct Uuid(String);
 
-impl TryFrom<String> for Uuid {
+impl Checked for Uuid {
     type Error = Blank;
 
-    fn try_from(text: String) -> Result<Uuid, Blank> {
+    fn checked(text: &String) -> Result<&String, Blank> {
         match text.chars().next() {
-            Some(_) => Ok(Uuid::new(text)),
+            Some(_) => Ok(text),
             None => Err(Blank),
         }
+    }
+}
+
+impl FromStr for Uuid {
+    type Err = Blank;
+
+    fn from_str(text: &str) -> Result<Uuid, Blank> {
+        Uuid::try_new(text.to_owned())
     }
 }

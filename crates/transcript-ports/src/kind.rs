@@ -1,19 +1,30 @@
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
+use std::str::FromStr;
+
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Spelled};
 
 use crate::blank::Blank;
 
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[serde(try_from = "String")]
+#[derive(
+    Newtype, Arbitrary, Display, Spelled, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
+#[newtype(checked)]
 pub struct Kind(String);
 
-impl TryFrom<String> for Kind {
+impl Checked for Kind {
     type Error = Blank;
 
-    fn try_from(text: String) -> Result<Kind, Blank> {
+    fn checked(text: &String) -> Result<&String, Blank> {
         match text.chars().next() {
-            Some(_) => Ok(Kind::new(text)),
+            Some(_) => Ok(text),
             None => Err(Blank),
         }
+    }
+}
+
+impl FromStr for Kind {
+    type Err = Blank;
+
+    fn from_str(text: &str) -> Result<Kind, Blank> {
+        Kind::try_new(text.to_owned())
     }
 }

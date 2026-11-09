@@ -7,7 +7,7 @@ use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
 use stream::{Anchor, Message, Relation, Shape, Stream};
-use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts, Uuid};
+use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts};
 
 const CITED: &str = "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b";
 const DIRECTORY: &str = "/projects/work";
@@ -223,9 +223,7 @@ impl Touching {
             stream
                 .links()
                 .iter()
-                .filter(|link| {
-                    link.anchors().into_iter().any(|anchor| *anchor.message() == Uuid::new((*touched).to_owned()))
-                })
+                .filter(|link| link.anchors().into_iter().any(|anchor| anchor.message().to_string() == *touched))
                 .map(ToString::to_string)
                 .collect()
         })

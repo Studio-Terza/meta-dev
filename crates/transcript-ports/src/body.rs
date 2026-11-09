@@ -1,22 +1,44 @@
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
+use std::str::FromStr;
+
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Spelled};
 
 #[derive(Debug, thiserror::Error)]
 #[error("message text holds a NUL character")]
 pub struct Nul;
 
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(try_from = "String")]
+#[derive(
+    Newtype, Arbitrary, Display, Spelled, CheckedDeserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord,
+)]
+#[newtype(checked)]
 pub struct Body(String);
 
-impl TryFrom<String> for Body {
+impl Body {
+    #[must_use]
+    pub fn part(&self, cut: impl for<'text> FnOnce(&'text str) -> &'text str) -> Body {
+        Body(cut(&self.0).to_owned())
+    }
+
+    pub(crate) fn after(self, before: &Body) -> Body {
+        Body(format!("{before} {self}"))
+    }
+}
+
+impl Checked for Body {
     type Error = Nul;
 
-    fn try_from(text: String) -> Result<Body, Nul> {
+    fn checked(text: &String) -> Result<&String, Nul> {
         match text.chars().find(|letter| *letter == '\0') {
             Some(_) => Err(Nul),
-            None => Ok(Body::new(text)),
+            None => Ok(text),
         }
+    }
+}
+
+impl FromStr for Body {
+    type Err = Nul;
+
+    fn from_str(text: &str) -> Result<Body, Nul> {
+        Body::try_new(text.to_owned())
     }
 }
 

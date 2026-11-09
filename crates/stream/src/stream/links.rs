@@ -62,7 +62,7 @@ impl<'stream> Links<'stream> {
         Lexemes::scanned(&text)
             .into_iter()
             .filter(|lexeme| matches!(lexeme.mark(), Mark::Uuid))
-            .map(|lexeme| Uuid::new(lexeme.span().slice(text.as_ref()).to_owned()))
+            .filter_map(|lexeme| lexeme.span().slice(text.as_ref()).parse::<Uuid>().ok())
             .filter(|cited| cited != message.record().uuid())
             .filter_map(|cited| self.chain.known(&cited))
             .map(|known| {

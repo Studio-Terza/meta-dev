@@ -22,6 +22,7 @@ use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
 enum Envelope {
     Read(Output),
     Garbled,
+    Unbuilt,
 }
 
 impl Envelope {
@@ -40,7 +41,8 @@ impl Envelope {
     }
 
     fn errored(told: &str) -> Envelope {
-        Envelope::Read(Output::Errored(Errored::new(Told::new(told.to_owned()), Usage::default())))
+        told.parse::<Told>()
+            .map_or(Envelope::Unbuilt, |told| Envelope::Read(Output::Errored(Errored::new(told, Usage::default()))))
     }
 
     fn unsuccessful() -> Envelope {

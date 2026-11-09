@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use grammar::reply::Inked;
-use serde::{Deserialize, Deserializer, de};
+use newtype::Checked;
+use serde::Deserialize;
 
 use super::{Finished, Reply, Told, Usage};
 use crate::{Stall, Stderr, Watched};
@@ -106,16 +107,18 @@ impl From<Output> for Watched {
     }
 }
 
+impl Checked for Told {
+    type Error = Uninked;
+
+    fn checked(text: &String) -> Result<&String, Uninked> {
+        Inked::read(text).map(|_inked| text).ok_or_else(|| Uninked(text.to_owned()))
+    }
+}
+
 impl FromStr for Told {
     type Err = Uninked;
 
     fn from_str(text: &str) -> Result<Told, Uninked> {
-        Inked::read(text).map(|inked| Told::new(inked.as_ref().to_owned())).ok_or_else(|| Uninked(text.to_owned()))
-    }
-}
-
-impl<'de> Deserialize<'de> for Told {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Told, D::Error> {
-        String::deserialize(deserializer)?.parse().map_err(de::Error::custom)
+        Told::try_new(text.to_owned())
     }
 }

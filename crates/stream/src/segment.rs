@@ -29,6 +29,6 @@ impl Segment {
 
     #[must_use]
     pub fn text(&self, message: &Message) -> Body {
-        Body::new(self.range.slice(message.record().text().as_ref()).to_owned())
+        message.record().text().part(|text| self.range.slice(text))
     }
 }

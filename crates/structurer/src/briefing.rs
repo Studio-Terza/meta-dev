@@ -299,7 +299,7 @@ impl Brief {
 
 impl Said {
     fn read(fields: &mut Fields) -> Result<Said, Unread> {
-        Ok(Said::new(SegmentRef::from(&fields.field::<Cited>()?), fields.field::<Quoted<_>>()?))
+        Ok(Said::new(SegmentRef::from(&fields.field::<Cited>()?), fields.field::<Phrase<_>>()?))
     }
 }
 

@@ -2,7 +2,7 @@ use std::fmt;
 
 use design_model::{NodeId, Outline, Provenance, SpanRelation};
 use grammar::cited::Cited;
-use grammar::output::field::{Id, Quoted, Word};
+use grammar::output::field::{Id, Phrase, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
 use newtype::Wrapping;
@@ -48,11 +48,11 @@ impl Viewed {
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
                 author: fields.field::<Word<_>>()?,
                 entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-                body: fields.field::<Quoted<_>>()?,
+                body: fields.field::<Phrase<_>>()?,
             }),
             Seen::Unplaced => Ok(Viewed::Unplaced {
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
-                body: fields.field::<Quoted<_>>()?,
+                body: fields.field::<Phrase<_>>()?,
             }),
         }
     }

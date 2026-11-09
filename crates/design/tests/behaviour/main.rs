@@ -5,6 +5,7 @@ mod structure;
 mod view;
 
 use std::collections::BTreeSet;
+use std::error::Error;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -36,7 +37,7 @@ use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof
 use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
-use newtype::{Counter, Wrapping};
+use newtype::Counter;
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use store_ports::{Busy, Sqlite, Store, Written};
 use stream::{Relation, Shape};
@@ -340,10 +341,10 @@ impl Links {
         let port = run.port(store.clone());
         let shown = Session::SAID
             .iter()
-            .map(|uuid| {
-                let uuid = Uuid::new((*uuid).to_owned());
-                port.read(ShownMessage::named(uuid.clone()))?
-                    .ok_or(Failure::Unmatched(Unmatched::NoMatch(Prefix::new(uuid.into_inner()))))
+            .map(|said| {
+                let missing = || Failure::Unmatched(Unmatched::NoMatch(Prefix::new((*said).to_owned())));
+                let uuid = said.parse::<Uuid>().map_err(|_blank| missing())?;
+                port.read(ShownMessage::named(uuid))?.ok_or_else(missing)
             })
             .collect::<Result<Vec<_>, Failure>>()?;
         Ok(shown
@@ -2040,7 +2041,7 @@ impl Generated {
     }
 
     fn uuid() -> BoxedStrategy<Uuid> {
-        Generated::message().prop_map(Uuid::new).boxed()
+        Generated::message().prop_filter_map("a message id is not blank", |id| id.parse::<Uuid>().ok()).boxed()
     }
 
     fn project() -> BoxedStrategy<Project> {
@@ -2127,13 +2128,11 @@ impl Generated {
 
     fn counted() -> BoxedStrategy<Line> {
         prop_oneof![
-            (Generated::text(), any::<u64>()).prop_map(|(session, cursor)| Line::Read {
-                session: SessionId::new(session),
-                cursor: Cursor::new(Offset::new(cursor))
-            }),
+            (any::<SessionId>(), any::<u64>())
+                .prop_map(|(session, cursor)| Line::Read { session, cursor: Cursor::new(Offset::new(cursor)) }),
             (Generated::author(), Generated::count()).prop_map(|(author, count)| Line::Authored { author, count }),
-            (Generated::text(), Generated::count())
-                .prop_map(|(kind, count)| Line::Unrecognised { kind: transcript_ports::Kind::new(kind), count }),
+            (any::<transcript_ports::Kind>(), Generated::count())
+                .prop_map(|(kind, count)| Line::Unrecognised { kind, count }),
             (select(Shape::VARIANTS), Generated::count()).prop_map(|(shape, count)| Line::Formed { shape, count }),
             (select(Relation::VARIANTS), Generated::count())
                 .prop_map(|(relation, count)| Line::Related { relation, count }),
@@ -2160,7 +2159,7 @@ impl Generated {
             (select(Role::VARIANTS), Generated::entered()).prop_map(|(role, entered)| Line::Role { role, entered }),
             (
                 (select(SpanRelation::VARIANTS), Generated::segment(), Generated::author()),
-                (proptest::option::of(Generated::sense()), Generated::entered(), Generated::text())
+                (proptest::option::of(Generated::sense()), Generated::entered(), any::<Body>())
             )
                 .prop_map(|((relation, segment, author), (sense, entered, body))| Line::Placed {
                     relation,
@@ -2168,7 +2167,7 @@ impl Generated {
                     author,
                     sense,
                     entered,
-                    body: Body::new(body)
+                    body
                 }),
         ]
         .boxed()
@@ -2176,28 +2175,16 @@ impl Generated {
 
     fn shown_message() -> BoxedStrategy<Line> {
         prop_oneof![
-            (Generated::uuid(), Generated::author(), Generated::text(), Generated::text()).prop_map(
-                |(uuid, author, session, stamp)| Line::Message {
-                    uuid,
-                    author,
-                    session: SessionId::new(session),
-                    stamp: Instant::new(stamp)
-                }
-            ),
-            (Generated::segment(), Generated::shape(), Generated::text())
-                .prop_map(|(segment, shape, body)| Line::Segment { segment, shape, body: Body::new(body) }),
+            (Generated::uuid(), Generated::author(), any::<SessionId>(), any::<Instant>())
+                .prop_map(|(uuid, author, session, stamp)| Line::Message { uuid, author, session, stamp }),
+            (Generated::segment(), Generated::shape(), any::<Body>())
+                .prop_map(|(segment, shape, body)| Line::Segment { segment, shape, body }),
             (Generated::anchored(), Generated::relation(), Generated::anchored())
                 .prop_map(|(source, relation, target)| Line::Link { source, relation, target }),
             (Generated::remark(), select(Standing::VARIANTS), Generated::entered())
                 .prop_map(|(remark, standing, entered)| Line::Annotated { remark, standing, entered }),
-            (Generated::segment(), Generated::author(), Generated::text(), Generated::text()).prop_map(
-                |(segment, author, stamp, body)| Line::Hit {
-                    segment,
-                    author,
-                    stamp: Instant::new(stamp),
-                    body: Body::new(body)
-                }
-            ),
+            (Generated::segment(), Generated::author(), any::<Instant>(), any::<Body>())
+                .prop_map(|(segment, author, stamp, body)| Line::Hit { segment, author, stamp, body }),
         ]
         .boxed()
     }
@@ -2208,8 +2195,8 @@ impl Generated {
             (Generated::node(), Generated::directive())
                 .prop_map(|(node, directive)| Line::Proposed { node, directive }),
             Generated::segment().prop_map(Line::Uncovered),
-            (0..i64::MAX, Generated::text())
-                .prop_map(|(file, stamp)| Line::Repeated { file: AppliedId::new(file), stamp: Instant::new(stamp) }),
+            (0..i64::MAX, any::<Instant>())
+                .prop_map(|(file, stamp)| Line::Repeated { file: AppliedId::new(file), stamp }),
         ]
         .boxed()
     }
@@ -2277,7 +2264,7 @@ impl Generated {
                 )),
             (
                 (Generated::node(), select(SpanRelation::VARIANTS), Generated::segment()),
-                (Generated::author(), Generated::entered(), Generated::text())
+                (Generated::author(), Generated::entered(), any::<Body>())
             )
                 .prop_map(|((node, relation, segment), (author, entered, body))| Viewed::Standing {
                     node,
@@ -2285,10 +2272,9 @@ impl Generated {
                     segment,
                     author,
                     entered,
-                    body: Body::new(body)
+                    body
                 }),
-            (Generated::segment(), Generated::text())
-                .prop_map(|(segment, body)| Viewed::Unplaced { segment, body: Body::new(body) }),
+            (Generated::segment(), any::<Body>()).prop_map(|(segment, body)| Viewed::Unplaced { segment, body }),
         ]
         .prop_map(Line::Viewed)
         .boxed()
@@ -2384,26 +2370,26 @@ impl Spread {
         SegmentRef::new(Prefix::new(prefix.to_owned()), Ordinal::new(ordinal))
     }
 
-    fn segment(prefix: &str, ordinal: usize, body: &str) -> Line {
-        Line::Segment {
+    fn segment(prefix: &str, ordinal: usize, body: &str) -> Result<Line, Box<dyn Error>> {
+        Ok(Line::Segment {
             segment: Spread::reference(prefix, ordinal),
             shape: ShapeName::new("sentence".to_owned()),
-            body: Body::new(body.to_owned()),
-        }
+            body: body.parse::<Body>()?,
+        })
     }
 
-    fn message(uuid: &str) -> Line {
-        Line::Message {
-            uuid: Uuid::new(uuid.to_owned()),
+    fn message(uuid: &str) -> Result<Line, Box<dyn Error>> {
+        Ok(Line::Message {
+            uuid: uuid.parse::<Uuid>()?,
             author: Authorship::Owner,
-            session: SessionId::new("s".to_owned()),
-            stamp: Instant::new("2026-01-01T00:00:00Z".to_owned()),
-        }
+            session: "s".parse::<SessionId>()?,
+            stamp: "2026-01-01T00:00:00Z".parse::<Instant>()?,
+        })
     }
 }
 
 #[test]
-fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies() -> Result<(), Failure> {
+fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies() -> Result<(), Box<dyn Error>> {
     let applying = Spread::applying()?;
     let shown = [
         Spread::parsed(&applying.run(&["show", SPREAD[0]])?),
@@ -2412,26 +2398,28 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
     ];
     let wanted = [
         vec![
-            Spread::message(SPREAD[0]),
-            Spread::segment("12345678", 0, "first thought."),
-            Spread::segment("12345678", 1, "second thought"),
+            Spread::message(SPREAD[0])?,
+            Spread::segment("12345678", 0, "first thought.")?,
+            Spread::segment("12345678", 1, "second thought")?,
         ],
-        vec![Spread::message(SPREAD[1]), Spread::segment("abcdef01-0", 0, "third thought")],
-        vec![Spread::message(SPREAD[2]), Spread::segment("abcdef01-1", 0, "fourth thought")],
+        vec![Spread::message(SPREAD[1])?, Spread::segment("abcdef01-0", 0, "third thought")?],
+        vec![Spread::message(SPREAD[2])?, Spread::segment("abcdef01-1", 0, "fourth thought")?],
     ];
     assert_eq!(shown, wanted);
     let found = Spread::parsed(&applying.run(&["search", "thought"])?);
-    let hit = |prefix: &str, ordinal: usize, body: &str| Line::Hit {
-        segment: Spread::reference(prefix, ordinal),
-        author: Authorship::Owner,
-        stamp: Instant::new("2026-01-01T00:00:00Z".to_owned()),
-        body: Body::new(body.to_owned()),
+    let hit = |prefix: &str, ordinal: usize, body: &str| -> Result<Line, Box<dyn Error>> {
+        Ok(Line::Hit {
+            segment: Spread::reference(prefix, ordinal),
+            author: Authorship::Owner,
+            stamp: "2026-01-01T00:00:00Z".parse::<Instant>()?,
+            body: body.parse::<Body>()?,
+        })
     };
     let hits = [
-        hit("12345678", 0, "first thought."),
-        hit("12345678", 1, "second thought"),
-        hit("abcdef01-0", 0, "third thought"),
-        hit("abcdef01-1", 0, "fourth thought"),
+        hit("12345678", 0, "first thought.")?,
+        hit("12345678", 1, "second thought")?,
+        hit("abcdef01-0", 0, "third thought")?,
+        hit("abcdef01-1", 0, "fourth thought")?,
     ];
     assert_eq!(found.len(), hits.len());
     assert!(hits.iter().all(|hit| found.contains(hit)));
@@ -2442,7 +2430,8 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
         directives.iter().filter_map(|directive| directive.parse().ok()).map(Line::Applied).collect();
     assert_eq!(echoed.len(), refs.len());
     assert!(echoed.iter().all(|echo| applied.contains(echo)));
-    refs.iter().try_for_each(|reference| applying.run(&["show", reference]).map(|_shown| ()))
+    refs.iter().try_for_each(|reference| applying.run(&["show", reference]).map(|_shown| ()))?;
+    Ok(())
 }
 
 #[test]
