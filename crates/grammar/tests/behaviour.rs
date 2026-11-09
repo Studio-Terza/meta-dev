@@ -910,6 +910,21 @@ laws::roundtrip!(
     Some
 );
 
+laws::law!(
+    any_text_the_spec_line_lexer_accepts_reads_back_from_its_rendering,
+    prop_oneof![
+        any::<String>(),
+        "(spec: |repair: main)?[a-z0-9#, \t\r\n-]{0,12}",
+        any::<Attachment>().prop_map(|attachment| format!("spec: {attachment}")),
+    ],
+    text,
+    {
+        let line = text.parse::<spec_line::Line>().ok();
+        let again = line.as_ref().and_then(|read| read.to_string().parse::<spec_line::Line>().ok());
+        prop_assert_eq!(again, line);
+    }
+);
+
 laws::table!(
     a_program_holds_exactly_one_word_with_no_space_around_it,
     |word: &&str| Program::try_new((*word).to_owned()).ok().map(Program::into_inner),

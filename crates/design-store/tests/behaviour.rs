@@ -1467,20 +1467,53 @@ laws::law!(
         let told = spawning.reply.map(Reply::into_inner);
         let kept = ran.first().and_then(Ran::reply).cloned().map(Excerpt::into_inner);
         prop_assert_eq!(kept.is_some(), told.is_some());
-        let rest: Option<String> =
-            told.as_ref().zip(kept.as_ref()).map(|(whole, part)| whole.chars().skip(part.chars().count()).collect());
-        let rebuilt = kept.as_ref().zip(rest.as_ref()).map(|(part, after)| format!("{part}{after}"));
-        prop_assert_eq!(rebuilt, told);
-        let bytes = kept.as_ref().map_or(0, String::len);
-        prop_assert!(bytes <= 16 * 1024);
-        prop_assert!(
-            rest.and_then(|after| after.chars().next()).is_none_or(|next| bytes + next.len_utf8() > 16 * 1024)
-        );
+        if let (Some(whole), Some(part)) = (told, kept) {
+            prop_assert!(part.len() <= whole.len());
+            prop_assert!(iter::zip(part.bytes(), whole.bytes()).all(|(mine, theirs)| mine == theirs));
+            prop_assert!(part.len() <= Excerpt::BYTES);
+            let next = whole.ceil_char_boundary(part.len().saturating_add(1));
+            prop_assert!(part.len() == whole.len() || next > Excerpt::BYTES);
+            prop_assert!(whole.len() > Excerpt::BYTES || part == whole);
+        }
         let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
         let running = [state].into_iter().filter(|now| *now == RunState::Running).map(|_| RunId::new(1));
         prop_assert_eq!(still, running.collect::<Vec<RunId>>());
     }
 );
+
+impl Spawning {
+    fn replying(reply: String) -> Spawning {
+        Spawning {
+            pid: Pid::new(7),
+            started: None,
+            deadline: Wall::new(0),
+            state: RunState::Replied,
+            usage: None,
+            reply: Some(Reply::new(reply)),
+        }
+    }
+
+    fn kept(self) -> Result<String, Box<dyn Error>> {
+        let lived = self.stored()?;
+        let reply = lived.ran.first().and_then(Ran::reply).cloned().ok_or("no reply kept")?;
+        Ok(Excerpt::into_inner(reply))
+    }
+}
+
+#[test]
+fn an_ascii_reply_of_twenty_thousand_bytes_is_stored_as_exactly_sixteen_kibibytes() -> Result<(), Box<dyn Error>> {
+    let kept = Spawning::replying("a".repeat(20_000)).kept()?;
+    assert_eq!(kept.len(), 16 * 1024);
+    Ok(())
+}
+
+#[test]
+fn an_ascii_reply_of_exactly_sixteen_kibibytes_is_stored_unchanged() -> Result<(), Box<dyn Error>> {
+    let told = "a".repeat(16 * 1024);
+    let kept = Spawning::replying(told.clone()).kept()?;
+    assert_eq!(kept, told);
+    Ok(())
+}
 
 #[test]
 fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result<(), Box<dyn Error>> {

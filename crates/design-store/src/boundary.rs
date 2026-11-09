@@ -570,7 +570,7 @@ impl Account {
 }
 
 impl Excerpt {
-    const BYTES: usize = 16 * 1024;
+    pub const BYTES: usize = 16 * 1024;
 }
 
 impl From<&Reply> for Excerpt {
