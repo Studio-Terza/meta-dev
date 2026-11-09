@@ -58,7 +58,9 @@ impl ShardSummary {
         let tallies = Outcome::ALL
             .into_iter()
             .zip(&texts)
-            .map(|(outcome, text)| Tally::new(outcome, Count::new(Lines::from(text.as_ref()).count())))
+            .map(|(outcome, text)| {
+                Tally::new(outcome, Count::new(text.as_ref().parse::<Lines>().into_iter().flatten().count()))
+            })
             .collect();
         let listed: String = Outcome::ALL
             .iter()
@@ -66,7 +68,7 @@ impl ShardSummary {
             .filter(|(outcome, _)| Outcome::LISTED.contains(outcome))
             .map(|(_, text)| text.as_ref())
             .collect();
-        let mut names: Vec<Mutant> = Lines::from(listed.as_str()).map(|name| Mutant::new(name.to_owned())).collect();
+        let mut names: Vec<Mutant> = listed.parse::<Lines>().into_iter().flatten().map(Mutant::new).collect();
         names.sort();
         Ok(Report::new(tallies, names))
     }

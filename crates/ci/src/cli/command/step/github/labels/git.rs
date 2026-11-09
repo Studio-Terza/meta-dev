@@ -35,13 +35,19 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
                 Self::HEAD,
             ],
         ))?;
-        Ok(Lines::from(listed.as_ref()).filter_map(|line| line.parse::<Change>().ok()).collect())
+        Ok(listed
+            .as_ref()
+            .parse::<Lines>()
+            .into_iter()
+            .flatten()
+            .filter_map(|line| line.parse::<Change>().ok())
+            .collect())
     }
 
     fn fork_point(&self, base: &Branch) -> Result<Revision, Failure<'static>> {
         let remote = [Self::REMOTE, base.as_ref()].concat();
         let found = self.asked(&Invocation::new("git", ["merge-base", remote.as_str(), Self::HEAD]))?;
-        Ok(Revision::new(Lines::from(found.as_ref()).next().unwrap_or_default().to_owned()))
+        Ok(Revision::new(found.as_ref().parse::<Lines>().into_iter().flatten().next().unwrap_or_default()))
     }
 
     fn asked(&self, invocation: &Invocation) -> Result<Text, Failure<'static>> {

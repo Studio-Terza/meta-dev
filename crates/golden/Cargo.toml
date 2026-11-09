@@ -18,6 +18,7 @@ path = "tests/behaviour.rs"
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
+text-lines = { path = "../text-lines" }
 thiserror.workspace = true
 
 [dev-dependencies]

@@ -1,8 +1,8 @@
 use std::io::Write;
 use std::str::FromStr;
 
-use design_model::{Entered, JobId, Provenance, Segment};
-use design_store::{Flailed, FlailedSegments, JobRetried, RunsOf};
+use design_model::{JobId, Segment};
+use design_store::{HeldBy, JobRetried, RunsOf};
 use grammar::output::Fields;
 use grammar::output::field::Integer;
 use store_ports::Store;
@@ -31,13 +31,11 @@ impl Retry {
         let Retry(job) = self;
         let lock = store.lock()?;
         store.read(RunsOf::from(job))?.first().ok_or(Failure::Unrun(job))?;
-        let held: Vec<Flailed> =
-            store.read(FlailedSegments)?.into_iter().filter(|flailed| flailed.job() == job).collect();
-        held.first().ok_or(Failure::Unflailed(job))?;
-        store.write(JobRetried::new(job, Provenance::from(Entered::Retry)))?;
+        let hold = store.read(HeldBy::from(job))?.ok_or(Failure::Unflailed(job))?;
+        store.write(JobRetried::from(&hold))?;
         lock.end()?;
-        let owed: Vec<Line> = held
-            .iter()
+        let owed: Vec<Line> = hold
+            .held()
             .map(|flailed| {
                 Line::Owed(Flailing::new(SegmentRef::from(AsRef::<Segment>::as_ref(flailed)), job, flailed.run()))
             })

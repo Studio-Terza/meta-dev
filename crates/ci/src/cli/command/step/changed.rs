@@ -57,7 +57,7 @@ impl Changed {
         )?;
         let arguments = [OsString::from(question), metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
-            .chain(Lines::from(changed.as_ref()).map(OsString::from));
+            .chain(changed.as_ref().parse::<Lines>().into_iter().flatten().map(OsString::from));
         Self::reach(ports, arguments)
     }
 }

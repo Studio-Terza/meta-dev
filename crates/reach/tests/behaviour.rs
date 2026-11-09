@@ -238,6 +238,6 @@ struct Text;
 
 impl Text {
     fn owned(text: &str) -> Vec<String> {
-        text_lines::Lines::from(text).map(str::to_owned).collect()
+        text.parse::<text_lines::Lines>().into_iter().flatten().collect()
     }
 }

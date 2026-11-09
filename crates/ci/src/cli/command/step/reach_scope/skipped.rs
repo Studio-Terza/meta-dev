@@ -36,7 +36,14 @@ impl fmt::Display for Skipped {
 
 impl From<&str> for Skips {
     fn from(report: &str) -> Skips {
-        Skips(Lines::from(report).filter_map(|line| Skipped::try_from(line).ok()).collect())
+        Skips(
+            report
+                .parse::<Lines>()
+                .into_iter()
+                .flatten()
+                .filter_map(|line| Skipped::try_from(line.as_str()).ok())
+                .collect(),
+        )
     }
 }
 
