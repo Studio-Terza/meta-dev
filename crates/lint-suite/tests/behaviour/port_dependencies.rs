@@ -478,6 +478,7 @@ macro_rules! expanding {
     ($path:literal, $text:literal) => {
         &[
             Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub struct Store;\n")),
+            Source::new(Located::new("crates/store-ports-macros/src/lib.rs"), Text::new("pub struct Query;\n")),
             Source::new(Located::new($path), Text::new($text)),
         ]
     };
@@ -507,6 +508,8 @@ const QUERIED_IN_PORT: &[Source] = &[Source::new(
         "fn f() {\n    crate::query!(r#\"\nSELECT\n  1\n\"#);\n    store_ports::query!(r#\"\nSELECT\n  1\n\"#);\n}\n",
     ),
 )];
+const MACRO_CRATE_QUERY: &[Source] =
+    expanding!("crates/design/src/lib.rs", "fn f() {\n    store_ports_macros::query!(r#\"\nSELECT\n  1\n\"#);\n}\n");
 const OTHER_QUERY: &[Source] = expanding!("crates/design/src/lib.rs", "fn f() {\n    sqlite::query!(a);\n}\n");
 
 struct Placed {
@@ -537,10 +540,16 @@ impl Expanding {
     }
 }
 
-const EXPANDING_MANIFESTS: [Source; 3] = [
+const EXPANDING_MANIFESTS: [Source; 4] = [
     Source::new(
         Located::new("crates/store-ports/Cargo.toml"),
         Text::new("[package]\nname = \"store-ports\"\n\n[package.metadata.port]\nowns = [\"sqlx\"]\n"),
+    ),
+    Source::new(
+        Located::new("crates/store-ports-macros/Cargo.toml"),
+        Text::new(
+            "[package]\nname = \"store-ports-macros\"\n\n[package.metadata.port]\nowns = [\"sqlx-macros-core\"]\nexpanders = { role = \"store\", macros = [\"query\", \"migrate\", \"Columns\"] }\n",
+        ),
     ),
     Source::new(
         Located::new("crates/design-store/Cargo.toml"),
@@ -650,6 +659,7 @@ laws::table!(
         Expanding(QUERIED_IN_STORE) => Lines::default(),
         Expanding(QUERIED_IN_PORT) => Lines::default(),
         Expanding(OTHER_QUERY) => Lines::default(),
+        Expanding(MACRO_CRATE_QUERY) => Lines::from(["crates/design/src/lib.rs:2"]),
     ]
 );
 

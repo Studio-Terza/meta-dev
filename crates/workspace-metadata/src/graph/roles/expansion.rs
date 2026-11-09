@@ -45,6 +45,10 @@ impl<'meta> Expansion<'meta> {
         self.expanders
     }
 
+    pub fn unit(&self) -> impl Iterator<Item = &'meta CrateName> + use<'_, 'meta> {
+        self.unit.iter().copied()
+    }
+
     pub fn admitted(&self) -> impl Iterator<Item = &'meta CrateName> + use<'_, 'meta> {
         self.unit.iter().chain(&self.declaring).copied()
     }

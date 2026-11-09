@@ -48,17 +48,15 @@ impl<'file> Roles<'file> {
     }
 
     fn expanded_outside(&self, expansion: &Expansion<'file>, imports: &Imports<'_>) -> Vec<Violation<'file>> {
-        let port =
-            self.owners.manifest(expansion.port()).map(|file| PlacedName::from(file.placement().package().root()));
-        let wanted: Vec<UsePath> = port
-            .iter()
+        let wanted: Vec<UsePath> = expansion
+            .unit()
+            .filter_map(|member| self.owners.manifest(member))
+            .map(|file| PlacedName::from(file.placement().package().root()))
             .flat_map(|placed| {
-                let root: &Name = placed.borrow();
-                expansion
-                    .expanders()
-                    .macros()
-                    .iter()
-                    .map(move |name| [root.clone(), Name::from(name.as_ref())].into_iter().collect())
+                expansion.expanders().macros().iter().map(move |name| {
+                    let root: &Name = placed.borrow();
+                    [root.clone(), Name::from(name.as_ref())].into_iter().collect()
+                })
             })
             .collect();
         let admitted: BTreeSet<Name> = expansion.admitted().map(|name| Name::from(name.as_ref())).collect();
