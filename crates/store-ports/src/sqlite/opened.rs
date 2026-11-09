@@ -1,5 +1,5 @@
 use sqlx::migrate::Migrator;
-use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
 use sqlx::{ConnectOptions, Connection, Sqlite, SqliteConnection, Transaction};
 use tokio::runtime::{Builder, Runtime};
 
@@ -17,6 +17,17 @@ impl Opened {
         let mut connection = runtime.block_on(options.connect()).map_err(StoreFailure::Open)?;
         runtime.block_on(migrator.run(&mut connection))?;
         Ok(Opened { runtime, connection })
+    }
+
+    pub(super) fn copied(options: &SqliteConnectOptions, image: SqliteOwnedBuf) -> Result<Opened, StoreFailure> {
+        let runtime = Builder::new_current_thread().build().map_err(StoreFailure::Runtime)?;
+        let mut connection = runtime.block_on(options.connect()).map_err(StoreFailure::Open)?;
+        runtime.block_on(connection.deserialize(None, image, false)).map_err(StoreFailure::Open)?;
+        Ok(Opened { runtime, connection })
+    }
+
+    pub(super) fn image(&mut self) -> Result<SqliteOwnedBuf, StoreFailure> {
+        self.runtime.block_on(self.connection.serialize(None)).map_err(StoreFailure::Open)
     }
 
     pub(super) fn read<Q: Query>(&mut self, query: Q) -> Result<Q::Rows, StoreFailure> {

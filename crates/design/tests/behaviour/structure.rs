@@ -14,8 +14,9 @@ use design::{
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, Provenance, RunId};
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
-    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished, HeadlessClaude,
-    Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, clock_ops, dispatch_ops,
+    Agent, AgentRun, Bell, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished,
+    HeadlessClaude, Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall,
+    clock_ops, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
 use newtype::Newtype;
@@ -77,7 +78,7 @@ impl ClockFiller for FakeClock {
         *self.now.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause) -> Wall {
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
         let mut now = self.now.lock().unwrap_or_else(PoisonError::into_inner);
         *now = now.after(pause).after(self.sleep);
         *now
