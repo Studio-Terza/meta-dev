@@ -36,6 +36,8 @@ pub enum Failure<'path> {
     Measured { path: Cow<'path, Path>, source: toml::de::Error },
     #[error("cannot read the cargo metadata: {0}")]
     Metadata(serde_json::Error),
+    #[error("rustc --print host-tuple names {} lines, not the one host platform clippy builds for", .0.len())]
+    NoHost(Vec<String>),
     #[error("cannot read the list of cold builds: {0}")]
     Runs(serde_json::Error),
     #[error("the mutation matrix failed: {0}")]

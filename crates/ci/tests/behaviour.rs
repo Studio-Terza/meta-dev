@@ -14,6 +14,9 @@ use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
 const TIMINGS_UNITS: &str = include_str!("timings/units.json");
 const TIMINGS_METADATA: &str = include_str!("timings/metadata.json");
+const EVERY_PLATFORM: &str = include_str!("timings/every-platform.json");
+const HOST_PLATFORM: &str = include_str!("timings/host-platform.json");
+const HOST: &str = "x86_64-unknown-linux-gnu";
 const GRAPH_PATH: [&str; 5] = [
     "graph-path 2.50 seconds, the longest chain of clippy units, counting only units sccache never caches:",
     "0.40 ext-macro (build)",
@@ -61,6 +64,7 @@ struct Script {
     changed: String,
     metadata: String,
     answers: Vec<Reply>,
+    exact: Vec<(Invocation, String)>,
     failing: Option<&'static str>,
     logged_text: String,
     calls: RefCell<Vec<Invocation>>,
@@ -75,6 +79,7 @@ impl Script {
             changed: String::new(),
             metadata: METADATA.to_owned(),
             answers: Vec::new(),
+            exact: Vec::new(),
             failing: None,
             logged_text: String::new(),
             calls: RefCell::new(Vec::new()),
@@ -102,6 +107,13 @@ impl Script {
     }
 
     fn answer_to(&self, invocation: &Invocation) -> String {
+        self.exact
+            .iter()
+            .find(|(asked, _)| asked == invocation)
+            .map_or_else(|| self.keyed_answer(invocation), |(_, text)| text.clone())
+    }
+
+    fn keyed_answer(&self, invocation: &Invocation) -> String {
         let key = [
             invocation.program().to_string_lossy().as_ref(),
             " ",
@@ -625,11 +637,23 @@ struct Graph {
 }
 
 impl Graph {
+    fn metadata_for(host: &str) -> Invocation {
+        Invocation::new("cargo", ["metadata", "--locked", "--format-version", "1", "--filter-platform", host])
+    }
+
+    fn hosted(script: Script) -> Script {
+        let answers = script.answers.into_iter().chain([Reply::to("rustc --print", &format!("{HOST}\n"))]).collect();
+        Script { answers, ..script }
+    }
+
     fn measured(page: &str, metadata: &str) -> Result<Graph, Box<dyn Error>> {
+        Graph::answered(page, Graph::hosted(Script { metadata: metadata.to_owned(), ..Script::new() }))
+    }
+
+    fn answered(page: &str, fake: Script) -> Result<Graph, Box<dyn Error>> {
         let scratch = Scratch::new()?;
         scratch.write("page.html", page)?;
         scratch.write("m.toml", "clippy = 50.80\n")?;
-        let fake = Script { metadata: metadata.to_owned(), ..Script::new() };
         let arguments = ["graph-path", &scratch.file("page.html"), &scratch.file("m.toml"), &scratch.file("path.txt")];
         let answer = scratch.answer(&fake, &arguments);
         let asked = fake.calls.borrow().clone();
@@ -641,7 +665,7 @@ impl Graph {
 fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_beside_the_wall()
 -> Result<(), Box<dyn Error>> {
     let Graph { answer, measured, report, asked } = Graph::measured(&Page::listing(TIMINGS_UNITS), TIMINGS_METADATA)?;
-    assert_eq!(asked, [Invocation::new("cargo", ["metadata", "--locked", "--format-version", "1"])]);
+    assert_eq!(asked, [Invocation::new("rustc", ["--print", "host-tuple"]), Graph::metadata_for(HOST)]);
     assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: GRAPH_PATH.to_vec(), err: Vec::<&str>::new() });
     assert_eq!(Text::lines(&report), GRAPH_PATH);
     assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.50", "graph-work = 3.95"]);
@@ -730,7 +754,7 @@ fn a_graph_path_needs_unit_timings_and_metadata_cargo_can_give() -> Result<(), B
     let scratch = Scratch::new()?;
     scratch.write("page.html", &Page::listing(TIMINGS_UNITS))?;
     let refused = scratch.answer(
-        &Script::refusing("cargo"),
+        &Graph::hosted(Script::refusing("cargo")),
         &["graph-path", &scratch.file("page.html"), &scratch.file("m.toml"), &scratch.file("path.txt")],
     );
     assert_eq!(
@@ -738,6 +762,51 @@ fn a_graph_path_needs_unit_timings_and_metadata_cargo_can_give() -> Result<(), B
         (ExitCode::FAILURE, vec!["cannot run cargo: boom".to_owned()])
     );
     assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("slowmacro", "0.1.0", "", "1.0"),
+            Page::of("mid", "0.1.0", " (check)", "1.0"),
+            Page::of("app", "0.1.0", " (check)", "1.0"),
+            Page::of("user", "0.1.0", " (check)", "0.5"),
+        ]
+        .join(","),
+    );
+    let fake = Script {
+        metadata: EVERY_PLATFORM.to_owned(),
+        exact: vec![(Graph::metadata_for(HOST), HOST_PLATFORM.to_owned())],
+        ..Graph::hosted(Script::new())
+    };
+    let Graph { answer, measured, .. } = Graph::answered(&page, fake)?;
+    let expected = [
+        "graph-path 2.00 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+        "1.00 mid (check)",
+        "1.00 app (check)",
+    ];
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.00", "graph-work = 3.50"]);
+    Ok(())
+}
+
+#[test]
+fn a_graph_path_needs_rustc_to_name_exactly_one_host() -> Result<(), Box<dyn Error>> {
+    let named = ["", "x86_64-unknown-linux-gnu\naarch64-apple-darwin\n"].map(|host| {
+        let fake = Script::answering(vec![Reply::to("rustc --print", host)]);
+        Graph::answered(&Page::listing(TIMINGS_UNITS), fake).map(|graph| {
+            (
+                graph.answer.exit,
+                graph.answer.err.contains("not the one host platform"),
+                graph.measured,
+                graph.asked.len(),
+            )
+        })
+    });
+    let refused = named.into_iter().collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(refused, vec![(ExitCode::FAILURE, true, "clippy = 50.80\n".to_owned(), 1); 2]);
     Ok(())
 }
 

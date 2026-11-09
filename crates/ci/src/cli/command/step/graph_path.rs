@@ -9,6 +9,7 @@ mod weighed;
 
 use std::ffi::OsString;
 use std::io::Write;
+use std::iter;
 use std::path::Path;
 
 use super::Step;
@@ -22,6 +23,7 @@ use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 use crates::Crates;
 use manifest::Manifest;
+use text_lines::Lines;
 use timed_unit::TimedUnit;
 use unit_dag::UnitDag;
 
@@ -33,13 +35,22 @@ pub struct GraphPath {
 }
 
 impl GraphPath {
-    const METADATA: [&'static str; 4] = ["metadata", "--locked", "--format-version", "1"];
+    const METADATA: [&'static str; 5] = ["metadata", "--locked", "--format-version", "1", "--filter-platform"];
+    const HOST: [&'static str; 2] = ["--print", "host-tuple"];
     const PATH: &'static str = "graph-path";
     const WORK: &'static str = "graph-work";
 
     fn crates(ports: &impl Ports) -> Result<Crates, Failure<'static>> {
-        let listed = Changed::asked(ports, &Invocation::new("cargo", Self::METADATA))?;
+        let host = Self::host(ports)?;
+        let arguments = Self::METADATA.into_iter().map(OsString::from).chain(iter::once(host));
+        let listed = Changed::asked(ports, &Invocation::new("cargo", arguments))?;
         serde_json::from_str::<Manifest>(listed.as_ref()).map(Manifest::crates).map_err(Failure::Metadata)
+    }
+
+    fn host(ports: &impl Ports) -> Result<OsString, Failure<'static>> {
+        let named = Changed::asked(ports, &Invocation::new("rustc", Self::HOST))?;
+        let lines: Vec<String> = named.as_ref().parse::<Lines>().into_iter().flatten().collect();
+        <[String; 1]>::try_from(lines).map(|[host]| OsString::from(host)).map_err(Failure::NoHost)
     }
 }
 
