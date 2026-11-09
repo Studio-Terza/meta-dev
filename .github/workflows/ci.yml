@@ -47,7 +47,7 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: fmt
         run: cargo fmt --check
@@ -77,7 +77,7 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: test compile
         if: env.BUILD_SCOPE != ''
@@ -114,7 +114,7 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" .'
