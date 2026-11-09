@@ -3,61 +3,36 @@
     {
       "id": "path+file:///w/gated#0.1.0",
       "name": "gated",
-      "features": { "measure": [] },
       "targets": [
-        { "name": "gated", "kind": ["lib"], "test": false },
-        { "name": "measured", "kind": ["test"], "required-features": ["measure"], "test": true },
-        { "name": "plain_gated", "kind": ["test"], "test": true }
+        { "name": "gated", "kind": ["lib"] },
+        { "name": "measured", "kind": ["test"], "required-features": ["measure"] }
       ]
     },
     {
-      "id": "path+file:///w/defaulted#0.1.0",
-      "name": "defaulted",
-      "features": { "default": ["extra"], "extra": [], "off": [] },
-      "targets": [
-        { "name": "defaulted", "kind": ["lib"], "test": false },
-        { "name": "needs_extra", "kind": ["test"], "required-features": ["extra"], "test": true },
-        { "name": "needs_off", "kind": ["test"], "required-features": ["off"], "test": true },
-        { "name": "never_run", "kind": ["test"], "test": false }
-      ]
+      "id": "path+file:///w/libonly#0.1.0",
+      "name": "libonly",
+      "targets": [{ "name": "libonly", "kind": ["lib"] }]
     },
     {
-      "id": "path+file:///w/chained#0.1.0",
-      "name": "chained",
-      "features": { "default": ["outer"], "outer": ["inner", "dep/forwarded", "dep:optional"], "inner": [] },
-      "targets": [
-        { "name": "chained", "kind": ["lib"], "test": false },
-        { "name": "needs_inner", "kind": ["test"], "required-features": ["inner"], "test": true },
-        { "name": "needs_both", "kind": ["test"], "required-features": ["inner", "off"], "test": true }
-      ]
+      "id": "path+file:///w/binonly#0.1.0",
+      "name": "binonly",
+      "targets": [{ "name": "binonly", "kind": ["bin"] }, { "name": "behaviour", "kind": ["test"] }]
     },
     {
-      "id": "path+file:///w/unit#0.1.0",
-      "name": "unit",
-      "features": {},
-      "targets": [
-        { "name": "unit", "kind": ["lib"], "test": true },
-        { "name": "behaviour", "kind": ["test"], "test": true },
-        { "name": "demo", "kind": ["example"], "test": false }
-      ]
+      "id": "path+file:///w/demo#0.1.0",
+      "name": "demo",
+      "targets": [{ "name": "demo", "kind": ["lib"] }, { "name": "showcase", "kind": ["example"] }]
     },
     {
-      "id": "path+file:///w/silent#0.1.0",
-      "name": "silent",
-      "targets": [
-        { "name": "silent", "kind": ["lib"], "test": false },
-        { "name": "silent", "kind": ["bin"], "test": true }
-      ]
+      "id": "path+file:///w/benched#0.1.0",
+      "name": "benched",
+      "targets": [{ "name": "benched", "kind": ["lib"] }, { "name": "speed", "kind": ["bench"] }]
     },
     {
-      "id": "path+file:///w/twin#0.1.0",
-      "name": "twin",
-      "features": {},
-      "targets": [
-        { "name": "behaviour", "kind": ["test"], "test": true },
-        { "name": "implied", "kind": ["test"] }
-      ]
+      "id": "path+file:///w/macros#0.1.0",
+      "name": "macros",
+      "targets": [{ "name": "macros", "kind": ["proc-macro"] }]
     }
   ],
-  "workspace_default_members": ["path+file:///w/unit#0.1.0", "path+file:///w/silent#0.1.0"]
+  "workspace_default_members": ["path+file:///w/libonly#0.1.0", "path+file:///w/binonly#0.1.0"]
 }

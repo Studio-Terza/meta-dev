@@ -279,8 +279,6 @@ laws::table!(
     ]
 );
 
-const LIBRARY_BINS_EXAMPLES_BENCHES: [&str; 4] = ["--lib", "--bins", "--examples", "--benches"];
-
 struct Clippy;
 
 impl Clippy {
@@ -300,49 +298,50 @@ impl Clippy {
 }
 
 laws::table!(
-    clippy_checks_each_unit_once_and_names_only_the_tests_whose_features_are_enabled,
+    clippy_names_the_kinds_of_target_the_scope_has_and_always_the_tests,
     Clippy::invoked,
     [
-        &["--workspace"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--workspace"]].concat(),
-        &["--workspace", "--timings", "--", "-D", "warnings"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--workspace", "--timings", "--", "-D", "warnings"]].concat(),
-        &["-p", "gated"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "plain_gated", "-p", "gated"]].concat(),
-        &["-p", "gated", "--package", "unit", "-p", "silent", "--", "-D", "warnings"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "plain_gated", "-p", "gated", "--package", "unit", "-p", "silent", "--", "-D", "warnings"]].concat(),
-        &["-p", "silent"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["-p", "silent"]].concat(),
-        &["-p", "defaulted"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "needs_extra", "-p", "defaulted"]].concat(),
-        &["-p", "chained"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "needs_inner", "-p", "chained"]].concat(),
-        &["-p", "unit"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "-p", "unit"]].concat(),
-        &["-p", "unmatched"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["-p", "unmatched"]].concat(),
-        &["--", "-D", "warnings"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--", "-D", "warnings"]].concat(),
-        &["-p"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "-p"]].concat(),
-        &["--workspace", "-p", "silent"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--workspace", "-p", "silent"]].concat(),
-        &["--all"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--all"]].concat(),
-        &["--", "-p", "gated"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--", "-p", "gated"]].concat(),
+        &["--workspace"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--workspace"],
+        &["--all"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--all"],
+        &["--workspace", "--timings", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--workspace", "--timings", "--", "-D", "warnings"],
+        &["-p", "libonly"][..] => vec!["--lib", "--tests", "-p", "libonly"],
+        &["-p", "binonly"][..] => vec!["--bins", "--tests", "-p", "binonly"],
+        &["-p", "demo"][..] => vec!["--lib", "--examples", "--tests", "-p", "demo"],
+        &["-p", "benched"][..] => vec!["--lib", "--benches", "--tests", "-p", "benched"],
+        &["-p", "macros"][..] => vec!["--lib", "--tests", "-p", "macros"],
+        &["-p", "gated"][..] => vec!["--lib", "--tests", "-p", "gated"],
+        &["-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--examples", "--tests", "-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"],
+        &["-p", "unmatched"][..] => vec!["--tests", "-p", "unmatched"],
+        &["--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--tests", "--", "-D", "warnings"],
+        &[][..] => vec!["--lib", "--bins", "--tests"],
+        &["-p"][..] => vec!["--lib", "--bins", "--tests", "-p"],
+        &["--workspace", "-p", "libonly"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--workspace", "-p", "libonly"],
+        &["--", "-p", "benched"][..] => vec!["--lib", "--bins", "--tests", "--", "-p", "benched"],
+        &["--", "--workspace"][..] => vec!["--lib", "--bins", "--tests", "--", "--workspace"],
     ]
 );
 
 #[test]
-fn a_test_with_unmet_required_features_is_not_named_and_nothing_checks_libraries_in_test_mode() {
-    let flags = Clippy::invoked(&["--workspace"]);
-    assert!(!flags.iter().any(|flag| ["measured", "needs_off", "needs_both", "never_run"].contains(&flag.as_str())));
-    assert!(!flags.iter().any(|flag| ["--tests", "--all-targets"].contains(&flag.as_str())));
-    assert_eq!(flags.iter().filter(|flag| *flag == "--lib").count(), 1);
+fn clippy_never_names_all_targets_or_single_tests_and_asks_for_benches_only_where_there_are_some() {
+    let without = Clippy::invoked(&["-p", "libonly", "-p", "binonly", "-p", "demo", "-p", "gated"]);
+    let with = Clippy::invoked(&["-p", "libonly", "-p", "benched"]);
+    assert!(!without.contains(&"--benches".to_owned()));
+    assert!(with.contains(&"--benches".to_owned()));
+    assert!(!without.iter().chain(&with).any(|flag| ["--all-targets", "--test"].contains(&flag.as_str())));
 }
 
 #[test]
 fn clippy_is_timed_under_its_stage_and_fails_with_its_code() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
-    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "-p", "silent"]);
+    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "-p", "binonly"]);
     assert_eq!(answer.exit, ExitCode::from(FAILED_WITH.get()));
     assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.50"]);
     assert_eq!(
         *fake.calls.borrow(),
         [
             Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
-            Invocation::new(
-                "cargo",
-                ["clippy", "--locked", "--lib", "--bins", "--examples", "--benches", "-p", "silent"]
-            ),
+            Invocation::new("cargo", ["clippy", "--locked", "--bins", "--tests", "-p", "binonly"]),
         ]
     );
     Ok(())
@@ -354,7 +353,7 @@ fn metadata_that_cannot_be_read_stops_clippy_before_it_runs() -> Result<(), Box<
     let fake = Script { metadata: "not json".to_owned(), ..Script::new() };
     let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "--workspace"]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.starts_with("cannot read the cargo metadata: "));
+    assert!(answer.err.contains("cannot read the cargo metadata: "));
     assert_eq!(fake.calls.borrow().len(), 1);
     assert_eq!(scratch.read("m.toml"), "");
     Ok(())

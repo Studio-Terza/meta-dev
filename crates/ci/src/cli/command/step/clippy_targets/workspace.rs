@@ -17,8 +17,10 @@ pub(super) struct Workspace {
 }
 
 impl Workspace {
-    const UNITS: [&'static str; 5] = ["--lib", "--bins", "--examples", "--benches", "--test"];
-    const TEST: &'static str = "--test";
+    const LIBRARIES: [&'static str; 6] = ["lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"];
+    const UNITS: [(&'static str, &'static [&'static str]); 4] =
+        [("--lib", &Self::LIBRARIES), ("--bins", &["bin"]), ("--examples", &["example"]), ("--benches", &["bench"])];
+    const TESTS: &'static str = "--tests";
 
     fn selected(&self, scope: &Scope) -> impl Iterator<Item = &Package> {
         self.packages.iter().filter(move |package| match scope {
@@ -29,12 +31,13 @@ impl Workspace {
     }
 
     pub(super) fn targets(&self, scope: &Scope) -> Vec<String> {
-        let tests: BTreeSet<&str> = self.selected(scope).flat_map(Package::tests).collect();
+        let kinds: BTreeSet<&str> = self.selected(scope).flat_map(Package::kinds).collect();
         Self::UNITS
             .iter()
-            .take_while(|unit| **unit != Self::TEST)
-            .map(|unit| (*unit).to_owned())
-            .chain(tests.into_iter().flat_map(|name| [Self::TEST.to_owned(), name.to_owned()]))
+            .filter(|(_, wanted)| wanted.iter().any(|kind| kinds.contains(kind)))
+            .map(|(flag, _)| *flag)
+            .chain([Self::TESTS])
+            .map(str::to_owned)
             .collect()
     }
 }
