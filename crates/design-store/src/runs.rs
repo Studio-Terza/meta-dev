@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{JobId, RunId, Segment};
+use design_model::{JobId, Provenance, RunId, Segment};
 use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
@@ -82,6 +82,14 @@ pub struct JobHalted {
     job: JobId,
     halted: Halted,
     account: Account,
+    held: Option<JobFlailed>,
+    retold: Vec<Retold>,
+}
+
+#[derive(Clone, Debug, Op)]
+pub struct Retold {
+    job: JobId,
+    account: Account,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -115,6 +123,12 @@ pub struct RunEnded {
 pub struct JobFlailed {
     run: RunId,
     segments: Vec<Segment>,
+}
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct JobRetried {
+    job: JobId,
+    provenance: Provenance,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -221,7 +235,24 @@ impl JobClosed {
 impl JobHalted {
     #[must_use]
     pub fn new(job: JobId, halted: Halted, account: Account) -> JobHalted {
-        JobHalted { job, halted, account }
+        JobHalted { job, halted, account, held: None, retold: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn holding(self, held: Option<JobFlailed>) -> JobHalted {
+        JobHalted { held, ..self }
+    }
+
+    #[must_use]
+    pub fn retelling(self, retold: Vec<Retold>) -> JobHalted {
+        JobHalted { retold, ..self }
+    }
+}
+
+impl Retold {
+    #[must_use]
+    pub fn new(job: JobId, account: Account) -> Retold {
+        Retold { job, account }
     }
 }
 
@@ -281,6 +312,13 @@ impl JobFlailed {
     #[must_use]
     pub fn new(run: RunId, segments: Vec<Segment>) -> JobFlailed {
         JobFlailed { run, segments }
+    }
+}
+
+impl JobRetried {
+    #[must_use]
+    pub fn new(job: JobId, provenance: Provenance) -> JobRetried {
+        JobRetried { job, provenance }
     }
 }
 

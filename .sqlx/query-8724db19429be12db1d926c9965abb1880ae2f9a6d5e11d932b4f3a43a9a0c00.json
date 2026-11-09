@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  retries (job, provenance)\nVALUES\n  (?1, ?2)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8724db19429be12db1d926c9965abb1880ae2f9a6d5e11d932b4f3a43a9a0c00"
+}

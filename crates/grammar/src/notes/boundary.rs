@@ -16,6 +16,22 @@ enum Row {
     Break,
 }
 
+#[derive(Logos, Clone, Debug, PartialEq, Eq)]
+enum Stamp {
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", |lex| Date::new(lex.slice().to_owned()))]
+    Day(Date),
+    #[regex(r"[Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?", |lex| Clock::new(lex.slice().to_owned()))]
+    Clock(Clock),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Stamping {
+    Started,
+    Dated(Date),
+    Timed(Date, Clock),
+    Unstamped,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Marker {
     Bullet,
@@ -40,7 +56,7 @@ enum Lexeme {
     #[token("**", |_| Marker::Emphasis)]
     #[token("_", |_| Marker::Emphasis)]
     #[token("__", |_| Marker::Emphasis)]
-    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?)?", |_| Marker::Date)]
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?)?", |_| Marker::Date)]
     #[token(":", |_| Marker::Colon)]
     #[regex(r"\[[ xX]\]", |_| Marker::Task)]
     #[regex(r"[ \t]+", |_| Marker::Space)]
@@ -390,8 +406,7 @@ impl<'lexed, 'text> Step<'lexed, 'text> {
     }
 
     fn dated(lexed: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
-        let (day, clock) = lexed.text.split_at_checked(10).unwrap_or((lexed.text, ""));
-        Step::after(Piece::Dated(Date::new(day.to_owned()), Clock::new(clock.to_owned())), rest)
+        Step::after(Stamp::lexer(lexed.text).fold(Stamping::Started, Stamping::took).piece(lexed), rest)
     }
 
     fn quoted(rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
@@ -411,6 +426,42 @@ impl Pieces {
     fn parsed(lexed: &[Lexed<'_>]) -> Pieces {
         let start = Cursor { rest: lexed };
         Pieces(iter::successors(start.step(), |step| step.cursor.step()).map(|step| step.piece).collect())
+    }
+}
+
+impl Stamp {
+    fn day(self) -> Option<Date> {
+        match self {
+            Stamp::Day(day) => Some(day),
+            Stamp::Clock(_) => None,
+        }
+    }
+
+    fn clock(self) -> Option<Clock> {
+        match self {
+            Stamp::Clock(clock) => Some(clock),
+            Stamp::Day(_) => None,
+        }
+    }
+}
+
+impl Stamping {
+    fn took(self, stamp: Result<Stamp, ()>) -> Stamping {
+        match self {
+            Stamping::Started => stamp.ok().and_then(Stamp::day).map_or(Stamping::Unstamped, Stamping::Dated),
+            Stamping::Dated(day) => {
+                stamp.ok().and_then(Stamp::clock).map_or(Stamping::Unstamped, |clock| Stamping::Timed(day, clock))
+            }
+            Stamping::Timed(..) | Stamping::Unstamped => Stamping::Unstamped,
+        }
+    }
+
+    fn piece(self, lexed: Lexed<'_>) -> Piece {
+        match self {
+            Stamping::Dated(day) => Piece::Dated(day, Clock::new(String::new())),
+            Stamping::Timed(day, clock) => Piece::Dated(day, clock),
+            Stamping::Started | Stamping::Unstamped => Piece::Text(lexed.text.to_owned()),
+        }
     }
 }
 

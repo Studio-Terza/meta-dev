@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nDELETE FROM\n  flailed\nWHERE\n  run IN (\n    SELECT\n      id\n    FROM\n      runs\n    WHERE\n      job = ?1\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "370b34baf5d247c2f2cdbbb193a6e47a2d0a2d372bcdf32c17068a7bc91dcb48"
+}

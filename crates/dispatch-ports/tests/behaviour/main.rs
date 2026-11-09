@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod ports;
 
 use std::error::Error;
@@ -24,7 +26,9 @@ impl Envelope {
     fn read(text: &str) -> Envelope {
         match Output::read(text, Stderr::Silent) {
             Output::Unreadable(Unreadable::Json { .. }) => Envelope::Garbled,
-            output => Envelope::Read(output),
+            output @ (Output::Finished(_)
+            | Output::Errored(_)
+            | Output::Unreadable(Unreadable::Unsuccessful { .. })) => Envelope::Read(output),
         }
     }
 
