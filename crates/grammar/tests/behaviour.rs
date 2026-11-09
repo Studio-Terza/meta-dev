@@ -573,8 +573,8 @@ laws::law!(
     ),
     file,
     {
-        let (lines, (ending, ended)) = file;
-        let lines: Vec<(String, String)> = lines.into_iter().chain([("x".to_owned(), "x".to_owned())]).collect();
+        let (drawn, (ending, ended)) = file;
+        let lines: Vec<(String, String)> = drawn.into_iter().chain([("x".to_owned(), "x".to_owned())]).collect();
         let text = [lines.iter().map(|(line, _laid)| line.as_str()).collect::<Vec<&str>>().join("\n").as_str(), ended]
             .concat();
         let laid = [lines.iter().map(|(_line, laid)| laid.as_str()).collect::<Vec<&str>>().join("\n").as_str(), ended]
@@ -627,9 +627,9 @@ impl Named {
     fn words(entry: &Entry) -> Said {
         let quotes: Result<Vec<String>, Unclosed> =
             entry.quotes().into_iter().map(|quote| quote.map(ToString::to_string).map_err(Clone::clone)).collect();
-        quotes.map(|quotes| {
+        quotes.map(|quoted| {
             [
-                quotes,
+                quoted,
                 entry.cites().iter().map(ToString::to_string).collect(),
                 entry.dates().iter().map(ToString::to_string).collect(),
             ]

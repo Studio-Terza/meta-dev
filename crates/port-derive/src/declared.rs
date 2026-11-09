@@ -81,8 +81,8 @@ impl Declared {
         &self.ops
     }
 
-    fn parsed(item: ItemTrait) -> Declared {
-        let mut item = Self::sealed(item);
+    fn parsed(declared: ItemTrait) -> Declared {
+        let mut item = Self::sealed(declared);
         let methods = item.items.iter_mut().filter_map(Self::required).map(Method::declared).collect();
         Declared {
             caller: CallerName::from(&item.ident),
@@ -102,7 +102,7 @@ impl Declared {
 
     fn required(item: &mut TraitItem) -> Option<&mut TraitItemFn> {
         match item {
-            TraitItem::Fn(function) => Some(function).filter(|function| function.default.is_none()),
+            TraitItem::Fn(function) => Some(function).filter(|candidate| candidate.default.is_none()),
             _ => None,
         }
     }

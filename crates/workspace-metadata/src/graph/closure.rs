@@ -17,8 +17,8 @@ impl<'meta> Closure<'meta> {
                 let reached: BTreeSet<&PackageId> = frontier.iter().flat_map(|id| requires.direct(id)).collect();
                 let next: BTreeSet<&PackageId> = reached.difference(seen).copied().collect();
                 Some(next)
-                    .filter(|next| next.first().is_some())
-                    .map(|next| (seen.union(&next).copied().collect(), next))
+                    .filter(|fresh| fresh.first().is_some())
+                    .map(|fresh| (seen.union(&fresh).copied().collect(), fresh))
             })
             .last()
             .map(|(seen, _)| seen)

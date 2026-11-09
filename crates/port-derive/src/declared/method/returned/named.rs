@@ -88,8 +88,8 @@ impl<'tree> NamedMut<'tree> {
 
 impl<'tree> Slot<'tree> {
     fn held(slot: &'tree mut Type) -> Option<Slot<'tree>> {
-        let resource = Named::read(slot).and_then(Named::resource).cloned();
-        resource.map(|resource| Slot { slot, resource })
+        let named = Named::read(slot).and_then(Named::resource).cloned();
+        named.map(|resource| Slot { slot, resource })
     }
 
     pub fn unwrapped(mut rebuilt: Type) -> Option<Type> {

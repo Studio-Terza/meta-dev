@@ -58,11 +58,12 @@ impl<'meta> Graph<'meta> {
                     .into_iter()
                     .filter_map(|owner| Some(self.package(owner)?.name()))
                     .collect();
-                let required = self.package(required)?.name();
-                let dependent = self.package(dependent)?;
-                Some(owners)
-                    .filter(|owners| owners.first().is_some())
-                    .map(|owners| (dependent.name(), required, Bypass::new(owners, dependent.keys(required).collect())))
+                let required_name = self.package(required)?.name();
+                let dependent_package = self.package(dependent)?;
+                Some(owners).filter(|claimed| claimed.first().is_some()).map(|claimed| {
+                    let keys = dependent_package.keys(required_name).collect();
+                    (dependent_package.name(), required_name, Bypass::new(claimed, keys))
+                })
             })
             .collect()
     }

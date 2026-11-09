@@ -36,11 +36,11 @@ impl<'meta> FromIterator<(&'meta CrateName, &'meta CrateName, Bypass<'meta>)> fo
     fn from_iter<Found: IntoIterator<Item = (&'meta CrateName, &'meta CrateName, Bypass<'meta>)>>(
         found: Found,
     ) -> Bypasses<'meta> {
-        Bypasses(found.into_iter().fold(BTreeMap::new(), |mut found, (dependent, required, bypass)| {
-            let merged = found.entry(dependent).or_insert_with(BTreeMap::new).entry(required).or_default();
+        Bypasses(found.into_iter().fold(BTreeMap::new(), |mut merging, (dependent, required, bypass)| {
+            let merged = merging.entry(dependent).or_insert_with(BTreeMap::new).entry(required).or_default();
             merged.owners.extend(bypass.owners);
             merged.keys.extend(bypass.keys.as_ref().iter().copied());
-            found
+            merging
         }))
     }
 }
