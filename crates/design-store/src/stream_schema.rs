@@ -1,13 +1,15 @@
 mod anchored;
 mod resegmented;
 
+use std::sync::LazyLock;
+
 use port_core::Op;
 use store_ports::{Batch, Migrator, Schema, Statements, StoreFailure, Version, Written};
 
 use anchored::Anchored;
 use resegmented::Resegmented;
 
-static MIGRATOR: Migrator = store_ports::migrate!();
+static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!());
 
 #[derive(Clone, Copy, Debug)]
 pub struct StreamSchema;

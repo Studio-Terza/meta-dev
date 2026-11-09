@@ -49,9 +49,6 @@ name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
-dependencies = [
- "serde_core",
-]
 
 [[package]]
 name = "block-buffer"
@@ -305,6 +302,7 @@ dependencies = [
  "port-core",
  "serde",
  "serde_json",
+ "sqlite-ports",
  "store-ports",
  "stream",
  "structurer",
@@ -312,6 +310,26 @@ dependencies = [
  "text-lines",
  "thiserror",
  "transcript-ports",
+]
+
+[[package]]
+name = "design-cli"
+version = "0.1.0"
+dependencies = [
+ "console-ports",
+ "design",
+ "design-model",
+ "dispatch-ports",
+ "e2e",
+ "exit",
+ "file-ports",
+ "grammar-slug",
+ "laws",
+ "serde_json",
+ "sqlite-ports",
+ "structurer",
+ "strum",
+ "text-lines",
 ]
 
 [[package]]
@@ -351,6 +369,7 @@ dependencies = [
  "newtype",
  "port-core",
  "serde_json",
+ "sqlite-ports",
  "store-ports",
  "stream",
  "strum",
@@ -788,6 +807,15 @@ dependencies = [
  "grammar",
  "laws",
  "newtype",
+]
+
+[[package]]
+name = "grammar-migration"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
 ]
 
 [[package]]
@@ -2543,9 +2571,6 @@ name = "smallvec"
 version = "1.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "socket2"
@@ -2574,6 +2599,30 @@ checksum = "0705994df478b895f05b8e290e0d46e53187b26f8d889d37b2a0881234922d94"
 dependencies = [
  "unicode_categories",
  "winnow 0.7.15",
+]
+
+[[package]]
+name = "sqlite-ports"
+version = "0.1.0"
+dependencies = [
+ "console-ports",
+ "exit",
+ "golden",
+ "hex",
+ "newtype",
+ "port-core",
+ "proc-macro2",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "sqlx-core",
+ "sqlx-sqlite",
+ "store-ports",
+ "syn 2.0.119",
+ "tempfile",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2613,7 +2662,6 @@ dependencies = [
  "memchr",
  "percent-encoding",
  "serde",
- "serde_json",
  "sha2 0.10.9",
  "smallvec",
  "thiserror",
@@ -2655,7 +2703,6 @@ dependencies = [
  "sqlx-core",
  "sqlx-sqlite",
  "syn 2.0.119",
- "thiserror",
  "tokio",
  "url",
 ]
@@ -2678,7 +2725,6 @@ dependencies = [
  "generic-array",
  "log",
  "percent-encoding",
- "serde",
  "sha1",
  "sha2 0.11.1",
  "sqlx-core",
@@ -2710,8 +2756,6 @@ dependencies = [
  "md-5",
  "memchr",
  "rand",
- "serde",
- "serde_json",
  "sha2 0.11.1",
  "smallvec",
  "sqlx-core",
@@ -2770,12 +2814,11 @@ dependencies = [
  "laws",
  "newtype",
  "port-core",
- "sqlx",
+ "sqlite-ports",
  "store-ports-macros",
  "strum",
  "tempfile",
  "thiserror",
- "tokio",
  "transcript-ports",
 ]
 
@@ -2783,10 +2826,15 @@ dependencies = [
 name = "store-ports-macros"
 version = "0.1.0"
 dependencies = [
+ "grammar-migration",
+ "hex",
  "proc-macro2",
  "quote",
- "sqlx-macros-core",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "syn 2.0.119",
+ "thiserror",
 ]
 
 [[package]]

@@ -39,7 +39,8 @@ use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
 use newtype::Counter;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
-use store_ports::{Batch, Busy, Sqlite, Statements, Store, StoreFailure, Written};
+use sqlite_ports::SqliteOpener;
+use store_ports::{Batch, Busy, Opens, Schema, Statements, Store, StoreFailure, Written};
 use stream::{Relation, Shape};
 use structure::Staff;
 use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
@@ -286,7 +287,7 @@ impl Invocation {
     fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Self::environment(), files, |_path| store.clone(), Staff::idle()).report(
+        Cli::new(&Self::environment(), files, Opening(|_path| store.clone()), Staff::idle()).report(
             &run,
             arguments.iter().map(OsString::from),
             &mut out,
@@ -382,8 +383,9 @@ struct Rooted;
 impl Rooted {
     fn outcome(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
         let mut out = Vec::new();
-        let outcome = Cli::new(&Invocation::environment(), session.files(), |_path| store.clone(), Staff::idle())
-            .rooted(arguments.iter().map(OsString::from), &mut out)?;
+        let outcome =
+            Cli::new(&Invocation::environment(), session.files(), Opening(|_path| store.clone()), Staff::idle())
+                .rooted(arguments.iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
 }
@@ -561,10 +563,10 @@ impl Opened {
         Cli::new(
             &Invocation::at(directory),
             files,
-            |path: PathBuf| {
+            Opening(|path: PathBuf| {
                 opened.lock().map(|mut paths| paths.push(path)).ok();
                 Sqlite::in_memory::<StreamSchema>()
-            },
+            }),
             Staff::idle(),
         )
         .report(&run, arguments.iter().map(OsString::from), &mut out)?;
@@ -1275,7 +1277,7 @@ fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Re
     let lent = Cli::new(
         &Invocation::environment(),
         FakeLent::new(&applying.files),
-        |_path| applying.store.clone(),
+        Opening(|_path| applying.store.clone()),
         Staff::idle(),
     )
     .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
@@ -1288,9 +1290,13 @@ impl Applying {
         self.files.create_directories(Path::new("/work/notes")).ok();
         self.files.write(Path::new("/work/notes/directives"), directives).ok();
         let mut out = Vec::new();
-        let outcome =
-            Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
-                .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
+        let outcome = Cli::new(
+            &Invocation::environment(),
+            FakeLent::new(&self.files),
+            Opening(|_path| self.store.clone()),
+            Staff::idle(),
+        )
+        .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
 
@@ -1506,8 +1512,13 @@ impl Lifecycle {
 
 impl Applying {
     fn outcome(&self, arguments: &[&str]) -> Result<Outcome, Failure> {
-        Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
-            .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
+        Cli::new(
+            &Invocation::environment(),
+            FakeLent::new(&self.files),
+            Opening(|_path| self.store.clone()),
+            Staff::idle(),
+        )
+        .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
     }
 }
 
@@ -1828,8 +1839,13 @@ impl Workspace {
     fn run(&self, directory: &str, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Invocation::at(directory), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
-            .report(&run, arguments.iter().map(OsString::from), &mut out)?;
+        Cli::new(
+            &Invocation::at(directory),
+            FakeLent::new(&self.files),
+            Opening(|_path| self.store.clone()),
+            Staff::idle(),
+        )
+        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
         Ok(String::from_utf8(out).unwrap_or_default())
     }
 
@@ -2732,3 +2748,20 @@ laws::law!(every_ref_that_show_or_search_prints_is_shown, Echoes::uttered(), utt
     let refused: Vec<&String> = refs.iter().filter(|reference| applying.run(&["show", reference]).is_err()).collect();
     prop_assert_eq!(refused, Vec::<&String>::new(), "{}", printed);
 });
+
+type Sqlite = <SqliteOpener as Opens>::Store;
+
+#[derive(Clone, Copy, Debug)]
+struct Opening<F>(F);
+
+impl<F: Fn(PathBuf) -> Sqlite> Opens for Opening<F> {
+    type Store = Sqlite;
+
+    fn file<S: Schema>(&self, path: PathBuf) -> Sqlite {
+        (self.0)(path)
+    }
+
+    fn in_memory<S: Schema>(&self) -> Sqlite {
+        SqliteOpener.in_memory::<S>()
+    }
+}

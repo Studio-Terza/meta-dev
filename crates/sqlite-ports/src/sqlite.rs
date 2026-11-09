@@ -1,3 +1,4 @@
+mod failed;
 mod migrations;
 mod opened;
 mod place;
@@ -9,18 +10,18 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use port_core::Pass;
 
-use crate::store::{StoreFiller, store_ops};
-use crate::store_lock::Claim;
-use crate::store_lock::StoreLock;
-use crate::{Batch, Busy, Query, Schema, StoreFailure, Written};
 use migrations::Migrations;
 use opened::Opened;
 use place::Place;
+use store_ports::{Batch, Busy, Claim, Opens, Query, Schema, StoreFailure, StoreFiller, StoreLock, Written, store_ops};
 
 #[derive(Clone, Debug)]
 pub struct Sqlite {
     shared: Arc<Shared>,
 }
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SqliteOpener;
 
 #[derive(Debug)]
 struct Shared {
@@ -75,5 +76,17 @@ impl StoreFiller for Sqlite {
                 .transpose()
                 .and_then(|_created| OpenOptions::new().create(true).truncate(false).write(true).open(path))
         })
+    }
+}
+
+impl Opens for SqliteOpener {
+    type Store = Sqlite;
+
+    fn file<S: Schema>(&self, path: PathBuf) -> Sqlite {
+        Sqlite::file::<S>(path)
+    }
+
+    fn in_memory<S: Schema>(&self) -> Sqlite {
+        Sqlite::in_memory::<S>()
     }
 }

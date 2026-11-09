@@ -17,10 +17,6 @@ pub trait Columns: Sized {
     type Raw;
 
     fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
-
-    fn decoded(raw: Self::Raw) -> Result<Self, sqlx::Error> {
-        Self::from_raw(raw).map_err(|failure| sqlx::Error::Decode(Box::new(failure)))
-    }
 }
 
 impl<Value: Stored<Kind: Encoding<Value>>> Column for Value {
