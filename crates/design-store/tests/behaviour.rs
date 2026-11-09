@@ -1499,3 +1499,26 @@ fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result
     assert_eq!(told, ["went on, then halted", "stalled"]);
     Ok(())
 }
+
+#[test]
+fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(Recorded::session()?.records)?;
+    let [first, second] = [JobId::new(1), JobId::new(2)];
+    store.write(JobOpened::from(first))?;
+    store.write(JobOpened::from(second))?;
+    let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
+    store.write(RunSpawned::new(RunId::new(1), first, spawned))?;
+    let segments = vec![Proposals::segment("o1", 0)];
+    let flail = Some(JobFlailed::new(RunId::new(1), segments));
+    let misfiled =
+        store.write(JobHalted::new(second, Halted::Flailed, Account::told(&"flailed")).holding(flail.clone()));
+    assert!(misfiled.is_err());
+    assert_eq!(store.read(HeldBy::from(second))?, None);
+    store.write(JobHalted::new(first, Halted::Flailed, Account::told(&"flailed")).holding(flail))?;
+    let hold = store.read(HeldBy::from(first))?.ok_or("no hold")?;
+    let filed: Vec<(JobId, RunId)> = hold.held().map(|flailed| (flailed.job(), flailed.run())).collect();
+    assert_eq!(filed, vec![(first, RunId::new(1))]);
+    Ok(())
+}

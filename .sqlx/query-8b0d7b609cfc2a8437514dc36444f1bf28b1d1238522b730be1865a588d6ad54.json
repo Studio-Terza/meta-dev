@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  flailed (message, ordinal, job, run)\nSELECT\n  ?1,\n  ?2,\n  (\n    SELECT\n      runs.job\n    FROM\n      runs\n    WHERE\n      runs.id = ?3\n  ),\n  ?3\nWHERE\n  NOT EXISTS (\n    SELECT\n      1\n    FROM\n      structured\n    WHERE\n      structured.message = ?1\n      AND structured.ordinal = ?2\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "8b0d7b609cfc2a8437514dc36444f1bf28b1d1238522b730be1865a588d6ad54"
+}

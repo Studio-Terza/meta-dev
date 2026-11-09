@@ -71,7 +71,10 @@ impl<'line> Line<'line> {
 
 impl<'line> Spec<'line> {
     fn after(text: &'line str, opening: &Lexed, rest: &[Lexed]) -> Option<Spec<'line>> {
-        rest.last().and_then(|last| text.get(opening.span.end..last.span.end)).map(|value| Spec::read(value, rest))
+        let spoken = rest.last().and_then(|last| text.get(opening.span.end..last.span.end))?;
+        let trailing: usize = spoken.chars().rev().take_while(|c| c.is_whitespace()).map(char::len_utf8).sum();
+        let value = spoken.get(..spoken.len().saturating_sub(trailing))?;
+        Some(Spec::read(value, rest))
     }
 
     fn read(value: &'line str, lexed: &[Lexed]) -> Spec<'line> {

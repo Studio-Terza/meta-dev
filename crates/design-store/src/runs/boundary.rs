@@ -182,7 +182,7 @@ VALUES
             account: Account,
             unreported: Delivery
         ))?;
-        let holding = held.map(|held| held.written(job, statements)).transpose()?;
+        let holding = held.map(|held| held.written(statements)).transpose()?;
         let retelling = retold
             .into_iter()
             .map(|retold| retold.written(statements))
@@ -367,7 +367,7 @@ WHERE
 }
 
 impl JobFlailed {
-    fn written(self, job: JobId, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let JobFlailed { run, segments } = self;
         let written = segments
             .iter()
@@ -381,8 +381,15 @@ INSERT INTO
 SELECT
   ?1,
   ?2,
-  ?3,
-  ?4
+  (
+    SELECT
+      runs.job
+    FROM
+      runs
+    WHERE
+      runs.id = ?3
+  ),
+  ?3
 WHERE
   NOT EXISTS (
     SELECT
@@ -396,7 +403,6 @@ WHERE
 "#,
                     message: Uuid,
                     ordinal: Ordinal,
-                    job: JobId,
                     run: RunId
                 ))
             })
