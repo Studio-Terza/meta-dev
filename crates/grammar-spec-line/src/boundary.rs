@@ -63,15 +63,11 @@ impl Head {
 
 impl Spec {
     fn after(rest: &[Lexed]) -> Option<Spec> {
-        rest.first().map(|_said| Spec::read(rest))
-    }
-
-    fn read(lexed: &[Lexed]) -> Spec {
-        let only = <&[Lexed; 1]>::try_from(lexed).ok();
-        Spec {
-            value: lexed.iter().map(|lexed| lexed.text.as_str()).collect(),
+        let only = <&[Lexed; 1]>::try_from(rest).ok();
+        rest.first().map(|_said| Spec {
+            value: rest.iter().map(|lexed| lexed.text.as_str()).collect(),
             attachment: only.and_then(|[only]| only.attachment()),
-        }
+        })
     }
 
     #[must_use]
