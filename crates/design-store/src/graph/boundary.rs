@@ -38,7 +38,6 @@ enum Root {
 pub struct Restaged {
     node: Resolved,
     transition: Transition,
-    provenance: Provenance,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -228,8 +227,8 @@ impl Root {
 
 impl Restaged {
     #[must_use]
-    pub fn new(node: Resolved, transition: Transition, provenance: Provenance) -> Restaged {
-        Restaged { node, transition, provenance }
+    pub fn new(node: Resolved, transition: Transition) -> Restaged {
+        Restaged { node, transition }
     }
 }
 
@@ -355,7 +354,7 @@ impl Batch for Restaged {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         let id = self.node.0;
-        let provenance = self.provenance;
+        let provenance = Provenance::Lead(Entered::Stage);
         let moved = self.transition.applied(NodeRow::loaded(self.node, statements)?)?;
         let StageColumns { stage, artifact, condition, reason } = StageColumns::from(moved.stage());
         Ok(statements.written(store_ports::query!(

@@ -63,7 +63,7 @@ impl Move {
     pub fn written(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
         let lock = store.lock()?;
         let node = Found::resolved(store, self.node)?;
-        store.write(Restaged::new(node, self.transition, Provenance::from(Entered::Stage)))?;
+        store.write(Restaged::new(node, self.transition))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
         Printed::lines(out, &Refs::placed(store, shown.placed())?)?;

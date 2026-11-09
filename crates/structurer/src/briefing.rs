@@ -66,7 +66,7 @@ enum Rule {
     )]
     Kinds,
     #[name(
-        "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment it links to needs its own. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
+        "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
     )]
     Cover,
     #[name(
@@ -74,7 +74,7 @@ enum Rule {
     )]
     Refer,
     #[name(
-        "An asked line shows a question still open from earlier in the session; it needs no directive of its own, but when a segment answers or decides it, link that segment to it as answers."
+        "An asked line shows a question still open from earlier in the session; it is a link target only and is never given a directive of its own, whether place, sense or any other: when a segment answers or decides it, link that segment to it as answers, and place and sense that segment as usual."
     )]
     Link,
     #[name(

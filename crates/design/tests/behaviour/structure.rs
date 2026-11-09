@@ -289,6 +289,26 @@ fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_a
 }
 
 #[test]
+fn a_brief_with_asked_lines_states_that_they_are_link_targets_only_and_a_reply_linking_an_answer_to_one_applies()
+-> Result<(), Box<dyn Error>> {
+    let asked = format!("{}.0", Session::ASKED);
+    let [decided, other] = [Applying::answer(0), Applying::answer(1)];
+    let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
+    let answering = format!("link({decided}, {asked}, answers)\nconversational({other})\nconversational({later})");
+    let structuring = Structuring::over(Script::replying(&[Some(&answering)]), Pause::new(0))?;
+    structuring
+        .applying
+        .applied(&format!("place({asked}, n1, questions)\nsense({asked}, question, specific, firm, explicit)"))?;
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let stated = "An asked line shows a question still open from earlier in the session; it is a link target only";
+    assert_eq!(briefs.iter().map(|brief| brief.matches(stated).count()).collect::<Vec<usize>>(), [1]);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!(structuring.applying.run(&["view", "open-questions"])?, "");
+    Ok(())
+}
+
+#[test]
 fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() -> Result<(), Box<dyn Error>> {
     let [first, second] = ["aaaaaaaa-0000-4000-8000-000000000011", "aaaaaaaa-0000-4000-8000-000000000012"];
     let [first_answer, second_answer] =
