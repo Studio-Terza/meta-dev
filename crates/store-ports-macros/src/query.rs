@@ -24,7 +24,6 @@ impl Expanding for Query {
         let failed = |unexpanded: Unexpanded| syn::Error::new(source.span(), unexpanded);
         let entry = Entry::found(&source).map_err(failed)?;
         entry.bound(bounds.len()).map_err(failed)?;
-        let tracked = entry.tracked();
         let sql = LitStr::new(&source.value(), source.span());
         let arguments: Vec<TokenStream> = bounds.iter().map(Bound::encoded).collect();
         let values = quote!(::std::vec![#(#arguments),*]);
@@ -48,10 +47,7 @@ impl Expanding for Query {
                 })
             },
         )?;
-        Ok(quote!({
-            #tracked
-            #prepared
-        }))
+        Ok(prepared)
     }
 }
 

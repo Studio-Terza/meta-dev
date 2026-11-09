@@ -1,10 +1,6 @@
 mod declared;
 mod unexpanded;
 
-use std::path::PathBuf;
-
-use proc_macro2::TokenStream;
-use quote::quote;
 use serde::Deserialize;
 use syn::LitStr;
 
@@ -16,8 +12,6 @@ pub use unexpanded::Unexpanded;
 
 #[derive(Debug, Deserialize)]
 pub struct Entry {
-    #[serde(skip)]
-    path: PathBuf,
     describe: Describe,
 }
 
@@ -46,14 +40,7 @@ impl Entry {
         let text = Disk::text(&path).map_err(|failed| Unexpanded::Unread { path: path.clone(), source: failed })?;
         let entry: Entry = serde_json::from_str(&text)
             .map_err(|failed| Unexpanded::Unparsed { path: path.clone(), source: failed })?;
-        Ok(Entry { path, ..entry })
-    }
-
-    pub fn tracked(&self) -> TokenStream {
-        let path = self.path.to_string_lossy();
-        quote!(
-            const _: &[u8] = include_bytes!(#path);
-        )
+        Ok(entry)
     }
 
     pub fn bound(&self, given: usize) -> Result<(), Unexpanded> {

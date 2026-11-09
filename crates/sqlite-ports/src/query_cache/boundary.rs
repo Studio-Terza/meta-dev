@@ -65,15 +65,16 @@ impl QueryCache {
     fn kept(&self, scratch: &mut Scratch, query: &str, out: &mut impl io::Write) -> Result<PathBuf, Uncached> {
         let hash = hex::encode(Sha256::digest(query.as_bytes()));
         let path = self.root.join(Self::DIRECTORY).join(format!("query-{hash}.json"));
-        let held = Some(path.clone()).filter(|cached| cached.is_file());
-        held.map_or_else(
-            || {
-                scratch
-                    .written(Entry::unwritten(query, hash), path)
-                    .and_then(|written| self.announced("wrote", written, out))
-            },
-            Ok,
-        )
+        let text = scratch.described(query, hash)?;
+        let current = fs::read(&path).ok();
+        Some(text)
+            .filter(|fresh| current.as_ref() != Some(fresh))
+            .map_or_else(|| Ok(path.clone()), |fresh| self.rewritten(path.clone(), &fresh, out))
+    }
+
+    fn rewritten(&self, path: PathBuf, text: &[u8], out: &mut impl io::Write) -> Result<PathBuf, Uncached> {
+        fs::write(&path, text).map_err(|failed| Uncached::Io { path: path.clone(), source: failed })?;
+        self.announced("wrote", path, out)
     }
 
     fn announced(&self, change: &str, path: PathBuf, out: &mut impl io::Write) -> Result<PathBuf, Uncached> {
@@ -103,18 +104,6 @@ struct Scratch {
     connection: SqliteConnection,
 }
 
-#[derive(Debug)]
-struct Unwritten<'query> {
-    query: &'query str,
-    hash: String,
-}
-
-impl Entry<'_> {
-    fn unwritten(query: &str, hash: String) -> Unwritten<'_> {
-        Unwritten { query, hash }
-    }
-}
-
 impl TryFrom<Vec<OsString>> for QueryCache {
     type Error = Uncached;
 
@@ -134,8 +123,7 @@ impl Scratch {
         Ok(Scratch { runtime, connection })
     }
 
-    fn written(&mut self, unwritten: Unwritten<'_>, path: PathBuf) -> Result<PathBuf, Uncached> {
-        let Unwritten { query, hash } = unwritten;
+    fn described(&mut self, query: &str, hash: String) -> Result<Vec<u8>, Uncached> {
         let sql = SqlStr::from_static(Box::leak(query.to_owned().into_boxed_str()));
         let describe = self
             .runtime
@@ -144,7 +132,6 @@ impl Scratch {
         let entry = Entry { db_name: QueryCache::DATABASE, query, describe, hash };
         let mut text = serde_json::to_vec_pretty(&entry).map_err(Uncached::Unwritten)?;
         text.push(b'\n');
-        fs::write(&path, text).map_err(|failed| Uncached::Io { path: path.clone(), source: failed })?;
-        Ok(path)
+        Ok(text)
     }
 }
