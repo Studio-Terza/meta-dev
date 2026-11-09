@@ -6,3 +6,6 @@ VALUES ('u1', 0, 'sentence', 'Only one.');
 
 INSERT INTO mechanical_links (source, relation, target, source_message, target_message)
 VALUES ('u1#0', 'answers', 'u1#1', 'u1', 'u1');
+
+INSERT INTO mechanical_links (source, relation, target, source_message, target_message)
+VALUES ('u1#2', 'answers', 'u1#3', 'u1', 'u1');

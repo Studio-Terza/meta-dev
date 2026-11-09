@@ -446,7 +446,7 @@ fn an_old_store_holding_a_link_to_a_segment_it_does_not_hold_refuses_the_open_an
     let store = run.port(Sqlite::in_memory::<Unanchored>());
     assert_eq!(
         Unanchored::refusal(store.read(SessionCursors)),
-        "these stored links name a segment the store does not hold: u1#0 answers u1#1"
+        "these stored links name a segment the store does not hold: u1#0 answers u1#1; u1#2 answers u1#3"
     );
 }
 
