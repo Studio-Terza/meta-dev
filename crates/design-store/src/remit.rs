@@ -7,7 +7,7 @@ use transcript_ports::Uuid;
 
 use design_jobs::{JobClosed, JobState};
 
-use crate::{Covered, Refusal};
+use crate::{Covered, Refusal, Unpaid};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Remit {
@@ -23,13 +23,6 @@ pub(crate) enum Paid {
 
 #[derive(Debug, Op)]
 pub struct JobRepeated(Remit);
-
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
-#[error("the directives leave segments of their job unstructured")]
-pub struct Unpaid {
-    first: Segment,
-    rest: Vec<Segment>,
-}
 
 impl Remit {
     #[must_use]
@@ -70,9 +63,8 @@ impl Remit {
 
 impl Paid {
     fn owing(job: JobId, left: &[Segment]) -> Result<Paid, Refusal> {
-        left.split_first().map_or(Ok(Paid::Job(job)), |(first, rest)| {
-            Err(Refusal::Unpaid(Unpaid { first: first.clone(), rest: rest.to_vec() }))
-        })
+        left.split_first()
+            .map_or(Ok(Paid::Job(job)), |(first, rest)| Err(Refusal::Unpaid(Unpaid::new(first.clone(), rest.to_vec()))))
     }
 
     pub(crate) fn closed(self, state: JobState, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
@@ -94,17 +86,5 @@ impl Batch for JobRepeated {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         Ok(self.0.paid(statements)?.closed(JobState::Repeated, statements)?)
-    }
-}
-
-impl Unpaid {
-    #[must_use]
-    pub fn first(&self) -> &Segment {
-        &self.first
-    }
-
-    #[must_use]
-    pub fn rest(&self) -> &[Segment] {
-        &self.rest
     }
 }

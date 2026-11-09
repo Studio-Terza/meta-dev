@@ -7,7 +7,8 @@ use store_ports::{Batch, Columns as Row, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
 use super::Directions;
-use crate::acyclic::{Closing, Keyed, Refusal, SegmentCorrects, SegmentSupersedes};
+use crate::Refusal;
+use crate::acyclic::{Closing, SegmentCorrects, SegmentSupersedes};
 use crate::annotation::Remark;
 use crate::graph::{NodeRow, Resolved};
 use design_jobs::JobState;
@@ -37,14 +38,9 @@ struct LinkColumns {
 }
 
 #[derive(Debug, Row)]
-pub(crate) struct Columns {
+struct Columns {
     message: Uuid,
     ordinal: Ordinal,
-}
-
-#[derive(Debug, Row)]
-struct KeyRow {
-    key: Keyed,
 }
 
 #[derive(Debug, Row)]
@@ -83,46 +79,6 @@ pub(crate) struct ConversationalRow {
     message: Uuid,
     ordinal: Ordinal,
     provenance: Provenance,
-}
-
-impl Columns {
-    pub(crate) fn rowid(self, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
-        let Columns { message, ordinal } = self;
-        let row = statements.one(store_ports::query!(
-            KeyRow,
-            r#"
-SELECT
-  rowid AS "key!: i64"
-FROM
-  segments
-WHERE
-  message = ?1
-  AND ordinal = ?2
-"#,
-            message: Uuid,
-            ordinal: Ordinal
-        ))?;
-        Ok(row.key)
-    }
-
-    pub(crate) fn covered(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Segment>, StoreFailure> {
-        let rows = statements.rows(store_ports::query!(
-            Columns,
-            r#"
-SELECT DISTINCT
-  message AS "message!: String",
-  ordinal AS "ordinal!: i64"
-FROM
-  structured
-WHERE
-  message = ?1
-ORDER BY
-  ordinal
-"#,
-            message: Uuid
-        ))?;
-        Ok(rows.into_iter().map(Segment::from).collect())
-    }
 }
 
 impl From<Columns> for Segment {

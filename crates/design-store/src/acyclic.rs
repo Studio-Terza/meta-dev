@@ -1,10 +1,8 @@
 mod boundary;
 
-use design_model::{Inversion, Misstaged, NodeId, NodeRelation, Segment, SegmentRelation};
+use design_model::{NodeId, NodeRelation, Segment, SegmentRelation};
 use named_derive::Named;
 use store_ports::{Statements, StoreFailure};
-
-use crate::Unpaid;
 
 pub(crate) use boundary::{Closing, Keyed};
 
@@ -26,22 +24,6 @@ pub enum Cycle {
     Segments { source: Segment, relation: SegmentRelation, target: Segment },
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum Refusal {
-    #[error("the edge would close a cycle of its relation")]
-    Cyclic(Cycle),
-    #[error("the superseding node refines the node it would supersede")]
-    Ancestral { old: NodeId, by: NodeId },
-    #[error("{0}")]
-    Inverted(#[from] Inversion),
-    #[error("{0}")]
-    Misstaged(#[from] Misstaged),
-    #[error("{0}")]
-    Unpaid(#[from] Unpaid),
-    #[error("{0}")]
-    Store(#[from] StoreFailure),
-}
-
 pub trait Closes {
     type Output;
 
@@ -57,6 +39,10 @@ impl Cycle {
             Cycle::Segments { source, relation, target } => closes.segments(source, relation, target),
         }
     }
+}
+
+pub(crate) trait Refuses: From<StoreFailure> {
+    fn cyclic(cycle: Cycle) -> Self;
 }
 
 pub(crate) trait Acyclic {

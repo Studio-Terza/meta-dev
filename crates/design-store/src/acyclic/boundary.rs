@@ -1,17 +1,22 @@
 use std::marker::PhantomData;
 
-use design_model::{NodeId, Segment};
+use design_model::{NodeId, Ordinal, Segment};
 use newtype::{Arbitrary, Counter, Newtype, Wrapping};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 
-use super::{Acyclic, Closed, Refusal};
-use crate::directions::Columns as SegmentColumns;
+use super::{Acyclic, Closed, Refuses};
+use transcript_ports::Uuid;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Keyed(i64);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 struct Depth(i64);
+
+#[derive(Debug, Columns)]
+struct KeyRow {
+    key: Keyed,
+}
 
 #[derive(Debug, Columns)]
 struct Reached {
@@ -37,7 +42,23 @@ impl Keyed {
     }
 
     pub(crate) fn segment(segment: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
-        SegmentColumns::from(segment).rowid(statements)
+        let message = AsRef::<Uuid>::as_ref(segment).clone();
+        let ordinal = Ordinal::from(segment);
+        let row = statements.one(store_ports::query!(
+            KeyRow,
+            r#"
+SELECT
+  rowid AS "key!: i64"
+FROM
+  segments
+WHERE
+  message = ?1
+  AND ordinal = ?2
+"#,
+            message: Uuid,
+            ordinal: Ordinal
+        ))?;
+        Ok(row.key)
     }
 }
 
@@ -46,21 +67,21 @@ impl<R: Acyclic> Closing<R> {
         Closing { source, target, relation: PhantomData }
     }
 
-    pub(crate) fn written<Failure>(
+    pub(crate) fn written<Failure, Refused>(
         self,
         statements: &mut Statements<'_>,
         edge: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,
-    ) -> Result<Written, Refusal>
+    ) -> Result<Written, Refused>
     where
-        Refusal: From<Failure>,
+        Refused: Refuses + From<Failure>,
     {
-        let open = self.opened(statements)?;
+        let open = self.opened::<Refused>(statements)?;
         let edged = edge(statements)?;
         let closed = open.closed(R::CLOSED, statements)?;
         Ok(edged.plus(closed))
     }
 
-    fn opened(self, statements: &mut Statements<'_>) -> Result<Open, Refusal> {
+    fn opened<Refused: Refuses>(self, statements: &mut Statements<'_>) -> Result<Open, Refused> {
         let open =
             Open { ancestor: R::keyed(&self.target, statements)?, descendant: R::keyed(&self.source, statements)? };
         let relation = R::CLOSED;
@@ -90,7 +111,7 @@ WHERE
             .into_iter()
             .map(|reached| reached.depth)
             .next()
-            .map_or(Ok(open), |_depth| Err(Refusal::Cyclic(R::cycle(self.source, self.target))))
+            .map_or(Ok(open), |_depth| Err(Refused::cyclic(R::cycle(self.source, self.target))))
     }
 }
 

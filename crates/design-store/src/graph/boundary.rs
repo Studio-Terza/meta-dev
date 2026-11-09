@@ -7,7 +7,8 @@ use newtype::Counter;
 use port_core::Op;
 use store_ports::{Batch, ColumnFailure, Columns, Query, Statements, StoreFailure, Written};
 
-use crate::acyclic::{Acyclic, Closed, Closing, Refines, Refusal, Supersedes};
+use crate::Refusal;
+use crate::acyclic::{Acyclic, Closed, Closing, Refines, Supersedes};
 use crate::{Link, Relative};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

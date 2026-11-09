@@ -7,7 +7,7 @@ use transcript_ports::Uuid;
 
 use crate::{Refusal, Remit, Unseen};
 
-pub(crate) use boundary::{Annotating, Columns};
+pub(crate) use boundary::Annotating;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Directed {
