@@ -23,7 +23,6 @@ mod project_root;
 mod quoted;
 mod relative;
 mod remit;
-mod runs;
 mod scope;
 mod search_segments;
 mod session_cursors;
@@ -37,7 +36,7 @@ pub use acyclic::{Closes, Cycle, Refusal};
 pub use annotation::{Annotation, Remarking};
 pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
 pub use asked_earlier::{Asked, AskedEarlier};
-pub use boundary::{Account, Excerpt, Hit, LinkRow, RelationName, ShapeName};
+pub use boundary::{Hit, LinkRow, RelationName, ShapeName};
 pub use citation::Citation;
 pub use covered::Covered;
 pub use cursors::Cursors;
@@ -56,12 +55,6 @@ pub use project_root::ProjectRoot;
 pub use quoted::{Quoted, QuotedSegments};
 use relative::Relative;
 pub use remit::{JobRepeated, Remit, Unpaid};
-pub use runs::{
-    FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRetried,
-    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded, RunSpawned, RunState, RunsOf,
-    Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
-};
-use runs::{JobClosed, JobState};
 pub use scope::Scope;
 pub use search_segments::SearchSegments;
 pub use session_cursors::SessionCursors;

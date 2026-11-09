@@ -1,9 +1,10 @@
 use design_model::{
     Dropped, NodeId, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Staging, Terminal,
 };
+use design_runs::Unplaced;
 use design_store::{
     Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest,
-    Stored, Unplaced,
+    Stored,
 };
 use newtype::Wrapping;
 use store_ports::{Store, StoreFailure};

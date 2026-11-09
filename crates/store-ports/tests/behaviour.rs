@@ -8,7 +8,8 @@ use design_model::{
     Prefix, Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage,
     Standing, Title,
 };
-use design_store::{RelationName, RunState, SessionCursors, ShapeName, ShownMessage, StreamSchema};
+use design_runs::RunState;
+use design_store::{RelationName, SessionCursors, ShapeName, ShownMessage, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar_search::Term;

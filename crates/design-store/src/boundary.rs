@@ -4,7 +4,6 @@ use std::fmt;
 use std::iter::Sum;
 
 use design_model::{Ordinal, Segment};
-use dispatch_ports::Reply;
 use file_ports::Offset;
 use grammar_search::Term;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
@@ -20,12 +19,6 @@ pub struct ShapeName(String);
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct RelationName(String);
-
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub struct Account(String);
-
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub struct Excerpt(String);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rank(f64);
@@ -659,24 +652,5 @@ impl AsRef<Authorship> for Hit {
 impl AsRef<Instant> for Hit {
     fn as_ref(&self) -> &Instant {
         &self.at
-    }
-}
-
-impl Account {
-    #[must_use]
-    pub fn told(told: &impl fmt::Display) -> Account {
-        Account(told.to_string())
-    }
-}
-
-impl Excerpt {
-    pub const BYTES: usize = 16 * 1024;
-}
-
-impl From<&Reply> for Excerpt {
-    fn from(reply: &Reply) -> Excerpt {
-        let told = reply.clone().into_inner();
-        let kept = told.get(..told.floor_char_boundary(Excerpt::BYTES)).unwrap_or_default();
-        Excerpt(kept.to_owned())
     }
 }

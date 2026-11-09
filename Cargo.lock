@@ -273,6 +273,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "design-model",
+ "design-runs",
  "design-store",
  "dispatch-ports",
  "e2e",
@@ -322,6 +323,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "design-jobs"
+version = "0.1.0"
+dependencies = [
+ "design-model",
+ "named-derive",
+ "newtype",
+ "port-core",
+ "store-ports",
+ "thiserror",
+]
+
+[[package]]
 name = "design-model"
 version = "0.1.0"
 dependencies = [
@@ -341,11 +354,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "design-runs"
+version = "0.1.0"
+dependencies = [
+ "design-jobs",
+ "design-model",
+ "design-store",
+ "dispatch-ports",
+ "laws",
+ "named-derive",
+ "newtype",
+ "port-core",
+ "sqlite-ports",
+ "store-ports",
+ "thiserror",
+ "transcript-ports",
+]
+
+[[package]]
 name = "design-store"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "design-jobs",
  "design-model",
+ "design-runs",
  "dispatch-ports",
  "exit",
  "file-ports",
@@ -2847,6 +2880,7 @@ name = "store-ports"
 version = "0.1.0"
 dependencies = [
  "design-model",
+ "design-runs",
  "design-store",
  "dispatch-ports",
  "file-ports",

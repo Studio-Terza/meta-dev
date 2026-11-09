@@ -1,12 +1,20 @@
 mod boundary;
 
+use std::fmt;
+
+use design_jobs::JobState;
 use design_model::{JobId, RunId, Segment};
-use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
+use dispatch_ports::{Deadline, Finished, Pid, Reply, Stall, Started, Usage};
 use named_derive::Named;
+use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use port_core::Op;
 use transcript_ports::{Body, SessionId};
 
-use crate::{Account, Excerpt};
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+pub struct Account(String);
+
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+pub struct Excerpt(String);
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunState {
@@ -26,22 +34,6 @@ pub enum RunState {
     Gone,
     #[name("failed")]
     Failed,
-}
-
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum JobState {
-    #[name("open")]
-    Open,
-    #[name("applied")]
-    Applied,
-    #[name("repeated")]
-    Repeated,
-    #[name("flailed")]
-    Flailed,
-    #[name("stalled")]
-    Stalled,
-    #[name("interrupted")]
-    Interrupted,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -69,12 +61,6 @@ pub struct Spawned {
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct JobOpened(JobId);
-
-#[derive(Clone, Copy, Debug, Op)]
-pub(crate) struct JobClosed {
-    job: JobId,
-    state: JobState,
-}
 
 #[derive(Clone, Debug, Op)]
 pub struct JobHalted {
@@ -229,12 +215,6 @@ impl From<&Stall> for RunState {
 impl From<JobId> for JobOpened {
     fn from(job: JobId) -> JobOpened {
         JobOpened(job)
-    }
-}
-
-impl JobClosed {
-    pub(crate) fn new(job: JobId, state: JobState) -> JobClosed {
-        JobClosed { job, state }
     }
 }
 
@@ -412,5 +392,24 @@ impl AsRef<SessionId> for Unplaced {
 impl AsRef<Body> for Unplaced {
     fn as_ref(&self) -> &Body {
         &self.body
+    }
+}
+
+impl Account {
+    #[must_use]
+    pub fn told(told: &impl fmt::Display) -> Account {
+        Account(told.to_string())
+    }
+}
+
+impl Excerpt {
+    pub const BYTES: usize = 16 * 1024;
+}
+
+impl From<&Reply> for Excerpt {
+    fn from(reply: &Reply) -> Excerpt {
+        let told = reply.clone().into_inner();
+        let kept = told.get(..told.floor_char_boundary(Excerpt::BYTES)).unwrap_or_default();
+        Excerpt(kept.to_owned())
     }
 }

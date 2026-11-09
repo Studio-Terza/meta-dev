@@ -12,6 +12,7 @@ test = false
 doctest = false
 
 [dependencies]
+design-jobs = { path = "../design-jobs" }
 design-model = { path = "../design-model" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
@@ -31,6 +32,7 @@ console-ports = { path = "../console-ports" }
 exit = { path = "../exit" }
 
 [dev-dependencies]
+design-runs = { path = "../design-runs" }
 sqlite-ports = { path = "../sqlite-ports" }
 laws = { path = "../laws" }
 

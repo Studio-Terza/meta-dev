@@ -4,12 +4,14 @@ use newtype::{Counter, Wrapping};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::{Body, SessionId, Uuid};
 
+use design_jobs::{JobClosed, JobState};
+
 use super::{
-    Delivery, FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, Hold, JobClosed, JobFlailed, JobHalted,
-    JobOpened, JobRetried, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded,
-    RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures,
-    Unstructured,
+    Delivery, FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, Hold, JobFlailed, JobHalted, JobOpened,
+    JobRetried, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded, RunSpawned, RunState,
+    RunsOf, Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
+
 use crate::{Account, Excerpt};
 
 #[derive(Debug, Columns)]
@@ -140,26 +142,6 @@ VALUES
 "#,
             job: JobId,
             open: JobState
-        ))
-    }
-}
-
-impl Batch for JobClosed {
-    type Failure = StoreFailure;
-
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobClosed { job, state } = self;
-        statements.written(store_ports::query!(
-            r#"
-UPDATE
-  jobs
-SET
-  state = ?2
-WHERE
-  id = ?1
-"#,
-            job: JobId,
-            state: JobState
         ))
     }
 }

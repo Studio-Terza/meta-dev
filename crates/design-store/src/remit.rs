@@ -5,7 +5,9 @@ use port_core::Op;
 use store_ports::{Batch, Query, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
-use crate::{Covered, JobClosed, JobState, Refusal};
+use design_jobs::{JobClosed, JobState};
+
+use crate::{Covered, Refusal};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Remit {

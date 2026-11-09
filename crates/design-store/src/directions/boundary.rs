@@ -10,7 +10,9 @@ use super::Directions;
 use crate::acyclic::{Closing, Keyed, Refusal, SegmentCorrects, SegmentSupersedes};
 use crate::annotation::Remark;
 use crate::graph::{NodeRow, Resolved};
-use crate::{Annotation, JobState, Linked};
+use design_jobs::JobState;
+
+use crate::{Annotation, Linked};
 
 #[derive(Debug)]
 pub(crate) struct Annotating<'held, 'run> {
