@@ -19,9 +19,10 @@ use grammar::search::Terms;
 use grammar::shard::Sharding;
 use grammar::slug::Letters;
 use grammar::spec_line;
-use grammar::spec_line::Attachment;
+use grammar::spec_line::{Attachment, Spec};
 use laws::proptest::collection::vec;
-use laws::proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof};
+use laws::proptest::option;
+use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 
 struct Marks;
@@ -864,16 +865,57 @@ laws::roundtrip!(
     Some
 );
 
+struct Drawn;
+
+impl Drawn {
+    fn line(drawn: Option<String>) -> Option<spec_line::Line> {
+        drawn.map_or(Some(spec_line::Line::Repair), |text| Spec::try_new(text).ok().map(spec_line::Line::Spec))
+    }
+}
+
 laws::roundtrip!(
-    a_spec_line_reads_back_from_its_rendering,
-    prop_oneof![
-        Just(spec_line::Line::Repair),
-        any::<Attachment>().prop_map(|attachment| spec_line::Line::Spec(attachment.into_inner())),
-        "[!-~]([ -~]{0,20}[!-~])?".prop_map(spec_line::Line::Spec),
-    ],
-    |line: &spec_line::Line| line.to_string(),
+    a_spec_line_reads_back_from_its_rendering_and_spec_text_that_would_not_is_refused,
+    option::of(prop_oneof![
+        any::<String>(),
+        "[a-z0-9#, \t\r\n-]{0,12}",
+        any::<Attachment>().prop_map(Attachment::into_inner),
+        any::<Spec>().prop_map(Spec::into_inner),
+    ]),
+    |drawn: &Option<String>| Drawn::line(drawn.clone()).map_or_else(String::new, |line| line.to_string()),
     |text: &String| text.parse::<spec_line::Line>().ok(),
-    Some
+    Drawn::line
+);
+
+laws::table!(
+    spec_text_is_refused_when_its_spec_line_would_not_read_it_back,
+    |text: &&str| Spec::try_new((*text).to_owned()).ok().map(Spec::into_inner),
+    [
+        "transcript-design#D1" => Some("transcript-design#D1".to_owned()),
+        "owner 96d13317" => Some("owner 96d13317".to_owned()),
+        "a  b" => Some("a  b".to_owned()),
+        "transcript-design#D1 " => None,
+        "x " => None,
+        "x\r" => None,
+        "a\nb" => None,
+        " " => None,
+        "" => None,
+    ]
+);
+
+laws::table!(
+    a_spec_line_reads_its_text_up_to_trailing_blanks_and_refuses_a_second_line,
+    |text: &&str| text.parse::<spec_line::Line>().ok().map(|line| line.to_string()),
+    [
+        "spec: transcript-design#D1" => Some("spec: transcript-design#D1".to_owned()),
+        "spec: transcript-design#D1 \r\n" => Some("spec: transcript-design#D1".to_owned()),
+        "repair: main  " => Some("repair: main".to_owned()),
+        "repair: main" => Some("repair: main".to_owned()),
+        "spec: a\nb" => None,
+        "repair: main\nb" => None,
+        "repair: main b" => None,
+        "spec: " => None,
+        "spec:" => None,
+    ]
 );
 
 laws::table!(

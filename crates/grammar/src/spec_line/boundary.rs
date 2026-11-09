@@ -1,8 +1,9 @@
 use std::fmt;
 use std::str::FromStr;
 
+use logos::Lexer;
 use logos::Logos;
-use newtype::{Arbitrary, Checked, Newtype};
+use newtype::{Arbitrary, Checked, Display, Newtype};
 
 use crate::unspelled::Unspelled;
 
@@ -32,11 +33,24 @@ enum Form {
     Labels,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Rest<'text> {
+    Empty,
+    Blank,
+    Written(&'text str),
+    Trailed(&'text str),
+    Garbled,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Line {
     Repair,
-    Spec(String),
+    Spec(Spec),
 }
+
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+#[newtype(checked, strategy = "[!-~]([ -~]{0,20}[!-~])?")]
+pub struct Spec(String);
 
 #[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
 #[newtype(
@@ -52,30 +66,67 @@ impl Line {
     #[must_use]
     pub fn attachment(&self) -> Option<Attachment> {
         match self {
-            Line::Spec(value) => Attachment::try_new(value.clone()).ok(),
+            Line::Spec(spec) => Attachment::try_new(spec.clone().into_inner()).ok(),
             Line::Repair => None,
         }
-    }
-
-    fn repaired(value: Option<&str>) -> Option<Line> {
-        value.map_or(Some(Line::Repair), |_trailing| None)
     }
 }
 
 impl Head {
-    fn line(self, value: Option<&str>) -> Option<Line> {
+    fn line(self, rest: Rest<'_>) -> Option<Line> {
+        match rest {
+            Rest::Empty | Rest::Blank => self.unwritten(),
+            Rest::Written(written) | Rest::Trailed(written) => self.written(written),
+            Rest::Garbled => None,
+        }
+    }
+
+    fn unwritten(self) -> Option<Line> {
         match self {
-            Head::Repair => Line::repaired(value),
-            Head::Spec => value.map(|written| Line::Spec(written.to_owned())),
+            Head::Repair => Some(Line::Repair),
+            Head::Spec => None,
+        }
+    }
+
+    fn written(self, written: &str) -> Option<Line> {
+        match self {
+            Head::Repair => None,
+            Head::Spec => Spec::lexed(written).map(Line::Spec),
         }
     }
 }
 
-impl<'text> Tail<'text> {
-    fn written(self) -> Option<&'text str> {
+impl Spec {
+    fn lexed(written: &str) -> Option<Spec> {
+        Spec::try_new(written.to_owned()).ok()
+    }
+}
+
+impl<'text> Rest<'text> {
+    fn lexed(tail: Lexer<'text, Tail<'text>>) -> Rest<'text> {
+        tail.map(Result::ok).fold(Rest::Empty, Rest::then)
+    }
+
+    fn then(self, token: Option<Tail<'text>>) -> Rest<'text> {
         match self {
-            Tail::Value(value) => Some(value),
-            Tail::Blank => None,
+            Rest::Empty => Rest::opened(token),
+            Rest::Written(written) => Rest::trailed(written, token),
+            Rest::Blank | Rest::Trailed(_) | Rest::Garbled => Rest::Garbled,
+        }
+    }
+
+    fn opened(token: Option<Tail<'text>>) -> Rest<'text> {
+        match token {
+            Some(Tail::Value(written)) => Rest::Written(written),
+            Some(Tail::Blank) => Rest::Blank,
+            None => Rest::Garbled,
+        }
+    }
+
+    fn trailed(written: &'text str, token: Option<Tail<'text>>) -> Rest<'text> {
+        match token {
+            Some(Tail::Blank) => Rest::Trailed(written),
+            Some(Tail::Value(_)) | None => Rest::Garbled,
         }
     }
 }
@@ -86,8 +137,8 @@ impl FromStr for Line {
     fn from_str(text: &str) -> Result<Line, Unspelled> {
         let mut head = Head::lexer(text);
         let opened = head.next().and_then(Result::ok);
-        let value = head.morph::<Tail<'_>>().next().and_then(Result::ok).and_then(Tail::written);
-        opened.and_then(|lexed| lexed.line(value)).ok_or(Unspelled)
+        let rest = Rest::lexed(head.morph::<Tail<'_>>());
+        opened.and_then(|lexed| lexed.line(rest)).ok_or(Unspelled)
     }
 }
 
@@ -95,7 +146,7 @@ impl fmt::Display for Line {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Line::Repair => formatter.write_str(Self::REPAIR),
-            Line::Spec(value) => write!(formatter, "{}{value}", Self::SPEC),
+            Line::Spec(spec) => write!(formatter, "{}{spec}", Self::SPEC),
         }
     }
 }
@@ -106,6 +157,17 @@ impl Checked for Attachment {
     fn checked(value: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Form, ()>> = Form::lexer(value).collect();
         <[Result<Form, ()>; 1]>::try_from(spelled).ok().and_then(|[only]| only.ok()).map(|_form| value).ok_or(Unspelled)
+    }
+}
+
+impl Checked for Spec {
+    type Error = Unspelled;
+
+    fn checked(value: &String) -> Result<&String, Unspelled> {
+        match Rest::lexed(Tail::lexer(value)) {
+            Rest::Written(_) => Ok(value),
+            Rest::Empty | Rest::Blank | Rest::Trailed(_) | Rest::Garbled => Err(Unspelled),
+        }
     }
 }
 
