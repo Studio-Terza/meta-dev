@@ -38,6 +38,18 @@ pub enum Failure<'path> {
     Runs(serde_json::Error),
     #[error("cannot read the cargo metadata: {0}")]
     Metadata(serde_json::Error),
+    #[error(
+        "clippy-targets cannot resolve the package spec `{}` against the cargo metadata: it takes workspace package names, not globs, versions or URLs",
+        .0.to_string_lossy()
+    )]
+    PackageSpec(std::ffi::OsString),
+    #[error(
+        "clippy-targets refuses `{}`: it chooses the targets from the cargo metadata of the workspace it runs in",
+        .0.to_string_lossy()
+    )]
+    Refused(std::ffi::OsString),
+    #[error("the clippy scope has no target to check, so clippy would pass by checking nothing")]
+    NothingToCheck,
     #[error("the mutation matrix failed: {0}")]
     Matrix(Refusal),
 }

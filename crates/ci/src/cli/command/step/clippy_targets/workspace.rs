@@ -23,16 +23,14 @@ pub(super) struct Workspace {
 impl Workspace {
     const TESTS: &'static str = "--tests";
 
-    pub(super) fn targets(&self, scope: &Scope) -> Vec<OsString> {
-        scope
-            .among(&self.packages, &self.workspace_default_members)
+    pub(super) fn targets(&self, scope: &Scope) -> Result<Vec<OsString>, Failure<'static>> {
+        let units = scope
+            .among(&self.packages, &self.workspace_default_members)?
             .into_iter()
             .flat_map(Package::units)
-            .collect::<BTreeSet<Unit>>()
-            .into_iter()
-            .map(OsString::from)
-            .chain([OsString::from(Self::TESTS)])
-            .collect()
+            .collect::<BTreeSet<Unit>>();
+        units.first().ok_or(Failure::NothingToCheck)?;
+        Ok(units.into_iter().map(OsString::from).chain([OsString::from(Self::TESTS)]).collect())
     }
 }
 

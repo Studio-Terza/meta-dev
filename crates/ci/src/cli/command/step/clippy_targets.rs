@@ -42,7 +42,7 @@ impl Step for ClippyTargets {
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let workspace = Changed::workspace_metadata(ports)?.as_ref().parse::<Workspace>()?;
-        let targets = workspace.targets(&Scope::from(self.arguments.as_slice()));
+        let targets = workspace.targets(&Scope::try_from(self.arguments.as_slice())?)?;
         let invocation = Invocation::new(
             "cargo",
             Self::CLIPPY.iter().map(OsString::from).chain(targets).chain(self.arguments.iter().cloned()),

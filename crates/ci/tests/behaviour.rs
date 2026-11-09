@@ -297,6 +297,20 @@ impl Clippy {
             .map(|argument| argument.to_string_lossy().into_owned())
             .collect()
     }
+
+    fn refused(scope: &[&str]) -> Vec<String> {
+        Clippy::refused_on(CLIPPY_FIXTURE, scope)
+    }
+
+    fn refused_on(metadata: &str, scope: &[&str]) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        let fake = Script { metadata: metadata.to_owned(), ..Script::new() };
+        let measured = scratch.file("m.toml");
+        let answer = scratch.answer(&fake, &[&["clippy-targets", measured.as_str(), "clippy"], scope].concat());
+        assert_eq!((answer.exit, answer.out.as_str(), scratch.read("m.toml").as_str()), (ExitCode::FAILURE, "", ""));
+        assert!(fake.calls.borrow().iter().all(|call| call.arguments().first().is_none_or(|first| first != "clippy")));
+        Text::lines(&answer.err)
+    }
 }
 
 laws::table!(
@@ -313,13 +327,73 @@ laws::table!(
         &["-p", "macros"][..] => vec!["--lib", "--tests", "-p", "macros"],
         &["-p", "gated"][..] => vec!["--lib", "--tests", "-p", "gated"],
         &["-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--examples", "--tests", "-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"],
-        &["-p", "unmatched"][..] => vec!["--tests", "-p", "unmatched"],
+        &["--package=binonly"][..] => vec!["--bins", "--tests", "--package=binonly"],
+        &["-pbinonly"][..] => vec!["--bins", "--tests", "-pbinonly"],
+        &["-p=binonly"][..] => vec!["--bins", "--tests", "-p=binonly"],
+        &["-vp", "binonly"][..] => vec!["--bins", "--tests", "-vp", "binonly"],
+        &["--packages", "x"][..] => vec!["--lib", "--bins", "--tests", "--packages", "x"],
         &["--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--tests", "--", "-D", "warnings"],
         &[][..] => vec!["--lib", "--bins", "--tests"],
-        &["-p"][..] => vec!["--lib", "--bins", "--tests", "-p"],
         &["--workspace", "-p", "libonly"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--workspace", "-p", "libonly"],
         &["--", "-p", "benched"][..] => vec!["--lib", "--bins", "--tests", "--", "-p", "benched"],
         &["--", "--workspace"][..] => vec!["--lib", "--bins", "--tests", "--", "--workspace"],
+    ]
+);
+
+const UNRESOLVED: &str = "against the cargo metadata: it takes workspace package names, not globs, versions or URLs";
+const REFUSED: &str = "it chooses the targets from the cargo metadata of the workspace it runs in";
+const NOTHING: &str = "the clippy scope has no target to check, so clippy would pass by checking nothing";
+const NO_PACKAGES: &str = r#"{ "packages": [], "workspace_default_members": [] }"#;
+const NO_DEFAULTS: &str = r#"{ "packages": [{ "id": "a", "name": "a", "targets": [{ "kind": ["lib"] }] }] }"#;
+
+laws::table!(
+    clippy_refuses_a_package_spec_it_cannot_resolve_naming_the_spec_and_never_runs,
+    |scope: &&[&str]| Clippy::refused(scope),
+    [
+        &["-p", "unmatched"][..] => vec![format!("clippy-targets cannot resolve the package spec `unmatched` {UNRESOLVED}")],
+        &["-p", "lib*"][..] => vec![format!("clippy-targets cannot resolve the package spec `lib*` {UNRESOLVED}")],
+        &["-p", "libonly@0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly@0.1.0` {UNRESOLVED}")],
+        &["--package=libonly@0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly@0.1.0` {UNRESOLVED}")],
+        &["-plib?nly"][..] => vec![format!("clippy-targets cannot resolve the package spec `lib?nly` {UNRESOLVED}")],
+        &["-p", "path+file:///w/libonly#0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `path+file:///w/libonly#0.1.0` {UNRESOLVED}")],
+        &["-p", "libonly", "-p", "libonly:0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly:0.1.0` {UNRESOLVED}")],
+        &["--workspace", "-p", "unmatched"][..] => vec![format!("clippy-targets cannot resolve the package spec `unmatched` {UNRESOLVED}")],
+        &["--package="][..] => vec![format!("clippy-targets cannot resolve the package spec `` {UNRESOLVED}")],
+    ]
+);
+
+laws::table!(
+    clippy_refuses_the_flags_that_would_choose_targets_or_another_workspace,
+    |scope: &&[&str]| Clippy::refused(scope),
+    [
+        &["--workspace", "--exclude", "libonly"][..] => vec![format!("clippy-targets refuses `--exclude`: {REFUSED}")],
+        &["--workspace", "--exclude=libonly"][..] => vec![format!("clippy-targets refuses `--exclude=libonly`: {REFUSED}")],
+        &["--manifest-path", "w/Cargo.toml"][..] => vec![format!("clippy-targets refuses `--manifest-path`: {REFUSED}")],
+        &["--workspace", "--all-targets"][..] => vec![format!("clippy-targets refuses `--all-targets`: {REFUSED}")],
+        &["-p", "benched", "--benches"][..] => vec![format!("clippy-targets refuses `--benches`: {REFUSED}")],
+        &["--bench=speed"][..] => vec![format!("clippy-targets refuses `--bench=speed`: {REFUSED}")],
+        &["--lib"][..] => vec![format!("clippy-targets refuses `--lib`: {REFUSED}")],
+        &["--tests"][..] => vec![format!("clippy-targets refuses `--tests`: {REFUSED}")],
+    ]
+);
+
+laws::table!(
+    clippy_refuses_a_package_flag_without_a_spec,
+    |scope: &&[&str]| Clippy::refused(scope).concat().contains("usage: ci "),
+    [
+        &["-p"][..] => true,
+        &["--package"][..] => true,
+        &["-p", "--", "-D", "warnings"][..] => true,
+    ]
+);
+
+laws::table!(
+    clippy_refuses_a_scope_with_no_target_rather_than_checking_nothing,
+    |(metadata, scope): &(&str, &[&str])| Clippy::refused_on(metadata, scope),
+    [
+        (NO_PACKAGES, &[][..]) => vec![NOTHING.to_owned()],
+        (NO_PACKAGES, &["--workspace"][..]) => vec![NOTHING.to_owned()],
+        (NO_DEFAULTS, &[][..]) => vec![NOTHING.to_owned()],
     ]
 );
 

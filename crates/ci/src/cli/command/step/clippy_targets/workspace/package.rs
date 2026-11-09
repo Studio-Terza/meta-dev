@@ -6,6 +6,7 @@ use serde::Deserialize;
 
 use super::super::name::{PackageId, PackageName};
 use super::unit::Unit;
+use crate::cli::command::failure::Failure;
 use target::Target;
 
 #[derive(Debug, Deserialize)]
@@ -20,8 +21,14 @@ impl Package {
         Some(self).filter(|package| defaults.contains(&package.id))
     }
 
-    pub(in super::super) fn named(&self, names: &[OsString]) -> Option<&Package> {
-        Some(self).filter(|package| names.iter().any(|name| name.to_str() == Some(package.name.as_ref())))
+    pub(in super::super) fn resolved<'package>(
+        packages: &'package [Package],
+        spec: &OsString,
+    ) -> Result<&'package Package, Failure<'static>> {
+        packages
+            .iter()
+            .find(|package| spec.to_str() == Some(package.name.as_ref()))
+            .ok_or_else(|| Failure::PackageSpec(spec.clone()))
     }
 
     pub(super) fn units(&self) -> impl Iterator<Item = Unit> {
