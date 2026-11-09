@@ -1,6 +1,6 @@
 use std::fmt;
 
-use newtype::Newtype;
+use newtype::Wrapping;
 use text_lines::OneLine;
 
 use super::super::build::Build;

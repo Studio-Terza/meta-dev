@@ -37,9 +37,9 @@ impl Exchange {
         [mut replies, complaints]: [PipeReader; 2],
         ringer: Ringer,
     ) -> Exchange {
-        let prompt = prompt.clone();
+        let sent = prompt.clone();
         let (telling, told) = mpsc::channel();
-        let writing = thread::spawn(move || prompting.write_all(prompt.as_ref()));
+        let writing = thread::spawn(move || prompting.write_all(sent.as_ref()));
         let complaining = thread::spawn(move || Stderr::heard(complaints));
         thread::spawn(move || {
             telling

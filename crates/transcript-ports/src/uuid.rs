@@ -1,19 +1,18 @@
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
+use grammar_output::Fields;
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
-use crate::blank::Blank;
+#[derive(Debug, thiserror::Error)]
+#[error("{0:?} is not a message uuid, which is one bare word of letters, digits, '_' and '-', not starting with '-'")]
+pub struct Unbare(String);
 
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[serde(try_from = "String")]
+#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[newtype(checked, strategy = "[A-Za-z0-9_][A-Za-z0-9_-]{0,36}")]
 pub struct Uuid(String);
 
-impl TryFrom<String> for Uuid {
-    type Error = Blank;
+impl Checked for Uuid {
+    type Error = Unbare;
 
-    fn try_from(text: String) -> Result<Uuid, Blank> {
-        match text.chars().next() {
-            Some(_) => Ok(Uuid::new(text)),
-            None => Err(Blank),
-        }
+    fn checked(text: &String) -> Result<&String, Unbare> {
+        Fields::bare(text).map(|_bare| text).ok_or_else(|| Unbare(text.clone()))
     }
 }

@@ -31,7 +31,7 @@ impl<'meta> Unported<'meta> {
     }
 
     fn reached(graph: &Graph<'meta>, owned: &Owned<'_, 'meta>, package: &'meta Package) -> Vec<Unported<'meta>> {
-        let reach = package.identity().map(|id| graph.normal_reach(id, &BTreeSet::new())).unwrap_or_default();
+        let reach = package.package_id().map(|id| graph.normal_reach(id, &BTreeSet::new())).unwrap_or_default();
         owned.within(&reach).into_iter().filter_map(|owner| owner.reached_by(graph, package)).collect()
     }
 }

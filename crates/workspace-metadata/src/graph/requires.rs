@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::metadata::{Edge, Node};
+use crate::metadata::{Node, NodeDependency};
 use crate::package_id::PackageId;
 
 #[derive(Debug, Default)]
@@ -8,14 +8,14 @@ pub(super) struct Requires<'meta>(BTreeMap<&'meta PackageId, BTreeSet<&'meta Pac
 
 impl<'meta> Extend<&'meta Node> for Requires<'meta> {
     fn extend<Nodes: IntoIterator<Item = &'meta Node>>(&mut self, nodes: Nodes) {
-        nodes.into_iter().for_each(|node| self.0.entry(node.as_ref()).or_default().extend(node.dependencies()));
+        nodes.into_iter().for_each(|node| self.0.entry(node.package_id()).or_default().extend(node.dependencies()));
     }
 }
 
 impl<'meta> Requires<'meta> {
     pub(super) fn normal(nodes: &'meta [Node]) -> Requires<'meta> {
         Requires(
-            nodes.iter().map(|node| (node.as_ref(), node.edges().iter().filter_map(Edge::normal).collect())).collect(),
+            nodes.iter().map(|node| (node.package_id(), node.normal().map(NodeDependency::package_id).collect())).collect(),
         )
     }
 

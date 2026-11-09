@@ -44,8 +44,8 @@ impl<'file> PairedMethods<'file> {
         let declared = methods
             .iter()
             .map(|method| Declared::new(Name::from(*method), Site::new(path, LineNumber::from(method.span()))));
-        owner.zip(Some(declared)).into_iter().for_each(|(name, declared)| {
-            self.found.entry(Owner::new(&self.module, name)).or_default().extend(declared);
+        owner.zip(Some(declared)).into_iter().for_each(|(name, listed)| {
+            self.found.entry(Owner::new(&self.module, name)).or_default().extend(listed);
         });
     }
 }
@@ -57,7 +57,7 @@ impl<'ast> Visit<'ast> for PairedMethods<'_> {
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
         let methods = Syntax::inherent(block)
-            .filter(|block| Walk::outside_tests(&block.attrs) == Walk::Entered)
+            .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
             .map(Self::public_methods)
             .unwrap_or_default();
         self.owned_by(Name::of_type(&block.self_ty), &methods);

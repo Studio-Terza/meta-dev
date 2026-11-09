@@ -2,6 +2,7 @@ use std::error::Error;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
 
 use dispatch_ports::{
     Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall, Started,
@@ -101,5 +102,29 @@ fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Box<dyn Error>> {
     };
     run.finish().settled()?;
     assert_eq!((waited, waits.recorded()), (Watching::START.after(pause), vec![Wait { pause, woke: Woke::Lapsed }]));
+    Ok(())
+}
+
+#[test]
+fn a_ring_wakes_one_wait_and_is_then_spent() -> Result<(), Box<dyn Error>> {
+    let waits = Waits::default();
+    let run = Run::root();
+    let woke = {
+        let agent = run.port(HeadlessClaude::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+            Agent::new("sh", &["-c", "exec sleep 30"]),
+        ));
+        let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
+        let held = agent
+            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("x".to_owned()))?;
+        let before = held.bell().waited(Duration::ZERO);
+        held.bell().ringer().ring();
+        let rung = held.bell().waited(Duration::ZERO);
+        let after = held.bell().waited(Duration::ZERO);
+        held.end()?;
+        [before, rung, after]
+    };
+    run.finish().settled()?;
+    assert_eq!(woke, [Woke::Lapsed, Woke::Rung, Woke::Lapsed]);
     Ok(())
 }

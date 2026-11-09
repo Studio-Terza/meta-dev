@@ -41,10 +41,7 @@ pub trait Ports {
             &mut refusal,
         );
         let text = |bytes: Vec<u8>| Text::new(String::from_utf8(bytes).unwrap_or_default());
-        Some(answered)
-            .filter(|answered| *answered == ExitCode::SUCCESS)
-            .map(|_| text(report))
-            .ok_or_else(|| text(refusal))
+        Some(answered).filter(|code| *code == ExitCode::SUCCESS).map(|_| text(report)).ok_or_else(|| text(refusal))
     }
 
     fn reaches(&self, questions: &[Vec<impl AsRef<OsStr>>]) -> Vec<Result<Text, Text>> {

@@ -10,7 +10,11 @@ pub(crate) struct Share(f64);
 impl Share {
     pub(crate) fn between(part: Count, whole: Count) -> Share {
         let ratio = |count: Count| f64::from(u32::try_from(count.count()).unwrap_or(u32::MAX));
-        Share(Some(whole).filter(|whole| *whole != Count::zero()).map_or(0.0, |whole| ratio(part) / ratio(whole)))
+        Share(
+            Some(whole)
+                .filter(|candidate| *candidate != Count::zero())
+                .map_or(0.0, |nonzero| ratio(part) / ratio(nonzero)),
+        )
     }
 }
 

@@ -25,11 +25,11 @@ impl Expanding for Query {
         let written = quote!(source = #source, args = [#(#arguments),*]);
         row.map_or_else(
             || Self::sqlx(written.clone()),
-            |row| {
+            |columns| {
                 let read = Self::sqlx(quote!(#written, record = __Raw));
                 quote! {{
-                    type __Raw = <#row as ::store_ports::Columns>::Raw;
-                    (#read).try_map(<#row as ::store_ports::Columns>::decoded)
+                    type __Raw = <#columns as ::store_ports::Columns>::Raw;
+                    (#read).try_map(<#columns as ::store_ports::Columns>::decoded)
                 }}
             },
         )
@@ -40,7 +40,7 @@ impl Query {
     fn sqlx(input: TokenStream) -> TokenStream {
         let expansion = syn::parse2::<QueryMacroInput>(input)
             .map_err(Box::from)
-            .and_then(|input| expand_input(input, FOSS_DRIVERS));
+            .and_then(|parsed| expand_input(parsed, FOSS_DRIVERS));
         Expanded::from(expansion).into()
     }
 

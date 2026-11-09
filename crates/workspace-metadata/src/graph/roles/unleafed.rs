@@ -25,7 +25,7 @@ impl<'meta> Unleafed<'meta> {
             .filter_map(|id| graph.package(id))
             .flat_map(|lexer| {
                 lexer
-                    .identity()
+                    .package_id()
                     .into_iter()
                     .flat_map(|id| graph.normal.direct(id))
                     .filter_map(move |required| Self::depending(graph, owned, lexer, required))

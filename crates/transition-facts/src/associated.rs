@@ -23,6 +23,6 @@ impl Associated {
     }
 
     fn matching(segment: Option<&PathSegment>, word: Word<'static>) -> Option<()> {
-        segment.and_then(|segment| Name::from(&segment.ident).matches::<Whole>(&[word]).map(|_| ()))
+        segment.and_then(|present| Name::from(&present.ident).matches::<Whole>(&[word]).map(|_| ()))
     }
 }

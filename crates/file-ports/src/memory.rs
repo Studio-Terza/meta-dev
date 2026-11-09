@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
 use locked::Locked;

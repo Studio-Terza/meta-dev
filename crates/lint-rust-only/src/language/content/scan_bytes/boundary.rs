@@ -1,5 +1,5 @@
 use file_ports::Bytes;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::ScanBytes;
 

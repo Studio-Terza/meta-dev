@@ -45,6 +45,9 @@ impl Head {
 
 impl From<&Name> for Head {
     fn from(name: &Name) -> Head {
-        Head::SPELLED.into_iter().find(|(spelled, _)| *name == *spelled).map_or(Head::Named, |(_, head)| head)
+        Head::SPELLED
+            .into_iter()
+            .find(|(spelled, _)| *name == Name::from(*spelled))
+            .map_or(Head::Named, |(_, head)| head)
     }
 }

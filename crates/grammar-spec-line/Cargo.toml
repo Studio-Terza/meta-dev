@@ -14,6 +14,8 @@ doctest = false
 
 [dependencies]
 grammar = { path = "../grammar" }
+grammar-unspelled = { path = "../grammar-unspelled" }
+newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]

@@ -26,8 +26,8 @@ impl<'meta> Closure<'meta> {
                 let known: BTreeSet<&PackageId> = seen.union(avoided).copied().collect();
                 let next: BTreeSet<&PackageId> = reached.difference(&known).copied().collect();
                 Some(next)
-                    .filter(|next| next.first().is_some())
-                    .map(|next| (seen.union(&next).copied().collect(), next))
+                    .filter(|unseen| unseen.first().is_some())
+                    .map(|unseen| (seen.union(&unseen).copied().collect(), unseen))
             })
             .last()
             .map(|(seen, _)| seen)

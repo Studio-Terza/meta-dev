@@ -9,7 +9,7 @@ mod span;
 
 pub use depth::Depth;
 pub use lexeme::Lexeme;
-pub use lexemes::Lexemes;
+pub use lexemes::{BareWord, Lexemes};
 pub use mark::Mark;
 pub use number::Number;
 pub use span::Span;

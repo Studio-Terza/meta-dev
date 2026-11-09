@@ -109,6 +109,7 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "port-core",
+ "thiserror",
 ]
 
 [[package]]
@@ -145,6 +146,8 @@ dependencies = [
  "console-ports",
  "file-ports",
  "gate-limits",
+ "grammar-assignment",
+ "grammar-shard",
  "grammar-spec-line",
  "laws",
  "mutation-report",
@@ -162,6 +165,27 @@ name = "cmov"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
+
+[[package]]
+name = "code-model"
+version = "0.1.0"
+dependencies = [
+ "lint-layout",
+]
+
+[[package]]
+name = "code-reader"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "laws",
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "console-ports"
@@ -594,7 +618,6 @@ dependencies = [
  "cargo-ports",
  "file-ports",
  "lint-runner",
- "port-core",
  "proptest",
 ]
 
@@ -669,8 +692,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "grammar-assignment"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+ "newtype",
+]
+
+[[package]]
+name = "grammar-banner"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+ "newtype",
+]
+
+[[package]]
 name = "grammar-cited"
 version = "0.1.0"
+dependencies = [
+ "grammar",
+]
 
 [[package]]
 name = "grammar-directive"
@@ -743,6 +789,7 @@ name = "grammar-notes"
 version = "0.1.0"
 dependencies = [
  "grammar",
+ "grammar-unspelled",
  "laws",
  "named-derive",
  "newtype",
@@ -759,6 +806,16 @@ dependencies = [
  "laws",
  "newtype",
  "thiserror",
+]
+
+[[package]]
+name = "grammar-program"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+ "newtype",
 ]
 
 [[package]]
@@ -793,6 +850,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "grammar-shard"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+]
+
+[[package]]
 name = "grammar-slug"
 version = "0.1.0"
 dependencies = [
@@ -805,7 +871,16 @@ name = "grammar-spec-line"
 version = "0.1.0"
 dependencies = [
  "grammar",
+ "grammar-unspelled",
  "laws",
+ "newtype",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-unspelled"
+version = "0.1.0"
+dependencies = [
  "thiserror",
 ]
 
@@ -822,6 +897,7 @@ dependencies = [
  "newtype",
  "syn 2.0.119",
  "text-lines",
+ "thiserror",
  "transition-facts",
  "type-facts",
 ]
@@ -1123,6 +1199,7 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "file-ports",
  "lint-layout",
  "lint-placement",
@@ -1209,11 +1286,13 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
+ "code-reader",
  "file-ports",
  "laws",
  "lint-core",
  "lint-placement",
  "newtype",
+ "text-lines",
  "workspace-metadata",
 ]
 
@@ -1241,6 +1320,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-hand-impls"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "lint-core",
+ "lint-layout",
+]
+
+[[package]]
 name = "lint-item-graph"
 version = "0.1.0"
 dependencies = [
@@ -1261,6 +1349,7 @@ dependencies = [
  "proc-macro2",
  "serde_core",
  "syn 2.0.119",
+ "text-lines",
  "thiserror",
  "toml",
  "workspace-metadata",
@@ -1348,6 +1437,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-narrowed-returns"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "lint-core",
+ "lint-layout",
+]
+
+[[package]]
 name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
@@ -1420,9 +1518,9 @@ dependencies = [
 name = "lint-no-plaintext"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1504,6 +1602,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "text-lines",
  "workspace-metadata",
 ]
 
@@ -1511,10 +1610,9 @@ dependencies = [
 name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
- "lint-file",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1567,13 +1665,17 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "file-ports",
  "lint-core",
  "lint-layout",
  "lint-placement",
  "lint-roots",
  "newtype",
+ "serde_json",
  "syn 2.0.119",
+ "thiserror",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1616,6 +1718,8 @@ name = "lint-runner"
 version = "0.1.0"
 dependencies = [
  "cargo-ports",
+ "code-model",
+ "code-reader",
  "file-ports",
  "golden",
  "graph-query",
@@ -1634,6 +1738,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-hand-impls",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",
@@ -1643,6 +1748,7 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-narrowed-returns",
  "lint-no-comments",
  "lint-no-early-exits",
  "lint-no-forwarders",
@@ -1718,6 +1824,7 @@ dependencies = [
 name = "lint-suite"
 version = "0.1.0"
 dependencies = [
+ "code-reader",
  "file-ports",
  "laws",
  "lint-arbitrary-newtypes",
@@ -1735,6 +1842,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-hand-impls",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",
@@ -1744,6 +1852,7 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-narrowed-returns",
  "lint-no-early-exits",
  "lint-no-forwarders",
  "lint-no-free-fns",
@@ -1859,6 +1968,7 @@ name = "lint-workflow-run"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "grammar-program",
  "lint-core",
  "lint-layout",
  "newtype",
@@ -2008,6 +2118,9 @@ dependencies = [
  "laws",
  "newtype-derive",
  "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -2743,6 +2856,7 @@ dependencies = [
 name = "test-log"
 version = "0.1.0"
 dependencies = [
+ "grammar-banner",
  "laws",
  "serde",
  "text-lines",
@@ -2754,8 +2868,7 @@ version = "0.1.0"
 dependencies = [
  "grammar-lines",
  "laws",
- "proptest",
- "serde",
+ "newtype",
  "serde_json",
  "thiserror",
 ]
@@ -2897,6 +3010,8 @@ name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "grammar-message",
+ "grammar-output",
  "laws",
  "newtype",
  "port-core",
@@ -3059,6 +3174,7 @@ checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 name = "workspace-metadata"
 version = "0.1.0"
 dependencies = [
+ "golden",
  "newtype",
  "serde",
  "serde_json",

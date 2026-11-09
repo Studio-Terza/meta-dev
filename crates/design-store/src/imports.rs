@@ -33,7 +33,7 @@ impl Imported {
         let written = [Directed::Proposed { node, parent }]
             .into_iter()
             .chain(directed)
-            .map(|directed| directed.written(&mut annotating))
+            .map(|direction| direction.written(&mut annotating))
             .collect::<Result<Vec<Written>, Refusal>>()?;
         Ok(Written::total(written.into_iter()))
     }

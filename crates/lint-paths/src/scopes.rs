@@ -26,11 +26,11 @@ impl<'file> Scopes<'file> {
             .get_mut(module)
             .zip(Some((local, target)))
             .into_iter()
-            .for_each(|(scope, (local, target))| scope.import(local, target));
+            .for_each(|(scope, (alias, path))| scope.import(alias, path));
     }
 
     pub(crate) fn glob(&mut self, module: &Module<'file>, prefix: UsePath) {
-        self.scopes.get_mut(module).zip(Some(prefix)).into_iter().for_each(|(scope, prefix)| scope.glob(prefix));
+        self.scopes.get_mut(module).zip(Some(prefix)).into_iter().for_each(|(scope, globbed)| scope.glob(globbed));
     }
 
     pub(crate) fn guard(&mut self, module: &Module<'file>, name: Option<Name>) {

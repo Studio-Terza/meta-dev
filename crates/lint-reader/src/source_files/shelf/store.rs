@@ -26,7 +26,7 @@ impl Shelved {
 impl From<Result<Opened, Failure>> for Shelved {
     fn from(opened: Result<Opened, Failure>) -> Shelved {
         match opened {
-            Ok(opened) => Shelved { parsed: Some(opened.parsed()), opened: Some(opened) },
+            Ok(file) => Shelved { parsed: Some(file.parsed()), opened: Some(file) },
             Err(failure) => Shelved { opened: None, parsed: Some(Err(failure)) },
         }
     }

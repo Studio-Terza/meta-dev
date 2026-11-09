@@ -10,7 +10,7 @@ pub(crate) trait Fixed<'meta>: fmt::Display + AsRef<Breaching<'meta>> {
     const FIX: Fix;
 
     fn lines(&self, package: &PackageRoot) -> BTreeSet<LineNumber> {
-        package.dependencies().sites(self.as_ref().keys())
+        package.dependency_sites().sites(self.as_ref().keys())
     }
 }
 

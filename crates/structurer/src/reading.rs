@@ -72,7 +72,7 @@ impl<'line> Call<'line> {
 
     pub(crate) fn opened(reader: &mut Reader<'line>, name: &'line Lexed) -> Result<Call<'line>, Misread> {
         let open = reader.next();
-        let opened = Some(open).filter(|open| Shape::shaped(open.piece()) == Shape::Open);
+        let opened = Some(open).filter(|candidate| Shape::shaped(candidate.piece()) == Shape::Open);
         opened.ok_or_else(|| Misread::expected(open, Wanted::Open))?;
         Term::arguments(reader, Vec::new()).map(|arguments| Call { name, arguments })
     }

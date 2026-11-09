@@ -43,7 +43,7 @@ pub(crate) enum Owner {
 impl Owner {
     fn admitting<'name>(&self, owner: &'name Name) -> Option<&'name Name> {
         match self {
-            Owner::Named(named) => Some(owner).filter(|owner| *owner == named),
+            Owner::Named(named) => Some(owner).filter(|candidate| *candidate == named),
             Owner::Operand => Some(owner),
         }
     }

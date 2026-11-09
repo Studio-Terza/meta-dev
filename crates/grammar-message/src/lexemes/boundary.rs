@@ -28,6 +28,9 @@ enum Token {
     Plain,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BareWord(String);
+
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
 enum Ink {
@@ -52,6 +55,22 @@ impl Lexemes {
                 )
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn uuids(text: &impl AsRef<str>) -> Vec<BareWord> {
+        Lexemes::scanned(text)
+            .into_iter()
+            .filter(|lexeme| matches!(lexeme.mark(), Mark::Uuid))
+            .map(|lexeme| BareWord(lexeme.span().slice(text.as_ref()).to_owned()))
+            .collect()
+    }
+}
+
+impl BareWord {
+    #[must_use]
+    pub fn into_inner(self) -> String {
+        self.0
     }
 }
 

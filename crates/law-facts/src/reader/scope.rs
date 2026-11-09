@@ -26,7 +26,7 @@ impl Scope {
 
     pub(crate) fn named(&self, written: &Name) -> Option<Name> {
         Some(written)
-            .filter(|name| **name != Self::SELF)
+            .filter(|name| **name != Name::from(Self::SELF))
             .map(|name| self.uses.import(name).map_or(name, Import::name))
             .or(self.self_type.as_ref())
             .cloned()
@@ -48,7 +48,7 @@ impl Scope {
     fn places_of<'scope>(&'scope self, first: &'scope Name, last: Option<&'scope Name>) -> Vec<Place<'scope>> {
         match last {
             None => self.uses.sources(first),
-            Some(last) => Vec::from([self.uses.qualified(first, last)]),
+            Some(tail) => Vec::from([self.uses.qualified(first, tail)]),
         }
     }
 

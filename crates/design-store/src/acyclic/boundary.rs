@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use design_model::{NodeId, Segment};
-use newtype::{Arbitrary, Counter, Newtype};
+use newtype::{Arbitrary, Counter, Newtype, Wrapping};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 
 use super::{Acyclic, Closed, Refusal};

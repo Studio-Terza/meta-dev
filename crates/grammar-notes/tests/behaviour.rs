@@ -1,8 +1,8 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-use grammar_notes::{Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
+use grammar_notes::{Date, Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
 use laws::proptest::collection::vec;
-use laws::proptest::prelude::{Strategy, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 
 const NOTED: &str = "(- |-|\\* |\\*|\\*\\*|\\+ |\\+|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|2026-11-0[1-9][Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,4})?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
@@ -193,8 +193,8 @@ laws::law!(
     ),
     file,
     {
-        let (lines, (ending, ended)) = file;
-        let lines: Vec<(String, String)> = lines.into_iter().chain([("x".to_owned(), "x".to_owned())]).collect();
+        let (drawn, (ending, ended)) = file;
+        let lines: Vec<(String, String)> = drawn.into_iter().chain([("x".to_owned(), "x".to_owned())]).collect();
         let text = [lines.iter().map(|(line, _laid)| line.as_str()).collect::<Vec<&str>>().join("\n").as_str(), ended]
             .concat();
         let laid = [lines.iter().map(|(_line, laid)| laid.as_str()).collect::<Vec<&str>>().join("\n").as_str(), ended]
@@ -247,9 +247,9 @@ impl Named {
     fn words(entry: &Entry) -> Said {
         let quotes: Result<Vec<String>, Unclosed> =
             entry.quotes().into_iter().map(|quote| quote.map(ToString::to_string).map_err(Clone::clone)).collect();
-        quotes.map(|quotes| {
+        quotes.map(|closed| {
             [
-                quotes,
+                closed,
                 entry.cites().iter().map(ToString::to_string).collect(),
                 entry.dates().iter().map(ToString::to_string).collect(),
             ]
@@ -486,6 +486,41 @@ laws::table!(
         &[" \t"][..] => true,
         &[""][..] => true,
     ]
+);
+
+laws::table!(
+    a_date_is_exactly_four_digits_then_two_then_two_joined_by_dashes,
+    |day: &&str| Date::try_new((*day).to_owned()).ok().map(Date::into_inner),
+    [
+        "2026-11-05" => Some("2026-11-05".to_owned()),
+        "" => None,
+        "26-11-05" => None,
+        "2026-1-05" => None,
+        "2026-11-5" => None,
+        "2026/11/05" => None,
+        "2026-11-05x" => None,
+        "202a-11-05" => None,
+        "2026-11-05 2026-11-06" => None,
+    ]
+);
+
+laws::table!(
+    a_date_parses_from_text_only_when_it_is_spelled_as_one,
+    |day: &&str| day.parse::<Date>().ok().map(|date| date.to_string()),
+    [
+        "1999-12-31" => Some("1999-12-31".to_owned()),
+        "1999-12" => None,
+        "1999-12-311" => None,
+        "19991231" => None,
+    ]
+);
+
+laws::roundtrip!(
+    a_date_is_displayed_and_parsed_back,
+    any::<Date>(),
+    |date: &Date| date.to_string(),
+    |text: &String| text.parse::<Date>().ok().map(|date| date.to_string()),
+    |date: Date| Some(date.to_string())
 );
 
 laws::table!(

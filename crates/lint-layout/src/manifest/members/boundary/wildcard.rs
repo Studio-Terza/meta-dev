@@ -4,7 +4,7 @@ use std::str::FromStr;
 use crate::matching::Matching;
 use crate::name::Name;
 use crate::word::Word;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 #[derive(Debug)]
 pub struct Wildcard(Vec<char>);

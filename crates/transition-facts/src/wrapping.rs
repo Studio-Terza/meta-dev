@@ -23,7 +23,7 @@ impl Wrapping {
     const RESULT: [Word<'static>; 1] = words!["Result"];
 
     pub(crate) fn around(self, inner: Wrapping) -> Wrapping {
-        Some(inner).filter(|inner| *inner == Wrapping::Many).unwrap_or(self)
+        Some(inner).filter(|candidate| *candidate == Wrapping::Many).unwrap_or(self)
     }
 
     pub(crate) fn returned(
@@ -45,8 +45,8 @@ impl Wrapping {
             Type::Paren(paren) => Self::peeled(&paren.elem, generic),
             Type::Array(_) | Type::Slice(_) => Wrapping::Many,
             Type::Path(path) => Self::pathed(path, generic),
-            Type::ImplTrait(found) => Bounds::new(&found.bounds).wrapping(),
-            Type::TraitObject(found) => Bounds::new(&found.bounds).wrapping(),
+            Type::ImplTrait(opaque) => Bounds::new(&opaque.bounds).wrapping(),
+            Type::TraitObject(object) => Bounds::new(&object.bounds).wrapping(),
             _ => Wrapping::Plain,
         }
     }

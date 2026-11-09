@@ -47,7 +47,7 @@ impl<'unit, 'meta> Owned<'unit, 'meta> {
 
 impl<'meta> Owner<'_, 'meta> {
     pub(super) fn reached_by(&self, graph: &Graph<'meta>, package: &'meta Package) -> Option<Unported<'meta>> {
-        let id = package.identity().filter(|id| self.unit.holds(id).is_none())?;
+        let id = package.package_id().filter(|id| self.unit.holds(id).is_none())?;
         let role = self.declared.dependents();
         let avoided = role.map(|role| graph.declaring(role)).unwrap_or_default();
         let direct: BTreeSet<&PackageId> = graph.normal.direct(id).collect();

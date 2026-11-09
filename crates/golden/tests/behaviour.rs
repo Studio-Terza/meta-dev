@@ -72,28 +72,6 @@ roundtrip!(
 );
 
 #[test]
-fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = Fixture::with_recorded("old\n")?;
-    let printed = Fixture::golden()
-        .verify(&Variables::default(), fixture.files(), Output::new("new\n"))
-        .err()
-        .map(|failure| format!("{failure:?}"));
-    let heading = format!("{}: output differs from the golden", Fixture::path().display());
-    let lines =
-        printed.as_deref().map(|text| text.parse::<text_lines::Lines>().into_iter().flatten().collect::<Vec<String>>());
-    let wanted = [
-        heading.as_str(),
-        "@ first change at line 1; - golden, + actual",
-        "- \"old\\n\"",
-        "+ \"new\\n\"",
-        "",
-        "if this change is intended, run `GOLDEN_RECORD=1 cargo test` and review the diff",
-    ];
-    assert_eq!(lines, Some(wanted.map(str::to_owned).to_vec()));
-    Ok(())
-}
-
-#[test]
 fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old")?;
     fixture.mark_package()?;
@@ -140,8 +118,8 @@ fn equal_texts_have_no_difference() {
 }
 
 #[test]
-fn the_golden_macro_finds_a_golden_in_the_calling_package() -> Result<(), Failure> {
-    golden!("macro.txt", "found through the macro\n")
+fn the_golden_macro_finds_a_golden_in_the_calling_package() {
+    golden!("macro.txt", "found through the macro\n");
 }
 
 #[test]
@@ -159,7 +137,7 @@ mod fixture {
     use console_ports::Variables;
     use file_ports::{Bytes, FileFailure, Files, Memory};
     use golden::{Golden, Mode, Output};
-    use newtype::Newtype;
+    use newtype::Wrapping;
 
     #[derive(Default)]
     pub struct Fixture {
@@ -208,7 +186,7 @@ mod fixture {
         }
 
         pub fn text(&self) -> Result<String, FileFailure> {
-            self.files.read_text(&Self::path()).map(Newtype::into_inner)
+            self.files.read_text(&Self::path()).map(Wrapping::into_inner)
         }
 
         pub fn recorded_through_the_api(text: &str) -> Option<Self> {

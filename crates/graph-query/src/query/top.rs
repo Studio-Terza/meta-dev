@@ -15,6 +15,6 @@ impl FromStr for Top {
     type Err = QueryFailure;
 
     fn from_str(text: &str) -> Result<Top, QueryFailure> {
-        text.parse().map(Top).map_err(|_| QueryFailure::Top(text.to_owned()))
+        text.parse().map(Top).map_err(|source| QueryFailure::Top { text: text.to_owned(), source })
     }
 }

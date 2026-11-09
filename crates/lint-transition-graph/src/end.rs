@@ -21,7 +21,7 @@ impl<'found> Node<'found> {
         name: &'found Name,
     ) -> Option<Node<'found>> {
         let krate = declaring.get(from).or_else(|| declaring.first().filter(|_| declaring.len() == 1));
-        krate.map(|krate| Node { krate, name })
+        krate.map(|found| Node { krate: found, name })
     }
 }
 
@@ -84,12 +84,19 @@ pub(crate) enum Place {
 }
 
 impl Place {
-    fn written(self, name: &Name, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn spelling(self, name: &Name) -> Spelling<'_, '_> {
         match self {
-            Place::Interface => write!(formatter, "impl {name}"),
-            Place::Domain | Place::Shared | Place::External | Place::Primitive => write!(formatter, "{name}"),
+            Place::Interface => Spelling::Interface(name),
+            Place::Domain | Place::Shared | Place::External | Place::Primitive => Spelling::Plain(name),
         }
     }
+}
+
+#[derive(Debug)]
+enum Spelling<'end, 'found> {
+    Node(&'end Node<'found>),
+    Interface(&'end Name),
+    Plain(&'end Name),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -115,6 +122,13 @@ impl<'found> End<'found> {
         self.node.as_ref()
     }
 
+    fn spelling(&self) -> Spelling<'_, 'found> {
+        match &self.node {
+            Some(node) => Spelling::Node(node),
+            None => self.place.spelling(self.name),
+        }
+    }
+
     pub(crate) fn unit(&self) -> Option<&End<'found>> {
         Some(self).filter(|end| end.name.matches::<Whole>(&[Self::UNIT]).is_some())
     }
@@ -128,9 +142,10 @@ impl AsRef<Name> for End<'_> {
 
 impl fmt::Display for End<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.node {
-            Some(node) => write!(formatter, "{node}"),
-            None => self.place.written(self.name, formatter),
+        match self.spelling() {
+            Spelling::Node(node) => write!(formatter, "{node}"),
+            Spelling::Interface(name) => write!(formatter, "impl {name}"),
+            Spelling::Plain(name) => write!(formatter, "{name}"),
         }
     }
 }
@@ -161,7 +176,7 @@ impl<'found> Ends<'found> {
 
     pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<Node<'found>> {
         let receiver = Some(mutation)
-            .filter(|mutation| *mutation == Mutation::ThroughSelf)
+            .filter(|candidate| *candidate == Mutation::ThroughSelf)
             .filter(|_| wrapping == Wrapping::Plain)
             .and_then(|_| self.gives.unit())
             .and_then(|_| self.takes.first().or(self.implementer.as_ref()));

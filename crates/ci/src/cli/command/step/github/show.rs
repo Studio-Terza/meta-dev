@@ -24,17 +24,17 @@ impl Show {
         journals: &'journal [Journal],
         out: &mut impl Write,
     ) -> Result<(), Failure<'journal>> {
-        journals.iter().zip(Journal::read_present(files, journals.iter().collect())).try_for_each(|(journal, text)| {
+        journals.iter().zip(Journal::read_present(files, journals.iter().collect())).try_for_each(|(journal, read)| {
             writeln!(out, "{journal}:")?;
-            let text = text.unwrap_or_else(|| Ok(Text::new(Self::ABSENT.to_owned())))?;
+            let text = read.unwrap_or_else(|| Ok(Text::new(Self::ABSENT.to_owned())))?;
             Ok(write!(out, "{text}")?)
         })
     }
 }
 
 impl Step for Show {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Show, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<Show, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let first = arguments.taken()?;
         Ok(Show {
             journals: iter::once(first)

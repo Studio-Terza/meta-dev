@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::vec::IntoIter;
 
 use grammar::logos::{Lexer, Logos};
-use newtype::Newtype;
+use newtype::{Guarded, Inner, Newtype, Stored, Validated};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -106,16 +106,39 @@ pub trait Field {
     fn taken(token: Token) -> Result<Self::Value, Token>;
 }
 
+pub trait Unwrapping<T> {
+    fn unwrapped(text: String) -> Option<T>;
+}
+
+impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
+    fn unwrapped(text: String) -> Option<T> {
+        Some(T::new(text))
+    }
+}
+
+impl<T: Guarded<Inner = String>> Unwrapping<T> for Validated {
+    fn unwrapped(text: String) -> Option<T> {
+        T::try_new(text).ok()
+    }
+}
+
 impl Fields {
     pub fn lexed(text: &str) -> Result<Fields, Stray> {
         let tokens = Lexeme::lexer(text)
             .spanned()
-            .map(|(lexeme, range)| {
+            .map(|(lexed, range)| {
                 let slice = text.get(range).unwrap_or_default().to_owned();
-                lexeme.map(|lexeme| Token::from((lexeme, slice.clone()))).map_err(|()| Stray(slice))
+                lexed.map(|lexeme| Token::from((lexeme, slice.clone()))).map_err(|()| Stray(slice))
             })
             .collect::<Result<Vec<Token>, Stray>>()?;
         Ok(Fields(tokens.into_iter().peekable()))
+    }
+
+    #[must_use]
+    pub fn bare(text: &str) -> Option<&str> {
+        let mut lexer = Lexeme::lexer(text);
+        let whole = lexer.next().filter(|lexed| *lexed == Ok(Lexeme::Bare)).map(|_bare| lexer.span());
+        whole.filter(|span| *span == (0..text.len())).map(|_whole| text)
     }
 
     #[must_use]
@@ -167,8 +190,9 @@ impl Token {
         self.expected(kind).and_then(|text| text.parse().map_err(|_unparsed| kept))
     }
 
-    pub(crate) fn wrapped<T: Newtype<Inner = String>>(self, kind: Kind) -> Result<T, Token> {
-        self.expected(kind).map(T::new)
+    pub(crate) fn wrapped<T: Stored<Kind: Unwrapping<T>>>(self, kind: Kind) -> Result<T, Token> {
+        let kept = self.clone();
+        self.expected(kind).and_then(|text| T::Kind::unwrapped(text).ok_or(kept))
     }
 }
 

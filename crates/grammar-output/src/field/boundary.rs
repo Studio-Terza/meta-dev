@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 
-use newtype::Newtype;
+use newtype::Stored;
 
-use crate::{Decimal, Field, Kind, Numbered, Token};
+use crate::{Decimal, Field, Kind, Numbered, Token, Unwrapping};
 use grammar_cited::Cited;
 
 #[derive(Debug)]
@@ -59,7 +59,7 @@ impl<T: FromStr> Field for Checked<T> {
     }
 }
 
-impl<T: Newtype<Inner = String>> Field for Bare<T> {
+impl<T: Stored<Kind: Unwrapping<T>>> Field for Bare<T> {
     type Value = T;
 
     fn taken(token: Token) -> Result<T, Token> {
@@ -67,7 +67,7 @@ impl<T: Newtype<Inner = String>> Field for Bare<T> {
     }
 }
 
-impl<T: Newtype<Inner = String>> Field for Quoted<T> {
+impl<T: Stored<Kind: Unwrapping<T>>> Field for Quoted<T> {
     type Value = T;
 
     fn taken(token: Token) -> Result<T, Token> {

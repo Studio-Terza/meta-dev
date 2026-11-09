@@ -30,6 +30,6 @@ impl AsRef<Name> for Hump {
 
 impl Matching for CamelWord {
     fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Word<'word>> {
-        name.humps().find_map(|hump| (*hump.as_ref() == word).then_some(word))
+        name.humps().find_map(|hump| (*hump.as_ref() == Name::from(word)).then_some(word))
     }
 }

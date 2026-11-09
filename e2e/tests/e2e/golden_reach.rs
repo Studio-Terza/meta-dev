@@ -43,7 +43,7 @@ fn goldens_and_new_scenarios_pass_only_inside_the_reach_of_the_rest_of_the_chang
     let tallies = world.names().fold(Tallies::default(), |tallies, changed| {
         let source = world.source_of(changed);
         let reached = world.reached(std::slice::from_ref(&source));
-        world.names().fold(tallies, |tallies, owner| {
+        world.names().fold(tallies, |so_far, owner| {
             let golden = world.below(owner, &["tests", "goldens", "e2e.txt"]);
             let scenario = world.below(owner, &["tests", "e2e", "added.rs"]);
             let expected = world.owners(&golden).is_subset(&reached);
@@ -56,8 +56,8 @@ fn goldens_and_new_scenarios_pass_only_inside_the_reach_of_the_rest_of_the_chang
                 vec![Change::new(Edit::Modified, source.clone()), Change::new(Edit::Added, scenario)],
             );
             Tallies {
-                goldens: tallies.goldens.counted(desk.labels_pass(&with_golden, BASE), expected),
-                scenarios: tallies.scenarios.counted(desk.labels_pass(&with_scenario, BASE), expected),
+                goldens: so_far.goldens.counted(desk.labels_pass(&with_golden, BASE), expected),
+                scenarios: so_far.scenarios.counted(desk.labels_pass(&with_scenario, BASE), expected),
             }
         })
     });

@@ -27,14 +27,14 @@ impl<'tree> Tree<'tree> {
 
     fn colon(self) -> Option<&'tree Punct> {
         match self.0 {
-            TokenTree::Punct(punct) => Some(punct).filter(|punct| punct.as_char() == Self::COLON),
+            TokenTree::Punct(punct) => Some(punct).filter(|candidate| candidate.as_char() == Self::COLON),
             TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_) => None,
         }
     }
 
     fn sqlx(self) -> Option<&'tree Ident> {
         match self.0 {
-            TokenTree::Ident(ident) => Some(ident).filter(|ident| *ident == Self::SQLX),
+            TokenTree::Ident(ident) => Some(ident).filter(|candidate| *candidate == Self::SQLX),
             TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
         }
     }

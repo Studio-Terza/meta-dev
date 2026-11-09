@@ -46,12 +46,12 @@ impl Design {
     }
 
     fn saying(said: &str, agent: &str) -> io::Result<Design> {
-        let home = Home::new()?;
-        let workspace = home.path().join("work");
+        let fresh = Home::new()?;
+        let workspace = AsRef::<Path>::as_ref(&fresh).join("work");
         let slug = Letters::slugged(&workspace.to_string_lossy());
         let session = Path::new(".claude/projects").join(slug).join("s.jsonl");
         let program = Path::new("bin/claude");
-        let home = home.holding(&session, &Bytes::from(said))?.holding(program, &Bytes::from(agent))?;
+        let home = fresh.holding(&session, &Bytes::from(said))?.holding(program, &Bytes::from(agent))?;
         Ok(Design { home, workspace })
     }
 

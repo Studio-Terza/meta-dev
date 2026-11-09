@@ -51,7 +51,7 @@ impl<Node: Ord + Copy, Label: Ord, Law: Ord> Move<Node, Label, Law> {
         lens.ordered(&self.with)
             .into_iter()
             .zip(lens.ordered(&ours.with))
-            .try_fold(labelled.through(self.reached, ours.reached)?, |renaming, (from, to)| renaming.paired(from, to))
+            .try_fold(labelled.through(self.reached, ours.reached)?, |grown, (from, to)| grown.paired(from, to))
     }
 }
 

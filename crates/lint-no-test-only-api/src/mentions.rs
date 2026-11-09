@@ -50,7 +50,7 @@ impl Mentions {
     fn scanned(&mut self, tree: TokenTree) {
         match tree {
             TokenTree::Ident(ident) => self.named(Name::from(&ident)),
-            TokenTree::Group(group) => group.stream().into_iter().for_each(|tree| self.scanned(tree)),
+            TokenTree::Group(group) => group.stream().into_iter().for_each(|token| self.scanned(token)),
             TokenTree::Punct(_) | TokenTree::Literal(_) => {}
         }
     }

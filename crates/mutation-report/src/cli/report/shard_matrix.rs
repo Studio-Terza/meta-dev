@@ -20,8 +20,8 @@ impl ShardMatrix {
 
     pub fn parsed(path: PathBuf, text: Result<Text, FileFailure>) -> Result<ShardMatrix, Failure<'static>> {
         match text {
-            Ok(text) => {
-                serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path: Cow::Owned(path), source })
+            Ok(read) => {
+                serde_json::from_str(read.as_ref()).map_err(|source| Failure::Parse { path: Cow::Owned(path), source })
             }
             Err(failure) => Err(Failure::Io { path: Cow::Owned(path), source: io::Error::from(failure) }),
         }

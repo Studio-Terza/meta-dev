@@ -14,8 +14,8 @@ pub struct Logged {
 }
 
 impl Step for Logged {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Logged, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<Logged, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let log = &arguments.taken()?;
         let program = &arguments.taken()?;
         let rest = arguments.rest();

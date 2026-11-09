@@ -13,7 +13,7 @@ use finding::Finding;
 use judged::Judged;
 use lint_core::{Headline, Lint, RepoFile, Report, Site, Violation};
 use lint_layout::LineNumber;
-use newtype::Newtype;
+use newtype::Wrapping;
 use saphyr::ScanError;
 
 #[derive(Debug)]
@@ -28,13 +28,13 @@ impl WorkflowRun {
             .and_then(|bytes| String::from_utf8(bytes.clone().into_inner()).map_err(Excerpt::from));
         text.map_or_else(
             |reason| vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { reason })],
-            |text| Self::violations_in(file, Document::try_from(text.as_str()), actions),
+            |decoded| Self::violations_in(file, decoded.parse(), actions),
         )
     }
 
     fn violations_in<'file>(
         file: &'file RepoFile,
-        parsed: Result<Document<'_>, ScanError>,
+        parsed: Result<Document, ScanError>,
         actions: Actions<'_>,
     ) -> Vec<Violation<'file>> {
         match parsed {

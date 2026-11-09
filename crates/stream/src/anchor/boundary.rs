@@ -15,7 +15,7 @@ impl Anchor {
     fn anchored(message: Uuid, ordinal: Option<usize>) -> Anchor {
         match ordinal {
             None => Anchor::Message(message),
-            Some(ordinal) => Anchor::Segment(SegmentId::new(message, Ordinal::new(ordinal))),
+            Some(counted) => Anchor::Segment(SegmentId::new(message, Ordinal::new(counted))),
         }
     }
 }
@@ -25,7 +25,10 @@ impl FromStr for Anchor {
 
     fn from_str(written: &str) -> Result<Anchor, Unanchored> {
         Anchoring::read(written)
-            .map(|anchoring| Anchor::anchored(Uuid::new(anchoring.message().to_owned()), anchoring.ordinal()))
+            .and_then(|anchoring| {
+                let message = Uuid::try_new(anchoring.message().to_owned()).ok()?;
+                Some(Anchor::anchored(message, anchoring.ordinal()))
+            })
             .ok_or_else(|| Unanchored(written.to_owned()))
     }
 }

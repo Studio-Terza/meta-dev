@@ -13,7 +13,7 @@ impl Scope {
     fn admits(self, ground: Ground) -> Option<Ground> {
         match self {
             Scope::Everywhere => Some(ground),
-            Scope::OutsidePorts => Some(ground).filter(|ground| *ground == Ground::Open),
+            Scope::OutsidePorts => Some(ground).filter(|candidate| *candidate == Ground::Open),
         }
     }
 }

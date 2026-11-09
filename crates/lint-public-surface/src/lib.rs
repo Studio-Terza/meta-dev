@@ -21,7 +21,7 @@ pub struct PublicSurface;
 impl Lint for PublicSurface {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let binaries = BinaryFiles::collect(files);
-        let references = files
+        let foreign = files
             .iter()
             .filter_map(|file| {
                 file.shipped().map_or_else(
@@ -30,7 +30,7 @@ impl Lint for PublicSurface {
                 )
             })
             .fold(ForeignReferences::default(), ForeignReferences::absorb);
-        let references = &references;
+        let references = &foreign;
         Report::new(
             Headline::new("a crate exports exactly what another crate uses"),
             files

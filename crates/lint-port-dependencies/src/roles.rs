@@ -9,6 +9,7 @@ use lint_core::{Site, SourceFile, Violation};
 use lint_layout::{Name, UsePath};
 use lint_paths::Imports;
 use lint_placement::CrateName as PlacedName;
+use text_lines::OneLine;
 use workspace_metadata::{CrateName, Expansion};
 
 use crate::owners::Owners;
@@ -35,7 +36,7 @@ impl<'file> Roles<'file> {
                 let package = file.placement().package();
                 let lines = Some(breach.lines(package))
                     .filter(|found| found.first().is_some())
-                    .unwrap_or_else(|| BTreeSet::from([package.dependencies().header()]));
+                    .unwrap_or_else(|| BTreeSet::from([package.dependency_sites().header()]));
                 let manifest = file.manifest_file().as_ref();
                 lines.into_iter().map(move |line| Violation::new(Site::new(manifest, line), Breached::new(breach)))
             })
@@ -74,6 +75,6 @@ impl<'file> Roles<'file> {
     }
 
     fn expander(file: &SourceFile) -> Option<CrateName> {
-        CrateName::try_from(file.placement().package().root().package()?.borrow()).ok()
+        OneLine::try_new(file.placement().package().root().package()?.to_string()).ok().map(CrateName::new)
     }
 }

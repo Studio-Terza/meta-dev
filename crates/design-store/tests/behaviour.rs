@@ -3,6 +3,7 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -24,11 +25,11 @@ use grammar_message::Lexemes;
 use grammar_search::Terms;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
-use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
-use newtype::{Counter, Newtype};
+use newtype::{Counter, Wrapping};
 use port_core::{Op, Port, Run};
 use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
 use stream::Stream;
@@ -75,7 +76,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
-    let shown = store.read(ShownMessage::named(Uuid::new("o1".to_owned())))?.ok_or("o1 was not stored")?;
+    let shown = store.read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?.ok_or("o1 was not stored")?;
     let message = shown.message();
     assert_eq!(
         [
@@ -104,7 +105,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
         .collect();
     assert_eq!(links, ["l1 replies-to o1"]);
     let cursors = store.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), cursor);
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), cursor);
     Ok(())
 }
 
@@ -124,7 +125,7 @@ fn an_unknown_message_is_not_shown() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Recorded::session()?.records)?;
-    assert!(store.read(ShownMessage::named(Uuid::new("nobody".to_owned())))?.is_none());
+    assert!(store.read(ShownMessage::named(Uuid::try_new("nobody".to_owned())?))?.is_none());
     Ok(())
 }
 
@@ -273,25 +274,25 @@ static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
 struct Around(char);
 
 impl Around {
-    fn uuid(self) -> Uuid {
-        Uuid::new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
+    fn uuid(self) -> Result<Uuid, Box<dyn Error>> {
+        Ok(Uuid::try_new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))?)
     }
 
     fn escaped(self) -> String {
         self.0.encode_utf16(&mut [0; 2]).iter().map(|unit| format!("\\u{unit:04x}")).collect::<Vec<String>>().concat()
     }
 
-    fn session(self) -> String {
-        format!(
+    fn session(self) -> Result<String, Box<dyn Error>> {
+        Ok(format!(
             "{{\"type\":\"user\",\"uuid\":\"{}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"{}w{}\"}}}}\n",
-            self.uuid(),
+            self.uuid()?,
             self.escaped(),
             self.escaped()
-        )
+        ))
     }
 
     fn shown(self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
-        let shown = store.read(ShownMessage::named(self.uuid()))?.ok_or("the message is not stored")?;
+        let shown = store.read(ShownMessage::named(self.uuid()?))?.ok_or("the message is not stored")?;
         Ok(shown
             .segments()
             .iter()
@@ -308,12 +309,12 @@ impl Around {
     fn fresh(self) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
         let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
-        fresh.write(Recorded::of(&self.session())?.records)?;
+        fresh.write(Recorded::of(&self.session()?)?.records)?;
         self.shown(&fresh)
     }
 
-    fn kept(self) -> Body {
-        Body::new(format!("{}w{}", self.0, self.0))
+    fn kept(self) -> Result<Body, Box<dyn Error>> {
+        Ok(Body::try_new(format!("{}w{}", self.0, self.0))?)
     }
 }
 
@@ -360,10 +361,14 @@ WHERE
 fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
 -> Result<(), Box<dyn Error>> {
     let migrated = Run::root().port(OLD_STORE.clone()).read(Bodies)?;
-    let inked: Vec<Around> =
-        (char::MIN..=char::MAX).filter(|point| BLANKS.binary_search(point).is_err()).map(Around).collect();
-    let kept: Vec<Option<&Body>> = inked.iter().map(|point| migrated.get(&point.uuid())).collect();
-    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect();
+    let inked: Vec<Around> = (char::MIN..=char::MAX)
+        .filter(|point| BLANKS.binary_search(point).is_err())
+        .filter(|point| Body::try_new(point.to_string()).is_ok())
+        .map(Around)
+        .collect();
+    let kept: Vec<Option<&Body>> =
+        inked.iter().map(|point| Ok(migrated.get(&point.uuid()?))).collect::<Result<_, Box<dyn Error>>>()?;
+    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect::<Result<_, Box<dyn Error>>>()?;
     assert_eq!(kept, both_sides.iter().map(Some).collect::<Vec<Option<&Body>>>());
     Ok(())
 }
@@ -394,7 +399,7 @@ impl Dag {
                 .collect();
             Just(edges.into_iter().collect::<Vec<Edge>>())
                 .prop_shuffle()
-                .prop_map(move |edges| Dag { facets: facets.clone(), edges })
+                .prop_map(move |shuffled| Dag { facets: facets.clone(), edges: shuffled })
         })
     }
 
@@ -419,13 +424,13 @@ impl Dag {
         [source, target]: [NodeId; 2],
         relation: NodeRelation,
     ) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
-        let (source, target) = (Dag::resolved(store, source)?, Dag::resolved(store, target)?);
-        Ok(store.write(Linked::new(source, relation, target, Entered::Init.into())))
+        let (from, to) = (Dag::resolved(store, source)?, Dag::resolved(store, target)?);
+        Ok(store.write(Linked::new(from, relation, to, Entered::Init.into())))
     }
 
     fn cast(store: &Port<'_, Sqlite>, node: NodeId, role: Role) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
-        let node = Dag::resolved(store, node)?;
-        Ok(store.write(Cast::new(node, Casting::new(role, Entered::Role.into()))))
+        let resolved = Dag::resolved(store, node)?;
+        Ok(store.write(Cast::new(resolved, Casting::new(role, Entered::Role.into()))))
     }
 
     fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, Box<dyn Error>> {
@@ -614,8 +619,8 @@ impl Proposals {
         }
     }
 
-    fn segment(message: &str, ordinal: usize) -> Segment {
-        Segment::new(Uuid::new(message.to_owned()), Ordinal::new(ordinal))
+    fn segment(message: &str, ordinal: usize) -> Result<Segment, Box<dyn Error>> {
+        Ok(Segment::new(Uuid::try_new(message.to_owned())?, Ordinal::new(ordinal)))
     }
 }
 
@@ -652,7 +657,7 @@ fn directions_are_written_whole_or_not_at_all() -> Result<(), Box<dyn Error>> {
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
     let root = Projects::rooted(&store, "p")?;
-    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
+    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0)? };
     assert!(Proposals::written(&store, vec![Proposals::child(root, 2)?, stray]).is_err());
     assert!(store.read(ShownNode::from(NodeId::new(2)))?.is_none());
     Ok(())
@@ -665,12 +670,12 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
     let root = Projects::rooted(&store, "p")?;
-    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
+    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0)? };
     let refused = Proposals::unseen(&store, "refused")?;
     assert!(
         store.write(Directions::new(Provenance::from(Entered::Apply), refused, vec![stray], Remit::Unbounded)).is_err()
     );
-    let [asked, answered] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    let [asked, answered] = [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?];
     let [first, second] = [JobId::new(1), JobId::new(2)];
     store.write(JobOpened::from(first))?;
     store.write(JobOpened::from(second))?;
@@ -714,9 +719,9 @@ fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), B
     let root = Projects::rooted(&store, "p")?;
     Proposals::written(&store, vec![Proposals::child(root, 2)?, Proposals::child(root, 3)?])?;
     Proposals::written(&store, vec![Proposals::superseded(2, 3)?])?;
-    let successor = store.read(ShownNode::from(NodeId::new(3)))?.ok_or("no successor")?;
+    let shown = store.read(ShownNode::from(NodeId::new(3)))?.ok_or("no successor")?;
     let links: Vec<(NodeEdge, Provenance)> =
-        successor.links().iter().map(|link| (link.edge(), link.provenance())).collect();
+        shown.links().iter().map(|link| (link.edge(), link.provenance())).collect();
     let applied = Provenance::from(Entered::Apply);
     let successor = NodeId::new(3);
     assert_eq!(
@@ -738,12 +743,12 @@ fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dy
     store.write(records)?;
     let heard = |prefix: &str| -> Result<Vec<(Segment, Authorship)>, Box<dyn Error>> {
         let spoken = store.read(Prefixed::from(Prefix::new(prefix.to_owned())))?;
-        Ok(spoken.iter().map(|spoken| (spoken.segment().clone(), spoken.author())).collect())
+        Ok(spoken.iter().map(|said| (said.segment().clone(), said.author())).collect())
     };
-    let owner = [(Proposals::segment("o1", 0), Authorship::Owner), (Proposals::segment("o1", 1), Authorship::Owner)];
+    let owner = [(Proposals::segment("o1", 0)?, Authorship::Owner), (Proposals::segment("o1", 1)?, Authorship::Owner)];
     assert_eq!(heard("o")?, owner);
     assert_eq!(heard("o1")?, owner);
-    assert_eq!(heard("l1")?, [(Proposals::segment("l1", 0), Authorship::Lead)]);
+    assert_eq!(heard("l1")?, [(Proposals::segment("l1", 0)?, Authorship::Lead)]);
     assert_eq!(heard("1")?, []);
     Ok(())
 }
@@ -755,10 +760,13 @@ fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(),
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(records)?;
     let [asked, answered, said] =
-        [("o1", 0), ("o1", 1), ("l1", 0)].map(|(message, ordinal)| Proposals::segment(message, ordinal));
+        [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?, Proposals::segment("l1", 0)?];
     let covered = |messages: &[&str]| -> Result<Vec<Segment>, Box<dyn Error>> {
-        let messages = messages.iter().map(|message| Uuid::new((*message).to_owned()));
-        Ok(store.read(messages.collect::<Covered>())?.into_iter().collect())
+        let uuids = messages
+            .iter()
+            .map(|message| Ok(Uuid::try_new((*message).to_owned())?))
+            .collect::<Result<Vec<Uuid>, Box<dyn Error>>>()?;
+        Ok(store.read(uuids.into_iter().collect::<Covered>())?.into_iter().collect())
     };
     assert_eq!(covered(&["o1", "l1"])?, []);
     let related = Directed::Related { source: said.clone(), target: answered, relation: SegmentRelation::Answers };
@@ -824,8 +832,8 @@ impl Ends {
                 Provenance::from(Entered::Apply),
                 file,
                 vec![Directed::Related {
-                    source: Proposals::segment("o1", edge.child),
-                    target: Proposals::segment("o1", edge.parent),
+                    source: Proposals::segment("o1", edge.child)?,
+                    target: Proposals::segment("o1", edge.parent)?,
                     relation,
                 }],
                 Remit::Unbounded,
@@ -833,16 +841,16 @@ impl Ends {
         }
     }
 
-    fn cycle(self, edge: Edge) -> Cycle {
+    fn cycle(self, edge: Edge) -> Result<Cycle, Box<dyn Error>> {
         match self {
             Ends::Nodes(relation) => {
-                Cycle::Nodes { source: Dag::id(edge.child), relation, target: Dag::id(edge.parent) }
+                Ok(Cycle::Nodes { source: Dag::id(edge.child), relation, target: Dag::id(edge.parent) })
             }
-            Ends::Segments(relation) => Cycle::Segments {
-                source: Proposals::segment("o1", edge.child),
+            Ends::Segments(relation) => Ok(Cycle::Segments {
+                source: Proposals::segment("o1", edge.child)?,
                 relation,
-                target: Proposals::segment("o1", edge.parent),
-            },
+                target: Proposals::segment("o1", edge.parent)?,
+            }),
         }
     }
 }
@@ -868,8 +876,8 @@ impl Probe {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(records)?;
-        (0..ENDS)
-            .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+        iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+            .take(ENDS)
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let ends = self.closed.ends();
         let mut files = (0..=self.edges.len())
@@ -911,21 +919,28 @@ impl Probe {
         Edge { child: 0, parent: 2 }
     }
 
-    fn wanted(&self) -> Option<Cycle> {
-        self.reached().get(&self.tried.child).map(|_reached| self.closed.ends().cycle(self.tried))
+    fn wanted(&self) -> Result<Option<Cycle>, Box<dyn Error>> {
+        self.reached().get(&self.tried.child).map(|_reached| self.closed.ends().cycle(self.tried)).transpose()
     }
 }
 
 laws::law!(an_edge_is_refused_exactly_where_the_closure_holds_its_reverse_path, Probe::any(), probe, {
     let refused = probe.refused().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    prop_assert_eq!(refused, probe.wanted());
+    prop_assert_eq!(refused, probe.wanted().map_err(|failure| TestCaseError::fail(failure.to_string()))?);
 });
 
 #[test]
-fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() {
+fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() -> Result<(), Box<dyn Error>> {
     let refused = Closed::ALL
-        .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused().ok().flatten());
-    assert_eq!(refused, Closed::ALL.map(|closed| Some(closed.ends().cycle(Probe::closing()))));
+        .into_iter()
+        .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused())
+        .collect::<Result<Vec<Option<Cycle>>, Box<dyn Error>>>()?;
+    let cycles = Closed::ALL
+        .into_iter()
+        .map(|closed| Ok(Some(closed.ends().cycle(Probe::closing())?)))
+        .collect::<Result<Vec<Option<Cycle>>, Box<dyn Error>>>()?;
+    assert_eq!(refused, cycles);
+    Ok(())
 }
 
 #[derive(Clone, Debug)]
@@ -1162,8 +1177,8 @@ impl Changes {
     fn written(&self) -> Result<Settled, Box<dyn Error>> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        (0..ENDS)
-            .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+        iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+            .take(ENDS)
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let refused = self
             .0
@@ -1270,8 +1285,8 @@ fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>>
     assert_eq!(store.read(ShownNode::from(eating))?.ok_or("no eating")?.links().len(), 0);
     Dag::cast(&store, eating, Role::Secondary)??;
     Dag::linked(&store, [eating, consumed], NodeRelation::Consumes)??;
-    let refused = Changes::inverted(Dag::cast(&store, eating, Role::Core)?)?;
-    assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
+    let inverted = Changes::inverted(Dag::cast(&store, eating, Role::Core)?)?;
+    assert_eq!(inverted, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     Ok(())
 }
 
@@ -1289,11 +1304,11 @@ fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Recorded::session()?.records)?;
     let before = Unstructuring::listed(&store)?;
-    Proposals::written(&store, vec![Directed::Conversational { segment: Proposals::segment("o1", 0) }])?;
+    Proposals::written(&store, vec![Directed::Conversational { segment: Proposals::segment("o1", 0)? }])?;
     let after = Unstructuring::listed(&store)?;
     assert_eq!(
         (before, after),
-        (vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)], vec![Proposals::segment("o1", 1)])
+        (vec![Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?], vec![Proposals::segment("o1", 1)?])
     );
     Ok(())
 }
@@ -1304,8 +1319,8 @@ fn the_structurer_s_context_outlines_every_live_node_past_200_with_its_parent() 
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Dag::planting(&store, Entry::new("q".parse()?, Facet::Project, Provenance::from(Entered::Init)))?)?;
     store.write(Dag::node(&store, Facet::Project)?)?;
-    (0..=200)
-        .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+    iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
+        .take(201)
         .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
     let [specified, dropped] = [NodeId::new(203), NodeId::new(202)];
     [Step::Refine, Step::Specify]
@@ -1334,7 +1349,7 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
     store.write(JobOpened::from(job))?;
     let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
     store.write(RunSpawned::new(RunId::new(1), job, spawned))?;
-    let [structured, unstructured] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    let [structured, unstructured] = [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?];
     Proposals::written(&store, vec![Directed::Conversational { segment: structured.clone() }])?;
     let held = Some(JobFlailed::new(RunId::new(1), vec![structured, unstructured.clone()]));
     store.write(JobHalted::new(job, Halted::Flailed, Account::told(&"flailed")).holding(held))?;
@@ -1363,7 +1378,7 @@ fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Resul
     store.write(JobOpened::from(job))?;
     let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
     store.write(RunSpawned::new(RunId::new(1), job, spawned))?;
-    let segments = vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    let segments = vec![Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?];
     let flail = Some(JobFlailed::new(RunId::new(1), segments.clone()));
     store.write(JobHalted::new(job, Halted::Flailed, Account::told(&"flailed")).holding(flail))?;
     let queued = Unstructuring::listed(&store)?;
@@ -1420,9 +1435,8 @@ impl Spawning {
         store.write(RunSpawned::new(id, job, spawned))?;
         let live = store.read(LiveRuns)?;
         let finished = self.reply.clone().map(|reply| Finished::new(reply, self.usage.unwrap_or_default()));
-        store.write(
-            finished.map_or(RunEnded::new(id, self.state, self.usage), |finished| RunEnded::finished(id, &finished)),
-        )?;
+        store
+            .write(finished.map_or(RunEnded::new(id, self.state, self.usage), |told| RunEnded::finished(id, &told)))?;
         Ok(Lived { live, ran: store.read(RunsOf::from(job))?, after: store.read(LiveRuns)? })
     }
 }
@@ -1444,20 +1458,26 @@ laws::law!(
         let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
         prop_assert_eq!(spawned, vec![wanted]);
         let ran: Vec<Ran> = lived.ran;
-        prop_assert_eq!(ran.iter().map(|ran| [ran.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
+        prop_assert_eq!(ran.iter().map(|one| [one.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
         let replied = spawning.reply.as_ref().map(|_reply| RunState::Replied);
         let state = replied.unwrap_or(spawning.state);
         let usage = replied.map_or(spawning.usage, |_replied| Some(spawning.usage.unwrap_or_default()));
-        let kept = spawning.reply.as_ref().map(|reply| {
-            let told = reply.clone().into_inner();
-            let within = told.char_indices().take_while(|(at, letter)| at + letter.len_utf8() <= 16 * 1024);
-            Excerpt::new(within.map(|(_at, letter)| letter).collect())
-        });
         prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![state]);
         prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![usage]);
-        prop_assert_eq!(ran.iter().map(|ran| ran.reply().cloned()).collect::<Vec<Option<Excerpt>>>(), vec![kept]);
+        let told = spawning.reply.map(Reply::into_inner);
+        let kept = ran.first().and_then(Ran::reply).cloned().map(Excerpt::into_inner);
+        prop_assert_eq!(kept.is_some(), told.is_some());
+        let rest: Option<String> =
+            told.as_ref().zip(kept.as_ref()).map(|(whole, part)| whole.chars().skip(part.chars().count()).collect());
+        let rebuilt = kept.as_ref().zip(rest.as_ref()).map(|(part, after)| format!("{part}{after}"));
+        prop_assert_eq!(rebuilt, told);
+        let bytes = kept.as_ref().map_or(0, String::len);
+        prop_assert!(bytes <= 16 * 1024);
+        prop_assert!(
+            rest.and_then(|after| after.chars().next()).is_none_or(|next| bytes + next.len_utf8() > 16 * 1024)
+        );
         let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
-        let running = [state].into_iter().filter(|state| *state == RunState::Running).map(|_| RunId::new(1));
+        let running = [state].into_iter().filter(|now| *now == RunState::Running).map(|_| RunId::new(1));
         prop_assert_eq!(still, running.collect::<Vec<RunId>>());
     }
 );
@@ -1489,7 +1509,7 @@ fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<d
     store.write(JobOpened::from(second))?;
     let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
     store.write(RunSpawned::new(RunId::new(1), first, spawned))?;
-    let segments = vec![Proposals::segment("o1", 0)];
+    let segments = vec![Proposals::segment("o1", 0)?];
     let flail = Some(JobFlailed::new(RunId::new(1), segments));
     let misfiled =
         store.write(JobHalted::new(second, Halted::Flailed, Account::told(&"flailed")).holding(flail.clone()));

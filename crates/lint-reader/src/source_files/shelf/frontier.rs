@@ -20,7 +20,7 @@ impl<'tree> Frontier<'tree> {
     #[must_use]
     pub fn explored(self, stocked: Shelf<'tree>, files: &impl Files) -> Shelf<'tree> {
         match self.next.first() {
-            Some(_) => stocked.explored(files, &self.next, &self.visited),
+            Some(_) => stocked.explored(files, &self.next, self.visited),
             None => stocked,
         }
     }

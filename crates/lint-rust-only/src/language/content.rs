@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use file_ports::Bytes;
 use lint_core::Contents;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::Language;
 use cuts::Cuts;
