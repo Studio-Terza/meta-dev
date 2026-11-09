@@ -2,6 +2,7 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::path::Path;
 
+use crate::{Opening, Sqlite};
 use design::{Cli, Count, Failure, Line, Miss, Noted, Outcome, Reconciliation, Reference};
 use design_model::{NodeId, NotesLine};
 use design_store::StreamSchema;
@@ -12,7 +13,6 @@ use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
-use store_ports::Sqlite;
 
 use super::view::Viewing;
 use super::{Applying, FakeLent, Invocation, Session, Speaker, Spread, Staff};
@@ -151,7 +151,7 @@ impl Noting {
         let landed = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&applying.files),
-            |_path| applying.store.clone(),
+            Opening(|_path| applying.store.clone()),
             Staff::idle(),
         )
         .report(&Run::root(), ["import-notes", NOTES].iter().map(OsString::from), &mut out);

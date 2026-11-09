@@ -1,15 +1,15 @@
 mod bound;
+mod cached;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use sqlx_macros_core::FOSS_DRIVERS;
-use sqlx_macros_core::query::{QueryMacroInput, expand_input};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::{LitStr, Token, Type};
 
-use crate::expanded::{Expanded, Expanding};
+use crate::expanded::Expanding;
 use bound::Bound;
+use cached::{Entry, Unexpanded};
 
 #[derive(Debug)]
 pub struct Query {
@@ -19,31 +19,43 @@ pub struct Query {
 }
 
 impl Expanding for Query {
-    fn expansion(self) -> TokenStream {
+    fn expansion(self) -> syn::Result<TokenStream> {
         let Query { row, source, bounds } = self;
-        let arguments = bounds.iter().map(Bound::raw);
-        let written = quote!(source = #source, args = [#(#arguments),*]);
-        row.map_or_else(
-            || Self::sqlx(written.clone()),
-            |columns| {
-                let read = Self::sqlx(quote!(#written, record = __Raw));
-                quote! {{
-                    type __Raw = <#columns as ::store_ports::Columns>::Raw;
-                    (#read).try_map(<#columns as ::store_ports::Columns>::decoded)
-                }}
+        let failed = |unexpanded: Unexpanded| syn::Error::new(source.span(), unexpanded);
+        let entry = Entry::found(&source).map_err(failed)?;
+        entry.bound(bounds.len()).map_err(failed)?;
+        let tracked = entry.tracked();
+        let sql = LitStr::new(&source.value(), source.span());
+        let arguments: Vec<TokenStream> = bounds.iter().map(Bound::encoded).collect();
+        let values = quote!(::std::vec![#(#arguments),*]);
+        let prepared = row.map_or_else(
+            || {
+                let written = quote!(::store_ports::Prepared::written);
+                Ok(quote!(#written(#sql, #values)))
             },
-        )
+            |columns| {
+                entry.columns().map_err(failed).map(|typed| {
+                    let read = quote!(::store_ports::Prepared::read);
+                    let taken = quote!(::store_ports::Values);
+                    let rows = quote!(::store_ports::Columns);
+                    quote! {
+                        #read(#sql, #values, |values: &mut #taken| {
+                            type __Raw = <#columns as #rows>::Raw;
+                            let raw = __Raw { #(#typed)* };
+                            <#columns as #rows>::from_raw(raw)
+                        })
+                    }
+                })
+            },
+        )?;
+        Ok(quote!({
+            #tracked
+            #prepared
+        }))
     }
 }
 
 impl Query {
-    fn sqlx(input: TokenStream) -> TokenStream {
-        let expansion = syn::parse2::<QueryMacroInput>(input)
-            .map_err(Box::from)
-            .and_then(|parsed| expand_input(parsed, FOSS_DRIVERS));
-        Expanded::from(expansion).into()
-    }
-
     fn row(input: ParseStream<'_>) -> syn::Result<Option<Type>> {
         input.fork().parse::<LitStr>().map_or_else(
             |_| {

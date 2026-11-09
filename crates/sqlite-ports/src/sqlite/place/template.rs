@@ -4,9 +4,10 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
 
-use crate::StoreFailure;
+use crate::sqlite::failed::Unopened;
 use crate::sqlite::migrations::Migrations;
 use crate::sqlite::opened::Opened;
+use store_ports::StoreFailure;
 
 #[derive(Debug, Default)]
 pub(super) struct Template {
@@ -43,7 +44,8 @@ impl Image {
                 Ok(opened)
             }),
             Image::Migrated(migrated) => SqliteOwnedBuf::try_from(&**migrated)
-                .map_err(StoreFailure::Open)
+                .map_err(Unopened::from)
+                .map_err(StoreFailure::from)
                 .and_then(|copied| Opened::copied(&Image::memory(), copied)),
         }
     }

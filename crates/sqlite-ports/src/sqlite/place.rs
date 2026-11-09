@@ -11,9 +11,7 @@ use super::migrations::Migrations;
 use super::opened::Opened;
 use template::Template;
 
-use crate::store_lock::Claim;
-use crate::store_lock::StoreLock;
-use crate::{Busy, StoreFailure};
+use store_ports::{Busy, Claim, StoreFailure, StoreLock};
 
 #[derive(Debug)]
 pub(super) enum Place {

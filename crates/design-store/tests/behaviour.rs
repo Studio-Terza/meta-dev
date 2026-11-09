@@ -31,7 +31,8 @@ use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
-use store_ports::{Batch, Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Version, Written};
+use sqlite_ports::SqliteOpener;
+use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
 use stream::{Message, Stream};
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Skipped, Transcripts, Uuid};
@@ -237,10 +238,10 @@ fn an_unrelated_word_finds_nothing() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-static SEEDS: Migrator = store_ports::migrate!("tests/seeded");
+static SEEDS: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/seeded"));
 
 static SEEDED: LazyLock<Migrator> =
-    LazyLock::new(|| Migrator::with_migrations(StreamSchema::migrator().iter().chain(SEEDS.iter()).cloned().collect()));
+    LazyLock::new(|| Migrator::from(StreamSchema::migrator().iter().chain(SEEDS.iter()).copied().collect::<Vec<_>>()));
 
 #[derive(Clone, Copy, Debug)]
 struct Seeded;
@@ -410,10 +411,10 @@ impl Listed {
     }
 }
 
-static UNANCHORED_SEEDS: Migrator = store_ports::migrate!("tests/unanchored");
+static UNANCHORED_SEEDS: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/unanchored"));
 
 static UNANCHORED: LazyLock<Migrator> = LazyLock::new(|| {
-    Migrator::with_migrations(StreamSchema::migrator().iter().chain(UNANCHORED_SEEDS.iter()).cloned().collect())
+    Migrator::from(StreamSchema::migrator().iter().chain(UNANCHORED_SEEDS.iter()).copied().collect::<Vec<_>>())
 });
 
 #[derive(Clone, Copy, Debug)]
@@ -1764,3 +1765,5 @@ fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<d
     assert_eq!(filed, vec![(first, RunId::new(1))]);
     Ok(())
 }
+
+type Sqlite = <SqliteOpener as store_ports::Opens>::Store;

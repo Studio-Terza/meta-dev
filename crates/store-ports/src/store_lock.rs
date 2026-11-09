@@ -22,7 +22,7 @@ enum Hold {
 }
 
 #[derive(Debug, Default)]
-pub(crate) enum Claim {
+pub enum Claim {
     #[default]
     Free,
     Taken,
@@ -33,7 +33,7 @@ pub(crate) enum Claim {
 pub struct Unlock(#[from] io::Error);
 
 impl StoreLock {
-    pub(crate) fn filed(lock: PathBuf, open: impl FnOnce(&Path) -> io::Result<File>) -> Result<StoreLock, Busy> {
+    pub fn filed(lock: PathBuf, open: impl FnOnce(&Path) -> io::Result<File>) -> Result<StoreLock, Busy> {
         open(&lock)
             .map_err(Refusal::Unopened)
             .and_then(|file| file.try_lock().map(|()| file).map_err(Refusal::from))
@@ -41,7 +41,7 @@ impl StoreLock {
             .map_err(|refusal| refusal.busy(lock))
     }
 
-    pub(crate) fn claimed(claim: &Arc<Mutex<Claim>>) -> Result<StoreLock, Busy> {
+    pub fn claimed(claim: &Arc<Mutex<Claim>>) -> Result<StoreLock, Busy> {
         let previous = std::mem::replace(&mut *claim.lock().unwrap_or_else(PoisonError::into_inner), Claim::Taken);
         previous.taken(claim)
     }

@@ -33,13 +33,13 @@ impl Parse for Columns {
 }
 
 impl Expanding for Columns {
-    fn expansion(self) -> TokenStream {
+    fn expansion(self) -> syn::Result<TokenStream> {
         let Columns { row: DeriveInput { vis, ident, .. }, fields } = self;
         let raw = format_ident!("{}Raw", ident);
         let visible = fields.iter().map(|field| &field.vis);
         let names: Vec<_> = fields.iter().map(|field| &field.ident).collect();
         let columns: Vec<_> = fields.iter().map(|field| &field.ty).collect();
-        quote! {
+        Ok(quote! {
             #[derive(Debug)]
             #vis struct #raw {
                 #(#visible #names: <#columns as ::store_ports::Column>::Raw,)*
@@ -54,6 +54,6 @@ impl Expanding for Columns {
                     })
                 }
             }
-        }
+        })
     }
 }

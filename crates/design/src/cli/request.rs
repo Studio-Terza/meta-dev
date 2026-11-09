@@ -12,7 +12,7 @@ use console_ports::Environment;
 use design_store::Scope;
 use file_ports::Files;
 use grammar_flag::Flags;
-use store_ports::Sqlite;
+use store_ports::Opens;
 
 use super::failure::Failure;
 use command::{Command, Verb};
@@ -188,8 +188,8 @@ impl Request {
         Projects::located(environment, files, self.workspace.as_deref().map(Path::new))
     }
 
-    pub fn opened(&self, located: &Located, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
-        self.command.opened(located.kept(Kept::Store), opened)
+    pub fn opened<O: Opens>(&self, located: &Located, opens: &O) -> O::Store {
+        self.command.opened(located.kept(Kept::Store), opens)
     }
 
     pub fn command(self) -> Command {

@@ -1,0 +1,24 @@
+[package]
+name = "sqlite-ports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.port]
+owns = ["sqlx", "sqlx-core", "sqlx-macros", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "tokio", "tokio-stream"]
+shared = ["hex", "proc-macro2", "quote", "serde", "serde_core", "serde_json", "sha2", "syn", "thiserror"]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+sqlx.workspace = true
+store-ports = { path = "../store-ports" }
+tokio.workspace = true
+
+[lints]
+workspace = true

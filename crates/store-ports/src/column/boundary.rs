@@ -15,6 +15,8 @@ pub enum ColumnFailure {
     Misspelled(#[source] Box<dyn Error + Send + Sync>),
     #[error("a stored column its row needs is null")]
     Absent,
+    #[error("a stored value is not of its column's storage type")]
+    Mistyped,
     #[error("a stored value fails its column type's check: {0}")]
     Refused(#[source] Box<dyn Error + Send + Sync>),
 }

@@ -10,9 +10,11 @@ pub struct Bound {
 }
 
 impl Bound {
-    pub fn raw(&self) -> TokenStream {
+    pub fn encoded(&self) -> TokenStream {
         let Bound { name, column } = self;
-        quote!(<#column as ::store_ports::Column>::raw(&#name))
+        let encode = quote!(::store_ports::IntoValue::into_value);
+        let raw = quote!(::store_ports::Column);
+        quote!(#encode(<#column as #raw>::raw(&#name)))
     }
 }
 

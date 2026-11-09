@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use design_store::StreamSchema;
-use store_ports::Sqlite;
+use store_ports::Opens;
 
 use super::Token;
 use crate::cli::failure::Failure;
@@ -28,10 +28,10 @@ impl Persistence {
         }
     }
 
-    pub fn opened(self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
+    pub fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
         match self {
-            Persistence::File => opened(path),
-            Persistence::DryRun => Sqlite::in_memory::<StreamSchema>(),
+            Persistence::File => opens.file::<StreamSchema>(path),
+            Persistence::DryRun => opens.in_memory::<StreamSchema>(),
         }
     }
 }

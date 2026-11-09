@@ -18,9 +18,10 @@ use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use newtype::{Arbitrary, Counter, Newtype};
 use port_core::{Op, Run};
+use sqlite_ports::SqliteOpener;
 use store_ports::{
-    Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure,
-    Version, Written,
+    Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version,
+    Written,
 };
 use strum::VariantArray;
 use tempfile::TempDir;
@@ -222,8 +223,12 @@ impl Batch for Rewriteless {
 struct Older;
 
 static OLDER: LazyLock<Migrator> = LazyLock::new(|| {
-    Migrator::with_migrations(
-        StreamSchema::migrator().iter().filter(|migration| migration.version < Older::RESEGMENTED).cloned().collect(),
+    Migrator::from(
+        StreamSchema::migrator()
+            .iter()
+            .filter(|migration| migration.version() < Older::RESEGMENTED)
+            .copied()
+            .collect::<Vec<_>>(),
     )
 });
 
@@ -231,7 +236,7 @@ impl Older {
     const RESEGMENTED: i64 = 20_261_108_000_012;
 
     fn versions() -> BTreeSet<Version> {
-        OLDER.iter().map(|migration| Version::new(migration.version)).collect()
+        OLDER.iter().map(|migration| Version::new(migration.version())).collect()
     }
 }
 
@@ -249,11 +254,7 @@ impl Schema for Older {
 
 struct Untouched;
 
-static UNTOUCHED: LazyLock<Migrator> = LazyLock::new(|| {
-    let mut migrator = Migrator::with_migrations(Vec::new());
-    migrator.set_ignore_missing(true);
-    migrator
-});
+static UNTOUCHED: LazyLock<Migrator> = LazyLock::new(|| Migrator::from(Vec::new()).ignoring_missing());
 
 impl Schema for Untouched {
     type Rewrite = Rewriteless;
@@ -295,11 +296,10 @@ impl Batch for Crashing {
 
 struct Broken;
 
-static BREAKS: Migrator = store_ports::migrate!("tests/broken");
+static BREAKS: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/broken"));
 
-static BROKEN: LazyLock<Migrator> = LazyLock::new(|| {
-    Migrator::with_migrations(StreamSchema::migrator().iter().chain(BREAKS.iter()).cloned().collect())
-});
+static BROKEN: LazyLock<Migrator> =
+    LazyLock::new(|| Migrator::from(StreamSchema::migrator().iter().chain(BREAKS.iter()).copied().collect::<Vec<_>>()));
 
 impl Schema for Broken {
     type Rewrite = <StreamSchema as Schema>::Rewrite;
@@ -329,7 +329,7 @@ impl Schema for Early {
         StreamSchema::migrator()
             .iter()
             .next()
-            .is_some_and(|first| Version::new(first.version) == pending)
+            .is_some_and(|first| Version::new(first.version()) == pending)
             .then_some(Staged)
     }
 }
@@ -687,10 +687,10 @@ VALUES
 
 struct Glossed;
 
-static GLOSSES: Migrator = store_ports::migrate!("tests/glossed");
+static GLOSSES: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/glossed"));
 
 static GLOSSED: LazyLock<Migrator> = LazyLock::new(|| {
-    Migrator::with_migrations(StreamSchema::migrator().iter().chain(GLOSSES.iter()).cloned().collect())
+    Migrator::from(StreamSchema::migrator().iter().chain(GLOSSES.iter()).copied().collect::<Vec<_>>())
 });
 
 impl Schema for Glossed {
@@ -1145,3 +1145,5 @@ laws::law!(a_negative_count_is_refused_as_unfit, i64::MIN..0, number, {
     prop_assert!(matches!(Ordinal::from_raw(number), Err(ColumnFailure::Unfit(_))));
     prop_assert!(matches!(Offset::from_raw(number), Err(ColumnFailure::Unfit(_))));
 });
+
+type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
