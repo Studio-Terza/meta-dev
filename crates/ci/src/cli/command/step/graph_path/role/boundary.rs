@@ -1,38 +1,34 @@
-use grammar::unit_label::{Label, Mode, Target, Unlabeled};
-use serde::Deserialize;
+use grammar::unit_label::{Fixed, Mode, Target, Unit};
 
 use super::Role;
 
-#[derive(Debug, Deserialize)]
-#[serde(try_from = "String")]
-pub(in super::super) struct Labeled(Label);
+#[derive(Debug, thiserror::Error)]
+#[error("a unit label cargo's timings never give a clippy unit")]
+pub(in super::super) struct Unlabeled;
 
-impl TryFrom<String> for Labeled {
+impl TryFrom<String> for Role {
     type Error = Unlabeled;
 
-    fn try_from(text: String) -> Result<Labeled, Unlabeled> {
-        text.parse().map(Labeled)
+    fn try_from(text: String) -> Result<Role, Unlabeled> {
+        Role::labelled(&text).ok_or(Unlabeled)
     }
 }
 
-impl Role {
-    fn targeted(target: Target) -> Role {
+impl Unit for Role {
+    fn fixed(fixed: Fixed) -> Role {
+        match fixed {
+            Fixed::Built => Role::HostBuild,
+            Fixed::Checked => Role::Library,
+            Fixed::CheckedTest => Role::LibraryTest,
+            Fixed::BuildScript => Role::BuildScript,
+            Fixed::BuildRun => Role::BuildRun,
+        }
+    }
+
+    fn target(target: Target) -> Role {
         match target.mode() {
             Mode::Check => Role::Target(target),
             Mode::CheckTest => Role::TestTarget(target),
-        }
-    }
-}
-
-impl From<Labeled> for Role {
-    fn from(Labeled(label): Labeled) -> Role {
-        match label {
-            Label::Built => Role::HostBuild,
-            Label::Checked => Role::Library,
-            Label::CheckedTest => Role::LibraryTest,
-            Label::BuildScript => Role::BuildScript,
-            Label::BuildRun => Role::BuildRun,
-            Label::Target(target) => Role::targeted(target),
         }
     }
 }

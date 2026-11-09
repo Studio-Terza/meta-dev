@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Kind, Label, Mode, Target, Unlabeled};
+pub use boundary::{Fixed, Kind, Mode, Target, Unit};

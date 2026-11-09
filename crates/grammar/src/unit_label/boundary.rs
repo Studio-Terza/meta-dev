@@ -1,5 +1,4 @@
 use std::fmt;
-use std::str::FromStr;
 
 use logos::{Lexer, Logos};
 use named_derive::Named;
@@ -8,30 +7,42 @@ use named_derive::Named;
 enum Piece {
     #[token(" ")]
     Space,
-    #[token("build-script")]
+    #[token(" build-script")]
     BuildScript,
-    #[token("(run)")]
+    #[token(" (run)")]
     Run,
-    #[token("\"bin\"", |_| Kind::Bin)]
-    #[token("\"test\"", |_| Kind::Test)]
-    #[token("\"bench\"", |_| Kind::Bench)]
-    #[token("\"example\"", |_| Kind::Example)]
+    #[token(" \"bin\"", |_| Kind::Bin)]
+    #[token(" \"test\"", |_| Kind::Test)]
+    #[token(" \"bench\"", |_| Kind::Bench)]
+    #[token(" \"example\"", |_| Kind::Example)]
     Kind(Kind),
-    #[token("(check)", |_| Mode::Check)]
-    #[token("(check-test)", |_| Mode::CheckTest)]
+    #[token(" (check)", |_| Mode::Check)]
+    #[token(" (check-test)", |_| Mode::CheckTest)]
     Mode(Mode),
     #[regex(r#"[^ "()]+"#, Piece::word)]
     Word(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Label {
+pub trait Unit: Sized {
+    fn fixed(fixed: Fixed) -> Self;
+
+    fn target(target: Target) -> Self;
+
+    #[must_use]
+    fn labelled(text: &str) -> Option<Self> {
+        Piece::lexer(text).collect::<Result<Vec<Piece>, ()>>().ok().and_then(|pieces| {
+            Fixed::read(&pieces).map(Self::fixed).or_else(|| Target::read(&pieces).map(Self::target))
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Fixed {
     Built,
     Checked,
     CheckedTest,
     BuildScript,
     BuildRun,
-    Target(Target),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -61,14 +72,46 @@ pub enum Mode {
     CheckTest,
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
-#[error("{0:?} is not a label cargo's timings give a unit of a clippy build")]
-pub struct Unlabeled(String);
+impl Fixed {
+    const BUILD_RUN: [Piece; 2] = [Piece::BuildScript, Piece::Run];
+
+    fn read(pieces: &[Piece]) -> Option<Fixed> {
+        <&[Piece; 0]>::try_from(pieces)
+            .ok()
+            .map(|_none| Fixed::Built)
+            .or_else(|| <&[Piece; 1]>::try_from(pieces).ok().and_then(|[only]| Fixed::alone(only)))
+            .or_else(|| Some(pieces).filter(|pieces| **pieces == Self::BUILD_RUN).map(|_run| Fixed::BuildRun))
+    }
+
+    fn alone(piece: &Piece) -> Option<Fixed> {
+        match piece {
+            Piece::Mode(mode) => Some(mode.library()),
+            Piece::BuildScript => Some(Fixed::BuildScript),
+            Piece::Space | Piece::Run | Piece::Kind(_) | Piece::Word(_) => None,
+        }
+    }
+}
 
 impl Target {
     #[must_use]
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    fn read(pieces: &[Piece]) -> Option<Target> {
+        let [space, name, kind, mode] = <&[Piece; 4]>::try_from(pieces).ok()?;
+        Some(space)
+            .filter(|space| **space == Piece::Space)
+            .and_then(|_space| Some(Target { name: name.named()?.to_owned(), kind: kind.kind()?, mode: mode.mode()? }))
+    }
+}
+
+impl Mode {
+    fn library(self) -> Fixed {
+        match self {
+            Mode::Check => Fixed::Checked,
+            Mode::CheckTest => Fixed::CheckedTest,
+        }
     }
 }
 
@@ -77,30 +120,25 @@ impl Piece {
         lexer.slice().to_owned()
     }
 
-    fn labelled(pieces: &[Piece]) -> Option<Label> {
-        match pieces {
-            [] => Some(Label::Built),
-            [Piece::Space, Piece::Mode(Mode::Check)] => Some(Label::Checked),
-            [Piece::Space, Piece::Mode(Mode::CheckTest)] => Some(Label::CheckedTest),
-            [Piece::Space, Piece::BuildScript] => Some(Label::BuildScript),
-            [Piece::Space, Piece::BuildScript, Piece::Space, Piece::Run] => Some(Label::BuildRun),
-            [Piece::Space, Piece::Word(name), Piece::Space, Piece::Kind(kind), Piece::Space, Piece::Mode(mode)] => {
-                Some(Label::Target(Target { name: name.clone(), kind: *kind, mode: *mode }))
-            }
-            _ => None,
+    fn named(&self) -> Option<&str> {
+        match self {
+            Piece::Word(word) => Some(word),
+            Piece::Space | Piece::BuildScript | Piece::Run | Piece::Kind(_) | Piece::Mode(_) => None,
         }
     }
-}
 
-impl FromStr for Label {
-    type Err = Unlabeled;
+    fn kind(&self) -> Option<Kind> {
+        match self {
+            Piece::Kind(kind) => Some(*kind),
+            Piece::Space | Piece::BuildScript | Piece::Run | Piece::Mode(_) | Piece::Word(_) => None,
+        }
+    }
 
-    fn from_str(text: &str) -> Result<Label, Unlabeled> {
-        Piece::lexer(text)
-            .collect::<Result<Vec<Piece>, ()>>()
-            .ok()
-            .and_then(|pieces| Piece::labelled(&pieces))
-            .ok_or_else(|| Unlabeled(text.to_owned()))
+    fn mode(&self) -> Option<Mode> {
+        match self {
+            Piece::Mode(mode) => Some(*mode),
+            Piece::Space | Piece::BuildScript | Piece::Run | Piece::Kind(_) | Piece::Word(_) => None,
+        }
     }
 }
 

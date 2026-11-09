@@ -20,8 +20,8 @@ pub enum Failure<'path> {
     Io { path: Cow<'path, Path>, source: io::Error },
     #[error("no libtest result line in {path}; the test output format may have changed", path = path.display())]
     NoTestResult { path: &'path Path },
-    #[error("cannot read the test output in {path}: {source}", path = path.display())]
-    MalformedTestResult { path: &'path Path, source: grammar::test_summary::Malformed },
+    #[error("\"{line}\" in {path} opens like a libtest result line but does not read as one; the test output format may have changed", path = path.display())]
+    MalformedTestResult { path: &'path Path, line: text_lines::LossyText },
     #[error("no unit timings in {path}; the cargo timings format may have changed", path = path.display())]
     NoTimings { path: Cow<'path, Path> },
     #[error("cannot run {program}: {source}", program = program.to_string_lossy())]
@@ -38,8 +38,8 @@ pub enum Failure<'path> {
     Measured { path: Cow<'path, Path>, source: toml::de::Error },
     #[error("cannot read the cargo metadata: {0}")]
     Metadata(serde_json::Error),
-    #[error("rustc --print host-tuple names {} lines, not the one host platform clippy builds for", .0.len())]
-    NoHost(Vec<String>),
+    #[error("rustc --print host-tuple printed \"{0}\", not the one host platform clippy builds for")]
+    NoHost(file_ports::Text),
     #[error("cannot read the list of cold builds: {0}")]
     Runs(serde_json::Error),
     #[error("the mutation matrix failed: {0}")]

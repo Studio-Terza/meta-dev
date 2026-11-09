@@ -7,10 +7,11 @@ use super::crates::{Crates, Origin};
 use super::manifest::Kind;
 use super::package::Package;
 use super::unit_key::UnitKey;
-pub(super) use boundary::Labeled;
 use grammar::unit_label::Target;
+use serde::Deserialize;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
 pub(super) enum Role {
     Library,
     HostBuild,

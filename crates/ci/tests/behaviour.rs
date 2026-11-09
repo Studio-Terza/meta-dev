@@ -58,13 +58,18 @@ impl Reply {
     }
 }
 
+struct ExactReply {
+    asked: Invocation,
+    text: String,
+}
+
 struct Script {
     exit: Exit,
     elapsed: Duration,
     changed: String,
     metadata: String,
     answers: Vec<Reply>,
-    exact: Vec<(Invocation, String)>,
+    exact: Vec<ExactReply>,
     failing: Option<&'static str>,
     logged_text: String,
     calls: RefCell<Vec<Invocation>>,
@@ -109,8 +114,8 @@ impl Script {
     fn answer_to(&self, invocation: &Invocation) -> String {
         self.exact
             .iter()
-            .find(|(asked, _)| asked == invocation)
-            .map_or_else(|| self.keyed_answer(invocation), |(_, text)| text.clone())
+            .find(|exact| exact.asked == *invocation)
+            .map_or_else(|| self.keyed_answer(invocation), |exact| exact.text.clone())
     }
 
     fn keyed_answer(&self, invocation: &Invocation) -> String {
@@ -212,6 +217,12 @@ impl Reach {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct Recorded {
+    exit: ExitCode,
+    lines: Vec<String>,
+}
+
 struct Sample;
 
 impl Sample {
@@ -222,18 +233,18 @@ impl Sample {
         Text::owned(&scratch.read("m.toml"))
     }
 
-    fn measured(exit: ExitCode, lines: &[&str]) -> (ExitCode, Vec<String>) {
-        (exit, lines.iter().map(|line| (*line).to_owned()).collect())
+    fn measured(exit: ExitCode, lines: &[&str]) -> Recorded {
+        Recorded { exit, lines: lines.iter().map(|line| (*line).to_owned()).collect() }
     }
 
-    fn libtest_line(output: &&str) -> (ExitCode, Vec<String>) {
+    fn libtest_line(output: &&str) -> Recorded {
         let scratch = Scratch::fresh();
         scratch.write("out.txt", output).ok();
         let answer = scratch.answer(
             &Script::new(),
             &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")],
         );
-        (answer.exit, Text::owned(&scratch.read("m.toml")))
+        Recorded { exit: answer.exit, lines: Text::owned(&scratch.read("m.toml")) }
     }
 
     fn reach_report(&[base, changed]: &[&str; 2]) -> Vec<String> {
@@ -410,7 +421,8 @@ fn a_result_line_libtest_could_not_have_written_is_a_failure_and_nothing_is_meas
         .answer(&Script::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("out.txt"));
-    assert!(answer.err.contains("\"test result: ok. 1 passed; finished in soon\" opens like a libtest result line"));
+    assert!(answer.err.contains("\"test result: ok. 1 passed; finished in soon\" in "));
+    assert!(answer.err.contains("opens like a libtest result line but does not read as one"));
     assert_eq!(scratch.read("m.toml"), "");
     Ok(())
 }
@@ -815,7 +827,7 @@ fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform(
     );
     let fake = Script {
         metadata: EVERY_PLATFORM.to_owned(),
-        exact: vec![(Graph::metadata_for(HOST), HOST_PLATFORM.to_owned())],
+        exact: vec![ExactReply { asked: Graph::metadata_for(HOST), text: HOST_PLATFORM.to_owned() }],
         ..Graph::hosted(Script::new())
     };
     let Graph { answer, measured, .. } = Graph::answered(&page, &fake)?;

@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Malformed, Summary};
+pub use boundary::{Opened, Summary};

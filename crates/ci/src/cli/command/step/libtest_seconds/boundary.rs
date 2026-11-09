@@ -1,5 +1,9 @@
-use grammar::test_summary::Summary;
+use std::path::Path;
 
+use grammar::test_summary::Summary;
+use text_lines::LossyText;
+
+use crate::cli::command::failure::Failure;
 use crate::cli::command::step::seconds::Seconds;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -9,10 +13,13 @@ impl Finished {
     pub fn seconds(self) -> Seconds {
         self.0
     }
-}
 
-impl From<Summary> for Finished {
-    fn from(summary: Summary) -> Finished {
-        Finished(Seconds::new(summary.seconds()))
+    pub fn read<'path>(path: &'path Path, line: &str) -> Option<Result<Finished, Failure<'path>>> {
+        Summary::opened(line).map(|opened| {
+            opened
+                .summary()
+                .map(|summary| Finished(Seconds::new(summary.seconds())))
+                .ok_or_else(|| Failure::MalformedTestResult { path, line: LossyText::from(line.as_bytes()) })
+        })
     }
 }
