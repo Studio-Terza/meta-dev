@@ -23,7 +23,6 @@ port-core = { path = "../port-core" }
 serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
-strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

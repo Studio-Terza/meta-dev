@@ -19,7 +19,6 @@ grammar-provenance = { path = "../grammar-provenance" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 serde.workspace = true
-strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

@@ -1,9 +1,8 @@
 use named_derive::Named;
-use strum::VariantArray;
 
 use crate::form::Form;
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shape {
     #[name("sentence")]
     Sentence,
