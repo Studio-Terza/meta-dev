@@ -623,6 +623,7 @@ dependencies = [
  "file-ports",
  "lint-runner",
  "proptest",
+ "timer-ports",
 ]
 
 [[package]]
@@ -1182,6 +1183,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "lint-runner",
+ "timer-ports",
 ]
 
 [[package]]
@@ -1412,6 +1414,7 @@ name = "lint-literal-names"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1463,6 +1466,7 @@ name = "lint-named-lifetimes"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1520,6 +1524,7 @@ name = "lint-no-free-fns"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1826,6 +1831,7 @@ dependencies = [
  "port-core",
  "text-lines",
  "thiserror",
+ "timer-ports",
  "workspace-metadata",
 ]
 
@@ -1928,6 +1934,7 @@ dependencies = [
  "lint-unconsumed-traits",
  "lint-vec-out-params",
  "lint-workflow-run",
+ "syn 2.0.119",
  "transition-facts",
  "type-facts",
 ]
@@ -2933,6 +2940,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "timer-ports"
+version = "0.1.0"
+dependencies = [
+ "port-core",
 ]
 
 [[package]]

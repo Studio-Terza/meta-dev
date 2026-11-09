@@ -93,36 +93,25 @@ impl<'graph> Walk<'graph> {
         descent.into_iter().fold(self, Walk::visited)
     }
 
-    fn visited(self, descent: Descent<'graph>) -> Walk<'graph> {
+    fn visited(mut self, descent: Descent<'graph>) -> Walk<'graph> {
         let scope = descent.scope;
-        let open = self.open.into_iter().chain([scope]).collect();
-        let marks = self.marks.opened(scope);
-        let opened = Walk { successors: self.successors, marks, open, components: self.components };
-        let walk = descent.successors.iter().fold(opened, |walking, next| {
+        self.open.push(scope);
+        self.marks = self.marks.opened(scope);
+        let walk = descent.successors.iter().fold(self, |walking, next| {
             let reached = walking.reached(*next);
-            Walk {
-                successors: reached.successors,
-                marks: reached.marks.inherited(scope, *next),
-                open: reached.open,
-                components: reached.components,
-            }
+            Walk { marks: reached.marks.inherited(scope, *next), ..reached }
         });
         let root = walk.marks.visit(scope).and_then(Visit::root);
         root.into_iter().fold(walk, Walk::closed)
     }
 
-    fn closed(self, root: Reach) -> Walk<'graph> {
+    fn closed(mut self, root: Reach) -> Walk<'graph> {
         let marks = &self.marks;
-        let kept =
-            self.open.iter().take_while(|open| marks.visit(**open).map(|visit| visit.order) < Some(root)).count();
-        let (open, members) = self.open.split_at(kept);
-        let component = Component::from_members(members.to_vec(), self.successors);
-        Walk {
-            successors: self.successors,
-            marks: self.marks.closed(&component),
-            open: open.to_vec(),
-            components: self.components.into_iter().chain([component]).collect(),
-        }
+        let kept = self.open.partition_point(|open| marks.visit(*open).map(|visit| visit.order) < Some(root));
+        let component = Component::from_members(self.open.split_off(kept), self.successors);
+        self.marks = self.marks.closed(&component);
+        self.components.push(component);
+        self
     }
 }
 

@@ -1,25 +1,23 @@
-use std::path::Path;
-
 use proc_macro2::{TokenStream, TokenTree};
 use syn::parse::Parse;
 use syn::visit::{self, Visit};
 use syn::{Block, ImplItemFn, ItemFn, Macro, Signature, TraitItemFn};
 
-use lint_core::Macros;
+use lint_core::{Macros, SourceFile};
 
 use crate::function_flow::FunctionFlow;
 
 pub struct Collector<'file> {
-    path: &'file Path,
+    file: &'file SourceFile,
     functions: Vec<FunctionFlow<'file>>,
 }
 
 impl<'file> Collector<'file> {
     const FUNCTION: &'static str = "fn";
 
-    pub fn collected(path: &'file Path, syntax: &syn::File) -> Vec<FunctionFlow<'file>> {
-        let mut collector = Collector { path, functions: Vec::new() };
-        collector.visit_file(syntax);
+    pub fn collected(file: &'file SourceFile) -> Vec<FunctionFlow<'file>> {
+        let mut collector = Collector { file, functions: Vec::new() };
+        collector.visit_file(file.syntax());
         collector.functions
     }
 
@@ -41,19 +39,20 @@ impl<'file> Collector<'file> {
     }
 
     fn judge(&mut self, signature: &Signature, body: Option<&Block>) {
-        let path = self.path;
+        let file = self.file;
         self.functions.extend(
             body.filter(|_| signature.constness.is_none())
-                .map(|block| FunctionFlow::judged(path, signature.ident.span(), block)),
+                .map(|block| FunctionFlow::judged(file, signature.ident.span(), block)),
         );
     }
 }
 
 impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_macro(&mut self, invocation: &'ast Macro) {
+        let file = self.file;
         Self::declaring(invocation)
             .into_iter()
-            .flat_map(Macros::statements)
+            .flat_map(|declared| Macros::expanded(file, declared).to_vec())
             .for_each(|statement| self.visit_stmt(&statement));
     }
 

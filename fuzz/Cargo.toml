@@ -24,6 +24,7 @@ file-ports = { path = "../crates/file-ports" }
 cargo-ports = { path = "../crates/cargo-ports" }
 lint-runner = { path = "../crates/lint-runner" }
 proptest.workspace = true
+timer-ports = { path = "../crates/timer-ports" }
 
 [lints]
 workspace = true

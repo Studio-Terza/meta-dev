@@ -4,6 +4,7 @@ use syn::ItemMod;
 
 use lint_layout::{Name, Word};
 use lint_placement::Placement;
+use newtype::Wrapping;
 
 use crate::source_file::SourceFile;
 use crate::walk::Walk;
@@ -44,6 +45,6 @@ impl Gate {
 
     #[must_use]
     pub fn names<'module>(&self, module: &'module ItemMod) -> Option<&'module ItemMod> {
-        (Name::from(&module.ident) == Name::from(self.module)).then_some(module)
+        (module.ident == self.module.into_inner()).then_some(module)
     }
 }

@@ -36,7 +36,7 @@ impl MacroAliases {
 
     fn alias(&self, rename: &UseRename) -> Vec<Name> {
         Some(rename)
-            .filter(|candidate| self.original == Name::from(&candidate.ident))
+            .filter(|candidate| candidate.ident == self.original)
             .map(|matched| Name::from(&matched.rename))
             .into_iter()
             .collect()
