@@ -73,6 +73,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         "::report(readout.files())",
         "flows.report::<",
         "::dirty(&system)",
+        "::of_names(extraction.names())",
         "ModelLint>::report",
         "WorkspaceLint>::report",
     ]

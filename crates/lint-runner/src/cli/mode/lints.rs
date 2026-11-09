@@ -102,7 +102,7 @@ type Query = for<'model> fn(&'model Model) -> Report<'model>;
 type Workspaced = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Report<'file>;
 
 impl Lints {
-    const LINTS: [Entry; 52] = [
+    const LINTS: [Entry; 51] = [
         Entry::spelled::<NoComments>(Work::Checked(|readout| vec![NoComments::report(readout.files())])),
         Entry::spelled::<NoFreeFns>(Work::Checked(|readout| vec![NoFreeFns::report(readout.files())])),
         Entry::spelled::<ThinMain>(Work::Checked(|readout| vec![ThinMain::report(readout.files())])),
@@ -130,7 +130,6 @@ impl Lints {
         Entry::spelled::<RepeatedMethods>(Work::Checked(|readout| vec![RepeatedMethods::report(readout.files())])),
         Entry::spelled::<StateGraph>(Work::Checked(|readout| vec![StateGraph::report(readout.files())])),
         Entry::spelled::<GuardMustUse>(Work::Checked(|readout| vec![GuardMustUse::report(readout.files())])),
-        Entry::spelled::<CrateGraph>(Work::Checked(|readout| vec![CrateGraph::report(readout.files())])),
         Entry::spelled::<PublicApiTests>(Work::Checked(|readout| vec![PublicApiTests::report(readout.files())])),
         Entry::spelled::<NoTestOnlyApi>(Work::Checked(|readout| vec![NoTestOnlyApi::report(readout.files())])),
         Entry::spelled::<NoIgnoredTests>(Work::Checked(|readout| vec![NoIgnoredTests::report(readout.files())])),
@@ -160,6 +159,7 @@ impl Lints {
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
+                .chain([CrateGraph::of_names(extraction.names())])
                 .collect()
         })),
         Entry::spelled::<UnconsumedTraits>(Work::Checked(|readout| vec![UnconsumedTraits::report(readout.files())])),

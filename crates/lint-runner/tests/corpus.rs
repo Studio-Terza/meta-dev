@@ -108,6 +108,7 @@ impl Corpus {
             "::report(readout.files())",
             "flows.report::<",
             "::dirty(&system)",
+            "::of_names(extraction.names())",
             "ModelLint>::report",
             "WorkspaceLint>::report",
         ]
