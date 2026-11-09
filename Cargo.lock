@@ -2593,10 +2593,21 @@ dependencies = [
 name = "sqlite-ports"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "exit",
+ "hex",
  "newtype",
  "port-core",
+ "proc-macro2",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "sqlx",
+ "sqlx-core",
+ "sqlx-sqlite",
  "store-ports",
+ "syn 2.0.119",
+ "thiserror",
  "tokio",
 ]
 
