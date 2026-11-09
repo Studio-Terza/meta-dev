@@ -16,7 +16,7 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
-rusqlite = { version = "0.37.0", default-features = false, features = ["bundled", "serialize"] }
+rusqlite = { version = "0.37.0", default-features = false, features = ["serialize"] }
 sha2.workspace = true
 store-ports = { path = "../store-ports" }
 thiserror.workspace = true
