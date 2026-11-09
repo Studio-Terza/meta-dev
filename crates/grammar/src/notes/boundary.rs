@@ -16,6 +16,22 @@ enum Row {
     Break,
 }
 
+#[derive(Logos, Clone, Debug, PartialEq, Eq)]
+enum Stamp {
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", |lex| lex.slice().parse::<Date>().ok())]
+    Day(Date),
+    #[regex(r"[Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?", |lex| lex.slice().parse::<Clock>().ok())]
+    Clock(Clock),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Stamping {
+    Started,
+    Dated(Date),
+    Timed(Date, Clock),
+    Unstamped,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Marker {
     Bullet,
@@ -40,7 +56,7 @@ enum Lexeme {
     #[token("**", |_| Marker::Emphasis)]
     #[token("_", |_| Marker::Emphasis)]
     #[token("__", |_| Marker::Emphasis)]
-    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?)?", |_| Marker::Date)]
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?)?", |_| Marker::Date)]
     #[token(":", |_| Marker::Colon)]
     #[regex(r"\[[ xX]\]", |_| Marker::Task)]
     #[regex(r"[ \t]+", |_| Marker::Space)]
@@ -63,14 +79,6 @@ enum Lexeme {
     Word,
     #[token("'s")]
     Possessive,
-}
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-enum Moment<'text> {
-    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")]
-    Day,
-    #[regex(r"[T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?", |lexer| lexer.slice())]
-    Clock(&'text str),
 }
 
 pub trait Reading {
@@ -106,7 +114,7 @@ enum Piece {
     Quoted(Quote),
     Unclosed(Unclosed),
     Cited(Cite),
-    Dated(Date, Clock),
+    Dated(Date, Option<Clock>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -398,10 +406,7 @@ impl<'lexed, 'text> Step<'lexed, 'text> {
     }
 
     fn dated(lexed: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
-        let mut moments = Moment::lexer(lexed.text);
-        let day = moments.next().map_or(lexed.text, |_day| moments.slice());
-        let clock = moments.next().and_then(Result::ok).and_then(Moment::clock).unwrap_or_default();
-        Step::after(Piece::Dated(Date::new(day.to_owned()), Clock::new(clock.to_owned())), rest)
+        Step::after(Stamp::lexer(lexed.text).fold(Stamping::Started, Stamping::took).piece(lexed), rest)
     }
 
     fn quoted(rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
@@ -417,19 +422,46 @@ impl<'lexed, 'text> Step<'lexed, 'text> {
     }
 }
 
-impl<'text> Moment<'text> {
-    fn clock(self) -> Option<&'text str> {
-        match self {
-            Moment::Clock(clock) => Some(clock),
-            Moment::Day => None,
-        }
-    }
-}
-
 impl Pieces {
     fn parsed(lexed: &[Lexed<'_>]) -> Pieces {
         let start = Cursor { rest: lexed };
         Pieces(iter::successors(start.step(), |step| step.cursor.step()).map(|step| step.piece).collect())
+    }
+}
+
+impl Stamp {
+    fn day(self) -> Option<Date> {
+        match self {
+            Stamp::Day(day) => Some(day),
+            Stamp::Clock(_) => None,
+        }
+    }
+
+    fn clock(self) -> Option<Clock> {
+        match self {
+            Stamp::Clock(clock) => Some(clock),
+            Stamp::Day(_) => None,
+        }
+    }
+}
+
+impl Stamping {
+    fn took(self, stamp: Result<Stamp, ()>) -> Stamping {
+        match self {
+            Stamping::Started => stamp.ok().and_then(Stamp::day).map_or(Stamping::Unstamped, Stamping::Dated),
+            Stamping::Dated(day) => {
+                stamp.ok().and_then(Stamp::clock).map_or(Stamping::Unstamped, |clock| Stamping::Timed(day, clock))
+            }
+            Stamping::Timed(..) | Stamping::Unstamped => Stamping::Unstamped,
+        }
+    }
+
+    fn piece(self, lexed: Lexed<'_>) -> Piece {
+        match self {
+            Stamping::Dated(day) => Piece::Dated(day, None),
+            Stamping::Timed(day, clock) => Piece::Dated(day, Some(clock)),
+            Stamping::Started | Stamping::Unstamped => Piece::Text(lexed.text.to_owned()),
+        }
     }
 }
 
@@ -536,7 +568,9 @@ impl fmt::Display for Piece {
             Piece::Quoted(quote) => write!(formatter, "\"{quote}\""),
             Piece::Cited(cite) => write!(formatter, "{cite}"),
             Piece::Unclosed(_) => formatter.write_str("\""),
-            Piece::Dated(date, clock) => write!(formatter, "{date}{clock}"),
+            Piece::Dated(date, clock) => {
+                write!(formatter, "{date}{}", clock.as_ref().map(ToString::to_string).unwrap_or_default())
+            }
         }
     }
 }

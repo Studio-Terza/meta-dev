@@ -25,7 +25,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref | job <job-id>> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings) | view (current-decision | open-questions | outline) [<node-id>] | view (unplaced | notes) | import-notes <file>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref | job <job-id>> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary> | hook (user-prompt-submit | stop | --settings) | view (current-decision | open-questions | outline) [<node-id>] | view (unplaced | notes) | import-notes <file> | retry <job-id>)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -52,6 +52,8 @@ pub enum Failure {
     Ended { node: NodeId, ending: Ending },
     #[error("no run of job {0} in the design store")]
     Unrun(JobId),
+    #[error("job {0} holds no flailed segments: it did not flail, or it was retried already; nothing was written")]
+    Unflailed(JobId),
     #[error("no project {0} in the design store; run design init {0} in its repository first")]
     Unrooted(Project),
     #[error("no project is configured here; name a node, or run design init <project> in its repository first")]
@@ -108,7 +110,7 @@ pub enum Failure {
     #[error("cannot read the hook input: {0}")]
     Unheard(#[source] serde_json::Error),
     #[error("cannot render the hook settings: {0}")]
-    Render(#[from] serde_json::Error),
+    Render(#[source] serde_json::Error),
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
@@ -203,6 +205,7 @@ impl Failure {
             | Failure::Unplaced(..)
             | Failure::Ended { .. }
             | Failure::Unrun(..)
+            | Failure::Unflailed(..)
             | Failure::Unrooted(..)
             | Failure::Unconfigured
             | Failure::Config(..)

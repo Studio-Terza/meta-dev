@@ -15,7 +15,7 @@ pub enum Provenance {
 
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "{0:?} is no provenance: one of init, apply, role, inheritance, agent- and a run number, as in agent-7, or import- and a notes line, as in import-12"
+    "{0:?} is no provenance: one of init, apply, role, inheritance, retry, agent- and a run number, as in agent-7, or import- and a notes line, as in import-12"
 )]
 pub struct Unprovenanced(String);
 

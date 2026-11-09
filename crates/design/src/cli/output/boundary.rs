@@ -148,6 +148,7 @@ pub enum Line {
     Retried(Lapsed),
     Flailed(Lapsed),
     FlailedSegment(Flailing),
+    Owed(Flailing),
     Viewed(Viewed),
     Noted(Noted),
 }
@@ -254,6 +255,8 @@ pub(crate) enum Key {
     Flailed,
     #[name("flailed-segment")]
     FlailedSegment,
+    #[name("owed")]
+    Owed,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -396,6 +399,7 @@ impl fmt::Display for Line {
             Line::Retried(lapsed) => write!(formatter, "{} {lapsed}", Key::Retried),
             Line::Flailed(lapsed) => write!(formatter, "{} {lapsed}", Key::Flailed),
             Line::FlailedSegment(flailing) => write!(formatter, "{} {flailing}", Key::FlailedSegment),
+            Line::Owed(flailing) => write!(formatter, "{} {flailing}", Key::Owed),
             Line::Viewed(viewed) => write!(formatter, "{viewed}"),
             Line::Noted(noted) => write!(formatter, "{noted}"),
         }
@@ -510,6 +514,7 @@ impl Key {
             Key::Retried => Lapsed::read(fields).map(Line::Retried),
             Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
             Key::FlailedSegment => Flailing::read(fields).map(Line::FlailedSegment),
+            Key::Owed => Flailing::read(fields).map(Line::Owed),
             Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
         }
     }

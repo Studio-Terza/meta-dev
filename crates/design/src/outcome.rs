@@ -21,4 +21,5 @@ pub enum Outcome {
     Told,
     Viewed,
     Imported,
+    Retried { segments: Count },
 }

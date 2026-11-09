@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 use grammar::anchor::Anchoring;
 use grammar::artifact::Artifacts;
 use grammar::assignment::Emptied;
@@ -389,7 +391,7 @@ laws::table!(
     ]
 );
 
-const NOTED: &str = "(- |-|\\* |\\*|\\*\\*|\\+ |\\+|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
+const NOTED: &str = "(- |-|\\* |\\*|\\*\\*|\\+ |\\+|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|2026-11-0[1-9][Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,4})?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
 
 const INKED: &str =
     "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
@@ -437,6 +439,27 @@ laws::law!(
         let line = Line::read(1, &format!("{opening}(owner, 0a1b2c3d): \"{quote}\"{after}"));
         prop_assert_eq!(line.read_by(Shaped), kind);
         prop_assert_eq!(line.read_by(Named), Ok([vec![quote], vec!["0a1b2c3d".to_owned()], vec![]]));
+    }
+);
+
+const CLOCK: &str = "([Tt ][0-2][0-9]:[0-5][0-9](:[0-5][0-9](\\.[0-9]{1,9})?)?([Zz]|[+-][0-2][0-9]:[0-5][0-9])?)?";
+
+laws::law!(
+    a_date_stamped_with_any_rfc_3339_time_offset_or_fraction_leaves_the_line_the_kind_its_first_word_gives,
+    (
+        select(vec!["", "- "]),
+        "2026-11-0[1-9]",
+        CLOCK,
+        select(vec![("RULING", "ruling"), ("LEAD", "lead"), ("plan", "remark")])
+    ),
+    said,
+    {
+        let (bullet, day, clock, (word, kind)) = said;
+        let text = format!("{bullet}{day}{clock} {word} (owner): \"yes\"");
+        let line = Line::read(1, &text);
+        prop_assert_eq!(line.read_by(Shaped), kind);
+        prop_assert_eq!(line.read_by(Named), Ok([vec!["yes".to_owned()], vec![], vec![day]]));
+        prop_assert_eq!(line.to_string(), text);
     }
 );
 
@@ -682,6 +705,9 @@ laws::table!(
         "- 2026-11-08 lead: the beds are dug" => "remark",
         " RULING (owner): indented" => "ruling",
         "- 2026-11-06 RULING (owner, 'yes'): we don't change Ann's plan" => "ruling",
+        "2026-11-05T04:07+01:00 RULING (owner): x" => "ruling",
+        "- 2026-11-05T04:07:09.125-03:30 LEAD: the beds are dug" => "lead",
+        "2026-11-05 04:07:09.5Z RULING (owner): x" => "ruling",
         "* RULING (owner): starred" => "ruling",
         "+ RULING (owner): plussed" => "ruling",
         "**RULING** (owner): bold" => "ruling",
