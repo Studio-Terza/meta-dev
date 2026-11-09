@@ -1,9 +1,13 @@
-use sqlx::migrate::Migrator;
+use std::collections::BTreeSet;
+
+use newtype::Newtype;
+use sqlx::migrate::Migrate;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
 use sqlx::{ConnectOptions, Connection, Sqlite, SqliteConnection, Transaction};
 use tokio::runtime::{Builder, Runtime};
 
-use crate::{Batch, Query, Statements, StoreFailure, Written};
+use super::migrations::Migrations;
+use crate::{Batch, Query, Statements, StoreFailure, Version, Written};
 
 #[derive(Debug)]
 pub(super) struct Opened {
@@ -12,11 +16,12 @@ pub(super) struct Opened {
 }
 
 impl Opened {
-    pub(super) fn connected(options: &SqliteConnectOptions, migrator: &Migrator) -> Result<Opened, StoreFailure> {
+    pub(super) fn connected(options: &SqliteConnectOptions, migrations: Migrations) -> Result<Opened, StoreFailure> {
         let runtime = Builder::new_current_thread().build().map_err(StoreFailure::Runtime)?;
-        let mut connection = runtime.block_on(options.connect()).map_err(StoreFailure::Open)?;
-        runtime.block_on(migrator.run(&mut connection))?;
-        Ok(Opened { runtime, connection })
+        let connection = runtime.block_on(options.connect()).map_err(StoreFailure::Open)?;
+        let mut opened = Opened { runtime, connection };
+        opened.migrated(migrations)?;
+        Ok(opened)
     }
 
     pub(super) fn copied(options: &SqliteConnectOptions, image: SqliteOwnedBuf) -> Result<Opened, StoreFailure> {
@@ -35,12 +40,35 @@ impl Opened {
     }
 
     pub(super) fn transacted<B: Batch>(&mut self, batch: B) -> Result<Written, B::Failure> {
-        let mut transaction = self.runtime.block_on(self.connection.begin()).map_err(StoreFailure::from)?;
-        let written = batch.written(&mut Statements::over(&mut transaction, &self.runtime));
-        Self::settled(&self.runtime, transaction, written)
+        self.settled(|statements| batch.written(statements))
+    }
+
+    fn migrated(&mut self, migrations: Migrations) -> Result<(), StoreFailure> {
+        let migrator = migrations.migrator();
+        self.runtime.block_on(migrator.run_to(i64::MIN, &mut self.connection))?;
+        let applied = self.runtime.block_on(self.connection.list_applied_migrations(&migrator.table_name))?;
+        let applied: BTreeSet<Version> = applied.iter().map(|migration| Version::new(migration.version)).collect();
+        let declared: BTreeSet<Version> = migrator.iter().map(|migration| Version::new(migration.version)).collect();
+        declared.difference(&applied).try_for_each(|pending| self.rewritten(migrations, *pending))?;
+        Ok(self.runtime.block_on(migrator.run(&mut self.connection))?)
+    }
+
+    fn rewritten(&mut self, migrations: Migrations, version: Version) -> Result<(), StoreFailure> {
+        self.settled(|statements| migrations.rewritten(version, statements))?;
+        Ok(self.runtime.block_on(migrations.migrator().run_to(version.into_inner(), &mut self.connection))?)
     }
 
     fn settled<Failure: From<StoreFailure>>(
+        &mut self,
+        written: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,
+    ) -> Result<Written, Failure> {
+        let runtime = &self.runtime;
+        let mut transaction = runtime.block_on(self.connection.begin()).map_err(StoreFailure::from)?;
+        let written = written(&mut Statements::over(&mut transaction, runtime));
+        Self::ended(runtime, transaction, written)
+    }
+
+    fn ended<Failure: From<StoreFailure>>(
         runtime: &Runtime,
         transaction: Transaction<'_, Sqlite>,
         written: Result<Written, Failure>,

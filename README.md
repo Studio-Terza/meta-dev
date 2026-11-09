@@ -205,6 +205,13 @@ writes for `Statements::written`; sqlx checks the SQL against the schema as its 
 every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
 `FromStr`, or an `Option` of one. A bare `i64`, `&str` or `String` is not a column and does not compile.
+
+A store's schema is a `store_ports::Schema`: its SQL migrations, and the typed Rust rewrite, a `Batch`, that runs
+before a pending migration of a given version. A rule that Rust already owns, such as how the segmenter sheds blanks,
+is never restated in SQL: the design store re-derives every stored segment body from its message through the same
+segmenter ingest runs (`Resegmented`, before migration 20261108000012, whose SQL rebuilds the search index), so an old
+store holds what a fresh ingest of the same transcript would. Rewrites run once, while their migration is pending.
+
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
 

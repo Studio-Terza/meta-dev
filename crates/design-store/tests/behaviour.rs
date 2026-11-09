@@ -29,10 +29,10 @@ use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::{Counter, Newtype};
 use port_core::{Op, Port, Run};
-use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
-use stream::Stream;
+use store_ports::{Batch, Migrator, Schema, Sqlite, Statements, Store, StoreFailure, Version, Written};
+use stream::{Message, Stream};
 use strum::VariantArray;
-use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
+use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Skipped, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
 
@@ -243,9 +243,38 @@ static SEEDED: LazyLock<Migrator> =
 #[derive(Clone, Copy, Debug)]
 struct Seeded;
 
+#[derive(Op)]
+enum Seeding {
+    Untrimmed,
+    Streamed(<StreamSchema as Schema>::Rewrite),
+}
+
+impl Seeding {
+    const UNTRIMMED: Version = Version::new(20_261_106_000_008);
+}
+
 impl Schema for Seeded {
+    type Rewrite = Seeding;
+
     fn migrator() -> &'static Migrator {
         &SEEDED
+    }
+
+    fn rewrite(before: Version) -> Option<Seeding> {
+        StreamSchema::rewrite(before)
+            .map(Seeding::Streamed)
+            .or_else(|| (before == Seeding::UNTRIMMED).then_some(Seeding::Untrimmed))
+    }
+}
+
+impl Batch for Seeding {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        match self {
+            Seeding::Untrimmed => Around::untrimmed(statements),
+            Seeding::Streamed(streamed) => streamed.written(statements),
+        }
     }
 }
 
@@ -272,6 +301,36 @@ static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
 struct Around(char);
 
 impl Around {
+    fn untrimmed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let written = BLANKS
+            .iter()
+            .map(|blank| Around(*blank).stored(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
+
+    fn stored(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let uuid = self.uuid();
+        let body = self.kept();
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  messages (uuid, session, parent, at, author, body)
+VALUES
+  (
+    ?1,
+    's',
+    NULL,
+    '2026-01-01T00:00:00Z',
+    'owner',
+    ?2
+  )
+"#,
+            uuid: Uuid,
+            body: Body
+        ))
+    }
+
     fn uuid(self) -> Uuid {
         Uuid::new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
     }
@@ -311,6 +370,16 @@ impl Around {
         self.shown(&fresh)
     }
 
+    fn rederived(self) -> Vec<Body> {
+        let message = Message::from(Skipped::new(self.uuid(), None).said(
+            SessionId::new("s".to_owned()),
+            Instant::default(),
+            Authorship::Owner,
+            self.kept(),
+        ));
+        message.segments().iter().map(|segment| segment.text(&message)).collect()
+    }
+
     fn kept(self) -> Body {
         Body::new(format!("{}w{}", self.0, self.0))
     }
@@ -326,44 +395,27 @@ fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_sh
     Ok(())
 }
 
-#[derive(Op)]
-struct Bodies;
-
-#[derive(Columns)]
-struct BodyRow {
-    message: Uuid,
-    body: Body,
-}
-
-impl Query for Bodies {
-    type Rows = BTreeMap<Uuid, Body>;
-
-    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Uuid, Body>, StoreFailure> {
-        let rows = statements.rows(store_ports::query!(
-            BodyRow,
-            r#"
-SELECT
-  message,
-  body
-FROM
-  segments
-WHERE
-  ordinal = 0
-"#
-        ))?;
-        Ok(rows.into_iter().map(|row| (row.message, row.body)).collect())
-    }
+#[test]
+fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides() {
+    let inked: Vec<Around> =
+        (char::MIN..=char::MAX).filter(|point| BLANKS.binary_search(point).is_err()).map(Around).collect();
+    let rederived: Vec<Vec<Body>> = inked.iter().map(|point| point.rederived()).collect();
+    let both_sides: Vec<Vec<Body>> = inked.iter().map(|point| vec![point.kept()]).collect();
+    assert_eq!(rederived, both_sides);
 }
 
 #[test]
-fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
+fn a_segment_stored_with_a_body_its_message_no_longer_derives_is_rederived_and_found_by_its_words()
 -> Result<(), Box<dyn Error>> {
-    let migrated = Run::root().port(OLD_STORE.clone()).read(Bodies)?;
-    let inked: Vec<Around> =
-        (char::MIN..=char::MAX).filter(|point| BLANKS.binary_search(point).is_err()).map(Around).collect();
-    let kept: Vec<Option<&Body>> = inked.iter().map(|point| migrated.get(&point.uuid())).collect();
-    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect();
-    assert_eq!(kept, both_sides.iter().map(Some).collect::<Vec<Option<&Body>>>());
+    let run = Run::root();
+    let store = run.port(OLD_STORE.clone());
+    let shown = store.read(ShownMessage::named(Uuid::new("o2".to_owned())))?.ok_or("o2 was not stored")?;
+    let bodies: Vec<String> = shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect();
+    assert_eq!(bodies, ["kept forever"]);
+    let terms = Terms::lexed(["forever"]).ok_or("no terms")?;
+    let hits = store.read(SearchSegments::matching(terms, Scope::Owner))?;
+    let found: Vec<String> = hits.iter().map(|hit| Body::from(hit).to_string()).collect();
+    assert_eq!(found, ["kept forever"]);
     Ok(())
 }
 

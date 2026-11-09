@@ -52,6 +52,9 @@ pub struct SegmentRow {
     body: Body,
 }
 
+#[derive(Debug)]
+pub(crate) struct Rederived(SegmentRow);
+
 #[derive(Debug, Columns)]
 pub struct LinkRow {
     source: Anchor,
@@ -161,6 +164,24 @@ WHERE
 "#,
             uuid: Uuid
         ))
+    }
+
+    pub(crate) fn every(statements: &mut Statements<'_>) -> Result<Vec<Message>, StoreFailure> {
+        let rows = statements.rows(store_ports::query!(
+            MessageRow,
+            r#"
+SELECT
+  uuid,
+  session,
+  parent,
+  at,
+  author,
+  body
+FROM
+  messages
+"#
+        ))?;
+        Ok(rows.into_iter().map(Record::from).map(Message::from).collect())
     }
 
     pub(crate) fn earlier(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Record>, StoreFailure> {
@@ -431,6 +452,33 @@ VALUES
             message: Uuid,
             ordinal: Ordinal,
             shape: ShapeName,
+            body: Body
+        ))
+    }
+}
+
+impl From<SegmentRow> for Rederived {
+    fn from(row: SegmentRow) -> Rederived {
+        Rederived(row)
+    }
+}
+
+impl Row for Rederived {
+    fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let Rederived(SegmentRow { message, ordinal, shape: _, body }) = self;
+        statements.written(store_ports::query!(
+            r#"
+UPDATE
+  segments
+SET
+  body = ?3
+WHERE
+  message = ?1
+  AND ordinal = ?2
+  AND body <> ?3
+"#,
+            message: Uuid,
+            ordinal: Ordinal,
             body: Body
         ))
     }

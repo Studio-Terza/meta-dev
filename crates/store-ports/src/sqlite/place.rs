@@ -5,9 +5,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqliteConnectOptions;
 
+use super::migrations::Migrations;
 use super::opened::Opened;
 use template::Template;
 
@@ -27,11 +27,11 @@ impl Place {
     pub(super) fn opened(
         &self,
         prepare: impl FnOnce(&Path) -> io::Result<()>,
-        migrator: &'static Migrator,
+        migrations: Migrations,
     ) -> Result<Opened, StoreFailure> {
         match self {
-            Place::File(path) => Self::filed(path, prepare).and_then(|options| Opened::connected(&options, migrator)),
-            Place::Memory => Template::shared(migrator).opened(migrator),
+            Place::File(path) => Self::filed(path, prepare).and_then(|options| Opened::connected(&options, migrations)),
+            Place::Memory => Template::shared(migrations).opened(migrations),
         }
     }
 
