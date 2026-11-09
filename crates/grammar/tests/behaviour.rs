@@ -11,6 +11,7 @@ use grammar::line::Unbroken;
 use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
+use grammar::notes::stamp::{Clock, Date};
 use grammar::notes::{Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
@@ -954,4 +955,82 @@ laws::law!(
         prop_assert_eq!(running.map(Banner::into_inner), Ok(name.clone()));
         prop_assert_eq!(documented.map(Banner::into_inner), Ok(format!("doc-{name}")));
     }
+);
+
+laws::table!(
+    a_date_is_exactly_four_digits_then_two_then_two_joined_by_dashes,
+    |day: &&str| Date::try_new((*day).to_owned()).ok().map(Date::into_inner),
+    [
+        "2026-11-05" => Some("2026-11-05".to_owned()),
+        "" => None,
+        "26-11-05" => None,
+        "2026-1-05" => None,
+        "2026-11-5" => None,
+        "2026/11/05" => None,
+        "2026-11-05x" => None,
+        "202a-11-05" => None,
+        "2026-11-05 2026-11-06" => None,
+    ]
+);
+
+laws::table!(
+    a_date_parses_from_text_only_when_it_is_spelled_as_one,
+    |day: &&str| day.parse::<Date>().ok().map(|date| date.to_string()),
+    [
+        "1999-12-31" => Some("1999-12-31".to_owned()),
+        "1999-12" => None,
+        "1999-12-311" => None,
+        "19991231" => None,
+    ]
+);
+
+laws::roundtrip!(
+    a_date_is_displayed_and_parsed_back,
+    any::<Date>(),
+    |date: &Date| date.to_string(),
+    |text: &String| text.parse::<Date>().ok().map(|date| date.to_string()),
+    |date: Date| Some(date.to_string())
+);
+
+laws::table!(
+    a_clock_is_a_marked_hour_and_minute_with_optional_seconds_fraction_and_zone,
+    |time: &&str| Clock::try_new((*time).to_owned()).ok().map(Clock::into_inner),
+    [
+        "T23:00" => Some("T23:00".to_owned()),
+        " 23:00" => Some(" 23:00".to_owned()),
+        "t23:00:15" => Some("t23:00:15".to_owned()),
+        "T23:00:15.250" => Some("T23:00:15.250".to_owned()),
+        "T23:00Z" => Some("T23:00Z".to_owned()),
+        "T23:00+01:00" => Some("T23:00+01:00".to_owned()),
+        "T23:00:15.5-05:30" => Some("T23:00:15.5-05:30".to_owned()),
+        "" => None,
+        "23:00" => None,
+        "T2:00" => None,
+        "T23:0" => None,
+        "T23-00" => None,
+        "T23:00:1" => None,
+        "T23:00:15." => None,
+        "T23:00.5" => None,
+        "T23:00+0100" => None,
+        "T23:00ZZ" => None,
+        "T23:00x" => None,
+    ]
+);
+
+laws::table!(
+    a_clock_parses_from_text_only_when_it_is_spelled_as_one,
+    |time: &&str| time.parse::<Clock>().ok().map(|clock| clock.to_string()),
+    [
+        "T07:30:00Z" => Some("T07:30:00Z".to_owned()),
+        "T07:30:00 Z" => None,
+        "07:30" => None,
+    ]
+);
+
+laws::roundtrip!(
+    a_clock_is_displayed_and_parsed_back,
+    any::<Clock>(),
+    |clock: &Clock| clock.to_string(),
+    |text: &String| text.parse::<Clock>().ok().map(|clock| clock.to_string()),
+    |clock: Clock| Some(clock.to_string())
 );
