@@ -3,45 +3,12 @@ description: Provide the pinned mold linker under target/mold, restored from the
 runs:
   using: composite
   steps:
-    - name: mold architecture
-      if: runner.arch != 'X64'
-      shell: bash
-      run: echo "::error::mold 3.0.0 is pinned to the x86_64 release and this runner is ${{ runner.arch }}"
     - name: mold needs x86_64
-      if: runner.arch != 'X64'
       shell: bash
-      run: exit 1
-    - name: mold restore
-      id: cache
-      uses: actions/cache/restore@v4
+      run: test ${{ runner.arch }} = X64
+    - uses: ./.github/actions/release
       with:
-        path: ${{ github.workspace }}/target/mold
-        key: mold-3.0.0-extracted-${{ runner.os }}-${{ runner.arch }}
-    - name: mold download
-      if: steps.cache.outputs.cache-hit != 'true'
-      uses: suisei-cn/actions-download-file@v1.6.1
-      with:
+        name: mold
         url: https://github.com/rui314/mold/releases/download/v3.0.0/mold-3.0.0-x86_64-linux.tar.gz
-        target: ${{ runner.temp }}
-        filename: mold.tar.gz
-        retry-times: "5"
-    - name: mold verify
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      working-directory: ${{ runner.temp }}
-      run: sha256sum --check --strict ${{ github.action_path }}/mold.sha256
-    - name: mold directory
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      run: mkdir -p ${{ github.workspace }}/target/mold
-    - name: mold unpack
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      working-directory: ${{ runner.temp }}
-      run: tar -xzf mold.tar.gz -C ${{ github.workspace }}/target/mold --strip-components=1
-    - name: mold save
-      if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ github.workspace }}/target/mold
+        checksum: ${{ github.action_path }}/mold.sha256
         key: mold-3.0.0-extracted-${{ runner.os }}-${{ runner.arch }}

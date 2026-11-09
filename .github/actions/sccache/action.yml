@@ -3,47 +3,14 @@ description: Provide the pinned sccache under target/sccache, restored from the 
 runs:
   using: composite
   steps:
-    - name: sccache architecture
-      if: runner.arch != 'X64'
-      shell: bash
-      run: echo "::error::sccache 0.10.0 is pinned to the x86_64 release and this runner is ${{ runner.arch }}"
     - name: sccache needs x86_64
-      if: runner.arch != 'X64'
       shell: bash
-      run: exit 1
-    - name: sccache restore
-      id: cache
-      uses: actions/cache/restore@v4
+      run: test ${{ runner.arch }} = X64
+    - uses: ./.github/actions/release
       with:
-        path: ${{ github.workspace }}/target/sccache
-        key: sccache-0.10.0-${{ runner.os }}-${{ runner.arch }}
-    - name: sccache download
-      if: steps.cache.outputs.cache-hit != 'true'
-      uses: suisei-cn/actions-download-file@v1.6.1
-      with:
-        url: https://github.com/mozilla/sccache/releases/download/v0.10.0/sccache-v0.10.0-x86_64-unknown-linux-musl.tar.gz
-        target: ${{ runner.temp }}
-        filename: sccache.tar.gz
-        retry-times: "5"
-    - name: sccache verify
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      working-directory: ${{ runner.temp }}
-      run: sha256sum --check --strict ${{ github.action_path }}/sccache.sha256
-    - name: sccache directory
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      run: mkdir -p ${{ github.workspace }}/target/sccache
-    - name: sccache unpack
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      working-directory: ${{ runner.temp }}
-      run: tar -xzf sccache.tar.gz -C ${{ github.workspace }}/target/sccache --strip-components=1
-    - name: sccache save
-      if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ github.workspace }}/target/sccache
-        key: sccache-0.10.0-${{ runner.os }}-${{ runner.arch }}
+        name: sccache
+        url: https://github.com/mozilla/sccache/releases/download/v0.19.0/sccache-v0.19.0-x86_64-unknown-linux-musl.tar.gz
+        checksum: ${{ github.action_path }}/sccache.sha256
+        key: sccache-0.19.0-${{ runner.os }}-${{ runner.arch }}
     - name: sccache environment
       uses: crazy-max/ghaction-github-runtime@v3.0.0
