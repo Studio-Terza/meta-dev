@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
@@ -21,11 +21,11 @@ pub struct Cached<'files, F> {
 }
 
 #[derive(Debug)]
-struct Memo<Value>(Mutex<BTreeMap<PathBuf, Arc<OnceLock<Recall<Value>>>>>);
+struct Memo<Value>(Mutex<HashMap<PathBuf, Arc<OnceLock<Recall<Value>>>>>);
 
 impl<Value: Clone> Memo<Value> {
     fn empty() -> Memo<Value> {
-        Memo(Mutex::new(BTreeMap::new()))
+        Memo(Mutex::new(HashMap::new()))
     }
 
     fn recalled(&self, path: &Path, fresh: impl Fn() -> Result<Value, FileFailure>) -> Result<Value, FileFailure> {

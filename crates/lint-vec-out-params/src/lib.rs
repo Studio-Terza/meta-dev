@@ -77,7 +77,7 @@ impl<'ast> Visit<'ast> for VecOutParams<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {

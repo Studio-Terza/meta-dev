@@ -123,6 +123,6 @@ impl<'ast> Visit<'ast> for Predicates<'_, '_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 }

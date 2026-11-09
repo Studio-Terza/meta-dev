@@ -6,6 +6,7 @@ use lint_core::{Macros, SourceFile};
 use super::{Declaration, Kind};
 
 pub struct Declarations<'file> {
+    file: &'file SourceFile,
     open: Vec<Declaration<'file>>,
     closed: Vec<Declaration<'file>>,
 }
@@ -14,6 +15,7 @@ impl<'file> Declarations<'file> {
     pub fn in_file(file: &'file SourceFile) -> Vec<Declaration<'file>> {
         let placement = file.placement();
         let mut scan = Declarations {
+            file,
             open: vec![Declaration::new(placement.crate_root(), placement.module())],
             closed: Vec::new(),
         };
@@ -47,6 +49,6 @@ impl<'ast> Visit<'ast> for Declarations<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 }

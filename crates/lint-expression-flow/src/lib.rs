@@ -85,13 +85,14 @@ impl ExpressionFlow {
 
 impl FileLint for ExpressionFlow {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut flows = Flows { path: file.path(), violations: Vec::new() };
+        let mut flows = Flows { file, path: file.path(), violations: Vec::new() };
         flows.visit_file(file.syntax());
         flows.violations
     }
 }
 
 struct Flows<'scan> {
+    file: &'scan SourceFile,
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
 }
@@ -112,7 +113,7 @@ impl Flows<'_> {
     }
 
     fn visit_body(&mut self, body: &Block) {
-        let mut locals = MutableLocals::default();
+        let mut locals = MutableLocals { file: self.file, declared: BTreeMap::new(), touched: Vec::new() };
         locals.visit_block(body);
         self.report(
             locals.only_reassigned(),
@@ -139,7 +140,7 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_item_const(&mut self, _: &'ast ItemConst) {}
@@ -231,13 +232,13 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     }
 }
 
-#[derive(Default)]
-struct MutableLocals {
+struct MutableLocals<'scan> {
+    file: &'scan SourceFile,
     declared: BTreeMap<Name, Span>,
     touched: Vec<Name>,
 }
 
-impl MutableLocals {
+impl MutableLocals<'_> {
     const WRITING_MACROS: [&'static str; 2] = ["write", "writeln"];
 
     fn declared_mutable(local: &Local) -> Option<&PatIdent> {
@@ -276,7 +277,7 @@ impl MutableLocals {
     }
 }
 
-impl<'ast> Visit<'ast> for MutableLocals {
+impl<'ast> Visit<'ast> for MutableLocals<'_> {
     fn visit_local(&mut self, local: &'ast Local) {
         self.declared
             .extend(Self::declared_mutable(local).map(|binding| (Name::from(&binding.ident), local.let_token.span)));
@@ -289,7 +290,7 @@ impl<'ast> Visit<'ast> for MutableLocals {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
         self.touched.extend(Self::written_to(invocation));
     }
 }

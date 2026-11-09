@@ -20,7 +20,7 @@ impl<'file> FileFlow<'file> {
         files
             .iter()
             .flat_map(|file| iter::once(file).chain(file.test_modules()))
-            .map(|file| FileFlow { file, functions: Collector::collected(file.path(), file.syntax()) })
+            .map(|file| FileFlow { file, functions: Collector::collected(file) })
             .collect()
     }
 

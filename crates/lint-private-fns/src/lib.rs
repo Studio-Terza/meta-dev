@@ -28,7 +28,7 @@ impl Lint for PrivateFns {
                 .iter()
                 .filter_map(SourceFile::shipped)
                 .flat_map(|file| {
-                    Self::private_fns(file.syntax())
+                    Self::private_fns(file)
                         .into_iter()
                         .filter(|(_, names)| Self::PER_TYPE.allows(Length::new(names.len())).is_none())
                         .map(move |(type_name, names)| {
@@ -46,17 +46,19 @@ impl Lint for PrivateFns {
 impl PrivateFns {
     const PER_TYPE: Bound = Bound::Most(4);
 
-    fn private_fns(file: &syn::File) -> BTreeMap<TypeName, Vec<Name>> {
-        let mut counter = PrivateFnCounter::default();
-        counter.visit_file(file);
-        counter.0
+    fn private_fns(file: &SourceFile) -> BTreeMap<TypeName, Vec<Name>> {
+        let mut counter = PrivateFnCounter { file, found: BTreeMap::new() };
+        counter.visit_file(file.syntax());
+        counter.found
     }
 }
 
-#[derive(Default)]
-struct PrivateFnCounter(BTreeMap<TypeName, Vec<Name>>);
+struct PrivateFnCounter<'file> {
+    file: &'file SourceFile,
+    found: BTreeMap<TypeName, Vec<Name>>,
+}
 
-impl PrivateFnCounter {
+impl PrivateFnCounter<'_> {
     fn private_names(item: &ItemImpl) -> impl Iterator<Item = Name> {
         item.items
             .iter()
@@ -75,20 +77,20 @@ impl PrivateFnCounter {
     fn inherent(&mut self, item: &ItemImpl) {
         match Walk::inherent_impls(item) {
             Walk::Entered => {
-                self.0.entry(TypeName::from_type(&item.self_ty)).or_default().extend(Self::private_names(item));
+                self.found.entry(TypeName::from_type(&item.self_ty)).or_default().extend(Self::private_names(item));
             }
             Walk::Skipped => {}
         }
     }
 }
 
-impl<'ast> Visit<'ast> for PrivateFnCounter {
+impl<'ast> Visit<'ast> for PrivateFnCounter<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
