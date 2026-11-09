@@ -13,4 +13,6 @@ pub enum Entered {
     Inheritance,
     #[name("retry")]
     Retry,
+    #[name("stage")]
+    Stage,
 }

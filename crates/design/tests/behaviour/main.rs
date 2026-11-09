@@ -19,9 +19,10 @@ use design::{
     Remark, Summary, Unmatched, Unresolved, Viewed,
 };
 use design_model::{
-    AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId, Kin, Node,
-    NodeEdge, NodeId, NodeRelation, NotesLine, Ordinal, Outline, Prefix, Project, Provenance, Reason, Refining, Role,
-    RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
+    AnyStage, Artifact, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId,
+    Kin, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Ordinal, Outline, Prefix, Project, Provenance, Reason,
+    Refining, Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal,
+    Title, Vague,
 };
 use design_store::{
     AppliedId, Excerpt, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage,
@@ -90,10 +91,14 @@ impl Session {
     }
 
     fn stamped(speaker: Speaker, uuid: &str, parent: &str, text: &str, day: &str) -> String {
+        Session::recorded("s", speaker, uuid, [parent, text, day])
+    }
+
+    fn recorded(session: &str, speaker: Speaker, uuid: &str, [parent, text, day]: [&str; 3]) -> String {
         let Wire { kind, origin } = speaker.wire();
         let content = speaker.content(text);
         format!(
-            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"{day}T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
+            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"{session}\",\"timestamp\":\"{day}T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
         )
     }
 
@@ -122,26 +127,47 @@ impl Session {
     fn linked() -> Session {
         Session::working(
             [
-                Self::line(Speaker::Owner, Self::ASKED, "null", "what of aaaaaaaa-0000-4000-8000-000000000004"),
-                Self::line(
+                Self::stamped(
+                    Speaker::Owner,
+                    Self::ASKED,
+                    "null",
+                    "what of aaaaaaaa-0000-4000-8000-000000000004",
+                    "2026-01-01",
+                ),
+                Self::stamped(
                     Speaker::Lead,
                     "aaaaaaaa-0000-4000-8000-000000000002",
                     "\"aaaaaaaa-0000-4000-8000-000000000001\"",
                     "1. a\\n2. b",
+                    "2026-01-02",
                 ),
-                Self::line(Speaker::Unheard, "b1", "\"aaaaaaaa-0000-4000-8000-000000000002\"", "result"),
-                Self::line(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000003", "\"b1\"", "1. yes\\n2. no"),
-                Self::line(
+                Self::stamped(
+                    Speaker::Unheard,
+                    "b1",
+                    "\"aaaaaaaa-0000-4000-8000-000000000002\"",
+                    "result",
+                    "2026-01-03",
+                ),
+                Self::stamped(
+                    Speaker::Owner,
+                    "aaaaaaaa-0000-4000-8000-000000000003",
+                    "\"b1\"",
+                    "1. yes\\n2. no",
+                    "2026-01-04",
+                ),
+                Self::stamped(
                     Speaker::Lead,
                     "aaaaaaaa-0000-4000-8000-000000000004",
                     "\"aaaaaaaa-0000-4000-8000-000000000003\"",
                     "see aaaaaaaa-0000-4000-8000-000000000001",
+                    "2026-01-05",
                 ),
-                Self::line(
+                Self::stamped(
                     Speaker::Owner,
                     "aaaaaaaa-0000-4000-8000-000000000005",
                     "\"aaaaaaaa-0000-4000-8000-000000000004\"",
                     "what of aaaaaaaa-0000-4000-8000-000000000004",
+                    "2026-01-06",
                 ),
             ]
             .concat(),
@@ -699,11 +725,11 @@ fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
     assert!(consuming.contains("consumes n1 project \"meta-dev\""));
     assert!(
         Graph::shown(&store, "n2")?
-            .contains("n2 \"demo\" project vague core entered init\n  edge n2 consumes n1 entered init\n")
+            .contains("n2 \"demo\" project vague vague core entered init\n  edge n2 consumes n1 entered init\n")
     );
     assert!(
         Graph::shown(&store, "n1")?
-            .contains("n1 \"meta-dev\" project vague core entered init\n  edge n2 consumes n1 entered init\n")
+            .contains("n1 \"meta-dev\" project vague vague core entered init\n  edge n2 consumes n1 entered init\n")
     );
     Ok(())
 }
@@ -879,9 +905,9 @@ fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result
     applying.applied("propose(new, refines(n2), feature, \"echo\")")?;
     let child = applying.run(&["show", "n4"])?;
     let wanted = [
-        "n4 \"demo\" feature vague core entered apply \"echo\"",
-        "  ancestor n1 \"demo\" project vague core entered init",
-        "  ancestor n2 \"demo\" feature vague core entered apply \"apply\"",
+        "n4 \"demo\" feature vague vague core entered apply \"echo\"",
+        "  ancestor n1 \"demo\" project vague vague core entered init",
+        "  ancestor n2 \"demo\" feature vague vague core entered apply \"apply\"",
         "  edge n4 refines n2 entered apply",
         "  role core entered apply",
     ];
@@ -889,7 +915,7 @@ fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result
     assert_eq!(child.matches('\n').count(), wanted.len());
     let root = applying.run(&["show", "n1"])?;
     assert_eq!(root.matches("  child ").count(), 2);
-    assert!(root.contains("  child n3 \"demo\" smell vague core entered apply \"drift\"\n"));
+    assert!(root.contains("  child n3 \"demo\" smell vague vague core entered apply \"drift\"\n"));
     Ok(())
 }
 
@@ -898,14 +924,14 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     applying.applied("propose(new, refines(n1), feature, \"old\")\npropose(new, refines(n1), feature, \"new\")")?;
     applying.applied("supersede(n2, by(n3))")?;
-    let root = "  ancestor n1 \"demo\" project vague core entered init";
+    let root = "  ancestor n1 \"demo\" project vague vague core entered init";
     let supersedes = "  edge n3 supersedes n2 entered apply";
     let cast = "  role core entered apply";
     let wanted = [
         (
             "n2",
             vec![
-                "n2 \"demo\" feature vague core entered apply \"old\"",
+                "n2 \"demo\" feature vague vague core entered apply \"old\"",
                 root,
                 "  edge n2 refines n1 entered apply",
                 supersedes,
@@ -915,7 +941,7 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
         (
             "n3",
             vec![
-                "n3 \"demo\" feature vague core entered apply \"new\"",
+                "n3 \"demo\" feature vague vague core entered apply \"new\"",
                 root,
                 "  edge n3 refines n1 entered apply",
                 supersedes,
@@ -1097,7 +1123,7 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
     let node = applying.run(&["show", "n3"])?;
     let wanted = [
-        "n3 \"demo\" feature vague core entered apply \"b\"",
+        "n3 \"demo\" feature vague vague core entered apply \"b\"",
         "  edge n3 refines n1 entered apply",
         "  edge n3 supersedes n2 entered apply",
     ];
@@ -1258,10 +1284,10 @@ laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VA
     let store = Sqlite::in_memory::<StreamSchema>();
     let shown = Graph::planted(&store, facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let wanted = [
-        format!("n3 \"demo\" {facet} vague core entered init"),
-        "  ancestor n1 \"demo\" project vague core entered init".to_owned(),
-        format!("  ancestor n2 \"demo\" {facet} vague core entered init"),
-        format!("  child n5 \"demo\" {facet} vague core entered init"),
+        format!("n3 \"demo\" {facet} vague vague core entered init"),
+        "  ancestor n1 \"demo\" project vague vague core entered init".to_owned(),
+        format!("  ancestor n2 \"demo\" {facet} vague vague core entered init"),
+        format!("  child n5 \"demo\" {facet} vague vague core entered init"),
         "  edge n3 refines n2 entered init".to_owned(),
     ];
     let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
@@ -1442,7 +1468,7 @@ fn specify_without_both_an_artifact_and_a_condition_fails_to_parse() -> Result<(
         applying.run(&["specify", "--artifact", "lint:no-comments", "--condition", "every comment is refused"]),
     ];
     assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining core entered apply"));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining set core entered apply"));
     Ok(())
 }
 
@@ -1455,7 +1481,7 @@ fn an_unparsed_artifact_condition_or_reason_is_refused_as_such() -> Result<(), F
     assert!(matches!(unspecified, Err(Failure::Unspecified(_))));
     assert!(matches!(unstated, Err(Failure::Unstated(_))));
     assert!(matches!(unreasoned, Err(Failure::Unstated(_))));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining core entered apply"));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining set core entered apply"));
     Ok(())
 }
 
@@ -1478,7 +1504,7 @@ fn each_lifecycle_option_belongs_to_its_own_command() -> Result<(), Failure> {
         applying.run(&["refine", "n2", "--dry-run"]),
     ];
     assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature vague core entered apply"));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature vague vague core entered apply"));
     Ok(())
 }
 
@@ -1487,17 +1513,17 @@ fn show_renders_a_terminal_node_with_its_artifact_and_condition() -> Result<(), 
     let applying = Lifecycle::reached(Stage::Terminal)?;
     let shown = applying.run(&["show", "n2"])?;
     let wanted = [
-        "n2 \"demo\" feature terminal core entered apply \"child\"",
+        "n2 \"demo\" feature terminal set core entered apply \"child\"",
         "  artifact \"lint:no-comments\"",
         "  condition \"every comment is refused\"",
-        "  ancestor n1 \"demo\" project vague core entered init",
+        "  ancestor n1 \"demo\" project vague vague core entered init",
         "  edge n2 refines n1 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
     assert_eq!(shown.matches('\n').count(), wanted.len());
     let reopened = applying.run(&["reopen", "n2"])?;
-    assert!(reopened.contains("n2 \"demo\" feature refining core entered apply \"child\"\n  ancestor "));
+    assert!(reopened.contains("n2 \"demo\" feature refining set core entered apply \"child\"\n  ancestor "));
     Ok(())
 }
 
@@ -1506,16 +1532,18 @@ fn a_dropped_node_stays_resolvable_with_its_reason() -> Result<(), Failure> {
     let applying = Lifecycle::reached(Stage::Dropped)?;
     let shown = applying.run(&["show", "n2"])?;
     let wanted = [
-        "n2 \"demo\" feature dropped core entered apply \"child\"",
+        "n2 \"demo\" feature dropped set core entered apply \"child\"",
         "  reason \"folded into n1\"",
-        "  ancestor n1 \"demo\" project vague core entered init",
+        "  ancestor n1 \"demo\" project vague vague core entered init",
         "  edge n2 refines n1 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
     assert_eq!(shown.matches('\n').count(), wanted.len());
     assert!(
-        applying.run(&["show", "n1"])?.contains("  child n2 \"demo\" feature dropped core entered apply \"child\"\n")
+        applying
+            .run(&["show", "n1"])?
+            .contains("  child n2 \"demo\" feature dropped set core entered apply \"child\"\n")
     );
     let placed = applying.applied(&format!("place({}, n2, mentions)", Applying::answer(1)))?;
     assert!(placed.contains("written 2\n"));
@@ -1550,13 +1578,13 @@ fn a_secondary_parent_never_takes_a_core_child_and_the_refusal_names_the_edge() 
     let edge = NodeEdge::new(NodeId::new(2), NodeRelation::Refines, NodeId::new(1));
     let parent = applying.run(&["role", "n1", "secondary"]);
     assert!(matches!(parent, Err(Failure::Inverted { edge: refused }) if refused == edge));
-    assert!(applying.run(&["show", "n1"])?.contains("n1 \"demo\" project vague core entered init\n"));
+    assert!(applying.run(&["show", "n1"])?.contains("n1 \"demo\" project vague vague core entered init\n"));
     assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
     assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
     let child = applying.run(&["role", "n2", "core"]);
     assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
     let child = applying.run(&["show", "n2"])?;
-    assert!(child.contains("n2 \"demo\" feature vague secondary entered apply"));
+    assert!(child.contains("n2 \"demo\" feature vague vague secondary entered apply"));
     assert!(child.contains("  role secondary entered role\n"));
     Ok(())
 }
@@ -1567,7 +1595,7 @@ fn a_proposal_inherits_a_secondary_parent_s_role_and_records_the_inheritance() -
     applying.run(&["role", "n1", "secondary"])?;
     applying.applied("propose(new, refines(n1), feature, \"child\")")?;
     let child = applying.run(&["show", "n2"])?;
-    assert!(child.contains("n2 \"demo\" feature vague secondary entered apply"));
+    assert!(child.contains("n2 \"demo\" feature vague vague secondary entered apply"));
     assert!(child.contains("  role secondary entered inheritance\n"));
     assert_eq!(applying.outcome(&["role", "n1", "core"])?, Outcome::Recast(Role::Core));
     Ok(())
@@ -2054,13 +2082,15 @@ impl Generated {
     fn summary() -> BoxedStrategy<Summary> {
         (
             (Generated::node(), Generated::project(), select(Facet::VARIANTS), Generated::entered()),
-            (select(Role::VARIANTS), Generated::entered(), Generated::stage()),
+            (select(Role::VARIANTS), Generated::entered(), Generated::stage(), select(Basis::VARIANTS)),
             proptest::option::of(Generated::text()),
         )
-            .prop_map(|((node, project, facet, entered), (role, cast, stage), title)| {
+            .prop_map(|((node, project, facet, entered), (role, cast, stage, basis), title)| {
                 let entry = Entry::new(project, facet, entered);
                 let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
-                Summary::from(&title.into_iter().fold(loaded, |node, title| node.titled(Title::new(title))))
+                Summary::from(
+                    &title.into_iter().fold(loaded.based(basis), |node, title| node.titled(Title::new(title))),
+                )
             })
             .boxed()
     }
@@ -2233,10 +2263,17 @@ impl Generated {
         prop_oneof![
             (
                 (Generated::node(), Generated::project(), select(Facet::VARIANTS), select(Stage::VARIANTS)),
-                (proptest::option::of(Generated::node()), proptest::option::of(Generated::text()))
+                (
+                    select(Basis::VARIANTS),
+                    proptest::option::of(Generated::node()),
+                    proptest::option::of(Generated::text())
+                )
             )
-                .prop_map(|((node, project, facet, stage), (parent, title))| Viewed::Outlined(
-                    Outline::new(node, project, facet, stage).parented(parent).titled(title.map(Title::new))
+                .prop_map(|((node, project, facet, stage), (basis, parent, title))| Viewed::Outlined(
+                    Outline::new(node, project, facet, stage)
+                        .based(basis)
+                        .parented(parent)
+                        .titled(title.map(Title::new))
                 )),
             (
                 (Generated::node(), select(SpanRelation::VARIANTS), Generated::segment()),

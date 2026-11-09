@@ -5,9 +5,9 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, AnyStage, Artifact, ArtifactKind, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet,
-    Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Project, Provenance, Reason, Role,
-    RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title, Transition,
+    AnyNode, AnyStage, Artifact, ArtifactKind, Basis, Condition, Confidence, Dropped, Entered, Entry, Explicitness,
+    Facet, Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Project, Provenance, Reason,
+    Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title, Transition,
 };
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq, prop_oneof};
@@ -57,6 +57,22 @@ fn every_stage_is_displayed_as_its_name_and_parsed_back_from_it() {
     assert_eq!(Names::unparsed(Stage::name), []);
     assert_eq!(Names::undisplayed(Stage::name), []);
 }
+
+#[test]
+fn every_basis_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(Basis::name), []);
+    assert_eq!(Names::undisplayed(Basis::name), []);
+}
+
+laws::law!(
+    a_set_basis_keeps_the_stored_stage_a_decided_one_refines_and_a_vague_one_stays_vague,
+    select(Stage::VARIANTS),
+    stored,
+    {
+        let staged: Vec<Stage> = Basis::VARIANTS.iter().map(|basis| basis.staged(stored)).collect();
+        prop_assert_eq!(staged, [stored, Stage::Refining, Stage::Vague]);
+    }
+);
 
 #[test]
 fn every_role_is_displayed_as_its_name_and_parsed_back_from_it() {
@@ -149,6 +165,7 @@ laws::table!(
     |text: &&'static str| text.parse::<Provenance>().ok(),
     [
         "apply" => Some(Provenance::from(Entered::Apply)),
+        "stage" => Some(Provenance::from(Entered::Stage)),
         "agent-7" => Some(Provenance::Agent(RunId::new(7))),
         "agent-0" => Some(Provenance::Agent(RunId::new(0))),
         "agent--3" => Some(Provenance::Agent(RunId::new(-3))),
