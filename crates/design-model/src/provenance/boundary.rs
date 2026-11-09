@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use grammar::provenance::{Originating, Origins};
 use newtype::{Newtype, Spelled};
+use strum::VariantArray;
 
 use crate::{Entered, NotesLine, RunId};
 
@@ -15,7 +16,8 @@ pub enum Provenance {
 
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "{0:?} is no provenance: one of init, apply, role, inheritance, retry, agent- and a run number, as in agent-7, or import- and a notes line, as in import-12"
+    "{0:?} is no provenance: one of {leads}, agent- and a run number, as in agent-7, or import- and a notes line, as in import-12",
+    leads = Entered::VARIANTS.iter().map(ToString::to_string).collect::<Vec<String>>().join(", ")
 )]
 pub struct Unprovenanced(String);
 

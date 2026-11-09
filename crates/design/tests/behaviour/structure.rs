@@ -621,3 +621,44 @@ fn probe_a_retried_and_applied_flail_is_not_told_as_held() -> Result<(), Box<dyn
     assert_eq!((stopped.outcome?, stopped.text.as_str()), (Outcome::Hooked(HookEvent::Stop), ""));
     Ok(())
 }
+
+#[test]
+fn probe_review_a_retried_flail_is_not_told_as_held_before_its_retry_runs() -> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u]), Pause::new(0))?;
+    let flailed = structuring.structured(&["structure"]);
+    let retried = structuring.structured(&["retry", "1"]);
+    let prompted = structuring.structured(&["hook", "user-prompt-submit"]);
+    assert!(matches!(flailed.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(retried.outcome?, Outcome::Retried { segments: Count::new(4) });
+    assert_eq!((prompted.outcome?, prompted.text.as_str()), (Outcome::Hooked(HookEvent::UserPromptSubmit), ""));
+    assert_eq!(structuring.unstructured()?, 4);
+    Ok(())
+}
+
+#[test]
+fn probe_review_b_a_retried_flail_that_flails_again_is_told_once_under_its_new_job() -> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u, u, u]), Pause::new(0))?;
+    let flailed = structuring.structured(&["structure"]);
+    let retried = structuring.structured(&["retry", "1"]);
+    let again = structuring.structured(&["structure"]);
+    let stopped = structuring.structured(&["hook", "stop"]);
+    let first = structuring.structured(&["retry", "1"]);
+    let second = structuring.structured(&["retry", "2"]);
+    let decision: Value = serde_json::from_str(&stopped.text)?;
+    let segment = |message, ordinal| {
+        SegmentRef::new(Prefix::new(format!("aaaaaaaa-0000-4000-8000-00000000000{message}")), Ordinal::new(ordinal))
+    };
+    let uncovered = Uncovered::new(segment(1, 0), vec![segment(3, 0), segment(3, 1), segment(5, 0)]);
+    let flails = Flails::new(Flail::new(JobId::new(2), Lapse::from(uncovered)), Vec::new());
+    let told = Failure::Flailed { flails, sequel: Sequel::NoMoreJobs }.to_string();
+    assert!(matches!(flailed.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(retried.outcome?, Outcome::Retried { segments: Count::new(4) });
+    assert!(matches!(again.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(decision.get("reason").and_then(Value::as_str), Some(told.as_str()));
+    assert_eq!(stopped.outcome?, Outcome::Blocked);
+    assert!(matches!(first.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(1)));
+    assert_eq!(second.outcome?, Outcome::Retried { segments: Count::new(4) });
+    Ok(())
+}

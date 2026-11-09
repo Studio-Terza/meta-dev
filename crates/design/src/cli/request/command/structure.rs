@@ -347,8 +347,7 @@ impl Progress {
     }
 
     fn after(worked: Vec<Worked>, done: Worked) -> Progress {
-        let stalled = (done.course() == Course::Halting).then_some(done.job);
-        done.course().progress(worked.into_iter().map(|worked| worked.followed(stalled)).chain([done]).collect())
+        done.course().progress(worked.into_iter().chain([done]).collect())
     }
 
     fn worked(self) -> Vec<Worked> {
@@ -361,11 +360,6 @@ impl Progress {
 impl Worked {
     fn course(&self) -> Course {
         self.halt.as_ref().map_or(Course::Onward, Halt::course)
-    }
-
-    fn followed(self, stalled: Option<JobId>) -> Worked {
-        let sequel = stalled.map_or(self.sequel, |job| Sequel::Halted { job });
-        Worked { sequel, ..self }
     }
 
     fn retold(&self, stalled: JobId) -> Option<Retold> {

@@ -119,7 +119,7 @@ pub struct RunEnded {
     reply: Option<Excerpt>,
 }
 
-#[derive(Clone, Debug, Op)]
+#[derive(Clone, Debug)]
 pub struct JobFlailed {
     run: RunId,
     segments: Vec<Segment>,
@@ -149,6 +149,9 @@ pub struct RunsOf(JobId);
 #[derive(Clone, Copy, Debug, Op)]
 pub struct FlailedSegments;
 
+#[derive(Clone, Copy, Debug, Op)]
+pub struct HeldBy(JobId);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ran {
     run: RunId,
@@ -168,6 +171,12 @@ pub struct Flailed {
     segment: Segment,
     job: JobId,
     run: RunId,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Hold {
+    first: Flailed,
+    rest: Vec<Flailed>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -312,9 +321,21 @@ impl JobFlailed {
     }
 }
 
-impl From<JobId> for JobRetried {
-    fn from(job: JobId) -> JobRetried {
-        JobRetried(job)
+impl From<&Hold> for JobRetried {
+    fn from(hold: &Hold) -> JobRetried {
+        JobRetried(hold.first.job)
+    }
+}
+
+impl From<JobId> for HeldBy {
+    fn from(job: JobId) -> HeldBy {
+        HeldBy(job)
+    }
+}
+
+impl Hold {
+    pub fn held(&self) -> impl Iterator<Item = &Flailed> {
+        [&self.first].into_iter().chain(&self.rest)
     }
 }
 

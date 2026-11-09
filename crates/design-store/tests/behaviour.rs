@@ -11,11 +11,12 @@ use design_model::{
     Prefix, Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Excerpt, FlailedSegments, JobFlailed,
-    JobOpened, JobRepeated, Linked, LiveRuns, NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed,
-    ProjectRoot, Ran, Refusal, RelationName, Remit, Resolved, Resolving, Restaged, RunEnded, RunSpawned, RunState,
-    RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned,
-    StoredRun, StreamSchema, UnplacedSegments, Unseen, Unstructured,
+    Account, AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Excerpt, FailuresReported,
+    FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRepeated, JobRetried, Linked, LiveRuns,
+    NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Remit,
+    Resolved, Resolving, Restaged, Retold, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen,
+    SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema,
+    UnplacedSegments, UnreportedFailures, Unseen, Unstructured,
 };
 use dispatch_ports::{Deadline, Finished, Pid, Reply, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -1335,7 +1336,8 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
     store.write(RunSpawned::new(RunId::new(1), job, spawned))?;
     let [structured, unstructured] = [Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
     Proposals::written(&store, vec![Directed::Conversational { segment: structured.clone() }])?;
-    store.write(JobFlailed::new(RunId::new(1), vec![structured, unstructured.clone()]))?;
+    let held = Some(JobFlailed::new(RunId::new(1), vec![structured, unstructured.clone()]));
+    store.write(JobHalted::new(job, Halted::Flailed, Account::told(&"flailed")).holding(held))?;
     let flailed: Vec<(Segment, RunId)> = store
         .read(FlailedSegments)?
         .iter()
@@ -1349,6 +1351,29 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
     Proposals::written(&store, vec![Directed::Conversational { segment: unstructured }])?;
     assert_eq!(store.read(FlailedSegments)?, Vec::new());
     assert_eq!(store.read(UnplacedSegments)?, Vec::new());
+    Ok(())
+}
+
+#[test]
+fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(Recorded::session()?.records)?;
+    let job = store.read(NextJob)?;
+    store.write(JobOpened::from(job))?;
+    let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
+    store.write(RunSpawned::new(RunId::new(1), job, spawned))?;
+    let segments = vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)];
+    let flail = Some(JobFlailed::new(RunId::new(1), segments.clone()));
+    store.write(JobHalted::new(job, Halted::Flailed, Account::told(&"flailed")).holding(flail))?;
+    let queued = Unstructuring::listed(&store)?;
+    let told = store.read(UnreportedFailures)?.len();
+    let hold = store.read(HeldBy::from(job))?.ok_or("no hold")?;
+    let holding: Vec<Segment> = hold.held().map(|flailed| AsRef::<Segment>::as_ref(flailed).clone()).collect();
+    store.write(JobRetried::from(&hold))?;
+    assert_eq!((queued, told, holding), (Vec::new(), 1, segments.clone()));
+    assert_eq!(Unstructuring::listed(&store)?, segments);
+    assert_eq!((store.read(HeldBy::from(job))?, store.read(UnreportedFailures)?), (None, Vec::new()));
     Ok(())
 }
 
@@ -1436,3 +1461,20 @@ laws::law!(
         prop_assert_eq!(still, running.collect::<Vec<RunId>>());
     }
 );
+
+#[test]
+fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let [first, second] = [JobId::new(1), JobId::new(2)];
+    store.write(JobOpened::from(first))?;
+    store.write(JobOpened::from(second))?;
+    store.write(JobHalted::new(first, Halted::Flailed, Account::told(&"went on")))?;
+    store.write([first].into_iter().collect::<FailuresReported>())?;
+    let retold = vec![Retold::new(first, Account::told(&"went on, then halted"))];
+    store.write(JobHalted::new(second, Halted::Stalled, Account::told(&"stalled")).retelling(retold))?;
+    let told: Vec<String> =
+        store.read(UnreportedFailures)?.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string()).collect();
+    assert_eq!(told, ["went on, then halted", "stalled"]);
+    Ok(())
+}

@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  flailed.message,\n  flailed.ordinal,\n  flailed.job,\n  flailed.run\nFROM\n  flailed\n  JOIN messages ON messages.uuid = flailed.message\nWHERE\n  flailed.job = ?1\nORDER BY\n  messages.at,\n  flailed.message,\n  flailed.ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flailed",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flailed",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "job",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flailed",
+            "name": "job"
+          }
+        }
+      },
+      {
+        "name": "run",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flailed",
+            "name": "run"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4c8c16c1b9812f443dadea4da46ee5a4125cc116f300f0dbb3fbbe0a1dc0cf18"
+}
