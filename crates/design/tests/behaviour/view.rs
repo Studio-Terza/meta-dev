@@ -132,7 +132,40 @@ impl Viewing {
     pub(super) fn node(line: &Line) -> Option<NodeId> {
         match line {
             Line::Viewed(Viewed::Standing { node, .. }) => Some(*node),
-            _ => None,
+            Line::Viewed(Viewed::Outlined(_) | Viewed::Unplaced { .. })
+            | Line::Read { .. }
+            | Line::Authored { .. }
+            | Line::Unrecognised { .. }
+            | Line::Formed { .. }
+            | Line::Related { .. }
+            | Line::Written(_)
+            | Line::Hit { .. }
+            | Line::Root { .. }
+            | Line::Consumes { .. }
+            | Line::Node(_)
+            | Line::Artifact(_)
+            | Line::Condition(_)
+            | Line::Reason(_)
+            | Line::Relative { .. }
+            | Line::Edge { .. }
+            | Line::Role { .. }
+            | Line::Placed { .. }
+            | Line::Message { .. }
+            | Line::Segment { .. }
+            | Line::Link { .. }
+            | Line::Annotated { .. }
+            | Line::Applied(_)
+            | Line::Proposed { .. }
+            | Line::Uncovered(_)
+            | Line::Repeated { .. }
+            | Line::Reaped { .. }
+            | Line::Interrupted(_)
+            | Line::Ran(_)
+            | Line::Retried(_)
+            | Line::Flailed(_)
+            | Line::FlailedSegment(_)
+            | Line::Owed(_)
+            | Line::Noted(_) => None,
         }
     }
 
@@ -141,14 +174,80 @@ impl Viewing {
             Line::Viewed(Viewed::Outlined(outline)) => {
                 Some(format!("n{} {} {}", outline.node().into_inner(), outline.stage(), outline.basis()))
             }
-            _ => None,
+            Line::Viewed(Viewed::Standing { .. } | Viewed::Unplaced { .. })
+            | Line::Read { .. }
+            | Line::Authored { .. }
+            | Line::Unrecognised { .. }
+            | Line::Formed { .. }
+            | Line::Related { .. }
+            | Line::Written(_)
+            | Line::Hit { .. }
+            | Line::Root { .. }
+            | Line::Consumes { .. }
+            | Line::Node(_)
+            | Line::Artifact(_)
+            | Line::Condition(_)
+            | Line::Reason(_)
+            | Line::Relative { .. }
+            | Line::Edge { .. }
+            | Line::Role { .. }
+            | Line::Placed { .. }
+            | Line::Message { .. }
+            | Line::Segment { .. }
+            | Line::Link { .. }
+            | Line::Annotated { .. }
+            | Line::Applied(_)
+            | Line::Proposed { .. }
+            | Line::Uncovered(_)
+            | Line::Repeated { .. }
+            | Line::Reaped { .. }
+            | Line::Interrupted(_)
+            | Line::Ran(_)
+            | Line::Retried(_)
+            | Line::Flailed(_)
+            | Line::FlailedSegment(_)
+            | Line::Owed(_)
+            | Line::Noted(_) => None,
         }
     }
 
     pub(super) fn unplaced(line: Line) -> Option<String> {
         match line {
             Line::Viewed(Viewed::Unplaced { segment, .. }) => Some(segment.to_string()),
-            _ => None,
+            Line::Viewed(Viewed::Outlined(_) | Viewed::Standing { .. })
+            | Line::Read { .. }
+            | Line::Authored { .. }
+            | Line::Unrecognised { .. }
+            | Line::Formed { .. }
+            | Line::Related { .. }
+            | Line::Written(_)
+            | Line::Hit { .. }
+            | Line::Root { .. }
+            | Line::Consumes { .. }
+            | Line::Node(_)
+            | Line::Artifact(_)
+            | Line::Condition(_)
+            | Line::Reason(_)
+            | Line::Relative { .. }
+            | Line::Edge { .. }
+            | Line::Role { .. }
+            | Line::Placed { .. }
+            | Line::Message { .. }
+            | Line::Segment { .. }
+            | Line::Link { .. }
+            | Line::Annotated { .. }
+            | Line::Applied(_)
+            | Line::Proposed { .. }
+            | Line::Uncovered(_)
+            | Line::Repeated { .. }
+            | Line::Reaped { .. }
+            | Line::Interrupted(_)
+            | Line::Ran(_)
+            | Line::Retried(_)
+            | Line::Flailed(_)
+            | Line::FlailedSegment(_)
+            | Line::Owed(_)
+            | Line::Noted(_) => None,
         }
     }
 }

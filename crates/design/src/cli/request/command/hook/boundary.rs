@@ -92,7 +92,7 @@ impl Settings {
     }
 
     pub fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
-        serde_json::to_writer_pretty(&mut *out, self)?;
+        serde_json::to_writer_pretty(&mut *out, self).map_err(Failure::Render)?;
         writeln!(out)?;
         Ok(Outcome::Settings)
     }
@@ -145,7 +145,7 @@ impl Decision {
     }
 
     fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
-        serde_json::to_writer(&mut *out, self)?;
+        serde_json::to_writer(&mut *out, self).map_err(Failure::Render)?;
         writeln!(out)?;
         Ok(self.outcome())
     }

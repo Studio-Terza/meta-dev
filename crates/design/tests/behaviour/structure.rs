@@ -125,6 +125,7 @@ impl Script {
     const UNCOVERING: &str = "propose(new a, refines(n1), feature, \"x\")";
     const MISREAD: &str = "place(";
     const NINE: &str = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i";
+    const SEVENTEEN: &str = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i\\n10. j\\n11. k\\n12. l\\n13. m\\n14. n\\n15. o\\n16. p\\n17. q";
 
     fn replying(replies: &[Option<&str>]) -> Script {
         Script {
@@ -400,29 +401,77 @@ fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_before_its_next_job_an
 }
 
 #[test]
-fn a_flail_then_a_stall_in_one_run_halts_it_on_the_stall_and_still_reports_the_flail() -> Result<(), Failure> {
+fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_the_flail_and_the_stall_it_halted_on()
+-> Result<(), Box<dyn Error>> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring {
         applying: Applying::over(&Session::working(Session::line(
             Speaker::Owner,
             Script::LISTED,
             "null",
-            Script::NINE,
+            Script::SEVENTEEN,
         )))?,
         script: Script::replying(&[u, u, None]),
         sleep: Pause::new(3600),
     };
-    let structured = structuring.structured(&["structure"]);
+    let stopped = structuring.structured(&["hook", "stop"]);
+    let decision: Value = serde_json::from_str(&stopped.text)?;
     let segment = |ordinal| SegmentRef::new(Prefix::new(Script::LISTED.to_owned()), Ordinal::new(ordinal));
     let lapse = Lapse::from(Uncovered::new(segment(0), (1..8).map(segment).collect()));
-    let reported = [
-        Line::Flailed(Lapsed::new(JobId::new(1), lapse)),
-        Line::FlailedSegment(Flailing::new(segment(7), JobId::new(1), RunId::new(2))),
-        Line::Ran(Attempted::new(RunId::new(3), JobId::new(2), RunState::Overdue, None)),
-    ];
-    assert_eq!(structured.has(&reported), []);
-    assert!(matches!(structured.outcome, Err(Failure::Stalled { job, stall: Stall::Overdue }) if job == JobId::new(2)));
-    assert_eq!((structuring.unstructured()?, structuring.script.prompts().len()), (1, 3));
+    let flailed = Failure::Flailed {
+        flails: Flails::new(Flail::new(JobId::new(1), lapse), Vec::new()),
+        sequel: Sequel::Halted { job: JobId::new(2) },
+    };
+    let stalled = Failure::Stalled { job: JobId::new(2), stall: Stall::Overdue };
+    let told = Lines::from(decision.get("reason").and_then(Value::as_str).unwrap_or_default()).collect::<Vec<&str>>();
+    assert_eq!(told, [flailed.to_string(), stalled.to_string()]);
+    assert_eq!(stopped.outcome?, Outcome::Blocked);
+    assert_eq!((structuring.unstructured()?, structuring.script.prompts().len()), (9, 3));
+    let overdue = Line::Ran(Attempted::new(RunId::new(3), JobId::new(2), RunState::Overdue, None));
+    assert_eq!(Structured::parsed(&structuring.applying.run(&["show", "job", "2"])?), [overdue]);
+    assert!(
+        matches!(structuring.applying.run(&["show", "job", "3"]), Err(Failure::Unrun(job)) if job == JobId::new(3))
+    );
+    Ok(())
+}
+
+#[test]
+fn a_retried_flail_owes_its_segments_again_and_the_next_run_sends_and_applies_them_while_a_job_that_did_not_flail_or_never_ran_is_refused()
+-> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u, Some(Script::COVERING)]), Pause::new(0))?;
+    let flailed = structuring.structured(&["structure"]);
+    let held = structuring.unstructured()?;
+    let retried = structuring.structured(&["retry", "1"]);
+    let owed = structuring.unstructured()?;
+    let applied = structuring.structured(&["structure"]);
+    let again = structuring.structured(&["retry", "1"]);
+    let unflailed = structuring.structured(&["retry", "2"]);
+    let unrun = structuring.structured(&["retry", "99"]);
+    let segment = |message, ordinal| {
+        SegmentRef::new(Prefix::new(format!("aaaaaaaa-0000-4000-8000-00000000000{message}")), Ordinal::new(ordinal))
+    };
+    let released = [(1, 0), (3, 0), (3, 1), (5, 0)]
+        .map(|(message, ordinal)| Line::Owed(Flailing::new(segment(message, ordinal), JobId::new(1), RunId::new(2))));
+    assert!(matches!(flailed.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!((held, owed, structuring.unstructured()?), (0, 4, 0));
+    assert_eq!(retried.lines, released);
+    assert_eq!(retried.outcome?, Outcome::Retried { segments: Count::new(4) });
+    assert_eq!(
+        applied.has(&[Line::Ran(Attempted::new(
+            RunId::new(3),
+            JobId::new(2),
+            RunState::Replied,
+            Some(Script::usage())
+        ))]),
+        []
+    );
+    assert_eq!(applied.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!(structuring.script.prompts().len(), 3);
+    assert!(matches!(again.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(1)));
+    assert!(matches!(unflailed.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(2)));
+    assert!(matches!(unrun.outcome, Err(Failure::Unrun(job)) if job == JobId::new(99)));
+    assert_eq!((again.text.as_str(), unflailed.text.as_str(), unrun.text.as_str()), ("", "", ""));
     Ok(())
 }
 
