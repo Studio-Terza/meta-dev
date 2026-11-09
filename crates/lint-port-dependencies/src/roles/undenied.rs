@@ -19,10 +19,7 @@ impl Undenied {
     const LEVELS: [&'static str; 2] = ["deny", "forbid"];
 
     pub(super) fn all(role: Role) -> Vec<Undenied> {
-        Self::DENIED
-            .iter()
-            .map(|lint| Undenied { role, lint: lint.iter().map(|segment| Name::from(*segment)).collect() })
-            .collect()
+        Self::missing_from(role, &BTreeSet::new())
     }
 
     pub(super) fn missing(role: Role, root: &SourceFile) -> Vec<Undenied> {
@@ -35,7 +32,13 @@ impl Undenied {
             .flatten()
             .map(|path| UsePath::from(&path))
             .collect();
-        Self::all(role).into_iter().filter(|undenied| denied.get(&undenied.lint).is_none()).collect()
+        Self::missing_from(role, &denied)
+    }
+
+    fn missing_from(role: Role, denied: &BTreeSet<UsePath>) -> Vec<Undenied> {
+        let required: BTreeSet<UsePath> =
+            Self::DENIED.iter().map(|lint| lint.iter().map(|segment| Name::from(*segment)).collect()).collect();
+        required.difference(denied).map(|lint| Undenied { role, lint: lint.clone() }).collect()
     }
 }
 

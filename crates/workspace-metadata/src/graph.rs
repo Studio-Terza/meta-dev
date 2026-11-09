@@ -91,11 +91,7 @@ impl<'meta> Graph<'meta> {
     #[must_use]
     pub fn serving(&self, role: Role) -> Vec<&'meta CrateName> {
         let ported = self.members.iter().copied().filter(|id| {
-            self.package(id)
-                .and_then(Package::port)
-                .and_then(PortTable::dependents)
-                .filter(|named| *named == role)
-                .is_some()
+            self.package(id).and_then(Package::port).and_then(PortTable::dependents).is_some_and(|named| named == role)
         });
         let named: Served<'meta> = self.declaring(role).into_iter().chain(ported).collect();
         named.closed(self).iter().filter_map(|id| Some(self.package(id)?.name())).collect()

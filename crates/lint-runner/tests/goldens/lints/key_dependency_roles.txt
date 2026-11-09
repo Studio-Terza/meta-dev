@@ -1,11 +1,12 @@
 test budget, report only:
 derive: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 design: 0 tests in 1 files, 0 of 0 lines, 0 process starts
-grammar: 0 tests in 1 files, 0 of 0 lines, 0 process starts
+grammar: 0 tests in 1 files, 0 of 2 lines, 0 process starts
 notes: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-a key dependency is used only in its role: a port that names dependents is depended on only by crates declaring that role, a lexer crate is a leaf lexing one format, a crate that expands a port's macros declares the role the port names for its expanders, and a workspace proc-macro reaches an owned package only through its own unit or a crate declaring the owning port's dependents role:
+a key dependency is used only in its role: a port that names dependents is depended on only by crates declaring that role, a lexer crate is a leaf lexing one format, a crate that expands a port's macros declares the role the port names for its expanders, a lexer crate, the port naming lexers as dependents and every crate only they depend on deny at their crate root each lint the crate the lexers came from denied, and a workspace proc-macro reaches an owned package only through its own unit or a crate declaring the owning port's dependents role:
 design/Cargo.toml:5: depends on grammar, which only a crate declaring [package.metadata.lexer] depends on; depend on the crates that declare the role and wrap the port, or make this crate one of them by declaring the role
 derive/Cargo.toml:8: is a proc-macro whose closure reaches logos, which a port owns, outside the owning unit and not through a crate declaring [package.metadata.lexer]; reach the owned package through a crate declaring the port's dependents role, or move the proc-macro into the owning unit
+notes/src/lib.rs:1: serves the lexer role and does not deny clippy::wildcard_enum_match_arm at its crate root, as the crate the lexers came from did; start the crate's lib.rs with #![deny(<lint>)] for each lint every crate of the role denies
 fails

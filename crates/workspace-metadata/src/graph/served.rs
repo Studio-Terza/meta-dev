@@ -29,13 +29,7 @@ impl<'meta> Served<'meta> {
     }
 
     fn joining(&self, graph: &Graph<'meta>) -> BTreeSet<&'meta PackageId> {
-        graph
-            .members
-            .iter()
-            .copied()
-            .filter(|id| self.0.get(id).is_none())
-            .filter_map(|id| self.serving(graph, id))
-            .collect()
+        graph.members.difference(&self.0).copied().filter_map(|id| self.serving(graph, id)).collect()
     }
 
     fn serving(&self, graph: &Graph<'meta>, required: &'meta PackageId) -> Option<&'meta PackageId> {
