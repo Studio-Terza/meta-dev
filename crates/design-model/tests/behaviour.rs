@@ -203,7 +203,7 @@ laws::roundtrip!(
     a_project_is_serialized_and_deserialized_back,
     Projects::any(),
     |project: &Project| serde_json::to_string(project).ok(),
-    |text: &Option<String>| text.as_deref().and_then(|text| serde_json::from_str::<Project>(text).ok()),
+    |text: &Option<String>| text.as_deref().and_then(|written| serde_json::from_str::<Project>(written).ok()),
     Some
 );
 
@@ -415,3 +415,10 @@ laws::table!(
         Ends(NodeRelation::Supersedes, Role::Secondary, Role::Core) => None,
     ]
 );
+
+#[test]
+fn a_refused_provenance_lists_every_way_of_entering_and_nothing_else_before_the_agent_and_import_forms() {
+    let leads = Entered::VARIANTS.iter().map(ToString::to_string).collect::<Vec<String>>().join(", ");
+    let refusal = "retry".parse::<Provenance>().err().map(|refusal| refusal.to_string()).unwrap_or_default();
+    assert!(refusal.contains(&format!(" is no provenance: one of {leads}, agent- and a run number")), "{refusal}");
+}

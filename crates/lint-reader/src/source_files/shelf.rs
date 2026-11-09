@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use file_ports::Files;
 use lint_core::SourceFile;
 use lint_layout::Failure;
+use lint_placement::Packages;
 use lint_roots::{Fact, Survey};
 
 mod frontier;
@@ -15,16 +16,17 @@ use super::scope::Scope;
 use frontier::Frontier;
 use store::Shelved;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Shelf<'tree> {
     survey: Survey,
+    packages: &'tree Packages,
     shelved: BTreeMap<Located<'tree>, Shelved>,
 }
 
 impl<'tree> Shelf<'tree> {
     #[must_use]
-    pub fn stocked(files: &impl Files, starts: &[Node<'tree>]) -> Shelf<'tree> {
-        Shelf::default().explored(files, starts, &BTreeSet::new())
+    pub fn stocked(files: &impl Files, packages: &'tree Packages, starts: &[Node<'tree>]) -> Shelf<'tree> {
+        Shelf { survey: Survey::default(), packages, shelved: BTreeMap::new() }.explored(files, starts, BTreeSet::new())
     }
 
     #[must_use]
@@ -42,14 +44,14 @@ impl<'tree> Shelf<'tree> {
         self.shelved.get(&located).and_then(Shelved::opened).and_then(|opened| opened.parsed().ok())
     }
 
-    pub fn explored(self, files: &impl Files, level: &[Node<'tree>], visited: &BTreeSet<Node<'tree>>) -> Shelf<'tree> {
-        let (_, fresh): (Vec<&Located<'tree>>, Vec<&Located<'tree>>) =
+    pub fn explored(self, files: &impl Files, level: &[Node<'tree>], earlier: BTreeSet<Node<'tree>>) -> Shelf<'tree> {
+        let (_, unshelved): (Vec<&Located<'tree>>, Vec<&Located<'tree>>) =
             level.iter().map(Node::located).partition(|located| self.shelved.contains_key(*located));
-        let fresh: BTreeSet<Located<'tree>> = fresh.into_iter().cloned().collect();
-        let stocked = self.read(files, fresh.into_iter().collect());
-        let candidates: Vec<PathBuf> = level.iter().flat_map(|node| stocked.candidates(node)).collect();
-        let stocked = Shelf { survey: stocked.survey.learn(files, Fact::Followed, &candidates), ..stocked };
-        let visited: BTreeSet<Node<'tree>> = visited.iter().chain(level).cloned().collect();
+        let fresh: BTreeSet<Located<'tree>> = unshelved.into_iter().cloned().collect();
+        let read = self.read(files, fresh.into_iter().collect());
+        let candidates: Vec<PathBuf> = level.iter().flat_map(|node| read.candidates(node)).collect();
+        let stocked = Shelf { survey: read.survey.learn(files, Fact::Followed, &candidates), ..read };
+        let visited: BTreeSet<Node<'tree>> = earlier.into_iter().chain(level.iter().cloned()).collect();
         let reached: BTreeSet<Node<'tree>> = level
             .iter()
             .flat_map(|node| stocked.declared(node).into_iter().map(move |child| (node, child)))
@@ -61,9 +63,9 @@ impl<'tree> Shelf<'tree> {
     }
 
     fn read(self, files: &impl Files, fresh: Vec<Located<'tree>>) -> Shelf<'tree> {
-        let opened = Located::open_many(files, &fresh);
-        fresh.into_iter().zip(opened).fold(self, |mut shelf, (located, opened)| {
-            shelf.shelved.insert(located, Shelved::from(opened));
+        let opened = Located::open_many(files, self.packages, &fresh);
+        fresh.into_iter().zip(opened).fold(self, |mut shelf, (located, outcome)| {
+            shelf.shelved.insert(located, Shelved::from(outcome));
             shelf
         })
     }

@@ -32,10 +32,10 @@ impl<'file> Declared<'file> {
     }
 
     fn with_methods(block: &ItemTrait) -> Option<&ItemTrait> {
-        Self::methods(block)
-            .next()
-            .filter(|_| block.attrs.iter().find(|attribute| attribute.path().is_ident(Self::DISPATCHING)).is_none())
-            .map(|_| block)
+        match block.attrs.iter().find(|attribute| attribute.path().is_ident(Self::DISPATCHING)) {
+            Some(_) => None,
+            None => Self::methods(block).next().map(|_| block),
+        }
     }
 
     fn provided(block: &ItemTrait) -> Vec<Name> {
@@ -56,7 +56,7 @@ impl<'ast> Visit<'ast> for Declared<'_> {
         let declaration = Declaration::new(Name::from(&block.ident), Self::provided(block), site);
         self.found.extend(
             Self::with_methods(block)
-                .filter(|block| Walk::outside_tests(&block.attrs) == Walk::Entered)
+                .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
                 .map(|_| declaration),
         );
     }

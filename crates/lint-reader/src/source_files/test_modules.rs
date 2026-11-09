@@ -25,8 +25,11 @@ impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
     }
 
     fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> TestModules<'shelf, 'tree> {
-        let source =
-            self.seen.insert(file.to_path_buf()).then_some(file).and_then(|file| self.shelf.test_source(scope, file));
+        let source = self
+            .seen
+            .insert(file.to_path_buf())
+            .then_some(file)
+            .and_then(|unseen| self.shelf.test_source(scope, unseen));
         self.opened(scope, file, children_directory, source)
     }
 
@@ -38,7 +41,7 @@ impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
         source: Option<SourceFile>,
     ) -> TestModules<'shelf, 'tree> {
         match source {
-            Some(source) => self.nested(scope, file, children_directory, source),
+            Some(opened) => self.nested(scope, file, children_directory, opened),
             None => self,
         }
     }

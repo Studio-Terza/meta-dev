@@ -59,7 +59,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
             let resolved = scope.endpoint(output);
             scope.associating(resolved)
         });
-        let output = found.items.iter().find_map(Self::output).map(|found| Wrapping::peeled(found, &|_| None));
+        let output = found.items.iter().find_map(Self::output).map(|returned| Wrapping::peeled(returned, &|_| None));
         SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins, output }
     }
 

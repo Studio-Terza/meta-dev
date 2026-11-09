@@ -18,8 +18,8 @@ pub struct History {
 }
 
 impl Step for History {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<History, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<History, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let metadata = &arguments.taken()?;
         let file = &arguments.taken()?;
         let revision = &arguments.taken()?;

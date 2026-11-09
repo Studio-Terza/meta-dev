@@ -1,5 +1,5 @@
 use file_ports::Offset;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::Read;
 use crate::{Cursor, Line, ReadFailure};

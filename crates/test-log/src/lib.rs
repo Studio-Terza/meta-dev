@@ -35,8 +35,10 @@ impl TestLog {
 impl From<&str> for TestLog {
     fn from(text: &str) -> TestLog {
         TestLog(
-            Lines::from(text)
-                .map(Line::from)
+            text.parse::<Lines>()
+                .into_iter()
+                .flatten()
+                .map(|line| Line::from(line.as_str()))
                 .fold(Reading::default(), |reading, line| line.continuing(reading))
                 .into_results(),
         )

@@ -52,7 +52,7 @@ impl TryFrom<&[Token]> for Init {
         let [project] = <[&Token; 1]>::try_from(naming).map_err(|_named| Failure::Usage)?;
         let consumed = <[&Token; 1]>::try_from(consuming)
             .map(|[consumed]| Some(consumed))
-            .or_else(|consuming| consuming.first().map_or(Ok(None), |_several| Err(Failure::Usage)))?;
+            .or_else(|several| several.first().map_or(Ok(None), |_first| Err(Failure::Usage)))?;
         Init::new(project.project()?, consumed.map(Token::project).transpose()?)
     }
 }

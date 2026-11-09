@@ -82,9 +82,9 @@ impl Projects {
         let working = Self::resolved(&current.clone().unwrap_or_default());
         let repo = Self::repository(files, &working);
         let config = LocalConfig::found(files, &repo)?;
-        let recorded = config.as_ref().map(|config| config.workspace().to_path_buf());
+        let recorded = config.as_ref().map(|found| found.workspace().to_path_buf());
         let chosen = workspace
-            .map(|workspace| current.clone().unwrap_or_default().join(workspace))
+            .map(|named| current.clone().unwrap_or_default().join(named))
             .or(recorded)
             .or(current)
             .ok_or(Failure::Unset(OsString::from("PWD")))?;
@@ -95,7 +95,7 @@ impl Projects {
             workspace: root,
             repo,
             working,
-            project: config.map(|config| AsRef::<Project>::as_ref(&config).clone()),
+            project: config.map(|found| AsRef::<Project>::as_ref(&found).clone()),
         })
     }
 

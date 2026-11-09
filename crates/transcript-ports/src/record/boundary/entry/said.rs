@@ -34,7 +34,7 @@ impl Said {
 
     fn after(self, before: Body) -> Said {
         match self {
-            Said::Text(text) => Said::Text(Body::new(format!("{before} {text}"))),
+            Said::Text(text) => before.joined(&text).map_or(Said::Silent, Said::Text),
             Said::Silent => Said::Text(before),
             Said::Unrecognised(unrecognised) => Said::Unrecognised(unrecognised),
         }

@@ -16,10 +16,11 @@ impl<'file> Coverage<'file> {
     }
 
     pub(crate) fn roundtrips_naming(&self, subject: &Subject<'_>) -> Vec<&BTreeSet<Name>> {
-        self.naming(subject).into_iter().filter(|law| law.kind() == Kind::Roundtrip).map(Law::mentions).collect()
-    }
-
-    pub(crate) fn naming(&self, subject: &Subject<'_>) -> Vec<&Law<'file>> {
-        self.laws.naming(subject.package(), &[subject.owner()])
+        self.laws
+            .naming(subject.package(), &[subject.owner()])
+            .into_iter()
+            .filter(|law| law.kind() == Kind::Roundtrip)
+            .map(Law::mentions)
+            .collect()
     }
 }

@@ -26,8 +26,8 @@ impl Admission {
         groups
             .into_iter()
             .zip(roots.into_iter().zip(loaded))
-            .map(|(group, (roots, loaded))| {
-                group.and_then(|found| Self::admitted(found, roots.into_iter().zip(loaded).collect()))
+            .map(|(group, (group_roots, workspaces))| {
+                group.and_then(|found| Self::admitted(found, group_roots.into_iter().zip(workspaces).collect()))
             })
             .collect()
     }
@@ -75,15 +75,15 @@ impl Admission {
         let mut loaded = self.loaded;
         let workspace = loaded.remove(root).transpose()?;
         let member = Some(package).filter(|candidate| {
-            workspace.as_ref().and_then(|workspace| workspace.admits(candidate.directory())).is_some()
+            workspace.as_ref().and_then(|enclosing| enclosing.admits(candidate.directory())).is_some()
         });
-        loaded.extend(workspace.map(|workspace| (root.to_path_buf(), Ok(workspace))));
+        loaded.extend(workspace.map(|kept| (root.to_path_buf(), Ok(kept))));
         Ok(Admission { loaded, admitted: self.admitted.into_iter().chain(member).collect() })
     }
 
     fn placed(self, root: Option<PathBuf>, package: Manifest) -> Result<Admission, Failure> {
         match root {
-            Some(root) => self.within(&root, package),
+            Some(workspace_root) => self.within(&workspace_root, package),
             None => Ok(Admission { admitted: self.admitted.into_iter().chain(Some(package)).collect(), ..self }),
         }
     }

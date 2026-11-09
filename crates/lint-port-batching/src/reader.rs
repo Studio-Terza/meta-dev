@@ -74,7 +74,7 @@ impl<'run, 'file> Reader<'run, 'file> {
 
     fn found(&mut self, port: Option<Port>, line: LineNumber) {
         let within = self.scope.within();
-        self.found.extend(within.zip(port).map(|(within, port)| (Spot::new(line, port), within)));
+        self.found.extend(within.zip(port).map(|(scope, found)| (Spot::new(line, found), scope)));
     }
 }
 

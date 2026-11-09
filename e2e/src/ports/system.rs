@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 use std::fmt;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use console_ports::{Environment, Process};
@@ -56,7 +56,7 @@ impl System {
     }
 
     pub fn record(line: &impl fmt::Display) -> io::Result<()> {
-        print!("{line}");
+        write!(io::stdout(), "{line}")?;
         Process
             .variable(OsStr::new(Self::TARGET))
             .map_or(Ok(()), |path| Disk.append(Path::new(&path), &Bytes::from(line)))

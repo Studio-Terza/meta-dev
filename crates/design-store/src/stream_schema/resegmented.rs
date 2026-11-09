@@ -40,7 +40,8 @@ impl Referenced {
 
 impl fmt::Display for Referenced {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("re-deriving the stored segments would change these segments that stored rows refer to:")?;
+        formatter
+            .write_str("re-deriving the stored segments would change these segments that stored rows refer to:")?;
         self.segments
             .iter()
             .try_for_each(|segment| write!(formatter, " {}#{}", AsRef::<Uuid>::as_ref(segment), Ordinal::from(segment)))

@@ -20,11 +20,11 @@ impl<'file> Functions<'file> {
     }
 
     fn recorded(&mut self, attributes: &[Attribute], name: &Ident, body: Option<&Block>) {
-        let function = |body: &Block| {
+        let function = |block: &Block| {
             Function::new(
                 Name::from(name),
                 Site::new(self.file.path(), LineNumber::from(name.span())),
-                Branches::scored(body, Propagation::Branch),
+                Branches::scored(block, Propagation::Branch),
             )
         };
         let found = body

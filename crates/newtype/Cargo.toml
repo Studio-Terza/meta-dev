@@ -12,9 +12,12 @@ doctest = false
 [dependencies]
 newtype-derive = { path = "../newtype-derive" }
 proptest.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }
+serde_json.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

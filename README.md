@@ -61,7 +61,8 @@ field only inside a module named `boundary` or a crate whose name ends in the wo
 (a struct with one unnamed field) and its own `new`, `try_new` and `into_inner` with one input, and trait impls, since the
 trait fixes the signature (`Display`, `FromStr`, `From`, `TryFrom`, `Debug`, `Hash`, `Ord` and the like); the trait
 declaration is read instead. A unit return is not flagged, nor are consts, statics and types inside bodies. Wire forms such
-as `serde_json::Value` and `toml::Value` are flagged the same way. Text handling (`trim`, `format!`, `to_string` and the like)
+as `serde_json::Value` and `toml::Value` are flagged the same way; a std trait such as `std::any::Any` is never a primitive
+or wire form, whether written as `dyn`, `impl` or a bound. Text handling (`trim`, `format!`, `to_string` and the like)
 is allowed in a door impl (`FromStr`, `TryFrom`, `Display`, `AsRef`, `Borrow`, `Deref`), on a type that has one, and in a
 boundary. The message names the fix: take and return a domain type, or move the code into a module named `boundary`.
 
@@ -101,6 +102,14 @@ ports and outside.
 `bool_methods` blocks any function in shipped code that returns `bool`, whatever its name or visibility, including trait
 declarations and functions inside bodies. Only a trait impl may, since the trait fixes its signature (`PartialEq::eq` and the
 like). Return an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `NonEmpty`.
+
+`narrowed_returns` lists, in the `--report` run only, every function returning `bool`, `Result<(), E>` or `Option<E>`
+where `E` is an error type, read through the code model: return types resolve through imports, globs and aliases (crate
+aliases and `fmt::Result`, `io::Result`, `thread::Result`), so a crate type named `Result` or a generic named like an
+error is not flagged. An error type is a crate type with an `Error` impl or a `thiserror` derive, a crate type returned as
+the `Err` of a `Result` outside trait impls, or `io::Error` and `fmt::Error`. Trait impls, `#[test]` functions and the
+crate's root `main` are exempt; test-scope helpers and inherent `fmt::Result` helpers are flagged. It stays report-only,
+beside the blocking `bool_methods`, until the backlog is fixed; then it joins the gate and replaces `bool_methods`.
 
 `no_early_exits` blocks the `return`, `break` and `continue` keywords in shipped and test code alike: function bodies,
 const fns, trait impls, closures, labeled blocks, `#[cfg(test)]` modules, files under `tests` and macro bodies. A body
@@ -204,7 +213,9 @@ rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one
 writes for `Statements::written`; sqlx checks the SQL against the schema as its own `query!` does. Every bound argument and
 every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
-`FromStr`, or an `Option` of one. A bare `i64`, `&str` or `String` is not a column and does not compile.
+`FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
+back through `newtype::Guarded`, so a stored value its check refuses fails the read; grammar's `Bare` and
+`Quoted` output fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
 
 A store's schema is a `store_ports::Schema`: its SQL migrations, and the typed Rust rewrites, each a `Batch` due when
 the migration of a given version is pending. Opening a store applies every pending migration and then every due rewrite,
@@ -215,11 +226,14 @@ compiling instead of failing on an old store. A rule that Rust already owns, suc
 into segments and sheds blanks, is never restated in SQL: `Resegmented`, due with migration 20261108000012, re-derives
 every message's segments through the same segmenter ingest runs, rewriting each segment's shape and body and adding and
 removing segments, so an old store holds the segments a fresh ingest of the same transcript would. Migration
-20261108000012 keeps the search index in step with every update and delete of a segment. A segment the design
-annotates (with a sense, a span edge, a segment link, a conversational mark or a flailed run) is never rewritten or
-dropped this way: a re-derivation that would change the shape or body of one, or drop it, refuses the open with
-`StoreFailure::Refused`, naming every such segment as `message#ordinal`, and the store is left as it was. Segments
-without an annotation are still re-derived.
+20261108000012 keeps the search index in step with every update and delete of a segment. Every row that points at a
+segment does so through a foreign key into `segments`, and the rewrite never lists those tables: it deletes each stored
+segment the segmenter would change or drop through `Statements::written_unless_referenced`, so SQLite checks every
+foreign key `pragma_foreign_key_list` reports, a table added later included. A re-derivation that would change the shape
+or body of a segment any row points at, or drop it, refuses the open with `StoreFailure::Refused`, naming every such
+segment as `message#ordinal`, and the store is left as it was. Segments nothing points at are still re-derived.
+Migration 20261109000001 gives `mechanical_links` the ordinals of its segment anchors (null for a message anchor) with
+foreign keys into `segments`, so a `cites` or `answers` link holds its segment like any annotation.
 
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
@@ -253,7 +267,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` lints), `lint-store-queries` (the `store_queries` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `store-ports` (the store port: the `Store` trait with per-type `read` and `write` ops and `lock`, its `Sqlite` filler over sqlx, `StoreLock`, the first held resource, and the `Column` and `Columns` traits), `store-ports-macros` (`store_ports::query!`, `store_ports::migrate!` and `#[derive(Columns)]`, over `sqlx-macros-core`, whose version moves in lockstep with sqlx as `[package.metadata.lockstep]` records), `design-store` (the design store's schema, queries and batches), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`), `cargo-ports` (the `Cargo` port, which runs `cargo metadata` for the gate) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` lints), `lint-store-queries` (the `store_queries` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates, dependencies and lib targets of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `store-ports` (the store port: the `Store` trait with per-type `read` and `write` ops and `lock`, its `Sqlite` filler over sqlx, `StoreLock`, the first held resource, and the `Column` and `Columns` traits), `store-ports-macros` (`store_ports::query!`, `store_ports::migrate!` and `#[derive(Columns)]`, over `sqlx-macros-core`, whose version moves in lockstep with sqlx as `[package.metadata.lockstep]` records), `design-store` (the design store's schema, queries and batches), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`), `cargo-ports` (the `cargo metadata` port: the `Cargo` port trait, `Toolchain` and the in-memory `Recorded`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose cycle spans more than 40 items.
 
 ## Query
@@ -329,7 +343,7 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
     ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
     ci tools <built directory> <tools directory>                build (dev profile) and copy reach, lint and ci
-    ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
+    ci mutants-changed <diff> <output> <shard> [<scope>...]     one shard of the mutants on the changed lines, or say it skipped
     ci mutants-shard <shard> <output>                           one weekly shard of all mutants
     ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
     ci compile-trend <cold build> <downloads>                   the trend issue when the cold build is slowest
@@ -458,19 +472,36 @@ cannot judge a slice. Main, and every pull request into main, ignore all this an
 
 ## Newtypes
 
-`#[derive(Newtype)]` implements `Newtype` (`type Inner`, `new`, `into_inner`) for a struct with one field,
-tuple or named, generic or not.
+`#[derive(Newtype)]` implements `Wrapping` (`type Inner`, `into_inner`) and `Newtype` (`new`) for a struct with one field,
+tuple or named, generic or not. It also writes exactly one `impl newtype::kind::Validity` for the type, with
+`type Kind = Unchecked` here and `type Kind = Checked` under `#[newtype(checked)]`, so a type is one or the other.
+`Newtype` requires `Validity<Kind = Unchecked>`, so a checked type never gets `new`.
 
     #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub struct Rounds(usize);
 
-A validated newtype has no `new`. With `#[newtype(check = ..., error = ...)]` the same derive implements
-inherent `try_new` and `into_inner` instead, and `try_new` is the only way in. The check is a function from `&Inner` to
-`Result<(), Error>`.
+A validated newtype has no `new`. With `#[newtype(checked)]` the same derive implements `Wrapping` and
+`newtype::Guarded` instead. `Guarded::try_new` is the single checked way in: the inherent `try_new`, `CheckedDeserialize`,
+the store's reads and `Arbitrary` all go through it. `Guarded` is only ever derived; `hand_impls` fails a hand-written
+`impl Guarded`, so no constructor skips the check. The rule lives on the type, in an `impl Checked`: a function from `&Inner`
+to `Result<&Inner, Error>`.
 
     #[derive(Newtype, Arbitrary, Debug)]
-    #[newtype(check = Even::check, error = Odd)]
+    #[newtype(checked)]
     struct Even(u32);
+
+    impl Checked for Even {
+        type Error = Odd;
+
+        fn checked(number: &u32) -> Result<&u32, Odd> { ... }
+    }
+
+`#[derive(Serialize, Deserialize)]` (`newtype::Serialize`, `newtype::Deserialize`) write and read a newtype as its inner
+value; `Deserialize` reads through `Newtype::new`, so only an unchecked newtype can derive it. A validated newtype
+derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through `Guarded::try_new` and is
+bounded by `Self: Guarded`, so it does not compile without the check or on a newtype that is not `#[newtype(checked)]`. A value the check refuses is a deserialization
+error carrying the check's message, so `Checked::Error` implements `Display`. They reach serde through `newtype::serde`,
+so the using crate needs only `newtype`.
 
 `#[derive(Arbitrary)]` (`newtype::Arbitrary`) implements proptest's `Arbitrary` through those constructors, so a validated newtype
 only generates values its check admits. It reaches proptest through `newtype::proptest`, so the using crate needs only
@@ -497,7 +528,7 @@ counts as `Inner`); a `const fn` is never counted, since a trait method cannot b
 
 Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; a public trait declaration is checked like a public function, a private one is not, and a type alias is read through (`type Label = String;` then `pub fn f(x: Label)` is flagged, the alias itself is not); use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
-Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
+Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. It reads the code model: a derive is serde's when its path resolves to `Deserialize` in a dependency whose package, as the crate's `Cargo.toml` declares it (renames, `workspace = true` and platform tables included), is `serde` or `serde_derive`; the lint declares those packages as data and never matches the spelling of a path. A newtype around text passes only if it derives `newtype::CheckedDeserialize`, resolved to newtype's own derive. `#[serde(try_from = ...)]`, `transparent` or `from`, an `impl Checked` beside an unchecked derive, another derive named `CheckedDeserialize`, or a hand-written `Deserialize` does not validate. A field type the reader cannot resolve (an external glob may shadow it, so even a plain `String` under `use other::*` is unresolved) is never text: on a type serde deserializes it raises "type not resolvable" at the field, and an explicit import clears it. The reader records why a path is unresolved. When the lookup failed in a module that holds an item-position macro invocation (a `macro_rules!` macro's call, `bitflags!`), and the name is not one a primitive, the prelude, std or a workspace crate supplies, the reader cannot rule out that the macro declared it: on a type serde deserializes, that field raises "type declared by a macro" at the field, and the fix is to declare the type directly, outside the macro. It is never text. A `String` beside an item macro still raises "type not resolvable", since an import settles it. A derive the reader cannot resolve (behind a glob or no import) on a type with a text or unresolvable field raises "derive not resolvable" at the derive; import it explicitly. A derive path into an external crate that no identity row names is followed through that crate's root: the lint asks `cargo metadata --locked --offline` once per workspace for each dependency's lib target, and the reader reads each crate root it needs once per run, caching its top-level `pub use` and `pub extern crate` items, its globs and its declared names (modules and `proc_macro_derive` names) in the model. So `newtype::serde::Deserialize` (newtype's root has `pub use serde;`) and `facade::Deserialize` (a root with `pub use serde::Deserialize;`) are serde's derive. A path through a declared module stays that crate's (`diesel::prelude::Insertable`); a derive's last step prefers a re-export of a proc-macro crate, the way Rust keeps a derive and a trait of one name apart. Only crate roots are read, never their modules. A derive whose crate root cannot be read (no metadata, missing source), whose name the root binds twice in one namespace, hides behind a glob the reader cannot see into, or re-exports in a loop raises "derive not resolvable". CI fetches dependency sources before the lint step for this. A dependency's key is matched to the crate path that names it by its words, so `wire-format` in `Cargo.toml` is the crate `wire_format`. The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. There is no allow-list.
 
 ## Guards
 
@@ -543,6 +574,9 @@ reach a `terminal` state, and a terminal state has no outgoing edges. A graph it
 The `mutants` job in `ci.yml` runs on each pull request. It applies `cargo mutants` to the lines the pull
 request changes, and tests each mutant with the crates the pull request reaches, because shared crates are
 tested through the crates that use them. A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
+The mutants run in eight `mutants-shard` jobs, each taking every eighth mutant (`--shard k/8 --sharding round-robin`),
+so a pull request that changes most of the workspace still fits GitHub's six-hour job limit. The `mutants` job
+waits for all of them and passes only if every shard succeeded, so a failed or cancelled shard fails it.
 
 `mutants.yml` runs every mutant once a week, in eight shards, or on request, each against the whole
 workspace (`.cargo/mutants.toml`). It reports in the run

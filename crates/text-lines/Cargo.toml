@@ -10,8 +10,8 @@ test = false
 doctest = false
 
 [dependencies]
-proptest.workspace = true
-serde.workspace = true
+grammar = { path = "../grammar" }
+newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]

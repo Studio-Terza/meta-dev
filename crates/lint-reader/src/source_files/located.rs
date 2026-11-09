@@ -3,17 +3,17 @@ use std::path::{Path, PathBuf};
 use file_ports::{FileFailure, Files, Text};
 use lint_core::SourceText;
 use lint_layout::Failure;
-use lint_placement::Placement;
+use lint_placement::{Packages, Placement};
 use lint_roots::Tree;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::opened::Opened;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Located<'tree> {
-    tree: &'tree Tree<'tree>,
-    package: PathBuf,
     file: PathBuf,
+    package: PathBuf,
+    tree: &'tree Tree<'tree>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -25,17 +25,19 @@ pub struct Node<'tree> {
 impl<'tree> Located<'tree> {
     #[must_use]
     pub fn new(tree: &'tree Tree<'tree>, package: &Path, file: &Path) -> Located<'tree> {
-        Located { tree, package: package.to_path_buf(), file: file.to_path_buf() }
+        Located { file: file.to_path_buf(), package: package.to_path_buf(), tree }
     }
 
-    pub fn open_many(files: &impl Files, fresh: &[Located<'tree>]) -> Vec<Result<Opened, Failure>> {
+    pub fn open_many(
+        files: &impl Files,
+        packages: &Packages,
+        fresh: &[Located<'tree>],
+    ) -> Vec<Result<Opened, Failure>> {
         let paths: Vec<&Path> = fresh.iter().map(|located| located.file.as_path()).collect();
-        let packages: Vec<&Path> = fresh.iter().map(|located| located.package.as_path()).collect();
         fresh
             .iter()
             .zip(files.read_text_many(&paths))
-            .zip(Placement::within_many(files, &packages, &paths))
-            .map(|((located, text), placement)| located.opened(text, placement))
+            .map(|(located, text)| located.opened(text, packages.placed(&located.package, &located.file)))
             .collect()
     }
 
@@ -51,11 +53,11 @@ impl<'tree> Located<'tree> {
 
     fn opened(&self, text: Result<Text, FileFailure>, placement: Placement) -> Result<Opened, Failure> {
         text.map_err(|failure| Failure::Io { path: self.tree.display(&self.file), source: failure.into() }).map(
-            |text| {
+            |read| {
                 Opened::new(
                     self.tree.display(&self.file),
                     self.file.clone(),
-                    SourceText::new(text.into_inner()),
+                    SourceText::new(read.into_inner()),
                     placement,
                 )
             },

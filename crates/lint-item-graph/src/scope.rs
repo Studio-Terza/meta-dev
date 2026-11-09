@@ -57,23 +57,27 @@ impl<'file> Scope<'file> {
     }
 
     fn kept_ident(&self, token: &TokenTree, root: &TokenTree, ident: &Ident, name: Name) -> Option<Name> {
-        match Some(root).filter(|root| ptr::eq(*root, token)) {
-            Some(_) => self.imports.local_item(&name, &self.local_roots).map(|imports| imports.original(name)),
+        match Some(root).filter(|candidate| ptr::eq(*candidate, token)) {
+            Some(_) => self
+                .imports
+                .local_item(&name, &self.local_roots)
+                .map(|imports| imports.holds(&name).map(Import::original).map_or(name, Name::from)),
             None => self.reaches(ident).map(|_| name),
         }
     }
 
     pub(crate) fn spelled(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Vec<Name> {
-        let imported = Some(root).filter(|root| ptr::eq(*root, token)).and_then(|_| self.imports.path_of(&name));
+        let imported =
+            Some(root).filter(|candidate| ptr::eq(*candidate, token)).and_then(|_| self.imports.path_of(&name));
         imported.unwrap_or_else(|| vec![name])
     }
 
     fn reaches<'token>(&self, ident: &'token Ident) -> Option<&'token Ident> {
+        let name = Name::from(ident);
         self.local_roots
-            .iter()
-            .find(|root| **root == *ident)
+            .get(&name)
             .map(|_| ident)
-            .or_else(|| self.imports.holds(ident).and(self.imports.local_item(ident, &self.local_roots)).map(|_| ident))
+            .or_else(|| self.imports.holds(&name).and(self.imports.local_item(&name, &self.local_roots)).map(|_| ident))
     }
 
     fn import(&mut self, path: Vec<&'file Ident>, tree: &'file UseTree) {

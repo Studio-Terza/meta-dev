@@ -136,13 +136,13 @@ impl Words {
                 expecting: Expecting::Word,
                 ..self
             }),
-            Expecting::Word => Argument::try_from(argument).and_then(|argument| self.worded(argument)),
+            Expecting::Word => Argument::try_from(argument).and_then(|read| self.worded(read)),
         }
     }
 
     fn worded(self, argument: Argument) -> Result<Words, Failure> {
         match argument {
-            Argument::Flag(flag) => flag.owned(self.verb).map(|flag| self.flagged(flag)),
+            Argument::Flag(flag) => flag.owned(self.verb).map(|owned| self.flagged(owned)),
             Argument::Plain(word) => self.said(Token::Word(word)),
         }
     }

@@ -61,9 +61,9 @@ impl Answer {
     fn refused(arguments: &[&str]) -> String {
         let answer = Answer::to(arguments);
         Some(answer)
-            .filter(|answer| answer.exit == ExitCode::FAILURE)
-            .filter(|answer| answer.out.is_empty())
-            .map(|answer| answer.err)
+            .filter(|candidate| candidate.exit == ExitCode::FAILURE)
+            .filter(|failed| failed.out.is_empty())
+            .map(|refused| refused.err)
             .unwrap_or_default()
     }
 }
@@ -238,6 +238,6 @@ struct Text;
 
 impl Text {
     fn owned(text: &str) -> Vec<String> {
-        text_lines::Lines::from(text).map(str::to_owned).collect()
+        text.parse::<text_lines::Lines>().into_iter().flatten().collect()
     }
 }

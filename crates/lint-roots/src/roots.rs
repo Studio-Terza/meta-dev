@@ -30,15 +30,15 @@ impl Roots {
     pub fn under(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Vec<Target>, Failure>> {
         let below = Directory::trees(files, &Self::canonical(trees));
         let directories: Vec<Vec<PathBuf>> =
-            trees.iter().zip(&below).map(|(tree, below)| Self::searched(tree, below)).collect();
+            trees.iter().zip(&below).map(|(tree, found)| Self::searched(tree, found)).collect();
         let read = Regrouped::like(&directories, Manifest::read_many(files, &directories.concat()));
         let manifests = below
             .into_iter()
             .zip(read)
-            .map(|(below, read)| {
-                below.and_then(|_| read.into_iter().collect::<Result<Vec<Option<Manifest>>, Failure>>())
+            .map(|(searched, outcomes)| {
+                searched.and_then(|_| outcomes.into_iter().collect::<Result<Vec<Option<Manifest>>, Failure>>())
             })
-            .map(|found| found.map(|found| found.into_iter().flatten().collect()))
+            .map(|found| found.map(|listed| listed.into_iter().flatten().collect()))
             .collect();
         Packages::targets_of(files, trees, Admission::members_among(files, manifests))
     }
@@ -46,7 +46,7 @@ impl Roots {
     fn searched(tree: &Tree<'_>, below: &Result<Vec<Directory>, Failure>) -> Vec<PathBuf> {
         below
             .iter()
-            .flat_map(|below| iter::once(tree.canonical()).chain(below.iter().map(AsRef::as_ref)))
+            .flat_map(|directories| iter::once(tree.canonical()).chain(directories.iter().map(AsRef::as_ref)))
             .map(Path::to_path_buf)
             .chain(below.iter().flat_map(|_| tree.canonical().ancestors().skip(1).map(Path::to_path_buf)))
             .collect()

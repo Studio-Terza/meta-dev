@@ -1,32 +1,30 @@
-mod boundary;
-
 use std::io::Write;
 use std::num::NonZeroU8;
 
+use grammar::spec_line::{Attachment, Line, Spec};
 use text_lines::Lines;
 
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Text};
-use boundary::{Attachment, Line};
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Verdict<'body> {
+pub(crate) enum Verdict {
     Repair,
-    Attached(Attachment<'body>),
-    Malformed(Vec<Line<'body>>),
+    Attached(Attachment),
+    Malformed(Vec<Line>),
     Missing,
 }
 
-impl<'body> Verdict<'body> {
+impl Verdict {
     const FORMS: &'static str = "write a line spec: none, spec: owner <uuid prefix of 8 or more hex digits>, or spec: <project>#D<n> or <project>#L<n> (several comma-separated); a PR that repairs a red main writes the line repair: main instead";
 
-    pub(crate) fn judging(body: &'body Text) -> Verdict<'body> {
-        let lines: Vec<Line> = Lines::from(body.as_ref()).map(Line::read).collect();
-        let specs: Vec<Line> = lines.iter().copied().filter(|line| line.spec().is_some()).collect();
-        let attached = specs.iter().filter_map(|line| line.spec()).find_map(|value| Attachment::try_from(value).ok());
-        lines
-            .iter()
-            .find(|line| **line == Line::Repair)
+    pub(crate) fn judging(body: &Text) -> Verdict {
+        let lines: Vec<Line> =
+            body.as_ref().parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Line>().ok()).collect();
+        let attached = lines.iter().filter_map(Line::spec).find_map(Spec::attachment).cloned();
+        let (repairs, specs): (Vec<Line>, Vec<Line>) = lines.into_iter().partition(|line| *line == Line::Repair);
+        repairs
+            .first()
             .map(|_| Verdict::Repair)
             .or_else(|| attached.map(Verdict::Attached))
             .unwrap_or_else(|| specs.first().map(|_| ()).map_or(Verdict::Missing, |()| Verdict::Malformed(specs)))
@@ -45,7 +43,7 @@ impl<'body> Verdict<'body> {
         }
     }
 
-    fn malformed(specs: &[Line<'_>], out: &mut impl Write) -> Result<(), Failure<'static>> {
+    fn malformed(specs: &[Line], out: &mut impl Write) -> Result<(), Failure<'static>> {
         specs.iter().try_for_each(|line| writeln!(out, "spec line malformed: {line}"))?;
         Ok(writeln!(out, "::error::no spec line of the body is well formed; {}", Self::FORMS)?)
     }

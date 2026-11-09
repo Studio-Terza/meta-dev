@@ -32,7 +32,7 @@ impl<'file, 'run> Queries<'file, 'run> {
 
     fn judged(&mut self, invocation: &Macro, sql: Option<Sql>) {
         match sql {
-            Some(sql) => self.checked(&sql),
+            Some(found) => self.checked(&found),
             None => MacroCalls::within(invocation).iter().for_each(|inner| self.met(inner)),
         }
     }

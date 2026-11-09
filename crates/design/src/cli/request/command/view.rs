@@ -10,7 +10,7 @@ use design_store::{
 use file_ports::Files;
 use grammar::notes::{self, Notes};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use store_ports::Store;
 
 use super::printed::Printed;
@@ -78,9 +78,9 @@ impl Lens {
         self.tree().map_or_else(|whole| whole, |tree| View::Tree(tree, Root::Configured))
     }
 
-    fn rooted(self, node: &Token) -> Result<View, Failure> {
+    fn rooted(self, token: &Token) -> Result<View, Failure> {
         let tree = self.tree().map_err(|_whole| Failure::Usage)?;
-        let node = node.text().ok_or(Failure::Usage)?.parse()?;
+        let node = token.text().ok_or(Failure::Usage)?.parse()?;
         Ok(View::Tree(tree, Root::Node(node)))
     }
 }
@@ -123,7 +123,7 @@ impl View {
         let noted: Vec<Noted> = ground.store().read(ImportedNotes::from(project.clone()))?;
         let ending = ground.store().read(ImportedEnding::from(project.clone()))?;
         Ok(Notes::gathered(
-            noted.iter().map(|noted| notes::Line::read(noted.line().into_inner(), &noted.title().clone().into_inner())),
+            noted.iter().map(|line| notes::Line::read(line.line().into_inner(), &line.title().clone().into_inner())),
             ending.unwrap_or_default(),
         ))
     }

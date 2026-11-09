@@ -12,6 +12,8 @@ use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
+const CRATES_GENERATED: usize = 31;
+const LINES_PRINTED: usize = 31;
 const LEAF_REPORT: [&str; 3] = ["REACH=1 of 5 crates", "BUILD_SCOPE=-p leaf", "MUTANTS_SCOPE=--test-package=leaf"];
 const TWO_REPORT: [&str; 3] = [
     "REACH=2 of 5 crates",
@@ -156,7 +158,7 @@ struct Answer {
 }
 
 impl Answer {
-    fn lines(&self) -> Printed<'_> {
+    fn lines(&self) -> Printed<String> {
         Printed { exit: self.exit, out: Text::lines(&self.out), err: Text::lines(&self.err) }
     }
 
@@ -435,7 +437,7 @@ fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() 
     let arguments = ["measured-history", &scratch.file("m.toml"), &scratch.file("history.tsv"), "abc123"];
     let answer = scratch.answer(&Script::new(), &arguments);
     let line = "abc123\tcold-clippy = 52.3\tcold-test-compile = 80";
-    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec![line]));
+    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec![line.to_owned()]));
     assert_eq!(Text::lines(&scratch.read("history.tsv")), ["older", line]);
     let missing = ["measured-history", &scratch.file("none.toml"), &scratch.file("history.tsv"), "abc123"];
     assert_eq!(scratch.answer(&Script::new(), &missing).exit, ExitCode::FAILURE);
@@ -512,7 +514,7 @@ fn a_history_needs_git_and_readable_metadata_and_a_writable_file() -> Result<(),
     scratch.write("metadata.json", METADATA)?;
     let named = |file: &str| ["history".to_owned(), scratch.file("metadata.json"), scratch.file(file), "r".to_owned()];
     let git = scratch.answer(&Script::refusing("git"), &named("history.tsv"));
-    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom"]));
+    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom".to_owned()]));
     scratch.write("blocker", "")?;
     assert_eq!(scratch.answer(&Script::new(), &named("blocker/history.tsv")).exit, ExitCode::FAILURE);
     let broken = ["history".to_owned(), scratch.file("none.json"), scratch.file("history.tsv"), "r".to_owned()];
@@ -571,9 +573,9 @@ fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box
 
 #[test]
 fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(), Box<dyn Error>> {
-    let units: Vec<String> = (0..31).map(|at| Page::unit(&format!("crate{at:02}"), "1.0")).collect();
+    let units: Vec<String> = (0..CRATES_GENERATED).map(|at| Page::unit(&format!("crate{at:02}"), "1.0")).collect();
     let answer = Page::timed(&Page::with(&units.join(",")))?.answer;
-    assert_eq!(answer.out.matches(char::from(10)).count(), 31);
+    assert_eq!(answer.out.matches(char::from(10)).count(), LINES_PRINTED);
     assert!(answer.out.contains("compile time per crate, seconds, longest first, 31.00 in all:\n"));
     Ok(())
 }
@@ -601,9 +603,9 @@ fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> 
 fn a_program_the_scope_needs_that_cannot_start_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let cargo = scratch.answer(&Script::refusing("cargo"), &Reach::on(&scratch, "push"));
-    assert_eq!((cargo.exit, Text::lines(&cargo.err)), (ExitCode::FAILURE, vec!["cannot run cargo: boom"]));
+    assert_eq!((cargo.exit, Text::lines(&cargo.err)), (ExitCode::FAILURE, vec!["cannot run cargo: boom".to_owned()]));
     let git = scratch.answer(&Script::refusing("git"), &Reach::on(&scratch, "pull_request"));
-    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom"]));
+    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom".to_owned()]));
     assert_eq!(git.out, "");
     Ok(())
 }
@@ -675,8 +677,15 @@ laws::table!(
         ["mutants-shard"] => true,
         ["mutants-shard", "0/8"] => true,
         ["mutants-shard", "0/8", "out", "extra"] => true,
+        ["mutants-shard", "8/8", "out"] => true,
+        ["mutants-shard", "0/0", "out"] => true,
+        ["mutants-shard", "3", "out"] => true,
         ["mutants-changed"] => true,
         ["mutants-changed", "diff"] => true,
+        ["mutants-changed", "diff", "out"] => true,
+        ["mutants-changed", "diff", "out", "8/8", "-p"] => true,
+        ["mutants-changed", "diff", "out", "-1/8", "-p"] => true,
+        ["mutants-changed", "diff", "out", "--test-package=leaf"] => true,
         ["wall-times"] => true,
         ["wall-times", "repo", "1"] => true,
         ["wall-times", "repo", "1", "job", "extra"] => true,
@@ -870,7 +879,8 @@ impl Exits {
 
     fn changed(code: &Code) -> ExitCode {
         let scratch = Scratch::fresh();
-        let arguments = ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "--test-package=leaf"];
+        let arguments =
+            ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "3/8", "--test-package=leaf"];
         scratch.answer(&Script::exiting(code.0), &arguments).exit
     }
 }
@@ -916,7 +926,14 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
     let fake = Script { changed: "+a line\n".to_owned(), ..Script::new() };
     let answer = scratch.answer(
         &fake,
-        &["mutants-changed", &scratch.file("tmp/c.diff"), &scratch.file("out"), "--test-package=a", "--test-package=b"],
+        &[
+            "mutants-changed",
+            &scratch.file("tmp/c.diff"),
+            &scratch.file("out"),
+            "15/16",
+            "--test-package=a",
+            "--test-package=b",
+        ],
     );
     assert_eq!(
         answer.lines(),
@@ -933,6 +950,10 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
                     "mutants",
                     "--in-diff",
                     scratch.file("tmp/c.diff").as_str(),
+                    "--shard",
+                    "15/16",
+                    "--sharding",
+                    "round-robin",
                     "--test-package=a",
                     "--test-package=b",
                     "--jobs",
@@ -953,8 +974,8 @@ fn missed_mutants_fail_the_step_and_are_listed() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "src/a.rs:1: replace f -> bool with true\n")?;
-    let answer =
-        scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
+    let answer = scratch
+        .answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
     assert_eq!(answer.exit, ExitCode::from(2));
     assert_eq!(Text::lines(&answer.out), ["mutants missed:", "src/a.rs:1: replace f -> bool with true"]);
     Ok(())
@@ -965,16 +986,16 @@ fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "")?;
-    let answer =
-        scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
-    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec!["mutants: none missed"]));
+    let answer = scratch
+        .answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
+    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec!["mutants: none missed".to_owned()]));
     Ok(())
 }
 
 #[test]
 fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
     let fake = Script::new();
-    let answer = Scratch::fresh().answer(&fake, &["mutants-changed", "c.diff", "out"]);
+    let answer = Scratch::fresh().answer(&fake, &["mutants-changed", "c.diff", "out", "0/8"]);
     assert_eq!(
         answer.lines(),
         Printed {
@@ -989,11 +1010,12 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
 #[test]
 fn a_failed_start_while_testing_changed_lines_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"];
+    let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("git"), &arguments).err), ["cannot run git: boom"]);
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("cargo"), &arguments).err), ["cannot run cargo: boom"]);
     scratch.write("blocker", "")?;
-    let blocked = scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("blocker/c.diff"), "out", "-p"]);
+    let blocked =
+        scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("blocker/c.diff"), "out", "0/8", "-p"]);
     assert!(blocked.err.contains("blocker/c.diff"));
     Ok(())
 }
@@ -1566,6 +1588,8 @@ laws::table!(
         "spec: owner 96d13317x\n" => Body::malformed(&["spec: owner 96d13317x"]),
         "spec: owner 96d1-3317\n" => Body::malformed(&["spec: owner 96d1-3317"]),
         "spec: owner\n" => Body::malformed(&["spec: owner"]),
+        "spec: owner \n" => Body::malformed(&["spec: owner"]),
+        "spec: spec: \n" => Body::malformed(&["spec: spec:"]),
         "spec: Lint-port#D3\n" => Body::malformed(&["spec: Lint-port#D3"]),
         "spec: lint_port#D3\n" => Body::malformed(&["spec: lint_port#D3"]),
         "spec: #D3\n" => Body::malformed(&["spec: #D3"]),
@@ -1723,21 +1747,37 @@ laws::table!(
 );
 
 #[derive(Debug, PartialEq)]
-struct Printed<'answer> {
+struct Printed<Line> {
     exit: ExitCode,
-    out: Vec<&'answer str>,
-    err: Vec<&'answer str>,
+    out: Vec<Line>,
+    err: Vec<Line>,
+}
+
+impl Printed<String> {
+    fn shown(&self) -> Printed<&str> {
+        Printed {
+            exit: self.exit,
+            out: self.out.iter().map(String::as_str).collect(),
+            err: self.err.iter().map(String::as_str).collect(),
+        }
+    }
+}
+
+impl PartialEq<Printed<&str>> for Printed<String> {
+    fn eq(&self, wanted: &Printed<&str>) -> bool {
+        self.shown() == *wanted
+    }
 }
 
 struct Text;
 
 impl Text {
     fn owned(text: &str) -> Vec<String> {
-        text_lines::Lines::from(text).map(str::to_owned).collect()
+        text.parse::<text_lines::Lines>().into_iter().flatten().collect()
     }
 
-    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
-        text_lines::Lines::from(text.as_ref()).collect()
+    fn lines(text: &impl AsRef<str>) -> Vec<String> {
+        text.as_ref().parse::<text_lines::Lines>().into_iter().flatten().collect()
     }
 }
 

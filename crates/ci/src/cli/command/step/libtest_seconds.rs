@@ -24,8 +24,8 @@ pub struct LibtestSeconds {
 }
 
 impl Step for LibtestSeconds {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<LibtestSeconds, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<LibtestSeconds, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let measured = &arguments.taken()?;
         let stage = &arguments.taken()?;
         let output = &arguments.taken()?;
@@ -39,14 +39,19 @@ impl Step for LibtestSeconds {
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let text = self.output.read(ports.files())?;
-        let results: Vec<Finished> =
-            Lines::from(text.as_ref()).filter_map(|line| line.parse::<Finished>().ok()).collect();
+        let results: Vec<Finished> = text
+            .as_ref()
+            .parse::<Lines>()
+            .into_iter()
+            .flatten()
+            .filter_map(|line| line.parse::<Finished>().ok())
+            .collect();
         let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
         results
             .first()
             .map(|_| total)
             .ok_or_else(|| Failure::NoTestResult { path: self.output.as_ref() })
-            .and_then(|total| self.measured.append(ports.files(), &self.stage, total))
+            .and_then(|summed| self.measured.append(ports.files(), &self.stage, summed))
             .map(|()| Exit::Success)
     }
 }

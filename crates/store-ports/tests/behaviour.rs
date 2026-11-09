@@ -152,7 +152,7 @@ impl Place {
     fn bodies(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
         let store = run.port(self.opened_as::<Untouched>());
-        let shown = store.read(ShownMessage::named(Uuid::new("o1".to_owned())))?.ok_or("o1 was not stored")?;
+        let shown = store.read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?.ok_or("o1 was not stored")?;
         Ok(shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect())
     }
 
@@ -162,7 +162,7 @@ impl Place {
         let run = Run::root();
         let store = run.port(self.opened_as::<Untouched>());
         let shown =
-            store.read(ShownMessage::named(Uuid::new(message.to_owned())))?.ok_or("the message is not stored")?;
+            store.read(ShownMessage::named(Uuid::try_new(message.to_owned())?))?.ok_or("the message is not stored")?;
         Ok(shown
             .segments()
             .iter()
@@ -177,7 +177,7 @@ impl Place {
         let run = Run::root();
         let older = run.port(place.opened_as::<Older>());
         older.write(Told::Stale)?;
-        older.write(Remarked { remark, on: Uuid::new("o1".to_owned()) })?;
+        older.write(Remarked { remark, on: Uuid::try_new("o1".to_owned())? })?;
         let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
         let refused = matches!(&refused, StoreFailure::Refused(_)).then(|| refused.to_string());
         Ok(Refusal { remark, refused, applied: place.applied()?, stored: place.shown("o1")? })
@@ -192,7 +192,7 @@ impl Place {
         let run = Run::root();
         let store = run.port(self.opened_as::<Untouched>());
         let shown =
-            store.read(ShownMessage::named(Uuid::new(message.to_owned())))?.ok_or("the message is not stored")?;
+            store.read(ShownMessage::named(Uuid::try_new(message.to_owned())?))?.ok_or("the message is not stored")?;
         Ok(shown
             .links()
             .iter()
@@ -803,9 +803,9 @@ fn reopening_a_store_keeps_its_rows_and_runs_no_migration_or_rewrite_again() -> 
     first.write(Stale)?;
     let reopened = run.port(place.opened());
     let cursors = reopened.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::new(Offset::new(7)));
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), Cursor::new(Offset::new(7)));
     assert_eq!(reopened.read(Applied)?.len(), StreamSchema::migrator().iter().count());
-    let shown = reopened.read(ShownMessage::named(Uuid::new("o1".to_owned())))?.ok_or("o1 was not stored")?;
+    let shown = reopened.read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?.ok_or("o1 was not stored")?;
     let bodies: Vec<String> = shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect();
     assert_eq!(bodies, ["kept"]);
     Ok(())
@@ -817,7 +817,7 @@ fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Box<dyn Error>
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     assert!(store.write(HalfWritten).is_err());
     let cursors = store.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::default());
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), Cursor::default());
     Ok(())
 }
 
@@ -846,7 +846,7 @@ fn a_crash_after_the_migrations_and_the_rewrite_leaves_the_store_as_it_was_and_t
     assert_eq!(place.bodies()?, ["kept"]);
     let reopened = run.port(place.opened());
     let cursors = reopened.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::default());
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), Cursor::default());
     assert_eq!(reopened.read(Applied)?.len(), StreamSchema::migrator().iter().count());
     assert_eq!(place.bodies()?, ["kept forever"]);
     Ok(())
@@ -895,7 +895,7 @@ fn a_rederivation_rewrites_a_changed_segment_that_carries_no_annotation() -> Res
     let run = Run::root();
     let older = run.port(place.opened_as::<Older>());
     older.write(Told::Stale)?;
-    older.write(Remarked { remark: Remark::Conversational, on: Uuid::new("o2".to_owned()) })?;
+    older.write(Remarked { remark: Remark::Conversational, on: Uuid::try_new("o2".to_owned())? })?;
     assert_eq!(run.port(place.opened()).read(Applied)?.len(), StreamSchema::migrator().iter().count());
     assert_eq!(place.shown("o1")?, ["0 sentence First point.", "1 sentence Second point."]);
     assert_eq!(place.shown("o2")?, ["0 sentence Only one."]);
@@ -908,7 +908,8 @@ fn a_rederivation_opens_a_store_whose_annotated_segments_it_does_not_change() ->
     let run = Run::root();
     let older = run.port(place.opened_as::<Older>());
     older.write(Told::Current)?;
-    let remarks = Remark::VARIANTS.iter().map(|remark| Remarked { remark: *remark, on: Uuid::new("o1".to_owned()) });
+    let on = Uuid::try_new("o1".to_owned())?;
+    let remarks = Remark::VARIANTS.iter().map(|remark| Remarked { remark: *remark, on: on.clone() });
     remarks.map(|remarked| older.write(remarked)).collect::<Result<Vec<Written>, StoreFailure>>()?;
     assert_eq!(run.port(place.opened()).read(Applied)?.len(), StreamSchema::migrator().iter().count());
     assert_eq!(place.shown("o1")?, ["0 sentence First point.", "1 sentence Second point."]);
@@ -956,7 +957,7 @@ fn a_rewrite_due_with_the_first_migration_runs_on_the_schema_its_queries_are_che
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<Early>());
     let cursors = store.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::new("staged".to_owned())), Cursor::new(Offset::new(7)));
+    assert_eq!(cursors.resuming(&SessionId::try_new("staged".to_owned())?), Cursor::new(Offset::new(7)));
     Ok(())
 }
 
@@ -984,7 +985,7 @@ fn a_held_memory_lock_refuses_a_second_lock_until_it_is_dropped() -> Result<(), 
 }
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
-#[newtype(strategy = -1.0e300..1.0e300)]
+#[newtype(strategy = -1.0e300_f64..1.0e300_f64)]
 struct Score(f64);
 
 struct Stored;

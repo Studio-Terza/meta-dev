@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
+use sqlx::error::ErrorKind;
 use sqlx::migrate::{Migrate, Migrator};
 use sqlx::query::{Map, Query};
 use sqlx::sqlite::SqliteRow;
-use sqlx::error::ErrorKind;
 use sqlx::{Error, IntoArguments, Sqlite, SqliteConnection};
 use tokio::runtime::Runtime;
 

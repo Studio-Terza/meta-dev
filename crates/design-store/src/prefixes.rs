@@ -3,7 +3,6 @@ mod boundary;
 use std::collections::{BTreeMap, BTreeSet};
 
 use design_model::Prefix;
-use newtype::Newtype;
 use port_core::Op;
 use transcript_ports::Uuid;
 

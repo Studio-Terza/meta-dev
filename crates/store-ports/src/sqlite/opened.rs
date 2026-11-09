@@ -62,9 +62,9 @@ impl Opened {
         written: Result<Written, Failure>,
     ) -> Result<Written, Failure> {
         match written {
-            Ok(written) => runtime
+            Ok(rows) => runtime
                 .block_on(transaction.commit())
-                .map(|()| written)
+                .map(|()| rows)
                 .map_err(|failed| Failure::from(StoreFailure::from(failed))),
             Err(failure) => runtime
                 .block_on(transaction.rollback())

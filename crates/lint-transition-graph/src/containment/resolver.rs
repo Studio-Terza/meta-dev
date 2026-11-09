@@ -89,13 +89,13 @@ impl<'found> Resolver<'found> {
 
     fn within(&self, target: &Target<'found>, name: &Name) -> Vec<Member<'found>> {
         let krate = target.krate();
-        let declaring = |name: &Name| self.declaring.get(name).map_or(&[][..], Vec::as_slice);
-        let stood = |name: &Name| self.stand_ins.standing_for(krate, name).iter();
+        let declaring = |declared: &Name| self.declaring.get(declared).map_or(&[][..], Vec::as_slice);
+        let stood = |standing: &Name| self.stand_ins.standing_for(krate, standing).iter();
         let unplaced = Target::new(krate, None, None);
         target.declared(declaring(name)).map_or_else(
             || {
                 let reached = Traversal::trees(stood(name), stood).into_iter().flatten();
-                reached.filter_map(|name| unplaced.declared(declaring(name))).collect()
+                reached.filter_map(|stand_in| unplaced.declared(declaring(stand_in))).collect()
             },
             |member| vec![member],
         )

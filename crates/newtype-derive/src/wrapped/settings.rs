@@ -1,20 +1,23 @@
 mod setting;
 
-use proc_macro2::Span;
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Error, Expr, Stmt, Token, Type, WherePredicate, parse_quote};
+use syn::{Attribute, Expr, Stmt, Token, Type, WherePredicate, parse_quote};
 
-use super::check::Check;
 use setting::Setting;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Checking {
+    Unchecked,
+    Checked,
+}
+
 pub struct Settings {
-    check: Option<Check>,
+    checking: Checking,
     strategy: Option<Expr>,
 }
 
 impl Settings {
     const ATTRIBUTE: &'static str = "newtype";
-    const INCOMPLETE: &'static str = "a check needs an error, and an error needs a check";
 
     pub fn declared(attributes: &[Attribute]) -> syn::Result<Settings> {
         let lists = attributes
@@ -23,19 +26,9 @@ impl Settings {
             .map(|attribute| attribute.parse_args_with(Punctuated::<Setting, Token![,]>::parse_terminated))
             .collect::<syn::Result<Vec<_>>>()?;
         let settings: Vec<Setting> = lists.into_iter().flatten().collect();
-        let function = settings.iter().find_map(Setting::function).cloned();
-        let error = settings.iter().find_map(Setting::error).cloned();
+        let checking = settings.iter().find_map(Setting::checking).unwrap_or(Checking::Unchecked);
         let strategy = settings.iter().find_map(Setting::strategy).cloned();
-        let partial = function.as_ref().map(|_| ()).xor(error.as_ref().map(|_| ()));
-        partial.map_or_else(
-            || {
-                Ok(Settings {
-                    check: function.zip(error).map(|(function, error)| Check::new(function, error)),
-                    strategy,
-                })
-            },
-            |()| Err(Error::new(Span::call_site(), Self::INCOMPLETE)),
-        )
+        Ok(Settings { checking, strategy })
     }
 
     pub fn required(&self, inner: &Type) -> Vec<WherePredicate> {
@@ -63,7 +56,7 @@ impl Settings {
         }
     }
 
-    pub fn checking(&self) -> Option<&Check> {
-        self.check.as_ref()
+    pub fn checking(&self) -> Checking {
+        self.checking
     }
 }

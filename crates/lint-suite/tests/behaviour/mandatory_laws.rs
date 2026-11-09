@@ -9,23 +9,7 @@ const SERDE_ONE: &str = "#[derive(Serialize)]\npub struct A;\n";
 const ENCODING: &str = "pub struct A;\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
 const FORMS: &str = "pub struct A;\nimpl A {\n    fn to_hex(&self) {}\n    fn from_hex() {}\n}\n";
 const MISMATCHED_FORMS: &str = "pub struct A;\nimpl A {\n    fn to_hex(&self) {}\n    fn from_bits() {}\n}\n";
-const ORDER: &str = "pub struct A;\nimpl Ord for A {}\n";
-const EQUALITY: &str = "pub struct A;\nimpl PartialEq for A {}\n";
-const DERIVED_ORDER: &str = "#[derive(PartialEq, Ord)]\npub struct A;\n";
-const POINTER_EQUALITY: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        std::rc::Rc::ptr_eq(&self.0, &other.0)\n    }\n}\n";
-const POINTER_FUNCTION: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        std::ptr::eq(self, other)\n    }\n}\n";
-const POINTER_AND_FIELD: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        Rc::ptr_eq(&self.0, &other.0) && self.1 == other.1\n    }\n}\n";
-const POINTER_ORDER: &str = "pub struct A;\nimpl Ord for A {\n    fn cmp(&self, other: &Self) -> Ordering {\n        Rc::ptr_eq(&self.0, &other.0).cmp(&true)\n    }\n}\n";
-const POINTER_METHOD: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        self.0.ptr_eq(&other.0)\n    }\n}\n";
-const POINTER_PAREN: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        (Rc::ptr_eq(&self.0, &other.0))\n    }\n}\n";
-const POINTER_ADDR: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        std::ptr::addr_eq(self, other)\n    }\n}\n";
-const OTHER_CALL: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        same(&self.0, &other.0)\n    }\n}\n";
-const OTHER_EQ: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        other::eq(self, other)\n    }\n}\n";
-const OTHER_PTR: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        ptr::read(self)\n    }\n}\n";
-const OTHER_METHOD: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        self.0.same(&other.0)\n    }\n}\n";
 const ROUNDTRIP: &str = "laws::roundtrip!(a, any::<A>(), A::encode, A::decode);\n";
-const LAW: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
-const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(value in any::<A>()) {}\n}\n";
 const OTHER_TYPE: &str = "laws::roundtrip!(b, any::<B>(), B::encode, B::decode);\n";
 
 const SERDE_ENUM: &str = "#[derive(Serialize, Deserialize)]\npub enum A {}\n";
@@ -51,66 +35,11 @@ const LAW_NAMING_BOTH: &str = "laws::law!(both, any::<A>(), value, { A::decode(&
 const ENCODE_ONLY: &str = "pub struct A;\nimpl A {\n    fn encode(&self) {}\n}\n";
 const DECODE_ONLY: &str = "pub struct A;\nimpl A {\n    fn decode() {}\n}\n";
 const PRIVATE_TEXT_PAIR: &str = "struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\n";
-const CRATE_ORDER: &str = "pub(crate) struct A;\nimpl Ord for A {}\n";
+const CRATE_ENCODING: &str = "pub(crate) struct A;\nimpl A {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const PRIVATE_TYPE_PUBLIC_IMPL: &str = "struct A;\nimpl A {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
 
-const CASES: [Case; 50] = [
-    Case::new(
-        Title::new("equality by pointer method"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_METHOD))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("equality by a parenthesised pointer test"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_PAREN))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("equality by addr eq"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_ADDR))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("equality by another call"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_CALL))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("equality by an eq of another module"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_EQ))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("equality by another ptr function"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_PTR))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("equality by another method"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_METHOD))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("equality by pointer"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_EQUALITY))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("equality by ptr eq"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_FUNCTION))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("pointer and a field"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_AND_FIELD))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("order from a pointer test"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_ORDER))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
+const CASES: [Case; 33] = [
     Case::new(
         Title::new("display and from_str"),
         &[Source::new(Located::new("src/a.rs"), Text::new(TEXT_PAIR))],
@@ -139,7 +68,7 @@ const CASES: [Case; 50] = [
     Case::new(
         Title::new("unrelated macro"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(UNRELATED_MACRO)),
         ],
         Flagged::new(&["src/a.rs:1"]),
@@ -165,36 +94,10 @@ const CASES: [Case; 50] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("hand-written equality"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(EQUALITY))],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("derived order"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(DERIVED_ORDER))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
         Title::new("roundtrip in a test"),
         &[
             Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(ROUNDTRIP)),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("law covers order"),
-        &[
-            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
-            Source::new(Located::new("tests/a.rs"), Text::new(LAW)),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("proptest covers equality"),
-        &[
-            Source::new(Located::new("src/a.rs"), Text::new(EQUALITY)),
-            Source::new(Located::new("tests/a.rs"), Text::new(PROPTEST)),
         ],
         Flagged::new(&[]),
     ),
@@ -337,8 +240,8 @@ const CASES: [Case; 50] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("a crate-private type with a hand-written order"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(CRATE_ORDER))],
+        Title::new("a crate-private type with a conversion pair"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(CRATE_ENCODING))],
         Flagged::new(&[]),
     ),
     Case::new(
@@ -354,26 +257,8 @@ const CASES: [Case; 50] = [
         ],
         Flagged::new(&["src/a.rs:1"]),
     ),
-    Case::new(
-        Title::new("an algebra law stands in for an order law"),
-        &[
-            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
-            Source::new(Located::new("tests/a.rs"), Text::new(ASSOCIATIVE)),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("an algebra law title is not a mention"),
-        &[
-            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
-            Source::new(Located::new("tests/a.rs"), Text::new(ASSOCIATIVE_TITLE)),
-        ],
-        Flagged::new(&["src/a.rs:1"]),
-    ),
 ];
 
-const ASSOCIATIVE: &str = "laws::associative!(regroups, any::<A>(), A::merge);\n";
-const ASSOCIATIVE_TITLE: &str = "laws::associative!(A, any::<u8>(), merge);\n";
 const LAW_FOR_PAIR: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
 
 #[test]
@@ -391,12 +276,8 @@ fn a_plain_law_does_not_stand_in_for_a_roundtrip() {
 #[test]
 fn the_message_names_the_fix() {
     let encoding = [Sources::file("src/a.rs", Text::new(ENCODING))];
-    let ordering = [Sources::file("src/a.rs", Text::new(ORDER))];
     let pair = MandatoryLaws::report(&encoding);
-    let order = MandatoryLaws::report(&ordering);
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
-    assert!(order.violations().iter().all(|violation| violation.to_string().contains("laws::law!")));
     assert!(pair.dirty().is_some());
-    assert!(order.dirty().is_some());
 }

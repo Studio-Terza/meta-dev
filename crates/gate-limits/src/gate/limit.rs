@@ -32,9 +32,8 @@ impl Limit {
     pub fn lowered(self, measured: Seconds) -> Result<Seconds, Refusal> {
         match self {
             Limit::Levels { .. } => Err(Refusal::Levels),
-            Limit::Record(record) => {
-                Self::exceeded(measured, record).map_or(Ok(measured), |record| Err(Refusal::Above { record }))
-            }
+            Limit::Record(record) => Self::exceeded(measured, record)
+                .map_or(Ok(measured), |exceeded| Err(Refusal::Above { record: exceeded })),
         }
     }
 

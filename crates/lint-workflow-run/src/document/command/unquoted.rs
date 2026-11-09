@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::document::text::Text;
 use crate::word::Word;

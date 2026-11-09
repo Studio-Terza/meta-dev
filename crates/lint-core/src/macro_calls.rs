@@ -37,6 +37,6 @@ impl MacroCalls {
 impl Parse for MacroCalls {
     fn parse(input: ParseStream) -> syn::Result<MacroCalls> {
         let steps = iter::from_fn(|| input.cursor().token_tree().map(|_| Self::step(input)));
-        steps.collect::<syn::Result<Vec<Vec<Macro>>>>().map(|steps| MacroCalls(steps.into_iter().flatten().collect()))
+        steps.collect::<syn::Result<Vec<Vec<Macro>>>>().map(|parsed| MacroCalls(parsed.into_iter().flatten().collect()))
     }
 }
