@@ -5,7 +5,7 @@ use grammar::cited::Cited;
 use grammar::output::field::{Id, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use structurer::{Outlined, SegmentRef};
 use transcript_ports::{Authorship, Body};
 

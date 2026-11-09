@@ -12,7 +12,8 @@ use crate::package_id::PackageId;
 use declared::Declared;
 pub use declared::PortTable;
 use dependency::Dependency;
-use target::{Kind, Target};
+pub use target::Form;
+use target::Target;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Package {
@@ -30,12 +31,16 @@ impl Package {
         &self.name
     }
 
-    pub fn identity(&self) -> Option<&PackageId> {
+    pub fn package_id(&self) -> Option<&PackageId> {
         self.id.as_ref()
     }
 
+    pub fn library(&self) -> Option<&Target> {
+        self.targets.iter().find(|target| target.form().is_some())
+    }
+
     pub fn proc_macro(&self) -> Option<&Package> {
-        self.targets.iter().flat_map(AsRef::as_ref).find(|kind| **kind == Kind::ProcMacro).map(|_| self)
+        self.targets.iter().filter_map(Target::form).find(|form| *form == Form::ProcMacro).map(|_| self)
     }
 
     pub fn port(&self) -> Option<&PortTable> {

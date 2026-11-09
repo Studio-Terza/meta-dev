@@ -26,7 +26,7 @@ impl<'file> Scan<'file> {
     }
 
     fn record(&mut self, span: Span, finding: Option<Finding>) {
-        self.found.extend(finding.map(|finding| Found::new(Site::new(self.path, LineNumber::from(span)), finding)));
+        self.found.extend(finding.map(|flagged| Found::new(Site::new(self.path, LineNumber::from(span)), flagged)));
     }
 }
 

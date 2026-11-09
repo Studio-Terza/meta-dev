@@ -21,8 +21,8 @@ impl SpecLine {
 }
 
 impl Step for SpecLine {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<SpecLine, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<SpecLine, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let pull_request = &arguments.taken()?;
         arguments.ended()?;
         Ok(SpecLine { pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()) })

@@ -20,7 +20,7 @@ impl Route {
     }
 
     fn all_taken(routed: &ExprMatch) -> Option<&ExprMatch> {
-        Some(routed).filter(|routed| routed.arms.iter().all(|arm| Self::taken(arm).is_some()))
+        Some(routed).filter(|candidate| candidate.arms.iter().all(|arm| Self::taken(arm).is_some()))
     }
 
     fn body(found: &Expr) -> Option<&Expr> {

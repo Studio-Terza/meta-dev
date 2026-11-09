@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  span_edges (message, ordinal, relation, node, provenance)\nVALUES\n  (?1, 0, 'decides', 1, 'init')\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "d94b116208bf0c3d7d51745407bb97f4025bbc67551d900665dced597e1d43be"
+}

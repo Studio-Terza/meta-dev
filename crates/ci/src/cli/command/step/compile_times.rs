@@ -54,8 +54,8 @@ impl CompileTimes {
 }
 
 impl Step for CompileTimes {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<CompileTimes, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<CompileTimes, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let page = &arguments.taken()?;
         let report = &arguments.taken()?;
         arguments.ended()?;

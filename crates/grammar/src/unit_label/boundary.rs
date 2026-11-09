@@ -80,7 +80,7 @@ impl Fixed {
             .ok()
             .map(|_none| Fixed::Built)
             .or_else(|| <&[Piece; 1]>::try_from(pieces).ok().and_then(|[only]| Fixed::alone(only)))
-            .or_else(|| Some(pieces).filter(|pieces| **pieces == Self::BUILD_RUN).map(|_run| Fixed::BuildRun))
+            .or_else(|| Some(pieces).filter(|label| **label == Self::BUILD_RUN).map(|_run| Fixed::BuildRun))
     }
 
     fn alone(piece: &Piece) -> Option<Fixed> {
@@ -101,7 +101,7 @@ impl Target {
     fn read(pieces: &[Piece]) -> Option<Target> {
         let [space, name, kind, mode] = <&[Piece; 4]>::try_from(pieces).ok()?;
         Some(space)
-            .filter(|space| **space == Piece::Space)
+            .filter(|leading| **leading == Piece::Space)
             .and_then(|_space| Some(Target { name: name.named()?.to_owned(), kind: kind.kind()?, mode: mode.mode()? }))
     }
 }

@@ -20,8 +20,8 @@ pub struct ColdSize {
 }
 
 impl Step for ColdSize {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ColdSize, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<ColdSize, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let directory = &arguments.taken()?;
         let out = &arguments.taken()?;
         arguments.ended()?;

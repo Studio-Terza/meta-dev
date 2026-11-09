@@ -7,9 +7,9 @@ pub struct Stale<'meta>(BTreeMap<&'meta CrateName, BTreeSet<&'meta CrateName>>);
 
 impl<'meta> FromIterator<(&'meta CrateName, &'meta CrateName)> for Stale<'meta> {
     fn from_iter<Found: IntoIterator<Item = (&'meta CrateName, &'meta CrateName)>>(found: Found) -> Stale<'meta> {
-        Stale(found.into_iter().fold(BTreeMap::new(), |mut found, (declarer, owned)| {
-            found.entry(declarer).or_insert_with(BTreeSet::new).insert(owned);
-            found
+        Stale(found.into_iter().fold(BTreeMap::new(), |mut gathered, (declarer, owned)| {
+            gathered.entry(declarer).or_insert_with(BTreeSet::new).insert(owned);
+            gathered
         }))
     }
 }

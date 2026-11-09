@@ -1,3 +1,4 @@
+mod gathered;
 mod ignored;
 mod kept;
 
@@ -6,9 +7,10 @@ use std::path::{Path, PathBuf};
 
 use file_ports::Files;
 use lint_layout::Failure;
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Newtype, Wrapping};
 
 use crate::survey::{Fact, Survey};
+use gathered::Gathered;
 use ignored::Ignored;
 use kept::Kept;
 
@@ -28,7 +30,7 @@ impl Directory {
         files: &impl Files,
         roots: &[PathBuf],
         ignored: &[Ignored],
-        found: impl Fn(&Kept<'_>, &Path, Vec<Directory>) -> Found,
+        found: impl Fn(&Gathered<'_>, &Path, Vec<Directory>) -> Found,
     ) -> Vec<Result<Found, Failure>> {
         let mut survey = Self::surveyed(files, roots, ignored, Survey::default());
         roots
@@ -37,17 +39,17 @@ impl Directory {
                 let kept = Kept::new(&survey, ignored);
                 let below = kept.preorder(kept.below(root));
                 let order: Vec<&Path> = iter::once(root.as_path()).chain(below.iter().map(AsRef::as_ref)).collect();
-                survey.failure(&order).map_or_else(|| Ok(found(&Kept::new(&survey, ignored), root, below)), Err)
+                survey.settled(&order).map(|settled| found(&Gathered::new(settled, ignored), root, below))
             })
             .collect()
     }
 
-    fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored], survey: Survey) -> Survey {
-        let survey = survey.learn(files, Fact::Listed, level);
-        let entries: Vec<PathBuf> = level.iter().flat_map(|directory| survey.entries(directory)).cloned().collect();
-        let survey = survey.learn(files, Fact::Kind, &entries);
+    fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored], known: Survey) -> Survey {
+        let listed = known.learn(files, Fact::Listed, level);
+        let entries: Vec<PathBuf> = level.iter().flat_map(|directory| listed.entries(directory)).cloned().collect();
+        let with_kinds = listed.learn(files, Fact::Kind, &entries);
         let manifests = Ignored::manifests(level);
-        let survey = survey.learn(files, Fact::Followed, &manifests);
+        let survey = with_kinds.learn(files, Fact::Followed, &manifests);
         let kept = Kept::new(&survey, ignored);
         let next: Vec<Directory> = level.iter().flat_map(|directory| kept.below(directory)).collect();
         Self::descended(files, next, ignored, survey)
@@ -57,7 +59,7 @@ impl Directory {
         match next.first() {
             Some(_) => Self::surveyed(
                 files,
-                &next.into_iter().map(Newtype::into_inner).collect::<Vec<PathBuf>>(),
+                &next.into_iter().map(Wrapping::into_inner).collect::<Vec<PathBuf>>(),
                 ignored,
                 survey,
             ),

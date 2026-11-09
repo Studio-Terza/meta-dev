@@ -1,11 +1,17 @@
-use logos::{Lexer, Logos};
+use logos::Logos;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-enum Spelling {
-    #[regex("[^#]+")]
-    Message,
-    #[regex("[^#]+#(0|[1-9][0-9]*)", Spelling::hashed)]
-    Segment(usize),
+enum Spelling<'text> {
+    #[regex("[^#]+", |lexer| lexer.slice())]
+    Message(&'text str),
+    #[token("#")]
+    Hash,
+}
+
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+enum Index {
+    #[regex("0|[1-9][0-9]*", |lexer| lexer.slice().parse().ok())]
+    Ordinal(usize),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,11 +23,12 @@ pub struct Anchoring {
 impl Anchoring {
     #[must_use]
     pub fn read(text: &str) -> Option<Anchoring> {
-        let spelled: Vec<Result<Spelling, ()>> = Spelling::lexer(text).collect();
-        <[Result<Spelling, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
-            .map(|spelling| spelling.read(text))
+        let spelled: Vec<Spelling<'_>> = Spelling::lexer(text).collect::<Result<_, ()>>().ok()?;
+        let (message, rest) = spelled.split_first()?;
+        let ordinal = rest
+            .first()
+            .map_or(Some(None), |_hash| <&[Spelling<'_>; 2]>::try_from(rest).ok().and_then(Index::hashed).map(Some));
+        message.message().zip(ordinal).map(|(said, index)| Anchoring { message: said.to_owned(), ordinal: index })
     }
 
     #[must_use]
@@ -33,28 +40,28 @@ impl Anchoring {
     pub fn ordinal(&self) -> Option<usize> {
         self.ordinal
     }
+}
 
-    fn whole(text: &str) -> Anchoring {
-        Anchoring { message: text.to_owned(), ordinal: None }
-    }
-
-    fn indexed(text: &str, hash: usize) -> Anchoring {
-        Anchoring {
-            message: text.get(..hash).unwrap_or_default().to_owned(),
-            ordinal: text.get(hash.saturating_add(1)..).and_then(|digits| digits.parse().ok()),
+impl<'text> Spelling<'text> {
+    fn message(self) -> Option<&'text str> {
+        match self {
+            Spelling::Message(message) => Some(message),
+            Spelling::Hash => None,
         }
     }
 }
 
-impl Spelling {
-    fn read(self, text: &str) -> Anchoring {
-        match self {
-            Spelling::Message => Anchoring::whole(text),
-            Spelling::Segment(hash) => Anchoring::indexed(text, hash),
-        }
+impl Index {
+    fn hashed([hash, digits]: &[Spelling<'_>; 2]) -> Option<usize> {
+        Some(hash).filter(|spelling| **spelling == Spelling::Hash)?;
+        Index::read(digits.message()?)
     }
 
-    fn hashed(lexer: &Lexer<'_, Spelling>) -> usize {
-        lexer.slice().char_indices().find(|(_, character)| *character == '#').map_or(0, |(hash, _)| hash)
+    fn read(digits: &str) -> Option<usize> {
+        let spelled: Vec<Result<Index, ()>> = Index::lexer(digits).collect();
+        <[Result<Index, ()>; 1]>::try_from(spelled)
+            .ok()
+            .and_then(|[only]| only.ok())
+            .map(|Index::Ordinal(ordinal)| ordinal)
     }
 }

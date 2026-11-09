@@ -9,9 +9,9 @@ pub struct Home<'file> {
     module: &'file ModulePath,
 }
 
-static NOWHERE: Home<'static> = Home { crate_file: &CrateFile::UNPLACED, module: &ModulePath::ROOT };
-
 impl<'file> Home<'file> {
+    pub const NOWHERE: Home<'static> = Home { crate_file: &CrateFile::UNPLACED, module: &ModulePath::ROOT };
+
     #[must_use]
     pub fn containing(file: &'file SourceFile) -> Home<'file> {
         Home { crate_file: file.crate_file(), module: file.placement().module() }
@@ -20,11 +20,5 @@ impl<'file> Home<'file> {
     #[must_use]
     pub fn in_crate_with(self, other: Home<'_>) -> Option<Home<'_>> {
         (self.crate_file == other.crate_file).then_some(other)
-    }
-}
-
-impl Default for Home<'_> {
-    fn default() -> Self {
-        NOWHERE
     }
 }

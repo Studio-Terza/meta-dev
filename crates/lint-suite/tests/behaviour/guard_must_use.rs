@@ -1,7 +1,6 @@
-use lint_fixtures::{Located, Source, Sources, Text};
+use lint_fixtures::{Lines, Located, Source, Sources, Text};
 use lint_guard_must_use::GuardMustUse;
 
-const NONE: [&str; 0] = [];
 const DROP_IMPL: &str = "impl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const UNMARKED: &str = "pub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const UNMARKED_ENUM: &str = "enum Lock {\n    Held,\n}\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
@@ -31,33 +30,33 @@ const UNION: &str = "pub union Lock {\n    a: u8,\n}\nimpl Drop for Lock {\n    
 const MARKED_HERE: &str = "#[must_use]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 
 laws::table!(unmarked_guards_are_flagged, Sources::flagged::<GuardMustUse>, [
-    [Source::new(Located::new("a.rs"), Text::new(UNMARKED_ENUM))] => ["a.rs:1"],
-    [Source::new(Located::new("a.rs"), Text::new(GENERIC))] => ["a.rs:1"],
-    [Source::new(Located::new("a.rs"), Text::new(QUALIFIED))] => ["a.rs:1"],
-    [Source::new(Located::new("a.rs"), Text::new(OTHER_ATTRIBUTE))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(IN_MODULE))] => ["a.rs:2"],
-    [Source::new(Located::new("crates/x/src/a.rs"), Text::new(DROP_IMPL)), Source::new(Located::new("crates/x/src/b.rs"), Text::new(PLAIN))] => ["crates/x/src/b.rs:1"],
-    [Source::new(Located::new("a.rs"), Text::new(ALIASED))] => ["a.rs:1"],
-    [Source::new(Located::new("a.rs"), Text::new(UNION))] => ["a.rs:1"],
-    [Source::new(Located::new("a.rs"), Text::new(OTHER_CONDITIONAL))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(MARK_AS_ARGUMENT))] => ["a.rs:2"],
+    [Source::new(Located::new("a.rs"), Text::new(UNMARKED_ENUM))] => Lines::from(["a.rs:1"]),
+    [Source::new(Located::new("a.rs"), Text::new(GENERIC))] => Lines::from(["a.rs:1"]),
+    [Source::new(Located::new("a.rs"), Text::new(QUALIFIED))] => Lines::from(["a.rs:1"]),
+    [Source::new(Located::new("a.rs"), Text::new(OTHER_ATTRIBUTE))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(IN_MODULE))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("crates/x/src/a.rs"), Text::new(DROP_IMPL)), Source::new(Located::new("crates/x/src/b.rs"), Text::new(PLAIN))] => Lines::from(["crates/x/src/b.rs:1"]),
+    [Source::new(Located::new("a.rs"), Text::new(ALIASED))] => Lines::from(["a.rs:1"]),
+    [Source::new(Located::new("a.rs"), Text::new(UNION))] => Lines::from(["a.rs:1"]),
+    [Source::new(Located::new("a.rs"), Text::new(OTHER_CONDITIONAL))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(MARK_AS_ARGUMENT))] => Lines::from(["a.rs:2"]),
 ]);
 
 laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<GuardMustUse>, [
-    [Source::new(Located::new("a.rs"), Text::new(MARKED_REASON))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(INHERENT))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(DROP_OF_REFERENCE))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(TEST_TYPE))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(TEST_ENUM))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(TEST_IMPL))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))] => NONE,
-    [Source::new(Located::new("x/tests/a.rs"), Text::new(UNMARKED))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(CONDITIONAL_MARK))] => NONE,
-    [Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod a;\nmod b;\n")), Source::new(Located::new("crates/x/src/a.rs"), Text::new(MARKED_HERE)), Source::new(Located::new("crates/x/src/b.rs"), Text::new(PLAIN))] => NONE,
-    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(MARKED_HERE)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(MARKED_REASON))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(INHERENT))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(DROP_OF_REFERENCE))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(TEST_TYPE))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(TEST_ENUM))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(TEST_IMPL))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))] => Lines::default(),
+    [Source::new(Located::new("x/tests/a.rs"), Text::new(UNMARKED))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(CONDITIONAL_MARK))] => Lines::default(),
+    [Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod a;\nmod b;\n")), Source::new(Located::new("crates/x/src/a.rs"), Text::new(MARKED_HERE)), Source::new(Located::new("crates/x/src/b.rs"), Text::new(PLAIN))] => Lines::default(),
+    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(MARKED_HERE)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => Lines::default(),
 ]);
 
 laws::table!(a_guard_in_another_crate_is_not_this_one, Sources::flagged::<GuardMustUse>, [
-    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(DROP_IMPL)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => NONE,
-    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(UNMARKED)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => ["crates/one/src/lib.rs:1"],
+    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(DROP_IMPL)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => Lines::default(),
+    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(UNMARKED)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => Lines::from(["crates/one/src/lib.rs:1"]),
 ]);

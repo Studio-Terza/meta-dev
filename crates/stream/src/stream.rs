@@ -2,7 +2,7 @@ mod links;
 
 use std::collections::BTreeSet;
 
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use transcript_ports::{Gather, Line, Record, Skipped, Unrecognised, Uuid};
 
 use crate::{Earlier, MechanicalLink, Message};

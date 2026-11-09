@@ -44,19 +44,11 @@ impl Ask {
     ) -> Answer<'view, 'found, 'file> {
         Answer { view, ask: self, listed: listed.unwrap_or(Listed::DEFAULT) }
     }
+}
 
-    fn written(&self, view: &Containment<'_, '_>, listed: Listed, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Ask::Defined(name) => write!(formatter, "{}", Named::new(view, name)),
-            Ask::Uses(name) => write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Used, listed)),
-            Ask::Users(name) => write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Users, listed)),
-            Ask::Implementers(name) => {
-                write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Implementers, listed))
-            }
-            Ask::Cluster(name) => write!(formatter, "{}", Home::from(Named::new(view, name))),
-            Ask::Exports(name) => write!(formatter, "{}", Exported::new(view, name, listed)),
-            Ask::Path(from, to) => write!(formatter, "{}", Route::new(view, from, to, listed)),
-        }
+impl<'view, 'found, 'file> Answer<'view, 'found, 'file> {
+    fn neighbours(&self, name: &'view Name, toward: Toward) -> Neighbours<'view, 'found, 'file> {
+        Neighbours::new(Named::new(self.view, name), toward, self.listed)
     }
 }
 
@@ -76,7 +68,20 @@ impl fmt::Display for Ask {
 
 impl fmt::Display for Answer<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "{}", self.ask)?;
-        self.ask.written(self.view, self.listed, formatter)
+        match self.ask {
+            Ask::Defined(name) => write!(formatter, "{}\n{}", self.ask, Named::new(self.view, name)),
+            Ask::Uses(name) => {
+                write!(formatter, "{}\n{}", self.ask, self.neighbours(name, Toward::Used))
+            }
+            Ask::Users(name) => {
+                write!(formatter, "{}\n{}", self.ask, self.neighbours(name, Toward::Users))
+            }
+            Ask::Implementers(name) => {
+                write!(formatter, "{}\n{}", self.ask, self.neighbours(name, Toward::Implementers))
+            }
+            Ask::Cluster(name) => write!(formatter, "{}\n{}", self.ask, Home::from(Named::new(self.view, name))),
+            Ask::Exports(name) => write!(formatter, "{}\n{}", self.ask, Exported::new(self.view, name, self.listed)),
+            Ask::Path(from, to) => write!(formatter, "{}\n{}", self.ask, Route::new(self.view, from, to, self.listed)),
+        }
     }
 }

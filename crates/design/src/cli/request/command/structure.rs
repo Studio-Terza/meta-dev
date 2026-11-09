@@ -166,11 +166,11 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
         let halt = ended.ending.halt().cloned();
         let held = halt.as_ref().and_then(Halt::flailed).map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
-        let halting = halt.as_ref().filter(|halt| halt.course() == Course::Halting);
+        let halting = halt.as_ref().filter(|stopped| stopped.course() == Course::Halting);
         let retold = halting.map(|_halt| earlier.iter().filter_map(|worked| worked.retold(id)).collect());
         let told =
-            halt.as_ref().map(|halt| halt.halted(id, sequel).holding(held).retelling(retold.unwrap_or_default()));
-        told.map(|told| self.store.write(told)).transpose()?;
+            halt.as_ref().map(|stopped| stopped.halted(id, sequel).holding(held).retelling(retold.unwrap_or_default()));
+        told.map(|ended_job| self.store.write(ended_job)).transpose()?;
         let retried = ended.retried.iter().map(|lapse| Line::Retried(Lapsed::new(id, lapse.clone())));
         let closing = ended.ending.lines(id, self.store)?;
         let runs = self.store.read(RunsOf::from(id))?;
@@ -184,8 +184,8 @@ impl<S: Store, D: Dispatch, C: Clock> Structure<'_, S, D, C> {
     fn said<Spoken: AsRef<Segment> + AsRef<Body>>(spoken: &[Spoken]) -> Vec<Said> {
         spoken
             .iter()
-            .map(|spoken| {
-                Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(spoken)), AsRef::<Body>::as_ref(spoken).clone())
+            .map(|heard| {
+                Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(heard)), AsRef::<Body>::as_ref(heard).clone())
             })
             .collect()
     }
@@ -241,7 +241,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
                 Parsed::new(self.structure.store, directives, Provenance::Agent(run), self.remit.clone())
                     .replied(finished.reply()),
             ),
-            reading @ (Reading::Again(_) | Reading::Flailed(_)) => Ok(Step::from(reading)),
+            unfinished @ (Reading::Again(_) | Reading::Flailed(_)) => Ok(Step::from(unfinished)),
         }
     }
 }
@@ -433,9 +433,9 @@ impl Structured {
             .iter()
             .rev()
             .find_map(|worked| worked.halt.as_ref().and_then(Halt::flailed).map(|_lapse| worked.sequel));
-        let flailed = flails.split_first().zip(sequel).map(|((first, rest), sequel)| Failure::Flailed {
+        let flailed = flails.split_first().zip(sequel).map(|((first, rest), followed)| Failure::Flailed {
             flails: Flails::new(first.clone(), rest.to_vec()),
-            sequel,
+            sequel: followed,
         });
         stalled.or(flailed).map_or(Ok(jobs), Err)
     }

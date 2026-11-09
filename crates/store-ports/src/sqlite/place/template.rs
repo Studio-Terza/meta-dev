@@ -1,11 +1,11 @@
+use std::any::TypeId;
 use std::collections::BTreeMap;
-use std::ptr;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
 
 use crate::StoreFailure;
+use crate::sqlite::migrations::Migrations;
 use crate::sqlite::opened::Opened;
 
 #[derive(Debug, Default)]
@@ -21,24 +21,24 @@ enum Image {
     Migrated(SqliteOwnedBuf),
 }
 
-static TEMPLATES: LazyLock<Mutex<BTreeMap<usize, Arc<Template>>>> = LazyLock::new(Mutex::default);
+static TEMPLATES: LazyLock<Mutex<BTreeMap<TypeId, Arc<Template>>>> = LazyLock::new(Mutex::default);
 
 impl Template {
-    pub(super) fn shared(migrator: &'static Migrator) -> Arc<Template> {
+    pub(super) fn shared(migrations: Migrations) -> Arc<Template> {
         let mut templates = TEMPLATES.lock().unwrap_or_else(PoisonError::into_inner);
-        Arc::clone(templates.entry(ptr::from_ref(migrator).addr()).or_default())
+        Arc::clone(templates.entry(migrations.schema()).or_default())
     }
 
-    pub(super) fn opened(&self, migrator: &Migrator) -> Result<Opened, StoreFailure> {
-        self.image.lock().unwrap_or_else(PoisonError::into_inner).opened(migrator)
+    pub(super) fn opened(&self, migrations: Migrations) -> Result<Opened, StoreFailure> {
+        self.image.lock().unwrap_or_else(PoisonError::into_inner).opened(migrations)
     }
 }
 
 impl Image {
-    fn opened(&mut self, migrator: &Migrator) -> Result<Opened, StoreFailure> {
+    fn opened(&mut self, migrations: Migrations) -> Result<Opened, StoreFailure> {
         match self {
-            Image::Unseen => Opened::connected(&Image::memory(), migrator).inspect(|_opened| *self = Image::Seen),
-            Image::Seen => Opened::connected(&Image::memory(), migrator).and_then(|mut opened| {
+            Image::Unseen => Opened::connected(&Image::memory(), migrations).inspect(|_opened| *self = Image::Seen),
+            Image::Seen => Opened::connected(&Image::memory(), migrations).and_then(|mut opened| {
                 *self = Image::Migrated(opened.image()?);
                 Ok(opened)
             }),

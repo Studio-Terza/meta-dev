@@ -19,6 +19,6 @@ impl Renaming {
     }
 
     fn local(casing: Casing, position: Position) -> Option<Renaming> {
-        Some(casing).filter(|casing| *casing == Casing::Lower).and(position.plain()).map(|_| Renaming::Slotted)
+        Some(casing).filter(|candidate| *candidate == Casing::Lower).and(position.plain()).map(|_| Renaming::Slotted)
     }
 }

@@ -28,7 +28,7 @@ impl Property {
     ];
 
     fn declared_by(name: &Name) -> Option<Property> {
-        Self::NAMED.iter().find(|(word, _)| *name == *word).map(|(_, property)| *property)
+        Self::NAMED.iter().find(|(word, _)| *name == Name::from(*word)).map(|(_, property)| *property)
     }
 }
 
@@ -49,8 +49,9 @@ impl Kind {
     pub fn of_macro(invocation: &Macro) -> Kind {
         let last = invocation.path.segments.last().map(|segment| Name::from(&segment.ident));
         let law = TestMarks::law(invocation);
-        let roundtrip = last.as_ref().filter(|name| **name == Self::ROUNDTRIP).and(law).map(|_| Kind::Roundtrip);
-        let proptest = last.as_ref().filter(|name| **name == Self::PROPTEST).map(|_| Kind::Proptest);
+        let roundtrip =
+            last.as_ref().filter(|name| **name == Name::from(Self::ROUNDTRIP)).and(law).map(|_| Kind::Roundtrip);
+        let proptest = last.as_ref().filter(|name| **name == Name::from(Self::PROPTEST)).map(|_| Kind::Proptest);
         let property = law.and(last.as_ref()).and_then(Property::declared_by).map(Kind::Property);
         roundtrip.or(proptest).or(property).or(law.map(|_| Kind::Law)).unwrap_or(Kind::Other)
     }

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::Need;
+use super::Pair;
 use crate::subject::Subject;
 use lint_core::Finding;
 use lint_core::Fix;
@@ -8,23 +8,28 @@ use lint_core::Fix;
 #[derive(Debug)]
 pub(crate) struct Obligation<'facts, 'file> {
     subject: &'facts Subject<'file>,
-    need: Need<'facts>,
+    pair: Pair<'facts>,
 }
 
 impl<'facts, 'file> Obligation<'facts, 'file> {
-    pub(crate) fn new(subject: &'facts Subject<'file>, need: Need<'facts>) -> Obligation<'facts, 'file> {
-        Obligation { subject, need }
+    pub(crate) fn new(subject: &'facts Subject<'file>, pair: Pair<'facts>) -> Obligation<'facts, 'file> {
+        Obligation { subject, pair }
     }
 }
 
 impl fmt::Display for Obligation<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "`{}` {}", self.subject.owner(), self.need)
+        write!(
+            formatter,
+            "`{}` has the conversion pair {} (Display and FromStr, Serialize and Deserialize, encode and decode, or to_x and from_x)",
+            self.subject.owner(),
+            self.pair
+        )
     }
 }
 
 impl Finding for Obligation<'_, '_> {
     fn fix(&self) -> Fix {
-        self.need.fix()
+        Fix::new("add a `laws::roundtrip!` in a test of the same package that names the type and the pair")
     }
 }

@@ -24,8 +24,8 @@ pub struct LibtestSeconds {
 }
 
 impl Step for LibtestSeconds {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<LibtestSeconds, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<LibtestSeconds, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let measured = &arguments.taken()?;
         let stage = &arguments.taken()?;
         let output = &arguments.taken()?;
@@ -51,7 +51,7 @@ impl Step for LibtestSeconds {
             .first()
             .map(|_| total)
             .ok_or_else(|| Failure::NoTestResult { path: self.output.as_ref() })
-            .and_then(|total| self.measured.append(ports.files(), &self.stage, total))
+            .and_then(|summed| self.measured.append(ports.files(), &self.stage, summed))
             .map(|()| Exit::Success)
     }
 }

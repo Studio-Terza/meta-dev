@@ -159,8 +159,8 @@ impl Syntax {
     #[must_use]
     pub fn newtype_field(fields: &Fields) -> Option<&Field> {
         match fields {
-            Fields::Unnamed(fields) => {
-                Some(fields).filter(|fields| fields.unnamed.len() == 1).and_then(|fields| fields.unnamed.first())
+            Fields::Unnamed(tuple) => {
+                Some(tuple).filter(|candidate| candidate.unnamed.len() == 1).and_then(|single| single.unnamed.first())
             }
             Fields::Named(_) | Fields::Unit => None,
         }

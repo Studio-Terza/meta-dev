@@ -5,6 +5,7 @@ mod structure;
 mod view;
 
 use std::collections::BTreeSet;
+use std::error::Error;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -16,7 +17,7 @@ use console_ports::{Heard, Variables};
 
 use design::{
     Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Miss, Noted, Outcome, Reconciliation, Reference,
-    Remark, Summary, Unmatched, Unresolved, Viewed,
+    RefusedLink, Remark, Summary, Unmatched, Unresolved, Viewed,
 };
 use design_model::{
     AnyStage, Artifact, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId,
@@ -36,9 +37,9 @@ use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof
 use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
-use newtype::{Counter, Newtype};
-use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
-use store_ports::{Busy, Sqlite, Store, Written};
+use newtype::Counter;
+use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
+use store_ports::{Batch, Busy, Sqlite, Statements, Store, StoreFailure, Written};
 use stream::{Relation, Shape};
 use structure::Staff;
 use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
@@ -340,8 +341,8 @@ impl Links {
         let port = run.port(store.clone());
         let shown = Session::SAID
             .iter()
+            .filter_map(|spelled| Uuid::try_new((*spelled).to_owned()).ok())
             .map(|uuid| {
-                let uuid = Uuid::new((*uuid).to_owned());
                 port.read(ShownMessage::named(uuid.clone()))?
                     .ok_or(Failure::Unmatched(Unmatched::NoMatch(Prefix::new(uuid.into_inner()))))
             })
@@ -395,6 +396,94 @@ fn a_rooted_run_writes_its_report_to_out_and_names_its_outcome() -> Result<(), F
     assert!(ingested.out.contains("authorship owner 2\n"));
     let shown = Rooted::outcome(&store, &Session::typical(), &["show", "o1"])?;
     assert_eq!(shown.outcome, Outcome::Shown);
+    Ok(())
+}
+
+#[derive(Debug, Op)]
+struct Unstored {
+    message: Uuid,
+    ordinal: Ordinal,
+}
+
+impl Batch for Unstored {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let Unstored { message, ordinal } = self;
+        statements.written(store_ports::query!(
+            r#"
+DELETE FROM
+  segments
+WHERE
+  message = ?1
+  AND ordinal = ?2
+"#,
+            message: Uuid,
+            ordinal: Ordinal
+        ))
+    }
+}
+
+struct Unheld;
+
+impl Unheld {
+    fn asked() -> String {
+        Session::line(Speaker::Lead, "l1", "null", "1. Alpha?\\n2. Beta?")
+    }
+
+    fn answered() -> Session {
+        Session::working([Unheld::asked(), Session::line(Speaker::Owner, "o1", "\"l1\"", "1. yes\\n2. no")].concat())
+    }
+
+    fn end(segment: &str, ordinal: usize) -> Anchored {
+        Anchored::Segment(SegmentRef::new(Prefix::new(segment.to_owned()), Ordinal::new(ordinal)))
+    }
+
+    fn refused(out: &str) -> Vec<Line> {
+        out.parse::<text_lines::Lines>()
+            .into_iter()
+            .flatten()
+            .filter_map(|line| line.parse::<Line>().ok())
+            .filter(|line| matches!(line, Line::Refused(_)))
+            .collect()
+    }
+
+    fn stored(store: &Sqlite) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let shown = run
+            .port(store.clone())
+            .read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?
+            .ok_or("o1 is not stored")?;
+        Ok(shown
+            .links()
+            .iter()
+            .map(|link| {
+                let [source, target] = link.anchors();
+                let relation: &RelationName = link.as_ref();
+                format!("{source} {relation} {target}")
+            })
+            .collect())
+    }
+}
+
+#[test]
+fn an_answer_to_an_item_the_store_does_not_hold_is_refused_and_the_rest_of_the_session_ingests()
+-> Result<(), Box<dyn Error>> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Invocation::against(&store, &Session::working(Unheld::asked()), &["ingest"])?;
+    let run = Run::root();
+    run.port(store.clone()).write(Unstored { message: Uuid::try_new("l1".to_owned())?, ordinal: Ordinal::new(1) })?;
+    let out = Invocation::against(&store, &Unheld::answered(), &["ingest"])?;
+    let refused = Line::Refused(RefusedLink::new(
+        Unheld::end("o1", 1),
+        RelationName::new("answers".to_owned()),
+        Unheld::end("l1", 1),
+    ));
+    assert_eq!(Unheld::refused(&out), [refused]);
+    assert_eq!(Unheld::stored(&store)?, ["o1 replies-to l1", "o1#0 answers l1#0"]);
+    let again = Invocation::against(&store, &Unheld::answered(), &["ingest"])?;
+    assert_eq!(again.matches("session").count(), 0);
+    assert_eq!(Unheld::refused(&again), Vec::<Line>::new());
     Ok(())
 }
 
@@ -768,7 +857,7 @@ fn only_ingest_has_a_dry_run() {
         Invocation::against(&store, &Session::typical(), &["--dry-run", "ingest"]),
         Invocation::against(&store, &Session::typical(), &["ingest", "--dry-run", "--dry-run"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
 }
 
 #[test]
@@ -1122,12 +1211,12 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     ];
     assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
     let node = applying.run(&["show", "n3"])?;
-    let wanted = [
+    let edges = [
         "n3 \"demo\" feature vague vague core entered apply \"b\"",
         "  edge n3 refines n1 entered apply",
         "  edge n3 supersedes n2 entered apply",
     ];
-    assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());
+    assert_eq!(Lines::missing(&node, &edges), Vec::<&&str>::new());
     Ok(())
 }
 
@@ -1169,9 +1258,7 @@ fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Re
         "place(aaaaaaaa-0000-4000-8000-000000000003.0, c, defines)",
         "propose(new first, refines(n1), feature, \"again\")",
     ]
-    .map(|directives| {
-        applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{directives}")).err()
-    });
+    .map(|refused| applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{refused}")).err());
     assert!(matches!(
         refusals,
         [Some(Failure::Unresolved(Unresolved::Unbound(_))), Some(Failure::Unresolved(Unresolved::Rebound(_)))]
@@ -1277,7 +1364,7 @@ fn only_init_consumes_a_project() {
         Invocation::against(&store, &session, &["--consumes", "demo", "init", "other"]),
         Invocation::against(&store, &session, &["init", "other", "--consumes", "demo", "--consumes", "demo"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
 }
 
 laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VARIANTS), facet, {
@@ -1311,8 +1398,8 @@ impl Graph {
             .map(|(child, parent)| {
                 let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
                 let planted = port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
-                let (child, parent) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
-                let linked = port.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
+                let (refining, refined) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
+                let linked = port.write(Linked::new(refining, NodeRelation::Refines, refined, Entered::Init.into()))?;
                 Ok(planted.plus(linked))
             })
             .collect::<Result<Vec<Written>, Failure>>()?;
@@ -1467,7 +1554,7 @@ fn specify_without_both_an_artifact_and_a_condition_fails_to_parse() -> Result<(
         applying.run(&["specify", "n2", "--artifact", "lint:no-comments", "--condition"]),
         applying.run(&["specify", "--artifact", "lint:no-comments", "--condition", "every comment is refused"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
     assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature refining set core entered apply"));
     Ok(())
 }
@@ -1503,7 +1590,7 @@ fn each_lifecycle_option_belongs_to_its_own_command() -> Result<(), Failure> {
         applying.run(&["search", "thanks", "--condition", "it holds"]),
         applying.run(&["refine", "n2", "--dry-run"]),
     ];
-    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
     assert!(applying.run(&["show", "n2"])?.contains("n2 \"demo\" feature vague vague core entered apply"));
     Ok(())
 }
@@ -1583,9 +1670,9 @@ fn a_secondary_parent_never_takes_a_core_child_and_the_refusal_names_the_edge() 
     assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
     let child = applying.run(&["role", "n2", "core"]);
     assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
-    let child = applying.run(&["show", "n2"])?;
-    assert!(child.contains("n2 \"demo\" feature vague vague secondary entered apply"));
-    assert!(child.contains("  role secondary entered role\n"));
+    let shown = applying.run(&["show", "n2"])?;
+    assert!(shown.contains("n2 \"demo\" feature vague vague secondary entered apply"));
+    assert!(shown.contains("  role secondary entered role\n"));
     Ok(())
 }
 
@@ -1673,7 +1760,7 @@ impl Applying {
     fn role(&self, node: NodeId) -> Option<Role> {
         let run = Run::root();
         let placed = run.port(self.store.clone()).read(ShownNode::from(node)).ok().flatten();
-        placed.map(|placed| placed.node().casting().role())
+        placed.map(|shown| shown.node().casting().role())
     }
 }
 
@@ -1956,7 +2043,7 @@ impl Rendered {
 #[test]
 fn show_renders_every_stage_edge_role_and_placement_of_a_small_tree() -> Result<(), Box<dyn std::error::Error>> {
     let rendered = Rendered::tree()?;
-    golden::golden!("show.txt", &rendered)?;
+    golden::golden!("show.txt", &rendered);
     Ok(())
 }
 
@@ -1973,7 +2060,7 @@ fn apply_echoes_every_directive_kind_and_show_cites_every_remarked_segment() -> 
     .join("\n");
     let applied = applying.applied(&directives)?;
     let shown = applying.run(&["show", "abcd0001"])?;
-    golden::golden!("apply.txt", &format!("design apply notes/directives\n{applied}design show abcd0001\n{shown}"))?;
+    golden::golden!("apply.txt", &format!("design apply notes/directives\n{applied}design show abcd0001\n{shown}"));
     Ok(())
 }
 
@@ -2036,11 +2123,11 @@ impl Generated {
     }
 
     fn message() -> BoxedStrategy<String> {
-        "[A-Za-z0-9_][A-Za-z0-9_-]{0,36}".boxed()
+        Generated::uuid().prop_map(Uuid::into_inner).boxed()
     }
 
     fn uuid() -> BoxedStrategy<Uuid> {
-        Generated::message().prop_map(Uuid::new).boxed()
+        any::<Uuid>().boxed()
     }
 
     fn project() -> BoxedStrategy<Project> {
@@ -2089,7 +2176,7 @@ impl Generated {
                 let entry = Entry::new(project, facet, entered);
                 let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
                 Summary::from(
-                    &title.into_iter().fold(loaded.based(basis), |node, title| node.titled(Title::new(title))),
+                    &title.into_iter().fold(loaded.based(basis), |titled, text| titled.titled(Title::new(text))),
                 )
             })
             .boxed()
@@ -2127,17 +2214,17 @@ impl Generated {
 
     fn counted() -> BoxedStrategy<Line> {
         prop_oneof![
-            (Generated::text(), any::<u64>()).prop_map(|(session, cursor)| Line::Read {
-                session: SessionId::new(session),
-                cursor: Cursor::new(Offset::new(cursor))
-            }),
+            (any::<SessionId>(), any::<u64>())
+                .prop_map(|(session, cursor)| Line::Read { session, cursor: Cursor::new(Offset::new(cursor)) }),
             (Generated::author(), Generated::count()).prop_map(|(author, count)| Line::Authored { author, count }),
-            (Generated::text(), Generated::count())
-                .prop_map(|(kind, count)| Line::Unrecognised { kind: transcript_ports::Kind::new(kind), count }),
+            (any::<transcript_ports::Kind>(), Generated::count())
+                .prop_map(|(kind, count)| Line::Unrecognised { kind, count }),
             (select(Shape::VARIANTS), Generated::count()).prop_map(|(shape, count)| Line::Formed { shape, count }),
             (select(Relation::VARIANTS), Generated::count())
                 .prop_map(|(relation, count)| Line::Related { relation, count }),
             Generated::count().prop_map(Line::Written),
+            (Generated::anchored(), Generated::relation(), Generated::anchored())
+                .prop_map(|(source, relation, target)| Line::Refused(RefusedLink::new(source, relation, target))),
             (Generated::node(), Generated::project()).prop_map(|(node, project)| Line::Root { node, project }),
             (Generated::node(), Generated::project()).prop_map(|(node, project)| Line::Consumes { node, project }),
         ]
@@ -2160,7 +2247,7 @@ impl Generated {
             (select(Role::VARIANTS), Generated::entered()).prop_map(|(role, entered)| Line::Role { role, entered }),
             (
                 (select(SpanRelation::VARIANTS), Generated::segment(), Generated::author()),
-                (proptest::option::of(Generated::sense()), Generated::entered(), Generated::text())
+                (proptest::option::of(Generated::sense()), Generated::entered(), any::<Body>())
             )
                 .prop_map(|((relation, segment, author), (sense, entered, body))| Line::Placed {
                     relation,
@@ -2168,7 +2255,7 @@ impl Generated {
                     author,
                     sense,
                     entered,
-                    body: Body::new(body)
+                    body
                 }),
         ]
         .boxed()
@@ -2176,28 +2263,16 @@ impl Generated {
 
     fn shown_message() -> BoxedStrategy<Line> {
         prop_oneof![
-            (Generated::uuid(), Generated::author(), Generated::text(), Generated::text()).prop_map(
-                |(uuid, author, session, stamp)| Line::Message {
-                    uuid,
-                    author,
-                    session: SessionId::new(session),
-                    stamp: Instant::new(stamp)
-                }
-            ),
-            (Generated::segment(), Generated::shape(), Generated::text())
-                .prop_map(|(segment, shape, body)| Line::Segment { segment, shape, body: Body::new(body) }),
+            (Generated::uuid(), Generated::author(), any::<SessionId>(), any::<Instant>())
+                .prop_map(|(uuid, author, session, stamp)| Line::Message { uuid, author, session, stamp }),
+            (Generated::segment(), Generated::shape(), any::<Body>())
+                .prop_map(|(segment, shape, body)| Line::Segment { segment, shape, body }),
             (Generated::anchored(), Generated::relation(), Generated::anchored())
                 .prop_map(|(source, relation, target)| Line::Link { source, relation, target }),
             (Generated::remark(), select(Standing::VARIANTS), Generated::entered())
                 .prop_map(|(remark, standing, entered)| Line::Annotated { remark, standing, entered }),
-            (Generated::segment(), Generated::author(), Generated::text(), Generated::text()).prop_map(
-                |(segment, author, stamp, body)| Line::Hit {
-                    segment,
-                    author,
-                    stamp: Instant::new(stamp),
-                    body: Body::new(body)
-                }
-            ),
+            (Generated::segment(), Generated::author(), any::<Instant>(), any::<Body>())
+                .prop_map(|(segment, author, stamp, body)| Line::Hit { segment, author, stamp, body }),
         ]
         .boxed()
     }
@@ -2208,8 +2283,8 @@ impl Generated {
             (Generated::node(), Generated::directive())
                 .prop_map(|(node, directive)| Line::Proposed { node, directive }),
             Generated::segment().prop_map(Line::Uncovered),
-            (0..i64::MAX, Generated::text())
-                .prop_map(|(file, stamp)| Line::Repeated { file: AppliedId::new(file), stamp: Instant::new(stamp) }),
+            (0..i64::MAX, any::<Instant>())
+                .prop_map(|(file, stamp)| Line::Repeated { file: AppliedId::new(file), stamp }),
         ]
         .boxed()
     }
@@ -2277,7 +2352,7 @@ impl Generated {
                 )),
             (
                 (Generated::node(), select(SpanRelation::VARIANTS), Generated::segment()),
-                (Generated::author(), Generated::entered(), Generated::text())
+                (Generated::author(), Generated::entered(), any::<Body>())
             )
                 .prop_map(|((node, relation, segment), (author, entered, body))| Viewed::Standing {
                     node,
@@ -2285,28 +2360,24 @@ impl Generated {
                     segment,
                     author,
                     entered,
-                    body: Body::new(body)
+                    body
                 }),
-            (Generated::segment(), Generated::text())
-                .prop_map(|(segment, body)| Viewed::Unplaced { segment, body: Body::new(body) }),
+            (Generated::segment(), any::<Body>()).prop_map(|(segment, body)| Viewed::Unplaced { segment, body }),
         ]
         .prop_map(Line::Viewed)
         .boxed()
     }
 
     fn noted() -> BoxedStrategy<Line> {
-        let reference = prop_oneof![
+        let references = prop_oneof![
             Generated::text().prop_map(|quote| Reference::Quote(Quote::new(quote))),
             "[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8}".prop_map(|cite| Reference::Cite(Cite::new(cite))),
         ];
         prop_oneof![
             (any::<usize>(), Generated::node())
                 .prop_map(|(line, node)| Noted::Imported { line: NotesLine::new(line), node }),
-            (any::<usize>(), reference, select(Miss::VARIANTS)).prop_map(|(line, reference, miss)| Noted::Unresolved {
-                line: NotesLine::new(line),
-                reference,
-                miss
-            }),
+            (any::<usize>(), references, select(Miss::VARIANTS))
+                .prop_map(|(line, reference, miss)| Noted::Unresolved { line: NotesLine::new(line), reference, miss }),
             any::<usize>().prop_map(|line| Noted::Unanchored(NotesLine::new(line))),
             (any::<usize>(), "[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8}", Generated::count()).prop_map(
                 |(line, cite, segments)| Noted::Ambiguous {
@@ -2384,26 +2455,26 @@ impl Spread {
         SegmentRef::new(Prefix::new(prefix.to_owned()), Ordinal::new(ordinal))
     }
 
-    fn segment(prefix: &str, ordinal: usize, body: &str) -> Line {
-        Line::Segment {
+    fn segment(prefix: &str, ordinal: usize, body: &str) -> Result<Line, Box<dyn Error>> {
+        Ok(Line::Segment {
             segment: Spread::reference(prefix, ordinal),
             shape: ShapeName::new("sentence".to_owned()),
-            body: Body::new(body.to_owned()),
-        }
+            body: Body::try_new(body.to_owned())?,
+        })
     }
 
-    fn message(uuid: &str) -> Line {
-        Line::Message {
-            uuid: Uuid::new(uuid.to_owned()),
+    fn message(uuid: &str) -> Result<Line, Box<dyn Error>> {
+        Ok(Line::Message {
+            uuid: Uuid::try_new(uuid.to_owned())?,
             author: Authorship::Owner,
-            session: SessionId::new("s".to_owned()),
-            stamp: Instant::new("2026-01-01T00:00:00Z".to_owned()),
-        }
+            session: SessionId::try_new("s".to_owned())?,
+            stamp: Instant::try_new("2026-01-01T00:00:00Z".to_owned())?,
+        })
     }
 }
 
 #[test]
-fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies() -> Result<(), Failure> {
+fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies() -> Result<(), Box<dyn Error>> {
     let applying = Spread::applying()?;
     let shown = [
         Spread::parsed(&applying.run(&["show", SPREAD[0]])?),
@@ -2412,29 +2483,31 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
     ];
     let wanted = [
         vec![
-            Spread::message(SPREAD[0]),
-            Spread::segment("12345678", 0, "first thought."),
-            Spread::segment("12345678", 1, "second thought"),
+            Spread::message(SPREAD[0])?,
+            Spread::segment("12345678", 0, "first thought.")?,
+            Spread::segment("12345678", 1, "second thought")?,
         ],
-        vec![Spread::message(SPREAD[1]), Spread::segment("abcdef01-0", 0, "third thought")],
-        vec![Spread::message(SPREAD[2]), Spread::segment("abcdef01-1", 0, "fourth thought")],
+        vec![Spread::message(SPREAD[1])?, Spread::segment("abcdef01-0", 0, "third thought")?],
+        vec![Spread::message(SPREAD[2])?, Spread::segment("abcdef01-1", 0, "fourth thought")?],
     ];
     assert_eq!(shown, wanted);
     let found = Spread::parsed(&applying.run(&["search", "thought"])?);
-    let hit = |prefix: &str, ordinal: usize, body: &str| Line::Hit {
-        segment: Spread::reference(prefix, ordinal),
-        author: Authorship::Owner,
-        stamp: Instant::new("2026-01-01T00:00:00Z".to_owned()),
-        body: Body::new(body.to_owned()),
+    let hit = |prefix: &str, ordinal: usize, body: &str| -> Result<Line, Box<dyn Error>> {
+        Ok(Line::Hit {
+            segment: Spread::reference(prefix, ordinal),
+            author: Authorship::Owner,
+            stamp: Instant::try_new("2026-01-01T00:00:00Z".to_owned())?,
+            body: Body::try_new(body.to_owned())?,
+        })
     };
     let hits = [
-        hit("12345678", 0, "first thought."),
-        hit("12345678", 1, "second thought"),
-        hit("abcdef01-0", 0, "third thought"),
-        hit("abcdef01-1", 0, "fourth thought"),
+        hit("12345678", 0, "first thought.")?,
+        hit("12345678", 1, "second thought")?,
+        hit("abcdef01-0", 0, "third thought")?,
+        hit("abcdef01-1", 0, "fourth thought")?,
     ];
     assert_eq!(found.len(), hits.len());
-    assert!(hits.iter().all(|hit| found.contains(hit)));
+    assert!(hits.iter().all(|expected| found.contains(expected)));
     let refs = ["12345678.0", "12345678.1", "abcdef01-0.0", "abcdef01-1.0"];
     let directives: Vec<String> = refs.iter().map(|reference| format!("conversational({reference})")).collect();
     let applied = Spread::parsed(&applying.applied(&directives.join("\n"))?);
@@ -2442,7 +2515,8 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
         directives.iter().filter_map(|directive| directive.parse().ok()).map(Line::Applied).collect();
     assert_eq!(echoed.len(), refs.len());
     assert!(echoed.iter().all(|echo| applied.contains(echo)));
-    refs.iter().try_for_each(|reference| applying.run(&["show", reference]).map(|_shown| ()))
+    refs.iter().try_for_each(|reference| applying.run(&["show", reference]).map(|_shown| ()))?;
+    Ok(())
 }
 
 #[test]
@@ -2478,6 +2552,7 @@ impl Ends {
             | Line::Formed { .. }
             | Line::Related { .. }
             | Line::Written(_)
+            | Line::Refused(_)
             | Line::Hit { .. }
             | Line::Root { .. }
             | Line::Consumes { .. }
@@ -2614,6 +2689,7 @@ impl Echoes {
             | Line::Formed { .. }
             | Line::Related { .. }
             | Line::Written(_)
+            | Line::Refused(_)
             | Line::Root { .. }
             | Line::Consumes { .. }
             | Line::Node(_)

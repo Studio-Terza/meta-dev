@@ -29,7 +29,7 @@ impl<'scope> Within<'scope> {
         let places = self.scope.places(written);
         written.last().and_then(|last| self.scope.named(last)).and_then(|named| {
             Some(named)
-                .filter(|named| self.traits.declaring(&places, named, self.home).is_none())
+                .filter(|candidate| self.traits.declaring(&places, candidate, self.home).is_none())
                 .map(Owner::Named)
                 .or_else(|| operand.cloned())
         })
@@ -89,7 +89,7 @@ impl<'scope> Routes<'scope> {
             || self.owner_segment(path),
             |qualified| self.within.scope.type_named(&qualified.ty).map(Owner::Named),
         );
-        owner.map(|owner| LawPath::new(owner, member))
+        owner.map(|found| LawPath::new(found, member))
     }
 
     fn checked(&self, side: Side, argument: &Expr) -> Option<Route> {

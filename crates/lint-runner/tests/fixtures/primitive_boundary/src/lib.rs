@@ -4,3 +4,4 @@ pub mod sizes;
 pub mod wire;
 pub mod text;
 pub mod door;
+pub mod line;

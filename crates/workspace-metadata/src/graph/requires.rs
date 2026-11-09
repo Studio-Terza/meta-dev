@@ -8,7 +8,7 @@ pub(super) struct Requires<'meta>(BTreeMap<&'meta PackageId, BTreeSet<&'meta Pac
 
 impl<'meta> Extend<&'meta Node> for Requires<'meta> {
     fn extend<Nodes: IntoIterator<Item = &'meta Node>>(&mut self, nodes: Nodes) {
-        nodes.into_iter().for_each(|node| self.0.entry(node.as_ref()).or_default().extend(node.dependencies()));
+        nodes.into_iter().for_each(|node| self.0.entry(node.package_id()).or_default().extend(node.dependencies()));
     }
 }
 

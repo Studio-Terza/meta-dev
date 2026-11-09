@@ -1,0 +1,6 @@
+facade Library /ws/vendor/facade/src/lib.rs
+  text is serde
+assertions Library /ws/vendor/assertions/src/lib.rs
+serde Library /ws/vendor/serde/src/lib.rs
+  serde_derive is serde_derive
+serde_derive ProcMacro /ws/vendor/serde_derive/src/lib.rs

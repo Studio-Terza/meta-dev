@@ -39,8 +39,8 @@ impl Keyed for Occurrence<'_> {
 impl<'file> Nested for Occurrence<'file> {
     fn lies_within<'outer>(&self, outer: &'outer Occurrence<'file>) -> Option<&'outer Occurrence<'file>> {
         Some(outer)
-            .filter(|outer| self.site.path() == outer.site.path())
-            .and_then(|outer| outer.extent.holds(&self.extent).map(|_| outer))
+            .filter(|candidate| self.site.path() == candidate.site.path())
+            .and_then(|same_file| same_file.extent.holds(&self.extent).map(|_| same_file))
     }
 }
 

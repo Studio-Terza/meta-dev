@@ -40,7 +40,9 @@ impl<'meta> Unit<'meta> {
         self.declarations
             .iter()
             .flat_map(|(declarer, declared)| declared.owns().iter().map(move |owned| (*declarer, owned)))
-            .filter(|(_, owned)| graph.resolved(owned).find(|id| reach.contains(id)).is_none())
+            .filter_map(|(declarer, owned)| {
+                graph.resolved(owned).find(|id| reach.contains(id)).map_or(Some((declarer, owned)), |_reached| None)
+            })
             .filter_map(|(declarer, owned)| Some((graph.package(declarer)?.name(), owned)))
             .collect()
     }

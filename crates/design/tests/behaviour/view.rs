@@ -6,7 +6,7 @@ use design_store::{StreamSchema, Unstructured};
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
-use newtype::Newtype;
+use newtype::Wrapping;
 use port_core::Run;
 use store_ports::{Sqlite, Store};
 use structurer::SegmentRef;
@@ -153,6 +153,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
@@ -195,6 +196,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
@@ -235,6 +237,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
@@ -613,7 +616,7 @@ fn each_view_renders_the_live_tree_its_standing_decisions_open_questions_and_unp
         .iter()
         .map(|arguments| applying.run(arguments).map(|out| format!("design {}\n{out}", arguments.join(" "))))
         .collect::<Result<String, Failure>>()?;
-    golden::golden!("view.txt", &rendered)?;
+    golden::golden!("view.txt", &rendered);
     Ok(())
 }
 

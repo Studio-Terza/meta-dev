@@ -1,5 +1,3 @@
-use std::fmt;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
     Library,
@@ -22,7 +20,7 @@ impl Role {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Input {
     role: Role,
     bytes: Vec<u8>,
@@ -62,11 +60,5 @@ impl Input {
             Role::Manifest => &[],
             Role::Library | Role::Binary | Role::Test => &self.bytes,
         }
-    }
-}
-
-impl fmt::Debug for Input {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} {:?}", self.name(), self.bytes)
     }
 }

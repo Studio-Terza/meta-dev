@@ -11,7 +11,10 @@ pub struct Looped;
 impl<Source: Clone, Target: From<Source> + PartialEq> Edge<Source, Target> {
     pub fn new(source: Source, target: Target) -> Result<Edge<Source, Target>, Looped> {
         let itself = Target::from(source.clone());
-        Some(target).filter(|target| *target != itself).map(|target| Edge { source, target }).ok_or(Looped)
+        Some(target)
+            .filter(|candidate| *candidate != itself)
+            .map(|distinct| Edge { source, target: distinct })
+            .ok_or(Looped)
     }
 }
 

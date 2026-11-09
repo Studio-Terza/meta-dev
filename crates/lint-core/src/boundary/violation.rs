@@ -1,7 +1,7 @@
 use std::fmt;
 
 use super::{Finding, Fix};
-use crate::site::Site;
+use code_model::Site;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Violation<'file> {

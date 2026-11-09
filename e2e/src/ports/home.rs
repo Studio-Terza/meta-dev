@@ -21,11 +21,6 @@ impl Home {
         TempDir::new().map(|directory| Home { directory })
     }
 
-    #[must_use]
-    pub fn path(&self) -> &Path {
-        self.directory.path()
-    }
-
     pub fn holding(self, file: &Path, contents: &Bytes) -> io::Result<Home> {
         let placed = self.directory.path().join(file);
         fs::create_dir_all(placed.parent().unwrap_or(self.directory.path()))?;
@@ -48,5 +43,11 @@ impl Home {
             .spawn()?;
         child.stdin.take().map(|mut stdin| stdin.write_all(input.as_ref())).transpose()?;
         child.wait_with_output()
+    }
+}
+
+impl AsRef<Path> for Home {
+    fn as_ref(&self) -> &Path {
+        self.directory.path()
     }
 }

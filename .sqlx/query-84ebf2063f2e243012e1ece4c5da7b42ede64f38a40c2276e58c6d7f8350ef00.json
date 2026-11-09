@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  cursors (session, read_to)\nSELECT\n  'staged',\n  7 + count(stage_provenance)\nFROM\n  nodes\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "84ebf2063f2e243012e1ece4c5da7b42ede64f38a40c2276e58c6d7f8350ef00"
+}

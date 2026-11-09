@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::contents::Contents;
 
@@ -6,13 +7,13 @@ use crate::contents::Contents;
 pub struct RepoFile {
     shown: PathBuf,
     inside: PathBuf,
-    contents: Contents,
+    contents: Arc<Contents>,
 }
 
 impl RepoFile {
     #[must_use]
     pub fn new(shown: impl Into<PathBuf>, inside: impl Into<PathBuf>, contents: Contents) -> RepoFile {
-        RepoFile { shown: shown.into(), inside: inside.into(), contents }
+        RepoFile { shown: shown.into(), inside: inside.into(), contents: Arc::new(contents) }
     }
 
     #[must_use]

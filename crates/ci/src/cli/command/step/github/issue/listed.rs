@@ -3,7 +3,7 @@ use text_lines::OneLine;
 
 use super::number::Number;
 use super::title::Title;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 #[derive(Debug, Deserialize)]
 pub struct Listed {

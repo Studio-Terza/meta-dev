@@ -12,8 +12,8 @@ pub struct RatchetLower {
 }
 
 impl Step for RatchetLower {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<RatchetLower, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<RatchetLower, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let record = arguments.taken()?;
         let measured = arguments.taken()?;
         arguments.ended()?;

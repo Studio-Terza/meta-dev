@@ -1,4 +1,4 @@
-mod boundary;
+pub(crate) mod boundary;
 
 pub use super::count::Count;
 pub(crate) use boundary::Key;

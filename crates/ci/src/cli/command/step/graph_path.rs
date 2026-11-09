@@ -70,8 +70,8 @@ impl GraphPath {
 }
 
 impl Step for GraphPath {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<GraphPath, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<GraphPath, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let page = &arguments.taken()?;
         let measured = &arguments.taken()?;
         let report = &arguments.taken()?;

@@ -27,8 +27,8 @@ impl<'bound> Bound<'bound> {
     fn traited(&self) -> Option<&'bound PathSegment> {
         match self.0 {
             TypeParamBound::Trait(found) => Some(found)
-                .filter(|found| matches!(found.modifier, TraitBoundModifier::None))
-                .and_then(|found| found.path.segments.last()),
+                .filter(|candidate| matches!(candidate.modifier, TraitBoundModifier::None))
+                .and_then(|plain| plain.path.segments.last()),
             _ => None,
         }
     }

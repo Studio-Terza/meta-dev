@@ -16,12 +16,12 @@ impl Focus {
             Expr::Reference(reference) => Self::reached(&reference.expr),
             Expr::Paren(paren) => Self::reached(&paren.expr),
             Expr::Unary(unary) => Some(unary)
-                .filter(|unary| matches!(unary.op, UnOp::Deref(_)))
-                .and_then(|unary| Self::reached(&unary.expr)),
+                .filter(|candidate| matches!(candidate.op, UnOp::Deref(_)))
+                .and_then(|deref| Self::reached(&deref.expr)),
             Expr::MethodCall(call) => Some(call)
-                .filter(|call| call.args.is_empty())
-                .filter(|call| Name::from(&call.method).matches::<Whole>(&Self::VIEWS).is_some())
-                .and_then(|call| Self::reached(&call.receiver)),
+                .filter(|candidate| candidate.args.is_empty())
+                .filter(|bare| Name::from(&bare.method).matches::<Whole>(&Self::VIEWS).is_some())
+                .and_then(|view| Self::reached(&view.receiver)),
             Expr::Field(field) => Self::rooted(field),
             _ => None,
         }

@@ -35,7 +35,7 @@ impl<'found> Head<'found> {
 
     fn parented(place: &Place<'found>, path: &[Name]) -> Target<'found> {
         let here = place.module();
-        let parents = path.iter().take_while(|step| **step == Self::PARENT).count();
+        let parents = path.iter().take_while(|step| **step == Name::from(Self::PARENT)).count();
         let base = here.get(..here.len().saturating_sub(parents)).unwrap_or_default();
         place.within(base, path.get(parents..).unwrap_or_default())
     }

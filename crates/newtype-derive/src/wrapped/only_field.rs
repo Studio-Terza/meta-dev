@@ -14,9 +14,8 @@ impl OnlyField {
 
     pub fn taken(data: Data) -> Result<OnlyField, Data> {
         match data {
-            Data::Struct(DataStruct { struct_token, fields, semi_token }) => {
-                Self::among(fields).map_err(|fields| Data::Struct(DataStruct { struct_token, fields, semi_token }))
-            }
+            Data::Struct(DataStruct { struct_token, fields, semi_token }) => Self::among(fields)
+                .map_err(|returned| Data::Struct(DataStruct { struct_token, fields: returned, semi_token })),
             Data::Enum(_) | Data::Union(_) => Err(data),
         }
     }
@@ -36,11 +35,10 @@ impl OnlyField {
     fn among(fields: Fields) -> Result<OnlyField, Fields> {
         match fields {
             Fields::Named(FieldsNamed { brace_token, named }) => {
-                Self::sole(named).map_err(|named| Fields::Named(FieldsNamed { brace_token, named }))
+                Self::sole(named).map_err(|returned| Fields::Named(FieldsNamed { brace_token, named: returned }))
             }
-            Fields::Unnamed(FieldsUnnamed { paren_token, unnamed }) => {
-                Self::sole(unnamed).map_err(|unnamed| Fields::Unnamed(FieldsUnnamed { paren_token, unnamed }))
-            }
+            Fields::Unnamed(FieldsUnnamed { paren_token, unnamed }) => Self::sole(unnamed)
+                .map_err(|returned| Fields::Unnamed(FieldsUnnamed { paren_token, unnamed: returned })),
             Fields::Unit => Err(fields),
         }
     }
@@ -50,7 +48,7 @@ impl OnlyField {
     ) -> Result<OnlyField, Punctuated<Field, Separator>> {
         <[Field; Self::ONLY]>::try_from(fields.into_iter().collect::<Vec<Field>>())
             .map(|[field]| OnlyField::from(field))
-            .map_err(|fields| fields.into_iter().collect())
+            .map_err(|returned| returned.into_iter().collect())
     }
 }
 

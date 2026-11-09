@@ -14,7 +14,7 @@ impl Kind {
     pub(crate) fn of_role(role: Role) -> Kind {
         match role {
             Role::Target => Kind::Tests,
-            Role::BinaryRoot | Role::LibraryRoot | Role::Other => Kind::Shipped,
+            Role::BinaryRoot | Role::LibraryRoot | Role::BuildScript | Role::Other => Kind::Shipped,
         }
     }
 

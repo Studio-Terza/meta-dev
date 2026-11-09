@@ -22,6 +22,6 @@ impl<'run> Wanted<'run> {
     }
 
     fn among_named<'name>(finals: &[Word<'_>], renamed: &BTreeSet<&Name>, name: &'name Name) -> Option<&'name Name> {
-        finals.iter().find(|word| name == *word).map(|_| name).or_else(|| renamed.get(name).map(|_| name))
+        finals.iter().find(|word| *name == Name::from(**word)).map(|_| name).or_else(|| renamed.get(name).map(|_| name))
     }
 }
