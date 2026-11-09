@@ -11,6 +11,4 @@ pub enum Entered {
     Role,
     #[name("inheritance")]
     Inheritance,
-    #[name("retry")]
-    Retry,
 }

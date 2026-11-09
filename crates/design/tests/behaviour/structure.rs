@@ -606,3 +606,18 @@ fn a_stop_whose_agent_stalls_blocks_loudly_and_the_stop_after_it_sends_the_segme
     assert_eq!(again.outcome?, Outcome::Hooked(HookEvent::Stop));
     Ok(())
 }
+
+#[test]
+fn probe_a_retried_and_applied_flail_is_not_told_as_held() -> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u, Some(Script::COVERING)]), Pause::new(0))?;
+    let flailed = structuring.structured(&["structure"]);
+    let retried = structuring.structured(&["retry", "1"]);
+    let applied = structuring.structured(&["structure"]);
+    let stopped = structuring.structured(&["hook", "stop"]);
+    assert!(matches!(flailed.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(retried.outcome?, Outcome::Retried { segments: Count::new(4) });
+    assert_eq!((applied.outcome?, structuring.unstructured()?), (Outcome::Structured { jobs: Count::new(1) }, 0));
+    assert_eq!((stopped.outcome?, stopped.text.as_str()), (Outcome::Hooked(HookEvent::Stop), ""));
+    Ok(())
+}

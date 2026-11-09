@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::str::FromStr;
 
-use design_model::{Entered, JobId, Provenance, Segment};
+use design_model::{JobId, Segment};
 use design_store::{Flailed, FlailedSegments, JobRetried, RunsOf};
 use grammar::output::Fields;
 use grammar::output::field::Integer;
@@ -34,7 +34,7 @@ impl Retry {
         let held: Vec<Flailed> =
             store.read(FlailedSegments)?.into_iter().filter(|flailed| flailed.job() == job).collect();
         held.first().ok_or(Failure::Unflailed(job))?;
-        store.write(JobRetried::new(job, Provenance::from(Entered::Retry)))?;
+        store.write(JobRetried::from(job))?;
         lock.end()?;
         let owed: Vec<Line> = held
             .iter()

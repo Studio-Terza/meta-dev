@@ -1,4 +1,4 @@
-use design_model::{JobId, Ordinal, Provenance, RunId, Segment};
+use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Newtype};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
@@ -219,6 +219,27 @@ FROM
   failures
 WHERE
   delivery = ?1
+EXCEPT
+SELECT
+  failures.job,
+  failures.account
+FROM
+  retries
+  JOIN failures ON failures.job = retries.job
+GROUP BY
+  retries.job
+HAVING
+  MIN(
+    EXISTS (
+      SELECT
+        1
+      FROM
+        structured
+      WHERE
+        structured.message = retries.message
+        AND structured.ordinal = retries.ordinal
+    )
+  )
 ORDER BY
   job
 "#,
@@ -399,16 +420,22 @@ impl Batch for JobRetried {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobRetried { job, provenance } = self;
+        let job = self.0;
         let recorded = statements.written(store_ports::query!(
             r#"
 INSERT INTO
-  retries (job, provenance)
-VALUES
-  (?1, ?2)
+  retries (job, message, ordinal)
+SELECT
+  runs.job,
+  flailed.message,
+  flailed.ordinal
+FROM
+  flailed
+  JOIN runs ON runs.id = flailed.run
+WHERE
+  runs.job = ?1
 "#,
-            job: JobId,
-            provenance: Provenance
+            job: JobId
         ))?;
         let cleared = statements.written(store_ports::query!(
             r#"

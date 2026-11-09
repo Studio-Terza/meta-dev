@@ -1,13 +1,11 @@
-mod boundary;
-
 use std::io::Write;
 use std::num::NonZeroU8;
 
+use grammar::spec_line::{Attachment, Line, Spec};
 use text_lines::Lines;
 
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Text};
-use boundary::{Attachment, Line};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Verdict<'body> {
@@ -23,7 +21,7 @@ impl<'body> Verdict<'body> {
     pub(crate) fn judging(body: &'body Text) -> Verdict<'body> {
         let lines: Vec<Line> = Lines::from(body.as_ref()).map(Line::read).collect();
         let specs: Vec<Line> = lines.iter().copied().filter(|line| line.spec().is_some()).collect();
-        let attached = specs.iter().filter_map(|line| line.spec()).find_map(|value| Attachment::try_from(value).ok());
+        let attached = specs.iter().filter_map(|line| line.spec()).find_map(Spec::attachment);
         lines
             .iter()
             .find(|line| **line == Line::Repair)

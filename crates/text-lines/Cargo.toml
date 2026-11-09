@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+grammar = { path = "../grammar" }
 proptest.workspace = true
 serde.workspace = true
 thiserror.workspace = true

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  job,\n  account\nFROM\n  failures\nWHERE\n  delivery = ?1\nORDER BY\n  job\n",
+  "query": "\nSELECT\n  job,\n  account\nFROM\n  failures\nWHERE\n  delivery = ?1\nEXCEPT\nSELECT\n  failures.job,\n  failures.account\nFROM\n  retries\n  JOIN failures ON failures.job = retries.job\nGROUP BY\n  retries.job\nHAVING\n  MIN(\n    EXISTS (\n      SELECT\n        1\n      FROM\n        structured\n      WHERE\n        structured.message = retries.message\n        AND structured.ordinal = retries.ordinal\n    )\n  )\nORDER BY\n  job\n",
   "describe": {
     "columns": [
       {
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "98df61440d9e8a707e464afbeee70767aa6f8af43d6d39388e08270d6bdfe18b"
+  "hash": "41bb5bee857d35b28058fc484dbead9f78e2eb9eff6f39b46fccb243b1fee485"
 }

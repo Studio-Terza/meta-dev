@@ -1,7 +1,6 @@
 mod first_change;
 mod line;
 mod mark;
-mod text_lines;
 
 use std::fmt;
 
@@ -9,7 +8,7 @@ use first_change::FirstChange;
 use line::Line;
 use mark::Mark;
 use newtype::Newtype;
-use text_lines::TextLines;
+use text_lines::KeptLines;
 
 use crate::Output;
 
@@ -31,7 +30,7 @@ impl Difference {
     }
 
     fn lines(text: Output<'_>) -> Vec<Line> {
-        TextLines::new(text.into_inner()).map(|line| Line::new(line.to_owned())).collect()
+        KeptLines::from(text.into_inner()).map(|line| Line::new(line.to_owned())).collect()
     }
 
     fn of_lines(recorded: &[Line], actual: &[Line]) -> Self {

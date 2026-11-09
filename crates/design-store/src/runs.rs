@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{JobId, Provenance, RunId, Segment};
+use design_model::{JobId, RunId, Segment};
 use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
@@ -126,10 +126,7 @@ pub struct JobFlailed {
 }
 
 #[derive(Clone, Copy, Debug, Op)]
-pub struct JobRetried {
-    job: JobId,
-    provenance: Provenance,
-}
+pub struct JobRetried(JobId);
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct NextJob;
@@ -315,10 +312,9 @@ impl JobFlailed {
     }
 }
 
-impl JobRetried {
-    #[must_use]
-    pub fn new(job: JobId, provenance: Provenance) -> JobRetried {
-        JobRetried { job, provenance }
+impl From<JobId> for JobRetried {
+    fn from(job: JobId) -> JobRetried {
+        JobRetried(job)
     }
 }
 
