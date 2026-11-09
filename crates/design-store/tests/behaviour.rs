@@ -1467,19 +1467,14 @@ laws::law!(
         let told = spawning.reply.map(Reply::into_inner);
         let kept = ran.first().and_then(Ran::reply).cloned().map(Excerpt::into_inner);
         prop_assert_eq!(kept.is_some(), told.is_some());
-        let longest: Option<String> = told.as_ref().map(|whole| {
-            whole
-                .chars()
-                .scan(0, |bytes: &mut usize, letter| {
-                    *bytes = bytes.saturating_add(letter.len_utf8());
-                    Some((*bytes, letter))
-                })
-                .take_while(|(bytes, _letter)| *bytes <= 16 * 1024)
-                .map(|(_bytes, letter)| letter)
-                .collect()
-        });
-        prop_assert!(kept.as_ref().map_or(0, String::len) <= 16 * 1024);
-        prop_assert_eq!(kept, longest);
+        if let (Some(whole), Some(part)) = (told, kept) {
+            prop_assert!(part.len() <= whole.len());
+            prop_assert!(iter::zip(part.bytes(), whole.bytes()).all(|(mine, theirs)| mine == theirs));
+            prop_assert!(part.len() <= Excerpt::BYTES);
+            let next = whole.ceil_char_boundary(part.len().saturating_add(1));
+            prop_assert!(part.len() == whole.len() || next > Excerpt::BYTES);
+            prop_assert!(whole.len() > Excerpt::BYTES || part == whole);
+        }
         let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
         let running = [state].into_iter().filter(|now| *now == RunState::Running).map(|_| RunId::new(1));
         prop_assert_eq!(still, running.collect::<Vec<RunId>>());
