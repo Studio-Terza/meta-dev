@@ -145,7 +145,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "gate-limits",
- "grammar",
+ "grammar-spec-line",
  "laws",
  "mutation-report",
  "newtype",
@@ -706,6 +706,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "grammar-lines"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "thiserror",
+]
+
+[[package]]
 name = "grammar-lstart"
 version = "0.1.0"
 dependencies = [
@@ -790,6 +798,15 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
+]
+
+[[package]]
+name = "grammar-spec-line"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+ "thiserror",
 ]
 
 [[package]]
@@ -2735,7 +2752,7 @@ dependencies = [
 name = "text-lines"
 version = "0.1.0"
 dependencies = [
- "grammar",
+ "grammar-lines",
  "laws",
  "proptest",
  "serde",
