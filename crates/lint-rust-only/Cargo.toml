@@ -14,5 +14,9 @@ file-ports = { path = "../file-ports" }
 lint-core = { path = "../lint-core" }
 newtype = { path = "../newtype" }
 
+[dev-dependencies]
+file-ports = { path = "../file-ports" }
+lint-core = { path = "../lint-core" }
+
 [lints]
 workspace = true

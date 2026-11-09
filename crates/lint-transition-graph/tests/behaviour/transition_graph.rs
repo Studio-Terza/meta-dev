@@ -2,7 +2,8 @@ use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::TransitionGraph;
 
-use crate::shown::{OnGraph, Shown};
+use crate::shown::OnGraph;
+use lint_fixtures::Shown;
 
 struct Graphed;
 
@@ -44,7 +45,7 @@ const TESTED: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    impl A {\n      
 
 laws::table!(
     the_transition_graph_of_a_crate_is_measured_with_its_coverage,
-    Shown::of::<OnGraph<TransitionGraph>>,
+    Shown::reported::<OnGraph<TransitionGraph>>,
     [
         [CONVERSIONS, "crate x:"] => vec!["crates/x/src/lib.rs:4: crate x: 2 domain types, 0 interface nodes, 0 black boxes, 1 domain pairs, 2 written edges, coverage 2 of 2, share 1.000, 0 touch a bare primitive; of which 0 algebra operations, 0 partial; not written: 0 derived lifts, 0 store operations; give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair"],
         [PRIMITIVES, "crate x:"] => vec!["crates/x/src/lib.rs:3: crate x: 1 domain types, 0 interface nodes, 1 black boxes, 0 domain pairs, 4 written edges, coverage 1 of 4, share 0.250, 3 touch a bare primitive; of which 1 algebra operations, 0 partial; not written: 0 derived lifts, 0 store operations; give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair"],

@@ -17,5 +17,9 @@ proc-macro2.workspace = true
 sqlformat.workspace = true
 syn.workspace = true
 
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

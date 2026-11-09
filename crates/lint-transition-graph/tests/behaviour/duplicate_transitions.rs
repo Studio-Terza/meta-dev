@@ -2,7 +2,8 @@ use lint_core::{Lint, Report, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{DuplicateTransitions, OneEdge};
 
-use crate::shown::{OnGraph, Shown};
+use crate::shown::OnGraph;
+use lint_fixtures::Shown;
 
 struct Duplicates;
 
@@ -20,7 +21,7 @@ impl Duplicates {
     }
 
     fn shows(pair: &[&str]) -> Vec<String> {
-        Shown::by(pair, |files| Self::reported(files).iter().flat_map(Shown::lines).collect())
+        Shown::filtered(pair, |files| Self::reported(files).iter().flat_map(Shown::listed).collect())
     }
 }
 

@@ -2,7 +2,7 @@ use lint_core::Lint;
 use lint_effect_sites::{EffectSites, EffectsInPorts};
 use lint_fixtures::{Located, Source, Sources, Text};
 
-use crate::shown::Shown;
+use lint_fixtures::Shown;
 
 struct Effects;
 
@@ -25,7 +25,7 @@ const FOREIGN: &str =
 
 laws::table!(
     effect_sites_are_counted_per_crate_and_listed_outside_ports,
-    Shown::of::<EffectSites>,
+    Shown::reported::<EffectSites>,
     [
         [EVERY_KIND, "crate x:"] => vec!["crates/x/src/lib.rs:4: crate x: 11 effect sites, 0 in ports, 11 outside ports (files 2, environment 1, clock 3, network 1, processes 1, randomness 1, stdio 2); move each effect site outside ports behind a port, until none remain outside"],
         [EVERY_KIND, "lib.rs:4: files effect"] => vec!["crates/x/src/lib.rs:4: files effect outside ports: calls std::fs::read_to_string; move the effect behind a port in a ports module and call the port from here"],
