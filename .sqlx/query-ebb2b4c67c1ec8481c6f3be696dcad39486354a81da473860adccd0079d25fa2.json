@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  segments (message, ordinal, shape, body)\nVALUES\n  ('o1', 0, 'sentence', 'kept')\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "ebb2b4c67c1ec8481c6f3be696dcad39486354a81da473860adccd0079d25fa2"
+}

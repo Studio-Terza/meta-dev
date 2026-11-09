@@ -1,4 +1,4 @@
-use grammar::message::Span;
+use grammar_message::Span;
 use transcript_ports::{Body, Nul};
 
 use crate::Message;

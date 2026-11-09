@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::directive::Pieces;
+use grammar_directive::Pieces;
 
 use crate::reading::Reader;
 use crate::{Directive, Misread};

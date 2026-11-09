@@ -4,8 +4,10 @@ mod step;
 use std::ffi::OsString;
 use std::io::Write;
 
+use step::clippy_targets::ClippyTargets;
 use step::cold_size::ColdSize;
 use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
+use step::graph_path::GraphPath;
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
@@ -16,12 +18,14 @@ pub(crate) use failure::Failure;
 #[derive(Debug)]
 pub enum Command {
     Timed(Timed),
+    ClippyTargets(ClippyTargets),
     LibtestSeconds(LibtestSeconds),
     Reach(ReachScope),
     History(History),
     MeasuredHistory(MeasuredHistory),
     RatchetLower(RatchetLower),
     CompileTimes(CompileTimes),
+    GraphPath(GraphPath),
     Logged(Logged),
     Tools(InstallTools),
     ToolsKey(ToolsKey),
@@ -41,12 +45,14 @@ pub enum Command {
 
 impl Command {
     const TIMED: &'static str = "timed";
+    const CLIPPY_TARGETS: &'static str = "clippy-targets";
     const LIBTEST_SECONDS: &'static str = "libtest-seconds";
     const REACH: &'static str = "reach";
     const HISTORY: &'static str = "history";
     const MEASURED_HISTORY: &'static str = "measured-history";
     const RATCHET_LOWER: &'static str = "ratchet-lower";
     const COMPILE_TIMES: &'static str = "compile-times";
+    const GRAPH_PATH: &'static str = "graph-path";
     const LOGGED: &'static str = "logged";
     const TOOLS: &'static str = "tools";
     const TOOLS_KEY: &'static str = "tools-key";
@@ -66,12 +72,14 @@ impl Command {
     pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
         match arguments.next().and_then(|name| name.into_string().ok()).as_deref() {
             Some(Self::TIMED) => Self::parsed(arguments.collect(), Command::Timed),
+            Some(Self::CLIPPY_TARGETS) => Self::parsed(arguments.collect(), Command::ClippyTargets),
             Some(Self::LIBTEST_SECONDS) => Self::parsed(arguments.collect(), Command::LibtestSeconds),
             Some(Self::REACH) => Self::parsed(arguments.collect(), Command::Reach),
             Some(Self::HISTORY) => Self::parsed(arguments.collect(), Command::History),
             Some(Self::MEASURED_HISTORY) => Self::parsed(arguments.collect(), Command::MeasuredHistory),
             Some(Self::RATCHET_LOWER) => Self::parsed(arguments.collect(), Command::RatchetLower),
             Some(Self::COMPILE_TIMES) => Self::parsed(arguments.collect(), Command::CompileTimes),
+            Some(Self::GRAPH_PATH) => Self::parsed(arguments.collect(), Command::GraphPath),
             Some(Self::LOGGED) => Self::parsed(arguments.collect(), Command::Logged),
             Some(Self::TOOLS) => Self::parsed(arguments.collect(), Command::Tools),
             Some(Self::TOOLS_KEY) => Self::parsed(arguments.collect(), Command::ToolsKey),
@@ -98,12 +106,14 @@ impl Command {
     pub fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         match self {
             Command::Timed(step) => step.carry_out(ports, out),
+            Command::ClippyTargets(step) => step.carry_out(ports, out),
             Command::LibtestSeconds(step) => step.carry_out(ports, out),
             Command::Reach(step) => step.carry_out(ports, out),
             Command::History(step) => step.carry_out(ports, out),
             Command::MeasuredHistory(step) => step.carry_out(ports, out),
             Command::RatchetLower(step) => step.carry_out(ports, out),
             Command::CompileTimes(step) => step.carry_out(ports, out),
+            Command::GraphPath(step) => step.carry_out(ports, out),
             Command::Logged(step) => step.carry_out(ports, out),
             Command::Tools(step) => step.carry_out(ports, out),
             Command::ToolsKey(step) => step.carry_out(ports, out),

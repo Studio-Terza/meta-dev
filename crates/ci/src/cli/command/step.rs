@@ -1,8 +1,10 @@
 mod arguments;
 mod changed;
+pub mod clippy_targets;
 pub mod cold_size;
 mod compile_times;
 pub mod github;
+pub mod graph_path;
 mod history;
 mod install_tools;
 mod journal;

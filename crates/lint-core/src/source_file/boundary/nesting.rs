@@ -74,21 +74,26 @@ impl Nesting {
     const LIMIT: Bound = Bound::Most(256);
 
     pub fn within_limit(text: &SourceText) -> Option<&SourceText> {
-        let bytes = text.as_ref().as_bytes();
-        let deepest = Self::peak(bytes, |_, current| Step::delimited(current)).max(Self::peak(bytes, Step::angled));
-        Self::LIMIT.allows(deepest).map(|_| text)
+        let peaks = text.as_ref().as_bytes().iter().fold(Peaks::default(), |peaks, current| peaks.after(*current));
+        Self::LIMIT.allows(peaks.deepest).map(|_| text)
     }
+}
 
-    fn peak(bytes: &[u8], step: impl Fn(u8, u8) -> Step) -> Depth {
-        bytes
-            .iter()
-            .scan((Depth::zero(), b' '), |(depth, before), current| {
-                *depth = depth.after(step(*before, *current));
-                *before = *current;
-                Some(*depth)
-            })
-            .max()
-            .unwrap_or_default()
+#[derive(Clone, Copy, Debug, Default)]
+struct Peaks {
+    delimited: Depth,
+    angled: Depth,
+    before: Option<u8>,
+    deepest: Depth,
+}
+
+impl Peaks {
+    const START: u8 = b' ';
+
+    fn after(self, current: u8) -> Peaks {
+        let delimited = self.delimited.after(Step::delimited(current));
+        let angled = self.angled.after(Step::angled(self.before.unwrap_or(Self::START), current));
+        Peaks { delimited, angled, before: Some(current), deepest: self.deepest.max(delimited).max(angled) }
     }
 }
 

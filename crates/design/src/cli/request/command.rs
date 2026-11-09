@@ -18,10 +18,11 @@ use std::str::FromStr;
 
 use console_ports::Environment;
 use design_store::Scope;
+use design_store::StreamSchema;
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
-use grammar::search::Terms;
-use store_ports::{Sqlite, Store};
+use grammar_search::Terms;
+use store_ports::{Opens, Store};
 
 use super::persistence::Persistence;
 use super::{Flag, Ground, Token, Valued};
@@ -153,9 +154,9 @@ impl Verb {
 }
 
 impl Command {
-    pub fn opened(&self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
+    pub fn opened<O: Opens>(&self, path: PathBuf, opens: &O) -> O::Store {
         match self {
-            Command::Ingest(persistence) => persistence.opened(path, opened),
+            Command::Ingest(persistence) => persistence.opened(path, opens),
             Command::Show(_)
             | Command::Search(..)
             | Command::Init(_)
@@ -166,7 +167,7 @@ impl Command {
             | Command::Hook(_)
             | Command::View(_)
             | Command::Import(_)
-            | Command::Retry(_) => opened(path),
+            | Command::Retry(_) => opens.file::<StreamSchema>(path),
         }
     }
 

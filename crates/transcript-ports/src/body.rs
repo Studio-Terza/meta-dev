@@ -1,4 +1,4 @@
-use grammar::message::Span;
+use grammar_message::Span;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]

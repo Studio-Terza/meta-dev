@@ -16,7 +16,12 @@ design-store = { path = "../design-store" }
 dispatch-ports = { path = "../dispatch-ports" }
 exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
-grammar = { path = "../grammar" }
+grammar-cited = { path = "../grammar-cited" }
+grammar-flag = { path = "../grammar-flag" }
+grammar-notes = { path = "../grammar-notes" }
+grammar-output = { path = "../grammar-output" }
+grammar-search = { path = "../grammar-search" }
+grammar-slug = { path = "../grammar-slug" }
 local-config = { path = "../local-config" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
@@ -34,6 +39,7 @@ transcript-ports = { path = "../transcript-ports" }
 e2e = { path = "../../e2e" }
 golden = { path = "../golden" }
 laws = { path = "../laws" }
+sqlite-ports = { path = "../sqlite-ports" }
 text-lines = { path = "../text-lines" }
 
 [lints]

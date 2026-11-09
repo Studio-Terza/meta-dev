@@ -60,7 +60,7 @@ impl VecOutParams<'_> {
     }
 
     fn last_segment<'path>(path: &'path TypePath, name: Word<'_>) -> Option<&'path PathSegment> {
-        path.path.segments.last().filter(|segment| Name::from(&segment.ident) == Name::from(name))
+        path.path.segments.last().filter(|segment| segment.ident == Name::from(name))
     }
 }
 
@@ -77,7 +77,7 @@ impl<'ast> Visit<'ast> for VecOutParams<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {

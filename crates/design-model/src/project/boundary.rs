@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::project::Names;
+use grammar_project::Names;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Serialize};
 
 #[derive(Newtype, Arbitrary, Display, Serialize, CheckedDeserialize, Clone, Debug, PartialEq, Eq)]

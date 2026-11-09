@@ -33,8 +33,9 @@ impl Lint for NamedNumbers {
                 .filter(|file| Gate::BOUNDARY.admits(file).is_none())
                 .filter(|file| support.iter().all(|path| path != file.path()))
                 .flat_map(|file| {
-                    Self::flagged::<Numbers>(
+                    Self::flagged(
                         file,
+                        Numbers { file, lines: Vec::new() },
                         Message::new(
                             Problem::new("numeric literal outside a const item"),
                             Fix::new("name it as a const so it can be found and tuned"),
@@ -57,27 +58,32 @@ impl NamedNumbers {
         }
     }
 
-    pub fn flagged<Found: Literals>(file: &SourceFile, message: Message) -> impl Iterator<Item = Violation<'_>> {
-        let mut found = Found::default();
+    pub fn flagged(
+        file: &SourceFile,
+        mut found: impl Literals,
+        message: Message,
+    ) -> impl Iterator<Item = Violation<'_>> {
         found.visit_file(file.syntax());
         found.lines().into_iter().map(move |line| Violation::new(Site::new(file.path(), line), message))
     }
 }
 
-pub trait Literals: for<'ast> Visit<'ast> + Default {
+pub trait Literals: for<'ast> Visit<'ast> {
     fn lines(self) -> Vec<LineNumber>;
 }
 
-impl Literals for Numbers {
+impl Literals for Numbers<'_> {
     fn lines(self) -> Vec<LineNumber> {
-        self.0
+        self.lines
     }
 }
 
-#[derive(Default)]
-struct Numbers(Vec<LineNumber>);
+struct Numbers<'file> {
+    file: &'file SourceFile,
+    lines: Vec<LineNumber>,
+}
 
-impl<'ast> Visit<'ast> for Numbers {
+impl<'ast> Visit<'ast> for Numbers<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Gate::BOUNDARY.enter_outside(module, || syn::visit::visit_item_mod(self, module));
     }
@@ -98,14 +104,14 @@ impl<'ast> Visit<'ast> for Numbers {
     fn visit_expr_const(&mut self, _: &'ast ExprConst) {}
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_lit_int(&mut self, literal: &'ast LitInt) {
-        self.0.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
+        self.lines.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
     }
 
     fn visit_lit_float(&mut self, literal: &'ast LitFloat) {
-        self.0.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
+        self.lines.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
     }
 }

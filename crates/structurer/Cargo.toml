@@ -12,7 +12,9 @@ doctest = false
 [dependencies]
 design-model = { path = "../design-model" }
 dispatch-ports = { path = "../dispatch-ports" }
-grammar = { path = "../grammar" }
+grammar-cited = { path = "../grammar-cited" }
+grammar-directive = { path = "../grammar-directive" }
+grammar-output = { path = "../grammar-output" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 strum.workspace = true

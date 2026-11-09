@@ -13,3 +13,7 @@ block = 3.5
 [lint]
 warn = 1.5
 block = 3
+
+[graph-path]
+warn = 3.96
+block = 5.28

@@ -4,7 +4,7 @@ mod stale_owns;
 use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Site, SourceFile, Violation};
-use lint_layout::{LineNumber, Name};
+use lint_layout::{LineNumber, Name, TableKey};
 use workspace_metadata::{Bypass, Bypasses, CrateName as PackageName, Stale};
 
 use foreign_dependency::ForeignDependency;
@@ -26,6 +26,10 @@ impl<'file> Owners<'file> {
         }
     }
 
+    pub(crate) fn manifest(&self, package: &PackageName) -> Option<&'file SourceFile> {
+        self.manifests.get(&Name::from(package.as_ref())).copied()
+    }
+
     pub(crate) fn foreign(&self, bypasses: Bypasses<'file>) -> Vec<Violation<'file>> {
         bypasses
             .into_iter()
@@ -41,7 +45,13 @@ impl<'file> Owners<'file> {
             .into_iter()
             .filter_map(|(declarer, owned)| {
                 let file = *self.manifests.get(&Name::from(declarer.as_ref()))?;
-                Some((Site::new(file.manifest_file().as_ref(), file.placement().package().key_lines().owns()?), owned))
+                Some((
+                    Site::new(
+                        file.manifest_file().as_ref(),
+                        file.placement().package().key_lines().line(TableKey::PortOwns)?,
+                    ),
+                    owned,
+                ))
             })
             .flat_map(|(site, owned)| {
                 owned.into_iter().map(move |package| Violation::new(site, StaleOwns::new(package)))

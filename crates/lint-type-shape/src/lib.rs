@@ -63,13 +63,14 @@ impl TypeShape {
 
 impl FileLint for TypeShape {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut shapes = TypeShapes { path: file.path(), violations: Vec::new() };
+        let mut shapes = TypeShapes { file, path: file.path(), violations: Vec::new() };
         shapes.visit_file(file.syntax());
         shapes.violations
     }
 }
 
 struct TypeShapes<'scan> {
+    file: &'scan SourceFile,
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
 }
@@ -134,7 +135,7 @@ impl<'ast> Visit<'ast> for TypeShapes<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {

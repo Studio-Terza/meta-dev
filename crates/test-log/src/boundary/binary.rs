@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::banner::Banner;
+use grammar_banner::Banner;
 
 use super::unmatched::Unmatched;
 

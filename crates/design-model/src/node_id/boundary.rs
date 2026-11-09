@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::node::{Ids, Spelled};
+use grammar_node::{Ids, Spelled};
 use newtype::{Arbitrary, Newtype};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

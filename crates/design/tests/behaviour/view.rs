@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use crate::Sqlite;
 use design::{Failure, Line, Unresolved, Viewed};
 use design_model::{Ending, NodeId, Segment};
 use design_store::{StreamSchema, Unstructured};
@@ -8,7 +9,7 @@ use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::Wrapping;
 use port_core::Run;
-use store_ports::{Sqlite, Store};
+use store_ports::Store;
 use structurer::SegmentRef;
 
 use super::{Applying, Invocation, Session, Spread};
@@ -153,6 +154,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
@@ -195,6 +197,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
@@ -235,6 +238,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }

@@ -102,3 +102,69 @@ const CASES: [Case; 15] = [
 fn skipped_tests_are_flagged() {
     assert_eq!(Sources::mismatches::<NoIgnoredTests>(&CASES), Lines::default());
 }
+
+const SWITCHED_OFF: Source =
+    Source::new(Located::new("crates/a/Cargo.toml"), Text::new("[package]\nname = \"a\"\n\n[lib]\ntest = false\n"));
+const SWITCHED_ON: Source = Source::new(Located::new("crates/a/Cargo.toml"), Text::new("[package]\nname = \"a\"\n"));
+const GATED_LIBRARY: &[Source] = &[Source::new(
+    Located::new("crates/a/src/lib.rs"),
+    Text::new("pub fn f() {}\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n"),
+)];
+const GATED_ITEM: &[Source] =
+    &[Source::new(Located::new("crates/a/src/a.rs"), Text::new("#[cfg(all(test, unix))]\nfn helper() {}\n"))];
+const GATED_FILE_IN_LIBRARY: &[Source] =
+    &[Source::new(Located::new("crates/a/src/a.rs"), Text::new("#![cfg(test)]\nfn helper() {}\n"))];
+const GATED_TESTS: &[Source] = &[Source::new(Located::new("crates/a/tests/a.rs"), Text::new(TEST_ONLY))];
+const UNGATED: &[Source] = &[Source::new(Located::new("crates/a/src/lib.rs"), Text::new(CONDITIONAL_HELPER))];
+
+struct Library(&'static [Source], &'static [Source]);
+
+impl Library {
+    fn flagged(&self) -> Lines {
+        Sources::placed_flagged::<NoIgnoredTests>(self.0, self.1)
+    }
+}
+
+laws::table!(
+    test_code_in_a_library_whose_tests_are_switched_off_is_flagged_because_it_never_runs,
+    Library::flagged,
+    [
+        Library(&[SWITCHED_OFF], GATED_LIBRARY) => ["crates/a/src/lib.rs:2"].into(),
+        Library(&[SWITCHED_OFF], GATED_ITEM) => ["crates/a/src/a.rs:1"].into(),
+        Library(&[SWITCHED_OFF], GATED_FILE_IN_LIBRARY) => ["crates/a/src/a.rs:1"].into(),
+        Library(&[SWITCHED_ON], GATED_LIBRARY) => Lines::default(),
+        Library(&[SWITCHED_OFF], GATED_TESTS) => Lines::default(),
+        Library(&[SWITCHED_OFF], UNGATED) => Lines::default(),
+    ]
+);
+
+const BINARY_SWITCHED_OFF: Source = Source::new(
+    Located::new("crates/a/Cargo.toml"),
+    Text::new("[package]\nname = \"a\"\n\n[lib]\ntest = false\n\n[[bin]]\nname = \"tool\"\ntest = false\n"),
+);
+const MAIN: Source = Source::new(
+    Located::new("crates/a/src/main.rs"),
+    Text::new("fn main() {}\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n"),
+);
+const GATED_MAIN: &[Source] = &[MAIN];
+const LISTED_BINARY: Source = Source::new(
+    Located::new("crates/a/src/bin/tool.rs"),
+    Text::new("fn main() {}\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n"),
+);
+const GATED_LISTED_BINARY: &[Source] = &[LISTED_BINARY];
+const GATED_BUILD_SCRIPT: &[Source] =
+    &[Source::new(Located::new("crates/a/build.rs"), Text::new("fn main() {}\n#[cfg(test)]\nfn helper() {}\n"))];
+
+laws::table!(
+    test_code_in_a_binary_is_judged_by_the_binary_and_in_a_build_script_never_runs,
+    Library::flagged,
+    [
+        Library(&[SWITCHED_OFF, MAIN], GATED_MAIN) => Lines::default(),
+        Library(&[SWITCHED_ON, MAIN], GATED_MAIN) => Lines::default(),
+        Library(&[BINARY_SWITCHED_OFF, MAIN], GATED_MAIN) => Lines::default(),
+        Library(&[SWITCHED_OFF, LISTED_BINARY], GATED_LISTED_BINARY) => Lines::default(),
+        Library(&[BINARY_SWITCHED_OFF, LISTED_BINARY], GATED_LISTED_BINARY) => ["crates/a/src/bin/tool.rs:1", "crates/a/src/bin/tool.rs:2"].into(),
+        Library(&[SWITCHED_ON], GATED_BUILD_SCRIPT) => ["crates/a/build.rs:2"].into(),
+        Library(&[SWITCHED_OFF], GATED_BUILD_SCRIPT) => ["crates/a/build.rs:2"].into(),
+    ]
+);

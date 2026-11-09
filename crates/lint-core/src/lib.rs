@@ -1,3 +1,4 @@
+mod attribute_macros;
 mod binary_files;
 mod boundary;
 mod contents;
@@ -21,6 +22,7 @@ mod type_homes;
 mod type_name;
 mod walk;
 
+pub use attribute_macros::AttributeMacros;
 pub use binary_files::BinaryFiles;
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use code_model::Site;

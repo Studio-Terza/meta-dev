@@ -1,8 +1,8 @@
 use std::fmt;
 use std::iter;
 
-use grammar::cited::Cited;
-use grammar::output::{Fields, Unread};
+use grammar_cited::Cited;
+use grammar_output::{Fields, Unread};
 
 use crate::SegmentRef;
 

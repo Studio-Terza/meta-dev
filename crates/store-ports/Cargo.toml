@@ -6,8 +6,8 @@ license.workspace = true
 publish.workspace = true
 
 [package.metadata.port]
-owns = ["sqlx", "sqlx-core", "sqlx-macros", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "tokio", "tokio-stream"]
-shared = ["proc-macro2", "quote", "serde", "serde_core", "serde_json", "syn", "thiserror"]
+owns = []
+shared = ["hex", "proc-macro2", "quote", "serde", "serde_core", "serde_json", "sha2", "syn", "thiserror"]
 
 [lib]
 test = false
@@ -16,17 +16,16 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
-sqlx.workspace = true
 store-ports-macros = { path = "../store-ports-macros" }
 thiserror.workspace = true
-tokio.workspace = true
 
 [dev-dependencies]
+sqlite-ports = { path = "../sqlite-ports" }
 design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
-grammar = { path = "../grammar" }
+grammar-search = { path = "../grammar-search" }
 laws = { path = "../laws" }
 strum.workspace = true
 tempfile.workspace = true

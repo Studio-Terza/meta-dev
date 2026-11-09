@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::Path;
 
 use file_ports::Files;
-use grammar::branch::Base;
+use grammar_branch::Base;
 
 use super::Step;
 use super::changed::{Changed, Question};

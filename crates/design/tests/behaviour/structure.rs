@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
+use crate::Opening;
 use design::{
     Agents, Attempted, Cli, Count, Failure, Flail, Flailing, Flails, HookEvent, Lapsed, Line, Outcome, Sequel,
     Unresolved,
@@ -196,7 +197,7 @@ impl Structuring {
         let outcome = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&self.applying.files),
-            |_path| self.applying.store.clone(),
+            Opening(|_path| self.applying.store.clone()),
             agents,
         )
         .report(&run, arguments.iter().map(OsString::from), &mut out);

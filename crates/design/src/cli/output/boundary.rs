@@ -8,9 +8,9 @@ use design_model::{
 use design_store::{AppliedId, Excerpt, RelationName, RunState, ShapeName};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
-use grammar::cited::Cited;
-use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
-use grammar::output::{Fields, Unread};
+use grammar_cited::Cited;
+use grammar_output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
+use grammar_output::{Fields, Unread};
 use named_derive::Named;
 use newtype::Wrapping;
 use stream::{Relation, Shape};
@@ -125,6 +125,7 @@ pub enum Line {
         relation: RelationName,
         target: Anchored,
     },
+    Refused(RefusedLink),
     Annotated {
         remark: Remark,
         standing: Standing,
@@ -152,6 +153,13 @@ pub enum Line {
     Owed(Flailing),
     Viewed(Viewed),
     Noted(Noted),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RefusedLink {
+    source: Anchored,
+    relation: RelationName,
+    target: Anchored,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -230,6 +238,8 @@ pub(crate) enum Key {
     Segment,
     #[name("link")]
     Link,
+    #[name("refused")]
+    Refused,
     #[name("annotation")]
     Annotation,
     #[name("applied")]
@@ -377,6 +387,7 @@ impl fmt::Display for Line {
             Line::Link { source, relation, target } => {
                 write!(formatter, "  {} {source} {relation} {target}", Key::Link)
             }
+            Line::Refused(refused) => write!(formatter, "{} {} {refused}", Key::Refused, Key::Link),
             Line::Annotated { remark, standing, entered } => {
                 write!(formatter, "  {} {} {standing} {} {entered}", Key::Annotation, remark.rendered(), Key::Entered)
             }
@@ -493,6 +504,7 @@ impl Key {
                 relation: fields.field::<Bare<_>>()?,
                 target: Anchored::read(fields)?,
             }),
+            Key::Refused => RefusedLink::read(fields.past(&[Key::Link])?).map(Line::Refused),
             Key::Annotation => Ok(Line::Annotated {
                 remark: Remark::read(fields)?,
                 standing: fields.field::<Word<_>>()?,
@@ -542,6 +554,27 @@ impl fmt::Display for Anchored {
             Anchored::Segment(segment) => write!(formatter, "{segment}"),
             Anchored::Message(prefix) => write!(formatter, "{prefix}"),
         }
+    }
+}
+
+impl RefusedLink {
+    #[must_use]
+    pub fn new(source: Anchored, relation: RelationName, target: Anchored) -> RefusedLink {
+        RefusedLink { source, relation, target }
+    }
+
+    fn read(fields: &mut Fields) -> Result<RefusedLink, Unread> {
+        Ok(RefusedLink {
+            source: Anchored::read(fields)?,
+            relation: fields.field::<Bare<_>>()?,
+            target: Anchored::read(fields)?,
+        })
+    }
+}
+
+impl fmt::Display for RefusedLink {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {} {}", self.source, self.relation, self.target)
     }
 }
 

@@ -70,6 +70,7 @@ lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-workflow-run = { path = "../lint-workflow-run" }
 laws = { path = "../laws" }
+syn.workspace = true
 
 [lints]
 workspace = true

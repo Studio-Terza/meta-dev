@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use grammar::search::Terms;
+use grammar_search::Terms;
 use port_core::Op;
 use store_ports::{Query, Statements, StoreFailure};
 

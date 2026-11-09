@@ -17,7 +17,7 @@ use console_ports::{Heard, Variables};
 
 use design::{
     Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Miss, Noted, Outcome, Reconciliation, Reference,
-    Remark, Summary, Unmatched, Unresolved, Viewed,
+    RefusedLink, Remark, Summary, Unmatched, Unresolved, Viewed,
 };
 use design_model::{
     AnyStage, Artifact, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId,
@@ -31,15 +31,16 @@ use design_store::{
 };
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
-use grammar::notes::{Cite, Quote};
+use grammar_notes::{Cite, Quote};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
 use newtype::Counter;
-use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
-use store_ports::{Busy, Sqlite, Store, Written};
+use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
+use sqlite_ports::SqliteOpener;
+use store_ports::{Batch, Busy, Opens, Schema, Statements, Store, StoreFailure, Written};
 use stream::{Relation, Shape};
 use structure::Staff;
 use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
@@ -286,7 +287,7 @@ impl Invocation {
     fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Self::environment(), files, |_path| store.clone(), Staff::idle()).report(
+        Cli::new(&Self::environment(), files, Opening(|_path| store.clone()), Staff::idle()).report(
             &run,
             arguments.iter().map(OsString::from),
             &mut out,
@@ -382,8 +383,9 @@ struct Rooted;
 impl Rooted {
     fn outcome(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
         let mut out = Vec::new();
-        let outcome = Cli::new(&Invocation::environment(), session.files(), |_path| store.clone(), Staff::idle())
-            .rooted(arguments.iter().map(OsString::from), &mut out)?;
+        let outcome =
+            Cli::new(&Invocation::environment(), session.files(), Opening(|_path| store.clone()), Staff::idle())
+                .rooted(arguments.iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
 }
@@ -396,6 +398,94 @@ fn a_rooted_run_writes_its_report_to_out_and_names_its_outcome() -> Result<(), F
     assert!(ingested.out.contains("authorship owner 2\n"));
     let shown = Rooted::outcome(&store, &Session::typical(), &["show", "o1"])?;
     assert_eq!(shown.outcome, Outcome::Shown);
+    Ok(())
+}
+
+#[derive(Debug, Op)]
+struct Unstored {
+    message: Uuid,
+    ordinal: Ordinal,
+}
+
+impl Batch for Unstored {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let Unstored { message, ordinal } = self;
+        statements.written(store_ports::query!(
+            r#"
+DELETE FROM
+  segments
+WHERE
+  message = ?1
+  AND ordinal = ?2
+"#,
+            message: Uuid,
+            ordinal: Ordinal
+        ))
+    }
+}
+
+struct Unheld;
+
+impl Unheld {
+    fn asked() -> String {
+        Session::line(Speaker::Lead, "l1", "null", "1. Alpha?\\n2. Beta?")
+    }
+
+    fn answered() -> Session {
+        Session::working([Unheld::asked(), Session::line(Speaker::Owner, "o1", "\"l1\"", "1. yes\\n2. no")].concat())
+    }
+
+    fn end(segment: &str, ordinal: usize) -> Anchored {
+        Anchored::Segment(SegmentRef::new(Prefix::new(segment.to_owned()), Ordinal::new(ordinal)))
+    }
+
+    fn refused(out: &str) -> Vec<Line> {
+        out.parse::<text_lines::Lines>()
+            .into_iter()
+            .flatten()
+            .filter_map(|line| line.parse::<Line>().ok())
+            .filter(|line| matches!(line, Line::Refused(_)))
+            .collect()
+    }
+
+    fn stored(store: &Sqlite) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let shown = run
+            .port(store.clone())
+            .read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?
+            .ok_or("o1 is not stored")?;
+        Ok(shown
+            .links()
+            .iter()
+            .map(|link| {
+                let [source, target] = link.anchors();
+                let relation: &RelationName = link.as_ref();
+                format!("{source} {relation} {target}")
+            })
+            .collect())
+    }
+}
+
+#[test]
+fn an_answer_to_an_item_the_store_does_not_hold_is_refused_and_the_rest_of_the_session_ingests()
+-> Result<(), Box<dyn Error>> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Invocation::against(&store, &Session::working(Unheld::asked()), &["ingest"])?;
+    let run = Run::root();
+    run.port(store.clone()).write(Unstored { message: Uuid::try_new("l1".to_owned())?, ordinal: Ordinal::new(1) })?;
+    let out = Invocation::against(&store, &Unheld::answered(), &["ingest"])?;
+    let refused = Line::Refused(RefusedLink::new(
+        Unheld::end("o1", 1),
+        RelationName::new("answers".to_owned()),
+        Unheld::end("l1", 1),
+    ));
+    assert_eq!(Unheld::refused(&out), [refused]);
+    assert_eq!(Unheld::stored(&store)?, ["o1 replies-to l1", "o1#0 answers l1#0"]);
+    let again = Invocation::against(&store, &Unheld::answered(), &["ingest"])?;
+    assert_eq!(again.matches("session").count(), 0);
+    assert_eq!(Unheld::refused(&again), Vec::<Line>::new());
     Ok(())
 }
 
@@ -473,10 +563,10 @@ impl Opened {
         Cli::new(
             &Invocation::at(directory),
             files,
-            |path: PathBuf| {
+            Opening(|path: PathBuf| {
                 opened.lock().map(|mut paths| paths.push(path)).ok();
                 Sqlite::in_memory::<StreamSchema>()
-            },
+            }),
             Staff::idle(),
         )
         .report(&run, arguments.iter().map(OsString::from), &mut out)?;
@@ -1187,7 +1277,7 @@ fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Re
     let lent = Cli::new(
         &Invocation::environment(),
         FakeLent::new(&applying.files),
-        |_path| applying.store.clone(),
+        Opening(|_path| applying.store.clone()),
         Staff::idle(),
     )
     .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
@@ -1200,9 +1290,13 @@ impl Applying {
         self.files.create_directories(Path::new("/work/notes")).ok();
         self.files.write(Path::new("/work/notes/directives"), directives).ok();
         let mut out = Vec::new();
-        let outcome =
-            Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
-                .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
+        let outcome = Cli::new(
+            &Invocation::environment(),
+            FakeLent::new(&self.files),
+            Opening(|_path| self.store.clone()),
+            Staff::idle(),
+        )
+        .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
 
@@ -1418,8 +1512,13 @@ impl Lifecycle {
 
 impl Applying {
     fn outcome(&self, arguments: &[&str]) -> Result<Outcome, Failure> {
-        Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
-            .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
+        Cli::new(
+            &Invocation::environment(),
+            FakeLent::new(&self.files),
+            Opening(|_path| self.store.clone()),
+            Staff::idle(),
+        )
+        .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
     }
 }
 
@@ -1740,8 +1839,13 @@ impl Workspace {
     fn run(&self, directory: &str, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Invocation::at(directory), FakeLent::new(&self.files), |_path| self.store.clone(), Staff::idle())
-            .report(&run, arguments.iter().map(OsString::from), &mut out)?;
+        Cli::new(
+            &Invocation::at(directory),
+            FakeLent::new(&self.files),
+            Opening(|_path| self.store.clone()),
+            Staff::idle(),
+        )
+        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
         Ok(String::from_utf8(out).unwrap_or_default())
     }
 
@@ -2135,6 +2239,8 @@ impl Generated {
             (select(Relation::VARIANTS), Generated::count())
                 .prop_map(|(relation, count)| Line::Related { relation, count }),
             Generated::count().prop_map(Line::Written),
+            (Generated::anchored(), Generated::relation(), Generated::anchored())
+                .prop_map(|(source, relation, target)| Line::Refused(RefusedLink::new(source, relation, target))),
             (Generated::node(), Generated::project()).prop_map(|(node, project)| Line::Root { node, project }),
             (Generated::node(), Generated::project()).prop_map(|(node, project)| Line::Consumes { node, project }),
         ]
@@ -2462,6 +2568,7 @@ impl Ends {
             | Line::Formed { .. }
             | Line::Related { .. }
             | Line::Written(_)
+            | Line::Refused(_)
             | Line::Hit { .. }
             | Line::Root { .. }
             | Line::Consumes { .. }
@@ -2598,6 +2705,7 @@ impl Echoes {
             | Line::Formed { .. }
             | Line::Related { .. }
             | Line::Written(_)
+            | Line::Refused(_)
             | Line::Root { .. }
             | Line::Consumes { .. }
             | Line::Node(_)
@@ -2640,3 +2748,20 @@ laws::law!(every_ref_that_show_or_search_prints_is_shown, Echoes::uttered(), utt
     let refused: Vec<&String> = refs.iter().filter(|reference| applying.run(&["show", reference]).is_err()).collect();
     prop_assert_eq!(refused, Vec::<&String>::new(), "{}", printed);
 });
+
+type Sqlite = <SqliteOpener as Opens>::Store;
+
+#[derive(Clone, Copy, Debug)]
+struct Opening<F>(F);
+
+impl<F: Fn(PathBuf) -> Sqlite> Opens for Opening<F> {
+    type Store = Sqlite;
+
+    fn file<S: Schema>(&self, path: PathBuf) -> Sqlite {
+        (self.0)(path)
+    }
+
+    fn in_memory<S: Schema>(&self) -> Sqlite {
+        SqliteOpener.in_memory::<S>()
+    }
+}

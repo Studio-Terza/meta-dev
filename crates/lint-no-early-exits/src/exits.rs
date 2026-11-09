@@ -32,7 +32,7 @@ impl FileLint for Exits<'_> {
 
 impl<'ast> Visit<'ast> for Exits<'_> {
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_expr_return(&mut self, expr: &'ast ExprReturn) {

@@ -1,9 +1,9 @@
 use std::fmt;
 
 use design_model::{NodeId, Outline, Provenance, SpanRelation};
-use grammar::cited::Cited;
-use grammar::output::field::{Id, Quoted, Word};
-use grammar::output::{Fields, Unread};
+use grammar_cited::Cited;
+use grammar_output::field::{Id, Quoted, Word};
+use grammar_output::{Fields, Unread};
 use named_derive::Named;
 use newtype::Wrapping;
 use structurer::{Outlined, SegmentRef};

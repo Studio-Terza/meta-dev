@@ -1,8 +1,12 @@
-use proc_macro2::TokenStream;
+mod boundary;
+
+use proc_macro2::{Span, TokenStream};
+use quote::quote;
 use syn::LitStr;
 use syn::parse::{Parse, ParseStream};
 
-use crate::expanded::{Expanded, Expanding};
+use crate::expanded::Expanding;
+use boundary::Directory;
 
 #[derive(Debug)]
 pub struct Migrations(Option<LitStr>);
@@ -14,7 +18,10 @@ impl Parse for Migrations {
 }
 
 impl Expanding for Migrations {
-    fn expansion(self) -> TokenStream {
-        Expanded::from(sqlx_macros_core::migrate::expand(self.0)).into()
+    fn expansion(self) -> syn::Result<TokenStream> {
+        let span = self.0.as_ref().map_or_else(Span::call_site, LitStr::span);
+        let found = Directory::named(self.0.as_ref()).migrations().map_err(|failed| syn::Error::new(span, failed))?;
+        let from = quote!(::store_ports::Migrator::from);
+        Ok(quote!(#from(::std::vec![#(#found),*])))
     }
 }

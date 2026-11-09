@@ -13,28 +13,29 @@ use design_model::{
 };
 use design_store::{
     Account, AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Excerpt, FailuresReported,
-    FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRepeated, JobRetried, Linked, LiveRuns,
-    NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Remit,
-    Resolved, Resolving, Restaged, Retold, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen,
-    SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema,
-    UnplacedSegments, UnreportedFailures, Unseen, Unstructured,
+    FlailedSegments, Halted, HeldBy, Holding, JobFlailed, JobHalted, JobOpened, JobRepeated, JobRetried, Linked,
+    LiveRuns, NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal,
+    RelationName, Remit, Resolved, Resolving, Restaged, Retold, RunEnded, RunSpawned, RunState, RunsOf, Scope,
+    SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun,
+    StreamSchema, UnplacedSegments, UnreportedFailures, Unseen, Unstructured,
 };
 use dispatch_ports::{Deadline, Finished, Pid, Reply, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
-use grammar::message::Lexemes;
-use grammar::search::Terms;
+use grammar_message::Lexemes;
+use grammar_search::Terms;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
-use newtype::{Counter, Wrapping};
+use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
-use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
-use stream::Stream;
+use sqlite_ports::SqliteOpener;
+use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
+use stream::{Message, Stream};
 use strum::VariantArray;
-use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
+use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Skipped, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
 
@@ -75,7 +76,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
     let Recorded { records, cursor } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(records)?;
+    store.write(store.read(Holding::from(records))?)?;
     let shown = store.read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?.ok_or("o1 was not stored")?;
     let message = shown.message();
     assert_eq!(
@@ -113,8 +114,8 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
 fn writing_the_same_session_again_writes_no_row() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    let first = store.write(Recorded::session()?.records)?;
-    let second = store.write(Recorded::session()?.records)?;
+    let first = store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
+    let second = store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
     assert!(first.count() > 0);
     assert_eq!(second, Written::zero());
     Ok(())
@@ -124,7 +125,7 @@ fn writing_the_same_session_again_writes_no_row() -> Result<(), Box<dyn Error>> 
 fn an_unknown_message_is_not_shown() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(Recorded::session()?.records)?;
+    store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
     assert!(store.read(ShownMessage::named(Uuid::try_new("nobody".to_owned())?))?.is_none());
     Ok(())
 }
@@ -151,7 +152,7 @@ impl Said {
     fn scoped(lines: &[String], words: &[&str], scope: Scope) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        store.write(Recorded::of(&lines.concat())?.records)?;
+        store.write(store.read(Holding::from(Recorded::of(&lines.concat())?.records))?)?;
         let terms = Terms::lexed(words.iter().copied()).ok_or("no terms")?;
         let hits = store.read(SearchSegments::matching(terms, scope))?;
         Ok(hits
@@ -237,17 +238,46 @@ fn an_unrelated_word_finds_nothing() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-static SEEDS: Migrator = store_ports::migrate!("tests/seeded");
+static SEEDS: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/seeded"));
 
 static SEEDED: LazyLock<Migrator> =
-    LazyLock::new(|| Migrator::with_migrations(StreamSchema::migrator().iter().chain(SEEDS.iter()).cloned().collect()));
+    LazyLock::new(|| Migrator::from(StreamSchema::migrator().iter().chain(SEEDS.iter()).copied().collect::<Vec<_>>()));
 
 #[derive(Clone, Copy, Debug)]
 struct Seeded;
 
+#[derive(Op)]
+enum Seeding {
+    Untrimmed,
+    Streamed(<StreamSchema as Schema>::Rewrite),
+}
+
+impl Seeding {
+    const UNTRIMMED: Version = Version::new(20_261_106_000_007);
+}
+
 impl Schema for Seeded {
+    type Rewrite = Seeding;
+
     fn migrator() -> &'static Migrator {
         &SEEDED
+    }
+
+    fn rewrite(pending: Version) -> Option<Seeding> {
+        StreamSchema::rewrite(pending)
+            .map(Seeding::Streamed)
+            .or_else(|| (pending == Seeding::UNTRIMMED).then_some(Seeding::Untrimmed))
+    }
+}
+
+impl Batch for Seeding {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        match self {
+            Seeding::Untrimmed => Around::untrimmed(statements),
+            Seeding::Streamed(streamed) => streamed.written(statements),
+        }
     }
 }
 
@@ -274,8 +304,49 @@ static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
 struct Around(char);
 
 impl Around {
-    fn uuid(self) -> Result<Uuid, Box<dyn Error>> {
-        Ok(Uuid::try_new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))?)
+    fn untrimmed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let written = BLANKS
+            .iter()
+            .map(|blank| Around(*blank).stored(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
+
+    fn stored(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let uuid = self.uuid().map_err(|failed| StoreFailure::Refused(Box::new(failed)))?;
+        let body = self.kept().map_err(|failed| StoreFailure::Refused(Box::new(failed)))?;
+        let message = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  messages (uuid, session, parent, at, author, body)
+VALUES
+  (
+    ?1,
+    's',
+    NULL,
+    '2026-01-01T00:00:00Z',
+    'owner',
+    ?2
+  )
+"#,
+            uuid: Uuid,
+            body: Body
+        ))?;
+        let segment = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  (?1, 0, 'sentence', ?2)
+"#,
+            uuid: Uuid,
+            body: Body
+        ))?;
+        Ok(message.plus(segment))
+    }
+
+    fn uuid(self) -> Result<Uuid, <Uuid as Checked>::Error> {
+        Uuid::try_new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
     }
 
     fn escaped(self) -> String {
@@ -291,8 +362,37 @@ impl Around {
         ))
     }
 
-    fn shown(self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
-        let shown = store.read(ShownMessage::named(self.uuid()?))?.ok_or("the message is not stored")?;
+    fn migrated(self) -> Result<Vec<String>, Box<dyn Error>> {
+        Listed(self.uuid()?).shown(&Run::root().port(OLD_STORE.clone()))
+    }
+
+    fn fresh(self) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
+        fresh.write(fresh.read(Holding::from(Recorded::of(&self.session()?)?.records))?)?;
+        Listed(self.uuid()?).shown(&fresh)
+    }
+
+    fn rederived(self) -> Result<Vec<Body>, Box<dyn Error + Send + Sync>> {
+        let message = Message::from(Skipped::new(self.uuid()?, None).said(
+            SessionId::try_new("s".to_owned())?,
+            Instant::try_new("2026-01-01T00:00:00Z".to_owned())?,
+            Authorship::Owner,
+            self.kept()?,
+        ));
+        Ok(message.segments().iter().map(|segment| segment.text(&message)).collect::<Result<Vec<Body>, _>>()?)
+    }
+
+    fn kept(self) -> Result<Body, Nul> {
+        Body::try_new(format!("{}w{}", self.0, self.0))
+    }
+}
+
+struct Listed(Uuid);
+
+impl Listed {
+    fn shown(&self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
+        let shown = store.read(ShownMessage::named(self.0.clone()))?.ok_or("the message is not stored")?;
         Ok(shown
             .segments()
             .iter()
@@ -302,20 +402,146 @@ impl Around {
             .collect())
     }
 
-    fn migrated(self) -> Result<Vec<String>, Box<dyn Error>> {
-        self.shown(&Run::root().port(OLD_STORE.clone()))
-    }
-
-    fn fresh(self) -> Result<Vec<String>, Box<dyn Error>> {
+    fn found(words: &[&str]) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
-        let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
-        fresh.write(Recorded::of(&self.session()?)?.records)?;
-        self.shown(&fresh)
+        let store = run.port(OLD_STORE.clone());
+        let terms = Terms::lexed(words.iter().copied()).ok_or("no terms")?;
+        let hits = store.read(SearchSegments::matching(terms, Scope::Owner))?;
+        Ok(hits.iter().map(|hit| Body::from(hit).to_string()).collect())
+    }
+}
+
+static UNANCHORED_SEEDS: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!("tests/unanchored"));
+
+static UNANCHORED: LazyLock<Migrator> = LazyLock::new(|| {
+    Migrator::from(StreamSchema::migrator().iter().chain(UNANCHORED_SEEDS.iter()).copied().collect::<Vec<_>>())
+});
+
+#[derive(Clone, Copy, Debug)]
+struct Unanchored;
+
+impl Schema for Unanchored {
+    type Rewrite = <StreamSchema as Schema>::Rewrite;
+
+    fn migrator() -> &'static Migrator {
+        &UNANCHORED
     }
 
-    fn kept(self) -> Result<Body, Box<dyn Error>> {
-        Ok(Body::try_new(format!("{}w{}", self.0, self.0))?)
+    fn rewrite(pending: Version) -> Option<Self::Rewrite> {
+        StreamSchema::rewrite(pending)
     }
+}
+
+impl Unanchored {
+    fn refusal<Rows: std::fmt::Debug>(opened: Result<Rows, StoreFailure>) -> String {
+        match opened {
+            Err(StoreFailure::Refused(refusal)) => refusal.to_string(),
+            other => format!("not refused: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn an_old_store_holding_a_link_to_a_segment_it_does_not_hold_refuses_the_open_and_names_the_link() {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<Unanchored>());
+    assert_eq!(
+        Unanchored::refusal(store.read(SessionCursors)),
+        "these stored links name a segment the store does not hold: u1#0 answers u1#1; u1#2 answers u1#3"
+    );
+}
+
+#[derive(Newtype, Display, Clone, Debug, PartialEq, Eq)]
+struct Named(String);
+
+#[derive(Debug, Columns)]
+struct SegmentKey {
+    child: Named,
+    on_update: Named,
+    on_delete: Named,
+    declared: Named,
+}
+
+#[derive(Debug, Op)]
+struct SegmentKeys;
+
+impl SegmentKey {
+    fn kept(&self) -> String {
+        let deferrable = self.declared.clone().into_inner().contains("DEFERRABLE");
+        format!("{}: on update {}, on delete {}, deferrable {deferrable}", self.child, self.on_update, self.on_delete)
+    }
+
+    fn immediate(&self) -> String {
+        format!("{}: on update NO ACTION, on delete NO ACTION, deferrable false", self.child)
+    }
+}
+
+impl Query for SegmentKeys {
+    type Rows = Vec<SegmentKey>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<SegmentKey>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            SegmentKey,
+            r#"
+SELECT
+  tables.name AS "child!: String",
+  CAST(keys.on_update AS TEXT) AS "on_update!: String",
+  CAST(keys.on_delete AS TEXT) AS "on_delete!: String",
+  upper(tables.sql) AS "declared!: String"
+FROM
+  sqlite_schema AS tables
+  JOIN pragma_foreign_key_list(tables.name) AS keys
+WHERE
+  tables.type = 'table'
+  AND keys."table" = 'segments'
+ORDER BY
+  tables.name,
+  keys.id
+"#
+        ))
+    }
+}
+
+#[test]
+fn every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let keys = run.port(Sqlite::in_memory::<StreamSchema>()).read(SegmentKeys)?;
+    let children: BTreeSet<String> = keys.iter().map(|key| key.child.clone().into_inner()).collect();
+    assert!(children.contains("mechanical_links"), "{children:?}");
+    let kept: Vec<String> = keys.iter().map(SegmentKey::kept).collect();
+    let immediate: Vec<String> = keys.iter().map(SegmentKey::immediate).collect();
+    assert_eq!(kept, immediate);
+    Ok(())
+}
+
+const RESEGMENTED: &str = concat!(
+    "{\"type\":\"user\",\"uuid\":\"o3\",\"parentUuid\":null,\"sessionId\":\"s\",",
+    "\"timestamp\":\"2026-01-01T00:00:03Z\",\"origin\":{\"kind\":\"human\"},",
+    "\"message\":{\"content\":\"First point. Second point.\"}}\n",
+    "{\"type\":\"user\",\"uuid\":\"o4\",\"parentUuid\":null,\"sessionId\":\"s\",",
+    "\"timestamp\":\"2026-01-01T00:00:04Z\",\"origin\":{\"kind\":\"human\"},",
+    "\"message\":{\"content\":\"Only one.\"}}\n"
+);
+
+#[test]
+fn a_message_stored_with_segments_or_shapes_it_no_longer_derives_holds_what_a_fresh_ingest_stores()
+-> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
+    fresh.write(fresh.read(Holding::from(Recorded::of(RESEGMENTED)?.records))?)?;
+    let old = run.port(OLD_STORE.clone());
+    let listed = [Listed(Uuid::try_new("o3".to_owned())?), Listed(Uuid::try_new("o4".to_owned())?)];
+    let migrated = listed.iter().map(|message| message.shown(&old)).collect::<Result<Vec<_>, _>>()?;
+    let ingested = listed.iter().map(|message| message.shown(&fresh)).collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(migrated, ingested);
+    let resegmented = [
+        vec!["0 sentence Body(\"First point.\")", "1 sentence Body(\"Second point.\")"],
+        vec!["0 sentence Body(\"Only one.\")"],
+    ];
+    assert_eq!(migrated, resegmented);
+    assert_eq!(Listed::found(&["second"])?, ["Second point."]);
+    assert_eq!(Listed::found(&["astray"])?, Vec::<String>::new());
+    Ok(())
 }
 
 #[test]
@@ -328,48 +554,33 @@ fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_sh
     Ok(())
 }
 
-#[derive(Op)]
-struct Bodies;
-
-#[derive(Columns)]
-struct BodyRow {
-    message: Uuid,
-    body: Body,
-}
-
-impl Query for Bodies {
-    type Rows = BTreeMap<Uuid, Body>;
-
-    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Uuid, Body>, StoreFailure> {
-        let rows = statements.rows(store_ports::query!(
-            BodyRow,
-            r#"
-SELECT
-  message,
-  body
-FROM
-  segments
-WHERE
-  ordinal = 0
-"#
-        ))?;
-        Ok(rows.into_iter().map(|row| (row.message, row.body)).collect())
-    }
-}
-
 #[test]
 fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
--> Result<(), Box<dyn Error>> {
-    let migrated = Run::root().port(OLD_STORE.clone()).read(Bodies)?;
+-> Result<(), Box<dyn Error + Send + Sync>> {
     let inked: Vec<Around> = (char::MIN..=char::MAX)
         .filter(|point| BLANKS.binary_search(point).is_err())
         .filter(|point| Body::try_new(point.to_string()).is_ok())
         .map(Around)
         .collect();
-    let kept: Vec<Option<&Body>> =
-        inked.iter().map(|point| Ok(migrated.get(&point.uuid()?))).collect::<Result<_, Box<dyn Error>>>()?;
-    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect::<Result<_, Box<dyn Error>>>()?;
-    assert_eq!(kept, both_sides.iter().map(Some).collect::<Vec<Option<&Body>>>());
+    let rederived = inked.iter().map(|point| point.rederived()).collect::<Result<Vec<Vec<Body>>, _>>()?;
+    let both_sides =
+        inked.iter().map(|point| point.kept().map(|kept| vec![kept])).collect::<Result<Vec<Vec<Body>>, _>>()?;
+    assert_eq!(rederived, both_sides);
+    Ok(())
+}
+
+#[test]
+fn a_segment_stored_with_a_body_its_message_no_longer_derives_is_rederived_and_found_by_its_words()
+-> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(OLD_STORE.clone());
+    let shown = store.read(ShownMessage::named(Uuid::try_new("o2".to_owned())?))?.ok_or("o2 was not stored")?;
+    let bodies: Vec<String> = shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect();
+    assert_eq!(bodies, ["kept forever"]);
+    let terms = Terms::lexed(["forever"]).ok_or("no terms")?;
+    let hits = store.read(SearchSegments::matching(terms, Scope::Owner))?;
+    let found: Vec<String> = hits.iter().map(|hit| Body::from(hit).to_string()).collect();
+    assert_eq!(found, ["kept forever"]);
     Ok(())
 }
 
@@ -655,7 +866,7 @@ fn directions_are_written_whole_or_not_at_all() -> Result<(), Box<dyn Error>> {
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(records)?;
+    store.write(store.read(Holding::from(records))?)?;
     let root = Projects::rooted(&store, "p")?;
     let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0)? };
     assert!(Proposals::written(&store, vec![Proposals::child(root, 2)?, stray]).is_err());
@@ -668,7 +879,7 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(records)?;
+    store.write(store.read(Holding::from(records))?)?;
     let root = Projects::rooted(&store, "p")?;
     let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0)? };
     let refused = Proposals::unseen(&store, "refused")?;
@@ -740,7 +951,7 @@ fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dy
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(records)?;
+    store.write(store.read(Holding::from(records))?)?;
     let heard = |prefix: &str| -> Result<Vec<(Segment, Authorship)>, Box<dyn Error>> {
         let spoken = store.read(Prefixed::from(Prefix::new(prefix.to_owned())))?;
         Ok(spoken.iter().map(|said| (said.segment().clone(), said.author())).collect())
@@ -758,7 +969,7 @@ fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(),
     let Recorded { records, .. } = Recorded::session()?;
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(records)?;
+    store.write(store.read(Holding::from(records))?)?;
     let [asked, answered, said] =
         [Proposals::segment("o1", 0)?, Proposals::segment("o1", 1)?, Proposals::segment("l1", 0)?];
     let covered = |messages: &[&str]| -> Result<Vec<Segment>, Box<dyn Error>> {
@@ -875,7 +1086,7 @@ impl Probe {
         let Recorded { records, .. } = Recorded::of(SEGMENTED)?;
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        store.write(records)?;
+        store.write(store.read(Holding::from(records))?)?;
         iter::repeat_with(|| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
             .take(ENDS)
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
@@ -970,7 +1181,7 @@ impl Mixed {
         let Recorded { records, .. } = Recorded::of(SEGMENTED)?;
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        store.write(records)?;
+        store.write(store.read(Holding::from(records))?)?;
         self.dag.planted(&store)?;
         let ends = self.closed.ends();
         let files = (0..self.edges.len())
@@ -1302,7 +1513,7 @@ impl Unstructuring {
 fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(Recorded::session()?.records)?;
+    store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
     let before = Unstructuring::listed(&store)?;
     Proposals::written(&store, vec![Directed::Conversational { segment: Proposals::segment("o1", 0)? }])?;
     let after = Unstructuring::listed(&store)?;
@@ -1344,7 +1555,7 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
 -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(Recorded::session()?.records)?;
+    store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
     let job = store.read(NextJob)?;
     store.write(JobOpened::from(job))?;
     let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
@@ -1373,7 +1584,7 @@ fn a_flailed_mark_lands_only_on_unstructured_segments_is_listed_with_its_job_and
 fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(Recorded::session()?.records)?;
+    store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
     let job = store.read(NextJob)?;
     store.write(JobOpened::from(job))?;
     let spawned = Spawned::new(Pid::new(7), None, Deadline::new(Wall::new(0)));
@@ -1427,7 +1638,7 @@ impl Spawning {
     fn stored(&self) -> Result<Lived, Box<dyn Error>> {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        store.write(Recorded::session()?.records)?;
+        store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
         let job = store.read(NextJob)?;
         store.write(JobOpened::from(job))?;
         let id = store.read(NextRun)?;
@@ -1536,7 +1747,7 @@ fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result
 fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(Recorded::session()?.records)?;
+    store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
     let [first, second] = [JobId::new(1), JobId::new(2)];
     store.write(JobOpened::from(first))?;
     store.write(JobOpened::from(second))?;
@@ -1554,3 +1765,5 @@ fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<d
     assert_eq!(filed, vec![(first, RunId::new(1))]);
     Ok(())
 }
+
+type Sqlite = <SqliteOpener as store_ports::Opens>::Store;

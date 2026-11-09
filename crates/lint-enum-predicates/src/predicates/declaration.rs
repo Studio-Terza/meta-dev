@@ -8,6 +8,7 @@ use lint_layout::Name;
 use lint_placement::{CrateRoot, ModulePath};
 
 use super::Kind;
+use super::known::Known;
 use declared::Declared;
 
 #[derive(Debug)]
@@ -34,15 +35,9 @@ impl<'file> Declaration<'file> {
         self.types.push(Declared::new(Name::from(ident), kind));
     }
 
-    pub fn kinds<'scan>(&'scan self, crate_root: &CrateRoot, name: &'scan Name) -> impl Iterator<Item = Kind> + 'scan {
-        Some(self)
-            .filter(|declaration| declaration.crate_root == crate_root)
-            .into_iter()
-            .flat_map(|declaration| declaration.types.iter())
-            .filter_map(move |declared| declared.named(name))
-    }
-
-    pub fn in_module(&self, module: &ModulePath) -> Option<&Declaration<'file>> {
-        (*self.module == *module).then_some(self)
+    pub fn filed<'scan>(&'scan self, known: Known<'scan>) -> Known<'scan> {
+        self.types.iter().fold(known, |filing, declared| {
+            filing.recorded(self.crate_root, &self.module, declared.as_ref(), Kind::from(declared))
+        })
     }
 }

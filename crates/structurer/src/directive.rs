@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use design_model::{Facet, SegmentRelation, Sense, SpanRelation, Title};
-use grammar::directive::Pieces;
+use grammar_directive::Pieces;
 
 use crate::reading::Reader;
 use crate::{Edge, Label, Misread, NodeRef, Proposal, SegmentRef};

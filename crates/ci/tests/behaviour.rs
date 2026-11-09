@@ -12,6 +12,20 @@ use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
+const CLIPPY_FIXTURE: &str = include_str!("metadata/clippy_targets.json");
+const TIMINGS_UNITS: &str = include_str!("timings/units.json");
+const TIMINGS_METADATA: &str = include_str!("timings/metadata.json");
+const EVERY_PLATFORM: &str = include_str!("timings/every-platform.json");
+const HOST_PLATFORM: &str = include_str!("timings/host-platform.json");
+const HOST: &str = "x86_64-unknown-linux-gnu";
+const GRAPH_PATH: [&str; 6] = [
+    "graph-path 2.50 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+    "0.40 ext-macro (build)",
+    "0.70 core (check)",
+    "0.60 app (check)",
+    "0.80 app behaviour \"test\" (check-test)",
+    "graph-work 3.95 seconds, the sum of the same units",
+];
 const CRATES_GENERATED: usize = 31;
 const LINES_PRINTED: usize = 31;
 const LEAF_REPORT: [&str; 3] = ["REACH=1 of 5 crates", "BUILD_SCOPE=-p leaf", "MUTANTS_SCOPE=--test-package=leaf"];
@@ -48,12 +62,18 @@ impl Reply {
     }
 }
 
+struct ExactReply {
+    asked: Invocation,
+    text: String,
+}
+
 struct Script {
     exit: Exit,
     elapsed: Duration,
     changed: String,
     metadata: String,
     answers: Vec<Reply>,
+    exact: Vec<ExactReply>,
     failing: Option<&'static str>,
     logged_text: String,
     calls: RefCell<Vec<Invocation>>,
@@ -68,6 +88,7 @@ impl Script {
             changed: String::new(),
             metadata: METADATA.to_owned(),
             answers: Vec::new(),
+            exact: Vec::new(),
             failing: None,
             logged_text: String::new(),
             calls: RefCell::new(Vec::new()),
@@ -95,6 +116,13 @@ impl Script {
     }
 
     fn answer_to(&self, invocation: &Invocation) -> String {
+        self.exact
+            .iter()
+            .find(|exact| exact.asked == *invocation)
+            .map_or_else(|| self.keyed_answer(invocation), |exact| exact.text.clone())
+    }
+
+    fn keyed_answer(&self, invocation: &Invocation) -> String {
         let key = [
             invocation.program().to_string_lossy().as_ref(),
             " ",
@@ -193,6 +221,12 @@ impl Reach {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct Recorded {
+    exit: ExitCode,
+    lines: Vec<String>,
+}
+
 struct Sample;
 
 impl Sample {
@@ -203,14 +237,18 @@ impl Sample {
         Text::owned(&scratch.read("m.toml"))
     }
 
-    fn libtest_line(output: &&str) -> Vec<String> {
+    fn measured(exit: ExitCode, lines: &[&str]) -> Recorded {
+        Recorded { exit, lines: lines.iter().map(|line| (*line).to_owned()).collect() }
+    }
+
+    fn libtest_line(output: &&str) -> Recorded {
         let scratch = Scratch::fresh();
         scratch.write("out.txt", output).ok();
-        scratch.answer(
+        let answer = scratch.answer(
             &Script::new(),
             &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")],
         );
-        Text::owned(&scratch.read("m.toml"))
+        Recorded { exit: answer.exit, lines: Text::owned(&scratch.read("m.toml")) }
     }
 
     fn reach_report(&[base, changed]: &[&str; 2]) -> Vec<String> {
@@ -238,24 +276,27 @@ laws::table!(
     the_libtest_seconds_of_every_result_line_are_added,
     Sample::libtest_line,
     [
-        "test result: ok. 3 passed; 0 failed; finished in 0.50s\n" => vec!["test-run = 0.50"],
-        "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n" => vec!["test-run = 1.75"],
-        "running 3 tests\n...\ntest result: ok. finished in 2.00s\nfinished in 9.00s\n" => vec!["test-run = 2.00"],
-        "test result: ok. 1 passed; 0 failed\n" => vec!["test-run = 0.00"],
-        "" => Vec::<&str>::new(),
-        "no result lines here\n" => Vec::<&str>::new(),
-        "test result: ok. finished in abc\n" => vec!["test-run = 0.00"],
-        "test result: ok. finished in 3s\n" => vec!["test-run = 3.00"],
-        "test result: ok. finished in 0.5\n" => vec!["test-run = 0.50"],
-        "test result: ok. finished in 1s in 2s\n" => vec!["test-run = 3.00"],
-        "  test result: ok. finished in 9s\n" => Vec::<&str>::new(),
-        "test results: ok. finished in 4s\n" => vec!["test-run = 4.00"],
-        "test result: ok. finished in\n" => vec!["test-run = 0.00"],
-        "test result: ok. finishedin 5s\n" => vec!["test-run = 0.00"],
-        "test result: ok. in 1.5.5s\n" => vec!["test-run = 0.00"],
-        "test resul: ok. finished in 5s\n" => Vec::<&str>::new(),
-        "test result: ok. finished  in\t7s\n" => vec!["test-run = 7.00"],
-        "test result: ok. finished in 0.004s\n" => vec!["test-run = 0.00"],
+        "test result: ok. 3 passed; 0 failed; finished in 0.50s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 0.50"]),
+        "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 1.75"]),
+        "running 3 tests\n...\ntest result: ok. finished in 2.00s\nfinished in 9.00s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 2.00"]),
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 0.50"]),
+        "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 1.25"]),
+        "test result: ok. 1 passed; 0 failed\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "" => Sample::measured(ExitCode::FAILURE, &[]),
+        "no result lines here\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in abc\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in 3s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 3.00"]),
+        "test result: ok. finished in 0.5\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in 1s in 2s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "  test result: ok. finished in 9s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test results: ok. finished in 4s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finishedin 5s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. in 1.5.5s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test resul: ok. finished in 5s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished  in\t7s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 7.00"]),
+        "test result: ok. finished in 0.004s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 0.00"]),
+        "test result: ok. finished in 2.00s\ntest result: ok. finished in abc\n" => Sample::measured(ExitCode::FAILURE, &[]),
     ]
 );
 
@@ -292,6 +333,185 @@ laws::table!(
         ["project/x", "README.md\n"] => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
     ]
 );
+
+struct Clippy;
+
+impl Clippy {
+    fn invoked(scope: &[&str]) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), ..Script::new() };
+        let measured = scratch.file("m.toml");
+        scratch.answer(&fake, &[&["clippy-targets", measured.as_str(), "clippy"], scope].concat());
+        let calls = fake.calls.borrow();
+        calls
+            .iter()
+            .filter(|call| call.arguments().first().is_some_and(|first| first == "clippy"))
+            .flat_map(|call| call.arguments().iter().skip(2))
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    fn refused(scope: &[&str]) -> Vec<String> {
+        Clippy::refused_on(CLIPPY_FIXTURE, scope)
+    }
+
+    fn refused_on(metadata: &str, scope: &[&str]) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        let fake = Script { metadata: metadata.to_owned(), ..Script::new() };
+        let measured = scratch.file("m.toml");
+        let answer = scratch.answer(&fake, &[&["clippy-targets", measured.as_str(), "clippy"], scope].concat());
+        assert_eq!((answer.exit, answer.out.as_str(), scratch.read("m.toml").as_str()), (ExitCode::FAILURE, "", ""));
+        assert!(fake.calls.borrow().iter().all(|call| call.arguments().first().is_none_or(|first| first != "clippy")));
+        Text::lines(&answer.err)
+    }
+}
+
+laws::table!(
+    clippy_names_the_kinds_of_target_the_scope_has_and_always_the_tests,
+    Clippy::invoked,
+    [
+        &["--workspace"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace"],
+        &["--all"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--all"],
+        &["--workspace", "--timings", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace", "--timings", "--", "-D", "warnings"],
+        &["-p", "libonly"][..] => vec!["--lib", "--tests", "-p", "libonly"],
+        &["-p", "binonly"][..] => vec!["--bins", "--tests", "-p", "binonly"],
+        &["-p", "demo"][..] => vec!["--lib", "--example", "showcase", "--tests", "-p", "demo"],
+        &["-p", "benched"][..] => vec!["--lib", "--bench", "speed", "--tests", "-p", "benched"],
+        &["-p", "libonly", "-p", "benched"][..] => vec!["--lib", "--bench", "speed", "--tests", "-p", "libonly", "-p", "benched"],
+        &["-p", "macros"][..] => vec!["--lib", "--tests", "-p", "macros"],
+        &["-p", "gated"][..] => vec!["--lib", "--tests", "-p", "gated"],
+        &["-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--example", "showcase", "--tests", "-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"],
+        &["--package=binonly"][..] => vec!["--bins", "--tests", "--package=binonly"],
+        &["-pbinonly"][..] => vec!["--bins", "--tests", "-pbinonly"],
+        &["-p=binonly"][..] => vec!["--bins", "--tests", "-p=binonly"],
+        &["-vp", "binonly"][..] => vec!["--bins", "--tests", "-vp", "binonly"],
+        &["--packages", "x"][..] => vec!["--lib", "--bins", "--tests", "--packages", "x"],
+        &["--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--tests", "--", "-D", "warnings"],
+        &[][..] => vec!["--lib", "--bins", "--tests"],
+        &["--workspace", "-p", "libonly"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace", "-p", "libonly"],
+        &["--", "-p", "benched"][..] => vec!["--lib", "--bins", "--tests", "--", "-p", "benched"],
+        &["--", "--workspace"][..] => vec!["--lib", "--bins", "--tests", "--", "--workspace"],
+    ]
+);
+
+const UNRESOLVED: &str = "against the cargo metadata: it takes workspace package names, not globs, versions or URLs";
+const REFUSED: &str = "it chooses the targets from the cargo metadata of the workspace it runs in";
+const NOTHING: &str = "the clippy scope has no target to check, so clippy would pass by checking nothing";
+const NO_PACKAGES: &str = r#"{ "packages": [], "workspace_default_members": [] }"#;
+const NO_DEFAULTS: &str =
+    r#"{ "packages": [{ "id": "a", "name": "a", "targets": [{ "name": "a", "kind": ["lib"] }] }] }"#;
+
+laws::table!(
+    clippy_refuses_a_package_spec_it_cannot_resolve_naming_the_spec_and_never_runs,
+    |scope: &&[&str]| Clippy::refused(scope),
+    [
+        &["-p", "unmatched"][..] => vec![format!("clippy-targets cannot resolve the package spec `unmatched` {UNRESOLVED}")],
+        &["-p", "lib*"][..] => vec![format!("clippy-targets cannot resolve the package spec `lib*` {UNRESOLVED}")],
+        &["-p", "libonly@0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly@0.1.0` {UNRESOLVED}")],
+        &["--package=libonly@0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly@0.1.0` {UNRESOLVED}")],
+        &["-plib?nly"][..] => vec![format!("clippy-targets cannot resolve the package spec `lib?nly` {UNRESOLVED}")],
+        &["-p", "path+file:///w/libonly#0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `path+file:///w/libonly#0.1.0` {UNRESOLVED}")],
+        &["-p", "libonly", "-p", "libonly:0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly:0.1.0` {UNRESOLVED}")],
+        &["--workspace", "-p", "unmatched"][..] => vec![format!("clippy-targets cannot resolve the package spec `unmatched` {UNRESOLVED}")],
+        &["--package="][..] => vec![format!("clippy-targets cannot resolve the package spec `` {UNRESOLVED}")],
+    ]
+);
+
+laws::table!(
+    clippy_refuses_the_flags_that_would_choose_targets_or_another_workspace,
+    |scope: &&[&str]| Clippy::refused(scope),
+    [
+        &["--workspace", "--exclude", "libonly"][..] => vec![format!("clippy-targets refuses `--exclude`: {REFUSED}")],
+        &["--workspace", "--exclude=libonly"][..] => vec![format!("clippy-targets refuses `--exclude=libonly`: {REFUSED}")],
+        &["--manifest-path", "w/Cargo.toml"][..] => vec![format!("clippy-targets refuses `--manifest-path`: {REFUSED}")],
+        &["--workspace", "--all-targets"][..] => vec![format!("clippy-targets refuses `--all-targets`: {REFUSED}")],
+        &["-p", "benched", "--benches"][..] => vec![format!("clippy-targets refuses `--benches`: {REFUSED}")],
+        &["--bench=speed"][..] => vec![format!("clippy-targets refuses `--bench=speed`: {REFUSED}")],
+        &["--lib"][..] => vec![format!("clippy-targets refuses `--lib`: {REFUSED}")],
+        &["--tests"][..] => vec![format!("clippy-targets refuses `--tests`: {REFUSED}")],
+    ]
+);
+
+laws::table!(
+    clippy_refuses_a_package_flag_without_a_spec,
+    |scope: &&[&str]| Clippy::refused(scope).concat().contains("usage: ci "),
+    [
+        &["-p"][..] => true,
+        &["--package"][..] => true,
+        &["-p", "--", "-D", "warnings"][..] => true,
+    ]
+);
+
+laws::table!(
+    clippy_refuses_a_scope_with_no_target_rather_than_checking_nothing,
+    |(metadata, scope): &(&str, &[&str])| Clippy::refused_on(metadata, scope),
+    [
+        (NO_PACKAGES, &[][..]) => vec![NOTHING.to_owned()],
+        (NO_PACKAGES, &["--workspace"][..]) => vec![NOTHING.to_owned()],
+        (NO_DEFAULTS, &[][..]) => vec![NOTHING.to_owned()],
+    ]
+);
+
+#[test]
+fn clippy_never_names_a_kind_flag_that_puts_libraries_in_test_mode_and_names_each_bench_and_example() {
+    let without = Clippy::invoked(&["-p", "libonly", "-p", "binonly", "-p", "demo", "-p", "gated"]);
+    let with = Clippy::invoked(&["-p", "libonly", "-p", "benched"]);
+    let whole = Clippy::invoked(&["--workspace"]);
+    assert!(without.iter().all(|flag| flag != "--bench"));
+    assert!(with.contains(&"--bench".to_owned()));
+    assert!(
+        without
+            .iter()
+            .chain(&with)
+            .chain(&whole)
+            .all(|flag| ["--all-targets", "--test", "--benches", "--examples"].iter().all(|named| flag != named))
+    );
+}
+
+#[test]
+fn clippy_is_timed_under_its_stage_and_fails_with_its_code() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
+    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "-p", "binonly"]);
+    assert_eq!(answer.exit, ExitCode::from(FAILED_WITH.get()));
+    assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.50"]);
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
+            Invocation::new("cargo", ["clippy", "--locked", "--bins", "--tests", "-p", "binonly"]),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_that_cannot_be_read_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let fake = Script { metadata: "not json".to_owned(), ..Script::new() };
+    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "--workspace"]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.contains("cannot read the cargo metadata: "));
+    assert_eq!(fake.calls.borrow().len(), 1);
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn metadata_that_cannot_be_asked_for_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let answer = scratch.answer(&Script::refusing("cargo"), &["clippy-targets", &scratch.file("m.toml"), "clippy"]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert_eq!(Text::lines(&answer.err), ["cannot run cargo: boom"]);
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn clippy_targets_needs_a_measured_file_and_a_stage() {
+    assert!(Answer::refused(&["clippy-targets"]));
+    assert!(Answer::refused(&["clippy-targets", "m.toml"]));
+}
 
 #[test]
 fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Error>> {
@@ -382,6 +602,23 @@ fn test_output_without_a_result_line_is_a_failure_and_nothing_is_measured() -> R
         .answer(&Script::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("no libtest result line"));
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn a_result_line_libtest_could_not_have_written_is_a_failure_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write(
+        "out.txt",
+        "test result: ok. 2 passed; finished in 1.00s\ntest result: ok. 1 passed; finished in soon\n",
+    )?;
+    let answer = scratch
+        .answer(&Script::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.contains("out.txt"));
+    assert!(answer.err.contains("\"test result: ok. 1 passed; finished in soon\" in "));
+    assert!(answer.err.contains("opens like a libtest result line but does not read as one"));
     assert_eq!(scratch.read("m.toml"), "");
     Ok(())
 }
@@ -565,6 +802,17 @@ impl Page {
         format!("{{\"i\": 0, \"name\": \"{name}\", \"mode\": \"todo\", \"duration\": {duration}, \"sections\": null}}")
     }
 
+    fn listing(units: &str) -> String {
+        format!("<html>\nconst UNIT_DATA = {units};\n</html>\n")
+    }
+
+    fn of(name: &str, version: &str, target: &str, duration: &str) -> String {
+        format!(
+            "{{\"i\": 0, \"name\": \"{name}\", \"version\": \"{version}\", \"mode\": \"todo\", \"target\": \"{}\", \"duration\": {duration}}}",
+            target.escape_default()
+        )
+    }
+
     fn timed(page: &str) -> Result<Timings, Box<dyn Error>> {
         let scratch = Scratch::new()?;
         scratch.write("page.html", page)?;
@@ -609,6 +857,239 @@ fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> 
     let missing =
         scratch.answer(&Script::new(), &["compile-times", &scratch.file("none.html"), &scratch.file("report.txt")]);
     assert_eq!(missing.exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+struct Graph {
+    answer: Answer,
+    measured: String,
+    report: String,
+    asked: Vec<Invocation>,
+}
+
+impl Graph {
+    fn metadata_for(host: &str) -> Invocation {
+        Invocation::new("cargo", ["metadata", "--locked", "--format-version", "1", "--filter-platform", host])
+    }
+
+    fn hosted(script: Script) -> Script {
+        let answers = script.answers.into_iter().chain([Reply::to("rustc --print", &format!("{HOST}\n"))]).collect();
+        Script { answers, ..script }
+    }
+
+    fn measured(page: &str, metadata: &str) -> Result<Graph, Box<dyn Error>> {
+        Graph::answered(page, &Graph::hosted(Script { metadata: metadata.to_owned(), ..Script::new() }))
+    }
+
+    fn answered(page: &str, fake: &Script) -> Result<Graph, Box<dyn Error>> {
+        let scratch = Scratch::new()?;
+        scratch.write("page.html", page)?;
+        scratch.write("m.toml", "clippy = 50.80\n")?;
+        let arguments = ["graph-path", &scratch.file("page.html"), &scratch.file("m.toml"), &scratch.file("path.txt")];
+        let answer = scratch.answer(fake, &arguments);
+        let asked = fake.calls.borrow().clone();
+        Ok(Graph { answer, measured: scratch.read("m.toml"), report: scratch.read("path.txt"), asked })
+    }
+}
+
+#[test]
+fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_beside_the_wall()
+-> Result<(), Box<dyn Error>> {
+    let Graph { answer, measured, report, asked } = Graph::measured(&Page::listing(TIMINGS_UNITS), TIMINGS_METADATA)?;
+    assert_eq!(asked, [Invocation::new("rustc", ["--print", "host-tuple"]), Graph::metadata_for(HOST)]);
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: GRAPH_PATH.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&report), GRAPH_PATH);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.50"]);
+    Ok(())
+}
+
+#[test]
+fn cacheable_external_units_weigh_nothing_however_long_they_took() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("heavy", "1.0.0", " (check)", "9.0"),
+            Page::of("heavy", "1.0.0", "", "5.0"),
+            Page::of("sys", "0.3.0", " (check)", "1.0"),
+        ]
+        .join(","),
+    );
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.00"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 0.00 seconds, the sum of the same units")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_proc_macro_host_build_and_a_build_script_count_even_outside_the_workspace() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("ext-macro", "2.0.0", "", "0.4"),
+            Page::of("sys", "0.3.0", " build-script", "0.1"),
+            Page::of("sys", "0.3.0", " build-script (run)", "0.2"),
+            Page::of("sys", "0.3.0", " (check)", "1.0"),
+        ]
+        .join(","),
+    );
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let expected = [
+        "graph-path 0.40 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+        "0.40 ext-macro (build)",
+        "graph-work 0.70 seconds, the sum of the same units",
+    ];
+    assert_eq!(Text::lines(&answer.out), expected);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.40"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 0.70 seconds, the sum of the same units")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_unit_the_page_does_not_time_weighs_nothing_but_still_links_its_neighbours() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("derive-macro", "0.1.0", "", "0.3"),
+            Page::of("app", "0.1.0", r#" behaviour "test" (check-test)"#, "0.8"),
+        ]
+        .join(","),
+    );
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let expected = [
+        "graph-path 1.10 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+        "0.30 derive-macro (build)",
+        r#"0.80 app behaviour "test" (check-test)"#,
+        "graph-work 1.10 seconds, the sum of the same units",
+    ];
+    assert_eq!(Text::lines(&answer.out), expected);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 1.10"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 1.10 seconds, the sum of the same units")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_unit_label_cargo_never_writes_refuses_the_page_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+    let labels = [" app bin (check)", " (check) ", " (build)", " app \"bin\"", " build-script (check)"];
+    let refused = labels
+        .iter()
+        .map(|label| {
+            Graph::measured(&Page::with(&Page::of("app", "0.1.0", label, "1.0")), TIMINGS_METADATA)
+                .map(|graph| (graph.answer.exit, graph.answer.err.contains("no unit timings in"), graph.measured))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(refused, vec![(ExitCode::FAILURE, true, "clippy = 50.80\n".to_owned()); labels.len()]);
+    Ok(())
+}
+
+#[test]
+fn two_check_variants_of_one_crate_count_the_longer_on_the_path_and_both_in_the_work() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[Page::of("core", "0.1.0", " (check)", "0.5"), Page::of("core", "0.1.0", " (check)", "0.7")].join(","),
+    );
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    assert_eq!(Text::lines(&answer.out).get(1).map(String::as_str), Some("0.70 core (check)"));
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.70"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 1.20 seconds, the sum of the same units")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_graph_path_needs_unit_timings_and_metadata_cargo_can_give() -> Result<(), Box<dyn Error>> {
+    let unreadable = Graph::measured(&Page::listing(TIMINGS_UNITS), "not json")?;
+    assert_eq!(unreadable.answer.exit, ExitCode::FAILURE);
+    assert!(unreadable.answer.err.contains("cannot read the cargo metadata: "));
+    assert_eq!(Text::lines(&unreadable.measured), ["clippy = 50.80"]);
+    assert_eq!(unreadable.report, "");
+    let untimed = Graph::measured("<html></html>", TIMINGS_METADATA)?;
+    assert_eq!(untimed.answer.exit, ExitCode::FAILURE);
+    assert!(untimed.answer.err.contains("no unit timings in"));
+    assert_eq!(untimed.asked, Vec::<Invocation>::new());
+    let scratch = Scratch::new()?;
+    scratch.write("page.html", &Page::listing(TIMINGS_UNITS))?;
+    let refused = scratch.answer(
+        &Graph::hosted(Script::refusing("cargo")),
+        &["graph-path", &scratch.file("page.html"), &scratch.file("m.toml"), &scratch.file("path.txt")],
+    );
+    assert_eq!(
+        (refused.exit, Text::lines(&refused.err)),
+        (ExitCode::FAILURE, vec!["cannot run cargo: boom".to_owned()])
+    );
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("slowmacro", "0.1.0", "", "1.0"),
+            Page::of("mid", "0.1.0", " (check)", "1.0"),
+            Page::of("app", "0.1.0", " (check)", "1.0"),
+            Page::of("user", "0.1.0", " (check)", "0.5"),
+        ]
+        .join(","),
+    );
+    let fake = Script {
+        metadata: EVERY_PLATFORM.to_owned(),
+        exact: vec![ExactReply { asked: Graph::metadata_for(HOST), text: HOST_PLATFORM.to_owned() }],
+        ..Graph::hosted(Script::new())
+    };
+    let Graph { answer, measured, report, .. } = Graph::answered(&page, &fake)?;
+    let expected = [
+        "graph-path 2.00 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+        "1.00 mid (check)",
+        "1.00 app (check)",
+        "graph-work 3.50 seconds, the sum of the same units",
+    ];
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.00"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 3.50 seconds, the sum of the same units")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_page_that_records_a_failed_build_is_skipped_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+    let failed = format!(
+        "<table>\n<tr><td class=\"error-text\">Error:</td><td>1 job failed</td></tr>\n</table>\n{}",
+        Page::listing(TIMINGS_UNITS)
+    );
+    let Graph { answer, measured, report, asked } = Graph::measured(&failed, TIMINGS_METADATA)?;
+    let skipped = "graph-path skipped: the timings page records a failed build, so it times only part of the clippy units and nothing is measured";
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: vec![skipped], err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&report), [skipped]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80"]);
+    assert_eq!(asked, Vec::<Invocation>::new());
+    Ok(())
+}
+
+#[test]
+fn a_graph_path_needs_rustc_to_name_exactly_one_host() -> Result<(), Box<dyn Error>> {
+    let named = ["", "x86_64-unknown-linux-gnu\naarch64-apple-darwin\n"].map(|host| {
+        let fake = Script::answering(vec![Reply::to("rustc --print", host)]);
+        Graph::answered(&Page::listing(TIMINGS_UNITS), &fake).map(|graph| {
+            (
+                graph.answer.exit,
+                graph.answer.err.contains("not the one host platform"),
+                graph.measured,
+                graph.asked.len(),
+            )
+        })
+    });
+    let refused = named.into_iter().collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(refused, vec![(ExitCode::FAILURE, true, "clippy = 50.80\n".to_owned(), 1); 2]);
     Ok(())
 }
 
@@ -672,6 +1153,10 @@ laws::table!(
         ["compile-times"] => true,
         ["compile-times", "page.html"] => true,
         ["compile-times", "page.html", "report.txt", "extra"] => true,
+        ["graph-path"] => true,
+        ["graph-path", "page.html"] => true,
+        ["graph-path", "page.html", "m.toml"] => true,
+        ["graph-path", "page.html", "m.toml", "path.txt", "extra"] => true,
         ["history"] => true,
         ["history", "metadata.json"] => true,
         ["history", "metadata.json", "history.tsv"] => true,
