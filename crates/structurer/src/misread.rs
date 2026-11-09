@@ -1,6 +1,6 @@
 use std::fmt;
 
-use grammar::directive::{Lexed, Location};
+use grammar::directive::{Column, Lexed, LineNumber, Location};
 use grammar::output::field::{Integer, Phrase, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
@@ -53,9 +53,9 @@ pub enum Wanted {
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Misread {
-    #[error("line {}, column {}: expected {wanted}", at.line(), at.column())]
+    #[error("{at}: expected {wanted}")]
     Expected { at: Location, wanted: Wanted },
-    #[error("line {}, column {}: {verb} is written {}", at.line(), at.column(), verb.form())]
+    #[error("{at}: {verb} is written {}", verb.form())]
     Arity { at: Location, verb: Verb },
 }
 
@@ -75,13 +75,22 @@ enum Missing {
 
 pub(crate) struct Briefed<'misread>(&'misread Misread);
 
+struct Spot(Location);
+
+impl fmt::Display for Spot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (line, column): (&LineNumber, &Column) = (self.0.as_ref(), self.0.as_ref());
+        write!(formatter, "{line} {column}")
+    }
+}
+
 impl fmt::Display for Briefed<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             Misread::Expected { at, wanted } => {
-                write!(formatter, "{} {} {} {}", Missing::Expected, at.line(), at.column(), Quoting::from(wanted))
+                write!(formatter, "{} {} {}", Missing::Expected, Spot(*at), Quoting::from(wanted))
             }
-            Misread::Arity { at, verb } => write!(formatter, "{} {} {} {verb}", Missing::Arity, at.line(), at.column()),
+            Misread::Arity { at, verb } => write!(formatter, "{} {} {verb}", Missing::Arity, Spot(*at)),
         }
     }
 }

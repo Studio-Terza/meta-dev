@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ops::Range;
 
 use logos::{Lexer, Logos};
@@ -270,15 +271,23 @@ impl Location {
     pub fn new(line: usize, column: usize) -> Location {
         Location { line: LineNumber(line), column: Column(column) }
     }
+}
 
-    #[must_use]
-    pub fn line(self) -> LineNumber {
-        self.line
+impl AsRef<LineNumber> for Location {
+    fn as_ref(&self) -> &LineNumber {
+        &self.line
     }
+}
 
-    #[must_use]
-    pub fn column(self) -> Column {
-        self.column
+impl AsRef<Column> for Location {
+    fn as_ref(&self) -> &Column {
+        &self.column
+    }
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "line {}, column {}", self.line, self.column)
     }
 }
 

@@ -7,6 +7,7 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
+use grammar::directive::{Column, LineNumber};
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
@@ -143,7 +144,7 @@ impl Spot {
         match parsed {
             Ok(_) => None,
             Err(Misread::Expected { at, .. } | Misread::Arity { at, .. }) => {
-                Spot::at(at.line().into_inner(), at.column().into_inner())
+                Spot::at(AsRef::<LineNumber>::as_ref(at).into_inner(), AsRef::<Column>::as_ref(at).into_inner())
             }
         }
     }
@@ -207,7 +208,9 @@ struct Jobs;
 
 impl Jobs {
     fn said() -> impl Strategy<Value = Said> {
-        (Generated::segment(), "[^\u{0}]{0,40}").prop_map(|(segment, body)| Said::new(segment, Body::new(body)))
+        (Generated::segment(), "[^\u{0}]{0,40}").prop_filter_map("a body holds no NUL", |(segment, body)| {
+            Some(Said::new(segment, Body::try_new(body).ok()?))
+        })
     }
 
     fn node() -> impl Strategy<Value = Outline> {
