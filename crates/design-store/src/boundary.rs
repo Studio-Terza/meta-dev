@@ -330,6 +330,8 @@ SELECT
 FROM
   pragma_foreign_key_check('mechanical_links') AS unchecked
   JOIN mechanical_links ON mechanical_links.rowid = unchecked.rowid
+GROUP BY
+  mechanical_links.rowid
 ORDER BY
   mechanical_links.rowid
 "#

@@ -12,6 +12,7 @@ use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
+const CLIPPY_FIXTURE: &str = include_str!("metadata/clippy_targets.json");
 const TIMINGS_UNITS: &str = include_str!("timings/units.json");
 const TIMINGS_METADATA: &str = include_str!("timings/metadata.json");
 const EVERY_PLATFORM: &str = include_str!("timings/every-platform.json");
@@ -318,6 +319,185 @@ laws::table!(
         ["main", "README.md\n"] => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
     ]
 );
+
+struct Clippy;
+
+impl Clippy {
+    fn invoked(scope: &[&str]) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), ..Script::new() };
+        let measured = scratch.file("m.toml");
+        scratch.answer(&fake, &[&["clippy-targets", measured.as_str(), "clippy"], scope].concat());
+        let calls = fake.calls.borrow();
+        calls
+            .iter()
+            .filter(|call| call.arguments().first().is_some_and(|first| first == "clippy"))
+            .flat_map(|call| call.arguments().iter().skip(2))
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    fn refused(scope: &[&str]) -> Vec<String> {
+        Clippy::refused_on(CLIPPY_FIXTURE, scope)
+    }
+
+    fn refused_on(metadata: &str, scope: &[&str]) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        let fake = Script { metadata: metadata.to_owned(), ..Script::new() };
+        let measured = scratch.file("m.toml");
+        let answer = scratch.answer(&fake, &[&["clippy-targets", measured.as_str(), "clippy"], scope].concat());
+        assert_eq!((answer.exit, answer.out.as_str(), scratch.read("m.toml").as_str()), (ExitCode::FAILURE, "", ""));
+        assert!(fake.calls.borrow().iter().all(|call| call.arguments().first().is_none_or(|first| first != "clippy")));
+        Text::lines(&answer.err)
+    }
+}
+
+laws::table!(
+    clippy_names_the_kinds_of_target_the_scope_has_and_always_the_tests,
+    Clippy::invoked,
+    [
+        &["--workspace"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace"],
+        &["--all"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--all"],
+        &["--workspace", "--timings", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace", "--timings", "--", "-D", "warnings"],
+        &["-p", "libonly"][..] => vec!["--lib", "--tests", "-p", "libonly"],
+        &["-p", "binonly"][..] => vec!["--bins", "--tests", "-p", "binonly"],
+        &["-p", "demo"][..] => vec!["--lib", "--example", "showcase", "--tests", "-p", "demo"],
+        &["-p", "benched"][..] => vec!["--lib", "--bench", "speed", "--tests", "-p", "benched"],
+        &["-p", "libonly", "-p", "benched"][..] => vec!["--lib", "--bench", "speed", "--tests", "-p", "libonly", "-p", "benched"],
+        &["-p", "macros"][..] => vec!["--lib", "--tests", "-p", "macros"],
+        &["-p", "gated"][..] => vec!["--lib", "--tests", "-p", "gated"],
+        &["-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--example", "showcase", "--tests", "-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"],
+        &["--package=binonly"][..] => vec!["--bins", "--tests", "--package=binonly"],
+        &["-pbinonly"][..] => vec!["--bins", "--tests", "-pbinonly"],
+        &["-p=binonly"][..] => vec!["--bins", "--tests", "-p=binonly"],
+        &["-vp", "binonly"][..] => vec!["--bins", "--tests", "-vp", "binonly"],
+        &["--packages", "x"][..] => vec!["--lib", "--bins", "--tests", "--packages", "x"],
+        &["--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--tests", "--", "-D", "warnings"],
+        &[][..] => vec!["--lib", "--bins", "--tests"],
+        &["--workspace", "-p", "libonly"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace", "-p", "libonly"],
+        &["--", "-p", "benched"][..] => vec!["--lib", "--bins", "--tests", "--", "-p", "benched"],
+        &["--", "--workspace"][..] => vec!["--lib", "--bins", "--tests", "--", "--workspace"],
+    ]
+);
+
+const UNRESOLVED: &str = "against the cargo metadata: it takes workspace package names, not globs, versions or URLs";
+const REFUSED: &str = "it chooses the targets from the cargo metadata of the workspace it runs in";
+const NOTHING: &str = "the clippy scope has no target to check, so clippy would pass by checking nothing";
+const NO_PACKAGES: &str = r#"{ "packages": [], "workspace_default_members": [] }"#;
+const NO_DEFAULTS: &str =
+    r#"{ "packages": [{ "id": "a", "name": "a", "targets": [{ "name": "a", "kind": ["lib"] }] }] }"#;
+
+laws::table!(
+    clippy_refuses_a_package_spec_it_cannot_resolve_naming_the_spec_and_never_runs,
+    |scope: &&[&str]| Clippy::refused(scope),
+    [
+        &["-p", "unmatched"][..] => vec![format!("clippy-targets cannot resolve the package spec `unmatched` {UNRESOLVED}")],
+        &["-p", "lib*"][..] => vec![format!("clippy-targets cannot resolve the package spec `lib*` {UNRESOLVED}")],
+        &["-p", "libonly@0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly@0.1.0` {UNRESOLVED}")],
+        &["--package=libonly@0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly@0.1.0` {UNRESOLVED}")],
+        &["-plib?nly"][..] => vec![format!("clippy-targets cannot resolve the package spec `lib?nly` {UNRESOLVED}")],
+        &["-p", "path+file:///w/libonly#0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `path+file:///w/libonly#0.1.0` {UNRESOLVED}")],
+        &["-p", "libonly", "-p", "libonly:0.1.0"][..] => vec![format!("clippy-targets cannot resolve the package spec `libonly:0.1.0` {UNRESOLVED}")],
+        &["--workspace", "-p", "unmatched"][..] => vec![format!("clippy-targets cannot resolve the package spec `unmatched` {UNRESOLVED}")],
+        &["--package="][..] => vec![format!("clippy-targets cannot resolve the package spec `` {UNRESOLVED}")],
+    ]
+);
+
+laws::table!(
+    clippy_refuses_the_flags_that_would_choose_targets_or_another_workspace,
+    |scope: &&[&str]| Clippy::refused(scope),
+    [
+        &["--workspace", "--exclude", "libonly"][..] => vec![format!("clippy-targets refuses `--exclude`: {REFUSED}")],
+        &["--workspace", "--exclude=libonly"][..] => vec![format!("clippy-targets refuses `--exclude=libonly`: {REFUSED}")],
+        &["--manifest-path", "w/Cargo.toml"][..] => vec![format!("clippy-targets refuses `--manifest-path`: {REFUSED}")],
+        &["--workspace", "--all-targets"][..] => vec![format!("clippy-targets refuses `--all-targets`: {REFUSED}")],
+        &["-p", "benched", "--benches"][..] => vec![format!("clippy-targets refuses `--benches`: {REFUSED}")],
+        &["--bench=speed"][..] => vec![format!("clippy-targets refuses `--bench=speed`: {REFUSED}")],
+        &["--lib"][..] => vec![format!("clippy-targets refuses `--lib`: {REFUSED}")],
+        &["--tests"][..] => vec![format!("clippy-targets refuses `--tests`: {REFUSED}")],
+    ]
+);
+
+laws::table!(
+    clippy_refuses_a_package_flag_without_a_spec,
+    |scope: &&[&str]| Clippy::refused(scope).concat().contains("usage: ci "),
+    [
+        &["-p"][..] => true,
+        &["--package"][..] => true,
+        &["-p", "--", "-D", "warnings"][..] => true,
+    ]
+);
+
+laws::table!(
+    clippy_refuses_a_scope_with_no_target_rather_than_checking_nothing,
+    |(metadata, scope): &(&str, &[&str])| Clippy::refused_on(metadata, scope),
+    [
+        (NO_PACKAGES, &[][..]) => vec![NOTHING.to_owned()],
+        (NO_PACKAGES, &["--workspace"][..]) => vec![NOTHING.to_owned()],
+        (NO_DEFAULTS, &[][..]) => vec![NOTHING.to_owned()],
+    ]
+);
+
+#[test]
+fn clippy_never_names_a_kind_flag_that_puts_libraries_in_test_mode_and_names_each_bench_and_example() {
+    let without = Clippy::invoked(&["-p", "libonly", "-p", "binonly", "-p", "demo", "-p", "gated"]);
+    let with = Clippy::invoked(&["-p", "libonly", "-p", "benched"]);
+    let whole = Clippy::invoked(&["--workspace"]);
+    assert!(without.iter().all(|flag| flag != "--bench"));
+    assert!(with.contains(&"--bench".to_owned()));
+    assert!(
+        without
+            .iter()
+            .chain(&with)
+            .chain(&whole)
+            .all(|flag| ["--all-targets", "--test", "--benches", "--examples"].iter().all(|named| flag != named))
+    );
+}
+
+#[test]
+fn clippy_is_timed_under_its_stage_and_fails_with_its_code() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
+    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "-p", "binonly"]);
+    assert_eq!(answer.exit, ExitCode::from(FAILED_WITH.get()));
+    assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.50"]);
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
+            Invocation::new("cargo", ["clippy", "--locked", "--bins", "--tests", "-p", "binonly"]),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_that_cannot_be_read_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let fake = Script { metadata: "not json".to_owned(), ..Script::new() };
+    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "--workspace"]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.contains("cannot read the cargo metadata: "));
+    assert_eq!(fake.calls.borrow().len(), 1);
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn metadata_that_cannot_be_asked_for_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let answer = scratch.answer(&Script::refusing("cargo"), &["clippy-targets", &scratch.file("m.toml"), "clippy"]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert_eq!(Text::lines(&answer.err), ["cannot run cargo: boom"]);
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn clippy_targets_needs_a_measured_file_and_a_stage() {
+    assert!(Answer::refused(&["clippy-targets"]));
+    assert!(Answer::refused(&["clippy-targets", "m.toml"]));
+}
 
 #[test]
 fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Error>> {
