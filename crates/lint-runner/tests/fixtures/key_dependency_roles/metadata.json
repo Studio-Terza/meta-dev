@@ -1,13 +1,13 @@
 {"workspace_root": "/", "workspace_members": ["grammar", "notes", "design", "derive"], "packages": [
-  {"id": "grammar", "name": "grammar", "manifest_path": "/grammar/Cargo.toml", "dependencies": [{"name": "logos"}], "metadata": {"port": {"owns": ["logos"], "dependents": "lexer"}}, "targets": [{"kind": ["lib"]}]},
-  {"id": "notes", "name": "notes", "manifest_path": "/notes/Cargo.toml", "dependencies": [{"name": "grammar"}], "metadata": {"lexer": {"format": "notes"}}, "targets": [{"kind": ["lib"]}]},
-  {"id": "design", "name": "design", "manifest_path": "/design/Cargo.toml", "dependencies": [{"name": "grammar"}, {"name": "notes"}], "targets": [{"kind": ["lib"]}]},
-  {"id": "derive", "name": "derive", "manifest_path": "/derive/Cargo.toml", "dependencies": [{"name": "design"}], "targets": [{"kind": ["proc-macro"]}]},
-  {"id": "logos", "name": "logos", "manifest_path": "/r/logos/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"]}]}
+  {"id": "grammar", "name": "grammar", "manifest_path": "/grammar/Cargo.toml", "dependencies": [{"name": "logos"}], "metadata": {"port": {"owns": ["logos"], "dependents": "lexer"}}, "targets": [{"kind": ["lib"], "src_path": "/grammar/src/lib.rs"}]},
+  {"id": "notes", "name": "notes", "manifest_path": "/notes/Cargo.toml", "dependencies": [{"name": "grammar"}], "metadata": {"lexer": {"format": "notes"}}, "targets": [{"kind": ["lib"], "src_path": "/notes/src/lib.rs"}]},
+  {"id": "design", "name": "design", "manifest_path": "/design/Cargo.toml", "dependencies": [{"name": "grammar"}, {"name": "notes"}], "targets": [{"kind": ["lib"], "src_path": "/design/src/lib.rs"}]},
+  {"id": "derive", "name": "derive", "manifest_path": "/derive/Cargo.toml", "dependencies": [{"name": "design"}], "targets": [{"kind": ["proc-macro"], "src_path": "/derive/src/lib.rs"}]},
+  {"id": "logos", "name": "logos", "manifest_path": "/r/logos/Cargo.toml", "dependencies": []}
 ], "resolve": {"nodes": [
-  {"id": "grammar", "dependencies": ["logos"], "deps": [{"pkg": "logos", "dep_kinds": [{"kind": null}]}]},
-  {"id": "notes", "dependencies": ["grammar"], "deps": [{"pkg": "grammar", "dep_kinds": [{"kind": null}]}]},
-  {"id": "design", "dependencies": ["grammar", "notes"], "deps": [{"pkg": "grammar", "dep_kinds": [{"kind": null}]}, {"pkg": "notes", "dep_kinds": [{"kind": null}]}]},
-  {"id": "derive", "dependencies": ["design"], "deps": [{"pkg": "design", "dep_kinds": [{"kind": null}]}]},
+  {"id": "grammar", "dependencies": ["logos"], "deps": [{"name": "logos", "pkg": "logos", "dep_kinds": [{"kind": null}]}]},
+  {"id": "notes", "dependencies": ["grammar"], "deps": [{"name": "grammar", "pkg": "grammar", "dep_kinds": [{"kind": null}]}]},
+  {"id": "design", "dependencies": ["grammar", "notes"], "deps": [{"name": "grammar", "pkg": "grammar", "dep_kinds": [{"kind": null}]}, {"name": "notes", "pkg": "notes", "dep_kinds": [{"kind": null}]}]},
+  {"id": "derive", "dependencies": ["design"], "deps": [{"name": "design", "pkg": "design", "dep_kinds": [{"kind": null}]}]},
   {"id": "logos", "dependencies": [], "deps": []}
 ]}}

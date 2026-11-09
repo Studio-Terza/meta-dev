@@ -371,7 +371,7 @@ const DERIVE: Source = Source::new(
 
 macro_rules! edge {
     ($dependency:literal) => {
-        concat!("{\"pkg\": \"", $dependency, "\", \"dep_kinds\": [{\"kind\": null}]}")
+        concat!("{\"name\": \"", $dependency, "\", \"pkg\": \"", $dependency, "\", \"dep_kinds\": [{\"kind\": null}]}")
     };
 }
 
@@ -379,14 +379,14 @@ macro_rules! member {
     ($name:literal, $kind:literal, $metadata:literal) => {
         concat!(
             "{\"id\": \"", $name, "\", \"name\": \"", $name, "\", \"manifest_path\": \"/w/crates/", $name,
-            "/Cargo.toml\", \"dependencies\": [], \"metadata\": ", $metadata, ", \"targets\": [{\"kind\": [\"", $kind, "\"]}]}"
+            "/Cargo.toml\", \"dependencies\": [], \"metadata\": ", $metadata, ", \"targets\": [{\"kind\": [\"", $kind, "\"], \"src_path\": \"/w/crates/", $name, "/src/lib.rs\"}]}"
         )
     };
     ($name:literal, $kind:literal, $metadata:literal, $first:literal $(, $rest:literal)*) => {
         concat!(
             "{\"id\": \"", $name, "\", \"name\": \"", $name, "\", \"manifest_path\": \"/w/crates/", $name,
             "/Cargo.toml\", \"dependencies\": [{\"name\": \"", $first, "\"}", $(", {\"name\": \"", $rest, "\"}",)*
-            "], \"metadata\": ", $metadata, ", \"targets\": [{\"kind\": [\"", $kind, "\"]}]}"
+            "], \"metadata\": ", $metadata, ", \"targets\": [{\"kind\": [\"", $kind, "\"], \"src_path\": \"/w/crates/", $name, "/src/lib.rs\"}]}"
         )
     };
 }
