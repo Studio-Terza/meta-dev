@@ -9,7 +9,7 @@ use design_model::{
 use design_store::{RunState, SessionCursors, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
-use grammar::search::Term;
+use grammar_search::Term;
 use laws::proptest::option;
 use laws::proptest::prelude::{any, prop_assert, prop_oneof};
 use laws::proptest::sample::select;

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use grammar::artifact::Artifacts;
+use grammar_artifact::Artifacts;
 use newtype::{Display, Spelled};
 
 use crate::ArtifactKind;

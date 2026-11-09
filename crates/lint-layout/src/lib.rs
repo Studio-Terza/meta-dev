@@ -16,7 +16,7 @@ mod word;
 pub use dependencies::Dependencies;
 pub use failure::Failure;
 pub use line_number::LineNumber;
-pub use manifest::{KeyLines, Manifest};
+pub use manifest::{KeyLines, Manifest, TableKey};
 pub use matching::Matching;
 pub use name::{CamelWord, Casing, Length, Lowered, Name, Prefix};
 pub use path_dependencies::PathDependencies;

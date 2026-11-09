@@ -1,8 +1,8 @@
 use std::fmt;
 
-use grammar::directive::{Lexed, Location};
-use grammar::output::field::{Integer, Phrase, Word};
-use grammar::output::{Fields, Unread};
+use grammar_directive::{Lexed, Location};
+use grammar_output::field::{Integer, Phrase, Word};
+use grammar_output::{Fields, Unread};
 use named_derive::Named;
 
 use crate::briefing::Quoting;

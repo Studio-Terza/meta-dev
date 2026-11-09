@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::reply::Inked;
+use grammar_reply::Inked;
 use serde::{Deserialize, Deserializer, de};
 
 use super::{Finished, Reply, Told, Usage};

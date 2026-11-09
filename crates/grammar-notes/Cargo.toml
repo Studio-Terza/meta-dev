@@ -1,0 +1,25 @@
+[package]
+name = "grammar-notes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.lexer]
+format = "notes"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+thiserror.workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

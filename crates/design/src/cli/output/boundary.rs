@@ -8,9 +8,9 @@ use design_model::{
 use design_store::{AppliedId, Excerpt, RelationName, RunState, ShapeName};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
-use grammar::cited::Cited;
-use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
-use grammar::output::{Fields, Unread};
+use grammar_cited::Cited;
+use grammar_output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
+use grammar_output::{Fields, Unread};
 use named_derive::Named;
 use newtype::Newtype;
 use stream::{Relation, Shape};

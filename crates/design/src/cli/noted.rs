@@ -1,9 +1,9 @@
 use std::fmt;
 
 use design_model::{NodeId, NotesLine, Prefix, Provenance};
-use grammar::notes::{Cite, Quote};
-use grammar::output::field::{Bare, Id, Integer, Quoted, Word};
-use grammar::output::{Fields, Unread};
+use grammar_notes::{Cite, Quote};
+use grammar_output::field::{Bare, Id, Integer, Quoted, Word};
+use grammar_output::{Fields, Unread};
 use named_derive::Named;
 use newtype::Newtype;
 use strum::VariantArray;

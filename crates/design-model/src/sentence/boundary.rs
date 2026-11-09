@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::line::Unbroken;
+use grammar_line::Unbroken;
 use newtype::{Display, Spelled};
 
 #[derive(Display, Spelled, Clone, Debug, PartialEq, Eq)]

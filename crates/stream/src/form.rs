@@ -1,4 +1,4 @@
-use grammar::message::{Depth, Mark, Number};
+use grammar_message::{Depth, Mark, Number};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Form {

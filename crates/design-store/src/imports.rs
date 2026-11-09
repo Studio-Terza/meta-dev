@@ -1,5 +1,5 @@
 use design_model::{Node, NodeId, Provenance, Vague};
-use grammar::notes::Ending;
+use grammar_notes::Ending;
 use newtype::Counter;
 use port_core::Op;
 use store_ports::{Batch, Statements, Written};

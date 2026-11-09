@@ -10,7 +10,8 @@ test = false
 doctest = false
 
 [dependencies]
-grammar = { path = "../grammar" }
+grammar-lstart = { path = "../grammar-lstart" }
+grammar-reply = { path = "../grammar-reply" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }

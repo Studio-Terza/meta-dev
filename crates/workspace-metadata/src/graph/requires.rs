@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::metadata::Node;
+use crate::metadata::{Edge, Node};
 use crate::package_id::PackageId;
 
 #[derive(Debug, Default)]
@@ -13,6 +13,16 @@ impl<'meta> Extend<&'meta Node> for Requires<'meta> {
 }
 
 impl<'meta> Requires<'meta> {
+    pub(super) fn normal(nodes: &'meta [Node]) -> Requires<'meta> {
+        Requires(
+            nodes.iter().map(|node| (node.as_ref(), node.edges().iter().filter_map(Edge::normal).collect())).collect(),
+        )
+    }
+
+    pub(super) fn joined(&mut self, other: Requires<'meta>) {
+        other.0.into_iter().for_each(|(dependent, required)| self.0.entry(dependent).or_default().extend(required));
+    }
+
     pub(super) fn direct(&self, dependent: &PackageId) -> impl Iterator<Item = &'meta PackageId> + use<'_, 'meta> {
         self.0.get(dependent).into_iter().flatten().copied()
     }

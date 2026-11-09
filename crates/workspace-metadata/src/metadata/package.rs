@@ -8,9 +8,11 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
+use crate::format::Format;
 use crate::package_id::PackageId;
+use crate::role::Role;
 use declared::Declared;
-pub use declared::PortTable;
+pub use declared::{Expanders, PortTable};
 use dependency::Dependency;
 use target::{Kind, Target};
 
@@ -40,6 +42,14 @@ impl Package {
 
     pub fn port(&self) -> Option<&PortTable> {
         self.metadata.as_ref().and_then(Declared::port)
+    }
+
+    pub fn declares(&self, role: Role) -> Option<Role> {
+        self.metadata.as_ref().and_then(|declared| declared.declares(role))
+    }
+
+    pub fn format(&self) -> Option<&Format> {
+        self.metadata.as_ref().and_then(Declared::format)
     }
 
     pub fn readings(&self) -> &[PathBuf] {

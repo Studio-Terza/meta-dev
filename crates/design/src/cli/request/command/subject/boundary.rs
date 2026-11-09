@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
 use design_model::{JobId, NodeId, Prefix};
-use grammar::cited::Cited;
-use grammar::output::Fields;
-use grammar::output::field::{Bare, Checked, Integer, Word};
+use grammar_cited::Cited;
+use grammar_output::Fields;
+use grammar_output::field::{Bare, Checked, Integer, Word};
 use named_derive::Named;
 use newtype::Newtype;
 use structurer::SegmentRef;

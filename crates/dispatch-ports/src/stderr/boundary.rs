@@ -1,6 +1,6 @@
 use std::io::{self, PipeReader, Read};
 
-use grammar::reply::Inked;
+use grammar_reply::Inked;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Stderr {

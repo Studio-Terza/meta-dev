@@ -12,9 +12,10 @@ use crate::outside::Outside;
 use crate::package_id::PackageId;
 use crate::readers::Readers;
 use crate::unreadable::Unreadable;
+pub use package::Expanders;
 pub(crate) use package::{Package, PortTable};
-pub(crate) use resolve::Node;
 use resolve::Resolve;
+pub(crate) use resolve::{Edge, Node};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Metadata {

@@ -10,7 +10,8 @@ test = false
 doctest = false
 
 [dependencies]
-grammar = { path = "../grammar" }
+grammar-anchor = { path = "../grammar-anchor" }
+grammar-message = { path = "../grammar-message" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 strum.workspace = true

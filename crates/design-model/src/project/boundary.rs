@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::project::Names;
+use grammar_project::Names;
 use newtype::{Display, Spelled};
 use serde::{Deserialize, Serialize};
 

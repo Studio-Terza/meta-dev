@@ -2,6 +2,7 @@ mod bypasses;
 mod claims;
 mod closure;
 mod requires;
+pub(crate) mod roles;
 mod stale;
 mod unit;
 
@@ -13,10 +14,12 @@ use newtype::Newtype;
 use crate::crate_name::CrateName;
 use crate::metadata::{Metadata, Package};
 use crate::package_id::PackageId;
+use crate::role::Role;
 pub use bypasses::{Bypass, Bypasses, DependencyKeys};
 use claims::Claims;
 use closure::Closure;
 use requires::Requires;
+use roles::{Expansion, RoleBreaches};
 pub use stale::Stale;
 use unit::Unit;
 
@@ -26,6 +29,7 @@ pub struct Graph<'meta> {
     named: BTreeMap<&'meta CrateName, BTreeSet<&'meta PackageId>>,
     members: BTreeSet<&'meta PackageId>,
     requires: Requires<'meta>,
+    normal: Requires<'meta>,
 }
 
 impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
@@ -39,6 +43,7 @@ impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
             );
             graph.members.extend(metadata.members());
             graph.requires.extend(metadata.nodes());
+            graph.normal.joined(Requires::normal(metadata.nodes()));
             graph
         })
     }
@@ -65,6 +70,32 @@ impl<'meta> Graph<'meta> {
                     .map(|owners| (dependent.name(), required, Bypass::new(owners, dependent.keys(required).collect())))
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn role_breaches(&self) -> RoleBreaches<'meta> {
+        RoleBreaches::found(self, &self.units())
+    }
+
+    #[must_use]
+    pub fn expansions(&self) -> Vec<Expansion<'meta>> {
+        Expansion::found(self, &self.units())
+    }
+
+    pub(super) fn declaring(&self, role: Role) -> BTreeSet<&'meta PackageId> {
+        self.members
+            .iter()
+            .copied()
+            .filter(|id| self.package(id).and_then(|package| package.declares(role)).is_some())
+            .collect()
+    }
+
+    pub(super) fn normal_reach(
+        &self,
+        start: &'meta PackageId,
+        avoided: &BTreeSet<&'meta PackageId>,
+    ) -> BTreeSet<&'meta PackageId> {
+        Closure::avoiding(&self.normal, BTreeSet::from([start]), avoided).into_inner()
     }
 
     #[must_use]

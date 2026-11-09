@@ -1,6 +1,9 @@
+mod edge;
+
 use serde::Deserialize;
 
 use crate::package_id::PackageId;
+pub use edge::Edge;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Resolve {
@@ -11,6 +14,8 @@ pub struct Resolve {
 pub struct Node {
     id: PackageId,
     dependencies: Vec<PackageId>,
+    #[serde(default)]
+    deps: Vec<Edge>,
 }
 
 impl Resolve {
@@ -28,5 +33,9 @@ impl AsRef<PackageId> for Node {
 impl Node {
     pub fn dependencies(&self) -> &[PackageId] {
         &self.dependencies
+    }
+
+    pub fn edges(&self) -> &[Edge] {
+        &self.deps
     }
 }

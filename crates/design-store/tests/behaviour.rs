@@ -20,8 +20,8 @@ use design_store::{
 };
 use dispatch_ports::{Deadline, Finished, Pid, Reply, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
-use grammar::message::Lexemes;
-use grammar::search::Terms;
+use grammar_message::Lexemes;
+use grammar_search::Terms;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};

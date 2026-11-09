@@ -5,7 +5,7 @@ use std::process::Output;
 
 use e2e::ports::Home;
 use file_ports::Bytes;
-use grammar::slug::Letters;
+use grammar_slug::Letters;
 
 #[derive(Debug)]
 pub struct Design {

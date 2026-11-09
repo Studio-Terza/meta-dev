@@ -10,7 +10,7 @@ proc-macro = true
 doctest = false
 
 [dependencies]
-grammar = { path = "../grammar" }
+grammar-ident = { path = "../grammar-ident" }
 proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["visit-mut"] }

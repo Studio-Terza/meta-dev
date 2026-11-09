@@ -36,7 +36,7 @@ use lint_no_plaintext::NoPlaintext;
 use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_port_batching::PortBatching;
-use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, OwnedDependencies};
+use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
@@ -64,7 +64,7 @@ pub struct Lints;
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 impl Lints {
-    const CHECKS: [Check; 50] = [
+    const CHECKS: [Check; 51] = [
         |readout| vec![NoComments::report(readout.files())],
         |readout| vec![NoFreeFns::report(readout.files())],
         |readout| vec![ThinMain::report(readout.files())],
@@ -99,6 +99,7 @@ impl Lints {
         |readout| vec![FakesAtPorts::report(readout.files())],
         |readout| vec![PortBatching::report(readout.files())],
         |readout| vec![OwnedDependencies::report(readout.files(), readout.workspaces())],
+        |readout| vec![KeyDependencyRoles::report(readout.files(), readout.workspaces())],
         |readout| vec![EffectsInFillers::report(readout.files())],
         |readout| vec![CountedCalls::report(readout.files())],
         |readout| vec![HiddenSqlx::report(readout.files())],

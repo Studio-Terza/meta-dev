@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use design_model::Title;
-use grammar::directive::{Lexed, Line, Location, Piece};
+use grammar_directive::{Lexed, Line, Location, Piece};
 
 use crate::misread::Wanted;
 use crate::verb::{By, New, Verb};

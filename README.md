@@ -32,7 +32,7 @@ no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starte
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
 effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run, owned_dependencies,
-effects_in_fillers, counted_calls, hidden_sqlx, store_queries.
+key_dependency_roles, effects_in_fillers, counted_calls, hidden_sqlx, store_queries.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
@@ -170,10 +170,11 @@ Everywhere else a test goes through the port's in-memory fake or a library API s
 and the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
 a process in test code still also needs what `process_starters` asks for.
 
-`owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` (crate `lint-port-dependencies`) keep the
+`owned_dependencies`, `key_dependency_roles`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` (crate `lint-port-dependencies`) keep the
 port framework the only way to an effect. Ownership is declared, never guessed: a crate owns a package by naming it in
 `[package.metadata.port] owns = ["logos"]` in its `Cargo.toml` (`grammar` owns `logos`, `logos-codegen` and
-`logos-derive`; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
+`logos-derive` and only re-exports `logos`, which the `grammar-<format>` lexer crates reach as `grammar::logos` with
+`#[logos(crate = grammar::logos)]` on each derive, while `grammar-cited` holds the `Cited` type two lexers share; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
 owns `sqlx-macros-core`). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
 proc-macro crate it depends on, so `store-ports` and `store-ports-macros` own jointly, and a proc-macro crate two ports
 depend on belongs to both units. The gate reads the dependency graph from `cargo metadata --format-version 1 --locked`,
@@ -198,6 +199,20 @@ function or another trait impl. Test code is skipped as
 code `#[port]` expands to is not source, so only the generated fillers count calls and acquisitions. `hidden_sqlx` fails
 the identifier `__sqlx` anywhere in source outside `store-ports` and `store-ports-macros`: `store_ports` re-exports sqlx as
 `__sqlx` only so that the code `store_ports::query!` and `store_ports::migrate!` expand to can name it.
+
+`key_dependency_roles` keeps each key dependency in its role, so a heavy package stays out of crates that do not need
+it. A port that names `[package.metadata.port] dependents = "lexer"` (as `grammar` does) is depended on directly, in any
+dependency table, only by crates that declare `[package.metadata.lexer]`. A lexer crate declares the one format it lexes
+with `format = "<name>"`, no two lexers lex the same format, and a lexer is a leaf: through normal edges it depends only
+on a port whose dependents are lexers, on other lexers, and on packages whose normal closure holds no package a port
+owns. A port declares who expands its macros with `expanders = { role = "store", macros = ["query", "migrate",
+"Columns"] }` (as `store-ports-macros` does), and shipped code that invokes one of those macros through the unit's port
+(`store_ports::query!`, or the name imported from `store_ports`, or `#[derive(Columns)]`) belongs to the unit or to a crate
+that declares `[package.metadata.store]`, as `design-store` does; test code is skipped. A workspace proc-macro crate whose
+normal closure holds a package a port owns belongs to that port's unit, or reaches the package only through crates that
+declare the port's `dependents` role, as `port-derive` reaches `logos` only through `grammar-ident`, so a proc-macro
+never drags a heavy dependency into the host build of every crate that uses it. Each finding points at the manifest
+line of the dependency, the format, or the macro call.
 
 The store is reached through `store_ports::query!`, never through sqlx. `store_ports::query!(Row, r#"…"#, id: NodeId)` reads
 rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one`, and `store_ports::query!(r#"…"#, id: NodeId)`

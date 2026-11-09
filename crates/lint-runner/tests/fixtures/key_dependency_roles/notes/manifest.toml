@@ -1,0 +1,8 @@
+[package]
+name = "notes"
+
+[package.metadata.lexer]
+format = "notes"
+
+[dependencies]
+grammar = { path = "../grammar" }
