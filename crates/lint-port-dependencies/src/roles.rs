@@ -53,8 +53,8 @@ impl<'file> Roles<'file> {
             self.owners.manifest(expansion.port()).map(|file| PlacedName::from(file.placement().package().root()));
         let wanted: Vec<UsePath> = port
             .iter()
-            .flat_map(|port| {
-                let root: &Name = port.borrow();
+            .flat_map(|placed| {
+                let root: &Name = placed.borrow();
                 expansion
                     .expanders()
                     .macros()

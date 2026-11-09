@@ -49,7 +49,7 @@ impl<'meta> Owner<'_, 'meta> {
     pub(super) fn reached_by(&self, graph: &Graph<'meta>, package: &'meta Package) -> Option<Unported<'meta>> {
         let id = package.package_id().filter(|id| self.unit.holds(id).is_none())?;
         let role = self.declared.dependents();
-        let avoided = role.map(|role| graph.declaring(role)).unwrap_or_default();
+        let avoided = role.map(|declared| graph.declaring(declared)).unwrap_or_default();
         let direct: BTreeSet<&PackageId> = graph.normal.direct(id).collect();
         let keys: DependencyKeys<'meta> = direct
             .difference(&avoided)
@@ -60,7 +60,7 @@ impl<'meta> Owner<'_, 'meta> {
             .collect();
         let owned = graph.package(self.package)?.name();
         Some(keys)
-            .filter(|keys| keys.as_ref().first().is_some())
-            .map(|keys| Unported::new(Breaching::new(package.name(), keys), owned, role))
+            .filter(|found| found.as_ref().first().is_some())
+            .map(|found| Unported::new(Breaching::new(package.name(), found), owned, role))
     }
 }
