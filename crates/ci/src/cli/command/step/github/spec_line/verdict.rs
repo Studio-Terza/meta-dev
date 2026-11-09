@@ -23,7 +23,7 @@ impl<'body> Verdict<'body> {
     pub(crate) fn judging(body: &'body Text) -> Verdict<'body> {
         let lines: Vec<Line> = Lines::from(body.as_ref()).map(Line::read).collect();
         let specs: Vec<Line> = lines.iter().copied().filter(|line| line.spec().is_some()).collect();
-        let attached = specs.iter().filter_map(|line| line.spec()).find_map(|value| Attachment::try_from(value).ok());
+        let attached = specs.iter().filter_map(|line| line.spec()).find_map(|value| Attachment::try_new(value).ok());
         lines
             .iter()
             .find(|line| **line == Line::Repair)

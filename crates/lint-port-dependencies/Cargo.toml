@@ -16,6 +16,7 @@ lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 workspace-metadata = { path = "../workspace-metadata" }
+text-lines = { path = "../text-lines" }
 proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true

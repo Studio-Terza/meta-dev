@@ -65,7 +65,7 @@ impl Asked {
     }
 
     fn query(words: &[&str]) -> Result<Query, QueryFailure> {
-        Query::try_from(words.iter().map(OsString::from).collect::<Vec<_>>().as_slice())
+        Query::read(words.iter().map(OsString::from).collect::<Vec<_>>().as_slice())
     }
 
     fn answered(words: &&[&str]) -> Vec<String> {
@@ -144,7 +144,8 @@ fn malformed_arguments_are_refused_with_the_reason() {
     assert_eq!(Asked::query(&["index", "--top"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["--users"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["--path", "Ledger"]), Err(QueryFailure::Unfinished));
-    assert_eq!(Asked::query(&["index", "--top", "many"]), Err(QueryFailure::Top("many".to_owned())));
+    let refused_top = Asked::query(&["index", "--top", "many"]);
+    assert!(matches!(refused_top, Err(QueryFailure::Top { text, .. }) if text == "many"));
     let refused = Asked::query(&["--role", "not a signature"]).map_err(|failure| failure.to_string());
     assert!(refused.is_err_and(|reason| reason.contains("is not a Rust signature")));
 }
@@ -163,7 +164,7 @@ fn terms_match_camel_and_snake_words_and_plurals() {
 fn a_role_agrees_on_receiver_arity_self_arguments_and_return_shape() {
     let role: Result<Role, QueryFailure> = "fn f(&self, other: &Self) -> Option<Self>".parse();
     assert_eq!(
-        role.map(|role| AsRef::<MethodShape>::as_ref(&role).to_string()),
+        role.map(|parsed| AsRef::<MethodShape>::as_ref(&parsed).to_string()),
         Ok("fn(&self, Self) -> Option".to_owned())
     );
 }

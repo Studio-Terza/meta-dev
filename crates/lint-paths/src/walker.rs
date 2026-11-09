@@ -104,7 +104,7 @@ impl<'ast, 'file> Visit<'ast> for Walker<'file, '_> {
     fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
         let path = Self::written(expression);
         let line = expression.path.segments.first().map(|segment| LineNumber::from(segment.ident.span()));
-        let made = path.segments().first().and(line).and_then(|line| self.made(path, line));
+        let made = path.segments().first().and(line).and_then(|first_line| self.made(path, first_line));
         self.found.extend(made);
         visit::visit_expr_path(self, expression);
     }

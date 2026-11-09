@@ -40,8 +40,8 @@ impl fmt::Display for Labels {
 }
 
 impl Step for Labels {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Labels, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<Labels, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let base = &arguments.taken()?;
         let pull_request = &arguments.taken()?;
         let metadata = &arguments.taken()?;

@@ -19,7 +19,7 @@ use dispatch_ports::{
     clock_ops, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
-use newtype::Newtype;
+use newtype::Wrapping;
 use port_core::{Calls, Snapshot};
 use port_core::{Pass, Run};
 use serde_json::Value;
@@ -436,7 +436,7 @@ fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_no
     golden::golden!(
         "structure-flailed.txt",
         &format!("design structure\n{}{told}\ndesign structure\n{}design show job 1\n{shown}", first.text, second.text)
-    )?;
+    );
     assert_eq!(second.outcome?, Outcome::Structured { jobs: Count::new(0) });
     Ok(())
 }
@@ -612,9 +612,9 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
     structuring.applying.run(&["drop", "n3", "--reason", "abandoned"])?;
     structuring.applying.run(&["refine", "n5"])?;
     structuring.applying.run(&["specify", "n5", "--artifact", "behaviour:h", "--condition", "h holds"])?;
-    golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured(&["structure"]).text))?;
+    golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured(&["structure"]).text));
     let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
-    golden::golden!("structure-briefs.txt", &briefs)?;
+    golden::golden!("structure-briefs.txt", &briefs);
     assert!(matches!(structuring.applying.run(&["show", "n6"]), Err(Failure::Unplaced(_))));
     Ok(())
 }
@@ -642,7 +642,7 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
         let failure = structured.outcome.as_ref().err().map(ToString::to_string).unwrap_or_default();
         format!("design structure\n{}{failure}\n", structured.text)
     });
-    golden::golden!("structure-unreadable.txt", &reported.concat())?;
+    golden::golden!("structure-unreadable.txt", &reported.concat());
     let run = Run::root();
     let store = run.port(structuring.applying.store.clone());
     let jobs = [1, 2, 3, 4].map(|job| store.read(RunsOf::from(JobId::new(job))));

@@ -30,7 +30,7 @@ impl Shard {
                 directory: PathBuf::from(directory),
                 destination: PathBuf::from(destination),
             })
-            .map_err(|_| Failure::Usage)
+            .map_err(Failure::Usage)
     }
 
     pub fn write_matrix(&self, files: &impl Files) -> Result<(), Failure> {

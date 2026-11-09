@@ -8,7 +8,7 @@ mod unit;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::crate_name::CrateName;
 use crate::metadata::{Metadata, Package};
@@ -31,7 +31,7 @@ pub struct Graph<'meta> {
 impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
     fn from_iter<Workspaces: IntoIterator<Item = &'meta Metadata>>(workspaces: Workspaces) -> Graph<'meta> {
         workspaces.into_iter().fold(Graph::default(), |mut graph, metadata| {
-            metadata.packages().iter().filter_map(|package| Some((package.identity()?, package))).for_each(
+            metadata.packages().iter().filter_map(|package| Some((package.package_id()?, package))).for_each(
                 |(id, package)| {
                     graph.packages.insert(id, package);
                     graph.named.entry(package.name()).or_default().insert(id);

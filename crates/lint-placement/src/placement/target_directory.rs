@@ -15,7 +15,7 @@ impl TargetDirectory {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
         let module = Some(rest)
-            .filter(|rest| rest.as_os_str().is_empty())
+            .filter(|candidate| candidate.as_os_str().is_empty())
             .map_or_else(|| ModulePath::of_file(rest), |_| ModulePath::default());
         Some(Placement {
             package,

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use lint_layout::Name;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::super::Containment;
 use super::super::slice::Slice;
@@ -22,18 +22,6 @@ impl<'view, 'found, 'file> Exported<'view, 'found, 'file> {
     ) -> Exported<'view, 'found, 'file> {
         Exported { view, name, listed }
     }
-
-    fn cut(&self, formatter: &mut fmt::Formatter<'_>, slice: &Slice<'found>) -> fmt::Result {
-        writeln!(formatter, "  {}", slice.cluster())?;
-        let users: Vec<_> =
-            Containment::adjacency(slice.cut().outgoing().iter().map(|link| link.reversed())).into_iter().collect();
-        users.first().map_or_else(|| writeln!(formatter, "    none"), |_| Ok(()))?;
-        users.iter().take(self.listed.into_inner()).try_for_each(|(export, outside)| {
-            let placed = Placed::new(self.view, *export, Spelled::Name);
-            writeln!(formatter, "    {placed}; used by {}", outside.iter().copied().collect::<Names<'found>>())
-        })?;
-        self.listed.more(&users).map_or(Ok(()), |more| writeln!(formatter, "    and {more} more"))
-    }
 }
 
 impl fmt::Display for Exported<'_, '_, '_> {
@@ -41,6 +29,16 @@ impl fmt::Display for Exported<'_, '_, '_> {
         let slices: Vec<&Slice<'_>> =
             self.view.slices().filter(|slice| slice.cluster().named(self.name).is_some()).collect();
         slices.first().map_or_else(|| writeln!(formatter, "  no crate or module named {}", self.name), |_| Ok(()))?;
-        slices.into_iter().try_for_each(|slice| self.cut(formatter, slice))
+        slices.into_iter().try_for_each(|slice| {
+            writeln!(formatter, "  {}", slice.cluster())?;
+            let users: Vec<_> =
+                Containment::adjacency(slice.cut().outgoing().iter().map(|link| link.reversed())).into_iter().collect();
+            users.first().map_or_else(|| writeln!(formatter, "    none"), |_| Ok(()))?;
+            users.iter().take(self.listed.into_inner()).try_for_each(|(export, outside)| {
+                let placed = Placed::new(self.view, *export, Spelled::Name);
+                writeln!(formatter, "    {placed}; used by {}", outside.iter().copied().collect::<Names<'_>>())
+            })?;
+            self.listed.more(&users).map_or(Ok(()), |more| writeln!(formatter, "    and {more} more"))
+        })
     }
 }

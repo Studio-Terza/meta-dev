@@ -11,7 +11,7 @@ use design_store::{
 };
 use file_ports::{Files, Text};
 use grammar::notes::{self, Cite, Date, Ending, Notes, Quote, Reading, Unclosed};
-use newtype::{Counter, Newtype};
+use newtype::{Counter, Wrapping};
 use store_ports::Store;
 use transcript_ports::{Authorship, Uuid};
 

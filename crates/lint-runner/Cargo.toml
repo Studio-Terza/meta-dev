@@ -16,7 +16,11 @@ file-ports = { path = "../file-ports" }
 graph-query = { path = "../graph-query" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-complexity = { path = "../lint-complexity" }
+code-model = { path = "../code-model" }
+code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
+lint-hand-impls = { path = "../lint-hand-impls" }
+lint-narrowed-returns = { path = "../lint-narrowed-returns" }
 lint-reader = { path = "../lint-reader" }
 lint-layout = { path = "../lint-layout" }
 lint-bool-methods = { path = "../lint-bool-methods" }
@@ -78,6 +82,7 @@ name = "behaviour"
 path = "tests/behaviour.rs"
 
 [dev-dependencies]
+cargo-ports = { path = "../cargo-ports" }
 golden = { path = "../golden" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }

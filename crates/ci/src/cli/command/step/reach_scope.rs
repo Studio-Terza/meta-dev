@@ -51,8 +51,8 @@ impl ReachScope {
 }
 
 impl Step for ReachScope {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ReachScope, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<ReachScope, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let metadata = &arguments.taken()?;
         let event = &arguments.taken()?;
         let base = &arguments.taken()?;

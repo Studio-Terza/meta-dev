@@ -83,9 +83,9 @@ impl<'found> Slice<'found> {
                 held
             });
         held.into_iter()
-            .map(|(cluster, members)| {
-                let cut = Cut::around(cluster, &members, users);
-                (cluster, Slice { cluster, members, cut })
+            .map(|(cluster, contained)| {
+                let cut = Cut::around(cluster, &contained, users);
+                (cluster, Slice { cluster, members: contained, cut })
             })
             .collect()
     }

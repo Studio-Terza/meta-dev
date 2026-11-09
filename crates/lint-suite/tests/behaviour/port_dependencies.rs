@@ -347,13 +347,13 @@ laws::table!(
     a_crate_outside_every_owning_unit_is_flagged_where_it_depends_on_a_package_an_owned_package_reaches,
     Placed::flagged,
     [
-        Placed::new(&[PORT, MACROS, ON_CLOSURE], UNIT_CRATES, STORE_ON_LIBSQLITE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, DEV_ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, WORKSPACE_RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, ON_MACRO_CLOSURE], UNIT_CRATES, STORE_ON_SQLX_CORE) => ["crates/design-store/Cargo.toml:5"],
-        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_UNDECLARED) => ["crates/design-store/Cargo.toml:4"],
+        Placed::new(&[PORT, MACROS, ON_CLOSURE], UNIT_CRATES, STORE_ON_LIBSQLITE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, DEV_ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, WORKSPACE_RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, ON_MACRO_CLOSURE], UNIT_CRATES, STORE_ON_SQLX_CORE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_UNDECLARED) => Lines::from(["crates/design-store/Cargo.toml:4"]),
     ]
 );
 
@@ -371,7 +371,7 @@ laws::table!(
     Placed::flagged,
     [
         Placed::new(&[PORT_ON_CLOSURE, MACROS], UNIT_CRATES, STORE) => Lines::default(),
-        Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_WITHOUT_MACROS) => ["crates/store-ports-macros/Cargo.toml:9"],
+        Placed::new(&[PORT, MACROS], UNIT_CRATES, STORE_WITHOUT_MACROS) => Lines::from(["crates/store-ports-macros/Cargo.toml:9"]),
     ]
 );
 
@@ -380,7 +380,7 @@ laws::table!(
     Placed::flagged,
     [
         Placed::new(&[ALPHA, BETA, SHARED_MACROS], SHARED_MACRO_CRATES, SHARED_MACRO) => Lines::default(),
-        Placed::new(&[ALPHA, BETA, SHARED_MACROS, GAMMA], SHARED_MACRO_CRATES, SHARED_MACRO) => ["crates/gamma/Cargo.toml:5"],
+        Placed::new(&[ALPHA, BETA, SHARED_MACROS, GAMMA], SHARED_MACRO_CRATES, SHARED_MACRO) => Lines::from(["crates/gamma/Cargo.toml:5"]),
     ]
 );
 
@@ -388,8 +388,8 @@ laws::table!(
     a_package_a_unit_names_in_owns_is_depended_on_directly_only_by_that_unit_even_inside_another_units_closure,
     Placed::flagged,
     [
-        Placed::new(&[ALPHA_ON_X_AND_Y, BETA_ON_Y], CROSS_UNIT_CRATES, CROSS_UNIT) => ["crates/alpha/Cargo.toml:9"],
-        Placed::new(&[ALPHA_ON_X, BETA_ON_Y, GAMMA_ON_Y], CROSS_UNIT_CRATES, OWNER_NAMED) => ["crates/gamma/Cargo.toml:5"],
+        Placed::new(&[ALPHA_ON_X_AND_Y, BETA_ON_Y], CROSS_UNIT_CRATES, CROSS_UNIT) => Lines::from(["crates/alpha/Cargo.toml:9"]),
+        Placed::new(&[ALPHA_ON_X, BETA_ON_Y, GAMMA_ON_Y], CROSS_UNIT_CRATES, OWNER_NAMED) => Lines::from(["crates/gamma/Cargo.toml:5"]),
     ]
 );
 
@@ -397,8 +397,8 @@ laws::table!(
     an_owns_entry_its_unit_does_not_reach_is_flagged_and_still_owns_the_package_by_name,
     Placed::flagged,
     [
-        Placed::new(&[ALPHA_OWNS_UNREACHED, GAMMA_ON_Y], CROSS_UNIT_CRATES, UNREACHED) => ["crates/gamma/Cargo.toml:5", "crates/alpha/Cargo.toml:5"],
-        Placed::new(&[ALPHA_OWNS_UNREACHED], CROSS_UNIT_CRATES, STALE) => ["crates/alpha/Cargo.toml:5"],
+        Placed::new(&[ALPHA_OWNS_UNREACHED, GAMMA_ON_Y], CROSS_UNIT_CRATES, UNREACHED) => Lines::from(["crates/gamma/Cargo.toml:5", "crates/alpha/Cargo.toml:5"]),
+        Placed::new(&[ALPHA_OWNS_UNREACHED], CROSS_UNIT_CRATES, STALE) => Lines::from(["crates/alpha/Cargo.toml:5"]),
     ]
 );
 
@@ -407,13 +407,13 @@ laws::table!(
     Sources::flagged::<EffectsInFillers>,
     [
         FILLED => Lines::default(),
-        INHERENT => ["crates/store-ports/src/lib.rs:8"],
-        FREE => ["crates/store-ports/src/load.rs:2"],
-        OTHER_TRAIT => ["crates/store-ports/src/lib.rs:8"],
-        UNPORTED_FILLER => ["crates/store-ports/src/lib.rs:12"],
+        INHERENT => Lines::from(["crates/store-ports/src/lib.rs:8"]),
+        FREE => Lines::from(["crates/store-ports/src/load.rs:2"]),
+        OTHER_TRAIT => Lines::from(["crates/store-ports/src/lib.rs:8"]),
+        UNPORTED_FILLER => Lines::from(["crates/store-ports/src/lib.rs:12"]),
         RELEASED => Lines::default(),
         QUALIFIED_RELEASE => Lines::default(),
-        RELEASED_ELSEWHERE => ["crates/store-ports/src/lib.rs:8"],
+        RELEASED_ELSEWHERE => Lines::from(["crates/store-ports/src/lib.rs:8"]),
         RELEASE_OUTSIDE_PORTS => Lines::default(),
         IN_TESTS => Lines::default(),
         NO_PORT => Lines::default(),
@@ -427,9 +427,9 @@ laws::table!(
         IN_PORT_CORE => Lines::default(),
         IN_PORT_DERIVE => Lines::default(),
         ACQUIRED_IN_PORT_CORE => Lines::default(),
-        ACQUIRED_ELSEWHERE => ["crates/store-ports/src/lib.rs:2"],
-        IMPORTED => ["crates/design/src/lib.rs:1"],
-        IN_MACRO => ["crates/design/tests/run.rs:2"],
+        ACQUIRED_ELSEWHERE => Lines::from(["crates/store-ports/src/lib.rs:2"]),
+        IMPORTED => Lines::from(["crates/design/src/lib.rs:1"]),
+        IN_MACRO => Lines::from(["crates/design/tests/run.rs:2"]),
     ]
 );
 
@@ -439,8 +439,8 @@ laws::table!(
     [
         IN_STORE_PORTS => Lines::default(),
         IN_STORE_PORTS_MACROS => Lines::default(),
-        SQLX_ELSEWHERE => ["crates/design-store/src/lib.rs:1"],
-        SQLX_IN_MACRO => ["crates/design/tests/run.rs:2"],
+        SQLX_ELSEWHERE => Lines::from(["crates/design-store/src/lib.rs:1"]),
+        SQLX_IN_MACRO => Lines::from(["crates/design/tests/run.rs:2"]),
         SQLX_ITSELF => Lines::default(),
     ]
 );

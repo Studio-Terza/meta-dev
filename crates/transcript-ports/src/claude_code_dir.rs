@@ -5,7 +5,7 @@ use std::ffi::OsStr;
 use std::path::PathBuf;
 
 use file_ports::{FileFailure, Files};
-use newtype::Newtype;
+use newtype::Wrapping;
 use port_core::Pass;
 
 use crate::transcripts::{TranscriptsFiller, transcripts_ops};

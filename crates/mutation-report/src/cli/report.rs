@@ -36,7 +36,7 @@ impl<'arguments> Report<'arguments> {
                 markdown: Path::new(markdown),
                 json: Path::new(json),
             })
-            .map_err(|_| Failure::Usage)
+            .map_err(Failure::Usage)
     }
 
     pub fn write_summary(&self, files: &impl Files) -> Result<(), Failure<'arguments>> {

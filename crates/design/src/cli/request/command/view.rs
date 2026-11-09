@@ -10,7 +10,7 @@ use design_store::{
 use file_ports::Files;
 use grammar::notes::{self, Notes};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use store_ports::Store;
 
 use super::printed::Printed;

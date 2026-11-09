@@ -1,4 +1,4 @@
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use transcript_ports::Uuid;
 
 use crate::Prefix;

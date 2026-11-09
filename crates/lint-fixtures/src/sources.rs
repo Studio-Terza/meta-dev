@@ -11,8 +11,10 @@ use std::str::FromStr;
 use file_ports::{Bytes, Memory};
 use lint_core::{Lint, Report, SourceFile, SourceText, WorkspaceLint};
 use lint_placement::Placement;
-use newtype::Newtype;
+use newtype::Wrapping;
 use workspace_metadata::Metadata;
+
+use crate::checks::Checks;
 
 pub use case::{Case, Title};
 pub use flagged::Flagged;
@@ -26,7 +28,7 @@ pub struct Sources(&'static [Source]);
 impl Sources {
     #[must_use]
     pub fn file(path: impl Into<PathBuf>, text: Text<'_>) -> SourceFile {
-        Self::kept(SourceFile::parse(path, SourceText::new(text.into_inner().to_string())))
+        Self::kept(SourceFile::parse(path, SourceText::new(text.into_inner().to_owned())))
     }
 
     fn kept<Parsed>(parsed: Result<Parsed, impl fmt::Display>) -> Parsed {
@@ -74,19 +76,20 @@ impl Sources {
     }
 
     #[must_use]
-    pub fn flagged<Checked: Lint>(sources: &[Source]) -> Lines {
-        Self::lines(&Checked::report(&Self::parsed(sources)))
+    pub fn flagged<Checked: Checks>(sources: &[Source]) -> Lines {
+        Checked::flagged(&Self::parsed(sources))
     }
 
     #[must_use]
-    pub fn mismatches<Checked: Lint>(cases: &[Case]) -> Lines {
+    pub fn mismatches<Checked: Checks>(cases: &[Case]) -> Lines {
         Lines::new(
             cases
                 .iter()
                 .filter_map(|case| {
                     let sources = Sources(case.sources());
                     let found = Self::flagged::<Checked>(sources.0);
-                    (found != case.flagged()).then(|| format!("{} ({sources}) flagged {found}", case.name()))
+                    (found != Lines::from(case.flagged()))
+                        .then(|| format!("{} ({sources}) flagged {found}", case.name()))
                 })
                 .collect(),
         )

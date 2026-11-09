@@ -37,7 +37,7 @@ impl FromStr for Shebang {
         let words = Self::words(line);
         let program = words.first().map(String::as_str).and_then(Self::named);
         let interpreter =
-            program.filter(|program| *program == Self::LAUNCHER).map_or(program, |_| Self::interpreter(&words));
+            program.filter(|candidate| *candidate == Self::LAUNCHER).map_or(program, |_| Self::interpreter(&words));
         Ok(Shebang(interpreter.map(str::to_owned)))
     }
 }

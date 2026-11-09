@@ -16,8 +16,8 @@ impl PathTokens {
     const SEGMENT_LENGTH: usize = 3;
     const CALL: char = '!';
 
-    pub fn new(tokens: TokenStream) -> PathTokens {
-        let tokens: Vec<TokenTree> = tokens.into_iter().collect();
+    pub fn new(stream: TokenStream) -> PathTokens {
+        let tokens: Vec<TokenTree> = stream.into_iter().collect();
         let calls: BTreeSet<usize> = tokens
             .iter()
             .zip(tokens.iter().skip(1))
@@ -26,7 +26,7 @@ impl PathTokens {
             .filter_map(|(at, ((name, call), group))| {
                 Syntax::token_ident(name)
                     .and(Syntax::punct(call))
-                    .filter(|call| call.as_char() == Self::CALL)
+                    .filter(|punct| punct.as_char() == Self::CALL)
                     .and(Syntax::group(group))
                     .map(|_| at + Self::SEPARATOR_LENGTH)
             })
@@ -59,7 +59,8 @@ impl PathTokens {
     }
 
     fn separator(token: &TokenTree) -> Option<&TokenTree> {
-        Some(token).filter(|token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
+        Some(token)
+            .filter(|candidate| matches!(candidate, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
     }
 }
 

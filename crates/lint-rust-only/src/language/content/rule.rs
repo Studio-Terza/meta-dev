@@ -1,4 +1,4 @@
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::Language;
 use super::text::Text;
@@ -149,9 +149,9 @@ impl Rule {
         let middle = self.middle.into_inner();
         let end = self.end.into_inner();
         Some(line.into_inner())
-            .filter(|line| line.get(..start.len()) == Some(start))
-            .filter(|line| line.len().checked_sub(end.len()).and_then(|from| line.get(from..)) == Some(end))
-            .filter(|line| line.contains(middle))
+            .filter(|text| text.get(..start.len()) == Some(start))
+            .filter(|starting| starting.len().checked_sub(end.len()).and_then(|from| starting.get(from..)) == Some(end))
+            .filter(|framed| framed.contains(middle))
             .map(|_| self.weight)
     }
 }

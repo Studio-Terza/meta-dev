@@ -21,7 +21,7 @@ impl<'scope> Route<'scope> {
         let scope = scopes.scope(module);
         let imported = scope
             .filter(|_| trail.followed(module, head).is_none())
-            .and_then(|scope| scope.imported(head))
+            .and_then(|unfollowed| unfollowed.imported(head))
             .map(|target| Route::Imported { head, target });
         let entered =
             Some(module.within(head.clone())).filter(|child| scopes.scope(child).is_some()).map(Route::Entered);
@@ -29,7 +29,7 @@ impl<'scope> Route<'scope> {
             .filter(|_| imported.is_none())
             .filter(|_| trail.globbing() == Globbing::Open)
             .into_iter()
-            .flat_map(|scope| scope.globs().iter());
+            .flat_map(|open| open.globs().iter());
         imported.into_iter().chain(entered).chain(globbed.map(Route::Globbed)).collect()
     }
 

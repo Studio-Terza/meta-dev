@@ -30,7 +30,7 @@ impl<'file> Guards<'file> {
     pub fn scanned(files: &[&'file SourceFile]) -> Modules<'file> {
         let empty = Guards {
             path: Path::new(""),
-            module: Module::default(),
+            module: Module::UNPLACED,
             members: Members::default(),
             modules: Modules::default(),
         };
@@ -39,7 +39,7 @@ impl<'file> Guards<'file> {
             .fold(empty, |guards, file| {
                 let mut next = Guards { path: file.path(), module: Module::of_file(file), ..guards };
                 next.visit_file(file.syntax());
-                next.modules.file(mem::take(&mut next.module), mem::take(&mut next.members));
+                next.modules.file(mem::replace(&mut next.module, Module::UNPLACED), mem::take(&mut next.members));
                 next
             })
             .modules
@@ -58,7 +58,7 @@ impl MustUse {
     const CONDITIONAL: &str = "cfg_attr";
 
     fn mark(attribute: &Attribute) -> Option<&Attribute> {
-        Some(attribute).filter(|attribute| attribute.path().is_ident(Self::MUST_USE)).or_else(|| {
+        Some(attribute).filter(|candidate| candidate.path().is_ident(Self::MUST_USE)).or_else(|| {
             attribute
                 .meta
                 .require_list()
@@ -82,9 +82,9 @@ impl<'ast> Visit<'ast> for Guards<'_> {
         let outer = mem::replace(&mut self.module, inner);
         let around = mem::take(&mut self.members);
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        let inner = mem::replace(&mut self.module, outer);
+        let visited = mem::replace(&mut self.module, outer);
         let within = mem::replace(&mut self.members, around);
-        self.modules.file(inner, within);
+        self.modules.file(visited, within);
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {

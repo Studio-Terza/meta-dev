@@ -7,6 +7,8 @@ use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use mutation_report::Cli;
 use serde_json::{Value, json};
 
+const OVERFLOWING_SECTION: usize = 305;
+const FULL_SECTION: usize = 300;
 const GOLDEN_SOURCE: &str = "\
 #[test]
 fn report_is_stable() -> Result<(), golden::Failure> {
@@ -120,13 +122,13 @@ fn the_report_lists_survivors_idle_tests_and_kills_that_no_golden_saw() -> Resul
     let checkout = Checkout::new()?;
     Shards::two(&checkout)?;
     assert_eq!(checkout.report(), Answer { exit: ExitCode::SUCCESS, err: String::new() });
-    golden::golden!("report.md", &checkout.markdown())?;
+    golden::golden!("report.md", &checkout.markdown());
     assert_eq!(
         checkout.json(),
         json!({
-            "mutants": 5,
-            "tests": 4,
-            "golden_tests": 7,
+            "mutants": 5_usize,
+            "tests": 4_usize,
+            "golden_tests": 7_usize,
             "surviving": ["a-missed", "m-missed"],
             "timed_out": ["m-timeout"],
             "tests_that_kill_nothing": ["b1 :: unused", "b2 :: other"],
@@ -143,8 +145,8 @@ fn no_shards_gives_an_empty_report() -> Result<(), Box<dyn Error>> {
     checkout.write("shards/loose-file.json", "{}")?;
     checkout.write("bare/crates/empty/src/lib.rs", "")?;
     assert_eq!(checkout.report_of("shards", "bare").exit, ExitCode::SUCCESS);
-    golden::golden!("empty_report.md", &checkout.markdown())?;
-    assert_eq!(checkout.field("mutants"), json!(0));
+    golden::golden!("empty_report.md", &checkout.markdown());
+    assert_eq!(checkout.field("mutants"), json!(0_usize));
     Ok(())
 }
 
@@ -154,7 +156,7 @@ fn a_source_file_with_a_byte_that_is_not_utf8_does_not_stop_the_report() -> Resu
     checkout.write("sources/crates/foo/tests/crash/input.rs", b"\xff\xfe")?;
     checkout.shard("shard-0", &json!({ "baseline": [], "mutants": [] }))?;
     assert_eq!(checkout.report().exit, ExitCode::SUCCESS);
-    assert_eq!(checkout.field("golden_tests"), json!(7));
+    assert_eq!(checkout.field("golden_tests"), json!(7_usize));
     Ok(())
 }
 
@@ -206,14 +208,14 @@ fn killed_mutants_are_listed_by_name_and_only_when_they_were_killed() -> Result<
 fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     let missed: Vec<Value> =
-        (0..305).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
+        (0..OVERFLOWING_SECTION).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
     checkout.shard("shard-0", &json!({ "baseline": [], "mutants": missed }))?;
     checkout.report();
     let markdown = checkout.markdown();
     assert!(markdown.contains("### Surviving mutants (305)\n\n- m000\n- m001\n"));
     assert!(markdown.contains("- m299\n- ... 5 more in report.json\n"));
     assert_eq!(markdown.matches("- m300").count(), 0);
-    assert_eq!(checkout.field("surviving").as_array().map(Vec::len), Some(305));
+    assert_eq!(checkout.field("surviving").as_array().map(Vec::len), Some(OVERFLOWING_SECTION));
     Ok(())
 }
 
@@ -221,7 +223,7 @@ fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Box<dyn Error
 fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     let missed: Vec<Value> =
-        (0..300).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
+        (0..FULL_SECTION).map(|index| Shards::mutant(&format!("m{index:03}"), "MissedMutant", &[])).collect();
     checkout.shard("shard-0", &json!({ "baseline": [], "mutants": missed }))?;
     checkout.report();
     let markdown = checkout.markdown();
@@ -245,22 +247,22 @@ fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Box<d
 #[test]
 fn shards_or_sources_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    let answer = checkout.report_of("absent", "sources");
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("absent"));
+    let absent = checkout.report_of("absent", "sources");
+    assert_eq!(absent.exit, ExitCode::FAILURE);
+    assert!(absent.err.contains("cannot use"));
+    assert!(absent.err.contains("absent"));
     checkout.directory("bare")?;
-    let answer = checkout.report_of("shards", "bare");
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("crates"));
+    let bare = checkout.report_of("shards", "bare");
+    assert_eq!(bare.exit, ExitCode::FAILURE);
+    assert!(bare.err.contains("cannot use"));
+    assert!(bare.err.contains("crates"));
     Ok(())
 }
 
 #[test]
 fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    let answer = Answer::to(
+    let unwritable_markdown = Answer::to(
         &checkout.files,
         &[
             checkout.path("shards").as_os_str(),
@@ -269,9 +271,9 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
             checkout.path("report.json").as_os_str(),
         ],
     );
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use /no/such/dir/report.md"));
-    let answer = Answer::to(
+    assert_eq!(unwritable_markdown.exit, ExitCode::FAILURE);
+    assert!(unwritable_markdown.err.contains("cannot use /no/such/dir/report.md"));
+    let unwritable_json = Answer::to(
         &checkout.files,
         &[
             checkout.path("shards").as_os_str(),
@@ -280,8 +282,8 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
             "/no/such/dir/report.json".as_ref(),
         ],
     );
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use /no/such/dir/report.json"));
+    assert_eq!(unwritable_json.exit, ExitCode::FAILURE);
+    assert!(unwritable_json.err.contains("cannot use /no/such/dir/report.json"));
     Ok(())
 }
 

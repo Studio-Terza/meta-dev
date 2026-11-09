@@ -13,7 +13,7 @@ impl<Node: Ord + Copy> Renaming<Node> {
 
     pub(crate) fn through(self, from: Option<Node>, to: Option<Node>) -> Option<Renaming<Node>> {
         match from.zip(to) {
-            Some((from, to)) => self.paired(from, to),
+            Some((source, target)) => self.paired(source, target),
             None => (from.is_none() == to.is_none()).then_some(self),
         }
     }
@@ -26,9 +26,9 @@ impl<Node: Ord + Copy> Renaming<Node> {
     }
 
     pub(crate) fn tallied(&self, sources: BTreeMap<Node, BTreeSet<Node>>) -> BTreeMap<Node, BTreeSet<Node>> {
-        self.pairs.iter().fold(sources, |mut sources, (from, to)| {
-            sources.entry(*to).or_insert_with(|| BTreeSet::from([*to])).insert(*from);
-            sources
+        self.pairs.iter().fold(sources, |mut tally, (from, to)| {
+            tally.entry(*to).or_insert_with(|| BTreeSet::from([*to])).insert(*from);
+            tally
         })
     }
 

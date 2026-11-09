@@ -1,4 +1,4 @@
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::document::text::Text;
 

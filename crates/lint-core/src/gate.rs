@@ -26,7 +26,9 @@ impl Gate {
         self.package_suffix
             .and_then(|suffix| placement.crate_root().package()?.matches::<Suffix>(&[suffix]))
             .map(|_| file)
-            .or_else(|| placement.module().segments().iter().find(|segment| **segment == self.module).map(|_| file))
+            .or_else(|| {
+                placement.module().segments().iter().find(|segment| **segment == Name::from(self.module)).map(|_| file)
+            })
     }
 
     #[must_use]
@@ -42,6 +44,6 @@ impl Gate {
 
     #[must_use]
     pub fn names<'module>(&self, module: &'module ItemMod) -> Option<&'module ItemMod> {
-        (Name::from(&module.ident) == self.module).then_some(module)
+        (Name::from(&module.ident) == Name::from(self.module)).then_some(module)
     }
 }

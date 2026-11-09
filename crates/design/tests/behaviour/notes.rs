@@ -176,10 +176,7 @@ fn import_notes_makes_a_node_of_every_content_line_anchors_each_ruling_and_view_
         .iter()
         .map(|node| applying.run(&["show", node]).map(|out| format!("design show {node}\n{out}")))
         .collect::<Result<String, Failure>>()?;
-    golden::golden!(
-        "notes.txt",
-        &format!("design import-notes {NOTES}\n{imported}design view notes\n{viewed}{shown}")
-    )?;
+    golden::golden!("notes.txt", &format!("design import-notes {NOTES}\n{imported}design view notes\n{viewed}{shown}"));
     Ok(())
 }
 

@@ -11,7 +11,7 @@ impl Exit {
     #[must_use]
     pub fn excusing(self, excused: &[NonZeroU8]) -> Exit {
         match self {
-            Exit::Failure(code) => excused.iter().find(|excused| **excused == code).map_or(self, |_| Exit::Success),
+            Exit::Failure(code) => excused.iter().find(|allowed| **allowed == code).map_or(self, |_| Exit::Success),
             Exit::Success => self,
         }
     }

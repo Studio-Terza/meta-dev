@@ -12,7 +12,7 @@ use design_store::{
 };
 use dispatch_ports::Reply;
 use file_ports::{Bytes, Files, Text};
-use newtype::{Counter, Newtype};
+use newtype::{Counter, Wrapping};
 use store_ports::{Store, Written};
 use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
 use transcript_ports::{Authorship, Uuid};

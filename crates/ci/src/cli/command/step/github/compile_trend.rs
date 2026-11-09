@@ -47,8 +47,8 @@ impl CompileTrend {
 }
 
 impl Step for CompileTrend {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<CompileTrend, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<CompileTrend, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let today = &arguments.taken()?;
         let downloads = &arguments.taken()?;
         arguments.ended()?;

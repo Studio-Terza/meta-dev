@@ -1,29 +1,18 @@
-use std::io;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::PathBuf;
 
 use cargo_ports::Cargo;
-use file_ports::Text;
-use lint_layout::Failure;
+use lint_reader::{CrateSources, Unlocated};
 use workspace_metadata::Metadata;
 
 #[derive(Debug, Default)]
 pub(crate) struct Workspaces(Vec<Metadata>);
 
 impl Workspaces {
-    pub(crate) fn described(cargo: &impl Cargo, roots: &[PathBuf]) -> Result<Workspaces, Failure> {
-        roots
-            .iter()
-            .zip(cargo.metadata(roots))
-            .map(|(root, described)| Self::parsed(root, described))
-            .collect::<Result<Vec<Metadata>, Failure>>()
-            .map(Workspaces)
-    }
+    const MANIFEST: &'static str = "Cargo.toml";
 
-    fn parsed(root: &Path, described: io::Result<Text>) -> Result<Metadata, Failure> {
-        described.map_err(|source| Failure::Cargo { path: root.to_path_buf(), source }).and_then(|text| {
-            Metadata::from_str(text.as_ref()).map_err(|source| Failure::Metadata { path: root.to_path_buf(), source })
-        })
+    pub(crate) fn described(cargo: &impl Cargo, roots: &[PathBuf]) -> Result<Workspaces, Unlocated> {
+        let manifests: Vec<PathBuf> = roots.iter().map(|root| root.join(Self::MANIFEST)).collect();
+        CrateSources::described(cargo, &manifests).map(Workspaces)
     }
 }
 

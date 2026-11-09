@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
+use text_lines::OneLine;
 use workspace_metadata::{Bypass, Bypasses, CrateName as PackageName, Stale};
 
 use foreign_dependency::ForeignDependency;
@@ -23,7 +24,8 @@ impl<'file> Owners<'file> {
                 .iter()
                 .rev()
                 .filter_map(|file| {
-                    Some((PackageName::try_from(file.placement().package().root().package()?.borrow()).ok()?, file))
+                    let named: &str = file.placement().package().root().package()?.borrow();
+                    Some((PackageName::new(OneLine::try_new(named.to_owned()).ok()?), file))
                 })
                 .collect(),
         }
@@ -65,9 +67,9 @@ impl<'file> Owners<'file> {
     }
 
     fn sites(file: &SourceFile, bypass: &Bypass<'_>) -> BTreeSet<LineNumber> {
-        let dependencies = file.placement().package().dependencies();
-        Some(dependencies.sites(bypass.keys()))
+        let lines = file.placement().package().key_lines();
+        Some(lines.dependency_sites(bypass.keys()))
             .filter(|found| found.first().is_some())
-            .unwrap_or_else(|| BTreeSet::from([dependencies.header()]))
+            .unwrap_or_else(|| BTreeSet::from([lines.dependencies_header()]))
     }
 }

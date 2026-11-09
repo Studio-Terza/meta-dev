@@ -13,6 +13,7 @@ doctest = false
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 workspace-metadata = { path = "../workspace-metadata" }
+text-lines = { path = "../text-lines" }
 proc-macro2.workspace = true
 syn.workspace = true
 thiserror.workspace = true

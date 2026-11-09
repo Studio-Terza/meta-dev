@@ -4,6 +4,7 @@ mod outcome;
 mod refusal;
 mod sources;
 mod stack_size;
+mod verdict;
 mod workspaces;
 
 use std::ffi::OsString;
@@ -13,16 +14,18 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
 
-use cargo_ports::CargoFiller;
+use cargo_ports::{Cargo, CargoFiller};
 use file_ports::Files;
-use lint_reader::SourceFiles;
+use lint_layout::Failure;
+use lint_reader::{SourceFiles, Stage};
 use port_core::Run;
 
 use mode::Mode;
 use outcome::Outcome;
 use refusal::Refusal;
-use sources::Sources;
+use sources::{Ports, Sources};
 use stack_size::StackSize;
+pub use verdict::Verdict;
 use workspaces::Workspaces;
 
 #[derive(Debug)]
@@ -35,8 +38,8 @@ impl Cli {
     pub fn from_args(arguments: impl Iterator<Item = OsString>) -> Cli {
         let given: Vec<OsString> = arguments.collect();
         let mode = Mode::of_arguments(&given);
-        let roots = mode.roots(&given);
-        let roots = roots.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| roots);
+        let named = mode.roots(&given);
+        let roots = named.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| named);
         Cli { roots, mode }
     }
 
@@ -44,49 +47,61 @@ impl Cli {
     pub fn report_to(
         &self,
         files: &(impl Files + Sync),
-        cargo: impl CargoFiller,
+        cargo: impl CargoFiller + Sync,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> ExitCode {
-        let run = Run::root();
-        self.described(self.mode.workspaces(&run.port(cargo), &self.roots), files, out, err)
+        self.verdict(files, cargo, out, err).into()
     }
 
-    fn described(
+    #[must_use]
+    pub fn verdict(
         &self,
-        workspaces: Result<Workspaces, Refusal<'_>>,
         files: &(impl Files + Sync),
+        cargo: impl CargoFiller + Sync,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
-    ) -> ExitCode {
-        match workspaces {
+    ) -> Verdict {
+        let run = Run::root();
+        let port = run.port(cargo);
+        let ports = Ports::new(files, &port);
+        match self.mode.workspaces(&port, &self.roots) {
             Ok(workspaces) => StackSize::LINT
-                .ran(|| self.linted(&Sources::new(files, &self.roots, workspaces.as_ref()), out, err))
+                .ran(|| self.linted(SourceFiles::staged(files, &self.roots), ports, &workspaces, out, err))
                 .unwrap_or_else(|failure| Self::refused(&failure, err)),
             Err(refused) => Self::refused(&refused, err),
         }
     }
 
-    fn linted(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+    fn linted(
+        &self,
+        staged: Result<Stage<'_>, Failure>,
+        ports: Ports<'_, impl Files + Sync, impl Cargo + Sync>,
+        workspaces: &Workspaces,
+        out: &mut impl Write,
+        err: &mut impl Write,
+    ) -> Verdict {
+        match staged {
+            Ok(stage) => self.staged(&Sources::new(ports, &stage, workspaces.as_ref()), out, err),
+            Err(failure) => Self::refused(&failure, err),
+        }
+    }
+
+    fn staged(
+        &self,
+        sources: &Sources<impl Files + Sync, impl Cargo + Sync>,
+        out: &mut impl Write,
+        err: &mut impl Write,
+    ) -> Verdict {
         thread::scope(|scope| {
-            let helpers = self.mode.helpers(scope, sources);
-            let read =
-                SourceFiles::read_all(sources.files(), sources.roots()).map(|readout| sources.described(readout));
-            let outcome = read.as_ref().map(|readout| self.mode.outcome_of(readout, helpers, out));
-            let refusal = outcome.as_ref().err().map(|failure| Self::refused(failure, err));
-            let written =
-                outcome.ok().as_ref().and_then(Outcome::violations).map(|violations| Self::written(violations, err));
-            refusal.or(written).unwrap_or(ExitCode::SUCCESS)
+            let run = self.mode.started(scope, sources);
+            let readout = sources.described(SourceFiles::read_staged(sources.ports().files(), sources.stage()));
+            run.outcome_of(&readout, sources.queue(), out).written(err)
         })
     }
 
-    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> ExitCode {
+    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> Verdict {
         writeln!(err, "{failure}").ok();
-        ExitCode::FAILURE
-    }
-
-    fn written(violations: &Outcome<'_>, err: &mut impl Write) -> ExitCode {
-        write!(err, "{violations}").ok();
-        ExitCode::FAILURE
+        Verdict::Refused
     }
 }

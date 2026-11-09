@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::crate_name::CrateName;
@@ -31,23 +31,48 @@ impl PackageRoot {
             .filter_map(|(path, real)| Some((path, real.ok()?)))
             .collect();
         let canonical = |path: &Path| found.get(path).cloned();
+        let workspaces = Self::workspaces(files, directories);
         directories
             .iter()
             .zip(&manifests)
             .map(|(directory, manifest)| {
                 let root = CrateRoot::of_manifest(directory.as_ref(), manifest.as_ref());
+                let workspace = Self::workspace(&workspaces, directory.as_ref(), manifest.as_ref());
                 PackageRoot {
+                    dependencies: manifest.as_ref().map(|present| present.dependencies(workspace)).unwrap_or_default(),
                     name: CrateName::from(&root),
                     root,
                     lines: manifest.as_ref().map(AsRef::as_ref).cloned().unwrap_or_default(),
-                    untested: manifest
-                        .as_ref()
-                        .map(|manifest| manifest.untested_targets(canonical))
-                        .unwrap_or_default(),
-                    dependencies: manifest.as_ref().map(Manifest::dependencies).cloned().unwrap_or_default(),
+                    untested: manifest.as_ref().map(|present| present.untested_targets(canonical)).unwrap_or_default(),
                 }
             })
             .collect()
+    }
+
+    fn workspaces(files: &impl Files, directories: &[impl AsRef<Path>]) -> BTreeMap<PathBuf, Manifest> {
+        let enclosing: Vec<PathBuf> = directories
+            .iter()
+            .flat_map(|directory| directory.as_ref().ancestors().skip(1))
+            .map(Path::to_path_buf)
+            .collect::<BTreeSet<PathBuf>>()
+            .into_iter()
+            .collect();
+        enclosing
+            .iter()
+            .cloned()
+            .zip(Manifest::read_many(files, &enclosing))
+            .filter_map(|(directory, read)| Some((directory, read.ok().flatten()?)))
+            .filter(|(_, manifest)| manifest.workspace().is_some())
+            .collect()
+    }
+
+    fn workspace<'read>(
+        workspaces: &'read BTreeMap<PathBuf, Manifest>,
+        directory: &Path,
+        manifest: Option<&'read Manifest>,
+    ) -> Option<&'read Manifest> {
+        let own = manifest.filter(|candidate| candidate.workspace().is_some());
+        own.or_else(|| directory.ancestors().skip(1).find_map(|enclosing| workspaces.get(enclosing)))
     }
 
     #[must_use]

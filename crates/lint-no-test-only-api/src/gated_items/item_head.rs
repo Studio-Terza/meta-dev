@@ -20,25 +20,25 @@ impl<'item> ItemHead<'item> {
 
     pub(super) fn of_item(item: &'item Item) -> Option<ItemHead<'item>> {
         match item {
-            Item::Const(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Enum(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Fn(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Mod(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Static(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Struct(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Trait(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Type(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Union(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
-            Item::Use(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
+            Item::Const(constant) => Some(ItemHead { attributes: &constant.attrs, visibility: &constant.vis }),
+            Item::Enum(enumeration) => Some(ItemHead { attributes: &enumeration.attrs, visibility: &enumeration.vis }),
+            Item::Fn(function) => Some(ItemHead { attributes: &function.attrs, visibility: &function.vis }),
+            Item::Mod(module) => Some(ItemHead { attributes: &module.attrs, visibility: &module.vis }),
+            Item::Static(global) => Some(ItemHead { attributes: &global.attrs, visibility: &global.vis }),
+            Item::Struct(structure) => Some(ItemHead { attributes: &structure.attrs, visibility: &structure.vis }),
+            Item::Trait(trait_item) => Some(ItemHead { attributes: &trait_item.attrs, visibility: &trait_item.vis }),
+            Item::Type(alias) => Some(ItemHead { attributes: &alias.attrs, visibility: &alias.vis }),
+            Item::Union(union) => Some(ItemHead { attributes: &union.attrs, visibility: &union.vis }),
+            Item::Use(import) => Some(ItemHead { attributes: &import.attrs, visibility: &import.vis }),
             _ => None,
         }
     }
 
     pub(super) fn of_member(member: &'item ImplItem) -> Option<ItemHead<'item>> {
         match member {
-            ImplItem::Const(member) => Some(ItemHead { attributes: &member.attrs, visibility: &member.vis }),
-            ImplItem::Fn(member) => Some(ItemHead { attributes: &member.attrs, visibility: &member.vis }),
-            ImplItem::Type(member) => Some(ItemHead { attributes: &member.attrs, visibility: &member.vis }),
+            ImplItem::Const(constant) => Some(ItemHead { attributes: &constant.attrs, visibility: &constant.vis }),
+            ImplItem::Fn(function) => Some(ItemHead { attributes: &function.attrs, visibility: &function.vis }),
+            ImplItem::Type(alias) => Some(ItemHead { attributes: &alias.attrs, visibility: &alias.vis }),
             _ => None,
         }
     }

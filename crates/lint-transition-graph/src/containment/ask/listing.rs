@@ -1,7 +1,8 @@
 use std::fmt;
 use std::num::NonZeroUsize;
 
-use newtype::{Arbitrary, Newtype};
+use lint_core::Site;
+use newtype::{Arbitrary, Newtype, Wrapping};
 
 use super::super::Containment;
 use super::super::member::Member;
@@ -39,6 +40,9 @@ enum Line<'view, 'found, 'file> {
     Outside(Outsider<'found, 'file>),
 }
 
+#[derive(Clone, Copy, Debug)]
+struct At<'file>(Option<Site<'file>>);
+
 #[derive(Debug)]
 pub(super) struct Names<'found>(Vec<Member<'found>>);
 
@@ -49,6 +53,10 @@ impl<'view, 'found, 'file> Placed<'view, 'found, 'file> {
         spelled: Spelled,
     ) -> Placed<'view, 'found, 'file> {
         Placed { view, member, spelled }
+    }
+
+    fn found_at(&self) -> At<'file> {
+        At(self.view.site(self.member))
     }
 }
 
@@ -73,15 +81,6 @@ impl<'found> FromIterator<Member<'found>> for Names<'found> {
     }
 }
 
-impl Spelled {
-    fn written(self, member: Member<'_>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Spelled::Path => write!(formatter, "{member}"),
-            Spelled::Name => write!(formatter, "{}", member.name()),
-        }
-    }
-}
-
 impl Listed {
     pub(super) fn more<Item>(self, items: &[Item]) -> Option<NonZeroUsize> {
         NonZeroUsize::new(items.len().saturating_sub(self.into_inner()))
@@ -103,8 +102,16 @@ impl fmt::Display for Line<'_, '_, '_> {
 
 impl fmt::Display for Placed<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.spelled.written(self.member, formatter)?;
-        self.view.site(self.member).map_or(Ok(()), |site| write!(formatter, " at {site}"))
+        match self.spelled {
+            Spelled::Path => write!(formatter, "{}{}", self.member, self.found_at()),
+            Spelled::Name => write!(formatter, "{}{}", self.member.name(), self.found_at()),
+        }
+    }
+}
+
+impl fmt::Display for At<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|site| write!(formatter, " at {site}"))
     }
 }
 

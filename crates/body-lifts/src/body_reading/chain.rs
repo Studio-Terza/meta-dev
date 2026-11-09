@@ -34,8 +34,8 @@ impl<'body> Chain<'body> {
             .iter()
             .all(|call| Name::from(&call.method).matches::<Whole>(&Self::STEPS).is_some())
             .then_some(&maps)
-            .filter(|maps| {
-                maps.iter().flat_map(|call| call.args.iter()).all(|argument| Self::mapping(argument).is_some())
+            .filter(|mapping_calls| {
+                mapping_calls.iter().flat_map(|call| call.args.iter()).all(|argument| Self::mapping(argument).is_some())
             })
             .and(mapped)
             .and_then(|_| Applied::traced(self.root))

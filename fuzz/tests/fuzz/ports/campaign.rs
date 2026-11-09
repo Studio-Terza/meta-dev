@@ -1,36 +1,31 @@
 use std::ffi::OsString;
-use std::io;
 use std::iter;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use cargo_ports::{CargoFiller, cargo_ops};
+use cargo_ports::Recorded;
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
-use lint_runner::Cli;
-use port_core::Pass;
-use proptest::prelude::Strategy;
-use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
+use lint_runner::{Cli, Verdict};
+use proptest::prelude::{Strategy, prop_assert_eq};
+use proptest::test_runner::{Config, Reason, TestCaseError, TestError, TestRunner};
 
-use crate::crash::Crash;
+use crate::crash::{Crash, Failing, Kept};
 use crate::input::Input;
+use crate::outcome::{Check, Outcome};
 
 const ROOT: &str = "/fuzzed";
 const BATCH: u32 = 64;
+const WORKSPACE: &str = "{\"workspace_root\": \"/fuzzed\", \"packages\": [], \"resolve\": null}";
+
+#[derive(Debug, PartialEq, Eq)]
+struct Run {
+    verdict: Verdict,
+    outcome: Outcome,
+}
 
 pub struct Campaign;
-
-struct Workspace;
-
-impl Workspace {
-    const METADATA: &'static str = "{\"workspace_root\": \"/fuzzed\", \"packages\": [], \"resolve\": null}";
-}
-
-impl CargoFiller for Workspace {
-    fn metadata(&self, _pass: Pass<'_, cargo_ops::Metadata>, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
-        roots.iter().map(|_| Ok(Text::new(Self::METADATA.to_owned()))).collect()
-    }
-}
 
 impl Campaign {
     fn case(target: &str, input: &Input) -> Case {
@@ -46,9 +41,21 @@ impl Campaign {
         ]
         .into_iter()
         .collect();
-        let arguments = [OsString::from(root)];
-        let _ = Cli::from_args(arguments.into_iter()).report_to(&files, Workspace, &mut Vec::new(), &mut Vec::new());
+        let run = Self::ran(&files);
+        prop_assert_eq!(&run, &Self::ran(&files), "two runs of the runner disagreed");
+        prop_assert_eq!(run.outcome.checked(run.verdict), Check::Held);
         Ok(())
+    }
+
+    fn ran(files: &Memory) -> Run {
+        let mut err = Vec::new();
+        let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(
+            files,
+            [(PathBuf::from(ROOT), Bytes::from(WORKSPACE))].into_iter().collect::<Recorded>(),
+            &mut Vec::new(),
+            &mut err,
+        );
+        Run { verdict, outcome: Outcome::from(err) }
     }
 
     fn batch(crashes: Crashes, target: &str, strategy: &impl Strategy<Value = Input>) -> Result<(), Crash> {
@@ -60,12 +67,21 @@ impl Campaign {
 
     fn crashed(crashes: Crashes, target: &str, failure: TestError<Input>) -> Crash {
         match failure {
-            TestError::Fail(reason, input) => Crash::Panicked {
-                kept: crashes.keep(&Self::case(target, &input)),
-                reason: reason.message().to_owned(),
-                input,
-            },
+            TestError::Fail(reason, input) => Self::failed(crashes, target, input, &reason),
             TestError::Abort(reason) => Crash::Aborted { reason: reason.message().to_owned() },
+        }
+    }
+
+    fn failed(crashes: Crashes, target: &str, input: Input, reason: &Reason) -> Crash {
+        let kept = Kept::from(crashes.keep(&Self::case(target, &input)));
+        Self::replayed(crashes, target, Failing::new(input, reason.message().to_owned(), kept))
+    }
+
+    fn replayed(crashes: Crashes, target: &str, failing: Failing) -> Crash {
+        match panic::catch_unwind(AssertUnwindSafe(|| Self::linted(crashes, target, failing.input()))) {
+            Err(_) => Crash::Panicked(failing),
+            Ok(Err(_)) => Crash::Failed(failing),
+            Ok(Ok(())) => Crash::Unrepeated(failing),
         }
     }
 

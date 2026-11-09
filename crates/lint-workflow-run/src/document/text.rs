@@ -3,7 +3,7 @@ mod expansion;
 use std::fmt;
 use std::path::Path;
 
-use newtype::Newtype;
+use newtype::{Newtype, Wrapping};
 
 use crate::characters::Characters;
 use crate::document::lines::Lines;

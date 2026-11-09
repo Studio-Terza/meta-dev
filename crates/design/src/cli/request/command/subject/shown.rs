@@ -2,7 +2,7 @@ use std::io::Write;
 
 use design_model::{Ordinal, Prefix};
 use design_store::{ShownMessage, Started, Stored};
-use newtype::Newtype;
+use newtype::Wrapping;
 use store_ports::Store;
 use structurer::SegmentRef;
 use transcript_ports::Uuid;

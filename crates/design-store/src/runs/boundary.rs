@@ -1,6 +1,6 @@
 use design_model::{JobId, Ordinal, Provenance, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
-use newtype::{Counter, Newtype};
+use newtype::{Counter, Wrapping};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::{Body, SessionId, Uuid};
 

@@ -41,7 +41,7 @@ impl MethodShape {
     fn of_literal(literal: &ExprStruct, self_name: &Name) -> MethodShape {
         let last = literal.path.segments.last();
         last.filter(|segment| segment.ident == Self::SELF)
-            .or_else(|| last.filter(|segment| *self_name == segment.ident))
+            .or_else(|| last.filter(|segment| *self_name == Name::from(&segment.ident)))
             .map_or(MethodShape::Logic, |_| MethodShape::Constructor)
     }
 }
