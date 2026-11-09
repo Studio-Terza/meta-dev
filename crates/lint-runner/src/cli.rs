@@ -106,7 +106,8 @@ impl Cli {
     ) -> Verdict {
         thread::scope(|scope| {
             let run = self.mode.started(scope, sources);
-            let readout = sources.described(SourceFiles::read_staged(sources.ports().files(), sources.stage()));
+            let surveyed = sources.surveyed();
+            let readout = surveyed.described(SourceFiles::read_staged(surveyed.ports().files(), sources.stage()));
             run.outcome_of(&readout, sources.queue(), out).written(err)
         })
     }

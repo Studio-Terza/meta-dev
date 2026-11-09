@@ -49,6 +49,10 @@ impl<'run, F, C> Surveyed<'run, F, C> {
     pub(crate) fn ports(&self) -> &Ports<'run, F, C> {
         &self.ports
     }
+
+    pub(crate) fn described(&self, readout: Readout) -> Readout {
+        readout.with_workspaces(self.workspaces.as_ref().to_vec())
+    }
 }
 
 impl<'run, F, C> Sources<'run, F, C> {
@@ -56,8 +60,8 @@ impl<'run, F, C> Sources<'run, F, C> {
         Sources { surveyed, stage, queue: Queue::default() }
     }
 
-    pub(crate) fn ports(&self) -> &Ports<'run, F, C> {
-        self.surveyed.ports()
+    pub(crate) fn surveyed(&self) -> &Surveyed<'run, F, C> {
+        &self.surveyed
     }
 
     pub(crate) fn stage(&self) -> &'run Stage<'run> {
@@ -66,9 +70,5 @@ impl<'run, F, C> Sources<'run, F, C> {
 
     pub(crate) fn queue(&self) -> &Queue {
         &self.queue
-    }
-
-    pub(crate) fn described(&self, readout: Readout) -> Readout {
-        readout.with_workspaces(self.surveyed.workspaces.as_ref().to_vec())
     }
 }

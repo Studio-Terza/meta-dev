@@ -157,7 +157,7 @@ impl Lints {
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C>,
     ) -> Crew<'scope> {
-        let located = Located::spawned(scope, move || sources.ports().located(sources.stage()));
+        let located = Located::spawned(scope, move || sources.surveyed().ports().located(sources.stage()));
         let helpers =
             Workers::available().helpers().filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok());
         Crew { located, helpers: helpers.collect() }
@@ -171,7 +171,9 @@ impl Lints {
 
     fn helped(sources: &Sources<impl Files, impl Cargo>) -> Vec<Rendered> {
         Self::worked(
-            &sources.described(SourceFiles::read_staged(sources.ports().files(), sources.stage())),
+            &sources
+                .surveyed()
+                .described(SourceFiles::read_staged(sources.surveyed().ports().files(), sources.stage())),
             sources.queue(),
         )
     }
