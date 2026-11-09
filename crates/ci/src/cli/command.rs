@@ -8,7 +8,9 @@ use step::cold_size::ColdSize;
 use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
-use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
+use step::{
+    ClippyTargets, CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey,
+};
 
 use super::ports::{Exit, Ports};
 pub(crate) use failure::Failure;
@@ -16,6 +18,7 @@ pub(crate) use failure::Failure;
 #[derive(Debug)]
 pub enum Command {
     Timed(Timed),
+    ClippyTargets(ClippyTargets),
     LibtestSeconds(LibtestSeconds),
     Reach(ReachScope),
     History(History),
@@ -41,6 +44,7 @@ pub enum Command {
 
 impl Command {
     const TIMED: &'static str = "timed";
+    const CLIPPY_TARGETS: &'static str = "clippy-targets";
     const LIBTEST_SECONDS: &'static str = "libtest-seconds";
     const REACH: &'static str = "reach";
     const HISTORY: &'static str = "history";
@@ -66,6 +70,7 @@ impl Command {
     pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
         match arguments.next().and_then(|name| name.into_string().ok()).as_deref() {
             Some(Self::TIMED) => Self::parsed(arguments.collect(), Command::Timed),
+            Some(Self::CLIPPY_TARGETS) => Self::parsed(arguments.collect(), Command::ClippyTargets),
             Some(Self::LIBTEST_SECONDS) => Self::parsed(arguments.collect(), Command::LibtestSeconds),
             Some(Self::REACH) => Self::parsed(arguments.collect(), Command::Reach),
             Some(Self::HISTORY) => Self::parsed(arguments.collect(), Command::History),
@@ -98,6 +103,7 @@ impl Command {
     pub fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         match self {
             Command::Timed(step) => step.carry_out(ports, out),
+            Command::ClippyTargets(step) => step.carry_out(ports, out),
             Command::LibtestSeconds(step) => step.carry_out(ports, out),
             Command::Reach(step) => step.carry_out(ports, out),
             Command::History(step) => step.carry_out(ports, out),

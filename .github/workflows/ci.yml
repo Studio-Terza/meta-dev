@@ -53,7 +53,7 @@ jobs:
         run: cargo fmt --check
       - name: clippy
         if: env.BUILD_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy-once $BUILD_SCOPE -- -D warnings'
+        run: '"$TOOLS/ci" clippy-targets "$MEASURED" clippy $BUILD_SCOPE -- -D warnings'
       - name: fuzz targets clippy
         if: env.BUILD_SCOPE == '--workspace' || contains(format('{0} ', env.BUILD_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings

@@ -12,6 +12,7 @@ use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
+const CLIPPY_FIXTURE: &str = include_str!("metadata/clippy_targets.json");
 const LEAF_REPORT: [&str; 3] = ["REACH=1 of 5 crates", "BUILD_SCOPE=-p leaf", "MUTANTS_SCOPE=--test-package=leaf"];
 const TWO_REPORT: [&str; 3] = [
     "REACH=2 of 5 crates",
@@ -277,6 +278,103 @@ laws::table!(
         ["main", "README.md\n"] => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
     ]
 );
+
+const LIBRARY_BINS_EXAMPLES_BENCHES: [&str; 4] = ["--lib", "--bins", "--examples", "--benches"];
+
+struct Clippy;
+
+impl Clippy {
+    fn invoked(scope: &[&str]) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), ..Script::new() };
+        let measured = scratch.file("m.toml");
+        scratch.answer(&fake, &[&["clippy-targets", measured.as_str(), "clippy"], scope].concat());
+        let calls = fake.calls.borrow();
+        calls
+            .iter()
+            .filter(|call| call.program() == "cargo" && call.arguments().first().is_some_and(|first| first == "clippy"))
+            .flat_map(|call| call.arguments().iter().skip(2))
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect()
+    }
+}
+
+laws::table!(
+    clippy_checks_each_unit_once_and_names_only_the_tests_whose_features_are_enabled,
+    Clippy::invoked,
+    [
+        &["--workspace"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--workspace"]].concat(),
+        &["--workspace", "--timings", "--", "-D", "warnings"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--workspace", "--timings", "--", "-D", "warnings"]].concat(),
+        &["-p", "gated"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "plain_gated", "-p", "gated"]].concat(),
+        &["-p", "gated", "--package", "unit", "-p", "silent", "--", "-D", "warnings"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "plain_gated", "-p", "gated", "--package", "unit", "-p", "silent", "--", "-D", "warnings"]].concat(),
+        &["-p", "silent"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["-p", "silent"]].concat(),
+        &["-p", "defaulted"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "needs_extra", "-p", "defaulted"]].concat(),
+        &["-p", "chained"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "needs_inner", "-p", "chained"]].concat(),
+        &["-p", "unit"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "-p", "unit"]].concat(),
+        &["-p", "unmatched"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["-p", "unmatched"]].concat(),
+        &["--", "-D", "warnings"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--", "-D", "warnings"]].concat(),
+        &["-p"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "-p"]].concat(),
+        &["--workspace", "-p", "silent"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--workspace", "-p", "silent"]].concat(),
+        &["--all"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--test", "implied", "--test", "needs_extra", "--test", "needs_inner", "--test", "plain_gated", "--all"]].concat(),
+        &["--", "-p", "gated"][..] => [&LIBRARY_BINS_EXAMPLES_BENCHES[..], &["--test", "behaviour", "--", "-p", "gated"]].concat(),
+    ]
+);
+
+#[test]
+fn a_test_with_unmet_required_features_is_not_named_and_nothing_checks_libraries_in_test_mode() {
+    let flags = Clippy::invoked(&["--workspace"]);
+    assert!(!flags.iter().any(|flag| ["measured", "needs_off", "needs_both", "never_run"].contains(&flag.as_str())));
+    assert!(!flags.iter().any(|flag| ["--tests", "--all-targets"].contains(&flag.as_str())));
+    assert_eq!(flags.iter().filter(|flag| *flag == "--lib").count(), 1);
+}
+
+#[test]
+fn clippy_is_timed_under_its_stage_and_fails_with_its_code() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let fake = Script { metadata: CLIPPY_FIXTURE.to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
+    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "-p", "silent"]);
+    assert_eq!(answer.exit, ExitCode::from(FAILED_WITH.get()));
+    assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.50"]);
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
+            Invocation::new(
+                "cargo",
+                ["clippy", "--locked", "--lib", "--bins", "--examples", "--benches", "-p", "silent"]
+            ),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_that_cannot_be_read_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let fake = Script { metadata: "not json".to_owned(), ..Script::new() };
+    let answer = scratch.answer(&fake, &["clippy-targets", &scratch.file("m.toml"), "clippy", "--workspace"]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.starts_with("cannot read the cargo metadata: "));
+    assert_eq!(fake.calls.borrow().len(), 1);
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn metadata_that_cannot_be_asked_for_stops_clippy_before_it_runs() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let answer = scratch.answer(&Script::refusing("cargo"), &["clippy-targets", &scratch.file("m.toml"), "clippy"]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert_eq!(Text::lines(&answer.err), ["cannot run cargo: boom"]);
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn clippy_targets_needs_a_measured_file_and_a_stage() {
+    assert!(Answer::refused(&["clippy-targets"]));
+    assert!(Answer::refused(&["clippy-targets", "m.toml"]));
+}
 
 #[test]
 fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Error>> {

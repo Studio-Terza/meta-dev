@@ -1,6 +1,7 @@
 mod arguments;
 mod branch;
 mod changed;
+mod clippy_targets;
 pub mod cold_size;
 mod compile_times;
 pub mod github;
@@ -26,6 +27,7 @@ use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
 pub(crate) use arguments::Arguments;
 
+pub use clippy_targets::ClippyTargets;
 pub use compile_times::CompileTimes;
 pub use history::History;
 pub use install_tools::InstallTools;

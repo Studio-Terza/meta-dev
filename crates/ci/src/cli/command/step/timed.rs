@@ -32,10 +32,21 @@ impl Step for Timed {
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+        Timed::measure(&self.measured, &self.stage, &self.invocation, ports)
+    }
+}
+
+impl Timed {
+    pub(super) fn measure<'measured>(
+        measured: &'measured Measured,
+        stage: &Stage,
+        invocation: &Invocation,
+        ports: &impl Ports,
+    ) -> Result<Exit, Failure<'measured>> {
         let run = ports
-            .run(&self.invocation)
-            .map_err(|source| Failure::Program { program: self.invocation.program().to_owned(), source })?;
-        self.measured.append(ports.files(), &self.stage, Seconds::from(run.elapsed()))?;
+            .run(invocation)
+            .map_err(|source| Failure::Program { program: invocation.program().to_owned(), source })?;
+        measured.append(ports.files(), stage, Seconds::from(run.elapsed()))?;
         Ok(run.exit())
     }
 }
