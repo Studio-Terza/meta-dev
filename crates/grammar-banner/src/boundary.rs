@@ -39,26 +39,19 @@ enum Heading<'text> {
     DocTests(&'text str),
 }
 
-impl<'text> Heading<'text> {
+impl Heading<'_> {
     const DOCTEST_PREFIX: &'static str = "doc-";
-
-    fn running(after: &[Spelling<'text>]) -> Option<Heading<'text>> {
-        let last = after.iter().rposition(|spelling| *spelling == Spelling::Target)?;
-        let deps = after.get(last..)?.get(..5)?;
-        <&[Spelling<'text>; 5]>::try_from(deps).ok().and_then(Spelling::binary)
-    }
-
-    fn documented(name: Option<&Spelling<'text>>) -> Option<Heading<'text>> {
-        name.and_then(|spelling| spelling.word()).map(Heading::DocTests)
-    }
 }
 
 impl<'text> Spelling<'text> {
-    fn binary([_target, profile, deps, name, close]: &[Spelling<'text>; 5]) -> Option<Heading<'text>> {
+    fn running(after: &[Spelling<'text>]) -> Option<&'text str> {
+        let last = after.iter().rposition(|spelling| *spelling == Spelling::Target)?;
+        let window = after.get(last..)?.get(..5)?;
+        let [_target, profile, deps, name, close] = <&[Spelling<'text>; 5]>::try_from(window).ok()?;
         profile.word()?;
         Some(deps).filter(|spelling| **spelling == Spelling::Deps)?;
         Some(close).filter(|spelling| **spelling == Spelling::Close)?;
-        name.word().map(Heading::Running)
+        name.word()
     }
 
     fn word(self) -> Option<&'text str> {
@@ -77,8 +70,8 @@ impl<'text> Spelling<'text> {
 
     fn headed(self, after: &[Spelling<'text>]) -> Option<Heading<'text>> {
         match self {
-            Spelling::Running => Heading::running(after),
-            Spelling::DocTests => Heading::documented(after.first()),
+            Spelling::Running => Spelling::running(after).map(Heading::Running),
+            Spelling::DocTests => after.first().and_then(|name| name.word()).map(Heading::DocTests),
             Spelling::Space
             | Spelling::Target
             | Spelling::Deps

@@ -9,8 +9,7 @@ use lint_core::{Site, SourceFile, Violation};
 use lint_layout::{Name, UsePath};
 use lint_paths::Imports;
 use lint_placement::CrateName as PlacedName;
-use text_lines::OneLine;
-use workspace_metadata::{CrateName, Expansion};
+use workspace_metadata::Expansion;
 
 use crate::owners::Owners;
 use breached::{Breached, Fixed};
@@ -62,19 +61,16 @@ impl<'file> Roles<'file> {
                     .map(move |name| [root.clone(), Name::from(name.as_ref())].into_iter().collect())
             })
             .collect();
+        let admitted: BTreeSet<Name> = expansion.admitted().map(|name| Name::from(name.as_ref())).collect();
         let finding = Unexpanded::new(expansion.port(), expansion.expanders().role());
         self.files
             .iter()
             .filter_map(SourceFile::shipped)
-            .filter(|file| Self::expander(file).and_then(|name| expansion.admits(&name)).is_none())
+            .filter(|file| file.placement().package().root().package().and_then(|name| admitted.get(name)).is_none())
             .flat_map(|file| {
                 let lines = Expanded::lines(file, imports, &wanted);
                 lines.into_iter().map(move |line| Violation::new(Site::new(file.path(), line), finding))
             })
             .collect()
-    }
-
-    fn expander(file: &SourceFile) -> Option<CrateName> {
-        OneLine::try_new(file.placement().package().root().package()?.to_string()).ok().map(CrateName::new)
     }
 }

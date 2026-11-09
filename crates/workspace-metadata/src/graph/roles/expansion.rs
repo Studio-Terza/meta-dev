@@ -45,8 +45,7 @@ impl<'meta> Expansion<'meta> {
         self.expanders
     }
 
-    #[must_use]
-    pub fn admits(&self, expander: &CrateName) -> Option<&'meta CrateName> {
-        self.unit.get(expander).or_else(|| self.declaring.get(expander)).copied()
+    pub fn admitted(&self) -> impl Iterator<Item = &'meta CrateName> + use<'_, 'meta> {
+        self.unit.iter().chain(&self.declaring).copied()
     }
 }
