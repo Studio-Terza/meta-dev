@@ -1481,6 +1481,40 @@ laws::law!(
     }
 );
 
+impl Spawning {
+    fn replying(reply: String) -> Spawning {
+        Spawning {
+            pid: Pid::new(7),
+            started: None,
+            deadline: Wall::new(0),
+            state: RunState::Replied,
+            usage: None,
+            reply: Some(Reply::new(reply)),
+        }
+    }
+
+    fn kept(self) -> Result<String, Box<dyn Error>> {
+        let lived = self.stored()?;
+        let reply = lived.ran.first().and_then(Ran::reply).cloned().ok_or("no reply kept")?;
+        Ok(Excerpt::into_inner(reply))
+    }
+}
+
+#[test]
+fn an_ascii_reply_of_twenty_thousand_bytes_is_stored_as_exactly_sixteen_kibibytes() -> Result<(), Box<dyn Error>> {
+    let kept = Spawning::replying("a".repeat(20_000)).kept()?;
+    assert_eq!(kept.len(), 16 * 1024);
+    Ok(())
+}
+
+#[test]
+fn an_ascii_reply_of_exactly_sixteen_kibibytes_is_stored_unchanged() -> Result<(), Box<dyn Error>> {
+    let told = "a".repeat(16 * 1024);
+    let kept = Spawning::replying(told.clone()).kept()?;
+    assert_eq!(kept, told);
+    Ok(())
+}
+
 #[test]
 fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
