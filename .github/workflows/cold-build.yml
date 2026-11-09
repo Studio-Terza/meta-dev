@@ -51,7 +51,7 @@ jobs:
       - name: tools
         run: cargo build --locked -q --bin ci --target-dir "$COLD/tools"
       - name: linker proof
-        run: readelf -p .comment "$TOOLS/ci"
+        run: grep --quiet --text --fixed-strings "mold 3.0.0" "$TOOLS/ci"
       - name: clippy from scratch
         env:
           CARGO_TARGET_DIR: ${{ env.CLIPPY_TARGET }}

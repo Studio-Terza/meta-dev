@@ -38,15 +38,16 @@ jobs:
       actions: read
       issues: write
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: ${{ github.workspace }}/target/sccache/sccache
       SCCACHE_GHA_ENABLED: "true"
+      ACTIONS_CACHE_SERVICE_V2: "on"
       RUSTFLAGS: -C link-arg=-fuse-ld=mold -C link-arg=-B${{ github.workspace }}/target/mold/bin
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: ./.github/actions/sccache
       - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: fmt
@@ -68,15 +69,16 @@ jobs:
       actions: read
       issues: write
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: ${{ github.workspace }}/target/sccache/sccache
       SCCACHE_GHA_ENABLED: "true"
+      ACTIONS_CACHE_SERVICE_V2: "on"
       RUSTFLAGS: -C link-arg=-fuse-ld=mold -C link-arg=-B${{ github.workspace }}/target/mold/bin
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: ./.github/actions/sccache
       - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: test compile
@@ -105,15 +107,16 @@ jobs:
       actions: read
       issues: write
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: ${{ github.workspace }}/target/sccache/sccache
       SCCACHE_GHA_ENABLED: "true"
+      ACTIONS_CACHE_SERVICE_V2: "on"
       RUSTFLAGS: -C link-arg=-fuse-ld=mold -C link-arg=-B${{ github.workspace }}/target/mold/bin
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: ./.github/actions/sccache
       - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: lint
