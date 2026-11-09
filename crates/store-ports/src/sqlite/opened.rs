@@ -48,11 +48,11 @@ impl Opened {
 
     fn settled<Failure: From<StoreFailure>>(
         &mut self,
-        written: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,
+        writing: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,
     ) -> Result<Written, Failure> {
         let runtime = &self.runtime;
         let mut transaction = runtime.block_on(self.connection.begin()).map_err(StoreFailure::from)?;
-        let written = written(&mut Statements::over(&mut transaction, runtime));
+        let written = writing(&mut Statements::over(&mut transaction, runtime));
         Self::ended(runtime, transaction, written)
     }
 

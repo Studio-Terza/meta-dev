@@ -178,8 +178,8 @@ impl Place {
         let older = run.port(place.opened_as::<Older>());
         older.write(Told::Stale)?;
         older.write(Remarked { remark, on: Uuid::try_new("o1".to_owned())? })?;
-        let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
-        let refused = matches!(&refused, StoreFailure::Refused(_)).then(|| refused.to_string());
+        let failure = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
+        let refused = matches!(&failure, StoreFailure::Refused(_)).then(|| failure.to_string());
         Ok(Refusal { remark, refused, applied: place.applied()?, stored: place.shown("o1")? })
     }
 

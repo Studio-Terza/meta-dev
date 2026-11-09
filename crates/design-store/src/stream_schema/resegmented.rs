@@ -22,8 +22,8 @@ impl Resegmented {
     pub(super) const PENDING: Version = Version::new(20_261_108_000_012);
 
     fn stale(derived: &[SegmentRow], stored: Vec<SegmentRow>) -> Vec<SegmentRow> {
-        let derived: BTreeMap<Segment, &SegmentRow> = derived.iter().map(|row| (row.segment(), row)).collect();
-        stored.into_iter().filter(|row| derived.get(&row.segment()) != Some(&row)).collect()
+        let keyed: BTreeMap<Segment, &SegmentRow> = derived.iter().map(|row| (row.segment(), row)).collect();
+        stored.into_iter().filter(|row| keyed.get(&row.segment()) != Some(&row)).collect()
     }
 }
 
