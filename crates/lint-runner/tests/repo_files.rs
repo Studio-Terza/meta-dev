@@ -31,7 +31,7 @@ impl Run {
 
     fn lines_at(&self, path: &str) -> Vec<String> {
         let site = format!("{path}:1: ");
-        Lines::from(self.err.as_str()).filter(|line| line.contains(&site)).map(str::to_owned).collect()
+        self.err.parse::<Lines>().into_iter().flatten().filter(|line| line.contains(&site)).collect()
     }
 
     fn findings(&self) -> usize {

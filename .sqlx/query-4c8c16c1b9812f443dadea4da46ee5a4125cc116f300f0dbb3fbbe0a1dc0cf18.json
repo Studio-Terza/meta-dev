@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  flailed.message,\n  flailed.ordinal,\n  runs.job,\n  flailed.run\nFROM\n  flailed\n  JOIN runs ON runs.id = flailed.run\n  JOIN messages ON messages.uuid = flailed.message\nORDER BY\n  messages.at,\n  flailed.message,\n  flailed.ordinal\n",
+  "query": "\nSELECT\n  flailed.message,\n  flailed.ordinal,\n  flailed.job,\n  flailed.run\nFROM\n  flailed\n  JOIN messages ON messages.uuid = flailed.message\nWHERE\n  flailed.job = ?1\nORDER BY\n  messages.at,\n  flailed.message,\n  flailed.ordinal\n",
   "describe": {
     "columns": [
       {
@@ -31,7 +31,7 @@
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "runs",
+            "table": "flailed",
             "name": "job"
           }
         }
@@ -49,7 +49,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "10d99c6ca96f7b7f61e436bb87894023de07cb7ccdeaf5a4c5d173cbb088ad0b"
+  "hash": "4c8c16c1b9812f443dadea4da46ee5a4125cc116f300f0dbb3fbbe0a1dc0cf18"
 }
