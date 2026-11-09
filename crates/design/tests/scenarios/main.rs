@@ -4,10 +4,11 @@ mod ports;
 
 use std::error::Error;
 
-use design::{Failure, HookEvent, Line, Unmatched};
-use design_model::Prefix;
+use design::{Failure, Flail, Flails, HookEvent, Line, Sequel, Unmatched};
+use design_model::{JobId, Prefix};
 use ports::Design;
 use serde_json::Value;
+use structurer::{Directives, Lapse};
 use strum::VariantArray;
 use text_lines::Lines;
 
@@ -118,6 +119,33 @@ fn a_flail_first_met_by_a_continuing_stop_reaches_the_lead_once_through_the_next
     );
     assert_eq!([continued, passed].map(|output| output.stdout), [Vec::<u8>::new(), Vec::new()]);
     assert_eq!(after.map(|output| output.stdout), [Vec::<u8>::new(), Vec::new()]);
+    Ok(())
+}
+
+#[test]
+fn a_run_killed_during_its_second_job_leaves_the_first_job_s_flail_told_and_the_next_run_sends_only_the_second_job_s_segment_again()
+-> Result<(), Box<dyn Error>> {
+    let stopping = "{\"session_id\":\"s\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}";
+    let design = Design::with_two_jobs_whose_agent_dies_on_the_second()?;
+    let killed = design.in_work(&["hook", "stop"], stopping)?;
+    let told = design.in_work(&["hook", "user-prompt-submit"], "")?;
+    let restarted = design.in_work(&["hook", "stop"], stopping)?;
+    let unrun = design.in_work(&["show", "job", "4"], "")?;
+    let lapse = "place(".parse::<Directives>().err().map(Lapse::from);
+    let flail = |job, sequel| {
+        let flails = lapse.clone().map(|lapse| Flails::new(Flail::new(JobId::new(job), lapse), Vec::new()));
+        flails.map(|flails| Failure::Flailed { flails, sequel }.to_string())
+    };
+    let [first, second] = [flail(1, Sequel::WentOn), flail(3, Sequel::NoMoreJobs)];
+    let context: Value = serde_json::from_slice(&told.stdout)?;
+    let decision: Value = serde_json::from_slice(&restarted.stdout)?;
+    let specific = context.get("hookSpecificOutput").and_then(|specific| specific.get("additionalContext"));
+    assert_eq!((killed.status.code(), killed.stdout), (None, Vec::new()));
+    assert_eq!(specific.and_then(Value::as_str), first.as_deref());
+    assert_eq!(decision.get("reason").and_then(Value::as_str), second.as_deref());
+    let refused = String::from_utf8(unrun.stderr)?;
+    assert_eq!(unrun.status.code(), Some(1));
+    assert_eq!(Lines::from(refused.as_str()).collect::<Vec<&str>>(), [Failure::Unrun(JobId::new(4)).to_string()]);
     Ok(())
 }
 

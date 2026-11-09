@@ -82,10 +82,15 @@ pub struct JobHalted {
     job: JobId,
     halted: Halted,
     account: Account,
+    held: Option<JobFlailed>,
+    retold: Vec<Retold>,
 }
 
 #[derive(Clone, Debug, Op)]
-pub struct JobsHalted(Vec<JobHalted>);
+pub struct Retold {
+    job: JobId,
+    account: Account,
+}
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct UnreportedFailures;
@@ -230,7 +235,24 @@ impl JobClosed {
 impl JobHalted {
     #[must_use]
     pub fn new(job: JobId, halted: Halted, account: Account) -> JobHalted {
-        JobHalted { job, halted, account }
+        JobHalted { job, halted, account, held: None, retold: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn holding(self, held: Option<JobFlailed>) -> JobHalted {
+        JobHalted { held, ..self }
+    }
+
+    #[must_use]
+    pub fn retelling(self, retold: Vec<Retold>) -> JobHalted {
+        JobHalted { retold, ..self }
+    }
+}
+
+impl Retold {
+    #[must_use]
+    pub fn new(job: JobId, account: Account) -> Retold {
+        Retold { job, account }
     }
 }
 
@@ -240,12 +262,6 @@ impl From<Halted> for JobState {
             Halted::Flailed => JobState::Flailed,
             Halted::Stalled => JobState::Stalled,
         }
-    }
-}
-
-impl FromIterator<JobHalted> for JobsHalted {
-    fn from_iter<Halts: IntoIterator<Item = JobHalted>>(halts: Halts) -> JobsHalted {
-        JobsHalted(halts.into_iter().collect())
     }
 }
 

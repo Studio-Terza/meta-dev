@@ -6,7 +6,7 @@ use transcript_ports::{Body, Uuid};
 
 use super::{
     Delivery, FailuresReported, Flailed, FlailedSegments, Halted, JobClosed, JobFlailed, JobHalted, JobOpened,
-    JobRetried, JobState, JobsHalted, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned,
+    JobRetried, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded, RunSpawned,
     RunState, RunsOf, Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
 use crate::{Account, Excerpt};
@@ -160,7 +160,7 @@ impl Batch for JobHalted {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobHalted { job, halted, account } = self;
+        let JobHalted { job, halted, account, held, retold } = self;
         let closed = JobClosed::new(job, JobState::from(halted)).written(statements)?;
         let unreported = Delivery::Unreported;
         let recorded = statements.written(store_ports::query!(
@@ -175,20 +175,32 @@ VALUES
             account: Account,
             unreported: Delivery
         ))?;
-        Ok(Written::total([closed, recorded].into_iter()))
+        let holding = held.map(|held| held.written(statements)).transpose()?;
+        let retelling = retold
+            .into_iter()
+            .map(|retold| retold.written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total([closed, recorded].into_iter().chain(holding).chain(retelling)))
     }
 }
 
-impl Batch for JobsHalted {
+impl Batch for Retold {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let written = self
-            .0
-            .into_iter()
-            .map(|halted| halted.written(statements))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+        let Retold { job, account } = self;
+        statements.written(store_ports::query!(
+            r#"
+UPDATE
+  failures
+SET
+  account = ?2
+WHERE
+  job = ?1
+"#,
+            job: JobId,
+            account: Account
+        ))
     }
 }
 

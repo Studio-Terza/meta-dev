@@ -360,7 +360,7 @@ fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_t
 }
 
 #[test]
-fn a_retried_flail_owes_its_segments_again_and_the_next_run_sends_and_applies_them_while_a_job_that_did_not_flail_is_refused()
+fn a_retried_flail_owes_its_segments_again_and_the_next_run_sends_and_applies_them_while_a_job_that_did_not_flail_or_never_ran_is_refused()
 -> Result<(), Box<dyn Error>> {
     let u = Some(Script::UNCOVERING);
     let structuring = Structuring::over(Script::replying(&[u, u, Some(Script::COVERING)]), Pause::new(0))?;
@@ -370,7 +370,8 @@ fn a_retried_flail_owes_its_segments_again_and_the_next_run_sends_and_applies_th
     let owed = structuring.unstructured()?;
     let applied = structuring.structured(&["structure"]);
     let again = structuring.structured(&["retry", "1"]);
-    let unrun = structuring.structured(&["retry", "2"]);
+    let unflailed = structuring.structured(&["retry", "2"]);
+    let unrun = structuring.structured(&["retry", "99"]);
     let segment = |message, ordinal| {
         SegmentRef::new(Prefix::new(format!("aaaaaaaa-0000-4000-8000-00000000000{message}")), Ordinal::new(ordinal))
     };
@@ -392,8 +393,9 @@ fn a_retried_flail_owes_its_segments_again_and_the_next_run_sends_and_applies_th
     assert_eq!(applied.outcome?, Outcome::Structured { jobs: Count::new(1) });
     assert_eq!(structuring.script.prompts().len(), 3);
     assert!(matches!(again.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(1)));
-    assert!(matches!(unrun.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(2)));
-    assert_eq!((again.text.as_str(), unrun.text.as_str()), ("", ""));
+    assert!(matches!(unflailed.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(2)));
+    assert!(matches!(unrun.outcome, Err(Failure::Unrun(job)) if job == JobId::new(99)));
+    assert_eq!((again.text.as_str(), unflailed.text.as_str(), unrun.text.as_str()), ("", "", ""));
     Ok(())
 }
 
