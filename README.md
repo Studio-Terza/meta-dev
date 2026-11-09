@@ -243,7 +243,9 @@ can name a segment of an earlier message that the store holds differently or not
 older segmenter. Before writing, `Holding` checks every segment each link names: the row the store will hold, the
 stored one or the one written now, must be the row the segmenter derives from that message. A link that fails is not
 written and ingest prints it as `refused link source relation target`; the rest of the session is written and its cursor
-advances.
+advances. `every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets` reads every foreign key into
+`segments` through a checked query over `pragma_foreign_key_list` and fails on an ON DELETE or ON UPDATE action or a
+table declaring `DEFERRABLE`, since the rewrite's refusal relies on SQLite refusing the delete at once.
 
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.

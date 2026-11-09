@@ -29,9 +29,9 @@ use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
-use newtype::{Checked, Counter, Wrapping};
+use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
-use store_ports::{Batch, Migrator, Schema, Sqlite, Statements, Store, StoreFailure, Version, Written};
+use store_ports::{Batch, Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Version, Written};
 use stream::{Message, Stream};
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Skipped, Transcripts, Uuid};
@@ -448,6 +448,69 @@ fn an_old_store_holding_a_link_to_a_segment_it_does_not_hold_refuses_the_open_an
         Unanchored::refusal(store.read(SessionCursors)),
         "these stored links name a segment the store does not hold: u1#0 answers u1#1"
     );
+}
+
+#[derive(Newtype, Display, Clone, Debug, PartialEq, Eq)]
+struct Named(String);
+
+#[derive(Debug, Columns)]
+struct SegmentKey {
+    child: Named,
+    on_update: Named,
+    on_delete: Named,
+    declared: Named,
+}
+
+#[derive(Debug, Op)]
+struct SegmentKeys;
+
+impl SegmentKey {
+    fn kept(&self) -> String {
+        let deferrable = self.declared.clone().into_inner().contains("DEFERRABLE");
+        format!("{}: on update {}, on delete {}, deferrable {deferrable}", self.child, self.on_update, self.on_delete)
+    }
+
+    fn immediate(&self) -> String {
+        format!("{}: on update NO ACTION, on delete NO ACTION, deferrable false", self.child)
+    }
+}
+
+impl Query for SegmentKeys {
+    type Rows = Vec<SegmentKey>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<SegmentKey>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            SegmentKey,
+            r#"
+SELECT
+  tables.name AS "child!: String",
+  CAST(keys.on_update AS TEXT) AS "on_update!: String",
+  CAST(keys.on_delete AS TEXT) AS "on_delete!: String",
+  upper(tables.sql) AS "declared!: String"
+FROM
+  sqlite_schema AS tables
+  JOIN pragma_foreign_key_list(tables.name) AS keys
+WHERE
+  tables.type = 'table'
+  AND keys."table" = 'segments'
+ORDER BY
+  tables.name,
+  keys.id
+"#
+        ))
+    }
+}
+
+#[test]
+fn every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let keys = run.port(Sqlite::in_memory::<StreamSchema>()).read(SegmentKeys)?;
+    let children: BTreeSet<String> = keys.iter().map(|key| key.child.clone().into_inner()).collect();
+    assert!(children.contains("mechanical_links"), "{children:?}");
+    let kept: Vec<String> = keys.iter().map(SegmentKey::kept).collect();
+    let immediate: Vec<String> = keys.iter().map(SegmentKey::immediate).collect();
+    assert_eq!(kept, immediate);
+    Ok(())
 }
 
 const RESEGMENTED: &str = concat!(
