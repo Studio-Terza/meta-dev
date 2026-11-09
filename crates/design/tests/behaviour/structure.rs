@@ -309,6 +309,47 @@ fn a_brief_with_asked_lines_states_that_they_are_link_targets_only_and_a_reply_l
 }
 
 #[test]
+fn a_reply_linking_to_a_job_segment_without_a_directive_for_it_is_refused_as_unpaid_but_one_linking_to_an_asked_line_is_accepted()
+-> Result<(), Box<dyn Error>> {
+    let asked = format!("{}.0", Session::ASKED);
+    let [decided, other] = [Applying::answer(0), Applying::answer(1)];
+    let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
+    let unpaid =
+        format!("link({decided}, {asked}, answers)\nlink({other}, {later}, refers-to)\nconversational({other})");
+    let paid = format!("link({decided}, {asked}, answers)\nconversational({other})\nconversational({later})");
+    let structuring = Structuring::over(Script::replying(&[Some(&unpaid), Some(&paid)]), Pause::new(0))?;
+    structuring
+        .applying
+        .applied(&format!("place({asked}, n1, questions)\nsense({asked}, question, specific, firm, explicit)"))?;
+    let structured = structuring.structured(&["structure"]);
+    let target = SegmentRef::new(Prefix::new("aaaaaaaa-0000-4000-8000-000000000005".to_owned()), Ordinal::new(0));
+    let refused = Line::Retried(Lapsed::new(JobId::new(1), Lapse::from(Uncovered::new(target, Vec::new()))));
+    assert_eq!(structured.has(&[refused]), []);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!(structuring.script.prompts().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_job_starting_partway_through_a_message_is_shown_the_question_open_earlier_in_that_message()
+-> Result<(), Box<dyn Error>> {
+    let message = "aaaaaaaa-0000-4000-8000-000000000021";
+    let session = Session::working(Session::line(Speaker::Owner, message, "null", "1. which crate\\n2. the first"));
+    let applying = Applying::over(&session)?;
+    applying.applied(&format!(
+        "place({message}.0, n1, questions)\nsense({message}.0, question, specific, firm, explicit)"
+    ))?;
+    let covering = format!("link({message}.1, {message}.0, answers)");
+    let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let shown = format!("asked {message}.0 \"1. which crate\"\n");
+    assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1]);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    Ok(())
+}
+
+#[test]
 fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() -> Result<(), Box<dyn Error>> {
     let [first, second] = ["aaaaaaaa-0000-4000-8000-000000000011", "aaaaaaaa-0000-4000-8000-000000000012"];
     let [first_answer, second_answer] =
