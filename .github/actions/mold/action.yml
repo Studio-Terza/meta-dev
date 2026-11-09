@@ -1,0 +1,14 @@
+name: mold
+description: Provide the pinned mold linker under target/mold, restored from the actions cache or downloaded and verified once
+runs:
+  using: composite
+  steps:
+    - name: mold needs x86_64
+      shell: bash
+      run: test ${{ runner.arch }} = X64
+    - uses: ./.github/actions/release
+      with:
+        name: mold
+        url: https://github.com/rui314/mold/releases/download/v3.0.0/mold-3.0.0-x86_64-linux.tar.gz
+        checksum: ${{ github.action_path }}/mold.sha256
+        key: mold-3.0.0-extracted-${{ runner.os }}-${{ runner.arch }}

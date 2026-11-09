@@ -38,16 +38,17 @@ jobs:
       actions: read
       issues: write
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: ${{ github.workspace }}/target/sccache/sccache
       SCCACHE_GHA_ENABLED: "true"
-      RUSTFLAGS: -C link-arg=-fuse-ld=mold
+      ACTIONS_CACHE_SERVICE_V2: "on"
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold -C link-arg=-B${{ github.workspace }}/target/mold/bin
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
-      - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/sccache
+      - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: fmt
         run: cargo fmt --check
@@ -57,6 +58,9 @@ jobs:
       - name: fuzz targets clippy
         if: env.BUILD_SCOPE == '--workspace' || contains(format('{0} ', env.BUILD_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
+      - name: sccache stats
+        if: always()
+        run: '"$RUSTC_WRAPPER" --show-stats'
       - uses: ./.github/actions/judge
         with:
           stages: clippy
@@ -68,16 +72,17 @@ jobs:
       actions: read
       issues: write
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: ${{ github.workspace }}/target/sccache/sccache
       SCCACHE_GHA_ENABLED: "true"
-      RUSTFLAGS: -C link-arg=-fuse-ld=mold
+      ACTIONS_CACHE_SERVICE_V2: "on"
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold -C link-arg=-B${{ github.workspace }}/target/mold/bin
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
-      - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/sccache
+      - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: test compile
         if: env.BUILD_SCOPE != ''
@@ -88,6 +93,9 @@ jobs:
       - name: test run seconds
         if: env.BUILD_SCOPE != ''
         run: '"$TOOLS/ci" libtest-seconds "$MEASURED" test-run "$TESTLOG"'
+      - name: sccache stats
+        if: always()
+        run: '"$RUSTC_WRAPPER" --show-stats'
       - uses: ./.github/actions/judge
         with:
           stages: test-compile test-run
@@ -105,22 +113,26 @@ jobs:
       actions: read
       issues: write
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: ${{ github.workspace }}/target/sccache/sccache
       SCCACHE_GHA_ENABLED: "true"
-      RUSTFLAGS: -C link-arg=-fuse-ld=mold
+      ACTIONS_CACHE_SERVICE_V2: "on"
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold -C link-arg=-B${{ github.workspace }}/target/mold/bin
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
-      - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/sccache
+      - uses: ./.github/actions/mold
       - uses: ./.github/actions/tools
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" .'
       - name: budget
         if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         run: '"$TOOLS/ci" show "$BUDGET"'
+      - name: sccache stats
+        if: always()
+        run: '"$RUSTC_WRAPPER" --show-stats'
       - uses: ./.github/actions/judge
         with:
           stages: lint

@@ -1,0 +1,54 @@
+name: release
+description: Provide a pinned release tarball under target/<name>, restored from the actions cache or downloaded, verified against its sha256 file and cached once
+
+inputs:
+  name:
+    description: The directory under target that receives the unpacked release
+    required: true
+  url:
+    description: The release tarball to download
+    required: true
+  checksum:
+    description: The sha256 file naming the tarball as <name>.tar.gz
+    required: true
+  key:
+    description: The actions cache key for the unpacked release
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: release restore
+      id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/target/${{ inputs.name }}
+        key: ${{ inputs.key }}
+    - name: release download
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: suisei-cn/actions-download-file@v1.6.1
+      with:
+        url: ${{ inputs.url }}
+        target: ${{ runner.temp }}
+        filename: ${{ inputs.name }}.tar.gz
+        retry-times: "5"
+    - name: release verify
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      run: sha256sum --check --strict ${{ inputs.checksum }}
+    - name: release directory
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: mkdir -p ${{ github.workspace }}/target/${{ inputs.name }}
+    - name: release unpack
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ github.workspace }}/target/${{ inputs.name }}
+      run: tar -xzf ${{ runner.temp }}/${{ inputs.name }}.tar.gz --strip-components=1
+    - name: release save
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ github.workspace }}/target/${{ inputs.name }}
+        key: ${{ inputs.key }}
