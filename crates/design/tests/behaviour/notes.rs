@@ -101,7 +101,45 @@ impl Noting {
         match line {
             Line::Placed { segment, .. } => Some(Ok(segment.to_string())),
             Line::Noted(Noted::Unresolved { miss, .. }) => Some(Err(miss)),
-            _other => None,
+            Line::Noted(
+                Noted::Imported { .. }
+                | Noted::Unanchored(_)
+                | Noted::Ambiguous { .. }
+                | Noted::Reconciled(_)
+                | Noted::Cites { .. },
+            )
+            | Line::Read { .. }
+            | Line::Authored { .. }
+            | Line::Unrecognised { .. }
+            | Line::Formed { .. }
+            | Line::Related { .. }
+            | Line::Written(_)
+            | Line::Hit { .. }
+            | Line::Root { .. }
+            | Line::Consumes { .. }
+            | Line::Node(_)
+            | Line::Artifact(_)
+            | Line::Condition(_)
+            | Line::Reason(_)
+            | Line::Relative { .. }
+            | Line::Edge { .. }
+            | Line::Role { .. }
+            | Line::Message { .. }
+            | Line::Segment { .. }
+            | Line::Link { .. }
+            | Line::Annotated { .. }
+            | Line::Applied(_)
+            | Line::Proposed { .. }
+            | Line::Uncovered(_)
+            | Line::Repeated { .. }
+            | Line::Reaped { .. }
+            | Line::Interrupted(_)
+            | Line::Ran(_)
+            | Line::Retried(_)
+            | Line::Flailed(_)
+            | Line::FlailedSegment(_)
+            | Line::Owed(_)
+            | Line::Viewed(_) => None,
         }
     }
 

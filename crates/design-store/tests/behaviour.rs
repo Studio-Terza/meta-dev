@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
