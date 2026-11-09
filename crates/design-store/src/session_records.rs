@@ -22,6 +22,9 @@ pub struct SessionRecords {
 #[derive(Debug, Op)]
 pub struct Holding(SessionRecords);
 
+#[derive(Debug, Op)]
+pub struct Held(SessionRecords);
+
 struct Anchoring {
     landing: BTreeMap<Segment, SegmentRow>,
     deriving: BTreeMap<Segment, SegmentRow>,
@@ -43,11 +46,6 @@ impl SessionRecords {
                 .collect(),
             cursor: CursorRow::reached(session, cursor),
         }
-    }
-
-    #[must_use]
-    pub fn refused(&self) -> &[LinkRow] {
-        &self.refused
     }
 
     fn all(rows: &[impl Row], statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
@@ -94,27 +92,35 @@ impl From<SessionRecords> for Holding {
 }
 
 impl Query for Holding {
-    type Rows = SessionRecords;
+    type Rows = Held;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<SessionRecords, StoreFailure> {
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Held, StoreFailure> {
         let Holding(records) = self;
         let anchoring = Anchoring::read(&records, statements)?;
         let (links, refused): (Vec<LinkRow>, Vec<LinkRow>) =
             records.links.iter().cloned().partition(|link| anchoring.unheld(link).is_none());
-        Ok(SessionRecords { links, refused, ..records })
+        Ok(Held(SessionRecords { links, refused, ..records }))
     }
 }
 
-impl Batch for SessionRecords {
+impl Held {
+    #[must_use]
+    pub fn refused(&self) -> &[LinkRow] {
+        &self.0.refused
+    }
+}
+
+impl Batch for Held {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let Held(records) = self;
         let written = [
-            Self::all(&self.messages, statements)?,
-            Self::all(&self.segments, statements)?,
-            Self::all(&self.links, statements)?,
-            Self::all(&self.edges, statements)?,
-            self.cursor.written(statements)?,
+            SessionRecords::all(&records.messages, statements)?,
+            SessionRecords::all(&records.segments, statements)?,
+            SessionRecords::all(&records.links, statements)?,
+            SessionRecords::all(&records.edges, statements)?,
+            records.cursor.written(statements)?,
         ];
         Ok(Written::total(written.into_iter()))
     }
