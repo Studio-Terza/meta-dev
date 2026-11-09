@@ -922,6 +922,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "lint-runner",
+ "timer-ports",
 ]
 
 [[package]]
@@ -1563,6 +1564,7 @@ dependencies = [
  "port-core",
  "text-lines",
  "thiserror",
+ "timer-ports",
  "workspace-metadata",
 ]
 
@@ -2667,6 +2669,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "timer-ports"
+version = "0.1.0"
+dependencies = [
+ "port-core",
 ]
 
 [[package]]
