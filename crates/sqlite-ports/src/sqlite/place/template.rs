@@ -2,11 +2,8 @@ use std::any::TypeId;
 use std::collections::BTreeMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
-
-use crate::sqlite::failed::Unopened;
 use crate::sqlite::migrations::Migrations;
-use crate::sqlite::opened::Opened;
+use crate::sqlite::opened::{Opened, Snapshot};
 use store_ports::StoreFailure;
 
 #[derive(Debug, Default)]
@@ -19,7 +16,7 @@ enum Image {
     #[default]
     Unseen,
     Seen,
-    Migrated(SqliteOwnedBuf),
+    Migrated(Snapshot),
 }
 
 static TEMPLATES: LazyLock<Mutex<BTreeMap<TypeId, Arc<Template>>>> = LazyLock::new(Mutex::default);
@@ -38,17 +35,12 @@ impl Template {
 impl Image {
     fn opened(&mut self, migrations: Migrations) -> Result<Opened, StoreFailure> {
         match self {
-            Image::Unseen => {
-                Opened::connected(&SqliteConnectOptions::new(), migrations).inspect(|_opened| *self = Image::Seen)
-            }
-            Image::Seen => Opened::connected(&SqliteConnectOptions::new(), migrations).and_then(|mut opened| {
+            Image::Unseen => Opened::fresh(migrations).inspect(|_opened| *self = Image::Seen),
+            Image::Seen => Opened::fresh(migrations).and_then(|opened| {
                 *self = Image::Migrated(opened.image()?);
                 Ok(opened)
             }),
-            Image::Migrated(migrated) => SqliteOwnedBuf::try_from(&**migrated)
-                .map_err(Unopened::from)
-                .map_err(StoreFailure::from)
-                .and_then(|copied| Opened::copied(&SqliteConnectOptions::new(), copied)),
+            Image::Migrated(migrated) => Opened::copied(migrated),
         }
     }
 }

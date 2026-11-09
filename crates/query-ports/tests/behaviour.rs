@@ -5,8 +5,8 @@ use std::fs;
 use std::path::Path;
 
 use golden::golden;
+use query_ports::QueryCache;
 use sha2::{Digest, Sha256};
-use sqlite_ports::QueryCache;
 use tempfile::TempDir;
 
 const KEPT: &str = "SELECT 1 AS one";
