@@ -1,6 +1,6 @@
 use std::fmt;
 
-use grammar::directive::{Column, Lexed, LineNumber, Location};
+use grammar::directive::{Lexed, Location, Spot};
 use grammar::output::field::{Integer, Phrase, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
@@ -75,22 +75,13 @@ enum Missing {
 
 pub(crate) struct Briefed<'misread>(&'misread Misread);
 
-struct Spot(Location);
-
-impl fmt::Display for Spot {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (line, column): (&LineNumber, &Column) = (self.0.as_ref(), self.0.as_ref());
-        write!(formatter, "{line} {column}")
-    }
-}
-
 impl fmt::Display for Briefed<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             Misread::Expected { at, wanted } => {
-                write!(formatter, "{} {} {}", Missing::Expected, Spot(*at), Quoting::from(wanted))
+                write!(formatter, "{} {} {}", Missing::Expected, Spot::from(*at), Quoting::from(wanted))
             }
-            Misread::Arity { at, verb } => write!(formatter, "{} {} {verb}", Missing::Arity, Spot(*at)),
+            Misread::Arity { at, verb } => write!(formatter, "{} {} {verb}", Missing::Arity, Spot::from(*at)),
         }
     }
 }

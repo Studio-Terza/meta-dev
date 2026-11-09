@@ -7,13 +7,12 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
-use grammar::directive::{Column, LineNumber};
+use grammar::directive::Location;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
-use newtype::Wrapping;
 use structurer::{
     Attempt, Briefing, Directive, Directives, Edge, Job, Label, Lapse, Misread, NodeRef, Proposal, Reading, Said,
     Uncovered,
@@ -122,30 +121,25 @@ laws::roundtrip!(
 );
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Spot {
-    line: usize,
-    column: usize,
-}
+struct Spot;
 
 impl Spot {
-    fn at(line: usize, column: usize) -> Option<Spot> {
-        Some(line).zip(Some(column)).map(|(line, column)| Spot { line, column })
+    fn at(line: usize, column: usize) -> Option<Location> {
+        Some(Location::new(line, column))
     }
 
-    fn of_one(text: &str) -> Option<Spot> {
+    fn of_one(text: &str) -> Option<Location> {
         Spot::of(&text.parse::<Directive>())
     }
 
-    fn of_many(text: &str) -> Option<Spot> {
+    fn of_many(text: &str) -> Option<Location> {
         Spot::of(&text.parse::<Directives>())
     }
 
-    fn of<Parsed>(parsed: &Result<Parsed, Misread>) -> Option<Spot> {
+    fn of<Parsed>(parsed: &Result<Parsed, Misread>) -> Option<Location> {
         match parsed {
             Ok(_) => None,
-            Err(Misread::Expected { at, .. } | Misread::Arity { at, .. }) => {
-                Spot::at(AsRef::<LineNumber>::as_ref(at).into_inner(), AsRef::<Column>::as_ref(at).into_inner())
-            }
+            Err(Misread::Expected { at, .. } | Misread::Arity { at, .. }) => Some(*at),
         }
     }
 }

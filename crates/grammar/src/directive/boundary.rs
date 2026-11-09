@@ -83,6 +83,9 @@ pub struct Location {
     column: Column,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Spot(Location);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lexed {
     piece: Piece,
@@ -273,21 +276,21 @@ impl Location {
     }
 }
 
-impl AsRef<LineNumber> for Location {
-    fn as_ref(&self) -> &LineNumber {
-        &self.line
-    }
-}
-
-impl AsRef<Column> for Location {
-    fn as_ref(&self) -> &Column {
-        &self.column
-    }
-}
-
 impl fmt::Display for Location {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "line {}, column {}", self.line, self.column)
+    }
+}
+
+impl From<Location> for Spot {
+    fn from(location: Location) -> Spot {
+        Spot(location)
+    }
+}
+
+impl fmt::Display for Spot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {}", self.0.line, self.0.column)
     }
 }
 
