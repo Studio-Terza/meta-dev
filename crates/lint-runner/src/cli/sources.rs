@@ -4,8 +4,8 @@ use lint_layout::Crates;
 use lint_reader::{CrateSources, Stage, Unlocated};
 
 use lint_core::Readout;
-use workspace_metadata::Metadata;
 
+use super::Workspaces;
 use super::boundary::Queue;
 
 #[derive(Debug)]
@@ -15,11 +15,16 @@ pub(crate) struct Ports<'run, F, C> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Sources<'run, F, C> {
+pub(crate) struct Surveyed<'run, F, C> {
     ports: Ports<'run, F, C>,
+    workspaces: Workspaces,
+}
+
+#[derive(Debug)]
+pub(crate) struct Sources<'run, F, C> {
+    surveyed: Surveyed<'run, F, C>,
     stage: &'run Stage<'run>,
     queue: Queue,
-    workspaces: &'run [Metadata],
 }
 
 impl<'run, F: Files, C: Cargo> Ports<'run, F, C> {
@@ -36,17 +41,23 @@ impl<'run, F: Files, C: Cargo> Ports<'run, F, C> {
     }
 }
 
-impl<'run, F, C> Sources<'run, F, C> {
-    pub(crate) fn new(
-        ports: Ports<'run, F, C>,
-        stage: &'run Stage<'run>,
-        workspaces: &'run [Metadata],
-    ) -> Sources<'run, F, C> {
-        Sources { ports, stage, queue: Queue::default(), workspaces }
+impl<'run, F, C> Surveyed<'run, F, C> {
+    pub(crate) fn new(ports: Ports<'run, F, C>, workspaces: Workspaces) -> Surveyed<'run, F, C> {
+        Surveyed { ports, workspaces }
     }
 
     pub(crate) fn ports(&self) -> &Ports<'run, F, C> {
         &self.ports
+    }
+}
+
+impl<'run, F, C> Sources<'run, F, C> {
+    pub(crate) fn new(surveyed: Surveyed<'run, F, C>, stage: &'run Stage<'run>) -> Sources<'run, F, C> {
+        Sources { surveyed, stage, queue: Queue::default() }
+    }
+
+    pub(crate) fn ports(&self) -> &Ports<'run, F, C> {
+        self.surveyed.ports()
     }
 
     pub(crate) fn stage(&self) -> &'run Stage<'run> {
@@ -58,6 +69,6 @@ impl<'run, F, C> Sources<'run, F, C> {
     }
 
     pub(crate) fn described(&self, readout: Readout) -> Readout {
-        readout.with_workspaces(self.workspaces.to_vec())
+        readout.with_workspaces(self.surveyed.workspaces.as_ref().to_vec())
     }
 }

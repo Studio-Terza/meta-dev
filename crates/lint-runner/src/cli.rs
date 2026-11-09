@@ -23,7 +23,7 @@ use port_core::Run;
 use mode::Mode;
 use outcome::Outcome;
 use refusal::Refusal;
-use sources::{Ports, Sources};
+use sources::{Ports, Sources, Surveyed};
 use stack_size::StackSize;
 pub use verdict::Verdict;
 use workspaces::Workspaces;
@@ -64,10 +64,22 @@ impl Cli {
     ) -> Verdict {
         let run = Run::root();
         let port = run.port(cargo);
-        let ports = Ports::new(files, &port);
-        match self.mode.workspaces(&port, &self.roots) {
-            Ok(workspaces) => StackSize::LINT
-                .ran(|| self.linted(SourceFiles::staged(files, &self.roots), ports, &workspaces, out, err))
+        let surveyed = self
+            .mode
+            .workspaces(&port, &self.roots)
+            .map(|workspaces| Surveyed::new(Ports::new(files, &port), workspaces));
+        self.judged(surveyed, out, err)
+    }
+
+    fn judged(
+        &self,
+        surveyed: Result<Surveyed<'_, impl Files + Sync, impl Cargo + Sync>, Refusal<'_>>,
+        out: &mut (impl Write + Send),
+        err: &mut (impl Write + Send),
+    ) -> Verdict {
+        match surveyed {
+            Ok(surveyed) => StackSize::LINT
+                .ran(|| self.linted(SourceFiles::staged(surveyed.ports().files(), &self.roots), surveyed, out, err))
                 .unwrap_or_else(|failure| Self::refused(&failure, err)),
             Err(refused) => Self::refused(&refused, err),
         }
@@ -76,13 +88,12 @@ impl Cli {
     fn linted(
         &self,
         staged: Result<Stage<'_>, Failure>,
-        ports: Ports<'_, impl Files + Sync, impl Cargo + Sync>,
-        workspaces: &Workspaces,
+        surveyed: Surveyed<'_, impl Files + Sync, impl Cargo + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
         match staged {
-            Ok(stage) => self.staged(&Sources::new(ports, &stage, workspaces.as_ref()), out, err),
+            Ok(stage) => self.staged(&Sources::new(surveyed, &stage), out, err),
             Err(failure) => Self::refused(&failure, err),
         }
     }
