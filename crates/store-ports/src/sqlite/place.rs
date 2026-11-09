@@ -1,9 +1,15 @@
+mod template;
+
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqliteConnectOptions;
+
+use super::opened::Opened;
+use template::Template;
 
 use crate::store_lock::Claim;
 use crate::store_lock::StoreLock;
@@ -18,13 +24,14 @@ pub(super) enum Place {
 impl Place {
     const LOCK: &'static str = "lock";
 
-    pub(super) fn connecting(
+    pub(super) fn opened(
         &self,
         prepare: impl FnOnce(&Path) -> io::Result<()>,
-    ) -> Result<SqliteConnectOptions, StoreFailure> {
+        migrator: &'static Migrator,
+    ) -> Result<Opened, StoreFailure> {
         match self {
-            Place::File(path) => Self::filed(path, prepare),
-            Place::Memory => Ok(SqliteConnectOptions::new().in_memory(true)),
+            Place::File(path) => Self::filed(path, prepare).and_then(|options| Opened::connected(&options, migrator)),
+            Place::Memory => Template::shared(migrator).opened(migrator),
         }
     }
 
