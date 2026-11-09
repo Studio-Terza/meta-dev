@@ -7,7 +7,7 @@ use design_model::{Ordinal, Segment};
 use dispatch_ports::Reply;
 use file_ports::Offset;
 use grammar::search::Term;
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Counter, Display, Newtype};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 use stream::{Anchor, MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
@@ -53,7 +53,13 @@ pub struct SegmentRow {
 }
 
 #[derive(Debug)]
-pub(crate) struct Rederived(SegmentRow);
+pub(crate) struct Rederived {
+    message: Uuid,
+    segments: Vec<Replaced>,
+}
+
+#[derive(Debug)]
+pub(crate) struct Replaced(SegmentRow);
 
 #[derive(Debug, Columns)]
 pub struct LinkRow {
@@ -457,30 +463,60 @@ VALUES
     }
 }
 
-impl From<SegmentRow> for Rederived {
-    fn from(row: SegmentRow) -> Rederived {
-        Rederived(row)
+impl From<&Message> for Rederived {
+    fn from(message: &Message) -> Rederived {
+        let segments = SegmentRow::within(message).into_iter().map(Replaced).collect();
+        Rederived { message: message.record().uuid().clone(), segments }
+    }
+}
+
+impl Row for Replaced {
+    fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let Replaced(SegmentRow { message, ordinal, shape, body }) = self;
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  (?1, ?2, ?3, ?4)
+ON CONFLICT
+  (message, ordinal)
+DO UPDATE SET
+  shape = excluded.shape,
+  body = excluded.body
+WHERE
+  shape <> excluded.shape
+  OR body <> excluded.body
+"#,
+            message: Uuid,
+            ordinal: Ordinal,
+            shape: ShapeName,
+            body: Body
+        ))
     }
 }
 
 impl Row for Rederived {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let Rederived(SegmentRow { message, ordinal, shape: _, body }) = self;
-        statements.written(store_ports::query!(
+        let replaced = self
+            .segments
+            .iter()
+            .map(|segment| segment.written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        let message = &self.message;
+        let surplus = Ordinal::new(self.segments.len());
+        let dropped = statements.written(store_ports::query!(
             r#"
-UPDATE
+DELETE FROM
   segments
-SET
-  body = ?3
 WHERE
   message = ?1
-  AND ordinal = ?2
-  AND body <> ?3
+  AND ordinal >= ?2
 "#,
             message: Uuid,
-            ordinal: Ordinal,
-            body: Body
-        ))
+            surplus: Ordinal
+        ))?;
+        Ok(Written::total(replaced.into_iter().chain([dropped])))
     }
 }
 

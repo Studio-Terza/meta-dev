@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  segments (message, ordinal, shape, body)\nVALUES\n  (?1, ?2, ?3, ?4)\nON CONFLICT\n  (message, ordinal)\nDO UPDATE SET\n  shape = excluded.shape,\n  body = excluded.body\nWHERE\n  shape <> excluded.shape\n  OR body <> excluded.body\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8924d22ac7de7dfdffd0c950f2fc7ad737fb3567c7f030540263009ed0155d99"
+}

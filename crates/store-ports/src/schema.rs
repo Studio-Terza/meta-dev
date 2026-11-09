@@ -5,5 +5,5 @@ pub trait Schema: 'static {
 
     fn migrator() -> &'static Migrator;
 
-    fn rewrite(before: Version) -> Option<Self::Rewrite>;
+    fn rewrite(pending: Version) -> Option<Self::Rewrite>;
 }

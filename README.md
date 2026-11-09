@@ -206,11 +206,18 @@ every field of a row is a `store_ports::Column`: a newtype over an integer, floa
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
 `FromStr`, or an `Option` of one. A bare `i64`, `&str` or `String` is not a column and does not compile.
 
-A store's schema is a `store_ports::Schema`: its SQL migrations, and the typed Rust rewrite, a `Batch`, that runs
-before a pending migration of a given version. A rule that Rust already owns, such as how the segmenter sheds blanks,
-is never restated in SQL: the design store re-derives every stored segment body from its message through the same
-segmenter ingest runs (`Resegmented`, before migration 20261108000012, whose SQL rebuilds the search index), so an old
-store holds what a fresh ingest of the same transcript would. Rewrites run once, while their migration is pending.
+A store's schema is a `store_ports::Schema`: its SQL migrations, and the typed Rust rewrites, each a `Batch` due when
+the migration of a given version is pending. Opening a store applies every pending migration and then every due rewrite,
+in version order, in one transaction: a store whose applied migrations do not match their declared checksums, a failing
+migration or a failing rewrite leaves the store exactly as it was. A rewrite runs only on the latest schema, the one
+`.sqlx` checks its queries against, so a later migration that renames a table or column a rewrite reads stops its query
+compiling instead of failing on an old store. A rule that Rust already owns, such as how the segmenter cuts a message
+into segments and sheds blanks, is never restated in SQL: `Resegmented`, due with migration 20261108000012, re-derives
+every message's segments through the same segmenter ingest runs, rewriting each segment's shape and body and adding and
+removing segments, so an old store holds the segments a fresh ingest of the same transcript would. Migration
+20261108000012 keeps the search index in step with every update and delete of a segment. A segment the design
+annotates is never dropped this way: a re-derivation that would drop one refuses the open, and the store is left as it
+was.
 
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.

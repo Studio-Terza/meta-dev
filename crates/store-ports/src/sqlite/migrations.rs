@@ -1,4 +1,5 @@
 use std::any::TypeId;
+use std::collections::BTreeSet;
 
 use newtype::Counter;
 use sqlx::migrate::Migrator;
@@ -25,11 +26,19 @@ impl Migrations {
         self.schema
     }
 
-    pub(super) fn rewritten(self, before: Version, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        (self.rewritten)(before, statements)
+    pub(super) fn rewritten(
+        self,
+        pending: &BTreeSet<Version>,
+        statements: &mut Statements<'_>,
+    ) -> Result<Written, StoreFailure> {
+        let written = pending
+            .iter()
+            .map(|version| (self.rewritten)(*version, statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
     }
 
-    fn rewritten_by<S: Schema>(before: Version, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        S::rewrite(before).map_or_else(|| Ok(Written::zero()), |rewrite| rewrite.written(statements))
+    fn rewritten_by<S: Schema>(pending: Version, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        S::rewrite(pending).map_or_else(|| Ok(Written::zero()), |rewrite| rewrite.written(statements))
     }
 }

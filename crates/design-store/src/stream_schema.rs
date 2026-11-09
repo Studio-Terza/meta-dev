@@ -16,7 +16,7 @@ impl Schema for StreamSchema {
         &MIGRATOR
     }
 
-    fn rewrite(before: Version) -> Option<Resegmented> {
-        (before == Resegmented::BEFORE).then_some(Resegmented)
+    fn rewrite(pending: Version) -> Option<Resegmented> {
+        (pending == Resegmented::PENDING).then_some(Resegmented)
     }
 }

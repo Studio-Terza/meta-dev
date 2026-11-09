@@ -2,13 +2,13 @@ use newtype::Counter;
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Version, Written};
 
-use crate::boundary::{MessageRow, Rederived, Row, SegmentRow};
+use crate::boundary::{MessageRow, Rederived, Row};
 
 #[derive(Debug, Op)]
 pub struct Resegmented;
 
 impl Resegmented {
-    pub(super) const BEFORE: Version = Version::new(20_261_108_000_012);
+    pub(super) const PENDING: Version = Version::new(20_261_108_000_012);
 }
 
 impl Batch for Resegmented {
@@ -16,7 +16,7 @@ impl Batch for Resegmented {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let messages = MessageRow::every(statements)?;
-        let rederived: Vec<Rederived> = messages.iter().flat_map(SegmentRow::within).map(Rederived::from).collect();
+        let rederived: Vec<Rederived> = messages.iter().map(Rederived::from).collect();
         let written =
             rederived.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
         Ok(Written::total(written.into_iter()))

@@ -250,7 +250,7 @@ enum Seeding {
 }
 
 impl Seeding {
-    const UNTRIMMED: Version = Version::new(20_261_106_000_008);
+    const UNTRIMMED: Version = Version::new(20_261_106_000_007);
 }
 
 impl Schema for Seeded {
@@ -260,10 +260,10 @@ impl Schema for Seeded {
         &SEEDED
     }
 
-    fn rewrite(before: Version) -> Option<Seeding> {
-        StreamSchema::rewrite(before)
+    fn rewrite(pending: Version) -> Option<Seeding> {
+        StreamSchema::rewrite(pending)
             .map(Seeding::Streamed)
-            .or_else(|| (before == Seeding::UNTRIMMED).then_some(Seeding::Untrimmed))
+            .or_else(|| (pending == Seeding::UNTRIMMED).then_some(Seeding::Untrimmed))
     }
 }
 
@@ -312,7 +312,7 @@ impl Around {
     fn stored(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let uuid = self.uuid();
         let body = self.kept();
-        statements.written(store_ports::query!(
+        let message = statements.written(store_ports::query!(
             r#"
 INSERT INTO
   messages (uuid, session, parent, at, author, body)
@@ -328,7 +328,18 @@ VALUES
 "#,
             uuid: Uuid,
             body: Body
-        ))
+        ))?;
+        let segment = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  (?1, 0, 'sentence', ?2)
+"#,
+            uuid: Uuid,
+            body: Body
+        ))?;
+        Ok(message.plus(segment))
     }
 
     fn uuid(self) -> Uuid {
@@ -348,26 +359,15 @@ VALUES
         )
     }
 
-    fn shown(self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
-        let shown = store.read(ShownMessage::named(self.uuid()))?.ok_or("the message is not stored")?;
-        Ok(shown
-            .segments()
-            .iter()
-            .map(|segment| {
-                format!("{} {} {:?}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment), Body::from(segment))
-            })
-            .collect())
-    }
-
     fn migrated(self) -> Result<Vec<String>, Box<dyn Error>> {
-        self.shown(&Run::root().port(OLD_STORE.clone()))
+        Listed(self.uuid()).shown(&Run::root().port(OLD_STORE.clone()))
     }
 
     fn fresh(self) -> Result<Vec<String>, Box<dyn Error>> {
         let run = Run::root();
         let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
         fresh.write(Recorded::of(&self.session())?.records)?;
-        self.shown(&fresh)
+        Listed(self.uuid()).shown(&fresh)
     }
 
     fn rederived(self) -> Vec<Body> {
@@ -383,6 +383,59 @@ VALUES
     fn kept(self) -> Body {
         Body::new(format!("{}w{}", self.0, self.0))
     }
+}
+
+struct Listed(Uuid);
+
+impl Listed {
+    fn shown(&self, store: &Port<'_, Sqlite>) -> Result<Vec<String>, Box<dyn Error>> {
+        let shown = store.read(ShownMessage::named(self.0.clone()))?.ok_or("the message is not stored")?;
+        Ok(shown
+            .segments()
+            .iter()
+            .map(|segment| {
+                format!("{} {} {:?}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment), Body::from(segment))
+            })
+            .collect())
+    }
+
+    fn found(words: &[&str]) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(OLD_STORE.clone());
+        let terms = Terms::lexed(words.iter().copied()).ok_or("no terms")?;
+        let hits = store.read(SearchSegments::matching(terms, Scope::Owner))?;
+        Ok(hits.iter().map(|hit| Body::from(hit).to_string()).collect())
+    }
+}
+
+const RESEGMENTED: &str = concat!(
+    "{\"type\":\"user\",\"uuid\":\"o3\",\"parentUuid\":null,\"sessionId\":\"s\",",
+    "\"timestamp\":\"2026-01-01T00:00:03Z\",\"origin\":{\"kind\":\"human\"},",
+    "\"message\":{\"content\":\"First point. Second point.\"}}\n",
+    "{\"type\":\"user\",\"uuid\":\"o4\",\"parentUuid\":null,\"sessionId\":\"s\",",
+    "\"timestamp\":\"2026-01-01T00:00:04Z\",\"origin\":{\"kind\":\"human\"},",
+    "\"message\":{\"content\":\"Only one.\"}}\n"
+);
+
+#[test]
+fn a_message_stored_with_segments_or_shapes_it_no_longer_derives_holds_what_a_fresh_ingest_stores()
+-> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let fresh = run.port(Sqlite::in_memory::<StreamSchema>());
+    fresh.write(Recorded::of(RESEGMENTED)?.records)?;
+    let old = run.port(OLD_STORE.clone());
+    let listed = [Listed(Uuid::new("o3".to_owned())), Listed(Uuid::new("o4".to_owned()))];
+    let migrated = listed.iter().map(|message| message.shown(&old)).collect::<Result<Vec<_>, _>>()?;
+    let ingested = listed.iter().map(|message| message.shown(&fresh)).collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(migrated, ingested);
+    let resegmented = [
+        vec!["0 sentence Body(\"First point.\")", "1 sentence Body(\"Second point.\")"],
+        vec!["0 sentence Body(\"Only one.\")"],
+    ];
+    assert_eq!(migrated, resegmented);
+    assert_eq!(Listed::found(&["second"])?, ["Second point."]);
+    assert_eq!(Listed::found(&["astray"])?, Vec::<String>::new());
+    Ok(())
 }
 
 #[test]

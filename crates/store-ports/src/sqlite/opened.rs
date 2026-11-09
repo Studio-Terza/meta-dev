@@ -1,13 +1,9 @@
-use std::collections::BTreeSet;
-
-use newtype::Newtype;
-use sqlx::migrate::Migrate;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
 use sqlx::{ConnectOptions, Connection, Sqlite, SqliteConnection, Transaction};
 use tokio::runtime::{Builder, Runtime};
 
 use super::migrations::Migrations;
-use crate::{Batch, Query, Statements, StoreFailure, Version, Written};
+use crate::{Batch, Query, Statements, StoreFailure, Written};
 
 #[derive(Debug)]
 pub(super) struct Opened {
@@ -43,19 +39,11 @@ impl Opened {
         self.settled(|statements| batch.written(statements))
     }
 
-    fn migrated(&mut self, migrations: Migrations) -> Result<(), StoreFailure> {
-        let migrator = migrations.migrator();
-        self.runtime.block_on(migrator.run_to(i64::MIN, &mut self.connection))?;
-        let applied = self.runtime.block_on(self.connection.list_applied_migrations(&migrator.table_name))?;
-        let applied: BTreeSet<Version> = applied.iter().map(|migration| Version::new(migration.version)).collect();
-        let declared: BTreeSet<Version> = migrator.iter().map(|migration| Version::new(migration.version)).collect();
-        declared.difference(&applied).try_for_each(|pending| self.rewritten(migrations, *pending))?;
-        Ok(self.runtime.block_on(migrator.run(&mut self.connection))?)
-    }
-
-    fn rewritten(&mut self, migrations: Migrations, version: Version) -> Result<(), StoreFailure> {
-        self.settled(|statements| migrations.rewritten(version, statements))?;
-        Ok(self.runtime.block_on(migrations.migrator().run_to(version.into_inner(), &mut self.connection))?)
+    fn migrated(&mut self, migrations: Migrations) -> Result<Written, StoreFailure> {
+        self.settled(|statements| {
+            let pending = statements.migrated(migrations.migrator())?;
+            migrations.rewritten(&pending, statements)
+        })
     }
 
     fn settled<Failure: From<StoreFailure>>(

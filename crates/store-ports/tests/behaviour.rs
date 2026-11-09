@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use design_model::{
     Artifact, ArtifactKind, Condition, Confidence, Entered, Explicitness, Facet, Kin, NodeId, NodeRelation, Ordinal,
@@ -17,8 +19,8 @@ use laws::proptest::strategy::Strategy;
 use newtype::{Arbitrary, Newtype};
 use port_core::{Op, Run};
 use store_ports::{
-    Batch, Busy, Column, ColumnFailure, Columns, Query, Schema, Sqlite, Statements, Store, StoreFailure, Version,
-    Written,
+    Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure,
+    Version, Written,
 };
 use strum::VariantArray;
 use tempfile::TempDir;
@@ -140,7 +142,228 @@ impl Place {
     }
 
     fn opened(&self) -> Sqlite {
-        Sqlite::file::<StreamSchema>(self.store())
+        self.opened_as::<StreamSchema>()
+    }
+
+    fn opened_as<S: Schema>(&self) -> Sqlite {
+        Sqlite::file::<S>(self.store())
+    }
+
+    fn bodies(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(self.opened_as::<Untouched>());
+        let shown = store.read(ShownMessage::named(Uuid::new("o1".to_owned())))?.ok_or("o1 was not stored")?;
+        Ok(shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect())
+    }
+
+    fn applied(&self) -> Result<BTreeSet<Version>, Box<dyn Error>> {
+        Ok(Run::root().port(self.opened_as::<Untouched>()).read(Applied)?.into_iter().collect())
+    }
+}
+
+#[derive(Op)]
+enum Rewriteless {}
+
+impl Batch for Rewriteless {
+    type Failure = StoreFailure;
+
+    fn written(self, _statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        match self {}
+    }
+}
+
+struct Older;
+
+static OLDER: LazyLock<Migrator> = LazyLock::new(|| {
+    Migrator::with_migrations(
+        StreamSchema::migrator().iter().filter(|migration| migration.version < Older::RESEGMENTED).cloned().collect(),
+    )
+});
+
+impl Older {
+    const RESEGMENTED: i64 = 20_261_108_000_012;
+
+    fn versions() -> BTreeSet<Version> {
+        OLDER.iter().map(|migration| Version::new(migration.version)).collect()
+    }
+}
+
+impl Schema for Older {
+    type Rewrite = Rewriteless;
+
+    fn migrator() -> &'static Migrator {
+        &OLDER
+    }
+
+    fn rewrite(_pending: Version) -> Option<Rewriteless> {
+        None
+    }
+}
+
+struct Untouched;
+
+static UNTOUCHED: LazyLock<Migrator> = LazyLock::new(|| {
+    let mut migrator = Migrator::with_migrations(Vec::new());
+    migrator.set_ignore_missing(true);
+    migrator
+});
+
+impl Schema for Untouched {
+    type Rewrite = Rewriteless;
+
+    fn migrator() -> &'static Migrator {
+        &UNTOUCHED
+    }
+
+    fn rewrite(_pending: Version) -> Option<Rewriteless> {
+        None
+    }
+}
+
+struct Faulted;
+
+#[derive(Op)]
+struct Crashing(<StreamSchema as Schema>::Rewrite);
+
+impl Schema for Faulted {
+    type Rewrite = Crashing;
+
+    fn migrator() -> &'static Migrator {
+        StreamSchema::migrator()
+    }
+
+    fn rewrite(pending: Version) -> Option<Crashing> {
+        StreamSchema::rewrite(pending).map(Crashing)
+    }
+}
+
+impl Batch for Crashing {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        self.0.written(statements)?;
+        HalfWritten.written(statements)
+    }
+}
+
+struct Broken;
+
+static BREAKS: Migrator = store_ports::migrate!("tests/broken");
+
+static BROKEN: LazyLock<Migrator> = LazyLock::new(|| {
+    Migrator::with_migrations(StreamSchema::migrator().iter().chain(BREAKS.iter()).cloned().collect())
+});
+
+impl Schema for Broken {
+    type Rewrite = <StreamSchema as Schema>::Rewrite;
+
+    fn migrator() -> &'static Migrator {
+        &BROKEN
+    }
+
+    fn rewrite(pending: Version) -> Option<Self::Rewrite> {
+        StreamSchema::rewrite(pending)
+    }
+}
+
+struct Early;
+
+#[derive(Op)]
+struct Staged;
+
+impl Schema for Early {
+    type Rewrite = Staged;
+
+    fn migrator() -> &'static Migrator {
+        StreamSchema::migrator()
+    }
+
+    fn rewrite(pending: Version) -> Option<Staged> {
+        StreamSchema::migrator()
+            .iter()
+            .next()
+            .is_some_and(|first| Version::new(first.version) == pending)
+            .then_some(Staged)
+    }
+}
+
+impl Batch for Staged {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+SELECT
+  'staged',
+  7 + count(stage_provenance)
+FROM
+  nodes
+"#
+        ))
+    }
+}
+
+#[derive(Op)]
+struct Edited;
+
+impl Batch for Edited {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(store_ports::query!(
+            r#"
+UPDATE
+  _sqlx_migrations
+SET
+  checksum = X'00'
+WHERE
+  version = 20261107000002
+"#
+        ))
+    }
+}
+
+#[derive(Op)]
+struct Annotated;
+
+impl Batch for Annotated {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  messages (uuid, session, parent, at, author, body)
+VALUES
+  (
+    'o1',
+    's',
+    NULL,
+    '2026-01-01T00:00:00Z',
+    'owner',
+    'kept forever'
+  )
+"#
+        ))?;
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  ('o1', 0, 'sentence', 'kept forever'),
+  ('o1', 1, 'sentence', 'gone')
+"#
+        ))?;
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  conversational (message, ordinal, provenance)
+VALUES
+  ('o1', 1, 'init')
+"#
+        ))
     }
 }
 
@@ -179,6 +402,71 @@ fn a_failing_statement_rolls_back_the_whole_batch() -> Result<(), Box<dyn Error>
     assert!(store.write(HalfWritten).is_err());
     let cursors = store.read(SessionCursors)?;
     assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::default());
+    Ok(())
+}
+
+#[test]
+fn a_store_whose_applied_migration_was_edited_is_refused_before_any_rewrite_and_left_as_it_was()
+-> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    let older = run.port(place.opened_as::<Older>());
+    older.write(Stale)?;
+    older.write(Edited)?;
+    assert!(matches!(run.port(place.opened()).read(Applied), Err(StoreFailure::Migrate(_))));
+    assert_eq!(place.applied()?, Older::versions());
+    assert_eq!(place.bodies()?, ["kept"]);
+    Ok(())
+}
+
+#[test]
+fn a_crash_after_the_migrations_and_the_rewrite_leaves_the_store_as_it_was_and_the_next_open_does_both()
+-> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened_as::<Older>()).write(Stale)?;
+    assert!(run.port(place.opened_as::<Faulted>()).read(Applied).is_err());
+    assert_eq!(place.applied()?, Older::versions());
+    assert_eq!(place.bodies()?, ["kept"]);
+    let reopened = run.port(place.opened());
+    let cursors = reopened.read(SessionCursors)?;
+    assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::default());
+    assert_eq!(reopened.read(Applied)?.len(), StreamSchema::migrator().iter().count());
+    assert_eq!(place.bodies()?, ["kept forever"]);
+    Ok(())
+}
+
+#[test]
+fn a_migration_failing_after_a_due_rewrite_leaves_the_store_as_it_was() -> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened_as::<Older>()).write(Stale)?;
+    assert!(matches!(run.port(place.opened_as::<Broken>()).read(Applied), Err(StoreFailure::Migrate(_))));
+    assert_eq!(place.applied()?, Older::versions());
+    assert_eq!(place.bodies()?, ["kept"]);
+    Ok(())
+}
+
+#[test]
+fn a_rederivation_that_would_drop_an_annotated_segment_refuses_and_leaves_the_store_as_it_was()
+-> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened_as::<Older>()).write(Annotated)?;
+    let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
+    assert!(refused.to_string().contains("FOREIGN KEY constraint failed"));
+    assert_eq!(place.applied()?, Older::versions());
+    assert_eq!(place.bodies()?, ["kept forever", "gone"]);
+    Ok(())
+}
+
+#[test]
+fn a_rewrite_due_with_the_first_migration_runs_on_the_schema_its_queries_are_checked_against()
+-> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<Early>());
+    let cursors = store.read(SessionCursors)?;
+    assert_eq!(cursors.resuming(&SessionId::new("staged".to_owned())), Cursor::new(Offset::new(7)));
     Ok(())
 }
 
