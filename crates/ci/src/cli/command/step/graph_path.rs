@@ -8,6 +8,7 @@ mod unit_dag;
 mod unit_key;
 mod unit_role;
 mod weighed;
+mod work;
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -27,6 +28,7 @@ use host::Host;
 use partial_timings::PartialTimings;
 use timed_unit::TimedUnit;
 use unit_dag::UnitDag;
+use work::Work;
 
 #[derive(Debug)]
 pub struct GraphPath {
@@ -37,7 +39,6 @@ pub struct GraphPath {
 
 impl GraphPath {
     const PATH: &'static str = "graph-path";
-    const WORK: &'static str = "graph-work";
 
     fn recorded(
         &self,
@@ -62,10 +63,14 @@ impl GraphPath {
         let crates = Host::asked(ports)?.crates(ports)?;
         let dag = UnitDag::weighed(&crates, units);
         let critical = dag.critical();
-        write!(out, "{critical}")?;
-        self.report.emptied(ports.files())?.append(ports.files(), &critical)?;
-        self.measured.append(ports.files(), &Stage::new(Self::PATH.to_owned()), *critical.as_ref())?;
-        self.measured.append(ports.files(), &Stage::new(Self::WORK.to_owned()), dag.work()).map(|()| Exit::Success)
+        let work = Work::from(dag.work());
+        write!(out, "{critical}{work}")?;
+        let report = self.report.emptied(ports.files())?;
+        report.append(ports.files(), &critical)?;
+        report.append(ports.files(), work)?;
+        self.measured
+            .append(ports.files(), &Stage::new(Self::PATH.to_owned()), *critical.as_ref())
+            .map(|()| Exit::Success)
     }
 }
 

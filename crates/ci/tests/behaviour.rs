@@ -18,12 +18,13 @@ const TIMINGS_METADATA: &str = include_str!("timings/metadata.json");
 const EVERY_PLATFORM: &str = include_str!("timings/every-platform.json");
 const HOST_PLATFORM: &str = include_str!("timings/host-platform.json");
 const HOST: &str = "x86_64-unknown-linux-gnu";
-const GRAPH_PATH: [&str; 5] = [
+const GRAPH_PATH: [&str; 6] = [
     "graph-path 2.50 seconds, the longest chain of clippy units, counting only units sccache never caches:",
     "0.40 ext-macro (build)",
     "0.70 core (check)",
     "0.60 app (check)",
     "0.80 app behaviour \"test\" (check-test)",
+    "graph-work 3.95 seconds, the sum of the same units",
 ];
 const CRATES_GENERATED: usize = 31;
 const LINES_PRINTED: usize = 31;
@@ -885,7 +886,7 @@ fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_besi
     assert_eq!(asked, [Invocation::new("rustc", ["--print", "host-tuple"]), Graph::metadata_for(HOST)]);
     assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: GRAPH_PATH.to_vec(), err: Vec::<&str>::new() });
     assert_eq!(Text::lines(&report), GRAPH_PATH);
-    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.50", "graph-work = 3.95"]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.50"]);
     Ok(())
 }
 
@@ -899,9 +900,13 @@ fn cacheable_external_units_weigh_nothing_however_long_they_took() -> Result<(),
         ]
         .join(","),
     );
-    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
     assert_eq!(answer.exit, ExitCode::SUCCESS);
-    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.00", "graph-work = 0.00"]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.00"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 0.00 seconds, the sum of the same units")
+    );
     Ok(())
 }
 
@@ -916,13 +921,18 @@ fn a_proc_macro_host_build_and_a_build_script_count_even_outside_the_workspace()
         ]
         .join(","),
     );
-    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
     let expected = [
         "graph-path 0.40 seconds, the longest chain of clippy units, counting only units sccache never caches:",
         "0.40 ext-macro (build)",
+        "graph-work 0.70 seconds, the sum of the same units",
     ];
     assert_eq!(Text::lines(&answer.out), expected);
-    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.40", "graph-work = 0.70"]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.40"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 0.70 seconds, the sum of the same units")
+    );
     Ok(())
 }
 
@@ -935,14 +945,19 @@ fn a_unit_the_page_does_not_time_weighs_nothing_but_still_links_its_neighbours()
         ]
         .join(","),
     );
-    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
     let expected = [
         "graph-path 1.10 seconds, the longest chain of clippy units, counting only units sccache never caches:",
         "0.30 derive-macro (build)",
         r#"0.80 app behaviour "test" (check-test)"#,
+        "graph-work 1.10 seconds, the sum of the same units",
     ];
     assert_eq!(Text::lines(&answer.out), expected);
-    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 1.10", "graph-work = 1.10"]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 1.10"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 1.10 seconds, the sum of the same units")
+    );
     Ok(())
 }
 
@@ -965,9 +980,13 @@ fn two_check_variants_of_one_crate_count_the_longer_on_the_path_and_both_in_the_
     let page = Page::with(
         &[Page::of("core", "0.1.0", " (check)", "0.5"), Page::of("core", "0.1.0", " (check)", "0.7")].join(","),
     );
-    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let Graph { answer, measured, report, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
     assert_eq!(Text::lines(&answer.out).get(1).map(String::as_str), Some("0.70 core (check)"));
-    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.70", "graph-work = 1.20"]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.70"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 1.20 seconds, the sum of the same units")
+    );
     Ok(())
 }
 
@@ -1012,14 +1031,19 @@ fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform(
         exact: vec![ExactReply { asked: Graph::metadata_for(HOST), text: HOST_PLATFORM.to_owned() }],
         ..Graph::hosted(Script::new())
     };
-    let Graph { answer, measured, .. } = Graph::answered(&page, &fake)?;
+    let Graph { answer, measured, report, .. } = Graph::answered(&page, &fake)?;
     let expected = [
         "graph-path 2.00 seconds, the longest chain of clippy units, counting only units sccache never caches:",
         "1.00 mid (check)",
         "1.00 app (check)",
+        "graph-work 3.50 seconds, the sum of the same units",
     ];
     assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() });
-    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.00", "graph-work = 3.50"]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.00"]);
+    assert_eq!(
+        Text::lines(&report).last().map(String::as_str),
+        Some("graph-work 3.50 seconds, the sum of the same units")
+    );
     Ok(())
 }
 
