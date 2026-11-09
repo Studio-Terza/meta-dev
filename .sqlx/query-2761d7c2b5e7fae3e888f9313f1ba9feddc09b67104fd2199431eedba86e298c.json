@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  mechanical_links.source,\n  mechanical_links.relation,\n  mechanical_links.target,\n  mechanical_links.source_message,\n  mechanical_links.target_message\nFROM\n  pragma_foreign_key_check('mechanical_links') AS unchecked\n  JOIN mechanical_links ON mechanical_links.rowid = unchecked.rowid\nORDER BY\n  mechanical_links.rowid\n",
+  "query": "\nSELECT\n  mechanical_links.source,\n  mechanical_links.relation,\n  mechanical_links.target,\n  mechanical_links.source_message,\n  mechanical_links.target_message\nFROM\n  pragma_foreign_key_check('mechanical_links') AS unchecked\n  JOIN mechanical_links ON mechanical_links.rowid = unchecked.rowid\nGROUP BY\n  mechanical_links.rowid\nORDER BY\n  mechanical_links.rowid\n",
   "describe": {
     "columns": [
       {
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "8bec82cb256e11b241e393e6c44e2f5336af793838e46350fa43fdc5b62fe914"
+  "hash": "2761d7c2b5e7fae3e888f9313f1ba9feddc09b67104fd2199431eedba86e298c"
 }
