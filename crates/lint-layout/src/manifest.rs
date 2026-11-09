@@ -142,7 +142,7 @@ impl Manifest {
     #[must_use]
     pub fn library_tests(&self) -> LibraryTests {
         let tests = self.table.get(Self::LIBRARY).and_then(|library| library.get(Self::TEST)).and_then(Value::as_bool);
-        (tests == Some(false)).then_some(LibraryTests::SwitchedOff).unwrap_or_default()
+        if tests == Some(false) { LibraryTests::SwitchedOff } else { LibraryTests::Run }
     }
 
     #[must_use]
