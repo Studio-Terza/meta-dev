@@ -37,11 +37,15 @@ runs:
       shell: bash
       working-directory: ${{ runner.temp }}
       run: sha256sum --check --strict ${{ inputs.checksum }}
+    - name: release directory
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: mkdir -p ${{ github.workspace }}/target/${{ inputs.name }}
     - name: release unpack
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      working-directory: ${{ github.workspace }}/target
-      run: tar -xzf ${{ runner.temp }}/${{ inputs.name }}.tar.gz --one-top-level=${{ inputs.name }} --strip-components=1
+      working-directory: ${{ github.workspace }}/target/${{ inputs.name }}
+      run: tar -xzf ${{ runner.temp }}/${{ inputs.name }}.tar.gz --strip-components=1
     - name: release save
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
