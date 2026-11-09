@@ -141,10 +141,8 @@ impl Manifest {
 
     #[must_use]
     pub fn library_tests(&self) -> LibraryTests {
-        match self.table.get(Self::LIBRARY).and_then(|library| library.get(Self::TEST)).and_then(Value::as_bool) {
-            Some(false) => LibraryTests::SwitchedOff,
-            Some(true) | None => LibraryTests::Run,
-        }
+        let tests = self.table.get(Self::LIBRARY).and_then(|library| library.get(Self::TEST)).and_then(Value::as_bool);
+        (tests == Some(false)).then_some(LibraryTests::SwitchedOff).unwrap_or_default()
     }
 
     #[must_use]

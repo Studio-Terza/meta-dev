@@ -53,7 +53,7 @@ jobs:
       - name: clippy from scratch
         env:
           CARGO_TARGET_DIR: ${{ env.CLIPPY_TARGET }}
-        run: '"$TOOLS/ci" timed "$MEASURED" cold-clippy cargo clippy --locked --lib --bins --tests --examples --benches --workspace --timings -- -D warnings'
+        run: '"$TOOLS/ci" timed "$MEASURED" cold-clippy cargo clippy-once --workspace --timings -- -D warnings'
       - name: clippy per crate
         run: '"$TOOLS/ci" compile-times "$CLIPPY_TARGET/cargo-timings/cargo-timing.html" "$CLIPPY_CRATES"'
       - name: test compile from scratch

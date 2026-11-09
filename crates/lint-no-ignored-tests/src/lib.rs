@@ -9,6 +9,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use lint_layout::LibraryTests;
 use skip_marks::SkipMarks;
 use test_gates::TestGates;
@@ -29,8 +30,10 @@ impl NoIgnoredTests {
         Problem::new("#[cfg(test)] code in a crate whose library sets `test = false`, so it never runs"),
         Fix::new("move the tests into the crate's tests directory and test through the public API"),
     );
+}
 
-    fn unrun(file: &SourceFile) -> Vec<Violation<'_>> {
+impl FileLint for NoIgnoredTests {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         file.shipped()
             .filter(|shipped| shipped.placement().package().library_tests() == LibraryTests::SwitchedOff)
             .map(|shipped| TestGates::lines_in(shipped.syntax()))
@@ -53,8 +56,8 @@ impl Lint for NoIgnoredTests {
                         .into_iter()
                         .map(move |line| Violation::new(Site::new(file.path(), line), Self::SKIPPED))
                         .chain(target)
-                        .chain(Self::unrun(file))
                 })
+                .chain(Self::in_shipped(files))
                 .collect(),
         )
     }

@@ -1225,6 +1225,7 @@ name = "lint-no-ignored-tests"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
