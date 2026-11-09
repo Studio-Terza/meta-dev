@@ -183,7 +183,7 @@ a process in test code still also needs what `process_starters` asks for.
 port framework the only way to an effect. Ownership is declared, never guessed: a crate owns a package by naming it in
 `[package.metadata.port] owns = ["logos"]` in its `Cargo.toml` (`grammar` owns `logos`, `logos-codegen` and
 `logos-derive` and only re-exports `logos`, which the `grammar-<format>` lexer crates reach as `grammar::logos` with
-`#[logos(crate = grammar::logos)]` on each derive, while `grammar-cited` holds the `Cited` type two lexers share; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
+`#[logos(crate = grammar::logos)]` on each derive, while the `grammar-cited` lexer's `Cited` is shared by two other lexers and `grammar-unspelled` holds the `Unspelled` refusal that every lexer's checked newtype and `FromStr` shares; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
 owns `sqlx-macros-core`). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
 proc-macro crate it depends on, so `store-ports` and `store-ports-macros` own jointly, and a proc-macro crate two ports
 depend on belongs to both units. The gate reads the dependency graph from `cargo metadata --format-version 1 --locked`,
@@ -229,8 +229,8 @@ writes for `Statements::written`; sqlx checks the SQL against the schema as its 
 every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
 `FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
-back through `newtype::Guarded`, so a stored value its check refuses fails the read; grammar's `Bare` and
-`Quoted` output fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
+back through `newtype::Guarded`, so a stored value its check refuses fails the read; `grammar-output`'s `Bare`
+and `Quoted` fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
 
