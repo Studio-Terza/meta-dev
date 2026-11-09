@@ -1271,6 +1271,7 @@ dependencies = [
  "lint-core",
  "lint-file",
  "lint-layout",
+ "lint-placement",
  "proc-macro2",
  "syn 2.0.119",
 ]
