@@ -59,16 +59,13 @@ jobs:
       - name: fuzz targets clippy
         if: env.BUILD_SCOPE == '--workspace' || contains(format('{0} ', env.BUILD_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
-      - uses: ./.github/actions/judge
-        with:
-          stages: clippy
       - name: graph path
         id: graph
-        if: env.BUILD_SCOPE == '--workspace' && steps.clippy.outcome == 'success' && always()
+        if: env.BUILD_SCOPE != '' && steps.clippy.outcome == 'success' && always()
         run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
       - name: graph path skipped
         id: graph_skipped
-        if: env.BUILD_SCOPE == '--workspace' && steps.clippy.outcome == 'failure' && always()
+        if: env.BUILD_SCOPE != '' && steps.clippy.outcome == 'failure' && always()
         run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
       - name: graph path report
         if: steps.graph.outcome == 'success' && always()
@@ -79,6 +76,9 @@ jobs:
       - name: graph path summary
         if: (steps.graph.outcome == 'success' || steps.graph_skipped.outcome == 'success') && always()
         run: '"$TOOLS/ci" summarize "$GRAPH_PATH" "$GITHUB_STEP_SUMMARY"'
+      - uses: ./.github/actions/judge
+        with:
+          stages: clippy graph-path
       - name: graph history restore
         if: github.event_name == 'push' && steps.graph.outcome == 'success' && always()
         uses: actions/cache/restore@v4
