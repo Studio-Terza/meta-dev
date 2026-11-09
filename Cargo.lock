@@ -450,8 +450,8 @@ dependencies = [
 name = "equivalence"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "laws",
- "lint-core",
  "newtype",
 ]
 
