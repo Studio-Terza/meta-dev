@@ -12,6 +12,15 @@ use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
+const TIMINGS_UNITS: &str = include_str!("timings/units.json");
+const TIMINGS_METADATA: &str = include_str!("timings/metadata.json");
+const GRAPH_PATH: [&str; 5] = [
+    "graph-path 2.50 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+    "0.40 ext-macro (build)",
+    "0.70 core (check)",
+    "0.60 app (check)",
+    "0.80 app behaviour \"test\" (check-test)",
+];
 const LEAF_REPORT: [&str; 3] = ["REACH=1 of 5 crates", "BUILD_SCOPE=-p leaf", "MUTANTS_SCOPE=--test-package=leaf"];
 const TWO_REPORT: [&str; 3] = [
     "REACH=2 of 5 crates",
@@ -550,6 +559,17 @@ impl Page {
         format!("{{\"i\": 0, \"name\": \"{name}\", \"mode\": \"todo\", \"duration\": {duration}, \"sections\": null}}")
     }
 
+    fn listing(units: &str) -> String {
+        format!("<html>\nconst UNIT_DATA = {units};\n</html>\n")
+    }
+
+    fn of(name: &str, version: &str, target: &str, duration: &str) -> String {
+        format!(
+            "{{\"i\": 0, \"name\": \"{name}\", \"version\": \"{version}\", \"mode\": \"todo\", \"target\": \"{}\", \"duration\": {duration}}}",
+            target.escape_default()
+        )
+    }
+
     fn timed(page: &str) -> Result<Timings, Box<dyn Error>> {
         let scratch = Scratch::new()?;
         scratch.write("page.html", page)?;
@@ -594,6 +614,130 @@ fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> 
     let missing =
         scratch.answer(&Script::new(), &["compile-times", &scratch.file("none.html"), &scratch.file("report.txt")]);
     assert_eq!(missing.exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+struct Graph {
+    answer: Answer,
+    measured: String,
+    report: String,
+    asked: Vec<Invocation>,
+}
+
+impl Graph {
+    fn measured(page: &str, metadata: &str) -> Result<Graph, Box<dyn Error>> {
+        let scratch = Scratch::new()?;
+        scratch.write("page.html", page)?;
+        scratch.write("m.toml", "clippy = 50.80\n")?;
+        let fake = Script { metadata: metadata.to_owned(), ..Script::new() };
+        let arguments = ["graph-path", &scratch.file("page.html"), &scratch.file("m.toml"), &scratch.file("path.txt")];
+        let answer = scratch.answer(&fake, &arguments);
+        let asked = fake.calls.borrow().clone();
+        Ok(Graph { answer, measured: scratch.read("m.toml"), report: scratch.read("path.txt"), asked })
+    }
+}
+
+#[test]
+fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_beside_the_wall()
+-> Result<(), Box<dyn Error>> {
+    let Graph { answer, measured, report, asked } = Graph::measured(&Page::listing(TIMINGS_UNITS), TIMINGS_METADATA)?;
+    assert_eq!(asked, [Invocation::new("cargo", ["metadata", "--locked", "--format-version", "1"])]);
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: GRAPH_PATH.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&report), GRAPH_PATH);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.50", "graph-work = 3.95"]);
+    Ok(())
+}
+
+#[test]
+fn cacheable_external_units_weigh_nothing_however_long_they_took() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("heavy", "1.0.0", " (check)", "9.0"),
+            Page::of("heavy", "1.0.0", "", "5.0"),
+            Page::of("sys", "0.3.0", " (check)", "1.0"),
+        ]
+        .join(","),
+    );
+    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.00", "graph-work = 0.00"]);
+    Ok(())
+}
+
+#[test]
+fn a_proc_macro_host_build_and_a_build_script_count_even_outside_the_workspace() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("ext-macro", "2.0.0", "", "0.4"),
+            Page::of("sys", "0.3.0", " build-script", "0.1"),
+            Page::of("sys", "0.3.0", " build-script (run)", "0.2"),
+            Page::of("sys", "0.3.0", " (check)", "1.0"),
+        ]
+        .join(","),
+    );
+    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let expected = [
+        "graph-path 0.40 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+        "0.40 ext-macro (build)",
+    ];
+    assert_eq!(Text::lines(&answer.out), expected);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.40", "graph-work = 0.70"]);
+    Ok(())
+}
+
+#[test]
+fn a_unit_the_page_does_not_time_weighs_nothing_but_still_links_its_neighbours() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("derive-macro", "0.1.0", "", "0.3"),
+            Page::of("app", "0.1.0", r#" behaviour "test" (check-test)"#, "0.8"),
+        ]
+        .join(","),
+    );
+    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let expected = [
+        "graph-path 1.10 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+        "0.30 derive-macro (build)",
+        r#"0.80 app behaviour "test" (check-test)"#,
+    ];
+    assert_eq!(Text::lines(&answer.out), expected);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 1.10", "graph-work = 1.10"]);
+    Ok(())
+}
+
+#[test]
+fn two_check_variants_of_one_crate_count_the_longer_on_the_path_and_both_in_the_work() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[Page::of("core", "0.1.0", " (check)", "0.5"), Page::of("core", "0.1.0", " (check)", "0.7")].join(","),
+    );
+    let Graph { answer, measured, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    assert_eq!(Text::lines(&answer.out).get(1).map(String::as_str), Some("0.70 core (check)"));
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 0.70", "graph-work = 1.20"]);
+    Ok(())
+}
+
+#[test]
+fn a_graph_path_needs_unit_timings_and_metadata_cargo_can_give() -> Result<(), Box<dyn Error>> {
+    let unreadable = Graph::measured(&Page::listing(TIMINGS_UNITS), "not json")?;
+    assert_eq!(unreadable.answer.exit, ExitCode::FAILURE);
+    assert!(unreadable.answer.err.contains("cannot read the cargo metadata: "));
+    assert_eq!(Text::lines(&unreadable.measured), ["clippy = 50.80"]);
+    assert_eq!(unreadable.report, "");
+    let untimed = Graph::measured("<html></html>", TIMINGS_METADATA)?;
+    assert_eq!(untimed.answer.exit, ExitCode::FAILURE);
+    assert!(untimed.answer.err.contains("no unit timings in"));
+    assert_eq!(untimed.asked, Vec::<Invocation>::new());
+    let scratch = Scratch::new()?;
+    scratch.write("page.html", &Page::listing(TIMINGS_UNITS))?;
+    let refused = scratch.answer(
+        &Script::refusing("cargo"),
+        &["graph-path", &scratch.file("page.html"), &scratch.file("m.toml"), &scratch.file("path.txt")],
+    );
+    assert_eq!(
+        (refused.exit, Text::lines(&refused.err)),
+        (ExitCode::FAILURE, vec!["cannot run cargo: boom".to_owned()])
+    );
+    assert_eq!(scratch.read("m.toml"), "");
     Ok(())
 }
 
@@ -657,6 +801,10 @@ laws::table!(
         ["compile-times"] => true,
         ["compile-times", "page.html"] => true,
         ["compile-times", "page.html", "report.txt", "extra"] => true,
+        ["graph-path"] => true,
+        ["graph-path", "page.html"] => true,
+        ["graph-path", "page.html", "m.toml"] => true,
+        ["graph-path", "page.html", "m.toml", "path.txt", "extra"] => true,
         ["history"] => true,
         ["history", "metadata.json"] => true,
         ["history", "metadata.json", "history.tsv"] => true,
