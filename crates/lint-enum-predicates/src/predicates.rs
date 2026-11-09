@@ -2,6 +2,7 @@ mod declaration;
 mod declarations;
 mod finding;
 mod kind;
+mod known;
 
 use std::borrow::Cow;
 
@@ -17,15 +18,18 @@ use declaration::Declaration;
 use declarations::Declarations;
 use finding::Finding;
 use kind::Kind;
+use known::Known;
 
 #[derive(Debug, Default)]
 pub struct EnumPredicates<'file> {
-    declarations: Vec<Declaration<'file>>,
+    known: Known<'file>,
 }
 
 impl Lint for EnumPredicates<'_> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let predicates = EnumPredicates { declarations: files.iter().flat_map(Declarations::in_file).collect() };
+        let declarations: Vec<Declaration<'_>> = files.iter().flat_map(Declarations::in_file).collect();
+        let predicates =
+            EnumPredicates { known: declarations.iter().fold(Known::default(), |known, found| found.filed(known)) };
         Report::new(
             Headline::new(
                 "an enum method returning bool throws away the variant; return an enum or match where the answer is used",
@@ -58,16 +62,8 @@ impl EnumPredicates<'_> {
         let local = Some(path)
             .filter(|candidate| candidate.qself.is_none())
             .filter(|unqualified| unqualified.path.segments.len() == 1)
-            .and_then(|_| {
-                self.declarations
-                    .iter()
-                    .filter_map(|declaration| declaration.in_module(module))
-                    .find_map(|declaration| declaration.kinds(crate_root, name).next())
-            });
-        let candidates: Vec<Kind> =
-            self.declarations.iter().flat_map(|declaration| declaration.kinds(crate_root, name)).collect();
-        let enums =
-            candidates.first().filter(|_| candidates.iter().all(|kind| *kind == Kind::Enum)).map(|_| Kind::Enum);
+            .and_then(|_| self.known.placed(crate_root, module, name));
+        let enums = self.known.enumerated(crate_root, name);
         local.or(enums).unwrap_or(Kind::Other)
     }
 }
