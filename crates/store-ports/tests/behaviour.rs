@@ -853,6 +853,17 @@ fn a_crash_after_the_migrations_and_the_rewrite_leaves_the_store_as_it_was_and_t
 }
 
 #[test]
+fn a_store_migrated_past_what_the_code_declares_is_refused_and_left_as_it_was() -> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    run.port(place.opened()).read(Applied)?;
+    let applied = place.applied()?;
+    assert!(matches!(run.port(place.opened_as::<Older>()).read(Applied), Err(StoreFailure::Migrate(_))));
+    assert_eq!(place.applied()?, applied);
+    Ok(())
+}
+
+#[test]
 fn a_migration_failing_after_a_due_rewrite_leaves_the_store_as_it_was() -> Result<(), Box<dyn Error>> {
     let place = Place::new()?;
     let run = Run::root();

@@ -84,7 +84,6 @@ enum Storage {
     Real,
     Float,
     Text,
-    Blob,
     #[serde(other)]
     Unmapped,
 }
@@ -116,7 +115,6 @@ impl Storage {
             Storage::Integer | Storage::Int4 | Storage::Int64 => Ok(parse_quote!(i64)),
             Storage::Real | Storage::Float => Ok(parse_quote!(f64)),
             Storage::Text => Ok(parse_quote!(::std::string::String)),
-            Storage::Blob => Ok(parse_quote!(::std::vec::Vec<u8>)),
             Storage::Unmapped => Err(Unexpanded::Unmapped(ident.clone())),
         }
     }

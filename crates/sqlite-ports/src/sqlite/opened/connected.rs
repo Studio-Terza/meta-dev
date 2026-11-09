@@ -85,8 +85,7 @@ impl Stored {
             .then(|| Ok(Value::Null))
             .or_else(|| <i64 as Type<Sqlite>>::compatible(&stored).then(|| self.0.try_decode().map(Value::Integer)))
             .or_else(|| <f64 as Type<Sqlite>>::compatible(&stored).then(|| self.0.try_decode().map(Value::Real)))
-            .or_else(|| <String as Type<Sqlite>>::compatible(&stored).then(|| self.0.try_decode().map(Value::Text)))
-            .unwrap_or_else(|| self.0.try_decode().map(Value::Blob))
+            .unwrap_or_else(|| self.0.try_decode().map(Value::Text))
             .map_err(|failed| StoreFailure::Statement(Box::new(failed)))
     }
 }
