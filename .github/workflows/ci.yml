@@ -11,6 +11,9 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_DEV_OPT_LEVEL: "1"
+  SQLITE3_LIB_DIR: ${{ github.workspace }}/target/sqlite
+  SQLITE3_STATIC: "1"
+  SQLITE3_NO_PKG_CONFIG: "1"
   TOOLS: ${{ github.workspace }}/target/ci/tools
   MEASURED: ${{ github.workspace }}/target/ci/measured.toml
   METADATA: ${{ github.workspace }}/target/ci/metadata.json
@@ -120,6 +123,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/tools
+      - uses: ./.github/actions/sqlite
       - name: test compile
         if: env.BUILD_SCOPE != ''
         run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $BUILD_SCOPE'
@@ -212,6 +216,7 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: ./.github/actions/tools
+      - uses: ./.github/actions/sqlite
       - uses: taiki-e/install-action@v2
         if: env.MUTANTS_SCOPE != ''
         with:

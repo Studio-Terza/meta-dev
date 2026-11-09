@@ -17,6 +17,7 @@ pub mod ratchet;
 mod reach_scope;
 mod revision;
 mod seconds;
+pub mod sqlite;
 mod stage;
 mod timed;
 mod tools_key;
