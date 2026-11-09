@@ -308,13 +308,6 @@ ORDER BY
         ))
     }
 
-    fn ordinal(anchor: &Anchor) -> Option<Ordinal> {
-        match anchor {
-            Anchor::Message(_) => None,
-            Anchor::Segment(id) => Some(Ordinal::new(id.ordinal().into_inner())),
-        }
-    }
-
     #[must_use]
     pub fn anchors(&self) -> [Anchor; 2] {
         [self.source.clone(), self.target.clone()]
@@ -503,8 +496,6 @@ VALUES
 impl Row for LinkRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let LinkRow { source, relation, target, source_message, target_message } = self;
-        let source_ordinal = LinkRow::ordinal(source);
-        let target_ordinal = LinkRow::ordinal(target);
         statements.written(store_ports::query!(
             r#"
 INSERT
@@ -513,20 +504,16 @@ INSERT
     relation,
     target,
     source_message,
-    source_ordinal,
-    target_message,
-    target_ordinal
+    target_message
   )
 VALUES
-  (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+  (?1, ?2, ?3, ?4, ?5)
 "#,
             source: Anchor,
             relation: RelationName,
             target: Anchor,
             source_message: Uuid,
-            source_ordinal: Option<Ordinal>,
-            target_message: Uuid,
-            target_ordinal: Option<Ordinal>
+            target_message: Uuid
         ))
     }
 }

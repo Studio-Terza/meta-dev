@@ -232,9 +232,10 @@ segment the segmenter would change or drop through `Statements::released`, which
 foreign key refuses the delete, so SQLite checks every foreign key `pragma_foreign_key_list` reports, a table added
 later included. A re-derivation that would change the shape or body of a segment any row points at, or drop it, refuses
 the open with `StoreFailure::Refused`, naming every such segment as `message#ordinal`, and the store is left as it was.
-Segments nothing points at are still re-derived. Migration 20261109000001 gives `mechanical_links` the ordinals of its
-segment anchors (null for a message anchor) with foreign keys into `segments`, so a `cites` or `answers` link holds its
-segment like any annotation.
+Segments nothing points at are still re-derived. Migration 20261109000001 gives `mechanical_links` generated
+`source_ordinal` and `target_ordinal` columns, read from the ordinal of a segment anchor (null for a message anchor),
+with foreign keys into `segments`, so a `cites` or `answers` link holds its segment like any annotation and its ordinal
+cannot disagree with its anchor.
 
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
