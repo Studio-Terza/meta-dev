@@ -6,10 +6,10 @@ use std::error::Error;
 
 use design::{Failure, Flail, Flails, HookEvent, Line, Sequel, Unmatched};
 use design_model::{JobId, Prefix};
+use newtype::Enumerated;
 use ports::Design;
 use serde_json::Value;
 use structurer::{Directives, Lapse};
-use strum::VariantArray;
 use text_lines::Lines;
 
 #[test]

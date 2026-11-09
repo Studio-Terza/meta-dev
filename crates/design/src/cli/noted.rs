@@ -6,7 +6,6 @@ use grammar_output::field::{Bare, Id, Integer, Quoted, Word};
 use grammar_output::{Fields, Unread};
 use named_derive::Named;
 use newtype::Wrapping;
-use strum::VariantArray;
 use transcript_ports::Authorship;
 
 use crate::cli::count::Count;
@@ -28,7 +27,7 @@ pub enum Reference {
     Cite(Cite),
 }
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Miss {
     #[name("unheard")]
     Unheard,

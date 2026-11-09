@@ -52,6 +52,10 @@ impl Table {
                 type Kind = ::newtype::Spelled;
             }
 
+            impl ::newtype::Enumerated for #ident {
+                const VARIANTS: &'static [Self] = &[#(#variants),*];
+            }
+
             #[derive(Debug, ::thiserror::Error)]
             #[error("{0:?} names no {kind}", kind = ::core::stringify!(#ident))]
             #visibility struct #unknown(::std::string::String);

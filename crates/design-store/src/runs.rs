@@ -4,12 +4,11 @@ use design_model::{JobId, RunId, Segment};
 use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
-use strum::VariantArray;
 use transcript_ports::{Body, SessionId};
 
 use crate::{Account, Excerpt};
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunState {
     #[name("running")]
     Running,
@@ -29,7 +28,7 @@ pub enum RunState {
     Failed,
 }
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum JobState {
     #[name("open")]
     Open,
@@ -45,7 +44,7 @@ pub(crate) enum JobState {
     Interrupted,
 }
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Halted {
     #[name("flailed")]
     Flailed,
@@ -53,7 +52,7 @@ pub enum Halted {
     Stalled,
 }
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Delivery {
     #[name("unreported")]
     Unreported,

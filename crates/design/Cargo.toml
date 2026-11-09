@@ -31,7 +31,6 @@ serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 structurer = { path = "../structurer" }
-strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
