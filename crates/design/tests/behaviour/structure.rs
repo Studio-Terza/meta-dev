@@ -262,6 +262,62 @@ fn a_reply_structuring_outside_its_job_or_repeating_a_job_is_retried_but_one_lin
 }
 
 #[test]
+fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_an_answer_to_one_but_not_place_one()
+-> Result<(), Box<dyn Error>> {
+    let asked = format!("{}.0", Session::ASKED);
+    let [decided, other] = [Applying::answer(0), Applying::answer(1)];
+    let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
+    let rest = format!("conversational({other})\nconversational({later})");
+    let placing = format!("place({asked}, n1, mentions)\nconversational({decided})\n{rest}");
+    let answering = format!("link({decided}, {asked}, answers)\n{rest}");
+    let structuring = Structuring::over(Script::replying(&[Some(&placing), Some(&answering)]), Pause::new(0))?;
+    structuring
+        .applying
+        .applied(&format!("place({asked}, n1, questions)\nsense({asked}, question, specific, firm, explicit)"))?;
+    let open = structuring.applying.run(&["view", "open-questions"])?;
+    let structured = structuring.structured(&["structure"]);
+    let outside = SegmentRef::new(Prefix::new(Session::ASKED.to_owned()), Ordinal::new(0));
+    let retried = Line::Retried(Lapsed::new(JobId::new(1), Lapse::refused(&Unresolved::Outside(outside))));
+    let shown = format!("asked {asked} \"what of aaaaaaaa-0000-4000-8000-000000000004\"\n");
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    assert_eq!(Lines::from(open.as_str()).count(), 1);
+    assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1, 1]);
+    assert_eq!(structured.has(&[retried]), []);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!(structuring.applying.run(&["view", "open-questions"])?, "");
+    Ok(())
+}
+
+#[test]
+fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() -> Result<(), Box<dyn Error>> {
+    let [first, second] = ["aaaaaaaa-0000-4000-8000-000000000011", "aaaaaaaa-0000-4000-8000-000000000012"];
+    let [first_answer, second_answer] =
+        ["aaaaaaaa-0000-4000-8000-000000000013", "aaaaaaaa-0000-4000-8000-000000000014"];
+    let lines = [
+        Session::recorded("x", Speaker::Owner, first, ["null", "which crate", "2026-01-01"]),
+        Session::recorded("y", Speaker::Owner, second, ["null", "which store", "2026-01-02"]),
+        Session::recorded("x", Speaker::Owner, first_answer, ["null", "the first", "2026-01-03"]),
+        Session::recorded("y", Speaker::Owner, second_answer, ["null", "the second", "2026-01-04"]),
+    ];
+    let applying = Applying::over(&Session::working(lines.concat()))?;
+    let questions = [first, second]
+        .map(|asked| format!("place({asked}.0, n1, questions)\nsense({asked}.0, question, specific, firm, explicit)"))
+        .join("\n");
+    applying.applied(&questions)?;
+    let covering = [first_answer, second_answer].map(|said| format!("conversational({said}.0)")).join("\n");
+    let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let shown =
+        [(first, "which crate"), (second, "which store")].map(|(asked, body)| format!("asked {asked}.0 \"{body}\"\n"));
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    let counts =
+        briefs.iter().map(|brief| shown.iter().map(|line| brief.matches(line).count()).collect::<Vec<usize>>());
+    assert_eq!(counts.collect::<Vec<Vec<usize>>>(), [[1, 1]]);
+    Ok(())
+}
+
+#[test]
 fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_not_redispatch_them()
 -> Result<(), Box<dyn Error>> {
     let u = Some(Script::UNCOVERING);

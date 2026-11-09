@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  segments.message,\n  segments.ordinal,\n  segments.body,\n  flailed.run AS \"run?: i64\"\nFROM\n  unplaced\n  JOIN segments ON segments.message = unplaced.message\n  AND segments.ordinal = unplaced.ordinal\n  JOIN messages ON messages.uuid = unplaced.message\n  LEFT JOIN flailed ON flailed.message = unplaced.message\n  AND flailed.ordinal = unplaced.ordinal\nORDER BY\n  messages.at,\n  segments.message,\n  segments.ordinal\n",
+  "query": "\nSELECT\n  segments.message,\n  segments.ordinal,\n  segments.body,\n  messages.session,\n  flailed.run AS \"run?: i64\"\nFROM\n  unplaced\n  JOIN segments ON segments.message = unplaced.message\n  AND segments.ordinal = unplaced.ordinal\n  JOIN messages ON messages.uuid = unplaced.message\n  LEFT JOIN flailed ON flailed.message = unplaced.message\n  AND flailed.ordinal = unplaced.ordinal\nORDER BY\n  messages.at,\n  segments.message,\n  segments.ordinal\n",
   "describe": {
     "columns": [
       {
@@ -37,8 +37,19 @@
         }
       },
       {
-        "name": "run?: i64",
+        "name": "session",
         "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "session"
+          }
+        }
+      },
+      {
+        "name": "run?: i64",
+        "ordinal": 4,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -55,8 +66,9 @@
       false,
       false,
       false,
+      false,
       true
     ]
   },
-  "hash": "92bac29caf1f4131e374601f271f420ab75869d50cb63c06761daa8b85778de3"
+  "hash": "eaeea0b912a0aab98b53cd0d6c81c4ed35976cc971cdee43ce1485fb28bcc4c4"
 }

@@ -2,6 +2,7 @@
 
 mod artifact;
 mod artifact_kind;
+mod basis;
 mod casting;
 mod confidence;
 mod ending;
@@ -38,6 +39,7 @@ mod transition;
 
 pub use artifact::{Artifact, Unspecified};
 pub use artifact_kind::ArtifactKind;
+pub use basis::Basis;
 pub use casting::Casting;
 pub use confidence::Confidence;
 pub use ending::Ending;

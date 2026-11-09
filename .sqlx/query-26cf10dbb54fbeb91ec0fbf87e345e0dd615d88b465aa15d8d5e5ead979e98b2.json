@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  id,\n  project,\n  facet,\n  stage,\n  provenance,\n  title,\n  role,\n  role_provenance,\n  artifact,\n  condition,\n  reason\nFROM\n  nodes\nWHERE\n  id = ?1\n",
+  "query": "\nSELECT\n  nodes.id,\n  nodes.project,\n  nodes.facet,\n  nodes.stage,\n  staged_nodes.basis AS \"basis!: String\",\n  nodes.provenance,\n  nodes.title,\n  nodes.role,\n  nodes.role_provenance,\n  nodes.artifact,\n  nodes.condition,\n  nodes.reason\nFROM\n  nodes\n  JOIN staged_nodes ON staged_nodes.id = nodes.id\nWHERE\n  nodes.id = ?1\n",
   "describe": {
     "columns": [
       {
@@ -48,8 +48,14 @@
         }
       },
       {
-        "name": "provenance",
+        "name": "basis!: String",
         "ordinal": 4,
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "name": "provenance",
+        "ordinal": 5,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -60,7 +66,7 @@
       },
       {
         "name": "title",
-        "ordinal": 5,
+        "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -71,7 +77,7 @@
       },
       {
         "name": "role",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +88,7 @@
       },
       {
         "name": "role_provenance",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +99,7 @@
       },
       {
         "name": "artifact",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -104,7 +110,7 @@
       },
       {
         "name": "condition",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -115,7 +121,7 @@
       },
       {
         "name": "reason",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -134,6 +140,7 @@
       false,
       false,
       false,
+      false,
       true,
       false,
       false,
@@ -142,5 +149,5 @@
       true
     ]
   },
-  "hash": "e10f80d1b6fe0c288fb2b91578dbeabcb10fe96e6b8a0f5ea515204328ea040a"
+  "hash": "26cf10dbb54fbeb91ec0fbf87e345e0dd615d88b465aa15d8d5e5ead979e98b2"
 }

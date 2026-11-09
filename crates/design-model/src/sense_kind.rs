@@ -9,6 +9,8 @@ pub enum SenseKind {
     Opinion,
     #[name("question")]
     Question,
+    #[name("ask")]
+    Ask,
     #[name("instruction")]
     Instruction,
     #[name("control")]

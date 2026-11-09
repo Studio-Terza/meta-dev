@@ -1,18 +1,19 @@
+use std::collections::BTreeSet;
 use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_store::{
-    Account, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted,
-    LiveRuns, NextJob, NextRun, OpenJobs, Remit, Retold, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun,
-    Unplaced, Unstructured,
+    Account, Asked, AskedEarlier, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened,
+    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Remit, Retold, RunEnded, RunSpawned, RunState, RunsOf,
+    Spawned, StoredRun, Unplaced, Unstructured,
 };
 use dispatch_ports::{
     AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
 };
 use port_core::Held;
-use store_ports::Store;
+use store_ports::{Store, StoreFailure};
 use structurer::{Attempt, Lapse, Reading, Said, SegmentRef};
-use transcript_ports::Body;
+use transcript_ports::{Body, SessionId};
 
 use super::Printed;
 use super::apply::{Application, Parsed};
@@ -150,10 +151,15 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
     fn job(&self, chunk: &[Unplaced], sequel: Sequel, earlier: &[Worked]) -> Result<Worked, Failure> {
         let id = self.store.read(NextJob)?;
         let context = self.store.read(ContextNodes)?;
-        let said = chunk.iter().map(|unplaced| {
-            Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)), AsRef::<Body>::as_ref(unplaced).clone())
-        });
-        let job = structurer::Job::new(said.collect(), context);
+        let sessions = chunk.iter().map(AsRef::<SessionId>::as_ref).collect::<BTreeSet<&SessionId>>();
+        let firsts = sessions
+            .iter()
+            .filter_map(|session| chunk.iter().find(|unplaced| AsRef::<SessionId>::as_ref(unplaced) == *session));
+        let asked = firsts
+            .map(|first| self.store.read(AskedEarlier::from(AsRef::<Segment>::as_ref(first))))
+            .collect::<Result<Vec<Vec<Asked>>, StoreFailure>>()?
+            .concat();
+        let job = structurer::Job::new(Structure::<S, D, C>::said(chunk), Structure::<S, D, C>::said(&asked), context);
         let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
         let remit = Remit::job(id, segments.clone());
         self.store.write(JobOpened::from(id))?;
@@ -171,6 +177,17 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let ran = runs.iter().map(|ran| Line::Ran(Attempted::new(ran.identity(), id, ran.state(), ran.usage())));
         let lines = retried.chain(closing).chain(ran).collect();
         Ok(Worked { job: id, sequel, halt, lines })
+    }
+}
+
+impl<S: Store, D: Dispatch, C: Clock> Structure<'_, S, D, C> {
+    fn said<Spoken: AsRef<Segment> + AsRef<Body>>(spoken: &[Spoken]) -> Vec<Said> {
+        spoken
+            .iter()
+            .map(|spoken| {
+                Said::new(SegmentRef::from(AsRef::<Segment>::as_ref(spoken)), AsRef::<Body>::as_ref(spoken).clone())
+            })
+            .collect()
     }
 }
 
