@@ -14,14 +14,14 @@ use laws::proptest::prelude::{any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
-use strum::VariantArray;
+use newtype::Enumerated;
 
 struct Names;
 
 impl Names {
     fn unparsed<Named>(name: impl Fn(Named) -> &'static str) -> Vec<Named>
     where
-        Named: VariantArray + Copy + FromStr + PartialEq,
+        Named: Enumerated + Copy + FromStr + PartialEq,
     {
         Named::VARIANTS
             .iter()
@@ -32,7 +32,7 @@ impl Names {
 
     fn undisplayed<Named>(name: impl Fn(Named) -> &'static str) -> Vec<Named>
     where
-        Named: VariantArray + Copy + Display,
+        Named: Enumerated + Copy + Display,
     {
         Named::VARIANTS.iter().copied().filter(|variant| variant.to_string() != name(*variant)).collect()
     }

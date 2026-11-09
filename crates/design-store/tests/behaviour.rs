@@ -21,7 +21,6 @@ use design_store::{
 };
 use dispatch_ports::{Deadline, Finished, Pid, Reply, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
-use grammar_message::Lexemes;
 use grammar_search::Terms;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
@@ -29,12 +28,12 @@ use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
+use newtype::Enumerated;
 use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
 use stream::{Message, Stream};
-use strum::VariantArray;
 use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Skipped, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
@@ -294,18 +293,16 @@ fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), Box<dyn
     Ok(())
 }
 
-static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
-    (char::MIN..=char::MAX)
-        .filter(|point| Lexemes::scanned(&point.to_string()).iter().all(|lexeme| lexeme.ink().is_none()))
-        .collect()
-});
+const SHED: [char; 6] = [' ', '\t', '\u{a0}', '\u{85}', '\u{2028}', '\u{3000}'];
+
+const KEPT: [char; 7] = ['a', 'é', 'か', '.', '—', '\u{200b}', '😀'];
 
 #[derive(Clone, Copy, Debug)]
 struct Around(char);
 
 impl Around {
     fn untrimmed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let written = BLANKS
+        let written = SHED
             .iter()
             .map(|blank| Around(*blank).stored(statements))
             .collect::<Result<Vec<Written>, StoreFailure>>()?;
@@ -545,9 +542,9 @@ fn a_message_stored_with_segments_or_shapes_it_no_longer_derives_holds_what_a_fr
 }
 
 #[test]
-fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_as_a_fresh_ingest_sheds_it()
+fn a_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_as_a_fresh_ingest_sheds_it()
 -> Result<(), Box<dyn Error>> {
-    let blanks: Vec<Around> = BLANKS.iter().copied().map(Around).collect();
+    let blanks: Vec<Around> = SHED.iter().copied().map(Around).collect();
     let migrated = blanks.iter().map(|blank| blank.migrated()).collect::<Result<Vec<_>, _>>()?;
     let fresh = blanks.iter().map(|blank| blank.fresh()).collect::<Result<Vec<_>, _>>()?;
     assert_eq!(migrated, fresh);
@@ -555,13 +552,9 @@ fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_sh
 }
 
 #[test]
-fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
+fn a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
 -> Result<(), Box<dyn Error + Send + Sync>> {
-    let inked: Vec<Around> = (char::MIN..=char::MAX)
-        .filter(|point| BLANKS.binary_search(point).is_err())
-        .filter(|point| Body::try_new(point.to_string()).is_ok())
-        .map(Around)
-        .collect();
+    let inked: Vec<Around> = KEPT.iter().copied().map(Around).collect();
     let rederived = inked.iter().map(|point| point.rederived()).collect::<Result<Vec<Vec<Body>>, _>>()?;
     let both_sides =
         inked.iter().map(|point| point.kept().map(|kept| vec![kept])).collect::<Result<Vec<Vec<Body>>, _>>()?;

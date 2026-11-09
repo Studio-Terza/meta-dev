@@ -296,7 +296,6 @@ dependencies = [
  "store-ports",
  "stream",
  "structurer",
- "strum",
  "text-lines",
  "thiserror",
  "transcript-ports",
@@ -315,10 +314,10 @@ dependencies = [
  "file-ports",
  "grammar-slug",
  "laws",
+ "newtype",
  "serde_json",
  "sqlite-ports",
  "structurer",
- "strum",
  "text-lines",
 ]
 
@@ -337,7 +336,6 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
- "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -351,7 +349,6 @@ dependencies = [
  "dispatch-ports",
  "exit",
  "file-ports",
- "grammar-message",
  "grammar-notes",
  "grammar-search",
  "laws",
@@ -362,7 +359,6 @@ dependencies = [
  "sqlite-ports",
  "store-ports",
  "stream",
- "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -2824,7 +2820,6 @@ dependencies = [
  "named-derive",
  "newtype",
  "port-core",
- "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -2852,7 +2847,6 @@ dependencies = [
  "laws",
  "named-derive",
  "newtype",
- "strum",
  "text-lines",
  "thiserror",
  "transcript-ports",

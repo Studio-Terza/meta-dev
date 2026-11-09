@@ -21,10 +21,10 @@ sqlite-ports = { path = "../sqlite-ports" }
 design-model = { path = "../design-model" }
 e2e = { path = "../../e2e" }
 laws = { path = "../laws" }
+newtype = { path = "../newtype" }
 grammar-slug = { path = "../grammar-slug" }
 serde_json.workspace = true
 structurer = { path = "../structurer" }
-strum.workspace = true
 text-lines = { path = "../text-lines" }
 
 [lints]

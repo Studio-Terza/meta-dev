@@ -38,13 +38,13 @@ use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
 use newtype::Counter;
+use newtype::Enumerated;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
 use store_ports::{Batch, Busy, Opens, Schema, Statements, Store, StoreFailure, Written};
 use stream::{Relation, Shape};
 use structure::Staff;
 use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
-use strum::VariantArray;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
 const HOME: &str = "/home/tester";
