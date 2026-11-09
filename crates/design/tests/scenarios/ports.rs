@@ -14,6 +14,8 @@ pub struct Design {
 }
 
 impl Design {
+    pub const SUCCEEDED: Option<i32> = Some(0_i32);
+    pub const FAILED: Option<i32> = Some(1_i32);
     const SESSION: &'static str = concat!(
         "{\"type\":\"user\",\"uuid\":\"o1\",\"parentUuid\":null,\"sessionId\":\"s\",",
         "\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{\"kind\":\"human\"},\"message\":{\"content\":\"go\"}}\n"
@@ -46,12 +48,12 @@ impl Design {
     }
 
     fn saying(said: &str, agent: &str) -> io::Result<Design> {
-        let home = Home::new()?;
-        let workspace = AsRef::<Path>::as_ref(&home).join("work");
+        let empty = Home::new()?;
+        let workspace = AsRef::<Path>::as_ref(&empty).join("work");
         let slug = Letters::slugged(&workspace.to_string_lossy());
         let session = Path::new(".claude/projects").join(slug).join("s.jsonl");
         let program = Path::new("bin/claude");
-        let home = home.holding(&session, &Bytes::from(said))?.holding(program, &Bytes::from(agent))?;
+        let home = empty.holding(&session, &Bytes::from(said))?.holding(program, &Bytes::from(agent))?;
         Ok(Design { home, workspace })
     }
 
