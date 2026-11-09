@@ -1,7 +1,7 @@
 use design_model::{
     AnyNode, AnyStage, Artifact, Basis, Casting, Condition, Dropped, Ending, Entered, Entry, Facet, Kin, Node,
-    NodeEdge, NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Restager, Role, Stage, Staging,
-    Terminal, Title, Transition, Vague,
+    NodeEdge, NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal,
+    Title, Transition, Vague,
 };
 use newtype::Counter;
 use port_core::Op;
@@ -38,7 +38,6 @@ enum Root {
 pub struct Restaged {
     node: Resolved,
     transition: Transition,
-    restager: Restager,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -228,8 +227,8 @@ impl Root {
 
 impl Restaged {
     #[must_use]
-    pub fn new(node: Resolved, transition: Transition, restager: Restager) -> Restaged {
-        Restaged { node, transition, restager }
+    pub fn new(node: Resolved, transition: Transition) -> Restaged {
+        Restaged { node, transition }
     }
 }
 
@@ -355,7 +354,7 @@ impl Batch for Restaged {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         let id = self.node.0;
-        let provenance = Provenance::from(self.restager);
+        let provenance = Provenance::Lead(Entered::Stage);
         let moved = self.transition.applied(NodeRow::loaded(self.node, statements)?)?;
         let StageColumns { stage, artifact, condition, reason } = StageColumns::from(moved.stage());
         Ok(statements.written(store_ports::query!(

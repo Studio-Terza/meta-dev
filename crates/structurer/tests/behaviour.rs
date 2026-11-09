@@ -255,16 +255,13 @@ laws::law!(a_retry_briefs_the_first_briefing_and_the_lapse, (Jobs::any(), Jobs::
     prop_assert_ne!(retried, job.briefing(&Attempt::First));
 });
 
-laws::law!(a_briefing_with_asked_lines_asks_for_no_directive_on_them, (Jobs::any(), Jobs::attempt()), drawn, {
+laws::law!(a_briefing_asks_for_no_directive_on_an_asked_line, (Jobs::any(), Jobs::attempt()), drawn, {
     let (job, attempt) = drawn;
-    let briefing = job.briefing(&attempt);
-    laws::proptest::prop_assume!(briefing.asked().next().is_some());
-    let rules: Vec<String> = briefing.rules().map(|rule| rule.to_string()).collect();
-    laws::proptest::prop_assert!(!rules.is_empty());
-    laws::proptest::prop_assert!(rules.iter().all(|rule| !rule.contains("needs its own")));
-    let asked: Vec<&String> = rules.iter().filter(|rule| rule.contains("asked")).collect();
-    laws::proptest::prop_assert_eq!(asked.len(), 1);
-    laws::proptest::prop_assert!(asked.iter().all(|rule| rule.contains("link target only")));
+    let rendered = job.briefing(&attempt).to_string();
+    let asked_listed = rendered.contains("\nasked ");
+    laws::proptest::prop_assert!(!rendered.contains("needs its own"));
+    laws::proptest::prop_assert_eq!(rendered.matches("link target only").count(), 1);
+    laws::proptest::prop_assert!(!asked_listed || rendered.contains("never given a directive of its own"));
 });
 
 laws::law!(a_briefing_tells_jobs_apart, (Jobs::any(), Jobs::any()), drawn, {
