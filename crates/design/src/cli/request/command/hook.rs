@@ -5,8 +5,8 @@ use std::io::Write;
 use console_ports::Environment;
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
+use newtype::Enumerated;
 use store_ports::Store;
-use strum::VariantArray;
 
 use super::Ground;
 use super::ingest::Ingest;

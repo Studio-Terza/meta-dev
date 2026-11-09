@@ -8,8 +8,8 @@ use grammar_cited::Cited;
 use grammar_output::field::{Id, Phrase, Quoted, Word};
 use grammar_output::{Fields, Unread};
 use named_derive::Named;
+use newtype::Enumerated;
 use newtype::Wrapping;
-use strum::VariantArray;
 use text_lines::Lines;
 
 use crate::job::Listing;

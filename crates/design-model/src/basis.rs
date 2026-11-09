@@ -1,9 +1,8 @@
 use named_derive::Named;
-use strum::VariantArray;
 
 use crate::Stage;
 
-#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Basis {
     #[name("set")]
     Set,
