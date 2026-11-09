@@ -31,6 +31,13 @@ impl Place {
         }
     }
 
+    pub(super) fn returned(&self, opened: Option<Opened>, migrations: Migrations) {
+        match self {
+            Place::File(_) => drop(opened),
+            Place::Memory => opened.into_iter().for_each(|idle| Template::shared(migrations).returned(idle)),
+        }
+    }
+
     pub(super) fn locked(
         &self,
         claim: &Arc<Mutex<Claim>>,

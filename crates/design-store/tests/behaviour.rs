@@ -1637,3 +1637,26 @@ fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<d
 }
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
+
+#[test]
+fn every_store_opened_in_memory_after_others_are_dropped_starts_empty_and_indexes_afresh() -> Result<(), Box<dyn Error>>
+{
+    let run = Run::root();
+    let searched = |store: &Port<'_, Sqlite>| -> Result<usize, Box<dyn Error>> {
+        let terms = Terms::lexed(["done"]).ok_or("no terms")?;
+        Ok(store.read(SearchSegments::matching(terms, Scope::Everyone))?.len())
+    };
+    let opened: Vec<Port<'_, Sqlite>> =
+        iter::repeat_with(|| run.port(Sqlite::in_memory::<StreamSchema>())).take(4).collect();
+    opened.iter().try_for_each(|earlier| -> Result<(), Box<dyn Error>> {
+        earlier.write(earlier.read(Holding::from(Recorded::session()?.records))?)?;
+        assert_eq!(searched(earlier)?, 1);
+        Ok(())
+    })?;
+    drop(opened);
+    let later = run.port(Sqlite::in_memory::<StreamSchema>());
+    assert_eq!(searched(&later)?, 0);
+    later.write(later.read(Holding::from(Recorded::session()?.records))?)?;
+    assert_eq!(searched(&later)?, 1);
+    Ok(())
+}
