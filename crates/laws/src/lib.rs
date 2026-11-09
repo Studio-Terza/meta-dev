@@ -2,6 +2,23 @@ pub use proptest;
 
 #[macro_export]
 macro_rules! law {
+    ($(#[$meta:meta])* $name:ident, given $given:ident = $setup:expr, $strategy:expr, $value:ident, $body:block) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+            let $given = $setup;
+            let mut runner = $crate::proptest::test_runner::TestRunner::new($crate::proptest::test_runner::Config {
+                failure_persistence: None,
+                rng_seed: $crate::proptest::test_runner::RngSeed::Fixed(0),
+                ..$crate::proptest::test_runner::Config::default()
+            });
+            runner.run(&$strategy, |$value| {
+                let _: () = $body;
+                Ok(())
+            })?;
+            Ok(())
+        }
+    };
     ($(#[$meta:meta])* $name:ident, $strategy:expr, $value:ident, $body:block) => {
         $crate::proptest::proptest! {
             #![proptest_config($crate::proptest::test_runner::Config {
