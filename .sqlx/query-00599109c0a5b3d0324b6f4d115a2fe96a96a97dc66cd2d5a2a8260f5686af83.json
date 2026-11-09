@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  message,\n  ordinal,\n  shape,\n  body\nFROM\n  segments\nWHERE\n  (message, ordinal) IN (\n    SELECT\n      message,\n      ordinal\n    FROM\n      span_edges\n    UNION\n    SELECT\n      message,\n      ordinal\n    FROM\n      senses\n    UNION\n    SELECT\n      source_message,\n      source_ordinal\n    FROM\n      segment_links\n    UNION\n    SELECT\n      target_message,\n      target_ordinal\n    FROM\n      segment_links\n    UNION\n    SELECT\n      message,\n      ordinal\n    FROM\n      conversational\n    UNION\n    SELECT\n      message,\n      ordinal\n    FROM\n      flailed\n  )\nORDER BY\n  message,\n  ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "shape",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "shape"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "00599109c0a5b3d0324b6f4d115a2fe96a96a97dc66cd2d5a2a8260f5686af83"
+}

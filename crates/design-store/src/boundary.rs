@@ -44,7 +44,7 @@ pub struct MessageRow {
     body: Body,
 }
 
-#[derive(Debug, Columns)]
+#[derive(Debug, PartialEq, Columns)]
 pub struct SegmentRow {
     message: Uuid,
     ordinal: Ordinal,
@@ -248,6 +248,66 @@ ORDER BY
 "#,
             uuid: Uuid
         ))
+    }
+
+    pub(crate) fn annotated(statements: &mut Statements<'_>) -> Result<Vec<SegmentRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            SegmentRow,
+            r#"
+SELECT
+  message,
+  ordinal,
+  shape,
+  body
+FROM
+  segments
+WHERE
+  (message, ordinal) IN (
+    SELECT
+      message,
+      ordinal
+    FROM
+      span_edges
+    UNION
+    SELECT
+      message,
+      ordinal
+    FROM
+      senses
+    UNION
+    SELECT
+      source_message,
+      source_ordinal
+    FROM
+      segment_links
+    UNION
+    SELECT
+      target_message,
+      target_ordinal
+    FROM
+      segment_links
+    UNION
+    SELECT
+      message,
+      ordinal
+    FROM
+      conversational
+    UNION
+    SELECT
+      message,
+      ordinal
+    FROM
+      flailed
+  )
+ORDER BY
+  message,
+  ordinal
+"#
+        ))
+    }
+
+    pub(crate) fn segment(&self) -> Segment {
+        Segment::new(self.message.clone(), self.ordinal)
     }
 
     #[must_use]
@@ -467,6 +527,12 @@ impl From<&Message> for Rederived {
     fn from(message: &Message) -> Rederived {
         let segments = SegmentRow::within(message).into_iter().map(Replaced).collect();
         Rederived { message: message.record().uuid().clone(), segments }
+    }
+}
+
+impl Rederived {
+    pub(crate) fn rows(&self) -> impl Iterator<Item = &SegmentRow> {
+        self.segments.iter().map(|Replaced(row)| row)
     }
 }
 

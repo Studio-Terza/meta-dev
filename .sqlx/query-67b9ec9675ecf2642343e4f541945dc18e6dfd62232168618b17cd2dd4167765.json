@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  flailed (message, ordinal, run)\nVALUES\n  (?1, 0, 1)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "67b9ec9675ecf2642343e4f541945dc18e6dfd62232168618b17cd2dd4167765"
+}

@@ -8,7 +8,7 @@ use design_model::{
     Prefix, Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage,
     Standing, Title,
 };
-use design_store::{RunState, SessionCursors, ShownMessage, StreamSchema};
+use design_store::{RunState, SessionCursors, ShapeName, ShownMessage, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar::search::Term;
@@ -16,7 +16,7 @@ use laws::proptest::option;
 use laws::proptest::prelude::{any, prop_assert, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Counter, Newtype};
 use port_core::{Op, Run};
 use store_ports::{
     Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure,
@@ -154,6 +154,38 @@ impl Place {
         let store = run.port(self.opened_as::<Untouched>());
         let shown = store.read(ShownMessage::named(Uuid::new("o1".to_owned())))?.ok_or("o1 was not stored")?;
         Ok(shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect())
+    }
+
+    const REANNOTATED: &str = "the store's rewrite refuses to open it: re-deriving the stored segments would change these annotated segments: o1#0";
+
+    fn shown(&self, message: &str) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(self.opened_as::<Untouched>());
+        let shown =
+            store.read(ShownMessage::named(Uuid::new(message.to_owned())))?.ok_or("the message is not stored")?;
+        Ok(shown
+            .segments()
+            .iter()
+            .map(|segment| {
+                format!("{} {} {}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment), Body::from(segment))
+            })
+            .collect())
+    }
+
+    fn refusal(remark: Remark) -> Result<Refusal, Box<dyn Error>> {
+        let place = Place::new()?;
+        let run = Run::root();
+        let older = run.port(place.opened_as::<Older>());
+        older.write(Told::Stale)?;
+        older.write(Remarked { remark, on: Uuid::new("o1".to_owned()) })?;
+        let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
+        let refused = matches!(&refused, StoreFailure::Refused(_)).then(|| refused.to_string());
+        Ok(Refusal { remark, refused, applied: place.applied()?, stored: place.shown("o1")? })
+    }
+
+    fn refused(remark: Remark) -> Refusal {
+        let stored = vec!["0 question First point. Second point.".to_owned()];
+        Refusal { remark, refused: Some(Place::REANNOTATED.to_owned()), applied: Older::versions(), stored }
     }
 
     fn applied(&self) -> Result<BTreeSet<Version>, Box<dyn Error>> {
@@ -367,6 +399,245 @@ VALUES
     }
 }
 
+#[derive(Op, Clone, Copy, Debug)]
+enum Told {
+    Stale,
+    Current,
+}
+
+impl Batch for Told {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let context = Told::context(statements)?;
+        let told = self.segments(statements)?;
+        Ok(context.plus(told))
+    }
+}
+
+impl Told {
+    fn context(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let messages = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  messages (uuid, session, parent, at, author, body)
+VALUES
+  (
+    'o1',
+    's',
+    NULL,
+    '2026-01-01T00:00:00Z',
+    'owner',
+    'First point. Second point.'
+  ),
+  (
+    'o2',
+    's',
+    NULL,
+    '2026-01-01T00:00:01Z',
+    'owner',
+    'Only one.'
+  )
+"#
+        ))?;
+        let segment = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  ('o2', 0, 'sentence', 'Only one.')
+"#
+        ))?;
+        Ok(messages.plus(segment))
+    }
+
+    fn segments(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        match self {
+            Told::Stale => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  (
+    'o1',
+    0,
+    'question',
+    'First point. Second point.'
+  )
+"#
+            )),
+            Told::Current => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  segments (message, ordinal, shape, body)
+VALUES
+  ('o1', 0, 'sentence', 'First point.'),
+  ('o1', 1, 'sentence', 'Second point.')
+"#
+            )),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, VariantArray)]
+enum Remark {
+    Conversational,
+    Sense,
+    SpanEdge,
+    LinkFrom,
+    LinkTo,
+    Flailed,
+}
+
+#[derive(Debug, PartialEq)]
+struct Refusal {
+    remark: Remark,
+    refused: Option<String>,
+    applied: BTreeSet<Version>,
+    stored: Vec<String>,
+}
+
+#[derive(Op, Clone, Debug)]
+struct Remarked {
+    remark: Remark,
+    on: Uuid,
+}
+
+impl Batch for Remarked {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        self.remark.written(&self.on, statements)
+    }
+}
+
+impl Remark {
+    fn written(self, on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        match self {
+            Remark::Conversational => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  conversational (message, ordinal, provenance)
+VALUES
+  (?1, 0, 'init')
+"#,
+                on: Uuid
+            )),
+            Remark::Sense => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  senses (
+    message,
+    ordinal,
+    kind,
+    specificity,
+    confidence,
+    explicitness,
+    provenance
+  )
+VALUES
+  (
+    ?1,
+    0,
+    'question',
+    'general',
+    'firm',
+    'explicit',
+    'init'
+  )
+"#,
+                on: Uuid
+            )),
+            Remark::SpanEdge => Remarked::spanned(on, statements),
+            Remark::LinkFrom => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  segment_links (
+    source_message,
+    source_ordinal,
+    relation,
+    target_message,
+    target_ordinal,
+    provenance
+  )
+VALUES
+  (?1, 0, 'answers', 'o2', 0, 'init')
+"#,
+                on: Uuid
+            )),
+            Remark::LinkTo => statements.written(store_ports::query!(
+                r#"
+INSERT INTO
+  segment_links (
+    source_message,
+    source_ordinal,
+    relation,
+    target_message,
+    target_ordinal,
+    provenance
+  )
+VALUES
+  ('o2', 0, 'answers', ?1, 0, 'init')
+"#,
+                on: Uuid
+            )),
+            Remark::Flailed => Remarked::flailed(on, statements),
+        }
+    }
+}
+
+impl Remarked {
+    fn spanned(on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let node = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  nodes (id, project, facet, stage, provenance)
+VALUES
+  (1, 'p', 'problem', 'vague', 'init')
+"#
+        ))?;
+        let edge = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  span_edges (message, ordinal, relation, node, provenance)
+VALUES
+  (?1, 0, 'decides', 1, 'init')
+"#,
+            on: Uuid
+        ))?;
+        Ok(node.plus(edge))
+    }
+
+    fn flailed(on: &Uuid, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let job = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  jobs (id)
+VALUES
+  (1)
+"#
+        ))?;
+        let ran = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  runs (id, job, pid, deadline, state)
+VALUES
+  (1, 1, 1, 1, 'replied')
+"#
+        ))?;
+        let flailed = statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  flailed (message, ordinal, run)
+VALUES
+  (?1, 0, 1)
+"#,
+            on: Uuid
+        ))?;
+        Ok(job.plus(ran).plus(flailed))
+    }
+}
+
 #[test]
 fn a_store_opens_lazily_and_creates_its_directory_on_the_first_op() -> Result<(), Box<dyn Error>> {
     let place = Place::new()?;
@@ -454,9 +725,48 @@ fn a_rederivation_that_would_drop_an_annotated_segment_refuses_and_leaves_the_st
     let run = Run::root();
     run.port(place.opened_as::<Older>()).write(Annotated)?;
     let refused = run.port(place.opened()).read(Applied).err().ok_or("the open was not refused")?;
-    assert!(refused.to_string().contains("FOREIGN KEY constraint failed"));
+    assert!(matches!(&refused, StoreFailure::Refused(_)));
+    assert_eq!(
+        refused.to_string(),
+        "the store's rewrite refuses to open it: re-deriving the stored segments would change these annotated segments: o1#1"
+    );
     assert_eq!(place.applied()?, Older::versions());
     assert_eq!(place.bodies()?, ["kept forever", "gone"]);
+    Ok(())
+}
+
+#[test]
+fn a_rederivation_that_would_change_any_annotated_segment_refuses_naming_it_and_leaves_the_store_as_it_was()
+-> Result<(), Box<dyn Error>> {
+    let refusals = Remark::VARIANTS.iter().map(|remark| Place::refusal(*remark)).collect::<Result<Vec<_>, _>>()?;
+    let refused: Vec<Refusal> = Remark::VARIANTS.iter().map(|remark| Place::refused(*remark)).collect();
+    assert_eq!(refusals, refused);
+    Ok(())
+}
+
+#[test]
+fn a_rederivation_rewrites_a_changed_segment_that_carries_no_annotation() -> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    let older = run.port(place.opened_as::<Older>());
+    older.write(Told::Stale)?;
+    older.write(Remarked { remark: Remark::Conversational, on: Uuid::new("o2".to_owned()) })?;
+    assert_eq!(run.port(place.opened()).read(Applied)?.len(), StreamSchema::migrator().iter().count());
+    assert_eq!(place.shown("o1")?, ["0 sentence First point.", "1 sentence Second point."]);
+    assert_eq!(place.shown("o2")?, ["0 sentence Only one."]);
+    Ok(())
+}
+
+#[test]
+fn a_rederivation_opens_a_store_whose_annotated_segments_it_does_not_change() -> Result<(), Box<dyn Error>> {
+    let place = Place::new()?;
+    let run = Run::root();
+    let older = run.port(place.opened_as::<Older>());
+    older.write(Told::Current)?;
+    let remarks = Remark::VARIANTS.iter().map(|remark| Remarked { remark: *remark, on: Uuid::new("o1".to_owned()) });
+    remarks.map(|remarked| older.write(remarked)).collect::<Result<Vec<Written>, StoreFailure>>()?;
+    assert_eq!(run.port(place.opened()).read(Applied)?.len(), StreamSchema::migrator().iter().count());
+    assert_eq!(place.shown("o1")?, ["0 sentence First point.", "1 sentence Second point."]);
     Ok(())
 }
 

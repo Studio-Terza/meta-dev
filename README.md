@@ -216,8 +216,10 @@ into segments and sheds blanks, is never restated in SQL: `Resegmented`, due wit
 every message's segments through the same segmenter ingest runs, rewriting each segment's shape and body and adding and
 removing segments, so an old store holds the segments a fresh ingest of the same transcript would. Migration
 20261108000012 keeps the search index in step with every update and delete of a segment. A segment the design
-annotates is never dropped this way: a re-derivation that would drop one refuses the open, and the store is left as it
-was.
+annotates (with a sense, a span edge, a segment link, a conversational mark or a flailed run) is never rewritten or
+dropped this way: a re-derivation that would change the shape or body of one, or drop it, refuses the open with
+`StoreFailure::Refused`, naming every such segment as `message#ordinal`, and the store is left as it was. Segments
+without an annotation are still re-derived.
 
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
