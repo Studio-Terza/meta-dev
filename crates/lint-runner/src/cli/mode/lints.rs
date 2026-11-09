@@ -63,7 +63,7 @@ use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
 use super::Survey;
-use crate::cli::boundary::{Helper, Helpers, Locator, Rendered, Slot, Worked, Workers};
+use crate::cli::boundary::{Helper, Helpers, Locator, Rendered, Slot, Surveyed, Worked, Workers};
 use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
 use crate::cli::{Outcome, Sources, Verdict};
 
@@ -84,15 +84,14 @@ impl Crew<'_> {
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
-        let timer = sources.wired().timer();
         let mine = Lints::worked(readout.done(), sources);
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
         self.locator.joined();
-        let survey = Stopwatch::measured(timer, Step::Survey, || Survey::measured(readout.done().files()));
-        let first = sources.earlier().chain([readout.timing(), survey.timing()]);
+        let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()));
+        let surveyed = Surveyed::from(&worked);
         let outcome = Lints::gathered(readout.done(), sources.located().done().as_ref().err(), worked);
-        outcome.surveyed(&[format_args!("{}{table}", survey.done())], out, err)
+        outcome.surveyed(&[format_args!("{surveyed}{table}")], out, err)
     }
 }
 
@@ -198,7 +197,7 @@ impl Lints {
             .into_iter()
             .enumerate()
             .map(|(index, entry)| entry.job(Slot::from(index)))
-            .chain([Job::MODEL])
+            .chain([Job::MODEL, Job::SURVEY])
             .collect();
         jobs.sort_by_key(Job::rank);
         sources.queue().claimed(&jobs).map(|job| job.done(readout, sources)).collect()
@@ -217,6 +216,7 @@ enum Work {
     Modelled(Query),
     Described(Workspaced),
     Model,
+    Survey,
 }
 
 impl Entry {
@@ -240,6 +240,16 @@ impl Work {
             Work::Modelled(query) => sources.model(readout).map(query).into_iter().collect(),
             Work::Described(described) => Self::described(described, readout, sources),
             Work::Model => sources.model(readout).map(|_| Vec::new()).unwrap_or_default(),
+            Work::Survey => Vec::new(),
+        }
+    }
+
+    fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+        match self {
+            Work::Survey => Worked::surveying(&Survey::measured(readout.files())),
+            Work::Checked(_) | Work::Modelled(_) | Work::Described(_) | Work::Model => {
+                Worked::rendering(slot, self.reported(readout, sources))
+            }
         }
     }
 
@@ -255,7 +265,8 @@ impl Work {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Rank {
-    First,
+    Model,
+    Survey,
     Early(Reverse<Slot>),
     Late(Slot),
 }
@@ -269,10 +280,12 @@ struct Job {
 
 impl Job {
     const MODEL: Job = Job { slot: Slot::NONE, step: Step::Model, work: Work::Model };
+    const SURVEY: Job = Job { slot: Slot::NONE, step: Step::Survey, work: Work::Survey };
 
     fn rank(&self) -> Rank {
         match self.work {
-            Work::Model => Rank::First,
+            Work::Model => Rank::Model,
+            Work::Survey => Rank::Survey,
             Work::Checked(_) => Rank::Early(Reverse(self.slot)),
             Work::Modelled(_) | Work::Described(_) => Rank::Late(self.slot),
         }
@@ -280,12 +293,7 @@ impl Job {
 
     fn done(self, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         let stopwatch = Stopwatch::started(sources.wired().timer());
-        let rendered = self
-            .work
-            .reported(readout, sources)
-            .into_iter()
-            .filter_map(|report| Rendered::dirty(self.slot, report))
-            .collect();
-        Worked::new(rendered, vec![stopwatch.stopped(self.step)])
+        let worked = self.work.worked(self.slot, readout, sources);
+        [worked, Worked::timed(stopwatch.stopped(self.step))].into_iter().collect()
     }
 }

@@ -51,15 +51,24 @@ impl fmt::Display for Rendered {
 pub(crate) struct Worked {
     rendered: Vec<Rendered>,
     timings: Vec<Timing>,
+    surveyed: Vec<String>,
 }
 
+#[derive(Debug)]
+pub(crate) struct Surveyed(Vec<String>);
+
 impl Worked {
-    pub(crate) fn new(rendered: Vec<Rendered>, timings: Vec<Timing>) -> Worked {
-        Worked { rendered, timings }
+    pub(crate) fn rendering(slot: Slot, reports: Vec<Report<'_>>) -> Worked {
+        let rendered = reports.into_iter().filter_map(|report| Rendered::dirty(slot, report)).collect();
+        Worked { rendered, ..Worked::default() }
+    }
+
+    pub(crate) fn surveying(survey: &impl fmt::Display) -> Worked {
+        Worked { surveyed: vec![survey.to_string()], ..Worked::default() }
     }
 
     pub(crate) fn timed(timing: Timing) -> Worked {
-        Worked { rendered: Vec::new(), timings: vec![timing] }
+        Worked { timings: vec![timing], ..Worked::default() }
     }
 
     pub(crate) fn timings(&self) -> &[Timing] {
@@ -76,8 +85,21 @@ impl FromIterator<Worked> for Worked {
         parts.into_iter().fold(Worked::default(), |mut whole, part| {
             whole.rendered.extend(part.rendered);
             whole.timings.extend(part.timings);
+            whole.surveyed.extend(part.surveyed);
             whole
         })
+    }
+}
+
+impl From<&Worked> for Surveyed {
+    fn from(worked: &Worked) -> Surveyed {
+        Surveyed(worked.surveyed.clone())
+    }
+}
+
+impl fmt::Display for Surveyed {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|survey| formatter.write_str(survey))
     }
 }
 
