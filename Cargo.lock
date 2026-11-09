@@ -145,6 +145,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "gate-limits",
+ "grammar",
  "laws",
  "mutation-report",
  "newtype",
@@ -2581,6 +2582,7 @@ dependencies = [
 name = "text-lines"
 version = "0.1.0"
 dependencies = [
+ "grammar",
  "laws",
  "proptest",
  "serde",

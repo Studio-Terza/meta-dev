@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nDELETE FROM\n  failures\nWHERE\n  job = ?1\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "307efb053502b67218b861ef13dd6eed838ad595a32df943de2950d73ce9c1be"
+}

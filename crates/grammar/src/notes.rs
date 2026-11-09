@@ -1,6 +1,5 @@
 mod boundary;
 mod cite;
-mod clock;
 mod date;
 mod layout;
 mod quote;
@@ -10,7 +9,6 @@ use named_derive::Named;
 
 pub use boundary::{Entry, Line, Notes, Reading};
 pub use cite::Cite;
-use clock::Clock;
 pub use date::Date;
 use layout::Layout;
 pub use quote::Quote;

@@ -4,7 +4,7 @@ use std::iter;
 
 use logos::Logos;
 
-use super::{Cite, Clock, Date, Ending, Layout, Quote, Unclosed};
+use super::{Cite, Date, Ending, Layout, Quote, Unclosed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
@@ -14,22 +14,6 @@ enum Row {
     Text,
     #[token("\n")]
     Break,
-}
-
-#[derive(Logos, Clone, Debug, PartialEq, Eq)]
-enum Stamp {
-    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", |lex| Date::new(lex.slice().to_owned()))]
-    Day(Date),
-    #[regex(r"[Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?", |lex| Clock::new(lex.slice().to_owned()))]
-    Clock(Clock),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Stamping {
-    Started,
-    Dated(Date),
-    Timed(Date, Clock),
-    Unstamped,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,11 +40,13 @@ enum Lexeme {
     #[token("**", |_| Marker::Emphasis)]
     #[token("_", |_| Marker::Emphasis)]
     #[token("__", |_| Marker::Emphasis)]
-    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?)?", |_| Marker::Date)]
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", |_| Marker::Date)]
     #[token(":", |_| Marker::Colon)]
     #[regex(r"\[[ xX]\]", |_| Marker::Task)]
     #[regex(r"[ \t]+", |_| Marker::Space)]
     Marker(Marker),
+    #[regex(r"[Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?")]
+    Clock,
     #[token("RULING")]
     Ruling,
     #[token("LEAD")]
@@ -114,7 +100,7 @@ enum Piece {
     Quoted(Quote),
     Unclosed(Unclosed),
     Cited(Cite),
-    Dated(Date, Clock),
+    Dated(Date),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -293,7 +279,8 @@ impl Opening {
 
 impl Kind {
     fn opened(lexed: &[Lexed<'_>]) -> Kind {
-        lexed.iter().find_map(|lexed| lexed.kind()).unwrap_or(Kind::Remark)
+        let before = iter::once(None).chain(lexed.iter().map(|lexed| lexed.lexeme));
+        lexed.iter().zip(before).find_map(|(lexed, before)| lexed.kind_after(before)).unwrap_or(Kind::Remark)
     }
 
     fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
@@ -333,6 +320,7 @@ impl Lexeme {
             | Lexeme::Close
             | Lexeme::Double
             | Lexeme::Cite
+            | Lexeme::Clock
             | Lexeme::Word
             | Lexeme::Possessive => Some(Kind::Remark),
         }
@@ -340,8 +328,10 @@ impl Lexeme {
 }
 
 impl<'text> Lexed<'text> {
-    fn kind(self) -> Option<Kind> {
-        self.lexeme.map_or(Some(Kind::Remark), Lexeme::kind)
+    fn kind_after(self, before: Option<Lexeme>) -> Option<Kind> {
+        let dated = before.filter(|before| *before == Lexeme::Marker(Marker::Date));
+        let stamped = dated.and(self.lexeme.filter(|lexeme| *lexeme == Lexeme::Clock));
+        stamped.map_or_else(|| self.lexeme.map_or(Some(Kind::Remark), Lexeme::kind), |_clock| None)
     }
 
     fn opening(self) -> Opening {
@@ -355,6 +345,7 @@ impl<'text> Lexed<'text> {
                 | Lexeme::Close
                 | Lexeme::Double
                 | Lexeme::Cite
+                | Lexeme::Clock
                 | Lexeme::Word
                 | Lexeme::Possessive,
             )
@@ -365,7 +356,7 @@ impl<'text> Lexed<'text> {
     fn taken<'lexed>(self, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         match self.lexeme {
             Some(Lexeme::Double) => Step::quoted(rest),
-            Some(Lexeme::Marker(Marker::Date)) => Step::dated(self, rest),
+            Some(Lexeme::Marker(Marker::Date)) => Step::after(Piece::Dated(Date::new(self.text.to_owned())), rest),
             Some(
                 Lexeme::Hash
                 | Lexeme::Marker(
@@ -382,6 +373,7 @@ impl<'text> Lexed<'text> {
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Cite
+                | Lexeme::Clock
                 | Lexeme::Word
                 | Lexeme::Possessive,
             )
@@ -405,10 +397,6 @@ impl<'lexed, 'text> Step<'lexed, 'text> {
         Step { piece, cursor: Cursor { rest } }
     }
 
-    fn dated(lexed: Lexed<'text>, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
-        Step::after(Stamp::lexer(lexed.text).fold(Stamping::Started, Stamping::took).piece(lexed), rest)
-    }
-
     fn quoted(rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         let closed = rest
             .iter()
@@ -426,42 +414,6 @@ impl Pieces {
     fn parsed(lexed: &[Lexed<'_>]) -> Pieces {
         let start = Cursor { rest: lexed };
         Pieces(iter::successors(start.step(), |step| step.cursor.step()).map(|step| step.piece).collect())
-    }
-}
-
-impl Stamp {
-    fn day(self) -> Option<Date> {
-        match self {
-            Stamp::Day(day) => Some(day),
-            Stamp::Clock(_) => None,
-        }
-    }
-
-    fn clock(self) -> Option<Clock> {
-        match self {
-            Stamp::Clock(clock) => Some(clock),
-            Stamp::Day(_) => None,
-        }
-    }
-}
-
-impl Stamping {
-    fn took(self, stamp: Result<Stamp, ()>) -> Stamping {
-        match self {
-            Stamping::Started => stamp.ok().and_then(Stamp::day).map_or(Stamping::Unstamped, Stamping::Dated),
-            Stamping::Dated(day) => {
-                stamp.ok().and_then(Stamp::clock).map_or(Stamping::Unstamped, |clock| Stamping::Timed(day, clock))
-            }
-            Stamping::Timed(..) | Stamping::Unstamped => Stamping::Unstamped,
-        }
-    }
-
-    fn piece(self, lexed: Lexed<'_>) -> Piece {
-        match self {
-            Stamping::Dated(day) => Piece::Dated(day, Clock::new(String::new())),
-            Stamping::Timed(day, clock) => Piece::Dated(day, clock),
-            Stamping::Started | Stamping::Unstamped => Piece::Text(lexed.text.to_owned()),
-        }
     }
 }
 
@@ -486,6 +438,7 @@ impl Piece {
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Double
+                | Lexeme::Clock
                 | Lexeme::Word
                 | Lexeme::Possessive,
             )
@@ -510,7 +463,7 @@ impl Piece {
 
     fn date(&self) -> Option<&Date> {
         match self {
-            Piece::Dated(date, _clock) => Some(date),
+            Piece::Dated(date) => Some(date),
             Piece::Text(_) | Piece::Quoted(_) | Piece::Unclosed(_) | Piece::Cited(_) => None,
         }
     }
@@ -568,7 +521,7 @@ impl fmt::Display for Piece {
             Piece::Quoted(quote) => write!(formatter, "\"{quote}\""),
             Piece::Cited(cite) => write!(formatter, "{cite}"),
             Piece::Unclosed(_) => formatter.write_str("\""),
-            Piece::Dated(date, clock) => write!(formatter, "{date}{clock}"),
+            Piece::Dated(date) => write!(formatter, "{date}"),
         }
     }
 }

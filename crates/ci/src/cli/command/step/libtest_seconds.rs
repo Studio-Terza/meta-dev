@@ -39,8 +39,13 @@ impl Step for LibtestSeconds {
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let text = self.output.read(ports.files())?;
-        let results: Vec<Finished> =
-            Lines::from(text.as_ref()).filter_map(|line| line.parse::<Finished>().ok()).collect();
+        let results: Vec<Finished> = text
+            .as_ref()
+            .parse::<Lines>()
+            .into_iter()
+            .flatten()
+            .filter_map(|line| line.parse::<Finished>().ok())
+            .collect();
         let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
         results
             .first()
