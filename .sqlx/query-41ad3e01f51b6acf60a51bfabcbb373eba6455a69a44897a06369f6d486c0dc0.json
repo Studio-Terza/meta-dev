@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  messages (uuid, session, parent, at, author, body)\nVALUES\n  (\n    'o1',\n    's',\n    NULL,\n    '2026-01-01T00:00:00Z',\n    'owner',\n    'First point. Second point.'\n  ),\n  (\n    'o2',\n    's',\n    NULL,\n    '2026-01-01T00:00:01Z',\n    'owner',\n    'Only one.'\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "41ad3e01f51b6acf60a51bfabcbb373eba6455a69a44897a06369f6d486c0dc0"
+}

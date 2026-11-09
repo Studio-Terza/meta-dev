@@ -153,6 +153,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
@@ -195,6 +196,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
@@ -235,6 +237,7 @@ impl Viewing {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }

@@ -1,3 +1,4 @@
+mod migrations;
 mod opened;
 mod place;
 
@@ -7,12 +8,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use port_core::Pass;
-use sqlx::migrate::Migrator;
 
 use crate::store::{StoreFiller, store_ops};
 use crate::store_lock::Claim;
 use crate::store_lock::StoreLock;
 use crate::{Batch, Busy, Query, Schema, StoreFailure, Written};
+use migrations::Migrations;
 use opened::Opened;
 use place::Place;
 
@@ -24,7 +25,7 @@ pub struct Sqlite {
 #[derive(Debug)]
 struct Shared {
     place: Place,
-    migrator: &'static Migrator,
+    migrations: Migrations,
     opened: Mutex<Option<Opened>>,
     claim: Arc<Mutex<Claim>>,
 }
@@ -32,16 +33,16 @@ struct Shared {
 impl Sqlite {
     #[must_use]
     pub fn file<S: Schema>(path: PathBuf) -> Sqlite {
-        Sqlite::placed(Place::File(path), S::migrator())
+        Sqlite::placed(Place::File(path), Migrations::declared::<S>())
     }
 
     #[must_use]
     pub fn in_memory<S: Schema>() -> Sqlite {
-        Sqlite::placed(Place::Memory, S::migrator())
+        Sqlite::placed(Place::Memory, Migrations::declared::<S>())
     }
 
-    fn placed(place: Place, migrator: &'static Migrator) -> Sqlite {
-        let shared = Shared { place, migrator, opened: Mutex::default(), claim: Arc::default() };
+    fn placed(place: Place, migrations: Migrations) -> Sqlite {
+        let shared = Shared { place, migrations, opened: Mutex::default(), claim: Arc::default() };
         Sqlite { shared: Arc::new(shared) }
     }
 }
@@ -53,7 +54,7 @@ impl Shared {
         body: impl FnOnce(&mut Opened) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
         let mut slot = self.opened.lock().unwrap_or_else(PoisonError::into_inner);
-        let opened = slot.take().map_or_else(|| self.place.opened(prepare, self.migrator), Ok)?;
+        let opened = slot.take().map_or_else(|| self.place.opened(prepare, self.migrations), Ok)?;
         body(slot.insert(opened))
     }
 }

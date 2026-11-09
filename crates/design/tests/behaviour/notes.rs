@@ -127,6 +127,7 @@ impl Noting {
             | Line::Message { .. }
             | Line::Segment { .. }
             | Line::Link { .. }
+            | Line::Refused(_)
             | Line::Annotated { .. }
             | Line::Applied(_)
             | Line::Proposed { .. }
