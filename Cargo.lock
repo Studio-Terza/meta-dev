@@ -146,7 +146,12 @@ dependencies = [
  "console-ports",
  "file-ports",
  "gate-limits",
- "grammar",
+ "grammar-assignment",
+ "grammar-shard",
+ "grammar-spec-line",
+ "grammar-test-summary",
+ "grammar-timing-page",
+ "grammar-unit-label",
  "laws",
  "mutation-report",
  "newtype",
@@ -286,7 +291,12 @@ dependencies = [
  "exit",
  "file-ports",
  "golden",
- "grammar",
+ "grammar-cited",
+ "grammar-flag",
+ "grammar-notes",
+ "grammar-output",
+ "grammar-search",
+ "grammar-slug",
  "laws",
  "local-config",
  "named-derive",
@@ -307,7 +317,12 @@ dependencies = [
 name = "design-model"
 version = "0.1.0"
 dependencies = [
- "grammar",
+ "grammar-artifact",
+ "grammar-line",
+ "grammar-node",
+ "grammar-notes",
+ "grammar-project",
+ "grammar-provenance",
  "laws",
  "named-derive",
  "newtype",
@@ -327,7 +342,9 @@ dependencies = [
  "dispatch-ports",
  "exit",
  "file-ports",
- "grammar",
+ "grammar-message",
+ "grammar-notes",
+ "grammar-search",
  "laws",
  "named-derive",
  "newtype",
@@ -365,7 +382,8 @@ dependencies = [
 name = "dispatch-ports"
 version = "0.1.0"
 dependencies = [
- "grammar",
+ "grammar-lstart",
+ "grammar-reply",
  "laws",
  "named-derive",
  "newtype",
@@ -657,10 +675,242 @@ dependencies = [
 name = "grammar"
 version = "0.1.0"
 dependencies = [
- "laws",
  "logos",
+]
+
+[[package]]
+name = "grammar-anchor"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-artifact"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-assignment"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+ "newtype",
+]
+
+[[package]]
+name = "grammar-banner"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+ "newtype",
+]
+
+[[package]]
+name = "grammar-cited"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+]
+
+[[package]]
+name = "grammar-directive"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-cited",
+ "newtype",
+]
+
+[[package]]
+name = "grammar-flag"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-ident"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-line"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-lines"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-lstart"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-message"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+ "newtype",
+]
+
+[[package]]
+name = "grammar-node"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-notes"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
  "named-derive",
  "newtype",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-output"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-cited",
+ "grammar-search",
+ "laws",
+ "newtype",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-program"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+ "newtype",
+]
+
+[[package]]
+name = "grammar-project"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+]
+
+[[package]]
+name = "grammar-provenance"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+]
+
+[[package]]
+name = "grammar-reply"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-search"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+ "newtype",
+]
+
+[[package]]
+name = "grammar-shard"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+]
+
+[[package]]
+name = "grammar-slug"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-spec-line"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
+ "newtype",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-test-summary"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-timing-page"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-unit-label"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+ "named-derive",
+ "newtype",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-unspelled"
+version = "0.1.0"
+dependencies = [
  "thiserror",
 ]
 
@@ -1381,6 +1631,7 @@ dependencies = [
  "lint-effect-sites",
  "lint-file",
  "lint-layout",
+ "lint-paths",
  "lint-placement",
  "proc-macro2",
  "quote",
@@ -1753,7 +2004,7 @@ name = "lint-workflow-run"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "grammar",
+ "grammar-program",
  "lint-core",
  "lint-layout",
  "newtype",
@@ -2002,7 +2253,7 @@ dependencies = [
 name = "port-derive"
 version = "0.1.0"
 dependencies = [
- "grammar",
+ "grammar-ident",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2502,7 +2753,7 @@ dependencies = [
  "design-store",
  "dispatch-ports",
  "file-ports",
- "grammar",
+ "grammar-search",
  "laws",
  "newtype",
  "port-core",
@@ -2530,7 +2781,8 @@ name = "stream"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "grammar",
+ "grammar-anchor",
+ "grammar-message",
  "laws",
  "named-derive",
  "newtype",
@@ -2557,7 +2809,9 @@ version = "0.1.0"
 dependencies = [
  "design-model",
  "dispatch-ports",
- "grammar",
+ "grammar-cited",
+ "grammar-directive",
+ "grammar-output",
  "laws",
  "named-derive",
  "newtype",
@@ -2638,7 +2892,7 @@ dependencies = [
 name = "test-log"
 version = "0.1.0"
 dependencies = [
- "grammar",
+ "grammar-banner",
  "laws",
  "serde",
  "text-lines",
@@ -2648,7 +2902,7 @@ dependencies = [
 name = "text-lines"
 version = "0.1.0"
 dependencies = [
- "grammar",
+ "grammar-lines",
  "laws",
  "newtype",
  "serde_json",
@@ -2799,7 +3053,8 @@ name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "grammar",
+ "grammar-message",
+ "grammar-output",
  "laws",
  "newtype",
  "port-core",

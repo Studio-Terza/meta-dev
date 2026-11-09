@@ -1,5 +1,5 @@
 use lint_fixtures::{Lines, Located, Source, Sources, Text};
-use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, OwnedDependencies};
+use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 
 const UNIT_CRATES: &[Source] = &[
     Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub struct Store;\n")),
@@ -327,6 +327,276 @@ const SQLX_IN_MACRO: &[Source] = &[Source::new(
 const SQLX_ITSELF: &[Source] =
     &[Source::new(Located::new("crates/design/src/lib.rs"), Text::new("use store_ports::Store;\nfn sqlx() {}\n"))];
 
+const ROLE_CRATES: &[Source] = &[
+    Source::new(
+        Located::new("crates/grammar/src/lib.rs"),
+        Text::new("#![deny(clippy::wildcard_enum_match_arm)]\n\npub use logos;\n"),
+    ),
+    Source::new(
+        Located::new("crates/grammar-notes/src/lib.rs"),
+        Text::new("#![deny(clippy::wildcard_enum_match_arm)]\n\npub struct Notes;\n"),
+    ),
+    Source::new(
+        Located::new("crates/grammar-ident/src/lib.rs"),
+        Text::new("#![deny(clippy::wildcard_enum_match_arm)]\n\npub struct Words;\n"),
+    ),
+    Source::new(Located::new("crates/design-model/src/lib.rs"), Text::new("pub struct Title;\n")),
+    Source::new(Located::new("crates/port-derive/src/lib.rs"), Text::new("pub struct Declared;\n")),
+    Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub struct Store;\n")),
+    Source::new(Located::new("crates/store-ports-macros/src/lib.rs"), Text::new("pub struct Query;\n")),
+    Source::new(Located::new("crates/design-store/src/lib.rs"), Text::new("pub struct Designs;\n")),
+    Source::new(Located::new("crates/design/src/lib.rs"), Text::new("pub struct Design;\n")),
+];
+const LOGOS_PORT: Source = Source::new(
+    Located::new("crates/grammar/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"grammar\"\n\n[package.metadata.port]\nowns = [\"logos\"]\ndependents = \"lexer\"\n\n[dependencies]\nlogos = \"0.16\"\n",
+    ),
+);
+const NOTES_LEXER: Source = Source::new(
+    Located::new("crates/grammar-notes/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"grammar-notes\"\n\n[package.metadata.lexer]\nformat = \"notes\"\n\n[dependencies]\ngrammar = { path = \"../grammar\" }\nstore-ports = { path = \"../store-ports\" }\n",
+    ),
+);
+const IDENT_LEXER: Source = Source::new(
+    Located::new("crates/grammar-ident/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"grammar-ident\"\n\n[package.metadata.lexer]\nformat = \"ident\"\n\n[dependencies]\ngrammar = { path = \"../grammar\" }\n",
+    ),
+);
+const MODEL: Source = Source::new(
+    Located::new("crates/design-model/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"design-model\"\n\n[dependencies]\ngrammar = { path = \"../grammar\" }\ngrammar-notes = { path = \"../grammar-notes\" }\n",
+    ),
+);
+const DERIVE: Source = Source::new(
+    Located::new("crates/port-derive/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"port-derive\"\n\n[dependencies]\ndesign-model = { path = \"../design-model\" }\ngrammar-ident = { path = \"../grammar-ident\" }\n",
+    ),
+);
+
+macro_rules! edge {
+    ($dependency:literal) => {
+        concat!("{\"name\": \"", $dependency, "\", \"pkg\": \"", $dependency, "\", \"dep_kinds\": [{\"kind\": null}]}")
+    };
+}
+
+macro_rules! member {
+    ($name:literal, $kind:literal, $metadata:literal) => {
+        concat!(
+            "{\"id\": \"", $name, "\", \"name\": \"", $name, "\", \"manifest_path\": \"/w/crates/", $name,
+            "/Cargo.toml\", \"dependencies\": [], \"metadata\": ", $metadata, ", \"targets\": [{\"kind\": [\"", $kind, "\"], \"src_path\": \"/w/crates/", $name, "/src/lib.rs\"}]}"
+        )
+    };
+    ($name:literal, $kind:literal, $metadata:literal, $first:literal $(, $rest:literal)*) => {
+        concat!(
+            "{\"id\": \"", $name, "\", \"name\": \"", $name, "\", \"manifest_path\": \"/w/crates/", $name,
+            "/Cargo.toml\", \"dependencies\": [{\"name\": \"", $first, "\"}", $(", {\"name\": \"", $rest, "\"}",)*
+            "], \"metadata\": ", $metadata, ", \"targets\": [{\"kind\": [\"", $kind, "\"], \"src_path\": \"/w/crates/", $name, "/src/lib.rs\"}]}"
+        )
+    };
+}
+
+macro_rules! node {
+    ($name:literal) => {
+        concat!("{\"id\": \"", $name, "\", \"dependencies\": [], \"deps\": []}")
+    };
+    ($name:literal, $first:literal $(, $rest:literal)*) => {
+        concat!(
+            "{\"id\": \"", $name, "\", \"dependencies\": [\"", $first, "\"", $(", \"", $rest, "\"",)* "], \"deps\": [",
+            edge!($first), $(", ", edge!($rest),)* "]}"
+        )
+    };
+}
+
+macro_rules! roles {
+    ($notes:expr, $ident:literal, $model:expr, $derive:expr) => {
+        Text::new(concat!(
+            "{\"workspace_root\": \"/w\", \"workspace_members\": [\"grammar\", \"grammar-notes\", \"grammar-ident\", \"design-model\", \"port-derive\", \"store-ports\", \"store-ports-macros\", \"design-store\", \"design\"], \"packages\": [",
+            member!("grammar", "lib", "{\"port\": {\"owns\": [\"logos\"], \"dependents\": \"lexer\"}}", "logos"), ", ",
+            member!("grammar-notes", "lib", "{\"lexer\": {\"format\": \"notes\"}}", "grammar", "store-ports"), ", ",
+            member!("grammar-ident", "lib", $ident, "grammar"), ", ",
+            member!("design-model", "lib", "null", "grammar", "grammar-notes"), ", ",
+            member!("port-derive", "proc-macro", "null", "design-model", "grammar-ident"), ", ",
+            member!("store-ports", "lib", "{\"port\": {\"owns\": [\"sqlx\"]}}", "sqlx", "store-ports-macros"), ", ",
+            member!("store-ports-macros", "proc-macro", "{\"port\": {\"owns\": [\"sqlx-macros-core\"], \"expanders\": {\"role\": \"store\", \"macros\": [\"query\", \"migrate\", \"Columns\"]}}}", "sqlx-macros-core"), ", ",
+            member!("design-store", "lib", "{\"store\": {}}", "store-ports"), ", ",
+            member!("design", "lib", "null", "store-ports", "design-store"), ", ",
+            "{\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []}, ",
+            "{\"id\": \"sqlx\", \"name\": \"sqlx\", \"manifest_path\": \"/r/sqlx/Cargo.toml\", \"dependencies\": []}, ",
+            "{\"id\": \"sqlx-macros-core\", \"name\": \"sqlx-macros-core\", \"manifest_path\": \"/r/sqlx-macros-core/Cargo.toml\", \"dependencies\": []}",
+            "], \"resolve\": {\"nodes\": [",
+            node!("grammar", "logos"), ", ",
+            $notes, ", ",
+            node!("grammar-ident", "grammar"), ", ",
+            $model, ", ",
+            $derive, ", ",
+            node!("store-ports", "sqlx", "store-ports-macros"), ", ",
+            node!("store-ports-macros", "sqlx-macros-core"), ", ",
+            node!("design-store", "store-ports"), ", ",
+            node!("design", "store-ports", "design-store"), ", ",
+            node!("logos"), ", ",
+            node!("sqlx"), ", ",
+            node!("sqlx-macros-core"),
+            "]}}"
+        ))
+    };
+}
+
+const LEXERS_IN_ROLE: Text = roles!(
+    node!("grammar-notes", "grammar"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "grammar-ident")
+);
+const MODEL_ON_PORT: Text = roles!(
+    node!("grammar-notes", "grammar"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar", "grammar-notes"),
+    node!("port-derive", "grammar-ident")
+);
+const LEXER_ON_STORE: Text = roles!(
+    node!("grammar-notes", "grammar", "store-ports"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "grammar-ident")
+);
+const SHARED_FORMAT: Text = roles!(
+    node!("grammar-notes", "grammar"),
+    "{\"lexer\": {\"format\": \"notes\"}}",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "grammar-ident")
+);
+const MACRO_THROUGH_MODEL: Text = roles!(
+    node!("grammar-notes", "grammar"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar", "grammar-notes"),
+    node!("port-derive", "design-model", "grammar-ident")
+);
+const MACRO_THROUGH_PORT: Text = roles!(
+    node!("grammar-notes", "grammar"),
+    "null",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "grammar-ident")
+);
+
+const DENIED: &str = "#![deny(clippy::wildcard_enum_match_arm)]\n\npub struct Lexed;\n";
+const UNDENIED: &str = "pub struct Lexed;\n";
+
+macro_rules! serving {
+    ($grammar:expr, $ident:expr, $unspelled:expr) => {
+        &[
+            Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new($grammar)),
+            Source::new(Located::new("crates/grammar-ident/src/lib.rs"), Text::new($ident)),
+            Source::new(Located::new("crates/grammar-unspelled/src/lib.rs"), Text::new($unspelled)),
+            Source::new(Located::new("crates/design-model/src/lib.rs"), Text::new(UNDENIED)),
+        ]
+    };
+}
+
+const ALL_DENIED: &[Source] = serving!(DENIED, DENIED, DENIED);
+const LEXER_UNDENIED: &[Source] = serving!(DENIED, UNDENIED, DENIED);
+const PORT_UNDENIED: &[Source] = serving!(UNDENIED, DENIED, DENIED);
+const HELPER_UNDENIED: &[Source] = serving!(DENIED, DENIED, UNDENIED);
+const LEXER_FORBIDDEN: &[Source] =
+    serving!(DENIED, "#![forbid(clippy::wildcard_enum_match_arm)]\n\npub struct Lexed;\n", DENIED);
+const LEXER_DENIED_IN_TESTS: &[Source] =
+    serving!(DENIED, "#![cfg_attr(test, deny(clippy::wildcard_enum_match_arm))]\n\npub struct Lexed;\n", DENIED);
+const LEXER_DENIED_OTHER: &[Source] =
+    serving!(DENIED, "#![deny(clippy::wildcard_imports)]\n\npub struct Lexed;\n", DENIED);
+const LEXER_WITHOUT_ROOT: &[Source] = &[
+    Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new(DENIED)),
+    Source::new(Located::new("crates/grammar-ident/src/words.rs"), Text::new(UNDENIED)),
+    Source::new(Located::new("crates/grammar-unspelled/src/lib.rs"), Text::new(DENIED)),
+];
+const UNSPELLED: Source = Source::new(
+    Located::new("crates/grammar-unspelled/Cargo.toml"),
+    Text::new("[package]\nname = \"grammar-unspelled\"\n"),
+);
+const MODEL_ON_LEXER: Source = Source::new(
+    Located::new("crates/design-model/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"design-model\"\n\n[dependencies]\ngrammar-ident = { path = \"../grammar-ident\" }\n",
+    ),
+);
+const SERVING_MANIFESTS: [Source; 4] = [LOGOS_PORT, IDENT_LEXER, UNSPELLED, MODEL_ON_LEXER];
+
+macro_rules! served {
+    ($model:expr) => {
+        Text::new(concat!(
+            "{\"workspace_root\": \"/w\", \"workspace_members\": [\"grammar\", \"grammar-ident\", \"grammar-unspelled\", \"design-model\"], \"packages\": [",
+            member!("grammar", "lib", "{\"port\": {\"owns\": [\"logos\"], \"dependents\": \"lexer\"}}", "logos"), ", ",
+            member!("grammar-ident", "lib", "{\"lexer\": {\"format\": \"ident\"}}", "grammar", "grammar-unspelled"), ", ",
+            member!("grammar-unspelled", "lib", "null"), ", ",
+            member!("design-model", "lib", "null", "grammar-ident", "grammar-unspelled"), ", ",
+            "{\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []}",
+            "], \"resolve\": {\"nodes\": [",
+            node!("grammar", "logos"), ", ",
+            node!("grammar-ident", "grammar", "grammar-unspelled"), ", ",
+            node!("grammar-unspelled"), ", ",
+            $model, ", ",
+            node!("logos"),
+            "]}}"
+        ))
+    };
+}
+
+const ONLY_LEXERS_ON_HELPER: Text = served!(node!("design-model", "grammar-ident"));
+const MODEL_ON_HELPER: Text = served!(node!("design-model", "grammar-ident", "grammar-unspelled"));
+
+macro_rules! expanding {
+    ($path:literal, $text:literal) => {
+        &[
+            Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub struct Store;\n")),
+            Source::new(Located::new("crates/store-ports-macros/src/lib.rs"), Text::new("pub struct Query;\n")),
+            Source::new(Located::new($path), Text::new($text)),
+        ]
+    };
+}
+
+const QUERIED: &[Source] =
+    expanding!("crates/design/src/lib.rs", "fn f() {\n    store_ports::query!(r#\"\nSELECT\n  1\n\"#);\n}\n");
+const IMPORTED_QUERY: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "use store_ports::query;\nfn f() {\n    vec![query!(r#\"\nSELECT\n  1\n\"#)];\n}\n"
+);
+const DERIVED_COLUMNS: &[Source] =
+    expanding!("crates/design/src/lib.rs", "use store_ports::Columns;\n#[derive(Debug, Columns)]\nstruct Row;\n");
+const MIGRATED: &[Source] =
+    expanding!("crates/design/src/lib.rs", "static MIGRATOR: Migrator = store_ports::migrate!();\n");
+const QUERIED_THROUGH_MACRO_CRATE: &[Source] =
+    expanding!("crates/design/src/lib.rs", "fn f() {\n    store_ports_macros::query!(r#\"\nSELECT\n  1\n\"#);\n}\n");
+const CONDITIONALLY_DERIVED: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "use store_ports::Columns;\n#[cfg_attr(all(), derive(Columns))]\nstruct Row;\n"
+);
+const NESTED_CFG_DERIVED: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "use store_ports::Columns;\n#[cfg_attr(all(), cfg_attr(any(), derive(Debug, Columns)))]\nstruct Row;\n"
+);
+const CFG_DERIVED_OTHER: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "use store_ports::Columns;\n#[cfg_attr(all(), derive(Debug))]\nstruct Row;\n"
+);
+const QUERIED_IN_TESTS: &[Source] =
+    expanding!("crates/design/tests/run.rs", "fn f() {\n    store_ports::query!(r#\"\nSELECT\n  1\n\"#);\n}\n");
+const QUERIED_IN_TEST_MODULE: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "#[cfg(test)]\nmod tests {\n    fn f() {\n        store_ports::query!(r#\"\nSELECT\n  1\n\"#);\n    }\n}\n"
+);
+const QUERIED_IN_STORE: &[Source] =
+    expanding!("crates/design-store/src/lib.rs", "fn f() {\n    store_ports::query!(r#\"\nSELECT\n  1\n\"#);\n}\n");
+const QUERIED_IN_PORT: &[Source] = &[Source::new(
+    Located::new("crates/store-ports/src/lib.rs"),
+    Text::new(
+        "fn f() {\n    crate::query!(r#\"\nSELECT\n  1\n\"#);\n    store_ports::query!(r#\"\nSELECT\n  1\n\"#);\n}\n",
+    ),
+)];
+const OTHER_QUERY: &[Source] = expanding!("crates/design/src/lib.rs", "fn f() {\n    sqlite::query!(a);\n}\n");
+
 struct Placed {
     manifests: &'static [Source],
     crates: &'static [Source],
@@ -341,7 +611,39 @@ impl Placed {
     fn flagged(&self) -> Lines {
         Sources::placed_in::<OwnedDependencies>(self.manifests, self.crates, self.workspace)
     }
+
+    fn roles(&self) -> Lines {
+        Sources::placed_in::<KeyDependencyRoles>(self.manifests, self.crates, self.workspace)
+    }
 }
+
+struct Expanding(&'static [Source]);
+
+impl Expanding {
+    fn flagged(&self) -> Lines {
+        Sources::placed_in::<KeyDependencyRoles>(&EXPANDING_MANIFESTS, self.0, LEXERS_IN_ROLE)
+    }
+}
+
+const EXPANDING_MANIFESTS: [Source; 4] = [
+    Source::new(
+        Located::new("crates/store-ports/Cargo.toml"),
+        Text::new("[package]\nname = \"store-ports\"\n\n[package.metadata.port]\nowns = [\"sqlx\"]\n"),
+    ),
+    Source::new(
+        Located::new("crates/store-ports-macros/Cargo.toml"),
+        Text::new(
+            "[package]\nname = \"store-ports-macros\"\n\n[package.metadata.port]\nowns = [\"sqlx-macros-core\"]\nexpanders = { role = \"store\", macros = [\"query\", \"migrate\", \"Columns\"] }\n",
+        ),
+    ),
+    Source::new(
+        Located::new("crates/design-store/Cargo.toml"),
+        Text::new("[package]\nname = \"design-store\"\n\n[package.metadata.store]\n"),
+    ),
+    Source::new(Located::new("crates/design/Cargo.toml"), Text::new("[package]\nname = \"design\"\n")),
+];
+
+const ROLE_MANIFESTS: [Source; 5] = [LOGOS_PORT, NOTES_LEXER, IDENT_LEXER, MODEL, DERIVE];
 
 laws::table!(
     a_crate_outside_every_owning_unit_is_flagged_where_it_depends_on_a_package_an_owned_package_reaches,
@@ -399,6 +701,69 @@ laws::table!(
     [
         Placed::new(&[ALPHA_OWNS_UNREACHED, GAMMA_ON_Y], CROSS_UNIT_CRATES, UNREACHED) => Lines::from(["crates/gamma/Cargo.toml:5", "crates/alpha/Cargo.toml:5"]),
         Placed::new(&[ALPHA_OWNS_UNREACHED], CROSS_UNIT_CRATES, STALE) => Lines::from(["crates/alpha/Cargo.toml:5"]),
+    ]
+);
+
+laws::table!(
+    a_crate_that_depends_directly_on_a_port_naming_dependents_declares_that_role,
+    Placed::roles,
+    [
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, LEXERS_IN_ROLE) => Lines::default(),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MODEL_ON_PORT) => Lines::from(["crates/design-model/Cargo.toml:5"]),
+    ]
+);
+
+laws::table!(
+    a_lexer_is_a_leaf_of_its_own_format,
+    Placed::roles,
+    [
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, LEXER_ON_STORE) => Lines::from(["crates/grammar-notes/Cargo.toml:9"]),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, SHARED_FORMAT) => Lines::from(["crates/grammar-ident/Cargo.toml:5", "crates/grammar-notes/Cargo.toml:5"]),
+    ]
+);
+
+laws::table!(
+    a_workspace_proc_macro_reaches_an_owned_package_only_through_a_crate_of_the_dependents_role,
+    Placed::roles,
+    [
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_THROUGH_MODEL) => Lines::from(["crates/design-model/Cargo.toml:5", "crates/port-derive/Cargo.toml:5"]),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_THROUGH_PORT) => Lines::from(["crates/grammar-ident/Cargo.toml:8", "crates/port-derive/Cargo.toml:6"]),
+    ]
+);
+
+laws::table!(
+    a_lexer_its_port_and_each_crate_only_they_depend_on_deny_the_lints_grammar_denied,
+    Placed::roles,
+    [
+        Placed::new(&SERVING_MANIFESTS, ALL_DENIED, ONLY_LEXERS_ON_HELPER) => Lines::default(),
+        Placed::new(&SERVING_MANIFESTS, LEXER_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, PORT_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, HELPER_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-unspelled/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, HELPER_UNDENIED, MODEL_ON_HELPER) => Lines::default(),
+        Placed::new(&SERVING_MANIFESTS, LEXER_FORBIDDEN, ONLY_LEXERS_ON_HELPER) => Lines::default(),
+        Placed::new(&SERVING_MANIFESTS, LEXER_DENIED_IN_TESTS, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, LEXER_DENIED_OTHER, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, LEXER_WITHOUT_ROOT, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/Cargo.toml:1"]),
+    ]
+);
+
+laws::table!(
+    shipped_code_outside_a_store_expands_no_store_ports_macro,
+    Expanding::flagged,
+    [
+        Expanding(QUERIED) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(IMPORTED_QUERY) => Lines::from(["crates/design/src/lib.rs:3"]),
+        Expanding(DERIVED_COLUMNS) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(MIGRATED) => Lines::from(["crates/design/src/lib.rs:1"]),
+        Expanding(QUERIED_THROUGH_MACRO_CRATE) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(CONDITIONALLY_DERIVED) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(NESTED_CFG_DERIVED) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(CFG_DERIVED_OTHER) => Lines::default(),
+        Expanding(QUERIED_IN_TESTS) => Lines::default(),
+        Expanding(QUERIED_IN_TEST_MODULE) => Lines::default(),
+        Expanding(QUERIED_IN_STORE) => Lines::default(),
+        Expanding(QUERIED_IN_PORT) => Lines::default(),
+        Expanding(OTHER_QUERY) => Lines::default(),
     ]
 );
 

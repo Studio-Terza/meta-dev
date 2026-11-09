@@ -43,7 +43,7 @@ use lint_no_plaintext::NoPlaintext;
 use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_port_batching::PortBatching;
-use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, OwnedDependencies};
+use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
@@ -102,7 +102,7 @@ type Query = for<'model> fn(&'model Model) -> Report<'model>;
 type Workspaced = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Report<'file>;
 
 impl Lints {
-    const LINTS: [Entry; 51] = [
+    const LINTS: [Entry; 52] = [
         Entry::spelled::<NoComments>(Work::Checked(|readout| vec![NoComments::report(readout.files())])),
         Entry::spelled::<NoFreeFns>(Work::Checked(|readout| vec![NoFreeFns::report(readout.files())])),
         Entry::spelled::<ThinMain>(Work::Checked(|readout| vec![ThinMain::report(readout.files())])),
@@ -138,6 +138,7 @@ impl Lints {
         Entry::spelled::<FakesAtPorts>(Work::Checked(|readout| vec![FakesAtPorts::report(readout.files())])),
         Entry::spelled::<PortBatching>(Work::Checked(|readout| vec![PortBatching::report(readout.files())])),
         Entry::spelled::<OwnedDependencies>(Work::Described(<OwnedDependencies as WorkspaceLint>::report)),
+        Entry::spelled::<KeyDependencyRoles>(Work::Described(<KeyDependencyRoles as WorkspaceLint>::report)),
         Entry::spelled::<EffectsInFillers>(Work::Checked(|readout| vec![EffectsInFillers::report(readout.files())])),
         Entry::spelled::<CountedCalls>(Work::Checked(|readout| vec![CountedCalls::report(readout.files())])),
         Entry::spelled::<HiddenSqlx>(Work::Checked(|readout| vec![HiddenSqlx::report(readout.files())])),

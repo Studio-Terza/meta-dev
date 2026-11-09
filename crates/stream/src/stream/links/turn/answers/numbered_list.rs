@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use grammar::message::Number;
+use grammar_message::Number;
 
 use crate::segment::Segment;
 

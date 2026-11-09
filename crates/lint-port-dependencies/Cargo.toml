@@ -14,6 +14,7 @@ lint-core = { path = "../lint-core" }
 lint-effect-sites = { path = "../lint-effect-sites" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
+lint-paths = { path = "../lint-paths" }
 lint-placement = { path = "../lint-placement" }
 text-lines = { path = "../text-lines" }
 workspace-metadata = { path = "../workspace-metadata" }

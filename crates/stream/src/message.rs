@@ -1,6 +1,6 @@
 mod segmenter;
 
-use grammar::message::Lexemes;
+use grammar_message::Lexemes;
 use transcript_ports::Record;
 
 use crate::segment::Segment;

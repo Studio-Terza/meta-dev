@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use grammar::anchor::Anchoring;
+use grammar_anchor::Anchoring;
 use transcript_ports::Uuid;
 
 use super::Anchor;

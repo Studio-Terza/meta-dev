@@ -1,6 +1,6 @@
 use design_model::Segment;
 use design_store::{Hit, Scope, SearchSegments};
-use grammar::search::Terms;
+use grammar_search::Terms;
 use store_ports::Store;
 
 use crate::cli::failure::Failure;

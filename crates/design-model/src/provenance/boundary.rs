@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use grammar::provenance::{Originating, Origins};
+use grammar_provenance::{Originating, Origins};
 use newtype::{Spelled, Wrapping};
 use strum::VariantArray;
 

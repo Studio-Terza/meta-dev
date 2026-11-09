@@ -23,7 +23,7 @@ pub use dependencies::Dependencies;
 pub use dependency_sites::DependencySites;
 pub use failure::Failure;
 pub use line_number::LineNumber;
-pub use manifest::{KeyLines, Manifest};
+pub use manifest::{KeyLines, Manifest, TableKey};
 pub use matching::Matching;
 pub use name::{CamelWord, Casing, Length, Lowered, Name, Prefix};
 pub use package_name::PackageName;
