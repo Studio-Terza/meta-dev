@@ -222,14 +222,18 @@ impl Sample {
         Text::owned(&scratch.read("m.toml"))
     }
 
-    fn libtest_line(output: &&str) -> Vec<String> {
+    fn measured(exit: ExitCode, lines: &[&str]) -> (ExitCode, Vec<String>) {
+        (exit, lines.iter().map(|line| (*line).to_owned()).collect())
+    }
+
+    fn libtest_line(output: &&str) -> (ExitCode, Vec<String>) {
         let scratch = Scratch::fresh();
         scratch.write("out.txt", output).ok();
-        scratch.answer(
+        let answer = scratch.answer(
             &Script::new(),
             &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")],
         );
-        Text::owned(&scratch.read("m.toml"))
+        (answer.exit, Text::owned(&scratch.read("m.toml")))
     }
 
     fn reach_report(&[base, changed]: &[&str; 2]) -> Vec<String> {
@@ -257,24 +261,27 @@ laws::table!(
     the_libtest_seconds_of_every_result_line_are_added,
     Sample::libtest_line,
     [
-        "test result: ok. 3 passed; 0 failed; finished in 0.50s\n" => vec!["test-run = 0.50"],
-        "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n" => vec!["test-run = 1.75"],
-        "running 3 tests\n...\ntest result: ok. finished in 2.00s\nfinished in 9.00s\n" => vec!["test-run = 2.00"],
-        "test result: ok. 1 passed; 0 failed\n" => vec!["test-run = 0.00"],
-        "" => Vec::<&str>::new(),
-        "no result lines here\n" => Vec::<&str>::new(),
-        "test result: ok. finished in abc\n" => vec!["test-run = 0.00"],
-        "test result: ok. finished in 3s\n" => vec!["test-run = 3.00"],
-        "test result: ok. finished in 0.5\n" => vec!["test-run = 0.50"],
-        "test result: ok. finished in 1s in 2s\n" => vec!["test-run = 3.00"],
-        "  test result: ok. finished in 9s\n" => Vec::<&str>::new(),
-        "test results: ok. finished in 4s\n" => vec!["test-run = 4.00"],
-        "test result: ok. finished in\n" => vec!["test-run = 0.00"],
-        "test result: ok. finishedin 5s\n" => vec!["test-run = 0.00"],
-        "test result: ok. in 1.5.5s\n" => vec!["test-run = 0.00"],
-        "test resul: ok. finished in 5s\n" => Vec::<&str>::new(),
-        "test result: ok. finished  in\t7s\n" => vec!["test-run = 7.00"],
-        "test result: ok. finished in 0.004s\n" => vec!["test-run = 0.00"],
+        "test result: ok. 3 passed; 0 failed; finished in 0.50s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 0.50"]),
+        "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 1.75"]),
+        "running 3 tests\n...\ntest result: ok. finished in 2.00s\nfinished in 9.00s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 2.00"]),
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 0.50"]),
+        "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 1.25"]),
+        "test result: ok. 1 passed; 0 failed\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "" => Sample::measured(ExitCode::FAILURE, &[]),
+        "no result lines here\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in abc\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in 3s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 3.00"]),
+        "test result: ok. finished in 0.5\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in 1s in 2s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "  test result: ok. finished in 9s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test results: ok. finished in 4s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished in\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finishedin 5s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. in 1.5.5s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test resul: ok. finished in 5s\n" => Sample::measured(ExitCode::FAILURE, &[]),
+        "test result: ok. finished  in\t7s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 7.00"]),
+        "test result: ok. finished in 0.004s\n" => Sample::measured(ExitCode::SUCCESS, &["test-run = 0.00"]),
+        "test result: ok. finished in 2.00s\ntest result: ok. finished in abc\n" => Sample::measured(ExitCode::FAILURE, &[]),
     ]
 );
 
@@ -388,6 +395,22 @@ fn test_output_without_a_result_line_is_a_failure_and_nothing_is_measured() -> R
         .answer(&Script::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("no libtest result line"));
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
+fn a_result_line_libtest_could_not_have_written_is_a_failure_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write(
+        "out.txt",
+        "test result: ok. 2 passed; finished in 1.00s\ntest result: ok. 1 passed; finished in soon\n",
+    )?;
+    let answer = scratch
+        .answer(&Script::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.contains("out.txt"));
+    assert!(answer.err.contains("\"test result: ok. 1 passed; finished in soon\" opens like a libtest result line"));
     assert_eq!(scratch.read("m.toml"), "");
     Ok(())
 }
@@ -726,6 +749,20 @@ fn a_unit_the_page_does_not_time_weighs_nothing_but_still_links_its_neighbours()
     ];
     assert_eq!(Text::lines(&answer.out), expected);
     assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 1.10", "graph-work = 1.10"]);
+    Ok(())
+}
+
+#[test]
+fn a_unit_label_cargo_never_writes_refuses_the_page_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+    let labels = [" app bin (check)", " (check) ", " (build)", " app \"bin\"", " build-script (check)"];
+    let refused = labels
+        .iter()
+        .map(|label| {
+            Graph::measured(&Page::with(&Page::of("app", "0.1.0", label, "1.0")), TIMINGS_METADATA)
+                .map(|graph| (graph.answer.exit, graph.answer.err.contains("no unit timings in"), graph.measured))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(refused, vec![(ExitCode::FAILURE, true, "clippy = 50.80\n".to_owned()); labels.len()]);
     Ok(())
 }
 

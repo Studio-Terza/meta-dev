@@ -20,6 +20,8 @@ pub enum Failure<'path> {
     Io { path: Cow<'path, Path>, source: io::Error },
     #[error("no libtest result line in {path}; the test output format may have changed", path = path.display())]
     NoTestResult { path: &'path Path },
+    #[error("cannot read the test output in {path}: {source}", path = path.display())]
+    MalformedTestResult { path: &'path Path, source: grammar::test_summary::Malformed },
     #[error("no unit timings in {path}; the cargo timings format may have changed", path = path.display())]
     NoTimings { path: Cow<'path, Path> },
     #[error("cannot run {program}: {source}", program = program.to_string_lossy())]

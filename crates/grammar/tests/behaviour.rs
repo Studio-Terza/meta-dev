@@ -16,7 +16,9 @@ use grammar::reply::Inked;
 use grammar::search::Term;
 use grammar::search::Terms;
 use grammar::slug::Letters;
+use grammar::test_summary::Summary;
 use grammar::timing_page::Build;
+use grammar::unit_label::{Label, Mode, Unlabeled};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{Strategy, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
@@ -918,5 +920,120 @@ laws::table!(
         "error-text Error: 1 job failed" => Build::Finished,
         "<td class=\"error\">Error:</td>" => Build::Finished,
         "" => Build::Finished,
+    ]
+);
+
+struct Labels;
+
+impl Labels {
+    fn read(text: &&str) -> Result<String, Unlabeled> {
+        text.parse::<Label>().map(|label| match label {
+            Label::Built => "built".to_owned(),
+            Label::Checked => "checked".to_owned(),
+            Label::CheckedTest => "checked test".to_owned(),
+            Label::BuildScript => "build script".to_owned(),
+            Label::BuildRun => "build run".to_owned(),
+            Label::Target(target) => format!("target{target} {}", Labels::mode(target.mode())),
+        })
+    }
+
+    fn mode(mode: Mode) -> &'static str {
+        match mode {
+            Mode::Check => "checked",
+            Mode::CheckTest => "checked as a test",
+        }
+    }
+
+    fn refused(text: &&str) -> bool {
+        text.parse::<Label>().is_err()
+    }
+}
+
+laws::table!(
+    a_unit_label_reads_as_the_role_cargo_gave_the_unit,
+    Labels::read,
+    [
+        "" => Ok("built".to_owned()),
+        " (check)" => Ok("checked".to_owned()),
+        " (check-test)" => Ok("checked test".to_owned()),
+        " build-script" => Ok("build script".to_owned()),
+        " build-script (run)" => Ok("build run".to_owned()),
+        " app \"bin\" (check)" => Ok("target app \"bin\" (check) checked".to_owned()),
+        " behaviour \"test\" (check-test)" => Ok("target behaviour \"test\" (check-test) checked as a test".to_owned()),
+        " b \"bench\" (check-test)" => Ok("target b \"bench\" (check-test) checked as a test".to_owned()),
+        " ex \"example\" (check)" => Ok("target ex \"example\" (check) checked".to_owned()),
+        " my-tool_2 \"bin\" (check-test)" => Ok("target my-tool_2 \"bin\" (check-test) checked as a test".to_owned()),
+    ]
+);
+
+laws::table!(
+    a_label_cargo_does_not_write_for_a_clippy_unit_is_refused,
+    Labels::refused,
+    [
+        "(check)" => true,
+        " (check) " => true,
+        "  (check)" => true,
+        " (run)" => true,
+        " build-script (check)" => true,
+        " app bin (check)" => true,
+        " app \"bin\"" => true,
+        " app \"lib\" (check)" => true,
+        " app \"bin\" (run)" => true,
+        " app \"bin\" (doc)" => true,
+        " (check)" => false,
+    ]
+);
+
+laws::table!(
+    a_libtest_result_line_reads_as_the_seconds_it_finished_in,
+    Summary::read,
+    [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s" => Ok(Summary::read("test result: ok. finished in 0.5s").ok().flatten()),
+        "test result: FAILED. 1 failed; finished in 2s" => Ok(Summary::read("test result: ok. finished in 2.00s").ok().flatten()),
+        "running 3 tests" => Ok(None),
+        "test foo ... ok" => Ok(None),
+        "" => Ok(None),
+        " test result: ok. finished in 1s" => Ok(None),
+    ]
+);
+
+struct Summaries;
+
+impl Summaries {
+    fn seconds(line: &&str) -> Option<f64> {
+        Summary::read(line).ok().flatten().map(Summary::seconds)
+    }
+
+    fn malformed(line: &&str) -> bool {
+        Summary::read(line).is_err()
+    }
+}
+
+laws::table!(
+    the_seconds_are_the_number_after_finished_in,
+    Summaries::seconds,
+    [
+        "test result: ok. finished in 0.50s" => Some(0.5),
+        "test result: ok. 2 passed; finished in 3s" => Some(3.0),
+        "test result: ok. finished\tin  0.004s" => Some(0.004),
+        "test result: ok. 0 filtered out; finished in 12.25s" => Some(12.25),
+    ]
+);
+
+laws::table!(
+    a_line_that_opens_like_a_result_but_does_not_read_as_one_is_malformed,
+    Summaries::malformed,
+    [
+        "test result: ok. 1 passed; 0 failed" => true,
+        "test result: ok. finished in abc" => true,
+        "test result: ok. finished in 0.5" => true,
+        "test result: ok. finished in 1s in 2s" => true,
+        "test result: ok. finishedin 5s" => true,
+        "test result: ok. in 1.5.5s" => true,
+        "test result: maybe. finished in 1s" => true,
+        "test result: ok. 3 skipped; finished in 1s" => true,
+        "test result: ok. finished in 1s " => true,
+        "test result: ok. finished in 1s" => false,
+        "test results: ok. finished in 1s" => false,
     ]
 );

@@ -7,8 +7,8 @@ use super::crates::{Crates, Origin};
 use super::manifest::Kind;
 use super::package::Package;
 use super::unit_key::UnitKey;
-pub(super) use boundary::Target;
-use text_lines::OneLine;
+pub(super) use boundary::Labeled;
+use grammar::unit_label::Target;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Role {
@@ -17,8 +17,8 @@ pub(super) enum Role {
     BuildScript,
     BuildRun,
     LibraryTest,
-    Target(OneLine),
-    TestTarget(OneLine),
+    Target(Target),
+    TestTarget(Target),
 }
 
 impl Role {

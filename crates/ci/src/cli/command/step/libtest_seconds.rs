@@ -5,6 +5,7 @@ use std::io::Write;
 use std::path::Path;
 
 use boundary::Finished;
+use grammar::test_summary::{Malformed, Summary};
 use text_lines::Lines;
 
 use super::Step;
@@ -39,13 +40,15 @@ impl Step for LibtestSeconds {
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let text = self.output.read(ports.files())?;
-        let results: Vec<Finished> = text
+        let read: Vec<Option<Summary>> = text
             .as_ref()
             .parse::<Lines>()
             .into_iter()
             .flatten()
-            .filter_map(|line| line.parse::<Finished>().ok())
-            .collect();
+            .map(|line| Summary::read(&line))
+            .collect::<Result<_, Malformed>>()
+            .map_err(|source| Failure::MalformedTestResult { path: self.output.as_ref(), source })?;
+        let results: Vec<Finished> = read.into_iter().flatten().map(Finished::from).collect();
         let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
         results
             .first()

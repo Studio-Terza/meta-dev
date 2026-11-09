@@ -19,4 +19,6 @@ pub mod reply;
 pub mod search;
 pub mod slug;
 pub mod spec_line;
+pub mod test_summary;
 pub mod timing_page;
+pub mod unit_label;
