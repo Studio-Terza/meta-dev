@@ -149,6 +149,9 @@ dependencies = [
  "grammar-assignment",
  "grammar-shard",
  "grammar-spec-line",
+ "grammar-test-summary",
+ "grammar-timing-page",
+ "grammar-unit-label",
  "laws",
  "mutation-report",
  "newtype",
@@ -873,6 +876,33 @@ dependencies = [
  "grammar",
  "grammar-unspelled",
  "laws",
+ "newtype",
+ "thiserror",
+]
+
+[[package]]
+name = "grammar-test-summary"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-timing-page"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+]
+
+[[package]]
+name = "grammar-unit-label"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
+ "named-derive",
  "newtype",
  "thiserror",
 ]

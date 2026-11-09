@@ -44,8 +44,8 @@ impl Step for LibtestSeconds {
             .parse::<Lines>()
             .into_iter()
             .flatten()
-            .filter_map(|line| line.parse::<Finished>().ok())
-            .collect();
+            .filter_map(|line| Finished::read(self.output.as_ref(), &line))
+            .collect::<Result<_, _>>()?;
         let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
         results
             .first()
