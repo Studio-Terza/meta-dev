@@ -6,7 +6,7 @@ mod roles;
 use lint_core::{Headline, Lint, Report, SourceFile, Violation, WorkspaceLint};
 use lint_effect_sites::EffectSites;
 use lint_file::FileLint;
-use workspace_metadata::{Graph, Metadata};
+use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
 use port_crate::PortCrate;
@@ -52,7 +52,7 @@ impl WorkspaceLint for KeyDependencyRoles {
         let roles = Roles::new(files, Owners::declared(files));
         Report::new(
             Headline::new(
-                "a key dependency is used only in its role: a port that names dependents is depended on only by crates declaring that role, a lexer crate is a leaf lexing one format, a crate that expands a port's macros declares the role the port names for its expanders, and a workspace proc-macro reaches an owned package only through its own unit or a crate declaring the owning port's dependents role",
+                "a key dependency is used only in its role: a port that names dependents is depended on only by crates declaring that role, a lexer crate is a leaf lexing one format, a crate that expands a port's macros declares the role the port names for its expanders, a lexer crate, the port naming lexers as dependents and every crate only they depend on deny at their crate root each lint the crate the lexers came from denied, and a workspace proc-macro reaches an owned package only through its own unit or a crate declaring the owning port's dependents role",
             ),
             [
                 roles.breached(breaches.unroled()),
@@ -60,6 +60,7 @@ impl WorkspaceLint for KeyDependencyRoles {
                 roles.breached(breaches.reformatted()),
                 roles.breached(breaches.unported()),
                 roles.unexpanded(&graph.expansions()),
+                roles.undenied(Role::Lexer, &graph.serving(Role::Lexer)),
             ]
             .concat(),
         )

@@ -328,9 +328,18 @@ const SQLX_ITSELF: &[Source] =
     &[Source::new(Located::new("crates/design/src/lib.rs"), Text::new("use store_ports::Store;\nfn sqlx() {}\n"))];
 
 const ROLE_CRATES: &[Source] = &[
-    Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new("pub use logos;\n")),
-    Source::new(Located::new("crates/grammar-notes/src/lib.rs"), Text::new("pub struct Notes;\n")),
-    Source::new(Located::new("crates/grammar-ident/src/lib.rs"), Text::new("pub struct Words;\n")),
+    Source::new(
+        Located::new("crates/grammar/src/lib.rs"),
+        Text::new("#![deny(clippy::wildcard_enum_match_arm)]\n\npub use logos;\n"),
+    ),
+    Source::new(
+        Located::new("crates/grammar-notes/src/lib.rs"),
+        Text::new("#![deny(clippy::wildcard_enum_match_arm)]\n\npub struct Notes;\n"),
+    ),
+    Source::new(
+        Located::new("crates/grammar-ident/src/lib.rs"),
+        Text::new("#![deny(clippy::wildcard_enum_match_arm)]\n\npub struct Words;\n"),
+    ),
     Source::new(Located::new("crates/design-model/src/lib.rs"), Text::new("pub struct Title;\n")),
     Source::new(Located::new("crates/port-derive/src/lib.rs"), Text::new("pub struct Declared;\n")),
     Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub struct Store;\n")),
@@ -473,6 +482,70 @@ const MACRO_THROUGH_PORT: Text = roles!(
     node!("design-model", "grammar-notes"),
     node!("port-derive", "grammar-ident")
 );
+
+const DENIED: &str = "#![deny(clippy::wildcard_enum_match_arm)]\n\npub struct Lexed;\n";
+const UNDENIED: &str = "pub struct Lexed;\n";
+
+macro_rules! serving {
+    ($grammar:expr, $ident:expr, $unspelled:expr) => {
+        &[
+            Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new($grammar)),
+            Source::new(Located::new("crates/grammar-ident/src/lib.rs"), Text::new($ident)),
+            Source::new(Located::new("crates/grammar-unspelled/src/lib.rs"), Text::new($unspelled)),
+            Source::new(Located::new("crates/design-model/src/lib.rs"), Text::new(UNDENIED)),
+        ]
+    };
+}
+
+const ALL_DENIED: &[Source] = serving!(DENIED, DENIED, DENIED);
+const LEXER_UNDENIED: &[Source] = serving!(DENIED, UNDENIED, DENIED);
+const PORT_UNDENIED: &[Source] = serving!(UNDENIED, DENIED, DENIED);
+const HELPER_UNDENIED: &[Source] = serving!(DENIED, DENIED, UNDENIED);
+const LEXER_FORBIDDEN: &[Source] =
+    serving!(DENIED, "#![forbid(clippy::wildcard_enum_match_arm)]\n\npub struct Lexed;\n", DENIED);
+const LEXER_DENIED_IN_TESTS: &[Source] =
+    serving!(DENIED, "#![cfg_attr(test, deny(clippy::wildcard_enum_match_arm))]\n\npub struct Lexed;\n", DENIED);
+const LEXER_DENIED_OTHER: &[Source] =
+    serving!(DENIED, "#![deny(clippy::wildcard_imports)]\n\npub struct Lexed;\n", DENIED);
+const LEXER_WITHOUT_ROOT: &[Source] = &[
+    Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new(DENIED)),
+    Source::new(Located::new("crates/grammar-ident/src/words.rs"), Text::new(UNDENIED)),
+    Source::new(Located::new("crates/grammar-unspelled/src/lib.rs"), Text::new(DENIED)),
+];
+const UNSPELLED: Source = Source::new(
+    Located::new("crates/grammar-unspelled/Cargo.toml"),
+    Text::new("[package]\nname = \"grammar-unspelled\"\n"),
+);
+const MODEL_ON_LEXER: Source = Source::new(
+    Located::new("crates/design-model/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"design-model\"\n\n[dependencies]\ngrammar-ident = { path = \"../grammar-ident\" }\n",
+    ),
+);
+const SERVING_MANIFESTS: [Source; 4] = [LOGOS_PORT, IDENT_LEXER, UNSPELLED, MODEL_ON_LEXER];
+
+macro_rules! served {
+    ($model:expr) => {
+        Text::new(concat!(
+            "{\"workspace_root\": \"/w\", \"workspace_members\": [\"grammar\", \"grammar-ident\", \"grammar-unspelled\", \"design-model\"], \"packages\": [",
+            member!("grammar", "lib", "{\"port\": {\"owns\": [\"logos\"], \"dependents\": \"lexer\"}}", "logos"), ", ",
+            member!("grammar-ident", "lib", "{\"lexer\": {\"format\": \"ident\"}}", "grammar", "grammar-unspelled"), ", ",
+            member!("grammar-unspelled", "lib", "null"), ", ",
+            member!("design-model", "lib", "null", "grammar-ident", "grammar-unspelled"), ", ",
+            "{\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []}",
+            "], \"resolve\": {\"nodes\": [",
+            node!("grammar", "logos"), ", ",
+            node!("grammar-ident", "grammar", "grammar-unspelled"), ", ",
+            node!("grammar-unspelled"), ", ",
+            $model, ", ",
+            node!("logos"),
+            "]}}"
+        ))
+    };
+}
+
+const ONLY_LEXERS_ON_HELPER: Text = served!(node!("design-model", "grammar-ident"));
+const MODEL_ON_HELPER: Text = served!(node!("design-model", "grammar-ident", "grammar-unspelled"));
 
 macro_rules! expanding {
     ($path:literal, $text:literal) => {
@@ -655,6 +728,22 @@ laws::table!(
     [
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_THROUGH_MODEL) => Lines::from(["crates/design-model/Cargo.toml:5", "crates/port-derive/Cargo.toml:5"]),
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_THROUGH_PORT) => Lines::from(["crates/grammar-ident/Cargo.toml:8", "crates/port-derive/Cargo.toml:6"]),
+    ]
+);
+
+laws::table!(
+    a_lexer_its_port_and_each_crate_only_they_depend_on_deny_the_lints_grammar_denied,
+    Placed::roles,
+    [
+        Placed::new(&SERVING_MANIFESTS, ALL_DENIED, ONLY_LEXERS_ON_HELPER) => Lines::default(),
+        Placed::new(&SERVING_MANIFESTS, LEXER_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, PORT_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, HELPER_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-unspelled/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, HELPER_UNDENIED, MODEL_ON_HELPER) => Lines::default(),
+        Placed::new(&SERVING_MANIFESTS, LEXER_FORBIDDEN, ONLY_LEXERS_ON_HELPER) => Lines::default(),
+        Placed::new(&SERVING_MANIFESTS, LEXER_DENIED_IN_TESTS, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, LEXER_DENIED_OTHER, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
+        Placed::new(&SERVING_MANIFESTS, LEXER_WITHOUT_ROOT, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/Cargo.toml:1"]),
     ]
 );
 

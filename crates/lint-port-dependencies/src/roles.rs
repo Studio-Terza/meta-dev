@@ -1,19 +1,22 @@
 mod breached;
 mod expanded;
+mod undenied;
 mod unexpanded;
 
 use std::borrow::Borrow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Site, SourceFile, Violation};
+use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_paths::Imports;
-use lint_placement::CrateName as PlacedName;
-use workspace_metadata::Expansion;
+use lint_placement::{CrateName as PlacedName, Role as Placed};
+use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
 use breached::{Breached, Fixed};
 use expanded::Expanded;
+use undenied::Undenied;
 use unexpanded::Unexpanded;
 
 #[derive(Debug)]
@@ -40,6 +43,34 @@ impl<'file> Roles<'file> {
                 lines.into_iter().map(move |line| Violation::new(Site::new(manifest, line), Breached::new(breach)))
             })
             .collect()
+    }
+
+    pub(crate) fn undenied(&self, role: Role, served: &[&CrateName]) -> Vec<Violation<'file>> {
+        let roots: BTreeMap<&Name, &'file SourceFile> = self
+            .files
+            .iter()
+            .filter(|file| file.placement().role() == Placed::LibraryRoot)
+            .filter_map(|file| Some((file.placement().package().root().package()?, file)))
+            .collect();
+        served.iter().filter_map(|name| self.denying(&roots, name, role)).flatten().collect()
+    }
+
+    fn denying(
+        &self,
+        roots: &BTreeMap<&Name, &'file SourceFile>,
+        name: &CrateName,
+        role: Role,
+    ) -> Option<Vec<Violation<'file>>> {
+        let (site, missing) = roots.get(&Name::from(name.as_ref())).map_or_else(
+            || {
+                Some((
+                    Site::new(self.owners.manifest(name)?.manifest_file().as_ref(), LineNumber::FIRST),
+                    Undenied::all(role),
+                ))
+            },
+            |root| Some((Site::new(root.path(), LineNumber::FIRST), Undenied::missing(role, root))),
+        )?;
+        Some(missing.into_iter().map(|undenied| Violation::new(site, undenied)).collect())
     }
 
     pub(crate) fn unexpanded(&self, expansions: &[Expansion<'file>]) -> Vec<Violation<'file>> {

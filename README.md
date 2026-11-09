@@ -215,13 +215,17 @@ dependency table, only by crates that declare `[package.metadata.lexer]`. A lexe
 with `format = "<name>"`, no two lexers lex the same format, and a lexer is a leaf: through normal edges it depends only
 on a port whose dependents are lexers, on other lexers, and on packages whose normal closure holds no package a port
 owns. A port declares who expands its macros with `expanders = { role = "store", macros = ["query", "migrate",
-"Columns"] }` (as `store-ports-macros` does), and shipped code that invokes one of those macros through the unit's port
-(`store_ports::query!`, or the name imported from `store_ports`, or `#[derive(Columns)]`) belongs to the unit or to a crate
+"Columns"] }` (as `store-ports-macros` does), and shipped code that invokes one of those macros through any crate of the
+unit (`store_ports::query!` or `store_ports_macros::query!`, or the name imported from either, or `#[derive(Columns)]`,
+also inside `cfg_attr`) belongs to the unit or to a crate
 that declares `[package.metadata.store]`, as `design-store` does; test code is skipped. A workspace proc-macro crate whose
 normal closure holds a package a port owns belongs to that port's unit, or reaches the package only through crates that
 declare the port's `dependents` role, as `port-derive` reaches `logos` only through `grammar-ident`, so a proc-macro
-never drags a heavy dependency into the host build of every crate that uses it. Each finding points at the manifest
-line of the dependency, the format, or the macro call.
+never drags a heavy dependency into the host build of every crate that uses it. Every lexer crate, the port that names
+lexers as its dependents, and every workspace crate that only those crates depend on (as `grammar-unspelled` is) starts
+its `lib.rs` with `#![deny(clippy::wildcard_enum_match_arm)]` (or `forbid`), the crate-level deny the single `grammar`
+crate carried before the lexers were split out of it; a deny under `cfg_attr` does not count. Each finding points at the
+manifest line of the dependency, the format, the macro call, or the first line of the crate root missing the deny.
 
 The store is reached through `store_ports::query!`, never through sqlx. `store_ports::query!(Row, r#"…"#, id: NodeId)` reads
 rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one`, and `store_ports::query!(r#"…"#, id: NodeId)`

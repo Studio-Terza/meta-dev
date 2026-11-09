@@ -3,6 +3,7 @@ mod claims;
 mod closure;
 mod requires;
 pub(crate) mod roles;
+mod served;
 mod stale;
 mod unit;
 
@@ -12,7 +13,7 @@ use std::iter;
 use newtype::Wrapping;
 
 use crate::crate_name::CrateName;
-use crate::metadata::{Metadata, Package};
+use crate::metadata::{Metadata, Package, PortTable};
 use crate::package_id::PackageId;
 use crate::role::Role;
 pub use bypasses::{Bypass, Bypasses, DependencyKeys};
@@ -20,6 +21,7 @@ use claims::Claims;
 use closure::Closure;
 use requires::Requires;
 use roles::{Expansion, RoleBreaches};
+use served::Served;
 pub use stale::Stale;
 use unit::Unit;
 
@@ -84,6 +86,19 @@ impl<'meta> Graph<'meta> {
     #[must_use]
     pub fn expansions(&self) -> Vec<Expansion<'meta>> {
         Expansion::found(self, &self.units())
+    }
+
+    #[must_use]
+    pub fn serving(&self, role: Role) -> Vec<&'meta CrateName> {
+        let ported = self.members.iter().copied().filter(|id| {
+            self.package(id)
+                .and_then(Package::port)
+                .and_then(PortTable::dependents)
+                .filter(|named| *named == role)
+                .is_some()
+        });
+        let named: Served<'meta> = self.declaring(role).into_iter().chain(ported).collect();
+        named.closed(self).iter().filter_map(|id| Some(self.package(id)?.name())).collect()
     }
 
     pub(super) fn declaring(&self, role: Role) -> BTreeSet<&'meta PackageId> {
