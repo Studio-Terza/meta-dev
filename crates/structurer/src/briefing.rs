@@ -74,7 +74,7 @@ enum Rule {
     )]
     Refer,
     #[name(
-        "An asked line shows a question still open from earlier in the session; it needs no directive of its own, but when a segment answers or decides it, link that segment to it as answers."
+        "An asked line shows a question still open from earlier in the session; it is a link target only and is never given a directive of its own, whether place, sense or any other: when a segment answers or decides it, link that segment to it as answers, and place and sense that segment as usual."
     )]
     Link,
     #[name(
