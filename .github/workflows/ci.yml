@@ -47,6 +47,11 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          key: ${{ github.job }}
+          cache-on-failure: true
+          save-if: ${{ github.event_name == 'push' }}
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/tools
       - name: fmt
@@ -77,6 +82,11 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          key: ${{ github.job }}
+          cache-on-failure: true
+          save-if: ${{ github.event_name == 'push' }}
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/tools
       - name: test compile
@@ -114,6 +124,11 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          key: ${{ github.job }}
+          cache-on-failure: true
+          save-if: ${{ github.event_name == 'push' }}
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/tools
       - name: lint
