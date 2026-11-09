@@ -73,11 +73,11 @@ impl Cli {
 
     fn judged(
         &self,
-        surveyed: Result<Surveyed<'_, impl Files + Sync, impl Cargo + Sync>, Refusal<'_>>,
+        described: Result<Surveyed<'_, impl Files + Sync, impl Cargo + Sync>, Refusal<'_>>,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> Verdict {
-        match surveyed {
+        match described {
             Ok(surveyed) => StackSize::LINT
                 .ran(|| self.linted(SourceFiles::staged(surveyed.ports().files(), &self.roots), surveyed, out, err))
                 .unwrap_or_else(|failure| Self::refused(&failure, err)),

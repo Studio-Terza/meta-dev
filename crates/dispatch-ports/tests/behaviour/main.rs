@@ -40,8 +40,8 @@ impl Envelope {
         Envelope::Read(Output::Finished(Finished::new(Reply::new(reply.to_owned()), usage)))
     }
 
-    fn errored(told: &str) -> Envelope {
-        told.parse::<Told>()
+    fn errored(said: &str) -> Envelope {
+        said.parse::<Told>()
             .map_or(Envelope::Unbuilt, |told| Envelope::Read(Output::Errored(Errored::new(told, Usage::default()))))
     }
 

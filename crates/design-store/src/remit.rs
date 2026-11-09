@@ -37,7 +37,7 @@ impl Remit {
 
     #[must_use]
     pub fn admitted(&self, segment: Segment) -> Option<Segment> {
-        Some(segment).filter(|segment| self.segments().is_none_or(|segments| segments.contains(segment)))
+        Some(segment).filter(|candidate| self.segments().is_none_or(|segments| segments.contains(candidate)))
     }
 
     fn covered(&self) -> Covered {

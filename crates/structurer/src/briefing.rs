@@ -211,23 +211,24 @@ impl Job {
 
 impl Briefing {
     fn examples(job: &Job) -> Vec<Directive> {
-        let segment = job.said(Listing::Segment).first().map(Said::segment);
-        let node = job.context().first().map(|outline| NodeRef::Stored(outline.node()));
-        let placed = segment.cloned().zip(node.clone()).map(|(segment, node)| Directive::Place {
+        let sample_segment = job.said(Listing::Segment).first().map(Said::segment);
+        let sample_node = job.context().first().map(|outline| NodeRef::Stored(outline.node()));
+        let placed = sample_segment.cloned().zip(sample_node.clone()).map(|(segment, node)| Directive::Place {
             segment,
             node,
             relation: SpanRelation::Mentions,
         });
         let label = Label::from(Sample::Label);
-        let proposed = node.and_then(|refines| Edge::new(label.clone(), refines).ok()).map(|edge| Directive::Propose {
-            proposal: Proposal::Labelled(edge),
-            facet: Facet::Feature,
-            title: Title::new(Sample::Title.to_string()),
-        });
-        let labelled = segment.cloned().zip(proposed).map(|(segment, proposed)| {
+        let proposing =
+            sample_node.and_then(|refines| Edge::new(label.clone(), refines).ok()).map(|edge| Directive::Propose {
+                proposal: Proposal::Labelled(edge),
+                facet: Facet::Feature,
+                title: Title::new(Sample::Title.to_string()),
+            });
+        let labelled = sample_segment.cloned().zip(proposing).map(|(segment, proposed)| {
             [proposed, Directive::Place { segment, node: NodeRef::from(label), relation: SpanRelation::Mentions }]
         });
-        let conversational = segment.cloned().map(|segment| Directive::Conversational { segment });
+        let conversational = sample_segment.cloned().map(|segment| Directive::Conversational { segment });
         placed.into_iter().chain(labelled.into_iter().flatten()).chain(conversational).collect()
     }
 

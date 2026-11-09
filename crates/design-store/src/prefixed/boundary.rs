@@ -93,12 +93,12 @@ ORDER BY
             prefixes: Listed
         ))?;
         let cited = self.0.into_iter().map(|prefix| (prefix, Vec::new())).collect();
-        Ok(rows.into_iter().fold(cited, |mut cited: BTreeMap<Prefix, Vec<Spoken>>, row| {
-            cited
+        Ok(rows.into_iter().fold(cited, |mut by_prefix: BTreeMap<Prefix, Vec<Spoken>>, row| {
+            by_prefix
                 .entry(row.prefix)
                 .or_default()
                 .push(Spoken { segment: Segment::new(row.uuid, row.ordinal), author: row.author });
-            cited
+            by_prefix
         }))
     }
 }

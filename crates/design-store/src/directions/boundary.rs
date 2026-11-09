@@ -428,23 +428,23 @@ VALUES
         Linking { source, target, relation, provenance: self.provenance }.closed(self.statements)
     }
 
-    pub(super) fn proposed(&mut self, node: &Node<Vague>, parent: NodeId) -> Result<Written, Refusal> {
+    pub(super) fn proposed(&mut self, node: &Node<Vague>, refined: NodeId) -> Result<Written, Refusal> {
         let planted = NodeRow::proposed(node, self.statements)?;
         let child = Resolved::read(node.identity(), self.statements)?;
-        let parent = Resolved::read(parent, self.statements)?;
+        let parent = Resolved::read(refined, self.statements)?;
         let linked = Linked::new(child, NodeRelation::Refines, parent, self.provenance).written(self.statements)?;
         Ok(planted.plus(linked))
     }
 
     pub(super) fn superseded(&mut self, supersession: Supersession) -> Result<Written, Refusal> {
-        let [old, by] = supersession.ends();
-        let old = Resolved::read(old, self.statements)?;
-        let by = Resolved::read(by, self.statements)?;
+        let [superseded, superseding] = supersession.ends();
+        let old = Resolved::read(superseded, self.statements)?;
+        let by = Resolved::read(superseding, self.statements)?;
         Linked::new(by, NodeRelation::Supersedes, old, self.provenance).written(self.statements)
     }
 
-    pub(super) fn cited(&mut self, node: NodeId, message: &Uuid) -> Result<Written, Refusal> {
-        let message = message.clone();
+    pub(super) fn cited(&mut self, node: NodeId, uuid: &Uuid) -> Result<Written, Refusal> {
+        let message = uuid.clone();
         let provenance = self.provenance;
         Ok(self.statements.written(store_ports::query!(
             r#"
