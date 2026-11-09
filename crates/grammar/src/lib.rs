@@ -4,6 +4,7 @@ pub mod anchor;
 pub mod artifact;
 pub mod assignment;
 pub mod banner;
+pub mod branch;
 pub mod cited;
 pub mod directive;
 pub mod flag;

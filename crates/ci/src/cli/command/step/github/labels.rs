@@ -1,3 +1,4 @@
+mod branch;
 mod change;
 mod check;
 mod fault;
@@ -13,13 +14,13 @@ use std::num::NonZeroU8;
 use std::path::Path;
 
 use super::super::Step;
-use super::super::branch::Branch;
 use super::super::changed::Changed;
 use super::super::journal::Journal;
 use super::pull_number::PullNumber;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports};
+use branch::Branch;
 use check::Check;
 use fault::Owed;
 use git::Git;

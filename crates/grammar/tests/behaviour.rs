@@ -4,6 +4,7 @@ use grammar::anchor::Anchoring;
 use grammar::artifact::Artifacts;
 use grammar::assignment::Emptied;
 use grammar::banner::Banner;
+use grammar::branch::Base;
 use grammar::cited::Cited;
 use grammar::flag::Flags;
 use grammar::ident::Words;
@@ -341,6 +342,23 @@ laws::table!(
         "\u{3000}fine" => "fine".to_owned(),
         "\u{2003}one\u{85}two\u{2029}" => "onetwo".to_owned(),
         "\u{200b}kept" => "\u{200b}kept".to_owned(),
+    ]
+);
+
+laws::table!(
+    a_base_branch_is_main_a_project_branch_or_another,
+    |name: &&str| Base::from(*name),
+    [
+        "main" => Base::Main,
+        "project/transcript-design" => Base::Project,
+        "project/x/y" => Base::Project,
+        "project/" => Base::Other,
+        "project" => Base::Other,
+        "projects/x" => Base::Other,
+        "feature/project/x" => Base::Other,
+        "maintenance" => Base::Other,
+        "main/x" => Base::Other,
+        "" => Base::Other,
     ]
 );
 

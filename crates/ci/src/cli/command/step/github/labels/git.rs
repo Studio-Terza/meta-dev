@@ -1,8 +1,8 @@
 use text_lines::Lines;
 
+use super::branch::Branch;
 use super::change::Change;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::branch::Branch;
 use crate::cli::command::step::revision::Revision;
 use crate::cli::ports::{Invocation, Ports, Text};
 

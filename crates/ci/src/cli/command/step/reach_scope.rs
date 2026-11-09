@@ -6,9 +6,9 @@ use std::io::Write;
 use std::path::Path;
 
 use file_ports::Files;
+use grammar::branch::Base;
 
 use super::Step;
-use super::branch::Branch;
 use super::changed::{Changed, Question};
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
@@ -21,13 +21,12 @@ use skipped::Skips;
 pub struct ReachScope {
     metadata: Journal,
     event: Event,
-    base: Branch,
+    base: Base,
     environment: Journal,
     summary: Journal,
 }
 
 impl ReachScope {
-    const MAIN: &'static str = "main";
     const WHOLE_WORKSPACE: &'static str = "BUILD_SCOPE=--workspace\n";
 
     fn report(&self, ports: &impl Ports) -> Result<Text, Failure<'_>> {
@@ -38,7 +37,10 @@ impl ReachScope {
     }
 
     fn question(&self) -> Question {
-        Some(self.base.as_ref()).filter(|base| *base == Self::MAIN).map_or(Question::Affected, |_| Question::Widened)
+        match self.base {
+            Base::Main | Base::Project => Question::Widened,
+            Base::Other => Question::Affected,
+        }
     }
 
     fn recorded(&self, files: &impl Files, report: &Text, out: &mut impl Write) -> Result<(), Failure<'_>> {
@@ -62,7 +64,7 @@ impl Step for ReachScope {
         Ok(ReachScope {
             metadata: Journal::file(Path::new(metadata)),
             event: Event::from(event.to_str().ok_or(Failure::Usage)?),
-            base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
+            base: Base::from(base.to_str().ok_or(Failure::Usage)?),
             environment: Journal::file(Path::new(environment)),
             summary: Journal::file(Path::new(summary)),
         })

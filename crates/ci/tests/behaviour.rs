@@ -268,6 +268,9 @@ laws::table!(
         ["feature", "crates/middle/src/lib.rs\ncrates/middle/src/other.rs\n"] => TWO_REPORT.to_vec(),
         ["feature", "README.md\n"] => EMPTY_REPORT_AND_NOTES.to_vec(),
         ["feature", ""] => EMPTY_REPORT_AND_NOTES.to_vec(),
+        ["project", "crates/leaf/src/lib.rs\n"] => LEAF_REPORT.to_vec(),
+        ["projects/x", "crates/leaf/src/lib.rs\n"] => LEAF_REPORT.to_vec(),
+        ["feature/project/x", "crates/leaf/src/lib.rs\n"] => LEAF_REPORT.to_vec(),
     ]
 );
 
@@ -277,6 +280,16 @@ laws::table!(
     [
         ["main", "crates/leaf/src/lib.rs\n"] => vec!["REACH=1 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=--test-package=leaf"],
         ["main", "README.md\n"] => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
+    ]
+);
+
+laws::table!(
+    a_pull_request_into_a_project_branch_runs_the_whole_workspace_like_one_into_main,
+    Sample::reach_report,
+    [
+        ["project/transcript-design", "crates/leaf/src/lib.rs\n"] => vec!["REACH=1 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=--test-package=leaf"],
+        ["project/x", "crates/middle/src/lib.rs\n"] => vec!["REACH=2 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=--test-package=middle --test-package=tested-through"],
+        ["project/x", "README.md\n"] => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
     ]
 );
 
