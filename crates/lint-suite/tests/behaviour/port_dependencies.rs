@@ -510,6 +510,18 @@ const QUERIED_IN_PORT: &[Source] = &[Source::new(
 )];
 const MACRO_CRATE_QUERY: &[Source] =
     expanding!("crates/design/src/lib.rs", "fn f() {\n    store_ports_macros::query!(r#\"\nSELECT\n  1\n\"#);\n}\n");
+const CFG_DERIVED: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "use store_ports::Columns;\n#[cfg_attr(all(), derive(Columns))]\nstruct Row;\n"
+);
+const NESTED_CFG_DERIVED: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "use store_ports::Columns;\n#[cfg_attr(all(), cfg_attr(any(), derive(Debug, Columns)))]\nstruct Row;\n"
+);
+const CFG_DERIVED_OTHER: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "use store_ports::Columns;\n#[cfg_attr(all(), derive(Debug))]\nstruct Row;\n"
+);
 const OTHER_QUERY: &[Source] = expanding!("crates/design/src/lib.rs", "fn f() {\n    sqlite::query!(a);\n}\n");
 
 struct Placed {
@@ -660,6 +672,9 @@ laws::table!(
         Expanding(QUERIED_IN_PORT) => Lines::default(),
         Expanding(OTHER_QUERY) => Lines::default(),
         Expanding(MACRO_CRATE_QUERY) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(CFG_DERIVED) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(NESTED_CFG_DERIVED) => Lines::from(["crates/design/src/lib.rs:2"]),
+        Expanding(CFG_DERIVED_OTHER) => Lines::default(),
     ]
 );
 

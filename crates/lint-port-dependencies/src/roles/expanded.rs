@@ -1,8 +1,7 @@
-use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{Attribute, ItemMod, Macro, Path, Token};
+use syn::{Attribute, ItemMod, Macro, Path};
 
-use lint_core::{MacroCalls, SourceFile, Walk};
+use lint_core::{AttributeMacros, MacroCalls, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, UsePath};
 use lint_paths::{Imports, Module};
 
@@ -34,14 +33,6 @@ impl<'file, 'run> Expanded<'file, 'run> {
         let inner = MacroCalls::within(invocation);
         self.met(&invocation.path).into_iter().chain(inner.iter().flat_map(|nested| self.called(nested))).collect()
     }
-
-    fn derived(attribute: &Attribute) -> Vec<Path> {
-        Some(attribute)
-            .filter(|candidate| candidate.path().is_ident("derive"))
-            .and_then(|derive| derive.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
-            .map(|paths| paths.into_iter().collect())
-            .unwrap_or_default()
-    }
 }
 
 impl<'file> Visit<'file> for Expanded<'file, '_> {
@@ -59,7 +50,8 @@ impl<'file> Visit<'file> for Expanded<'file, '_> {
     }
 
     fn visit_attribute(&mut self, attribute: &'file Attribute) {
-        let found: Vec<LineNumber> = Self::derived(attribute).iter().filter_map(|path| self.met(path)).collect();
+        let found: Vec<LineNumber> =
+            AttributeMacros::expanded(&attribute.meta).iter().filter_map(|path| self.met(path)).collect();
         self.found.extend(found);
     }
 }
