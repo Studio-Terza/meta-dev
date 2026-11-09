@@ -1,5 +1,7 @@
 mod target;
 
+use std::ffi::OsString;
+
 use serde::Deserialize;
 
 use super::super::name::{PackageId, PackageName};
@@ -14,12 +16,12 @@ pub(crate) struct Package {
 }
 
 impl Package {
-    pub(in super::super) fn id(&self) -> &PackageId {
-        &self.id
+    pub(in super::super) fn defaulted(&self, defaults: &[PackageId]) -> Option<&Package> {
+        Some(self).filter(|package| defaults.contains(&package.id))
     }
 
-    pub(in super::super) fn name(&self) -> &PackageName {
-        &self.name
+    pub(in super::super) fn named(&self, names: &[OsString]) -> Option<&Package> {
+        Some(self).filter(|package| names.iter().any(|name| name.to_str() == Some(package.name.as_ref())))
     }
 
     pub(super) fn units(&self) -> impl Iterator<Item = Unit> {

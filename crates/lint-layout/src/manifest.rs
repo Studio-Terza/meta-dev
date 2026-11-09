@@ -16,6 +16,8 @@ use crate::crate_key::CrateKey;
 use crate::dependencies::Dependencies;
 use crate::dependency_sites::DependencySites;
 use crate::failure::Failure;
+use std::ops::Not;
+
 use crate::library_tests::LibraryTests;
 use crate::name::Name;
 use crate::package_name::PackageName;
@@ -168,7 +170,9 @@ impl Manifest {
             .get(Self::LIBRARY)
             .and_then(|library| library.get(Self::TEST))
             .and_then(Value::as_bool)
-            .map_or(LibraryTests::Run, LibraryTests::from)
+            .map(Not::not)
+            .filter(|switched_off| *switched_off)
+            .map_or(LibraryTests::Run, |_| LibraryTests::SwitchedOff)
     }
 
     #[must_use]

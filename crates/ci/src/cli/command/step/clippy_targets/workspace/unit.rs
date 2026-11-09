@@ -10,11 +10,11 @@ pub(super) enum Unit {
 
 impl From<Unit> for OsString {
     fn from(unit: Unit) -> OsString {
-        OsString::from(match unit {
-            Unit::Library => "--lib",
-            Unit::Bins => "--bins",
-            Unit::Examples => "--examples",
-            Unit::Benches => "--benches",
-        })
+        match unit {
+            Unit::Library => OsString::from("--lib"),
+            Unit::Bins => OsString::from("--bins"),
+            Unit::Examples => OsString::from("--examples"),
+            Unit::Benches => OsString::from("--benches"),
+        }
     }
 }

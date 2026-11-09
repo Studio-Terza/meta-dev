@@ -1,13 +1,13 @@
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 
-use super::name::{PackageId, PackageName};
+use super::name::PackageId;
 use super::workspace::Package;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Scope {
     Default,
     Workspace,
-    Packages(Vec<PackageName>),
+    Packages(Vec<OsString>),
 }
 
 impl Scope {
@@ -22,23 +22,31 @@ impl Scope {
     ) -> Vec<&'package Package> {
         match self {
             Scope::Workspace => packages.iter().collect(),
-            Scope::Default => packages.iter().filter(|package| defaults.contains(package.id())).collect(),
-            Scope::Packages(names) => packages.iter().filter(|package| names.contains(package.name())).collect(),
+            Scope::Default => packages.iter().filter_map(|package| package.defaulted(defaults)).collect(),
+            Scope::Packages(names) => packages.iter().filter_map(|package| package.named(names)).collect(),
         }
+    }
+
+    fn packages(words: &[&OsStr]) -> Vec<OsString> {
+        words
+            .iter()
+            .zip(words.iter().skip(1))
+            .filter(|(flag, _)| Self::PACKAGE.iter().any(|package| ***flag == **package))
+            .map(|(_, name)| (*name).to_owned())
+            .collect()
+    }
+
+    fn before_end(arguments: &[OsString]) -> Vec<&OsStr> {
+        arguments.iter().map(OsString::as_os_str).take_while(|word| **word != *Self::END).collect()
     }
 }
 
 impl From<&[OsString]> for Scope {
     fn from(arguments: &[OsString]) -> Scope {
-        let words: Vec<&str> =
-            arguments.iter().map_while(|argument| argument.to_str()).take_while(|word| *word != Self::END).collect();
-        let packages: Vec<PackageName> = words
-            .iter()
-            .zip(words.iter().skip(1))
-            .filter(|(flag, _)| Self::PACKAGE.contains(flag))
-            .filter_map(|(_, name)| PackageName::try_from(*name).ok())
-            .collect();
-        let workspace = words.iter().find(|word| Self::WORKSPACE.contains(word)).map(|_| Scope::Workspace);
+        let words = Scope::before_end(arguments);
+        let packages = Scope::packages(&words);
+        let workspace =
+            words.iter().find(|word| Self::WORKSPACE.iter().any(|flag| ***word == **flag)).map(|_| Scope::Workspace);
         let named = packages.first().map(|_| Scope::Packages(packages.clone()));
         workspace.or(named).unwrap_or(Scope::Default)
     }
