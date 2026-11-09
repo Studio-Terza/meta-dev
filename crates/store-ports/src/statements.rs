@@ -59,7 +59,7 @@ impl<'run> Statements<'run> {
     {
         self.runtime
             .block_on(query.execute(&mut *self.connection))
-            .map(|done| Released::Deleted(Written::affected(&done)))
+            .map(|_done| Released::Deleted)
             .or_else(Released::refused)
     }
 

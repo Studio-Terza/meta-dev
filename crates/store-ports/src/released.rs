@@ -1,12 +1,11 @@
-use newtype::Counter;
 use sqlx::Error;
 use sqlx::error::{DatabaseError, ErrorKind};
 
-use crate::{StoreFailure, Written};
+use crate::StoreFailure;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Released {
-    Deleted(Written),
+    Deleted,
     Referenced,
 }
 
@@ -16,14 +15,5 @@ impl Released {
         (kind == Some(ErrorKind::ForeignKeyViolation))
             .then_some(Released::Referenced)
             .ok_or_else(|| StoreFailure::from(failed))
-    }
-}
-
-impl From<Released> for Written {
-    fn from(released: Released) -> Written {
-        match released {
-            Released::Deleted(written) => written,
-            Released::Referenced => Written::zero(),
-        }
     }
 }

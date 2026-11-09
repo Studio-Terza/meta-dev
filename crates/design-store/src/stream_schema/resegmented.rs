@@ -28,17 +28,14 @@ impl Resegmented {
 }
 
 impl Referenced {
-    fn refused(stale: &[SegmentRow], released: &[Released]) -> Result<Written, StoreFailure> {
+    fn refused(stale: &[SegmentRow], released: &[Released]) -> Result<(), StoreFailure> {
         let segments: Vec<Segment> = stale
             .iter()
             .zip(released)
             .filter(|(_, release)| **release == Released::Referenced)
             .map(|(row, _)| row.segment())
             .collect();
-        segments
-            .is_empty()
-            .then(|| Written::total(released.iter().copied().map(Written::from)))
-            .ok_or_else(|| StoreFailure::Refused(Box::new(Referenced { segments })))
+        segments.is_empty().then_some(()).ok_or_else(|| StoreFailure::Refused(Box::new(Referenced { segments })))
     }
 }
 
@@ -63,9 +60,9 @@ impl Batch for Resegmented {
         let stale = Resegmented::stale(&derived, SegmentRow::every(statements)?);
         let released =
             stale.iter().map(|row| row.released(statements)).collect::<Result<Vec<Released>, StoreFailure>>()?;
-        let dropped = Referenced::refused(&stale, &released)?;
+        Referenced::refused(&stale, &released)?;
         let written =
             derived.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter().chain([dropped])))
+        Ok(Written::total(written.into_iter()))
     }
 }
