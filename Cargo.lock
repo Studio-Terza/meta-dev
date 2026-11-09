@@ -622,6 +622,7 @@ dependencies = [
  "file-ports",
  "lint-runner",
  "proptest",
+ "timer-ports",
 ]
 
 [[package]]
