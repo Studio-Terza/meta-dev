@@ -32,7 +32,6 @@ exit = { path = "../exit" }
 
 [dev-dependencies]
 sqlite-ports = { path = "../sqlite-ports" }
-grammar-message = { path = "../grammar-message" }
 laws = { path = "../laws" }
 
 [lints]
