@@ -32,7 +32,7 @@ no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starte
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
 effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run, owned_dependencies,
-effects_in_fillers, counted_calls, hidden_sqlx, store_queries.
+key_dependency_roles, effects_in_fillers, counted_calls, hidden_sqlx, store_queries.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
@@ -179,10 +179,11 @@ Everywhere else a test goes through the port's in-memory fake or a library API s
 and the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
 a process in test code still also needs what `process_starters` asks for.
 
-`owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` (crate `lint-port-dependencies`) keep the
+`owned_dependencies`, `key_dependency_roles`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` (crate `lint-port-dependencies`) keep the
 port framework the only way to an effect. Ownership is declared, never guessed: a crate owns a package by naming it in
 `[package.metadata.port] owns = ["logos"]` in its `Cargo.toml` (`grammar` owns `logos`, `logos-codegen` and
-`logos-derive`; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
+`logos-derive` and only re-exports `logos`, which the `grammar-<format>` lexer crates reach as `grammar::logos` with
+`#[logos(crate = grammar::logos)]` on each derive, while the `grammar-cited` lexer's `Cited` is shared by two other lexers and `grammar-unspelled` holds the `Unspelled` refusal that every lexer's checked newtype and `FromStr` shares; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
 owns `sqlx-macros-core`). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
 proc-macro crate it depends on, so `store-ports` and `store-ports-macros` own jointly, and a proc-macro crate two ports
 depend on belongs to both units. The gate reads the dependency graph from `cargo metadata --format-version 1 --locked`,
@@ -208,14 +209,32 @@ code `#[port]` expands to is not source, so only the generated fillers count cal
 the identifier `__sqlx` anywhere in source outside `store-ports` and `store-ports-macros`: `store_ports` re-exports sqlx as
 `__sqlx` only so that the code `store_ports::query!` and `store_ports::migrate!` expand to can name it.
 
+`key_dependency_roles` keeps each key dependency in its role, so a heavy package stays out of crates that do not need
+it. A port that names `[package.metadata.port] dependents = "lexer"` (as `grammar` does) is depended on directly, in any
+dependency table, only by crates that declare `[package.metadata.lexer]`. A lexer crate declares the one format it lexes
+with `format = "<name>"`, no two lexers lex the same format, and a lexer is a leaf: through normal edges it depends only
+on a port whose dependents are lexers, on other lexers, and on packages whose normal closure holds no package a port
+owns. A port declares who expands its macros with `expanders = { role = "store", macros = ["query", "migrate",
+"Columns"] }` (as `store-ports-macros` does), and shipped code that invokes one of those macros through any crate of the
+unit (`store_ports::query!` or `store_ports_macros::query!`, or the name imported from either, or `#[derive(Columns)]`,
+also inside `cfg_attr`) belongs to the unit or to a crate
+that declares `[package.metadata.store]`, as `design-store` does; test code is skipped. A workspace proc-macro crate whose
+normal closure holds a package a port owns belongs to that port's unit, or reaches the package only through crates that
+declare the port's `dependents` role, as `port-derive` reaches `logos` only through `grammar-ident`, so a proc-macro
+never drags a heavy dependency into the host build of every crate that uses it. Every lexer crate, the port that names
+lexers as its dependents, and every workspace crate that only those crates depend on (as `grammar-unspelled` is) starts
+its `lib.rs` with `#![deny(clippy::wildcard_enum_match_arm)]` (or `forbid`), the crate-level deny the single `grammar`
+crate carried before the lexers were split out of it; a deny under `cfg_attr` does not count. Each finding points at the
+manifest line of the dependency, the format, the macro call, or the first line of the crate root missing the deny.
+
 The store is reached through `store_ports::query!`, never through sqlx. `store_ports::query!(Row, r#"…"#, id: NodeId)` reads
 rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one`, and `store_ports::query!(r#"…"#, id: NodeId)`
 writes for `Statements::written`; sqlx checks the SQL against the schema as its own `query!` does. Every bound argument and
 every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
 `FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
-back through `newtype::Guarded`, so a stored value its check refuses fails the read; grammar's `Bare` and
-`Quoted` output fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
+back through `newtype::Guarded`, so a stored value its check refuses fails the read; `grammar-output`'s `Bare`
+and `Quoted` fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
 
 A store's schema is a `store_ports::Schema`: its SQL migrations, and the typed Rust rewrites, each a `Batch` due when
 the migration of a given version is pending. Opening a store applies every pending migration and then every due rewrite,

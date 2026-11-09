@@ -8,6 +8,7 @@ publish.workspace = true
 [package.metadata.port]
 owns = ["logos", "logos-codegen", "logos-derive"]
 shared = ["proc-macro2", "quote", "syn"]
+dependents = "lexer"
 
 [lib]
 test = false
@@ -15,12 +16,6 @@ doctest = false
 
 [dependencies]
 logos.workspace = true
-named-derive = { path = "../named-derive" }
-newtype = { path = "../newtype" }
-thiserror.workspace = true
-
-[dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

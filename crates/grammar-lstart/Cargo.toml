@@ -1,0 +1,22 @@
+[package]
+name = "grammar-lstart"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.lexer]
+format = "lstart"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

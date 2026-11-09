@@ -8,7 +8,7 @@ use design_store::{
     UnplacedSegments,
 };
 use file_ports::Files;
-use grammar::notes::{self, Notes};
+use grammar_notes::{self as notes, Notes};
 use named_derive::Named;
 use newtype::Wrapping;
 use store_ports::Store;

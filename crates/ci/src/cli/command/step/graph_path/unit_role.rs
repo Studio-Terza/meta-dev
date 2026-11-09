@@ -7,7 +7,7 @@ use super::crates::{Crates, Origin};
 use super::manifest::Kind;
 use super::package::Package;
 use super::unit_key::UnitKey;
-use grammar::unit_label::Target;
+use grammar_unit_label::Target;
 use serde::Deserialize;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]

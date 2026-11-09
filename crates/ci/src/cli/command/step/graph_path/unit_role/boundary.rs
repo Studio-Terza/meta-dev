@@ -1,4 +1,4 @@
-use grammar::unit_label::{Fixed, Mode, Target, Unit};
+use grammar_unit_label::{Fixed, Mode, Target, Unit};
 
 use super::UnitRole;
 

@@ -5,7 +5,7 @@ mod turn;
 
 use std::collections::BTreeSet;
 
-use grammar::message::Lexemes;
+use grammar_message::Lexemes;
 use transcript_ports::{Authorship, Skipped, Uuid};
 
 use crate::anchor::Anchor;

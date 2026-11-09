@@ -1,5 +1,5 @@
 use design_model::{Project, Provenance, Title};
-use grammar::notes::Ending;
+use grammar_notes::Ending;
 use store_ports::{Columns, Query, Statements, StoreFailure};
 
 use super::{ImportedEnding, ImportedNotes, Noted};

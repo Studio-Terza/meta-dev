@@ -22,7 +22,7 @@ use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports};
 use file_ports::Text;
-use grammar::timing_page::Build;
+use grammar_timing_page::Build;
 use host::Host;
 use partial_timings::PartialTimings;
 use timed_unit::TimedUnit;

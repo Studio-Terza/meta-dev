@@ -20,7 +20,7 @@ use console_ports::Environment;
 use design_store::Scope;
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
-use grammar::search::Terms;
+use grammar_search::Terms;
 use store_ports::{Sqlite, Store};
 
 use super::persistence::Persistence;

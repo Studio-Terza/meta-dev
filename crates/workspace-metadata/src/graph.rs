@@ -2,6 +2,8 @@ mod bypasses;
 mod claims;
 mod closure;
 mod requires;
+pub(crate) mod roles;
+mod served;
 mod stale;
 mod unit;
 
@@ -11,12 +13,15 @@ use std::iter;
 use newtype::Wrapping;
 
 use crate::crate_name::CrateName;
-use crate::metadata::{Metadata, Package};
+use crate::metadata::{Metadata, Package, PortTable};
 use crate::package_id::PackageId;
+use crate::role::Role;
 pub use bypasses::{Bypass, Bypasses, DependencyKeys};
 use claims::Claims;
 use closure::Closure;
 use requires::Requires;
+use roles::{Expansion, RoleBreaches};
+use served::Served;
 pub use stale::Stale;
 use unit::Unit;
 
@@ -26,6 +31,7 @@ pub struct Graph<'meta> {
     named: BTreeMap<&'meta CrateName, BTreeSet<&'meta PackageId>>,
     members: BTreeSet<&'meta PackageId>,
     requires: Requires<'meta>,
+    normal: Requires<'meta>,
 }
 
 impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
@@ -39,6 +45,7 @@ impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
             );
             graph.members.extend(metadata.members());
             graph.requires.extend(metadata.nodes());
+            graph.normal.joined(Requires::normal(metadata.nodes()));
             graph
         })
     }
@@ -69,6 +76,41 @@ impl<'meta> Graph<'meta> {
                 })
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn role_breaches(&self) -> RoleBreaches<'meta> {
+        RoleBreaches::found(self, &self.units())
+    }
+
+    #[must_use]
+    pub fn expansions(&self) -> Vec<Expansion<'meta>> {
+        Expansion::found(self, &self.units())
+    }
+
+    #[must_use]
+    pub fn serving(&self, role: Role) -> Vec<&'meta CrateName> {
+        let ported = self.members.iter().copied().filter(|id| {
+            self.package(id).and_then(Package::port).and_then(PortTable::dependents).is_some_and(|named| named == role)
+        });
+        let named: Served<'meta> = self.declaring(role).into_iter().chain(ported).collect();
+        named.closed(self).iter().filter_map(|id| Some(self.package(id)?.name())).collect()
+    }
+
+    pub(super) fn declaring(&self, role: Role) -> BTreeSet<&'meta PackageId> {
+        self.members
+            .iter()
+            .copied()
+            .filter(|id| self.package(id).and_then(|package| package.declares(role)).is_some())
+            .collect()
+    }
+
+    pub(super) fn normal_reach(
+        &self,
+        start: &'meta PackageId,
+        avoided: &BTreeSet<&'meta PackageId>,
+    ) -> BTreeSet<&'meta PackageId> {
+        Closure::avoiding(&self.normal, BTreeSet::from([start]), avoided).into_inner()
     }
 
     #[must_use]

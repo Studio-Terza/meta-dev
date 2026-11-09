@@ -1,4 +1,4 @@
-use grammar::output::Fields;
+use grammar_output::Fields;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]

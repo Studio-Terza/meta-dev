@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use grammar::test_summary::Summary;
+use grammar_test_summary::Summary;
 use text_lines::LossyText;
 
 use crate::cli::command::failure::Failure;
