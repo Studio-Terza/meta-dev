@@ -27,12 +27,13 @@ impl Artifacts {
     #[must_use]
     pub fn spelled(text: &str) -> Option<Spelled<'_>> {
         let mut head = Head::lexer(text);
-        let kind = head.next().filter(|lexed| *lexed == Ok(Head::Kind)).map(|_kind| head.slice());
+        let head_kind = head.next().filter(|lexed| *lexed == Ok(Head::Kind)).map(|_kind| head.slice());
         let colon = head.next().filter(|lexed| *lexed == Ok(Head::Colon));
         let mut tail = head.morph::<Tail>();
-        let name = tail.next().filter(|lexed| *lexed == Ok(Tail::Name)).map(|_name| tail.slice());
+        let tail_name = tail.next().filter(|lexed| *lexed == Ok(Tail::Name)).map(|_name| tail.slice());
         let rest: Vec<Result<Tail, ()>> = tail.collect();
-        kind.zip(name)
+        head_kind
+            .zip(tail_name)
             .zip(colon)
             .filter(|_spelled| rest.is_empty())
             .map(|((kind, name), _colon)| Spelled { kind, name })

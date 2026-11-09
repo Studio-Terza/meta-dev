@@ -69,8 +69,8 @@ impl Spec {
     fn read(lexed: &[Lexed]) -> Spec {
         let only = <&[Lexed; 1]>::try_from(lexed).ok();
         Spec {
-            value: lexed.iter().map(|lexed| lexed.text.as_str()).collect(),
-            attachment: only.and_then(|[only]| only.attachment()),
+            value: lexed.iter().map(|piece| piece.text.as_str()).collect(),
+            attachment: only.and_then(|[single]| single.attachment()),
         }
     }
 
@@ -86,12 +86,12 @@ impl Lexed {
     }
 
     fn spoken(lexed: &[Lexed]) -> &[Lexed] {
-        let last = lexed.iter().rposition(|lexed| lexed.piece.spoken().is_some());
-        lexed.get(..last.map_or(0, |last| last + 1)).unwrap_or_default()
+        let last = lexed.iter().rposition(|candidate| candidate.piece.spoken().is_some());
+        lexed.get(..last.map_or(0, |at| at + 1)).unwrap_or_default()
     }
 
     fn next(pieces: &mut Lexer<'_, Piece>) -> Option<Result<Lexed, ()>> {
-        pieces.next().map(|piece| piece.map(|piece| Lexed { piece, text: pieces.slice().to_owned() }))
+        pieces.next().map(|lexing| lexing.map(|piece| Lexed { piece, text: pieces.slice().to_owned() }))
     }
 }
 
@@ -103,7 +103,7 @@ impl FromStr for Line {
         let opening = head.next().and_then(Result::ok);
         let mut pieces = head.morph::<Piece>();
         let lexed = iter::from_fn(|| Lexed::next(&mut pieces)).collect::<Result<Vec<Lexed>, ()>>();
-        opening.zip(lexed.ok()).and_then(|(opening, lexed)| opening.line(Lexed::spoken(&lexed))).ok_or(Unspecified)
+        opening.zip(lexed.ok()).and_then(|(opened, read)| opened.line(Lexed::spoken(&read))).ok_or(Unspecified)
     }
 }
 

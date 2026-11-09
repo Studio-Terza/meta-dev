@@ -241,11 +241,12 @@ impl Tails {
 }
 
 laws::law!(read_from_agrees_between_disk_and_memory, 0u64..16, at, {
-    let scratch = tempfile::tempdir().map_err(|_| laws::proptest::test_runner::TestCaseError::fail("no scratch"))?;
+    let scratch =
+        tempfile::tempdir().map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
     let memory = Memory::default();
     memory
         .create_directories(Path::new("/scratch"))
-        .map_err(|_| laws::proptest::test_runner::TestCaseError::fail("no memory"))?;
+        .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
     let on_disk = Tails::of(&Disk, scratch.path(), Offset::new(at));
     let in_memory = Tails::of(&memory, Path::new("/scratch"), Offset::new(at));
     laws::proptest::prop_assert_eq!(on_disk.ok(), in_memory.ok());

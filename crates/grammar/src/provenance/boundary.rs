@@ -53,8 +53,8 @@ impl Spelling {
 
     fn originated<Origin: Originating>(self, origin: Origin) -> Option<Origin::Output> {
         match self {
-            Spelling::Agent(run) => run.map(|run| origin.agent(run)),
-            Spelling::Import(line) => line.map(|line| origin.import(line)),
+            Spelling::Agent(run) => run.map(|id| origin.agent(id)),
+            Spelling::Import(line) => line.map(|number| origin.import(number)),
         }
     }
 }

@@ -107,7 +107,7 @@ impl Fields {
             .spanned()
             .map(|(lexeme, range)| {
                 let slice = text.get(range).unwrap_or_default().to_owned();
-                lexeme.map(|lexeme| Token::from((lexeme, slice.clone()))).map_err(|()| Stray(slice))
+                lexeme.map(|known| Token::from((known, slice.clone()))).map_err(|()| Stray(slice))
             })
             .collect::<Result<Vec<Token>, Stray>>()?;
         Ok(Fields(tokens.into_iter().peekable()))

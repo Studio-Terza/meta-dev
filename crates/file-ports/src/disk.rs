@@ -1,5 +1,6 @@
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{self, Write};
+use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 
 use newtype::Wrapping;
@@ -19,10 +20,11 @@ impl Files for Disk {
     }
 
     fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
-        let mut file = File::open(path)?;
-        file.seek(SeekFrom::Start(offset.into_inner()))?;
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
+        let file = File::open(path)?;
+        let start = offset.into_inner();
+        let remaining = usize::try_from(file.metadata()?.len().saturating_sub(start)).map_err(io::Error::other)?;
+        let mut bytes = vec![0_u8; remaining];
+        file.read_exact_at(&mut bytes, start)?;
         Ok(Bytes::new(bytes))
     }
 

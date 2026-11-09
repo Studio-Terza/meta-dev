@@ -279,8 +279,8 @@ impl Opening {
 
 impl Kind {
     fn opened(lexed: &[Lexed<'_>]) -> Kind {
-        let before = iter::once(None).chain(lexed.iter().map(|lexed| lexed.lexeme));
-        lexed.iter().zip(before).find_map(|(lexed, before)| lexed.kind_after(before)).unwrap_or(Kind::Remark)
+        let preceding = iter::once(None).chain(lexed.iter().map(|piece| piece.lexeme));
+        lexed.iter().zip(preceding).find_map(|(current, previous)| current.kind_after(previous)).unwrap_or(Kind::Remark)
     }
 
     fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
@@ -329,7 +329,7 @@ impl Lexeme {
 
 impl<'text> Lexed<'text> {
     fn kind_after(self, before: Option<Lexeme>) -> Option<Kind> {
-        let dated = before.filter(|before| *before == Lexeme::Marker(Marker::Date));
+        let dated = before.filter(|candidate| *candidate == Lexeme::Marker(Marker::Date));
         let stamped = dated.and(self.lexeme.filter(|lexeme| *lexeme == Lexeme::Clock));
         stamped.map_or_else(|| self.lexeme.map_or(Some(Kind::Remark), Lexeme::kind), |_clock| None)
     }
@@ -382,7 +382,7 @@ impl<'text> Lexed<'text> {
     }
 
     fn joined(lexed: &[Lexed<'text>]) -> String {
-        lexed.iter().map(|lexed| lexed.text).collect()
+        lexed.iter().map(|piece| piece.text).collect()
     }
 }
 
