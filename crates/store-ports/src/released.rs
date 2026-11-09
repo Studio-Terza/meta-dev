@@ -1,6 +1,6 @@
 use newtype::Counter;
 use sqlx::Error;
-use sqlx::error::ErrorKind;
+use sqlx::error::{DatabaseError, ErrorKind};
 
 use crate::{StoreFailure, Written};
 
@@ -12,7 +12,7 @@ pub enum Released {
 
 impl Released {
     pub(crate) fn refused(failed: Error) -> Result<Released, StoreFailure> {
-        let kind = failed.as_database_error().map(|database| database.kind());
+        let kind = failed.as_database_error().map(DatabaseError::kind);
         (kind == Some(ErrorKind::ForeignKeyViolation))
             .then_some(Released::Referenced)
             .ok_or_else(|| StoreFailure::from(failed))
