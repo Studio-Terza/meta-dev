@@ -351,12 +351,11 @@ fn a_job_starting_partway_through_a_message_is_shown_the_question_open_earlier_i
 }
 
 #[test]
-fn a_job_is_shown_only_the_questions_open_earlier_in_ordinal_and_message_order_when_messages_share_the_same_timestamp()
--> Result<(), Box<dyn Error>> {
+fn same_timestamp_messages_are_ordered_by_transcript_order_not_uuid() -> Result<(), Box<dyn Error>> {
     let [before, middle, after] = [
-        "aaaaaaaa-0000-4000-8000-000000000031",
-        "aaaaaaaa-0000-4000-8000-000000000032",
-        "aaaaaaaa-0000-4000-8000-000000000033",
+        "aaaaaaaa-0000-4000-8000-000000000043",
+        "aaaaaaaa-0000-4000-8000-000000000042",
+        "aaaaaaaa-0000-4000-8000-000000000041",
     ];
     let lines = [
         Session::stamped(Speaker::Owner, before, "null", "which crate", "2026-01-01"),
