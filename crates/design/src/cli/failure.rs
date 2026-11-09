@@ -192,7 +192,44 @@ impl Failure {
         match self {
             Failure::Unresolved(unresolved) => Ok(Lapse::refused(&unresolved)),
             Failure::Uncovered(uncovered) => Ok(Lapse::from(uncovered)),
-            other => Err(other),
+            other @ (Failure::Usage
+            | Failure::SelfConsuming(..)
+            | Failure::Unset(..)
+            | Failure::Unreadable(..)
+            | Failure::Files(..)
+            | Failure::Read(..)
+            | Failure::Write(..)
+            | Failure::Unmatched(..)
+            | Failure::Project(..)
+            | Failure::Unnumbered(..)
+            | Failure::Unplaced(..)
+            | Failure::Ended { .. }
+            | Failure::Unrun(..)
+            | Failure::Unflailed(..)
+            | Failure::Unrooted(..)
+            | Failure::Unconfigured
+            | Failure::Config(..)
+            | Failure::Directives(..)
+            | Failure::Misread(..)
+            | Failure::Notes(..)
+            | Failure::Reimported(..)
+            | Failure::Unanchored { .. }
+            | Failure::Unreconciled { .. }
+            | Failure::Unspecified(..)
+            | Failure::Unstated(..)
+            | Failure::Misstaged { .. }
+            | Failure::Inverted { .. }
+            | Failure::Busy(..)
+            | Failure::Store(..)
+            | Failure::Unlock(..)
+            | Failure::Dispatch(..)
+            | Failure::Flailed { .. }
+            | Failure::Stalled { .. }
+            | Failure::Deaf(..)
+            | Failure::Unheard(..)
+            | Failure::Render(..)
+            | Failure::Released(..)
+            | Failure::Unreleased { .. }) => Err(other),
         }
     }
 

@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 mod artifact;
 mod artifact_kind;
 mod casting;

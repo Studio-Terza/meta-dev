@@ -16,12 +16,35 @@ enum Row {
     Break,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Marker {
+    Bullet,
+    Numbered,
+    Quote,
+    Emphasis,
+    Date,
+    Colon,
+    Task,
+    Space,
+}
+
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Lexeme {
     #[regex(r"#+[ \t]+")]
     Hash,
-    #[token("-")]
-    Dash,
+    #[token("-", |_| Marker::Bullet)]
+    #[token("*", |_| Marker::Bullet)]
+    #[token("+", |_| Marker::Bullet)]
+    #[regex(r"[0-9]{1,7}[.)]", |_| Marker::Numbered)]
+    #[token(">", |_| Marker::Quote)]
+    #[token("**", |_| Marker::Emphasis)]
+    #[token("_", |_| Marker::Emphasis)]
+    #[token("__", |_| Marker::Emphasis)]
+    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?)?", |_| Marker::Date)]
+    #[token(":", |_| Marker::Colon)]
+    #[regex(r"\[[ xX]\]", |_| Marker::Task)]
+    #[regex(r"[ \t]+", |_| Marker::Space)]
+    Marker(Marker),
     #[token("RULING")]
     Ruling,
     #[token("LEAD")]
@@ -35,15 +58,11 @@ enum Lexeme {
     #[regex(r"[0-9a-f]{8}")]
     #[regex(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
     Cite,
-    #[regex(r"[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?)?")]
-    Date,
-    #[regex(r"[\p{L}\p{N}_]+")]
+    #[regex(r"[\p{L}\p{N}]+(_+[\p{L}\p{N}]+)*")]
     #[regex(r"[\p{L}\p{N}_]*[\p{L}\p{N}_&&[^0-9a-f]][\p{L}\p{N}_]*('[\p{L}\p{N}]+)+")]
     Word,
     #[token("'s")]
     Possessive,
-    #[regex(r"[ \t]+")]
-    Space,
 }
 
 pub trait Reading {
@@ -258,7 +277,7 @@ impl Opening {
 
 impl Kind {
     fn opened(lexed: &[Lexed<'_>]) -> Kind {
-        lexed.iter().find_map(|lexed| lexed.lexeme.map_or(Some(Kind::Remark), Lexeme::kind)).unwrap_or(Kind::Remark)
+        lexed.iter().find_map(|lexed| lexed.kind()).unwrap_or(Kind::Remark)
     }
 
     fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
@@ -290,7 +309,7 @@ impl Entry {
 impl Lexeme {
     fn kind(self) -> Option<Kind> {
         match self {
-            Lexeme::Dash | Lexeme::Date | Lexeme::Space => None,
+            Lexeme::Marker(_) => None,
             Lexeme::Ruling => Some(Kind::Ruling),
             Lexeme::Lead => Some(Kind::Lead),
             Lexeme::Hash
@@ -305,21 +324,23 @@ impl Lexeme {
 }
 
 impl<'text> Lexed<'text> {
+    fn kind(self) -> Option<Kind> {
+        self.lexeme.map_or(Some(Kind::Remark), Lexeme::kind)
+    }
+
     fn opening(self) -> Opening {
         match self.lexeme {
             Some(Lexeme::Hash) => Opening::Heading,
             Some(
-                Lexeme::Dash
+                Lexeme::Marker(_)
                 | Lexeme::Ruling
                 | Lexeme::Lead
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Double
                 | Lexeme::Cite
-                | Lexeme::Date
                 | Lexeme::Word
-                | Lexeme::Possessive
-                | Lexeme::Space,
+                | Lexeme::Possessive,
             )
             | None => Opening::Prose,
         }
@@ -328,18 +349,25 @@ impl<'text> Lexed<'text> {
     fn taken<'lexed>(self, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         match self.lexeme {
             Some(Lexeme::Double) => Step::quoted(rest),
-            Some(Lexeme::Date) => Step::dated(self, rest),
+            Some(Lexeme::Marker(Marker::Date)) => Step::dated(self, rest),
             Some(
                 Lexeme::Hash
-                | Lexeme::Dash
+                | Lexeme::Marker(
+                    Marker::Bullet
+                    | Marker::Numbered
+                    | Marker::Quote
+                    | Marker::Emphasis
+                    | Marker::Colon
+                    | Marker::Task
+                    | Marker::Space,
+                )
                 | Lexeme::Ruling
                 | Lexeme::Lead
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Cite
                 | Lexeme::Word
-                | Lexeme::Possessive
-                | Lexeme::Space,
+                | Lexeme::Possessive,
             )
             | None => Step::after(Piece::read(self), rest),
         }
@@ -392,16 +420,23 @@ impl Piece {
             Some(Lexeme::Cite) => Piece::Cited(Cite::new(lexed.text.to_owned())),
             Some(
                 Lexeme::Hash
-                | Lexeme::Dash
-                | Lexeme::Date
+                | Lexeme::Marker(
+                    Marker::Bullet
+                    | Marker::Numbered
+                    | Marker::Quote
+                    | Marker::Emphasis
+                    | Marker::Date
+                    | Marker::Colon
+                    | Marker::Task
+                    | Marker::Space,
+                )
                 | Lexeme::Ruling
                 | Lexeme::Lead
                 | Lexeme::Open
                 | Lexeme::Close
                 | Lexeme::Double
                 | Lexeme::Word
-                | Lexeme::Possessive
-                | Lexeme::Space,
+                | Lexeme::Possessive,
             )
             | None => Piece::Text(lexed.text.to_owned()),
         }

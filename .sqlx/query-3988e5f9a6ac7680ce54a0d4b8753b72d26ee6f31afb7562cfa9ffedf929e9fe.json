@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  ending\nFROM\n  notes_endings\nWHERE\n  project = ?1\n",
+  "query": "\nSELECT\n  notes_endings.ending\nFROM\n  notes_endings\n  JOIN nodes ON nodes.id = notes_endings.node\nWHERE\n  nodes.project = ?1\n",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "f5205f933f4a96ac4c8a2c7b35c7be1fbb7145a8a8cdb2a70df61c7f380390e1"
+  "hash": "3988e5f9a6ac7680ce54a0d4b8753b72d26ee6f31afb7562cfa9ffedf929e9fe"
 }

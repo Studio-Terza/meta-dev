@@ -377,7 +377,7 @@ laws::table!(
     ]
 );
 
-const NOTED: &str = "(- |-|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|2026-11-0[1-9][Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,4})?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
+const NOTED: &str = "(- |-|\\* |\\*|\\*\\*|\\+ |\\+|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|2026-11-0[1-9][Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,4})?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
 
 const INKED: &str =
     "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
@@ -407,7 +407,15 @@ laws::law!(
 laws::law!(
     a_double_quote_keeps_its_contractions_and_possessives_and_the_line_keeps_the_kind_its_opening_word_gives,
     (
-        select(vec![("RULING ", "ruling"), ("- RULING ", "ruling"), ("- LEAD ", "lead"), ("Lead ", "remark")]),
+        select(vec![
+            ("RULING ", "ruling"),
+            ("- RULING ", "ruling"),
+            ("* RULING ", "ruling"),
+            ("+ **RULING** ", "ruling"),
+            ("- LEAD ", "lead"),
+            ("**LEAD** ", "lead"),
+            ("Lead ", "remark"),
+        ]),
         "[a-z]{1,6}('s|s'|n't)?( '?[a-z]{1,6}('s|s'|n't)?'?){0,3}",
         "( '?[a-z]{1,6}('s|s'|n't)?'?){0,4}",
     ),
@@ -438,6 +446,79 @@ laws::law!(
         prop_assert_eq!(line.read_by(Shaped), kind);
         prop_assert_eq!(line.read_by(Named), Ok([vec!["yes".to_owned()], vec![], vec![day]]));
         prop_assert_eq!(line.to_string(), text);
+    }
+);
+
+const MARKUP: [&str; 24] = [
+    "- ",
+    "* ",
+    "+ ",
+    "-",
+    "**",
+    "*",
+    "_",
+    "__",
+    "1. ",
+    "12) ",
+    "3.",
+    "> ",
+    ">",
+    "[ ] ",
+    "[x] ",
+    "[X]",
+    "2026-11-05",
+    "2026-11-05: ",
+    "2026-11-05 04:07 ",
+    "2026-11-05T04:07",
+    "2026-11-05T04:07:00Z: ",
+    ": ",
+    ":",
+    "\t",
+];
+
+laws::law!(
+    any_allowed_markup_before_the_first_word_leaves_the_line_the_kind_that_word_gives,
+    (
+        vec(select(MARKUP.to_vec()), 0..8),
+        select(vec![
+            ("RULING", "ruling"),
+            ("LEAD", "lead"),
+            ("plan", "remark"),
+            ("Ruling", "remark"),
+            ("RULINGS", "remark")
+        ]),
+    ),
+    said,
+    {
+        let (markup, (word, kind)) = said;
+        let line = Line::read(1, &format!("{} {word} (owner): x", markup.concat()));
+        prop_assert_eq!(line.read_by(Shaped), kind);
+    }
+);
+
+laws::law!(
+    any_other_opener_before_ruling_makes_the_line_a_remark,
+    (
+        vec(select(MARKUP.to_vec()), 0..4),
+        select(vec!["\"", "~~", "~", "|", "`", "(", "{", ".", ",", "#", "<", "0a1b2c3d", "note"]),
+        vec(select(MARKUP.to_vec()), 0..4),
+    ),
+    said,
+    {
+        let (before, opener, after) = said;
+        let line = Line::read(1, &format!("{} {opener}{} RULING (owner): \"yes\"", before.concat(), after.concat()));
+        prop_assert_eq!(line.read_by(Shaped), "remark");
+    }
+);
+
+laws::law!(
+    a_bare_number_before_ruling_makes_the_line_a_remark,
+    (vec(select(MARKUP.to_vec()), 0..4), "[0-9]{1,12}", vec(select(MARKUP.to_vec()), 0..4)),
+    said,
+    {
+        let (before, number, after) = said;
+        let line = Line::read(1, &format!("{} {number} {} RULING (owner): \"yes\"", before.concat(), after.concat()));
+        prop_assert_eq!(line.read_by(Shaped), "remark");
     }
 );
 
@@ -573,7 +654,7 @@ impl Reading for Named {
 }
 
 laws::table!(
-    a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_word_after_any_bullet_date_and_space,
+    a_notes_line_is_layout_a_heading_or_an_entry_whose_kind_is_its_first_alphabetic_word,
     |text: &&str| Line::read(1, text).read_by(Shaped),
     [
         "" => "layout",
@@ -613,6 +694,41 @@ laws::table!(
         "2026-11-05T04:07+01:00 RULING (owner): x" => "ruling",
         "- 2026-11-05T04:07:09.125-03:30 LEAD: the beds are dug" => "lead",
         "2026-11-05 04:07:09.5Z RULING (owner): x" => "ruling",
+        "* RULING (owner): starred" => "ruling",
+        "+ RULING (owner): plussed" => "ruling",
+        "**RULING** (owner): bold" => "ruling",
+        "*RULING*: leaning" => "ruling",
+        "2026-11-05: RULING (owner): dated" => "ruling",
+        "- 2026-11-05: **RULING** (owner): every prefix" => "ruling",
+        "+ **LEAD** 2026-11-08: the beds are dug" => "lead",
+        ": RULING (owner): a bare colon" => "ruling",
+        "2026-11-05 : RULING (owner): a spaced colon" => "ruling",
+        "1. RULING (owner): numbered" => "ruling",
+        "> RULING (owner): quoted" => "ruling",
+        "**2026-11-05**: RULING (owner): a bold date" => "ruling",
+        "- [x] RULING (owner): a task" => "ruling",
+        "- [ ] LEAD: an open task" => "lead",
+        "- [x] done: RULING aside" => "remark",
+        "__RULING__ (owner): underlined" => "ruling",
+        "_LEAD_: the beds are dug" => "lead",
+        "12) RULING (owner): numbered" => "ruling",
+        "3 RULING rows still lack labels." => "remark",
+        "- 3 RULING rows still lack labels." => "remark",
+        "1234567 RULING (owner): seven digits" => "remark",
+        "12345678 RULING (owner): eight digits" => "remark",
+        "1234567. RULING (owner): numbered" => "ruling",
+        "2026-11-05 04:07 RULING (owner): timed" => "ruling",
+        "2026-11-05T04:07 RULING (owner): timed" => "ruling",
+        "- 2026-11-05T04:07:00Z: RULING (owner): timed" => "ruling",
+        "04:07 RULING (owner): a bare time" => "remark",
+        "2026-11 RULING (owner): a bare month" => "remark",
+        "\"RULING\" lines must quote the owner." => "remark",
+        "| RULING | count |" => "remark",
+        "~~RULING (owner): \"yes the new trellis is approved.\"~~ withdrawn" => "remark",
+        "`RULING` is a kind word" => "remark",
+        "snake_case RULING" => "remark",
+        "* note: RULING aside" => "remark",
+        "**Lead**: the beds are dug" => "remark",
     ]
 );
 
@@ -646,6 +762,11 @@ laws::table!(
             vec![],
             vec!["1f2e3d4c-1234-4abc-8def-0123456789ab".to_owned(), "0123abcd".to_owned()],
             vec!["2026-11-07".to_owned()],
+        ]),
+        "RULING (owner, 2026-11-05T04:07): \"dig the beds\" and 2026-11-06 08:15:30 too" => Ok([
+            vec!["dig the beds".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned(), "2026-11-06".to_owned()],
         ]),
         "an \"unclosed quote and a 'stray" => Err(Unclosed::new(Quote::new("unclosed quote and a 'stray".to_owned()))),
         "# Notes \"quoted\" 1f2e3d4c" => Ok([vec!["quoted".to_owned()], vec!["1f2e3d4c".to_owned()], vec![]]),

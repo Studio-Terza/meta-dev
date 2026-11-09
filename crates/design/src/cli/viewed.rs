@@ -4,6 +4,7 @@ use design_model::{NodeId, Outline, Provenance, SpanRelation};
 use grammar::cited::Cited;
 use grammar::output::field::{Id, Quoted, Word};
 use grammar::output::{Fields, Unread};
+use named_derive::Named;
 use newtype::Newtype;
 use structurer::{Outlined, SegmentRef};
 use transcript_ports::{Authorship, Body};
@@ -27,11 +28,21 @@ pub enum Viewed {
     },
 }
 
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Seen {
+    #[name("outline")]
+    Outline,
+    #[name("standing")]
+    Standing,
+    #[name("unplaced")]
+    Unplaced,
+}
+
 impl Viewed {
-    pub(crate) fn read(key: Key, fields: &mut Fields) -> Result<Viewed, Unread> {
-        match key {
-            Key::Outline => Outlined::read(fields).map(Viewed::Outlined),
-            Key::Standing => Ok(Viewed::Standing {
+    pub(crate) fn read(seen: Seen, fields: &mut Fields) -> Result<Viewed, Unread> {
+        match seen {
+            Seen::Outline => Outlined::read(fields).map(Viewed::Outlined),
+            Seen::Standing => Ok(Viewed::Standing {
                 node: fields.field::<Id<_>>()?,
                 relation: fields.field::<Word<_>>()?,
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
@@ -39,11 +50,10 @@ impl Viewed {
                 entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
                 body: fields.field::<Quoted<_>>()?,
             }),
-            Key::Unplaced => Ok(Viewed::Unplaced {
+            Seen::Unplaced => Ok(Viewed::Unplaced {
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
                 body: fields.field::<Quoted<_>>()?,
             }),
-            _unviewed => Err(Unread::Unkeyed),
         }
     }
 }
@@ -51,17 +61,17 @@ impl Viewed {
 impl fmt::Display for Viewed {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Viewed::Outlined(outline) => write!(formatter, "{} {}", Key::Outline, Outlined::from(outline)),
+            Viewed::Outlined(outline) => write!(formatter, "{} {}", Seen::Outline, Outlined::from(outline)),
             Viewed::Standing { node, relation, segment, author, entered, body } => write!(
                 formatter,
                 "{} n{} {relation} {segment} {author} {} {entered} {}",
-                Key::Standing,
+                Seen::Standing,
                 node.into_inner(),
                 Key::Entered,
                 Fields::quoting(body.as_ref())
             ),
             Viewed::Unplaced { segment, body } => {
-                write!(formatter, "{} {segment} {}", Key::Unplaced, Fields::quoting(body.as_ref()))
+                write!(formatter, "{} {segment} {}", Seen::Unplaced, Fields::quoting(body.as_ref()))
             }
         }
     }

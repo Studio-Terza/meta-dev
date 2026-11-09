@@ -66,33 +66,48 @@ enum Part {
     Segments,
 }
 
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Note {
+    #[name("imported")]
+    Imported,
+    #[name("unresolved")]
+    Unresolved,
+    #[name("unanchored")]
+    Unanchored,
+    #[name("ambiguous-anchor")]
+    AmbiguousAnchor,
+    #[name("reconciled")]
+    Reconciled,
+    #[name("cites")]
+    Cites,
+}
+
 impl Noted {
-    pub(crate) fn read(key: Key, fields: &mut Fields) -> Result<Noted, Unread> {
-        match key {
-            Key::Imported => Ok(Noted::Imported {
+    pub(crate) fn read(note: Note, fields: &mut Fields) -> Result<Noted, Unread> {
+        match note {
+            Note::Imported => Ok(Noted::Imported {
                 line: NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?),
                 node: fields.field::<Id<_>>()?,
             }),
-            Key::Unresolved => Ok(Noted::Unresolved {
+            Note::Unresolved => Ok(Noted::Unresolved {
                 line: NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?),
                 reference: Reference::read(fields)?,
                 miss: fields.field::<Word<_>>()?,
             }),
-            Key::Unanchored => {
+            Note::Unanchored => {
                 Ok(Noted::Unanchored(NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?)))
             }
-            Key::AmbiguousAnchor => Ok(Noted::Ambiguous {
+            Note::AmbiguousAnchor => Ok(Noted::Ambiguous {
                 line: NotesLine::new(fields.past(&[Part::Line])?.field::<Integer<_>>()?),
                 cite: fields.past(&[Part::Cite])?.field::<Bare<_>>()?,
                 segments: Count::new(fields.past(&[Part::Segments])?.field::<Integer<_>>()?),
             }),
-            Key::Reconciled => Reconciliation::read(fields).map(Noted::Reconciled),
-            Key::Cites => Ok(Noted::Cites {
+            Note::Reconciled => Reconciliation::read(fields).map(Noted::Reconciled),
+            Note::Cites => Ok(Noted::Cites {
                 message: fields.field::<Bare<_>>()?,
                 author: fields.field::<Word<_>>()?,
                 entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
             }),
-            _unnoted => Err(Unread::Unkeyed),
         }
     }
 }
@@ -129,23 +144,23 @@ impl fmt::Display for Noted {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Noted::Imported { line, node } => {
-                write!(formatter, "{} {} {line} n{}", Key::Imported, Part::Line, node.into_inner())
+                write!(formatter, "{} {} {line} n{}", Note::Imported, Part::Line, node.into_inner())
             }
             Noted::Unresolved { line, reference, miss } => {
-                write!(formatter, "{} {} {line} {reference} {miss}", Key::Unresolved, Part::Line)
+                write!(formatter, "{} {} {line} {reference} {miss}", Note::Unresolved, Part::Line)
             }
-            Noted::Unanchored(line) => write!(formatter, "{} {} {line}", Key::Unanchored, Part::Line),
+            Noted::Unanchored(line) => write!(formatter, "{} {} {line}", Note::Unanchored, Part::Line),
             Noted::Ambiguous { line, cite, segments } => write!(
                 formatter,
                 "{} {} {line} {} {cite} {} {segments}",
-                Key::AmbiguousAnchor,
+                Note::AmbiguousAnchor,
                 Part::Line,
                 Part::Cite,
                 Part::Segments
             ),
-            Noted::Reconciled(reconciliation) => write!(formatter, "{} {reconciliation}", Key::Reconciled),
+            Noted::Reconciled(reconciliation) => write!(formatter, "{} {reconciliation}", Note::Reconciled),
             Noted::Cites { message, author, entered } => {
-                write!(formatter, "  {} {message} {author} {} {entered}", Key::Cites, Key::Entered)
+                write!(formatter, "  {} {message} {author} {} {entered}", Note::Cites, Key::Entered)
             }
         }
     }
