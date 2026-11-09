@@ -1,16 +1,16 @@
 use std::fmt;
 
 use super::package::Package;
-use super::role::Role;
+use super::unit_role::UnitRole;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct UnitKey {
     package: Package,
-    role: Role,
+    role: UnitRole,
 }
 
 impl UnitKey {
-    pub(super) fn new(package: Package, role: Role) -> UnitKey {
+    pub(super) fn new(package: Package, role: UnitRole) -> UnitKey {
         UnitKey { package, role }
     }
 
@@ -18,11 +18,11 @@ impl UnitKey {
         &self.package
     }
 
-    pub(super) fn role(&self) -> &Role {
+    pub(super) fn role(&self) -> &UnitRole {
         &self.role
     }
 
-    pub(super) fn sibling(&self, role: Role) -> UnitKey {
+    pub(super) fn sibling(&self, role: UnitRole) -> UnitKey {
         UnitKey { package: self.package.clone(), role }
     }
 }

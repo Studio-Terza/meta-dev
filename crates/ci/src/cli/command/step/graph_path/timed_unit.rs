@@ -2,8 +2,8 @@ use serde::Deserialize;
 
 use super::crates::Crates;
 use super::package::Package;
-use super::role::Role;
 use super::unit_key::UnitKey;
+use super::unit_role::UnitRole;
 use super::weighed::Weighed;
 use crate::cli::command::step::seconds::Seconds;
 use text_lines::OneLine;
@@ -13,7 +13,7 @@ pub(super) struct TimedUnit {
     name: OneLine,
     version: OneLine,
     #[serde(rename = "target")]
-    role: Role,
+    role: UnitRole,
     duration: Seconds,
 }
 

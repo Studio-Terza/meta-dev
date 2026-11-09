@@ -1,9 +1,9 @@
 use std::fmt;
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Skipped;
+pub(super) struct PartialTimings;
 
-impl fmt::Display for Skipped {
+impl fmt::Display for PartialTimings {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             formatter,

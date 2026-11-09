@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::manifest::Kind;
 use super::package::Package;
-use super::role::Role;
 use super::unit_key::UnitKey;
+use super::unit_role::UnitRole;
 
 #[derive(Debug)]
 pub(super) struct Crates {
@@ -57,6 +57,6 @@ impl Crates {
     }
 
     pub(super) fn linked(&self, package: &Package) -> UnitKey {
-        UnitKey::new(package.clone(), self.macros.get(package).map_or(Role::Library, |_| Role::HostBuild))
+        UnitKey::new(package.clone(), self.macros.get(package).map_or(UnitRole::Library, |_| UnitRole::HostBuild))
     }
 }

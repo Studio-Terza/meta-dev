@@ -2,11 +2,11 @@ mod crates;
 mod host;
 mod manifest;
 mod package;
-mod role;
-mod skipped;
+mod partial_timings;
 mod timed_unit;
 mod unit_dag;
 mod unit_key;
+mod unit_role;
 mod weighed;
 
 use std::ffi::OsString;
@@ -24,7 +24,7 @@ use crate::cli::ports::{Exit, Ports};
 use file_ports::Text;
 use grammar::timing_page::Build;
 use host::Host;
-use skipped::Skipped;
+use partial_timings::PartialTimings;
 use timed_unit::TimedUnit;
 use unit_dag::UnitDag;
 
@@ -53,8 +53,8 @@ impl GraphPath {
     }
 
     fn skipped(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        write!(out, "{Skipped}")?;
-        self.report.emptied(ports.files())?.append(ports.files(), Skipped).map(|()| Exit::Success)
+        write!(out, "{PartialTimings}")?;
+        self.report.emptied(ports.files())?.append(ports.files(), PartialTimings).map(|()| Exit::Success)
     }
 
     fn measured(&self, ports: &impl Ports, out: &mut impl Write, page: &Text) -> Result<Exit, Failure<'_>> {
