@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::str::FromStr;
 
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Spelled};
@@ -13,11 +15,6 @@ pub struct Nul;
 pub struct Body(String);
 
 impl Body {
-    #[must_use]
-    pub fn part(&self, cut: impl for<'text> FnOnce(&'text str) -> &'text str) -> Body {
-        Body(cut(&self.0).to_owned())
-    }
-
     pub(crate) fn after(self, before: &Body) -> Body {
         Body(format!("{before} {self}"))
     }

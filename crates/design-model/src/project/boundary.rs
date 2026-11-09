@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
 use grammar::project::Names;
-use newtype::{Checked, CheckedDeserialize, Display, Newtype, Spelled};
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Spelled};
 use serde::Serialize;
 
-#[derive(Newtype, Display, Spelled, CheckedDeserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked)]
+#[derive(Newtype, Arbitrary, Display, Spelled, CheckedDeserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[newtype(checked, strategy = "[A-Za-z0-9][A-Za-z0-9._-]{0,15}")]
 pub struct Project(String);
 
 #[derive(Debug, thiserror::Error)]
