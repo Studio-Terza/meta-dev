@@ -2,6 +2,7 @@ mod crates;
 mod manifest;
 mod package;
 mod role;
+mod skipped;
 mod timed_unit;
 mod unit_dag;
 mod unit_key;
@@ -22,7 +23,10 @@ use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 use crates::Crates;
+use file_ports::Text;
+use grammar::timing_page::Build;
 use manifest::Manifest;
+use skipped::Skipped;
 use text_lines::Lines;
 use timed_unit::TimedUnit;
 use unit_dag::UnitDag;
@@ -52,6 +56,22 @@ impl GraphPath {
         let lines: Vec<String> = named.as_ref().parse::<Lines>().into_iter().flatten().collect();
         <[String; 1]>::try_from(lines).map(|[host]| OsString::from(host)).map_err(Failure::NoHost)
     }
+
+    fn skipped(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+        write!(out, "{Skipped}")?;
+        self.report.emptied(ports.files())?.append(ports.files(), Skipped).map(|()| Exit::Success)
+    }
+
+    fn measured(&self, ports: &impl Ports, out: &mut impl Write, page: &Text) -> Result<Exit, Failure<'_>> {
+        let units: Vec<TimedUnit> = CompileTimes::units(&self.page, page)?;
+        let crates = Self::crates(ports)?;
+        let dag = UnitDag::weighed(&crates, units);
+        let critical = dag.critical();
+        write!(out, "{critical}")?;
+        self.report.emptied(ports.files())?.append(ports.files(), &critical)?;
+        self.measured.append(ports.files(), &Stage::new(Self::PATH.to_owned()), *critical.as_ref())?;
+        self.measured.append(ports.files(), &Stage::new(Self::WORK.to_owned()), dag.work()).map(|()| Exit::Success)
+    }
 }
 
 impl Step for GraphPath {
@@ -69,13 +89,10 @@ impl Step for GraphPath {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        let units: Vec<TimedUnit> = CompileTimes::units(&self.page, &self.page.read(ports.files())?)?;
-        let crates = Self::crates(ports)?;
-        let dag = UnitDag::weighed(&crates, units);
-        let critical = dag.critical();
-        write!(out, "{critical}")?;
-        self.report.emptied(ports.files())?.append(ports.files(), &critical)?;
-        self.measured.append(ports.files(), &Stage::new(Self::PATH.to_owned()), *critical.as_ref())?;
-        self.measured.append(ports.files(), &Stage::new(Self::WORK.to_owned()), dag.work()).map(|()| Exit::Success)
+        let page = self.page.read(ports.files())?;
+        match Build::recorded(page.as_ref()) {
+            Build::Finished => self.measured(ports, out, &page),
+            Build::Failed => self.skipped(ports, out),
+        }
     }
 }

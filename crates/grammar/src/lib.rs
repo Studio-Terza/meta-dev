@@ -19,3 +19,4 @@ pub mod reply;
 pub mod search;
 pub mod slug;
 pub mod spec_line;
+pub mod timing_page;

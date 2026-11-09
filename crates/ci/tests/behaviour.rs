@@ -647,15 +647,15 @@ impl Graph {
     }
 
     fn measured(page: &str, metadata: &str) -> Result<Graph, Box<dyn Error>> {
-        Graph::answered(page, Graph::hosted(Script { metadata: metadata.to_owned(), ..Script::new() }))
+        Graph::answered(page, &Graph::hosted(Script { metadata: metadata.to_owned(), ..Script::new() }))
     }
 
-    fn answered(page: &str, fake: Script) -> Result<Graph, Box<dyn Error>> {
+    fn answered(page: &str, fake: &Script) -> Result<Graph, Box<dyn Error>> {
         let scratch = Scratch::new()?;
         scratch.write("page.html", page)?;
         scratch.write("m.toml", "clippy = 50.80\n")?;
         let arguments = ["graph-path", &scratch.file("page.html"), &scratch.file("m.toml"), &scratch.file("path.txt")];
-        let answer = scratch.answer(&fake, &arguments);
+        let answer = scratch.answer(fake, &arguments);
         let asked = fake.calls.borrow().clone();
         Ok(Graph { answer, measured: scratch.read("m.toml"), report: scratch.read("path.txt"), asked })
     }
@@ -781,7 +781,7 @@ fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform(
         exact: vec![(Graph::metadata_for(HOST), HOST_PLATFORM.to_owned())],
         ..Graph::hosted(Script::new())
     };
-    let Graph { answer, measured, .. } = Graph::answered(&page, fake)?;
+    let Graph { answer, measured, .. } = Graph::answered(&page, &fake)?;
     let expected = [
         "graph-path 2.00 seconds, the longest chain of clippy units, counting only units sccache never caches:",
         "1.00 mid (check)",
@@ -793,10 +793,25 @@ fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform(
 }
 
 #[test]
+fn a_page_that_records_a_failed_build_is_skipped_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+    let failed = format!(
+        "<table>\n<tr><td class=\"error-text\">Error:</td><td>1 job failed</td></tr>\n</table>\n{}",
+        Page::listing(TIMINGS_UNITS)
+    );
+    let Graph { answer, measured, report, asked } = Graph::measured(&failed, TIMINGS_METADATA)?;
+    let skipped = "graph-path skipped: the timings page records a failed build, so it times only part of the clippy units and nothing is measured";
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: vec![skipped], err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&report), [skipped]);
+    assert_eq!(Text::lines(&measured), ["clippy = 50.80"]);
+    assert_eq!(asked, Vec::<Invocation>::new());
+    Ok(())
+}
+
+#[test]
 fn a_graph_path_needs_rustc_to_name_exactly_one_host() -> Result<(), Box<dyn Error>> {
     let named = ["", "x86_64-unknown-linux-gnu\naarch64-apple-darwin\n"].map(|host| {
         let fake = Script::answering(vec![Reply::to("rustc --print", host)]);
-        Graph::answered(&Page::listing(TIMINGS_UNITS), fake).map(|graph| {
+        Graph::answered(&Page::listing(TIMINGS_UNITS), &fake).map(|graph| {
             (
                 graph.answer.exit,
                 graph.answer.err.contains("not the one host platform"),

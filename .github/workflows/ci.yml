@@ -53,6 +53,7 @@ jobs:
       - name: fmt
         run: cargo fmt --check
       - name: clippy
+        id: clippy
         if: env.BUILD_SCOPE != ''
         run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets --timings $BUILD_SCOPE -- -D warnings'
       - name: fuzz targets clippy
@@ -63,7 +64,11 @@ jobs:
           stages: clippy
       - name: graph path
         id: graph
-        if: env.BUILD_SCOPE == '--workspace' && always()
+        if: env.BUILD_SCOPE == '--workspace' && steps.clippy.outcome == 'success' && always()
+        run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
+      - name: graph path skipped
+        id: graph_skipped
+        if: env.BUILD_SCOPE == '--workspace' && steps.clippy.outcome == 'failure' && always()
         run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
       - name: graph path report
         if: steps.graph.outcome == 'success' && always()
@@ -72,7 +77,7 @@ jobs:
         if: steps.graph.outcome == 'success' && always()
         run: '"$TOOLS/ci" summarize "$MEASURED" "$GITHUB_STEP_SUMMARY"'
       - name: graph path summary
-        if: steps.graph.outcome == 'success' && always()
+        if: (steps.graph.outcome == 'success' || steps.graph_skipped.outcome == 'success') && always()
         run: '"$TOOLS/ci" summarize "$GRAPH_PATH" "$GITHUB_STEP_SUMMARY"'
       - name: graph history restore
         if: github.event_name == 'push' && steps.graph.outcome == 'success' && always()
