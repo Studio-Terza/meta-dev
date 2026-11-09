@@ -59,6 +59,6 @@ impl Request {
         let text = files
             .read_text(metadata)
             .map_err(|failure| Failure::Read { path: metadata.to_path_buf(), source: io::Error::from(failure) })?;
-        Ok(serde_json::from_str::<Metadata>(text.as_ref())?.checked()?)
+        Ok(text.as_ref().parse::<Metadata>()?.checked()?)
     }
 }

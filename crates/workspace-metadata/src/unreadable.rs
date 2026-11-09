@@ -1,3 +1,3 @@
 #[derive(Debug, thiserror::Error)]
-#[error("cargo metadata is not readable: {0}")]
+#[error("cannot parse cargo metadata: {0}")]
 pub struct Unreadable(#[from] serde_json::Error);

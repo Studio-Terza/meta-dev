@@ -15,7 +15,6 @@ file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
 text-lines = { path = "../text-lines" }
 workspace-metadata = { path = "../workspace-metadata" }
-serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

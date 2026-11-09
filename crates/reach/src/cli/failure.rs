@@ -7,8 +7,8 @@ pub enum Failure {
     Read { path: PathBuf, source: io::Error },
     #[error("cannot write the report: {0}")]
     Write(#[from] io::Error),
-    #[error("cannot parse cargo metadata: {0}")]
-    Parse(#[from] serde_json::Error),
+    #[error(transparent)]
+    Parse(#[from] workspace_metadata::Unreadable),
     #[error(transparent)]
     Outside(#[from] workspace_metadata::Outside),
     #[error(
