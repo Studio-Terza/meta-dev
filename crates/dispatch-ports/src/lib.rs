@@ -19,7 +19,7 @@ mod watch;
 
 pub use agent::Agent;
 pub use agent_run::AgentRun;
-pub use bell::Bell;
+pub use bell::{Bell, Woke};
 pub use clock::{Clock, ClockFiller, clock_ops};
 pub use dispatch::{Dispatch, DispatchFiller, dispatch_ops};
 pub use dispatch_failure::{DispatchFailure, Fault};

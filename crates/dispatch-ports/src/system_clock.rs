@@ -13,7 +13,7 @@ impl ClockFiller for SystemClock {
     }
 
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
-        bell.waited(Duration::from(pause));
+        let _woke = bell.waited(Duration::from(pause));
         Wall::from(SystemTime::now())
     }
 }

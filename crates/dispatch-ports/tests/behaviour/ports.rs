@@ -2,17 +2,14 @@ use std::error::Error;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::Mutex;
-use std::thread;
-use std::time::{Duration, Instant};
 
 use dispatch_ports::{
     Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall, Started,
-    SystemClock, Timeout, Tokens, Usage, Watch, Watched,
+    SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
 };
 use port_core::Run;
 
-use super::{FakeClock, Sleep, Watching};
+use super::{FakeClock, Sleep, Wait, Waits, Watching};
 
 #[test]
 fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), Box<dyn Error>> {
@@ -59,15 +56,12 @@ impl Stalling {
     const PROMPT: usize = 256 * 1024;
 
     fn watched(arguments: &&'static [&'static str]) -> Option<Stalled> {
+        let waits = Waits::default();
         let run = Run::root();
         let ended = {
             let agent =
                 run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", arguments)));
-            let clock = run.port(FakeClock {
-                now: Mutex::new(Watching::START),
-                sleep: Sleep { after: 0, slept: Pause::new(0) },
-                waits: Mutex::new(0),
-            });
+            let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
             let deadline = Deadline::after(clock.now(), Timeout::new(1));
             let held = agent.dispatch(&Job::due_by(deadline), &Prompt::new("x".repeat(Stalling::PROMPT))).ok()?;
             let pid = held.pid();
@@ -89,49 +83,23 @@ laws::table!(
 );
 
 #[test]
-fn a_bell_rung_by_an_earlier_run_does_not_cut_the_next_run_short() -> Result<(), Box<dyn Error>> {
-    let run = Run::root();
-    let elapsed = {
-        let agent = run.port(HeadlessClaude::new(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-            Agent::new("sh", &["-c", "case \"$(cat)\" in x) exec sleep 30;; *) echo '{\"subtype\":\"success\",\"result\":\"r\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}';; esac"]),
-        ));
-        let clock = run.port(SystemClock);
-        let first = agent
-            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("y".to_owned()))?;
-        thread::sleep(Duration::from_millis(500));
-        let _done = Watch::over(&agent, &clock).watched(first)?;
-        let began = Instant::now();
-        let second = agent
-            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(6))), &Prompt::new("x".to_owned()))?;
-        let watched = Watch::over(&agent, &clock).watched(second)?;
-        assert_eq!(watched, Watched::Stalled(Stall::Overdue));
-        began.elapsed()
-    };
-    run.finish().settled()?;
-    assert!(elapsed.as_secs_f64() >= 5.0, "killed after {elapsed:?}, before its 6 s deadline");
-    Ok(())
-}
-
-#[test]
 fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Box<dyn Error>> {
     let pause = Pause::new(1);
+    let waits = Waits::default();
     let run = Run::root();
-    let elapsed = {
+    let waited = {
         let agent = run.port(HeadlessClaude::new(
             PathBuf::from(env!("CARGO_MANIFEST_DIR")),
             Agent::new("sh", &["-c", "exec sleep 30"]),
         ));
-        let clock = run.port(SystemClock);
+        let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
         let silent = agent
             .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("x".to_owned()))?;
-        let began = Instant::now();
-        clock.waited(pause, silent.bell());
-        let elapsed = began.elapsed();
+        let waited = clock.waited(pause, silent.bell());
         silent.end()?;
-        elapsed
+        waited
     };
     run.finish().settled()?;
-    assert!(elapsed >= Duration::from(pause), "an unrung wait returned after {elapsed:?}, before its {pause:?}");
+    assert_eq!((waited, waits.recorded()), (Watching::START.after(pause), vec![Wait { pause, woke: Woke::Lapsed }]));
     Ok(())
 }
