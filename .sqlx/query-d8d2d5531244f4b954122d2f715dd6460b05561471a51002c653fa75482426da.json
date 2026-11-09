@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  latest.message AS \"message!: String\",\n  latest.ordinal AS \"ordinal!: i64\",\n  latest.body AS \"body!: String\"\nFROM\n  (\n    SELECT\n      segments.message,\n      segments.ordinal,\n      segments.body,\n      asked.at\n    FROM\n      open_questions\n      JOIN messages AS asked ON asked.uuid = open_questions.message\n      JOIN messages AS job ON job.uuid = ?1\n      JOIN segments ON segments.message = open_questions.message\n      AND segments.ordinal = open_questions.ordinal\n    WHERE\n      asked.session = job.session\n      AND (\n        asked.at,\n        open_questions.message,\n        open_questions.ordinal\n      ) < (job.at, job.uuid, ?2)\n    GROUP BY\n      segments.message,\n      segments.ordinal\n    ORDER BY\n      asked.at DESC,\n      segments.message DESC,\n      segments.ordinal DESC\n    LIMIT\n      8\n  ) AS latest\nORDER BY\n  latest.at,\n  latest.message,\n  latest.ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "body!: String",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d8d2d5531244f4b954122d2f715dd6460b05561471a51002c653fa75482426da"
+}
