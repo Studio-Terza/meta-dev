@@ -2722,6 +2722,7 @@ dependencies = [
  "newtype",
  "port-core",
  "sqlx",
+ "sqlx-core",
  "store-ports-macros",
  "strum",
  "tempfile",

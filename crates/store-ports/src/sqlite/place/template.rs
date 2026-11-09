@@ -11,6 +11,7 @@ use crate::sqlite::opened::Opened;
 #[derive(Debug, Default)]
 pub(super) struct Template {
     image: Mutex<Image>,
+    spare: Mutex<Vec<Opened>>,
 }
 
 #[derive(Debug, Default)]
@@ -30,7 +31,16 @@ impl Template {
     }
 
     pub(super) fn opened(&self, migrations: Migrations) -> Result<Opened, StoreFailure> {
-        self.image.lock().unwrap_or_else(PoisonError::into_inner).opened(migrations)
+        let spare = self.spare.lock().unwrap_or_else(PoisonError::into_inner).pop();
+        spare.map_or_else(
+            || self.image.lock().unwrap_or_else(PoisonError::into_inner).opened(migrations).and_then(Opened::rewound),
+            Ok,
+        )
+    }
+
+    pub(super) fn returned(&self, opened: Opened) {
+        let rewound = opened.rewound();
+        self.spare.lock().unwrap_or_else(PoisonError::into_inner).extend(rewound);
     }
 }
 

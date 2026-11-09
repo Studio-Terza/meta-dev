@@ -23,6 +23,7 @@ pub struct Sqlite {
 }
 
 #[derive(Debug)]
+#[must_use]
 struct Shared {
     place: Place,
     migrations: Migrations,
@@ -75,5 +76,12 @@ impl StoreFiller for Sqlite {
                 .transpose()
                 .and_then(|_created| OpenOptions::new().create(true).truncate(false).write(true).open(path))
         })
+    }
+}
+
+impl Drop for Shared {
+    fn drop(&mut self) {
+        let opened = self.opened.get_mut().ok().and_then(Option::take);
+        self.place.kept(self.migrations, opened);
     }
 }

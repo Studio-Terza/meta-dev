@@ -46,6 +46,13 @@ impl Place {
         }
     }
 
+    pub(super) fn kept(&self, migrations: Migrations, opened: Option<Opened>) {
+        match self {
+            Place::File(_path) => drop(opened),
+            Place::Memory => opened.into_iter().for_each(|spare| Template::shared(migrations).returned(spare)),
+        }
+    }
+
     fn filed(path: &Path, prepare: impl FnOnce(&Path) -> io::Result<()>) -> Result<SqliteConnectOptions, StoreFailure> {
         path.parent()
             .map(prepare)

@@ -1,5 +1,6 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
-use sqlx::{ConnectOptions, Connection, Sqlite, SqliteConnection, Transaction};
+use sqlx::{ConnectOptions, Connection, Database, Sqlite, SqliteConnection, Transaction};
+use sqlx_core::transaction::TransactionManager;
 use tokio::runtime::{Builder, Runtime};
 
 use super::migrations::Migrations;
@@ -25,6 +26,20 @@ impl Opened {
         let mut connection = runtime.block_on(options.connect()).map_err(StoreFailure::Open)?;
         runtime.block_on(connection.deserialize(None, image, false)).map_err(StoreFailure::Open)?;
         Ok(Opened { runtime, connection })
+    }
+
+    pub(super) fn rewound(mut self) -> Result<Opened, StoreFailure> {
+        let depth = <Sqlite as Database>::TransactionManager::get_transaction_depth(&self.connection);
+        let runtime = &self.runtime;
+        let connection = &mut self.connection;
+        (depth > 0)
+            .then(|| runtime.block_on(<Sqlite as Database>::TransactionManager::rollback(connection)))
+            .transpose()
+            .map_err(StoreFailure::Open)?;
+        runtime
+            .block_on(<Sqlite as Database>::TransactionManager::begin(connection, None))
+            .map_err(StoreFailure::Open)?;
+        Ok(self)
     }
 
     pub(super) fn image(&mut self) -> Result<SqliteOwnedBuf, StoreFailure> {

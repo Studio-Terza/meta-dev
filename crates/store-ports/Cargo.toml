@@ -14,6 +14,7 @@ test = false
 doctest = false
 
 [dependencies]
+sqlx-core = { version = "0.9.0", default-features = false }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 sqlx.workspace = true
