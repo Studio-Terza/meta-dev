@@ -141,8 +141,9 @@ impl<'found> Resolver<'found> {
         names: &ReferencedNames,
     ) -> Vec<Link<'found>> {
         let uses = names.uses();
+        let distinct: BTreeSet<&UsePath> = uses.values().flatten().copied().collect();
         let found: BTreeMap<&UsePath, Vec<Member<'found>>> =
-            uses.values().flatten().map(|path| (*path, self.used(reach, krate, path))).collect();
+            distinct.into_iter().map(|path| (path, self.used(reach, krate, path))).collect();
         uses.iter()
             .filter_map(|(owner, used)| {
                 let declaring = self.declaring.get(*owner).map_or(&[][..], Vec::as_slice);
