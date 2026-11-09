@@ -1,8 +1,8 @@
-use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteOwnedBuf};
 use sqlx::{ConnectOptions, Connection, Sqlite, SqliteConnection, Transaction};
 use tokio::runtime::{Builder, Runtime};
 
+use super::migrations::Migrations;
 use crate::{Batch, Query, Statements, StoreFailure, Written};
 
 #[derive(Debug)]
@@ -12,11 +12,12 @@ pub(super) struct Opened {
 }
 
 impl Opened {
-    pub(super) fn connected(options: &SqliteConnectOptions, migrator: &Migrator) -> Result<Opened, StoreFailure> {
+    pub(super) fn connected(options: &SqliteConnectOptions, migrations: Migrations) -> Result<Opened, StoreFailure> {
         let runtime = Builder::new_current_thread().build().map_err(StoreFailure::Runtime)?;
-        let mut connection = runtime.block_on(options.connect()).map_err(StoreFailure::Open)?;
-        runtime.block_on(migrator.run(&mut connection))?;
-        Ok(Opened { runtime, connection })
+        let connection = runtime.block_on(options.connect()).map_err(StoreFailure::Open)?;
+        let mut opened = Opened { runtime, connection };
+        opened.migrated(migrations)?;
+        Ok(opened)
     }
 
     pub(super) fn copied(options: &SqliteConnectOptions, image: SqliteOwnedBuf) -> Result<Opened, StoreFailure> {
@@ -35,12 +36,27 @@ impl Opened {
     }
 
     pub(super) fn transacted<B: Batch>(&mut self, batch: B) -> Result<Written, B::Failure> {
-        let mut transaction = self.runtime.block_on(self.connection.begin()).map_err(StoreFailure::from)?;
-        let written = batch.written(&mut Statements::over(&mut transaction, &self.runtime));
-        Self::settled(&self.runtime, transaction, written)
+        self.settled(|statements| batch.written(statements))
+    }
+
+    fn migrated(&mut self, migrations: Migrations) -> Result<Written, StoreFailure> {
+        self.settled(|statements| {
+            let pending = statements.migrated(migrations.migrator())?;
+            migrations.rewritten(&pending, statements)
+        })
     }
 
     fn settled<Failure: From<StoreFailure>>(
+        &mut self,
+        writing: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,
+    ) -> Result<Written, Failure> {
+        let runtime = &self.runtime;
+        let mut transaction = runtime.block_on(self.connection.begin()).map_err(StoreFailure::from)?;
+        let written = writing(&mut Statements::over(&mut transaction, runtime));
+        Self::ended(runtime, transaction, written)
+    }
+
+    fn ended<Failure: From<StoreFailure>>(
         runtime: &Runtime,
         transaction: Transaction<'_, Sqlite>,
         written: Result<Written, Failure>,

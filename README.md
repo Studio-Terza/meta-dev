@@ -235,6 +235,37 @@ every field of a row is a `store_ports::Column`: a newtype over an integer, floa
 `FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
 back through `newtype::Guarded`, so a stored value its check refuses fails the read; `grammar-output`'s `Bare`
 and `Quoted` fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
+
+A store's schema is a `store_ports::Schema`: its SQL migrations, and the typed Rust rewrites, each a `Batch` due when
+the migration of a given version is pending. Opening a store applies every pending migration and then every due rewrite,
+in version order, in one transaction: a store whose applied migrations do not match their declared checksums, a failing
+migration or a failing rewrite leaves the store exactly as it was. A rewrite runs only on the latest schema, the one
+`.sqlx` checks its queries against, so a later migration that renames a table or column a rewrite reads stops its query
+compiling instead of failing on an old store. A rule that Rust already owns, such as how the segmenter cuts a message
+into segments and sheds blanks, is never restated in SQL: `Resegmented`, due with migration 20261108000012, re-derives
+every message's segments through the same segmenter ingest runs, rewriting each segment's shape and body and adding and
+removing segments, so an old store holds the segments a fresh ingest of the same transcript would. Migration
+20261108000012 keeps the search index in step with every update and delete of a segment. Every row that points at a
+segment does so through a foreign key into `segments`, and the rewrite never lists those tables: it deletes each stored
+segment the segmenter would change or drop through `Statements::released`, which answers `Released::Referenced` where a
+foreign key refuses the delete, so SQLite checks every foreign key `pragma_foreign_key_list` reports, a table added
+later included. A re-derivation that would change the shape or body of a segment any row points at, or drop it, refuses
+the open with `StoreFailure::Refused`, naming every such segment as `message#ordinal`, and the store is left as it was.
+Segments nothing points at are still re-derived. Migration 20261109000001 gives `mechanical_links` generated
+`source_ordinal` and `target_ordinal` columns, read from the ordinal of a segment anchor (null for a message anchor),
+with foreign keys into `segments`, so a `cites` or `answers` link holds its segment like any annotation and its ordinal
+cannot disagree with its anchor. The migration copies the stored links with those keys deferred, and the rewrite due with
+it, `Anchored`, reads `pragma_foreign_key_check` for `mechanical_links`: an old store holding a link whose segment it does
+not hold refuses the open with `StoreFailure::Refused`, naming every such link as `source relation target`, never with a
+bare foreign key failure. Ingest links over every message of a session, earlier ones re-segmented in memory, so a link
+can name a segment of an earlier message that the store holds differently or not at all, such as one stored under an
+older segmenter. Before writing, `Holding` checks every segment each link names: the row the store will hold, the
+stored one or the one written now, must be the row the segmenter derives from that message. A link that fails is not
+written and ingest prints it as `refused link source relation target`; the rest of the session is written and its cursor
+advances. `every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets` reads every foreign key into
+`segments` through a checked query over `pragma_foreign_key_list` and fails on an ON DELETE or ON UPDATE action or a
+table declaring `DEFERRABLE`, since the rewrite's refusal relies on SQLite refusing the delete at once.
+
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
 

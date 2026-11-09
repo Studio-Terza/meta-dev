@@ -1,9 +1,12 @@
+use std::collections::BTreeSet;
+
+use sqlx::migrate::{Migrate, Migrator};
 use sqlx::query::{Map, Query};
 use sqlx::sqlite::SqliteRow;
 use sqlx::{IntoArguments, Sqlite, SqliteConnection};
 use tokio::runtime::Runtime;
 
-use crate::{Columns, StoreFailure, Written};
+use crate::{Columns, Released, StoreFailure, Version, Written};
 
 mod boundary;
 
@@ -48,5 +51,24 @@ impl<'run> Statements<'run> {
     {
         let done = self.runtime.block_on(query.execute(&mut *self.connection))?;
         Ok(Written::affected(&done))
+    }
+
+    pub fn released<Arguments>(&mut self, query: Query<'_, Sqlite, Arguments>) -> Result<Released, StoreFailure>
+    where
+        Arguments: Send + IntoArguments<Sqlite>,
+    {
+        self.runtime
+            .block_on(query.execute(&mut *self.connection))
+            .map(|_done| Released::Deleted)
+            .or_else(Released::refused)
+    }
+
+    pub(crate) fn migrated(&mut self, migrator: &Migrator) -> Result<BTreeSet<Version>, StoreFailure> {
+        self.runtime.block_on(self.connection.ensure_migrations_table(&migrator.table_name))?;
+        let listed = self.runtime.block_on(self.connection.list_applied_migrations(&migrator.table_name))?;
+        let applied: BTreeSet<Version> = listed.iter().map(|migration| Version::new(migration.version)).collect();
+        self.runtime.block_on(migrator.run(&mut *self.connection))?;
+        let declared: BTreeSet<Version> = migrator.iter().map(|migration| Version::new(migration.version)).collect();
+        Ok(declared.difference(&applied).copied().collect())
     }
 }
