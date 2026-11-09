@@ -603,7 +603,6 @@ dependencies = [
  "cargo-ports",
  "file-ports",
  "lint-runner",
- "port-core",
  "proptest",
 ]
 
@@ -1130,6 +1129,7 @@ dependencies = [
  "proc-macro2",
  "serde_core",
  "syn 2.0.119",
+ "text-lines",
  "thiserror",
  "toml",
  "workspace-metadata",
@@ -1747,6 +1747,7 @@ name = "lint-workflow-run"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "grammar",
  "lint-core",
  "lint-layout",
  "newtype",
@@ -2096,6 +2097,7 @@ dependencies = [
  "golden",
  "laws",
  "newtype",
+ "serde_json",
  "text-lines",
  "thiserror",
  "workspace-metadata",
@@ -2630,6 +2632,7 @@ dependencies = [
 name = "test-log"
 version = "0.1.0"
 dependencies = [
+ "grammar",
  "laws",
  "serde",
  "text-lines",
@@ -2783,6 +2786,7 @@ name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "grammar",
  "laws",
  "newtype",
  "port-core",

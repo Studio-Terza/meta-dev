@@ -37,7 +37,9 @@ pub struct NodeDependency {
 #[derive(Clone, Debug, Deserialize)]
 pub struct Node {
     id: PackageId,
+    #[serde(default)]
     dependencies: Vec<PackageId>,
+    #[serde(default)]
     deps: Vec<NodeDependency>,
 }
 

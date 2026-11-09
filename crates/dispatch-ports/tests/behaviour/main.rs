@@ -22,7 +22,6 @@ use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
 enum Envelope {
     Read(Output),
     Garbled,
-    Unbuilt,
 }
 
 impl Envelope {
@@ -40,9 +39,9 @@ impl Envelope {
         Envelope::Read(Output::Finished(Finished::new(Reply::new(reply.to_owned()), usage)))
     }
 
-    fn errored(said: &str) -> Envelope {
-        said.parse::<Told>()
-            .map_or(Envelope::Unbuilt, |told| Envelope::Read(Output::Errored(Errored::new(told, Usage::default()))))
+    fn errored(told: &str) -> Envelope {
+        Told::try_new(told.to_owned())
+            .map_or(Envelope::Garbled, |inked| Envelope::Read(Output::Errored(Errored::new(inked, Usage::default()))))
     }
 
     fn unsuccessful() -> Envelope {
@@ -257,7 +256,8 @@ impl Lingering {
         let run = Run::root();
         let watched = {
             let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
-            let dispatch = run.port(FakeDispatch { finishing: None, polls: Mutex::new(0) });
+            let replying = Lingering::pauses(timeout).saturating_add(2);
+            let dispatch = run.port(FakeDispatch { finishing: Some(replying), polls: Mutex::new(0) });
             let deadline = Deadline::after(Watching::START, timeout);
             let held = dispatch.dispatch(&Job::due_by(deadline), &Prompt::new(String::new()))?;
             held.bell().ringer().ring();
@@ -266,11 +266,15 @@ impl Lingering {
         Ok(Observed::read(watched, run.finish().snapshot(), waits))
     }
 
-    fn observed(timeout: Timeout) -> Observed {
+    fn pauses(timeout: Timeout) -> usize {
         let deadline = Deadline::after(Watching::START, timeout);
-        let pauses = iter::successors(Some(Watching::START), |now| Some(now.after(Watching::PAUSE)))
+        iter::successors(Some(Watching::START), |now| Some(now.after(Watching::PAUSE)))
             .take_while(|now| deadline.due(*now) == Due::Pending)
-            .count();
+            .count()
+    }
+
+    fn observed(timeout: Timeout) -> Observed {
+        let pauses = Lingering::pauses(timeout);
         let checks = Calls::new(pauses.saturating_add(1));
         Observed {
             watched: Watched::Stalled(Stall::Overdue),
@@ -280,7 +284,7 @@ impl Lingering {
     }
 }
 
-laws::law!(a_ring_left_on_the_bell_does_not_cut_a_run_short, 1..200_u32, drawn, {
+laws::law!(a_ring_left_on_the_bell_neither_cuts_a_run_short_nor_carries_it_past_its_deadline, 1..200_u32, drawn, {
     let timeout = Timeout::new(drawn);
     let watched = Lingering::watched(timeout).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     prop_assert_eq!(watched, Lingering::observed(timeout));

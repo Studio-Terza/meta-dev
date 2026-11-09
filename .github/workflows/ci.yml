@@ -155,11 +155,16 @@ jobs:
           name: elegance-history
           path: ${{ github.workspace }}/target/ci/history.tsv
 
-  mutants:
+  mutants-shard:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       CARGO_PROFILE_DEV_OPT_LEVEL: "0"
+      SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -171,4 +176,14 @@ jobs:
         with:
           tool: cargo-mutants@27.1.0
       - name: mutants in changed lines
-        run: '"$TOOLS/ci" mutants-changed "$RUNNER_TEMP/changed.diff" "$RUNNER_TEMP" $MUTANTS_SCOPE'
+        run: '"$TOOLS/ci" mutants-changed "$RUNNER_TEMP/changed.diff" "$RUNNER_TEMP" "$SHARD" $MUTANTS_SCOPE'
+
+  mutants:
+    if: always() && github.event_name == 'pull_request'
+    needs: mutants-shard
+    runs-on: ubuntu-latest
+    steps:
+      - name: every shard succeeded
+        env:
+          SHARDS: ${{ needs.mutants-shard.result }}
+        run: test "$SHARDS" = success

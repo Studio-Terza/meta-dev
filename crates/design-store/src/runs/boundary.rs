@@ -79,7 +79,8 @@ struct Spent {
 
 impl From<Option<Usage>> for Spent {
     fn from(usage: Option<Usage>) -> Spent {
-        let [input, output, cache_written, cache_read] = usage.map(|used| used.spent().map(Some)).unwrap_or_default();
+        let [input, output, cache_written, cache_read] =
+            usage.map(|reported| reported.spent().map(Some)).unwrap_or_default();
         Spent { input, output, cache_written, cache_read }
     }
 }
@@ -182,9 +183,11 @@ VALUES
             account: Account,
             unreported: Delivery
         ))?;
-        let holding = held.map(|flailed| flailed.written(statements)).transpose()?;
-        let retelling =
-            retold.into_iter().map(|told| told.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
+        let holding = held.map(|flailing| flailing.written(statements)).transpose()?;
+        let retelling = retold
+            .into_iter()
+            .map(|again| again.written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
         Ok(Written::total([closed, recorded].into_iter().chain(holding).chain(retelling)))
     }
 }
@@ -585,7 +588,7 @@ impl Query for Unstructured {
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Unplaced>, StoreFailure> {
         let unplaced = UnplacedSegments.rows(statements)?;
-        Ok(unplaced.into_iter().filter(|candidate| candidate.flailed.is_none()).collect())
+        Ok(unplaced.into_iter().filter(|segment| segment.flailed.is_none()).collect())
     }
 }
 

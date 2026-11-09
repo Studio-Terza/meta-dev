@@ -8,9 +8,9 @@ use code_reader::Reader;
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
-use lint_core::{Lint, ModelLint, Readout, Report, WorkspaceLint};
-use lint_layout::Crates;
-use lint_reader::SourceFiles;
+use lint_core::{Lint, ModelLint, Readout, Report, SourceFile, WorkspaceLint};
+use lint_reader::{Described, SourceFiles};
+use workspace_metadata::Metadata;
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_bool_methods::BoolMethods;
@@ -76,7 +76,7 @@ pub(crate) struct Crew<'scope> {
 impl Crew<'_> {
     #[must_use]
     pub(crate) fn checked<'file>(self, readout: &'file Readout, queue: &Queue) -> Outcome<'file> {
-        let modelled = self.located.joined().map(|crates| Lints::modelled(readout, &crates));
+        let modelled = self.located.joined().map(|described| Lints::modelled(readout, &described));
         let mine = Lints::worked(readout, queue);
         let rendered: Vec<Rendered> =
             iter::once(mine).chain(self.helpers.into_iter().map(Helper::joined)).flatten().collect();
@@ -87,6 +87,8 @@ impl Crew<'_> {
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
+
+type Survey = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Report<'file>;
 
 impl Lints {
     const LINTS: [Entry; 51] = [
@@ -122,7 +124,7 @@ impl Lints {
         Entry::Checked(|readout| vec![NoTestIo::report(readout.files())]),
         Entry::Checked(|readout| vec![FakesAtPorts::report(readout.files())]),
         Entry::Checked(|readout| vec![PortBatching::report(readout.files())]),
-        Entry::Checked(|readout| vec![OwnedDependencies::report(readout.files(), readout.workspaces())]),
+        Entry::Described(<OwnedDependencies as WorkspaceLint>::report),
         Entry::Checked(|readout| vec![EffectsInFillers::report(readout.files())]),
         Entry::Checked(|readout| vec![CountedCalls::report(readout.files())]),
         Entry::Checked(|readout| vec![HiddenSqlx::report(readout.files())]),
@@ -157,7 +159,7 @@ impl Lints {
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C>,
     ) -> Crew<'scope> {
-        let located = Located::spawned(scope, move || sources.surveyed().ports().located(sources.stage()));
+        let located = Located::spawned(scope, move || sources.ports().located(sources.stage()));
         let helpers =
             Workers::available().helpers().filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok());
         Crew { located, helpers: helpers.collect() }
@@ -170,12 +172,7 @@ impl Lints {
     }
 
     fn helped(sources: &Sources<impl Files, impl Cargo>) -> Vec<Rendered> {
-        Self::worked(
-            &sources
-                .surveyed()
-                .described(SourceFiles::read_staged(sources.surveyed().ports().files(), sources.stage())),
-            sources.queue(),
-        )
+        Self::worked(&SourceFiles::read_staged(sources.ports().files(), sources.stage()), sources.queue())
     }
 
     fn worked(readout: &Readout, queue: &Queue) -> Vec<Rendered> {
@@ -188,15 +185,15 @@ impl Lints {
         queue.claimed(&jobs).flat_map(|job| job.done(readout)).collect()
     }
 
-    fn modelled(readout: &Readout, crates: &Crates) -> Vec<Rendered> {
-        let model = Reader::read(readout, crates);
+    fn modelled(readout: &Readout, described: &Described) -> Vec<Rendered> {
+        let model = Reader::read(readout, described.crates());
         Self::LINTS
             .into_iter()
             .enumerate()
             .filter_map(|(index, entry)| {
                 entry
-                    .modelled()
-                    .and_then(|query| query(&model).dirty())
+                    .surveyed(&model, readout.files(), described.workspaces())
+                    .and_then(Report::dirty)
                     .map(|report| Rendered::render(Slot::from(index), &report))
             })
             .collect()
@@ -207,19 +204,26 @@ impl Lints {
 enum Entry {
     Checked(Check),
     Modelled(Query),
+    Described(Survey),
 }
 
 impl Entry {
     fn checked(self) -> Option<Check> {
         match self {
             Entry::Checked(check) => Some(check),
-            Entry::Modelled(_) => None,
+            Entry::Modelled(_) | Entry::Described(_) => None,
         }
     }
 
-    fn modelled(self) -> Option<Query> {
+    fn surveyed<'run>(
+        self,
+        model: &'run Model,
+        files: &'run [SourceFile],
+        workspaces: &'run [Metadata],
+    ) -> Option<Report<'run>> {
         match self {
-            Entry::Modelled(query) => Some(query),
+            Entry::Modelled(query) => Some(query(model)),
+            Entry::Described(survey) => Some(survey(files, workspaces)),
             Entry::Checked(_) => None,
         }
     }

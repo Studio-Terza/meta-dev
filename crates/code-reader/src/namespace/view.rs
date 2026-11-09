@@ -4,7 +4,7 @@ use super::binding::Binding;
 use super::entries::Admission;
 use super::resolver::{Outer, Resolution};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 enum Found<'rows> {
     #[default]
     Nothing,
@@ -84,7 +84,7 @@ impl Determinacy {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct View<'rows> {
     found: Found<'rows>,
     pending: Determinacy,

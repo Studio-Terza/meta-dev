@@ -54,8 +54,7 @@ impl Metadata {
         let members: BTreeSet<&PackageId> = self.workspace_members.iter().collect();
         let named: BTreeMap<&PackageId, &CrateName> =
             self.packages.iter().filter_map(|package| Some((package.package_id()?, package.name()))).collect();
-        let nodes: BTreeMap<&PackageId, &Node> =
-            self.resolve.iter().flat_map(Resolve::nodes).map(|node| (node.package_id(), node)).collect();
+        let nodes: BTreeMap<&PackageId, &Node> = self.nodes().iter().map(|node| (node.package_id(), node)).collect();
         let direct: BTreeSet<&PackageId> = members
             .iter()
             .filter_map(|member| nodes.get(member))
@@ -115,7 +114,7 @@ impl Metadata {
     }
 
     pub(crate) fn nodes(&self) -> &[Node] {
-        self.resolve.as_ref().map_or(&[], Resolve::nodes)
+        self.resolve.as_ref().map_or(&[], AsRef::as_ref)
     }
 }
 

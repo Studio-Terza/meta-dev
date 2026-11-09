@@ -1,7 +1,5 @@
 use logos::Logos;
 
-use super::Attachment;
-
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Piece {
     #[token("none")]
@@ -16,6 +14,13 @@ pub(super) enum Piece {
     Space,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Form {
+    None,
+    Owner,
+    Labels,
+}
+
 impl Piece {
     pub(super) fn spoken(self) -> Option<Piece> {
         match self {
@@ -24,9 +29,11 @@ impl Piece {
         }
     }
 
-    pub(super) fn attachment(self, text: String) -> Option<Attachment> {
+    pub(super) fn attached(self) -> Option<Form> {
         match self {
-            Piece::None | Piece::Owner | Piece::Labels => Some(Attachment(text)),
+            Piece::None => Some(Form::None),
+            Piece::Owner => Some(Form::Owner),
+            Piece::Labels => Some(Form::Labels),
             Piece::Word | Piece::Space => None,
         }
     }

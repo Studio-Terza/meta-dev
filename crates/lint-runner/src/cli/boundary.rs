@@ -8,8 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, Scope, ScopedJoinHandle};
 
 use lint_core::Report;
-use lint_layout::Crates;
-use lint_reader::Unlocated;
+use lint_reader::{Described, Unlocated};
 
 use super::stack_size::StackSize;
 
@@ -57,19 +56,19 @@ impl Queue {
 
 #[derive(Debug)]
 pub(crate) enum Located<'scope> {
-    Locating(ScopedJoinHandle<'scope, Result<Crates, Unlocated>>),
-    Found(Result<Crates, Unlocated>),
+    Locating(ScopedJoinHandle<'scope, Result<Described, Unlocated>>),
+    Found(Result<Described, Unlocated>),
 }
 
 impl<'scope> Located<'scope> {
     pub(crate) fn spawned(
         scope: &'scope Scope<'scope, '_>,
-        locate: impl Fn() -> Result<Crates, Unlocated> + Send + Copy + 'scope,
+        locate: impl Fn() -> Result<Described, Unlocated> + Send + Copy + 'scope,
     ) -> Located<'scope> {
         thread::Builder::new().spawn_scoped(scope, locate).map_or_else(|_| Located::Found(locate()), Located::Locating)
     }
 
-    pub(crate) fn joined(self) -> Result<Crates, Unlocated> {
+    pub(crate) fn joined(self) -> Result<Described, Unlocated> {
         match self {
             Located::Locating(locating) => locating.join().unwrap_or_else(|payload| resume_unwind(payload)),
             Located::Found(found) => found,

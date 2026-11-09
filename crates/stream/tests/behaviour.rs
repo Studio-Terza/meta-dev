@@ -7,7 +7,7 @@ use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
 use stream::{Anchor, Message, Relation, Shape, Stream};
-use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts};
+use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts, Uuid};
 
 const CITED: &str = "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b";
 const DIRECTORY: &str = "/projects/work";
@@ -158,7 +158,13 @@ impl Cases {
 
     fn bodies(text: &&str) -> Vec<String> {
         Fixture::first(text)
-            .map(|message| message.segments().iter().map(|segment| segment.text(&message).to_string()).collect())
+            .map(|message| {
+                message
+                    .segments()
+                    .iter()
+                    .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -219,13 +225,14 @@ impl Touching {
             Say::new("l1", Some("o1"), Authorship::Lead, "1. reply"),
             Say::new("o2", Some("l1"), Authorship::Owner, "1. yes"),
         ])
-        .map(|stream| {
-            stream
+        .and_then(|stream| {
+            let uuid = Uuid::try_new((*touched).to_owned())?;
+            Ok(stream
                 .links()
                 .iter()
-                .filter(|link| link.anchors().into_iter().any(|anchor| anchor.message().to_string() == *touched))
+                .filter(|link| link.anchors().into_iter().any(|anchor| *anchor.message() == uuid))
                 .map(ToString::to_string)
-                .collect()
+                .collect())
         })
         .unwrap_or_default()
     }
@@ -244,7 +251,11 @@ laws::table!(
 
 laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace, "[ -~\n\t•]{0,80}", text, {
     let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let bodies: Vec<String> = message.segments().iter().map(|segment| segment.text(&message).to_string()).collect();
+    let bodies: Vec<String> = message
+        .segments()
+        .iter()
+        .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
+        .collect();
     let inked = |text: &str| text.chars().filter(|letter| !letter.is_whitespace()).collect::<String>();
     prop_assert_eq!(inked(&bodies.concat()), inked(&text));
     let ends = |body: &String| [body.chars().next(), body.chars().last()].into_iter().flatten().collect::<Vec<char>>();

@@ -56,7 +56,29 @@ const OPAQUE_ROOT: &str = "mod topic;\nmod head;\n";
 const OPAQUE_TOPIC: &str = "pub use other::*;\n";
 const BESIDE_OPAQUE_GLOB: &str = "use crate::topic::*;\nuse std::fmt;\npub struct Head;\nimpl fmt::Debug for Head {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.finish() }\n}\n";
 
-const CASES: [Case; 31] = [
+const HAND_GUARDED: &str = "use newtype::Guarded;\nstruct A(String);\nimpl Guarded for A {\n    fn try_new(inner: String) -> Result<A, Unbare> { Ok(A(inner)) }\n}\nstruct B(String);\nimpl newtype::Guarded for B {\n    fn try_new(inner: String) -> Result<B, Unbare> { Ok(B(inner)) }\n}\n";
+const DERIVED_GUARDED: &str = "use newtype::{Checked, Newtype};\n#[derive(Newtype, Clone, Debug)]\n#[newtype(checked)]\nstruct A(String);\nimpl Checked for A {\n    type Error = Unbare;\n    fn checked(inner: &String) -> Result<&String, Unbare> { Ok(inner) }\n}\n";
+
+const NEWTYPE_MANIFEST: &str = "[package]\nname = \"newtype\"\n";
+const USER_MANIFEST: &str = "[package]\nname = \"user\"\n[dependencies]\nnewtype = { path = \"../newtype\" }\n";
+const NEWTYPE_ROOT: &str = "mod boundary;\npub use boundary::Guarded;\npub struct A(String);\nimpl Guarded for A {}\npub struct B(String);\nimpl crate::Guarded for B {}\npub struct C(String);\nimpl boundary::Guarded for C {}\n";
+const NEWTYPE_BOUNDARY: &str = "pub trait Guarded {}\n";
+const NEWTYPE_REEXPORT: &str = "mod boundary;\npub use boundary::Guarded;\n";
+const IMPORTED_GUARDED: &str = "use newtype::Guarded;\npub struct A(String);\nimpl Guarded for A {}\n";
+const PATHED_GUARDED: &str = "pub struct B(String);\nimpl newtype::Guarded for B {}\n";
+const GLOBBED_GUARDED: &str = "use newtype::*;\npub struct C(String);\nimpl Guarded for C {}\n";
+const RENAMED_GUARDED: &str = "use newtype::Guarded as Checked;\npub struct D(String);\nimpl Checked for D {}\n";
+const DERIVED_IN_WORKSPACE: &str = "use newtype::{Checked, Newtype};\n#[derive(Newtype, Clone, Debug)]\n#[newtype(checked)]\npub struct E(String);\nimpl Checked for E {}\n";
+const OWN_GUARDED: &str = "pub trait Guarded {}\npub struct F(String);\nimpl Guarded for F {}\n";
+
+const WORKSPACE: &[Source] = &[
+    Source::new(Located::new("crates/newtype/Cargo.toml"), Text::new(NEWTYPE_MANIFEST)),
+    Source::new(Located::new("crates/user/Cargo.toml"), Text::new(USER_MANIFEST)),
+];
+const BOUNDARY: Source = Source::new(Located::new("crates/newtype/src/boundary.rs"), Text::new(NEWTYPE_BOUNDARY));
+const REEXPORTING: Source = Source::new(Located::new("crates/newtype/src/lib.rs"), Text::new(NEWTYPE_REEXPORT));
+
+const CASES: [Case; 33] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -226,9 +248,40 @@ const CASES: [Case; 31] = [
         ],
         Flagged::new(&["src/head.rs:4"]),
     ),
+    Case::new(
+        Title::new("a hand impl of newtype's Guarded"),
+        &[Source::new(Located::new("a.rs"), Text::new(HAND_GUARDED))],
+        Flagged::new(&["a.rs:3", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("Guarded from the Newtype derive"),
+        &[Source::new(Located::new("a.rs"), Text::new(DERIVED_GUARDED))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
-fn every_hand_impl_of_a_derivable_std_trait_is_flagged() {
+fn every_hand_impl_of_a_derivable_trait_is_flagged() {
     assert_eq!(Sources::mismatches::<Queried<HandImpls>>(&CASES), Lines::default());
 }
+
+laws::table!(
+    every_hand_impl_of_the_workspace_guarded_is_flagged,
+    |sources: &&[Source]| Sources::placed_flagged::<Queried<HandImpls>>(WORKSPACE, sources),
+    [
+        &[BOUNDARY, Source::new(Located::new("crates/newtype/src/lib.rs"), Text::new(NEWTYPE_ROOT))][..]
+            => Lines::from(["crates/newtype/src/lib.rs:4", "crates/newtype/src/lib.rs:6", "crates/newtype/src/lib.rs:8"]),
+        &[BOUNDARY, REEXPORTING, Source::new(Located::new("crates/user/src/lib.rs"), Text::new(IMPORTED_GUARDED))][..]
+            => Lines::from(["crates/user/src/lib.rs:3"]),
+        &[BOUNDARY, REEXPORTING, Source::new(Located::new("crates/user/src/lib.rs"), Text::new(PATHED_GUARDED))][..]
+            => Lines::from(["crates/user/src/lib.rs:2"]),
+        &[BOUNDARY, REEXPORTING, Source::new(Located::new("crates/user/src/lib.rs"), Text::new(GLOBBED_GUARDED))][..]
+            => Lines::from(["crates/user/src/lib.rs:3"]),
+        &[BOUNDARY, REEXPORTING, Source::new(Located::new("crates/user/src/lib.rs"), Text::new(RENAMED_GUARDED))][..]
+            => Lines::from(["crates/user/src/lib.rs:3"]),
+        &[BOUNDARY, REEXPORTING, Source::new(Located::new("crates/user/src/lib.rs"), Text::new(DERIVED_IN_WORKSPACE))][..]
+            => Lines::default(),
+        &[BOUNDARY, REEXPORTING, Source::new(Located::new("crates/user/src/lib.rs"), Text::new(OWN_GUARDED))][..]
+            => Lines::default(),
+    ]
+);

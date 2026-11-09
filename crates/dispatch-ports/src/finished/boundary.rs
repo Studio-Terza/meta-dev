@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use grammar::reply::Inked;
 use newtype::Checked;
 use serde::Deserialize;
@@ -111,14 +109,6 @@ impl Checked for Told {
     type Error = Uninked;
 
     fn checked(text: &String) -> Result<&String, Uninked> {
-        Inked::read(text).map(|_inked| text).ok_or_else(|| Uninked(text.to_owned()))
-    }
-}
-
-impl FromStr for Told {
-    type Err = Uninked;
-
-    fn from_str(text: &str) -> Result<Told, Uninked> {
-        Told::try_new(text.to_owned())
+        Inked::read(text).map(|_inked| text).ok_or_else(|| Uninked(text.clone()))
     }
 }

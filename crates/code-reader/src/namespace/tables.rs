@@ -1,7 +1,6 @@
 mod components;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::ops::ControlFlow;
 
 use code_model::Domain;
 use lint_layout::Name;
@@ -114,7 +113,7 @@ impl<'rows> Explicit<'rows> {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Exposed<'rows> {
     default: View<'rows>,
     names: BTreeMap<Key<'rows>, View<'rows>>,
@@ -150,7 +149,7 @@ impl<'rows> Exposed<'rows> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct GlobView<'rows> {
     id: GlobId,
     visibility: Visibility,
@@ -167,7 +166,7 @@ impl<'rows> GlobView<'rows> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct ModuleGlob<'rows> {
     glob: GlobView<'rows>,
     module: ScopeId,
@@ -294,7 +293,7 @@ impl<'tables, 'rows> Names<'tables, 'rows> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Exposing<'rows> {
     scope: ScopeId,
     globs: Vec<ModuleGlob<'rows>>,
@@ -326,33 +325,21 @@ impl<'tables, 'rows> Exposure<'tables, 'rows> {
             modules.iter().map(|globs| globs.iter().map(|glob| glob.module).collect()).collect();
         Components::ordered(&successors).settled(modules, &self)
     }
-
-    fn advanced(
-        modules: Vec<Vec<ModuleGlob<'rows>>>,
-        exposed: Vec<Exposing<'rows>>,
-        moved: Option<ScopeId>,
-    ) -> ControlFlow<Vec<Vec<ModuleGlob<'rows>>>, Vec<Vec<ModuleGlob<'rows>>>> {
-        match moved {
-            Some(_) => {
-                ControlFlow::Continue(exposed.into_iter().fold(modules, |written, exposing| exposing.written(written)))
-            }
-            None => ControlFlow::Break(modules),
-        }
-    }
 }
 
 impl<'rows> Settling<Vec<Vec<ModuleGlob<'rows>>>> for Exposure<'_, 'rows> {
-    fn round(
+    type Round = Vec<Exposing<'rows>>;
+
+    fn round(&self, modules: &Vec<Vec<ModuleGlob<'rows>>>, scopes: &[ScopeId]) -> Vec<Exposing<'rows>> {
+        self.names(modules).exposed(scopes)
+    }
+
+    fn written(
         &self,
+        exposed: Vec<Exposing<'rows>>,
         modules: Vec<Vec<ModuleGlob<'rows>>>,
-        scopes: &[ScopeId],
-    ) -> ControlFlow<Vec<Vec<ModuleGlob<'rows>>>, Vec<Vec<ModuleGlob<'rows>>>> {
-        let exposed = self.names(&modules).exposed(scopes);
-        let moved = exposed
-            .iter()
-            .find(|exposing| exposing.scope.row(&modules) != Some(&exposing.globs))
-            .map(|exposing| exposing.scope);
-        Exposure::advanced(modules, exposed, moved)
+    ) -> Vec<Vec<ModuleGlob<'rows>>> {
+        exposed.into_iter().fold(modules, |written, exposing| exposing.written(written))
     }
 }
 

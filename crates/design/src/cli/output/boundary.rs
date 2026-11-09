@@ -422,7 +422,7 @@ impl Key {
     fn line(self, fields: &mut Fields) -> Result<Line, Unread> {
         match self {
             Key::Session => Ok(Line::Read {
-                session: fields.field::<Phrase<_>>()?,
+                session: fields.field::<Quoted<_>>()?,
                 cursor: Cursor::new(Offset::new(fields.past(&[Key::Read, Key::To])?.field::<Integer<_>>()?)),
             }),
             Key::Authorship => Ok(Line::Authored {
@@ -430,7 +430,7 @@ impl Key {
                 count: Count::new(fields.field::<Integer<_>>()?),
             }),
             Key::Unrecognised => Ok(Line::Unrecognised {
-                kind: fields.field::<Phrase<_>>()?,
+                kind: fields.field::<Quoted<_>>()?,
                 count: Count::new(fields.field::<Integer<_>>()?),
             }),
             Key::Form => {
@@ -444,8 +444,8 @@ impl Key {
             Key::Hit => Ok(Line::Hit {
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
                 author: fields.field::<Word<_>>()?,
-                stamp: fields.field::<Phrase<_>>()?,
-                body: fields.field::<Phrase<_>>()?,
+                stamp: fields.field::<Quoted<_>>()?,
+                body: fields.field::<Quoted<_>>()?,
             }),
             Key::Root => Ok(Line::Root {
                 node: fields.field::<Id<_>>()?,
@@ -475,18 +475,18 @@ impl Key {
                 author: fields.field::<Word<_>>()?,
                 sense: fields.optional::<Word<_>>().map(|kind| Remark::sensed(kind, fields)).transpose()?,
                 entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-                body: fields.field::<Phrase<_>>()?,
+                body: fields.field::<Quoted<_>>()?,
             }),
             Key::Message => Ok(Line::Message {
-                uuid: fields.field::<Word<_>>()?,
+                uuid: fields.field::<Bare<_>>()?,
                 author: fields.field::<Word<_>>()?,
-                session: fields.past(&[Key::Session])?.field::<Phrase<_>>()?,
-                stamp: fields.past(&[Key::At])?.field::<Phrase<_>>()?,
+                session: fields.past(&[Key::Session])?.field::<Quoted<_>>()?,
+                stamp: fields.past(&[Key::At])?.field::<Quoted<_>>()?,
             }),
             Key::Segment => Ok(Line::Segment {
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
                 shape: fields.field::<Bare<_>>()?,
-                body: fields.field::<Phrase<_>>()?,
+                body: fields.field::<Quoted<_>>()?,
             }),
             Key::Link => Ok(Line::Link {
                 source: Anchored::read(fields)?,
@@ -506,7 +506,7 @@ impl Key {
             Key::Uncovered => Ok(Line::Uncovered(SegmentRef::from(&fields.field::<Cited>()?))),
             Key::Already => Ok(Line::Repeated {
                 file: AppliedId::new(fields.past(&[Key::Applied, Key::File])?.field::<Integer<_>>()?),
-                stamp: fields.past(&[Key::At])?.field::<Phrase<_>>()?,
+                stamp: fields.past(&[Key::At])?.field::<Quoted<_>>()?,
             }),
             Key::Reaped => {
                 Ok(Line::Reaped { run: RunId::new(fields.field::<Integer<_>>()?), state: fields.field::<Word<_>>()? })
@@ -570,7 +570,7 @@ impl Summary {
 
     fn rendered(&self) -> String {
         let Summary { node, project, facet, stage, basis, role, entered, title } = self;
-        let titled = title.as_ref().map(|given| format!(" {}", Line::quoted(given))).unwrap_or_default();
+        let titled = title.as_ref().map(|named| format!(" {}", Line::quoted(named))).unwrap_or_default();
         format!(
             "{} {} {facet} {stage} {basis} {role} {} {entered}{titled}",
             Line::numbered(*node),

@@ -1,12 +1,8 @@
-use std::str::FromStr;
-
-use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Spelled};
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 use crate::blank::Blank;
 
-#[derive(
-    Newtype, Arbitrary, Display, Spelled, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[newtype(checked)]
 pub struct Kind(String);
 
@@ -14,17 +10,6 @@ impl Checked for Kind {
     type Error = Blank;
 
     fn checked(text: &String) -> Result<&String, Blank> {
-        match text.chars().next() {
-            Some(_) => Ok(text),
-            None => Err(Blank),
-        }
-    }
-}
-
-impl FromStr for Kind {
-    type Err = Blank;
-
-    fn from_str(text: &str) -> Result<Kind, Blank> {
-        Kind::try_new(text.to_owned())
+        text.chars().next().map(|_first| text).ok_or(Blank)
     }
 }

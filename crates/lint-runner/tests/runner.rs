@@ -69,10 +69,10 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let runner = include_str!("../src/cli/mode/lints.rs");
     let listed_by_the_runner = [
         "::report(readout.files())",
-        "::report(readout.files(), readout.workspaces())",
         "flows.report::<",
         "::dirty(&system)",
         "ModelLint>::report",
+        "WorkspaceLint>::report",
     ]
     .iter()
     .map(|call| runner.matches(call).count())
@@ -231,12 +231,24 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\n")?;
     let clean = root.verdict(&[]);
-    root.write("src/lib.rs", DIRTY)?;
+    root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
+    let mut err = Vec::new();
+    let unwritten = [&[][..], &["--report"], &["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]]
+        .map(|flags| {
+            Cli::from_args(flags.iter().map(OsString::from).chain([OsString::from(&root.root)])).verdict(
+                &root.files,
+                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                &mut <&mut [u8]>::default(),
+                &mut err,
+            )
+        });
     let unreadable = Trees::verdict(&Memory::default(), Path::new("/no/such/root"), &[]);
     assert_eq!(
         [clean, root.verdict(&[]), root.verdict(&["query", "--role", "nonsense", "--in"]), unreadable],
         [Verdict::Clean, Verdict::Violations, Verdict::Refused, Verdict::Refused]
     );
+    assert_eq!(unwritten, [Verdict::Refused; 3]);
+    assert_eq!(String::from_utf8(err)?.matches("cannot write the output").count(), 3);
     Ok(())
 }
 

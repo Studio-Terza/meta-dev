@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use file_ports::{Bytes, Memory};
-use lint_core::{Lint, Report, SourceFile, SourceText, WorkspaceLint};
+use lint_core::{Report, SourceFile, SourceText, WorkspaceLint};
 use lint_placement::Placement;
 use newtype::Wrapping;
 use workspace_metadata::Metadata;
@@ -55,8 +55,8 @@ impl Sources {
     }
 
     #[must_use]
-    pub fn placed_flagged<Checked: Lint>(manifests: &[Source], sources: &[Source]) -> Lines {
-        Self::lines(&Checked::report(&Self::placed(manifests, sources)))
+    pub fn placed_flagged<Checked: Checks>(manifests: &[Source], sources: &[Source]) -> Lines {
+        Checked::flagged(&Self::placed(manifests, sources))
     }
 
     #[must_use]

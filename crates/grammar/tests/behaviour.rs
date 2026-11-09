@@ -2,6 +2,8 @@
 
 use grammar::anchor::Anchoring;
 use grammar::artifact::Artifacts;
+use grammar::assignment::Emptied;
+use grammar::banner::Banner;
 use grammar::cited::Cited;
 use grammar::flag::Flags;
 use grammar::ident::Words;
@@ -9,15 +11,19 @@ use grammar::line::Unbroken;
 use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
-use grammar::notes::{Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
+use grammar::notes::{Date, Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
+use grammar::program::Program;
 use grammar::reply::Inked;
 use grammar::search::Term;
 use grammar::search::Terms;
+use grammar::shard::Sharding;
 use grammar::slug::Letters;
+use grammar::spec_line;
+use grammar::spec_line::Attachment;
 use laws::proptest::collection::vec;
-use laws::proptest::prelude::{Strategy, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 
 struct Marks;
@@ -338,6 +344,14 @@ laws::table!(
     ]
 );
 
+laws::roundtrip!(
+    a_sharding_is_displayed_and_parsed_back,
+    (1..=u16::MAX).prop_flat_map(|count| (0..count).prop_map(move |index| (index, count))),
+    |(index, count): &(u16, u16)| format!("{index}/{count}"),
+    |text: &String| text.parse::<Sharding>().ok().map(|sharding| sharding.to_string()),
+    |(index, count): (u16, u16)| Some(format!("{index}/{count}"))
+);
+
 laws::table!(
     an_anchor_reads_as_a_message_id_or_one_with_a_segment_index,
     Inks::anchored,
@@ -627,9 +641,9 @@ impl Named {
     fn words(entry: &Entry) -> Said {
         let quotes: Result<Vec<String>, Unclosed> =
             entry.quotes().into_iter().map(|quote| quote.map(ToString::to_string).map_err(Clone::clone)).collect();
-        quotes.map(|quoted| {
+        quotes.map(|closed| {
             [
-                quoted,
+                closed,
                 entry.cites().iter().map(ToString::to_string).collect(),
                 entry.dates().iter().map(ToString::to_string).collect(),
             ]
@@ -866,6 +880,123 @@ laws::table!(
         &[" \t"][..] => true,
         &[""][..] => true,
     ]
+);
+
+laws::roundtrip!(
+    a_command_s_program_is_its_first_word_whatever_follows,
+    (any::<Program>(), "[ \t]{0,3}", "([ \t][ -~]{0,20})?"),
+    |(program, lead, rest): &(Program, String, String)| format!("{lead}{}{rest}", program.clone().into_inner()),
+    |text: &String| text.parse::<Program>().ok(),
+    |(program, _lead, _rest): (Program, String, String)| Some(program)
+);
+
+laws::roundtrip!(
+    an_emptied_assignment_reads_back_its_name,
+    any::<Emptied>(),
+    |emptied: &Emptied| format!("{}=", emptied.clone().into_inner()),
+    |text: &String| text.parse::<Emptied>().ok(),
+    Some
+);
+
+laws::roundtrip!(
+    a_spec_line_reads_back_from_its_rendering,
+    prop_oneof![
+        Just("repair: main".to_owned()),
+        any::<Attachment>().prop_map(|attachment| format!("spec: {attachment}")),
+        "[!-~]([ -~]{0,20}[!-~])?".prop_map(|value| format!("spec: {value}")),
+    ],
+    |text: &String| text.parse::<spec_line::Line>().ok(),
+    |line: &Option<spec_line::Line>| line.as_ref().map(ToString::to_string),
+    Some
+);
+
+laws::table!(
+    a_program_holds_exactly_one_word_with_no_space_around_it,
+    |word: &&str| Program::try_new((*word).to_owned()).ok().map(Program::into_inner),
+    [
+        "cargo" => Some("cargo".to_owned()),
+        "./run.sh" => Some("./run.sh".to_owned()),
+        "" => None,
+        "cargo test" => None,
+        " cargo" => None,
+        "cargo\n" => None,
+    ]
+);
+
+laws::table!(
+    an_emptied_name_is_exactly_one_identifier,
+    |name: &&str| Emptied::try_new((*name).to_owned()).ok().map(Emptied::into_inner),
+    [
+        "RUSTFLAGS" => Some("RUSTFLAGS".to_owned()),
+        "_cache9" => Some("_cache9".to_owned()),
+        "" => None,
+        "=" => None,
+        "A=" => None,
+        "9A" => None,
+        "a b" => None,
+    ]
+);
+
+laws::table!(
+    a_banner_label_is_exactly_one_plain_word,
+    |label: &&str| Banner::try_new((*label).to_owned()).ok().map(Banner::into_inner),
+    [
+        "grammar" => Some("grammar".to_owned()),
+        "doc-test_log" => Some("doc-test_log".to_owned()),
+        "" => None,
+        "Running" => None,
+        "Doc-tests" => None,
+        "a b" => None,
+        "a/b" => None,
+        "(" => None,
+    ]
+);
+
+laws::law!(
+    a_test_binary_banner_is_labelled_by_its_binary_and_a_doctest_banner_by_its_crate,
+    "[a-z_][a-z0-9_-]{0,12}",
+    name,
+    {
+        let running = format!("     Running unittests src/lib.rs (target/debug/deps/{name})").parse::<Banner>();
+        let documented = format!("   Doc-tests {name}").parse::<Banner>();
+        prop_assert_eq!(running.map(Banner::into_inner), Ok(name.clone()));
+        prop_assert_eq!(documented.map(Banner::into_inner), Ok(format!("doc-{name}")));
+    }
+);
+
+laws::table!(
+    a_date_is_exactly_four_digits_then_two_then_two_joined_by_dashes,
+    |day: &&str| Date::try_new((*day).to_owned()).ok().map(Date::into_inner),
+    [
+        "2026-11-05" => Some("2026-11-05".to_owned()),
+        "" => None,
+        "26-11-05" => None,
+        "2026-1-05" => None,
+        "2026-11-5" => None,
+        "2026/11/05" => None,
+        "2026-11-05x" => None,
+        "202a-11-05" => None,
+        "2026-11-05 2026-11-06" => None,
+    ]
+);
+
+laws::table!(
+    a_date_parses_from_text_only_when_it_is_spelled_as_one,
+    |day: &&str| day.parse::<Date>().ok().map(|date| date.to_string()),
+    [
+        "1999-12-31" => Some("1999-12-31".to_owned()),
+        "1999-12" => None,
+        "1999-12-311" => None,
+        "19991231" => None,
+    ]
+);
+
+laws::roundtrip!(
+    a_date_is_displayed_and_parsed_back,
+    any::<Date>(),
+    |date: &Date| date.to_string(),
+    |text: &String| text.parse::<Date>().ok().map(|date| date.to_string()),
+    |date: Date| Some(date.to_string())
 );
 
 laws::table!(

@@ -1,10 +1,10 @@
 {"workspace_root": "/", "workspace_members": ["grammar", "design", "store"], "packages": [
-  {"id": "grammar", "name": "grammar", "manifest_path": "/grammar/Cargo.toml", "dependencies": [{"name": "logos"}], "metadata": {"port": {"owns": ["logos"], "shared": ["serde"]}}, "targets": [{"kind": ["lib"], "src_path": "/grammar/src/lib.rs"}]},
-  {"id": "design", "name": "design", "manifest_path": "/design/Cargo.toml", "dependencies": [{"name": "logos"}, {"name": "logos"}], "targets": [{"kind": ["lib"], "src_path": "/design/src/lib.rs"}]},
-  {"id": "store", "name": "store", "manifest_path": "/store/Cargo.toml", "dependencies": [{"name": "hashbrown"}, {"name": "serde"}], "targets": [{"kind": ["lib"], "src_path": "/store/src/lib.rs"}]},
-  {"id": "logos", "name": "logos", "manifest_path": "/r/logos/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"], "src_path": "/r/logos/src/lib.rs"}]},
-  {"id": "hashbrown", "name": "hashbrown", "manifest_path": "/r/hashbrown/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"], "src_path": "/r/hashbrown/src/lib.rs"}]},
-  {"id": "serde", "name": "serde", "manifest_path": "/r/serde/Cargo.toml", "dependencies": [], "targets": [{"kind": ["lib"], "src_path": "/r/serde/src/lib.rs"}]}
+  {"id": "grammar", "name": "grammar", "manifest_path": "/grammar/Cargo.toml", "dependencies": [{"name": "logos"}], "metadata": {"port": {"owns": ["logos"], "shared": ["serde"]}}},
+  {"id": "design", "name": "design", "manifest_path": "/design/Cargo.toml", "dependencies": [{"name": "logos"}, {"name": "logos"}]},
+  {"id": "store", "name": "store", "manifest_path": "/store/Cargo.toml", "dependencies": [{"name": "hashbrown"}, {"name": "serde"}]},
+  {"id": "logos", "name": "logos", "manifest_path": "/r/logos/Cargo.toml", "dependencies": []},
+  {"id": "hashbrown", "name": "hashbrown", "manifest_path": "/r/hashbrown/Cargo.toml", "dependencies": []},
+  {"id": "serde", "name": "serde", "manifest_path": "/r/serde/Cargo.toml", "dependencies": []}
 ], "resolve": {"nodes": [
   {"id": "grammar", "dependencies": ["logos"]},
   {"id": "design", "dependencies": ["logos"]},

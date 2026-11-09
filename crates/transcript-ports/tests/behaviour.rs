@@ -4,13 +4,14 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
-use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::prelude::{any, prop_assert_eq};
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Read, Record, Session, Skipped, Transcripts, Unrecognised,
+    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
+    Unrecognised,
 };
 
 const DIRECTORY: &str = "/projects/work";
@@ -22,6 +23,12 @@ impl Lines {
     fn entry(kind: &str, uuid: &str, origin: &str, content: &str) -> String {
         format!(
             "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":null,\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:0{uuid}Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
+        )
+    }
+
+    fn in_session(session: &str) -> String {
+        format!(
+            "{{\"type\":\"user\",\"uuid\":\"1\",\"parentUuid\":null,\"sessionId\":\"{session}\",\"timestamp\":\"2026-01-01T00:00:01Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"typed words\"}}}}\n"
         )
     }
 
@@ -236,7 +243,7 @@ fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
 fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
     let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
-    assert_eq!(stamps, ["2026-01-01T00:00:01Z".parse::<Instant>()?]);
+    assert_eq!(stamps, [Instant::try_new("2026-01-01T00:00:01Z".to_owned())?]);
     Ok(())
 }
 
@@ -273,6 +280,37 @@ fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
     assert_eq!(texts, ["abc"]);
     Ok(())
 }
+
+laws::table!(
+    a_message_uuid_is_read_only_when_it_is_one_bare_word,
+    |uuid: &&str| {
+        Transcript::holding(&Lines::typed(uuid)).read(Cursor::default()).ok().map(|read| {
+            Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect::<Vec<String>>()
+        })
+    },
+    [
+        "abc" => Some(vec![String::from("abc")]),
+        "_a-9" => Some(vec![String::from("_a-9")]),
+        "msg:1" => None,
+        "a b" => None,
+        "-a" => None,
+        "" => None,
+    ]
+);
+
+laws::table!(
+    a_line_whose_session_is_blank_yields_no_record,
+    |session: &&str| {
+        Transcript::holding(&Lines::in_session(session)).read(Cursor::default()).ok().map(|read| {
+            Views::records(read).into_iter().map(|record| record.session().to_string()).collect::<Vec<String>>()
+        })
+    },
+    [
+        "s1" => Some(vec![String::from("s1")]),
+        "a b" => Some(vec![String::from("a b")]),
+        "" => Some(Vec::new()),
+    ]
+);
 
 #[test]
 fn a_session_is_listed_by_its_file_stem() {
@@ -460,4 +498,46 @@ laws::table!(
     a_name_of_neither_party_is_no_authorship,
     |name: &&str| name.parse::<Authorship>().ok(),
     ["human" => None, "" => None],
+);
+
+laws::table!(
+    an_instant_is_made_only_from_non_blank_text,
+    |text: &&str| Instant::try_new((*text).to_owned()).ok().map(|instant| instant.to_string()),
+    ["" => None, "2026-01-01T00:00:01Z" => Some(String::from("2026-01-01T00:00:01Z"))],
+);
+
+laws::table!(
+    a_kind_is_made_only_from_non_blank_text,
+    |text: &&str| Kind::try_new((*text).to_owned()).ok().map(|kind| kind.to_string()),
+    ["" => None, "summary" => Some(String::from("summary"))],
+);
+
+laws::table!(
+    a_session_id_is_made_only_from_non_blank_text,
+    |text: &&str| SessionId::try_new((*text).to_owned()).ok().map(|session| session.to_string()),
+    ["" => None, "s1" => Some(String::from("s1"))],
+);
+
+laws::roundtrip!(
+    an_instant_is_rebuilt_from_its_display,
+    any::<Instant>(),
+    |instant: &Instant| instant.to_string(),
+    |text: &String| Instant::try_new(text.clone()).ok(),
+    Some,
+);
+
+laws::roundtrip!(
+    a_kind_is_rebuilt_from_its_display,
+    any::<Kind>(),
+    |kind: &Kind| kind.to_string(),
+    |text: &String| Kind::try_new(text.clone()).ok(),
+    Some,
+);
+
+laws::roundtrip!(
+    a_session_id_is_rebuilt_from_its_display,
+    any::<SessionId>(),
+    |session: &SessionId| session.to_string(),
+    |text: &String| SessionId::try_new(text.clone()).ok(),
+    Some,
 );

@@ -74,8 +74,8 @@ lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-workflow-run = { path = "../lint-workflow-run" }
 port-core = { path = "../port-core" }
-workspace-metadata = { path = "../workspace-metadata" }
 thiserror.workspace = true
+workspace-metadata = { path = "../workspace-metadata" }
 
 [[test]]
 name = "behaviour"

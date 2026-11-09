@@ -37,13 +37,13 @@ impl Bell {
     }
 
     pub fn waited(&self, pause: Duration) -> Woke {
-        let locked = self.0.chime.lock().unwrap_or_else(PoisonError::into_inner);
-        let (mut chime, lapsed) = self
+        let listening = self.0.chime.lock().unwrap_or_else(PoisonError::into_inner);
+        let (mut heard, lapsed) = self
             .0
             .heard
-            .wait_timeout_while(locked, pause, |heard| *heard == Chime::Quiet)
+            .wait_timeout_while(listening, pause, |chime| *chime == Chime::Quiet)
             .unwrap_or_else(PoisonError::into_inner);
-        *chime = Chime::Quiet;
+        *heard = Chime::Quiet;
         Woke::from(lapsed)
     }
 }

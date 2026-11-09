@@ -20,11 +20,6 @@ pub fn derive_display(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Formatting>(input.into()).into()
 }
 
-#[proc_macro_derive(Spelled)]
-pub fn derive_spelled(input: TokenStream) -> TokenStream {
-    Marked::spelled(input.into()).into()
-}
-
 #[proc_macro_derive(Deserialize, attributes(newtype))]
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Deserializing>(input.into()).into()
@@ -38,4 +33,9 @@ pub fn derive_checked_deserialize(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Serialize, attributes(newtype))]
 pub fn derive_serialize(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Serializing>(input.into()).into()
+}
+
+#[proc_macro_derive(Spelled)]
+pub fn derive_spelled(input: TokenStream) -> TokenStream {
+    Marked::spelled(input.into()).into()
 }

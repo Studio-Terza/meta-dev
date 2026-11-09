@@ -1,10 +1,9 @@
 use std::str::FromStr;
 
 use grammar::project::Names;
-use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Spelled};
-use serde::Serialize;
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype, Serialize};
 
-#[derive(Newtype, Arbitrary, Display, Spelled, CheckedDeserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, Serialize, CheckedDeserialize, Clone, Debug, PartialEq, Eq)]
 #[newtype(checked, strategy = "[A-Za-z0-9][A-Za-z0-9._-]{0,15}")]
 pub struct Project(String);
 
@@ -16,7 +15,7 @@ impl Checked for Project {
     type Error = Unnamed;
 
     fn checked(text: &String) -> Result<&String, Unnamed> {
-        Names::named(text).map(|_named| text).ok_or_else(|| Unnamed(text.to_owned()))
+        Names::named(text).map(|_named| text).ok_or_else(|| Unnamed(text.clone()))
     }
 }
 

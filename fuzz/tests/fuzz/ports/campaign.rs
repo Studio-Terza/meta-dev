@@ -17,7 +17,6 @@ use crate::outcome::{Check, Outcome};
 
 const ROOT: &str = "/fuzzed";
 const BATCH: u32 = 64;
-const WORKSPACE: &str = "{\"workspace_root\": \"/fuzzed\", \"packages\": [], \"resolve\": null}";
 
 #[derive(Debug, PartialEq, Eq)]
 struct Run {
@@ -26,6 +25,16 @@ struct Run {
 }
 
 pub struct Campaign;
+
+struct Workspace;
+
+impl Workspace {
+    const METADATA: &'static str = "{\"workspace_root\": \"/fuzzed\", \"packages\": [], \"resolve\": null}";
+
+    fn described() -> Recorded {
+        [(PathBuf::from(ROOT), Bytes::from(Self::METADATA))].into_iter().collect()
+    }
+}
 
 impl Campaign {
     fn case(target: &str, input: &Input) -> Case {
@@ -51,7 +60,7 @@ impl Campaign {
         let mut err = Vec::new();
         let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(
             files,
-            [(PathBuf::from(ROOT), Bytes::from(WORKSPACE))].into_iter().collect::<Recorded>(),
+            Workspace::described(),
             &mut Vec::new(),
             &mut err,
         );

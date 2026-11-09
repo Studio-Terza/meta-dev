@@ -5,7 +5,7 @@ use file_ports::FileFailure;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Unlocated {
-    #[error("cannot describe the workspace: {source}")]
+    #[error("cannot locate external crate sources: {source}")]
     Metadata {
         #[from]
         source: CargoFailure,

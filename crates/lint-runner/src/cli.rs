@@ -1,14 +1,11 @@
 mod boundary;
 mod mode;
 mod outcome;
-mod refusal;
 mod sources;
 mod stack_size;
 mod verdict;
-mod workspaces;
 
 use std::ffi::OsString;
-use std::fmt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -22,11 +19,9 @@ use port_core::Run;
 
 use mode::Mode;
 use outcome::Outcome;
-use refusal::Refusal;
-use sources::{Ports, Sources, Surveyed};
+use sources::{Ports, Sources};
 use stack_size::StackSize;
 pub use verdict::Verdict;
-use workspaces::Workspaces;
 
 #[derive(Debug)]
 pub struct Cli {
@@ -63,38 +58,34 @@ impl Cli {
         err: &mut (impl Write + Send),
     ) -> Verdict {
         let run = Run::root();
-        let port = run.port(cargo);
-        let surveyed = self
-            .mode
-            .workspaces(&port, &self.roots)
-            .map(|workspaces| Surveyed::new(Ports::new(files, &port), workspaces));
-        self.judged(surveyed, out, err)
+        self.metered(files, &run.port(cargo), out, err)
     }
 
-    fn judged(
+    fn metered(
         &self,
-        described: Result<Surveyed<'_, impl Files + Sync, impl Cargo + Sync>, Refusal<'_>>,
+        files: &(impl Files + Sync),
+        metered: &(impl Cargo + Sync),
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> Verdict {
-        match described {
-            Ok(surveyed) => StackSize::LINT
-                .ran(|| self.linted(SourceFiles::staged(surveyed.ports().files(), &self.roots), surveyed, out, err))
-                .unwrap_or_else(|failure| Self::refused(&failure, err)),
-            Err(refused) => Self::refused(&refused, err),
+        match self.mode.refusal() {
+            Some(refused) => Verdict::refused(refused, err),
+            None => StackSize::LINT
+                .ran(|| self.linted(SourceFiles::staged(files, &self.roots), Ports::new(files, metered), out, err))
+                .unwrap_or_else(|failure| Verdict::refused(&failure, err)),
         }
     }
 
     fn linted(
         &self,
         staged: Result<Stage<'_>, Failure>,
-        surveyed: Surveyed<'_, impl Files + Sync, impl Cargo + Sync>,
+        ports: Ports<'_, impl Files + Sync, impl Cargo + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
         match staged {
-            Ok(stage) => self.staged(&Sources::new(surveyed, &stage), out, err),
-            Err(failure) => Self::refused(&failure, err),
+            Ok(stage) => self.staged(&Sources::new(ports, &stage), out, err),
+            Err(failure) => Verdict::refused(&failure, err),
         }
     }
 
@@ -106,14 +97,8 @@ impl Cli {
     ) -> Verdict {
         thread::scope(|scope| {
             let run = self.mode.started(scope, sources);
-            let surveyed = sources.surveyed();
-            let readout = surveyed.described(SourceFiles::read_staged(surveyed.ports().files(), sources.stage()));
-            run.outcome_of(&readout, sources.queue(), out).written(err)
+            let readout = SourceFiles::read_staged(sources.ports().files(), sources.stage());
+            run.verdict_of(&readout, sources.queue(), out, err)
         })
-    }
-
-    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> Verdict {
-        writeln!(err, "{failure}").ok();
-        Verdict::Refused
     }
 }

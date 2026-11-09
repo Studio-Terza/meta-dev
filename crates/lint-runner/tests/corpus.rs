@@ -29,9 +29,9 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
         .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
     let drifted: Vec<String> = outputs.iter().flat_map(|(fixture, output)| Corpus::verify(fixture, output)).collect();
     assert_eq!(drifted, Vec::<String>::new());
-    let printed: Vec<String> =
+    let lines: Vec<String> =
         outputs.iter().flat_map(|(_, output)| output.parse::<Lines>().into_iter().flatten()).collect();
-    let violations: Vec<Violation<'_>> = printed.iter().map(String::as_str).filter_map(Corpus::violation).collect();
+    let violations: Vec<Violation<'_>> = lines.iter().map(String::as_str).filter_map(Corpus::violation).collect();
     let unfixed: Vec<(&str, usize)> = violations
         .iter()
         .filter(|violation| Corpus::fix_named(violation.said).is_none())
@@ -106,10 +106,10 @@ impl Corpus {
         let runner = include_str!("../src/cli/mode/lints.rs");
         [
             "::report(readout.files())",
-            "::report(readout.files(), readout.workspaces())",
             "flows.report::<",
             "::dirty(&system)",
             "ModelLint>::report",
+            "WorkspaceLint>::report",
         ]
         .iter()
         .map(|call| runner.matches(call).count())

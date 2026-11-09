@@ -1,7 +1,7 @@
 WITH
 RECURSIVE points (n) AS (
   SELECT
-    1
+    0
   UNION ALL
   SELECT
     n + 1
@@ -21,7 +21,8 @@ SELECT
 FROM
   points
 WHERE
-  n NOT BETWEEN 55296 AND 57343;
+  n > 0
+  AND n NOT BETWEEN 55296 AND 57343;
 
 INSERT INTO segments (message, ordinal, shape, body)
 SELECT

@@ -14,6 +14,7 @@ use toml::{Table, Value};
 
 use crate::crate_key::CrateKey;
 use crate::dependencies::Dependencies;
+use crate::dependency_sites::DependencySites;
 use crate::failure::Failure;
 use crate::name::Name;
 use crate::package_name::PackageName;
@@ -29,6 +30,7 @@ pub struct Manifest {
     directory: PathBuf,
     table: Table,
     lines: KeyLines,
+    sites: DependencySites,
 }
 
 impl Manifest {
@@ -71,8 +73,9 @@ impl Manifest {
     fn typed(directory: &Path, text: &SourceText) -> Result<Manifest, toml::de::Error> {
         let document = DeTable::parse(text.as_ref())?;
         let lines = KeyLines::read(text, document.get_ref());
+        let sites = DependencySites::listed(text, document.get_ref());
         let table = Table::deserialize(Deserializer::from(document))?;
-        Ok(Manifest { directory: directory.to_path_buf(), table, lines })
+        Ok(Manifest { directory: directory.to_path_buf(), table, lines, sites })
     }
 
     #[must_use]
@@ -88,6 +91,11 @@ impl Manifest {
     #[must_use]
     pub fn package_name(&self) -> Option<Name> {
         self.table.get(Self::PACKAGE)?.get("name")?.as_str().map(Name::from)
+    }
+
+    #[must_use]
+    pub fn dependency_sites(&self) -> &DependencySites {
+        &self.sites
     }
 
     #[must_use]

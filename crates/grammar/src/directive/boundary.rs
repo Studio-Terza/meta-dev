@@ -1,4 +1,3 @@
-use std::fmt;
 use std::ops::Range;
 
 use logos::{Lexer, Logos};
@@ -82,9 +81,6 @@ pub struct Location {
     line: LineNumber,
     column: Column,
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Spot(Location);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lexed {
@@ -269,28 +265,21 @@ impl Piece {
     }
 }
 
+impl AsRef<LineNumber> for Location {
+    fn as_ref(&self) -> &LineNumber {
+        &self.line
+    }
+}
+
 impl Location {
     #[must_use]
     pub fn new(line: usize, column: usize) -> Location {
         Location { line: LineNumber(line), column: Column(column) }
     }
-}
 
-impl fmt::Display for Location {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "line {}, column {}", self.line, self.column)
-    }
-}
-
-impl From<Location> for Spot {
-    fn from(location: Location) -> Spot {
-        Spot(location)
-    }
-}
-
-impl fmt::Display for Spot {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} {}", self.0.line, self.0.column)
+    #[must_use]
+    pub fn column(self) -> Column {
+        self.column
     }
 }
 

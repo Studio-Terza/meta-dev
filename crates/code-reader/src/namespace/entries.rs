@@ -20,7 +20,7 @@ use super::tables::{Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
 use super::use_path::{Leaf, UsePath};
 use super::view::View;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Visibility {
     Private,
     Visible,
@@ -59,7 +59,7 @@ impl Visibility {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Sight {
     Inside,
     ByPath,
@@ -90,7 +90,7 @@ pub(super) enum Admission {
     Obscured,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct DeclaredId(usize);
 
 impl DeclaredId {

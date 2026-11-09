@@ -17,13 +17,13 @@ use target::Target;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Package {
-    name: CrateName,
     id: Option<PackageId>,
-    #[serde(default)]
-    targets: Vec<Target>,
+    name: CrateName,
     manifest_path: PathBuf,
     dependencies: Vec<Dependency>,
     metadata: Option<Declared>,
+    #[serde(default)]
+    targets: Vec<Target>,
 }
 
 impl Package {
@@ -40,7 +40,7 @@ impl Package {
     }
 
     pub fn proc_macro(&self) -> Option<&Package> {
-        self.library().filter(|library| library.form() == Some(Form::ProcMacro)).map(|_| self)
+        self.targets.iter().filter_map(Target::form).find(|form| *form == Form::ProcMacro).map(|_| self)
     }
 
     pub fn port(&self) -> Option<&PortTable> {

@@ -43,12 +43,12 @@ impl Opened {
     fn settled<Failure: From<StoreFailure>>(
         runtime: &Runtime,
         transaction: Transaction<'_, Sqlite>,
-        outcome: Result<Written, Failure>,
+        written: Result<Written, Failure>,
     ) -> Result<Written, Failure> {
-        match outcome {
-            Ok(written) => runtime
+        match written {
+            Ok(rows) => runtime
                 .block_on(transaction.commit())
-                .map(|()| written)
+                .map(|()| rows)
                 .map_err(|failed| Failure::from(StoreFailure::from(failed))),
             Err(failure) => runtime
                 .block_on(transaction.rollback())

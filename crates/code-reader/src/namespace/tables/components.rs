@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::iter;
 use std::ops::ControlFlow;
 
@@ -138,21 +139,39 @@ enum Shape {
 }
 
 impl Shape {
-    fn rounds<State>(
-        self,
-        state: State,
-        scopes: &[ScopeId],
-        settling: &impl Settling<State>,
-    ) -> ControlFlow<State, State> {
+    fn rounds<State>(self, state: State, scopes: &[ScopeId], settling: &impl Settling<State>) -> State {
         match self {
-            Shape::Acyclic => settling.round(state, scopes),
-            Shape::Cyclic => iter::repeat(()).try_fold(state, |settled, ()| settling.round(settled, scopes)),
+            Shape::Acyclic => settling.written(settling.round(&state, scopes), state),
+            Shape::Cyclic => Shape::reached(state, scopes, settling),
         }
+    }
+
+    fn reached<State>(state: State, scopes: &[ScopeId], settling: &impl Settling<State>) -> State {
+        let mut reached = BTreeSet::new();
+        let (ControlFlow::Break(settled) | ControlFlow::Continue(settled)) = iter::repeat(())
+            .try_fold(state, |held, ()| settling.stepped(&mut reached, settling.round(&held, scopes), held));
+        settled
     }
 }
 
 pub(super) trait Settling<State> {
-    fn round(&self, state: State, scopes: &[ScopeId]) -> ControlFlow<State, State>;
+    type Round: Ord + Clone;
+
+    fn round(&self, state: &State, scopes: &[ScopeId]) -> Self::Round;
+
+    fn written(&self, round: Self::Round, state: State) -> State;
+
+    fn stepped(
+        &self,
+        reached: &mut BTreeSet<Self::Round>,
+        round: Self::Round,
+        held: State,
+    ) -> ControlFlow<State, State> {
+        match reached.insert(round.clone()).then_some(()) {
+            Some(()) => ControlFlow::Continue(self.written(round, held)),
+            None => ControlFlow::Break(held),
+        }
+    }
 }
 
 impl Component {
@@ -160,12 +179,6 @@ impl Component {
         let inner = scopes.iter().flat_map(|scope| scope.row(successors).into_iter().flatten());
         let shape = inner.clone().find(|next| scopes.contains(next)).map_or(Shape::Acyclic, |_| Shape::Cyclic);
         Component { scopes, shape }
-    }
-
-    fn settled<State>(&self, state: State, settling: &impl Settling<State>) -> State {
-        let (ControlFlow::Break(settled) | ControlFlow::Continue(settled)) =
-            self.shape.rounds(state, &self.scopes, settling);
-        settled
     }
 }
 
@@ -181,6 +194,6 @@ impl Components {
     }
 
     pub(super) fn settled<State>(&self, state: State, settling: &impl Settling<State>) -> State {
-        self.0.iter().fold(state, |settled, component| component.settled(settled, settling))
+        self.0.iter().fold(state, |settled, component| component.shape.rounds(settled, &component.scopes, settling))
     }
 }

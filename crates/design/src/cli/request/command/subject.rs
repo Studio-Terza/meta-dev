@@ -38,8 +38,8 @@ impl Subject {
     fn ran(store: &impl Store, job: JobId, out: &mut impl Write) -> Result<Printed, Failure> {
         let ran = store.read(RunsOf::from(job))?;
         ran.first().ok_or(Failure::Unrun(job))?;
-        let lines = ran.iter().map(|run| {
-            Line::Ran(Attempted::new(run.identity(), job, run.state(), run.usage()).replied(run.reply().cloned()))
+        let lines = ran.iter().map(|one| {
+            Line::Ran(Attempted::new(one.identity(), job, one.state(), one.usage()).replied(one.reply().cloned()))
         });
         Printed::lines(out, &lines.collect::<Vec<Line>>())
     }

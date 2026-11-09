@@ -17,7 +17,7 @@ use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
 use super::boundary::Queue;
-use super::{Outcome, Refusal, Sources, Workspaces};
+use super::{Outcome, Sources, Verdict};
 use elegance::Elegance;
 use lints::{Crew, Lints};
 
@@ -63,11 +63,10 @@ impl Mode {
         }
     }
 
-    pub(crate) fn workspaces(&self, cargo: &impl Cargo, roots: &[PathBuf]) -> Result<Workspaces, Refusal<'_>> {
+    pub(crate) fn refusal(&self) -> Option<&QueryFailure> {
         match self {
-            Mode::Gate => Workspaces::described(cargo, roots).map_err(Refusal::Workspace),
-            Mode::Report | Mode::Query(Ok(_)) => Ok(Workspaces::default()),
-            Mode::Query(Err(failure)) => Err(Refusal::Query(failure)),
+            Mode::Query(Err(failure)) => Some(failure),
+            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) => None,
         }
     }
 
@@ -85,38 +84,35 @@ impl Mode {
 }
 
 impl Run<'_, '_> {
-    pub(crate) fn outcome_of<'file>(
+    pub(crate) fn verdict_of(
         self,
-        readout: &'file Readout,
+        readout: &Readout,
         queue: &Queue,
         out: &mut impl Write,
-    ) -> Outcome<'file> {
+        err: &mut impl Write,
+    ) -> Verdict {
         match self {
-            Run::Gate(crew) => Self::gated(readout, queue, crew, out),
-            Run::Report => Self::reported(readout.files(), out),
-            Run::Query(found) => Self::queried(found, readout.files(), out),
+            Run::Gate(crew) => Self::gated(&crew.checked(readout, queue), readout.files(), out, err),
+            Run::Report => Self::reported(readout.files(), out, err),
+            Run::Query(found) => Self::queried(found, readout.files(), out, err),
         }
     }
 
-    fn gated<'file>(readout: &'file Readout, queue: &Queue, crew: Crew<'_>, out: &mut impl Write) -> Outcome<'file> {
-        let files = readout.files();
-        write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)).ok();
-        crew.checked(readout, queue)
+    fn gated(outcome: &Outcome<'_>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
+        outcome.surveyed(
+            &[format_args!("{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files))],
+            out,
+            err,
+        )
     }
-    fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
+    fn reported(files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
         let model = Reader::read_files(files);
-        Elegance::reports(files, &model).iter().try_for_each(|report| write!(out, "{report}")).ok();
-        Outcome::Clean
+        Outcome::Clean.surveyed(&Elegance::reports(files, &model), out, err)
     }
 
-    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
-        found
-            .iter()
-            .try_for_each(|query| {
-                let extraction = Extraction::from(files);
-                write!(out, "{}", query.reply(&TypeSystem::built_from(files, &extraction)))
-            })
-            .ok();
-        Outcome::Clean
+    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
+        let extraction = Extraction::from(files);
+        let system = TypeSystem::built_from(files, &extraction);
+        Outcome::Clean.surveyed(found.map(|query| query.reply(&system)).as_slice(), out, err)
     }
 }

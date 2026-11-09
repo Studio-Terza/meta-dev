@@ -12,10 +12,10 @@ use crate::segment_id::SegmentId;
 pub struct Unanchored(String);
 
 impl Anchor {
-    fn anchored(message: Uuid, indexed: Option<usize>) -> Anchor {
-        match indexed {
+    fn anchored(message: Uuid, ordinal: Option<usize>) -> Anchor {
+        match ordinal {
             None => Anchor::Message(message),
-            Some(ordinal) => Anchor::Segment(SegmentId::new(message, Ordinal::new(ordinal))),
+            Some(counted) => Anchor::Segment(SegmentId::new(message, Ordinal::new(counted))),
         }
     }
 }
@@ -26,7 +26,8 @@ impl FromStr for Anchor {
     fn from_str(written: &str) -> Result<Anchor, Unanchored> {
         Anchoring::read(written)
             .and_then(|anchoring| {
-                anchoring.message().parse::<Uuid>().ok().map(|message| Anchor::anchored(message, anchoring.ordinal()))
+                let message = Uuid::try_new(anchoring.message().to_owned()).ok()?;
+                Some(Anchor::anchored(message, anchoring.ordinal()))
             })
             .ok_or_else(|| Unanchored(written.to_owned()))
     }

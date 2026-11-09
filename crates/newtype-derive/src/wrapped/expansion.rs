@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{GenericParam, LifetimeParam, Member, WherePredicate, parse_quote};
+use syn::{GenericParam, LifetimeParam, WherePredicate, parse_quote};
 
 use super::Wrapped;
 use super::settings::Checking;
@@ -65,11 +65,10 @@ impl Deserializing {
     fn reading(
         wrapped: Wrapped,
         required: impl IntoIterator<Item = WherePredicate>,
-        finish: impl FnOnce(&Member) -> TokenStream,
+        built: &TokenStream,
     ) -> TokenStream {
         let Wrapped { ident, generics, field, .. } = wrapped;
         let inner = field.inner();
-        let built = finish(field.member());
         let (_, arguments, _) = generics.split_for_impl();
         let named = quote!(#ident #arguments);
         let mut borrowing = generics;
@@ -97,9 +96,11 @@ impl Expansion for Constructors {
         let (implemented, arguments, bounds) = wrapped.generics.split_for_impl();
         let member = wrapped.field.member();
         let inner = wrapped.field.inner();
-        let stored = Marked::new(name, &wrapped.generics).stored(&quote!(::newtype::Inner));
+        let marked = Marked::new(name, &wrapped.generics);
+        let opened_store = marked.stored(&quote!(::newtype::Inner));
+        let guarded_store = marked.stored(&quote!(::newtype::Validated));
         let opened = quote! {
-            #stored
+            #opened_store
 
             impl #implemented #name #arguments #bounds {
                 #[must_use]
@@ -115,19 +116,23 @@ impl Expansion for Constructors {
             }
         };
         let guarded = quote! {
+            #guarded_store
+
             impl #implemented #name #arguments #bounds {
-                pub fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error>
-                where
-                    Self: ::newtype::kind::Validity<Kind = ::newtype::kind::Checked>
-                        + ::newtype::Checked
-                        + ::newtype::Wrapping<Inner = #inner>,
-                {
-                    <Self as ::newtype::Wrapping>::admitted(inner, |inner| Self { #member: inner })
+                pub fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error> {
+                    <Self as ::newtype::Guarded>::try_new(inner)
                 }
 
                 #[must_use]
                 pub fn into_inner(self) -> #inner {
                     self.#member
+                }
+            }
+
+            impl #implemented ::newtype::Guarded for #name #arguments #bounds {
+                fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error> {
+                    <Self as ::newtype::Checked>::checked(&inner)?;
+                    ::core::result::Result::Ok(Self { #member: inner })
                 }
             }
         };
@@ -195,9 +200,11 @@ impl Expansion for Formatting {
 
 impl Expansion for Deserializing {
     fn of(wrapped: Wrapped) -> TokenStream {
-        Deserializing::reading(wrapped, [], |_| {
-            quote!(::core::result::Result::map(read, <Self as ::newtype::Newtype>::new))
-        })
+        Deserializing::reading(
+            wrapped,
+            [],
+            &quote!(::core::result::Result::map(read, <Self as ::newtype::Newtype>::new)),
+        )
     }
 }
 
@@ -205,16 +212,14 @@ impl Expansion for CheckedDeserializing {
     fn of(wrapped: Wrapped) -> TokenStream {
         Deserializing::reading(
             wrapped,
-            [parse_quote!(Self: ::newtype::kind::Validity<Kind = ::newtype::kind::Checked> + ::newtype::Checked)],
-            |member| {
-                quote! {
-                    ::core::result::Result::and_then(read, |inner| {
-                        ::core::result::Result::map_err(
-                            <Self as ::newtype::Wrapping>::admitted(inner, |inner| Self { #member: inner }),
-                            <Arriving::Error as ::newtype::serde::de::Error>::custom,
-                        )
-                    })
-                }
+            [parse_quote!(Self: ::newtype::Guarded)],
+            &quote! {
+                ::core::result::Result::and_then(read, |inner| {
+                    ::core::result::Result::map_err(
+                        <Self as ::newtype::Guarded>::try_new(inner),
+                        <Arriving::Error as ::newtype::serde::de::Error>::custom,
+                    )
+                })
             },
         )
     }

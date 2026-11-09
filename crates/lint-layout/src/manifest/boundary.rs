@@ -1,4 +1,4 @@
-use toml::de::{DeTable, DeValue};
+use toml::de::DeTable;
 
 use super::Manifest;
 
@@ -7,13 +7,6 @@ impl Manifest {
         table: &'table DeTable<'text>,
         wanted: &&str,
     ) -> Option<&'table DeTable<'text>> {
-        Self::entries_in(table, wanted).find_map(DeValue::as_table)
-    }
-
-    pub(super) fn entries_in<'table, 'text>(
-        table: &'table DeTable<'text>,
-        wanted: &str,
-    ) -> impl Iterator<Item = &'table DeValue<'text>> {
-        table.iter().filter(move |(key, _)| key.get_ref() == wanted).map(|(_, value)| value.get_ref())
+        table.iter().find(|(key, _)| key.get_ref() == *wanted).and_then(|(_, value)| value.get_ref().as_table())
     }
 }

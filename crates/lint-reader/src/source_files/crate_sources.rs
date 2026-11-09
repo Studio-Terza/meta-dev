@@ -7,7 +7,7 @@ use lint_layout::{CrateSource, Crates, Dependencies, LibraryForm, Manifest, Name
 use newtype::Wrapping;
 use workspace_metadata::{CrateName, Form, Library, Metadata};
 
-use super::Unlocated;
+use super::{Described, Unlocated};
 
 #[derive(Debug)]
 pub struct CrateSources;
@@ -15,10 +15,21 @@ pub struct CrateSources;
 impl CrateSources {
     const MANIFEST: &'static str = "Cargo.toml";
 
-    pub fn read(files: &impl Files, cargo: &impl Cargo, packages: &[&Path]) -> Result<Crates, Unlocated> {
+    pub fn read(files: &impl Files, cargo: &impl Cargo, packages: &[&Path]) -> Result<Described, Unlocated> {
         let manifests: Vec<PathBuf> =
             Self::workspaces(files, packages).iter().map(|workspace| workspace.join(Self::MANIFEST)).collect();
-        let read = Self::described(cargo, &manifests)?;
+        let read: Vec<Metadata> = manifests
+            .iter()
+            .zip(cargo.metadata(&manifests))
+            .map(|(manifest, answer)| {
+                serde_json::from_slice::<Metadata>(answer?.as_ref())
+                    .map_err(|source| Unlocated::Unparsed { manifest: manifest.clone(), source })
+            })
+            .collect::<Result<_, _>>()?;
+        Self::crates(files, &read).map(|crates| Described::new(crates, read))
+    }
+
+    fn crates(files: &impl Files, read: &[Metadata]) -> Result<Crates, Unlocated> {
         let libraries: Vec<Library<'_>> = read.iter().flat_map(Metadata::libraries).collect();
         let roots: Vec<&Path> = libraries.iter().map(Library::root).collect();
         libraries
@@ -34,17 +45,6 @@ impl CrateSources {
                 let source =
                     CrateSource::new(SourceText::new(found.into_inner()), Self::form(library.form()), dependencies);
                 Ok((Self::package(library.name()), source))
-            })
-            .collect()
-    }
-
-    pub fn described(cargo: &impl Cargo, manifests: &[PathBuf]) -> Result<Vec<Metadata>, Unlocated> {
-        manifests
-            .iter()
-            .zip(cargo.metadata_many(manifests))
-            .map(|(manifest, answer)| {
-                serde_json::from_slice::<Metadata>(answer?.as_ref())
-                    .map_err(|source| Unlocated::Unparsed { manifest: manifest.clone(), source })
             })
             .collect()
     }

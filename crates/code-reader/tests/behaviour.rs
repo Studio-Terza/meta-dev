@@ -173,6 +173,21 @@ const RE_EXPORT_CYCLE: [Fixture; 11] = [
     Fixture::new("src/m8.rs", "pub use super::*;\n"),
     Fixture::new("src/m9.rs", "pub use super::*;\nimpl Mark for R {}\nimpl Clone for R {}\n"),
 ];
+const RE_EXPORT_CHAIN: [Fixture; 6] = [
+    Fixture::new("src/lib.rs", "mod a;\nmod b;\nmod c;\nmod d;\nmod e;\n"),
+    Fixture::new("src/a.rs", "use crate::b::Mark;\nimpl Mark for R {}\n"),
+    Fixture::new("src/b.rs", "pub use crate::c::Mark;\n"),
+    Fixture::new("src/c.rs", "pub use crate::d::Mark;\n"),
+    Fixture::new("src/d.rs", "pub use crate::e::Mark;\n"),
+    Fixture::new("src/e.rs", "pub trait Mark {}\n"),
+];
+const GLOB_RING: [Fixture; 5] = [
+    Fixture::new("src/lib.rs", "mod a;\nmod b;\nmod c;\nmod d;\n"),
+    Fixture::new("src/a.rs", "pub use crate::b::*;\n"),
+    Fixture::new("src/b.rs", "pub use crate::c::*;\n"),
+    Fixture::new("src/c.rs", "pub use crate::a::*;\npub trait Far {}\n"),
+    Fixture::new("src/d.rs", "use crate::a::*;\nimpl Far for R {}\n"),
+];
 const GLOB_THROUGH_A_LATER_SIBLING: [Fixture; 6] = [
     Fixture::new("src/lib.rs", "mod a;\nmod b;\nmod c;\nmod d;\nmod e;\n"),
     Fixture::new("src/a.rs", "pub use crate::b::*;\npub use crate::c::*;\n"),
@@ -741,6 +756,8 @@ laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     CYCLE => [Expect::unknown(&["X"])],
     RE_EXPORT_CYCLE => [Expect::krate(&["crate", "Mark"]), Expect::std_trait(&["std", "clone", "Clone"])],
     GLOB_THROUGH_A_LATER_SIBLING => [Expect::krate(&["crate", "e", "Far"])],
+    RE_EXPORT_CHAIN => [Expect::krate(&["crate", "e", "Mark"])],
+    GLOB_RING => [Expect::krate(&["crate", "c", "Far"])],
     WORKSPACE => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "clone", "Clone"])],
     NESTED_FILES => [Expect::krate(&["crate", "Mark"]), Expect::krate(&["crate", "Mark"])],
     WORKSPACE_CRATE_REEXPORTED => [

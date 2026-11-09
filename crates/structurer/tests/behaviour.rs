@@ -7,12 +7,13 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
-use grammar::directive::Location;
+use laws::proptest::arbitrary::any;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
+use newtype::Wrapping;
 use structurer::{
     Attempt, Briefing, Directive, Directives, Edge, Job, Label, Lapse, Misread, NodeRef, Proposal, Reading, Said,
     Uncovered,
@@ -121,21 +122,30 @@ laws::roundtrip!(
 );
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Spot;
+struct Spot {
+    line: usize,
+    column: usize,
+}
 
 impl Spot {
-    fn of_one(text: &str) -> Option<Location> {
+    fn at(line: usize, column: usize) -> Option<Spot> {
+        Some(line).zip(Some(column)).map(|(row, place)| Spot { line: row, column: place })
+    }
+
+    fn of_one(text: &str) -> Option<Spot> {
         Spot::of(&text.parse::<Directive>())
     }
 
-    fn of_many(text: &str) -> Option<Location> {
+    fn of_many(text: &str) -> Option<Spot> {
         Spot::of(&text.parse::<Directives>())
     }
 
-    fn of<Parsed>(parsed: &Result<Parsed, Misread>) -> Option<Location> {
+    fn of<Parsed>(parsed: &Result<Parsed, Misread>) -> Option<Spot> {
         match parsed {
             Ok(_) => None,
-            Err(Misread::Expected { at, .. } | Misread::Arity { at, .. }) => Some(*at),
+            Err(Misread::Expected { at, .. } | Misread::Arity { at, .. }) => {
+                Spot::at(at.as_ref().into_inner(), at.column().into_inner())
+            }
         }
     }
 }
@@ -146,39 +156,39 @@ laws::table!(
     [
         "place(85b287b3.0, n1, defines)" => None,
         "  place( 85b287b3.0 ,n1,defines )" => None,
-        "plaice(85b287b3.0, n1, defines)" => Some(Location::new(1, 1)),
-        "place 85b287b3.0" => Some(Location::new(1, 7)),
-        "place(85b287b3.0, n1)" => Some(Location::new(1, 1)),
-        "place(n1, n1, defines)" => Some(Location::new(1, 7)),
+        "plaice(85b287b3.0, n1, defines)" => Spot::at(1, 1),
+        "place 85b287b3.0" => Spot::at(1, 7),
+        "place(85b287b3.0, n1)" => Spot::at(1, 1),
+        "place(n1, n1, defines)" => Spot::at(1, 7),
         "place(85b287b3.0, x1, defines)" => None,
-        "place(85b287b3.0, n01, defines)" => Some(Location::new(1, 19)),
-        "place(85b287b3.0, n1, define)" => Some(Location::new(1, 23)),
-        "place(85b287b3, n1, defines)" => Some(Location::new(1, 7)),
-        "propose(old, refines(n1), feature, \"t\")" => Some(Location::new(1, 9)),
-        "propose(new, n1, feature, \"t\")" => Some(Location::new(1, 14)),
-        "propose(new, by(n1), feature, \"t\")" => Some(Location::new(1, 14)),
-        "propose(new, refines(n1), feature, title)" => Some(Location::new(1, 36)),
-        "supersede(n1, by(n2)) extra" => Some(Location::new(1, 23)),
-        "supersede(n1, by(n1))" => Some(Location::new(1, 18)),
-        "supersede(x, by(x))" => Some(Location::new(1, 17)),
+        "place(85b287b3.0, n01, defines)" => Spot::at(1, 19),
+        "place(85b287b3.0, n1, define)" => Spot::at(1, 23),
+        "place(85b287b3, n1, defines)" => Spot::at(1, 7),
+        "propose(old, refines(n1), feature, \"t\")" => Spot::at(1, 9),
+        "propose(new, n1, feature, \"t\")" => Spot::at(1, 14),
+        "propose(new, by(n1), feature, \"t\")" => Spot::at(1, 14),
+        "propose(new, refines(n1), feature, title)" => Spot::at(1, 36),
+        "supersede(n1, by(n2)) extra" => Spot::at(1, 23),
+        "supersede(n1, by(n1))" => Spot::at(1, 18),
+        "supersede(x, by(x))" => Spot::at(1, 17),
         "supersede(x, by(n1))" => None,
-        "link(85b287b3.0, 85b287b3.0, answers)" => Some(Location::new(1, 18)),
-        "link(85b287b3.0, 85b287b3.0, refers-to)" => Some(Location::new(1, 18)),
-        "link(85b287b3.0, 85b287b3.0, supersedes)" => Some(Location::new(1, 18)),
-        "link(85b287b3.0, 85b287b3.0, corrects)" => Some(Location::new(1, 18)),
+        "link(85b287b3.0, 85b287b3.0, answers)" => Spot::at(1, 18),
+        "link(85b287b3.0, 85b287b3.0, refers-to)" => Spot::at(1, 18),
+        "link(85b287b3.0, 85b287b3.0, supersedes)" => Spot::at(1, 18),
+        "link(85b287b3.0, 85b287b3.0, corrects)" => Spot::at(1, 18),
         "link(85b287b3.0, 85b287b3.1, corrects)" => None,
-        "propose(new x, refines(x), feature, \"t\")" => Some(Location::new(1, 24)),
+        "propose(new x, refines(x), feature, \"t\")" => Spot::at(1, 24),
         "propose(new x, refines(n1), feature, \"t\")" => None,
         "propose(new  x, refines(y), feature, \"t\")" => None,
-        "propose(new n2, refines(n1), feature, \"t\")" => Some(Location::new(1, 9)),
-        "propose(x, refines(n1), feature, \"t\")" => Some(Location::new(1, 9)),
-        "conversational(85b287b3.0" => Some(Location::new(1, 26)),
-        "conversational(85b287b3.0)\n" => Some(Location::new(1, 27)),
-        "conversational()" => Some(Location::new(1, 16)),
-        "sense(85b287b3.0, remark, general, firm, plain)" => Some(Location::new(1, 42)),
-        "link(85b287b3.0; 85b287b3.1, answers)" => Some(Location::new(1, 16)),
-        "propose(new, refines(n1), feature, \"open)" => Some(Location::new(1, 36)),
-        "" => Some(Location::new(1, 1)),
+        "propose(new n2, refines(n1), feature, \"t\")" => Spot::at(1, 9),
+        "propose(x, refines(n1), feature, \"t\")" => Spot::at(1, 9),
+        "conversational(85b287b3.0" => Spot::at(1, 26),
+        "conversational(85b287b3.0)\n" => Spot::at(1, 27),
+        "conversational()" => Spot::at(1, 16),
+        "sense(85b287b3.0, remark, general, firm, plain)" => Spot::at(1, 42),
+        "link(85b287b3.0; 85b287b3.1, answers)" => Spot::at(1, 16),
+        "propose(new, refines(n1), feature, \"open)" => Spot::at(1, 36),
+        "" => Spot::at(1, 1),
     ]
 );
 
@@ -188,9 +198,9 @@ laws::table!(
     [
         "" => None,
         "\n\nconversational(85b287b3.0)\n" => None,
-        "conversational(85b287b3.0)\n\n  place(85b287b3.0 n1, defines)" => Some(Location::new(3, 20)),
-        "conversational(85b287b3.0)\r\nlink(85b287b3.0, 85b287b3.1)" => Some(Location::new(2, 1)),
-        "propose(new, refines(n1), feature, \"é \\\" ü\")\nsupersede(n1)" => Some(Location::new(2, 1)),
+        "conversational(85b287b3.0)\n\n  place(85b287b3.0 n1, defines)" => Spot::at(3, 20),
+        "conversational(85b287b3.0)\r\nlink(85b287b3.0, 85b287b3.1)" => Spot::at(2, 1),
+        "propose(new, refines(n1), feature, \"é \\\" ü\")\nsupersede(n1)" => Spot::at(2, 1),
     ]
 );
 
@@ -198,9 +208,7 @@ struct Jobs;
 
 impl Jobs {
     fn said() -> impl Strategy<Value = Said> {
-        (Generated::segment(), "[^\u{0}]{0,40}").prop_filter_map("a body holds no NUL", |(segment, body)| {
-            Some(Said::new(segment, Body::try_new(body).ok()?))
-        })
+        (Generated::segment(), any::<Body>()).prop_map(|(segment, body)| Said::new(segment, body))
     }
 
     fn node() -> impl Strategy<Value = Outline> {

@@ -60,9 +60,12 @@ impl<'meta> Graph<'meta> {
                     .collect();
                 let required_name = self.package(required)?.name();
                 let dependent_package = self.package(dependent)?;
-                Some(owners).filter(|claimed| claimed.first().is_some()).map(|claimed| {
-                    let keys = dependent_package.keys(required_name).collect();
-                    (dependent_package.name(), required_name, Bypass::new(claimed, keys))
+                Some(owners).filter(|named| named.first().is_some()).map(|named| {
+                    (
+                        dependent_package.name(),
+                        required_name,
+                        Bypass::new(named, dependent_package.keys(required_name).collect()),
+                    )
                 })
             })
             .collect()

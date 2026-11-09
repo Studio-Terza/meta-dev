@@ -213,7 +213,9 @@ rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one
 writes for `Statements::written`; sqlx checks the SQL against the schema as its own `query!` does. Every bound argument and
 every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
 `#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
-`FromStr`, or an `Option` of one. A bare `i64`, `&str` or `String` is not a column and does not compile.
+`FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
+back through `newtype::Guarded`, so a stored value its check refuses fails the read; grammar's `Bare` and
+`Quoted` output fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
 
@@ -246,7 +248,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` lints), `lint-store-queries` (the `store_queries` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates, dependencies and lib targets of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `store-ports` (the store port: the `Store` trait with per-type `read` and `write` ops and `lock`, its `Sqlite` filler over sqlx, `StoreLock`, the first held resource, and the `Column` and `Columns` traits), `store-ports-macros` (`store_ports::query!`, `store_ports::migrate!` and `#[derive(Columns)]`, over `sqlx-macros-core`, whose version moves in lockstep with sqlx as `[package.metadata.lockstep]` records), `design-store` (the design store's schema, queries and batches), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`), `cargo-ports` (the `cargo metadata` port: the `Cargo` trait, `Toolchain` and the in-memory `Recorded`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` lints), `lint-store-queries` (the `store_queries` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates, dependencies and lib targets of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `store-ports` (the store port: the `Store` trait with per-type `read` and `write` ops and `lock`, its `Sqlite` filler over sqlx, `StoreLock`, the first held resource, and the `Column` and `Columns` traits), `store-ports-macros` (`store_ports::query!`, `store_ports::migrate!` and `#[derive(Columns)]`, over `sqlx-macros-core`, whose version moves in lockstep with sqlx as `[package.metadata.lockstep]` records), `design-store` (the design store's schema, queries and batches), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`), `cargo-ports` (the `cargo metadata` port: the `Cargo` port trait, `Toolchain` and the in-memory `Recorded`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose cycle spans more than 40 items.
 
 ## Query
@@ -322,7 +324,7 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
     ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
     ci tools <built directory> <tools directory>                build (dev profile) and copy reach, lint and ci
-    ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
+    ci mutants-changed <diff> <output> <shard> [<scope>...]     one shard of the mutants on the changed lines, or say it skipped
     ci mutants-shard <shard> <output>                           one weekly shard of all mutants
     ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
     ci compile-trend <cold build> <downloads>                   the trend issue when the cold build is slowest
@@ -460,8 +462,9 @@ tuple or named, generic or not. It also writes exactly one `impl newtype::kind::
     pub struct Rounds(usize);
 
 A validated newtype has no `new`. With `#[newtype(checked)]` the same derive implements `Wrapping` and
-inherent `try_new` and `into_inner` instead, and `try_new` is the only way in; it requires
-`Self: Validity<Kind = Checked> + Checked`. The rule lives on the type, in an `impl Checked`: a function from `&Inner`
+`newtype::Guarded` instead. `Guarded::try_new` is the single checked way in: the inherent `try_new`, `CheckedDeserialize`,
+the store's reads and `Arbitrary` all go through it. `Guarded` is only ever derived; `hand_impls` fails a hand-written
+`impl Guarded`, so no constructor skips the check. The rule lives on the type, in an `impl Checked`: a function from `&Inner`
 to `Result<&Inner, Error>`.
 
     #[derive(Newtype, Arbitrary, Debug)]
@@ -476,9 +479,8 @@ to `Result<&Inner, Error>`.
 
 `#[derive(Serialize, Deserialize)]` (`newtype::Serialize`, `newtype::Deserialize`) write and read a newtype as its inner
 value; `Deserialize` reads through `Newtype::new`, so only an unchecked newtype can derive it. A validated newtype
-derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through the type's `impl Checked` and is
-bounded by `Self: Validity<Kind = Checked> + Checked`, so it does not compile without the check or on a newtype that is
-not `#[newtype(checked)]`. A value the check refuses is a deserialization
+derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through `Guarded::try_new` and is
+bounded by `Self: Guarded`, so it does not compile without the check or on a newtype that is not `#[newtype(checked)]`. A value the check refuses is a deserialization
 error carrying the check's message, so `Checked::Error` implements `Display`. They reach serde through `newtype::serde`,
 so the using crate needs only `newtype`.
 
@@ -553,6 +555,9 @@ reach a `terminal` state, and a terminal state has no outgoing edges. A graph it
 The `mutants` job in `ci.yml` runs on each pull request. It applies `cargo mutants` to the lines the pull
 request changes, and tests each mutant with the crates the pull request reaches, because shared crates are
 tested through the crates that use them. A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
+The mutants run in eight `mutants-shard` jobs, each taking every eighth mutant (`--shard k/8 --sharding round-robin`),
+so a pull request that changes most of the workspace still fits GitHub's six-hour job limit. The `mutants` job
+waits for all of them and passes only if every shard succeeded, so a failed or cancelled shard fails it.
 
 `mutants.yml` runs every mutant once a week, in eight shards, or on request, each against the whole
 workspace (`.cargo/mutants.toml`). It reports in the run

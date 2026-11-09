@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::num::TryFromIntError;
 use std::str::FromStr;
 
-use newtype::{Inner, Newtype, Optional, Spelled};
+use newtype::{Guarded, Inner, Newtype, Optional, Spelled, Validated};
 
 use super::Column;
 
@@ -15,6 +15,8 @@ pub enum ColumnFailure {
     Misspelled(#[source] Box<dyn Error + Send + Sync>),
     #[error("a stored column its row needs is null")]
     Absent,
+    #[error("a stored value fails its column type's check: {0}")]
+    Refused(#[source] Box<dyn Error + Send + Sync>),
 }
 
 pub trait Encoding<Value> {
@@ -42,6 +44,22 @@ impl<Value: Newtype<Inner: Primitive> + Clone> Encoding<Value> for Inner {
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
         Value::Inner::from_raw(raw).map(Value::new)
+    }
+}
+
+impl<Value> Encoding<Value> for Validated
+where
+    Value: Guarded<Inner: Primitive, Error: Error + Send + Sync + 'static> + Clone,
+{
+    type Raw = <Value::Inner as Primitive>::Raw;
+
+    fn raw(value: &Value) -> Self::Raw {
+        value.clone().into_inner().into_raw()
+    }
+
+    fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
+        Value::Inner::from_raw(raw)
+            .and_then(|inner| Value::try_new(inner).map_err(|refused| ColumnFailure::Refused(Box::new(refused))))
     }
 }
 

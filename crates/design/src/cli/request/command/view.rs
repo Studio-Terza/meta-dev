@@ -78,9 +78,9 @@ impl Lens {
         self.tree().map_or_else(|whole| whole, |tree| View::Tree(tree, Root::Configured))
     }
 
-    fn rooted(self, given: &Token) -> Result<View, Failure> {
+    fn rooted(self, token: &Token) -> Result<View, Failure> {
         let tree = self.tree().map_err(|_whole| Failure::Usage)?;
-        let node = given.text().ok_or(Failure::Usage)?.parse()?;
+        let node = token.text().ok_or(Failure::Usage)?.parse()?;
         Ok(View::Tree(tree, Root::Node(node)))
     }
 }
@@ -123,7 +123,7 @@ impl View {
         let noted: Vec<Noted> = ground.store().read(ImportedNotes::from(project.clone()))?;
         let ending = ground.store().read(ImportedEnding::from(project.clone()))?;
         Ok(Notes::gathered(
-            noted.iter().map(|note| notes::Line::read(note.line().into_inner(), &note.title().clone().into_inner())),
+            noted.iter().map(|line| notes::Line::read(line.line().into_inner(), &line.title().clone().into_inner())),
             ending.unwrap_or_default(),
         ))
     }

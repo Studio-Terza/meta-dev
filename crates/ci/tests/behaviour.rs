@@ -677,8 +677,15 @@ laws::table!(
         ["mutants-shard"] => true,
         ["mutants-shard", "0/8"] => true,
         ["mutants-shard", "0/8", "out", "extra"] => true,
+        ["mutants-shard", "8/8", "out"] => true,
+        ["mutants-shard", "0/0", "out"] => true,
+        ["mutants-shard", "3", "out"] => true,
         ["mutants-changed"] => true,
         ["mutants-changed", "diff"] => true,
+        ["mutants-changed", "diff", "out"] => true,
+        ["mutants-changed", "diff", "out", "8/8", "-p"] => true,
+        ["mutants-changed", "diff", "out", "-1/8", "-p"] => true,
+        ["mutants-changed", "diff", "out", "--test-package=leaf"] => true,
         ["wall-times"] => true,
         ["wall-times", "repo", "1"] => true,
         ["wall-times", "repo", "1", "job", "extra"] => true,
@@ -872,7 +879,8 @@ impl Exits {
 
     fn changed(code: &Code) -> ExitCode {
         let scratch = Scratch::fresh();
-        let arguments = ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "--test-package=leaf"];
+        let arguments =
+            ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "3/8", "--test-package=leaf"];
         scratch.answer(&Script::exiting(code.0), &arguments).exit
     }
 }
@@ -918,7 +926,14 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
     let fake = Script { changed: "+a line\n".to_owned(), ..Script::new() };
     let answer = scratch.answer(
         &fake,
-        &["mutants-changed", &scratch.file("tmp/c.diff"), &scratch.file("out"), "--test-package=a", "--test-package=b"],
+        &[
+            "mutants-changed",
+            &scratch.file("tmp/c.diff"),
+            &scratch.file("out"),
+            "15/16",
+            "--test-package=a",
+            "--test-package=b",
+        ],
     );
     assert_eq!(
         answer.lines(),
@@ -935,6 +950,10 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
                     "mutants",
                     "--in-diff",
                     scratch.file("tmp/c.diff").as_str(),
+                    "--shard",
+                    "15/16",
+                    "--sharding",
+                    "round-robin",
                     "--test-package=a",
                     "--test-package=b",
                     "--jobs",
@@ -955,8 +974,8 @@ fn missed_mutants_fail_the_step_and_are_listed() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "src/a.rs:1: replace f -> bool with true\n")?;
-    let answer =
-        scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
+    let answer = scratch
+        .answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
     assert_eq!(answer.exit, ExitCode::from(2));
     assert_eq!(Text::lines(&answer.out), ["mutants missed:", "src/a.rs:1: replace f -> bool with true"]);
     Ok(())
@@ -967,8 +986,8 @@ fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "")?;
-    let answer =
-        scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
+    let answer = scratch
+        .answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
     assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec!["mutants: none missed".to_owned()]));
     Ok(())
 }
@@ -976,7 +995,7 @@ fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
     let fake = Script::new();
-    let answer = Scratch::fresh().answer(&fake, &["mutants-changed", "c.diff", "out"]);
+    let answer = Scratch::fresh().answer(&fake, &["mutants-changed", "c.diff", "out", "0/8"]);
     assert_eq!(
         answer.lines(),
         Printed {
@@ -991,11 +1010,12 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
 #[test]
 fn a_failed_start_while_testing_changed_lines_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"];
+    let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("git"), &arguments).err), ["cannot run git: boom"]);
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("cargo"), &arguments).err), ["cannot run cargo: boom"]);
     scratch.write("blocker", "")?;
-    let blocked = scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("blocker/c.diff"), "out", "-p"]);
+    let blocked =
+        scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("blocker/c.diff"), "out", "0/8", "-p"]);
     assert!(blocked.err.contains("blocker/c.diff"));
     Ok(())
 }

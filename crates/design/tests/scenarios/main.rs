@@ -15,7 +15,7 @@ use text_lines::Lines;
 #[test]
 fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Box<dyn Error>> {
     let output = Design::with_a_session_in_work()?.run(&["frobnicate"])?;
-    assert_ne!(output.status.code(), Design::SUCCEEDED);
+    assert_ne!(output.status.code(), Some(0_i32));
     assert!(String::from_utf8(output.stderr)?.contains("usage: design"));
     Ok(())
 }
@@ -23,7 +23,7 @@ fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Bo
 #[test]
 fn ingest_of_a_workspace_exits_successfully_with_its_report() -> Result<(), Box<dyn Error>> {
     let output = Design::with_a_session_in_work()?.in_work(&["ingest"], "")?;
-    assert_eq!(output.status.code(), Design::SUCCEEDED);
+    assert_eq!(output.status.code(), Some(0_i32));
     assert!(String::from_utf8(output.stdout)?.contains("authorship owner 1\n"));
     Ok(())
 }
@@ -52,7 +52,7 @@ fn the_hook_settings_are_json_naming_for_every_event_a_command_that_runs_its_hoo
             command.as_str()?.contains(&format!(" hook {event}")).then_some(*event)
         })
         .collect::<Vec<HookEvent>>();
-    assert_eq!(output.status.code(), Design::SUCCEEDED);
+    assert_eq!(output.status.code(), Some(0_i32));
     assert_eq!(commanded, HookEvent::VARIANTS);
     Ok(())
 }
@@ -62,8 +62,8 @@ fn a_prompt_hook_ingests_and_prints_nothing_into_the_conversation() -> Result<()
     let design = Design::with_a_session_in_work()?;
     let hooked = design.in_work(&["hook", "user-prompt-submit"], "")?;
     let shown = design.in_work(&["show", "o1"], "")?;
-    assert_eq!((hooked.status.code(), hooked.stdout, hooked.stderr), (Design::SUCCEEDED, Vec::new(), Vec::new()));
-    assert_eq!(shown.status.code(), Design::SUCCEEDED);
+    assert_eq!((hooked.status.code(), hooked.stdout, hooked.stderr), (Some(0_i32), Vec::new(), Vec::new()));
+    assert_eq!(shown.status.code(), Some(0_i32));
     Ok(())
 }
 
@@ -79,12 +79,12 @@ fn a_stop_whose_agent_flails_blocks_once_with_a_json_decision_at_exit_zero_and_a
     let noticed = Design::with_a_session_in_work()?.in_work(&["hook", "stop"], continuing)?;
     let decision: Value = serde_json::from_slice(&blocked.stdout)?;
     let notice: Value = serde_json::from_slice(&noticed.stdout)?;
-    assert_eq!((blocked.status.code(), blocked.stderr), (Design::SUCCEEDED, Vec::new()));
+    assert_eq!((blocked.status.code(), blocked.stderr), (Some(0_i32), Vec::new()));
     assert_eq!(decision.get("decision").and_then(Value::as_str), Some("block"));
     assert!(decision.get("reason").is_some_and(Value::is_string));
-    assert_eq!((passed.status.code(), passed.stdout, passed.stderr), (Design::SUCCEEDED, Vec::new(), Vec::new()));
-    assert_eq!((prompted.status.code(), prompted.stdout, prompted.stderr), (Design::SUCCEEDED, Vec::new(), Vec::new()));
-    assert_eq!((noticed.status.code(), noticed.stderr), (Design::SUCCEEDED, Vec::new()));
+    assert_eq!((passed.status.code(), passed.stdout, passed.stderr), (Some(0_i32), Vec::new(), Vec::new()));
+    assert_eq!((prompted.status.code(), prompted.stdout, prompted.stderr), (Some(0_i32), Vec::new(), Vec::new()));
+    assert_eq!((noticed.status.code(), noticed.stderr), (Some(0_i32), Vec::new()));
     assert_eq!(notice.get("decision"), None);
     assert_eq!(notice.get("systemMessage"), decision.get("reason"));
     Ok(())
@@ -115,7 +115,7 @@ fn a_flail_first_met_by_a_continuing_stop_reaches_the_lead_once_through_the_next
     assert_eq!(decision.get("reason"), messages[1].get("systemMessage"));
     assert_eq!(
         [&continued, &told, &blocked].map(|output| (output.status.code(), output.stderr.as_slice())),
-        [(Design::SUCCEEDED, &[][..]), (Design::SUCCEEDED, &[][..]), (Design::SUCCEEDED, &[][..])]
+        [(Some(0_i32), &[][..]), (Some(0_i32), &[][..]), (Some(0_i32), &[][..])]
     );
     assert_eq!([continued, passed].map(|output| output.stdout), [Vec::<u8>::new(), Vec::new()]);
     assert_eq!(after.map(|output| output.stdout), [Vec::<u8>::new(), Vec::new()]);
@@ -133,18 +133,18 @@ fn a_run_killed_during_its_second_job_leaves_the_first_job_s_flail_told_and_the_
     let unrun = design.in_work(&["show", "job", "4"], "")?;
     let lapse = "place(".parse::<Directives>().err().map(Lapse::from);
     let flail = |job, sequel| {
-        let flails = lapse.clone().map(|misread| Flails::new(Flail::new(JobId::new(job), misread), Vec::new()));
-        flails.map(|flailed| Failure::Flailed { flails: flailed, sequel }.to_string())
+        let flails = lapse.clone().map(|flailed| Flails::new(Flail::new(JobId::new(job), flailed), Vec::new()));
+        flails.map(|gathered| Failure::Flailed { flails: gathered, sequel }.to_string())
     };
     let [first, second] = [flail(1, Sequel::WentOn), flail(3, Sequel::NoMoreJobs)];
     let context: Value = serde_json::from_slice(&told.stdout)?;
     let decision: Value = serde_json::from_slice(&restarted.stdout)?;
-    let specific = context.get("hookSpecificOutput").and_then(|output| output.get("additionalContext"));
+    let specific = context.get("hookSpecificOutput").and_then(|specific| specific.get("additionalContext"));
     assert_eq!((killed.status.code(), killed.stdout), (None, Vec::new()));
     assert_eq!(specific.and_then(Value::as_str), first.as_deref());
     assert_eq!(decision.get("reason").and_then(Value::as_str), second.as_deref());
     let refused = String::from_utf8(unrun.stderr)?;
-    assert_eq!(unrun.status.code(), Design::FAILED);
+    assert_eq!(unrun.status.code(), Some(1_i32));
     assert_eq!(
         refused.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>(),
         [Failure::Unrun(JobId::new(4)).to_string()]
@@ -172,11 +172,11 @@ impl Answer {
     }
 
     fn failed(failure: &Failure) -> Answer {
-        Answer { code: Design::FAILED, stderr: format!("{failure}\n"), unparsed: Vec::new() }
+        Answer { code: Some(1), stderr: format!("{failure}\n"), unparsed: Vec::new() }
     }
 
     fn printed() -> Answer {
-        Answer { code: Design::SUCCEEDED, stderr: String::new(), unparsed: Vec::new() }
+        Answer { code: Some(0_i32), stderr: String::new(), unparsed: Vec::new() }
     }
 }
 

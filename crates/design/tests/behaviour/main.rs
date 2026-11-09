@@ -341,10 +341,10 @@ impl Links {
         let port = run.port(store.clone());
         let shown = Session::SAID
             .iter()
-            .map(|said| {
-                let missing = || Failure::Unmatched(Unmatched::NoMatch(Prefix::new((*said).to_owned())));
-                let uuid = said.parse::<Uuid>().map_err(|_blank| missing())?;
-                port.read(ShownMessage::named(uuid))?.ok_or_else(missing)
+            .filter_map(|spelled| Uuid::try_new((*spelled).to_owned()).ok())
+            .map(|uuid| {
+                port.read(ShownMessage::named(uuid.clone()))?
+                    .ok_or(Failure::Unmatched(Unmatched::NoMatch(Prefix::new(uuid.into_inner()))))
             })
             .collect::<Result<Vec<_>, Failure>>()?;
         Ok(shown
@@ -1123,12 +1123,12 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     ];
     assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
     let node = applying.run(&["show", "n3"])?;
-    let described = [
+    let edges = [
         "n3 \"demo\" feature vague vague core entered apply \"b\"",
         "  edge n3 refines n1 entered apply",
         "  edge n3 supersedes n2 entered apply",
     ];
-    assert_eq!(Lines::missing(&node, &described), Vec::<&&str>::new());
+    assert_eq!(Lines::missing(&node, &edges), Vec::<&&str>::new());
     Ok(())
 }
 
@@ -1170,7 +1170,7 @@ fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Re
         "place(aaaaaaaa-0000-4000-8000-000000000003.0, c, defines)",
         "propose(new first, refines(n1), feature, \"again\")",
     ]
-    .map(|refusal| applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{refusal}")).err());
+    .map(|refused| applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{refused}")).err());
     assert!(matches!(
         refusals,
         [Some(Failure::Unresolved(Unresolved::Unbound(_))), Some(Failure::Unresolved(Unresolved::Rebound(_)))]
@@ -1307,11 +1307,11 @@ impl Graph {
         let port = run.port(store.clone());
         let written = (2_i64..)
             .zip(parents)
-            .map(|(child_id, parent_id)| {
+            .map(|(child, parent)| {
                 let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
-                let planted = port.write(Planting::sown(Node::new(NodeId::new(child_id), entry)))?;
-                let (child, parent) = (Graph::resolved(&port, child_id)?, Graph::resolved(&port, *parent_id)?);
-                let linked = port.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
+                let planted = port.write(Planting::sown(Node::new(NodeId::new(child), entry)))?;
+                let (refining, refined) = (Graph::resolved(&port, child)?, Graph::resolved(&port, *parent)?);
+                let linked = port.write(Linked::new(refining, NodeRelation::Refines, refined, Entered::Init.into()))?;
                 Ok(planted.plus(linked))
             })
             .collect::<Result<Vec<Written>, Failure>>()?;
@@ -1580,11 +1580,11 @@ fn a_secondary_parent_never_takes_a_core_child_and_the_refusal_names_the_edge() 
     assert!(applying.run(&["show", "n1"])?.contains("n1 \"demo\" project vague vague core entered init\n"));
     assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
     assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
-    let recast = applying.run(&["role", "n2", "core"]);
-    assert!(matches!(recast, Err(Failure::Inverted { edge: inverted }) if inverted == edge));
-    let child = applying.run(&["show", "n2"])?;
-    assert!(child.contains("n2 \"demo\" feature vague vague secondary entered apply"));
-    assert!(child.contains("  role secondary entered role\n"));
+    let child = applying.run(&["role", "n2", "core"]);
+    assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
+    let shown = applying.run(&["show", "n2"])?;
+    assert!(shown.contains("n2 \"demo\" feature vague vague secondary entered apply"));
+    assert!(shown.contains("  role secondary entered role\n"));
     Ok(())
 }
 
@@ -2035,11 +2035,11 @@ impl Generated {
     }
 
     fn message() -> BoxedStrategy<String> {
-        "[A-Za-z0-9_][A-Za-z0-9_-]{0,36}".boxed()
+        Generated::uuid().prop_map(Uuid::into_inner).boxed()
     }
 
     fn uuid() -> BoxedStrategy<Uuid> {
-        Generated::message().prop_filter_map("a message id is not blank", |id| id.parse::<Uuid>().ok()).boxed()
+        any::<Uuid>().boxed()
     }
 
     fn project() -> BoxedStrategy<Project> {
@@ -2088,7 +2088,7 @@ impl Generated {
                 let entry = Entry::new(project, facet, entered);
                 let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
                 Summary::from(
-                    &title.into_iter().fold(loaded.based(basis), |built, given| built.titled(Title::new(given))),
+                    &title.into_iter().fold(loaded.based(basis), |titled, text| titled.titled(Title::new(text))),
                 )
             })
             .boxed()
@@ -2369,16 +2369,16 @@ impl Spread {
         Ok(Line::Segment {
             segment: Spread::reference(prefix, ordinal),
             shape: ShapeName::new("sentence".to_owned()),
-            body: body.parse::<Body>()?,
+            body: Body::try_new(body.to_owned())?,
         })
     }
 
     fn message(uuid: &str) -> Result<Line, Box<dyn Error>> {
         Ok(Line::Message {
-            uuid: uuid.parse::<Uuid>()?,
+            uuid: Uuid::try_new(uuid.to_owned())?,
             author: Authorship::Owner,
-            session: "s".parse::<SessionId>()?,
-            stamp: "2026-01-01T00:00:00Z".parse::<Instant>()?,
+            session: SessionId::try_new("s".to_owned())?,
+            stamp: Instant::try_new("2026-01-01T00:00:00Z".to_owned())?,
         })
     }
 }
@@ -2406,8 +2406,8 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
         Ok(Line::Hit {
             segment: Spread::reference(prefix, ordinal),
             author: Authorship::Owner,
-            stamp: "2026-01-01T00:00:00Z".parse::<Instant>()?,
-            body: body.parse::<Body>()?,
+            stamp: Instant::try_new("2026-01-01T00:00:00Z".to_owned())?,
+            body: Body::try_new(body.to_owned())?,
         })
     };
     let hits = [

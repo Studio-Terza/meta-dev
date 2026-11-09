@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
 use file_ports::{Bytes, Text};
@@ -21,13 +21,22 @@ impl Toolchain {
 }
 
 impl CargoFiller for Toolchain {
-    fn metadata(&self, _pass: Pass<'_, cargo_ops::Metadata>, manifest: &Path) -> Result<Bytes, CargoFailure> {
-        Command::new("cargo")
-            .args(["metadata", "--format-version", "1", "--locked", "--offline", "--manifest-path"])
-            .arg(manifest)
-            .stdin(Stdio::null())
-            .output()
-            .map_err(|source| CargoFailure::Unstarted { manifest: manifest.to_path_buf(), source })
-            .and_then(|output| Self::answered(manifest, output))
+    fn metadata(
+        &self,
+        _pass: Pass<'_, cargo_ops::Metadata>,
+        manifests: &[PathBuf],
+    ) -> Vec<Result<Bytes, CargoFailure>> {
+        manifests
+            .iter()
+            .map(|manifest| {
+                Command::new("cargo")
+                    .args(["metadata", "--format-version", "1", "--locked", "--offline", "--manifest-path"])
+                    .arg(manifest)
+                    .stdin(Stdio::null())
+                    .output()
+                    .map_err(|source| CargoFailure::Unstarted { manifest: manifest.clone(), source })
+                    .and_then(|output| Self::answered(manifest, output))
+            })
+            .collect()
     }
 }

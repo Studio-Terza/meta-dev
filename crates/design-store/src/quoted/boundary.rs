@@ -28,10 +28,10 @@ impl Query for QuotedSegments {
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Quote, Vec<Quoted>>, StoreFailure> {
         let rows = QuotedRow::found(&self.0.iter().collect(), statements)?;
-        let found = self.0.into_iter().map(|quote| (quote, Vec::new())).collect();
-        Ok(rows.into_iter().fold(found, |mut by_quote: BTreeMap<Quote, Vec<Quoted>>, row| {
-            by_quote.entry(row.quote.clone()).or_default().push(Quoted::from(row));
-            by_quote
+        let empty = self.0.into_iter().map(|quote| (quote, Vec::new())).collect();
+        Ok(rows.into_iter().fold(empty, |mut found: BTreeMap<Quote, Vec<Quoted>>, row| {
+            found.entry(row.quote.clone()).or_default().push(Quoted::from(row));
+            found
         }))
     }
 }

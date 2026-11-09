@@ -9,8 +9,8 @@ pub struct Resolve {
     nodes: Vec<Node>,
 }
 
-impl Resolve {
-    pub fn nodes(&self) -> &[Node] {
+impl AsRef<[Node]> for Resolve {
+    fn as_ref(&self) -> &[Node] {
         &self.nodes
     }
 }

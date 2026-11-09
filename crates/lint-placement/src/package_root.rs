@@ -5,6 +5,7 @@ use crate::crate_name::CrateName;
 use crate::crate_root::CrateRoot;
 use file_ports::Files;
 use lint_layout::Dependencies;
+use lint_layout::DependencySites;
 use lint_layout::KeyLines;
 use lint_layout::Manifest;
 use lint_layout::Untested;
@@ -16,6 +17,7 @@ pub struct PackageRoot {
     lines: KeyLines,
     untested: Untested,
     dependencies: Dependencies,
+    sites: DependencySites,
 }
 
 impl PackageRoot {
@@ -44,6 +46,7 @@ impl PackageRoot {
                     root,
                     lines: manifest.as_ref().map(AsRef::as_ref).cloned().unwrap_or_default(),
                     untested: manifest.as_ref().map(|present| present.untested_targets(canonical)).unwrap_or_default(),
+                    sites: manifest.as_ref().map(Manifest::dependency_sites).cloned().unwrap_or_default(),
                 }
             })
             .collect()
@@ -83,6 +86,7 @@ impl PackageRoot {
             lines: KeyLines::default(),
             untested: Untested::default(),
             dependencies: Dependencies::default(),
+            sites: DependencySites::default(),
         }
     }
 
@@ -109,5 +113,10 @@ impl PackageRoot {
     #[must_use]
     pub fn dependencies(&self) -> &Dependencies {
         &self.dependencies
+    }
+
+    #[must_use]
+    pub fn dependency_sites(&self) -> &DependencySites {
+        &self.sites
     }
 }
