@@ -1,5 +1,6 @@
 mod dependencies;
 mod failure;
+mod library_tests;
 mod line_number;
 mod manifest;
 mod matching;
@@ -15,6 +16,7 @@ mod word;
 
 pub use dependencies::Dependencies;
 pub use failure::Failure;
+pub use library_tests::LibraryTests;
 pub use line_number::LineNumber;
 pub use manifest::{KeyLines, Manifest};
 pub use matching::Matching;

@@ -6,6 +6,7 @@ use crate::crate_root::CrateRoot;
 use file_ports::Files;
 use lint_layout::Dependencies;
 use lint_layout::KeyLines;
+use lint_layout::LibraryTests;
 use lint_layout::Manifest;
 use lint_layout::Untested;
 
@@ -15,6 +16,7 @@ pub struct PackageRoot {
     name: CrateName,
     lines: KeyLines,
     untested: Untested,
+    library: LibraryTests,
     dependencies: Dependencies,
 }
 
@@ -44,6 +46,7 @@ impl PackageRoot {
                         .as_ref()
                         .map(|manifest| manifest.untested_targets(canonical))
                         .unwrap_or_default(),
+                    library: manifest.as_ref().map(Manifest::library_tests).unwrap_or_default(),
                     dependencies: manifest.as_ref().map(Manifest::dependencies).cloned().unwrap_or_default(),
                 }
             })
@@ -57,6 +60,7 @@ impl PackageRoot {
             root,
             lines: KeyLines::default(),
             untested: Untested::default(),
+            library: LibraryTests::default(),
             dependencies: Dependencies::default(),
         }
     }
@@ -79,6 +83,11 @@ impl PackageRoot {
     #[must_use]
     pub fn untested(&self) -> &Untested {
         &self.untested
+    }
+
+    #[must_use]
+    pub fn library_tests(&self) -> LibraryTests {
+        self.library
     }
 
     #[must_use]

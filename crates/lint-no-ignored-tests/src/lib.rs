@@ -1,4 +1,5 @@
 mod skip_marks;
+mod test_gates;
 
 use lint_core::Fix;
 use lint_core::Message;
@@ -8,7 +9,9 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::{Headline, Lint};
+use lint_layout::LibraryTests;
 use skip_marks::SkipMarks;
+use test_gates::TestGates;
 
 #[derive(Debug)]
 pub struct NoIgnoredTests;
@@ -22,6 +25,20 @@ impl NoIgnoredTests {
         Problem::new("test skipped by an attribute"),
         Fix::new("remove the attribute and make the test pass, or delete the test"),
     );
+    const UNRUN: Message = Message::new(
+        Problem::new("#[cfg(test)] code in a crate whose library sets `test = false`, so it never runs"),
+        Fix::new("move the tests into the crate's tests directory and test through the public API"),
+    );
+
+    fn unrun(file: &SourceFile) -> Vec<Violation<'_>> {
+        file.shipped()
+            .filter(|shipped| shipped.placement().package().library_tests() == LibraryTests::SwitchedOff)
+            .map(|shipped| TestGates::lines_in(shipped.syntax()))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|line| Violation::new(Site::new(file.path(), line), Self::UNRUN))
+            .collect()
+    }
 }
 
 impl Lint for NoIgnoredTests {
@@ -36,6 +53,7 @@ impl Lint for NoIgnoredTests {
                         .into_iter()
                         .map(move |line| Violation::new(Site::new(file.path(), line), Self::SKIPPED))
                         .chain(target)
+                        .chain(Self::unrun(file))
                 })
                 .collect(),
         )

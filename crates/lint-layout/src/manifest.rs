@@ -14,6 +14,7 @@ use toml::{Table, Value};
 
 use crate::dependencies::Dependencies;
 use crate::failure::Failure;
+use crate::library_tests::LibraryTests;
 use crate::name::Name;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
@@ -136,6 +137,14 @@ impl Manifest {
             .filter_map(|target| target.get(Self::PATH)?.as_str())
             .filter_map(|path| canonical(&self.directory.join(path)))
             .collect()
+    }
+
+    #[must_use]
+    pub fn library_tests(&self) -> LibraryTests {
+        match self.table.get(Self::LIBRARY).and_then(|library| library.get(Self::TEST)).and_then(Value::as_bool) {
+            Some(false) => LibraryTests::SwitchedOff,
+            Some(true) | None => LibraryTests::Run,
+        }
     }
 
     #[must_use]
