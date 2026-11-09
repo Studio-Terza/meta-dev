@@ -47,7 +47,7 @@ impl Design {
 
     fn saying(said: &str, agent: &str) -> io::Result<Design> {
         let home = Home::new()?;
-        let workspace = home.path().join("work");
+        let workspace = AsRef::<Path>::as_ref(&home).join("work");
         let slug = Letters::slugged(&workspace.to_string_lossy());
         let session = Path::new(".claude/projects").join(slug).join("s.jsonl");
         let program = Path::new("bin/claude");
