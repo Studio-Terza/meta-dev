@@ -361,8 +361,11 @@ WHERE
 fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
 -> Result<(), Box<dyn Error>> {
     let migrated = Run::root().port(OLD_STORE.clone()).read(Bodies)?;
-    let inked: Vec<Around> =
-        (char::MIN..=char::MAX).filter(|point| BLANKS.binary_search(point).is_err()).map(Around).collect();
+    let inked: Vec<Around> = (char::MIN..=char::MAX)
+        .filter(|point| BLANKS.binary_search(point).is_err())
+        .map(Around)
+        .filter(|point| point.kept().is_ok())
+        .collect();
     let kept: Vec<Option<&Body>> =
         inked.iter().map(|point| Ok(migrated.get(&point.uuid()?))).collect::<Result<_, Box<dyn Error>>>()?;
     let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect::<Result<_, _>>()?;

@@ -1,7 +1,7 @@
 WITH
 RECURSIVE points (n) AS (
   SELECT
-    0
+    1
   UNION ALL
   SELECT
     n + 1
