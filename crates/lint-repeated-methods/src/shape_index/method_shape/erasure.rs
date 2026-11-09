@@ -40,7 +40,7 @@ impl<'found> Erasure<'found> {
     fn renamed(&self, ident: Ident) -> Ident {
         let span = ident.span();
         Some(ident)
-            .filter(|candidate| *self.self_type != Name::from(candidate))
+            .filter(|candidate| *candidate != *self.self_type)
             .unwrap_or_else(|| Ident::new(Self::OWN_TYPE, span))
     }
 

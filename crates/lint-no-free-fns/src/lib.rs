@@ -2,6 +2,7 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use std::path::Path as StdPath;
 use syn::visit::Visit;
 
@@ -20,19 +21,13 @@ impl Lint for NoFreeFns {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("free functions are not allowed; make them associated functions or methods"),
-            files.iter().flat_map(|file| Self::free_fns(file.path(), file.syntax())).collect(),
+            files.iter().flat_map(<Self as FileLint>::violations).collect(),
         )
     }
 }
 
 impl NoFreeFns {
     const REQUIRED_FREE: [&'static str; 4] = ["test", "proc_macro", "proc_macro_derive", "proc_macro_attribute"];
-
-    fn free_fns<'file>(path: &'file StdPath, file: &syn::File) -> Vec<Violation<'file>> {
-        let mut visitor = FreeFns { path, found: Vec::new() };
-        visitor.visit_file(file);
-        visitor.found
-    }
 
     fn exemption(function: &ItemFn) -> Option<&Ident> {
         Some(&function.sig.ident)
@@ -49,7 +44,16 @@ impl NoFreeFns {
     }
 }
 
+impl FileLint for NoFreeFns {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut visitor = FreeFns { file, path: file.path(), found: Vec::new() };
+        visitor.visit_file(file.syntax());
+        visitor.found
+    }
+}
+
 struct FreeFns<'file> {
+    file: &'file SourceFile,
     path: &'file StdPath,
     found: Vec<Violation<'file>>,
 }
@@ -65,6 +69,6 @@ impl<'ast> Visit<'ast> for FreeFns<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        lint_core::Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        lint_core::Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 }

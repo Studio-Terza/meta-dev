@@ -10,6 +10,7 @@ cargo-ports = { path = "../cargo-ports" }
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 lint-runner = { path = "../lint-runner" }
+timer-ports = { path = "../timer-ports" }
 
 [lints]
 workspace = true

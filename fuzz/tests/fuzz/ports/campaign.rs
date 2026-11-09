@@ -7,9 +7,10 @@ use std::time::Instant;
 use cargo_ports::Recorded;
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
-use lint_runner::{Cli, Verdict};
+use lint_runner::{Cli, Ports, Verdict};
 use proptest::prelude::{Strategy, prop_assert_eq};
 use proptest::test_runner::{Config, Reason, TestCaseError, TestError, TestRunner};
+use timer_ports::Monotonic;
 
 use crate::crash::{Crash, Failing, Kept};
 use crate::input::Input;
@@ -59,8 +60,7 @@ impl Campaign {
     fn ran(files: &Memory) -> Run {
         let mut err = Vec::new();
         let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(
-            files,
-            Workspace::described(),
+            Ports::new(files, Workspace::described(), Monotonic::default()),
             &mut Vec::new(),
             &mut err,
         );

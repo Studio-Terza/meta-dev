@@ -1,3 +1,3 @@
 mod cli;
 
-pub use cli::{Cli, Verdict};
+pub use cli::{Cli, Ports, Verdict};

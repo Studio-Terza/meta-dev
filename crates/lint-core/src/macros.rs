@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use proc_macro2::{Group, TokenStream, TokenTree};
 use quote::quote;
 use syn::parse::discouraged::Speculative;
@@ -5,7 +7,12 @@ use syn::parse::{ParseStream, Parser};
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Block, Expr, Macro, Stmt, Token};
 
+use crate::source_file::SourceFile;
 use crate::syntax::Syntax;
+
+mod boundary;
+
+pub use boundary::Expansions;
 
 #[derive(Debug)]
 pub struct Macros;
@@ -26,8 +33,13 @@ impl Macros {
             .collect()
     }
 
-    pub fn walk(invocation: &Macro, visit: impl FnMut(&Stmt)) {
-        Self::statements(invocation).iter().for_each(visit);
+    #[must_use]
+    pub fn expanded(file: &SourceFile, invocation: &Macro) -> Rc<[Stmt]> {
+        file.expansions().statements(file.syntax(), invocation)
+    }
+
+    pub fn walk(file: &SourceFile, invocation: &Macro, visit: impl FnMut(&Stmt)) {
+        Self::expanded(file, invocation).iter().for_each(visit);
     }
 
     #[must_use]

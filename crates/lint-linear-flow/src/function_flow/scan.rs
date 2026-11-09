@@ -5,20 +5,21 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, Item, Local, Macro};
 
-use lint_core::{Macros, Site};
+use lint_core::{Macros, Site, SourceFile};
 use lint_layout::LineNumber;
 
 use crate::finding::Finding;
 use crate::function_flow::found::Found;
 
 pub struct Scan<'file> {
+    file: &'file SourceFile,
     path: &'file Path,
     found: Vec<Found<'file>>,
 }
 
 impl<'file> Scan<'file> {
-    pub fn new(path: &'file Path) -> Scan<'file> {
-        Scan { path, found: Vec::new() }
+    pub fn new(file: &'file SourceFile) -> Scan<'file> {
+        Scan { file, path: file.path(), found: Vec::new() }
     }
 
     pub fn into_found(self) -> Vec<Found<'file>> {
@@ -34,7 +35,7 @@ impl<'ast> Visit<'ast> for Scan<'_> {
     fn visit_item(&mut self, _nested: &'ast Item) {}
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_expr_if(&mut self, expr: &'ast ExprIf) {

@@ -88,13 +88,14 @@ impl FnShape {
 
 impl FileLint for FnShape {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut shapes = Shapes { path: file.path(), depth: NestingDepth::default(), violations: Vec::new() };
+        let mut shapes = Shapes { file, path: file.path(), depth: NestingDepth::default(), violations: Vec::new() };
         shapes.visit_file(file.syntax());
         shapes.violations
     }
 }
 
 struct Shapes<'scan> {
+    file: &'scan SourceFile,
     path: &'scan Path,
     depth: NestingDepth,
     violations: Vec<Violation<'scan>>,
@@ -139,7 +140,7 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {

@@ -42,19 +42,20 @@ impl ForeignReferences {
         let own_crate = binaries
             .holding(file.path())
             .map_or_else(|| Some(CrateName::from(file.placement().crate_root())), |_| None);
-        let mut references = ForeignReferences { own_crate, crates: BTreeMap::new() };
-        references.visit_file(file.syntax());
-        references
+        let mut reading = Reading { file, references: ForeignReferences { own_crate, crates: BTreeMap::new() } };
+        reading.visit_file(file.syntax());
+        reading.references
     }
 
     pub fn in_own_tests(file: &SourceFile) -> Option<ForeignReferences> {
         let package = file.placement().package().root();
         file.placement().crate_root().directory().starts_with(package.directory().join(Self::TESTS)).then(|| {
             let tested = CrateName::from(package);
-            let mut references = ForeignReferences::default();
-            references.visit_file(file.syntax());
+            let mut reading = Reading { file, references: ForeignReferences::default() };
+            reading.visit_file(file.syntax());
             ForeignReferences {
-                crates: references
+                crates: reading
+                    .references
                     .crates
                     .remove_entry(&tested)
                     .map(|(name, reach)| (name, reach.names_only()))
@@ -112,19 +113,24 @@ impl ForeignReferences {
     }
 }
 
-impl<'ast> Visit<'ast> for ForeignReferences {
+struct Reading<'file> {
+    file: &'file SourceFile,
+    references: ForeignReferences,
+}
+
+impl<'ast> Visit<'ast> for Reading<'_> {
     fn visit_item_use(&mut self, item: &'ast ItemUse) {
-        self.walk(None, &item.tree);
+        self.references.walk(None, &item.tree);
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
         syn::visit::visit_macro(self, invocation);
     }
 
     fn visit_path(&mut self, path: &'ast Path) {
         path.segments.first().zip(path.segments.iter().nth(1)).into_iter().for_each(|(first, second)| {
-            self.record(Some(&first.ident), Leaf::Named(&second.ident));
+            self.references.record(Some(&first.ident), Leaf::Named(&second.ident));
         });
         syn::visit::visit_path(self, path);
     }

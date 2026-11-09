@@ -1,7 +1,23 @@
+use std::borrow::Borrow;
 use std::collections::BTreeSet;
 
 use lint_layout::Name;
 use proc_macro2::Ident;
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Leaf(Name);
+
+impl From<&Import<'_>> for Leaf {
+    fn from(import: &Import<'_>) -> Leaf {
+        Leaf(Name::from(import.leaf))
+    }
+}
+
+impl Borrow<Name> for Leaf {
+    fn borrow(&self) -> &Name {
+        &self.0
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Import<'file> {
@@ -26,10 +42,6 @@ impl<'file> Import<'file> {
 
     pub fn itself(mut path: Vec<&'file Ident>) -> Option<Import<'file>> {
         path.pop().map(|leaf| Import { leaf, path, original: leaf })
-    }
-
-    pub fn names(&self, name: &Name) -> Option<&Import<'file>> {
-        (*name == Name::from(self.leaf)).then_some(self)
     }
 
     pub fn rooted_in(&self, local_roots: &BTreeSet<Name>) -> Option<&'file Ident> {

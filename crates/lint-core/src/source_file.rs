@@ -5,6 +5,7 @@ mod manifest_file;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use crate::macros::Expansions;
 use boundary::Nesting;
 use file_ports::Absent;
 use lint_layout::Failure;
@@ -26,6 +27,7 @@ pub struct SourceFile {
     syntax: syn::File,
     test_modules: Vec<SourceFile>,
     manifest: OnceLock<ManifestFile>,
+    expansions: Expansions,
 }
 
 impl SourceFile {
@@ -55,6 +57,7 @@ impl SourceFile {
                 syntax,
                 test_modules: Vec::new(),
                 manifest: OnceLock::new(),
+                expansions: Expansions::default(),
             }),
             Err(source) => Err(Failure::Parse { path, line: LineNumber::from(source.span()), source }),
         }
@@ -122,5 +125,10 @@ impl SourceFile {
     #[must_use]
     pub fn syntax(&self) -> &syn::File {
         &self.syntax
+    }
+
+    #[must_use]
+    pub(crate) fn expansions(&self) -> &Expansions {
+        &self.expansions
     }
 }

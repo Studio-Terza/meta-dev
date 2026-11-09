@@ -2,6 +2,7 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use std::path::Path;
 
 use syn::visit::Visit;
@@ -22,14 +23,7 @@ pub struct LiteralNames;
 
 impl Lint for LiteralNames {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("function names say what the function does"),
-            files
-                .iter()
-                .filter_map(SourceFile::shipped)
-                .flat_map(|file| Self::vague_names(file.path(), file.syntax()))
-                .collect(),
-        )
+        Report::new(Headline::new("function names say what the function does"), Self::in_shipped(files))
     }
 }
 
@@ -47,15 +41,18 @@ impl LiteralNames {
             .then_some(Finding::VagueName { name })
             .or_else(|| name.matches::<Whole>(&Self::VAGUE).map(|_| Finding::VagueName { name }))
     }
+}
 
-    fn vague_names<'file>(path: &'file Path, file: &syn::File) -> Vec<Violation<'file>> {
-        let mut names = VagueNames { path, found: Vec::new() };
-        names.visit_file(file);
+impl FileLint for LiteralNames {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut names = VagueNames { file, path: file.path(), found: Vec::new() };
+        names.visit_file(file.syntax());
         names.found
     }
 }
 
 struct VagueNames<'file> {
+    file: &'file SourceFile,
     path: &'file Path,
     found: Vec<Violation<'file>>,
 }
@@ -80,7 +77,7 @@ impl<'ast> Visit<'ast> for VagueNames<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
