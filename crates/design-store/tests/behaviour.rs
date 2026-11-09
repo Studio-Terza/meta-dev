@@ -410,6 +410,46 @@ impl Listed {
     }
 }
 
+static UNANCHORED_SEEDS: Migrator = store_ports::migrate!("tests/unanchored");
+
+static UNANCHORED: LazyLock<Migrator> = LazyLock::new(|| {
+    Migrator::with_migrations(StreamSchema::migrator().iter().chain(UNANCHORED_SEEDS.iter()).cloned().collect())
+});
+
+#[derive(Clone, Copy, Debug)]
+struct Unanchored;
+
+impl Schema for Unanchored {
+    type Rewrite = <StreamSchema as Schema>::Rewrite;
+
+    fn migrator() -> &'static Migrator {
+        &UNANCHORED
+    }
+
+    fn rewrite(pending: Version) -> Option<Self::Rewrite> {
+        StreamSchema::rewrite(pending)
+    }
+}
+
+impl Unanchored {
+    fn refusal<Rows: std::fmt::Debug>(opened: Result<Rows, StoreFailure>) -> String {
+        match opened {
+            Err(StoreFailure::Refused(refusal)) => refusal.to_string(),
+            other => format!("not refused: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn an_old_store_holding_a_link_to_a_segment_it_does_not_hold_refuses_the_open_and_names_the_link() {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<Unanchored>());
+    assert_eq!(
+        Unanchored::refusal(store.read(SessionCursors)),
+        "these stored links name a segment the store does not hold: u1#0 answers u1#1"
+    );
+}
+
 const RESEGMENTED: &str = concat!(
     "{\"type\":\"user\",\"uuid\":\"o3\",\"parentUuid\":null,\"sessionId\":\"s\",",
     "\"timestamp\":\"2026-01-01T00:00:03Z\",\"origin\":{\"kind\":\"human\"},",

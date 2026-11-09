@@ -235,7 +235,15 @@ the open with `StoreFailure::Refused`, naming every such segment as `message#ord
 Segments nothing points at are still re-derived. Migration 20261109000001 gives `mechanical_links` generated
 `source_ordinal` and `target_ordinal` columns, read from the ordinal of a segment anchor (null for a message anchor),
 with foreign keys into `segments`, so a `cites` or `answers` link holds its segment like any annotation and its ordinal
-cannot disagree with its anchor.
+cannot disagree with its anchor. The migration copies the stored links with those keys deferred, and the rewrite due with
+it, `Anchored`, reads `pragma_foreign_key_check` for `mechanical_links`: an old store holding a link whose segment it does
+not hold refuses the open with `StoreFailure::Refused`, naming every such link as `source relation target`, never with a
+bare foreign key failure. Ingest links over every message of a session, earlier ones re-segmented in memory, so a link
+can name a segment of an earlier message that the store holds differently or not at all, such as one stored under an
+older segmenter. Before writing, `Holding` checks every segment each link names: the row the store will hold, the
+stored one or the one written now, must be the row the segmenter derives from that message. A link that fails is not
+written and ingest prints it as `refused link source relation target`; the rest of the session is written and its cursor
+advances.
 
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.

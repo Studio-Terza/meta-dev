@@ -1,3 +1,5 @@
+PRAGMA defer_foreign_keys = ON;
+
 CREATE TABLE anchored_links (
     source TEXT NOT NULL,
     relation TEXT NOT NULL,
@@ -25,3 +27,5 @@ ALTER TABLE anchored_links RENAME TO mechanical_links;
 CREATE INDEX mechanical_links_by_source ON mechanical_links (source_message, source_ordinal);
 
 CREATE INDEX mechanical_links_by_target ON mechanical_links (target_message, target_ordinal);
+
+PRAGMA defer_foreign_keys = OFF;

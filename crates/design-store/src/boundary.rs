@@ -9,7 +9,7 @@ use file_ports::Offset;
 use grammar::search::Term;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use store_ports::{Columns, Released, Statements, StoreFailure, Written};
-use stream::{Anchor, MechanicalLink, Message, Shape};
+use stream::{Anchor, Anchors, MechanicalLink, Message, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
@@ -44,7 +44,7 @@ pub struct MessageRow {
     body: Body,
 }
 
-#[derive(Debug, PartialEq, Columns)]
+#[derive(Clone, Debug, PartialEq, Columns)]
 pub struct SegmentRow {
     message: Uuid,
     ordinal: Ordinal,
@@ -52,7 +52,7 @@ pub struct SegmentRow {
     body: Body,
 }
 
-#[derive(Debug, Columns)]
+#[derive(Clone, Debug, Columns)]
 pub struct LinkRow {
     source: Anchor,
     relation: RelationName,
@@ -311,6 +311,49 @@ ORDER BY
     #[must_use]
     pub fn anchors(&self) -> [Anchor; 2] {
         [self.source.clone(), self.target.clone()]
+    }
+
+    pub(crate) fn segments(&self) -> Vec<Segment> {
+        [&self.source, &self.target].into_iter().filter_map(|anchor| anchor.visited(Held)).collect()
+    }
+
+    pub(crate) fn unchecked(statements: &mut Statements<'_>) -> Result<Vec<LinkRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
+            LinkRow,
+            r#"
+SELECT
+  mechanical_links.source,
+  mechanical_links.relation,
+  mechanical_links.target,
+  mechanical_links.source_message,
+  mechanical_links.target_message
+FROM
+  pragma_foreign_key_check('mechanical_links') AS unchecked
+  JOIN mechanical_links ON mechanical_links.rowid = unchecked.rowid
+ORDER BY
+  mechanical_links.rowid
+"#
+        ))
+    }
+}
+
+impl fmt::Display for LinkRow {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {} {}", self.source, self.relation, self.target)
+    }
+}
+
+struct Held;
+
+impl Anchors for Held {
+    type Output = Option<Segment>;
+
+    fn message(self, _message: &Uuid) -> Option<Segment> {
+        None
+    }
+
+    fn segment(self, segment: &SegmentId) -> Option<Segment> {
+        Some(Segment::new(segment.message().clone(), Ordinal::new(segment.ordinal().into_inner())))
     }
 }
 
