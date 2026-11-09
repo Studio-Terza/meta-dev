@@ -16,28 +16,32 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ github.workspace }}/target/mold
-        key: mold-3.0.0-${{ runner.os }}-${{ runner.arch }}
+        key: mold-3.0.0-extracted-${{ runner.os }}-${{ runner.arch }}
     - name: mold download
       if: steps.cache.outputs.cache-hit != 'true'
       uses: suisei-cn/actions-download-file@v1.6.1
       with:
         url: https://github.com/rui314/mold/releases/download/v3.0.0/mold-3.0.0-x86_64-linux.tar.gz
-        target: ${{ github.workspace }}/target/mold
+        target: ${{ runner.temp }}
         filename: mold.tar.gz
         retry-times: "5"
     - name: mold verify
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      working-directory: ${{ github.workspace }}/target/mold
+      working-directory: ${{ runner.temp }}
       run: sha256sum --check --strict ${{ github.action_path }}/mold.sha256
-    - name: mold extract
+    - name: mold directory
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      working-directory: ${{ github.workspace }}/target/mold
-      run: tar -xzf mold.tar.gz --strip-components=1
+      run: mkdir -p ${{ github.workspace }}/target/mold
+    - name: mold unpack
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      run: tar -xzf mold.tar.gz -C ${{ github.workspace }}/target/mold --strip-components=1
     - name: mold save
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/target/mold
-        key: mold-3.0.0-${{ runner.os }}-${{ runner.arch }}
+        key: mold-3.0.0-extracted-${{ runner.os }}-${{ runner.arch }}
