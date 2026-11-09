@@ -31,7 +31,7 @@ impl Package {
             .ok_or_else(|| Failure::PackageSpec(spec.clone()))
     }
 
-    pub(super) fn units(&self) -> impl Iterator<Item = Unit> {
+    pub(super) fn units(&self) -> impl Iterator<Item = Unit<'_>> {
         self.targets.iter().filter_map(Target::unit)
     }
 }

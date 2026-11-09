@@ -28,9 +28,9 @@ impl Workspace {
             .among(&self.packages, &self.workspace_default_members)?
             .into_iter()
             .flat_map(Package::units)
-            .collect::<BTreeSet<Unit>>();
+            .collect::<BTreeSet<Unit<'_>>>();
         units.first().ok_or(Failure::NothingToCheck)?;
-        Ok(units.into_iter().map(OsString::from).chain([OsString::from(Self::TESTS)]).collect())
+        Ok(units.into_iter().flat_map(Unit::flags).chain([OsString::from(Self::TESTS)]).collect())
     }
 }
 

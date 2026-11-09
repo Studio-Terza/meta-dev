@@ -317,16 +317,17 @@ laws::table!(
     clippy_names_the_kinds_of_target_the_scope_has_and_always_the_tests,
     Clippy::invoked,
     [
-        &["--workspace"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--workspace"],
-        &["--all"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--all"],
-        &["--workspace", "--timings", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--workspace", "--timings", "--", "-D", "warnings"],
+        &["--workspace"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace"],
+        &["--all"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--all"],
+        &["--workspace", "--timings", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace", "--timings", "--", "-D", "warnings"],
         &["-p", "libonly"][..] => vec!["--lib", "--tests", "-p", "libonly"],
         &["-p", "binonly"][..] => vec!["--bins", "--tests", "-p", "binonly"],
-        &["-p", "demo"][..] => vec!["--lib", "--examples", "--tests", "-p", "demo"],
-        &["-p", "benched"][..] => vec!["--lib", "--benches", "--tests", "-p", "benched"],
+        &["-p", "demo"][..] => vec!["--lib", "--example", "showcase", "--tests", "-p", "demo"],
+        &["-p", "benched"][..] => vec!["--lib", "--bench", "speed", "--tests", "-p", "benched"],
+        &["-p", "libonly", "-p", "benched"][..] => vec!["--lib", "--bench", "speed", "--tests", "-p", "libonly", "-p", "benched"],
         &["-p", "macros"][..] => vec!["--lib", "--tests", "-p", "macros"],
         &["-p", "gated"][..] => vec!["--lib", "--tests", "-p", "gated"],
-        &["-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--examples", "--tests", "-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"],
+        &["-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--example", "showcase", "--tests", "-p", "libonly", "--package", "binonly", "-p", "demo", "--", "-D", "warnings"],
         &["--package=binonly"][..] => vec!["--bins", "--tests", "--package=binonly"],
         &["-pbinonly"][..] => vec!["--bins", "--tests", "-pbinonly"],
         &["-p=binonly"][..] => vec!["--bins", "--tests", "-p=binonly"],
@@ -334,7 +335,7 @@ laws::table!(
         &["--packages", "x"][..] => vec!["--lib", "--bins", "--tests", "--packages", "x"],
         &["--", "-D", "warnings"][..] => vec!["--lib", "--bins", "--tests", "--", "-D", "warnings"],
         &[][..] => vec!["--lib", "--bins", "--tests"],
-        &["--workspace", "-p", "libonly"][..] => vec!["--lib", "--bins", "--examples", "--benches", "--tests", "--workspace", "-p", "libonly"],
+        &["--workspace", "-p", "libonly"][..] => vec!["--lib", "--bins", "--example", "showcase", "--bench", "speed", "--tests", "--workspace", "-p", "libonly"],
         &["--", "-p", "benched"][..] => vec!["--lib", "--bins", "--tests", "--", "-p", "benched"],
         &["--", "--workspace"][..] => vec!["--lib", "--bins", "--tests", "--", "--workspace"],
     ]
@@ -344,7 +345,8 @@ const UNRESOLVED: &str = "against the cargo metadata: it takes workspace package
 const REFUSED: &str = "it chooses the targets from the cargo metadata of the workspace it runs in";
 const NOTHING: &str = "the clippy scope has no target to check, so clippy would pass by checking nothing";
 const NO_PACKAGES: &str = r#"{ "packages": [], "workspace_default_members": [] }"#;
-const NO_DEFAULTS: &str = r#"{ "packages": [{ "id": "a", "name": "a", "targets": [{ "kind": ["lib"] }] }] }"#;
+const NO_DEFAULTS: &str =
+    r#"{ "packages": [{ "id": "a", "name": "a", "targets": [{ "name": "a", "kind": ["lib"] }] }] }"#;
 
 laws::table!(
     clippy_refuses_a_package_spec_it_cannot_resolve_naming_the_spec_and_never_runs,
@@ -398,12 +400,19 @@ laws::table!(
 );
 
 #[test]
-fn clippy_never_names_all_targets_or_single_tests_and_asks_for_benches_only_where_there_are_some() {
+fn clippy_never_names_a_kind_flag_that_puts_libraries_in_test_mode_and_names_each_bench_and_example() {
     let without = Clippy::invoked(&["-p", "libonly", "-p", "binonly", "-p", "demo", "-p", "gated"]);
     let with = Clippy::invoked(&["-p", "libonly", "-p", "benched"]);
-    assert!(without.iter().all(|flag| flag != "--benches"));
-    assert!(with.contains(&"--benches".to_owned()));
-    assert!(without.iter().chain(&with).all(|flag| ["--all-targets", "--test"].iter().all(|named| flag != named)));
+    let whole = Clippy::invoked(&["--workspace"]);
+    assert!(without.iter().all(|flag| flag != "--bench"));
+    assert!(with.contains(&"--bench".to_owned()));
+    assert!(
+        without
+            .iter()
+            .chain(&with)
+            .chain(&whole)
+            .all(|flag| ["--all-targets", "--test", "--benches", "--examples"].iter().all(|named| flag != named))
+    );
 }
 
 #[test]

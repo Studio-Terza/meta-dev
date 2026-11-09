@@ -1,20 +1,22 @@
 use std::ffi::OsString;
 
+use super::super::name::TargetName;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) enum Unit {
+pub(super) enum Unit<'target> {
     Library,
     Bins,
-    Examples,
-    Benches,
+    Example(&'target TargetName),
+    Bench(&'target TargetName),
 }
 
-impl From<Unit> for OsString {
-    fn from(unit: Unit) -> OsString {
-        match unit {
-            Unit::Library => OsString::from("--lib"),
-            Unit::Bins => OsString::from("--bins"),
-            Unit::Examples => OsString::from("--examples"),
-            Unit::Benches => OsString::from("--benches"),
+impl Unit<'_> {
+    pub(super) fn flags(self) -> Vec<OsString> {
+        match self {
+            Unit::Library => vec![OsString::from("--lib")],
+            Unit::Bins => vec![OsString::from("--bins")],
+            Unit::Example(name) => vec![OsString::from("--example"), OsString::from(name.as_ref())],
+            Unit::Bench(name) => vec![OsString::from("--bench"), OsString::from(name.as_ref())],
         }
     }
 }
