@@ -1,3 +1,4 @@
+mod name;
 mod scope;
 mod workspace;
 
@@ -44,11 +45,7 @@ impl Step for ClippyTargets {
         let targets = workspace.targets(&Scope::from(self.arguments.as_slice()));
         let invocation = Invocation::new(
             "cargo",
-            Self::CLIPPY
-                .iter()
-                .map(OsString::from)
-                .chain(targets.into_iter().map(OsString::from))
-                .chain(self.arguments.iter().cloned()),
+            Self::CLIPPY.iter().map(OsString::from).chain(targets).chain(self.arguments.iter().cloned()),
         );
         Timed::measure(&self.measured, &self.stage, &invocation, ports)
     }

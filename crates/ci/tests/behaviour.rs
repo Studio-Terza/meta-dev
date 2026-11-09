@@ -292,7 +292,7 @@ impl Clippy {
         let calls = fake.calls.borrow();
         calls
             .iter()
-            .filter(|call| call.program() == "cargo" && call.arguments().first().is_some_and(|first| first == "clippy"))
+            .filter(|call| call.arguments().first().is_some_and(|first| first == "clippy"))
             .flat_map(|call| call.arguments().iter().skip(2))
             .map(|argument| argument.to_string_lossy().into_owned())
             .collect()
@@ -327,9 +327,9 @@ laws::table!(
 fn clippy_never_names_all_targets_or_single_tests_and_asks_for_benches_only_where_there_are_some() {
     let without = Clippy::invoked(&["-p", "libonly", "-p", "binonly", "-p", "demo", "-p", "gated"]);
     let with = Clippy::invoked(&["-p", "libonly", "-p", "benched"]);
-    assert!(!without.contains(&"--benches".to_owned()));
+    assert!(without.iter().all(|flag| flag != "--benches"));
     assert!(with.contains(&"--benches".to_owned()));
-    assert!(!without.iter().chain(&with).any(|flag| ["--all-targets", "--test"].contains(&flag.as_str())));
+    assert!(without.iter().chain(&with).all(|flag| ["--all-targets", "--test"].iter().all(|named| flag != named)));
 }
 
 #[test]

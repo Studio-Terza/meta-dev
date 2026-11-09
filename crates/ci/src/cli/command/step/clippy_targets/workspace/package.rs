@@ -2,25 +2,27 @@ mod target;
 
 use serde::Deserialize;
 
+use super::super::name::{PackageId, PackageName};
+use super::unit::Unit;
 use target::Target;
 
 #[derive(Debug, Deserialize)]
-pub(super) struct Package {
-    id: String,
-    name: String,
+pub(crate) struct Package {
+    id: PackageId,
+    name: PackageName,
     targets: Vec<Target>,
 }
 
 impl Package {
-    pub(super) fn among(&self, members: &[String]) -> bool {
-        members.contains(&self.id)
+    pub(in super::super) fn id(&self) -> &PackageId {
+        &self.id
     }
 
-    pub(super) fn named(&self, names: &[String]) -> bool {
-        names.contains(&self.name)
+    pub(in super::super) fn name(&self) -> &PackageName {
+        &self.name
     }
 
-    pub(super) fn kinds(&self) -> impl Iterator<Item = &str> {
-        self.targets.iter().flat_map(Target::kinds)
+    pub(super) fn units(&self) -> impl Iterator<Item = Unit> {
+        self.targets.iter().filter_map(Target::unit)
     }
 }

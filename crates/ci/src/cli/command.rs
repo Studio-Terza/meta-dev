@@ -4,13 +4,12 @@ mod step;
 use std::ffi::OsString;
 use std::io::Write;
 
+use step::clippy_targets::ClippyTargets;
 use step::cold_size::ColdSize;
 use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
-use step::{
-    ClippyTargets, CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey,
-};
+use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
 use super::ports::{Exit, Ports};
 pub(crate) use failure::Failure;
