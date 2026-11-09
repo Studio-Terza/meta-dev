@@ -2,19 +2,22 @@ use std::error::Error;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Mutex;
 
 use dispatch_ports::{
-    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, Stall, Started,
-    SystemClock, Timeout, Tokens, Usage, Watch, Watched,
+    Agent, Bell, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall,
+    Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched,
 };
 use port_core::Run;
+
+use super::{FakeClock, Sleep, Watching};
 
 #[test]
 fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), Box<dyn Error>> {
     let mut sleeper = Command::new("sleep").arg("30").process_group(0).spawn()?;
     let pid = Pid::new(sleeper.id());
     let run = Run::root();
-    let claude = run.port(HeadlessClaude::new(PathBuf::new(), Agent::CLAUDE));
+    let claude = run.port(HeadlessClaude::new(PathBuf::new(), Agent::CLAUDE, &Bell::default()));
     let before = claude.started(pid)?.is_some();
     let killed = claude.kill(pid)?;
     sleeper.wait()?;
@@ -29,9 +32,13 @@ fn an_agent_that_prints_its_result_is_watched_to_that_reply_and_usage() -> Resul
     let printed = r#"{"subtype":"success","result":"conversational(a.0)","usage":{"input_tokens":4,"output_tokens":9,"cache_creation_input_tokens":2,"cache_read_input_tokens":7}}"#;
     let run = Run::root();
     let watched = {
-        let echo =
-            run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", &["-c", "cat"])));
-        let clock = run.port(SystemClock);
+        let bell = Bell::default();
+        let echo = run.port(HeadlessClaude::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+            Agent::new("sh", &["-c", "cat"]),
+            &bell,
+        ));
+        let clock = run.port(SystemClock::new(&bell));
         let deadline = Deadline::after(clock.now(), Timeout::new(60));
         let held = echo.dispatch(&Job::due_by(deadline), &Prompt::new(printed.to_owned()))?;
         Watch::over(&echo, &clock).watched(held)?
@@ -56,9 +63,16 @@ impl Stalling {
     fn watched(arguments: &&'static [&'static str]) -> Option<Stalled> {
         let run = Run::root();
         let ended = {
-            let agent =
-                run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", arguments)));
-            let clock = run.port(SystemClock);
+            let agent = run.port(HeadlessClaude::new(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+                Agent::new("sh", arguments),
+                &Bell::default(),
+            ));
+            let clock = run.port(FakeClock {
+                now: Mutex::new(Watching::START),
+                sleep: Sleep { after: 0, slept: Pause::new(0) },
+                waits: Mutex::new(0),
+            });
             let deadline = Deadline::after(clock.now(), Timeout::new(1));
             let held = agent.dispatch(&Job::due_by(deadline), &Prompt::new("x".repeat(Stalling::PROMPT))).ok()?;
             let pid = held.pid();

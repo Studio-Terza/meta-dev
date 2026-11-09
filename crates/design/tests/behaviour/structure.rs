@@ -14,8 +14,9 @@ use design::{
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, Provenance, RunId};
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
-    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished, HeadlessClaude,
-    Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, clock_ops, dispatch_ops,
+    Agent, AgentRun, Bell, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished,
+    HeadlessClaude, Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall,
+    clock_ops, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
 use newtype::Newtype;
@@ -604,8 +605,9 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
     let missing = Agent::new("/nonexistent/claude", &[]);
     let garbled = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
     let reported = [errs, refuses, missing, garbled].map(|agent| {
+        let bell = Bell::default();
         let structured = structuring.structured_by(
-            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent), SystemClock),
+            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent, &bell), SystemClock::new(&bell)),
             &["structure"],
         );
         let failure = structured.outcome.as_ref().err().map(ToString::to_string).unwrap_or_default();
@@ -631,8 +633,9 @@ fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let stopped = [1, 2].map(|_stop| {
         let missing = Agent::new("/nonexistent/claude", &[]);
+        let bell = Bell::default();
         structuring.structured_by(
-            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), missing), SystemClock),
+            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), missing, &bell), SystemClock::new(&bell)),
             &["hook", "stop"],
         )
     });

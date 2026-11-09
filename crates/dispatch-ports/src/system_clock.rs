@@ -1,12 +1,20 @@
-use std::thread;
 use std::time::{Duration, SystemTime};
 
 use port_core::Pass;
 
-use crate::{ClockFiller, Pause, Wall, clock_ops};
+use crate::{Bell, ClockFiller, Pause, Wall, clock_ops};
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SystemClock;
+#[derive(Debug)]
+pub struct SystemClock {
+    bell: Bell,
+}
+
+impl SystemClock {
+    #[must_use]
+    pub fn new(bell: &Bell) -> SystemClock {
+        SystemClock { bell: bell.clone() }
+    }
+}
 
 impl ClockFiller for SystemClock {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
@@ -14,7 +22,7 @@ impl ClockFiller for SystemClock {
     }
 
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause) -> Wall {
-        thread::sleep(Duration::from(pause));
+        self.bell.waited(Duration::from(pause));
         Wall::from(SystemTime::now())
     }
 }

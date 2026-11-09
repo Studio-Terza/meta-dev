@@ -4,7 +4,7 @@ use std::process::{Child, Command, Stdio};
 
 use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 
-use crate::{Deadline, DispatchFailure, Pid};
+use crate::{Deadline, DispatchFailure, Output, Pid};
 use boundary::Process;
 
 pub(crate) use boundary::Exchange;
@@ -26,7 +26,7 @@ impl AgentRun {
         AgentRun { pid: Pid::new(child.id()), deadline, process: Some(Process::new(child, exchange)) }
     }
 
-    pub(crate) fn read_out(&mut self) -> Option<Exchange> {
+    pub(crate) fn read_out(&mut self) -> Option<Result<Output, DispatchFailure>> {
         self.process.as_mut().and_then(Process::read_out)
     }
 

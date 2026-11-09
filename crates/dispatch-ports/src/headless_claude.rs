@@ -7,12 +7,15 @@ use std::process::{Command, Stdio};
 use port_core::Pass;
 
 use crate::agent_run::Exchange;
-use crate::{Agent, AgentRun, DispatchFailure, DispatchFiller, Ended, Job, Output, Pid, Prompt, Started, dispatch_ops};
+use crate::{
+    Agent, AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Job, Output, Pid, Prompt, Started, dispatch_ops,
+};
 
 #[derive(Clone, Debug)]
 pub struct HeadlessClaude {
     scratch: PathBuf,
     agent: Agent,
+    bell: Bell,
 }
 
 impl HeadlessClaude {
@@ -21,8 +24,8 @@ impl HeadlessClaude {
     const LOCALE: [&'static str; 2] = ["LC_ALL", "C"];
 
     #[must_use]
-    pub fn new(scratch: PathBuf, agent: Agent) -> HeadlessClaude {
-        HeadlessClaude { scratch, agent }
+    pub fn new(scratch: PathBuf, agent: Agent, bell: &Bell) -> HeadlessClaude {
+        HeadlessClaude { scratch, agent, bell: bell.clone() }
     }
 }
 
@@ -37,7 +40,7 @@ impl DispatchFiller for HeadlessClaude {
         let (agent_in, prompting) = io::pipe().map_err(DispatchFailure::Pipe)?;
         let (replies, agent_out) = io::pipe().map_err(DispatchFailure::Pipe)?;
         let (complaints, agent_err) = io::pipe().map_err(DispatchFailure::Pipe)?;
-        let exchange = Exchange::begun(prompt, prompting, replies, complaints);
+        let exchange = Exchange::begun(prompt, prompting, [replies, complaints], self.bell.clone());
         Command::new(self.agent.program())
             .args(self.agent.arguments())
             .current_dir(&self.scratch)
@@ -55,7 +58,7 @@ impl DispatchFiller for HeadlessClaude {
         _pass: Pass<'_, dispatch_ops::Output>,
         run: &mut AgentRun,
     ) -> Result<Option<Output>, DispatchFailure> {
-        run.read_out().map(Exchange::joined).transpose()
+        run.read_out().transpose()
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, pid: Pid) -> Result<Option<Started>, DispatchFailure> {
