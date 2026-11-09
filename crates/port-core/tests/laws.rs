@@ -356,7 +356,7 @@ laws::law!(a_resource_is_released_exactly_once_whether_ended_or_dropped, any::<b
     let run = Run::root();
     let port = run.port(Memory::holding(&["a"]));
     let held = Transcripts::lock(&port, &Session("a".to_owned()));
-    let ended = ending.then_some(held).map(|held| held.map(Held::end));
+    let ended = ending.then_some(held).map(|locked| locked.map(Held::end));
     prop_assert!(ended.iter().all(|result| matches!(result, Ok(Ok(_)))));
     drop(port);
     let measured = run.finish();

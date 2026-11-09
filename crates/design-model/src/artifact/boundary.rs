@@ -32,9 +32,9 @@ impl FromStr for Artifact {
 }
 
 impl Artifact {
-    fn joined(kind: &str, name: &str) -> Option<Artifact> {
-        let name = ArtifactName(name.to_owned());
-        kind.parse::<ArtifactKind>().ok().map(|kind| Artifact { kind, name })
+    fn joined(spelled_kind: &str, spelled_name: &str) -> Option<Artifact> {
+        let name = ArtifactName(spelled_name.to_owned());
+        spelled_kind.parse::<ArtifactKind>().ok().map(|kind| Artifact { kind, name })
     }
 }
 

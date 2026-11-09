@@ -48,7 +48,7 @@ impl<'file> Owners<'file> {
                 let file = *self.manifests.get(declarer)?;
                 Some((Site::new(file.manifest_file().as_ref(), file.placement().package().key_lines().owns()?), owned))
             })
-            .flat_map(|(site, owned)| owned.into_iter().map(move |owned| Violation::new(site, StaleOwns::new(owned))))
+            .flat_map(|(site, owned)| owned.into_iter().map(move |name| Violation::new(site, StaleOwns::new(name))))
             .collect()
     }
 

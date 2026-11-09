@@ -48,7 +48,7 @@ impl Sources {
             .iter()
             .map(|source| {
                 let placement = Placement::locate(&files, source.path());
-                let text = SourceText::new(source.text().into_inner().to_string());
+                let text = SourceText::new(source.text().into_inner().to_owned());
                 Self::kept(SourceFile::parse_at(source.path().into(), source.path().into(), placement, text))
             })
             .collect()
