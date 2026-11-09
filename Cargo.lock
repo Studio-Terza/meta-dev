@@ -359,7 +359,6 @@ dependencies = [
  "dispatch-ports",
  "exit",
  "file-ports",
- "grammar-message",
  "grammar-notes",
  "grammar-search",
  "laws",
