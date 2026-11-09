@@ -2,7 +2,7 @@ use design_model::{JobId, Ordinal, Provenance, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Wrapping};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
-use transcript_ports::{Body, Uuid};
+use transcript_ports::{Body, SessionId, Uuid};
 
 use super::{
     Delivery, FailuresReported, Flailed, FlailedSegments, Halted, JobClosed, JobFlailed, JobHalted, JobOpened,
@@ -45,6 +45,7 @@ struct UnplacedRow {
     message: Uuid,
     ordinal: Ordinal,
     body: Body,
+    session: SessionId,
     run: Option<RunId>,
 }
 
@@ -91,7 +92,12 @@ impl From<LiveRow> for StoredRun {
 
 impl From<UnplacedRow> for Unplaced {
     fn from(row: UnplacedRow) -> Unplaced {
-        Unplaced { segment: Segment::new(row.message, row.ordinal), body: row.body, flailed: row.run }
+        Unplaced {
+            segment: Segment::new(row.message, row.ordinal),
+            body: row.body,
+            session: row.session,
+            flailed: row.run,
+        }
     }
 }
 
@@ -566,6 +572,7 @@ SELECT
   segments.message,
   segments.ordinal,
   segments.body,
+  messages.session,
   flailed.run AS "run?: i64"
 FROM
   unplaced

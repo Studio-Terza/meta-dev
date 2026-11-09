@@ -12,6 +12,7 @@ use newtype::Wrapping;
 use strum::VariantArray;
 use text_lines::Lines;
 
+use crate::job::Listing;
 use crate::lapse::Retried;
 use crate::verb::Form;
 use crate::{Attempt, Directive, Edge, Job, Label, Lapse, NodeRef, Proposal, Said, SegmentRef};
@@ -25,7 +26,7 @@ enum Brief {
     Form(Form),
     Choices(Choice),
     Example(Directive),
-    Segment(Said),
+    Said(Listing, Said),
     Node(Outline),
     Retry(Lapse),
 }
@@ -42,6 +43,8 @@ enum Key {
     Example,
     #[name("segment")]
     Segment,
+    #[name("asked")]
+    Asked,
     #[name("node")]
     Node,
     #[name("retry")]
@@ -59,6 +62,10 @@ enum Rule {
     #[name("A choices line lists the words that one slot of the forms takes.")]
     Choose,
     #[name(
+        "Sense as a question only a design question the owner has yet to decide; sense as an ask a request to the lead for status, explanation or analysis, which the lead's reply settles; sense an opinion, argument or instruction phrased as a question as an opinion, remark or instruction."
+    )]
+    Kinds,
+    #[name(
         "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment it links to needs its own. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
     )]
     Cover,
@@ -66,6 +73,10 @@ enum Rule {
         "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
     )]
     Refer,
+    #[name(
+        "An asked line shows a question still open from earlier in the session; it needs no directive of its own, but when a segment answers or decides it, link that segment to it as answers."
+    )]
+    Link,
     #[name(
         "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."
     )]
@@ -110,7 +121,20 @@ pub struct Outlined<'outline>(&'outline Outline);
 
 impl Rule {
     const OPENING: [Rule; 3] = [Rule::Role, Rule::Reply, Rule::Choose];
-    const CLOSING: [Rule; 2] = [Rule::Cover, Rule::Refer];
+    const CLOSING: [Rule; 4] = [Rule::Kinds, Rule::Cover, Rule::Refer, Rule::Link];
+}
+
+impl Listing {
+    const ALL: [Listing; 2] = [Listing::Segment, Listing::Asked];
+}
+
+impl From<Listing> for Key {
+    fn from(listing: Listing) -> Key {
+        match listing {
+            Listing::Segment => Key::Segment,
+            Listing::Asked => Key::Asked,
+        }
+    }
 }
 
 impl Form {
@@ -174,7 +198,11 @@ impl Job {
                 .chain(Choice::ALL.into_iter().map(Brief::Choices))
                 .chain(Rule::CLOSING.into_iter().map(Brief::Rule))
                 .chain(Briefing::examples(self).into_iter().map(Brief::Example))
-                .chain(self.segments().iter().cloned().map(Brief::Segment))
+                .chain(
+                    Listing::ALL.into_iter().flat_map(|listing| {
+                        self.said(listing).iter().cloned().map(move |said| Brief::Said(listing, said))
+                    }),
+                )
                 .chain(self.context().iter().cloned().map(Brief::Node))
                 .collect(),
         ))
@@ -183,7 +211,7 @@ impl Job {
 
 impl Briefing {
     fn examples(job: &Job) -> Vec<Directive> {
-        let segment = job.segments().first().map(Said::segment);
+        let segment = job.said(Listing::Segment).first().map(Said::segment);
         let node = job.context().first().map(|outline| NodeRef::Stored(outline.node()));
         let placed = segment.cloned().zip(node.clone()).map(|(said, outlined)| Directive::Place {
             segment: said,
@@ -230,8 +258,8 @@ impl fmt::Display for Brief {
             Brief::Form(form) => write!(formatter, "{} {}", Key::Form, Quoting::from(form)),
             Brief::Choices(choice) => write!(formatter, "{} {choice}{}", Key::Choices, Listed(*choice)),
             Brief::Example(directive) => write!(formatter, "{} {}", Key::Example, Quoting::from(directive)),
-            Brief::Segment(said) => {
-                write!(formatter, "{} {} {}", Key::Segment, said.segment(), Quoting::from(said.body()))
+            Brief::Said(listing, said) => {
+                write!(formatter, "{} {} {}", Key::from(*listing), said.segment(), Quoting::from(said.body()))
             }
             Brief::Node(outline) => write!(formatter, "{} {}", Key::Node, Outlined::from(outline)),
             Brief::Retry(lapse) => write!(formatter, "{} {}", Key::Retry, Retried::from(lapse)),
@@ -256,7 +284,8 @@ impl Brief {
             Key::Form => Ok(Brief::Form(fields.field::<Phrase<_>>()?)),
             Key::Choices => fields.field::<Word<Choice>>()?.read(fields).map(Brief::Choices),
             Key::Example => Ok(Brief::Example(fields.field::<Phrase<_>>()?)),
-            Key::Segment => Said::read(fields).map(Brief::Segment),
+            Key::Segment => Said::read(fields).map(|said| Brief::Said(Listing::Segment, said)),
+            Key::Asked => Said::read(fields).map(|said| Brief::Said(Listing::Asked, said)),
             Key::Node => Outlined::read(fields).map(Brief::Node),
             Key::Retry => Lapse::read(fields).map(Brief::Retry),
         }
@@ -277,7 +306,10 @@ impl Outlined<'_> {
             fields.field::<Word<_>>()?,
             fields.field::<Word<_>>()?,
         );
-        Ok(outline.parented(fields.optional::<Id<_>>()).titled(fields.optional::<Quoted<_>>()))
+        Ok(outline
+            .based(fields.field::<Word<_>>()?)
+            .parented(fields.optional::<Id<_>>())
+            .titled(fields.optional::<Quoted<_>>()))
     }
 }
 
@@ -292,11 +324,12 @@ impl fmt::Display for Outlined<'_> {
         let outline = self.0;
         write!(
             formatter,
-            "n{} {} {} {}",
+            "n{} {} {} {} {}",
             outline.node().into_inner(),
             Quoting::from(outline.project()),
             outline.facet(),
-            outline.stage()
+            outline.stage(),
+            outline.basis()
         )?;
         outline.parent().iter().try_for_each(|parent| write!(formatter, " n{}", parent.into_inner()))?;
         outline.title().iter().try_for_each(|title| write!(formatter, " {}", Quoting::from(*title)))
