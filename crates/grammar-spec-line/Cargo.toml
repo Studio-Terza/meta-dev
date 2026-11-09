@@ -1,0 +1,25 @@
+[package]
+name = "grammar-spec-line"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.lexer]
+format = "spec-line"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+grammar-unspelled = { path = "../grammar-unspelled" }
+newtype = { path = "../newtype" }
+thiserror.workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

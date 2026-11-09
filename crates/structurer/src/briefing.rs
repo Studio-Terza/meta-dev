@@ -4,9 +4,9 @@ use std::str::FromStr;
 use design_model::{
     Confidence, Explicitness, Facet, Outline, SegmentRelation, SenseKind, SpanRelation, Specificity, Title,
 };
-use grammar::cited::Cited;
-use grammar::output::field::{Id, Phrase, Quoted, Word};
-use grammar::output::{Fields, Unread};
+use grammar_cited::Cited;
+use grammar_output::field::{Id, Phrase, Quoted, Word};
+use grammar_output::{Fields, Unread};
 use named_derive::Named;
 use newtype::Wrapping;
 use strum::VariantArray;

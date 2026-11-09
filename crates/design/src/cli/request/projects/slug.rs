@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use grammar::slug::Letters;
+use grammar_slug::Letters;
 use newtype::{Arbitrary, Newtype, Wrapping};
 
 use crate::cli::failure::Failure;

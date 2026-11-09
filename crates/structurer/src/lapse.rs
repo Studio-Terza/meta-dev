@@ -4,8 +4,8 @@ use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
 
-use grammar::output::field::{Quoted, Word};
-use grammar::output::{Fields, Unread};
+use grammar_output::field::{Quoted, Word};
+use grammar_output::{Fields, Unread};
 use named_derive::Named;
 
 use crate::briefing::Quoting;

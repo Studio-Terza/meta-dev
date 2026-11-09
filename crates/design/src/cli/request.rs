@@ -11,7 +11,7 @@ use std::str::FromStr;
 use console_ports::Environment;
 use design_store::Scope;
 use file_ports::Files;
-use grammar::flag::Flags;
+use grammar_flag::Flags;
 use store_ports::Sqlite;
 
 use super::failure::Failure;

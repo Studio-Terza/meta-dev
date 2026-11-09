@@ -1,0 +1,6 @@
+[package]
+name = "design"
+
+[dependencies]
+grammar = { path = "../grammar" }
+notes = { path = "../notes" }

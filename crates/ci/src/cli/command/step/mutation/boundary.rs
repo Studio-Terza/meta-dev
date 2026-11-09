@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::str::FromStr;
 
-use grammar::shard::Sharding;
+use grammar_shard::Sharding;
 
 use crate::cli::command::failure::Failure;
 

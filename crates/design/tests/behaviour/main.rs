@@ -31,7 +31,7 @@ use design_store::{
 };
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
-use grammar::notes::{Cite, Quote};
+use grammar_notes::{Cite, Quote};
 use laws::proptest;
 use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;

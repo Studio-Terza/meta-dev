@@ -10,7 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-grammar = { path = "../grammar" }
+grammar-banner = { path = "../grammar-banner" }
 serde.workspace = true
 text-lines = { path = "../text-lines" }
 

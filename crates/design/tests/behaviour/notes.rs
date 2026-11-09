@@ -6,7 +6,7 @@ use design::{Cli, Count, Failure, Line, Miss, Noted, Outcome, Reconciliation, Re
 use design_model::{NodeId, NotesLine};
 use design_store::StreamSchema;
 use file_ports::{Bytes, Files};
-use grammar::notes::{Cite, Quote};
+use grammar_notes::{Cite, Quote};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;

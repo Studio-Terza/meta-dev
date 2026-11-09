@@ -1,4 +1,4 @@
-use grammar::notes::Line;
+use grammar_notes::Line;
 
 use super::Title;
 

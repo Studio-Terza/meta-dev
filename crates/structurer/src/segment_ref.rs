@@ -1,5 +1,5 @@
 use design_model::{Ordinal, Prefix};
-use grammar::cited::Cited;
+use grammar_cited::Cited;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SegmentRef {
