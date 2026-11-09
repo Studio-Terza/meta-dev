@@ -52,7 +52,7 @@ enum Key {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-enum Rule {
+pub enum Rule {
     #[name("You structure a project owner's words into a design graph.")]
     Role,
     #[name(
@@ -66,7 +66,7 @@ enum Rule {
     )]
     Kinds,
     #[name(
-        "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment it links to needs its own. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
+        "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
     )]
     Cover,
     #[name(
@@ -231,6 +231,14 @@ impl Briefing {
         placed.into_iter().chain(labelled.into_iter().flatten()).chain(conversational).collect()
     }
 
+    pub fn rules(&self) -> impl Iterator<Item = Rule> + '_ {
+        self.0.iter().filter_map(Brief::rule)
+    }
+
+    pub fn asked(&self) -> impl Iterator<Item = &Said> {
+        self.0.iter().filter_map(Brief::asked)
+    }
+
     #[must_use]
     pub fn retried(self, lapse: &Lapse) -> Briefing {
         Briefing(self.0.into_iter().chain([Brief::Retry(lapse.clone()), Brief::Rule(Rule::Again)]).collect())
@@ -278,6 +286,31 @@ impl FromStr for Brief {
 }
 
 impl Brief {
+    fn rule(&self) -> Option<Rule> {
+        match self {
+            Brief::Rule(rule) => Some(*rule),
+            Brief::Form(_)
+            | Brief::Choices(_)
+            | Brief::Example(_)
+            | Brief::Said(..)
+            | Brief::Node(_)
+            | Brief::Retry(_) => None,
+        }
+    }
+
+    fn asked(&self) -> Option<&Said> {
+        match self {
+            Brief::Said(Listing::Asked, said) => Some(said),
+            Brief::Rule(_)
+            | Brief::Form(_)
+            | Brief::Choices(_)
+            | Brief::Example(_)
+            | Brief::Said(Listing::Segment, _)
+            | Brief::Node(_)
+            | Brief::Retry(_) => None,
+        }
+    }
+
     fn read(fields: &mut Fields) -> Result<Brief, Unread> {
         match fields.field::<Word<Key>>()? {
             Key::Rule => Ok(Brief::Rule(fields.field::<Phrase<_>>()?)),
