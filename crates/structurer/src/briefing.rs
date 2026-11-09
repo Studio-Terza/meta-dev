@@ -247,7 +247,12 @@ impl FromStr for Briefing {
     type Err = Unread;
 
     fn from_str(text: &str) -> Result<Briefing, Unread> {
-        Lines::from(text).map(str::parse).collect::<Result<Vec<Brief>, Unread>>().map(Briefing)
+        text.parse::<Lines>()
+            .into_iter()
+            .flatten()
+            .map(|line| line.parse())
+            .collect::<Result<Vec<Brief>, Unread>>()
+            .map(Briefing)
     }
 }
 

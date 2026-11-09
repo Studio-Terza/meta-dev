@@ -145,7 +145,10 @@ fn a_run_killed_during_its_second_job_leaves_the_first_job_s_flail_told_and_the_
     assert_eq!(decision.get("reason").and_then(Value::as_str), second.as_deref());
     let refused = String::from_utf8(unrun.stderr)?;
     assert_eq!(unrun.status.code(), Some(1_i32));
-    assert_eq!(Lines::from(refused.as_str()).collect::<Vec<&str>>(), [Failure::Unrun(JobId::new(4)).to_string()]);
+    assert_eq!(
+        refused.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>(),
+        [Failure::Unrun(JobId::new(4)).to_string()]
+    );
     Ok(())
 }
 
@@ -160,7 +163,7 @@ impl Answer {
     fn given(arguments: &&[&str]) -> Option<Answer> {
         let output = Design::with_a_session_in_work().ok()?.in_work(arguments, "").ok()?;
         let stdout = String::from_utf8(output.stdout).ok()?;
-        let unparsed = Lines::from(stdout.as_str()).filter(|line| line.parse::<Line>().is_err()).map(str::to_owned);
+        let unparsed = stdout.parse::<Lines>().into_iter().flatten().filter(|line| line.parse::<Line>().is_err());
         Some(Answer {
             code: output.status.code(),
             stderr: String::from_utf8(output.stderr).ok()?,

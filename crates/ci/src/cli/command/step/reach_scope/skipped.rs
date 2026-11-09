@@ -23,7 +23,7 @@ impl FromStr for Skipped {
 
 impl From<&str> for Skips {
     fn from(report: &str) -> Skips {
-        Skips(Lines::from(report).filter_map(|line| line.parse::<Skipped>().ok()).collect())
+        Skips(report.parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Skipped>().ok()).collect())
     }
 }
 

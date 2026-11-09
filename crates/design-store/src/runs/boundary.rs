@@ -1,13 +1,14 @@
-use design_model::{JobId, Ordinal, Provenance, RunId, Segment};
+use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Wrapping};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::{Body, SessionId, Uuid};
 
 use super::{
-    Delivery, FailuresReported, Flailed, FlailedSegments, Halted, JobClosed, JobFlailed, JobHalted, JobOpened,
-    JobRetried, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded, RunSpawned,
-    RunState, RunsOf, Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
+    Delivery, FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, Hold, JobClosed, JobFlailed, JobHalted,
+    JobOpened, JobRetried, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded,
+    RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures,
+    Unstructured,
 };
 use crate::{Account, Excerpt};
 
@@ -196,17 +197,20 @@ impl Batch for Retold {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let Retold { job, account } = self;
+        let unreported = Delivery::Unreported;
         statements.written(store_ports::query!(
             r#"
 UPDATE
   failures
 SET
-  account = ?2
+  account = ?2,
+  delivery = ?3
 WHERE
   job = ?1
 "#,
             job: JobId,
-            account: Account
+            account: Account,
+            unreported: Delivery
         ))
     }
 }
@@ -363,9 +367,7 @@ WHERE
     }
 }
 
-impl Batch for JobFlailed {
-    type Failure = StoreFailure;
-
+impl JobFlailed {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let JobFlailed { run, segments } = self;
         let written = segments
@@ -376,10 +378,18 @@ impl Batch for JobFlailed {
                 statements.written(store_ports::query!(
                     r#"
 INSERT INTO
-  flailed (message, ordinal, run)
+  flailed (message, ordinal, job, run)
 SELECT
   ?1,
   ?2,
+  (
+    SELECT
+      runs.job
+    FROM
+      runs
+    WHERE
+      runs.id = ?3
+  ),
   ?3
 WHERE
   NOT EXISTS (
@@ -406,34 +416,26 @@ impl Batch for JobRetried {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobRetried { job, provenance } = self;
-        let recorded = statements.written(store_ports::query!(
-            r#"
-INSERT INTO
-  retries (job, provenance)
-VALUES
-  (?1, ?2)
-"#,
-            job: JobId,
-            provenance: Provenance
-        ))?;
-        let cleared = statements.written(store_ports::query!(
+        let job = self.0;
+        let released = statements.written(store_ports::query!(
             r#"
 DELETE FROM
   flailed
 WHERE
-  run IN (
-    SELECT
-      id
-    FROM
-      runs
-    WHERE
-      job = ?1
-  )
+  job = ?1
 "#,
             job: JobId
         ))?;
-        Ok(Written::total([recorded, cleared].into_iter()))
+        let withdrawn = statements.written(store_ports::query!(
+            r#"
+DELETE FROM
+  failures
+WHERE
+  job = ?1
+"#,
+            job: JobId
+        ))?;
+        Ok(Written::total([released, withdrawn].into_iter()))
     }
 }
 
@@ -447,11 +449,10 @@ impl Query for FlailedSegments {
 SELECT
   flailed.message,
   flailed.ordinal,
-  runs.job,
+  flailed.job,
   flailed.run
 FROM
   flailed
-  JOIN runs ON runs.id = flailed.run
   JOIN messages ON messages.uuid = flailed.message
 ORDER BY
   messages.at,
@@ -460,6 +461,36 @@ ORDER BY
 "#
         ))?;
         Ok(rows.into_iter().map(Flailed::from).collect())
+    }
+}
+
+impl Query for HeldBy {
+    type Rows = Option<Hold>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Hold>, StoreFailure> {
+        let job = self.0;
+        let rows = statements.rows(store_ports::query!(
+            FlailedRow,
+            r#"
+SELECT
+  flailed.message,
+  flailed.ordinal,
+  flailed.job,
+  flailed.run
+FROM
+  flailed
+  JOIN messages ON messages.uuid = flailed.message
+WHERE
+  flailed.job = ?1
+ORDER BY
+  messages.at,
+  flailed.message,
+  flailed.ordinal
+"#,
+            job: JobId
+        ))?;
+        let held: Vec<Flailed> = rows.into_iter().map(Flailed::from).collect();
+        Ok(held.split_first().map(|(first, rest)| Hold { first: first.clone(), rest: rest.to_vec() }))
     }
 }
 

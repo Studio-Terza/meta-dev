@@ -11,8 +11,7 @@ use grammar::line::Unbroken;
 use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
-use grammar::notes::stamp::{Clock, Date};
-use grammar::notes::{Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
+use grammar::notes::{Date, Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
 use grammar::program::Program;
@@ -253,6 +252,14 @@ impl Node {
         self.0
     }
 }
+
+laws::roundtrip!(
+    a_spec_line_without_trailing_space_is_parsed_and_shown_back_as_written,
+    "repair: main|spec: ( ?[!-~]{1,8})( [!-~]{1,8}){0,3}",
+    |text: &String| text.parse::<grammar::spec_line::Line>().ok(),
+    |line: &Option<grammar::spec_line::Line>| line.as_ref().map(ToString::to_string),
+    Some
+);
 
 laws::roundtrip!(
     any_text_is_quoted_and_lexed_back_as_one_quoted_field,
@@ -894,12 +901,12 @@ laws::roundtrip!(
 laws::roundtrip!(
     a_spec_line_reads_back_from_its_rendering,
     prop_oneof![
-        Just(spec_line::Line::Repair),
-        any::<Attachment>().prop_map(|attachment| spec_line::Line::Spec(attachment.into_inner())),
-        "[!-~]([ -~]{0,20}[!-~])?".prop_map(spec_line::Line::Spec),
+        Just("repair: main".to_owned()),
+        any::<Attachment>().prop_map(|attachment| format!("spec: {attachment}")),
+        "[!-~]([ -~]{0,20}[!-~])?".prop_map(|value| format!("spec: {value}")),
     ],
-    |line: &spec_line::Line| line.to_string(),
     |text: &String| text.parse::<spec_line::Line>().ok(),
+    |line: &Option<spec_line::Line>| line.as_ref().map(ToString::to_string),
     Some
 );
 
@@ -993,44 +1000,40 @@ laws::roundtrip!(
 );
 
 laws::table!(
-    a_clock_is_a_marked_hour_and_minute_with_optional_seconds_fraction_and_zone,
-    |time: &&str| Clock::try_new((*time).to_owned()).ok().map(Clock::into_inner),
+    a_date_is_any_year_month_day_wherever_it_stands_and_whatever_follows_it,
+    |text: &&str| Line::read(1, text).read_by(Named),
     [
-        "T23:00" => Some("T23:00".to_owned()),
-        " 23:00" => Some(" 23:00".to_owned()),
-        "t23:00:15" => Some("t23:00:15".to_owned()),
-        "T23:00:15.250" => Some("T23:00:15.250".to_owned()),
-        "T23:00Z" => Some("T23:00Z".to_owned()),
-        "T23:00+01:00" => Some("T23:00+01:00".to_owned()),
-        "T23:00:15.5-05:30" => Some("T23:00:15.5-05:30".to_owned()),
-        "" => None,
-        "23:00" => None,
-        "T2:00" => None,
-        "T23:0" => None,
-        "T23-00" => None,
-        "T23:00:1" => None,
-        "T23:00:15." => None,
-        "T23:00.5" => None,
-        "T23:00+0100" => None,
-        "T23:00ZZ" => None,
-        "T23:00x" => None,
+        "ruled 2026-11-05\"rain delay\" (0a1b2c3d)" => Ok([
+            vec!["rain delay".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05T04:07\"rain delay\" (0a1b2c3d)" => Ok([
+            vec!["rain delay".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05 04:07:09.5+01:00 \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05(0a1b2c3d)" => Ok([vec![], vec!["0a1b2c3d".to_owned()], vec!["2026-11-05".to_owned()]]),
+        "ruled 2026-11-05: \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05 and 2026-11-06 and 2026-12-31." => Ok([
+            vec![],
+            vec![],
+            vec!["2026-11-05".to_owned(), "2026-11-06".to_owned(), "2026-12-31".to_owned()],
+        ]),
+        "ruled 2026-1-05, 26-11-05, 2026-11-5, 2026/11/05 and 202611050" => Ok(<[Vec<String>; 3]>::default()),
+        "ruled at T04:07 or 04:07 or 04:07:09Z with \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec![],
+        ]),
     ]
-);
-
-laws::table!(
-    a_clock_parses_from_text_only_when_it_is_spelled_as_one,
-    |time: &&str| time.parse::<Clock>().ok().map(|clock| clock.to_string()),
-    [
-        "T07:30:00Z" => Some("T07:30:00Z".to_owned()),
-        "T07:30:00 Z" => None,
-        "07:30" => None,
-    ]
-);
-
-laws::roundtrip!(
-    a_clock_is_displayed_and_parsed_back,
-    any::<Clock>(),
-    |clock: &Clock| clock.to_string(),
-    |text: &String| text.parse::<Clock>().ok().map(|clock| clock.to_string()),
-    |clock: Clock| Some(clock.to_string())
 );

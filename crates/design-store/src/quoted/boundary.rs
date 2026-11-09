@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
 use design_model::{Ordinal, Segment};
-use grammar::notes::Quote;
-use grammar::notes::stamp::Date;
+use grammar::notes::{Date, Quote};
 use store_ports::{Columns, Query, Statements, StoreFailure};
 use transcript_ports::{Authorship, Uuid};
 

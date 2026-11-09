@@ -9,6 +9,7 @@ pub mod directive;
 pub mod flag;
 pub mod ident;
 pub mod line;
+pub mod lines;
 pub mod lstart;
 pub mod message;
 pub mod node;

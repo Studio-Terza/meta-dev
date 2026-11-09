@@ -85,7 +85,7 @@ impl Asked {
         let extraction = Extraction::from(files.as_slice());
         let system = TypeSystem::built_from(&files, &extraction);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
-        Lines::from(query.reply(&system).to_string().as_str()).map(ToOwned::to_owned).collect()
+        query.reply(&system).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 
     fn lines(words: &&[&str]) -> Vec<String> {
@@ -93,7 +93,7 @@ impl Asked {
         let facts = Facts::of_files(&files);
         let transitions = Transitions::of_files(&files);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
-        Lines::from(query.matches(&facts, &transitions).to_string().as_str()).map(ToOwned::to_owned).collect()
+        query.matches(&facts, &transitions).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 }
 

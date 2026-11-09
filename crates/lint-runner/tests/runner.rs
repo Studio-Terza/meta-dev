@@ -183,7 +183,7 @@ fn the_query_command_lists_matching_abstractions_and_blocks_nothing() -> Result<
     root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
     let run = root.flagged(&["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
-    let lines: Vec<&str> = text_lines::Lines::from(run.out.as_str()).collect();
+    let lines: Vec<String> = run.out.parse::<text_lines::Lines>().into_iter().flatten().collect();
     assert_eq!(
         lines.first().map(|line| line.contains("score 5: trait Index in r at /scratch/src/lib.rs:3")),
         Some(true)
@@ -259,7 +259,10 @@ fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_deriv
     let mut err = Vec::new();
     let arguments = [OsString::from(&root.root)].into_iter();
     let verdict = Cli::from_args(arguments).verdict(&root.files, Recorded::default(), &mut Vec::new(), &mut err);
-    assert_eq!((verdict, text_lines::Lines::from(String::from_utf8(err)?.as_str()).count()), (Verdict::Refused, 1));
+    assert_eq!(
+        (verdict, String::from_utf8(err)?.parse::<text_lines::Lines>().into_iter().flatten().count()),
+        (Verdict::Refused, 1)
+    );
     Ok(())
 }
 

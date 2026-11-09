@@ -10,8 +10,7 @@ use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
 };
 use file_ports::{Files, Text};
-use grammar::notes::stamp::Date;
-use grammar::notes::{self, Cite, Ending, Notes, Quote, Reading, Unclosed};
+use grammar::notes::{self, Cite, Date, Ending, Notes, Quote, Reading, Unclosed};
 use newtype::{Counter, Wrapping};
 use store_ports::Store;
 use transcript_ports::{Authorship, Uuid};

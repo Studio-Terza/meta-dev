@@ -158,7 +158,7 @@ struct Answer {
 }
 
 impl Answer {
-    fn lines(&self) -> Printed<'_> {
+    fn lines(&self) -> Printed<String> {
         Printed { exit: self.exit, out: Text::lines(&self.out), err: Text::lines(&self.err) }
     }
 
@@ -437,7 +437,7 @@ fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() 
     let arguments = ["measured-history", &scratch.file("m.toml"), &scratch.file("history.tsv"), "abc123"];
     let answer = scratch.answer(&Script::new(), &arguments);
     let line = "abc123\tcold-clippy = 52.3\tcold-test-compile = 80";
-    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec![line]));
+    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec![line.to_owned()]));
     assert_eq!(Text::lines(&scratch.read("history.tsv")), ["older", line]);
     let missing = ["measured-history", &scratch.file("none.toml"), &scratch.file("history.tsv"), "abc123"];
     assert_eq!(scratch.answer(&Script::new(), &missing).exit, ExitCode::FAILURE);
@@ -514,7 +514,7 @@ fn a_history_needs_git_and_readable_metadata_and_a_writable_file() -> Result<(),
     scratch.write("metadata.json", METADATA)?;
     let named = |file: &str| ["history".to_owned(), scratch.file("metadata.json"), scratch.file(file), "r".to_owned()];
     let git = scratch.answer(&Script::refusing("git"), &named("history.tsv"));
-    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom"]));
+    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom".to_owned()]));
     scratch.write("blocker", "")?;
     assert_eq!(scratch.answer(&Script::new(), &named("blocker/history.tsv")).exit, ExitCode::FAILURE);
     let broken = ["history".to_owned(), scratch.file("none.json"), scratch.file("history.tsv"), "r".to_owned()];
@@ -603,9 +603,9 @@ fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> 
 fn a_program_the_scope_needs_that_cannot_start_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let cargo = scratch.answer(&Script::refusing("cargo"), &Reach::on(&scratch, "push"));
-    assert_eq!((cargo.exit, Text::lines(&cargo.err)), (ExitCode::FAILURE, vec!["cannot run cargo: boom"]));
+    assert_eq!((cargo.exit, Text::lines(&cargo.err)), (ExitCode::FAILURE, vec!["cannot run cargo: boom".to_owned()]));
     let git = scratch.answer(&Script::refusing("git"), &Reach::on(&scratch, "pull_request"));
-    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom"]));
+    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom".to_owned()]));
     assert_eq!(git.out, "");
     Ok(())
 }
@@ -988,7 +988,7 @@ fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
     scratch.write("out/mutants.out/missed.txt", "")?;
     let answer = scratch
         .answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
-    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec!["mutants: none missed"]));
+    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec!["mutants: none missed".to_owned()]));
     Ok(())
 }
 
@@ -1588,6 +1588,8 @@ laws::table!(
         "spec: owner 96d13317x\n" => Body::malformed(&["spec: owner 96d13317x"]),
         "spec: owner 96d1-3317\n" => Body::malformed(&["spec: owner 96d1-3317"]),
         "spec: owner\n" => Body::malformed(&["spec: owner"]),
+        "spec: owner \n" => Body::malformed(&["spec: owner"]),
+        "spec: spec: \n" => Body::malformed(&["spec: spec:"]),
         "spec: Lint-port#D3\n" => Body::malformed(&["spec: Lint-port#D3"]),
         "spec: lint_port#D3\n" => Body::malformed(&["spec: lint_port#D3"]),
         "spec: #D3\n" => Body::malformed(&["spec: #D3"]),
@@ -1745,21 +1747,37 @@ laws::table!(
 );
 
 #[derive(Debug, PartialEq)]
-struct Printed<'answer> {
+struct Printed<Line> {
     exit: ExitCode,
-    out: Vec<&'answer str>,
-    err: Vec<&'answer str>,
+    out: Vec<Line>,
+    err: Vec<Line>,
+}
+
+impl Printed<String> {
+    fn shown(&self) -> Printed<&str> {
+        Printed {
+            exit: self.exit,
+            out: self.out.iter().map(String::as_str).collect(),
+            err: self.err.iter().map(String::as_str).collect(),
+        }
+    }
+}
+
+impl PartialEq<Printed<&str>> for Printed<String> {
+    fn eq(&self, wanted: &Printed<&str>) -> bool {
+        self.shown() == *wanted
+    }
 }
 
 struct Text;
 
 impl Text {
     fn owned(text: &str) -> Vec<String> {
-        text_lines::Lines::from(text).map(str::to_owned).collect()
+        text.parse::<text_lines::Lines>().into_iter().flatten().collect()
     }
 
-    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
-        text_lines::Lines::from(text.as_ref()).collect()
+    fn lines(text: &impl AsRef<str>) -> Vec<String> {
+        text.as_ref().parse::<text_lines::Lines>().into_iter().flatten().collect()
     }
 }
 

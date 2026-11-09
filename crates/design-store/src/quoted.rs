@@ -3,8 +3,7 @@ mod boundary;
 use std::collections::BTreeSet;
 
 use design_model::{Ordinal, Segment};
-use grammar::notes::Quote;
-use grammar::notes::stamp::Date;
+use grammar::notes::{Date, Quote};
 use port_core::Op;
 
 #[derive(Clone, Debug, Op)]

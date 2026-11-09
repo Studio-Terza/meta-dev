@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{JobId, Provenance, RunId, Segment};
+use design_model::{JobId, RunId, Segment};
 use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
@@ -119,17 +119,14 @@ pub struct RunEnded {
     reply: Option<Excerpt>,
 }
 
-#[derive(Clone, Debug, Op)]
+#[derive(Clone, Debug)]
 pub struct JobFlailed {
     run: RunId,
     segments: Vec<Segment>,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
-pub struct JobRetried {
-    job: JobId,
-    provenance: Provenance,
-}
+pub struct JobRetried(JobId);
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct NextJob;
@@ -152,6 +149,9 @@ pub struct RunsOf(JobId);
 #[derive(Clone, Copy, Debug, Op)]
 pub struct FlailedSegments;
 
+#[derive(Clone, Copy, Debug, Op)]
+pub struct HeldBy(JobId);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ran {
     run: RunId,
@@ -171,6 +171,12 @@ pub struct Flailed {
     segment: Segment,
     job: JobId,
     run: RunId,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Hold {
+    first: Flailed,
+    rest: Vec<Flailed>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -316,10 +322,21 @@ impl JobFlailed {
     }
 }
 
-impl JobRetried {
-    #[must_use]
-    pub fn new(job: JobId, provenance: Provenance) -> JobRetried {
-        JobRetried { job, provenance }
+impl From<&Hold> for JobRetried {
+    fn from(hold: &Hold) -> JobRetried {
+        JobRetried(hold.first.job)
+    }
+}
+
+impl From<JobId> for HeldBy {
+    fn from(job: JobId) -> HeldBy {
+        HeldBy(job)
+    }
+}
+
+impl Hold {
+    pub fn held(&self) -> impl Iterator<Item = &Flailed> {
+        [&self.first].into_iter().chain(&self.rest)
     }
 }
 

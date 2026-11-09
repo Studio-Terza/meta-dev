@@ -222,7 +222,7 @@ impl Structuring {
 
 impl Structured {
     fn parsed(text: &str) -> Vec<Line> {
-        Lines::from(text).filter_map(|line| line.parse::<Line>().ok()).collect()
+        text.parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Line>().ok()).collect()
     }
 
     fn has(&self, wanted: &[Line]) -> Vec<Line> {
@@ -281,7 +281,7 @@ fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_a
     let retried = Line::Retried(Lapsed::new(JobId::new(1), Lapse::refused(&Unresolved::Outside(outside))));
     let shown = format!("asked {asked} \"what of aaaaaaaa-0000-4000-8000-000000000004\"\n");
     let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
-    assert_eq!(Lines::from(open.as_str()).count(), 1);
+    assert_eq!(open.parse::<Lines>().into_iter().flatten().count(), 1);
     assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1, 1]);
     assert_eq!(structured.has(&[retried]), []);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
@@ -495,7 +495,14 @@ fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_t
         sequel: Sequel::Halted { job: JobId::new(2) },
     };
     let stalled = Failure::Stalled { job: JobId::new(2), stall: Stall::Overdue };
-    let told = Lines::from(decision.get("reason").and_then(Value::as_str).unwrap_or_default()).collect::<Vec<&str>>();
+    let told = decision
+        .get("reason")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .parse::<Lines>()
+        .into_iter()
+        .flatten()
+        .collect::<Vec<String>>();
     assert_eq!(told, [flailed.to_string(), stalled.to_string()]);
     assert_eq!(stopped.outcome?, Outcome::Blocked);
     assert_eq!((structuring.unstructured()?, structuring.script.prompts().len()), (9, 3));
@@ -752,5 +759,61 @@ fn a_stop_whose_agent_stalls_blocks_loudly_and_the_stop_after_it_sends_the_segme
     assert_eq!(stalled.outcome?, Outcome::Blocked);
     assert_eq!((owed, structuring.unstructured()?), (4, 0));
     assert_eq!(again.outcome?, Outcome::Hooked(HookEvent::Stop));
+    Ok(())
+}
+
+#[test]
+fn probe_a_retried_and_applied_flail_is_not_told_as_held() -> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u, Some(Script::COVERING)]), Pause::new(0))?;
+    let flailed = structuring.structured(&["structure"]);
+    let retried = structuring.structured(&["retry", "1"]);
+    let applied = structuring.structured(&["structure"]);
+    let stopped = structuring.structured(&["hook", "stop"]);
+    assert!(matches!(flailed.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(retried.outcome?, Outcome::Retried { segments: Count::new(4) });
+    assert_eq!((applied.outcome?, structuring.unstructured()?), (Outcome::Structured { jobs: Count::new(1) }, 0));
+    assert_eq!((stopped.outcome?, stopped.text.as_str()), (Outcome::Hooked(HookEvent::Stop), ""));
+    Ok(())
+}
+
+#[test]
+fn probe_review_a_retried_flail_is_not_told_as_held_before_its_retry_runs() -> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u]), Pause::new(0))?;
+    let flailed = structuring.structured(&["structure"]);
+    let retried = structuring.structured(&["retry", "1"]);
+    let prompted = structuring.structured(&["hook", "user-prompt-submit"]);
+    assert!(matches!(flailed.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(retried.outcome?, Outcome::Retried { segments: Count::new(4) });
+    assert_eq!((prompted.outcome?, prompted.text.as_str()), (Outcome::Hooked(HookEvent::UserPromptSubmit), ""));
+    assert_eq!(structuring.unstructured()?, 4);
+    Ok(())
+}
+
+#[test]
+fn probe_review_b_a_retried_flail_that_flails_again_is_told_once_under_its_new_job() -> Result<(), Box<dyn Error>> {
+    let u = Some(Script::UNCOVERING);
+    let structuring = Structuring::over(Script::replying(&[u, u, u, u]), Pause::new(0))?;
+    let flailed = structuring.structured(&["structure"]);
+    let retried = structuring.structured(&["retry", "1"]);
+    let again = structuring.structured(&["structure"]);
+    let stopped = structuring.structured(&["hook", "stop"]);
+    let first = structuring.structured(&["retry", "1"]);
+    let second = structuring.structured(&["retry", "2"]);
+    let decision: Value = serde_json::from_str(&stopped.text)?;
+    let segment = |message: u8, ordinal| {
+        SegmentRef::new(Prefix::new(format!("aaaaaaaa-0000-4000-8000-00000000000{message}")), Ordinal::new(ordinal))
+    };
+    let uncovered = Uncovered::new(segment(1, 0), vec![segment(3, 0), segment(3, 1), segment(5, 0)]);
+    let flails = Flails::new(Flail::new(JobId::new(2), Lapse::from(uncovered)), Vec::new());
+    let told = Failure::Flailed { flails, sequel: Sequel::NoMoreJobs }.to_string();
+    assert!(matches!(flailed.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(retried.outcome?, Outcome::Retried { segments: Count::new(4) });
+    assert!(matches!(again.outcome, Err(Failure::Flailed { sequel: Sequel::NoMoreJobs, .. })));
+    assert_eq!(decision.get("reason").and_then(Value::as_str), Some(told.as_str()));
+    assert_eq!(stopped.outcome?, Outcome::Blocked);
+    assert!(matches!(first.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(1)));
+    assert_eq!(second.outcome?, Outcome::Retried { segments: Count::new(4) });
     Ok(())
 }
