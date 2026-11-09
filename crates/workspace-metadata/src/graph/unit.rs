@@ -40,11 +40,21 @@ impl<'meta> Unit<'meta> {
         self.declarations
             .iter()
             .flat_map(|(declarer, declared)| declared.owns().iter().map(move |owned| (*declarer, owned)))
-            .filter_map(|(declarer, owned)| match graph.resolved(owned).find(|id| reach.contains(id)) {
-                Some(_reached) => None,
-                None => Some((graph.package(declarer)?.name(), owned)),
+            .filter_map(|(declarer, owned)| {
+                Some((graph.package(declarer)?.name(), Unit::outside(graph, &reach, owned)?))
             })
             .collect()
+    }
+
+    fn outside(
+        graph: &Graph<'meta>,
+        reach: &BTreeSet<&'meta PackageId>,
+        owned: &'meta CrateName,
+    ) -> Option<&'meta CrateName> {
+        match graph.resolved(owned).find(|id| reach.contains(id)) {
+            Some(_reached) => None,
+            None => Some(owned),
+        }
     }
 
     pub(super) fn holds(&self, package: &PackageId) -> Option<&'meta PackageId> {
