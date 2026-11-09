@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use serde::Deserialize;
 
 use crate::role::Role;
-use macro_name::MacroName;
+pub use macro_name::MacroName;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Expanders {

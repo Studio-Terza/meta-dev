@@ -10,7 +10,7 @@ use serde::de::IgnoredAny;
 
 use crate::format::Format;
 use crate::role::Role;
-pub use expanders::Expanders;
+pub use expanders::{Expanders, MacroName};
 use lexer_table::LexerTable;
 pub use port_table::PortTable;
 use reach_table::ReachTable;

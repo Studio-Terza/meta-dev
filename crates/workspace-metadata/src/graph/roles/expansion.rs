@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::crate_name::CrateName;
-use crate::metadata::{Expanders, PortTable};
+use crate::metadata::{Expanders, MacroName, PortTable};
 
 use super::super::Graph;
 use super::super::unit::Unit;
@@ -45,8 +45,15 @@ impl<'meta> Expansion<'meta> {
         self.expanders
     }
 
-    pub fn unit(&self) -> impl Iterator<Item = &'meta CrateName> + use<'_, 'meta> {
-        self.unit.iter().copied()
+    pub fn paths<Spelled>(
+        &self,
+        spell: impl Fn(&'meta CrateName, &'meta MacroName) -> Option<Spelled>,
+    ) -> Vec<Spelled> {
+        self.unit
+            .iter()
+            .flat_map(|member| self.expanders.macros().iter().map(move |name| (*member, name)))
+            .filter_map(|(member, name)| spell(member, name))
+            .collect()
     }
 
     pub fn admitted(&self) -> impl Iterator<Item = &'meta CrateName> + use<'_, 'meta> {

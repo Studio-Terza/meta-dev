@@ -14,7 +14,7 @@ use crate::package_id::PackageId;
 use crate::readers::Readers;
 use crate::unreadable::Unreadable;
 pub use library::Library;
-pub use package::{Expanders, Form};
+pub use package::{Expanders, Form, MacroName};
 pub(crate) use package::{Package, PortTable};
 use resolve::Resolve;
 pub(crate) use resolve::{Node, NodeDependency};

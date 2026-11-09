@@ -12,7 +12,7 @@ use crate::format::Format;
 use crate::package_id::PackageId;
 use crate::role::Role;
 use declared::Declared;
-pub use declared::{Expanders, PortTable};
+pub use declared::{Expanders, MacroName, PortTable};
 use dependency::Dependency;
 pub use target::Form;
 use target::Target;
