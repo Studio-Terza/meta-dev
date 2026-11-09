@@ -867,3 +867,42 @@ laws::table!(
         &[""][..] => true,
     ]
 );
+
+laws::table!(
+    a_date_is_any_year_month_day_wherever_it_stands_and_whatever_follows_it,
+    |text: &&str| Line::read(1, text).read_by(Named),
+    [
+        "ruled 2026-11-05\"rain delay\" (0a1b2c3d)" => Ok([
+            vec!["rain delay".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05T04:07\"rain delay\" (0a1b2c3d)" => Ok([
+            vec!["rain delay".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05 04:07:09.5+01:00 \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05(0a1b2c3d)" => Ok([vec![], vec!["0a1b2c3d".to_owned()], vec!["2026-11-05".to_owned()]]),
+        "ruled 2026-11-05: \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05 and 2026-11-06 and 2026-12-31." => Ok([
+            vec![],
+            vec![],
+            vec!["2026-11-05".to_owned(), "2026-11-06".to_owned(), "2026-12-31".to_owned()],
+        ]),
+        "ruled 2026-1-05, 26-11-05, 2026-11-5, 2026/11/05 and 202611050" => Ok(<[Vec<String>; 3]>::default()),
+        "ruled at T04:07 or 04:07 or 04:07:09Z with \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec![],
+        ]),
+    ]
+);
