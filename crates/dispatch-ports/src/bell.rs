@@ -1,8 +1,11 @@
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::time::Duration;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug)]
 pub struct Bell(Arc<Peal>);
+
+#[derive(Debug)]
+pub(crate) struct Ringer(Arc<Peal>);
 
 #[derive(Debug, Default)]
 struct Peal {
@@ -18,9 +21,12 @@ enum Chime {
 }
 
 impl Bell {
-    pub(crate) fn ring(&self) {
-        *self.0.chime.lock().unwrap_or_else(PoisonError::into_inner) = Chime::Rung;
-        self.0.heard.notify_all();
+    pub(crate) fn hung() -> Bell {
+        Bell(Arc::default())
+    }
+
+    pub(crate) fn ringer(&self) -> Ringer {
+        Ringer(Arc::clone(&self.0))
     }
 
     pub(crate) fn waited(&self, pause: Duration) {
@@ -31,5 +37,12 @@ impl Bell {
             .wait_timeout_while(chime, pause, |chime| *chime == Chime::Quiet)
             .unwrap_or_else(PoisonError::into_inner);
         *chime = Chime::Quiet;
+    }
+}
+
+impl Ringer {
+    pub(crate) fn ring(&self) {
+        *self.0.chime.lock().unwrap_or_else(PoisonError::into_inner) = Chime::Rung;
+        self.0.heard.notify_all();
     }
 }

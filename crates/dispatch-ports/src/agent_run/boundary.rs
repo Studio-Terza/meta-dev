@@ -3,7 +3,8 @@ use std::process::Child;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread::{self, JoinHandle};
 
-use crate::{Bell, DispatchFailure, Output, Prompt, Stderr};
+use crate::bell::Ringer;
+use crate::{DispatchFailure, Output, Prompt, Stderr};
 
 #[derive(Debug)]
 pub(crate) struct Process {
@@ -34,7 +35,7 @@ impl Exchange {
         prompt: &Prompt,
         mut prompting: PipeWriter,
         [mut replies, complaints]: [PipeReader; 2],
-        bell: Bell,
+        ringer: Ringer,
     ) -> Exchange {
         let prompt = prompt.clone();
         let (telling, told) = mpsc::channel();
@@ -44,7 +45,7 @@ impl Exchange {
             telling
                 .send(Exchange::collected(&mut replies, writing, complaining))
                 .into_iter()
-                .for_each(|()| bell.ring());
+                .for_each(|()| ringer.ring());
         });
         Exchange(told)
     }

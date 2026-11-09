@@ -4,7 +4,7 @@ use std::process::{Child, Command, Stdio};
 
 use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 
-use crate::{Deadline, DispatchFailure, Output, Pid};
+use crate::{Bell, Deadline, DispatchFailure, Output, Pid};
 use boundary::Process;
 
 pub(crate) use boundary::Exchange;
@@ -13,17 +13,18 @@ pub(crate) use boundary::Exchange;
 pub struct AgentRun {
     pid: Pid,
     deadline: Deadline,
+    bell: Bell,
     process: Option<Process>,
 }
 
 impl AgentRun {
     #[must_use]
     pub fn new(pid: Pid, deadline: Deadline) -> AgentRun {
-        AgentRun { pid, deadline, process: None }
+        AgentRun { pid, deadline, bell: Bell::hung(), process: None }
     }
 
-    pub(crate) fn spawned(child: Child, exchange: Exchange, deadline: Deadline) -> AgentRun {
-        AgentRun { pid: Pid::new(child.id()), deadline, process: Some(Process::new(child, exchange)) }
+    pub(crate) fn spawned(child: Child, exchange: Exchange, bell: Bell, deadline: Deadline) -> AgentRun {
+        AgentRun { pid: Pid::new(child.id()), deadline, bell, process: Some(Process::new(child, exchange)) }
     }
 
     pub(crate) fn read_out(&mut self) -> Option<Result<Output, DispatchFailure>> {
@@ -33,6 +34,11 @@ impl AgentRun {
     #[must_use]
     pub fn pid(&self) -> Pid {
         self.pid
+    }
+
+    #[must_use]
+    pub fn bell(&self) -> &Bell {
+        &self.bell
     }
 }
 

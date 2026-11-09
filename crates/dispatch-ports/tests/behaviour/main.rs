@@ -6,9 +6,9 @@ use std::error::Error;
 use std::sync::{Mutex, PoisonError};
 
 use dispatch_ports::{
-    AgentRun, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job, Output,
-    Pause, Pid, Prompt, Reply, Stall, Started, Stderr, Timeout, Tokens, Told, Unreadable, Usage, Wall, Watch, Watched,
-    clock_ops, dispatch_ops,
+    AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Ended, Errored, Finished, Job,
+    Output, Pause, Pid, Prompt, Reply, Stall, Started, Stderr, Timeout, Tokens, Told, Unreadable, Usage, Wall, Watch,
+    Watched, clock_ops, dispatch_ops,
 };
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::sample::select;
@@ -80,7 +80,7 @@ impl ClockFiller for FakeClock {
         *self.now.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause) -> Wall {
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
         let mut waits = self.waits.lock().unwrap_or_else(PoisonError::into_inner);
         let slept = Some(self.sleep).filter(|sleep| sleep.after == *waits).map_or(Pause::new(0), |sleep| sleep.slept);
         *waits = waits.saturating_add(1);

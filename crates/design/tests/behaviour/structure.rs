@@ -78,7 +78,7 @@ impl ClockFiller for FakeClock {
         *self.now.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause) -> Wall {
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
         let mut now = self.now.lock().unwrap_or_else(PoisonError::into_inner);
         *now = now.after(pause).after(self.sleep);
         *now
@@ -605,9 +605,8 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
     let missing = Agent::new("/nonexistent/claude", &[]);
     let garbled = Agent::new("sh", &["-c", r"cat >/dev/null; printf '\377'"]);
     let reported = [errs, refuses, missing, garbled].map(|agent| {
-        let bell = Bell::default();
         let structured = structuring.structured_by(
-            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent, &bell), SystemClock::new(&bell)),
+            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent), SystemClock),
             &["structure"],
         );
         let failure = structured.outcome.as_ref().err().map(ToString::to_string).unwrap_or_default();
@@ -633,9 +632,8 @@ fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let stopped = [1, 2].map(|_stop| {
         let missing = Agent::new("/nonexistent/claude", &[]);
-        let bell = Bell::default();
         structuring.structured_by(
-            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), missing, &bell), SystemClock::new(&bell)),
+            Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), missing), SystemClock),
             &["hook", "stop"],
         )
     });

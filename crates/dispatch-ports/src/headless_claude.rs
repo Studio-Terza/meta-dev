@@ -15,7 +15,6 @@ use crate::{
 pub struct HeadlessClaude {
     scratch: PathBuf,
     agent: Agent,
-    bell: Bell,
 }
 
 impl HeadlessClaude {
@@ -24,8 +23,8 @@ impl HeadlessClaude {
     const LOCALE: [&'static str; 2] = ["LC_ALL", "C"];
 
     #[must_use]
-    pub fn new(scratch: PathBuf, agent: Agent, bell: &Bell) -> HeadlessClaude {
-        HeadlessClaude { scratch, agent, bell: bell.clone() }
+    pub fn new(scratch: PathBuf, agent: Agent) -> HeadlessClaude {
+        HeadlessClaude { scratch, agent }
     }
 }
 
@@ -40,7 +39,8 @@ impl DispatchFiller for HeadlessClaude {
         let (agent_in, prompting) = io::pipe().map_err(DispatchFailure::Pipe)?;
         let (replies, agent_out) = io::pipe().map_err(DispatchFailure::Pipe)?;
         let (complaints, agent_err) = io::pipe().map_err(DispatchFailure::Pipe)?;
-        let exchange = Exchange::begun(prompt, prompting, [replies, complaints], self.bell.clone());
+        let bell = Bell::hung();
+        let exchange = Exchange::begun(prompt, prompting, [replies, complaints], bell.ringer());
         Command::new(self.agent.program())
             .args(self.agent.arguments())
             .current_dir(&self.scratch)
@@ -49,7 +49,7 @@ impl DispatchFiller for HeadlessClaude {
             .stdout(agent_out)
             .stderr(agent_err)
             .spawn()
-            .map(|child| AgentRun::spawned(child, exchange, *job.as_ref()))
+            .map(|child| AgentRun::spawned(child, exchange, bell, *job.as_ref()))
             .map_err(DispatchFailure::Spawn)
     }
 
