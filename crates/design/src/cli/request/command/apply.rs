@@ -234,7 +234,7 @@ impl Applied {
     fn covered<S: Store>(store: &S, resolved: Vec<Resolved>, written: Written) -> Result<Applied, Failure> {
         let owned: BTreeSet<Segment> = resolved
             .iter()
-            .flat_map(|resolved| &resolved.grounded.heard)
+            .flat_map(|each| &each.grounded.heard)
             .filter(|spoken| spoken.author() == Authorship::Owner)
             .map(|spoken| spoken.segment().clone())
             .collect();
@@ -318,7 +318,7 @@ impl<S: Store> Resolution<'_, '_, S> {
     fn heard(&self, reference: &SegmentRef, remit: &Remit) -> Result<Heard, Failure> {
         let prefix: &Prefix = reference.as_ref();
         let spoken = self.grounds.store.read(Prefixed::from(prefix.clone()))?;
-        let messages: BTreeSet<&Uuid> = spoken.iter().map(|spoken| spoken.segment().as_ref()).collect();
+        let messages: BTreeSet<&Uuid> = spoken.iter().map(|heard| heard.segment().as_ref()).collect();
         let message = Heard::only(reference, messages)?;
         let wanted = Segment::new(message, Ordinal::from(reference));
         let segment = spoken
@@ -338,7 +338,7 @@ impl<S: Store> Resolution<'_, '_, S> {
 
     fn stored(&self, id: NodeId) -> Result<AnyNode, Failure> {
         let placed = self.grounds.store.read(ShownNode::from(id))?;
-        Ok(placed.map(|placed| placed.node().clone()).ok_or(Unresolved::Unplaced(id))?)
+        Ok(placed.map(|shown| shown.node().clone()).ok_or(Unresolved::Unplaced(id))?)
     }
 }
 
@@ -363,8 +363,8 @@ impl Closes for Cycled {
 impl Heard {
     fn only(reference: &SegmentRef, messages: BTreeSet<&Uuid>) -> Result<Uuid, Unresolved> {
         let found: Vec<Uuid> = messages.into_iter().cloned().collect();
-        <[Uuid; 1]>::try_from(found).map(|[message]| message).map_err(|found| {
-            found.first().map_or_else(
+        <[Uuid; 1]>::try_from(found).map(|[message]| message).map_err(|several_or_none| {
+            several_or_none.first().map_or_else(
                 || Unresolved::Unheard(reference.clone()),
                 |_several| Unresolved::Ambiguous(reference.clone()),
             )
@@ -375,9 +375,9 @@ impl Heard {
 impl<S: Store> Visit for &Resolution<'_, '_, S> {
     type Output = Result<Grounded, Failure>;
 
-    fn place(self, segment: &SegmentRef, node: &NodeRef, relation: SpanRelation) -> Result<Grounded, Failure> {
-        let Heard { segment, message } = self.heard(segment, &self.grounds.remit)?;
-        let node = self.node(node)?.identity();
+    fn place(self, cited: &SegmentRef, named: &NodeRef, relation: SpanRelation) -> Result<Grounded, Failure> {
+        let Heard { segment, message } = self.heard(cited, &self.grounds.remit)?;
+        let node = self.node(named)?.identity();
         Ok(Grounded {
             directed: Directed::Placed { segment, node, relation },
             heard: message,
@@ -385,30 +385,30 @@ impl<S: Store> Visit for &Resolution<'_, '_, S> {
         })
     }
 
-    fn sense(self, segment: &SegmentRef, sense: Sense) -> Result<Grounded, Failure> {
-        let Heard { segment, message } = self.heard(segment, &self.grounds.remit)?;
+    fn sense(self, cited: &SegmentRef, sense: Sense) -> Result<Grounded, Failure> {
+        let Heard { segment, message } = self.heard(cited, &self.grounds.remit)?;
         Ok(Grounded { directed: Directed::Sensed { segment, sense }, heard: message, effect: Effect::Unchanged })
     }
 
-    fn link(self, source: &SegmentRef, target: &SegmentRef, relation: SegmentRelation) -> Result<Grounded, Failure> {
-        let looped = Unresolved::Looped(source.clone());
-        let source = self.heard(source, &self.grounds.remit)?;
-        let target = self.heard(target, &Remit::Unbounded)?;
+    fn link(self, from: &SegmentRef, to: &SegmentRef, relation: SegmentRelation) -> Result<Grounded, Failure> {
+        let looped = Unresolved::Looped(from.clone());
+        let source = self.heard(from, &self.grounds.remit)?;
+        let target = self.heard(to, &Remit::Unbounded)?;
         let heard = source.message.into_iter().chain(target.message).collect();
         let edge = Edge::new(source.segment, target.segment).map_err(|_looped| looped)?;
         let directed =
-            edge.ends(|source, target| Directed::Related { source: source.clone(), target: target.clone(), relation });
+            edge.ends(|start, end| Directed::Related { source: start.clone(), target: end.clone(), relation });
         Ok(Grounded { directed, heard, effect: Effect::Unchanged })
     }
 
     fn propose(
         self,
-        fresh: Option<&Label>,
+        labelled: Option<&Label>,
         refines: &NodeRef,
         facet: Facet,
         title: &Title,
     ) -> Result<Grounded, Failure> {
-        let fresh = fresh.map(|label| self.batch.unbound(label)).transpose()?;
+        let fresh = labelled.map(|label| self.batch.unbound(label)).transpose()?;
         let parent = self.node(refines)?;
         let entry = Entry::new(parent.entry().project().clone(), facet, self.grounds.provenance);
         let node = Node::proposed(self.batch.next, entry, parent.casting()).titled(title.clone());
@@ -416,15 +416,15 @@ impl<S: Store> Visit for &Resolution<'_, '_, S> {
         Ok(Grounded { directed: Directed::Proposed { node, parent: parent.identity() }, heard: Vec::new(), effect })
     }
 
-    fn supersede(self, old: &NodeRef, by: &NodeRef) -> Result<Grounded, Failure> {
-        let old = self.node(old)?;
-        let by = self.node(by)?;
+    fn supersede(self, superseded: &NodeRef, superseding: &NodeRef) -> Result<Grounded, Failure> {
+        let old = self.node(superseded)?;
+        let by = self.node(superseding)?;
         let supersession = Supersession::within(&old, &by).map_err(Unresolved::from)?;
         Ok(Grounded { directed: Directed::Superseded(supersession), heard: Vec::new(), effect: Effect::Unchanged })
     }
 
-    fn converse(self, segment: &SegmentRef) -> Result<Grounded, Failure> {
-        let Heard { segment, message } = self.heard(segment, &self.grounds.remit)?;
+    fn converse(self, cited: &SegmentRef) -> Result<Grounded, Failure> {
+        let Heard { segment, message } = self.heard(cited, &self.grounds.remit)?;
         Ok(Grounded { directed: Directed::Conversational { segment }, heard: message, effect: Effect::Unchanged })
     }
 }

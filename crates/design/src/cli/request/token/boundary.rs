@@ -85,14 +85,14 @@ impl Token {
         let words: Vec<&str> = rest.iter().filter_map(Token::text).collect();
         let once = wanted
             .iter()
-            .map(|wanted| rest.iter().filter_map(|token| token.valued(*wanted)).count())
+            .map(|valued| rest.iter().filter_map(|token| token.valued(*valued)).count())
             .filter(|given| *given == 1)
             .count();
         let counted = [once, WORDS + wanted.len()];
         <[&str; WORDS]>::try_from(words)
             .ok()
             .filter(|_words| counted == [wanted.len(), rest.len()])
-            .map(|words| Shaped { words, rest })
+            .map(|exact| Shaped { words: exact, rest })
             .ok_or(Failure::Usage)
     }
 }

@@ -570,7 +570,7 @@ impl Summary {
 
     fn rendered(&self) -> String {
         let Summary { node, project, facet, stage, basis, role, entered, title } = self;
-        let titled = title.as_ref().map(|title| format!(" {}", Line::quoted(title))).unwrap_or_default();
+        let titled = title.as_ref().map(|given| format!(" {}", Line::quoted(given))).unwrap_or_default();
         format!(
             "{} {} {facet} {stage} {basis} {role} {} {entered}{titled}",
             Line::numbered(*node),

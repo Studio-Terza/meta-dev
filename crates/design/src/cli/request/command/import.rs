@@ -242,8 +242,8 @@ impl Answers {
         let quotations: Vec<Sought<Vec<Segment>>> = entry
             .quotes()
             .into_iter()
-            .map(|quote| {
-                quote.map_or_else(Sought::unclosed, |quote| Sought {
+            .map(|read| {
+                read.map_or_else(Sought::unclosed, |quote| Sought {
                     reference: Reference::Quote(quote.clone()),
                     found: self.quote(quote, &cited, &dates),
                 })
@@ -275,41 +275,42 @@ impl Answers {
 
     fn cite(&self, cite: &Cite) -> Result<Speech, Miss> {
         let spoken = self.cited.get(&Prefix::new(cite.clone().into_inner())).map(Vec::as_slice).unwrap_or_default();
-        let authors = spoken.iter().fold(BTreeMap::<Uuid, Speech>::new(), |mut authors, spoken| {
-            let message: &Uuid = spoken.segment().as_ref();
-            authors
+        let authors = spoken.iter().fold(BTreeMap::<Uuid, Speech>::new(), |mut by_message, heard| {
+            let message: &Uuid = heard.segment().as_ref();
+            by_message
                 .entry(message.clone())
                 .or_insert_with(|| Speech {
                     cite: cite.clone(),
                     message: message.clone(),
-                    author: spoken.author(),
+                    author: heard.author(),
                     segments: Vec::new(),
                 })
                 .segments
-                .push(spoken.segment().clone());
-            authors
+                .push(heard.segment().clone());
+            by_message
         });
         Miss::only(authors)
     }
 
     fn quote(&self, quote: &Quote, cited: &BTreeSet<Uuid>, dates: &[&Date]) -> Result<Vec<Segment>, Miss> {
         let found = self.quoted.get(quote).map(Vec::as_slice).unwrap_or_default();
-        let said = found.iter().fold(BTreeMap::<Occurrence, Utterance>::new(), |mut said, quoted| {
+        let said = found.iter().fold(BTreeMap::<Occurrence, Utterance>::new(), |mut by_occurrence, quoted| {
             let segment: &Segment = quoted.as_ref();
             let message: &Uuid = segment.as_ref();
-            said.entry(Occurrence { message: message.clone(), ordinal: quoted.occurrence() })
+            by_occurrence
+                .entry(Occurrence { message: message.clone(), ordinal: quoted.occurrence() })
                 .or_insert_with(|| Utterance { day: quoted.day().clone(), segments: Vec::new() })
                 .segments
                 .push(segment.clone());
-            said
+            by_occurrence
         });
         let narrowed = Utterance::narrowed(said, cited);
         let same_day: BTreeSet<Uuid> = narrowed
             .iter()
-            .filter(|(_occurrence, said)| dates.contains(&&said.day))
-            .map(|(occurrence, _said)| occurrence.message.clone())
+            .filter(|(_occurrence, utterance)| dates.contains(&&utterance.day))
+            .map(|(occurrence, _utterance)| occurrence.message.clone())
             .collect();
-        Miss::only(Utterance::narrowed(narrowed, &same_day)).map(|said| said.segments)
+        Miss::only(Utterance::narrowed(narrowed, &same_day)).map(|utterance| utterance.segments)
     }
 }
 
@@ -355,7 +356,7 @@ impl Utterance {
     fn narrowed(said: BTreeMap<Occurrence, Utterance>, chosen: &BTreeSet<Uuid>) -> BTreeMap<Occurrence, Utterance> {
         let (kept, rest): (BTreeMap<Occurrence, Utterance>, BTreeMap<Occurrence, Utterance>) =
             said.into_iter().partition(|(occurrence, _said)| chosen.contains(&occurrence.message));
-        [kept, rest].into_iter().find(|said| said.first_key_value().is_some()).unwrap_or_default()
+        [kept, rest].into_iter().find(|part| part.first_key_value().is_some()).unwrap_or_default()
     }
 }
 
@@ -363,7 +364,7 @@ impl Miss {
     fn only<Key, Value>(found: BTreeMap<Key, Value>) -> Result<Value, Miss> {
         <[Value; 1]>::try_from(found.into_values().collect::<Vec<Value>>())
             .map(|[only]| only)
-            .map_err(|found| found.first().map_or(Miss::Unheard, |_several| Miss::Ambiguous))
+            .map_err(|several_or_none| several_or_none.first().map_or(Miss::Unheard, |_several| Miss::Ambiguous))
     }
 }
 
@@ -498,8 +499,8 @@ impl Census {
     fn counted(drafted: &[Drafted]) -> Census {
         Census {
             came: Count::new(drafted.len()),
-            rulings: Count::new(drafted.iter().filter(|drafted| drafted.ruled != Ruled::Remark).count()),
-            anchored: Count::new(drafted.iter().filter(|drafted| drafted.ruled == Ruled::Anchored).count()),
+            rulings: Count::new(drafted.iter().filter(|draft| draft.ruled != Ruled::Remark).count()),
+            anchored: Count::new(drafted.iter().filter(|draft| draft.ruled == Ruled::Anchored).count()),
         }
     }
 
@@ -509,7 +510,7 @@ impl Census {
         Report {
             lines: lines.into_iter().chain([reconciled]).collect(),
             settlement: Some(nodes)
-                .filter(|nodes| *nodes == came)
+                .filter(|imported| *imported == came)
                 .map_or(Settlement::Unreconciled { lines: came, nodes }, |_balanced| Settlement::Imported),
         }
     }
@@ -573,8 +574,8 @@ impl Voice {
     fn anchored<'heard>(self, quoted: BTreeSet<&'heard Segment>, owned: &[&'heard Speech]) -> Vec<Anchor<'heard>> {
         match self {
             Voice::Ruling => Some(quoted)
-                .filter(|quoted| quoted.first().is_some())
-                .map_or_else(|| Speech::anchors(owned), |quoted| vec![Anchor::Narrowed(quoted)]),
+                .filter(|candidate| candidate.first().is_some())
+                .map_or_else(|| Speech::anchors(owned), |narrowed| vec![Anchor::Narrowed(narrowed)]),
             Voice::Remark => vec![Anchor::Narrowed(quoted)],
         }
     }
@@ -617,7 +618,7 @@ impl Ruled {
         match ambiguities.first() {
             Some(_ambiguous) => Ruled::Ambiguous(ambiguities),
             None => Some(anchors)
-                .filter(|anchors| *anchors != Count::zero())
+                .filter(|counted| *counted != Count::zero())
                 .map_or(Ruled::Unanchored, |_anchored| Ruled::Anchored),
         }
     }
