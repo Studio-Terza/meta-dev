@@ -62,7 +62,8 @@ FROM
       segments.message,
       segments.ordinal,
       segments.body,
-      asked.at
+      asked.at,
+      asked.rowid AS position
     FROM
       open_questions
       JOIN messages AS asked ON asked.uuid = open_questions.message
@@ -73,22 +74,22 @@ FROM
       asked.session = job.session
       AND (
         asked.at,
-        open_questions.message,
+        asked.rowid,
         open_questions.ordinal
-      ) < (job.at, job.uuid, ?2)
+      ) < (job.at, job.rowid, ?2)
     GROUP BY
       segments.message,
       segments.ordinal
     ORDER BY
       asked.at DESC,
-      segments.message DESC,
+      asked.rowid DESC,
       segments.ordinal DESC
     LIMIT
       8
   ) AS latest
 ORDER BY
   latest.at,
-  latest.message,
+  latest.position,
   latest.ordinal
 "#,
             job: Uuid,
