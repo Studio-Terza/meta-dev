@@ -20,5 +20,7 @@ laws::table!(
         ["\"a OR b*\"", "c:d"] => vec!["a", "or", "b", "c", "d"],
         ["Écoute", "v0.2"] => vec!["écoute", "v0", "2"],
         ["--", "..."] => Vec::<String>::new(),
+        ["かなカナ—naïve", "café…ok"] => vec!["かなカナ", "naïve", "café", "ok"],
+        ["一、二。三"] => vec!["一", "二", "三"],
     ]
 );

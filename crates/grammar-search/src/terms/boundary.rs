@@ -6,9 +6,9 @@ use crate::Term;
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
 enum Piece {
-    #[regex(r"[\p{L}\p{N}]+")]
-    Word,
-    #[regex(r"[^\p{L}\p{N}]")]
+    #[regex(r"[^\x00-\x2F\x3A-\x40\x5B-\x60\x7B-\x7F]+")]
+    Run,
+    #[regex(r"[\x00-\x2F\x3A-\x40\x5B-\x60\x7B-\x7F]")]
     Separator,
 }
 
@@ -30,9 +30,19 @@ impl Piece {
     fn words(text: &str) -> Vec<Term> {
         Piece::lexer(text)
             .spanned()
-            .filter(|(piece, _)| *piece == Ok(Piece::Word))
+            .filter(|(piece, _)| *piece == Ok(Piece::Run))
             .filter_map(|(_, range)| text.get(range))
-            .map(|word| Term::new(word.chars().flat_map(char::to_lowercase).collect()))
+            .flat_map(Piece::alphanumeric)
+            .map(|word| Term::new(word.into_iter().flat_map(char::to_lowercase).collect()))
+            .collect()
+    }
+
+    fn alphanumeric(run: &str) -> Vec<Vec<char>> {
+        let letters: Vec<char> = run.chars().collect();
+        letters
+            .chunk_by(|before, after| before.is_alphanumeric() == after.is_alphanumeric())
+            .filter(|chunk| chunk.first().is_some_and(|first| first.is_alphanumeric()))
+            .map(<[char]>::to_vec)
             .collect()
     }
 }
