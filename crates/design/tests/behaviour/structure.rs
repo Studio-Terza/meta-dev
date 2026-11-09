@@ -350,6 +350,37 @@ fn a_job_starting_partway_through_a_message_is_shown_the_question_open_earlier_i
 }
 
 #[test]
+fn a_job_is_shown_only_the_questions_open_earlier_in_ordinal_and_message_order_when_messages_share_the_same_timestamp()
+-> Result<(), Box<dyn Error>> {
+    let [before, middle, after] = [
+        "aaaaaaaa-0000-4000-8000-000000000031",
+        "aaaaaaaa-0000-4000-8000-000000000032",
+        "aaaaaaaa-0000-4000-8000-000000000033",
+    ];
+    let lines = [
+        Session::stamped(Speaker::Owner, before, "null", "which crate", "2026-01-01"),
+        Session::stamped(Speaker::Owner, middle, "null", "1. which store\\n2. the first", "2026-01-01"),
+        Session::stamped(Speaker::Owner, after, "null", "which port", "2026-01-01"),
+    ];
+    let applying = Applying::over(&Session::working(lines.concat()))?;
+    let questions = [before, middle, after]
+        .map(|asked| format!("place({asked}.0, n1, questions)\nsense({asked}.0, question, specific, firm, explicit)"))
+        .join("\n");
+    applying.applied(&questions)?;
+    let covering = format!("link({middle}.1, {middle}.0, answers)");
+    let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let shown = [(before, "which crate"), (middle, "1. which store"), (after, "which port")]
+        .map(|(asked, body)| format!("asked {asked}.0 \"{body}\"\n"));
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    let counts =
+        briefs.iter().map(|brief| shown.iter().map(|line| brief.matches(line).count()).collect::<Vec<usize>>());
+    assert_eq!(counts.collect::<Vec<Vec<usize>>>(), [[1, 1, 0]]);
+    Ok(())
+}
+
+#[test]
 fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() -> Result<(), Box<dyn Error>> {
     let [first, second] = ["aaaaaaaa-0000-4000-8000-000000000011", "aaaaaaaa-0000-4000-8000-000000000012"];
     let [first_answer, second_answer] =

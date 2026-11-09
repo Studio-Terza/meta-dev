@@ -4,7 +4,7 @@ use store_ports::{Columns, Query, Statements, StoreFailure};
 use transcript_ports::{Body, Uuid};
 
 #[derive(Clone, Debug, Op)]
-pub struct AskedEarlier(Segment);
+pub struct AskedEarlier<'segment>(&'segment Segment);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Asked {
@@ -19,9 +19,9 @@ struct AskedRow {
     body: Body,
 }
 
-impl From<&Segment> for AskedEarlier {
-    fn from(segment: &Segment) -> AskedEarlier {
-        AskedEarlier(segment.clone())
+impl<'segment> From<&'segment Segment> for AskedEarlier<'segment> {
+    fn from(segment: &'segment Segment) -> AskedEarlier<'segment> {
+        AskedEarlier(segment)
     }
 }
 
@@ -43,12 +43,12 @@ impl AsRef<Body> for Asked {
     }
 }
 
-impl Query for AskedEarlier {
+impl Query for AskedEarlier<'_> {
     type Rows = Vec<Asked>;
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Asked>, StoreFailure> {
-        let job = AsRef::<Uuid>::as_ref(&self.0).clone();
-        let ordinal = Ordinal::from(&self.0);
+        let job = AsRef::<Uuid>::as_ref(self.0);
+        let ordinal = Ordinal::from(self.0);
         let rows = statements.rows(store_ports::query!(
             AskedRow,
             r#"
