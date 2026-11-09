@@ -3,7 +3,7 @@ mod connected;
 
 use std::path::Path;
 
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::Connection;
 use store_ports::{Batch, Query, StoreFailure, Written};
 
 use super::failed::{Unexecuted, Unopened};
@@ -22,8 +22,7 @@ impl Opened {
     const STATEMENTS: usize = 100;
 
     pub(super) fn filed(path: &Path, migrations: Migrations) -> Result<Opened, StoreFailure> {
-        let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-        let connection = Connection::open_with_flags(path, flags).map_err(Unopened::from)?;
+        let connection = Connection::open(path).map_err(Unopened::from)?;
         Opened::configured(connection)?.migrated(migrations)
     }
 
