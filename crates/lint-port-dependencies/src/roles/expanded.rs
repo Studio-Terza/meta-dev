@@ -32,13 +32,13 @@ impl<'file, 'run> Expanded<'file, 'run> {
 
     fn called(&self, invocation: &Macro) -> Vec<LineNumber> {
         let inner = MacroCalls::within(invocation);
-        self.met(&invocation.path).into_iter().chain(inner.iter().flat_map(|inner| self.called(inner))).collect()
+        self.met(&invocation.path).into_iter().chain(inner.iter().flat_map(|nested| self.called(nested))).collect()
     }
 
     fn derived(attribute: &Attribute) -> Vec<Path> {
         Some(attribute)
-            .filter(|attribute| attribute.path().is_ident("derive"))
-            .and_then(|attribute| attribute.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
+            .filter(|candidate| candidate.path().is_ident("derive"))
+            .and_then(|derive| derive.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
             .map(|paths| paths.into_iter().collect())
             .unwrap_or_default()
     }
