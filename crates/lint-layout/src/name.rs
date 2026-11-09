@@ -114,6 +114,12 @@ impl AsRef<Path> for Name {
     }
 }
 
+impl AsRef<str> for Name {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl From<Word<'_>> for Name {
     fn from(word: Word<'_>) -> Name {
         Name(word.into_inner().to_owned())

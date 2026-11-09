@@ -13,7 +13,7 @@ use std::process::ExitCode;
 use std::thread;
 
 use cargo_ports::{Cargo, CargoFiller};
-use file_ports::Files;
+use file_ports::{Cached, Files};
 use lint_layout::Failure;
 use lint_reader::{SourceFiles, Stage};
 use port_core::Run;
@@ -77,7 +77,8 @@ impl Cli {
         let run = Run::root();
         let cargo = run.port(ports.cargo);
         let timer = run.port(ports.timer);
-        self.metered(&Wired::new(ports.files, &cargo, &timer, self.timings), out, err)
+        let files = Cached::new(ports.files);
+        self.metered(&Wired::new(&files, &cargo, &timer, self.timings), out, err)
     }
 
     fn metered(

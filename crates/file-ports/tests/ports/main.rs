@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Text};
+use file_ports::{Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -125,6 +125,34 @@ fn fake_keeps_the_contract() -> Result<(), FileFailure> {
 }
 
 #[test]
+fn cached_keeps_the_contract_over_disk_and_the_fake() -> Result<(), FileFailure> {
+    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
+    Checks::on(&Cached::new(&Disk), scratch.path())?;
+    let memory = Memory::default();
+    memory.create_directories(Path::new("/scratch"))?;
+    Checks::on(&Cached::new(&memory), Path::new("/scratch"))
+}
+
+#[test]
+fn cached_reads_each_path_once_until_something_is_written_through_it() -> Result<(), FileFailure> {
+    let memory: Memory = [(PathBuf::from("/a.txt"), Bytes::from("first"))].into_iter().collect();
+    let cached = Cached::new(&memory);
+    let first = cached.read_text(Path::new("/a.txt"))?;
+    let listed_first = cached.entries(Path::new("/"))?;
+    memory.write(Path::new("/a.txt"), Bytes::from("second"))?;
+    memory.write(Path::new("/b.txt"), Bytes::from("b"))?;
+    let remembered = (cached.read_text(Path::new("/a.txt"))?, cached.read(Path::new("/a.txt"))?);
+    let listed = cached.entries(Path::new("/"))?;
+    cached.write(Path::new("/c.txt"), Bytes::from("c"))?;
+    let reread = cached.read_text(Path::new("/a.txt"))?;
+    assert_eq!([first, reread], [Text::new("first".to_owned()), Text::new("second".to_owned())]);
+    assert_eq!(remembered, (Text::new("first".to_owned()), Bytes::from("first")));
+    assert_eq!([listed_first, listed], [[PathBuf::from("/a.txt")], [PathBuf::from("/a.txt")]]);
+    assert_eq!(cached.entries(Path::new("/"))?.len(), 3);
+    Ok(())
+}
+
+#[test]
 fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
     let memory: Memory = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
     assert_eq!(memory.kind(Path::new("/a")), Kind::Directory);
@@ -227,7 +255,12 @@ fn disk_and_the_fake_answer_batches_path_by_path() -> Result<(), FileFailure> {
     Batches::on(&Disk, scratch.path())?;
     let fake = Memory::default();
     fake.create_directories(Path::new("/batch"))?;
-    Batches::on(&fake, Path::new("/batch"))
+    Batches::on(&fake, Path::new("/batch"))?;
+    let cached_scratch = tempfile::tempdir().map_err(FileFailure::from)?;
+    Batches::on(&Cached::new(&Disk), cached_scratch.path())?;
+    let cached_fake = Memory::default();
+    cached_fake.create_directories(Path::new("/batch"))?;
+    Batches::on(&Cached::new(&cached_fake), Path::new("/batch"))
 }
 
 struct Tails;

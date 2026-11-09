@@ -60,7 +60,7 @@ impl VecOutParams<'_> {
     }
 
     fn last_segment<'path>(path: &'path TypePath, name: Word<'_>) -> Option<&'path PathSegment> {
-        path.path.segments.last().filter(|segment| Name::from(&segment.ident) == Name::from(name))
+        path.path.segments.last().filter(|segment| segment.ident == Name::from(name))
     }
 }
 

@@ -42,7 +42,7 @@ impl<'file, 'ports> Declarations<'file, 'ports> {
 
     fn filled(&self, block: &ItemImpl) -> Option<Span> {
         let last = block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last())?;
-        let filler = self.ports.iter().find(|port| port.suffixed(Self::FILLER) == Name::from(&last.ident)).map(|_| ());
+        let filler = self.ports.iter().find(|port| last.ident == port.suffixed(Self::FILLER)).map(|_| ());
         let release = Name::from(&last.ident).matches::<Whole>(&Self::RELEASE).map(|_| ());
         filler.or(release).map(|()| block.span())
     }
