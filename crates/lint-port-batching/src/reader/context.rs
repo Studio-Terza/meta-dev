@@ -30,7 +30,7 @@ impl<'run> Context<'run> {
 
     pub fn held(&self, owner: &Type) -> Option<&'run BTreeSet<Name>> {
         let holders = self.holders;
-        Spelling::last(owner).and_then(|owner| holders.fields(&self.crate_name, &owner))
+        Spelling::last(owner).and_then(|last| holders.fields(&self.crate_name, &last))
     }
 
     pub fn bindings(&self, module: &Module<'_>, generics: &BTreeSet<Name>, signature: &Signature) -> BTreeSet<Name> {

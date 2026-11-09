@@ -8,7 +8,7 @@ use grammar::cited::Cited;
 use grammar::output::field::{Id, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use strum::VariantArray;
 use text_lines::Lines;
 
@@ -213,9 +213,9 @@ impl Briefing {
     fn examples(job: &Job) -> Vec<Directive> {
         let segment = job.said(Listing::Segment).first().map(Said::segment);
         let node = job.context().first().map(|outline| NodeRef::Stored(outline.node()));
-        let placed = segment.cloned().zip(node.clone()).map(|(segment, node)| Directive::Place {
-            segment,
-            node,
+        let placed = segment.cloned().zip(node.clone()).map(|(said, outlined)| Directive::Place {
+            segment: said,
+            node: outlined,
             relation: SpanRelation::Mentions,
         });
         let label = Label::from(Sample::Label);
@@ -224,10 +224,10 @@ impl Briefing {
             facet: Facet::Feature,
             title: Title::new(Sample::Title.to_string()),
         });
-        let labelled = segment.cloned().zip(proposed).map(|(segment, proposed)| {
-            [proposed, Directive::Place { segment, node: NodeRef::from(label), relation: SpanRelation::Mentions }]
+        let labelled = segment.cloned().zip(proposed).map(|(said, propose)| {
+            [propose, Directive::Place { segment: said, node: NodeRef::from(label), relation: SpanRelation::Mentions }]
         });
-        let conversational = segment.cloned().map(|segment| Directive::Conversational { segment });
+        let conversational = segment.cloned().map(|said| Directive::Conversational { segment: said });
         placed.into_iter().chain(labelled.into_iter().flatten()).chain(conversational).collect()
     }
 

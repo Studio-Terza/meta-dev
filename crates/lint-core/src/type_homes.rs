@@ -10,7 +10,7 @@ use crate::home::Home;
 use crate::source_file::SourceFile;
 use crate::walk::Walk;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TypeHomes<'file> {
     declared: BTreeMap<Name, Vec<Home<'file>>>,
     reading: Home<'file>,
@@ -19,7 +19,9 @@ pub struct TypeHomes<'file> {
 impl<'file> TypeHomes<'file> {
     #[must_use]
     pub fn declared_in(files: &[&'file SourceFile]) -> TypeHomes<'file> {
-        files.iter().fold(TypeHomes::default(), |homes, file| homes.reading(file))
+        files
+            .iter()
+            .fold(TypeHomes { declared: BTreeMap::new(), reading: Home::NOWHERE }, |homes, file| homes.reading(file))
     }
 
     #[must_use]

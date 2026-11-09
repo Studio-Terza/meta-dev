@@ -17,6 +17,7 @@ disallowed-methods = [
   "str::split_at_checked",
   "str::split_at_mut",
   "str::split_at_mut_checked",
+  "str::char_indices",
   "str::trim",
   "str::trim_start",
   "str::trim_end",

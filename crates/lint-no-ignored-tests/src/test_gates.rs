@@ -20,8 +20,8 @@ impl TestGates {
 impl<'ast> Visit<'ast> for TestGates {
     fn visit_attribute(&mut self, attribute: &'ast Attribute) {
         let gated = Some(attribute)
-            .filter(|attribute| Walk::outside_tests(slice::from_ref(*attribute)) == Walk::Skipped)
-            .map(|attribute| LineNumber::from(attribute.pound_token.span));
+            .filter(|candidate| Walk::outside_tests(slice::from_ref(*candidate)) == Walk::Skipped)
+            .map(|skipped| LineNumber::from(skipped.pound_token.span));
         self.0.extend(gated);
         visit::visit_attribute(self, attribute);
     }

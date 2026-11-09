@@ -25,8 +25,8 @@ impl<'bound> Bounds<'bound> {
     pub(crate) fn iterating(bound: &TypeParamBound) -> Option<&PathSegment> {
         match bound {
             TypeParamBound::Trait(found) => Some(found)
-                .filter(|found| matches!(found.modifier, TraitBoundModifier::None))
-                .and_then(|found| found.path.segments.last())
+                .filter(|candidate| matches!(candidate.modifier, TraitBoundModifier::None))
+                .and_then(|plain| plain.path.segments.last())
                 .filter(|last| Name::from(&last.ident).matches::<Whole>(&Wrapping::ITERATORS).is_some()),
             _ => None,
         }

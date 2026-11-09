@@ -39,7 +39,7 @@ impl Cli {
             .and_then(OsStr::to_str)
             .ok_or(Failure::Usage)
             .and_then(str::parse::<Command>)
-            .and_then(|command| Request::parsed(command, arguments))
+            .and_then(|parsed| Request::parsed(parsed, arguments))
             .and_then(|request| request.written(files, &metadata, out))
     }
 

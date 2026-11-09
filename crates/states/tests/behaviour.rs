@@ -29,7 +29,7 @@ impl Flow {
 
     fn reviewed<'id>(review: Reviewing<'id>, left: Option<u8>, verdict: Verdict, passes: &Cell<u8>) -> Finished<'id> {
         match left {
-            Some(left) => Self::run(review.rework(), left, verdict, passes),
+            Some(remaining) => Self::run(review.rework(), remaining, verdict, passes),
             None => Self::decided(review, verdict),
         }
     }

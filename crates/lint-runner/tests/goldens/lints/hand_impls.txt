@@ -1,0 +1,11 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 36 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+a hand impl of a derivable trait is prone to subtle bugs; derive it:
+src/lib.rs:4: hand impl of Clone for Held; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
+src/lib.rs:9: hand impl of PartialEq for Kept; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
+src/lib.rs:21: hand impl of Debug for dyn Shape; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
+src/lib.rs:26: hand impl of Clone for Box<dyn Shape>; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
+src/lib.rs:32: hand impl of Clone for Pair<[T;N]>; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
+fails

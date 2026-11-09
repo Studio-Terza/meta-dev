@@ -37,7 +37,7 @@ WHERE
 impl NotedRow {
     fn noted(self) -> Option<Noted> {
         let NotedRow { provenance, title } = self;
-        provenance.imported().zip(title).map(|(line, title)| Noted { line, title })
+        provenance.imported().zip(title).map(|(line, heading)| Noted { line, title: heading })
     }
 }
 

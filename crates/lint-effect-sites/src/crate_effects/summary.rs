@@ -54,7 +54,7 @@ impl fmt::Display for Summary<'_> {
             self.in_ports,
             Count::total(self.outside.values().copied())
         )?;
-        kinds.map_or(Ok(()), |kinds| write!(formatter, " ({kinds})"))
+        kinds.map_or(Ok(()), |listed| write!(formatter, " ({listed})"))
     }
 }
 

@@ -2,7 +2,7 @@ use std::fmt;
 
 use design_model::{Facet, NodeId, Ordinal, Prefix, Segment, SegmentRelation, Sense, SpanRelation, Title};
 use grammar::directive::Quote;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::verb::{By, New, Refines, Verb};
 use crate::{Bind, Directive, Label, NodeRef, SegmentRef, Visit};

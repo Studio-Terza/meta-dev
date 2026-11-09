@@ -5,7 +5,7 @@ use grammar::cited::Cited;
 use grammar::output::Fields;
 use grammar::output::field::{Bare, Checked, Integer, Word};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use structurer::SegmentRef;
 
 use super::Subject;

@@ -6,9 +6,12 @@ use std::iter;
 use std::str::FromStr;
 
 use logos::{Lexer, Logos};
+use newtype::{Arbitrary, Checked, Newtype};
 
 use head::Head;
 use piece::Piece;
+
+use crate::unspelled::Unspelled;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Line {
@@ -22,7 +25,11 @@ pub struct Spec {
     attachment: Option<Attachment>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(
+    checked,
+    strategy = "none|owner [0-9a-f]{8}[0-9a-f-]{0,8}|[a-z0-9-]{1,8}#[DL][0-9]{1,3}(, ?[a-z0-9-]{1,8}#[DL][0-9]{1,3}){0,2}"
+)]
 pub struct Attachment(String);
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -69,8 +76,8 @@ impl Spec {
     fn read(lexed: &[Lexed]) -> Spec {
         let only = <&[Lexed; 1]>::try_from(lexed).ok();
         Spec {
-            value: lexed.iter().map(|lexed| lexed.text.as_str()).collect(),
-            attachment: only.and_then(|[only]| only.attachment()),
+            value: lexed.iter().map(|piece| piece.text.as_str()).collect(),
+            attachment: only.and_then(|[sole]| sole.attachment()),
         }
     }
 
@@ -82,16 +89,16 @@ impl Spec {
 
 impl Lexed {
     fn attachment(&self) -> Option<Attachment> {
-        self.piece.attachment(self.text.clone())
+        Attachment::try_new(self.text.clone()).ok()
     }
 
     fn spoken(lexed: &[Lexed]) -> &[Lexed] {
-        let last = lexed.iter().rposition(|lexed| lexed.piece.spoken().is_some());
-        lexed.get(..last.map_or(0, |last| last + 1)).unwrap_or_default()
+        let last = lexed.iter().rposition(|said| said.piece.spoken().is_some());
+        lexed.get(..last.map_or(0, |at| at + 1)).unwrap_or_default()
     }
 
     fn next(pieces: &mut Lexer<'_, Piece>) -> Option<Result<Lexed, ()>> {
-        pieces.next().map(|piece| piece.map(|piece| Lexed { piece, text: pieces.slice().to_owned() }))
+        pieces.next().map(|lexed| lexed.map(|piece| Lexed { piece, text: pieces.slice().to_owned() }))
     }
 }
 
@@ -103,7 +110,7 @@ impl FromStr for Line {
         let opening = head.next().and_then(Result::ok);
         let mut pieces = head.morph::<Piece>();
         let lexed = iter::from_fn(|| Lexed::next(&mut pieces)).collect::<Result<Vec<Lexed>, ()>>();
-        opening.zip(lexed.ok()).and_then(|(opening, lexed)| opening.line(Lexed::spoken(&lexed))).ok_or(Unspecified)
+        opening.zip(lexed.ok()).and_then(|(opened, said)| opened.line(Lexed::spoken(&said))).ok_or(Unspecified)
     }
 }
 
@@ -113,6 +120,20 @@ impl fmt::Display for Line {
             Line::Repair => formatter.write_str(Self::REPAIR),
             Line::Spec(spec) => write!(formatter, "{}{}", Self::SPEC, spec.value),
         }
+    }
+}
+
+impl Checked for Attachment {
+    type Error = Unspelled;
+
+    fn checked(value: &String) -> Result<&String, Unspelled> {
+        let spelled: Vec<Result<Piece, ()>> = Piece::lexer(value).collect();
+        <[Result<Piece, ()>; 1]>::try_from(spelled)
+            .ok()
+            .and_then(|[only]| only.ok())
+            .and_then(Piece::attached)
+            .map(|_form| value)
+            .ok_or(Unspelled)
     }
 }
 

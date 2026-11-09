@@ -32,28 +32,28 @@ enum Step {
 }
 
 impl Step {
-    const ARROWS: [([char; 2], Step); 2] = [(['=', '>'], Step::Reset), (['-', '>'], Step::Level)];
-    const ANGLED: [(char, Step); 9] = [
-        ('(', Step::Reset),
-        ('[', Step::Reset),
-        ('{', Step::Reset),
-        (')', Step::Reset),
-        (']', Step::Reset),
-        ('}', Step::Reset),
-        (';', Step::Reset),
-        ('<', Step::Deeper),
-        ('>', Step::Shallower),
+    const ARROWS: [([u8; 2], Step); 2] = [(*b"=>", Step::Reset), (*b"->", Step::Level)];
+    const ANGLED: [(u8, Step); 9] = [
+        (b'(', Step::Reset),
+        (b'[', Step::Reset),
+        (b'{', Step::Reset),
+        (b')', Step::Reset),
+        (b']', Step::Reset),
+        (b'}', Step::Reset),
+        (b';', Step::Reset),
+        (b'<', Step::Deeper),
+        (b'>', Step::Shallower),
     ];
-    const DELIMITED: [(char, Step); 6] = [
-        ('(', Step::Deeper),
-        ('[', Step::Deeper),
-        ('{', Step::Deeper),
-        (')', Step::Shallower),
-        (']', Step::Shallower),
-        ('}', Step::Shallower),
+    const DELIMITED: [(u8, Step); 6] = [
+        (b'(', Step::Deeper),
+        (b'[', Step::Deeper),
+        (b'{', Step::Deeper),
+        (b')', Step::Shallower),
+        (b']', Step::Shallower),
+        (b'}', Step::Shallower),
     ];
 
-    fn angled(before: char, current: char) -> Step {
+    fn angled(before: u8, current: u8) -> Step {
         Self::ARROWS
             .into_iter()
             .find(|(arrow, _)| *arrow == [before, current])
@@ -62,7 +62,7 @@ impl Step {
             .unwrap_or(Step::Level)
     }
 
-    fn delimited(current: char) -> Step {
+    fn delimited(current: u8) -> Step {
         Self::DELIMITED.into_iter().find(|(mark, _)| *mark == current).map_or(Step::Level, |(_, step)| step)
     }
 }
@@ -74,15 +74,15 @@ impl Nesting {
     const LIMIT: Bound = Bound::Most(256);
 
     pub fn within_limit(text: &SourceText) -> Option<&SourceText> {
-        let chars: Vec<char> = text.as_ref().chars().collect();
-        let deepest = Self::peak(&chars, |_, current| Step::delimited(current)).max(Self::peak(&chars, Step::angled));
+        let bytes = text.as_ref().as_bytes();
+        let deepest = Self::peak(bytes, |_, current| Step::delimited(current)).max(Self::peak(bytes, Step::angled));
         Self::LIMIT.allows(deepest).map(|_| text)
     }
 
-    fn peak(chars: &[char], step: impl Fn(char, char) -> Step) -> Depth {
-        chars
+    fn peak(bytes: &[u8], step: impl Fn(u8, u8) -> Step) -> Depth {
+        bytes
             .iter()
-            .scan((Depth::zero(), ' '), |(depth, before), current| {
+            .scan((Depth::zero(), b' '), |(depth, before), current| {
                 *depth = depth.after(step(*before, *current));
                 *before = *current;
                 Some(*depth)

@@ -3,7 +3,7 @@ use std::io::Write;
 
 use console_ports::Heard;
 use design_store::{Account, FailuresReported, Unreported, UnreportedFailures};
-use newtype::Newtype;
+use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
 

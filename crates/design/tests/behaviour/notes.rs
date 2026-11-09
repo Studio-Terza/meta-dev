@@ -176,10 +176,7 @@ fn import_notes_makes_a_node_of_every_content_line_anchors_each_ruling_and_view_
         .iter()
         .map(|node| applying.run(&["show", node]).map(|out| format!("design show {node}\n{out}")))
         .collect::<Result<String, Failure>>()?;
-    golden::golden!(
-        "notes.txt",
-        &format!("design import-notes {NOTES}\n{imported}design view notes\n{viewed}{shown}")
-    )?;
+    golden::golden!("notes.txt", &format!("design import-notes {NOTES}\n{imported}design view notes\n{viewed}{shown}"));
     Ok(())
 }
 
@@ -225,8 +222,8 @@ laws::law!(
         let imported =
             Noting::imported(&applying, &notes).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
         let viewed = applying.run(&["view", "notes"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        let laid: String = lines.iter().flat_map(|(_line, viewed)| [*viewed, "\n"]).collect();
-        let inked = lines.iter().filter(|(_line, viewed)| !viewed.is_empty()).count() + 1;
+        let laid: String = lines.iter().flat_map(|(_line, text)| [*text, "\n"]).collect();
+        let inked = lines.iter().filter(|(_line, text)| !text.is_empty()).count() + 1;
         let nodes =
             Spread::parsed(&imported).iter().filter(|line| matches!(line, Line::Noted(Noted::Imported { .. }))).count();
         prop_assert_eq!(viewed, format!("{laid}last line{ending}"));

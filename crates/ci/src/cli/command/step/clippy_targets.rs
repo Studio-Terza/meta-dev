@@ -28,8 +28,8 @@ impl ClippyTargets {
 }
 
 impl Step for ClippyTargets {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ClippyTargets, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(words: Vec<OsString>) -> Result<ClippyTargets, Failure<'static>> {
+        let mut arguments = Arguments::from(words);
         let measured = &arguments.taken()?;
         let stage = &arguments.taken()?;
         Ok(ClippyTargets {

@@ -18,8 +18,8 @@ pub struct Timed {
 }
 
 impl Step for Timed {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Timed, Failure<'static>> {
-        let mut arguments = Arguments::from(arguments);
+    fn from_arguments(given: Vec<OsString>) -> Result<Timed, Failure<'static>> {
+        let mut arguments = Arguments::from(given);
         let measured = &arguments.taken()?;
         let stage = &arguments.taken()?;
         let program = &arguments.taken()?;

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use file_ports::Size;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::{Cursor, SessionId};
 

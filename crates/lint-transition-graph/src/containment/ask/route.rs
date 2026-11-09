@@ -4,7 +4,7 @@ use std::iter;
 use std::ops::Not;
 
 use lint_layout::Name;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use super::super::member::Member;
 use super::super::{Containment, Toward};

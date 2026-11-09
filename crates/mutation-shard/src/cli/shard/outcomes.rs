@@ -50,7 +50,7 @@ impl Outcomes {
         chosen
             .into_iter()
             .map(|path| {
-                path.and_then(|path| read.get(path))
+                path.and_then(|found| read.get(found))
                     .map(|bytes| TestLog::from(LossyText::from(bytes.as_ref()).as_ref()))
                     .unwrap_or_default()
             })

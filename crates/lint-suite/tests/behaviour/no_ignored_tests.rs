@@ -129,9 +129,9 @@ laws::table!(
     test_code_in_a_library_whose_tests_are_switched_off_is_flagged_because_it_never_runs,
     Library::flagged,
     [
-        Library(&[SWITCHED_OFF], GATED_LIBRARY) => ["crates/a/src/lib.rs:2"],
-        Library(&[SWITCHED_OFF], GATED_ITEM) => ["crates/a/src/a.rs:1"],
-        Library(&[SWITCHED_OFF], GATED_FILE_IN_LIBRARY) => ["crates/a/src/a.rs:1"],
+        Library(&[SWITCHED_OFF], GATED_LIBRARY) => ["crates/a/src/lib.rs:2"].into(),
+        Library(&[SWITCHED_OFF], GATED_ITEM) => ["crates/a/src/a.rs:1"].into(),
+        Library(&[SWITCHED_OFF], GATED_FILE_IN_LIBRARY) => ["crates/a/src/a.rs:1"].into(),
         Library(&[SWITCHED_ON], GATED_LIBRARY) => Lines::default(),
         Library(&[SWITCHED_OFF], GATED_TESTS) => Lines::default(),
         Library(&[SWITCHED_OFF], UNGATED) => Lines::default(),

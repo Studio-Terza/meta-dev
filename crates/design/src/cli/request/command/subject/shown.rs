@@ -2,7 +2,7 @@ use std::io::Write;
 
 use design_model::{Ordinal, Prefix};
 use design_store::{ShownMessage, Started, Stored};
-use newtype::Newtype;
+use newtype::Wrapping;
 use store_ports::Store;
 use structurer::SegmentRef;
 use transcript_ports::Uuid;
@@ -17,7 +17,8 @@ pub struct Shown(Stored);
 
 impl Shown {
     pub fn message(store: &impl Store, prefix: &Prefix) -> Result<Shown, Failure> {
-        let exact = store.read(ShownMessage::named(Uuid::new(prefix.clone().into_inner())))?;
+        let named = Uuid::try_new(prefix.clone().into_inner()).ok();
+        let exact = named.map(|uuid| store.read(ShownMessage::named(uuid))).transpose()?.flatten();
         let stored = exact.map_or_else(|| Shown::prefixed(store, prefix), Ok)?;
         Ok(Shown(stored))
     }

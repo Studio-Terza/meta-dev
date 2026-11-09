@@ -5,7 +5,7 @@ use grammar::notes::{Cite, Quote};
 use grammar::output::field::{Bare, Id, Integer, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use strum::VariantArray;
 use transcript_ports::Authorship;
 

@@ -109,7 +109,7 @@ impl Assertion {
     fn named(name: &Name, tables: &MacroAliases) -> Assertion {
         name.matches::<Whole>(&Self::EQUALITIES)
             .map(|_| Assertion::Equality)
-            .or_else(|| (*name == Self::ASSERT).then_some(Assertion::Bare))
+            .or_else(|| (*name == Name::from(Self::ASSERT)).then_some(Assertion::Bare))
             .or_else(|| tables.call(name).map(|_| Assertion::Table))
             .unwrap_or(Assertion::Other)
     }
@@ -133,8 +133,8 @@ impl Assertion {
     fn sides(condition: Expr) -> Vec<Expr> {
         match condition {
             Expr::Binary(binary) => Some(binary)
-                .filter(|binary| matches!(binary.op, BinOp::Eq(_) | BinOp::Ne(_)))
-                .map(|binary| vec![*binary.left, *binary.right])
+                .filter(|candidate| matches!(candidate.op, BinOp::Eq(_) | BinOp::Ne(_)))
+                .map(|comparison| vec![*comparison.left, *comparison.right])
                 .unwrap_or_default(),
             _ => Vec::new(),
         }

@@ -4,7 +4,7 @@ mod reached;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use newtype::Newtype;
+use newtype::Wrapping;
 
 use crate::package_id::PackageId;
 

@@ -22,7 +22,7 @@ pub(crate) struct Offers<'file> {
 impl<'file> Offers<'file> {
     pub(crate) fn in_file(file: &'file SourceFile) -> Vec<Candidate<'file>> {
         let mut offers = Offers { path: file.path(), found: Vec::new() };
-        file.shipped().into_iter().for_each(|file| offers.visit_file(file.syntax()));
+        file.shipped().into_iter().for_each(|shipped| offers.visit_file(shipped.syntax()));
         offers.found
     }
 
@@ -65,7 +65,7 @@ impl<'ast> Visit<'ast> for Offers<'_> {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let owner = Self::owner(item).filter(|_| Walk::inherent_impls(item) == Walk::Entered);
-        Walk::enter(&item.attrs, || owner.iter().for_each(|owner| self.constructors(item, owner)));
+        Walk::enter(&item.attrs, || owner.iter().for_each(|named| self.constructors(item, named)));
     }
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {

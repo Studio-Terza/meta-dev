@@ -1,7 +1,9 @@
+use code_model::Model;
 use lint_complexity::Complexity;
-use lint_core::{Lint, Report, SourceFile};
+use lint_core::{Lint, ModelLint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
+use lint_narrowed_returns::NarrowedReturns;
 use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
     AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction, GraphLint,
@@ -14,7 +16,7 @@ pub struct Elegance;
 
 impl Elegance {
     #[must_use]
-    pub fn reports(files: &[SourceFile]) -> Vec<Report<'_>> {
+    pub fn reports<'read>(files: &'read [SourceFile], model: &'read Model) -> Vec<Report<'read>> {
         let extraction = Extraction::from(files);
         let system = TypeSystem::built_from(files, &extraction);
         vec![
@@ -32,6 +34,7 @@ impl Elegance {
             EffectSites::report(files),
             FlowShapes::report(files),
             NormalisedShapes::report(files),
+            <NarrowedReturns as ModelLint>::report(model),
         ]
     }
 }

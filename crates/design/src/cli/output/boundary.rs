@@ -12,7 +12,7 @@ use grammar::cited::Cited;
 use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
 use grammar::output::{Fields, Unread};
 use named_derive::Named;
-use newtype::Newtype;
+use newtype::Wrapping;
 use stream::{Relation, Shape};
 use structurer::{Directive, Lapse, Retried, SegmentRef};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
@@ -570,7 +570,7 @@ impl Summary {
 
     fn rendered(&self) -> String {
         let Summary { node, project, facet, stage, basis, role, entered, title } = self;
-        let titled = title.as_ref().map(|title| format!(" {}", Line::quoted(title))).unwrap_or_default();
+        let titled = title.as_ref().map(|named| format!(" {}", Line::quoted(named))).unwrap_or_default();
         format!(
             "{} {} {facet} {stage} {basis} {role} {} {entered}{titled}",
             Line::numbered(*node),

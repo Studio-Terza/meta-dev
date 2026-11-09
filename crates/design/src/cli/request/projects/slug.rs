@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use grammar::slug::Letters;
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Newtype, Wrapping};
 
 use crate::cli::failure::Failure;
 

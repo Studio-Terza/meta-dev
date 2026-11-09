@@ -11,8 +11,7 @@ doctest = false
 
 [dependencies]
 grammar = { path = "../grammar" }
-proptest.workspace = true
-serde.workspace = true
+newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]

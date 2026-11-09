@@ -27,16 +27,16 @@ laws::table!(
     effect_sites_are_counted_per_crate_and_listed_outside_ports,
     Shown::of::<EffectSites>,
     [
-        [EVERY_KIND, "crate x: 11 effect sites, 0 in ports, 11 outside ports (files 2, environment 1, clock 3, network 1, processes 1, randomness 1, stdio 2)"] => true,
-        [EVERY_KIND, "crates/x/src/lib.rs:4: files effect outside ports: calls std::fs::read_to_string"] => true,
-        [EVERY_KIND, "crates/x/src/lib.rs:14: stdio effect outside ports: calls println!"] => true,
-        [IN_PORTS, "crate x: 2 effect sites, 1 in ports, 1 outside ports (files 1)"] => true,
-        [IN_PORTS, "lib.rs:3: files effect"] => false,
-        [IN_PORTS, "lib.rs:7: files effect outside ports: calls std::fs::write"] => true,
-        [PRINTED_IN_MODULES, "crate x: 2 effect sites, 1 in ports, 1 outside ports (stdio 1)"] => true,
-        [PRINTED_IN_MODULES, "lib.rs:3: stdio effect outside ports: calls println!"] => true,
-        [IN_TESTS, "crate x"] => false,
-        [FOREIGN, "crate x"] => false,
+        [EVERY_KIND, "crate x:"] => vec!["crates/x/src/lib.rs:4: crate x: 11 effect sites, 0 in ports, 11 outside ports (files 2, environment 1, clock 3, network 1, processes 1, randomness 1, stdio 2); move each effect site outside ports behind a port, until none remain outside"],
+        [EVERY_KIND, "lib.rs:4: files effect"] => vec!["crates/x/src/lib.rs:4: files effect outside ports: calls std::fs::read_to_string; move the effect behind a port in a ports module and call the port from here"],
+        [EVERY_KIND, "lib.rs:14: stdio effect"] => vec!["crates/x/src/lib.rs:14: stdio effect outside ports: calls println!; move the effect behind a port in a ports module and call the port from here"],
+        [IN_PORTS, "crate x:"] => vec!["crates/x/src/lib.rs:3: crate x: 2 effect sites, 1 in ports, 1 outside ports (files 1); move each effect site outside ports behind a port, until none remain outside"],
+        [IN_PORTS, "lib.rs:3: files effect"] => Vec::<String>::new(),
+        [IN_PORTS, "lib.rs:7: files effect"] => vec!["crates/x/src/lib.rs:7: files effect outside ports: calls std::fs::write; move the effect behind a port in a ports module and call the port from here"],
+        [PRINTED_IN_MODULES, "crate x:"] => vec!["crates/x/src/lib.rs:3: crate x: 2 effect sites, 1 in ports, 1 outside ports (stdio 1); move each effect site outside ports behind a port, until none remain outside"],
+        [PRINTED_IN_MODULES, "lib.rs:3: stdio effect"] => vec!["crates/x/src/lib.rs:3: stdio effect outside ports: calls println!; move the effect behind a port in a ports module and call the port from here"],
+        [IN_TESTS, "crate x"] => Vec::<String>::new(),
+        [FOREIGN, "crate x"] => Vec::<String>::new(),
     ]
 );
 

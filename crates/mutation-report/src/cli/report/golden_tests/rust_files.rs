@@ -66,22 +66,26 @@ impl RustFiles {
         let entries: Vec<Result<Vec<Entry>, Failure<'static>>> = level
             .iter()
             .zip(listings)
-            .scan(kinds.into_iter(), |kinds, (directory, listing)| Some(Entry::listed(directory, listing, kinds)))
+            .scan(kinds.into_iter(), |remaining, (directory, listing)| {
+                Some(Entry::listed(directory, listing, remaining))
+            })
             .collect();
         let deeper: Vec<&Path> = entries.iter().flatten().flatten().filter_map(Entry::directory).collect();
         let below = deeper.first().map_or_else(Vec::new, |_| Self::listed(files, &deeper));
         entries
             .into_iter()
-            .scan(below.into_iter(), |below, entries| Some(entries.and_then(|entries| Self::flattened(entries, below))))
+            .scan(below.into_iter(), |remaining, listed| {
+                Some(listed.and_then(|found| Self::flattened(found, remaining)))
+            })
             .collect()
     }
 
     fn flattened(entries: Vec<Entry>, below: &mut impl Iterator<Item = Listing>) -> Listing {
         let found: Vec<Listing> = entries.into_iter().map(|entry| entry.found(below)).collect();
-        found.into_iter().try_fold(Vec::new(), |found, more| Ok(found.into_iter().chain(more?).collect()))
+        found.into_iter().try_fold(Vec::new(), |gathered, more| Ok(gathered.into_iter().chain(more?).collect()))
     }
 
     fn rust(file: PathBuf) -> Option<PathBuf> {
-        Some(file).filter(|file| file.extension().is_some_and(|extension| extension == Self::RUST))
+        Some(file).filter(|candidate| candidate.extension().is_some_and(|extension| extension == Self::RUST))
     }
 }

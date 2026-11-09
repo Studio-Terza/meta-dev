@@ -57,8 +57,8 @@ impl FromStr for Change {
         let starts = [0].into_iter().chain(tabs.iter().map(|at| at + Self::SEPARATOR.len()));
         let ends = tabs.iter().copied().chain([line.len()]);
         let fields: Vec<&str> = starts.zip(ends).filter_map(|(start, end)| line.get(start..end)).collect();
-        let (status, paths) = fields.split_first().ok_or(NotAChange)?;
-        let status = status.chars().next().map(Status::from).ok_or(NotAChange)?;
+        let (field, paths) = fields.split_first().ok_or(NotAChange)?;
+        let status = field.chars().next().map(Status::from).ok_or(NotAChange)?;
         status.change(paths).ok_or(NotAChange)
     }
 }

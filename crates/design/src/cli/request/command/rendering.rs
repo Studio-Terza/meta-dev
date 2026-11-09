@@ -5,7 +5,7 @@ use design_store::{
     Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest,
     Stored, Unplaced,
 };
-use newtype::Newtype;
+use newtype::Wrapping;
 use store_ports::{Store, StoreFailure};
 use stream::{Anchors, SegmentId};
 use structurer::SegmentRef;

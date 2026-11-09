@@ -1,7 +1,7 @@
 use std::fmt;
 
 use file_ports::Size;
-use newtype::{Arbitrary, Newtype};
+use newtype::{Arbitrary, Newtype, Wrapping};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Kilobytes(u64);

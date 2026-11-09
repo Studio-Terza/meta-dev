@@ -17,26 +17,44 @@ impl<'view, 'found, 'file> From<Named<'view, 'found, 'file>> for Home<'view, 'fo
 }
 
 impl<'found> Home<'_, 'found, '_> {
-    fn located(&self, formatter: &mut fmt::Formatter<'_>, member: Member<'found>) -> fmt::Result {
-        let view = self.named.view();
+    fn beside(&self, member: Member<'found>) -> Names<'found> {
         let home = member.cluster();
-        let users = view.users_within(member);
-        let beside: Names<'found> = view
+        self.named
+            .view()
             .slice(home)
             .into_iter()
             .flat_map(Slice::members)
             .filter(|other| other.cluster() == home)
             .filter(|other| **other != member)
             .copied()
-            .collect();
-        write!(formatter, "    in {home}")?;
-        users.map_or(Ok(()), |users| write!(formatter, "; its users lie within {users}"))?;
-        writeln!(formatter, "; beside {beside}")
+            .collect()
     }
 }
 
 impl fmt::Display for Home<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.named.each(formatter, |formatter, member| self.located(formatter, member))
+        match self.named.found() {
+            Err(missing) => write!(formatter, "{missing}"),
+            Ok(found) => found.iter().try_for_each(|member| {
+                write!(formatter, "  {}\n{}", self.named.placed(*member), Located { home: self, member: *member })
+            }),
+        }
+    }
+}
+
+struct Located<'home, 'view, 'found, 'file> {
+    home: &'home Home<'view, 'found, 'file>,
+    member: Member<'found>,
+}
+
+impl fmt::Display for Located<'_, '_, '_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "    in {}", self.member.cluster())?;
+        self.home
+            .named
+            .view()
+            .users_within(self.member)
+            .map_or(Ok(()), |users| write!(formatter, "; its users lie within {users}"))?;
+        writeln!(formatter, "; beside {}", self.home.beside(self.member))
     }
 }

@@ -53,7 +53,7 @@ impl<'text> Command<'text> {
                 (setting == Key::Shell)
                     .then(|| self.foreign_shell())
                     .flatten()
-                    .map(|word| Finding::Interpreter { name: Excerpt::from(word) })
+                    .map(|name| Finding::Interpreter { name })
             })
     }
 
@@ -61,7 +61,7 @@ impl<'text> Command<'text> {
         Some(self.0.count()).filter(|characters| *characters > Self::LIMIT)
     }
 
-    fn foreign_shell(self) -> Option<Text<'text>> {
+    fn foreign_shell(self) -> Option<Excerpt> {
         self.0.first_word_outside(&Self::SHELLS)
     }
 

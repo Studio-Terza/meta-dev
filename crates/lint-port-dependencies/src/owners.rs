@@ -1,11 +1,10 @@
 mod foreign_dependency;
 mod stale_owns;
 
-use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Site, SourceFile, Violation};
-use lint_layout::LineNumber;
+use lint_layout::{LineNumber, Name};
 use workspace_metadata::{Bypass, Bypasses, CrateName as PackageName, Stale};
 
 use foreign_dependency::ForeignDependency;
@@ -13,7 +12,7 @@ use stale_owns::StaleOwns;
 
 #[derive(Debug)]
 pub(crate) struct Owners<'file> {
-    manifests: BTreeMap<PackageName, &'file SourceFile>,
+    manifests: BTreeMap<Name, &'file SourceFile>,
 }
 
 impl<'file> Owners<'file> {
@@ -22,9 +21,7 @@ impl<'file> Owners<'file> {
             manifests: files
                 .iter()
                 .rev()
-                .filter_map(|file| {
-                    Some((PackageName::try_from(file.placement().package().root().package()?.borrow()).ok()?, file))
-                })
+                .filter_map(|file| Some((file.placement().package().root().package()?.clone(), file)))
                 .collect(),
         }
     }
@@ -32,7 +29,7 @@ impl<'file> Owners<'file> {
     pub(crate) fn foreign(&self, bypasses: Bypasses<'file>) -> Vec<Violation<'file>> {
         bypasses
             .into_iter()
-            .filter_map(|(dependent, required)| Some((*self.manifests.get(dependent)?, required)))
+            .filter_map(|(dependent, required)| Some((*self.manifests.get(&Name::from(dependent.as_ref()))?, required)))
             .flat_map(|(file, required)| {
                 required.into_iter().flat_map(move |(package, bypass)| Self::bypassing(file, package, &bypass))
             })
@@ -43,10 +40,12 @@ impl<'file> Owners<'file> {
         stale
             .into_iter()
             .filter_map(|(declarer, owned)| {
-                let file = *self.manifests.get(declarer)?;
+                let file = *self.manifests.get(&Name::from(declarer.as_ref()))?;
                 Some((Site::new(file.manifest_file().as_ref(), file.placement().package().key_lines().owns()?), owned))
             })
-            .flat_map(|(site, owned)| owned.into_iter().map(move |owned| Violation::new(site, StaleOwns::new(owned))))
+            .flat_map(|(site, owned)| {
+                owned.into_iter().map(move |package| Violation::new(site, StaleOwns::new(package)))
+            })
             .collect()
     }
 
@@ -65,7 +64,7 @@ impl<'file> Owners<'file> {
     }
 
     fn sites(file: &SourceFile, bypass: &Bypass<'_>) -> BTreeSet<LineNumber> {
-        let dependencies = file.placement().package().dependencies();
+        let dependencies = file.placement().package().dependency_sites();
         Some(dependencies.sites(bypass.keys()))
             .filter(|found| found.first().is_some())
             .unwrap_or_else(|| BTreeSet::from([dependencies.header()]))

@@ -42,7 +42,7 @@ where
     }
 
     fn descended(&mut self, child: Index) -> option::IntoIter<Index> {
-        Some(child).filter(|child| self.seen.insert(*child)).into_iter().for_each(|child| self.enter(child));
+        Some(child).filter(|candidate| self.seen.insert(*candidate)).into_iter().for_each(|unseen| self.enter(unseen));
         None.into_iter()
     }
 }
