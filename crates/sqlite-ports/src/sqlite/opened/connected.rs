@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use sqlx::migrate::{Migrate, Migrator};
 use sqlx::sqlite::{SqliteArguments, SqliteRow, SqliteValue, SqliteValueRef};
 use sqlx::{Arguments, Row, Sqlite, SqliteConnection, Type, Value as _, ValueRef};
-use store_ports::{Bind, Execute, StoreFailure, Value, Version, Written};
+use store_ports::{Argument, Bind, Execute, StoreFailure, Value, Version, Written};
 use tokio::runtime::Runtime;
 
 use super::super::failed::{Unbound, Unexecuted, Unmigrated};
@@ -38,9 +38,9 @@ impl<'run> Connected<'run> {
 }
 
 impl Bound {
-    fn arguments(values: Vec<Value>) -> Result<SqliteArguments, StoreFailure> {
+    fn arguments(arguments: Vec<Argument>) -> Result<SqliteArguments, StoreFailure> {
         let mut bound = Bound::default();
-        values.into_iter().try_for_each(|value| value.bound(&mut bound))?;
+        arguments.into_iter().try_for_each(|argument| argument.bound(&mut bound))?;
         Ok(bound.0)
     }
 
@@ -59,10 +59,6 @@ impl Bind for Bound {
 
     fn integer(&mut self, integer: i64) -> Result<(), StoreFailure> {
         self.added(integer)
-    }
-
-    fn real(&mut self, real: f64) -> Result<(), StoreFailure> {
-        self.added(real)
     }
 
     fn text(&mut self, text: String) -> Result<(), StoreFailure> {
@@ -102,13 +98,13 @@ impl From<SqliteValueRef<'_>> for Stored {
 }
 
 impl Execute for Connected<'_> {
-    fn fetched(&mut self, sql: &'static str, arguments: Vec<Value>) -> Result<Vec<Vec<Value>>, StoreFailure> {
+    fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure> {
         let query = sqlx::query_with(sql, Bound::arguments(arguments)?);
         let rows = self.runtime.block_on(query.fetch_all(&mut *self.connection)).map_err(Unexecuted::from)?;
         rows.iter().map(Stored::row).collect()
     }
 
-    fn executed(&mut self, sql: &'static str, arguments: Vec<Value>) -> Result<Written, StoreFailure> {
+    fn executed(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Written, StoreFailure> {
         let query = sqlx::query_with(sql, Bound::arguments(arguments)?);
         let done = self.runtime.block_on(query.execute(&mut *self.connection)).map_err(Unexecuted::from)?;
         Ok(Written::new(usize::try_from(done.rows_affected()).unwrap_or(usize::MAX)))

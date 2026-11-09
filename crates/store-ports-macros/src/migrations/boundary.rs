@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::PathBuf;
 
-use grammar_migration::{MigrationFile, Transaction};
+use grammar_migration::MigrationFile;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::LitStr;
@@ -16,15 +16,12 @@ pub struct Directory(PathBuf);
 pub struct Found {
     file: MigrationFile,
     path: PathBuf,
-    transaction: Transaction,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum Unmigrated {
     #[error("cannot list the migrations in {}: {source}", path.display())]
     Unlisted { path: PathBuf, source: io::Error },
-    #[error("cannot read the migration {}: {source}", path.display())]
-    Unread { path: PathBuf, source: io::Error },
     #[error("{} is not named <version>_<description>.sql", path.display())]
     Unnamed { path: PathBuf },
     #[error("{} repeats migration version {version}", path.display())]
@@ -58,8 +55,7 @@ impl Found {
     fn read(path: PathBuf) -> Result<Found, Unmigrated> {
         let named = path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
         let file = named.parse::<MigrationFile>().map_err(|_unspelled| Unmigrated::Unnamed { path: path.clone() })?;
-        let sql = Disk::text(&path).map_err(|source| Unmigrated::Unread { path: path.clone(), source })?;
-        Ok(Found { file, path, transaction: Transaction::from(sql.as_str()) })
+        Ok(Found { file, path })
     }
 }
 
@@ -69,9 +65,6 @@ impl ToTokens for Found {
         let description = self.file.description();
         let path = self.path.to_string_lossy();
         let new = quote!(::store_ports::Migration::new);
-        let transacted = self
-            .transaction
-            .chosen(quote!(::store_ports::Transacted::Wrapped), quote!(::store_ports::Transacted::Unwrapped));
-        tokens.extend(quote!(#new(#version, #description, include_str!(#path), #transacted)));
+        tokens.extend(quote!(#new(#version, #description, include_str!(#path))));
     }
 }

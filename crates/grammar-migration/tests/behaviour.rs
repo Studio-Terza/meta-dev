@@ -1,6 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-use grammar_migration::{MigrationFile, Transaction};
+use grammar_migration::MigrationFile;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Named {
@@ -43,18 +43,5 @@ laws::table!(
         "20261106000000__stream.sql" => None,
         "99999999999999999999_stream.sql" => None,
         "" => None,
-    ]
-);
-
-laws::table!(
-    only_a_migration_opening_with_sqlx_s_header_runs_outside_a_transaction,
-    |sql: &&str| Transaction::from(*sql),
-    [
-        "-- no-transaction\nCREATE INDEX a ON b (c);" => Transaction::Unwrapped,
-        "-- no-transaction" => Transaction::Unwrapped,
-        "CREATE TABLE a (b TEXT);" => Transaction::Wrapped,
-        " -- no-transaction" => Transaction::Wrapped,
-        "-- no transaction" => Transaction::Wrapped,
-        "" => Transaction::Wrapped,
     ]
 );

@@ -2595,6 +2595,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "exit",
+ "golden",
  "hex",
  "newtype",
  "port-core",
@@ -2607,6 +2608,7 @@ dependencies = [
  "sqlx-sqlite",
  "store-ports",
  "syn 2.0.119",
+ "tempfile",
  "thiserror",
  "tokio",
 ]

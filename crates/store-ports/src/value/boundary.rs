@@ -9,65 +9,64 @@ pub enum Value {
     Blob(Vec<u8>),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Argument {
+    Null,
+    Integer(i64),
+    Text(String),
+    Blob(Vec<u8>),
+}
+
 pub trait Bind {
     fn null(&mut self) -> Result<(), StoreFailure>;
 
     fn integer(&mut self, integer: i64) -> Result<(), StoreFailure>;
-
-    fn real(&mut self, real: f64) -> Result<(), StoreFailure>;
 
     fn text(&mut self, text: String) -> Result<(), StoreFailure>;
 
     fn blob(&mut self, blob: Vec<u8>) -> Result<(), StoreFailure>;
 }
 
-pub trait IntoValue {
-    fn into_value(self) -> Value;
+pub trait IntoArgument {
+    fn into_argument(self) -> Argument;
 }
 
 pub trait FromValue: Sized {
     fn from_value(value: Value) -> Result<Self, ColumnFailure>;
 }
 
-impl Value {
+impl Argument {
     pub fn bound(self, bind: &mut impl Bind) -> Result<(), StoreFailure> {
         match self {
-            Value::Null => bind.null(),
-            Value::Integer(integer) => bind.integer(integer),
-            Value::Real(real) => bind.real(real),
-            Value::Text(text) => bind.text(text),
-            Value::Blob(blob) => bind.blob(blob),
+            Argument::Null => bind.null(),
+            Argument::Integer(integer) => bind.integer(integer),
+            Argument::Text(text) => bind.text(text),
+            Argument::Blob(blob) => bind.blob(blob),
         }
     }
 }
 
-impl IntoValue for i64 {
-    fn into_value(self) -> Value {
-        Value::Integer(self)
+impl IntoArgument for i64 {
+    fn into_argument(self) -> Argument {
+        Argument::Integer(self)
     }
 }
 
-impl IntoValue for f64 {
-    fn into_value(self) -> Value {
-        Value::Real(self)
+impl IntoArgument for String {
+    fn into_argument(self) -> Argument {
+        Argument::Text(self)
     }
 }
 
-impl IntoValue for String {
-    fn into_value(self) -> Value {
-        Value::Text(self)
+impl IntoArgument for Vec<u8> {
+    fn into_argument(self) -> Argument {
+        Argument::Blob(self)
     }
 }
 
-impl IntoValue for Vec<u8> {
-    fn into_value(self) -> Value {
-        Value::Blob(self)
-    }
-}
-
-impl<Inner: IntoValue> IntoValue for Option<Inner> {
-    fn into_value(self) -> Value {
-        self.map_or(Value::Null, IntoValue::into_value)
+impl<Inner: IntoArgument> IntoArgument for Option<Inner> {
+    fn into_argument(self) -> Argument {
+        self.map_or(Argument::Null, IntoArgument::into_argument)
     }
 }
 

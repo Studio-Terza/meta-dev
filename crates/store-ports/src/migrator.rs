@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Migration, Migrator, Transacted};
+pub use boundary::{Migration, Migrator};

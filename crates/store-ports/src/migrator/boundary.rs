@@ -1,12 +1,6 @@
 use std::slice;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Transacted {
-    Wrapped,
-    Unwrapped,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Missing {
     Refused,
     Ignored,
@@ -17,22 +11,12 @@ pub struct Migration {
     version: i64,
     description: &'static str,
     sql: &'static str,
-    transacted: Transacted,
 }
 
 #[derive(Clone, Debug)]
 pub struct Migrator {
     migrations: Vec<Migration>,
     missing: Missing,
-}
-
-impl From<Transacted> for bool {
-    fn from(transacted: Transacted) -> bool {
-        match transacted {
-            Transacted::Wrapped => false,
-            Transacted::Unwrapped => true,
-        }
-    }
 }
 
 impl From<Missing> for bool {
@@ -46,8 +30,8 @@ impl From<Missing> for bool {
 
 impl Migration {
     #[must_use]
-    pub fn new(version: i64, description: &'static str, sql: &'static str, transacted: Transacted) -> Migration {
-        Migration { version, description, sql, transacted }
+    pub fn new(version: i64, description: &'static str, sql: &'static str) -> Migration {
+        Migration { version, description, sql }
     }
 
     #[must_use]
@@ -55,11 +39,8 @@ impl Migration {
         self.version
     }
 
-    pub fn rebuilt<Rebuilt>(
-        &self,
-        rebuild: impl FnOnce(i64, &'static str, &'static str, Transacted) -> Rebuilt,
-    ) -> Rebuilt {
-        rebuild(self.version, self.description, self.sql, self.transacted)
+    pub fn rebuilt<Rebuilt>(&self, rebuild: impl FnOnce(i64, &'static str, &'static str) -> Rebuilt) -> Rebuilt {
+        rebuild(self.version, self.description, self.sql)
     }
 }
 

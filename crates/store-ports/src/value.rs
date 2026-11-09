@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Bind, FromValue, IntoValue, Value};
+pub use boundary::{Argument, Bind, FromValue, IntoArgument, Value};

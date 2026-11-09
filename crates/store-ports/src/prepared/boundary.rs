@@ -1,18 +1,18 @@
 use std::fmt::Debug;
 use std::vec;
 
-use crate::{ColumnFailure, Columns, Released, StoreFailure, Value, Written};
+use crate::{Argument, ColumnFailure, Columns, Released, StoreFailure, Value, Written};
 
 pub trait Execute: Debug {
-    fn fetched(&mut self, sql: &'static str, arguments: Vec<Value>) -> Result<Vec<Vec<Value>>, StoreFailure>;
+    fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure>;
 
-    fn executed(&mut self, sql: &'static str, arguments: Vec<Value>) -> Result<Written, StoreFailure>;
+    fn executed(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Written, StoreFailure>;
 }
 
 #[derive(Debug)]
 pub struct Prepared<Row> {
     sql: &'static str,
-    arguments: Vec<Value>,
+    arguments: Vec<Argument>,
     decode: fn(&mut Values) -> Result<Row, ColumnFailure>,
 }
 
@@ -21,7 +21,7 @@ pub struct Values(vec::IntoIter<Value>);
 
 impl Prepared<()> {
     #[must_use]
-    pub fn written(sql: &'static str, arguments: Vec<Value>) -> Prepared<()> {
+    pub fn written(sql: &'static str, arguments: Vec<Argument>) -> Prepared<()> {
         Prepared { sql, arguments, decode: |_values| Ok(()) }
     }
 }
@@ -30,7 +30,7 @@ impl<Row: Columns> Prepared<Row> {
     #[must_use]
     pub fn read(
         sql: &'static str,
-        arguments: Vec<Value>,
+        arguments: Vec<Argument>,
         decode: fn(&mut Values) -> Result<Row, ColumnFailure>,
     ) -> Prepared<Row> {
         Prepared { sql, arguments, decode }

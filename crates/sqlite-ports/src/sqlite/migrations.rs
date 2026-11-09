@@ -42,14 +42,8 @@ impl Migrations {
     }
 
     fn migration(declared: &store_ports::Migration) -> Migration {
-        declared.rebuilt(|version, description, sql, transacted| {
-            Migration::new(
-                version,
-                Cow::Borrowed(description),
-                MigrationType::Simple,
-                SqlStr::from_static(sql),
-                bool::from(transacted),
-            )
+        declared.rebuilt(|version, description, sql| {
+            Migration::new(version, Cow::Borrowed(description), MigrationType::Simple, SqlStr::from_static(sql), false)
         })
     }
 

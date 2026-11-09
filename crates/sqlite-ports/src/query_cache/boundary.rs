@@ -66,7 +66,21 @@ impl QueryCache {
         let hash = hex::encode(Sha256::digest(query.as_bytes()));
         let path = self.root.join(Self::DIRECTORY).join(format!("query-{hash}.json"));
         let held = Some(path.clone()).filter(|cached| cached.is_file());
-        held.map_or_else(|| scratch.written(Entry::unwritten(query, hash), path, out), Ok)
+        held.map_or_else(
+            || {
+                scratch
+                    .written(Entry::unwritten(query, hash), path)
+                    .and_then(|written| self.announced("wrote", written, out))
+            },
+            Ok,
+        )
+    }
+
+    fn announced(&self, change: &str, path: PathBuf, out: &mut impl io::Write) -> Result<PathBuf, Uncached> {
+        let shown = path.strip_prefix(&self.root).unwrap_or(&path);
+        writeln!(out, "{change} {}", shown.display())
+            .map_err(|failed| Uncached::Io { path: path.clone(), source: failed })?;
+        Ok(path)
     }
 
     fn pruned(&self, kept: &BTreeSet<PathBuf>, out: &mut impl io::Write) -> Result<(), Uncached> {
@@ -78,8 +92,7 @@ impl QueryCache {
             .collect::<Result<BTreeSet<PathBuf>, Uncached>>()?;
         listed.difference(kept).try_for_each(|stale| {
             fs::remove_file(stale).map_err(|failed| Uncached::Io { path: stale.clone(), source: failed })?;
-            writeln!(out, "removed {}", stale.display())
-                .map_err(|failed| Uncached::Io { path: stale.clone(), source: failed })
+            self.announced("removed", stale.clone(), out).map(|_removed| ())
         })
     }
 }
@@ -121,12 +134,7 @@ impl Scratch {
         Ok(Scratch { runtime, connection })
     }
 
-    fn written(
-        &mut self,
-        unwritten: Unwritten<'_>,
-        path: PathBuf,
-        out: &mut impl io::Write,
-    ) -> Result<PathBuf, Uncached> {
+    fn written(&mut self, unwritten: Unwritten<'_>, path: PathBuf) -> Result<PathBuf, Uncached> {
         let Unwritten { query, hash } = unwritten;
         let sql = SqlStr::from_static(Box::leak(query.to_owned().into_boxed_str()));
         let describe = self
@@ -137,8 +145,6 @@ impl Scratch {
         let mut text = serde_json::to_vec_pretty(&entry).map_err(Uncached::Unwritten)?;
         text.push(b'\n');
         fs::write(&path, text).map_err(|failed| Uncached::Io { path: path.clone(), source: failed })?;
-        writeln!(out, "wrote {}", path.display())
-            .map_err(|failed| Uncached::Io { path: path.clone(), source: failed })?;
         Ok(path)
     }
 }

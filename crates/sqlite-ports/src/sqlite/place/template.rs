@@ -38,19 +38,17 @@ impl Template {
 impl Image {
     fn opened(&mut self, migrations: Migrations) -> Result<Opened, StoreFailure> {
         match self {
-            Image::Unseen => Opened::connected(&Image::memory(), migrations).inspect(|_opened| *self = Image::Seen),
-            Image::Seen => Opened::connected(&Image::memory(), migrations).and_then(|mut opened| {
+            Image::Unseen => {
+                Opened::connected(&SqliteConnectOptions::new(), migrations).inspect(|_opened| *self = Image::Seen)
+            }
+            Image::Seen => Opened::connected(&SqliteConnectOptions::new(), migrations).and_then(|mut opened| {
                 *self = Image::Migrated(opened.image()?);
                 Ok(opened)
             }),
             Image::Migrated(migrated) => SqliteOwnedBuf::try_from(&**migrated)
                 .map_err(Unopened::from)
                 .map_err(StoreFailure::from)
-                .and_then(|copied| Opened::copied(&Image::memory(), copied)),
+                .and_then(|copied| Opened::copied(&SqliteConnectOptions::new(), copied)),
         }
-    }
-
-    fn memory() -> SqliteConnectOptions {
-        SqliteConnectOptions::new().in_memory(true)
     }
 }

@@ -31,5 +31,9 @@ syn.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
+[dev-dependencies]
+golden = { path = "../golden" }
+tempfile.workspace = true
+
 [lints]
 workspace = true
