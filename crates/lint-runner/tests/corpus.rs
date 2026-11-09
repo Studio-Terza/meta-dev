@@ -5,7 +5,8 @@ use std::process::ExitCode;
 
 use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
-use lint_runner::Cli;
+use lint_runner::{Cli, Ports};
+use timer_ports::Monotonic;
 
 use text_lines::Lines;
 
@@ -93,8 +94,7 @@ impl Corpus {
         let described = corpus.read(&fixture.join(METADATA)).unwrap_or_else(|_| Bytes::from(NO_DEPENDENCIES));
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(
-            &root,
-            [(PathBuf::from(""), described)].into_iter().collect::<Recorded>(),
+            Ports::new(&root, [(PathBuf::from(""), described)].into_iter().collect::<Recorded>(), Monotonic::default()),
             &mut printed,
             &mut failed,
         );

@@ -20,6 +20,7 @@ mod homomorphism;
 mod linear_flow;
 mod literal_names;
 mod long_exact_strings;
+mod macros;
 mod mandatory_laws;
 mod manual_iteration;
 mod module_nesting;

@@ -11,7 +11,7 @@ use super::boundary::Rendered;
 pub enum Outcome<'run> {
     Clean,
     Violations { reports: Vec<Rendered>, failures: &'run [Failure] },
-    Unlocated(Unlocated),
+    Unlocated(&'run Unlocated),
 }
 
 impl<'run> Outcome<'run> {

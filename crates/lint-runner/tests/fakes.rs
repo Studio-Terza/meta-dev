@@ -144,13 +144,20 @@ impl FakeCounted<'_> {
     }
 }
 
+impl FakeCounted<'_> {
+    fn counted_source(&self, path: &Path) {
+        self.sources.fetch_add(usize::from(path.extension() == Some(OsStr::new(SOURCE_EXTENSION))), Ordering::SeqCst);
+    }
+}
+
 impl Files for FakeCounted<'_> {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        self.counted_source(path);
         self.memory.read(path)
     }
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
-        self.sources.fetch_add(usize::from(path.extension() == Some(OsStr::new(SOURCE_EXTENSION))), Ordering::SeqCst);
+        self.counted_source(path);
         self.memory.read_text(path)
     }
 

@@ -44,6 +44,7 @@ enum Context {
 impl FileLint for ConstShape {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut contexts = ConstContexts {
+            file,
             path: file.path(),
             context: Context::Surface,
             zone: Zone::of_file(file),
@@ -92,6 +93,7 @@ impl Zone {
 }
 
 struct ConstContexts<'scan> {
+    file: &'scan SourceFile,
     path: &'scan Path,
     context: Context,
     zone: Zone,
@@ -189,7 +191,7 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_expr_cast(&mut self, cast: &'ast ExprCast) {

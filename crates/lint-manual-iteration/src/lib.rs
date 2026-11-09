@@ -77,13 +77,14 @@ impl ManualIteration {
 
 impl FileLint for ManualIteration {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut iterations = Iterations { path: file.path(), violations: Vec::new() };
+        let mut iterations = Iterations { file, path: file.path(), violations: Vec::new() };
         iterations.visit_file(file.syntax());
         iterations.violations
     }
 }
 
 struct Iterations<'scan> {
+    file: &'scan SourceFile,
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
 }
@@ -108,7 +109,7 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
