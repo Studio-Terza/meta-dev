@@ -1,8 +1,10 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 use std::io;
 
 use design_model::{
-    Confidence, Explicitness, Facet, NodeId, Ordinal, Outline, Prefix, Project, SegmentRelation, Sense, SenseKind,
-    SpanRelation, Specificity, Stage, Title,
+    Basis, Confidence, Explicitness, Facet, NodeId, Ordinal, Outline, Prefix, Project, SegmentRelation, Sense,
+    SenseKind, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
 use laws::proptest::arbitrary::any;
@@ -211,17 +213,19 @@ impl Jobs {
 
     fn node() -> impl Strategy<Value = Outline> {
         (
-            (0..i64::MAX, select(Facet::VARIANTS), select(Stage::VARIANTS)),
+            (0..i64::MAX, select(Facet::VARIANTS), select(Stage::VARIANTS), select(Basis::VARIANTS)),
             (option::of("[^\u{0}]{0,24}"), option::of(0..i64::MAX), "[a-z][a-z0-9-]{0,8}"),
         )
-            .prop_filter_map("a project name", |((id, facet, stage), (title, parent, project))| {
-                let outline = Outline::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage);
+            .prop_filter_map("a project name", |((id, facet, stage, basis), (title, parent, project))| {
+                let outline =
+                    Outline::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage).based(basis);
                 Some(outline.titled(title.map(Title::new)).parented(parent.map(NodeId::new)))
             })
     }
 
     fn any() -> impl Strategy<Value = Job> {
-        (vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::node(), 0..4)).prop_map(|(said, nodes)| Job::new(said, nodes))
+        (vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::said(), 0..=Job::SEGMENTS), vec(Jobs::node(), 0..4))
+            .prop_map(|(said, asked, nodes)| Job::new(said, asked, nodes))
     }
 
     fn lapse() -> impl Strategy<Value = Lapse> {
@@ -253,6 +257,21 @@ laws::law!(a_retry_briefs_the_first_briefing_and_the_lapse, (Jobs::any(), Jobs::
     laws::proptest::prop_assert_eq!(&retried, &job.briefing(&Attempt::First).retried(&lapse));
     prop_assert_ne!(retried, job.briefing(&Attempt::First));
 });
+
+laws::law!(
+    a_briefing_states_that_a_linked_job_segment_needs_its_own_directive_and_an_asked_line_needs_none,
+    (Jobs::any(), Jobs::attempt()),
+    drawn,
+    {
+        let (job, attempt) = drawn;
+        let rendered = job.briefing(&attempt).to_string();
+        let asked_listed = rendered.contains("\nasked ");
+        laws::proptest::prop_assert!(rendered.contains("a segment below that it links to needs its own"));
+        laws::proptest::prop_assert!(rendered.contains("an asked line needs none"));
+        laws::proptest::prop_assert_eq!(rendered.matches("link target only").count(), 1);
+        laws::proptest::prop_assert!(!asked_listed || rendered.contains("never given a directive of its own"));
+    }
+);
 
 laws::law!(a_briefing_tells_jobs_apart, (Jobs::any(), Jobs::any()), drawn, {
     let (one, other) = drawn;

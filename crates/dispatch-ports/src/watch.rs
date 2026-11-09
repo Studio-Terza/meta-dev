@@ -1,7 +1,9 @@
+use std::iter;
+
 use port_core::Held;
 
 use crate::{
-    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Fault, Finished, Pause, Unreadable, Usage,
+    AgentRun, Bell, Clock, Deadline, Dispatch, DispatchFailure, Due, Errored, Fault, Finished, Pause, Unreadable, Usage,
 };
 
 #[derive(Debug)]
@@ -49,24 +51,21 @@ impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
 
     pub fn watched(&self, mut run: Held<'_, AgentRun>) -> Result<Watched, DispatchFailure> {
         let deadline = *AsRef::<Deadline>::as_ref(&*run);
-        let watched = deadline
-            .checks(self.clock.now(), Self::PAUSE)
-            .map(|_planned| self.checked(&mut run))
+        let watched = iter::repeat_with(|| self.clock.now())
+            .take_while(|now| deadline.due(*now) == Due::Pending)
+            .map(|_now| self.polled(&mut run))
             .find_map(Result::transpose)
             .unwrap_or(Ok(Watched::Stalled(Stall::Overdue)))?;
         run.end()?;
         Ok(watched)
     }
 
-    fn checked(&self, run: &mut AgentRun) -> Result<Option<Watched>, DispatchFailure> {
-        match AsRef::<Deadline>::as_ref(run).due(self.clock.now()) {
-            Due::Passed => Ok(Some(Watched::Stalled(Stall::Overdue))),
-            Due::Pending => Ok(self.dispatch.output(run)?.map(Watched::from).or_else(|| self.slept())),
-        }
+    fn polled(&self, run: &mut AgentRun) -> Result<Option<Watched>, DispatchFailure> {
+        Ok(self.dispatch.output(run)?.map(Watched::from).or_else(|| self.slept(run.bell())))
     }
 
-    fn slept(&self) -> Option<Watched> {
-        self.clock.waited(Self::PAUSE);
+    fn slept(&self, bell: &Bell) -> Option<Watched> {
+        self.clock.waited(Self::PAUSE, bell);
         None
     }
 }

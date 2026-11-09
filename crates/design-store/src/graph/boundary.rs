@@ -1,7 +1,7 @@
 use design_model::{
-    AnyNode, AnyStage, Artifact, Casting, Condition, Dropped, Ending, Entered, Entry, Facet, Kin, Node, NodeEdge,
-    NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal, Title,
-    Transition, Vague,
+    AnyNode, AnyStage, Artifact, Basis, Casting, Condition, Dropped, Ending, Entered, Entry, Facet, Kin, Node,
+    NodeEdge, NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal,
+    Title, Transition, Vague,
 };
 use newtype::Counter;
 use port_core::Op;
@@ -88,6 +88,7 @@ pub(crate) struct NodeRow {
     project: Project,
     facet: Facet,
     stage: Stage,
+    basis: Basis,
     provenance: Provenance,
     title: Option<Title>,
     role: Role,
@@ -103,6 +104,7 @@ struct OutlineRow {
     project: Project,
     facet: Facet,
     stage: Stage,
+    basis: Basis,
     title: Option<Title>,
     parent: Option<NodeId>,
 }
@@ -114,6 +116,7 @@ pub(crate) struct RelativeRow {
     project: Project,
     facet: Facet,
     stage: Stage,
+    basis: Basis,
     provenance: Provenance,
     title: Option<Title>,
     role: Role,
@@ -351,6 +354,7 @@ impl Batch for Restaged {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         let id = self.node.0;
+        let provenance = Provenance::Lead(Entered::Stage);
         let moved = self.transition.applied(NodeRow::loaded(self.node, statements)?)?;
         let StageColumns { stage, artifact, condition, reason } = StageColumns::from(moved.stage());
         Ok(statements.written(store_ports::query!(
@@ -361,7 +365,8 @@ SET
   stage = ?2,
   artifact = ?3,
   condition = ?4,
-  reason = ?5
+  reason = ?5,
+  stage_provenance = ?6
 WHERE
   id = ?1
 "#,
@@ -369,7 +374,8 @@ WHERE
             stage: Stage,
             artifact: Option<Artifact>,
             condition: Option<Condition>,
-            reason: Option<Reason>
+            reason: Option<Reason>,
+            provenance: Provenance
         ))?)
     }
 }
@@ -453,17 +459,20 @@ impl TryFrom<NodeRow> for AnyNode {
 
     fn try_from(row: NodeRow) -> Result<AnyNode, ColumnFailure> {
         let entry = Entry::new(row.project, row.facet, row.provenance);
-        let columns =
-            StageColumns { stage: row.stage, artifact: row.artifact, condition: row.condition, reason: row.reason };
+        let stage = row.basis.staged(row.stage);
+        let columns = StageColumns { stage, artifact: row.artifact, condition: row.condition, reason: row.reason };
         let casting = Casting::new(row.role, row.role_provenance);
-        let node = AnyNode::loaded(row.id, entry, casting, columns.try_into()?);
+        let node = AnyNode::loaded(row.id, entry, casting, columns.try_into()?).based(row.basis);
         Ok(row.title.into_iter().fold(node, Node::titled))
     }
 }
 
 impl From<OutlineRow> for Outline {
     fn from(row: OutlineRow) -> Outline {
-        Outline::new(row.id, row.project, row.facet, row.stage).titled(row.title).parented(row.parent)
+        Outline::new(row.id, row.project, row.facet, row.basis.staged(row.stage))
+            .based(row.basis)
+            .titled(row.title)
+            .parented(row.parent)
     }
 }
 
@@ -476,6 +485,7 @@ impl TryFrom<RelativeRow> for Relative {
             project: row.project,
             facet: row.facet,
             stage: row.stage,
+            basis: row.basis,
             provenance: row.provenance,
             title: row.title,
             role: row.role,
@@ -529,21 +539,23 @@ LIMIT
             NodeRow,
             r#"
 SELECT
-  id,
-  project,
-  facet,
-  stage,
-  provenance,
-  title,
-  role,
-  role_provenance,
-  artifact,
-  condition,
-  reason
+  nodes.id,
+  nodes.project,
+  nodes.facet,
+  nodes.stage,
+  staged_nodes.basis AS "basis!: String",
+  nodes.provenance,
+  nodes.title,
+  nodes.role,
+  nodes.role_provenance,
+  nodes.artifact,
+  nodes.condition,
+  nodes.reason
 FROM
   nodes
+  JOIN staged_nodes ON staged_nodes.id = nodes.id
 WHERE
-  id = ?1
+  nodes.id = ?1
 "#,
             id: NodeId
         ))?;
@@ -556,21 +568,23 @@ WHERE
             NodeRow,
             r#"
 SELECT
-  id,
-  project,
-  facet,
-  stage,
-  provenance,
-  title,
-  role,
-  role_provenance,
-  artifact,
-  condition,
-  reason
+  nodes.id,
+  nodes.project,
+  nodes.facet,
+  nodes.stage,
+  staged_nodes.basis AS "basis!: String",
+  nodes.provenance,
+  nodes.title,
+  nodes.role,
+  nodes.role_provenance,
+  nodes.artifact,
+  nodes.condition,
+  nodes.reason
 FROM
   nodes
+  JOIN staged_nodes ON staged_nodes.id = nodes.id
 WHERE
-  id = ?1
+  nodes.id = ?1
 "#,
             id: NodeId
         ))?;
@@ -648,6 +662,7 @@ SELECT
   nodes.project,
   nodes.facet,
   nodes.stage,
+  staged_nodes.basis AS "basis!: String",
   nodes.provenance,
   nodes.title,
   nodes.role,
@@ -661,6 +676,7 @@ FROM
     WHEN closure.descendant = ?1 THEN closure.ancestor
     ELSE closure.descendant
   END
+  JOIN staged_nodes ON staged_nodes.id = nodes.id
 WHERE
   closure.relation = ?4
   AND (
@@ -762,6 +778,7 @@ SELECT
   nodes.project,
   nodes.facet,
   nodes.stage,
+  staged_nodes.basis AS "basis!: String",
   nodes.title,
   (
     SELECT
@@ -776,6 +793,7 @@ SELECT
 FROM
   nodes
   JOIN live_nodes ON live_nodes.id = nodes.id
+  JOIN staged_nodes ON staged_nodes.id = nodes.id
 ORDER BY
   nodes.project,
   nodes.id

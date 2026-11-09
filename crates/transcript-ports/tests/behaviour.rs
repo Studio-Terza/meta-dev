@@ -1,14 +1,17 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
-use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::prelude::{any, prop_assert_eq};
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Read, Record, Session, Skipped, Transcripts, Unrecognised,
+    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
+    Unrecognised,
 };
 
 const DIRECTORY: &str = "/projects/work";
@@ -495,4 +498,46 @@ laws::table!(
     a_name_of_neither_party_is_no_authorship,
     |name: &&str| name.parse::<Authorship>().ok(),
     ["human" => None, "" => None],
+);
+
+laws::table!(
+    an_instant_is_made_only_from_non_blank_text,
+    |text: &&str| Instant::try_new((*text).to_owned()).ok().map(|instant| instant.to_string()),
+    ["" => None, "2026-01-01T00:00:01Z" => Some(String::from("2026-01-01T00:00:01Z"))],
+);
+
+laws::table!(
+    a_kind_is_made_only_from_non_blank_text,
+    |text: &&str| Kind::try_new((*text).to_owned()).ok().map(|kind| kind.to_string()),
+    ["" => None, "summary" => Some(String::from("summary"))],
+);
+
+laws::table!(
+    a_session_id_is_made_only_from_non_blank_text,
+    |text: &&str| SessionId::try_new((*text).to_owned()).ok().map(|session| session.to_string()),
+    ["" => None, "s1" => Some(String::from("s1"))],
+);
+
+laws::roundtrip!(
+    an_instant_is_rebuilt_from_its_display,
+    any::<Instant>(),
+    |instant: &Instant| instant.to_string(),
+    |text: &String| Instant::try_new(text.clone()).ok(),
+    Some,
+);
+
+laws::roundtrip!(
+    a_kind_is_rebuilt_from_its_display,
+    any::<Kind>(),
+    |kind: &Kind| kind.to_string(),
+    |text: &String| Kind::try_new(text.clone()).ok(),
+    Some,
+);
+
+laws::roundtrip!(
+    a_session_id_is_rebuilt_from_its_display,
+    any::<SessionId>(),
+    |session: &SessionId| session.to_string(),
+    |text: &String| SessionId::try_new(text.clone()).ok(),
+    Some,
 );

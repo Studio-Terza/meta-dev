@@ -53,10 +53,7 @@ impl Shared {
         body: impl FnOnce(&mut Opened) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
         let mut slot = self.opened.lock().unwrap_or_else(PoisonError::into_inner);
-        let opened = slot.take().map_or_else(
-            || self.place.connecting(prepare).and_then(|options| Opened::connected(&options, self.migrator)),
-            Ok,
-        )?;
+        let opened = slot.take().map_or_else(|| self.place.opened(prepare, self.migrator), Ok)?;
         body(slot.insert(opened))
     }
 }

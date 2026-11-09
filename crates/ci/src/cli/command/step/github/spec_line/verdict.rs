@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::num::NonZeroU8;
 
-use grammar::spec_line::{Attachment, Line};
+use grammar::spec_line::{Attachment, Line, Spec};
 use text_lines::Lines;
 
 use crate::cli::command::failure::Failure;
@@ -19,14 +19,15 @@ impl Verdict {
     const FORMS: &'static str = "write a line spec: none, spec: owner <uuid prefix of 8 or more hex digits>, or spec: <project>#D<n> or <project>#L<n> (several comma-separated); a PR that repairs a red main writes the line repair: main instead";
 
     pub(crate) fn judging(body: &Text) -> Verdict {
-        let lines: Vec<Line> = Lines::from(body.as_ref()).filter_map(|line| line.parse().ok()).collect();
-        let attached = lines.iter().find_map(Line::attachment);
-        lines
-            .iter()
-            .find(|line| **line == Line::Repair)
+        let lines: Vec<Line> =
+            body.as_ref().parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Line>().ok()).collect();
+        let attached = lines.iter().filter_map(Line::spec).find_map(Spec::attachment).cloned();
+        let (repairs, specs): (Vec<Line>, Vec<Line>) = lines.into_iter().partition(|line| *line == Line::Repair);
+        repairs
+            .first()
             .map(|_| Verdict::Repair)
             .or_else(|| attached.map(Verdict::Attached))
-            .unwrap_or_else(|| lines.first().map(|_| ()).map_or(Verdict::Missing, |()| Verdict::Malformed(lines)))
+            .unwrap_or_else(|| specs.first().map(|_| ()).map_or(Verdict::Missing, |()| Verdict::Malformed(specs)))
     }
 
     pub(crate) fn reported(&self, out: &mut impl Write) -> Result<(), Failure<'static>> {

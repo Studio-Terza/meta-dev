@@ -1,3 +1,5 @@
+#![deny(clippy::wildcard_enum_match_arm)]
+
 use grammar::anchor::Anchoring;
 use grammar::artifact::Artifacts;
 use grammar::assignment::Emptied;
@@ -9,7 +11,7 @@ use grammar::line::Unbroken;
 use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexeme, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
-use grammar::notes::{Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
+use grammar::notes::{Date, Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
 use grammar::output::field::{Bare, Id, Integer, Quoted};
 use grammar::output::{Fields, Unread};
 use grammar::program::Program;
@@ -19,10 +21,9 @@ use grammar::search::Terms;
 use grammar::shard::Sharding;
 use grammar::slug::Letters;
 use grammar::spec_line;
-use grammar::spec_line::{Attachment, Spec};
+use grammar::spec_line::Attachment;
 use laws::proptest::collection::vec;
-use laws::proptest::option;
-use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 
 struct Marks;
@@ -253,6 +254,14 @@ impl Node {
 }
 
 laws::roundtrip!(
+    a_spec_line_without_trailing_space_is_parsed_and_shown_back_as_written,
+    "repair: main|spec: ( ?[!-~]{1,8})( [!-~]{1,8}){0,3}",
+    |text: &String| text.parse::<grammar::spec_line::Line>().ok(),
+    |line: &Option<grammar::spec_line::Line>| line.as_ref().map(ToString::to_string),
+    Some
+);
+
+laws::roundtrip!(
     any_text_is_quoted_and_lexed_back_as_one_quoted_field,
     "(?s).{0,40}",
     |text: &String| text.clone(),
@@ -390,7 +399,7 @@ laws::table!(
     ]
 );
 
-const NOTED: &str = "(- |-|\\* |\\*|\\*\\*|\\+ |\\+|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
+const NOTED: &str = "(- |-|\\* |\\*|\\*\\*|\\+ |\\+|# |#|RULING|LEAD|[a-z]{1,4}n't|: |:|\\(|\\)|\"[a-z: ]{0,6}\"|'[a-z:' ]{0,6}'|\"|'|[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|2026-11-0[1-9]|2026-11-0[1-9][Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,4})?)?([Zz]|[+-][0-9]{2}:[0-9]{2})?|[a-zé]{1,5}'s|[a-z]{1,5}s'|'[a-z]{1,5}s' [a-z]{1,5}'|\"[a-z]{1,5}s' [a-z]{1,5}\"|[a-z]{1,6}| |\t|\r|[.,;~é]){0,14}";
 
 const INKED: &str =
     "(- |# |RULING|: |\\(|\\)|\"[a-z ]{0,6}\"|'[a-z ]{0,6}'|[0-9a-f]{8}|2026-11-0[1-9]|[a-z]{1,6}| |[.,;]){0,10}[a-z.]";
@@ -438,6 +447,27 @@ laws::law!(
         let line = Line::read(1, &format!("{opening}(owner, 0a1b2c3d): \"{quote}\"{after}"));
         prop_assert_eq!(line.read_by(Shaped), kind);
         prop_assert_eq!(line.read_by(Named), Ok([vec![quote], vec!["0a1b2c3d".to_owned()], vec![]]));
+    }
+);
+
+const CLOCK: &str = "([Tt ][0-2][0-9]:[0-5][0-9](:[0-5][0-9](\\.[0-9]{1,9})?)?([Zz]|[+-][0-2][0-9]:[0-5][0-9])?)?";
+
+laws::law!(
+    a_date_stamped_with_any_rfc_3339_time_offset_or_fraction_leaves_the_line_the_kind_its_first_word_gives,
+    (
+        select(vec!["", "- "]),
+        "2026-11-0[1-9]",
+        CLOCK,
+        select(vec![("RULING", "ruling"), ("LEAD", "lead"), ("plan", "remark")])
+    ),
+    said,
+    {
+        let (bullet, day, clock, (word, kind)) = said;
+        let text = format!("{bullet}{day}{clock} {word} (owner): \"yes\"");
+        let line = Line::read(1, &text);
+        prop_assert_eq!(line.read_by(Shaped), kind);
+        prop_assert_eq!(line.read_by(Named), Ok([vec!["yes".to_owned()], vec![], vec![day]]));
+        prop_assert_eq!(line.to_string(), text);
     }
 );
 
@@ -683,6 +713,9 @@ laws::table!(
         "- 2026-11-08 lead: the beds are dug" => "remark",
         " RULING (owner): indented" => "ruling",
         "- 2026-11-06 RULING (owner, 'yes'): we don't change Ann's plan" => "ruling",
+        "2026-11-05T04:07+01:00 RULING (owner): x" => "ruling",
+        "- 2026-11-05T04:07:09.125-03:30 LEAD: the beds are dug" => "lead",
+        "2026-11-05 04:07:09.5Z RULING (owner): x" => "ruling",
         "* RULING (owner): starred" => "ruling",
         "+ RULING (owner): plussed" => "ruling",
         "**RULING** (owner): bold" => "ruling",
@@ -865,57 +898,31 @@ laws::roundtrip!(
     Some
 );
 
-struct Drawn;
-
-impl Drawn {
-    fn line(drawn: Option<String>) -> Option<spec_line::Line> {
-        drawn.map_or(Some(spec_line::Line::Repair), |text| Spec::try_new(text).ok().map(spec_line::Line::Spec))
-    }
-}
-
 laws::roundtrip!(
-    a_spec_line_reads_back_from_its_rendering_and_spec_text_that_would_not_is_refused,
-    option::of(prop_oneof![
-        any::<String>(),
-        "[a-z0-9#, \t\r\n-]{0,12}",
-        any::<Attachment>().prop_map(Attachment::into_inner),
-        any::<Spec>().prop_map(Spec::into_inner),
-    ]),
-    |drawn: &Option<String>| Drawn::line(drawn.clone()).map_or_else(String::new, |line| line.to_string()),
+    a_spec_line_reads_back_from_its_rendering,
+    prop_oneof![
+        Just("repair: main".to_owned()),
+        any::<Attachment>().prop_map(|attachment| format!("spec: {attachment}")),
+        "[!-~]([ -~]{0,20}[!-~])?".prop_map(|value| format!("spec: {value}")),
+    ],
     |text: &String| text.parse::<spec_line::Line>().ok(),
-    Drawn::line
+    |line: &Option<spec_line::Line>| line.as_ref().map(ToString::to_string),
+    Some
 );
 
-laws::table!(
-    spec_text_is_refused_when_its_spec_line_would_not_read_it_back,
-    |text: &&str| Spec::try_new((*text).to_owned()).ok().map(Spec::into_inner),
-    [
-        "transcript-design#D1" => Some("transcript-design#D1".to_owned()),
-        "owner 96d13317" => Some("owner 96d13317".to_owned()),
-        "a  b" => Some("a  b".to_owned()),
-        "transcript-design#D1 " => None,
-        "x " => None,
-        "x\r" => None,
-        "a\nb" => None,
-        " " => None,
-        "" => None,
-    ]
-);
-
-laws::table!(
-    a_spec_line_reads_its_text_up_to_trailing_blanks_and_refuses_a_second_line,
-    |text: &&str| text.parse::<spec_line::Line>().ok().map(|line| line.to_string()),
-    [
-        "spec: transcript-design#D1" => Some("spec: transcript-design#D1".to_owned()),
-        "spec: transcript-design#D1 \r\n" => Some("spec: transcript-design#D1".to_owned()),
-        "repair: main  " => Some("repair: main".to_owned()),
-        "repair: main" => Some("repair: main".to_owned()),
-        "spec: a\nb" => None,
-        "repair: main\nb" => None,
-        "repair: main b" => None,
-        "spec: " => None,
-        "spec:" => None,
-    ]
+laws::law!(
+    any_text_the_spec_line_lexer_accepts_reads_back_from_its_rendering,
+    prop_oneof![
+        any::<String>(),
+        "(spec: |repair: main)?[a-z0-9#, \t\r\n-]{0,12}",
+        any::<Attachment>().prop_map(|attachment| format!("spec: {attachment}")),
+    ],
+    text,
+    {
+        let line = text.parse::<spec_line::Line>().ok();
+        let again = line.as_ref().and_then(|read| read.to_string().parse::<spec_line::Line>().ok());
+        prop_assert_eq!(again, line);
+    }
 );
 
 laws::table!(
@@ -970,4 +977,78 @@ laws::law!(
         prop_assert_eq!(running.map(Banner::into_inner), Ok(name.clone()));
         prop_assert_eq!(documented.map(Banner::into_inner), Ok(format!("doc-{name}")));
     }
+);
+
+laws::table!(
+    a_date_is_exactly_four_digits_then_two_then_two_joined_by_dashes,
+    |day: &&str| Date::try_new((*day).to_owned()).ok().map(Date::into_inner),
+    [
+        "2026-11-05" => Some("2026-11-05".to_owned()),
+        "" => None,
+        "26-11-05" => None,
+        "2026-1-05" => None,
+        "2026-11-5" => None,
+        "2026/11/05" => None,
+        "2026-11-05x" => None,
+        "202a-11-05" => None,
+        "2026-11-05 2026-11-06" => None,
+    ]
+);
+
+laws::table!(
+    a_date_parses_from_text_only_when_it_is_spelled_as_one,
+    |day: &&str| day.parse::<Date>().ok().map(|date| date.to_string()),
+    [
+        "1999-12-31" => Some("1999-12-31".to_owned()),
+        "1999-12" => None,
+        "1999-12-311" => None,
+        "19991231" => None,
+    ]
+);
+
+laws::roundtrip!(
+    a_date_is_displayed_and_parsed_back,
+    any::<Date>(),
+    |date: &Date| date.to_string(),
+    |text: &String| text.parse::<Date>().ok().map(|date| date.to_string()),
+    |date: Date| Some(date.to_string())
+);
+
+laws::table!(
+    a_date_is_any_year_month_day_wherever_it_stands_and_whatever_follows_it,
+    |text: &&str| Line::read(1, text).read_by(Named),
+    [
+        "ruled 2026-11-05\"rain delay\" (0a1b2c3d)" => Ok([
+            vec!["rain delay".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05T04:07\"rain delay\" (0a1b2c3d)" => Ok([
+            vec!["rain delay".to_owned()],
+            vec!["0a1b2c3d".to_owned()],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05 04:07:09.5+01:00 \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05(0a1b2c3d)" => Ok([vec![], vec!["0a1b2c3d".to_owned()], vec!["2026-11-05".to_owned()]]),
+        "ruled 2026-11-05: \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec!["2026-11-05".to_owned()],
+        ]),
+        "ruled 2026-11-05 and 2026-11-06 and 2026-12-31." => Ok([
+            vec![],
+            vec![],
+            vec!["2026-11-05".to_owned(), "2026-11-06".to_owned(), "2026-12-31".to_owned()],
+        ]),
+        "ruled 2026-1-05, 26-11-05, 2026-11-5, 2026/11/05 and 202611050" => Ok(<[Vec<String>; 3]>::default()),
+        "ruled at T04:07 or 04:07 or 04:07:09Z with \"rain delay\"" => Ok([
+            vec!["rain delay".to_owned()],
+            vec![],
+            vec![],
+        ]),
+    ]
 );

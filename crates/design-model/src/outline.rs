@@ -1,4 +1,4 @@
-use crate::{Facet, NodeId, Project, Stage, Title};
+use crate::{Basis, Facet, NodeId, Project, Stage, Title};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Outline {
@@ -6,6 +6,7 @@ pub struct Outline {
     project: Project,
     facet: Facet,
     stage: Stage,
+    basis: Basis,
     title: Option<Title>,
     parent: Option<NodeId>,
 }
@@ -13,7 +14,12 @@ pub struct Outline {
 impl Outline {
     #[must_use]
     pub fn new(node: NodeId, project: Project, facet: Facet, stage: Stage) -> Outline {
-        Outline { node, project, facet, stage, title: None, parent: None }
+        Outline { node, project, facet, stage, basis: Basis::Vague, title: None, parent: None }
+    }
+
+    #[must_use]
+    pub fn based(self, basis: Basis) -> Outline {
+        Outline { basis, ..self }
     }
 
     #[must_use]
@@ -44,6 +50,11 @@ impl Outline {
     #[must_use]
     pub fn stage(&self) -> Stage {
         self.stage
+    }
+
+    #[must_use]
+    pub fn basis(&self) -> Basis {
+        self.basis
     }
 
     #[must_use]

@@ -2,12 +2,13 @@ use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Wrapping};
 use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
-use transcript_ports::{Body, Uuid};
+use transcript_ports::{Body, SessionId, Uuid};
 
 use super::{
-    Delivery, FailuresReported, Flailed, FlailedSegments, Halted, JobClosed, JobFlailed, JobHalted, JobOpened,
-    JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf,
-    Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
+    Delivery, FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, Hold, JobClosed, JobFlailed, JobHalted,
+    JobOpened, JobRetried, JobState, JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded,
+    RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures,
+    Unstructured,
 };
 use crate::{Account, Excerpt};
 
@@ -45,6 +46,7 @@ struct UnplacedRow {
     message: Uuid,
     ordinal: Ordinal,
     body: Body,
+    session: SessionId,
     run: Option<RunId>,
 }
 
@@ -91,7 +93,12 @@ impl From<LiveRow> for StoredRun {
 
 impl From<UnplacedRow> for Unplaced {
     fn from(row: UnplacedRow) -> Unplaced {
-        Unplaced { segment: Segment::new(row.message, row.ordinal), body: row.body, flailed: row.run }
+        Unplaced {
+            segment: Segment::new(row.message, row.ordinal),
+            body: row.body,
+            session: row.session,
+            flailed: row.run,
+        }
     }
 }
 
@@ -161,7 +168,7 @@ impl Batch for JobHalted {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobHalted { job, halted, account } = self;
+        let JobHalted { job, halted, account, held, retold } = self;
         let closed = JobClosed::new(job, JobState::from(halted)).written(statements)?;
         let unreported = Delivery::Unreported;
         let recorded = statements.written(store_ports::query!(
@@ -176,7 +183,35 @@ VALUES
             account: Account,
             unreported: Delivery
         ))?;
-        Ok(Written::total([closed, recorded].into_iter()))
+        let holding = held.map(|flailing| flailing.written(statements)).transpose()?;
+        let retelling = retold
+            .into_iter()
+            .map(|again| again.written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total([closed, recorded].into_iter().chain(holding).chain(retelling)))
+    }
+}
+
+impl Batch for Retold {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let Retold { job, account } = self;
+        let unreported = Delivery::Unreported;
+        statements.written(store_ports::query!(
+            r#"
+UPDATE
+  failures
+SET
+  account = ?2,
+  delivery = ?3
+WHERE
+  job = ?1
+"#,
+            job: JobId,
+            account: Account,
+            unreported: Delivery
+        ))
     }
 }
 
@@ -332,9 +367,7 @@ WHERE
     }
 }
 
-impl Batch for JobFlailed {
-    type Failure = StoreFailure;
-
+impl JobFlailed {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let JobFlailed { run, segments } = self;
         let written = segments
@@ -345,10 +378,18 @@ impl Batch for JobFlailed {
                 statements.written(store_ports::query!(
                     r#"
 INSERT INTO
-  flailed (message, ordinal, run)
+  flailed (message, ordinal, job, run)
 SELECT
   ?1,
   ?2,
+  (
+    SELECT
+      runs.job
+    FROM
+      runs
+    WHERE
+      runs.id = ?3
+  ),
   ?3
 WHERE
   NOT EXISTS (
@@ -371,6 +412,33 @@ WHERE
     }
 }
 
+impl Batch for JobRetried {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let job = self.0;
+        let released = statements.written(store_ports::query!(
+            r#"
+DELETE FROM
+  flailed
+WHERE
+  job = ?1
+"#,
+            job: JobId
+        ))?;
+        let withdrawn = statements.written(store_ports::query!(
+            r#"
+DELETE FROM
+  failures
+WHERE
+  job = ?1
+"#,
+            job: JobId
+        ))?;
+        Ok(Written::total([released, withdrawn].into_iter()))
+    }
+}
+
 impl Query for FlailedSegments {
     type Rows = Vec<Flailed>;
 
@@ -381,11 +449,10 @@ impl Query for FlailedSegments {
 SELECT
   flailed.message,
   flailed.ordinal,
-  runs.job,
+  flailed.job,
   flailed.run
 FROM
   flailed
-  JOIN runs ON runs.id = flailed.run
   JOIN messages ON messages.uuid = flailed.message
 ORDER BY
   messages.at,
@@ -394,6 +461,36 @@ ORDER BY
 "#
         ))?;
         Ok(rows.into_iter().map(Flailed::from).collect())
+    }
+}
+
+impl Query for HeldBy {
+    type Rows = Option<Hold>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Hold>, StoreFailure> {
+        let job = self.0;
+        let rows = statements.rows(store_ports::query!(
+            FlailedRow,
+            r#"
+SELECT
+  flailed.message,
+  flailed.ordinal,
+  flailed.job,
+  flailed.run
+FROM
+  flailed
+  JOIN messages ON messages.uuid = flailed.message
+WHERE
+  flailed.job = ?1
+ORDER BY
+  messages.at,
+  flailed.message,
+  flailed.ordinal
+"#,
+            job: JobId
+        ))?;
+        let held: Vec<Flailed> = rows.into_iter().map(Flailed::from).collect();
+        Ok(held.split_first().map(|(first, rest)| Hold { first: first.clone(), rest: rest.to_vec() }))
     }
 }
 
@@ -506,6 +603,7 @@ SELECT
   segments.message,
   segments.ordinal,
   segments.body,
+  messages.session,
   flailed.run AS "run?: i64"
 FROM
   unplaced

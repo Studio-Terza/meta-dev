@@ -2642,6 +2642,7 @@ dependencies = [
 name = "text-lines"
 version = "0.1.0"
 dependencies = [
+ "grammar",
  "laws",
  "newtype",
  "serde_json",

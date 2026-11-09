@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nDELETE FROM\n  flailed\nWHERE\n  job = ?1\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "54912e601bf34a1aea2b750c7b93e9b76591b664952d3519ff258cb8327c73fd"
+}

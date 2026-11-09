@@ -1,46 +1,17 @@
+mod head;
+mod piece;
+
 use std::fmt;
+use std::iter;
 use std::str::FromStr;
 
-use logos::Lexer;
-use logos::Logos;
-use newtype::{Arbitrary, Checked, Display, Newtype};
+use logos::{Lexer, Logos};
+use newtype::{Arbitrary, Checked, Newtype};
+
+use head::Head;
+use piece::Piece;
 
 use crate::unspelled::Unspelled;
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-enum Head {
-    #[token("repair: main")]
-    Repair,
-    #[token("spec: ")]
-    Spec,
-}
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-enum Tail<'text> {
-    #[regex(r"[^\n]*[^\s]", |lexer| lexer.slice(), allow_greedy = true)]
-    Value(&'text str),
-    #[regex(r"\s+")]
-    Blank,
-}
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-enum Form {
-    #[token("none")]
-    Nothing,
-    #[regex("owner [0-9A-Fa-f]{8}[0-9A-Fa-f-]*")]
-    Owner,
-    #[regex("( *[a-z0-9-]+#[DL][0-9]+,)* *[a-z0-9-]+#[DL][0-9]+")]
-    Labels,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Rest<'text> {
-    Empty,
-    Blank,
-    Written(&'text str),
-    Trailed(&'text str),
-    Garbled,
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Line {
@@ -48,9 +19,11 @@ pub enum Line {
     Spec(Spec),
 }
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-#[newtype(checked, strategy = "[!-~]([ -~]{0,20}[!-~])?")]
-pub struct Spec(String);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Spec {
+    value: String,
+    attachment: Option<Attachment>,
+}
 
 #[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
 #[newtype(
@@ -59,86 +32,85 @@ pub struct Spec(String);
 )]
 pub struct Attachment(String);
 
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("the line is neither a spec line nor repair: main")]
+pub struct Unspecified;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Lexed {
+    piece: Piece,
+    text: String,
+}
+
 impl Line {
-    const SPEC: &'static str = "spec: ";
     const REPAIR: &'static str = "repair: main";
+    const SPEC: &'static str = "spec: ";
 
     #[must_use]
-    pub fn attachment(&self) -> Option<Attachment> {
+    pub fn spec(&self) -> Option<&Spec> {
         match self {
-            Line::Spec(spec) => Attachment::try_new(spec.clone().into_inner()).ok(),
+            Line::Spec(spec) => Some(spec),
             Line::Repair => None,
         }
+    }
+
+    fn repaired(rest: &[Lexed]) -> Option<Line> {
+        rest.first().map_or(Some(Line::Repair), |_more| None)
     }
 }
 
 impl Head {
-    fn line(self, rest: Rest<'_>) -> Option<Line> {
-        match rest {
-            Rest::Empty | Rest::Blank => self.unwritten(),
-            Rest::Written(written) | Rest::Trailed(written) => self.written(written),
-            Rest::Garbled => None,
-        }
-    }
-
-    fn unwritten(self) -> Option<Line> {
+    fn line(self, spoken: &[Lexed]) -> Option<Line> {
         match self {
-            Head::Repair => Some(Line::Repair),
-            Head::Spec => None,
-        }
-    }
-
-    fn written(self, written: &str) -> Option<Line> {
-        match self {
-            Head::Repair => None,
-            Head::Spec => Spec::lexed(written).map(Line::Spec),
+            Head::Repair => Line::repaired(spoken),
+            Head::Spec => Spec::after(spoken).map(Line::Spec),
         }
     }
 }
 
 impl Spec {
-    fn lexed(written: &str) -> Option<Spec> {
-        Spec::try_new(written.to_owned()).ok()
+    fn after(rest: &[Lexed]) -> Option<Spec> {
+        rest.first().map(|_said| Spec::read(rest))
+    }
+
+    fn read(lexed: &[Lexed]) -> Spec {
+        let only = <&[Lexed; 1]>::try_from(lexed).ok();
+        Spec {
+            value: lexed.iter().map(|piece| piece.text.as_str()).collect(),
+            attachment: only.and_then(|[sole]| sole.attachment()),
+        }
+    }
+
+    #[must_use]
+    pub fn attachment(&self) -> Option<&Attachment> {
+        self.attachment.as_ref()
     }
 }
 
-impl<'text> Rest<'text> {
-    fn lexed(tail: Lexer<'text, Tail<'text>>) -> Rest<'text> {
-        tail.map(Result::ok).fold(Rest::Empty, Rest::then)
+impl Lexed {
+    fn attachment(&self) -> Option<Attachment> {
+        Attachment::try_new(self.text.clone()).ok()
     }
 
-    fn then(self, token: Option<Tail<'text>>) -> Rest<'text> {
-        match self {
-            Rest::Empty => Rest::opened(token),
-            Rest::Written(written) => Rest::trailed(written, token),
-            Rest::Blank | Rest::Trailed(_) | Rest::Garbled => Rest::Garbled,
-        }
+    fn spoken(lexed: &[Lexed]) -> &[Lexed] {
+        let last = lexed.iter().rposition(|said| said.piece.spoken().is_some());
+        lexed.get(..last.map_or(0, |at| at + 1)).unwrap_or_default()
     }
 
-    fn opened(token: Option<Tail<'text>>) -> Rest<'text> {
-        match token {
-            Some(Tail::Value(written)) => Rest::Written(written),
-            Some(Tail::Blank) => Rest::Blank,
-            None => Rest::Garbled,
-        }
-    }
-
-    fn trailed(written: &'text str, token: Option<Tail<'text>>) -> Rest<'text> {
-        match token {
-            Some(Tail::Blank) => Rest::Trailed(written),
-            Some(Tail::Value(_)) | None => Rest::Garbled,
-        }
+    fn next(pieces: &mut Lexer<'_, Piece>) -> Option<Result<Lexed, ()>> {
+        pieces.next().map(|lexed| lexed.map(|piece| Lexed { piece, text: pieces.slice().to_owned() }))
     }
 }
 
 impl FromStr for Line {
-    type Err = Unspelled;
+    type Err = Unspecified;
 
-    fn from_str(text: &str) -> Result<Line, Unspelled> {
+    fn from_str(text: &str) -> Result<Line, Unspecified> {
         let mut head = Head::lexer(text);
-        let opened = head.next().and_then(Result::ok);
-        let rest = Rest::lexed(head.morph::<Tail<'_>>());
-        opened.and_then(|lexed| lexed.line(rest)).ok_or(Unspelled)
+        let opening = head.next().and_then(Result::ok);
+        let mut pieces = head.morph::<Piece>();
+        let lexed = iter::from_fn(|| Lexed::next(&mut pieces)).collect::<Result<Vec<Lexed>, ()>>();
+        opening.zip(lexed.ok()).and_then(|(opened, said)| opened.line(Lexed::spoken(&said))).ok_or(Unspecified)
     }
 }
 
@@ -146,7 +118,7 @@ impl fmt::Display for Line {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Line::Repair => formatter.write_str(Self::REPAIR),
-            Line::Spec(spec) => write!(formatter, "{}{spec}", Self::SPEC),
+            Line::Spec(spec) => write!(formatter, "{}{}", Self::SPEC, spec.value),
         }
     }
 }
@@ -155,19 +127,13 @@ impl Checked for Attachment {
     type Error = Unspelled;
 
     fn checked(value: &String) -> Result<&String, Unspelled> {
-        let spelled: Vec<Result<Form, ()>> = Form::lexer(value).collect();
-        <[Result<Form, ()>; 1]>::try_from(spelled).ok().and_then(|[only]| only.ok()).map(|_form| value).ok_or(Unspelled)
-    }
-}
-
-impl Checked for Spec {
-    type Error = Unspelled;
-
-    fn checked(value: &String) -> Result<&String, Unspelled> {
-        match Rest::lexed(Tail::lexer(value)) {
-            Rest::Written(_) => Ok(value),
-            Rest::Empty | Rest::Blank | Rest::Trailed(_) | Rest::Garbled => Err(Unspelled),
-        }
+        let spelled: Vec<Result<Piece, ()>> = Piece::lexer(value).collect();
+        <[Result<Piece, ()>; 1]>::try_from(spelled)
+            .ok()
+            .and_then(|[only]| only.ok())
+            .and_then(Piece::attached)
+            .map(|_form| value)
+            .ok_or(Unspelled)
     }
 }
 

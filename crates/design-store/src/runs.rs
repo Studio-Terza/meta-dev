@@ -5,7 +5,7 @@ use dispatch_ports::{Deadline, Finished, Pid, Stall, Started, Usage};
 use named_derive::Named;
 use port_core::Op;
 use strum::VariantArray;
-use transcript_ports::Body;
+use transcript_ports::{Body, SessionId};
 
 use crate::{Account, Excerpt};
 
@@ -82,6 +82,14 @@ pub struct JobHalted {
     job: JobId,
     halted: Halted,
     account: Account,
+    held: Option<JobFlailed>,
+    retold: Vec<Retold>,
+}
+
+#[derive(Clone, Debug, Op)]
+pub struct Retold {
+    job: JobId,
+    account: Account,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -111,11 +119,14 @@ pub struct RunEnded {
     reply: Option<Excerpt>,
 }
 
-#[derive(Clone, Debug, Op)]
+#[derive(Clone, Debug)]
 pub struct JobFlailed {
     run: RunId,
     segments: Vec<Segment>,
 }
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct JobRetried(JobId);
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct NextJob;
@@ -137,6 +148,9 @@ pub struct RunsOf(JobId);
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct FlailedSegments;
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct HeldBy(JobId);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ran {
@@ -160,6 +174,12 @@ pub struct Flailed {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Hold {
+    first: Flailed,
+    rest: Vec<Flailed>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unreported {
     job: JobId,
     account: Account,
@@ -169,6 +189,7 @@ pub struct Unreported {
 pub struct Unplaced {
     segment: Segment,
     body: Body,
+    session: SessionId,
     flailed: Option<RunId>,
 }
 
@@ -221,7 +242,24 @@ impl JobClosed {
 impl JobHalted {
     #[must_use]
     pub fn new(job: JobId, halted: Halted, account: Account) -> JobHalted {
-        JobHalted { job, halted, account }
+        JobHalted { job, halted, account, held: None, retold: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn holding(self, held: Option<JobFlailed>) -> JobHalted {
+        JobHalted { held, ..self }
+    }
+
+    #[must_use]
+    pub fn retelling(self, retold: Vec<Retold>) -> JobHalted {
+        JobHalted { retold, ..self }
+    }
+}
+
+impl Retold {
+    #[must_use]
+    pub fn new(job: JobId, account: Account) -> Retold {
+        Retold { job, account }
     }
 }
 
@@ -281,6 +319,24 @@ impl JobFlailed {
     #[must_use]
     pub fn new(run: RunId, segments: Vec<Segment>) -> JobFlailed {
         JobFlailed { run, segments }
+    }
+}
+
+impl From<&Hold> for JobRetried {
+    fn from(hold: &Hold) -> JobRetried {
+        JobRetried(hold.first.job)
+    }
+}
+
+impl From<JobId> for HeldBy {
+    fn from(job: JobId) -> HeldBy {
+        HeldBy(job)
+    }
+}
+
+impl Hold {
+    pub fn held(&self) -> impl Iterator<Item = &Flailed> {
+        [&self.first].into_iter().chain(&self.rest)
     }
 }
 
@@ -345,6 +401,12 @@ impl AsRef<Segment> for Flailed {
 impl AsRef<Segment> for Unplaced {
     fn as_ref(&self) -> &Segment {
         &self.segment
+    }
+}
+
+impl AsRef<SessionId> for Unplaced {
+    fn as_ref(&self) -> &SessionId {
+        &self.session
     }
 }
 

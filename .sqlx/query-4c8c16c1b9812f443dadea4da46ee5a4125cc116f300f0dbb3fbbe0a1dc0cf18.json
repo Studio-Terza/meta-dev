@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  segments.message,\n  segments.ordinal,\n  segments.body,\n  flailed.run AS \"run?: i64\"\nFROM\n  unplaced\n  JOIN segments ON segments.message = unplaced.message\n  AND segments.ordinal = unplaced.ordinal\n  JOIN messages ON messages.uuid = unplaced.message\n  LEFT JOIN flailed ON flailed.message = unplaced.message\n  AND flailed.ordinal = unplaced.ordinal\nORDER BY\n  messages.at,\n  segments.message,\n  segments.ordinal\n",
+  "query": "\nSELECT\n  flailed.message,\n  flailed.ordinal,\n  flailed.job,\n  flailed.run\nFROM\n  flailed\n  JOIN messages ON messages.uuid = flailed.message\nWHERE\n  flailed.job = ?1\nORDER BY\n  messages.at,\n  flailed.message,\n  flailed.ordinal\n",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "segments",
+            "table": "flailed",
             "name": "message"
           }
         }
@@ -20,24 +20,24 @@
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "segments",
+            "table": "flailed",
             "name": "ordinal"
           }
         }
       },
       {
-        "name": "body",
+        "name": "job",
         "ordinal": 2,
-        "type_info": "Text",
+        "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "segments",
-            "name": "body"
+            "table": "flailed",
+            "name": "job"
           }
         }
       },
       {
-        "name": "run?: i64",
+        "name": "run",
         "ordinal": 3,
         "type_info": "Integer",
         "origin": {
@@ -49,14 +49,14 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
       false,
       false,
-      true
+      false
     ]
   },
-  "hash": "92bac29caf1f4131e374601f271f420ab75869d50cb63c06761daa8b85778de3"
+  "hash": "4c8c16c1b9812f443dadea4da46ee5a4125cc116f300f0dbb3fbbe0a1dc0cf18"
 }

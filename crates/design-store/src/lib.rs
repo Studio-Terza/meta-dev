@@ -3,6 +3,7 @@
 mod acyclic;
 mod annotation;
 mod applied_file;
+mod asked_earlier;
 mod boundary;
 mod citation;
 mod covered;
@@ -35,6 +36,7 @@ mod stream_schema;
 pub use acyclic::{Closes, Cycle, Refusal};
 pub use annotation::{Annotation, Remarking};
 pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
+pub use asked_earlier::{Asked, AskedEarlier};
 pub use boundary::{Account, Excerpt, Hit, RelationName, ShapeName};
 pub use citation::Citation;
 pub use covered::Covered;
@@ -55,9 +57,9 @@ pub use quoted::{Quoted, QuotedSegments};
 use relative::Relative;
 pub use remit::{JobRepeated, Remit, Unpaid};
 pub use runs::{
-    FailuresReported, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns,
-    NextJob, NextRun, OpenJobs, Ran, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced,
-    UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
+    FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRetried,
+    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded, RunSpawned, RunState, RunsOf,
+    Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
 };
 use runs::{JobClosed, JobState};
 pub use scope::Scope;

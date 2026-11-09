@@ -9,13 +9,15 @@ form "supersede(<node>, by(<node>))"
 form "conversational(<segment>)"
 choices span-relation defines decides questions revises mentions
 choices segment-relation answers refers-to supersedes corrects
-choices kind decision opinion question instruction control remark smell
+choices kind decision opinion question ask instruction control remark smell
 choices specificity general specific exact
 choices confidence tentative leaning firm
 choices explicitness explicit implicit
 choices facet project feature smell
-rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment it links to needs its own. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
+rule "Sense as a question only a design question the owner has yet to decide; sense as an ask a request to the lead for status, explanation or analysis, which the lead's reply settles; sense an opinion, argument or instruction phrased as a question as an opinion, remark or instruction."
+rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment below that it links to needs its own; an asked line needs none. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
 rule "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
+rule "An asked line shows a question still open from earlier in the session; it is a link target only and is never given a directive of its own, whether place, sense or any other: when a segment answers or decides it, link that segment to it as answers, and place and sense that segment as usual."
 example "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)"
 example "propose(new topic, refines(n1), feature, \"what the segment is about\")"
 example "place(aaaaaaaa-0000-4000-8000-000000000001.0, topic, mentions)"
@@ -24,9 +26,9 @@ segment aaaaaaaa-0000-4000-8000-000000000001.0 "what of aaaaaaaa-0000-4000-8000-
 segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
 segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
-node n1 "demo" project vague
-node n5 "demo" feature terminal n1 "h"
-node n2 "other" project vague
+node n1 "demo" project vague vague
+node n5 "demo" feature terminal set n1 "h"
+node n2 "other" project vague vague
 rule "You structure a project owner's words into a design graph."
 rule "Reply with directive lines only, one directive per line, with no prose, numbering or code fences; each line takes one of the forms below."
 rule "A choices line lists the words that one slot of the forms takes."
@@ -38,13 +40,15 @@ form "supersede(<node>, by(<node>))"
 form "conversational(<segment>)"
 choices span-relation defines decides questions revises mentions
 choices segment-relation answers refers-to supersedes corrects
-choices kind decision opinion question instruction control remark smell
+choices kind decision opinion question ask instruction control remark smell
 choices specificity general specific exact
 choices confidence tentative leaning firm
 choices explicitness explicit implicit
 choices facet project feature smell
-rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment it links to needs its own. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
+rule "Sense as a question only a design question the owner has yet to decide; sense as an ask a request to the lead for status, explanation or analysis, which the lead's reply settles; sense an opinion, argument or instruction phrased as a question as an opinion, remark or instruction."
+rule "Give every segment below at least one directive: mark chatter conversational; otherwise place it on the node it is about, proposing a node that refines the closest listed node when none fits, and sense it. A link is a directive for its first segment only, so a segment below that it links to needs its own; an asked line needs none. The listed nodes span every project; a node line names its project, and a segment goes under the project it is about."
 rule "Write a segment exactly as listed, its message id, a dot and its index; write a node as n and its number, or as the label of a node proposed earlier in your reply."
+rule "An asked line shows a question still open from earlier in the session; it is a link target only and is never given a directive of its own, whether place, sense or any other: when a segment answers or decides it, link that segment to it as answers, and place and sense that segment as usual."
 example "place(aaaaaaaa-0000-4000-8000-000000000001.0, n1, mentions)"
 example "propose(new topic, refines(n1), feature, \"what the segment is about\")"
 example "place(aaaaaaaa-0000-4000-8000-000000000001.0, topic, mentions)"
@@ -53,8 +57,8 @@ segment aaaaaaaa-0000-4000-8000-000000000001.0 "what of aaaaaaaa-0000-4000-8000-
 segment aaaaaaaa-0000-4000-8000-000000000003.0 "1. yes"
 segment aaaaaaaa-0000-4000-8000-000000000003.1 "2. no"
 segment aaaaaaaa-0000-4000-8000-000000000005.0 "what of aaaaaaaa-0000-4000-8000-000000000004"
-node n1 "demo" project vague
-node n5 "demo" feature terminal n1 "h"
-node n2 "other" project vague
+node n1 "demo" project vague vague
+node n5 "demo" feature terminal set n1 "h"
+node n2 "other" project vague vague
 retry uncovered aaaaaaaa-0000-4000-8000-000000000001.0 aaaaaaaa-0000-4000-8000-000000000003.0 aaaaaaaa-0000-4000-8000-000000000003.1 aaaaaaaa-0000-4000-8000-000000000005.0
 rule "Your previous reply could not be used, for the reason on the retry line; reply again, following the forms exactly."
