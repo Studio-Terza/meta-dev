@@ -173,15 +173,15 @@ fn only_the_baseline_scenario_gives_baseline_tests() -> Result<(), Box<dyn Error
 #[test]
 fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
-    let answer = mutants.shard();
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("outcomes.json"));
+    let missing = mutants.shard();
+    assert_eq!(missing.exit, ExitCode::FAILURE);
+    assert!(missing.err.contains("cannot use"));
+    assert!(missing.err.contains("outcomes.json"));
     mutants.broken_outcomes("not json")?;
-    let answer = mutants.shard();
-    assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot parse"));
-    assert!(answer.err.contains("outcomes.json"));
+    let broken = mutants.shard();
+    assert_eq!(broken.exit, ExitCode::FAILURE);
+    assert!(broken.err.contains("cannot parse"));
+    assert!(broken.err.contains("outcomes.json"));
     assert_eq!(mutants.files.kind(&mutants.destination()), Kind::Missing);
     Ok(())
 }

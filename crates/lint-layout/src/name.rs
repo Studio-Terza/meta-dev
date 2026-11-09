@@ -4,7 +4,6 @@ mod length;
 mod lowered;
 mod prefix;
 
-use std::borrow::Borrow;
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::Path;
@@ -17,7 +16,7 @@ pub use camel_word::CamelWord;
 pub use casing::Casing;
 pub use length::Length;
 pub use lowered::Lowered;
-use newtype::Newtype;
+use newtype::Wrapping;
 use newtype::proptest::arbitrary::{Arbitrary, any};
 use newtype::proptest::strategy::{BoxedStrategy, Strategy};
 pub use prefix::Prefix;
@@ -109,33 +108,9 @@ impl From<&str> for Name {
     }
 }
 
-impl Borrow<str> for Name {
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
-impl PartialEq<Word<'_>> for Name {
-    fn eq(&self, word: &Word<'_>) -> bool {
-        self.0 == word.into_inner()
-    }
-}
-
-impl PartialEq<&str> for Name {
-    fn eq(&self, text: &&str) -> bool {
-        self.0 == *text
-    }
-}
-
 impl AsRef<Path> for Name {
     fn as_ref(&self) -> &Path {
         Path::new(&self.0)
-    }
-}
-
-impl PartialEq<Ident> for Name {
-    fn eq(&self, ident: &Ident) -> bool {
-        *ident == self.0
     }
 }
 

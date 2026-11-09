@@ -12,15 +12,15 @@ impl Scored {
 
     fn highest_is(pair: &[&str]) -> bool {
         Some(pair)
-            .filter(|pair| pair.len() == 2)
-            .and_then(|pair| pair.first().zip(pair.last()))
+            .filter(|candidate| candidate.len() == 2)
+            .and_then(|two| two.first().zip(two.last()))
             .is_some_and(|(text, expected)| Self::of(text).contains(&format!("highest {expected}; ")))
     }
 
     fn lists(pair: &[&str]) -> bool {
         Some(pair)
-            .filter(|pair| pair.len() == 2)
-            .and_then(|pair| pair.first().zip(pair.last()))
+            .filter(|candidate| candidate.len() == 2)
+            .and_then(|two| two.first().zip(two.last()))
             .is_some_and(|(text, expected)| Self::of(text).contains(expected))
     }
 }

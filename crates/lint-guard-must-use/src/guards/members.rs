@@ -22,7 +22,7 @@ impl<'file> Members<'file> {
     }
 
     pub fn alias(&mut self, name: Name, target: Option<Name>) {
-        self.aliases.extend(target.map(|target| (name, target)));
+        self.aliases.extend(target.map(|aliased| (name, aliased)));
     }
 
     pub fn drop_implemented(&mut self, name: Option<Name>) {

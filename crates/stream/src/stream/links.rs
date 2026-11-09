@@ -5,7 +5,7 @@ mod turn;
 
 use std::collections::BTreeSet;
 
-use grammar::message::{Lexemes, Mark};
+use grammar::message::Lexemes;
 use transcript_ports::{Authorship, Skipped, Uuid};
 
 use crate::anchor::Anchor;
@@ -58,11 +58,11 @@ impl<'stream> Links<'stream> {
     }
 
     fn cited_by(&self, segment: &Segment, message: &Message) -> Vec<MechanicalLink> {
-        let text = segment.text(message);
-        Lexemes::scanned(&text)
-            .into_iter()
-            .filter(|lexeme| matches!(lexeme.mark(), Mark::Uuid))
-            .map(|lexeme| Uuid::new(lexeme.span().slice(text.as_ref()).to_owned()))
+        segment
+            .text(message)
+            .iter()
+            .flat_map(Lexemes::uuids)
+            .filter_map(|word| Uuid::try_new(word.into_inner()).ok())
             .filter(|cited| cited != message.record().uuid())
             .filter_map(|cited| self.chain.known(&cited))
             .map(|known| {

@@ -1,11 +1,12 @@
 mod boundary;
 
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, CheckedDeserialize, Display, Newtype};
 use serde::Deserialize;
 
 pub use boundary::{Errored, Output, Unreadable};
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq)]
+#[newtype(checked)]
 pub struct Told(String);
 
 #[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]

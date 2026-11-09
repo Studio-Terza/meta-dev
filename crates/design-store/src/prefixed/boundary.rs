@@ -92,8 +92,8 @@ ORDER BY
 "#,
             prefixes: Listed
         ))?;
-        let cited = self.0.into_iter().map(|prefix| (prefix, Vec::new())).collect();
-        Ok(rows.into_iter().fold(cited, |mut cited: BTreeMap<Prefix, Vec<Spoken>>, row| {
+        let empty = self.0.into_iter().map(|prefix| (prefix, Vec::new())).collect();
+        Ok(rows.into_iter().fold(empty, |mut cited: BTreeMap<Prefix, Vec<Spoken>>, row| {
             cited
                 .entry(row.prefix)
                 .or_default()

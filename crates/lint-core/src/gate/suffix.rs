@@ -7,6 +7,6 @@ pub struct Suffix;
 
 impl Matching for Suffix {
     fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Word<'word>> {
-        name.words().last().filter(|last| last.lowered() == word).map(|_| word)
+        name.words().last().filter(|last| last.lowered() == Name::from(word).lowered()).map(|_| word)
     }
 }

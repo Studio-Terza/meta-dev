@@ -1,29 +1,50 @@
-use std::path::PathBuf;
+use cargo_ports::Cargo;
+use file_ports::Files;
+use lint_reader::{CrateSources, Described, Stage, Unlocated};
 
-use lint_core::Readout;
-use workspace_metadata::Metadata;
+use super::boundary::Queue;
 
 #[derive(Debug)]
-pub(crate) struct Sources<'run, F> {
+pub(crate) struct Ports<'run, F, C> {
     files: &'run F,
-    roots: &'run [PathBuf],
-    workspaces: &'run [Metadata],
+    cargo: &'run C,
 }
 
-impl<'run, F> Sources<'run, F> {
-    pub(crate) fn new(files: &'run F, roots: &'run [PathBuf], workspaces: &'run [Metadata]) -> Sources<'run, F> {
-        Sources { files, roots, workspaces }
+#[derive(Debug)]
+pub(crate) struct Sources<'run, F, C> {
+    ports: Ports<'run, F, C>,
+    stage: &'run Stage<'run>,
+    queue: Queue,
+}
+
+impl<'run, F: Files, C: Cargo> Ports<'run, F, C> {
+    pub(crate) fn new(files: &'run F, cargo: &'run C) -> Ports<'run, F, C> {
+        Ports { files, cargo }
     }
 
     pub(crate) fn files(&self) -> &'run F {
         self.files
     }
 
-    pub(crate) fn roots(&self) -> &'run [PathBuf] {
-        self.roots
+    pub(crate) fn located(&self, stage: &Stage<'_>) -> Result<Described, Unlocated> {
+        CrateSources::read(self.files, self.cargo, &stage.package_directories())
+    }
+}
+
+impl<'run, F, C> Sources<'run, F, C> {
+    pub(crate) fn new(ports: Ports<'run, F, C>, stage: &'run Stage<'run>) -> Sources<'run, F, C> {
+        Sources { ports, stage, queue: Queue::default() }
     }
 
-    pub(crate) fn described(&self, readout: Readout) -> Readout {
-        readout.with_workspaces(self.workspaces.to_vec())
+    pub(crate) fn ports(&self) -> &Ports<'run, F, C> {
+        &self.ports
+    }
+
+    pub(crate) fn stage(&self) -> &'run Stage<'run> {
+        self.stage
+    }
+
+    pub(crate) fn queue(&self) -> &Queue {
+        &self.queue
     }
 }

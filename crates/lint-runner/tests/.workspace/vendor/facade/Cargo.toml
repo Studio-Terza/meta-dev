@@ -1,0 +1,15 @@
+[package]
+name = "facade"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "facade-tool"
+path = "src/bin/tool.rs"
+
+[dependencies]
+text = { package = "serde", path = "../serde" }

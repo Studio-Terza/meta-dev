@@ -20,7 +20,7 @@ impl Finished {
     fn decimal(letter: char) -> Option<char> {
         Some(letter)
             .filter(char::is_ascii_digit)
-            .or_else(|| Some(letter).filter(|letter| *letter == Self::DECIMAL_POINT))
+            .or_else(|| Some(letter).filter(|candidate| *candidate == Self::DECIMAL_POINT))
     }
 
     fn duration_after(words: &[String]) -> Seconds {

@@ -7,12 +7,12 @@ const DECLARES: &str = "pub enum Mode { A }\n";
 
 #[test]
 fn only_an_enum_of_that_name_in_reach_counts() {
-    let files =
+    let apart =
         [Sources::file("x/src/mode.rs", Text::new(DECLARES)), Sources::file("y/src/impls.rs", Text::new(IMPL_ONLY))];
-    assert!(EnumPredicates::report(&files).dirty().is_none());
-    let files =
+    assert!(EnumPredicates::report(&apart).dirty().is_none());
+    let kinds =
         [Sources::file("x/src/a.rs", Text::new(STATUS_ENUM)), Sources::file("x/src/b.rs", Text::new(STATUS_STRUCT))];
-    assert!(EnumPredicates::report(&files).dirty().is_none());
+    assert!(EnumPredicates::report(&kinds).dirty().is_none());
 }
 
 const SHARED_TEST_NAME: &str = "enum Mode { A }\n";

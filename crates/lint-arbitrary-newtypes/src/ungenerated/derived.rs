@@ -12,10 +12,10 @@ impl Derived {
     const GENERATING: [Word<'static>; 1] = words!["Arbitrary"];
 
     pub fn lacks_generator(&self) -> Option<&Name> {
-        self.0
-            .iter()
-            .find(|name| name.matches::<Whole>(&Self::WRAPPING).is_some())
-            .filter(|_| self.0.iter().find(|name| name.matches::<Whole>(&Self::GENERATING).is_some()).is_none())
+        match self.0.iter().find_map(|name| name.matches::<Whole>(&Self::GENERATING)) {
+            Some(_) => None,
+            None => self.0.iter().find(|name| name.matches::<Whole>(&Self::WRAPPING).is_some()),
+        }
     }
 }
 

@@ -13,7 +13,7 @@ impl Resends {
         messages
             .iter()
             .map(Message::record)
-            .filter(|record| *record.text() != Body::default())
+            .filter_map(|record| record.text().written().map(|_| record))
             .fold(BTreeMap::<(Authorship, &Body), Vec<&Uuid>>::new(), |mut sent, record| {
                 sent.entry((record.author(), record.text())).or_default().push(record.uuid());
                 sent

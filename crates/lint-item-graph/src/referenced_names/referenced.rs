@@ -32,17 +32,19 @@ impl Referenced {
             .iter()
             .zip(path.roots())
             .filter_map(|(token, root)| {
-                Syntax::token_ident(token).zip(root).map(|(ident, root)| (token, root, Name::from(ident)))
+                Syntax::token_ident(token).zip(root).map(|(ident, resolved)| (token, resolved, Name::from(ident)))
             })
             .collect();
         let local: Vec<Segment<'_>> = idents
             .iter()
-            .filter_map(|(token, root, name)| scope.kept(token, root, name.clone()).map(|name| Segment { root, name }))
+            .filter_map(|(token, root, name)| {
+                scope.kept(token, root, name.clone()).map(|kept| Segment { root, name: kept })
+            })
             .collect();
         let across: Vec<Segment<'_>> = idents
             .into_iter()
             .flat_map(|(token, root, name)| {
-                scope.spelled(token, root, name).into_iter().map(move |name| Segment { root, name })
+                scope.spelled(token, root, name).into_iter().map(move |spelled| Segment { root, name: spelled })
             })
             .collect();
         let nested =

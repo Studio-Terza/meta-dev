@@ -279,8 +279,8 @@ impl Opening {
 
 impl Kind {
     fn opened(lexed: &[Lexed<'_>]) -> Kind {
-        let before = iter::once(None).chain(lexed.iter().map(|lexed| lexed.lexeme));
-        lexed.iter().zip(before).find_map(|(lexed, before)| lexed.kind_after(before)).unwrap_or(Kind::Remark)
+        let before = iter::once(None).chain(lexed.iter().map(|piece| piece.lexeme));
+        lexed.iter().zip(before).find_map(|(piece, previous)| piece.kind_after(previous)).unwrap_or(Kind::Remark)
     }
 
     fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
@@ -329,7 +329,7 @@ impl Lexeme {
 
 impl<'text> Lexed<'text> {
     fn kind_after(self, before: Option<Lexeme>) -> Option<Kind> {
-        let dated = before.filter(|before| *before == Lexeme::Marker(Marker::Date));
+        let dated = before.filter(|previous| *previous == Lexeme::Marker(Marker::Date));
         let stamped = dated.and(self.lexeme.filter(|lexeme| *lexeme == Lexeme::Clock));
         stamped.map_or_else(|| self.lexeme.map_or(Some(Kind::Remark), Lexeme::kind), |_clock| None)
     }
@@ -356,7 +356,6 @@ impl<'text> Lexed<'text> {
     fn taken<'lexed>(self, rest: &'lexed [Lexed<'text>]) -> Step<'lexed, 'text> {
         match self.lexeme {
             Some(Lexeme::Double) => Step::quoted(rest),
-            Some(Lexeme::Marker(Marker::Date)) => Step::after(Piece::Dated(Date::new(self.text.to_owned())), rest),
             Some(
                 Lexeme::Hash
                 | Lexeme::Marker(
@@ -364,6 +363,7 @@ impl<'text> Lexed<'text> {
                     | Marker::Numbered
                     | Marker::Quote
                     | Marker::Emphasis
+                    | Marker::Date
                     | Marker::Colon
                     | Marker::Task
                     | Marker::Space,
@@ -382,7 +382,7 @@ impl<'text> Lexed<'text> {
     }
 
     fn joined(lexed: &[Lexed<'text>]) -> String {
-        lexed.iter().map(|lexed| lexed.text).collect()
+        lexed.iter().map(|piece| piece.text).collect()
     }
 }
 
@@ -421,6 +421,9 @@ impl Piece {
     fn read(lexed: Lexed<'_>) -> Piece {
         match lexed.lexeme {
             Some(Lexeme::Cite) => Piece::Cited(Cite::new(lexed.text.to_owned())),
+            Some(Lexeme::Marker(Marker::Date)) => {
+                lexed.text.parse::<Date>().map_or_else(|_unspelled| Piece::Text(lexed.text.to_owned()), Piece::Dated)
+            }
             Some(
                 Lexeme::Hash
                 | Lexeme::Marker(
@@ -428,7 +431,6 @@ impl Piece {
                     | Marker::Numbered
                     | Marker::Quote
                     | Marker::Emphasis
-                    | Marker::Date
                     | Marker::Colon
                     | Marker::Task
                     | Marker::Space,

@@ -81,9 +81,9 @@ impl Summary {
     }
 
     fn golden<'set>(test: &OneLine, golden: &'set BTreeSet<TestName>) -> Option<&'set TestName> {
-        let test = test.as_ref();
+        let line = test.as_ref();
         let name =
-            test.match_indices(Self::SCOPE).last().and_then(|(at, mark)| test.get(at + mark.len()..)).unwrap_or(test);
+            line.match_indices(Self::SCOPE).last().and_then(|(at, mark)| line.get(at + mark.len()..)).unwrap_or(line);
         let spelled: String = name.chars().skip_while(|letter| letter.is_whitespace()).collect();
         golden.get(&TestName::new(spelled))
     }

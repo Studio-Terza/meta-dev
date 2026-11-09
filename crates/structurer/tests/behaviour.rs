@@ -7,12 +7,13 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
+use laws::proptest::arbitrary::any;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
-use newtype::Newtype;
+use newtype::Wrapping;
 use structurer::{
     Attempt, Briefing, Directive, Directives, Edge, Job, Label, Lapse, Misread, NodeRef, Proposal, Reading, Said,
     Uncovered,
@@ -128,7 +129,7 @@ struct Spot {
 
 impl Spot {
     fn at(line: usize, column: usize) -> Option<Spot> {
-        Some(line).zip(Some(column)).map(|(line, column)| Spot { line, column })
+        Some(line).zip(Some(column)).map(|(row, place)| Spot { line: row, column: place })
     }
 
     fn of_one(text: &str) -> Option<Spot> {
@@ -143,7 +144,7 @@ impl Spot {
         match parsed {
             Ok(_) => None,
             Err(Misread::Expected { at, .. } | Misread::Arity { at, .. }) => {
-                Spot::at(at.line().into_inner(), at.column().into_inner())
+                Spot::at(at.as_ref().into_inner(), at.column().into_inner())
             }
         }
     }
@@ -207,7 +208,7 @@ struct Jobs;
 
 impl Jobs {
     fn said() -> impl Strategy<Value = Said> {
-        (Generated::segment(), "[^\u{0}]{0,40}").prop_map(|(segment, body)| Said::new(segment, Body::new(body)))
+        (Generated::segment(), any::<Body>()).prop_map(|(segment, body)| Said::new(segment, body))
     }
 
     fn node() -> impl Strategy<Value = Outline> {

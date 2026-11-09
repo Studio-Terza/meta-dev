@@ -1,19 +1,15 @@
-use newtype::{Arbitrary, Display, Newtype};
-use serde::Deserialize;
+use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 use crate::blank::Blank;
 
-#[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(try_from = "String")]
+#[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(checked)]
 pub struct Instant(String);
 
-impl TryFrom<String> for Instant {
+impl Checked for Instant {
     type Error = Blank;
 
-    fn try_from(text: String) -> Result<Instant, Blank> {
-        match text.chars().next() {
-            Some(_) => Ok(Instant::new(text)),
-            None => Err(Blank),
-        }
+    fn checked(text: &String) -> Result<&String, Blank> {
+        text.chars().next().map(|_first| text).ok_or(Blank)
     }
 }

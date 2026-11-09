@@ -1,7 +1,7 @@
 use crate::matching::Matching;
 use crate::name::Name;
 use crate::word::Word;
-use newtype::Newtype;
+use newtype::Wrapping;
 
 #[derive(Debug)]
 pub struct Prefix;

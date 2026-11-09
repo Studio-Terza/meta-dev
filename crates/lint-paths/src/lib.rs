@@ -29,8 +29,8 @@ pub struct Paths;
 
 impl Paths {
     #[must_use]
-    pub fn read<'file>(files: impl IntoIterator<Item = &'file SourceFile>, finals: &[Word<'_>]) -> Vec<Use<'file>> {
-        let files: Vec<&SourceFile> = files.into_iter().collect();
+    pub fn read<'file>(sources: impl IntoIterator<Item = &'file SourceFile>, finals: &[Word<'_>]) -> Vec<Use<'file>> {
+        let files: Vec<&SourceFile> = sources.into_iter().collect();
         let scopes = Collector::collect(&files);
         let resolver = Resolver::over(&scopes);
         let wanted = Wanted::among(&scopes, finals);
@@ -38,8 +38,8 @@ impl Paths {
     }
 
     #[must_use]
-    pub fn every<'file>(files: impl IntoIterator<Item = &'file SourceFile>) -> Vec<Use<'file>> {
-        let files: Vec<&SourceFile> = files.into_iter().collect();
+    pub fn every<'file>(sources: impl IntoIterator<Item = &'file SourceFile>) -> Vec<Use<'file>> {
+        let files: Vec<&SourceFile> = sources.into_iter().collect();
         let scopes = Collector::collect(&files);
         let resolver = Resolver::over(&scopes);
         files.iter().flat_map(|file| Walker::walk(file, &scopes, &Wanted::Every, &resolver)).collect()

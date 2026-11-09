@@ -21,7 +21,10 @@ impl<'generics> Constraint<'generics> {
         constraints: &'all [Constraint<'generics>],
         name: &'all Name,
     ) -> impl Iterator<Item = &'generics TypeParamBound> + 'all {
-        constraints.iter().filter(move |constraint| *name == *constraint.name).map(|constraint| constraint.bound)
+        constraints
+            .iter()
+            .filter(move |constraint| *name == Name::from(constraint.name))
+            .map(|constraint| constraint.bound)
     }
 
     fn required(predicate: &'generics WherePredicate) -> Vec<Constraint<'generics>> {

@@ -12,7 +12,6 @@ use lint_core::Walk;
 use lint_layout::Name;
 pub use vertex::Vertex;
 
-#[derive(Default)]
 pub struct Declarations<'file> {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
@@ -23,7 +22,13 @@ pub struct Declarations<'file> {
 
 impl<'file> From<&[&'file SourceFile]> for Declarations<'file> {
     fn from(files: &[&'file SourceFile]) -> Declarations<'file> {
-        let seeded = Declarations { homes: TypeHomes::declared_in(files), ..Declarations::default() };
+        let seeded = Declarations {
+            vertices: BTreeSet::new(),
+            aliases: BTreeMap::new(),
+            homes: TypeHomes::declared_in(files),
+            sum_types: BTreeMap::new(),
+            reading: BTreeSet::new(),
+        };
         files
             .iter()
             .fold(seeded, |mut declarations, file| {

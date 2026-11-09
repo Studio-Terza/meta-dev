@@ -35,7 +35,7 @@ impl<'found, 'file> Behaviour<'found, 'file> {
         let moves = system.edges().iter().enumerate().fold(Moves::new(), |moves, (ordinal, edge)| {
             let laws =
                 operations.get(&Count::new(ordinal)).map_or(&[][..], |operation| attached.of_operation(operation));
-            Step::read(edge).into_iter().fold(moves, |moves, step| Self::moved(moves, edge, step, laws))
+            Step::read(edge).into_iter().fold(moves, |so_far, step| Self::moved(so_far, edge, step, laws))
         });
         let sites = moves.keys().fold(BTreeMap::new(), |mut sites, node| {
             sites.extend(Self::declared(system, node).map(|site| (*node, site)));
@@ -64,11 +64,11 @@ impl<'found, 'file> Behaviour<'found, 'file> {
 
     fn moved(moves: Moves<'found>, edge: &Edge<'found, '_>, step: Step<'found>, laws: &[Property]) -> Moves<'found> {
         let taken: BTreeSet<Node<'found>> = edge.ends().taken().copied().collect();
-        taken.iter().fold(moves, |mut moves, node| {
+        taken.iter().fold(moves, |mut gathered, node| {
             let with = taken.iter().copied().filter(|other| other != node).collect();
             let reached = edge.ends().as_ref().node().copied();
-            moves.entry(*node).or_default().push(Move::new(step, reached, with, laws.to_vec()));
-            moves
+            gathered.entry(*node).or_default().push(Move::new(step, reached, with, laws.to_vec()));
+            gathered
         })
     }
 }

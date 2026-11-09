@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+grammar = { path = "../grammar" }
 serde.workspace = true
 text-lines = { path = "../text-lines" }
 

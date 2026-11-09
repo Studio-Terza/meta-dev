@@ -174,7 +174,7 @@ impl<'found, 'file> Containment<'found, 'file> {
         toward: Toward,
     ) -> impl Iterator<Item = Outsider<'found, 'file>> + '_ {
         Some(toward)
-            .filter(|toward| *toward == Toward::Implementers)
+            .filter(|candidate| *candidate == Toward::Implementers)
             .into_iter()
             .flat_map(move |_| self.outsiders.get(&member).into_iter().flatten().copied())
     }

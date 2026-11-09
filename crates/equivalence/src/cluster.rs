@@ -52,8 +52,8 @@ impl<Node: Ord + Copy> Placing<Node> {
     ) -> Placing<Node> {
         let renaming = self.pending.and_then(|node| rename(cluster.first(), node));
         let pending = self.pending.filter(|_| renaming.is_none());
-        let cluster = renaming.into_iter().fold(cluster, Cluster::joined);
-        Placing { clusters: self.clusters.into_iter().chain([cluster]).collect(), pending }
+        let joined = renaming.into_iter().fold(cluster, Cluster::joined);
+        Placing { clusters: self.clusters.into_iter().chain([joined]).collect(), pending }
     }
 
     pub(crate) fn finished(self) -> Vec<Cluster<Node>> {

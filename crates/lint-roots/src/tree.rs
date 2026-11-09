@@ -16,10 +16,10 @@ impl<'given> Tree<'given> {
         given
             .iter()
             .zip(files.canonical_many(given))
-            .map(|(given, canonical)| {
-                canonical
-                    .map(|canonical| Tree { canonical, given })
-                    .map_err(|failure| Failure::Io { path: given.clone(), source: failure.into() })
+            .map(|(path, resolved)| {
+                resolved
+                    .map(|canonical| Tree { canonical, given: path })
+                    .map_err(|failure| Failure::Io { path: path.clone(), source: failure.into() })
             })
             .collect()
     }

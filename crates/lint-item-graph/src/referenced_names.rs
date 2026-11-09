@@ -76,9 +76,9 @@ impl ReferencedNames {
     }
 
     fn united(all: BTreeMap<Name, Vec<UsePath>>, more: BTreeMap<Name, Vec<UsePath>>) -> BTreeMap<Name, Vec<UsePath>> {
-        more.into_iter().fold(all, |mut all, (owner, uses)| {
-            all.entry(owner).or_default().extend(uses);
-            all
+        more.into_iter().fold(all, |mut united, (owner, uses)| {
+            united.entry(owner).or_default().extend(uses);
+            united
         })
     }
 
@@ -88,9 +88,11 @@ impl ReferencedNames {
     }
 
     fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
-        owner.filter(|owner| *owner != Self::UNNAMED).map_or_else(ReferencedNames::default, |owner| {
-            Referenced::of_tokens(scope, item.into_token_stream()).owned(owner, parameters)
-        })
+        owner
+            .filter(|candidate| *candidate != Name::from(Self::UNNAMED))
+            .map_or_else(ReferencedNames::default, |named| {
+                Referenced::of_tokens(scope, item.into_token_stream()).owned(named, parameters)
+            })
     }
 }
 

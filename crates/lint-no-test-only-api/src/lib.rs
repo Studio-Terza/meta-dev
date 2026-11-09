@@ -48,7 +48,7 @@ impl NoTestOnlyApi {
 impl FileLint for NoTestOnlyApi {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let shipped =
-            iter::once(file).filter_map(SourceFile::shipped).flat_map(|file| GatedItems::in_file(file.syntax()));
+            iter::once(file).filter_map(SourceFile::shipped).flat_map(|code| GatedItems::in_file(code.syntax()));
         shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.path())).collect()
     }
 }

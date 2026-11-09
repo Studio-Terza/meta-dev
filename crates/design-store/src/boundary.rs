@@ -7,7 +7,7 @@ use design_model::{Ordinal, Segment};
 use dispatch_ports::Reply;
 use file_ports::Offset;
 use grammar::search::Term;
-use newtype::{Arbitrary, Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 use stream::{Anchor, MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
@@ -194,11 +194,13 @@ impl SegmentRow {
         message
             .segments()
             .iter()
-            .map(|segment| SegmentRow {
-                message: uuid.clone(),
-                ordinal: Ordinal::new(segment.identity().ordinal().into_inner()),
-                shape: ShapeName::new(Shape::from(segment.form()).to_string()),
-                body: segment.text(message),
+            .filter_map(|segment| {
+                segment.text(message).ok().map(|body| SegmentRow {
+                    message: uuid.clone(),
+                    ordinal: Ordinal::new(segment.identity().ordinal().into_inner()),
+                    shape: ShapeName::new(Shape::from(segment.form()).to_string()),
+                    body,
+                })
             })
             .collect()
     }

@@ -13,10 +13,10 @@ pub struct Export {
 
 impl Export {
     pub fn in_root(file: &SourceFile) -> Vec<Export> {
-        (file.placement().role() == Role::LibraryRoot).then_some(file).map_or_else(Vec::new, |file| {
-            Self::reexports(file)
+        (file.placement().role() == Role::LibraryRoot).then_some(file).map_or_else(Vec::new, |root| {
+            Self::reexports(root)
                 .flat_map(|used| Self::leaves(&used.tree))
-                .chain(Self::modules(file).map(Self::of_module))
+                .chain(Self::modules(root).map(Self::of_module))
                 .collect()
         })
     }

@@ -1,10 +1,9 @@
+use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use cargo_ports::{CargoFiller, cargo_ops};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
-use port_core::Pass;
 
 pub struct FakeUnlistable<'memory> {
     memory: &'memory Memory,
@@ -43,7 +42,7 @@ impl Files for FakeUnlistable<'_> {
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        Some(directory).filter(|directory| *directory == self.unlistable).map_or_else(
+        Some(directory).filter(|candidate| *candidate == self.unlistable).map_or_else(
             || self.memory.entries(directory),
             |_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::PermissionDenied))),
         )
@@ -74,7 +73,7 @@ impl FakeLinked<'_> {
     }
 
     fn followed<'path>(&'path self, path: &'path Path) -> &'path Path {
-        Some(path).filter(|path| *path == self.link).map_or(path, |_| &self.target)
+        Some(path).filter(|candidate| *candidate == self.link).map_or(path, |_| &self.target)
     }
 }
 
@@ -114,7 +113,7 @@ impl Files for FakeLinked<'_> {
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        Some(path).filter(|path| *path == self.link).map_or_else(|| self.memory.kind(path), |_| Kind::Link)
+        Some(path).filter(|candidate| *candidate == self.link).map_or_else(|| self.memory.kind(path), |_| Kind::Link)
     }
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
@@ -122,19 +121,26 @@ impl Files for FakeLinked<'_> {
     }
 }
 
+const SOURCE_EXTENSION: &str = "rs";
+
 pub struct FakeCounted<'memory> {
     memory: &'memory Memory,
     counted: PathBuf,
     listings: AtomicUsize,
+    sources: AtomicUsize,
 }
 
 impl FakeCounted<'_> {
     pub fn new(memory: &Memory, counted: PathBuf) -> FakeCounted<'_> {
-        FakeCounted { memory, counted, listings: AtomicUsize::new(0) }
+        FakeCounted { memory, counted, listings: AtomicUsize::new(0), sources: AtomicUsize::new(0) }
     }
 
     pub fn listings(&self) -> usize {
         self.listings.load(Ordering::SeqCst)
+    }
+
+    pub fn sources(&self) -> usize {
+        self.sources.load(Ordering::SeqCst)
     }
 }
 
@@ -144,6 +150,7 @@ impl Files for FakeCounted<'_> {
     }
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        self.sources.fetch_add(usize::from(path.extension() == Some(OsStr::new(SOURCE_EXTENSION))), Ordering::SeqCst);
         self.memory.read_text(path)
     }
 
@@ -178,25 +185,5 @@ impl Files for FakeCounted<'_> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
-    }
-}
-
-pub struct FakeCargo(String);
-
-impl FakeCargo {
-    const EMPTY: &'static str = "{\"workspace_root\": \"/\", \"packages\": [], \"resolve\": null}";
-
-    pub fn new(metadata: String) -> FakeCargo {
-        FakeCargo(metadata)
-    }
-
-    pub fn empty() -> FakeCargo {
-        FakeCargo(Self::EMPTY.to_owned())
-    }
-}
-
-impl CargoFiller for FakeCargo {
-    fn metadata(&self, _pass: Pass<'_, cargo_ops::Metadata>, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
-        roots.iter().map(|_| Ok(Text::new(self.0.clone()))).collect()
     }
 }

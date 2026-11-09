@@ -26,6 +26,10 @@ impl Ignored {
         directories.iter().map(|directory| directory.join(Self::MANIFEST)).collect()
     }
 
+    pub fn among(rules: &[Ignored], survey: &Survey, path: &Path) -> Option<Ignored> {
+        rules.iter().find_map(|rule| rule.applying_to(survey, path))
+    }
+
     pub fn applying_to(self, survey: &Survey, path: &Path) -> Option<Ignored> {
         match self {
             Ignored::Hidden => path

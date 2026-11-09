@@ -28,9 +28,9 @@ pub(crate) struct Coverage {
 impl Coverage {
     pub(crate) fn tallied<'edge, 'found: 'edge, 'file: 'found>(
         system: &TypeSystem<'found, 'file>,
-        edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
+        listed: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Coverage {
-        let edges: Vec<&Edge<'found, 'file>> = edges.collect();
+        let edges: Vec<&Edge<'found, 'file>> = listed.collect();
         let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
         edges
             .iter()
