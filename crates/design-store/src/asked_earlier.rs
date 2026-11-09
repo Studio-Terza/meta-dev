@@ -4,7 +4,7 @@ use store_ports::{Columns, Query, Statements, StoreFailure};
 use transcript_ports::{Body, Uuid};
 
 #[derive(Clone, Debug, Op)]
-pub struct AskedEarlier(Uuid);
+pub struct AskedEarlier<'segment>(&'segment Segment);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Asked {
@@ -19,9 +19,9 @@ struct AskedRow {
     body: Body,
 }
 
-impl From<&Segment> for AskedEarlier {
-    fn from(segment: &Segment) -> AskedEarlier {
-        AskedEarlier(AsRef::<Uuid>::as_ref(segment).clone())
+impl<'segment> From<&'segment Segment> for AskedEarlier<'segment> {
+    fn from(segment: &'segment Segment) -> AskedEarlier<'segment> {
+        AskedEarlier(segment)
     }
 }
 
@@ -43,11 +43,12 @@ impl AsRef<Body> for Asked {
     }
 }
 
-impl Query for AskedEarlier {
+impl Query for AskedEarlier<'_> {
     type Rows = Vec<Asked>;
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Asked>, StoreFailure> {
-        let job = self.0;
+        let job = AsRef::<Uuid>::as_ref(self.0);
+        let ordinal = Ordinal::from(self.0);
         let rows = statements.rows(store_ports::query!(
             AskedRow,
             r#"
@@ -61,7 +62,8 @@ FROM
       segments.message,
       segments.ordinal,
       segments.body,
-      asked.at
+      asked.at,
+      asked.rowid AS position
     FROM
       open_questions
       JOIN messages AS asked ON asked.uuid = open_questions.message
@@ -70,23 +72,28 @@ FROM
       AND segments.ordinal = open_questions.ordinal
     WHERE
       asked.session = job.session
-      AND asked.at < job.at
+      AND (
+        asked.at,
+        asked.rowid,
+        open_questions.ordinal
+      ) < (job.at, job.rowid, ?2)
     GROUP BY
       segments.message,
       segments.ordinal
     ORDER BY
       asked.at DESC,
-      segments.message DESC,
+      asked.rowid DESC,
       segments.ordinal DESC
     LIMIT
       8
   ) AS latest
 ORDER BY
   latest.at,
-  latest.message,
+  latest.position,
   latest.ordinal
 "#,
-            job: Uuid
+            job: Uuid,
+            ordinal: Ordinal
         ))?;
         Ok(rows.into_iter().map(Asked::from).collect())
     }

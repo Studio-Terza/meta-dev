@@ -258,6 +258,21 @@ laws::law!(a_retry_briefs_the_first_briefing_and_the_lapse, (Jobs::any(), Jobs::
     prop_assert_ne!(retried, job.briefing(&Attempt::First));
 });
 
+laws::law!(
+    a_briefing_states_that_a_linked_job_segment_needs_its_own_directive_and_an_asked_line_needs_none,
+    (Jobs::any(), Jobs::attempt()),
+    drawn,
+    {
+        let (job, attempt) = drawn;
+        let rendered = job.briefing(&attempt).to_string();
+        let asked_listed = rendered.contains("\nasked ");
+        laws::proptest::prop_assert!(rendered.contains("a segment below that it links to needs its own"));
+        laws::proptest::prop_assert!(rendered.contains("an asked line needs none"));
+        laws::proptest::prop_assert_eq!(rendered.matches("link target only").count(), 1);
+        laws::proptest::prop_assert!(!asked_listed || rendered.contains("never given a directive of its own"));
+    }
+);
+
 laws::law!(a_briefing_tells_jobs_apart, (Jobs::any(), Jobs::any()), drawn, {
     let (one, other) = drawn;
     laws::proptest::prop_assume!(one != other);

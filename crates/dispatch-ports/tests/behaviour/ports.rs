@@ -4,10 +4,12 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use dispatch_ports::{
-    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pid, Prompt, Reply, Stall, Started,
-    SystemClock, Timeout, Tokens, Usage, Watch, Watched,
+    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall, Started,
+    SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
 };
 use port_core::Run;
+
+use super::{FakeClock, Sleep, Wait, Waits, Watching};
 
 #[test]
 fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), Box<dyn Error>> {
@@ -54,11 +56,12 @@ impl Stalling {
     const PROMPT: usize = 256 * 1024;
 
     fn watched(arguments: &&'static [&'static str]) -> Option<Stalled> {
+        let waits = Waits::default();
         let run = Run::root();
         let ended = {
             let agent =
                 run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", arguments)));
-            let clock = run.port(SystemClock);
+            let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
             let deadline = Deadline::after(clock.now(), Timeout::new(1));
             let held = agent.dispatch(&Job::due_by(deadline), &Prompt::new("x".repeat(Stalling::PROMPT))).ok()?;
             let pid = held.pid();
@@ -78,3 +81,25 @@ laws::table!(
         &["-c", "exec 0<&-; exec sleep 30"][..] => Some(Stalled { watched: Watched::Stalled(Stall::Overdue), left: None }),
     ]
 );
+
+#[test]
+fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Box<dyn Error>> {
+    let pause = Pause::new(1);
+    let waits = Waits::default();
+    let run = Run::root();
+    let waited = {
+        let agent = run.port(HeadlessClaude::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+            Agent::new("sh", &["-c", "exec sleep 30"]),
+        ));
+        let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
+        let silent = agent
+            .dispatch(&Job::due_by(Deadline::after(clock.now(), Timeout::new(60))), &Prompt::new("x".to_owned()))?;
+        let waited = clock.waited(pause, silent.bell());
+        silent.end()?;
+        waited
+    };
+    run.finish().settled()?;
+    assert_eq!((waited, waits.recorded()), (Watching::START.after(pause), vec![Wait { pause, woke: Woke::Lapsed }]));
+    Ok(())
+}

@@ -14,8 +14,9 @@ use design::{
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, Provenance, RunId};
 use design_store::{JobOpened, Planting, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use dispatch_ports::{
-    Agent, AgentRun, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished, HeadlessClaude,
-    Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, clock_ops, dispatch_ops,
+    Agent, AgentRun, Bell, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished,
+    HeadlessClaude, Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall,
+    clock_ops, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
 use newtype::Wrapping;
@@ -77,7 +78,7 @@ impl ClockFiller for FakeClock {
         *self.now.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause) -> Wall {
+    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
         let mut now = self.now.lock().unwrap_or_else(PoisonError::into_inner);
         *now = now.after(pause).after(self.sleep);
         *now
@@ -285,6 +286,97 @@ fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_a
     assert_eq!(structured.has(&[retried]), []);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
     assert_eq!(structuring.applying.run(&["view", "open-questions"])?, "");
+    Ok(())
+}
+
+#[test]
+fn a_brief_with_asked_lines_states_that_they_are_link_targets_only_and_a_reply_linking_an_answer_to_one_applies()
+-> Result<(), Box<dyn Error>> {
+    let asked = format!("{}.0", Session::ASKED);
+    let [decided, other] = [Applying::answer(0), Applying::answer(1)];
+    let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
+    let answering = format!("link({decided}, {asked}, answers)\nconversational({other})\nconversational({later})");
+    let structuring = Structuring::over(Script::replying(&[Some(&answering)]), Pause::new(0))?;
+    structuring
+        .applying
+        .applied(&format!("place({asked}, n1, questions)\nsense({asked}, question, specific, firm, explicit)"))?;
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let stated = "An asked line shows a question still open from earlier in the session; it is a link target only";
+    assert_eq!(briefs.iter().map(|brief| brief.matches(stated).count()).collect::<Vec<usize>>(), [1]);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!(structuring.applying.run(&["view", "open-questions"])?, "");
+    Ok(())
+}
+
+#[test]
+fn a_reply_linking_to_a_job_segment_without_a_directive_for_it_is_refused_as_unpaid_but_one_linking_to_an_asked_line_is_accepted()
+-> Result<(), Box<dyn Error>> {
+    let asked = format!("{}.0", Session::ASKED);
+    let [decided, other] = [Applying::answer(0), Applying::answer(1)];
+    let later = "aaaaaaaa-0000-4000-8000-000000000005.0";
+    let unpaid =
+        format!("link({decided}, {asked}, answers)\nlink({other}, {later}, refers-to)\nconversational({other})");
+    let paid = format!("link({decided}, {asked}, answers)\nconversational({other})\nconversational({later})");
+    let structuring = Structuring::over(Script::replying(&[Some(&unpaid), Some(&paid)]), Pause::new(0))?;
+    structuring
+        .applying
+        .applied(&format!("place({asked}, n1, questions)\nsense({asked}, question, specific, firm, explicit)"))?;
+    let structured = structuring.structured(&["structure"]);
+    let target = SegmentRef::new(Prefix::new("aaaaaaaa-0000-4000-8000-000000000005".to_owned()), Ordinal::new(0));
+    let refused = Line::Retried(Lapsed::new(JobId::new(1), Lapse::from(Uncovered::new(target, Vec::new()))));
+    assert_eq!(structured.has(&[refused]), []);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    assert_eq!(structuring.script.prompts().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_job_starting_partway_through_a_message_is_shown_the_question_open_earlier_in_that_message()
+-> Result<(), Box<dyn Error>> {
+    let message = "aaaaaaaa-0000-4000-8000-000000000021";
+    let session = Session::working(Session::line(Speaker::Owner, message, "null", "1. which crate\\n2. the first"));
+    let applying = Applying::over(&session)?;
+    applying.applied(&format!(
+        "place({message}.0, n1, questions)\nsense({message}.0, question, specific, firm, explicit)"
+    ))?;
+    let covering = format!("link({message}.1, {message}.0, answers)");
+    let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let shown = format!("asked {message}.0 \"1. which crate\"\n");
+    assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1]);
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    Ok(())
+}
+
+#[test]
+fn same_timestamp_messages_are_ordered_by_transcript_order_not_uuid() -> Result<(), Box<dyn Error>> {
+    let [before, middle, after] = [
+        "aaaaaaaa-0000-4000-8000-000000000043",
+        "aaaaaaaa-0000-4000-8000-000000000042",
+        "aaaaaaaa-0000-4000-8000-000000000041",
+    ];
+    let lines = [
+        Session::stamped(Speaker::Owner, before, "null", "which crate", "2026-01-01"),
+        Session::stamped(Speaker::Owner, middle, "null", "1. which store\\n2. the first", "2026-01-01"),
+        Session::stamped(Speaker::Owner, after, "null", "which port", "2026-01-01"),
+    ];
+    let applying = Applying::over(&Session::working(lines.concat()))?;
+    let questions = [before, middle, after]
+        .map(|asked| format!("place({asked}.0, n1, questions)\nsense({asked}.0, question, specific, firm, explicit)"))
+        .join("\n");
+    applying.applied(&questions)?;
+    let covering = format!("link({middle}.1, {middle}.0, answers)");
+    let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
+    let structured = structuring.structured(&["structure"]);
+    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let shown = [(before, "which crate"), (middle, "1. which store"), (after, "which port")]
+        .map(|(asked, body)| format!("asked {asked}.0 \"{body}\"\n"));
+    assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
+    let counts =
+        briefs.iter().map(|brief| shown.iter().map(|line| brief.matches(line).count()).collect::<Vec<usize>>());
+    assert_eq!(counts.collect::<Vec<Vec<usize>>>(), [[1, 1, 0]]);
     Ok(())
 }
 
