@@ -15,7 +15,10 @@ impl<'meta> Extend<&'meta Node> for Requires<'meta> {
 impl<'meta> Requires<'meta> {
     pub(super) fn normal(nodes: &'meta [Node]) -> Requires<'meta> {
         Requires(
-            nodes.iter().map(|node| (node.package_id(), node.normal().map(NodeDependency::package_id).collect())).collect(),
+            nodes
+                .iter()
+                .map(|node| (node.package_id(), node.normal().map(NodeDependency::package_id).collect()))
+                .collect(),
         )
     }
 
