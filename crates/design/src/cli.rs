@@ -14,7 +14,7 @@ use console_ports::Environment;
 use dispatch_ports::{ClockFiller, DispatchFiller};
 use file_ports::Files;
 use port_core::Run;
-use store_ports::Sqlite;
+use store_ports::Opens;
 
 use crate::Outcome;
 
@@ -60,7 +60,7 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         out: &mut impl Write,
     ) -> Result<Outcome, Failure>
     where
-        O: FnOnce(PathBuf) -> Sqlite,
+        O: Opens,
         H: FnOnce(PathBuf) -> D,
     {
         let run = Run::root();
@@ -75,12 +75,12 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         out: &mut impl Write,
     ) -> Result<Outcome, Failure>
     where
-        O: FnOnce(PathBuf) -> Sqlite,
+        O: Opens,
         H: FnOnce(PathBuf) -> D,
     {
         let request = Request::parsed(arguments)?;
         let located = request.located(self.environment, &self.files)?;
-        let store = run.port(request.opened(&located, self.opened));
+        let store = run.port(request.opened(&located, &self.opened));
         let dispatch = run.port((self.agents.hired)(located.kept(Kept::Agents)));
         let clock = run.port(self.agents.clock);
         request.command().written(

@@ -39,6 +39,7 @@ transcript-ports = { path = "../transcript-ports" }
 e2e = { path = "../../e2e" }
 golden = { path = "../golden" }
 laws = { path = "../laws" }
+sqlite-ports = { path = "../sqlite-ports" }
 text-lines = { path = "../text-lines" }
 
 [lints]
