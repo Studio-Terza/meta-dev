@@ -30,7 +30,7 @@ impl Difference {
     }
 
     fn lines(text: Output<'_>) -> Vec<Line> {
-        KeptLines::from(text.into_inner()).map(|line| Line::new(line.to_owned())).collect()
+        text.into_inner().parse::<KeptLines>().into_iter().flatten().map(Line::new).collect()
     }
 
     fn of_lines(recorded: &[Line], actual: &[Line]) -> Self {

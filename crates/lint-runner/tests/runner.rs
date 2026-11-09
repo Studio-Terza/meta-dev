@@ -159,7 +159,7 @@ fn the_query_command_lists_matching_abstractions_and_blocks_nothing() -> Result<
     root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
     let run = root.flagged(&["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
-    let lines: Vec<&str> = text_lines::Lines::from(run.out.as_str()).collect();
+    let lines: Vec<String> = run.out.parse::<text_lines::Lines>().into_iter().flatten().collect();
     assert_eq!(
         lines.first().map(|line| line.contains("score 5: trait Index in r at /scratch/src/lib.rs:3")),
         Some(true)

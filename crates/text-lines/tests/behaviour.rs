@@ -4,11 +4,13 @@ struct Sample;
 
 impl Sample {
     fn bracketed(text: &&str) -> String {
-        Lines::from(*text).map(|line| ["<", line, ">"].concat()).collect()
+        text.parse::<Lines>().into_iter().flatten().map(|line| ["<", line.as_str(), ">"].concat()).collect()
     }
 
     fn kept(text: &&str) -> String {
-        KeptLines::from(*text)
+        text.parse::<KeptLines>()
+            .into_iter()
+            .flatten()
             .flat_map(|line| ["<".to_owned(), line.escape_debug().to_string(), ">".to_owned()])
             .collect()
     }

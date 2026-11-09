@@ -221,8 +221,8 @@ fn a_record_blocks_only_above_itself_and_only_a_record_is_lowered() -> io::Resul
 struct Text;
 
 impl Text {
-    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
-        text_lines::Lines::from(text.as_ref()).collect()
+    fn lines(text: &impl AsRef<str>) -> Vec<String> {
+        text.as_ref().parse::<text_lines::Lines>().into_iter().flatten().collect()
     }
 }
 

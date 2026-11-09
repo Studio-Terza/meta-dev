@@ -1,3 +1,6 @@
+use std::str::FromStr;
+use std::vec::IntoIter;
+
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
@@ -11,70 +14,75 @@ enum Piece {
 #[derive(Debug)]
 struct Broken<'text>(Lexer<'text, Piece>);
 
-#[derive(Debug)]
-pub struct Lines<'text>(Broken<'text>);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Lines(Vec<String>);
 
-#[derive(Debug)]
-pub struct KeptLines<'text>(Broken<'text>);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeptLines(Vec<String>);
 
-#[derive(Clone, Copy, Debug)]
-struct Line<'text> {
-    text: &'text str,
-    kept: &'text str,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Unsplit {}
+
+#[derive(Clone, Debug)]
+struct Line {
+    text: String,
+    kept: String,
 }
 
 impl Piece {
-    fn text<'text>(self, lexer: &mut Lexer<'text, Piece>) -> &'text str {
+    fn line(self, lexer: &mut Lexer<'_, Piece>) -> Line {
         match self {
-            Piece::Break => "",
+            Piece::Break => Line { text: String::new(), kept: lexer.slice().to_owned() },
             Piece::Text => Piece::broken(lexer),
         }
     }
 
-    fn broken<'text>(lexer: &mut Lexer<'text, Piece>) -> &'text str {
+    fn broken(lexer: &mut Lexer<'_, Piece>) -> Line {
         let text = lexer.slice();
-        lexer.next().map_or(text, |_break| text)
+        let ending = lexer.next().map(|_break| lexer.slice()).unwrap_or_default();
+        Line { text: text.to_owned(), kept: [text, ending].concat() }
     }
 }
 
-impl<'text> Broken<'text> {
-    fn new(text: &'text str) -> Broken<'text> {
-        Broken(Piece::lexer(text))
-    }
+impl Iterator for Broken<'_> {
+    type Item = Line;
 
-    fn line(&mut self) -> Option<Line<'text>> {
+    fn next(&mut self) -> Option<Line> {
         let piece = self.0.next()?.unwrap_or(Piece::Text);
-        let start = self.0.span().start;
-        let text = piece.text(&mut self.0);
-        let kept = self.0.source().get(start..self.0.span().end).unwrap_or_default();
-        Some(Line { text, kept })
+        Some(piece.line(&mut self.0))
     }
 }
 
-impl<'text> From<&'text str> for Lines<'text> {
-    fn from(text: &'text str) -> Lines<'text> {
-        Lines(Broken::new(text))
+impl FromStr for Lines {
+    type Err = Unsplit;
+
+    fn from_str(text: &str) -> Result<Lines, Unsplit> {
+        Ok(Lines(Broken(Piece::lexer(text)).map(|line| line.text).collect()))
     }
 }
 
-impl<'text> From<&'text str> for KeptLines<'text> {
-    fn from(text: &'text str) -> KeptLines<'text> {
-        KeptLines(Broken::new(text))
+impl FromStr for KeptLines {
+    type Err = Unsplit;
+
+    fn from_str(text: &str) -> Result<KeptLines, Unsplit> {
+        Ok(KeptLines(Broken(Piece::lexer(text)).map(|line| line.kept).collect()))
     }
 }
 
-impl<'text> Iterator for Lines<'text> {
-    type Item = &'text str;
+impl IntoIterator for Lines {
+    type Item = String;
+    type IntoIter = IntoIter<String>;
 
-    fn next(&mut self) -> Option<&'text str> {
-        self.0.line().map(|line| line.text)
+    fn into_iter(self) -> IntoIter<String> {
+        self.0.into_iter()
     }
 }
 
-impl<'text> Iterator for KeptLines<'text> {
-    type Item = &'text str;
+impl IntoIterator for KeptLines {
+    type Item = String;
+    type IntoIter = IntoIter<String>;
 
-    fn next(&mut self) -> Option<&'text str> {
-        self.0.line().map(|line| line.kept)
+    fn into_iter(self) -> IntoIter<String> {
+        self.0.into_iter()
     }
 }

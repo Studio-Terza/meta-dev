@@ -221,7 +221,7 @@ impl Structuring {
 
 impl Structured {
     fn parsed(text: &str) -> Vec<Line> {
-        Lines::from(text).filter_map(|line| line.parse::<Line>().ok()).collect()
+        text.parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Line>().ok()).collect()
     }
 
     fn has(&self, wanted: &[Line]) -> Vec<Line> {
@@ -280,7 +280,7 @@ fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_a
     let retried = Line::Retried(Lapsed::new(JobId::new(1), Lapse::refused(&Unresolved::Outside(outside))));
     let shown = format!("asked {asked} \"what of aaaaaaaa-0000-4000-8000-000000000004\"\n");
     let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
-    assert_eq!(Lines::from(open.as_str()).count(), 1);
+    assert_eq!(open.parse::<Lines>().into_iter().flatten().count(), 1);
     assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1, 1]);
     assert_eq!(structured.has(&[retried]), []);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
@@ -403,7 +403,14 @@ fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_t
         sequel: Sequel::Halted { job: JobId::new(2) },
     };
     let stalled = Failure::Stalled { job: JobId::new(2), stall: Stall::Overdue };
-    let told = Lines::from(decision.get("reason").and_then(Value::as_str).unwrap_or_default()).collect::<Vec<&str>>();
+    let told = decision
+        .get("reason")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .parse::<Lines>()
+        .into_iter()
+        .flatten()
+        .collect::<Vec<String>>();
     assert_eq!(told, [flailed.to_string(), stalled.to_string()]);
     assert_eq!(stopped.outcome?, Outcome::Blocked);
     assert_eq!((structuring.unstructured()?, structuring.script.prompts().len()), (9, 3));

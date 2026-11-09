@@ -79,7 +79,8 @@ fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::e
         .err()
         .map(|failure| format!("{failure:?}"));
     let heading = format!("{}: output differs from the golden", Fixture::path().display());
-    let lines = printed.as_deref().map(|text| text_lines::Lines::from(text).collect::<Vec<&str>>());
+    let lines =
+        printed.as_deref().map(|text| text.parse::<text_lines::Lines>().into_iter().flatten().collect::<Vec<String>>());
     let wanted = [
         heading.as_str(),
         "@ first change at line 1; - golden, + actual",
@@ -88,7 +89,7 @@ fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::e
         "",
         "if this change is intended, run `GOLDEN_RECORD=1 cargo test` and review the diff",
     ];
-    assert_eq!(lines, Some(wanted.to_vec()));
+    assert_eq!(lines, Some(wanted.map(str::to_owned).to_vec()));
     Ok(())
 }
 

@@ -27,6 +27,6 @@ impl Measured {
 
     pub(crate) fn row(&self, files: &impl Files) -> Result<Text, Failure<'_>> {
         let text = self.0.read(files)?;
-        Ok(Text::new(Lines::from(text.as_ref()).collect::<Vec<&str>>().join(Self::TAB)))
+        Ok(Text::new(text.as_ref().parse::<Lines>().into_iter().flatten().collect::<Vec<String>>().join(Self::TAB)))
     }
 }

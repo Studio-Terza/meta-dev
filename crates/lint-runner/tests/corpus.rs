@@ -28,13 +28,14 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
     let differences: Vec<String> =
         outputs.iter().filter_map(|(fixture, output)| Corpus::difference(fixture, output)).collect();
     assert_eq!(differences, Vec::<String>::new());
-    let printed: Vec<&str> = outputs
+    let printed: Vec<String> = outputs
         .iter()
-        .flat_map(|(_, output)| Lines::from(output.as_str()))
+        .flat_map(|(_, output)| output.parse::<Lines>().into_iter().flatten())
         .filter(|line| Corpus::is_violation(line))
         .collect();
-    let unfixed: Vec<&str> = printed.iter().copied().filter(|line| Corpus::fix_named(line).is_none()).collect();
-    assert_ne!(printed, Vec::<&str>::new());
+    let unfixed: Vec<&str> =
+        printed.iter().map(String::as_str).filter(|line| Corpus::fix_named(line).is_none()).collect();
+    assert_ne!(printed, Vec::<String>::new());
     assert_eq!(unfixed, Vec::<&str>::new());
     Ok(())
 }
