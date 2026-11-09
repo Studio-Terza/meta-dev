@@ -4,8 +4,10 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::iter;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use std::thread;
 
 use design_model::{
     AnyNode, Casting, Entered, Entry, Facet, JobId, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal,
@@ -386,6 +388,18 @@ VALUES
     fn kept(self) -> Result<Body, Nul> {
         Body::try_new(format!("{}w{}", self.0, self.0))
     }
+
+    fn mismatched(points: &[Around]) -> Result<Vec<char>, Box<dyn Error + Send + Sync>> {
+        points
+            .iter()
+            .map(|point| {
+                let both_sides = vec![point.kept()?];
+                let rederived = point.rederived()?;
+                Ok(Some(point.0).filter(|_kept| rederived != both_sides))
+            })
+            .collect::<Result<Vec<Option<char>>, Box<dyn Error + Send + Sync>>>()
+            .map(|found| found.into_iter().flatten().collect())
+    }
 }
 
 struct Listed(Uuid);
@@ -562,10 +576,16 @@ fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kep
         .filter(|point| Body::try_new(point.to_string()).is_ok())
         .map(Around)
         .collect();
-    let rederived = inked.iter().map(|point| point.rederived()).collect::<Result<Vec<Vec<Body>>, _>>()?;
-    let both_sides =
-        inked.iter().map(|point| point.kept().map(|kept| vec![kept])).collect::<Result<Vec<Vec<Body>>, _>>()?;
-    assert_eq!(rederived, both_sides);
+    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get);
+    let share = inked.len().div_ceil(workers).max(1);
+    let mismatched = thread::scope(|scope| {
+        let parts: Vec<_> = inked.chunks(share).map(|part| scope.spawn(move || Around::mismatched(part))).collect();
+        parts
+            .into_iter()
+            .map(|part| part.join().map_err(|_panicked| "a worker panicked")?)
+            .collect::<Result<Vec<Vec<char>>, _>>()
+    })?;
+    assert_eq!(mismatched.concat(), Vec::<char>::new());
     Ok(())
 }
 
