@@ -16,6 +16,9 @@ use crate::crate_key::CrateKey;
 use crate::dependencies::Dependencies;
 use crate::dependency_sites::DependencySites;
 use crate::failure::Failure;
+use std::ops::Not;
+
+use crate::library_tests::LibraryTests;
 use crate::name::Name;
 use crate::package_name::PackageName;
 use crate::path_dependencies::PathDependencies;
@@ -159,6 +162,17 @@ impl Manifest {
             .filter_map(|target| target.get(Self::PATH)?.as_str())
             .filter_map(|path| canonical(&self.directory.join(path)))
             .collect()
+    }
+
+    #[must_use]
+    pub fn library_tests(&self) -> LibraryTests {
+        self.table
+            .get(Self::LIBRARY)
+            .and_then(|library| library.get(Self::TEST))
+            .and_then(Value::as_bool)
+            .map(Not::not)
+            .filter(|switched_off| *switched_off)
+            .map_or(LibraryTests::Run, |_| LibraryTests::SwitchedOff)
     }
 
     #[must_use]

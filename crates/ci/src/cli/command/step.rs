@@ -1,6 +1,7 @@
 mod arguments;
 mod branch;
 mod changed;
+pub mod clippy_targets;
 pub mod cold_size;
 mod compile_times;
 pub mod github;

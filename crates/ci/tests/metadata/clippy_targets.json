@@ -1,0 +1,38 @@
+{
+  "packages": [
+    {
+      "id": "path+file:///w/gated#0.1.0",
+      "name": "gated",
+      "targets": [
+        { "name": "gated", "kind": ["lib"] },
+        { "name": "measured", "kind": ["test"], "required-features": ["measure"] }
+      ]
+    },
+    {
+      "id": "path+file:///w/libonly#0.1.0",
+      "name": "libonly",
+      "targets": [{ "name": "libonly", "kind": ["lib"] }]
+    },
+    {
+      "id": "path+file:///w/binonly#0.1.0",
+      "name": "binonly",
+      "targets": [{ "name": "binonly", "kind": ["bin"] }, { "name": "behaviour", "kind": ["test"] }]
+    },
+    {
+      "id": "path+file:///w/demo#0.1.0",
+      "name": "demo",
+      "targets": [{ "name": "demo", "kind": ["lib"] }, { "name": "showcase", "kind": ["example"] }]
+    },
+    {
+      "id": "path+file:///w/benched#0.1.0",
+      "name": "benched",
+      "targets": [{ "name": "benched", "kind": ["lib"] }, { "name": "speed", "kind": ["bench"] }]
+    },
+    {
+      "id": "path+file:///w/macros#0.1.0",
+      "name": "macros",
+      "targets": [{ "name": "macros", "kind": ["proc-macro"] }]
+    }
+  ],
+  "workspace_default_members": ["path+file:///w/libonly#0.1.0", "path+file:///w/binonly#0.1.0"]
+}

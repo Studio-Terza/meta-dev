@@ -147,6 +147,7 @@ dependencies = [
  "file-ports",
  "gate-limits",
  "grammar-assignment",
+ "grammar-cargo-option",
  "grammar-shard",
  "grammar-spec-line",
  "grammar-test-summary",
@@ -713,6 +714,15 @@ dependencies = [
  "grammar-unspelled",
  "laws",
  "newtype",
+]
+
+[[package]]
+name = "grammar-cargo-option"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "grammar-unspelled",
+ "laws",
 ]
 
 [[package]]
@@ -1524,7 +1534,9 @@ name = "lint-no-ignored-tests"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
+ "lint-placement",
  "proc-macro2",
  "syn 2.0.119",
 ]

@@ -55,7 +55,7 @@ jobs:
       - name: clippy
         id: clippy
         if: env.BUILD_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets --timings $BUILD_SCOPE -- -D warnings'
+        run: '"$TOOLS/ci" clippy-targets "$MEASURED" clippy --timings $BUILD_SCOPE -- -D warnings'
       - name: fuzz targets clippy
         if: env.BUILD_SCOPE == '--workspace' || contains(format('{0} ', env.BUILD_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
