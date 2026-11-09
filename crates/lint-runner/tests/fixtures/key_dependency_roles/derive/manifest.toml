@@ -1,0 +1,8 @@
+[package]
+name = "derive"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+design = { path = "../design" }

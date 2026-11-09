@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  conversational (message, ordinal, provenance)\nVALUES\n  (?1, 0, 'init')\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "bd808c825cc8e678950c5496680e83c41b8ec901db32095eedac6dde9bd08cd6"
+}

@@ -7,6 +7,7 @@ use std::io::Write;
 use step::clippy_targets::ClippyTargets;
 use step::cold_size::ColdSize;
 use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
+use step::graph_path::GraphPath;
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
@@ -24,6 +25,7 @@ pub enum Command {
     MeasuredHistory(MeasuredHistory),
     RatchetLower(RatchetLower),
     CompileTimes(CompileTimes),
+    GraphPath(GraphPath),
     Logged(Logged),
     Tools(InstallTools),
     ToolsKey(ToolsKey),
@@ -50,6 +52,7 @@ impl Command {
     const MEASURED_HISTORY: &'static str = "measured-history";
     const RATCHET_LOWER: &'static str = "ratchet-lower";
     const COMPILE_TIMES: &'static str = "compile-times";
+    const GRAPH_PATH: &'static str = "graph-path";
     const LOGGED: &'static str = "logged";
     const TOOLS: &'static str = "tools";
     const TOOLS_KEY: &'static str = "tools-key";
@@ -76,6 +79,7 @@ impl Command {
             Some(Self::MEASURED_HISTORY) => Self::parsed(arguments.collect(), Command::MeasuredHistory),
             Some(Self::RATCHET_LOWER) => Self::parsed(arguments.collect(), Command::RatchetLower),
             Some(Self::COMPILE_TIMES) => Self::parsed(arguments.collect(), Command::CompileTimes),
+            Some(Self::GRAPH_PATH) => Self::parsed(arguments.collect(), Command::GraphPath),
             Some(Self::LOGGED) => Self::parsed(arguments.collect(), Command::Logged),
             Some(Self::TOOLS) => Self::parsed(arguments.collect(), Command::Tools),
             Some(Self::TOOLS_KEY) => Self::parsed(arguments.collect(), Command::ToolsKey),
@@ -109,6 +113,7 @@ impl Command {
             Command::MeasuredHistory(step) => step.carry_out(ports, out),
             Command::RatchetLower(step) => step.carry_out(ports, out),
             Command::CompileTimes(step) => step.carry_out(ports, out),
+            Command::GraphPath(step) => step.carry_out(ports, out),
             Command::Logged(step) => step.carry_out(ports, out),
             Command::Tools(step) => step.carry_out(ports, out),
             Command::ToolsKey(step) => step.carry_out(ports, out),

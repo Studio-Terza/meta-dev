@@ -26,7 +26,7 @@ design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
 dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
-grammar = { path = "../grammar" }
+grammar-search = { path = "../grammar-search" }
 laws = { path = "../laws" }
 strum.workspace = true
 tempfile.workspace = true

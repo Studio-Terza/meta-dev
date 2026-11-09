@@ -25,7 +25,7 @@ use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
 use crate::word::Word;
-pub use key_lines::KeyLines;
+pub use key_lines::{KeyLines, TableKey};
 use members::Members;
 
 #[derive(Debug)]

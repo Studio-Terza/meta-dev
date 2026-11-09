@@ -1,0 +1,26 @@
+[package]
+name = "grammar-output"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.lexer]
+format = "output"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+grammar-cited = { path = "../grammar-cited" }
+newtype = { path = "../newtype" }
+thiserror.workspace = true
+
+[dev-dependencies]
+grammar-search = { path = "../grammar-search" }
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

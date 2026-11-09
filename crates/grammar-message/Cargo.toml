@@ -1,0 +1,23 @@
+[package]
+name = "grammar-message"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.lexer]
+format = "message"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+newtype = { path = "../newtype" }
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

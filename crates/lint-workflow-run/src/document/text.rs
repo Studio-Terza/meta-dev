@@ -3,7 +3,7 @@ mod expansion;
 use std::fmt;
 use std::path::Path;
 
-use grammar::program::Program;
+use grammar_program::Program;
 use newtype::{Newtype, Wrapping};
 
 use crate::characters::Characters;

@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::num::NonZeroU8;
 
-use grammar::spec_line::{Attachment, Line, Spec};
+use grammar_spec_line::{Attachment, Line, Spec};
 use text_lines::Lines;
 
 use crate::cli::command::failure::Failure;

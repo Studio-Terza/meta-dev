@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use grammar::cargo_option::{CargoOption, Options};
+use grammar_cargo_option::{CargoOption, Options};
 
 use super::name::PackageId;
 use super::workspace::Package;

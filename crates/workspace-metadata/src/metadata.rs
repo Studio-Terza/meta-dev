@@ -14,10 +14,10 @@ use crate::package_id::PackageId;
 use crate::readers::Readers;
 use crate::unreadable::Unreadable;
 pub use library::Library;
-pub use package::Form;
+pub use package::{Expanders, Form, MacroName};
 pub(crate) use package::{Package, PortTable};
-pub(crate) use resolve::Node;
-use resolve::{NodeDependency, Resolve};
+use resolve::Resolve;
+pub(crate) use resolve::{Node, NodeDependency};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Metadata {

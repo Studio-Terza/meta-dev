@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::io;
 
 use sqlx::migrate::MigrateError;
@@ -18,4 +19,6 @@ pub enum StoreFailure {
     Statement(#[from] sqlx::Error),
     #[error("a stored column does not read back as its type: {0}")]
     Column(#[from] ColumnFailure),
+    #[error("the store's rewrite refuses to open it: {0}")]
+    Refused(#[source] Box<dyn Error + Send + Sync>),
 }

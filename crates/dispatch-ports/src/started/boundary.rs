@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use grammar::lstart::Stamp;
+use grammar_lstart::Stamp;
 use named_derive::Named;
 use newtype::Spelled;
 

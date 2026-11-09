@@ -1,4 +1,4 @@
-use grammar::message::{Lexeme, Mark, Span};
+use grammar_message::{Lexeme, Mark, Span};
 
 use crate::form::Form;
 use transcript_ports::Uuid;

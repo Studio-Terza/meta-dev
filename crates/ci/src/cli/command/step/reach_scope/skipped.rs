@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use grammar::assignment::Emptied;
+use grammar_assignment::Emptied;
 use text_lines::Lines;
 
 #[derive(Debug, PartialEq, Eq)]
