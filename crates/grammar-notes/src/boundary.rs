@@ -62,8 +62,9 @@ enum Lexeme {
     #[regex(r"[0-9a-f]{8}")]
     #[regex(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")]
     Cite,
-    #[regex(r"[\p{L}\p{N}]+(_+[\p{L}\p{N}]+)*")]
-    #[regex(r"[\p{L}\p{N}_]*[\p{L}\p{N}_&&[^0-9a-f]][\p{L}\p{N}_]*('[\p{L}\p{N}]+)+")]
+    #[regex(r#"[^ \t\r\n"():*_+>#\[\]'.,;!?\-—–…、。“”‘’]+"#, priority = 1)]
+    #[token("RULING's")]
+    #[token("LEAD's")]
     Word,
     #[token("'s")]
     Possessive,

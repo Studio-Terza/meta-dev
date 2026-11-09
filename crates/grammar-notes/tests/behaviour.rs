@@ -166,9 +166,9 @@ laws::law!(
     a_cite_before_a_possessive_is_named,
     vec(
         (
-            "[a-z]{1,6}('s|n't)?",
+            "[a-zéかな]{1,6}('s|n't)?",
             "[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-            "('s|'|:|,|\\.|\\))?",
+            "('s|'|:|,|\\.|\\)|—|…|、|。|”|’)?",
         ),
         0..5
     ),
@@ -297,6 +297,11 @@ laws::table!(
         "- 2026-11-06 lead: x" => "remark",
         "-x" => "remark",
         "plain prose" => "remark",
+        "RULING: café かな naïve" => "ruling",
+        "かな RULING" => "remark",
+        "café's RULING" => "remark",
+        "RULINGかな" => "remark",
+        "RULING— kept" => "ruling",
         "RULING (owner, explicit, 2026-11-05): \"the new trellis is approved.\"" => "ruling",
         "- 2026-11-06 RULING (owner, 0a1b2c3d): 'every bed gets a label'" => "ruling",
         "RULING (owner, explicit, 2026-11-05: \"done\"): the measure" => "ruling",
