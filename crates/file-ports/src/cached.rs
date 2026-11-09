@@ -4,6 +4,10 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use newtype::Wrapping;
 
+mod boundary;
+
+use boundary::Recall;
+
 use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
 
 #[derive(Debug)]
@@ -17,18 +21,18 @@ pub struct Cached<'files, F> {
 }
 
 #[derive(Debug)]
-struct Memo<Value>(Mutex<BTreeMap<PathBuf, Arc<OnceLock<Option<Value>>>>>);
+struct Memo<Value>(Mutex<BTreeMap<PathBuf, Arc<OnceLock<Recall<Value>>>>>);
 
 impl<Value: Clone> Memo<Value> {
     fn empty() -> Memo<Value> {
         Memo(Mutex::new(BTreeMap::new()))
     }
 
-    fn recalled(&self, path: &Path, fresh: impl FnOnce() -> Option<Value>) -> Option<Value> {
-        self.slot(path).get_or_init(fresh).clone()
+    fn recalled(&self, path: &Path, fresh: impl Fn() -> Result<Value, FileFailure>) -> Result<Value, FileFailure> {
+        self.slot(path).get_or_init(|| Recall::remembered(fresh())).replayed(fresh)
     }
 
-    fn slot(&self, path: &Path) -> Arc<OnceLock<Option<Value>>> {
+    fn slot(&self, path: &Path) -> Arc<OnceLock<Recall<Value>>> {
         let mut slots = self.0.lock().unwrap_or_else(PoisonError::into_inner);
         let found = slots.get(path).map(Arc::clone);
         found.unwrap_or_else(|| Arc::clone(slots.entry(path.to_path_buf()).or_default()))
@@ -61,19 +65,19 @@ impl<'files, F: Files> Cached<'files, F> {
         done
     }
 
-    fn decoded(&self, path: &Path) -> Option<Text> {
+    fn decoded(&self, path: &Path) -> Result<Text, FileFailure> {
         let read = self.read(path).ok().and_then(|bytes| String::from_utf8(bytes.into_inner()).ok());
-        read.map(Text::new).or_else(|| self.files.read_text(path).ok())
+        read.map(Text::new).map_or_else(|| self.files.read_text(path), Ok)
     }
 }
 
 impl<F: Files> Files for Cached<'_, F> {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
-        self.reads.recalled(path, || self.files.read(path).ok()).map_or_else(|| self.files.read(path), Ok)
+        self.reads.recalled(path, || self.files.read(path))
     }
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
-        self.texts.recalled(path, || self.decoded(path)).map_or_else(|| self.files.read_text(path), Ok)
+        self.texts.recalled(path, || self.decoded(path))
     }
 
     fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
@@ -93,19 +97,15 @@ impl<F: Files> Files for Cached<'_, F> {
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        self.listings
-            .recalled(directory, || self.files.entries(directory).ok())
-            .map_or_else(|| self.files.entries(directory), Ok)
+        self.listings.recalled(directory, || self.files.entries(directory))
     }
 
     fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
-        self.canonicals
-            .recalled(path, || self.files.canonical(path).ok())
-            .map_or_else(|| self.files.canonical(path), Ok)
+        self.canonicals.recalled(path, || self.files.canonical(path))
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        self.kinds.recalled(path, || Some(self.files.kind(path))).unwrap_or_else(|| self.files.kind(path))
+        self.kinds.recalled(path, || Ok(self.files.kind(path))).unwrap_or_else(|_| self.files.kind(path))
     }
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {

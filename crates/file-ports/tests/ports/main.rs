@@ -153,6 +153,28 @@ fn cached_reads_each_path_once_until_something_is_written_through_it() -> Result
 }
 
 #[test]
+fn cached_remembers_a_disk_failure_with_its_message_until_something_is_written_through_it() -> Result<(), FileFailure> {
+    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
+    let later = scratch.path().join("later.txt");
+    let cached = Cached::new(&Disk);
+    let first = cached.canonical(&later).map_err(|failure| failure.to_string());
+    Disk.write(&later, Bytes::from("now here"))?;
+    let remembered = cached.canonical(&later).map_err(|failure| failure.to_string());
+    let missing = matches!(cached.read_text(&later), Err(FileFailure::Missing(_)));
+    cached.write(&scratch.path().join("other.txt"), Bytes::from("other"))?;
+    assert_eq!(first, remembered);
+    assert_eq!(
+        first.map_err(|said| said
+            == Disk
+                .canonical(&scratch.path().join("absent"))
+                .map_or_else(|failure| failure.to_string(), |_| String::new())),
+        Err(true)
+    );
+    assert_eq!((missing, cached.read_text(&later)?.as_ref().to_owned()), (false, "now here".to_owned()));
+    Ok(())
+}
+
+#[test]
 fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
     let memory: Memory = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
     assert_eq!(memory.kind(Path::new("/a")), Kind::Directory);
