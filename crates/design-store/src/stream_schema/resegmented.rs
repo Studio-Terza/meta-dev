@@ -5,7 +5,7 @@ use std::fmt;
 use design_model::{Ordinal, Segment};
 use newtype::Counter;
 use port_core::Op;
-use store_ports::{Batch, Statements, StoreFailure, Version, Written};
+use store_ports::{Batch, Released, Statements, StoreFailure, Version, Written};
 use transcript_ports::Uuid;
 
 use crate::boundary::{MessageRow, Row, SegmentRow};
@@ -28,12 +28,16 @@ impl Resegmented {
 }
 
 impl Referenced {
-    fn refused(released: Vec<(Segment, Option<Written>)>) -> Result<Written, StoreFailure> {
-        let segments: Vec<Segment> =
-            released.iter().filter(|(_, written)| written.is_none()).map(|(segment, _)| segment.clone()).collect();
+    fn refused(stale: &[SegmentRow], released: &[Released]) -> Result<Written, StoreFailure> {
+        let segments: Vec<Segment> = stale
+            .iter()
+            .zip(released)
+            .filter(|(_, release)| **release == Released::Referenced)
+            .map(|(row, _)| row.segment())
+            .collect();
         segments
             .is_empty()
-            .then(|| Written::total(released.into_iter().filter_map(|(_, written)| written)))
+            .then(|| Written::total(released.iter().copied().map(Written::from)))
             .ok_or_else(|| StoreFailure::Refused(Box::new(Referenced { segments })))
     }
 }
@@ -56,11 +60,10 @@ impl Batch for Resegmented {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let messages = MessageRow::every(statements)?;
         let derived: Vec<SegmentRow> = messages.iter().flat_map(SegmentRow::within).collect();
-        let released = Resegmented::stale(&derived, SegmentRow::every(statements)?)
-            .iter()
-            .map(|row| row.released(statements).map(|written| (row.segment(), written)))
-            .collect::<Result<Vec<_>, StoreFailure>>()?;
-        let dropped = Referenced::refused(released)?;
+        let stale = Resegmented::stale(&derived, SegmentRow::every(statements)?);
+        let released =
+            stale.iter().map(|row| row.released(statements)).collect::<Result<Vec<Released>, StoreFailure>>()?;
+        let dropped = Referenced::refused(&stale, &released)?;
         let written =
             derived.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
         Ok(Written::total(written.into_iter().chain([dropped])))

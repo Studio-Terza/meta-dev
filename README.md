@@ -228,12 +228,13 @@ every message's segments through the same segmenter ingest runs, rewriting each 
 removing segments, so an old store holds the segments a fresh ingest of the same transcript would. Migration
 20261108000012 keeps the search index in step with every update and delete of a segment. Every row that points at a
 segment does so through a foreign key into `segments`, and the rewrite never lists those tables: it deletes each stored
-segment the segmenter would change or drop through `Statements::written_unless_referenced`, so SQLite checks every
-foreign key `pragma_foreign_key_list` reports, a table added later included. A re-derivation that would change the shape
-or body of a segment any row points at, or drop it, refuses the open with `StoreFailure::Refused`, naming every such
-segment as `message#ordinal`, and the store is left as it was. Segments nothing points at are still re-derived.
-Migration 20261109000001 gives `mechanical_links` the ordinals of its segment anchors (null for a message anchor) with
-foreign keys into `segments`, so a `cites` or `answers` link holds its segment like any annotation.
+segment the segmenter would change or drop through `Statements::released`, which answers `Released::Referenced` where a
+foreign key refuses the delete, so SQLite checks every foreign key `pragma_foreign_key_list` reports, a table added
+later included. A re-derivation that would change the shape or body of a segment any row points at, or drop it, refuses
+the open with `StoreFailure::Refused`, naming every such segment as `message#ordinal`, and the store is left as it was.
+Segments nothing points at are still re-derived. Migration 20261109000001 gives `mechanical_links` the ordinals of its
+segment anchors (null for a message anchor) with foreign keys into `segments`, so a `cites` or `answers` link holds its
+segment like any annotation.
 
 `store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
 formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.

@@ -1,13 +1,12 @@
 use std::collections::BTreeSet;
 
-use sqlx::error::ErrorKind;
 use sqlx::migrate::{Migrate, Migrator};
 use sqlx::query::{Map, Query};
 use sqlx::sqlite::SqliteRow;
-use sqlx::{Error, IntoArguments, Sqlite, SqliteConnection};
+use sqlx::{IntoArguments, Sqlite, SqliteConnection};
 use tokio::runtime::Runtime;
 
-use crate::{Columns, StoreFailure, Version, Written};
+use crate::{Columns, Released, StoreFailure, Version, Written};
 
 mod boundary;
 
@@ -54,18 +53,14 @@ impl<'run> Statements<'run> {
         Ok(Written::affected(&done))
     }
 
-    pub fn written_unless_referenced<Arguments>(
-        &mut self,
-        query: Query<'_, Sqlite, Arguments>,
-    ) -> Result<Option<Written>, StoreFailure>
+    pub fn released<Arguments>(&mut self, query: Query<'_, Sqlite, Arguments>) -> Result<Released, StoreFailure>
     where
         Arguments: Send + IntoArguments<Sqlite>,
     {
-        match self.runtime.block_on(query.execute(&mut *self.connection)) {
-            Ok(done) => Ok(Some(Written::affected(&done))),
-            Err(Error::Database(failed)) if failed.kind() == ErrorKind::ForeignKeyViolation => Ok(None),
-            Err(failed) => Err(StoreFailure::from(failed)),
-        }
+        self.runtime
+            .block_on(query.execute(&mut *self.connection))
+            .map(|done| Released::Deleted(Written::affected(&done)))
+            .or_else(Released::refused)
     }
 
     pub(crate) fn migrated(&mut self, migrator: &Migrator) -> Result<BTreeSet<Version>, StoreFailure> {

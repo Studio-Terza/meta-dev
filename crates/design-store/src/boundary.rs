@@ -8,7 +8,7 @@ use dispatch_ports::Reply;
 use file_ports::Offset;
 use grammar::search::Term;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
-use store_ports::{Columns, Statements, StoreFailure, Written};
+use store_ports::{Columns, Released, Statements, StoreFailure, Written};
 use stream::{Anchor, MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
@@ -261,9 +261,9 @@ ORDER BY
         ))
     }
 
-    pub(crate) fn released(&self, statements: &mut Statements<'_>) -> Result<Option<Written>, StoreFailure> {
+    pub(crate) fn released(&self, statements: &mut Statements<'_>) -> Result<Released, StoreFailure> {
         let SegmentRow { message, ordinal, .. } = self;
-        statements.written_unless_referenced(store_ports::query!(
+        statements.released(store_ports::query!(
             r#"
 DELETE FROM
   segments
