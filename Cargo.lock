@@ -134,6 +134,7 @@ dependencies = [
  "file-ports",
  "gate-limits",
  "grammar-assignment",
+ "grammar-branch",
  "grammar-cargo-option",
  "grammar-shard",
  "grammar-spec-line",
@@ -807,6 +808,14 @@ dependencies = [
  "grammar-unspelled",
  "laws",
  "newtype",
+]
+
+[[package]]
+name = "grammar-branch"
+version = "0.1.0"
+dependencies = [
+ "grammar",
+ "laws",
 ]
 
 [[package]]

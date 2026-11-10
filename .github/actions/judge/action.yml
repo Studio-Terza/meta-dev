@@ -13,7 +13,7 @@ runs:
       if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/project/') || github.base_ref == 'main' || startsWith(github.base_ref, 'project/')
       shell: bash
       env:
-        ARGS: ${{ inputs.stages }} --report-only test-compile clippy ${{ startsWith(github.base_ref, 'project/') && 'clippy test-run lint' || '' }}
+        ARGS: ${{ inputs.stages }} --report-only test-compile clippy
       run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" $ARGS'
     - name: step times
       if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
