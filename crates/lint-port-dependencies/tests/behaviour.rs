@@ -526,12 +526,15 @@ const SERVING_MANIFESTS: [Source; 4] = [LOGOS_PORT, IDENT_LEXER, UNSPELLED, MODE
 
 macro_rules! served {
     ($model:expr) => {
+        served!("null", $model)
+    };
+    ($declared:literal, $model:expr) => {
         Text::new(concat!(
             "{\"workspace_root\": \"/w\", \"workspace_members\": [\"grammar\", \"grammar-ident\", \"grammar-unspelled\", \"design-model\"], \"packages\": [",
             member!("grammar", "lib", "{\"port\": {\"owns\": [\"logos\"], \"dependents\": \"lexer\"}}", "logos"), ", ",
             member!("grammar-ident", "lib", "{\"lexer\": {\"format\": \"ident\"}}", "grammar", "grammar-unspelled"), ", ",
             member!("grammar-unspelled", "lib", "null"), ", ",
-            member!("design-model", "lib", "null", "grammar-ident", "grammar-unspelled"), ", ",
+            member!("design-model", "lib", $declared, "grammar-ident", "grammar-unspelled"), ", ",
             "{\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []}",
             "], \"resolve\": {\"nodes\": [",
             node!("grammar", "logos"), ", ",
@@ -546,6 +549,10 @@ macro_rules! served {
 
 const ONLY_LEXERS_ON_HELPER: Text = served!(node!("design-model", "grammar-ident"));
 const MODEL_ON_HELPER: Text = served!(node!("design-model", "grammar-ident", "grammar-unspelled"));
+const STORE_PORT_ON_LEXER: Text = served!(
+    "{\"port\": {\"owns\": [\"rusqlite\"], \"dependents\": \"store\"}}",
+    node!("design-model", "grammar-ident")
+);
 
 macro_rules! expanding {
     ($path:literal, $text:literal) => {
@@ -740,6 +747,7 @@ laws::table!(
         Placed::new(&SERVING_MANIFESTS, PORT_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar/src/lib.rs:1"]),
         Placed::new(&SERVING_MANIFESTS, HELPER_UNDENIED, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-unspelled/src/lib.rs:1"]),
         Placed::new(&SERVING_MANIFESTS, HELPER_UNDENIED, MODEL_ON_HELPER) => Lines::default(),
+        Placed::new(&SERVING_MANIFESTS, ALL_DENIED, STORE_PORT_ON_LEXER) => Lines::default(),
         Placed::new(&SERVING_MANIFESTS, LEXER_FORBIDDEN, ONLY_LEXERS_ON_HELPER) => Lines::default(),
         Placed::new(&SERVING_MANIFESTS, LEXER_DENIED_IN_TESTS, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
         Placed::new(&SERVING_MANIFESTS, LEXER_DENIED_OTHER, ONLY_LEXERS_ON_HELPER) => Lines::from(["crates/grammar-ident/src/lib.rs:1"]),
