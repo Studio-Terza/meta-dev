@@ -3421,6 +3421,7 @@ name = "workspace-metadata"
 version = "0.1.0"
 dependencies = [
  "golden",
+ "laws",
  "newtype",
  "serde",
  "serde_json",

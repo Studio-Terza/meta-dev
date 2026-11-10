@@ -8,6 +8,7 @@ use crate::role::Role;
 pub use macro_name::MacroName;
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Expanders {
     role: Role,
     macros: BTreeSet<MacroName>,

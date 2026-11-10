@@ -18,3 +18,23 @@ fn real_cargo_metadata_lists_each_dependency_library_with_its_root_form_and_rena
     golden::golden!("libraries.txt", &format!("{}\n", listed.join("\n")));
     Ok(())
 }
+
+macro_rules! ported {
+    ($table:literal) => {
+        concat!(
+            "{\"workspace_root\": \"/w\", \"packages\": [{\"name\": \"store\", \"manifest_path\": \"/w/crates/store/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": ",
+            $table,
+            "}}]}"
+        )
+    };
+}
+
+laws::table!(
+    a_port_table_reads_only_the_keys_it_knows,
+    |text: &&str| serde_json::from_str::<Metadata>(text).is_ok(),
+    [
+        ported!("{\"owns\": [\"rusqlite\"]}") => true,
+        ported!("{\"own\": [\"rusqlite\"]}") => false,
+        ported!("{\"owns\": [], \"expander\": {\"role\": \"store\", \"macros\": []}}") => false,
+    ]
+);

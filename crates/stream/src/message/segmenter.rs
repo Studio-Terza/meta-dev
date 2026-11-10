@@ -50,16 +50,17 @@ impl Part {
 }
 
 impl Fill {
-    fn marked(mark: Mark) -> Fill {
-        match mark {
+    fn marked(lexeme: Lexeme) -> Fill {
+        match lexeme.mark() {
             Mark::Break => Fill::Blank,
-            Mark::Stop | Mark::Numbered(..) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Fill::Written,
+            Mark::Plain => lexeme.ink().map_or(Fill::Blank, |_| Fill::Written),
+            Mark::Stop | Mark::Numbered(..) | Mark::Bulleted | Mark::Quoted | Mark::Uuid => Fill::Written,
         }
     }
 
-    fn after(self, mark: Mark) -> Fill {
+    fn after(self, lexeme: Lexeme) -> Fill {
         match self {
-            Fill::Blank => Fill::marked(mark),
+            Fill::Blank => Fill::marked(lexeme),
             Fill::Written => Fill::Written,
         }
     }
@@ -89,14 +90,14 @@ impl Open {
                 span: lexeme.span(),
                 ink: lexeme.ink(),
             },
-            fill: Fill::marked(lexeme.mark()),
+            fill: Fill::marked(lexeme),
         }
     }
 
     fn extended(self, lexeme: Lexeme) -> Open {
         Open {
             part: self.part.joined(Part { form: self.part.form, span: lexeme.span(), ink: lexeme.ink() }),
-            fill: self.fill.after(lexeme.mark()),
+            fill: self.fill.after(lexeme),
         }
     }
 

@@ -8,6 +8,7 @@ use crate::role::Role;
 use super::expanders::Expanders;
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PortTable {
     #[serde(default)]
     owns: BTreeSet<CrateName>,

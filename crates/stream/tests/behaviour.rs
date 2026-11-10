@@ -260,6 +260,7 @@ laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace
     prop_assert_eq!(inked(&bodies.concat()), inked(&text));
     let ends = |body: &String| [body.chars().next(), body.chars().last()].into_iter().flatten().collect::<Vec<char>>();
     prop_assert!(bodies.iter().flat_map(ends).all(|end| !end.is_whitespace()));
+    prop_assert!(bodies.iter().all(|body| !body.is_empty()));
 });
 
 laws::table!(
@@ -269,6 +270,8 @@ laws::table!(
         "Hello there.  How are you? \n1. one \n  - two\t\n> three \n" => ["Hello there.", "How are you?", "1. one", "- two", "> three"],
         "  padded  " => ["padded"],
         "1. yes\n2. no" => ["1. yes", "2. no"],
+        "First.\n  \nSecond." => ["First.", "Second."],
+        "- a profile.\n  \n  The auditor reads code." => ["- a profile.", "The auditor reads code."],
     ]
 );
 
