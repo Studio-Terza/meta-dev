@@ -11,3 +11,12 @@ laws::table!(
         (7, 7) => Elapsed::from(Duration::ZERO),
     ]
 );
+
+laws::table!(
+    an_elapsed_time_shows_its_whole_milliseconds,
+    |milliseconds: &u64| Elapsed::from(Duration::from_millis(*milliseconds)).to_string(),
+    [
+        1_500 => "1500".to_owned(),
+        0 => "0".to_owned(),
+    ]
+);

@@ -72,7 +72,6 @@ pub struct Lints;
 
 #[derive(Debug)]
 pub(crate) struct Crew<'scope> {
-    locator: Locator<'scope>,
     helpers: Helpers<'scope>,
 }
 
@@ -86,7 +85,6 @@ impl Crew<'_> {
     ) -> Verdict {
         let mine = Lints::worked(readout.done(), sources);
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
-        self.locator.joined();
         let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()));
         let surveyed = Surveyed::from(&worked);
@@ -173,13 +171,13 @@ impl Lints {
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
     ) -> Crew<'scope> {
-        let locator = Locator::spawned(scope, move || {
+        Locator::spawned(scope, move || {
             sources.located();
         });
         let helpers = Workers::available()
             .helpers()
             .filter_map(|index| Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ok());
-        Crew { locator, helpers: helpers.collect() }
+        Crew { helpers: helpers.collect() }
     }
 
     fn gathered<'run>(readout: &'run Readout, unlocated: Option<&'run Unlocated>, worked: Worked) -> Outcome<'run> {

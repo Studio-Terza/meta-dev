@@ -816,3 +816,19 @@ fn a_lexer_sharing_its_format_is_told_which_other_lexer_shares_it() {
     let ident = told.iter().filter(|line| line.contains("grammar-ident/Cargo.toml"));
     assert_eq!(ident.filter(|line| line.contains("which grammar-notes also lexes")).count(), 1, "{told:?}");
 }
+
+#[test]
+fn a_stale_owns_entry_and_a_lexer_off_its_leaf_say_what_they_found() {
+    let stale = Shown::placed_in::<OwnedDependencies>(&[ALPHA_OWNS_UNREACHED], CROSS_UNIT_CRATES, STALE);
+    let unleafed = Shown::placed_in::<KeyDependencyRoles>(&ROLE_MANIFESTS, ROLE_CRATES, LEXER_ON_STORE);
+    assert_eq!(
+        stale.iter().filter(|line| line.contains("which nothing in its unit depends on")).count(),
+        1,
+        "{stale:?}"
+    );
+    assert_eq!(
+        unleafed.iter().filter(|line| line.contains("is a lexer and depends on store-ports")).count(),
+        1,
+        "{unleafed:?}"
+    );
+}

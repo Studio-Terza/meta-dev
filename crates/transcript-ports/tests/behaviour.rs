@@ -541,3 +541,12 @@ laws::roundtrip!(
     |text: &String| SessionId::try_new(text.clone()).ok(),
     Some,
 );
+
+laws::table!(
+    a_body_holding_a_nul_is_refused_and_any_other_text_is_kept_whole,
+    |text: &&str| transcript_ports::Body::try_new((*text).to_owned()).ok().map(|body| body.to_string()),
+    [
+        "said\0plainly" => None,
+        "said plainly" => Some("said plainly".to_owned()),
+    ]
+);
