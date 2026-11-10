@@ -3,6 +3,7 @@ use serde::Deserialize;
 use crate::format::Format;
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LexerTable {
     format: Format,
 }

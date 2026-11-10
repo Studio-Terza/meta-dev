@@ -18,6 +18,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 golden = { path = "../golden" }
+laws = { path = "../laws" }
 serde_json.workspace = true
 
 [lints]
