@@ -91,10 +91,3 @@ impl Opens for SqliteOpener {
         Sqlite::in_memory::<S>()
     }
 }
-
-impl Drop for Shared {
-    fn drop(&mut self) {
-        let opened = self.opened.get_mut().unwrap_or_else(PoisonError::into_inner).take();
-        self.place.returned(opened, self.migrations);
-    }
-}

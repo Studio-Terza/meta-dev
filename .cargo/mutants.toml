@@ -1,9 +1,2 @@
 test_workspace = true
 exclude_globs = ["**/main.rs", "**/ports/system.rs"]
-exclude_re = [
-    '^crates/sqlite-ports/src/sqlite/opened\.rs:\d+:\d+: replace Opened::emptying ',
-    '^crates/sqlite-ports/src/sqlite/opened\.rs:\d+:\d+: replace Opened::emptied ',
-    '^crates/sqlite-ports/src/sqlite\.rs:\d+:\d+: replace <impl Drop for Shared>',
-    '^crates/sqlite-ports/src/sqlite/place\.rs:\d+:\d+: replace Place::returned ',
-    '^crates/sqlite-ports/src/sqlite/place/template\.rs:\d+:\d+: replace Template::returned ',
-]

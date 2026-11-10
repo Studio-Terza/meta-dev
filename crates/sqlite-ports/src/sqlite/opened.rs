@@ -8,7 +8,7 @@ use store_ports::{Batch, Query, StoreFailure, Written};
 
 use super::failed::{Unexecuted, Unopened};
 use super::migrations::Migrations;
-pub(super) use boundary::{Emptying, Snapshot};
+pub(super) use boundary::Snapshot;
 use connected::Connected;
 
 #[derive(Debug)]
@@ -39,14 +39,6 @@ impl Opened {
 
     pub(super) fn image(&self) -> Result<Snapshot, StoreFailure> {
         Ok(Snapshot::taken(&self.connection).map_err(Unopened::from)?)
-    }
-
-    pub(super) fn emptying(&self) -> Option<Emptying> {
-        Emptying::listed(&self.connection).ok().flatten()
-    }
-
-    pub(super) fn emptied(self, emptying: &Emptying) -> Option<Opened> {
-        emptying.emptied(&self.connection).ok().flatten().map(|()| self)
     }
 
     pub(super) fn read<Q: Query>(&self, query: Q) -> Result<Q::Rows, StoreFailure> {
