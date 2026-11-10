@@ -1,0 +1,24 @@
+[package]
+name = "design-closure"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.store]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+design-model = { path = "../design-model" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+serde_json.workspace = true
+store-ports = { path = "../store-ports" }
+thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[lints]
+workspace = true

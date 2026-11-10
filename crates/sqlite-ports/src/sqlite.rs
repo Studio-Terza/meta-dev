@@ -23,6 +23,7 @@ pub struct Sqlite {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SqliteOpener;
 
+#[must_use]
 #[derive(Debug)]
 struct Shared {
     place: Place,
@@ -88,5 +89,12 @@ impl Opens for SqliteOpener {
 
     fn in_memory<S: Schema>(&self) -> Sqlite {
         Sqlite::in_memory::<S>()
+    }
+}
+
+impl Drop for Shared {
+    fn drop(&mut self) {
+        let opened = self.opened.get_mut().unwrap_or_else(PoisonError::into_inner).take();
+        self.place.returned(opened, self.migrations);
     }
 }

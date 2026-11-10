@@ -128,3 +128,7 @@ preserves!(
     usize::wrapping_mul,
     |numbers: Vec<u8>| numbers.len()
 );
+
+laws::law!(a_given_value_is_built_once_and_shared_by_every_case, given table = Sample::sorted(&[3, 1, 2]), any::<u8>(), probe, {
+    proptest::prop_assert_eq!(table.binary_search(&probe).is_ok(), [1, 2, 3].contains(&probe));
+});

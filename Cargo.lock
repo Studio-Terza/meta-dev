@@ -273,6 +273,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "design-model",
+ "design-runs",
  "design-store",
  "dispatch-ports",
  "e2e",
@@ -322,6 +323,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "design-closure"
+version = "0.1.0"
+dependencies = [
+ "design-model",
+ "named-derive",
+ "newtype",
+ "serde_json",
+ "store-ports",
+ "thiserror",
+ "transcript-ports",
+]
+
+[[package]]
+name = "design-graph"
+version = "0.1.0"
+dependencies = [
+ "design-closure",
+ "design-jobs",
+ "design-model",
+ "file-ports",
+ "grammar-notes",
+ "newtype",
+ "port-core",
+ "store-ports",
+ "thiserror",
+ "transcript-ports",
+]
+
+[[package]]
+name = "design-jobs"
+version = "0.1.0"
+dependencies = [
+ "design-model",
+ "named-derive",
+ "newtype",
+ "port-core",
+ "store-ports",
+ "thiserror",
+]
+
+[[package]]
+name = "design-messages"
+version = "0.1.0"
+dependencies = [
+ "console-ports",
+ "design-closure",
+ "design-model",
+ "exit",
+ "file-ports",
+ "grammar-notes",
+ "grammar-search",
+ "newtype",
+ "port-core",
+ "store-ports",
+ "stream",
+ "transcript-ports",
+]
+
+[[package]]
 name = "design-model"
 version = "0.1.0"
 dependencies = [
@@ -341,25 +401,41 @@ dependencies = [
 ]
 
 [[package]]
-name = "design-store"
+name = "design-runs"
 version = "0.1.0"
 dependencies = [
- "console-ports",
+ "design-jobs",
  "design-model",
+ "design-store",
  "dispatch-ports",
- "exit",
- "file-ports",
- "grammar-notes",
- "grammar-search",
  "laws",
  "named-derive",
  "newtype",
  "port-core",
- "serde_json",
+ "sqlite-ports",
+ "store-ports",
+ "thiserror",
+ "transcript-ports",
+]
+
+[[package]]
+name = "design-store"
+version = "0.1.0"
+dependencies = [
+ "design-closure",
+ "design-graph",
+ "design-messages",
+ "design-model",
+ "design-runs",
+ "dispatch-ports",
+ "file-ports",
+ "grammar-search",
+ "laws",
+ "newtype",
+ "port-core",
  "sqlite-ports",
  "store-ports",
  "stream",
- "thiserror",
  "transcript-ports",
 ]
 
@@ -450,8 +526,8 @@ dependencies = [
 name = "equivalence"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "laws",
- "lint-core",
  "newtype",
 ]
 
@@ -496,6 +572,18 @@ name = "exit"
 version = "0.1.0"
 
 [[package]]
+name = "fallible-iterator"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
+
+[[package]]
+name = "fallible-streaming-iterator"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
+
+[[package]]
 name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -527,6 +615,12 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "foldhash"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "foldhash"
@@ -953,13 +1047,22 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
+version = "0.15.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
+dependencies = [
+ "foldhash 0.1.5",
+]
+
+[[package]]
+name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "allocator-api2",
  "equivalent",
- "foldhash",
+ "foldhash 0.2.0",
 ]
 
 [[package]]
@@ -968,7 +1071,16 @@ version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
- "foldhash",
+ "foldhash 0.2.0",
+]
+
+[[package]]
+name = "hashlink"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
+dependencies = [
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -1174,9 +1286,9 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.37.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f111c8c41e7c61a49cd34e44c7619462967221a6443b0ec299e0ac30cfb9b1"
+checksum = "133c182a6a2c87864fe97778797e46c7e999672690dc9fa3ee8e241aa4a9c13f"
 dependencies = [
  "pkg-config",
  "vcpkg",
@@ -1197,8 +1309,10 @@ dependencies = [
 name = "lint-arbitrary-newtypes"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1209,6 +1323,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1218,6 +1333,7 @@ name = "lint-clones"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1227,7 +1343,9 @@ name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "syn 2.0.119",
@@ -1239,6 +1357,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -1264,6 +1383,7 @@ name = "lint-crate-graph"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
@@ -1283,7 +1403,9 @@ dependencies = [
 name = "lint-effect-sites"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "lint-placement",
@@ -1297,6 +1419,7 @@ name = "lint-enum-predicates"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "syn 2.0.119",
@@ -1308,6 +1431,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -1318,6 +1442,7 @@ name = "lint-fakes-at-ports"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "lint-placement",
@@ -1351,6 +1476,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "newtype",
  "proc-macro2",
@@ -1361,7 +1487,9 @@ dependencies = [
 name = "lint-guard-must-use"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "lint-placement",
@@ -1373,7 +1501,9 @@ name = "lint-hand-impls"
 version = "0.1.0"
 dependencies = [
  "code-model",
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
 ]
 
@@ -1409,6 +1539,7 @@ name = "lint-linear-flow"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -1422,6 +1553,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1430,7 +1562,9 @@ dependencies = [
 name = "lint-long-exact-strings"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -1441,7 +1575,9 @@ name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
  "law-facts",
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1452,6 +1588,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -1462,6 +1599,7 @@ name = "lint-module-nesting"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -1474,6 +1612,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1483,6 +1622,7 @@ name = "lint-named-numbers"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1493,6 +1633,7 @@ version = "0.1.0"
 dependencies = [
  "code-model",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
 ]
 
@@ -1512,6 +1653,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -1522,6 +1664,7 @@ name = "lint-no-forwarders"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1532,6 +1675,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1540,8 +1684,10 @@ dependencies = [
 name = "lint-no-ignored-tests"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -1553,6 +1699,7 @@ name = "lint-no-numbers-in-binaries"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-named-numbers",
  "syn 2.0.119",
@@ -1563,6 +1710,7 @@ name = "lint-no-parameter-bags"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "syn 2.0.119",
@@ -1573,15 +1721,21 @@ name = "lint-no-plaintext"
 version = "0.1.0"
 dependencies = [
  "code-model",
+ "code-reader",
+ "file-ports",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
+ "lint-placement",
 ]
 
 [[package]]
 name = "lint-no-test-io"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "lint-placement",
@@ -1593,6 +1747,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -1604,7 +1759,9 @@ dependencies = [
 name = "lint-paired-apis"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "lint-placement",
@@ -1615,7 +1772,9 @@ dependencies = [
 name = "lint-paths"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -1627,7 +1786,9 @@ name = "lint-placement"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "laws",
  "lint-layout",
+ "lint-mandatory-laws",
  "syn 2.0.119",
 ]
 
@@ -1637,6 +1798,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-fakes-at-ports",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "lint-placement",
@@ -1647,9 +1809,11 @@ dependencies = [
 name = "lint-port-dependencies"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
  "lint-effect-sites",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "lint-placement",
@@ -1666,6 +1830,7 @@ version = "0.1.0"
 dependencies = [
  "code-model",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
 ]
 
@@ -1674,6 +1839,7 @@ name = "lint-private-fns"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1682,16 +1848,21 @@ dependencies = [
 name = "lint-process-starters"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
+ "lint-placement",
 ]
 
 [[package]]
 name = "lint-public-api-tests"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -1701,6 +1872,7 @@ name = "lint-public-surface"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "syn 2.0.119",
@@ -1710,7 +1882,9 @@ dependencies = [
 name = "lint-raw-resources"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
 ]
@@ -1737,6 +1911,7 @@ name = "lint-repeated-methods"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "newtype",
  "proc-macro2",
@@ -1750,7 +1925,9 @@ version = "0.1.0"
 dependencies = [
  "body-shape",
  "equivalence",
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -1855,8 +2032,10 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "newtype",
  "quote",
@@ -1867,7 +2046,9 @@ dependencies = [
 name = "lint-store-queries"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "proc-macro2",
@@ -1876,81 +2057,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-suite"
-version = "0.1.0"
-dependencies = [
- "code-reader",
- "file-ports",
- "laws",
- "lint-arbitrary-newtypes",
- "lint-bool-methods",
- "lint-clones",
- "lint-complexity",
- "lint-const-shape",
- "lint-core",
- "lint-crate-graph",
- "lint-distinct-signatures",
- "lint-effect-sites",
- "lint-enum-predicates",
- "lint-expression-flow",
- "lint-fakes-at-ports",
- "lint-fixtures",
- "lint-fn-shape",
- "lint-guard-must-use",
- "lint-hand-impls",
- "lint-layout",
- "lint-linear-flow",
- "lint-literal-names",
- "lint-long-exact-strings",
- "lint-mandatory-laws",
- "lint-manual-iteration",
- "lint-module-nesting",
- "lint-named-lifetimes",
- "lint-named-numbers",
- "lint-narrowed-returns",
- "lint-no-early-exits",
- "lint-no-forwarders",
- "lint-no-free-fns",
- "lint-no-ignored-tests",
- "lint-no-numbers-in-binaries",
- "lint-no-parameter-bags",
- "lint-no-plaintext",
- "lint-no-test-io",
- "lint-no-test-only-api",
- "lint-paired-apis",
- "lint-paths",
- "lint-placement",
- "lint-port-batching",
- "lint-port-dependencies",
- "lint-primitive-boundary",
- "lint-private-fns",
- "lint-process-starters",
- "lint-public-api-tests",
- "lint-public-surface",
- "lint-raw-resources",
- "lint-reader",
- "lint-repeated-methods",
- "lint-repeated-shapes",
- "lint-rust-only",
- "lint-state-graph",
- "lint-store-queries",
- "lint-test-budget",
- "lint-thin-main",
- "lint-transition-graph",
- "lint-type-shape",
- "lint-unconsumed-traits",
- "lint-vec-out-params",
- "lint-workflow-run",
- "syn 2.0.119",
- "transition-facts",
- "type-facts",
-]
-
-[[package]]
 name = "lint-test-budget"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "lint-process-starters",
@@ -1964,6 +2076,7 @@ name = "lint-thin-main"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -1978,7 +2091,10 @@ dependencies = [
  "body-shape",
  "equivalence",
  "law-facts",
+ "laws",
  "lint-core",
+ "lint-distinct-signatures",
+ "lint-fixtures",
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
@@ -1996,6 +2112,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -2006,6 +2123,7 @@ name = "lint-unconsumed-traits"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -2015,6 +2133,7 @@ name = "lint-vec-out-params"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -2025,8 +2144,10 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "grammar-program",
+ "laws",
  "lint-core",
  "lint-layout",
+ "lint-mandatory-laws",
  "newtype",
  "saphyr",
 ]
@@ -2314,6 +2435,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "query-ports"
+version = "0.1.0"
+dependencies = [
+ "console-ports",
+ "exit",
+ "golden",
+ "hex",
+ "proc-macro2",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "sqlx-core",
+ "sqlx-sqlite",
+ "syn 2.0.119",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2405,6 +2547,20 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "rusqlite"
+version = "0.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "165ca6e57b20e1351573e3729b958bc62f0e48025386970b6e4d29e7a7e71f3f"
+dependencies = [
+ "bitflags",
+ "fallible-iterator",
+ "fallible-streaming-iterator",
+ "hashlink 0.10.0",
+ "libsqlite3-sys",
+ "smallvec",
+]
 
 [[package]]
 name = "rustix"
@@ -2578,24 +2734,12 @@ dependencies = [
 name = "sqlite-ports"
 version = "0.1.0"
 dependencies = [
- "console-ports",
- "exit",
- "golden",
- "hex",
  "newtype",
  "port-core",
- "proc-macro2",
- "serde",
- "serde_json",
+ "rusqlite",
  "sha2 0.10.9",
- "sqlx",
- "sqlx-core",
- "sqlx-sqlite",
  "store-ports",
- "syn 2.0.119",
- "tempfile",
  "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -2779,6 +2923,7 @@ name = "store-ports"
 version = "0.1.0"
 dependencies = [
  "design-model",
+ "design-runs",
  "design-store",
  "dispatch-ports",
  "file-ports",
@@ -3100,6 +3245,7 @@ version = "0.1.0"
 dependencies = [
  "body-lifts",
  "lint-core",
+ "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "newtype",

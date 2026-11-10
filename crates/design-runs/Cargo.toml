@@ -1,0 +1,31 @@
+[package]
+name = "design-runs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.store]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+design-jobs = { path = "../design-jobs" }
+design-model = { path = "../design-model" }
+dispatch-ports = { path = "../dispatch-ports" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+store-ports = { path = "../store-ports" }
+thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+design-store = { path = "../design-store" }
+laws = { path = "../laws" }
+sqlite-ports = { path = "../sqlite-ports" }
+
+[lints]
+workspace = true

@@ -1,4 +1,4 @@
-use lint_core::Site;
+use code_model::Site;
 
 use crate::member::Keyed;
 

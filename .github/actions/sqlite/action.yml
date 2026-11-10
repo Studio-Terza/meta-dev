@@ -1,0 +1,15 @@
+name: sqlite
+description: Build the pinned SQLite source once per version and flags into SQLITE3_LIB_DIR, so cargo links it instead of compiling it
+
+runs:
+  using: composite
+  steps:
+    - id: cached
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.SQLITE3_LIB_DIR }}
+        key: sqlite-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'crates/ci/src/cli/command/step/sqlite/boundary.rs') }}
+    - name: build sqlite
+      if: steps.cached.outputs.cache-hit != 'true'
+      shell: bash
+      run: '"$TOOLS/ci" sqlite "$SQLITE3_LIB_DIR"'

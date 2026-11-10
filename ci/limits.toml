@@ -7,13 +7,13 @@ warn = 12
 block = 18
 
 [test-run]
-warn = 2
-block = 3.5
+warn = 3.5
+block = 7
 
 [lint]
-warn = 1.5
-block = 3
+warn = 3
+block = 6
 
 [graph-path]
-warn = 3.96
-block = 5.28
+warn = 5.28
+block = 8

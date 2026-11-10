@@ -1,72 +1,14 @@
-#![deny(clippy::wildcard_enum_match_arm)]
+mod recall;
 
-mod acyclic;
-mod annotation;
-mod applied_file;
-mod asked_earlier;
-mod boundary;
-mod citation;
-mod covered;
-mod cursors;
-mod directions;
-mod earlier_lines;
-mod graph;
-mod imported_notes;
-mod imports;
-mod link;
-mod listed;
-mod placed;
-mod placement;
-mod prefixed;
-mod prefixes;
-mod project_root;
-mod quoted;
-mod relative;
-mod remit;
-mod runs;
-mod scope;
-mod search_segments;
-mod session_cursors;
-mod session_records;
-mod shown_message;
-mod shown_node;
-mod stored;
-mod stream_schema;
-
-pub use acyclic::{Closes, Cycle, Refusal};
-pub use annotation::{Annotation, Remarking};
-pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
-pub use asked_earlier::{Asked, AskedEarlier};
-pub use boundary::{Account, Excerpt, Hit, LinkRow, RelationName, ShapeName};
-pub use citation::Citation;
-pub use covered::Covered;
-pub use cursors::Cursors;
-pub use directions::{Directed, Directions};
-pub use earlier_lines::EarlierLines;
-pub use graph::{Cast, ContextNodes, Ended, Linked, Planting, Resolved, Resolving, Restaged};
-pub use imported_notes::{ImportedEnding, ImportedNotes, Noted};
-pub use imports::{Imported, Imports};
-use link::Link;
-use listed::Listed;
-pub use placed::Placed;
-pub use placement::{CurrentSpans, Placement};
-pub use prefixed::{Cited, NextNode, Prefixed, Spoken, Started};
-pub use prefixes::{Prefixes, Shortest};
-pub use project_root::ProjectRoot;
-pub use quoted::{Quoted, QuotedSegments};
-use relative::Relative;
-pub use remit::{JobRepeated, Remit, Unpaid};
-pub use runs::{
-    FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRetried,
-    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Ran, Retold, RunEnded, RunSpawned, RunState, RunsOf,
-    Spawned, StoredRun, Unplaced, UnplacedSegments, Unreported, UnreportedFailures, Unstructured,
+pub use design_closure::{Annotation, Closes, Cycle, Remarking};
+pub use design_graph::{
+    AppliedFile, AppliedId, Cast, Citation, Cited, ContextNodes, Covered, CurrentSpans, Directed, Directions, Earlier,
+    Ended, Imported, Imports, JobRepeated, Linked, NextNode, Placed, Placement, Planting, Prefixed, ProjectRoot,
+    Refusal, Remit, Resolved, Resolving, Restaged, Seen, Sees, ShownNode, Spoken, Started, Unpaid, Unseen,
 };
-use runs::{JobClosed, JobState};
-pub use scope::Scope;
-pub use search_segments::SearchSegments;
-pub use session_cursors::SessionCursors;
-pub use session_records::{Holding, SessionRecords};
-pub use shown_message::ShownMessage;
-pub use shown_node::ShownNode;
-pub use stored::Stored;
-pub use stream_schema::StreamSchema;
+pub use design_messages::{
+    Asked, AskedEarlier, Cursors, EarlierLines, Hit, Holding, ImportedEnding, ImportedNotes, LinkRow, Noted, Prefixes,
+    Quoted, QuotedSegments, RelationName, Scope, SearchSegments, SessionCursors, SessionRecords, ShapeName, Shortest,
+    ShownMessage, Stored, StreamSchema,
+};
+pub use recall::{Recall, Recalled, Recollection};

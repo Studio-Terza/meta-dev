@@ -2,11 +2,11 @@ use std::collections::BTreeSet;
 use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
-use design_store::{
-    Account, Asked, AskedEarlier, ContextNodes, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened,
-    JobsInterrupted, LiveRuns, NextJob, NextRun, OpenJobs, Remit, Retold, RunEnded, RunSpawned, RunState, RunsOf,
-    Spawned, StoredRun, Unplaced, Unstructured,
+use design_runs::{
+    Account, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns, NextJob,
+    NextRun, OpenJobs, Retold, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
 };
+use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
     AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
 };

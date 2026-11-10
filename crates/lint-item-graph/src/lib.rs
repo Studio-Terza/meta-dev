@@ -1,8 +1,10 @@
+mod file_names;
 mod node_index;
 mod referenced_names;
 mod scope;
 mod traversal;
 
+pub use file_names::FileNames;
 pub use referenced_names::ReferencedNames;
 pub use scope::Scope;
 pub use traversal::Traversal;
@@ -11,7 +13,6 @@ use node_index::NodeIndex;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lint_core::SourceFile;
 use lint_layout::Name;
 
 #[derive(Clone, Debug, Default)]
@@ -22,15 +23,6 @@ pub struct ItemGraph<Node = Name> {
 }
 
 impl ItemGraph {
-    #[must_use]
-    pub fn of_files(files: &[&SourceFile]) -> ItemGraph {
-        let references = files
-            .iter()
-            .map(|file| ReferencedNames::of_file(file))
-            .fold(ReferencedNames::default(), ReferencedNames::merged);
-        references.into_graph()
-    }
-
     fn standing_in(self, names: &BTreeSet<Name>) -> ItemGraph {
         let indexed = self.names.iter().enumerate().filter(|(_, name)| names.contains(*name));
         ItemGraph { stand_ins: indexed.map(|(index, _)| NodeIndex::from(index)).collect(), ..self }

@@ -6,34 +6,20 @@ license.workspace = true
 publish.workspace = true
 
 [package.metadata.port]
-owns = ["sqlx", "sqlx-core", "sqlx-macros", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "tokio", "tokio-stream"]
-shared = ["hex", "proc-macro2", "quote", "serde", "serde_core", "serde_json", "sha2", "syn", "thiserror"]
+owns = ["rusqlite"]
+shared = ["sha2", "thiserror"]
 
 [lib]
 test = false
 doctest = false
 
 [dependencies]
-console-ports = { path = "../console-ports" }
-exit = { path = "../exit" }
-hex.workspace = true
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
-proc-macro2.workspace = true
-sqlx.workspace = true
-sqlx-core = { version = "0.9.0", default-features = false, features = ["offline"] }
-sqlx-sqlite = { version = "0.9.0", default-features = false, features = ["offline"] }
-serde.workspace = true
-serde_json.workspace = true
+rusqlite = { version = "0.37.0", default-features = false, features = ["serialize"] }
 sha2.workspace = true
 store-ports = { path = "../store-ports" }
-syn.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
-
-[dev-dependencies]
-golden = { path = "../golden" }
-tempfile.workspace = true
 
 [lints]
 workspace = true

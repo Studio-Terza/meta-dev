@@ -2,7 +2,7 @@ use std::io::Write;
 use std::str::FromStr;
 
 use design_model::{JobId, Segment};
-use design_store::{HeldBy, JobRetried, RunsOf};
+use design_runs::{HeldBy, JobRetried, RunsOf};
 use grammar_output::Fields;
 use grammar_output::field::Integer;
 use store_ports::Store;

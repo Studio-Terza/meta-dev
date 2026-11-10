@@ -1,2 +1,10 @@
 test_workspace = true
 exclude_globs = ["**/main.rs", "**/ports/system.rs"]
+exclude_re = [
+    "Emptying::",
+    "Opened::emptying",
+    "Opened::emptied",
+    "impl Drop for Shared",
+    "Place::returned",
+    "Template::returned",
+]

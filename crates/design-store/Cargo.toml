@@ -13,24 +13,20 @@ doctest = false
 
 [dependencies]
 design-model = { path = "../design-model" }
-dispatch-ports = { path = "../dispatch-ports" }
-file-ports = { path = "../file-ports" }
-grammar-notes = { path = "../grammar-notes" }
 grammar-search = { path = "../grammar-search" }
-named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
-serde_json.workspace = true
 store-ports = { path = "../store-ports" }
-stream = { path = "../stream" }
-thiserror.workspace = true
-transcript-ports = { path = "../transcript-ports" }
-
-[build-dependencies]
-console-ports = { path = "../console-ports" }
-exit = { path = "../exit" }
+design-closure = { path = "../design-closure" }
+design-graph = { path = "../design-graph" }
+design-messages = { path = "../design-messages" }
 
 [dev-dependencies]
+dispatch-ports = { path = "../dispatch-ports" }
+file-ports = { path = "../file-ports" }
+stream = { path = "../stream" }
+transcript-ports = { path = "../transcript-ports" }
+design-runs = { path = "../design-runs" }
 sqlite-ports = { path = "../sqlite-ports" }
 laws = { path = "../laws" }
 

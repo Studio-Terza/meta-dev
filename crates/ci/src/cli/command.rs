@@ -10,6 +10,7 @@ use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize,
 use step::graph_path::GraphPath;
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
+use step::sqlite::BuildSqlite;
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
 use super::ports::{Exit, Ports};
@@ -41,6 +42,7 @@ pub enum Command {
     ShardSummary(ShardSummary),
     Matrix(Matrix),
     ColdSize(ColdSize),
+    BuildSqlite(BuildSqlite),
 }
 
 impl Command {
@@ -68,6 +70,7 @@ impl Command {
     const SHARD_SUMMARY: &'static str = "shard-summary";
     const MATRIX: &'static str = "matrix";
     const COLD_SIZE: &'static str = "cold-size";
+    const SQLITE: &'static str = "sqlite";
 
     pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
         match arguments.next().and_then(|name| name.into_string().ok()).as_deref() {
@@ -95,6 +98,7 @@ impl Command {
             Some(Self::SHARD_SUMMARY) => Self::parsed(arguments.collect(), Command::ShardSummary),
             Some(Self::MATRIX) => Self::parsed(arguments.collect(), Command::Matrix),
             Some(Self::COLD_SIZE) => Self::parsed(arguments.collect(), Command::ColdSize),
+            Some(Self::SQLITE) => Self::parsed(arguments.collect(), Command::BuildSqlite),
             _ => Err(Failure::Usage),
         }
     }
@@ -129,6 +133,7 @@ impl Command {
             Command::ShardSummary(step) => step.carry_out(ports, out),
             Command::Matrix(step) => step.carry_out(ports, out),
             Command::ColdSize(step) => step.carry_out(ports, out),
+            Command::BuildSqlite(step) => step.carry_out(ports, out),
         }
     }
 }

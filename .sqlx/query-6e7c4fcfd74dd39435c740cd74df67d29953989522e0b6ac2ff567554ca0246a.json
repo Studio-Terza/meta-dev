@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  nodes.id AS \"node!: i64\",\n  nodes.stage AS \"stage!: String\",\n  nodes.title AS \"title!: String\",\n  hits.rank AS \"rank!: f64\"\nFROM\n  (\n    SELECT\n      rowid,\n      rank\n    FROM\n      segments_fts\n    WHERE\n      segments_fts MATCH ?1\n    ORDER BY\n      rank\n    LIMIT\n      200\n  ) AS hits\n  JOIN segments ON segments.rowid = hits.rowid\n  JOIN span_edges ON span_edges.message = segments.message\n  AND span_edges.ordinal = segments.ordinal\n  JOIN nodes ON nodes.id = span_edges.node\n  JOIN live_nodes ON live_nodes.id = nodes.id\nWHERE\n  nodes.title <> ''\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "node!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "stage!: String",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "stage"
+          }
+        }
+      },
+      {
+        "name": "title!: String",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "rank!: f64",
+        "ordinal": 3,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "segments_fts",
+            "name": "rank"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "6e7c4fcfd74dd39435c740cd74df67d29953989522e0b6ac2ff567554ca0246a"
+}
