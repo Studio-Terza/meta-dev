@@ -12,5 +12,8 @@ doctest = false
 [dependencies]
 port-core = { path = "../port-core" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true
