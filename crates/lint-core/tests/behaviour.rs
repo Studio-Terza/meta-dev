@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::rc::Rc;
 
 use lint_core::{Macros, SourceFile, SourceText};
 use syn::Macro;
@@ -44,5 +45,6 @@ fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_ne
     assert_eq!([Walked::statements(&file, outer), Walked::statements(&file, &copied)], [first.clone(), first]);
     assert_eq!(Walked::statements(&file, inner).len(), 1);
     assert_eq!(Walked::statements(&file, inner), Walked::statements(&file, &inner_copy));
+    assert!(Rc::ptr_eq(&Macros::expanded(&file, inner), &Macros::expanded(&file, inner)));
     Ok(())
 }
