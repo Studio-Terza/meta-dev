@@ -832,3 +832,10 @@ fn a_stale_owns_entry_and_a_lexer_off_its_leaf_say_what_they_found() {
         "{unleafed:?}"
     );
 }
+
+#[test]
+fn an_expansion_outside_its_role_names_the_role_to_declare() {
+    let told = Shown::placed_in::<KeyDependencyRoles>(&EXPANDING_MANIFESTS, QUERIED, LEXERS_IN_ROLE);
+    let named = told.iter().filter(|line| line.contains("in a crate that does not declare [package.metadata.store]"));
+    assert_eq!(named.count(), 1, "{told:?}");
+}
