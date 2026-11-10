@@ -3118,6 +3118,7 @@ dependencies = [
 name = "timer-ports"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "port-core",
 ]
 
