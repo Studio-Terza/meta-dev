@@ -1,5 +1,4 @@
 mod bound;
-mod cached;
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -9,7 +8,7 @@ use syn::{LitStr, Token, Type};
 
 use crate::expanded::Expanding;
 use bound::Bound;
-use cached::{Entry, Unexpanded};
+use query_cache::{Entry, Unexpanded};
 
 #[derive(Debug)]
 pub struct Query {

@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::LitStr;
 
-use crate::ports::Disk;
+use query_cache::Disk;
 
 #[derive(Debug)]
 pub struct Directory(PathBuf);

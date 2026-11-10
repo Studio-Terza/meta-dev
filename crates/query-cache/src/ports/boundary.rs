@@ -17,6 +17,7 @@ impl Disk {
         fs::read_to_string(path)
     }
 
+    #[must_use]
     pub fn held(path: PathBuf) -> Option<PathBuf> {
         Some(path).filter(|candidate| candidate.is_file())
     }

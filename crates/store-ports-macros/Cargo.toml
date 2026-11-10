@@ -15,6 +15,7 @@ doctest = false
 
 [dependencies]
 grammar-migration = { path = "../grammar-migration" }
+query-cache = { path = "../query-cache" }
 hex.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true

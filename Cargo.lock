@@ -2444,6 +2444,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "query-cache"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "laws",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "syn 2.0.119",
+ "thiserror",
+]
+
+[[package]]
 name = "query-ports"
 version = "0.1.0"
 dependencies = [
@@ -2955,6 +2970,7 @@ dependencies = [
  "grammar-migration",
  "hex",
  "proc-macro2",
+ "query-cache",
  "quote",
  "serde",
  "serde_json",
