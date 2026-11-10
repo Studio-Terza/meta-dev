@@ -63,7 +63,7 @@ use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
 use super::Survey;
-use crate::cli::boundary::{Helper, Helpers, Locator, Rendered, Slot, Surveyed, Worked, Workers};
+use crate::cli::boundary::{Helper, Helpers, Rendered, Slot, Surveyed, Worked, Workers};
 use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
 use crate::cli::{Outcome, Sources, Verdict};
 
@@ -171,9 +171,6 @@ impl Lints {
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
     ) -> Crew<'scope> {
-        Locator::spawned(scope, move || {
-            sources.located();
-        });
         let helpers = Workers::available()
             .helpers()
             .filter_map(|index| Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ok());

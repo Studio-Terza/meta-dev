@@ -114,15 +114,6 @@ impl Queue {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct Locator;
-
-impl Locator {
-    pub(crate) fn spawned<'scope>(scope: &'scope Scope<'scope, '_>, locate: impl FnOnce() + Send + 'scope) {
-        thread::Builder::new().spawn_scoped(scope, locate).ok();
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Workers(usize);
 
