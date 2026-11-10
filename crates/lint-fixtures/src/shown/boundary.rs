@@ -1,6 +1,10 @@
-use lint_core::{Lint, Report, SourceFile};
+use std::str::FromStr;
 
-use crate::{Sources, Text};
+use lint_core::{Lint, Report, SourceFile, WorkspaceLint};
+use newtype::Wrapping;
+use workspace_metadata::Metadata;
+
+use crate::{Source, Sources, Text};
 
 #[derive(Debug)]
 pub struct Shown;
@@ -22,6 +26,17 @@ impl Shown {
     #[must_use]
     pub fn reported<Checked: Lint>(pair: &[&str]) -> Vec<String> {
         Self::filtered(pair, |files| Self::listed(&Checked::report(files)))
+    }
+
+    #[must_use]
+    pub fn placed_in<Checked: WorkspaceLint>(
+        manifests: &[Source],
+        sources: &[Source],
+        workspace: Text<'_>,
+    ) -> Vec<String> {
+        let workspaces = [Sources::kept(Metadata::from_str(workspace.into_inner()))];
+        let files = Sources::placed(manifests, sources);
+        Self::listed(&Checked::report(&files, &workspaces))
     }
 
     #[must_use]

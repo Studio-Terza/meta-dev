@@ -31,7 +31,7 @@ impl Sources {
         Self::kept(SourceFile::parse(path, SourceText::new(text.into_inner().to_owned())))
     }
 
-    fn kept<Parsed>(parsed: Result<Parsed, impl fmt::Display>) -> Parsed {
+    pub(crate) fn kept<Parsed>(parsed: Result<Parsed, impl fmt::Display>) -> Parsed {
         match parsed {
             Ok(file) => file,
             Err(failure) => unreachable!("fixture source parses: {failure}"),
