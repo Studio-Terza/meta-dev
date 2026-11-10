@@ -2812,6 +2812,9 @@ fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Res
     let recalled = applying.run(&["recall", "elephants"])?;
     let strongest = "n3 vague: Trunks";
     assert_eq!(recalled.get(..strongest.len()), Some(strongest), "{recalled}");
+    let both = applying.run(&["recall", "elephants", "rivers"])?;
+    let summed = "n2 vague: Herds";
+    assert_eq!(both.get(..summed.len()), Some(summed), "{both}");
     assert_eq!(Lines::missing(&recalled, &["n2 vague: Herds"]), Vec::<&&str>::new(), "{recalled}");
     Ok(())
 }
