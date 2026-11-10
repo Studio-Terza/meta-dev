@@ -839,3 +839,13 @@ fn an_expansion_outside_its_role_names_the_role_to_declare() {
     let named = told.iter().filter(|line| line.contains("in a crate that does not declare [package.metadata.store]"));
     assert_eq!(named.count(), 1, "{told:?}");
 }
+
+const QUERIED_IN_MODULE: &[Source] = expanding!(
+    "crates/design/src/lib.rs",
+    "mod inner {\n    fn f() {\n        store_ports::query!(r#\"\nSELECT\n  1\n\"#);\n    }\n}\n"
+);
+
+#[test]
+fn an_expansion_inside_an_inline_module_is_found() {
+    assert_eq!(Expanding(QUERIED_IN_MODULE).flagged(), Lines::from(["crates/design/src/lib.rs:3"]));
+}

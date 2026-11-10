@@ -20,3 +20,13 @@ laws::table!(
         0 => "0".to_owned(),
     ]
 );
+
+#[test]
+fn the_monotonic_clock_moves_forward_with_time() {
+    let run = port_core::Run::root();
+    let clock = run.port(timer_ports::Monotonic::default());
+    let first = timer_ports::Timer::now(&clock);
+    std::thread::sleep(Duration::from_millis(5));
+    let later = timer_ports::Timer::now(&clock);
+    assert!(later.since(first) >= Elapsed::from(Duration::from_millis(5)));
+}

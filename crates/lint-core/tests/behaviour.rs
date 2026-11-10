@@ -48,3 +48,14 @@ fn a_macro_body_walks_to_the_same_statements_each_time_from_any_copy_and_when_ne
     assert!(Rc::ptr_eq(&Macros::expanded(&file, inner), &Macros::expanded(&file, inner)));
     Ok(())
 }
+
+#[test]
+fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), Box<dyn Error>> {
+    let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
+    let lengths = ["m!(a)", "m!(a; b)", "m!(a; b; c)"]
+        .iter()
+        .map(|text| syn::parse_str::<Macro>(text).map(|invocation| Macros::expanded(&file, &invocation).len()))
+        .collect::<Result<Vec<usize>, syn::Error>>()?;
+    assert_eq!(lengths, [1, 2, 3]);
+    Ok(())
+}

@@ -13,6 +13,7 @@ doctest = false
 port-core = { path = "../port-core" }
 
 [dev-dependencies]
+port-core = { path = "../port-core" }
 laws = { path = "../laws" }
 
 [lints]
