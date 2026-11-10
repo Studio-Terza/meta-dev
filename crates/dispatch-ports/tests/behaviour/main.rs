@@ -316,3 +316,12 @@ laws::roundtrip!(
     |text: &String| text.parse::<Started>().ok(),
     Some
 );
+
+laws::table!(
+    a_pause_lasts_its_whole_seconds,
+    |seconds: &u32| Duration::from(Pause::new(*seconds)),
+    [
+        3 => Duration::from_secs(3),
+        0 => Duration::ZERO,
+    ]
+);
