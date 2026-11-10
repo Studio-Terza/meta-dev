@@ -3,9 +3,12 @@ use std::io::Write;
 
 use console_ports::Heard;
 use design_runs::{Account, FailuresReported, Unreported, UnreportedFailures};
+use design_store::Recalled;
+use grammar_search::Terms;
 use newtype::Wrapping;
 use serde::{Deserialize, Serialize};
 use store_ports::Store;
+use transcript_ports::Body;
 
 use crate::cli::failure::Failure;
 use crate::cli::output::Count;
@@ -27,6 +30,11 @@ struct Handler {
     kind: &'static str,
     command: String,
     timeout: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Prompting {
+    prompt: Option<Body>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,7 +122,7 @@ impl Stopping {
                 |halt| Decision::Notice { system_message: halt.to_string() }.written(out),
                 |_jobs| Ok(Outcome::Hooked(HookEvent::Stop)),
             ),
-            None => Decision::told(store, HookEvent::Stop, out),
+            None => Decision::told(store, HookEvent::Stop, &[], out),
         }
     }
 }
@@ -126,12 +134,24 @@ impl From<bool> for Continuation {
 }
 
 impl Decision {
-    pub fn told(store: &impl Store, event: HookEvent, out: &mut impl Write) -> Result<Outcome, Failure> {
+    const RECALLED: &'static str = "Design nodes matching this message (design show <id>):";
+
+    pub fn told(
+        store: &impl Store,
+        event: HookEvent,
+        recalled: &[Recalled],
+        out: &mut impl Write,
+    ) -> Result<Outcome, Failure> {
         let unreported = store.read(UnreportedFailures)?;
-        let accounts: Vec<String> =
-            unreported.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string()).collect();
-        unreported.first().map(|_first| accounts.join("\n")).map_or(Ok(Outcome::Hooked(event)), |told| {
-            let outcome = Decision::telling(event, told).written(out)?;
+        let accounts = unreported.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string());
+        let nodes = recalled
+            .first()
+            .map(|_first| Self::RECALLED.to_owned())
+            .into_iter()
+            .chain(recalled.iter().map(Recalled::to_string));
+        let told: Vec<String> = accounts.chain(nodes).collect();
+        told.first().map(|_first| told.join("\n")).map_or(Ok(Outcome::Hooked(event)), |joined| {
+            let outcome = Decision::telling(event, joined).written(out)?;
             store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>())?;
             Ok(outcome)
         })
@@ -156,5 +176,18 @@ impl Decision {
             Decision::Notice { .. } => Outcome::Noticed,
             Decision::Context { .. } => Outcome::Told,
         }
+    }
+}
+
+impl Prompting {
+    pub fn heard(heard: Heard) -> Result<Prompting, Failure> {
+        let text = heard.into_inner();
+        text.is_empty()
+            .then_some(Prompting { prompt: None })
+            .map_or_else(|| serde_json::from_str(&text).map_err(Failure::Unheard), Ok)
+    }
+
+    pub fn terms(&self) -> Option<Terms> {
+        self.prompt.as_ref().map(Body::to_string).and_then(|prompt| Terms::lexed([prompt.as_str()]))
     }
 }

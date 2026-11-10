@@ -2779,3 +2779,34 @@ impl<F: Fn(PathBuf) -> Sqlite> Opens for Opening<F> {
         SqliteOpener.in_memory::<S>()
     }
 }
+
+struct Recalling;
+
+impl Recalling {
+    fn prompted(applying: &Applying, prompt: &str) -> Result<String, Failure> {
+        let heard = Heard::new(format!("{{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"{prompt}\"}}"));
+        let environment = Invocation::at("/work").hearing(heard);
+        let run = Run::root();
+        let mut out = Vec::new();
+        Cli::new(&environment, FakeLent::new(&applying.files), Opening(|_path| applying.store.clone()), Staff::idle())
+            .report(&run, ["hook", "user-prompt-submit"].iter().map(OsString::from), &mut out)?;
+        Ok(String::from_utf8(out).unwrap_or_default())
+    }
+}
+
+#[test]
+fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Result<(), Failure> {
+    let session = Found::said(&[
+        Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000011", "elephants gather near rivers".to_owned()),
+        Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000012", "tortoises sleep in winter".to_owned()),
+    ]);
+    let applying = Applying::over(&session)?;
+    applying.applied(
+        "propose(new, refines(n1), feature, \"Herds\")\nplace(aaaaaaaa-0000-4000-8000-000000000011.0, n2, mentions)",
+    )?;
+    let told = Recalling::prompted(&applying, "where do elephants roam")?;
+    assert!(told.contains("n2 vague: Herds"), "{told}");
+    let unmatched = Recalling::prompted(&applying, "tortoises")?;
+    assert_eq!(unmatched.matches("Herds").count(), 0, "{unmatched}");
+    Ok(())
+}

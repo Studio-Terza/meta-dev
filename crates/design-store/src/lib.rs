@@ -1,3 +1,5 @@
+mod recall;
+
 pub use design_closure::{Annotation, Closes, Cycle, Remarking};
 pub use design_graph::{
     AppliedFile, AppliedId, Cast, Citation, Cited, ContextNodes, Covered, CurrentSpans, Directed, Directions, Earlier,
@@ -9,3 +11,4 @@ pub use design_messages::{
     Quoted, QuotedSegments, RelationName, Scope, SearchSegments, SessionCursors, SessionRecords, ShapeName, Shortest,
     ShownMessage, Stored, StreamSchema,
 };
+pub use recall::{Recall, Recalled};
