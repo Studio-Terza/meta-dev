@@ -2427,3 +2427,26 @@ fn sqlite_whose_compile_fails_is_not_archived() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+#[test]
+fn a_build_script_waits_for_the_host_build_of_its_build_dependencies() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(
+        &[
+            Page::of("heavy", "1.0.0", "", "0.5"),
+            Page::of("sys", "0.3.0", " build-script", "0.1"),
+            Page::of("sys", "0.3.0", " build-script (run)", "0.2"),
+            Page::of("sys", "0.3.0", " (check)", "1.0"),
+        ]
+        .join(","),
+    );
+    let Graph { answer, .. } = Graph::measured(&page, TIMINGS_METADATA)?;
+    let expected = [
+        "graph-path 0.30 seconds, the longest chain of clippy units, counting only units sccache never caches:",
+        "0.00 heavy (build)",
+        "0.10 sys build-script",
+        "0.20 sys build-script (run)",
+        "graph-work 0.30 seconds, the sum of the same units",
+    ];
+    assert_eq!(Text::lines(&answer.out), expected);
+    Ok(())
+}
