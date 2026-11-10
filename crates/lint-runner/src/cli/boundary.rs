@@ -114,19 +114,6 @@ impl Queue {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct Locator<'scope>(Option<ScopedJoinHandle<'scope, ()>>);
-
-impl<'scope> Locator<'scope> {
-    pub(crate) fn spawned(scope: &'scope Scope<'scope, '_>, locate: impl FnOnce() + Send + 'scope) -> Locator<'scope> {
-        Locator(thread::Builder::new().spawn_scoped(scope, locate).ok())
-    }
-
-    pub(crate) fn joined(self) {
-        self.0.into_iter().for_each(|locating| locating.join().unwrap_or_else(|payload| resume_unwind(payload)));
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Workers(usize);
 
