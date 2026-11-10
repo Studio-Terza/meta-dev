@@ -11,4 +11,4 @@ pub use design_messages::{
     Quoted, QuotedSegments, RelationName, Scope, SearchSegments, SessionCursors, SessionRecords, ShapeName, Shortest,
     ShownMessage, Stored, StreamSchema,
 };
-pub use recall::{Recall, Recalled};
+pub use recall::{Recall, Recalled, Recollection};

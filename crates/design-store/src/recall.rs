@@ -75,3 +75,18 @@ impl fmt::Display for Recalled {
         write!(formatter, "n{} {}: {}", self.node.into_inner(), self.stage, self.title)
     }
 }
+
+#[derive(Debug)]
+pub struct Recollection<'recalled>(&'recalled [Recalled]);
+
+impl<'recalled> From<&'recalled [Recalled]> for Recollection<'recalled> {
+    fn from(recalled: &'recalled [Recalled]) -> Recollection<'recalled> {
+        Recollection(recalled)
+    }
+}
+
+impl fmt::Display for Recollection<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|recalled| writeln!(formatter, "{recalled}"))
+    }
+}

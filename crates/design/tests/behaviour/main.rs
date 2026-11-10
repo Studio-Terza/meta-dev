@@ -2808,5 +2808,7 @@ fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Res
     assert!(told.contains("n2 vague: Herds"), "{told}");
     let unmatched = Recalling::prompted(&applying, "tortoises")?;
     assert_eq!(unmatched.matches("Herds").count(), 0, "{unmatched}");
+    let recalled = applying.run(&["recall", "elephants"])?;
+    assert_eq!(Lines::missing(&recalled, &["n2 vague: Herds"]), Vec::<&&str>::new(), "{recalled}");
     Ok(())
 }
