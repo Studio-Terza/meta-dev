@@ -5,7 +5,8 @@ use design_model::{
     AnyNode, Artifact, Basis, Condition, Facet, JobId, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason,
     Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
 };
-use design_store::{AppliedId, Excerpt, RelationName, RunState, ShapeName};
+use design_runs::{Excerpt, RunState};
+use design_store::{AppliedId, RelationName, ShapeName};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
 use grammar_cited::Cited;

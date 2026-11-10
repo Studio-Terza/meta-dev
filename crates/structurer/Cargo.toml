@@ -17,7 +17,6 @@ grammar-directive = { path = "../grammar-directive" }
 grammar-output = { path = "../grammar-output" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
-strum.workspace = true
 text-lines = { path = "../text-lines" }
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }

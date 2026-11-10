@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::slice;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,15 +18,6 @@ pub struct Migration {
 pub struct Migrator {
     migrations: Vec<Migration>,
     missing: Missing,
-}
-
-impl From<Missing> for bool {
-    fn from(missing: Missing) -> bool {
-        match missing {
-            Missing::Refused => false,
-            Missing::Ignored => true,
-        }
-    }
 }
 
 impl Migration {
@@ -54,9 +46,9 @@ impl Migrator {
         Migrator { missing: Missing::Ignored, ..self }
     }
 
-    #[must_use]
-    pub fn missing(&self) -> Missing {
-        self.missing
+    pub fn undeclared(&self, applied: impl IntoIterator<Item = i64>) -> Option<i64> {
+        let declared: BTreeSet<i64> = self.migrations.iter().map(Migration::version).collect();
+        self.missing.refused(&declared, &applied.into_iter().collect())
     }
 }
 
@@ -72,5 +64,14 @@ impl<'migrator> IntoIterator for &'migrator Migrator {
 
     fn into_iter(self) -> slice::Iter<'migrator, Migration> {
         self.migrations.iter()
+    }
+}
+
+impl Missing {
+    fn refused(self, declared: &BTreeSet<i64>, applied: &BTreeSet<i64>) -> Option<i64> {
+        match self {
+            Missing::Refused => applied.difference(declared).next().copied(),
+            Missing::Ignored => None,
+        }
     }
 }

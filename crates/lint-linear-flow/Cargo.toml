@@ -17,5 +17,9 @@ newtype = { path = "../newtype" }
 proc-macro2.workspace = true
 syn.workspace = true
 
+[dev-dependencies]
+lint-core = { path = "../lint-core" }
+lint-fixtures = { path = "../lint-fixtures" }
+
 [lints]
 workspace = true

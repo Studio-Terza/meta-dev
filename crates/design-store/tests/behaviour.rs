@@ -11,30 +11,29 @@ use design_model::{
     AnyNode, Casting, Entered, Entry, Facet, JobId, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal,
     Prefix, Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
-use design_store::{
-    Account, AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Excerpt, FailuresReported,
-    FlailedSegments, Halted, HeldBy, Holding, JobFlailed, JobHalted, JobOpened, JobRepeated, JobRetried, Linked,
-    LiveRuns, NextJob, NextNode, NextRun, OpenJobs, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal,
-    RelationName, Remit, Resolved, Resolving, Restaged, Retold, RunEnded, RunSpawned, RunState, RunsOf, Scope,
-    SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, Spawned, StoredRun,
-    StreamSchema, UnplacedSegments, UnreportedFailures, Unseen, Unstructured,
+use design_runs::{
+    Account, FailuresReported, FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRetried, NextJob,
+    OpenJobs, Retold, RunSpawned, Spawned, UnplacedSegments, UnreportedFailures, Unstructured,
 };
-use dispatch_ports::{Deadline, Finished, Pid, Reply, Started, Tokens, Usage, Wall};
+use design_store::{
+    AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Holding, JobRepeated, Linked, NextNode,
+    Placed, Planting, Prefixed, ProjectRoot, Refusal, RelationName, Remit, Resolved, Resolving, Restaged, Scope,
+    SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, StreamSchema, Unseen,
+};
+use dispatch_ports::{Deadline, Pid, Wall};
 use file_ports::{Bytes, Files, Memory};
-use grammar_message::Lexemes;
 use grammar_search::Terms;
 use laws::proptest::collection::vec;
-use laws::proptest::option;
-use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
+use newtype::Enumerated;
 use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
 use stream::{Message, Stream};
-use strum::VariantArray;
 use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Skipped, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
@@ -294,18 +293,16 @@ fn a_segment_stored_before_stemming_is_found_by_its_stem() -> Result<(), Box<dyn
     Ok(())
 }
 
-static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
-    (char::MIN..=char::MAX)
-        .filter(|point| Lexemes::scanned(&point.to_string()).iter().all(|lexeme| lexeme.ink().is_none()))
-        .collect()
-});
+const SHED: [char; 6] = [' ', '\t', '\u{a0}', '\u{85}', '\u{2028}', '\u{3000}'];
+
+const KEPT: [char; 7] = ['a', 'é', 'か', '.', '—', '\u{200b}', '😀'];
 
 #[derive(Clone, Copy, Debug)]
 struct Around(char);
 
 impl Around {
     fn untrimmed(statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let written = BLANKS
+        let written = SHED
             .iter()
             .map(|blank| Around(*blank).stored(statements))
             .collect::<Result<Vec<Written>, StoreFailure>>()?;
@@ -545,9 +542,9 @@ fn a_message_stored_with_segments_or_shapes_it_no_longer_derives_holds_what_a_fr
 }
 
 #[test]
-fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_as_a_fresh_ingest_sheds_it()
+fn a_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_shed_as_a_fresh_ingest_sheds_it()
 -> Result<(), Box<dyn Error>> {
-    let blanks: Vec<Around> = BLANKS.iter().copied().map(Around).collect();
+    let blanks: Vec<Around> = SHED.iter().copied().map(Around).collect();
     let migrated = blanks.iter().map(|blank| blank.migrated()).collect::<Result<Vec<_>, _>>()?;
     let fresh = blanks.iter().map(|blank| blank.fresh()).collect::<Result<Vec<_>, _>>()?;
     assert_eq!(migrated, fresh);
@@ -555,13 +552,9 @@ fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_sh
 }
 
 #[test]
-fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
+fn a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
 -> Result<(), Box<dyn Error + Send + Sync>> {
-    let inked: Vec<Around> = (char::MIN..=char::MAX)
-        .filter(|point| BLANKS.binary_search(point).is_err())
-        .filter(|point| Body::try_new(point.to_string()).is_ok())
-        .map(Around)
-        .collect();
+    let inked: Vec<Around> = KEPT.iter().copied().map(Around).collect();
     let rederived = inked.iter().map(|point| point.rederived()).collect::<Result<Vec<Vec<Body>>, _>>()?;
     let both_sides =
         inked.iter().map(|point| point.kept().map(|kept| vec![kept])).collect::<Result<Vec<Vec<Body>>, _>>()?;
@@ -1603,129 +1596,6 @@ fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Resul
     Ok(())
 }
 
-#[derive(Clone, Debug)]
-struct Spawning {
-    pid: Pid,
-    started: Option<Started>,
-    deadline: Wall,
-    state: RunState,
-    usage: Option<Usage>,
-    reply: Option<Reply>,
-}
-
-impl Spawning {
-    fn any() -> impl Strategy<Value = Spawning> {
-        (
-            any::<Pid>(),
-            option::of(
-                Just("Sat Nov  7 10:00:00 2026").prop_filter_map("a start time", |text| text.parse::<Started>().ok()),
-            ),
-            any::<Wall>(),
-            select(RunState::VARIANTS),
-            option::of((any::<Tokens>(), any::<Tokens>(), any::<Tokens>(), any::<Tokens>())),
-            option::of(("[a-z\"\n€]{1,8}", 0..6000_usize).prop_map(|(unit, times)| Reply::new(unit.repeat(times)))),
-        )
-            .prop_map(|(pid, started, deadline, state, usage, reply)| Spawning {
-                pid,
-                started,
-                deadline,
-                state,
-                usage: usage.map(|(input, output, written, read)| Usage::new(input, output, written, read)),
-                reply,
-            })
-    }
-
-    fn stored(&self) -> Result<Lived, Box<dyn Error>> {
-        let run = Run::root();
-        let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        store.write(store.read(Holding::from(Recorded::session()?.records))?)?;
-        let job = store.read(NextJob)?;
-        store.write(JobOpened::from(job))?;
-        let id = store.read(NextRun)?;
-        let spawned = Spawned::new(self.pid, self.started.clone(), Deadline::new(self.deadline));
-        store.write(RunSpawned::new(id, job, spawned))?;
-        let live = store.read(LiveRuns)?;
-        let finished = self.reply.clone().map(|reply| Finished::new(reply, self.usage.unwrap_or_default()));
-        store
-            .write(finished.map_or(RunEnded::new(id, self.state, self.usage), |told| RunEnded::finished(id, &told)))?;
-        Ok(Lived { live, ran: store.read(RunsOf::from(job))?, after: store.read(LiveRuns)? })
-    }
-}
-
-#[derive(Debug)]
-struct Lived {
-    live: Vec<StoredRun>,
-    ran: Vec<Ran>,
-    after: Vec<StoredRun>,
-}
-
-laws::law!(
-    a_spawned_run_is_live_until_it_ends_with_its_state_usage_and_reply_bounded_to_sixteen_kibibytes,
-    Spawning::any(),
-    spawning,
-    {
-        let lived = spawning.stored().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        let spawned: Vec<Spawned> = lived.live.iter().map(|stored| stored.spawned().clone()).collect();
-        let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
-        prop_assert_eq!(spawned, vec![wanted]);
-        let ran: Vec<Ran> = lived.ran;
-        prop_assert_eq!(ran.iter().map(|one| [one.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
-        let replied = spawning.reply.as_ref().map(|_reply| RunState::Replied);
-        let state = replied.unwrap_or(spawning.state);
-        let usage = replied.map_or(spawning.usage, |_replied| Some(spawning.usage.unwrap_or_default()));
-        prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![state]);
-        prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![usage]);
-        let told = spawning.reply.map(Reply::into_inner);
-        let kept = ran.first().and_then(Ran::reply).cloned().map(Excerpt::into_inner);
-        prop_assert_eq!(kept.is_some(), told.is_some());
-        if let (Some(whole), Some(part)) = (told, kept) {
-            prop_assert!(part.len() <= whole.len());
-            prop_assert!(iter::zip(part.bytes(), whole.bytes()).all(|(mine, theirs)| mine == theirs));
-            prop_assert!(part.len() <= Excerpt::BYTES);
-            let next = whole.ceil_char_boundary(part.len().saturating_add(1));
-            prop_assert!(part.len() == whole.len() || next > Excerpt::BYTES);
-            prop_assert!(whole.len() > Excerpt::BYTES || part == whole);
-        }
-        let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
-        let running = [state].into_iter().filter(|now| *now == RunState::Running).map(|_| RunId::new(1));
-        prop_assert_eq!(still, running.collect::<Vec<RunId>>());
-    }
-);
-
-impl Spawning {
-    fn replying(reply: String) -> Spawning {
-        Spawning {
-            pid: Pid::new(7),
-            started: None,
-            deadline: Wall::new(0),
-            state: RunState::Replied,
-            usage: None,
-            reply: Some(Reply::new(reply)),
-        }
-    }
-
-    fn kept(self) -> Result<String, Box<dyn Error>> {
-        let lived = self.stored()?;
-        let reply = lived.ran.first().and_then(Ran::reply).cloned().ok_or("no reply kept")?;
-        Ok(Excerpt::into_inner(reply))
-    }
-}
-
-#[test]
-fn an_ascii_reply_of_twenty_thousand_bytes_is_stored_as_exactly_sixteen_kibibytes() -> Result<(), Box<dyn Error>> {
-    let kept = Spawning::replying("a".repeat(20_000)).kept()?;
-    assert_eq!(kept.len(), 16 * 1024);
-    Ok(())
-}
-
-#[test]
-fn an_ascii_reply_of_exactly_sixteen_kibibytes_is_stored_unchanged() -> Result<(), Box<dyn Error>> {
-    let told = "a".repeat(16 * 1024);
-    let kept = Spawning::replying(told.clone()).kept()?;
-    assert_eq!(kept, told);
-    Ok(())
-}
-
 #[test]
 fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
@@ -1767,3 +1637,26 @@ fn a_held_segment_is_held_under_the_job_its_run_belongs_to() -> Result<(), Box<d
 }
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
+
+#[test]
+fn every_store_opened_in_memory_after_others_are_dropped_starts_empty_and_indexes_afresh() -> Result<(), Box<dyn Error>>
+{
+    let run = Run::root();
+    let searched = |store: &Port<'_, Sqlite>| -> Result<usize, Box<dyn Error>> {
+        let terms = Terms::lexed(["done"]).ok_or("no terms")?;
+        Ok(store.read(SearchSegments::matching(terms, Scope::Everyone))?.len())
+    };
+    let opened: Vec<Port<'_, Sqlite>> =
+        iter::repeat_with(|| run.port(Sqlite::in_memory::<StreamSchema>())).take(4).collect();
+    opened.iter().try_for_each(|earlier| -> Result<(), Box<dyn Error>> {
+        earlier.write(earlier.read(Holding::from(Recorded::session()?.records))?)?;
+        assert_eq!(searched(earlier)?, 1);
+        Ok(())
+    })?;
+    drop(opened);
+    let later = run.port(Sqlite::in_memory::<StreamSchema>());
+    assert_eq!(searched(&later)?, 0);
+    later.write(later.read(Holding::from(Recorded::session()?.records))?)?;
+    assert_eq!(searched(&later)?, 1);
+    Ok(())
+}

@@ -2,8 +2,8 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar_provenance::{Originating, Origins};
+use newtype::Enumerated;
 use newtype::{Spelled, Wrapping};
-use strum::VariantArray;
 
 use crate::{Entered, NotesLine, RunId};
 

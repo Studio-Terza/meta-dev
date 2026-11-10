@@ -3,6 +3,7 @@ mod resolved;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
+use std::ops::Bound;
 use std::path::{Path, PathBuf};
 
 use newtype::Wrapping;
@@ -97,8 +98,14 @@ impl Files for Memory {
             let files = self.files.held();
             let directories = self.directories.held();
             let children: BTreeSet<PathBuf> = files
-                .keys()
-                .chain(directories.iter())
+                .range::<Path, _>((Bound::Included(directory), Bound::Unbounded))
+                .map(|(held, _bytes)| held)
+                .take_while(|held| held.starts_with(directory))
+                .chain(
+                    directories
+                        .range::<Path, _>((Bound::Included(directory), Bound::Unbounded))
+                        .take_while(|held| held.starts_with(directory)),
+                )
                 .filter_map(|held| held.strip_prefix(directory).ok())
                 .filter_map(|inside| inside.components().next())
                 .map(|first| directory.join(first))

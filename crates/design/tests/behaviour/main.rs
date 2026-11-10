@@ -25,9 +25,10 @@ use design_model::{
     Refining, Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal,
     Title, Vague,
 };
+use design_runs::{Excerpt, RunState};
 use design_store::{
-    AppliedId, Excerpt, Linked, Planting, RelationName, Resolved, Resolving, RunState, ShapeName, ShownMessage,
-    ShownNode, Stored, StreamSchema,
+    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShapeName, ShownMessage, ShownNode, Stored,
+    StreamSchema,
 };
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
@@ -38,13 +39,13 @@ use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
 use laws::proptest::test_runner::TestCaseError;
 use newtype::Counter;
+use newtype::Enumerated;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
 use store_ports::{Batch, Busy, Opens, Schema, Statements, Store, StoreFailure, Written};
 use stream::{Relation, Shape};
 use structure::Staff;
 use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
-use strum::VariantArray;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
 const HOME: &str = "/home/tester";
@@ -639,23 +640,32 @@ fn a_reply_appended_after_an_ingest_links_to_the_message_stored_before_it() -> R
     Ok(())
 }
 
-laws::law!(ingesting_a_transcript_in_two_parts_stores_the_links_of_ingesting_it_whole, 0usize..1400, cut, {
-    let session = Session::linked();
-    let whole = Links::whole(&session).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let split = Links::split(&session, cut).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let relations: BTreeSet<&str> = whole.iter().map(|link| link.relation.as_str()).collect();
-    prop_assert_eq!(relations, BTreeSet::from(["answers", "cites", "replies-to", "resends"]));
-    prop_assert_eq!(split, whole);
-});
+laws::law!(
+    ingesting_a_transcript_in_two_parts_stores_the_links_of_ingesting_it_whole,
+    given whole = Links::whole(&Session::linked())?,
+    0usize..1400,
+    cut,
+    {
+        let session = Session::linked();
+        let split = Links::split(&session, cut).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let relations: BTreeSet<&str> = whole.iter().map(|link| link.relation.as_str()).collect();
+        prop_assert_eq!(relations, BTreeSet::from(["answers", "cites", "replies-to", "resends"]));
+        prop_assert_eq!(&split, &whole);
+    }
+);
 
 struct Found;
 
 impl Found {
-    fn by(session: &Session, arguments: &[&str]) -> Result<String, TestCaseError> {
+    fn ingested(session: &Session) -> Result<Sqlite, TestCaseError> {
         let store = Sqlite::in_memory::<StreamSchema>();
         Invocation::against(&store, session, &["ingest"])
             .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        Invocation::against(&store, session, arguments).map_err(|failure| TestCaseError::fail(failure.to_string()))
+        Ok(store)
+    }
+
+    fn by(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<String, TestCaseError> {
+        Invocation::against(store, session, arguments).map_err(|failure| TestCaseError::fail(failure.to_string()))
     }
 
     fn said(lines: &[Said]) -> Session {
@@ -680,7 +690,8 @@ laws::law!(an_owner_segment_is_found_by_a_word_it_contains_and_no_other_is, "[a-
         Said::by(Speaker::Owner, "o1", format!("alpha {word}")),
         Said::by(Speaker::Owner, "o2", "1234 5678".to_owned()),
     ]);
-    let out = Found::by(&session, &["search", &word])?;
+    let store = Found::ingested(&session)?;
+    let out = Found::by(&store, &session, &["search", &word])?;
     prop_assert!(out.contains("hit o1.0 owner"));
     prop_assert!(!out.contains("hit o2.0 owner"));
 });
@@ -692,7 +703,8 @@ laws::law!(several_words_find_only_the_segments_holding_every_one, ("a[a-z]{3,8}
         Said::by(Speaker::Owner, "o2", format!("{first} 1234")),
         Said::by(Speaker::Owner, "o3", format!("5678 {second}")),
     ]);
-    let out = Found::by(&session, &["search", &first, &second])?;
+    let store = Found::ingested(&session)?;
+    let out = Found::by(&store, &session, &["search", &first, &second])?;
     prop_assert_eq!(out.matches(" owner ").count(), 1);
     prop_assert!(out.contains("hit o1.0 owner"));
 });
@@ -700,8 +712,9 @@ laws::law!(several_words_find_only_the_segments_holding_every_one, ("a[a-z]{3,8}
 laws::law!(the_lead_is_searched_only_when_everyone_is_asked_for, "[a-z]{4,10}", word, {
     let session =
         Found::said(&[Said::by(Speaker::Owner, "o1", word.clone()), Said::by(Speaker::Lead, "l1", word.clone())]);
-    let owner = Found::by(&session, &["search", &word])?;
-    let everyone = Found::by(&session, &["search", "--all", &word])?;
+    let store = Found::ingested(&session)?;
+    let owner = Found::by(&store, &session, &["search", &word])?;
+    let everyone = Found::by(&store, &session, &["search", "--all", &word])?;
     prop_assert!(owner.contains("hit o1.0 owner"));
     prop_assert!(!owner.contains("hit l1.0 lead"));
     prop_assert!(everyone.contains("hit o1.0 owner"));
@@ -712,8 +725,9 @@ laws::law!(a_word_is_found_whatever_its_case, "[a-z]{4,10}", word, {
     let raised: String = word.chars().map(|letter| letter.to_ascii_uppercase()).collect();
     let session =
         Found::said(&[Said::by(Speaker::Owner, "o1", raised.clone()), Said::by(Speaker::Owner, "o2", word.clone())]);
-    let lower = Found::by(&session, &["search", &word])?;
-    let upper = Found::by(&session, &["search", &raised])?;
+    let store = Found::ingested(&session)?;
+    let lower = Found::by(&store, &session, &["search", &word])?;
+    let upper = Found::by(&store, &session, &["search", &raised])?;
     prop_assert!(lower.contains("hit o1.0 owner") && lower.contains("hit o2.0 owner"));
     prop_assert!(upper.contains("hit o1.0 owner") && upper.contains("hit o2.0 owner"));
 });
@@ -2764,4 +2778,43 @@ impl<F: Fn(PathBuf) -> Sqlite> Opens for Opening<F> {
     fn in_memory<S: Schema>(&self) -> Sqlite {
         SqliteOpener.in_memory::<S>()
     }
+}
+
+struct Recalling;
+
+impl Recalling {
+    fn prompted(applying: &Applying, prompt: &str) -> Result<String, Failure> {
+        let heard = Heard::new(format!("{{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"{prompt}\"}}"));
+        let environment = Invocation::at("/work").hearing(heard);
+        let run = Run::root();
+        let mut out = Vec::new();
+        Cli::new(&environment, FakeLent::new(&applying.files), Opening(|_path| applying.store.clone()), Staff::idle())
+            .report(&run, ["hook", "user-prompt-submit"].iter().map(OsString::from), &mut out)?;
+        Ok(String::from_utf8(out).unwrap_or_default())
+    }
+}
+
+#[test]
+fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Result<(), Failure> {
+    let session = Found::said(&[
+        Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000011", "elephants gather near rivers".to_owned()),
+        Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000012", "tortoises sleep in winter".to_owned()),
+        Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000013", "elephants elephants".to_owned()),
+    ]);
+    let applying = Applying::over(&session)?;
+    applying.applied(
+        "propose(new, refines(n1), feature, \"Herds\")\nplace(aaaaaaaa-0000-4000-8000-000000000011.0, n2, mentions)\npropose(new, refines(n1), feature, \"Trunks\")\nplace(aaaaaaaa-0000-4000-8000-000000000013.0, n3, mentions)",
+    )?;
+    let told = Recalling::prompted(&applying, "where do elephants roam")?;
+    assert!(told.contains("n2 vague: Herds"), "{told}");
+    let unmatched = Recalling::prompted(&applying, "tortoises")?;
+    assert_eq!(unmatched.matches("Herds").count(), 0, "{unmatched}");
+    let recalled = applying.run(&["recall", "elephants"])?;
+    let strongest = "n3 vague: Trunks";
+    assert_eq!(recalled.get(..strongest.len()), Some(strongest), "{recalled}");
+    let both = applying.run(&["recall", "elephants", "rivers"])?;
+    let summed = "n2 vague: Herds";
+    assert_eq!(both.get(..summed.len()), Some(summed), "{both}");
+    assert_eq!(Lines::missing(&recalled, &["n2 vague: Herds"]), Vec::<&&str>::new(), "{recalled}");
+    Ok(())
 }

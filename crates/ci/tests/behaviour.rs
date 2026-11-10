@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io::{self, Write};
+use std::iter;
 use std::num::NonZeroU8;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -2327,4 +2328,102 @@ impl Scratch {
     fn path(&self) -> &Path {
         &self.root
     }
+}
+
+struct Sqlite;
+
+struct Built {
+    answer: Answer,
+    calls: Vec<Vec<String>>,
+    library: String,
+}
+
+impl Sqlite {
+    const LISTED: &str = r#"{"packages": [
+        {"name": "rusqlite", "manifest_path": "/r/rusqlite-0.37.0/Cargo.toml"},
+        {"name": "libsqlite3-sys", "manifest_path": "/r/libsqlite3-sys-0.37.0/Cargo.toml"}
+    ]}"#;
+    const UNLISTED: &str = r#"{"packages": [{"name": "rusqlite", "manifest_path": "/r/rusqlite-0.37.0/Cargo.toml"}]}"#;
+    const METADATA: [&str; 5] = ["cargo", "metadata", "--locked", "--format-version", "1"];
+    const COMPILED: [&str; 24] = [
+        "cc",
+        "-O2",
+        "-DSQLITE_CORE",
+        "-DSQLITE_DEFAULT_FOREIGN_KEYS=1",
+        "-DSQLITE_ENABLE_API_ARMOR",
+        "-DSQLITE_ENABLE_COLUMN_METADATA",
+        "-DSQLITE_ENABLE_DBSTAT_VTAB",
+        "-DSQLITE_ENABLE_FTS3",
+        "-DSQLITE_ENABLE_FTS3_PARENTHESIS",
+        "-DSQLITE_ENABLE_FTS5",
+        "-DSQLITE_ENABLE_JSON1",
+        "-DSQLITE_ENABLE_LOAD_EXTENSION=1",
+        "-DSQLITE_ENABLE_MEMORY_MANAGEMENT",
+        "-DSQLITE_ENABLE_RTREE",
+        "-DSQLITE_ENABLE_STAT4",
+        "-DSQLITE_SOUNDEX",
+        "-DSQLITE_THREADSAFE=1",
+        "-DSQLITE_USE_URI",
+        "-DHAVE_USLEEP=1",
+        "-DHAVE_ISNAN",
+        "-D_POSIX_THREAD_SAFE_FUNCTIONS",
+        "-DSQLITE_DEFAULT_MEMSTATUS=0",
+        "-DHAVE_LOCALTIME_R",
+        "-c",
+    ];
+
+    fn built(metadata: &str, exit: u8) -> Result<Built, Box<dyn Error>> {
+        let scratch = Scratch::new()?;
+        let script = Script { metadata: metadata.to_owned(), ..Script::exiting(exit) };
+        let library = scratch.file("sqlite");
+        let answer = scratch.answer(&script, &["sqlite", &library]);
+        let calls = script.calls.borrow().iter().map(Sqlite::words).collect();
+        Ok(Built { answer, calls, library })
+    }
+
+    fn words(call: &Invocation) -> Vec<String> {
+        iter::once(call.program())
+            .chain(call.arguments().iter().map(OsString::as_os_str))
+            .map(|word| word.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    fn owned(words: &[&str]) -> Vec<String> {
+        words.iter().map(|word| (*word).to_owned()).collect()
+    }
+}
+
+#[test]
+fn sqlite_is_compiled_from_the_source_cargo_metadata_names_and_archived_into_the_library_directory()
+-> Result<(), Box<dyn Error>> {
+    let Built { answer, calls, library } = Sqlite::built(Sqlite::LISTED, 0)?;
+    let object = format!("{library}/sqlite3.o");
+    let compiled = Sqlite::owned(&Sqlite::COMPILED)
+        .into_iter()
+        .chain(["/r/libsqlite3-sys-0.37.0/sqlite3/sqlite3.c".to_owned(), "-o".to_owned(), object.clone()])
+        .collect();
+    let archived = vec!["ar".to_owned(), "rcs".to_owned(), format!("{library}/libsqlite3.a"), object];
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(calls, [Sqlite::owned(&Sqlite::METADATA), compiled, archived]);
+    Ok(())
+}
+
+#[test]
+fn sqlite_without_libsqlite3_sys_in_the_metadata_is_refused_and_compiles_nothing() -> Result<(), Box<dyn Error>> {
+    let Built { answer, calls, .. } = Sqlite::built(Sqlite::UNLISTED, 0)?;
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.contains("no libsqlite3-sys package"));
+    assert_eq!(calls, [Sqlite::owned(&Sqlite::METADATA)]);
+    Ok(())
+}
+
+#[test]
+fn sqlite_whose_compile_fails_is_not_archived() -> Result<(), Box<dyn Error>> {
+    let Built { answer, calls, .. } = Sqlite::built(Sqlite::LISTED, 1)?;
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert_eq!(
+        calls.iter().map(|call| call.first().cloned().unwrap_or_default()).collect::<Vec<String>>(),
+        ["cargo", "cc"]
+    );
+    Ok(())
 }

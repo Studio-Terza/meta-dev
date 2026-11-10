@@ -13,12 +13,12 @@ use laws::proptest::option;
 use laws::proptest::prelude::{Just, prop_assert_ne, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
+use newtype::Enumerated;
 use newtype::Wrapping;
 use structurer::{
     Attempt, Briefing, Directive, Directives, Edge, Job, Label, Lapse, Misread, NodeRef, Proposal, Reading, Said,
     Uncovered,
 };
-use strum::VariantArray;
 use transcript_ports::Body;
 
 struct Generated;

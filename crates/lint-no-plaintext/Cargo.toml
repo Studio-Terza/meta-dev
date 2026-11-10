@@ -14,5 +14,13 @@ code-model = { path = "../code-model" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 
+[dev-dependencies]
+file-ports = { path = "../file-ports" }
+code-reader = { path = "../code-reader" }
+lint-core = { path = "../lint-core" }
+lint-fixtures = { path = "../lint-fixtures" }
+lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
+
 [lints]
 workspace = true

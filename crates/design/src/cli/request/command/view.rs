@@ -3,9 +3,9 @@ use std::io::Write;
 use std::iter;
 
 use design_model::{NodeId, Outline, Segment, SpanRelation};
+use design_runs::UnplacedSegments;
 use design_store::{
     ContextNodes, CurrentSpans, Ended, ImportedEnding, ImportedNotes, Noted, Placement, ProjectRoot, Resolved,
-    UnplacedSegments,
 };
 use file_ports::Files;
 use grammar_notes::{self as notes, Notes};

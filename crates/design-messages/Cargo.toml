@@ -1,0 +1,31 @@
+[package]
+name = "design-messages"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.store]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+design-closure = { path = "../design-closure" }
+design-model = { path = "../design-model" }
+file-ports = { path = "../file-ports" }
+grammar-notes = { path = "../grammar-notes" }
+grammar-search = { path = "../grammar-search" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+store-ports = { path = "../store-ports" }
+stream = { path = "../stream" }
+transcript-ports = { path = "../transcript-ports" }
+
+[build-dependencies]
+console-ports = { path = "../console-ports" }
+exit = { path = "../exit" }
+
+[lints]
+workspace = true

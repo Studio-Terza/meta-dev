@@ -17,5 +17,11 @@ lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
 saphyr = "0.3.3"
 
+[dev-dependencies]
+file-ports = { path = "../file-ports" }
+lint-core = { path = "../lint-core" }
+lint-mandatory-laws = { path = "../lint-mandatory-laws" }
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

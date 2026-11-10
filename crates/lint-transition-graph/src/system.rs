@@ -1,6 +1,7 @@
 use std::cell::OnceCell;
 
 use lint_core::SourceFile;
+use lint_item_graph::FileNames;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -14,11 +15,16 @@ use crate::workspace_types::WorkspaceTypes;
 pub struct Extraction<'file> {
     facts: Facts<'file>,
     transitions: Transitions<'file>,
+    names: FileNames<'file>,
 }
 
 impl<'file> From<&'file [SourceFile]> for Extraction<'file> {
     fn from(files: &'file [SourceFile]) -> Extraction<'file> {
-        Extraction { facts: Facts::of_files(files), transitions: Transitions::of_files(files) }
+        Extraction {
+            facts: Facts::of_files(files),
+            transitions: Transitions::of_files(files),
+            names: FileNames::from(files),
+        }
     }
 }
 
@@ -31,6 +37,11 @@ impl<'file> Extraction<'file> {
     #[must_use]
     pub fn transitions(&self) -> &Transitions<'file> {
         &self.transitions
+    }
+
+    #[must_use]
+    pub fn names(&self) -> &FileNames<'file> {
+        &self.names
     }
 }
 
@@ -67,8 +78,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
 
     #[must_use]
     pub fn containment(&self) -> &Containment<'found, 'file> {
-        self.containment
-            .get_or_init(|| Containment::clustered(self.files, self.extraction.facts(), self.extraction.transitions()))
+        self.containment.get_or_init(|| Containment::clustered(self.files, self.extraction))
     }
 
     #[must_use]

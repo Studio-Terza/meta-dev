@@ -8,7 +8,8 @@ use design_model::{
     Prefix, Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage,
     Standing, Title,
 };
-use design_store::{RelationName, RunState, SessionCursors, ShapeName, ShownMessage, StreamSchema};
+use design_runs::RunState;
+use design_store::{RelationName, SessionCursors, ShapeName, ShownMessage, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar_search::Term;
@@ -16,6 +17,7 @@ use laws::proptest::option;
 use laws::proptest::prelude::{any, prop_assert, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
+use newtype::Enumerated;
 use newtype::{Arbitrary, Counter, Newtype};
 use port_core::{Op, Run};
 use sqlite_ports::SqliteOpener;
@@ -1006,7 +1008,7 @@ impl Stored {
         Value::from_raw(raw.clone()).ok()
     }
 
-    fn unread<Named: VariantArray + Column<Raw: Clone> + PartialEq + Copy>() -> Vec<Named> {
+    fn unread<Named: Enumerated + Column<Raw: Clone> + PartialEq + Copy>() -> Vec<Named> {
         Named::VARIANTS.iter().copied().filter(|named| Stored::back::<Named>(&named.raw()) != Some(*named)).collect()
     }
 }

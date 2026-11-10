@@ -5,8 +5,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use sqlx::sqlite::SqliteConnectOptions;
-
 use super::migrations::Migrations;
 use super::opened::Opened;
 use template::Template;
@@ -28,8 +26,15 @@ impl Place {
         migrations: Migrations,
     ) -> Result<Opened, StoreFailure> {
         match self {
-            Place::File(path) => Self::filed(path, prepare).and_then(|options| Opened::connected(&options, migrations)),
+            Place::File(path) => Self::filed(path, prepare).and_then(|()| Opened::filed(path, migrations)),
             Place::Memory => Template::shared(migrations).opened(migrations),
+        }
+    }
+
+    pub(super) fn returned(&self, opened: Option<Opened>, migrations: Migrations) {
+        match self {
+            Place::File(_) => drop(opened),
+            Place::Memory => opened.into_iter().for_each(|idle| Template::shared(migrations).returned(idle)),
         }
     }
 
@@ -44,11 +49,7 @@ impl Place {
         }
     }
 
-    fn filed(path: &Path, prepare: impl FnOnce(&Path) -> io::Result<()>) -> Result<SqliteConnectOptions, StoreFailure> {
-        path.parent()
-            .map(prepare)
-            .transpose()
-            .map(|_prepared| SqliteConnectOptions::new().filename(path).create_if_missing(true))
-            .map_err(StoreFailure::Directory)
+    fn filed(path: &Path, prepare: impl FnOnce(&Path) -> io::Result<()>) -> Result<(), StoreFailure> {
+        path.parent().map(prepare).transpose().map(|_prepared| ()).map_err(StoreFailure::Directory)
     }
 }

@@ -5,7 +5,7 @@ mod shown;
 use std::io::Write;
 
 use design_model::{JobId, NodeId, Prefix};
-use design_store::RunsOf;
+use design_runs::RunsOf;
 use store_ports::Store;
 use structurer::SegmentRef;
 

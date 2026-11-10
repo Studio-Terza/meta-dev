@@ -17,8 +17,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use console_ports::Environment;
-use design_store::Scope;
 use design_store::StreamSchema;
+use design_store::{Recall, Recollection, Scope};
 use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
 use grammar_search::Terms;
@@ -47,6 +47,7 @@ pub enum Command {
     Ingest(Persistence),
     Show(Subject),
     Search(Terms, Scope),
+    Recall(Terms),
     Init(Init),
     Apply(PathBuf),
     Move(Move),
@@ -63,6 +64,7 @@ pub enum Verb {
     Ingest,
     Show,
     Search,
+    Recall,
     Init,
     Apply,
     Move(Moving),
@@ -83,10 +85,11 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 15] = [
+    const NAMED: [(&'static str, Verb); 16] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
+        ("recall", Verb::Recall),
         ("init", Verb::Init),
         ("apply", Verb::Apply),
         ("refine", Verb::Move(Moving::Refine)),
@@ -110,6 +113,7 @@ impl Verb {
             Verb::Move(Moving::Drop) => &[Flag::Valued(Valued::Reason)],
             Verb::Hook => &[Flag::Settings],
             Verb::Show
+            | Verb::Recall
             | Verb::Apply
             | Verb::Move(Moving::Refine | Moving::Reopen)
             | Verb::Role
@@ -137,6 +141,13 @@ impl Verb {
                 .and_then(Terms::lexed)
                 .ok_or(Failure::Usage)
                 .map(|terms| Command::Search(terms, scope)),
+            Verb::Recall => rest
+                .iter()
+                .map(Token::text)
+                .collect::<Option<Vec<&str>>>()
+                .and_then(Terms::lexed)
+                .ok_or(Failure::Usage)
+                .map(Command::Recall),
             Verb::Init => Init::try_from(rest).map(Command::Init),
             Verb::Apply => Token::only(rest).map(PathBuf::from).map(Command::Apply),
             Verb::Move(moving) => Move::read(moving, rest).map(Command::Move),
@@ -159,6 +170,7 @@ impl Command {
             Command::Ingest(persistence) => persistence.opened(path, opens),
             Command::Show(_)
             | Command::Search(..)
+            | Command::Recall(_)
             | Command::Init(_)
             | Command::Apply(_)
             | Command::Move(_)
@@ -186,6 +198,12 @@ impl Command {
             Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
                 .and_then(|lines| Printed::lines(out, &lines))
                 .map(|_printed| Outcome::Searched),
+            Command::Recall(terms) => ground
+                .store()
+                .read(Recall::telling(&terms))
+                .map_err(Failure::from)
+                .and_then(|recalled| Printed::rendered(out, &Recollection::from(recalled.as_slice())))
+                .map(|_printed| Outcome::Recalled),
             Command::Init(init) => init
                 .planted(&ground)
                 .and_then(|initialised| Printed::lines(out, &initialised.lines()))

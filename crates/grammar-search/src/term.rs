@@ -1,4 +1,4 @@
 use newtype::{Arbitrary, Display, Newtype};
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Term(String);
