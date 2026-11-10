@@ -2,9 +2,9 @@ use design_model::NodeId;
 use port_core::Op;
 use store_ports::{Query, Statements, StoreFailure};
 
-use crate::acyclic::Refines;
 use crate::graph::{EdgeRow, NodeRow, RelativeRow};
 use crate::{Citation, Placed, Placement};
+use design_closure::Refines;
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct ShownNode(NodeId);

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use newtype::{Arbitrary, Newtype};
 
 #[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Listed(String);
+pub struct Listed(String);
 
 impl<Item: Display> FromIterator<Item> for Listed {
     fn from_iter<Items: IntoIterator<Item = Item>>(items: Items) -> Listed {

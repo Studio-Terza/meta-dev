@@ -12,7 +12,7 @@ use stream::{Anchor, Anchors, MechanicalLink, Message, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
-use crate::acyclic::Keyed;
+use design_closure::Keyed;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct ShapeName(String);

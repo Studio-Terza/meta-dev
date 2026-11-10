@@ -2,8 +2,9 @@ use port_core::Op;
 use store_ports::{Query, Statements, StoreFailure};
 use transcript_ports::Uuid;
 
+use crate::Stored;
 use crate::boundary::{LinkRow, MessageRow, SegmentRow};
-use crate::{Annotation, Stored};
+use design_closure::Annotation;
 
 #[derive(Clone, Debug, Op)]
 pub struct ShownMessage(Uuid);

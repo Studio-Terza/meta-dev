@@ -1,8 +1,8 @@
 use design_model::{Inversion, Misstaged, NodeId, Segment};
 use store_ports::StoreFailure;
 
-use crate::Cycle;
-use crate::acyclic::Refuses;
+use design_closure::Cycle;
+use design_closure::Refuses;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("the directives leave segments of their job unstructured")]

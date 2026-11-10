@@ -6,7 +6,7 @@ use store_ports::{Columns, Query, Statements, StoreFailure};
 use transcript_ports::{Authorship, Uuid};
 
 use super::{Quoted, QuotedSegments};
-use crate::Listed;
+use design_closure::Listed;
 
 #[derive(Debug, Columns)]
 struct QuotedRow {

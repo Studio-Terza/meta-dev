@@ -1,3 +1,5 @@
+mod boundary;
+
 use design_model::{NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Standing};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,7 +51,8 @@ impl Remark {
 }
 
 impl Annotation {
-    pub(crate) fn new(remark: Remark, provenance: Provenance, standing: Standing) -> Annotation {
+    #[must_use]
+    pub fn new(remark: Remark, provenance: Provenance, standing: Standing) -> Annotation {
         Annotation { remark, provenance, standing }
     }
 

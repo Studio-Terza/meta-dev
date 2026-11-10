@@ -8,8 +8,8 @@ use port_core::Op;
 use store_ports::{Batch, ColumnFailure, Columns, Query, Statements, StoreFailure, Written};
 
 use crate::Refusal;
-use crate::acyclic::{Acyclic, Closed, Closing, Refines, Supersedes};
 use crate::{Link, Relative};
+use design_closure::{Acyclic, Closed, Closing, Refines, Supersedes};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Resolved(NodeId);

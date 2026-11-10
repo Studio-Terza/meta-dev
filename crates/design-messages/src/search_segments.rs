@@ -5,8 +5,8 @@ use port_core::Op;
 use store_ports::{Query, Statements, StoreFailure};
 
 use crate::Scope;
-use crate::acyclic::Keyed;
 use crate::boundary::{Hit, Rank, RankRow};
+use design_closure::Keyed;
 
 #[derive(Clone, Debug, Op)]
 pub struct SearchSegments {

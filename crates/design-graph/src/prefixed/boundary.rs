@@ -5,8 +5,8 @@ use store_ports::{Columns, Query, Statements, StoreFailure};
 use transcript_ports::{Authorship, Uuid};
 
 use super::{Cited, NextNode, Prefixed, Spoken, Started};
-use crate::Listed;
 use crate::graph::NodeRow;
+use design_closure::Listed;
 
 #[derive(Debug, Columns)]
 struct SpokenRow {

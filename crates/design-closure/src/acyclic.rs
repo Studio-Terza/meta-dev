@@ -4,10 +4,10 @@ use design_model::{NodeId, NodeRelation, Segment, SegmentRelation};
 use named_derive::Named;
 use store_ports::{Statements, StoreFailure};
 
-pub(crate) use boundary::{Closing, Keyed};
+pub use boundary::{Closing, Keyed};
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Closed {
+pub enum Closed {
     #[name("refines")]
     Refines,
     #[name("supersedes")]
@@ -41,11 +41,11 @@ impl Cycle {
     }
 }
 
-pub(crate) trait Refuses: From<StoreFailure> {
+pub trait Refuses: From<StoreFailure> {
     fn cyclic(cycle: Cycle) -> Self;
 }
 
-pub(crate) trait Acyclic {
+pub trait Acyclic {
     type End;
 
     const CLOSED: Closed;
@@ -56,16 +56,16 @@ pub(crate) trait Acyclic {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Refines;
+pub struct Refines;
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Supersedes;
+pub struct Supersedes;
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SegmentSupersedes;
+pub struct SegmentSupersedes;
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SegmentCorrects;
+pub struct SegmentCorrects;
 
 impl Acyclic for Refines {
     type End = NodeId;

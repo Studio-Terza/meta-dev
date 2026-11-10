@@ -8,7 +8,7 @@ use super::{Acyclic, Closed, Refuses};
 use transcript_ports::Uuid;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Keyed(i64);
+pub struct Keyed(i64);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 struct Depth(i64);
@@ -24,7 +24,7 @@ struct Reached {
 }
 
 #[derive(Debug)]
-pub(crate) struct Closing<R: Acyclic> {
+pub struct Closing<R: Acyclic> {
     source: R::End,
     target: R::End,
     relation: PhantomData<R>,
@@ -37,11 +37,12 @@ struct Open {
 }
 
 impl Keyed {
-    pub(crate) fn node(id: NodeId) -> Keyed {
+    #[must_use]
+    pub fn node(id: NodeId) -> Keyed {
         Keyed(id.into_inner())
     }
 
-    pub(crate) fn segment(segment: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+    pub fn segment(segment: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
         let message = AsRef::<Uuid>::as_ref(segment).clone();
         let ordinal = Ordinal::from(segment);
         let row = statements.one(store_ports::query!(
@@ -63,11 +64,11 @@ WHERE
 }
 
 impl<R: Acyclic> Closing<R> {
-    pub(crate) fn new(source: R::End, target: R::End) -> Closing<R> {
+    pub fn new(source: R::End, target: R::End) -> Closing<R> {
         Closing { source, target, relation: PhantomData }
     }
 
-    pub(crate) fn written<Failure, Refused>(
+    pub fn written<Failure, Refused>(
         self,
         statements: &mut Statements<'_>,
         edge: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,

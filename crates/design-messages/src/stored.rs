@@ -1,5 +1,5 @@
-use crate::Annotation;
 use crate::boundary::{LinkRow, MessageRow, SegmentRow};
+use design_closure::Annotation;
 
 #[derive(Debug)]
 pub struct Stored {

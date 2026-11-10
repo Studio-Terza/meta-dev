@@ -323,6 +323,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "design-closure"
+version = "0.1.0"
+dependencies = [
+ "design-model",
+ "named-derive",
+ "newtype",
+ "serde_json",
+ "store-ports",
+ "thiserror",
+ "transcript-ports",
+]
+
+[[package]]
+name = "design-graph"
+version = "0.1.0"
+dependencies = [
+ "design-closure",
+ "design-jobs",
+ "design-model",
+ "file-ports",
+ "grammar-notes",
+ "newtype",
+ "port-core",
+ "store-ports",
+ "thiserror",
+ "transcript-ports",
+]
+
+[[package]]
 name = "design-jobs"
 version = "0.1.0"
 dependencies = [
@@ -332,6 +361,24 @@ dependencies = [
  "port-core",
  "store-ports",
  "thiserror",
+]
+
+[[package]]
+name = "design-messages"
+version = "0.1.0"
+dependencies = [
+ "console-ports",
+ "design-closure",
+ "design-model",
+ "exit",
+ "file-ports",
+ "grammar-notes",
+ "grammar-search",
+ "newtype",
+ "port-core",
+ "store-ports",
+ "stream",
+ "transcript-ports",
 ]
 
 [[package]]
@@ -375,24 +422,20 @@ dependencies = [
 name = "design-store"
 version = "0.1.0"
 dependencies = [
- "console-ports",
- "design-jobs",
+ "design-closure",
+ "design-graph",
+ "design-messages",
  "design-model",
  "design-runs",
  "dispatch-ports",
- "exit",
  "file-ports",
- "grammar-notes",
  "grammar-search",
  "laws",
- "named-derive",
  "newtype",
  "port-core",
- "serde_json",
  "sqlite-ports",
  "store-ports",
  "stream",
- "thiserror",
  "transcript-ports",
 ]
 
