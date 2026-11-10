@@ -45,6 +45,7 @@ const GLOB_BENEATH_IMPORT: &str =
 const GLOB_BENEATH_DECLARED: &str = "use std::fmt::*;\ntrait Debug {}\nimpl Debug for R {}\nimpl Display for R {}\n";
 const GLOB_THROUGH_GLOB: &str =
     "mod a {\n    pub mod b {\n        pub trait T {}\n    }\n}\nuse a::*;\nuse b::*;\nimpl T for R {}\n";
+const GLOB_MUTUAL: &str = "mod a {\n    pub use super::b::*;\n    pub trait T {}\n}\nmod b {\n    pub use super::a::*;\n}\nuse a::*;\nmod c {\n    use super::b::*;\n    impl T for R {}\n}\n";
 const GLOB_CARRIES_EXPANSION: &str = "mod hash {\n    array_impl!(1, 2);\n}\npub use hash::*;\nimpl Clone for R {}\n";
 const GLOB_CARRIES_EXPANSION_ABOVE: &str =
     "pin_project! {\n    struct Limited {}\n}\nmod tests {\n    use super::*;\n    impl Debug for R {}\n}\n";
@@ -653,6 +654,7 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_BENEATH_IMPORT => [Expect::std_trait(&["std", "clone", "Clone"])],
     GLOB_BENEATH_DECLARED => [Expect::krate(&["crate", "Debug"]), Expect::std_trait(&["std", "fmt", "Display"])],
     GLOB_THROUGH_GLOB => [Expect::krate(&["crate", "a", "b", "T"])],
+    GLOB_MUTUAL => [Expect::krate(&["crate", "a", "T"])],
     GLOB_PRIVATE_SELF => [Expect::krate(&["crate", "Clone"])],
     GLOB_VISIBLE_CRATE => [Expect::std_trait(&["std", "fmt", "Debug"])],
     GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],

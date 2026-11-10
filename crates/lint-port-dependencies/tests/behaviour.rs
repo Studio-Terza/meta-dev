@@ -1,4 +1,4 @@
-use lint_fixtures::{Lines, Located, Source, Sources, Text};
+use lint_fixtures::{Lines, Located, Shown, Source, Sources, Text};
 use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 
 const UNIT_CRATES: &[Source] = &[
@@ -809,3 +809,10 @@ laws::table!(
         SQLX_ITSELF => Lines::default(),
     ]
 );
+
+#[test]
+fn a_lexer_sharing_its_format_is_told_which_other_lexer_shares_it() {
+    let told = Shown::placed_in::<KeyDependencyRoles>(&ROLE_MANIFESTS, ROLE_CRATES, SHARED_FORMAT);
+    let ident = told.iter().filter(|line| line.contains("grammar-ident/Cargo.toml"));
+    assert_eq!(ident.filter(|line| line.contains("which grammar-notes also lexes")).count(), 1, "{told:?}");
+}
