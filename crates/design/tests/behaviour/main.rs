@@ -2799,16 +2799,19 @@ fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Res
     let session = Found::said(&[
         Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000011", "elephants gather near rivers".to_owned()),
         Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000012", "tortoises sleep in winter".to_owned()),
+        Said::by(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000013", "elephants elephants".to_owned()),
     ]);
     let applying = Applying::over(&session)?;
     applying.applied(
-        "propose(new, refines(n1), feature, \"Herds\")\nplace(aaaaaaaa-0000-4000-8000-000000000011.0, n2, mentions)",
+        "propose(new, refines(n1), feature, \"Herds\")\nplace(aaaaaaaa-0000-4000-8000-000000000011.0, n2, mentions)\npropose(new, refines(n1), feature, \"Trunks\")\nplace(aaaaaaaa-0000-4000-8000-000000000013.0, n3, mentions)",
     )?;
     let told = Recalling::prompted(&applying, "where do elephants roam")?;
     assert!(told.contains("n2 vague: Herds"), "{told}");
     let unmatched = Recalling::prompted(&applying, "tortoises")?;
     assert_eq!(unmatched.matches("Herds").count(), 0, "{unmatched}");
     let recalled = applying.run(&["recall", "elephants"])?;
+    let strongest = "n3 vague: Trunks";
+    assert_eq!(recalled.get(..strongest.len()), Some(strongest), "{recalled}");
     assert_eq!(Lines::missing(&recalled, &["n2 vague: Herds"]), Vec::<&&str>::new(), "{recalled}");
     Ok(())
 }
