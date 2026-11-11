@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{QueryCache, Uncached};
+pub use boundary::QueryCache;
