@@ -11,6 +11,8 @@ doctest = false
 
 [dependencies]
 file-ports = { path = "../file-ports" }
+grammar-lines = { path = "../grammar-lines" }
+text-lines = { path = "../text-lines" }
 grammar-message = { path = "../grammar-message" }
 grammar-output = { path = "../grammar-output" }
 newtype = { path = "../newtype" }

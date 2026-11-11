@@ -291,10 +291,10 @@ laws::table!(
     [
         "abc" => Some(vec![String::from("abc")]),
         "_a-9" => Some(vec![String::from("_a-9")]),
-        "msg:1" => None,
-        "a b" => None,
-        "-a" => None,
-        "" => None,
+        "msg:1" => Some(Vec::new()),
+        "a b" => Some(Vec::new()),
+        "-a" => Some(Vec::new()),
+        "" => Some(Vec::new()),
     ]
 );
 
