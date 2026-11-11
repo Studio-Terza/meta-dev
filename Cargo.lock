@@ -3256,6 +3256,7 @@ name = "transcript-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "grammar-lines",
  "grammar-message",
  "grammar-output",
  "laws",
@@ -3263,6 +3264,7 @@ dependencies = [
  "port-core",
  "serde",
  "serde_json",
+ "text-lines",
  "thiserror",
 ]
 
