@@ -2,11 +2,11 @@ use std::error::Error;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use dispatch_ports::{
-    Agent, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall, Started,
-    SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
+    Agent, AgentRun, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall,
+    Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
 };
 use port_core::Run;
 
@@ -102,6 +102,21 @@ fn a_wait_nobody_rings_lasts_its_full_pause() -> Result<(), Box<dyn Error>> {
     };
     run.finish().settled()?;
     assert_eq!((waited, waits.recorded()), (Watching::START.after(pause), vec![Wait { pause, woke: Woke::Lapsed }]));
+    Ok(())
+}
+
+#[test]
+fn quiet_bell_waits_out_its_pause() -> Result<(), Box<dyn Error>> {
+    let pause = Duration::from_millis(50);
+    let run = Run::root();
+    let quiet = {
+        let clock = run.port(SystemClock);
+        AgentRun::new(Pid::new(1), Deadline::after(clock.now(), Timeout::new(5)))
+    };
+    run.finish().settled()?;
+    let started = Instant::now();
+    let woke = quiet.bell().waited(pause);
+    assert_eq!((woke, started.elapsed() >= pause), (Woke::Lapsed, true));
     Ok(())
 }
 
