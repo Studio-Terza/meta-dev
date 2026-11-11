@@ -1,3 +1,4 @@
+mod attribute_macros;
 mod binary_files;
 mod boundary;
 mod contents;
@@ -21,6 +22,7 @@ mod type_homes;
 mod type_name;
 mod walk;
 
+pub use attribute_macros::AttributeMacros;
 pub use binary_files::BinaryFiles;
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use code_model::Site;
@@ -29,7 +31,7 @@ pub use declared_type::DeclaredType;
 pub use gate::Gate;
 pub use headline::Headline;
 pub use home::Home;
-pub use lint::Lint;
+pub use lint::{Lint, WorkspaceLint};
 pub use macro_aliases::MacroAliases;
 pub use macro_calls::MacroCalls;
 pub use macros::Macros;

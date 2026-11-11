@@ -7,9 +7,13 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_DEV_OPT_LEVEL: "1"
+  SQLITE3_LIB_DIR: ${{ github.workspace }}/target/sqlite
+  SQLITE3_STATIC: "1"
+  SQLITE3_NO_PKG_CONFIG: "1"
   TOOLS: ${{ github.workspace }}/target/ci/tools
   MEASURED: ${{ github.workspace }}/target/ci/measured.toml
   METADATA: ${{ github.workspace }}/target/ci/metadata.json
@@ -20,6 +24,7 @@ env:
   HISTORY: ${{ github.workspace }}/target/ci/history.tsv
   TIMINGS: ${{ github.workspace }}/target/cargo-timings/cargo-timing.html
   COMPILE_TIMES: ${{ github.workspace }}/target/ci/compile-times.txt
+  GRAPH_PATH: ${{ github.workspace }}/target/ci/graph-path.txt
 
 permissions:
   contents: read
@@ -51,14 +56,54 @@ jobs:
       - name: fmt
         run: cargo fmt --check
       - name: clippy
+        id: clippy
         if: env.BUILD_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets $BUILD_SCOPE -- -D warnings'
+        run: '"$TOOLS/ci" clippy-targets "$MEASURED" clippy --timings $BUILD_SCOPE -- -D warnings'
       - name: fuzz targets clippy
         if: env.BUILD_SCOPE == '--workspace' || contains(format('{0} ', env.BUILD_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
+      - name: graph path
+        id: graph
+        if: env.BUILD_SCOPE != '' && steps.clippy.outcome == 'success' && always()
+        run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
+      - name: graph path skipped
+        id: graph_skipped
+        if: env.BUILD_SCOPE != '' && steps.clippy.outcome == 'failure' && always()
+        run: '"$TOOLS/ci" graph-path "$TIMINGS" "$MEASURED" "$GRAPH_PATH"'
+      - name: graph path report
+        if: steps.graph.outcome == 'success' && always()
+        run: '"$TOOLS/ci" show "$MEASURED"'
+      - name: stage times summary
+        if: steps.graph.outcome == 'success' && always()
+        run: '"$TOOLS/ci" summarize "$MEASURED" "$GITHUB_STEP_SUMMARY"'
+      - name: graph path summary
+        if: (steps.graph.outcome == 'success' || steps.graph_skipped.outcome == 'success') && always()
+        run: '"$TOOLS/ci" summarize "$GRAPH_PATH" "$GITHUB_STEP_SUMMARY"'
       - uses: ./.github/actions/judge
         with:
-          stages: clippy
+          stages: clippy graph-path
+      - name: graph history restore
+        if: github.event_name == 'push' && steps.graph.outcome == 'success' && always()
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/target/ci/history.tsv
+          key: graph-history-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: graph-history-${{ github.ref_name }}-
+      - name: graph history
+        if: github.event_name == 'push' && steps.graph.outcome == 'success' && always()
+        run: '"$TOOLS/ci" measured-history "$MEASURED" "$HISTORY" "$GITHUB_SHA"'
+      - name: graph history save
+        if: github.event_name == 'push' && steps.graph.outcome == 'success' && always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/target/ci/history.tsv
+          key: graph-history-${{ github.ref_name }}-${{ github.sha }}
+      - name: graph history file
+        if: github.event_name == 'push' && steps.graph.outcome == 'success' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graph-history
+          path: ${{ github.workspace }}/target/ci/history.tsv
 
   test:
     runs-on: ubuntu-latest
@@ -78,6 +123,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/tools
+      - uses: ./.github/actions/sqlite
       - name: test compile
         if: env.BUILD_SCOPE != ''
         run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $BUILD_SCOPE'
@@ -118,7 +164,7 @@ jobs:
       - name: dependency sources
         run: cargo fetch --locked
       - name: lint
-        run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" .'
+        run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" --timings .'
       - name: budget
         if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         run: '"$TOOLS/ci" show "$BUDGET"'
@@ -154,20 +200,36 @@ jobs:
           name: elegance-history
           path: ${{ github.workspace }}/target/ci/history.tsv
 
-  mutants:
+  mutants-shard:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       CARGO_PROFILE_DEV_OPT_LEVEL: "0"
+      SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - uses: ./.github/actions/toolchain
       - uses: ./.github/actions/tools
+      - uses: ./.github/actions/sqlite
       - uses: taiki-e/install-action@v2
         if: env.MUTANTS_SCOPE != ''
         with:
           tool: cargo-mutants@27.1.0
       - name: mutants in changed lines
-        run: '"$TOOLS/ci" mutants-changed "$RUNNER_TEMP/changed.diff" "$RUNNER_TEMP" $MUTANTS_SCOPE'
+        run: '"$TOOLS/ci" mutants-changed "$RUNNER_TEMP/changed.diff" "$RUNNER_TEMP" "$SHARD" $MUTANTS_SCOPE'
+
+  mutants:
+    if: always() && github.event_name == 'pull_request'
+    needs: mutants-shard
+    runs-on: ubuntu-latest
+    steps:
+      - name: every shard succeeded
+        env:
+          SHARDS: ${{ needs.mutants-shard.result }}
+        run: test "$SHARDS" = success

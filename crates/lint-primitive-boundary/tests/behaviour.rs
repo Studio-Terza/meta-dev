@@ -1,0 +1,437 @@
+use lint_primitive_boundary::PrimitiveBoundary;
+
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+
+const BARE: &str = "fn f(x: u32) -> f64 {\n    g(x)\n}\n";
+const SUPPORT_MODULE: &str = "#[cfg(test)]\nmod fixtures;\n";
+const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f(x: u32) {}\n}\n";
+const INLINE_BOUNDARY: &str = "mod boundary {\n    pub fn f(x: u32) -> String {\n        x.to_string()\n    }\n}\n";
+const INLINE_OTHER: &str = "mod masks {\n    pub fn f(x: u32) {}\n}\n";
+const METHOD: &str = "struct A;\nimpl A {\n    fn f(x: u32) {}\n}\n";
+const TRAIT_METHOD: &str = "struct A;\nimpl Tr for A {\n    fn f(x: u32) -> bool {\n        g(x)\n    }\n}\n";
+const TRAIT_DECLARATION: &str = "trait T {\n    fn f(&self, x: &str) -> String;\n}\n";
+const VARIANT: &str = "enum Buffer {\n    Full(usize),\n    Named { count: u8 },\n}\n";
+const CONSTANT: &str = "const LIMIT: usize = 1;\nstatic NAME: &str = \"a\";\n";
+const NEWTYPE: &str = "struct Count(usize);\nstruct Label<'text>(&'text str);\n";
+const TWO_FIELDS: &str = "struct Pair(u32, u32);\n";
+const NAMED_FIELD: &str = "pub struct A {\n    name: String,\n    size: Size,\n}\n";
+const NEWTYPE_EDGES: &str = "struct Count(usize);\nimpl Count {\n    const fn new(count: usize) -> Count {\n        Count(count)\n    }\n    fn try_new(count: usize) -> Result<Count, E> {\n        g(count)\n    }\n    fn into_inner(self) -> usize {\n        self.0\n    }\n}\n";
+const NEWTYPE_ACCESSOR: &str =
+    "struct Count(usize);\nimpl Count {\n    fn count(self) -> usize {\n        self.0\n    }\n}\n";
+const CONSTRUCTOR_ELSEWHERE: &str =
+    "struct A {\n    b: B,\n}\nimpl A {\n    fn new(x: u32) -> A {\n        g(x)\n    }\n}\n";
+const WIDE_CONSTRUCTOR: &str = "struct Count(usize);\nimpl Count {\n    fn new(count: usize, more: usize) -> Count {\n        g(count, more)\n    }\n}\n";
+const NESTED: &str = "pub fn f(x: Option<String>, y: Vec<&str>, z: &mut [u8]) {}\n";
+const FLAG: &str = "fn f(x: bool) {}\n";
+const TUPLE: &str = "fn f(x: (u8, char)) {}\n";
+const CLOSURE: &str = "fn f(x: impl Fn(&str) -> bool) {}\n";
+const BOUND: &str = "fn m<T>(a: T)\nwhere\n    T: AsRef<str>,\n{\n}\n";
+const ALIASED: &str = "type Label = String;\nfn f(x: Label) {}\n";
+const ALIASED_QUALIFIED: &str = "type Label = <A>::String;\nfn f(x: Label) {}\n";
+const TWO_FIELD_CONSTRUCTOR: &str =
+    "struct Pair(A, B);\nimpl Pair {\n    fn new(x: u32) -> Pair {\n        g(x)\n    }\n}\n";
+const QUALIFIED: &str = "fn m(a: std::string::String, b: alloc::string::String) {}\n";
+const RENAMED: &str = "use std::string::String as S;\nfn m(a: S) {}\n";
+const FOREIGN_PATHS: &str = "fn f(x: other::String, y: &other::str, z: <A>::String) {}\n";
+const IN_BODY: &str = "fn f() {\n    fn g(x: &str) {}\n}\n";
+const BODY_TYPES: &str = "fn f(x: A) -> B {\n    let y: u32 = x.into();\n    h(y.cast::<u64>())\n}\n";
+const UNIT: &str = "fn f(x: A) {}\nfn g(x: A) -> Result<(), E> {\n    h(x)\n}\n";
+const WIRE: &str = "fn f(x: serde_json::Value) {}\nstruct A {\n    b: toml::Value,\n}\n";
+const EXTERN: &str = "unsafe extern \"C\" {\n    fn m(a: &str);\n}\n";
+const UNION: &str = "union U {\n    a: &'static str,\n}\n";
+const DEFAULTED: &str = "pub struct A<T = String> {\n    pub a: T,\n}\n";
+const FROM_STR: &str = "pub struct A;\nimpl FromStr for A {\n    type Err = E;\n    fn from_str(text: &str) -> Result<A, E> {\n        g(text)\n    }\n}\n";
+const STRING_FROM: &str = "fn f() -> Name {\n    String::from(\"a\")\n}\n";
+const MACROS: &str = "fn f() {\n    let t = format!(\"x\");\n    let u = vec!(1);\n}\n";
+const INLINE_TEXT: &str = "mod inner {\n    pub fn f(x: Name) {\n        x.trim();\n    }\n}\n";
+const DOOR: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\n";
+const DOOR_AND_HELPER: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
+const DOOR_AND_OTHER_TYPE: &str = "struct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl B {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
+const TEST_NEWTYPE: &str = "pub struct Id(u64);\n";
+const SHIPPED_CONSTRUCTOR: &str =
+    "pub struct Id {\n    v: V,\n}\nimpl Id {\n    pub fn new(v: u64) -> Id {\n        g(v)\n    }\n}\n";
+const TEST_DOOR: &str = "struct A;\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n#[cfg(test)]\nmod tests {\n    impl fmt::Display for super::A {\n        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n            g(f)\n        }\n    }\n}\n";
+const MACRO_DOOR: &str = "struct A;\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\nm! {\n    impl fmt::Display for A {\n        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n            g(f)\n        }\n    }\n}\n";
+const MACRO_TEXT: &str =
+    "fn f(x: Name) {\n    assert!(x.trim().is_empty());\n    println!(\"{}\", x.to_string());\n}\n";
+const BESIDE_MACRO: &str = "m! {\n    fn f(x: &str) {}\n}\nfn g(y: u8) {}\n";
+const SAME_NAME_DOOR: &str = "mod m {\n    pub struct A;\n    impl std::fmt::Display for A {\n        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {\n            g(f)\n        }\n    }\n}\nmod n {\n    pub struct A;\n    impl A {\n        fn f(x: Name) {\n            x.trim();\n        }\n    }\n}\n";
+const SAME_NAME_NEWTYPE: &str = "pub struct Id(u64);\nmod other {\n    pub struct Id {\n        v: V,\n    }\n    impl Id {\n        pub fn new(v: u64) -> Id {\n            g(v)\n        }\n    }\n}\n";
+const ANY_TRAIT: &str = "use std::any::Any;\npub fn f(a: &dyn Any, b: impl core::any::Any) {}\npub fn g<T: std::any::Any>(t: T, c: u32) {}\n";
+const MODULE_ALIAS: &str =
+    "pub type Count = usize;\nmod inner {\n    use super::Count;\n    fn c(x: Count) {}\n}\nfn d(x: Count) {}\n";
+const BARE_FUNCTION_TYPES: &str = "pub fn f(x: fn(u8) -> String, y: Option<fn(&[usize]) -> bool>) {}\npub struct A {\n    pub b: fn(char),\n    pub c: Vec<fn() -> u32>,\n}\npub enum B {\n    C(fn(f32)),\n}\n";
+const PROJECTIONS: &str = "pub fn f<T: Tr>(x: <Vec<u32> as Tr>::X, y: <T as Tr>::X, z: <A as Tr<u8>>::X, w: <u16>::X) {}\npub fn g<T: Lending>(x: T::Item<i32>) {}\npub struct A {\n    pub b: <Vec<i64> as Tr>::X,\n}\ntrait L {\n    fn l(&self, x: Self::Item<char>);\n}\n";
+const CALLABLE_BOUNDS: &str = "pub fn f(x: impl Fn(u16) -> char, y: Box<dyn Fn(&str) -> i64>) {}\npub fn g<T: Into<f32>, U>(t: T, u: U)\nwhere\n    U: AsRef<[i16]>,\n{\n}\npub fn h(x: impl Iterator<Item: Into<String>>, y: impl Iterator<Item = f64>) {}\npub struct A<T: Into<u8>> {\n    pub b: T,\n}\n";
+const COMPOUNDS: &str = "pub fn f(x: [u64; 4], y: (A, i32), z: &&mut u128, w: *const isize) {}\npub struct A {\n    pub b: [u16; 2],\n    pub c: (B, i64),\n}\n";
+const CONST_ARGUMENT: &str = "pub fn f(x: A<{ size_of::<u64>() }>) {}\n";
+const WIRE_BESIDE_GLOB: &str = "use std::collections::*;\nuse serde_json::Value;\npub fn f(v: Value) -> Z {}\n";
+const SPELLED_BESIDE_GLOB: &str =
+    "use other::*;\npub fn f(x: String) -> Z {}\npub fn g(v: serde_json::Value) -> Z {}\n";
+const BUILTIN_BESIDE_GLOB: &str = "use other::*;\npub fn f(x: u32, y: &str) -> Z {}\npub fn g(v: other::u32) -> Z {}\n";
+const BUILTIN_IMPORTED_FROM_EXPANSION: &str =
+    "mod units {\n    make!();\n}\nuse units::u32;\npub fn f(x: u32) -> Z {}\npub fn g(x: units::u32) -> Z {}\n";
+const WIRE_RENAMED_CRATE: &str = "use toml as t;\npub fn f(v: t::Value) -> Z {}\n";
+const SHADOWED_ALIAS: &str = "type Count = usize;\nmod inner {\n    struct Count;\n    fn c(x: Count) {}\n}\n";
+const WIRE_THROUGH_SUPER_GLOB: &str =
+    "use serde_json::Value;\nmod inner {\n    use super::*;\n    fn c(x: Value) {}\n}\n";
+const LOCAL_STRING: &str = "pub struct String;\npub fn f(x: String) -> A {}\n";
+
+const OTHER_CRATE_NEWTYPE: &str = "pub struct Capture(Sink);\n";
+const OTHER_CRATE_CONSTRUCTOR: &str = "pub struct Capture {\n    sink: Sink,\n    yields: Yields,\n}\nimpl Capture {\n    pub fn new(v: u64) -> Capture {\n        g(v)\n    }\n}\n";
+
+const CASES: [Case; 70] = [
+    Case::new(
+        Title::new("a constructor on a struct with fields beside a same-named newtype in another crate"),
+        &[
+            Source::new(Located::new("crates/a/src/lib.rs"), Text::new(OTHER_CRATE_NEWTYPE)),
+            Source::new(Located::new("crates/b/src/lib.rs"), Text::new(OTHER_CRATE_CONSTRUCTOR)),
+        ],
+        Flagged::new(&["crates/b/src/lib.rs:6"]),
+    ),
+    Case::new(
+        Title::new("an inner struct shadows an outer alias of a primitive, as rustc resolves it"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SHADOWED_ALIAS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a wire type reached through use super::* in a child module"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(WIRE_THROUGH_SUPER_GLOB))],
+        Flagged::new(&["crates/x/src/lib.rs:4"]),
+    ),
+    Case::new(
+        Title::new("std's Any is a trait, so dyn, impl and bound uses of it are not primitives"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ANY_TRAIT))],
+        Flagged::new(&["crates/x/src/lib.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a door on another same-named type exempts nothing"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME_NAME_DOOR))],
+        Flagged::new(&["crates/x/src/lib.rs:13"]),
+    ),
+    Case::new(
+        Title::new("a constructor on a same-named type elsewhere than the newtype"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME_NAME_NEWTYPE))],
+        Flagged::new(&["crates/x/src/lib.rs:7"]),
+    ),
+    Case::new(
+        Title::new("an alias resolves through module scope"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(MODULE_ALIAS))],
+        Flagged::new(&["crates/x/src/lib.rs:4", "crates/x/src/lib.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a shipped constructor beside a same-named newtype in a test file"),
+        &[
+            Source::new(Located::new("crates/x/tests/a.rs"), Text::new(TEST_NEWTYPE)),
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SHIPPED_CONSTRUCTOR)),
+        ],
+        Flagged::new(&["crates/x/src/lib.rs:5"]),
+    ),
+    Case::new(
+        Title::new("test module"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("support module beside a plain file"),
+        &[
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SUPPORT_MODULE)),
+            Source::new(Located::new("crates/x/src/fixtures.rs"), Text::new(BARE)),
+            Source::new(Located::new("crates/x/src/clock.rs"), Text::new(BARE)),
+        ],
+        Flagged::new(&["crates/x/src/clock.rs:1", "crates/x/src/clock.rs:1"]),
+    ),
+    Case::new(
+        Title::new("boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/mask.rs"), Text::new(BARE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("boundary module root"),
+        &[Source::new(Located::new("crates/x/src/boundary.rs"), Text::new(BARE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inline boundary module, signatures and text"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BOUNDARY))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inline other module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_OTHER))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("other module file"),
+        &[Source::new(Located::new("crates/x/src/masks/mask.rs"), Text::new(BARE))],
+        Flagged::new(&["crates/x/src/masks/mask.rs:1", "crates/x/src/masks/mask.rs:1"]),
+    ),
+    Case::new(
+        Title::new("integration test"),
+        &[Source::new(Located::new("x/tests/a.rs"), Text::new(BARE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("private inherent method"),
+        &[Source::new(Located::new("a.rs"), Text::new(METHOD))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("trait impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_METHOD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("trait declaration"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_DECLARATION))],
+        Flagged::new(&["a.rs:2", "a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("enum variant fields"),
+        &[Source::new(Located::new("a.rs"), Text::new(VARIANT))],
+        Flagged::new(&["a.rs:2", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("constants and statics"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONSTANT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(Title::new("newtypes"), &[Source::new(Located::new("a.rs"), Text::new(NEWTYPE))], Flagged::new(&[])),
+    Case::new(
+        Title::new("two fields are no newtype"),
+        &[Source::new(Located::new("a.rs"), Text::new(TWO_FIELDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a private named field"),
+        &[Source::new(Located::new("a.rs"), Text::new(NAMED_FIELD))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a newtype's own new, try_new and into_inner"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEWTYPE_EDGES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("any other newtype accessor"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEWTYPE_ACCESSOR))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("new on a type that is not a newtype"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONSTRUCTOR_ELSEWHERE))],
+        Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("a newtype constructor with two inputs"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDE_CONSTRUCTOR))],
+        Flagged::new(&["a.rs:3", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("primitives nested in other types"),
+        &[Source::new(Located::new("a.rs"), Text::new(NESTED))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a bool parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(FLAG))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a tuple of primitives"),
+        &[Source::new(Located::new("a.rs"), Text::new(TUPLE))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a closure in a signature"),
+        &[Source::new(Located::new("a.rs"), Text::new(CLOSURE))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a where bound"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUND))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("an alias of a primitive is read through"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("an alias of a qualified path is not read through"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_QUALIFIED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("new on a tuple struct of two fields"),
+        &[Source::new(Located::new("a.rs"), Text::new(TWO_FIELD_CONSTRUCTOR))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("qualified String"),
+        &[Source::new(Located::new("a.rs"), Text::new(QUALIFIED))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a renamed import"),
+        &[Source::new(Located::new("a.rs"), Text::new(RENAMED))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("foreign and qualified paths"),
+        &[Source::new(Located::new("a.rs"), Text::new(FOREIGN_PATHS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a function inside a body"),
+        &[Source::new(Located::new("a.rs"), Text::new(IN_BODY))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("types inside a body"),
+        &[Source::new(Located::new("a.rs"), Text::new(BODY_TYPES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(Title::new("unit returns"), &[Source::new(Located::new("a.rs"), Text::new(UNIT))], Flagged::new(&[])),
+    Case::new(
+        Title::new("wire forms"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE))],
+        Flagged::new(&["a.rs:1", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("an extern function"),
+        &[Source::new(Located::new("a.rs"), Text::new(EXTERN))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a union field"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNION))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a defaulted generic"),
+        &[Source::new(Located::new("a.rs"), Text::new(DEFAULTED))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(Title::new("FromStr"), &[Source::new(Located::new("a.rs"), Text::new(FROM_STR))], Flagged::new(&[])),
+    Case::new(
+        Title::new("String::from"),
+        &[Source::new(Located::new("a.rs"), Text::new(STRING_FROM))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("format and other macros"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACROS))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("text in an inline module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_TEXT))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("text inside a Display impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(DOOR))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in an inherent impl of a Display type"),
+        &[Source::new(Located::new("a.rs"), Text::new(DOOR_AND_HELPER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in an impl of another type"),
+        &[Source::new(Located::new("a.rs"), Text::new(DOOR_AND_OTHER_TYPE))],
+        Flagged::new(&["a.rs:10"]),
+    ),
+    Case::new(
+        Title::new("text in a boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/parse.rs"), Text::new(INLINE_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a ports module is no boundary"),
+        &[Source::new(Located::new("crates/x/src/ports.rs"), Text::new(FLAG))],
+        Flagged::new(&["crates/x/src/ports.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a door impl in a cfg(test) module opens no door for shipped text"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_DOOR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a door impl in a macro body opens no door for shipped text"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACRO_DOOR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("text in std macro arguments is not blocked yet"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACRO_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a primitive beside an item macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(BESIDE_MACRO))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("primitives inside bare fn types in signatures, fields and variants"),
+        &[Source::new(Located::new("a.rs"), Text::new(BARE_FUNCTION_TYPES))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:3", "a.rs:4", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("primitives inside projections and qualified paths"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROJECTIONS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:2", "a.rs:4", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("primitives inside bounds, Fn sugar and associated constraints"),
+        &[Source::new(Located::new("a.rs"), Text::new(CALLABLE_BOUNDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:2", "a.rs:4", "a.rs:7", "a.rs:7", "a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("primitives inside arrays, tuples, references and pointers"),
+        &[Source::new(Located::new("a.rs"), Text::new(COMPOUNDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:3", "a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a primitive inside a const generic argument"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONST_ARGUMENT))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("an explicitly imported wire type beside a glob from outside the crate"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE_BESIDE_GLOB))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a text or wire type a glob may shadow is read by its spelling"),
+        &[Source::new(Located::new("a.rs"), Text::new(SPELLED_BESIDE_GLOB))],
+        Flagged::new(&["a.rs:2", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a built-in a glob may shadow is read by its spelling"),
+        &[Source::new(Located::new("a.rs"), Text::new(BUILTIN_BESIDE_GLOB))],
+        Flagged::new(&["a.rs:2", "a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a built-in imported from a module a macro may fill is read by its spelling"),
+        &[Source::new(Located::new("a.rs"), Text::new(BUILTIN_IMPORTED_FROM_EXPANSION))],
+        Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("a wire type reached through a renamed crate import"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE_RENAMED_CRATE))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("the crate's own String is not a primitive"),
+        &[Source::new(Located::new("a.rs"), Text::new(LOCAL_STRING))],
+        Flagged::new(&[]),
+    ),
+];
+
+#[test]
+fn primitives_outside_a_boundary_are_flagged() {
+    assert_eq!(Sources::mismatches::<Queried<PrimitiveBoundary>>(&CASES), Lines::default());
+}

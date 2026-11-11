@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  session,\n  uuid,\n  parent\nFROM\n  edges\nWHERE\n  session = ?1\n  AND uuid NOT IN (\n    SELECT\n      uuid\n    FROM\n      messages\n  )\nORDER BY\n  rowid\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "session",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "edges",
+            "name": "session"
+          }
+        }
+      },
+      {
+        "name": "uuid",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "edges",
+            "name": "uuid"
+          }
+        }
+      },
+      {
+        "name": "parent",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "edges",
+            "name": "parent"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "ba8154fe843fcefb1eebf3e3d7e98f478d9c6728467fad6cd990a37fbf434214"
+}

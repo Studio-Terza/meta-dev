@@ -6,9 +6,13 @@ mod text;
 
 use std::fmt;
 use std::path::PathBuf;
+use std::str::FromStr;
 
-use lint_core::{Report, SourceFile, SourceText};
+use file_ports::{Bytes, Memory};
+use lint_core::{Report, SourceFile, SourceText, WorkspaceLint};
+use lint_placement::Placement;
 use newtype::Wrapping;
+use workspace_metadata::Metadata;
 
 use crate::checks::Checks;
 
@@ -24,10 +28,41 @@ pub struct Sources(&'static [Source]);
 impl Sources {
     #[must_use]
     pub fn file(path: impl Into<PathBuf>, text: Text<'_>) -> SourceFile {
-        match SourceFile::parse(path, SourceText::new(text.into_inner().to_owned())) {
+        Self::kept(SourceFile::parse(path, SourceText::new(text.into_inner().to_owned())))
+    }
+
+    pub(crate) fn kept<Parsed>(parsed: Result<Parsed, impl fmt::Display>) -> Parsed {
+        match parsed {
             Ok(file) => file,
             Err(failure) => unreachable!("fixture source parses: {failure}"),
         }
+    }
+
+    #[must_use]
+    pub fn placed(manifests: &[Source], sources: &[Source]) -> Vec<SourceFile> {
+        let files: Memory = manifests
+            .iter()
+            .map(|manifest| (manifest.path().to_path_buf(), Bytes::from(manifest.text().into_inner())))
+            .collect();
+        sources
+            .iter()
+            .map(|source| {
+                let placement = Placement::locate(&files, source.path());
+                let text = SourceText::new(source.text().into_inner().to_owned());
+                Self::kept(SourceFile::parse_at(source.path().into(), source.path().into(), placement, text))
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn placed_flagged<Checked: Checks>(manifests: &[Source], sources: &[Source]) -> Lines {
+        Checked::flagged(&Self::placed(manifests, sources))
+    }
+
+    #[must_use]
+    pub fn placed_in<Checked: WorkspaceLint>(manifests: &[Source], sources: &[Source], workspace: Text<'_>) -> Lines {
+        let workspaces = [Self::kept(Metadata::from_str(workspace.into_inner()))];
+        Self::lines(&Checked::report(&Self::placed(manifests, sources), &workspaces))
     }
 
     #[must_use]

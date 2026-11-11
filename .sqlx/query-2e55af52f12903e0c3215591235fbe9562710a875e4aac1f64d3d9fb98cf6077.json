@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  cursors (session, read_to)\nVALUES\n  (?1, ?2)\nON CONFLICT\n  (session)\nDO UPDATE SET\n  read_to = excluded.read_to\nWHERE\n  read_to <> excluded.read_to\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2e55af52f12903e0c3215591235fbe9562710a875e4aac1f64d3d9fb98cf6077"
+}

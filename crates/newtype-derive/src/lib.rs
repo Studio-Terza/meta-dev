@@ -1,5 +1,7 @@
+mod marked;
 mod wrapped;
 
+use marked::Marked;
 use proc_macro::TokenStream;
 use wrapped::{CheckedDeserializing, Constructors, Deserializing, Formatting, Serializing, Strategy, Wrapped};
 
@@ -31,4 +33,9 @@ pub fn derive_checked_deserialize(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Serialize, attributes(newtype))]
 pub fn derive_serialize(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Serializing>(input.into()).into()
+}
+
+#[proc_macro_derive(Spelled)]
+pub fn derive_spelled(input: TokenStream) -> TokenStream {
+    Marked::spelled(input.into()).into()
 }

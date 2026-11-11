@@ -24,8 +24,9 @@ impl Lint for NoNumbersInBinaries {
                 .iter()
                 .filter(|file| binaries.holding(file.path()).is_some())
                 .flat_map(|file| {
-                    NamedNumbers::flagged::<Numbers>(
+                    NamedNumbers::flagged(
                         file,
+                        Numbers::default(),
                         Message::new(
                             Problem::new("numeric literal in a binary"),
                             Fix::new("read it from the settings file or its embedded defaults"),

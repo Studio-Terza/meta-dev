@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  span_edges.node,\n  span_edges.relation,\n  span_edges.message,\n  span_edges.ordinal,\n  messages.author,\n  segments.body,\n  span_edges.provenance,\n  senses.kind,\n  senses.specificity,\n  senses.confidence,\n  senses.explicitness\nFROM\n  span_edges\n  JOIN segments ON segments.message = span_edges.message\n  AND segments.ordinal = span_edges.ordinal\n  JOIN messages ON messages.uuid = span_edges.message\n  LEFT JOIN senses ON senses.message = span_edges.message\n  AND senses.ordinal = span_edges.ordinal\n  AND NOT EXISTS (\n    SELECT\n      1\n    FROM\n      senses AS later\n    WHERE\n      later.supersedes = senses.id\n  )\nWHERE\n  span_edges.node = ?1\nORDER BY\n  span_edges.rowid\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "node",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "node"
+          }
+        }
+      },
+      {
+        "name": "relation",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "message",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "author",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "author"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "specificity",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "specificity"
+          }
+        }
+      },
+      {
+        "name": "confidence",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "confidence"
+          }
+        }
+      },
+      {
+        "name": "explicitness",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "senses",
+            "name": "explicitness"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "26ff15ebaf080841c03307b53b5df739ac72bf3b63c64217f4232893b93fecd0"
+}

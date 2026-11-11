@@ -31,7 +31,8 @@ manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_bi
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
-effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run.
+effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run, owned_dependencies,
+key_dependency_roles, effects_in_fillers, counted_calls, hidden_sqlx, store_queries.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
@@ -178,6 +179,96 @@ Everywhere else a test goes through the port's in-memory fake or a library API s
 and the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
 a process in test code still also needs what `process_starters` asks for.
 
+`owned_dependencies`, `key_dependency_roles`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` (crate `lint-port-dependencies`) keep the
+port framework the only way to an effect. Ownership is declared, never guessed: a crate owns a package by naming it in
+`[package.metadata.port] owns = ["logos"]` in its `Cargo.toml` (`grammar` owns `logos`, `logos-codegen` and
+`logos-derive` and only re-exports `logos`, which the `grammar-<format>` lexer crates reach as `grammar::logos` with
+`#[logos(crate = grammar::logos)]` on each derive, while the `grammar-cited` lexer's `Cited` is shared by two other lexers and `grammar-unspelled` holds the `Unspelled` refusal that every lexer's checked newtype and `FromStr` shares; `query-ports` owns `sqlx`, its drivers, `tokio` and `tokio-stream`, and `sqlite-ports` owns `rusqlite`;
+`store-ports` owns nothing and names the store role its macros expand for). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
+proc-macro crate it depends on, so `store-ports` and `store-ports-macros` own jointly, and a proc-macro crate two ports
+depend on belongs to both units. The gate reads the dependency graph from `cargo metadata --format-version 1 --locked`,
+through the `Cargo` port of `cargo-ports`, and refuses to run when that fails; packages are told apart by their resolved
+identities. A package named in `owns` belongs to the declaring unit alone: `owned_dependencies` fails every other crate
+that depends on it directly, another unit whose closure holds it included, and names the declaring crate. An `owns` entry
+that resolves to no package the declaring unit depends on, directly or not, fails at its manifest line. The closure rule
+covers the rest: every package reachable from a package a unit owns belongs to that unit, and a package no unit names is
+depended on directly only by the units whose closure holds it; every other workspace crate fails where it depends on it,
+in `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]` or their `[target.*]` forms, also when renamed with
+`package =`. It points at the manifest line and names every unit whose closure holds the package. So a direct
+`libsqlite3-sys` dependency outside `store-ports` fails although no crate names it in `owns`. A package of the
+closure that other crates may depend on directly is declared by the unit in `[package.metadata.port] shared = [...]`:
+`store-ports` shares `proc-macro2`, `quote`, `serde`, `serde_core`, `serde_json`, `syn` and `thiserror`, and `grammar`
+shares `proc-macro2`, `quote` and `syn`. Nothing else is shared: a crate that needs an unshared package calls an owner's
+API. `effects_in_fillers` judges a crate that declares a `#[port]` (or `#[port_core::port]`) trait: every
+effect site, in the vocabulary of `effects_in_ports`, must sit inside an `impl <Trait>Filler for ..` block of a port trait
+that crate declares or an `impl Release for ..` block (a held resource's release), never in an inherent method, a free
+function or another trait impl. Test code is skipped as
+`effects_in_ports` skips it, and a crate with no `#[port]` trait is not judged. `counted_calls` fails the identifiers
+`counted_call` and `counted_acquire` anywhere in source, macro bodies included, outside `port-core` and `port-derive`; the
+code `#[port]` expands to is not source, so only the generated fillers count calls and acquisitions. `hidden_sqlx` fails
+the identifier `__sqlx` anywhere in source outside `store-ports` and `store-ports-macros`: `store_ports` re-exports sqlx as
+`__sqlx` only so that the code `store_ports::query!` and `store_ports::migrate!` expand to can name it.
+
+`key_dependency_roles` keeps each key dependency in its role, so a heavy package stays out of crates that do not need
+it. A port that names `[package.metadata.port] dependents = "lexer"` (as `grammar` does) is depended on directly, in any
+dependency table, only by crates that declare `[package.metadata.lexer]`. A lexer crate declares the one format it lexes
+with `format = "<name>"`, no two lexers lex the same format, and a lexer is a leaf: through normal edges it depends only
+on a port whose dependents are lexers, on other lexers, and on packages whose normal closure holds no package a port
+owns. A port declares who expands its macros with `expanders = { role = "store", macros = ["query", "migrate",
+"Columns"] }` (as `store-ports-macros` does), and shipped code that invokes one of those macros through any crate of the
+unit (`store_ports::query!` or `store_ports_macros::query!`, or the name imported from either, or `#[derive(Columns)]`,
+also inside `cfg_attr`) belongs to the unit or to a crate
+that declares `[package.metadata.store]`, as `design-store` does; test code is skipped. A workspace proc-macro crate whose
+normal closure holds a package a port owns belongs to that port's unit, or reaches the package only through crates that
+declare the port's `dependents` role, as `port-derive` reaches `logos` only through `grammar-ident`, so a proc-macro
+never drags a heavy dependency into the host build of every crate that uses it. Every lexer crate, the port that names
+lexers as its dependents, and every workspace crate that only those crates depend on (as `grammar-unspelled` is) starts
+its `lib.rs` with `#![deny(clippy::wildcard_enum_match_arm)]` (or `forbid`), the crate-level deny the single `grammar`
+crate carried before the lexers were split out of it; a deny under `cfg_attr` does not count. Each finding points at the
+manifest line of the dependency, the format, the macro call, or the first line of the crate root missing the deny.
+
+The store is reached through `store_ports::query!`, never through sqlx. `store_ports::query!(Row, r#"…"#, id: NodeId)` reads
+rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one`, and `store_ports::query!(r#"…"#, id: NodeId)`
+writes for `Statements::written`; sqlx checks the SQL against the schema as its own `query!` does. Every bound argument and
+every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
+`#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
+`FromStr`, or an `Option` of one. A checked newtype (`#[newtype(checked)]`) is stored as its inner value and read
+back through `newtype::Guarded`, so a stored value its check refuses fails the read; `grammar-output`'s `Bare`
+and `Quoted` fields read it the same way. A bare `i64`, `&str` or `String` is not a column and does not compile.
+
+A store's schema is a `store_ports::Schema`: its SQL migrations, and the typed Rust rewrites, each a `Batch` due when
+the migration of a given version is pending. Opening a store applies every pending migration and then every due rewrite,
+in version order, in one transaction: a store whose applied migrations do not match their declared checksums, a failing
+migration or a failing rewrite leaves the store exactly as it was. A rewrite runs only on the latest schema, the one
+`.sqlx` checks its queries against, so a later migration that renames a table or column a rewrite reads stops its query
+compiling instead of failing on an old store. A rule that Rust already owns, such as how the segmenter cuts a message
+into segments and sheds blanks, is never restated in SQL: `Resegmented`, due with migration 20261108000012, re-derives
+every message's segments through the same segmenter ingest runs, rewriting each segment's shape and body and adding and
+removing segments, so an old store holds the segments a fresh ingest of the same transcript would. Migration
+20261108000012 keeps the search index in step with every update and delete of a segment. Every row that points at a
+segment does so through a foreign key into `segments`, and the rewrite never lists those tables: it deletes each stored
+segment the segmenter would change or drop through `Statements::released`, which answers `Released::Referenced` where a
+foreign key refuses the delete, so SQLite checks every foreign key `pragma_foreign_key_list` reports, a table added
+later included. A re-derivation that would change the shape or body of a segment any row points at, or drop it, refuses
+the open with `StoreFailure::Refused`, naming every such segment as `message#ordinal`, and the store is left as it was.
+Segments nothing points at are still re-derived. Migration 20261109000001 gives `mechanical_links` generated
+`source_ordinal` and `target_ordinal` columns, read from the ordinal of a segment anchor (null for a message anchor),
+with foreign keys into `segments`, so a `cites` or `answers` link holds its segment like any annotation and its ordinal
+cannot disagree with its anchor. The migration copies the stored links with those keys deferred, and the rewrite due with
+it, `Anchored`, reads `pragma_foreign_key_check` for `mechanical_links`: an old store holding a link whose segment it does
+not hold refuses the open with `StoreFailure::Refused`, naming every such link as `source relation target`, never with a
+bare foreign key failure. Ingest links over every message of a session, earlier ones re-segmented in memory, so a link
+can name a segment of an earlier message that the store holds differently or not at all, such as one stored under an
+older segmenter. Before writing, `Holding` checks every segment each link names: the row the store will hold, the
+stored one or the one written now, must be the row the segmenter derives from that message. A link that fails is not
+written and ingest prints it as `refused link source relation target`; the rest of the session is written and its cursor
+advances. `every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets` reads every foreign key into
+`segments` through a checked query over `pragma_foreign_key_list` and fails on an ON DELETE or ON UPDATE action or a
+table declaring `DEFERRABLE`, since the rewrite's refusal relies on SQLite refusing the delete at once.
+
+`store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
+formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
+
 `fakes_at_ports` keeps test doubles at ports. In a file under a package's `tests` directory, a struct, enum or union
 whose name has the word `Fake`, `Stub`, `Mock`, `Spy` or `Dummy` among its camel-case words (`FakeClock`, `HTTPStub`, not
 `Fakery` or `Spyglass`) must implement a port: a trait whose path, read through the `use` items of its test target as
@@ -207,7 +298,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates, dependencies and lib targets of `cargo metadata`), `cargo-ports` (the `cargo metadata` port: the `Cargo` trait, `Toolchain` and the in-memory `Recorded`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` lints), `lint-store-queries` (the `store_queries` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates, dependencies and lib targets of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `store-ports` (the store port: the `Store` trait with per-type `read` and `write` ops and `lock`, its `Sqlite` filler over sqlx, `StoreLock`, the first held resource, and the `Column` and `Columns` traits), `store-ports-macros` (`store_ports::query!`, `store_ports::migrate!` and `#[derive(Columns)]`, over `sqlx-macros-core`, whose version moves in lockstep with sqlx as `[package.metadata.lockstep]` records), `design-store` (the design store's schema, queries and batches), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`), `cargo-ports` (the `cargo metadata` port: the `Cargo` port trait, `Toolchain` and the in-memory `Recorded`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose cycle spans more than 40 items.
 
 ## Query
@@ -283,7 +374,7 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
     ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
     ci tools <built directory> <tools directory>                build (dev profile) and copy reach, lint and ci
-    ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
+    ci mutants-changed <diff> <output> <shard> [<scope>...]     one shard of the mutants on the changed lines, or say it skipped
     ci mutants-shard <shard> <output>                           one weekly shard of all mutants
     ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
     ci compile-trend <cold build> <downloads>                   the trend issue when the cold build is slowest
@@ -421,8 +512,9 @@ tuple or named, generic or not. It also writes exactly one `impl newtype::kind::
     pub struct Rounds(usize);
 
 A validated newtype has no `new`. With `#[newtype(checked)]` the same derive implements `Wrapping` and
-inherent `try_new` and `into_inner` instead, and `try_new` is the only way in; it requires
-`Self: Validity<Kind = Checked> + Checked`. The rule lives on the type, in an `impl Checked`: a function from `&Inner`
+`newtype::Guarded` instead. `Guarded::try_new` is the single checked way in: the inherent `try_new`, `CheckedDeserialize`,
+the store's reads and `Arbitrary` all go through it. `Guarded` is only ever derived; `hand_impls` fails a hand-written
+`impl Guarded`, so no constructor skips the check. The rule lives on the type, in an `impl Checked`: a function from `&Inner`
 to `Result<&Inner, Error>`.
 
     #[derive(Newtype, Arbitrary, Debug)]
@@ -437,9 +529,8 @@ to `Result<&Inner, Error>`.
 
 `#[derive(Serialize, Deserialize)]` (`newtype::Serialize`, `newtype::Deserialize`) write and read a newtype as its inner
 value; `Deserialize` reads through `Newtype::new`, so only an unchecked newtype can derive it. A validated newtype
-derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through the type's `impl Checked` and is
-bounded by `Self: Validity<Kind = Checked> + Checked`, so it does not compile without the check or on a newtype that is
-not `#[newtype(checked)]`. A value the check refuses is a deserialization
+derives `CheckedDeserialize` (`newtype::CheckedDeserialize`) instead: it reads through `Guarded::try_new` and is
+bounded by `Self: Guarded`, so it does not compile without the check or on a newtype that is not `#[newtype(checked)]`. A value the check refuses is a deserialization
 error carrying the check's message, so `Checked::Error` implements `Display`. They reach serde through `newtype::serde`,
 so the using crate needs only `newtype`.
 
@@ -514,6 +605,9 @@ reach a `terminal` state, and a terminal state has no outgoing edges. A graph it
 The `mutants` job in `ci.yml` runs on each pull request. It applies `cargo mutants` to the lines the pull
 request changes, and tests each mutant with the crates the pull request reaches, because shared crates are
 tested through the crates that use them. A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
+The mutants run in eight `mutants-shard` jobs, each taking every eighth mutant (`--shard k/8 --sharding round-robin`),
+so a pull request that changes most of the workspace still fits GitHub's six-hour job limit. The `mutants` job
+waits for all of them and passes only if every shard succeeded, so a failed or cancelled shard fails it.
 
 `mutants.yml` runs every mutant once a week, in eight shards, or on request, each against the whole
 workspace (`.cargo/mutants.toml`). It reports in the run

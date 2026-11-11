@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  id,\n  applied_at\nFROM\n  applied_files\nWHERE\n  content = ?1\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "applied_files",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "applied_at",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "applied_files",
+            "name": "applied_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "b9452baf09a69912f8e820d157b7790eb97feb51200ecc9036900e73b4444cc6"
+}

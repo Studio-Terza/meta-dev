@@ -1,0 +1,13 @@
+use named_derive::Named;
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SegmentRelation {
+    #[name("answers")]
+    Answers,
+    #[name("refers-to")]
+    RefersTo,
+    #[name("supersedes")]
+    Supersedes,
+    #[name("corrects")]
+    Corrects,
+}

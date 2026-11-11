@@ -1,0 +1,179 @@
+{
+  "packages": [
+    {
+      "name": "app",
+      "version": "0.1.0",
+      "id": "path+file:///work/crates/app#0.1.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "app"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/app/Cargo.toml"
+    },
+    {
+      "name": "mid",
+      "version": "0.1.0",
+      "id": "path+file:///work/crates/mid#0.1.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "mid"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/mid/Cargo.toml"
+    },
+    {
+      "name": "slowmacro",
+      "version": "0.1.0",
+      "id": "path+file:///work/crates/slowmacro#0.1.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "proc-macro"
+          ],
+          "crate_types": [
+            "proc-macro"
+          ],
+          "name": "slowmacro"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/slowmacro/Cargo.toml"
+    },
+    {
+      "name": "user",
+      "version": "0.1.0",
+      "id": "path+file:///work/crates/user#0.1.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "user"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/user/Cargo.toml"
+    }
+  ],
+  "workspace_members": [
+    "path+file:///work/crates/app#0.1.0",
+    "path+file:///work/crates/mid#0.1.0",
+    "path+file:///work/crates/slowmacro#0.1.0",
+    "path+file:///work/crates/user#0.1.0"
+  ],
+  "workspace_default_members": [
+    "path+file:///work/crates/app#0.1.0",
+    "path+file:///work/crates/mid#0.1.0",
+    "path+file:///work/crates/slowmacro#0.1.0",
+    "path+file:///work/crates/user#0.1.0"
+  ],
+  "resolve": {
+    "nodes": [
+      {
+        "id": "path+file:///work/crates/app#0.1.0",
+        "dependencies": [
+          "path+file:///work/crates/mid#0.1.0",
+          "path+file:///work/crates/slowmacro#0.1.0"
+        ],
+        "deps": [
+          {
+            "name": "mid",
+            "pkg": "path+file:///work/crates/mid#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "slowmacro",
+            "pkg": "path+file:///work/crates/slowmacro#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(windows)"
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///work/crates/mid#0.1.0",
+        "dependencies": [
+          "path+file:///work/crates/slowmacro#0.1.0"
+        ],
+        "deps": [
+          {
+            "name": "slowmacro",
+            "pkg": "path+file:///work/crates/slowmacro#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": "cfg(any())"
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///work/crates/slowmacro#0.1.0",
+        "dependencies": [],
+        "deps": [],
+        "features": []
+      },
+      {
+        "id": "path+file:///work/crates/user#0.1.0",
+        "dependencies": [
+          "path+file:///work/crates/slowmacro#0.1.0"
+        ],
+        "deps": [
+          {
+            "name": "slowmacro",
+            "pkg": "path+file:///work/crates/slowmacro#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      }
+    ],
+    "root": null
+  },
+  "target_directory": "/work/target",
+  "version": 1,
+  "workspace_root": "/work",
+  "metadata": null
+}

@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
-use crate::metadata::package_id::PackageId;
+use crate::package_id::PackageId;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -12,7 +12,7 @@ enum DependencyKind {
     Other,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct Linkage {
     kind: Option<DependencyKind>,
 }
@@ -26,7 +26,7 @@ impl Linkage {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct NodeDependency {
     name: CrateName,
     pkg: PackageId,
@@ -34,9 +34,12 @@ pub struct NodeDependency {
     dep_kinds: Vec<Linkage>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Node {
     id: PackageId,
+    #[serde(default)]
+    dependencies: Vec<PackageId>,
+    #[serde(default)]
     deps: Vec<NodeDependency>,
 }
 
@@ -53,6 +56,10 @@ impl NodeDependency {
 impl Node {
     pub fn package_id(&self) -> &PackageId {
         &self.id
+    }
+
+    pub fn dependencies(&self) -> &[PackageId] {
+        &self.dependencies
     }
 
     pub fn normal(&self) -> impl Iterator<Item = &NodeDependency> {

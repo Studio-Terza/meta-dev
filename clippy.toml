@@ -13,6 +13,11 @@ disallowed-methods = [
   "str::split_ascii_whitespace",
   "str::split_once",
   "str::rsplit_once",
+  "str::split_at",
+  "str::split_at_checked",
+  "str::split_at_mut",
+  "str::split_at_mut_checked",
+  "str::char_indices",
   "str::trim",
   "str::trim_start",
   "str::trim_end",
@@ -51,4 +56,16 @@ disallowed-methods = [
   "std::io::BufRead::split",
   "std::str::from_utf8",
   "std::string::String::from_utf8_lossy",
+  "logos::Lexer::remainder",
+  { path = "regex::Regex::new", allow-invalid = true },
+  { path = "regex::bytes::Regex::new", allow-invalid = true },
+  { path = "regex::RegexSet::new", allow-invalid = true },
+  { path = "regex::RegexBuilder::new", allow-invalid = true },
+]
+disallowed-types = [
+  { path = "regex::Regex", allow-invalid = true },
+  { path = "regex::bytes::Regex", allow-invalid = true },
+  { path = "regex::RegexSet", allow-invalid = true },
+  { path = "regex::RegexBuilder", allow-invalid = true },
+  { path = "regex_automata::meta::Regex", allow-invalid = true },
 ]

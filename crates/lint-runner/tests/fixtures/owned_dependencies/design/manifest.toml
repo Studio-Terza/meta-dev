@@ -1,0 +1,8 @@
+[package]
+name = "design"
+
+[dependencies]
+logos = "1"
+
+[dev-dependencies]
+logos = "1"

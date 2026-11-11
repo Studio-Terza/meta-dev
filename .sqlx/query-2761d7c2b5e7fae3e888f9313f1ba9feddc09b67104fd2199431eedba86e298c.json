@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  mechanical_links.source,\n  mechanical_links.relation,\n  mechanical_links.target,\n  mechanical_links.source_message,\n  mechanical_links.target_message\nFROM\n  pragma_foreign_key_check('mechanical_links') AS unchecked\n  JOIN mechanical_links ON mechanical_links.rowid = unchecked.rowid\nGROUP BY\n  mechanical_links.rowid\nORDER BY\n  mechanical_links.rowid\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "source",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "relation",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "target",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "target"
+          }
+        }
+      },
+      {
+        "name": "source_message",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "source_message"
+          }
+        }
+      },
+      {
+        "name": "target_message",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "target_message"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2761d7c2b5e7fae3e888f9313f1ba9feddc09b67104fd2199431eedba86e298c"
+}

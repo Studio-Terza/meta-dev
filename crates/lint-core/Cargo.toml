@@ -18,6 +18,10 @@ proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true
 lint-layout = { path = "../lint-layout" }
+workspace-metadata = { path = "../workspace-metadata" }
+
+[dev-dependencies]
+syn.workspace = true
 
 [lints]
 workspace = true

@@ -7,6 +7,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
 
+use serde::de::DeserializeOwned;
 use serde_json::Deserializer;
 
 use file_ports::Text;
@@ -34,15 +35,21 @@ impl CompileTimes {
         page: impl Into<Cow<'path, Path>>,
         read: &Text,
     ) -> Result<BTreeMap<OneLine, Seconds>, Failure<'path>> {
+        let units: Vec<Unit> = Self::units(page, read)?;
+        Ok(units.into_iter().fold(BTreeMap::new(), |totals, unit| unit.tallied(totals)))
+    }
+
+    pub(crate) fn units<'path, Timed: DeserializeOwned>(
+        page: impl Into<Cow<'path, Path>>,
+        read: &Text,
+    ) -> Result<Vec<Timed>, Failure<'path>> {
         let text = read.as_ref();
-        let units: Vec<Unit> = text
-            .match_indices(Self::UNIT_DATA)
+        text.match_indices(Self::UNIT_DATA)
             .next()
             .and_then(|(at, found)| text.get(at + found.len()..))
-            .and_then(|rest| Deserializer::from_str(rest).into_iter::<Vec<Unit>>().next())
+            .and_then(|rest| Deserializer::from_str(rest).into_iter::<Vec<Timed>>().next())
             .and_then(Result::ok)
-            .ok_or_else(|| Failure::NoTimings { path: page.into() })?;
-        Ok(units.into_iter().fold(BTreeMap::new(), |totals, unit| unit.tallied(totals)))
+            .ok_or_else(|| Failure::NoTimings { path: page.into() })
     }
 }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nUPDATE\n  jobs\nSET\n  state = ?2\nWHERE\n  state = ?1\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8a94f13165ed469d9ecc48d4e5ffa672ddcfc4a4d481e03e6f9b3affb0ded2e3"
+}

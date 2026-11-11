@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT DISTINCT\n  message AS \"message!: String\",\n  ordinal AS \"ordinal!: i64\"\nFROM\n  structured\nWHERE\n  message = ?1\nORDER BY\n  ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "source_message"
+          }
+        }
+      },
+      {
+        "name": "ordinal!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "source_ordinal"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a6cc905bcf3170e6c2d0c27825c35d30143297a9b3c28479ed6f07cc863de846"
+}

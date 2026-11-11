@@ -2,6 +2,7 @@ mod elegance;
 mod lints;
 
 use std::ffi::OsString;
+use std::fmt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::thread::Scope;
@@ -11,13 +12,14 @@ use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;
-use lint_core::{Lint, Readout, SourceFile};
+use lint_core::{Lint, Readout, Report, SourceFile};
 use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
+use timer_ports::Timer;
 
-use super::boundary::Queue;
-use super::{Outcome, Sources};
+use super::timings::Measured;
+use super::{Outcome, Sources, Verdict};
 use elegance::Elegance;
 use lints::{Crew, Lints};
 
@@ -70,10 +72,10 @@ impl Mode {
         }
     }
 
-    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync>(
+    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
         &self,
         scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F, C>,
+        sources: &'scope Sources<F, C, T>,
     ) -> Run<'scope, '_> {
         match self {
             Mode::Gate => Run::Gate(Lints::started(scope, sources)),
@@ -84,38 +86,47 @@ impl Mode {
 }
 
 impl Run<'_, '_> {
-    pub(crate) fn outcome_of<'file>(
+    pub(crate) fn verdict_of(
         self,
-        readout: &'file Readout,
-        queue: &Queue,
+        readout: &Measured<Readout>,
+        sources: &Sources<impl Files, impl Cargo, impl Timer>,
         out: &mut impl Write,
-    ) -> Outcome<'file> {
+        err: &mut impl Write,
+    ) -> Verdict {
         match self {
-            Run::Gate(crew) => Self::gated(readout, queue, crew, out),
-            Run::Report => Self::reported(readout.files(), out),
-            Run::Query(found) => Self::queried(found, readout.files(), out),
+            Run::Gate(crew) => crew.gated(readout, sources, out, err),
+            Run::Report => Self::reported(readout.done().files(), out, err),
+            Run::Query(found) => Self::queried(found, readout.done().files(), out, err),
         }
     }
 
-    fn gated<'file>(readout: &'file Readout, queue: &Queue, crew: Crew<'_>, out: &mut impl Write) -> Outcome<'file> {
-        let files = readout.files();
-        write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)).ok();
-        crew.checked(readout, queue)
-    }
-    fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
+    fn reported(files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
         let model = Reader::read_files(files);
-        Elegance::reports(files, &model).iter().try_for_each(|report| write!(out, "{report}")).ok();
-        Outcome::Clean
+        Outcome::Clean.surveyed(&Elegance::reports(files, &model), out, err)
     }
 
-    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
-        found
-            .iter()
-            .try_for_each(|query| {
-                let extraction = Extraction::from(files);
-                write!(out, "{}", query.reply(&TypeSystem::built_from(files, &extraction)))
-            })
-            .ok();
-        Outcome::Clean
+    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
+        let extraction = Extraction::from(files);
+        let system = TypeSystem::built_from(files, &extraction);
+        Outcome::Clean.surveyed(found.map(|query| query.reply(&system)).as_slice(), out, err)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Survey<'files> {
+    budget: TestBudget,
+    paired: Report<'files>,
+    clones: Report<'files>,
+}
+
+impl<'files> Survey<'files> {
+    pub(crate) fn measured(files: &'files [SourceFile]) -> Survey<'files> {
+        Survey { budget: TestBudget::measured(files), paired: PairedApis::report(files), clones: Clones::report(files) }
+    }
+}
+
+impl fmt::Display for Survey<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}{}{}", self.budget, self.paired, self.clones)
     }
 }

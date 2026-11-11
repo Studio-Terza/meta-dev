@@ -1,0 +1,23 @@
+[package]
+name = "design-jobs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.store]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+design-model = { path = "../design-model" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+store-ports = { path = "../store-ports" }
+thiserror.workspace = true
+
+[lints]
+workspace = true

@@ -8,7 +8,7 @@ use super::resolver::Resolution;
 use super::settling::Target;
 use super::std_names::StdNames;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Binding {
     Module(ScopeId),
     Item(ScopeId, DeclaredId),

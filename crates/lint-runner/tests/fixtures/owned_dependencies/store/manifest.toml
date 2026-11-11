@@ -1,0 +1,6 @@
+[package]
+name = "store"
+
+[dependencies]
+hashbrown = "0.16"
+serde = "1"

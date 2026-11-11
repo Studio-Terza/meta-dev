@@ -1,0 +1,2 @@
+wrote .sqlx/query-70d501bdc85b04fc40fa92c599432fc63329dd6e35496a0970c77f6c8698ef30.json
+removed .sqlx/query-stale.json

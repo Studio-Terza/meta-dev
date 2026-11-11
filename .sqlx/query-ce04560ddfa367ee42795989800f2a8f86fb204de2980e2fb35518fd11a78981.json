@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nUPDATE\n  failures\nSET\n  delivery = ?2\nWHERE\n  job = ?1\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ce04560ddfa367ee42795989800f2a8f86fb204de2980e2fb35518fd11a78981"
+}

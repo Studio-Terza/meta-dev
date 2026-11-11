@@ -1,7 +1,9 @@
 mod crate_key;
 mod crates;
 mod dependencies;
+mod dependency_sites;
 mod failure;
+mod library_tests;
 mod line_number;
 mod manifest;
 mod matching;
@@ -19,9 +21,11 @@ mod word;
 
 pub use crates::{CrateSource, Crates, LibraryForm};
 pub use dependencies::Dependencies;
+pub use dependency_sites::DependencySites;
 pub use failure::Failure;
+pub use library_tests::LibraryTests;
 pub use line_number::LineNumber;
-pub use manifest::Manifest;
+pub use manifest::{KeyLines, Manifest, TableKey};
 pub use matching::Matching;
 pub use name::{CamelWord, Casing, Length, Lowered, Name, Prefix};
 pub use package_name::PackageName;

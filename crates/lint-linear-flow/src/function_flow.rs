@@ -2,12 +2,10 @@ mod found;
 mod root;
 mod scan;
 
-use std::path::Path;
-
 use proc_macro2::Span;
 use syn::Block;
 
-use lint_core::{Site, Violation};
+use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 
 use crate::finding::Rule;
@@ -24,9 +22,10 @@ pub struct FunctionFlow<'file> {
 }
 
 impl<'file> FunctionFlow<'file> {
-    pub fn judged(path: &'file Path, name: Span, body: &Block) -> FunctionFlow<'file> {
+    pub fn judged(file: &'file SourceFile, name: Span, body: &Block) -> FunctionFlow<'file> {
+        let path = file.path();
         let root = Root::from(body);
-        let mut scan = Scan::new(path);
+        let mut scan = Scan::new(file);
         root.scanned_by(&mut scan);
         FunctionFlow {
             site: Site::new(path, LineNumber::from(name)),

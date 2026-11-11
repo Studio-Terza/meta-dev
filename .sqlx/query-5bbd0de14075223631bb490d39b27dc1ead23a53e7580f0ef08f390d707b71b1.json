@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  source,\n  relation,\n  target,\n  source_message,\n  target_message\nFROM\n  mechanical_links\nWHERE\n  ?1 IN (source_message, target_message)\nORDER BY\n  rowid\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "source",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "relation",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "target",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "target"
+          }
+        }
+      },
+      {
+        "name": "source_message",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "source_message"
+          }
+        }
+      },
+      {
+        "name": "target_message",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mechanical_links",
+            "name": "target_message"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5bbd0de14075223631bb490d39b27dc1ead23a53e7580f0ef08f390d707b71b1"
+}

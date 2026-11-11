@@ -5,8 +5,9 @@ use std::process::ExitCode;
 
 use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Memory};
-use lint_runner::Cli;
+use lint_runner::{Cli, Ports};
 use text_lines::Lines;
+use timer_ports::Monotonic;
 
 use crate::fakes::FakeLinked;
 
@@ -31,7 +32,7 @@ impl Run {
 
     fn lines_at(&self, path: &str) -> Vec<String> {
         let site = format!("{path}:1: ");
-        Lines::from(self.err.as_str()).filter(|line| line.contains(&site)).map(str::to_owned).collect()
+        self.err.parse::<Lines>().into_iter().flatten().filter(|line| line.contains(&site)).collect()
     }
 
     fn findings(&self) -> usize {
@@ -68,8 +69,11 @@ impl Checkout {
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(
-            files,
-            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            Ports::new(
+                files,
+                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                Monotonic::default(),
+            ),
             &mut out,
             &mut err,
         );

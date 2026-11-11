@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 pub use node::{Node, NodeDependency};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Resolve {
     nodes: Vec<Node>,
 }

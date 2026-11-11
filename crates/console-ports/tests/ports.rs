@@ -1,16 +1,11 @@
 use std::ffi::{OsStr, OsString};
-use std::process::ExitCode;
 
 use console_ports::{Environment, Process, Variables};
 
 #[test]
 fn the_process_answers_with_its_arguments() {
-    let mut seen = None;
-    let _ = Process::answer(|arguments, _, _| {
-        seen = Some(arguments);
-        ExitCode::SUCCESS
-    });
-    assert!(seen.is_some());
+    let answered = Process::answer(|arguments, _, _| arguments);
+    assert_eq!(answered, std::env::args_os().skip(1).collect::<Vec<OsString>>());
 }
 
 #[test]

@@ -8,21 +8,24 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
-use crate::metadata::package_id::PackageId;
+use crate::format::Format;
+use crate::package_id::PackageId;
+use crate::role::Role;
 use declared::Declared;
+pub use declared::{Expanders, MacroName, PortTable};
 use dependency::Dependency;
 pub use target::Form;
 use target::Target;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Package {
-    name: CrateName,
     id: Option<PackageId>,
-    #[serde(default)]
-    targets: Vec<Target>,
+    name: CrateName,
     manifest_path: PathBuf,
     dependencies: Vec<Dependency>,
     metadata: Option<Declared>,
+    #[serde(default)]
+    targets: Vec<Target>,
 }
 
 impl Package {
@@ -38,6 +41,22 @@ impl Package {
         self.targets.iter().find(|target| target.form().is_some())
     }
 
+    pub fn proc_macro(&self) -> Option<&Package> {
+        self.targets.iter().filter_map(Target::form).find(|form| *form == Form::ProcMacro).map(|_| self)
+    }
+
+    pub fn port(&self) -> Option<&PortTable> {
+        self.metadata.as_ref().and_then(Declared::port)
+    }
+
+    pub fn declares(&self, role: Role) -> Option<Role> {
+        self.metadata.as_ref().and_then(|declared| declared.declares(role))
+    }
+
+    pub fn format(&self) -> Option<&Format> {
+        self.metadata.as_ref().and_then(Declared::format)
+    }
+
     pub fn readings(&self) -> &[PathBuf] {
         self.metadata.as_ref().map_or(&[], Declared::reads)
     }
@@ -48,6 +67,13 @@ impl Package {
 
     pub fn into_manifest(self) -> PathBuf {
         self.manifest_path
+    }
+
+    pub fn keys<'package>(
+        &'package self,
+        required: &'package CrateName,
+    ) -> impl Iterator<Item = &'package CrateName> + use<'package> {
+        self.dependencies.iter().filter_map(|dependency| dependency.key_of(required))
     }
 
     pub fn dependencies_among<'package>(

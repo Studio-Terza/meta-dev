@@ -41,7 +41,7 @@ impl<'space> From<&'space Namespace<'space>> for Seeds<'space> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Target {
     Waiting,
     Module(ScopeId, Sight),
@@ -95,7 +95,7 @@ impl Target {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ScopeSettling {
     imports: Vec<Resolution>,
     targets: Vec<Target>,

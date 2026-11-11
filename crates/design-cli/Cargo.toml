@@ -1,0 +1,31 @@
+[package]
+name = "design-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "design"
+path = "src/main.rs"
+
+[dependencies]
+console-ports = { path = "../console-ports" }
+design = { path = "../design" }
+dispatch-ports = { path = "../dispatch-ports" }
+exit = { path = "../exit" }
+file-ports = { path = "../file-ports" }
+sqlite-ports = { path = "../sqlite-ports" }
+
+[dev-dependencies]
+design-model = { path = "../design-model" }
+e2e = { path = "../../e2e" }
+laws = { path = "../laws" }
+newtype = { path = "../newtype" }
+grammar-slug = { path = "../grammar-slug" }
+serde_json.workspace = true
+structurer = { path = "../structurer" }
+text-lines = { path = "../text-lines" }
+
+[lints]
+workspace = true

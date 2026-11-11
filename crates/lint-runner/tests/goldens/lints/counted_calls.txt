@@ -1,0 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 1 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler:
+src/lib.rs:1: names counted_call or counted_acquire outside port-core and port-derive; declare the trait with #[port] and implement its Filler, so the generated code counts each call and acquisition
+fails

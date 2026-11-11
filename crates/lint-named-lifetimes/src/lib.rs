@@ -2,6 +2,7 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use syn::visit::Visit;
 
 use std::path::Path;
@@ -22,22 +23,25 @@ impl Lint for NamedLifetimes {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("lifetimes are named with a word, never a letter"),
-            files.iter().flat_map(|file| Self::short_lifetimes(file.path(), file.syntax())).collect(),
+            files.iter().flat_map(<Self as FileLint>::violations).collect(),
         )
     }
 }
 
 impl NamedLifetimes {
     const MINIMUM_LENGTH: Length = Length::new(2);
+}
 
-    fn short_lifetimes<'file>(path: &'file Path, file: &syn::File) -> Vec<Violation<'file>> {
-        let mut visitor = ShortLifetimes { path, found: Vec::new() };
-        visitor.visit_file(file);
+impl FileLint for NamedLifetimes {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut visitor = ShortLifetimes { file, path: file.path(), found: Vec::new() };
+        visitor.visit_file(file.syntax());
         visitor.found
     }
 }
 
 struct ShortLifetimes<'file> {
+    file: &'file SourceFile,
     path: &'file Path,
     found: Vec<Violation<'file>>,
 }
@@ -51,6 +55,6 @@ impl<'ast> Visit<'ast> for ShortLifetimes<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        lint_core::Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        lint_core::Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 }

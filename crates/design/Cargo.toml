@@ -1,0 +1,46 @@
+[package]
+name = "design"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+console-ports = { path = "../console-ports" }
+design-model = { path = "../design-model" }
+design-runs = { path = "../design-runs" }
+design-store = { path = "../design-store" }
+dispatch-ports = { path = "../dispatch-ports" }
+exit = { path = "../exit" }
+file-ports = { path = "../file-ports" }
+grammar-cited = { path = "../grammar-cited" }
+grammar-flag = { path = "../grammar-flag" }
+grammar-notes = { path = "../grammar-notes" }
+grammar-output = { path = "../grammar-output" }
+grammar-search = { path = "../grammar-search" }
+grammar-slug = { path = "../grammar-slug" }
+local-config = { path = "../local-config" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+serde.workspace = true
+serde_json.workspace = true
+store-ports = { path = "../store-ports" }
+stream = { path = "../stream" }
+structurer = { path = "../structurer" }
+thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+e2e = { path = "../../e2e" }
+golden = { path = "../golden" }
+laws = { path = "../laws" }
+sqlite-ports = { path = "../sqlite-ports" }
+text-lines = { path = "../text-lines" }
+
+[lints]
+workspace = true

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  notes_endings.ending\nFROM\n  notes_endings\n  JOIN nodes ON nodes.id = notes_endings.node\nWHERE\n  nodes.project = ?1\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "ending",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notes_endings",
+            "name": "ending"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3988e5f9a6ac7680ce54a0d4b8753b72d26ee6f31afb7562cfa9ffedf929e9fe"
+}

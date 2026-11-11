@@ -3,7 +3,16 @@ use std::fmt;
 use newtype::Checked;
 
 #[derive(
-    newtype::Newtype, newtype::Arbitrary, newtype::CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord,
+    newtype::Newtype,
+    newtype::Arbitrary,
+    newtype::CheckedDeserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
 )]
 #[newtype(checked, strategy = "\\PC*")]
 pub struct OneLine(String);

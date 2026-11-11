@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  segment_links (\n    source_message,\n    source_ordinal,\n    relation,\n    target_message,\n    target_ordinal,\n    provenance\n  )\nVALUES\n  (?1, 0, 'answers', 'o2', 0, 'init')\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "254d6fd951c8c447fceec346139efc18eb8e3d0f5f617c03fa7e637540d40715"
+}

@@ -15,5 +15,9 @@ lint-layout = { path = "../lint-layout" }
 proc-macro2.workspace = true
 syn.workspace = true
 
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

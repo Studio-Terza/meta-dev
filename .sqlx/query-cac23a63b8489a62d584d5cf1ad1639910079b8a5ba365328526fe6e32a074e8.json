@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  id,\n  state,\n  input_tokens,\n  output_tokens,\n  cache_written_tokens,\n  cache_read_tokens,\n  reply\nFROM\n  runs\nWHERE\n  job = ?1\nORDER BY\n  id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "state",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "input_tokens",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "input_tokens"
+          }
+        }
+      },
+      {
+        "name": "output_tokens",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "output_tokens"
+          }
+        }
+      },
+      {
+        "name": "cache_written_tokens",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "cache_written_tokens"
+          }
+        }
+      },
+      {
+        "name": "cache_read_tokens",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "cache_read_tokens"
+          }
+        }
+      },
+      {
+        "name": "reply",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "reply"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "cac23a63b8489a62d584d5cf1ad1639910079b8a5ba365328526fe6e32a074e8"
+}

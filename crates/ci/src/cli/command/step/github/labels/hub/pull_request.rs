@@ -16,7 +16,11 @@ impl PullRequest {
     }
 
     pub(crate) fn carrying(&self, check: Check) -> Option<&PullRequest> {
-        Lines::from(self.0.as_ref())
+        self.0
+            .as_ref()
+            .parse::<Lines>()
+            .into_iter()
+            .flatten()
             .skip(1)
             .filter_map(|name| name.parse::<Check>().ok())
             .find(|carried| *carried == check)
@@ -24,6 +28,13 @@ impl PullRequest {
     }
 
     pub(crate) fn refactor(&self) -> Option<&PullRequest> {
-        Lines::from(self.0.as_ref()).next().filter(|kind| *kind == Self::REFACTOR_KIND).map(|_| self)
+        self.0
+            .as_ref()
+            .parse::<Lines>()
+            .into_iter()
+            .flatten()
+            .next()
+            .filter(|kind| *kind == Self::REFACTOR_KIND)
+            .map(|_| self)
     }
 }

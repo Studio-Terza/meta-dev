@@ -19,6 +19,7 @@ required-features = ["measure"]
 [dependencies]
 console-ports = { path = "../crates/console-ports" }
 file-ports = { path = "../crates/file-ports" }
+tempfile.workspace = true
 
 [dev-dependencies]
 ci = { path = "../crates/ci" }

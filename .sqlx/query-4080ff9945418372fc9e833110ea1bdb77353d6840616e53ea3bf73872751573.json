@@ -1,0 +1,47 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  tables.name AS \"child!: String\",\n  CAST(keys.on_update AS TEXT) AS \"on_update!: String\",\n  CAST(keys.on_delete AS TEXT) AS \"on_delete!: String\",\n  upper(tables.sql) AS \"declared!: String\"\nFROM\n  sqlite_schema AS tables\n  JOIN pragma_foreign_key_list(tables.name) AS keys\nWHERE\n  tables.type = 'table'\n  AND keys.\"table\" = 'segments'\nORDER BY\n  tables.name,\n  keys.id\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "child!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sqlite_master",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "on_update!: String",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "name": "on_delete!: String",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "name": "declared!: String",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "4080ff9945418372fc9e833110ea1bdb77353d6840616e53ea3bf73872751573"
+}

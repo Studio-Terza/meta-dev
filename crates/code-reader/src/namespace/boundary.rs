@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::iter;
 use std::ops::ControlFlow;
 
@@ -22,7 +23,7 @@ impl ScopeId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct GlobId(usize);
 
 impl GlobId {
@@ -42,20 +43,21 @@ impl Reach {
     }
 }
 
-pub(super) trait Lattice: PartialEq + Sized {
+pub(super) trait Lattice: Ord + Clone {
     fn joined(&self, computed: Self) -> Self;
 
     fn settled(self, advanced: impl Fn(&Self) -> Self) -> Self {
+        let mut reached = BTreeSet::from([self.clone()]);
         Self::reached(iter::repeat(()).try_fold(self, |state, ()| {
             let next = state.joined(advanced(&state));
-            state.stepped(next)
+            Self::stepped(&mut reached, next)
         }))
     }
 
-    fn stepped(self, next: Self) -> ControlFlow<Self, Self> {
-        match [self].into_iter().find(|state| *state == next) {
-            Some(_) => ControlFlow::Break(next),
-            None => ControlFlow::Continue(next),
+    fn stepped(reached: &mut BTreeSet<Self>, next: Self) -> ControlFlow<Self, Self> {
+        match reached.insert(next.clone()).then_some(()) {
+            Some(()) => ControlFlow::Continue(next),
+            None => ControlFlow::Break(next),
         }
     }
 

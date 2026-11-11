@@ -1,3 +1,4 @@
+mod boundary;
 mod cargo_mutants;
 mod matrix;
 mod mutants_changed;

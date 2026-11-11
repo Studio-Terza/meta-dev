@@ -14,5 +14,10 @@ file-ports = { path = "../file-ports" }
 lint-layout = { path = "../lint-layout" }
 syn.workspace = true
 
+[dev-dependencies]
+file-ports = { path = "../file-ports" }
+lint-mandatory-laws = { path = "../lint-mandatory-laws" }
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

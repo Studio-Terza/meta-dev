@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  runs (id, job, pid, started, deadline, state)\nVALUES\n  (?1, ?2, ?3, ?4, ?5, ?6)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "974cee7e9b64003c5d1b00a51b235e3e97e9e828c51c13a902b8f14d33ce08f1"
+}

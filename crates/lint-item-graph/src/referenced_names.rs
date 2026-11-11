@@ -35,7 +35,7 @@ impl ReferencedNames {
     const UNNAMED: &str = "_";
 
     #[must_use]
-    pub fn of_file(file: &SourceFile) -> ReferencedNames {
+    pub(crate) fn of_file(file: &SourceFile) -> ReferencedNames {
         Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()))
     }
 

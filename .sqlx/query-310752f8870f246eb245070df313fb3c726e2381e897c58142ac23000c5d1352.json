@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  id\nFROM\n  nodes\nWHERE\n  project = ?1\n  AND facet = ?2\nORDER BY\n  id\nLIMIT\n  1\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "310752f8870f246eb245070df313fb3c726e2381e897c58142ac23000c5d1352"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  depth AS \"depth!: i64\"\nFROM\n  closure\nWHERE\n  relation = ?1\n  AND ancestor = ?2\n  AND descendant = ?3\nUNION ALL\nSELECT\n  0\nWHERE\n  ?2 = ?3\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "depth!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "closure",
+            "name": "depth"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "66263bc9d20aaad03886f712ead844bbe1b3c519cd9553e0d240641327832558"
+}

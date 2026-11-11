@@ -1,32 +1,39 @@
+mod boundary;
+mod key_lines;
 mod members;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Text};
 use newtype::Wrapping;
-use toml::Spanned;
-use toml::de::DeTable;
+use serde_core::Deserialize;
+use toml::de::{DeTable, Deserializer};
 use toml::{Table, Value};
 
 use crate::crate_key::CrateKey;
 use crate::dependencies::Dependencies;
+use crate::dependency_sites::DependencySites;
 use crate::failure::Failure;
-use crate::line_number::LineNumber;
+use std::ops::Not;
+
+use crate::library_tests::LibraryTests;
 use crate::name::Name;
 use crate::package_name::PackageName;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
 use crate::word::Word;
+pub use key_lines::{KeyLines, TableKey};
 use members::Members;
 
 #[derive(Debug)]
 pub struct Manifest {
     directory: PathBuf,
-    text: SourceText,
     table: Table,
+    lines: KeyLines,
+    sites: DependencySites,
 }
 
 impl Manifest {
@@ -34,7 +41,6 @@ impl Manifest {
     const PACKAGE: &'static str = "package";
     const WORKSPACE: &'static str = "workspace";
     const PATH: &'static str = "path";
-    const FEATURES: &'static str = "features";
     const LIBRARY: &'static str = "lib";
     const TEST: &'static str = "test";
     const NAME: &'static str = "name";
@@ -58,14 +64,21 @@ impl Manifest {
 
     fn parsed(directory: &Path, read: Result<Text, FileFailure>) -> Result<Option<Manifest>, Failure> {
         match read.map(Wrapping::into_inner).map_err(io::Error::from) {
-            Ok(text) => text
-                .parse::<Table>()
-                .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text), table }))
+            Ok(text) => Self::typed(directory, &SourceText::new(text))
+                .map(Some)
                 .map_err(|source| Failure::Manifest { path: directory.join(Self::FILE), source }),
             Err(source) => Some(source.kind())
                 .filter(|kind| *kind == io::ErrorKind::NotFound)
                 .map_or(Err(Failure::Io { path: directory.join(Self::FILE), source }), |_| Ok(None)),
         }
+    }
+
+    fn typed(directory: &Path, text: &SourceText) -> Result<Manifest, toml::de::Error> {
+        let document = DeTable::parse(text.as_ref())?;
+        let lines = KeyLines::read(text, document.get_ref());
+        let sites = DependencySites::listed(text, document.get_ref());
+        let table = Table::deserialize(Deserializer::from(document))?;
+        Ok(Manifest { directory: directory.to_path_buf(), table, lines, sites })
     }
 
     #[must_use]
@@ -84,6 +97,11 @@ impl Manifest {
     }
 
     #[must_use]
+    pub fn dependency_sites(&self) -> &DependencySites {
+        &self.sites
+    }
+
+    #[must_use]
     pub fn dependencies(&self, workspace: Option<&Manifest>) -> Dependencies {
         let inherited = workspace.and_then(|root| root.table.get(Self::WORKSPACE)?.get(Self::INHERITED)?.as_table());
         let platforms = self.table.get(Self::PLATFORMS).and_then(Value::as_table).into_iter().flat_map(Table::values);
@@ -99,26 +117,6 @@ impl Manifest {
                 (CrateKey::new(Name::from(key.as_str()).words()), PackageName::from(&Name::from(package)))
             })
             .collect()
-    }
-
-    #[must_use]
-    pub fn features(&self) -> BTreeMap<Name, LineNumber> {
-        DeTable::parse(self.text.as_ref())
-            .map(|document| {
-                document
-                    .get_ref()
-                    .iter()
-                    .filter(|(key, _)| key.get_ref() == Self::FEATURES)
-                    .filter_map(|(_, value)| value.get_ref().as_table())
-                    .flat_map(|features| features.keys())
-                    .map(|key| (Name::from(key.get_ref().as_ref()), self.line_of(key)))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    fn line_of<Key>(&self, key: &Spanned<Key>) -> LineNumber {
-        LineNumber::from(self.text.as_ref().get(..key.span().start).unwrap_or_default().matches('\n').count() + 1)
     }
 
     #[must_use]
@@ -167,6 +165,17 @@ impl Manifest {
     }
 
     #[must_use]
+    pub fn library_tests(&self) -> LibraryTests {
+        self.table
+            .get(Self::LIBRARY)
+            .and_then(|library| library.get(Self::TEST))
+            .and_then(Value::as_bool)
+            .map(Not::not)
+            .filter(|switched_off| *switched_off)
+            .map_or(LibraryTests::Run, |_| LibraryTests::SwitchedOff)
+    }
+
+    #[must_use]
     pub fn untested_targets(&self, canonical: impl Fn(&Path) -> Option<PathBuf>) -> Untested {
         let library = self.table.get(Self::LIBRARY).into_iter();
         let listed = Self::TESTED_LISTS.iter().filter_map(|key| self.table.get(*key)).filter_map(Value::as_array);
@@ -206,5 +215,11 @@ impl Manifest {
             .filter_map(Value::as_str)
             .map(Name::from)
             .collect()
+    }
+}
+
+impl AsRef<KeyLines> for Manifest {
+    fn as_ref(&self) -> &KeyLines {
+        &self.lines
     }
 }

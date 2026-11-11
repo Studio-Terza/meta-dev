@@ -58,7 +58,7 @@ impl From<Option<&Canonical>> for Outer {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Resolution {
     Waiting,
     Bound(Binding),

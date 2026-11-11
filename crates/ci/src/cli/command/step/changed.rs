@@ -21,11 +21,11 @@ impl Changed {
         ports: &impl Ports,
         metadata: &'journal Journal,
     ) -> Result<(), Failure<'journal>> {
-        let text = Self::asked(
-            ports,
-            &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
-        )?;
-        metadata.replace(ports.files(), &text)
+        metadata.replace(ports.files(), &Self::workspace_metadata(ports)?)
+    }
+
+    pub(crate) fn workspace_metadata(ports: &impl Ports) -> Result<Text, Failure<'static>> {
+        Self::asked(ports, &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]))
     }
 
     pub(crate) fn reach(
@@ -57,7 +57,7 @@ impl Changed {
         )?;
         let arguments = [OsString::from(question), metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
-            .chain(Lines::from(changed.as_ref()).map(OsString::from));
+            .chain(changed.as_ref().parse::<Lines>().into_iter().flatten().map(OsString::from));
         Self::reach(ports, arguments)
     }
 }

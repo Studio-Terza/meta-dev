@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  source_message,\n  source_ordinal,\n  relation,\n  target_message,\n  target_ordinal,\n  provenance\nFROM\n  segment_links\nWHERE\n  source_message = ?1\nORDER BY\n  source_ordinal,\n  relation,\n  target_message,\n  target_ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "source_message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "source_message"
+          }
+        }
+      },
+      {
+        "name": "source_ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "source_ordinal"
+          }
+        }
+      },
+      {
+        "name": "relation",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "target_message",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "target_message"
+          }
+        }
+      },
+      {
+        "name": "target_ordinal",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "target_ordinal"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "provenance"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8d07d8670f835be35cbe76716bc36272b0c8e72d53af53fa11d7e9fd0ac6d265"
+}

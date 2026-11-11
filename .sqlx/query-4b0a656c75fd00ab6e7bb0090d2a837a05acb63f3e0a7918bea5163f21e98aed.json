@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  uuid\nFROM\n  messages\nWHERE\n  substr(uuid, 1, length(?1)) = ?1\nORDER BY\n  uuid\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "uuid",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "messages",
+            "name": "uuid"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4b0a656c75fd00ab6e7bb0090d2a837a05acb63f3e0a7918bea5163f21e98aed"
+}

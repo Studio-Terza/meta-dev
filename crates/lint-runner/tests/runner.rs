@@ -4,7 +4,8 @@ use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
 use lint_fixtures::{Lines, Sources};
 use lint_reader::SourceFiles;
-use lint_runner::{Cli, Verdict};
+use lint_runner::{Cli, Ports, Verdict};
+use timer_ports::Monotonic;
 
 use std::ffi::OsString;
 use std::num::NonZeroUsize;
@@ -34,6 +35,7 @@ const DEEP_NESTING: usize = 5_000;
 const SHALLOW_NESTING: usize = 100;
 const MIDDLING_NESTING: usize = 200;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
+const MOST_READERS: usize = 4;
 const NO_DEPENDENCIES: &str = "{\"workspace_root\": \"/\", \"packages\": []}";
 
 #[test]
@@ -57,18 +59,27 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         Ok::<usize, FileFailure>(
             found
                 + Trees::occurrences(&workspace, &source, "impl Lint for")?
+                + Trees::occurrences(&workspace, &source, "impl WorkspaceLint for")?
                 + Trees::occurrences(&workspace, &source, "impl ModelLint for")?
                 + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
                 + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?,
         )
     })?;
-    let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
+    let mode = include_str!("../src/cli/mode.rs");
+    let listed_by_the_mode =
+        mode.matches("::report(files)").count() + mode.matches("::report(files, readout.workspaces())").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
-    let listed_by_the_runner =
-        ["::report(readout.files())", "flows.report::<", "::dirty(&system)", "ModelLint>::report"]
-            .iter()
-            .map(|call| runner.matches(call).count())
-            .sum::<usize>();
+    let listed_by_the_runner = [
+        "::report(readout.files())",
+        "flows.report::<",
+        "::dirty(&system)",
+        "::of_names(extraction.names())",
+        "ModelLint>::report",
+        "WorkspaceLint>::report",
+    ]
+    .iter()
+    .map(|call| runner.matches(call).count())
+    .sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance =
@@ -175,7 +186,7 @@ fn the_query_command_lists_matching_abstractions_and_blocks_nothing() -> Result<
     root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
     let run = root.flagged(&["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
-    let lines: Vec<&str> = text_lines::Lines::from(run.out.as_str()).collect();
+    let lines: Vec<String> = run.out.parse::<text_lines::Lines>().into_iter().flatten().collect();
     assert_eq!(
         lines.first().map(|line| line.contains("score 5: trait Index in r at /scratch/src/lib.rs:3")),
         Some(true)
@@ -194,16 +205,62 @@ fn the_query_command_refuses_a_malformed_role() {
 }
 
 #[test]
+fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", CLEAN)?;
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let gate = Cli::from_args([OsString::from(&root.root)].into_iter()).report_to(
+        Ports::new(
+            &root.files,
+            [(PathBuf::from("/"), Bytes::from("not json"))].into_iter().collect::<Recorded>(),
+            Monotonic::default(),
+        ),
+        &mut out,
+        &mut err,
+    );
+    let (mut report_out, mut report_err) = (Vec::new(), Vec::new());
+    let report = Cli::from_args([OsString::from("--report"), OsString::from(&root.root)].into_iter()).report_to(
+        Ports::new(
+            &root.files,
+            [(PathBuf::from("/"), Bytes::from("not json"))].into_iter().collect::<Recorded>(),
+            Monotonic::default(),
+        ),
+        &mut report_out,
+        &mut report_err,
+    );
+    assert_eq!(gate, ExitCode::FAILURE);
+    assert_ne!(err, Vec::<u8>::new());
+    assert_eq!(out, Vec::<u8>::new());
+    assert_eq!(report, ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
 fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\n")?;
     let clean = root.verdict(&[]);
-    root.write("src/lib.rs", DIRTY)?;
+    root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
+    let mut err = Vec::new();
+    let unwritten = [&[][..], &["--report"], &["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]]
+        .map(|flags| {
+            Cli::from_args(flags.iter().map(OsString::from).chain([OsString::from(&root.root)])).verdict(
+                Ports::new(
+                    &root.files,
+                    [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                    Monotonic::default(),
+                ),
+                &mut <&mut [u8]>::default(),
+                &mut err,
+            )
+        });
     let unreadable = Trees::verdict(&Memory::default(), Path::new("/no/such/root"), &[]);
     assert_eq!(
         [clean, root.verdict(&[]), root.verdict(&["query", "--role", "nonsense", "--in"]), unreadable],
         [Verdict::Clean, Verdict::Violations, Verdict::Refused, Verdict::Refused]
     );
+    assert_eq!(unwritten, [Verdict::Refused; 3]);
+    assert_eq!(String::from_utf8(err)?.matches("cannot write the output").count(), 3);
     Ok(())
 }
 
@@ -213,8 +270,15 @@ fn a_cargo_metadata_failure_refuses_the_run_once_rather_than_flagging_each_deriv
     root.write("src/lib.rs", "#[derive(serde::Deserialize)]\npub struct A {\n    a: Title,\n}\n")?;
     let mut err = Vec::new();
     let arguments = [OsString::from(&root.root)].into_iter();
-    let verdict = Cli::from_args(arguments).verdict(&root.files, &Recorded::default(), &mut Vec::new(), &mut err);
-    assert_eq!((verdict, text_lines::Lines::from(String::from_utf8(err)?.as_str()).count()), (Verdict::Refused, 1));
+    let verdict = Cli::from_args(arguments).verdict(
+        Ports::new(&root.files, Recorded::default(), Monotonic::default()),
+        &mut Vec::new(),
+        &mut err,
+    );
+    assert_eq!(
+        (verdict, String::from_utf8(err)?.parse::<text_lines::Lines>().into_iter().flatten().count()),
+        (Verdict::Refused, 1)
+    );
     Ok(())
 }
 
@@ -224,7 +288,11 @@ fn a_workspace_located_through_cargo_resolves_a_derive_through_its_dependencies_
     let workspace = golden::fixtures!("tests/.workspace")?;
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let arguments = [Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/.workspace").into_os_string()].into_iter();
-    let exit = Cli::from_args(arguments).report_to(&workspace, &Toolchain, &mut out, &mut err);
+    let exit = Cli::from_args(arguments).report_to(
+        Ports::new(&workspace, Toolchain, Monotonic::default()),
+        &mut out,
+        &mut err,
+    );
     let said = String::from_utf8(err)?;
     assert_eq!((exit, said.matches("app/src/lib.rs:3: free text in title;").count()), (ExitCode::FAILURE, 1));
     Ok(())
@@ -239,18 +307,41 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_gate_lists_the_tree_once_and_reads_the_sources_once_per_worker() -> Result<(), Box<dyn Error>> {
-    const MOST_READERS: usize = 4;
+fn the_gate_lists_the_tree_once_and_reads_each_source_once() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::package()?;
     scratch.write("src/lib.rs", CLEAN)?;
-    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(MOST_READERS);
     let reading = FakeCounted::new(&scratch.files, scratch.root.clone());
     Trees::flagged(&reading, &scratch.root, &["--report"]);
     let gating = FakeCounted::new(&scratch.files, scratch.root.clone());
     let gate = Trees::flagged(&gating, &scratch.root, &[]);
     assert_eq!(gate.exit, ExitCode::SUCCESS);
     assert_eq!(gating.listings(), reading.listings());
-    assert_eq!(gating.sources(), reading.sources() * workers);
+    assert_eq!([gating.sources(), reading.sources()], [1, 1]);
+    Ok(())
+}
+
+#[test]
+fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", CLEAN)?;
+    let timed = Trees::timed(&root.files, &root.root, &["--timings"])?;
+    let untimed = Trees::timed(&root.files, &root.root, &[])?;
+    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(MOST_READERS);
+    let rows = [
+        "lint timings in milliseconds:\n",
+        "  phase total\n",
+        "  phase stage: list the trees and their packages\n",
+        "  phase locate: describe the workspaces through cargo metadata\n",
+        "  phase model: build the code model\n",
+        "  phase survey: test budget, paired apis and clones\n",
+        "  lint lint_no_comments::NoComments\n",
+        "  lint lint_hand_impls::HandImpls\n",
+        "  lint lint_port_dependencies::OwnedDependencies\n",
+        "  lint lint_linear_flow::flows::Flows<'_>\n",
+    ];
+    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 10], "{timed}");
+    assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");
+    assert_eq!(untimed.matches("lint timings").count(), 0, "{untimed}");
     Ok(())
 }
 
@@ -271,8 +362,11 @@ impl Trees {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
         let exit = Cli::from_args(arguments).report_to(
-            files,
-            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            Ports::new(
+                files,
+                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                Monotonic::default(),
+            ),
             &mut out,
             &mut err,
         );
@@ -283,11 +377,30 @@ impl Trees {
         }
     }
 
+    fn timed(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Result<String, Box<dyn Error>> {
+        let mut out = Vec::new();
+        let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
+        let exit = Cli::from_args(arguments).report_to(
+            Ports::new(
+                files,
+                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                Monotonic::default(),
+            ),
+            &mut out,
+            &mut Vec::new(),
+        );
+        assert_eq!(exit, ExitCode::SUCCESS);
+        Ok(String::from_utf8(out)?)
+    }
+
     fn verdict(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Verdict {
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
         Cli::from_args(arguments).verdict(
-            files,
-            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            Ports::new(
+                files,
+                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                Monotonic::default(),
+            ),
             &mut Vec::new(),
             &mut Vec::new(),
         )
@@ -297,8 +410,11 @@ impl Trees {
         let mut out = Vec::new();
         let mut err = Vec::new();
         let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(
-            files,
-            &[(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            Ports::new(
+                files,
+                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                Monotonic::default(),
+            ),
             &mut out,
             &mut err,
         );

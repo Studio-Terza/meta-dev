@@ -54,6 +54,7 @@ lint-no-test-only-api = { path = "../lint-no-test-only-api" }
 lint-clones = { path = "../lint-clones" }
 lint-paired-apis = { path = "../lint-paired-apis" }
 lint-port-batching = { path = "../lint-port-batching" }
+lint-port-dependencies = { path = "../lint-port-dependencies" }
 lint-primitive-boundary = { path = "../lint-primitive-boundary" }
 lint-private-fns = { path = "../lint-private-fns" }
 lint-process-starters = { path = "../lint-process-starters" }
@@ -64,6 +65,7 @@ lint-repeated-methods = { path = "../lint-repeated-methods" }
 lint-repeated-shapes = { path = "../lint-repeated-shapes" }
 lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
+lint-store-queries = { path = "../lint-store-queries" }
 lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
 lint-transition-graph = { path = "../lint-transition-graph" }
@@ -71,6 +73,10 @@ lint-type-shape = { path = "../lint-type-shape" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-workflow-run = { path = "../lint-workflow-run" }
+port-core = { path = "../port-core" }
+timer-ports = { path = "../timer-ports" }
+thiserror.workspace = true
+workspace-metadata = { path = "../workspace-metadata" }
 
 [[test]]
 name = "behaviour"

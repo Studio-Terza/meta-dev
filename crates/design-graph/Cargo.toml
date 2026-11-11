@@ -1,0 +1,27 @@
+[package]
+name = "design-graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.store]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+design-closure = { path = "../design-closure" }
+design-jobs = { path = "../design-jobs" }
+design-model = { path = "../design-model" }
+file-ports = { path = "../file-ports" }
+grammar-notes = { path = "../grammar-notes" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+store-ports = { path = "../store-ports" }
+thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[lints]
+workspace = true

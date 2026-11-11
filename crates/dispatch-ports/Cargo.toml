@@ -1,0 +1,26 @@
+[package]
+name = "dispatch-ports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar-lstart = { path = "../grammar-lstart" }
+grammar-reply = { path = "../grammar-reply" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  source,\n  relation,\n  target,\n  provenance\nFROM\n  node_edges\nWHERE\n  source = ?1\n  OR target = ?1\nORDER BY\n  source,\n  relation,\n  target\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "source",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "node_edges",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "relation",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "node_edges",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "target",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "node_edges",
+            "name": "target"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "node_edges",
+            "name": "provenance"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "98a47dce819fb1e9b12a4ee4a754df2ae5ce4d856b4a51be69a7778e21a03ce3"
+}

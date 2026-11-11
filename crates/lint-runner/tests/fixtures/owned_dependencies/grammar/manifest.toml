@@ -1,0 +1,9 @@
+[package]
+name = "grammar"
+
+[package.metadata.port]
+owns = ["logos"]
+shared = ["serde"]
+
+[dependencies]
+logos = "1"

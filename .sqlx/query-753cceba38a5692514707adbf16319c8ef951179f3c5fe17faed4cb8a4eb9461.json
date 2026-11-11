@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO messages (uuid, session, parent, at, author, body)\nVALUES\n  (?1, ?2, ?3, ?4, ?5, ?6)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "753cceba38a5692514707adbf16319c8ef951179f3c5fe17faed4cb8a4eb9461"
+}

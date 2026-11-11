@@ -5,12 +5,15 @@ use std::process::ExitCode;
 
 use cargo_ports::Recorded;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
-use lint_runner::Cli;
+use lint_runner::{Cli, Ports};
+use timer_ports::Monotonic;
+
 use text_lines::Lines;
 
 const FIXTURES: &str = "tests/fixtures";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
+const METADATA: &str = "metadata.json";
 const SITE_END: &str = ": ";
 const LINE_START: &str = ":";
 const FIX_START: &str = "; ";
@@ -27,8 +30,9 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
         .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
     let drifted: Vec<String> = outputs.iter().flat_map(|(fixture, output)| Corpus::verify(fixture, output)).collect();
     assert_eq!(drifted, Vec::<String>::new());
-    let violations: Vec<Violation<'_>> =
-        outputs.iter().flat_map(|(_, output)| Lines::from(output.as_str())).filter_map(Corpus::violation).collect();
+    let lines: Vec<String> =
+        outputs.iter().flat_map(|(_, output)| output.parse::<Lines>().into_iter().flatten()).collect();
+    let violations: Vec<Violation<'_>> = lines.iter().map(String::as_str).filter_map(Corpus::violation).collect();
     let unfixed: Vec<(&str, usize)> = violations
         .iter()
         .filter(|violation| Corpus::fix_named(violation.said).is_none())
@@ -80,16 +84,17 @@ impl Corpus {
         let root: Memory = corpus
             .entries(fixture)?
             .iter()
+            .filter(|found| found.file_name() != Some(METADATA.as_ref()))
             .map(|found| Self::copied(corpus, found, Path::new(Self::renamed(found))))
             .collect::<Result<Vec<Vec<Copied>>, FileFailure>>()?
             .into_iter()
             .flatten()
             .map(|copied| (copied.path, copied.bytes))
             .collect();
+        let described = corpus.read(&fixture.join(METADATA)).unwrap_or_else(|_| Bytes::from(NO_DEPENDENCIES));
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(
-            &root,
-            &[(PathBuf::from(""), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+            Ports::new(&root, [(PathBuf::from(""), described)].into_iter().collect::<Recorded>(), Monotonic::default()),
             &mut printed,
             &mut failed,
         );
@@ -99,10 +104,17 @@ impl Corpus {
 
     fn lints() -> usize {
         let runner = include_str!("../src/cli/mode/lints.rs");
-        ["::report(readout.files())", "flows.report::<", "::dirty(&system)", "ModelLint>::report"]
-            .iter()
-            .map(|call| runner.matches(call).count())
-            .sum::<usize>()
+        [
+            "::report(readout.files())",
+            "flows.report::<",
+            "::dirty(&system)",
+            "::of_names(extraction.names())",
+            "ModelLint>::report",
+            "WorkspaceLint>::report",
+        ]
+        .iter()
+        .map(|call| runner.matches(call).count())
+        .sum::<usize>()
             + include_str!("../src/cli/mode.rs").matches("::report(files)").count()
     }
 

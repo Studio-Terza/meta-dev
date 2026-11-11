@@ -1,0 +1,5 @@
+CREATE TABLE retries (
+    id INTEGER PRIMARY KEY NOT NULL,
+    job INTEGER NOT NULL REFERENCES jobs (id),
+    provenance TEXT NOT NULL
+) STRICT;

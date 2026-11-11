@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  senses (\n    message,\n    ordinal,\n    kind,\n    specificity,\n    confidence,\n    explicitness,\n    provenance\n  )\nVALUES\n  (\n    ?1,\n    0,\n    'question',\n    'general',\n    'firm',\n    'explicit',\n    'init'\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e1ab16682bb2dc74e0e32bb5a81f77ae669489d040ae94f1ae17b23069092235"
+}

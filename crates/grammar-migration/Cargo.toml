@@ -1,0 +1,23 @@
+[package]
+name = "grammar-migration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.lexer]
+format = "migration"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+grammar-unspelled = { path = "../grammar-unspelled" }
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

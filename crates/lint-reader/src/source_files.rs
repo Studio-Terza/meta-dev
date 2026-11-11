@@ -1,4 +1,5 @@
 mod crate_sources;
+mod described;
 mod located;
 mod modules;
 mod opened;
@@ -12,6 +13,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 pub use crate_sources::CrateSources;
+pub use described::Described;
 use file_ports::Files;
 use lint_core::{Readout, SourceFile};
 use lint_layout::Failure;

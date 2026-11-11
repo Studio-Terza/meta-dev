@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  message,\n  ordinal,\n  shape,\n  body\nFROM\n  segments\nWHERE\n  message = ?1\nORDER BY\n  ordinal\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "shape",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "shape"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f835e02aef2c3922b8f109c7b846305b5ef920b4a0cc8677f79fa7fb23d15997"
+}

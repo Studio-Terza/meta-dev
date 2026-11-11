@@ -1,0 +1,26 @@
+[package]
+name = "stream"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar-anchor = { path = "../grammar-anchor" }
+grammar-message = { path = "../grammar-message" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+file-ports = { path = "../file-ports" }
+laws = { path = "../laws" }
+port-core = { path = "../port-core" }
+
+[lints]
+workspace = true

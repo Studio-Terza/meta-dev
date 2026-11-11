@@ -1,8 +1,10 @@
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
+use newtype::Wrapping;
+
+use crate::{Bytes, FileFailure, Files, Kind, Offset, Size, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Disk;
@@ -14,6 +16,14 @@ impl Files for Disk {
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
         Ok(Text::new(fs::read_to_string(path)?))
+    }
+
+    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
+        let mut file = File::open(path)?;
+        file.seek(SeekFrom::Start(offset.into_inner()))?;
+        let mut bytes = Vec::new();
+        io::copy(&mut file, &mut bytes)?;
+        Ok(Bytes::new(bytes))
     }
 
     fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {

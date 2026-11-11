@@ -61,7 +61,7 @@ impl<'file> Scope<'file> {
             Some(_) => self
                 .imports
                 .local_item(&name, &self.local_roots)
-                .map(|imports| imports.holds(&name).map(Import::original).map_or(name, Name::from)),
+                .map(|imports| imports.naming(&name).first().map(Import::original).map_or(name, Name::from)),
             None => self.reaches(ident).map(|_| name),
         }
     }
@@ -74,10 +74,9 @@ impl<'file> Scope<'file> {
 
     fn reaches<'token>(&self, ident: &'token Ident) -> Option<&'token Ident> {
         let name = Name::from(ident);
-        self.local_roots
-            .get(&name)
-            .map(|_| ident)
-            .or_else(|| self.imports.holds(&name).and(self.imports.local_item(&name, &self.local_roots)).map(|_| ident))
+        self.local_roots.get(&name).map(|_| ident).or_else(|| {
+            self.imports.naming(&name).first().and(self.imports.local_item(&name, &self.local_roots)).map(|_| ident)
+        })
     }
 
     fn import(&mut self, path: Vec<&'file Ident>, tree: &'file UseTree) {

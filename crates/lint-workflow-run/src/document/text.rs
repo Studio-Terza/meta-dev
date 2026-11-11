@@ -3,6 +3,7 @@ mod expansion;
 use std::fmt;
 use std::path::Path;
 
+use grammar_program::Program;
 use newtype::{Newtype, Wrapping};
 
 use crate::characters::Characters;
@@ -35,14 +36,13 @@ impl<'text> Text<'text> {
             .map(|_| Self::EXPANSION)
     }
 
-    pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Text<'text>> {
-        let start = self.trimmed().0;
-        let end = start.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(start.len(), |(at, _)| at);
-        start
-            .get(..end)
-            .filter(|word| word.chars().next().is_some())
-            .and_then(|word| known.iter().find(|shell| shell.into_inner() == word).map_or(Some(word), |_| None))
-            .map(Text)
+    pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Excerpt> {
+        self.0
+            .parse::<Program>()
+            .ok()
+            .map(Program::into_inner)
+            .filter(|word| known.iter().all(|shell| shell.into_inner() != *word))
+            .map(Excerpt::new)
     }
 
     pub(crate) fn count(self) -> Characters {

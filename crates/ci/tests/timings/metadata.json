@@ -1,0 +1,354 @@
+{
+  "packages": [
+    {
+      "name": "heavy",
+      "version": "1.0.0",
+      "id": "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "heavy"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/heavy/Cargo.toml"
+    },
+    {
+      "name": "ext-macro",
+      "version": "2.0.0",
+      "id": "registry+https://github.com/rust-lang/crates.io-index#ext-macro@2.0.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "proc-macro"
+          ],
+          "crate_types": [
+            "proc-macro"
+          ],
+          "name": "ext-macro"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/ext-macro/Cargo.toml"
+    },
+    {
+      "name": "sys",
+      "version": "0.3.0",
+      "id": "registry+https://github.com/rust-lang/crates.io-index#sys@0.3.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "sys"
+        },
+        {
+          "kind": [
+            "custom-build"
+          ],
+          "crate_types": [
+            "custom-build"
+          ],
+          "name": "sys"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/sys/Cargo.toml"
+    },
+    {
+      "name": "helper",
+      "version": "0.9.0",
+      "id": "registry+https://github.com/rust-lang/crates.io-index#helper@0.9.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "helper"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/helper/Cargo.toml"
+    },
+    {
+      "name": "derive-macro",
+      "version": "0.1.0",
+      "id": "path+file:///work/crates/derive-macro#0.1.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "proc-macro"
+          ],
+          "crate_types": [
+            "proc-macro"
+          ],
+          "name": "derive-macro"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/derive-macro/Cargo.toml"
+    },
+    {
+      "name": "core",
+      "version": "0.1.0",
+      "id": "path+file:///work/crates/core#0.1.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "core"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/core/Cargo.toml"
+    },
+    {
+      "name": "app",
+      "version": "0.1.0",
+      "id": "path+file:///work/crates/app#0.1.0",
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "app"
+        },
+        {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "app"
+        },
+        {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "test"
+          ],
+          "name": "app"
+        }
+      ],
+      "features": {},
+      "manifest_path": "/work/crates/app/Cargo.toml"
+    }
+  ],
+  "workspace_members": [
+    "path+file:///work/crates/derive-macro#0.1.0",
+    "path+file:///work/crates/core#0.1.0",
+    "path+file:///work/crates/app#0.1.0"
+  ],
+  "workspace_default_members": [
+    "path+file:///work/crates/derive-macro#0.1.0",
+    "path+file:///work/crates/core#0.1.0",
+    "path+file:///work/crates/app#0.1.0"
+  ],
+  "resolve": {
+    "nodes": [
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0",
+        "dependencies": [],
+        "deps": [],
+        "features": []
+      },
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#ext-macro@2.0.0",
+        "dependencies": [
+          "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0"
+        ],
+        "deps": [
+          {
+            "name": "heavy",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#sys@0.3.0",
+        "dependencies": [
+          "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0"
+        ],
+        "deps": [
+          {
+            "name": "heavy",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0",
+            "dep_kinds": [
+              {
+                "kind": "build",
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#helper@0.9.0",
+        "dependencies": [
+          "registry+https://github.com/rust-lang/crates.io-index#sys@0.3.0"
+        ],
+        "deps": [
+          {
+            "name": "sys",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#sys@0.3.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///work/crates/derive-macro#0.1.0",
+        "dependencies": [
+          "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0"
+        ],
+        "deps": [
+          {
+            "name": "heavy",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///work/crates/core#0.1.0",
+        "dependencies": [
+          "path+file:///work/crates/derive-macro#0.1.0",
+          "registry+https://github.com/rust-lang/crates.io-index#ext-macro@2.0.0",
+          "registry+https://github.com/rust-lang/crates.io-index#sys@0.3.0",
+          "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0"
+        ],
+        "deps": [
+          {
+            "name": "derive_macro",
+            "pkg": "path+file:///work/crates/derive-macro#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "ext_macro",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#ext-macro@2.0.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "sys",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#sys@0.3.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "heavy",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#heavy@1.0.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///work/crates/app#0.1.0",
+        "dependencies": [
+          "path+file:///work/crates/core#0.1.0",
+          "registry+https://github.com/rust-lang/crates.io-index#helper@0.9.0"
+        ],
+        "deps": [
+          {
+            "name": "core",
+            "pkg": "path+file:///work/crates/core#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "helper",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#helper@0.9.0",
+            "dep_kinds": [
+              {
+                "kind": "dev",
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      }
+    ],
+    "root": null
+  },
+  "target_directory": "/work/target",
+  "version": 1,
+  "workspace_root": "/work",
+  "metadata": null
+}

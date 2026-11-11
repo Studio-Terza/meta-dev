@@ -1,0 +1,30 @@
+[package]
+name = "design-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar-artifact = { path = "../grammar-artifact" }
+grammar-line = { path = "../grammar-line" }
+grammar-node = { path = "../grammar-node" }
+grammar-notes = { path = "../grammar-notes" }
+grammar-project = { path = "../grammar-project" }
+grammar-provenance = { path = "../grammar-provenance" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+serde.workspace = true
+thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+laws = { path = "../laws" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

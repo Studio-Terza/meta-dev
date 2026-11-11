@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 file-ports = { path = "../file-ports" }
+port-core = { path = "../port-core" }
 thiserror.workspace = true
 
 [lints]

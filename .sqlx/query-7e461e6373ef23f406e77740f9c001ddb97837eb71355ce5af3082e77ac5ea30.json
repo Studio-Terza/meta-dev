@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nDELETE FROM\n  flailed\nWHERE\n  EXISTS (\n    SELECT\n      1\n    FROM\n      structured\n    WHERE\n      structured.message = flailed.message\n      AND structured.ordinal = flailed.ordinal\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "7e461e6373ef23f406e77740f9c001ddb97837eb71355ce5af3082e77ac5ea30"
+}

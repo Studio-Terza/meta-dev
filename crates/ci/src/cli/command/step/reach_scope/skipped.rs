@@ -1,6 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
+use grammar_assignment::Emptied;
 use text_lines::Lines;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -12,26 +13,17 @@ pub struct NotSkipped;
 #[derive(Debug, PartialEq, Eq)]
 pub struct Skips(Vec<Skipped>);
 
-impl Skipped {
-    const EMPTY: char = '=';
-}
-
 impl FromStr for Skipped {
     type Err = NotSkipped;
 
     fn from_str(line: &str) -> Result<Skipped, NotSkipped> {
-        line.char_indices()
-            .last()
-            .filter(|(_, last)| *last == Self::EMPTY)
-            .and_then(|(at, _)| line.get(..at))
-            .map(|name| Skipped(name.to_owned()))
-            .ok_or(NotSkipped)
+        line.parse::<Emptied>().map(|emptied| Skipped(emptied.into_inner())).map_err(|_unassigned| NotSkipped)
     }
 }
 
 impl From<&str> for Skips {
     fn from(report: &str) -> Skips {
-        Skips(Lines::from(report).filter_map(|line| line.parse::<Skipped>().ok()).collect())
+        Skips(report.parse::<Lines>().into_iter().flatten().filter_map(|line| line.parse::<Skipped>().ok()).collect())
     }
 }
 

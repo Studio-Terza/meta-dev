@@ -45,6 +45,8 @@ const GLOB_BENEATH_IMPORT: &str =
 const GLOB_BENEATH_DECLARED: &str = "use std::fmt::*;\ntrait Debug {}\nimpl Debug for R {}\nimpl Display for R {}\n";
 const GLOB_THROUGH_GLOB: &str =
     "mod a {\n    pub mod b {\n        pub trait T {}\n    }\n}\nuse a::*;\nuse b::*;\nimpl T for R {}\n";
+const GLOB_MUTUAL: &str = "mod a {\n    pub use super::b::*;\n    pub trait T {}\n}\nmod b {\n    pub use super::a::*;\n}\nuse a::*;\nmod c {\n    use super::b::*;\n    impl T for R {}\n}\n";
+const GLOB_MUTUAL_CARRIED: &str = "mod a {\n    pub use super::b::*;\n    pub use super::d::*;\n}\nmod b {\n    pub use super::a::*;\n    pub use super::e::*;\n}\nmod d {\n    pub trait U {}\n}\nmod e {\n    pub trait V {}\n}\nmod c {\n    use super::b::*;\n    impl U for R {}\n}\nmod f {\n    use super::a::*;\n    impl V for R {}\n}\n";
 const GLOB_CARRIES_EXPANSION: &str = "mod hash {\n    array_impl!(1, 2);\n}\npub use hash::*;\nimpl Clone for R {}\n";
 const GLOB_CARRIES_EXPANSION_ABOVE: &str =
     "pin_project! {\n    struct Limited {}\n}\nmod tests {\n    use super::*;\n    impl Debug for R {}\n}\n";
@@ -172,6 +174,21 @@ const RE_EXPORT_CYCLE: [Fixture; 11] = [
     Fixture::new("src/m7.rs", "pub use super::*;\n"),
     Fixture::new("src/m8.rs", "pub use super::*;\n"),
     Fixture::new("src/m9.rs", "pub use super::*;\nimpl Mark for R {}\nimpl Clone for R {}\n"),
+];
+const RE_EXPORT_CHAIN: [Fixture; 6] = [
+    Fixture::new("src/lib.rs", "mod a;\nmod b;\nmod c;\nmod d;\nmod e;\n"),
+    Fixture::new("src/a.rs", "use crate::b::Mark;\nimpl Mark for R {}\n"),
+    Fixture::new("src/b.rs", "pub use crate::c::Mark;\n"),
+    Fixture::new("src/c.rs", "pub use crate::d::Mark;\n"),
+    Fixture::new("src/d.rs", "pub use crate::e::Mark;\n"),
+    Fixture::new("src/e.rs", "pub trait Mark {}\n"),
+];
+const GLOB_RING: [Fixture; 5] = [
+    Fixture::new("src/lib.rs", "mod a;\nmod b;\nmod c;\nmod d;\n"),
+    Fixture::new("src/a.rs", "pub use crate::b::*;\n"),
+    Fixture::new("src/b.rs", "pub use crate::c::*;\n"),
+    Fixture::new("src/c.rs", "pub use crate::a::*;\npub trait Far {}\n"),
+    Fixture::new("src/d.rs", "use crate::a::*;\nimpl Far for R {}\n"),
 ];
 const GLOB_THROUGH_A_LATER_SIBLING: [Fixture; 6] = [
     Fixture::new("src/lib.rs", "mod a;\nmod b;\nmod c;\nmod d;\nmod e;\n"),
@@ -638,6 +655,8 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_BENEATH_IMPORT => [Expect::std_trait(&["std", "clone", "Clone"])],
     GLOB_BENEATH_DECLARED => [Expect::krate(&["crate", "Debug"]), Expect::std_trait(&["std", "fmt", "Display"])],
     GLOB_THROUGH_GLOB => [Expect::krate(&["crate", "a", "b", "T"])],
+    GLOB_MUTUAL => [Expect::krate(&["crate", "a", "T"])],
+    GLOB_MUTUAL_CARRIED => [Expect::krate(&["crate", "d", "U"]), Expect::krate(&["crate", "e", "V"])],
     GLOB_PRIVATE_SELF => [Expect::krate(&["crate", "Clone"])],
     GLOB_VISIBLE_CRATE => [Expect::std_trait(&["std", "fmt", "Debug"])],
     GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],
@@ -741,6 +760,8 @@ laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     CYCLE => [Expect::unknown(&["X"])],
     RE_EXPORT_CYCLE => [Expect::krate(&["crate", "Mark"]), Expect::std_trait(&["std", "clone", "Clone"])],
     GLOB_THROUGH_A_LATER_SIBLING => [Expect::krate(&["crate", "e", "Far"])],
+    RE_EXPORT_CHAIN => [Expect::krate(&["crate", "e", "Mark"])],
+    GLOB_RING => [Expect::krate(&["crate", "c", "Far"])],
     WORKSPACE => [Expect::std_trait(&["std", "clone", "Clone"]), Expect::std_trait(&["std", "clone", "Clone"])],
     NESTED_FILES => [Expect::krate(&["crate", "Mark"]), Expect::krate(&["crate", "Mark"])],
     WORKSPACE_CRATE_REEXPORTED => [

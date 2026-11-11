@@ -29,7 +29,7 @@ impl TargetKind {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Target {
     kind: Vec<TargetKind>,
     src_path: PathBuf,

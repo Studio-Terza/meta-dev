@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+grammar-lines = { path = "../grammar-lines" }
 newtype = { path = "../newtype" }
 thiserror.workspace = true
 

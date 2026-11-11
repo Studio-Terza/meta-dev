@@ -11,6 +11,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_DEV_OPT_LEVEL: "1"
@@ -52,7 +53,7 @@ jobs:
       - name: clippy from scratch
         env:
           CARGO_TARGET_DIR: ${{ env.CLIPPY_TARGET }}
-        run: '"$TOOLS/ci" timed "$MEASURED" cold-clippy cargo clippy --locked --all-targets --workspace --timings -- -D warnings'
+        run: '"$TOOLS/ci" clippy-targets "$MEASURED" cold-clippy --workspace --timings -- -D warnings'
       - name: clippy per crate
         run: '"$TOOLS/ci" compile-times "$CLIPPY_TARGET/cargo-timings/cargo-timing.html" "$CLIPPY_CRATES"'
       - name: test compile from scratch

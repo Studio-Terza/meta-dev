@@ -26,6 +26,7 @@ use per_element::PerElement;
 use scope::Scope;
 
 pub struct Reader<'run, 'file> {
+    file: &'file SourceFile,
     module: Module<'file>,
     context: Context<'run>,
     scope: Scope<'run>,
@@ -40,6 +41,7 @@ impl<'run, 'file> Reader<'run, 'file> {
     ) -> Vec<Violation<'file>> {
         let crate_name = CrateName::from(file.placement().crate_root());
         let mut reader = Reader {
+            file,
             module: Module::of_file(file),
             context: Context::new(judge, holders, crate_name),
             scope: Scope::default(),
@@ -118,7 +120,7 @@ impl<'ast> Visit<'ast> for Reader<'_, '_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {

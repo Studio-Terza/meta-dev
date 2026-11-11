@@ -1,0 +1,36 @@
+[package]
+name = "store-ports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.port]
+owns = []
+shared = ["hex", "proc-macro2", "quote", "serde", "serde_core", "serde_json", "sha2", "syn", "thiserror"]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+store-ports-macros = { path = "../store-ports-macros" }
+thiserror.workspace = true
+
+[dev-dependencies]
+sqlite-ports = { path = "../sqlite-ports" }
+design-model = { path = "../design-model" }
+design-runs = { path = "../design-runs" }
+design-store = { path = "../design-store" }
+dispatch-ports = { path = "../dispatch-ports" }
+file-ports = { path = "../file-ports" }
+grammar-search = { path = "../grammar-search" }
+laws = { path = "../laws" }
+strum.workspace = true
+tempfile.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[lints]
+workspace = true

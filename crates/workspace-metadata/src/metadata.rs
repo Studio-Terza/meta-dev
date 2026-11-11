@@ -1,23 +1,25 @@
 mod library;
 mod package;
-mod package_id;
 mod resolve;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
 use crate::outside::Outside;
+use crate::package_id::PackageId;
 use crate::readers::Readers;
+use crate::unreadable::Unreadable;
 pub use library::Library;
-pub use package::Form;
-use package::Package;
-use package_id::PackageId;
-use resolve::{Node, NodeDependency, Resolve};
+pub use package::{Expanders, Form, MacroName};
+pub(crate) use package::{Package, PortTable};
+use resolve::Resolve;
+pub(crate) use resolve::{Node, NodeDependency};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Metadata {
     workspace_root: PathBuf,
     packages: Vec<Package>,
@@ -52,8 +54,7 @@ impl Metadata {
         let members: BTreeSet<&PackageId> = self.workspace_members.iter().collect();
         let named: BTreeMap<&PackageId, &CrateName> =
             self.packages.iter().filter_map(|package| Some((package.package_id()?, package.name()))).collect();
-        let nodes: BTreeMap<&PackageId, &Node> =
-            self.resolve.iter().flat_map(Resolve::as_ref).map(|node| (node.package_id(), node)).collect();
+        let nodes: BTreeMap<&PackageId, &Node> = self.nodes().iter().map(|node| (node.package_id(), node)).collect();
         let direct: BTreeSet<&PackageId> = members
             .iter()
             .filter_map(|member| nodes.get(member))
@@ -102,5 +103,25 @@ impl Metadata {
                 dependents.entry(dependency).or_insert_with(BTreeSet::new).insert(name);
                 dependents
             })
+    }
+
+    pub(crate) fn packages(&self) -> &[Package] {
+        &self.packages
+    }
+
+    pub(crate) fn members(&self) -> &[PackageId] {
+        &self.workspace_members
+    }
+
+    pub(crate) fn nodes(&self) -> &[Node] {
+        self.resolve.as_ref().map_or(&[], AsRef::as_ref)
+    }
+}
+
+impl FromStr for Metadata {
+    type Err = Unreadable;
+
+    fn from_str(text: &str) -> Result<Metadata, Unreadable> {
+        Ok(serde_json::from_str(text)?)
     }
 }

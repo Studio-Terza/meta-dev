@@ -34,6 +34,7 @@ impl NoTestOnlyApi {
     fn in_manifest<'file>(package: &PackageRoot, file: &'file SourceFile) -> Vec<Violation<'file>> {
         let manifest = file.manifest_file();
         package
+            .key_lines()
             .features()
             .iter()
             .filter_map(|(name, line)| {

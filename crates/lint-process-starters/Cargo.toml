@@ -14,5 +14,11 @@ lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-paths = { path = "../lint-paths" }
 
+[dev-dependencies]
+file-ports = { path = "../file-ports" }
+lint-core = { path = "../lint-core" }
+lint-fixtures = { path = "../lint-fixtures" }
+lint-placement = { path = "../lint-placement" }
+
 [lints]
 workspace = true

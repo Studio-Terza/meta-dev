@@ -1,7 +1,7 @@
 mod checked;
 mod plain;
 
-pub use checked::Checked;
+pub use checked::{Checked, Guarded};
 pub use plain::{Newtype, Wrapping, kind};
 
 pub trait Counter: Newtype<Inner = usize> + Copy {

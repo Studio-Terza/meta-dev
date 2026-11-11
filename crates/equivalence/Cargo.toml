@@ -10,7 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-lint-core = { path = "../lint-core" }
+code-model = { path = "../code-model" }
 newtype = { path = "../newtype" }
 
 [dev-dependencies]
