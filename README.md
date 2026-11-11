@@ -183,8 +183,8 @@ a process in test code still also needs what `process_starters` asks for.
 port framework the only way to an effect. Ownership is declared, never guessed: a crate owns a package by naming it in
 `[package.metadata.port] owns = ["logos"]` in its `Cargo.toml` (`grammar` owns `logos`, `logos-codegen` and
 `logos-derive` and only re-exports `logos`, which the `grammar-<format>` lexer crates reach as `grammar::logos` with
-`#[logos(crate = grammar::logos)]` on each derive, while the `grammar-cited` lexer's `Cited` is shared by two other lexers and `grammar-unspelled` holds the `Unspelled` refusal that every lexer's checked newtype and `FromStr` shares; `store-ports` owns `sqlx`, `sqlx-macros`, its drivers, `tokio` and `tokio-stream`; `store-ports-macros`
-owns `sqlx-macros-core`). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
+`#[logos(crate = grammar::logos)]` on each derive, while the `grammar-cited` lexer's `Cited` is shared by two other lexers and `grammar-unspelled` holds the `Unspelled` refusal that every lexer's checked newtype and `FromStr` shares; `query-ports` owns `sqlx`, its drivers, `tokio` and `tokio-stream`, and `sqlite-ports` owns `rusqlite`;
+`store-ports` owns nothing and names the store role its macros expand for). An owning unit is a crate with a `[package.metadata.port]` table together with every workspace
 proc-macro crate it depends on, so `store-ports` and `store-ports-macros` own jointly, and a proc-macro crate two ports
 depend on belongs to both units. The gate reads the dependency graph from `cargo metadata --format-version 1 --locked`,
 through the `Cargo` port of `cargo-ports`, and refuses to run when that fails; packages are told apart by their resolved
