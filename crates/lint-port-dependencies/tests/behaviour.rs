@@ -36,6 +36,14 @@ const DEV_ON_OWNED: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),
     Text::new("[package]\nname = \"design-store\"\n\n[dev-dependencies]\nsqlx.workspace = true\n"),
 );
+const BUILD_ON_OWNED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[build-dependencies]\nsqlx = \"0.9\"\n"),
+);
+const TARGET_ON_OWNED: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[target.'cfg(unix)'.dependencies]\nsqlx = \"0.9\"\n"),
+);
 const RENAMED: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),
     Text::new(
@@ -659,6 +667,8 @@ laws::table!(
         Placed::new(&[PORT, MACROS, ON_CLOSURE], UNIT_CRATES, STORE_ON_LIBSQLITE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
         Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => Lines::from(["crates/design-store/Cargo.toml:5"]),
         Placed::new(&[PORT, MACROS, DEV_ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, BUILD_ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => Lines::from(["crates/design-store/Cargo.toml:5"]),
+        Placed::new(&[PORT, MACROS, TARGET_ON_OWNED], UNIT_CRATES, STORE_ON_SQLX) => Lines::from(["crates/design-store/Cargo.toml:5"]),
         Placed::new(&[PORT, MACROS, RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
         Placed::new(&[PORT, MACROS, WORKSPACE_RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
         Placed::new(&[PORT, MACROS, ON_MACRO_CLOSURE], UNIT_CRATES, STORE_ON_SQLX_CORE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
