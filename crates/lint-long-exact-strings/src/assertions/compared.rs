@@ -66,8 +66,7 @@ impl<'run> Compared<'run> {
         let name = invocation.path.segments.last().map(|last| Name::from(&last.ident))?;
         let arguments: Vec<Expr> = invocation
             .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
-            .map(|arguments| arguments.into_iter().collect())
-            .unwrap_or_default();
+            .map_or_default(|arguments| arguments.into_iter().collect());
         let formatted = name.matches::<Whole>(&Self::FORMATS).map(|_| arguments.first().and_then(Syntax::literal));
         let listed = name
             .matches::<Whole>(&Self::LISTS)

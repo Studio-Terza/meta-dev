@@ -7,8 +7,7 @@ struct Lexed;
 impl Lexed {
     fn terms(words: &[&str]) -> Vec<String> {
         Terms::lexed(words.iter().copied())
-            .map(|terms| [terms.first()].into_iter().chain(terms.rest()).map(ToString::to_string).collect())
-            .unwrap_or_default()
+            .map_or_default(|terms| [terms.first()].into_iter().chain(terms.rest()).map(ToString::to_string).collect())
     }
 }
 

@@ -95,7 +95,7 @@ impl<'tree> SourceFiles<'tree> {
         let read = staged.targets().iter().fold(self, |reading, target| {
             target.files().iter().fold(reading, |in_target, file| {
                 let scope = Scope::new(tree, target.package(), CrateFile::from(tree.display(file)));
-                let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
+                let children = file.parent().map_or_default(Path::to_path_buf);
                 in_target.file(&scope, file, &children)
             })
         });

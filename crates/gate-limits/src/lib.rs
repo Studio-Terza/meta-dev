@@ -41,7 +41,6 @@ impl Cli {
         Cli { limits, measured, only, report_only }
     }
 
-    #[must_use]
     pub fn report_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         self.gate(files).map_or_else(|failure| Self::refused(&failure, err), |gate| self.reported(&gate, out))
     }

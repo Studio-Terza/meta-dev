@@ -43,12 +43,12 @@ impl PackageRoot {
                 let root = CrateRoot::of_manifest(directory.as_ref(), manifest.as_ref());
                 let workspace = Self::workspace(&workspaces, directory.as_ref(), manifest.as_ref());
                 PackageRoot {
-                    dependencies: manifest.as_ref().map(|present| present.dependencies(workspace)).unwrap_or_default(),
+                    dependencies: manifest.as_ref().map_or_default(|present| present.dependencies(workspace)),
                     name: CrateName::from(&root),
                     root,
                     lines: manifest.as_ref().map(AsRef::as_ref).cloned().unwrap_or_default(),
-                    untested: manifest.as_ref().map(|present| present.untested_targets(canonical)).unwrap_or_default(),
-                    library: manifest.as_ref().map(Manifest::library_tests).unwrap_or_default(),
+                    untested: manifest.as_ref().map_or_default(|present| present.untested_targets(canonical)),
+                    library: manifest.as_ref().map_or_default(Manifest::library_tests),
                     sites: manifest.as_ref().map(Manifest::dependency_sites).cloned().unwrap_or_default(),
                 }
             })

@@ -12,7 +12,6 @@ use shard::{Failure, Shard};
 pub struct Cli;
 
 impl Cli {
-    #[must_use]
     pub fn answer(arguments: impl Iterator<Item = OsString>, files: &impl Files, err: &mut impl Write) -> ExitCode {
         let given: Vec<OsString> = arguments.collect();
         Shard::from_arguments(&given)

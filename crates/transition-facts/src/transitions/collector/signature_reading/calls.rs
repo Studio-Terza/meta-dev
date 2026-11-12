@@ -83,8 +83,7 @@ impl<'ast> Visit<'ast> for Calls {
     fn visit_expr_call(&mut self, found: &'ast ExprCall) {
         visit::visit_expr_call(self, found);
         let segments: Vec<Name> = Syntax::expr_path(&found.func)
-            .map(|path| path.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect())
-            .unwrap_or_default();
+            .map_or_default(|path| path.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect());
         let owner = segments.iter().rev().nth(1).cloned();
         self.made.extend(segments.last().cloned().map(|name| Callee::Path { owner, name }));
     }

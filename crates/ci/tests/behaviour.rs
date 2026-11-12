@@ -127,7 +127,7 @@ impl Script {
         let key = [
             invocation.program().to_string_lossy().as_ref(),
             " ",
-            invocation.arguments().first().map(|first| first.to_string_lossy()).unwrap_or_default().as_ref(),
+            invocation.arguments().first().map_or_default(|first| first.to_string_lossy()).as_ref(),
         ]
         .concat();
         self.answers.iter().find(|reply| reply.key == key).map_or_else(
@@ -2314,7 +2314,7 @@ impl Scratch {
     }
 
     fn read(&self, name: &str) -> String {
-        self.files.read_text(&self.root.join(name)).map(|text| text.to_string()).unwrap_or_default()
+        self.files.read_text(&self.root.join(name)).map_or_default(|text| text.to_string())
     }
 
     fn write(&self, name: &str, text: &str) -> Result<(), FileFailure> {

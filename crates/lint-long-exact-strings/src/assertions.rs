@@ -82,7 +82,7 @@ impl<'file> Visit<'file> for Assertions<'file> {
 impl Assertions<'_> {
     fn met(&mut self, invocation: &Macro) {
         match Assertion::named(
-            &invocation.path.segments.last().map(|last| Name::from(&last.ident)).unwrap_or_default(),
+            &invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident)),
             &self.tables,
         )
         .compared(invocation)
@@ -126,16 +126,14 @@ impl Assertion {
     fn arguments(invocation: &Macro) -> Vec<Expr> {
         invocation
             .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
-            .map(|arguments| arguments.into_iter().collect())
-            .unwrap_or_default()
+            .map_or_default(|arguments| arguments.into_iter().collect())
     }
 
     fn sides(condition: Expr) -> Vec<Expr> {
         match condition {
             Expr::Binary(binary) => Some(binary)
                 .filter(|candidate| matches!(candidate.op, BinOp::Eq(_) | BinOp::Ne(_)))
-                .map(|comparison| vec![*comparison.left, *comparison.right])
-                .unwrap_or_default(),
+                .map_or_default(|comparison| vec![*comparison.left, *comparison.right]),
             _ => Vec::new(),
         }
     }

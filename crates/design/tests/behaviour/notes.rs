@@ -93,7 +93,7 @@ impl Noting {
     fn placed(remark: &str) -> Option<Result<Vec<String>, Miss>> {
         let applying = Noting::ready().ok()?;
         let reported = Noting::reported(&applying, &format!("# Notes\nRULING (owner c3c3c3c3): {remark}\n"));
-        let shown = applying.run(&["show", "n3"]).map(|shown| Spread::parsed(&shown)).unwrap_or_default();
+        let shown = applying.run(&["show", "n3"]).map_or_default(|shown| Spread::parsed(&shown));
         Some(reported.lines.into_iter().chain(shown).filter_map(Noting::found).collect())
     }
 

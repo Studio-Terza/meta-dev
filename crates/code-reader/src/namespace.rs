@@ -102,11 +102,11 @@ impl<'read> Namespace<'read> {
     }
 
     pub(super) fn anchors(&self, scope: ScopeId) -> Anchors {
-        scope.row(&self.scopes).map(ScopeRow::anchors).unwrap_or_default()
+        scope.row(&self.scopes).map_or_default(ScopeRow::anchors)
     }
 
     pub(super) fn chain(&self, scope: ScopeId) -> &[ScopeId] {
-        scope.row(&self.scopes).map(ScopeRow::chain).unwrap_or_default()
+        scope.row(&self.scopes).map_or_default(ScopeRow::chain)
     }
 
     pub(super) fn prelude(&self, name: &Name, viewer: ScopeId) -> Option<Binding> {

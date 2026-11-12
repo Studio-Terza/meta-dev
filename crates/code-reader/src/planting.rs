@@ -96,7 +96,7 @@ impl<'read> Files<'read> {
 
     fn planted_at(&mut self, lowered: &mut Lowered<'read>, slot: Slot, path: &Path) {
         let child = self.0.remove(path);
-        let slots = child.map(|removed| lowered.planted(slot, removed)).unwrap_or_default();
+        let slots = child.map_or_default(|removed| lowered.planted(slot, removed));
         *self = std::mem::take(self).filled(lowered, slots);
     }
 }

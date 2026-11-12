@@ -25,7 +25,7 @@ pub struct Modules {
 impl Modules {
     #[must_use]
     pub fn candidates(file: &Path, children_directory: &Path, items: &[Item]) -> Vec<PathBuf> {
-        let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
+        let file_directory = file.parent().map_or_default(Path::to_path_buf);
         [Walk::Entered, Walk::Skipped]
             .into_iter()
             .flat_map(|wanted| Declaration::within(items, children_directory, wanted))
@@ -47,7 +47,7 @@ impl Modules {
 
     #[must_use]
     pub fn declared_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
-        let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
+        let file_directory = file.parent().map_or_default(Path::to_path_buf);
         let entered = Declaration::within(items, children_directory, Walk::Entered);
         let skipped = Declaration::within(items, children_directory, Walk::Skipped);
         let tests = skipped

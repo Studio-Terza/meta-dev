@@ -53,7 +53,7 @@ impl Directory {
 
 impl Found {
     fn read(path: PathBuf) -> Result<Found, Unmigrated> {
-        let named = path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+        let named = path.file_name().map_or_default(|name| name.to_string_lossy().into_owned());
         let file = named.parse::<MigrationFile>().map_err(|_unspelled| Unmigrated::Unnamed { path: path.clone() })?;
         Ok(Found { file, path })
     }

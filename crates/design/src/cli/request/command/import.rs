@@ -274,7 +274,7 @@ impl Answers {
     }
 
     fn cite(&self, cite: &Cite) -> Result<Speech, Miss> {
-        let spoken = self.cited.get(&Prefix::new(cite.clone().into_inner())).map(Vec::as_slice).unwrap_or_default();
+        let spoken = self.cited.get(&Prefix::new(cite.clone().into_inner())).map_or_default(Vec::as_slice);
         let authors = spoken.iter().fold(BTreeMap::<Uuid, Speech>::new(), |mut authors, said| {
             let message: &Uuid = said.segment().as_ref();
             authors
@@ -293,7 +293,7 @@ impl Answers {
     }
 
     fn quote(&self, quote: &Quote, cited: &BTreeSet<Uuid>, dates: &[&Date]) -> Result<Vec<Segment>, Miss> {
-        let found = self.quoted.get(quote).map(Vec::as_slice).unwrap_or_default();
+        let found = self.quoted.get(quote).map_or_default(Vec::as_slice);
         let utterances = found.iter().fold(BTreeMap::<Occurrence, Utterance>::new(), |mut said, quoted| {
             let segment: &Segment = quoted.as_ref();
             let message: &Uuid = segment.as_ref();

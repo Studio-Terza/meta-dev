@@ -38,7 +38,7 @@ impl SupportModules {
     fn directory_of(path: &Path) -> PathBuf {
         path.file_name()
             .filter(|name| Self::ROOT_FILES.iter().any(|root| name == root))
-            .map_or_else(|| path.with_extension(""), |_| path.parent().map(Path::to_path_buf).unwrap_or_default())
+            .map_or_else(|| path.with_extension(""), |_| path.parent().map_or_default(Path::to_path_buf))
     }
 }
 

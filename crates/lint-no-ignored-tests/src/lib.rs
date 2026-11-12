@@ -49,8 +49,7 @@ impl FileLint for NoIgnoredTests {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         file.shipped()
             .and_then(Self::never_tested)
-            .map(|shipped| TestGates::lines_in(shipped.syntax()))
-            .unwrap_or_default()
+            .map_or_default(|shipped| TestGates::lines_in(shipped.syntax()))
             .into_iter()
             .map(|line| Violation::new(Site::new(file.path(), line), Self::UNRUN))
             .collect()

@@ -427,7 +427,7 @@ fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_no
         sleep: Pause::new(0),
     };
     let first = structuring.structured(&["structure"]);
-    let told = first.outcome.as_ref().err().map(ToString::to_string).unwrap_or_default();
+    let told = first.outcome.as_ref().err().map_or_default(ToString::to_string);
     assert!(matches!(first.outcome, Err(Failure::Flailed { sequel: Sequel::WentOn, .. })));
     let second = structuring.structured(&["structure"]);
     assert_eq!(structuring.script.prompts().len(), 3, "the second run re-sent the flailed job's segments");
@@ -648,7 +648,7 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
             Agents::new(|_scratch| HeadlessClaude::new(scratch.clone(), agent), SystemClock),
             &["structure"],
         );
-        let failure = structured.outcome.as_ref().err().map(ToString::to_string).unwrap_or_default();
+        let failure = structured.outcome.as_ref().err().map_or_default(ToString::to_string);
         format!("design structure\n{}{failure}\n", structured.text)
     });
     golden::golden!("structure-unreadable.txt", &reported.concat());

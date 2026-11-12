@@ -369,7 +369,7 @@ impl fmt::Display for Line {
                 formatter,
                 "  {} {relation} {segment} {author}{} {} {entered} {}",
                 Key::Placed,
-                sense.map(Line::sensed).unwrap_or_default(),
+                sense.map_or_default(Line::sensed),
                 Key::Entered,
                 Line::quoted(body)
             ),
@@ -604,7 +604,7 @@ impl Summary {
 
     fn rendered(&self) -> String {
         let Summary { node, project, facet, stage, basis, role, entered, title } = self;
-        let titled = title.as_ref().map(|named| format!(" {}", Line::quoted(named))).unwrap_or_default();
+        let titled = title.as_ref().map_or_default(|named| format!(" {}", Line::quoted(named)));
         format!(
             "{} {} {facet} {stage} {basis} {role} {} {entered}{titled}",
             Line::numbered(*node),

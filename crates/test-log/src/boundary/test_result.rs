@@ -19,7 +19,7 @@ impl TestResult {
     const JOIN: &'static str = " :: ";
 
     pub fn key(&self, binary: Option<&Binary>) -> TestName {
-        TestName::new(format!("{}{}{}", binary.map(Binary::label).unwrap_or_default(), Self::JOIN, self.name))
+        TestName::new(format!("{}{}{}", binary.map_or_default(Binary::label), Self::JOIN, self.name))
     }
 
     pub fn verdict(&self) -> Verdict {

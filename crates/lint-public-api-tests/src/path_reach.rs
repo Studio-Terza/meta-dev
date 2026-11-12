@@ -25,9 +25,9 @@ impl PathReach {
     }
 
     fn beside(file: &SourceFile) -> PathReach {
-        let package = AsRef::<Path>::as_ref(file.manifest_file()).parent().map(Path::to_path_buf).unwrap_or_default();
+        let package = AsRef::<Path>::as_ref(file.manifest_file()).parent().map_or_default(Path::to_path_buf);
         PathReach {
-            directory: file.path().parent().map(Path::to_path_buf).unwrap_or_default(),
+            directory: file.path().parent().map_or_default(Path::to_path_buf),
             source: Self::lexical(&package.join(Self::SOURCE_DIRECTORY)),
             lines: Vec::new(),
         }
@@ -41,7 +41,7 @@ impl PathReach {
         match component {
             Component::ParentDir => folded.file_name().map_or_else(
                 || folded.join(Component::ParentDir),
-                |_| folded.parent().map(Path::to_path_buf).unwrap_or_default(),
+                |_| folded.parent().map_or_default(Path::to_path_buf),
             ),
             Component::CurDir => folded,
             other => folded.join(other),

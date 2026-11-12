@@ -34,8 +34,7 @@ impl Head {
             Head::Named => path
                 .segments()
                 .first()
-                .map(|head| resolver.routed(module, head, &path, trail))
-                .unwrap_or_default()
+                .map_or_default(|head| resolver.routed(module, head, &path, trail))
                 .into_iter()
                 .chain(iter::once(path))
                 .collect(),

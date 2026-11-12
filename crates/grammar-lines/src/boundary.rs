@@ -40,7 +40,7 @@ impl Piece {
 
     fn broken(lexer: &mut Lexer<'_, Piece>) -> Line {
         let text = lexer.slice();
-        let ending = lexer.next().map(|_break| lexer.slice()).unwrap_or_default();
+        let ending = lexer.next().map_or_default(|_break| lexer.slice());
         Line { text: text.to_owned(), kept: [text, ending].concat() }
     }
 }

@@ -25,8 +25,7 @@ pub(crate) struct ReservedNames<Kind>(PhantomData<Kind>);
 impl<Kind: Reserved> FileLint for ReservedNames<Kind> {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         Self::outside_owners(file)
-            .map(|outside| Self::lines(outside.syntax().to_token_stream()))
-            .unwrap_or_default()
+            .map_or_default(|outside| Self::lines(outside.syntax().to_token_stream()))
             .into_iter()
             .map(|line| Violation::new(Site::new(file.path(), line), Kind::default()))
             .collect()

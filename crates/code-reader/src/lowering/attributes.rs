@@ -50,7 +50,6 @@ impl Attributes {
             .ok()
             .and_then(|list| Element::named(&list.path, name).map(|()| list))
             .and_then(|list| list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ok())
-            .map(|parsed| parsed.into_iter().map(Element).collect())
-            .unwrap_or_default()
+            .map_or_default(|parsed| parsed.into_iter().map(Element).collect())
     }
 }

@@ -235,7 +235,7 @@ impl Work {
             Work::Checked(check) => check(readout),
             Work::Modelled(query) => sources.model(readout).map(query).into_iter().collect(),
             Work::Described(described) => Self::described(described, readout, sources),
-            Work::Model => sources.model(readout).map(|_| Vec::new()).unwrap_or_default(),
+            Work::Model => sources.model(readout).map_or_default(|_| Vec::new()),
             Work::Survey => Vec::new(),
         }
     }

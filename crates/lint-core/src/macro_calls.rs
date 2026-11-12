@@ -11,7 +11,7 @@ pub struct MacroCalls(Vec<Macro>);
 impl MacroCalls {
     #[must_use]
     pub fn within(invocation: &Macro) -> Vec<Macro> {
-        syn::parse2::<MacroCalls>(invocation.tokens.clone()).map(|calls| calls.0).unwrap_or_default()
+        syn::parse2::<MacroCalls>(invocation.tokens.clone()).map_or_default(|calls| calls.0)
     }
 
     fn step(input: ParseStream) -> syn::Result<Vec<Macro>> {

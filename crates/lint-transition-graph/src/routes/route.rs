@@ -31,7 +31,7 @@ impl<'walk, 'graph, 'found, 'file> Route<'walk, 'graph, 'found, 'file> {
     ) -> Option<Route<'walk, 'graph, 'found, 'file>> {
         let places: Vec<Site<'file>> =
             group.sites().into_iter().copied().collect::<BTreeSet<Site<'file>>>().into_iter().collect();
-        let called = group.members().first().map(Leg::called).unwrap_or_default();
+        let called = group.members().first().map_or_default(Leg::called);
         let joined = called
             .first()
             .zip(called.last())
@@ -71,7 +71,7 @@ impl<'file> From<&Route<'_, '_, '_, 'file>> for Option<Violation<'file>> {
 
 impl fmt::Display for Route<'_, '_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let called = self.group.members().first().map(Leg::called).unwrap_or_default();
+        let called = self.group.members().first().map_or_default(Leg::called);
         let route = Listed::<_, ','>::joined(called.iter().map(|edge| edge.transition()));
         let others = Listed::<_, ','>::joined(self.places.iter().skip(1));
         write!(
