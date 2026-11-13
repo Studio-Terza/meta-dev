@@ -2,11 +2,10 @@ mod import;
 mod imports;
 
 use std::collections::BTreeSet;
-use std::ptr;
 
 use lint_core::Walk;
 use lint_layout::Name;
-use proc_macro2::{Ident, TokenTree};
+use proc_macro2::Ident;
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UsePath, UseTree};
 
@@ -47,36 +46,6 @@ impl Scope {
     #[must_use]
     pub fn module_root(&self, head: &Name) -> Option<&Name> {
         self.local_roots.get(head)
-    }
-
-    pub(crate) fn kept(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Option<Name> {
-        match root {
-            TokenTree::Ident(ident) => self.kept_ident(token, root, ident, name),
-            TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
-        }
-    }
-
-    fn kept_ident(&self, token: &TokenTree, root: &TokenTree, ident: &Ident, name: Name) -> Option<Name> {
-        match Some(root).filter(|candidate| ptr::eq(*candidate, token)) {
-            Some(_) => self
-                .imports
-                .local_item(&name, &self.local_roots)
-                .map(|imports| imports.naming(&name).first().map(Import::original).cloned().unwrap_or(name)),
-            None => self.reaches(ident).map(|_| name),
-        }
-    }
-
-    pub(crate) fn spelled(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Vec<Name> {
-        let imported =
-            Some(root).filter(|candidate| ptr::eq(*candidate, token)).and_then(|_| self.imports.path_of(&name));
-        imported.unwrap_or_else(|| vec![name])
-    }
-
-    fn reaches<'token>(&self, ident: &'token Ident) -> Option<&'token Ident> {
-        let name = Name::from(ident);
-        self.local_roots.get(&name).map(|_| ident).or_else(|| {
-            self.imports.naming(&name).first().and(self.imports.local_item(&name, &self.local_roots)).map(|_| ident)
-        })
     }
 
     fn stepped(&mut self, path: &[&Ident], step: &UsePath) {

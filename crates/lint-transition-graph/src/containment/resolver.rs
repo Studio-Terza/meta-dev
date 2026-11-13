@@ -8,8 +8,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
 use lint_core::{FileHead, Site};
-use lint_item_graph::{FileNames, ReferencedNames, Scope, Traversal};
-use lint_layout::{Name, UsePath};
+use lint_item_graph::{FileScopes, Scope, Traversal};
+use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::{Endpoint, Nature, Transition};
 use type_facts::{Dependency, Implementation};
@@ -32,16 +32,16 @@ pub(crate) struct Resolver<'found> {
 impl<'found> Resolver<'found> {
     pub(crate) fn of_members(
         members: impl Iterator<Item = Member<'found>>,
-        names: &'found FileNames<'_>,
+        scopes: &'found FileScopes<'_>,
         stand_ins: StandIns<'found>,
     ) -> Resolver<'found> {
-        let scoped: Vec<(&'found FileHead, &'found Scope)> = names.each(|head, scope, _| (head, scope)).collect();
-        let modules = scoped.iter().fold(BTreeMap::new(), |mut modules: BTreeMap<_, BTreeSet<_>>, (head, _)| {
+        let files: Vec<(&'found FileHead, &'found Scope)> = scopes.each(|head, scope| (head, scope)).collect();
+        let modules = files.iter().fold(BTreeMap::new(), |mut modules: BTreeMap<_, BTreeSet<_>>, (head, _)| {
             let placement = head.placement();
             modules.entry(placement.package().crate_name()).or_default().extend(placement.module().segments());
             modules
         });
-        let places = scoped.iter().map(|(head, scope)| {
+        let places = files.iter().map(|(head, scope)| {
             let placement = head.placement();
             let place = Place::new(placement.package().crate_name(), placement.module().segments(), scope);
             (head.path(), place)
@@ -87,7 +87,7 @@ impl<'found> Resolver<'found> {
     fn within(&self, target: &Target<'found>, name: &Name) -> Vec<Member<'found>> {
         let krate = target.krate();
         let declaring = |declared: &Name| self.declaring.get(declared).map_or(&[][..], Vec::as_slice);
-        let stood = |standing: &Name| self.stand_ins.standing_for(krate, standing).iter();
+        let stood = |standing: &Name| self.stand_ins.standing_for(krate, standing).iter().copied();
         let unplaced = Target::new(krate, None, None);
         target.declared(declaring(name)).map_or_else(
             || {
@@ -122,46 +122,6 @@ impl<'found> Resolver<'found> {
             Nature::Interface => self.members(file, endpoint.as_ref(), &[], None),
             Nature::Primitive | Nature::Boxed => Vec::new(),
         }
-    }
-
-    pub(crate) fn bodies(&self, file: &FileHead, names: &ReferencedNames) -> Vec<Link<'found>> {
-        let krate = file.placement().package().crate_name();
-        self.places
-            .get(file.path())
-            .map_or_else(Vec::new, |place| self.bodies_reached(&Reach::new(place, &self.modules), krate, names))
-    }
-
-    fn bodies_reached(
-        &self,
-        reach: &Reach<'_, 'found>,
-        krate: &CrateName,
-        names: &ReferencedNames,
-    ) -> Vec<Link<'found>> {
-        let uses = names.uses();
-        let distinct: BTreeSet<&UsePath> = uses.values().flatten().copied().collect();
-        let found: BTreeMap<&UsePath, Vec<Member<'found>>> =
-            distinct.into_iter().map(|path| (path, self.used(reach, krate, path))).collect();
-        uses.iter()
-            .filter_map(|(owner, used)| {
-                let declaring = self.declaring.get(*owner).map_or(&[][..], Vec::as_slice);
-                let holder = reach.target(owner, &[], None).and_then(|target| target.declared(declaring))?;
-                let ends = used.iter().flat_map(|path| found.get(path).into_iter().flatten());
-                Some(ends.map(move |end| Link::new(holder, *end)))
-            })
-            .flatten()
-            .collect()
-    }
-
-    fn used(&self, reach: &Reach<'_, 'found>, krate: &CrateName, path: &UsePath) -> Vec<Member<'found>> {
-        let named = path.naming(|name| {
-            let standing = self.stand_ins.standing_for(krate, name).first().and(Some(name));
-            self.declaring.get(name).and(Some(name)).or(standing)
-        });
-        let found = named
-            .segments()
-            .split_last()
-            .and_then(|(name, written)| reach.target(name, written, None).map(|target| self.within(&target, name)));
-        found.unwrap_or_default()
     }
 
     pub(crate) fn signature(&self, transition: Transition<'found, '_>) -> Vec<Link<'found>> {

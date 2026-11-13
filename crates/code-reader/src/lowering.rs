@@ -24,7 +24,7 @@ use code_model::{
     Alias, Building, Entry, FileId, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Reach, Region,
     Signature, Sited, Spelling, Subject, TypeRef,
 };
-use lint_core::{Macros, SourceFile};
+use lint_core::SourceFile;
 use lint_layout::{Name, Position, TestMarks, Whole, Word, words};
 
 use crate::namespace::{
@@ -419,10 +419,15 @@ impl<'read> Plot<'read> {
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
         let places: Vec<Places> =
             Parallel::default().mapped(&self.grown, |grown| grown.rows.places.settled(&resolving.based(grown.base)));
+        let with_places = self
+            .grown
+            .iter()
+            .zip(&places)
+            .fold(with_exports, |built, (grown, seated)| seated.placed(grown.file, built));
         let columns = self.grown.into_iter().zip(&places).fold(Columns::default(), |columns, (grown, seated)| {
             grown.rows.spread(Footing::new(resolving.based(grown.base), grown.file, grown.outer, seated), columns)
         });
-        columns.built(with_exports).built()
+        columns.built(with_places).built()
     }
 }
 
@@ -613,12 +618,10 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     }
 
     fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
-        visit::visit_item_macro(self, item);
-        let expanded = item.ident.as_ref().map_or_else(|| Macros::items(&item.mac), |_| Vec::new());
-        expanded.iter().fold(self, |lowering, declared| {
-            lowering.visit_item(declared);
-            lowering
-        });
+        match &item.ident {
+            Some(ident) => self.owned_by(ident, Domain::Macros, |lowering| visit::visit_item_macro(lowering, item)),
+            None => self.expanded(item),
+        }
     }
 
     fn visit_macro(&mut self, invoked: &'ast Macro) {

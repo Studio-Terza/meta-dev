@@ -1,3 +1,4 @@
+use code_reader::Reader;
 use law_facts::Laws;
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
@@ -16,7 +17,8 @@ impl Clustered {
         let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
         let laws = Laws::from(files.as_slice());
-        let system = TypeSystem::built_from(&extraction, &laws);
+        let model = Reader::read_files(&files);
+        let system = TypeSystem::built_from(&extraction, &laws, &model);
         report(&system).iter().map(ToString::to_string).collect()
     }
 
@@ -386,7 +388,7 @@ fn a_variant_path_names_its_enum_and_a_module_path_names_its_type() {
         ),
         Clustered::at(
             "crates/x/src/hub.rs",
-            "mod pull_request;\nuse crate::event::Event;\npub struct Hub;\nimpl Hub {\n    fn pulled(&self) {\n        Event::PullRequest;\n    }\n}\n",
+            "pub mod pull_request;\nuse crate::event::Event;\npub struct Hub;\nimpl Hub {\n    fn pulled(&self) {\n        Event::PullRequest;\n    }\n}\n",
         ),
         Clustered::at("crates/x/src/hub/pull_request.rs", "pub struct PullRequest;\n"),
         Clustered::at("crates/x/src/rule.rs", "pub enum Rule {\n    Linear(u8),\n    Plain { width: u8 },\n}\n"),
@@ -565,18 +567,32 @@ fn field_and_variant_names_are_not_references_but_their_values_are() {
 }
 
 #[test]
-fn a_cycle_closed_through_a_trait_impl_is_reported() {
+fn a_cycle_closed_through_a_trait_impl_or_an_aliased_field_is_reported() {
     let implemented = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
         Clustered::at("crates/x/src/a.rs", "pub struct A;\nimpl crate::b::Tr for A {}\n"),
         Clustered::at("crates/x/src/b.rs", "pub trait Tr {}\npub struct B(crate::a::A);\n"),
     ];
+    let aliased = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct A(crate::b::Named);\npub struct C;\n"),
+        Clustered::at("crates/x/src/b.rs", "pub type Named = B;\npub struct B(crate::a::C);\n"),
+    ];
+    let reported: Vec<Vec<String>> = [implemented, aliased]
+        .iter()
+        .map(|sources| {
+            Clustered::lines(sources, |view| {
+                ClusterReport::<AcyclicQuotients>::report_graph(view).violations().to_vec()
+            })
+        })
+        .collect();
+    let closing = |edges: &str| {
+        vec![format!(
+            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through {edges}; move the shared types into one part that the others use, so the parts form layers"
+        )]
+    };
     assert_eq!(
-        Clustered::lines(&implemented, |view| ClusterReport::<AcyclicQuotients>::report_graph(view)
-            .violations()
-            .to_vec()),
-        [
-            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through x::a::A -> x::b::Tr, x::b::B -> x::a::A; move the shared types into one part that the others use, so the parts form layers"
-        ]
+        reported,
+        [closing("x::a::A -> x::b::Tr, x::b::B -> x::a::A"), closing("x::a::A -> x::b::B, x::b::B -> x::a::C")]
     );
 }

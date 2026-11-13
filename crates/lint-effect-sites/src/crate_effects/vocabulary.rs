@@ -156,7 +156,7 @@ impl Vocabulary {
     fn effected(used: &PathUse) -> Option<Effected> {
         match used.mention() {
             Mention::Invoked => Self::printed(used.written()),
-            Mention::Expression | Mention::InMacro => {
+            Mention::Expression | Mention::InMacro | Mention::Interpolated => {
                 Self::LONG.iter().chain(&Self::SHORT).find_map(|tail| tail.effected(used))
             }
         }

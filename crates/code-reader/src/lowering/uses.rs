@@ -26,14 +26,14 @@ impl UseRow {
     fn domain(&self) -> Domain {
         match self.mention {
             Mention::Invoked => Domain::Macros,
-            Mention::Expression | Mention::InMacro => Domain::Types,
+            Mention::Expression | Mention::InMacro | Mention::Interpolated => Domain::Types,
         }
     }
 
     fn kept<'resolved>(&self, resolved: &'resolved Resolved) -> Option<&'resolved Resolved> {
         match self.mention {
             Mention::Invoked => Some(resolved),
-            Mention::Expression | Mention::InMacro => {
+            Mention::Expression | Mention::InMacro | Mention::Interpolated => {
                 self.written.tail().first().map(|_| resolved).or_else(|| resolved.known())
             }
         }
@@ -109,8 +109,11 @@ impl Lowering<'_> {
             .last()
             .map_or_else(|| Position::from(invoked.path.span()), |last| Position::from(last.ident.span()));
         self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
-        TokenPaths::within(invoked.tokens.clone()).into_iter().fold(self, |lowering, spelled| {
-            spelled.handed(|path, at| lowering.used(path, at, Mention::InMacro));
+        let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
+        let interpolated =
+            TokenPaths::interpolated(invoked).into_iter().map(|spelled| (spelled, Mention::Interpolated));
+        plain.chain(interpolated).fold(self, |lowering, (spelled, mention)| {
+            spelled.handed(|path, at| lowering.used(path, at, mention));
             lowering
         });
     }

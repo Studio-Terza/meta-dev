@@ -1,3 +1,4 @@
+use code_reader::Reader;
 use law_facts::Laws;
 use std::ffi::OsString;
 
@@ -85,7 +86,8 @@ impl Asked {
         let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
         let laws = Laws::from(files.as_slice());
-        let system = TypeSystem::built_from(&extraction, &laws);
+        let model = Reader::read_files(&files);
+        let system = TypeSystem::built_from(&extraction, &laws, &model);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
         query.reply(&system).to_string().parse::<Lines>().into_iter().flatten().collect()
     }

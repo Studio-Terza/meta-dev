@@ -10,6 +10,16 @@ pub enum Mention {
     Expression,
     Invoked,
     InMacro,
+    Interpolated,
+}
+
+impl Mention {
+    pub(crate) fn interpolated(self) -> Option<Mention> {
+        match self {
+            Mention::Interpolated => Some(self),
+            Mention::Expression | Mention::Invoked | Mention::InMacro => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

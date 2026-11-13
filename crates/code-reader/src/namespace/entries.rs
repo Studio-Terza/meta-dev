@@ -365,6 +365,10 @@ impl From<&Item> for Entries {
             Item::Macro(ItemMacro { ident: None, mac, .. }) => {
                 Entries::from(mac).merged(Entries::of_items(&Macros::items(mac)))
             }
+            Item::Macro(ItemMacro { ident: Some(ident), .. }) => Entries::from(Declared {
+                domain: Domain::Macros,
+                ..Declared::named_item(ident, &syn::Visibility::Inherited, ItemKind::Macro)
+            }),
             Item::Struct(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))
             }

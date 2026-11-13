@@ -17,6 +17,7 @@ pub enum ItemKind {
     Function,
     Const,
     Static,
+    Macro,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -29,6 +30,11 @@ impl Item {
     #[must_use]
     pub fn new(name: Name, kind: ItemKind) -> Item {
         Item { name, kind }
+    }
+
+    #[must_use]
+    pub fn kind(&self) -> ItemKind {
+        self.kind
     }
 }
 

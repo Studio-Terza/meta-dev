@@ -5,9 +5,10 @@ use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use code_model::Model;
 use law_facts::{Laws, Package};
 use lint_core::{Parsed, SourceFile};
-use lint_item_graph::FileNames;
+use lint_item_graph::FileScopes;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -23,7 +24,7 @@ use fillers::Fillers;
 pub struct Extraction<'file> {
     facts: Facts<'file>,
     transitions: Transitions<'file>,
-    names: FileNames<'file>,
+    scopes: FileScopes<'file>,
     fillers: Fillers<'file>,
     packages: BTreeMap<&'file Path, Package<'file>>,
 }
@@ -42,7 +43,7 @@ impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
         Extraction {
             facts: Facts::from(parsed),
             transitions: Transitions::from(parsed),
-            names: FileNames::from(parsed),
+            scopes: FileScopes::from(parsed),
             fillers: Fillers::default(),
             packages: BTreeMap::from([(parsed.head().path(), Package::from(parsed.head()))]),
         }
@@ -53,7 +54,7 @@ impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
 struct Parts<'file> {
     facts: Vec<Facts<'file>>,
     transitions: Vec<Transitions<'file>>,
-    names: Vec<FileNames<'file>>,
+    scopes: Vec<FileScopes<'file>>,
     fillers: Vec<Fillers<'file>>,
     packages: BTreeMap<&'file Path, Package<'file>>,
 }
@@ -63,7 +64,7 @@ impl<'file> FromIterator<Extraction<'file>> for Extraction<'file> {
         let split = parts.into_iter().fold(Parts::default(), |mut split, part| {
             split.facts.push(part.facts);
             split.transitions.push(part.transitions);
-            split.names.push(part.names);
+            split.scopes.push(part.scopes);
             split.fillers.push(part.fillers);
             split.packages.extend(part.packages);
             split
@@ -71,7 +72,7 @@ impl<'file> FromIterator<Extraction<'file>> for Extraction<'file> {
         Extraction {
             facts: split.facts.into_iter().collect(),
             transitions: split.transitions.into_iter().collect(),
-            names: split.names.into_iter().collect(),
+            scopes: split.scopes.into_iter().collect(),
             fillers: split.fillers.into_iter().collect(),
             packages: split.packages,
         }
@@ -90,8 +91,8 @@ impl<'file> Extraction<'file> {
     }
 
     #[must_use]
-    pub fn names(&self) -> &FileNames<'file> {
-        &self.names
+    pub fn scopes(&self) -> &FileScopes<'file> {
+        &self.scopes
     }
 
     pub(crate) fn fillers(&self) -> &Fillers<'file> {
@@ -105,6 +106,7 @@ pub struct TypeSystem<'found, 'file> {
     edges: Vec<Edge<'found, 'file>>,
     laws: &'found Laws<'file>,
     extraction: &'found Extraction<'file>,
+    model: &'found Model,
     containment: OnceCell<Containment<'found, 'file>>,
     algebras: OnceCell<Algebras<'found, 'file>>,
     declarations: OnceCell<Declarations<'found, 'file>>,
@@ -114,7 +116,11 @@ pub struct TypeSystem<'found, 'file> {
 
 impl<'found, 'file> TypeSystem<'found, 'file> {
     #[must_use]
-    pub fn built_from(extraction: &'found Extraction<'file>, laws: &'found Laws<'file>) -> TypeSystem<'found, 'file> {
+    pub fn built_from(
+        extraction: &'found Extraction<'file>,
+        laws: &'found Laws<'file>,
+        model: &'found Model,
+    ) -> TypeSystem<'found, 'file> {
         let types = WorkspaceTypes::declared(extraction.facts(), extraction.transitions());
         let edges = extraction.transitions().all().map(|found| types.edge(found)).collect();
         TypeSystem {
@@ -122,6 +128,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             edges,
             laws,
             extraction,
+            model,
             containment: OnceCell::new(),
             algebras: OnceCell::new(),
             declarations: OnceCell::new(),
@@ -132,7 +139,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
 
     #[must_use]
     pub fn containment(&self) -> &Containment<'found, 'file> {
-        self.containment.get_or_init(|| Containment::clustered(self.extraction))
+        self.containment.get_or_init(|| Containment::clustered(self.extraction, self.model))
     }
 
     #[must_use]
