@@ -1,0 +1,125 @@
+use syn::visit;
+use syn::{Ident, ItemImpl};
+
+use code_model::{ItemId, Region, Resolved, Seat, TypeRef};
+
+use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
+
+use super::signature::Written;
+use super::{Enclosure, ImplRow, Lowering};
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct PlaceId(usize);
+
+#[derive(Clone, Copy, Debug)]
+struct SubjectId(usize);
+
+#[derive(Debug)]
+struct SubjectRow {
+    scope: ScopeId,
+    ty: TypeRef<Written>,
+}
+
+#[derive(Debug)]
+struct OwnerRow {
+    scope: ScopeId,
+    name: UsePath,
+    domain: Domain,
+}
+
+impl OwnerRow {
+    fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Option<ItemId> {
+        resolving.path(self.scope, &self.name, self.domain).crate_item()
+    }
+}
+
+#[derive(Debug)]
+struct PlaceRow {
+    subject: Option<SubjectId>,
+    owner: Option<OwnerRow>,
+}
+
+#[derive(Debug, Default)]
+pub(super) struct PlaceRows {
+    subjects: Vec<SubjectRow>,
+    places: Vec<PlaceRow>,
+}
+
+impl PlaceRows {
+    pub(super) fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Places {
+        let subjects: Vec<TypeRef> =
+            self.subjects.iter().map(|row| Written::typed(&row.ty, resolving, row.scope)).collect();
+        let places = self
+            .places
+            .iter()
+            .map(|row| {
+                let subject = row.subject.and_then(|id| subjects.get(id.0)).cloned();
+                let declared = row.owner.as_ref().and_then(|owner| owner.settled(resolving));
+                let owner = declared.or_else(|| subject.as_ref()?.named().map(AsRef::<Resolved>::as_ref)?.crate_item());
+                Place { subject, owner }
+            })
+            .collect();
+        Places(places)
+    }
+
+    fn subject_of(&self, place: Option<PlaceId>) -> Option<SubjectId> {
+        place.and_then(|id| self.places.get(id.0)).and_then(|row| row.subject)
+    }
+}
+
+#[derive(Debug)]
+struct Place {
+    subject: Option<TypeRef>,
+    owner: Option<ItemId>,
+}
+
+#[derive(Debug)]
+pub(super) struct Places(Vec<Place>);
+
+impl Places {
+    pub(super) fn seat(&self, region: Region, place: Option<PlaceId>) -> Seat {
+        let found = place.and_then(|id| self.0.get(id.0));
+        Seat::new(region, found.and_then(|seated| seated.subject.clone())).owned(found.and_then(|seated| seated.owner))
+    }
+}
+
+impl Lowering<'_> {
+    fn placed(&mut self, row: PlaceRow) -> PlaceId {
+        let places = &mut self.lowered.rows.places.places;
+        let place = PlaceId(places.len());
+        places.push(row);
+        place
+    }
+
+    pub(super) fn owning(&mut self, ident: &Ident, domain: Domain) -> PlaceId {
+        let subject = self.lowered.rows.places.subject_of(self.context.place());
+        let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain };
+        self.placed(PlaceRow { subject, owner: Some(owner) })
+    }
+
+    pub(super) fn owned_by(&mut self, ident: &Ident, domain: Domain, visited: impl FnOnce(&mut Self)) {
+        let place = self.owning(ident, domain);
+        let context = self.context.owned(place);
+        self.contextual(context, visited);
+    }
+
+    pub(super) fn trait_owning(&mut self, ident: &Ident) -> PlaceId {
+        let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain: Domain::Types };
+        self.placed(PlaceRow { subject: None, owner: Some(owner) })
+    }
+
+    pub(super) fn impl_visited(&mut self, block: &ItemImpl) {
+        let declared = self.generics.extended(&block.generics);
+        let subject = declared.lowered(&block.self_ty);
+        let generics = declared.subject(subject.clone());
+        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, subject.clone()));
+        let rows = &mut self.lowered.rows.places.subjects;
+        let subjected = SubjectId(rows.len());
+        rows.push(SubjectRow { scope: self.here.scope(), ty: subject });
+        let place = self.placed(PlaceRow { subject: Some(subjected), owner: None });
+        let context = self.context.of_impl(block, place);
+        self.contextual(context, |lowering| {
+            lowering.enclosed(Enclosure::of_impl(block), generics, |enclosed| visit::visit_item_impl(enclosed, block));
+        });
+    }
+}

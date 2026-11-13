@@ -4,7 +4,7 @@ use code_model::{Ground, Reach, Region, Within, Zone};
 use lint_core::{Gate, SourceFile, Walk};
 
 use super::Lowering;
-use super::subjects::SubjectId;
+use super::places::PlaceId;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Regions;
@@ -39,36 +39,36 @@ impl Regions {
 #[derive(Debug)]
 pub(super) struct Context {
     region: Region,
-    subject: Option<SubjectId>,
+    place: Option<PlaceId>,
 }
 
 impl Context {
     pub(super) fn outermost(region: Region) -> Context {
-        Context { region, subject: None }
+        Context { region, place: None }
     }
 
     pub(super) fn within_item(&self, attributes: &[Attribute]) -> Context {
-        Context { region: Regions::tested(self.region, attributes), subject: self.subject }
+        Context { region: Regions::tested(self.region, attributes), place: self.place }
     }
 
     pub(super) fn within_module(&self, item: &ItemMod) -> Context {
-        Context { region: Regions::of_module(self.region, item), subject: self.subject }
+        Context { region: Regions::of_module(self.region, item), place: self.place }
     }
 
-    pub(super) fn of_impl(&self, block: &ItemImpl, subject: SubjectId) -> Context {
-        Context { region: self.region.inside(Self::within(block)), subject: Some(subject) }
+    pub(super) fn of_impl(&self, block: &ItemImpl, place: PlaceId) -> Context {
+        Context { region: self.region.inside(Self::within(block)), place: Some(place) }
     }
 
-    pub(super) fn of_trait(&self) -> Context {
-        Context { region: self.region, subject: None }
+    pub(super) fn owned(&self, place: PlaceId) -> Context {
+        Context { region: self.region, place: Some(place) }
     }
 
     pub(super) fn region(&self) -> Region {
         self.region
     }
 
-    pub(super) fn subject(&self) -> Option<SubjectId> {
-        self.subject
+    pub(super) fn place(&self) -> Option<PlaceId> {
+        self.place
     }
 
     fn within(block: &ItemImpl) -> Within {

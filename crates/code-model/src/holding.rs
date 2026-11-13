@@ -12,6 +12,7 @@ pub enum Held {
     NewtypeField,
     StructParameter,
     Alias,
+    Value,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

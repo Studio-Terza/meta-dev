@@ -2,10 +2,10 @@ mod attributes;
 mod boundary;
 mod calls;
 mod held;
+mod places;
 mod regions;
 mod seat;
 mod signature;
-mod subjects;
 mod uses;
 
 use std::ffi::OsStr;
@@ -15,16 +15,16 @@ use std::sync::Arc;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemFn, ItemEnum,
-    ItemFn, ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Macro, Signature as SynSignature,
-    TraitItemFn,
+    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemFn, ItemConst,
+    ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, Macro,
+    Signature as SynSignature, TraitItemFn,
 };
 
 use code_model::{
     Alias, Building, Entry, FileId, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Reach, Region,
     Signature, Sited, Spelling, Subject, TypeRef,
 };
-use lint_core::SourceFile;
+use lint_core::{Macros, SourceFile};
 use lint_layout::{Name, Position, TestMarks, Whole, Word, words};
 
 use crate::namespace::{
@@ -36,10 +36,10 @@ use attributes::Attributes;
 use boundary::SelfType;
 use calls::CallRow;
 use held::{Holder, HoldingRow, Link};
+use places::{PlaceId, PlaceRows, Places};
 use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
 use signature::{DeclaredParameter, InScope, LoweredInput, Written};
-use subjects::{SubjectId, SubjectRows, Subjects};
 use uses::UseRow;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -152,7 +152,7 @@ struct FnRow {
     output: Option<TypeRef<Written>>,
     constraints: Vec<TypeRef<Written>>,
     region: Region,
-    subject: Option<SubjectId>,
+    place: Option<PlaceId>,
 }
 
 impl FnRow {
@@ -172,7 +172,7 @@ impl Built for FnRow {
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints);
         let function = Function::new(self.name, self.owner, self.entry, signature)
-            .seated(footing.subjects().seat(self.region.joined(footing.outer()), self.subject));
+            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place));
         self.located.function(footing, building, function)
     }
 }
@@ -269,7 +269,7 @@ pub(crate) struct FileRows {
     holdings: Vec<HoldingRow>,
     calls: Vec<CallRow>,
     uses: Vec<UseRow>,
-    subjects: SubjectRows,
+    places: PlaceRows,
 }
 
 impl FileRows {
@@ -416,9 +416,9 @@ impl<'read> Plot<'read> {
         let exports = self.space.exports();
         let with_exports =
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
-        let subjects: Vec<Subjects> =
-            self.grown.iter().map(|grown| grown.rows.subjects.settled(&resolving.based(grown.base))).collect();
-        let columns = self.grown.into_iter().zip(&subjects).fold(Columns::default(), |columns, (grown, seated)| {
+        let places: Vec<Places> =
+            self.grown.iter().map(|grown| grown.rows.places.settled(&resolving.based(grown.base))).collect();
+        let columns = self.grown.into_iter().zip(&places).fold(Columns::default(), |columns, (grown, seated)| {
             grown.rows.spread(Footing::new(resolving.based(grown.base), grown.file, grown.outer, seated), columns)
         });
         columns.built(with_exports).built()
@@ -465,7 +465,7 @@ impl Lowering<'_> {
             output: generics.output(&signature.output),
             constraints: generics.constraints(&signature.generics),
             region: self.context.region(),
-            subject: self.context.subject(),
+            place: self.context.place(),
             name,
         });
         generics
@@ -501,14 +501,16 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
 
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
         let generics = self.generics.subjectless().extended(&item.generics);
-        let context = self.context.of_trait();
+        let place = self.trait_owning(&item.ident);
+        let context = self.context.owned(place);
         self.contextual(context, |lowering| {
             lowering.enclosed(Enclosure::Trait, generics, |enclosed| visit::visit_item_trait(enclosed, item));
         });
     }
 
     fn visit_item_fn(&mut self, item: &'ast ItemFn) {
-        let tested = self.context.within_item(&item.attrs);
+        let place = self.owning(&item.sig.ident, Domain::Values);
+        let tested = self.context.within_item(&item.attrs).owned(place);
         self.contextual(tested, |lowering| {
             let generics = lowering.function(&item.attrs, &item.sig);
             lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_item_fn(enclosed, item));
@@ -545,7 +547,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
             parameters: generics.declarations(&item.generics),
             target,
         });
-        visit::visit_item_type(self, item);
+        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_type(lowering, item));
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
@@ -554,7 +556,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
         self.struct_held(item, &scope, link);
-        visit::visit_item_struct(self, item);
+        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_struct(lowering, item));
     }
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
@@ -566,7 +568,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
             lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
             lowering
         });
-        visit::visit_item_enum(self, item);
+        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_enum(lowering, item));
     }
 
     fn visit_item_union(&mut self, item: &'ast ItemUnion) {
@@ -574,7 +576,19 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.fields_held(&Holder::named(&item.ident, Held::UnionField), &link, item.fields.named.iter(), &scope);
-        visit::visit_item_union(self, item);
+        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_union(lowering, item));
+    }
+
+    fn visit_item_const(&mut self, item: &'ast ItemConst) {
+        let target = self.generics.lowered(&item.ty);
+        self.hold(Holder::named(&item.ident, Held::Value), Link::declaring(&item.ident).valued(), target);
+        self.owned_by(&item.ident, Domain::Values, |lowering| visit::visit_item_const(lowering, item));
+    }
+
+    fn visit_item_static(&mut self, item: &'ast ItemStatic) {
+        let target = self.generics.lowered(&item.ty);
+        self.hold(Holder::named(&item.ident, Held::Value), Link::declaring(&item.ident).valued(), target);
+        self.owned_by(&item.ident, Domain::Values, |lowering| visit::visit_item_static(lowering, item));
     }
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
@@ -595,6 +609,15 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
         self.path_used(expression);
         visit::visit_expr_path(self, expression);
+    }
+
+    fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
+        visit::visit_item_macro(self, item);
+        let expanded = item.ident.as_ref().map_or_else(|| Macros::items(&item.mac), |_| Vec::new());
+        expanded.iter().fold(self, |lowering, declared| {
+            lowering.visit_item(declared);
+            lowering
+        });
     }
 
     fn visit_macro(&mut self, invoked: &'ast Macro) {

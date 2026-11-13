@@ -7,7 +7,8 @@ use syn::{
 };
 
 use code_model::{Building, CrateExports, Domain, Item as ModelItem, ItemId, ItemKind, Reexport, Unresolved};
-use lint_layout::{Dependencies, Name, Whole, Word, words};
+use lint_core::Macros;
+use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
 use super::anchor::Anchor;
@@ -147,6 +148,10 @@ impl Declared {
         Declared::new(Name::from(ident), Visibility::from(visibility), DeclaredKind::Item(kind))
     }
 
+    fn valued(self) -> Declared {
+        Declared { domain: Domain::Values, ..self }
+    }
+
     fn issued(&self, building: &mut Building) -> Option<ItemId> {
         let kind = self.kind.item_kind()?;
         Some(building.declared(ModelItem::new(self.name.clone(), kind)))
@@ -188,10 +193,20 @@ pub(crate) enum Imported {
 }
 
 impl Imported {
+    const TYPED: [Domain; 2] = [Domain::Types, Domain::Macros];
+
+    fn domains(name: &Name) -> &'static [Domain] {
+        match name.casing() {
+            Casing::Camel => &Self::TYPED,
+            Casing::Lower | Casing::Shouting | Casing::Other => &Domain::ALL,
+        }
+    }
+
     fn entries(self, visibility: Visibility) -> Entries {
         match self {
-            Imported::Named(name, path) => Domain::ALL
-                .into_iter()
+            Imported::Named(name, path) => Self::domains(&name)
+                .iter()
+                .copied()
                 .map(|domain| Entries::from(Import { name: name.clone(), path: path.clone(), visibility, domain }))
                 .fold(Entries::default(), Entries::merged),
             Imported::Glob(path) => Entries::from(Glob { source: GlobSource::Path(path), visibility }),
@@ -347,7 +362,9 @@ impl From<&Item> for Entries {
         match item {
             Item::Use(used) => Entries::from(used),
             Item::ExternCrate(declared) => Entries::from(declared),
-            Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
+            Item::Macro(ItemMacro { ident: None, mac, .. }) => {
+                Entries::from(mac).merged(Entries::of_items(&Macros::items(mac)))
+            }
             Item::Struct(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))
             }
@@ -367,8 +384,15 @@ impl From<&Item> for Entries {
             Item::Fn(declared) => DeriveMacro(declared)
                 .declared()
                 .into_iter()
+                .chain([Declared::named_item(&declared.sig.ident, &declared.vis, ItemKind::Function).valued()])
                 .map(Entries::from)
                 .fold(Entries::default(), Entries::merged),
+            Item::Const(declared) => {
+                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Const).valued())
+            }
+            Item::Static(declared) => {
+                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Static).valued())
+            }
             _ => Entries::default(),
         }
     }
@@ -495,6 +519,7 @@ impl Entries {
             .declared
             .iter()
             .filter(|declared| shown(declared.visibility))
+            .filter(|declared| declared.domain != Domain::Values)
             .map(|declared| &declared.name)
             .chain(modules)
             .collect();

@@ -6,7 +6,7 @@ use lint_layout::Position;
 
 use crate::namespace::{Resolving, ScopeId};
 
-use super::subjects::Subjects;
+use super::places::Places;
 
 pub(super) trait Built {
     fn built(self, footing: Footing<'_>, building: Building) -> Building;
@@ -17,7 +17,7 @@ pub(super) struct Footing<'grown> {
     resolving: Resolving<'grown, 'grown, 'grown>,
     file: FileId,
     outer: Region,
-    subjects: &'grown Subjects,
+    places: &'grown Places,
 }
 
 impl<'grown> Footing<'grown> {
@@ -25,17 +25,17 @@ impl<'grown> Footing<'grown> {
         resolving: Resolving<'grown, 'grown, 'grown>,
         file: FileId,
         outer: Region,
-        subjects: &'grown Subjects,
+        places: &'grown Places,
     ) -> Footing<'grown> {
-        Footing { resolving, file, outer, subjects }
+        Footing { resolving, file, outer, places }
     }
 
     pub(super) fn resolving(self) -> Resolving<'grown, 'grown, 'grown> {
         self.resolving
     }
 
-    pub(super) fn subjects(self) -> &'grown Subjects {
-        self.subjects
+    pub(super) fn places(self) -> &'grown Places {
+        self.places
     }
 
     pub(super) fn outer(self) -> Region {

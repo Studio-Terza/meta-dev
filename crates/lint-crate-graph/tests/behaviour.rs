@@ -1,6 +1,6 @@
-use lint_core::{Lint, SourceFile};
+use lint_core::SourceFile;
 use lint_crate_graph::CrateGraph;
-use lint_fixtures::{Lines, Sources, Text};
+use lint_fixtures::{Checks, Lines, Queried, Sources, Text};
 
 const ONE: &str = "crates/one/src/lib.rs";
 const TWO: &str = "crates/two/src/lib.rs";
@@ -44,7 +44,7 @@ impl Items {
     }
 
     fn flagged(files: &[SourceFile]) -> Lines {
-        Sources::lines(&CrateGraph::report(files))
+        Queried::<CrateGraph>::flagged(files)
     }
 }
 
@@ -82,8 +82,8 @@ fn a_cycle_closed_through_impl_bodies_across_files_is_flagged() {
     };
     let first: Vec<String> = Items::links(BIG_RING).take(LINKS_IN_ROOT).map(link).collect();
     let second: Vec<String> = Items::links(BIG_RING).skip(LINKS_IN_ROOT).map(link).collect();
-    let root = Sources::file(ONE, Text::new(&format!("mod other;\n{}", first.concat())));
-    let other = Sources::file("crates/one/src/other.rs", Text::new(&second.concat()));
+    let root = Sources::file(ONE, Text::new(&format!("mod other;\nuse other::*;\n{}", first.concat())));
+    let other = Sources::file("crates/one/src/other.rs", Text::new(&format!("use super::*;\n{}", second.concat())));
     assert_eq!(Items::flagged(&[root, other]), Lines::from(FLAGGED));
 }
 

@@ -38,15 +38,22 @@ impl Holder {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct Link(UsePath);
+pub(super) struct Link {
+    name: UsePath,
+    domain: Domain,
+}
 
 impl Link {
     pub(super) fn declaring(ident: &Ident) -> Link {
-        Link(UsePath::from(ident))
+        Link { name: UsePath::from(ident), domain: Domain::Types }
+    }
+
+    pub(super) fn valued(self) -> Link {
+        Link { domain: Domain::Values, ..self }
     }
 
     fn declares(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Option<ItemId> {
-        resolving.path(scope, &self.0, Domain::Types).crate_item()
+        resolving.path(scope, &self.name, self.domain).crate_item()
     }
 }
 

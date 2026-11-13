@@ -75,7 +75,7 @@ impl NoPlaintext {
     fn field(holding: &Holding) -> Option<&Holding> {
         match holding.held() {
             Held::StructField | Held::EnumField | Held::NewtypeField => Some(holding),
-            Held::UnionField | Held::StructParameter | Held::Alias => None,
+            Held::UnionField | Held::StructParameter | Held::Alias | Held::Value => None,
         }
     }
 }

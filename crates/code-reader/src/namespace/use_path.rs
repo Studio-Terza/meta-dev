@@ -12,6 +12,7 @@ use super::boundary::ScopeId;
 use super::entries::Imported;
 use super::resolver::{Outer, Resolution, Resolver};
 use super::std_names::{Canonical, StdNames, Table};
+use super::tables::Key;
 use super::view::View;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,6 +139,7 @@ impl Relative<'_> {
         match self.shape.looked(domain) {
             Domain::Types => resolver.named(self.first, self.shape, self.reading, viewer),
             Domain::Macros => resolver.macro_named(self.first, viewer),
+            Domain::Values => resolver.keyed(Key::new(Domain::Values, self.first), viewer),
         }
     }
 }

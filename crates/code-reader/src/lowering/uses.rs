@@ -3,14 +3,14 @@ mod tokens;
 use syn::spanned::Spanned;
 use syn::{ExprPath, Macro, QSelf, Type};
 
-use code_model::{Building, Domain, Mention, PathUse, Region, Resolved};
+use code_model::{Building, Domain, Member, Mention, PathUse, Region, Resolved};
 use lint_layout::Position;
 
 use crate::namespace::UsePath;
 
 use super::Lowering;
+use super::places::PlaceId;
 use super::seat::{Built, Footing, Located};
-use super::subjects::SubjectId;
 use tokens::TokenPaths;
 
 #[derive(Debug)]
@@ -19,7 +19,7 @@ pub(super) struct UseRow {
     written: UsePath,
     mention: Mention,
     region: Region,
-    subject: Option<SubjectId>,
+    place: Option<PlaceId>,
 }
 
 impl UseRow {
@@ -45,14 +45,20 @@ impl Built for UseRow {
         let resolving = footing.resolving();
         let scope = self.located.scope();
         let direct = resolving.path(scope, &self.written, self.domain());
-        let aliased = direct.unresolved().and_then(|_| {
-            let head = resolving.path(scope, &self.written.parent()?, Domain::Types);
-            building.aliased(&head)?.joined(self.written.tail().last()?)
-        });
-        let resolved = aliased.unwrap_or(direct);
+        let head = direct
+            .unresolved()
+            .and_then(|_| Some(resolving.path(scope, &self.written.parent()?, Domain::Types)))
+            .zip(self.written.tail().last());
+        let aliased = head.as_ref().and_then(|(parent, last)| building.aliased(parent)?.joined(last));
+        let member = head.as_ref().and_then(|(parent, _)| Some(Resolved::Member(Member::from(parent.crate_item()?))));
+        let valued = || {
+            direct.unresolved().and(Some(self.domain())).filter(|domain| *domain == Domain::Types)?;
+            Some(resolving.path(scope, &self.written, Domain::Values)).filter(|resolved| resolved.known().is_some())
+        };
+        let resolved = aliased.or(member).or_else(valued).unwrap_or(direct);
         let written = self.written.written();
         let named = self.kept(&resolved).map(|_| ()).map(|()| resolved);
-        let seat = footing.subjects().seat(self.region.joined(footing.outer()), self.subject);
+        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);
         let line = self.located.position().line();
         let used = named.map(|kept| PathUse::new(written, kept, self.mention, seat));
         used.into_iter().fold(building, |mut built, found| {
@@ -115,7 +121,7 @@ impl Lowering<'_> {
             written,
             mention,
             region: self.context.region(),
-            subject: self.context.subject(),
+            place: self.context.place(),
         };
         self.lowered.rows.uses.push(row);
     }

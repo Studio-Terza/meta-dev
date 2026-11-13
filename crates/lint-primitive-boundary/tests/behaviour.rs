@@ -360,9 +360,9 @@ const CASES: [Case; 70] = [
         Flagged::new(&["a.rs:4"]),
     ),
     Case::new(
-        Title::new("a door impl in a macro body opens no door for shipped text"),
+        Title::new("a door impl in an item macro body opens its door like one written outside"),
         &[Source::new(Located::new("a.rs"), Text::new(MACRO_DOOR))],
-        Flagged::new(&["a.rs:4"]),
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("text in std macro arguments is not blocked yet"),
@@ -370,9 +370,9 @@ const CASES: [Case; 70] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("a primitive beside an item macro"),
+        Title::new("a primitive inside and beside an item macro"),
         &[Source::new(Located::new("a.rs"), Text::new(BESIDE_MACRO))],
-        Flagged::new(&["a.rs:4"]),
+        Flagged::new(&["a.rs:2", "a.rs:4"]),
     ),
     Case::new(
         Title::new("primitives inside bare fn types in signatures, fields and variants"),

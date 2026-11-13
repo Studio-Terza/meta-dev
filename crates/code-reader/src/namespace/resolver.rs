@@ -174,6 +174,14 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         )
     }
 
+    pub(super) fn keyed(&self, key: Key<'_>, viewer: ScopeId) -> Resolution {
+        self.chained(viewer, key, Reading::Written).contested(
+            None,
+            || Outer::Assumed(Binding::UNBOUND),
+            || self.space.expanded(viewer),
+        )
+    }
+
     pub(super) fn named(&self, first: &Name, shape: Shape, reading: Reading, viewer: ScopeId) -> Resolution {
         self.chained(viewer, Key::new(Domain::Types, first), reading).contested(
             shape.primitive(first).map(Binding::Primitive),

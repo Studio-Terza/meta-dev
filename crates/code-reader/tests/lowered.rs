@@ -249,7 +249,7 @@ fn self_is_not_a_written_spelling() {
 const HOLDINGS: &str = "struct Pair<T = u8>(T, u8);\nstruct Count(usize);\nenum E<T = u8> {\n    A(u8),\n    B { b: u8 },\n}\nunion U {\n    a: u8,\n}\nconst C: u8 = 1;\ntype A = u8;\n";
 
 #[test]
-fn every_field_struct_parameter_and_alias_is_read_with_its_kind_and_item() {
+fn every_field_struct_parameter_constant_and_alias_is_read_with_its_kind_and_item() {
     assert_eq!(
         Read::held(HOLDINGS),
         [
@@ -260,6 +260,7 @@ fn every_field_struct_parameter_and_alias_is_read_with_its_kind_and_item() {
             HeldRow::declaring("A", Held::EnumField),
             HeldRow::declaring("b", Held::EnumField),
             HeldRow::declaring("a", Held::UnionField),
+            HeldRow::declaring("C", Held::Value),
             HeldRow::declaring("A", Held::Alias),
         ]
     );
@@ -274,6 +275,7 @@ fn every_function_carries_its_reach_zone_and_enclosure() {
         [
             PlacedRow::new("shipped", Owner::Free, Reach::Shipped),
             PlacedRow::new("tested", Owner::Free, Reach::Test),
+            PlacedRow::new("expanded", Owner::Free, Reach::Shipped),
             PlacedRow::new("parsed", Owner::Free, Reach::Shipped).zoned(Zone::Boundary),
             PlacedRow::new("foreign", Owner::Foreign, Reach::Shipped),
             PlacedRow::new("clone", Owner::TraitImpl, Reach::Shipped).inside(Within::TraitImpl),

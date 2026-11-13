@@ -3,6 +3,7 @@ use lint_layout::Name;
 use crate::boundary::ItemId;
 use crate::external::External;
 use crate::item_path::ItemPath;
+use crate::member::Member;
 use crate::primitive::Primitive;
 use crate::unresolved::Unresolved;
 
@@ -11,6 +12,7 @@ pub enum Resolved {
     Std(ItemPath),
     StdTrait(ItemPath),
     Crate(ItemId),
+    Member(Member),
     External(External),
     Primitive(Primitive),
     Param(Name),
@@ -23,6 +25,7 @@ impl Resolved {
         match self {
             Resolved::Std(path) | Resolved::StdTrait(path) => Some(path),
             Resolved::Crate(_)
+            | Resolved::Member(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
@@ -35,7 +38,11 @@ impl Resolved {
         match self {
             Resolved::Std(path) | Resolved::StdTrait(path) => Some(Resolved::Std(path.joined(segment))),
             Resolved::External(external) => Some(Resolved::External(external.joined(segment))),
-            Resolved::Crate(_) | Resolved::Primitive(_) | Resolved::Param(_) | Resolved::Unknown(..) => None,
+            Resolved::Crate(_)
+            | Resolved::Member(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_)
+            | Resolved::Unknown(..) => None,
         }
     }
 
@@ -46,6 +53,7 @@ impl Resolved {
             Resolved::Std(_)
             | Resolved::StdTrait(_)
             | Resolved::Crate(_)
+            | Resolved::Member(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
             | Resolved::Unknown(..) => None,
@@ -56,7 +64,22 @@ impl Resolved {
     pub fn crate_item(&self) -> Option<ItemId> {
         match self {
             Resolved::Crate(item) => Some(*item),
-            Resolved::Std(_)
+            Resolved::Member(_)
+            | Resolved::Std(_)
+            | Resolved::StdTrait(_)
+            | Resolved::External(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_)
+            | Resolved::Unknown(..) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn member(&self) -> Option<&Member> {
+        match self {
+            Resolved::Member(member) => Some(member),
+            Resolved::Crate(_)
+            | Resolved::Std(_)
             | Resolved::StdTrait(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
@@ -72,6 +95,7 @@ impl Resolved {
             Resolved::Std(_)
             | Resolved::StdTrait(_)
             | Resolved::Crate(_)
+            | Resolved::Member(_)
             | Resolved::External(_)
             | Resolved::Param(_)
             | Resolved::Unknown(..) => None,
@@ -85,6 +109,7 @@ impl Resolved {
             Resolved::Std(_)
             | Resolved::StdTrait(_)
             | Resolved::Crate(_)
+            | Resolved::Member(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_) => Some(self),
@@ -98,6 +123,7 @@ impl Resolved {
             Resolved::Std(_)
             | Resolved::StdTrait(_)
             | Resolved::Crate(_)
+            | Resolved::Member(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_) => None,
@@ -110,6 +136,7 @@ impl Resolved {
             Resolved::Std(_)
             | Resolved::StdTrait(_)
             | Resolved::Crate(_)
+            | Resolved::Member(_)
             | Resolved::External(_)
             | Resolved::Primitive(_)
             | Resolved::Unknown(..) => None,

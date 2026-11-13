@@ -1,8 +1,7 @@
 use std::error::Error;
 
-use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
-use lint_fixtures::{Lines, Sources};
+use lint_fixtures::{Checks, Lines, Queried};
 use lint_reader::SourceFiles;
 use lint_runner::{Cli, Ports, Verdict};
 use timer_ports::Monotonic;
@@ -487,7 +486,7 @@ impl Scratch {
 
     fn crate_graph_lines(&self) -> Result<Lines, Box<dyn Error>> {
         let readout = SourceFiles::read(&self.files, &self.root)?;
-        Ok(Sources::lines(&CrateGraph::report(readout.files())))
+        Ok(Queried::<CrateGraph>::flagged(readout.files()))
     }
 }
 
@@ -783,8 +782,8 @@ fn a_binary_and_its_module_files_are_judged_as_one_crate() -> Result<(), Box<dyn
         .map(|(index, next)| format!("pub struct R{index}(R{next});\n"))
         .collect();
     let (opened, closed) = links.split_at(RING / 2);
-    root.write("src/main.rs", &format!("mod a;\n{}fn main() {{}}\n", opened.concat()))?;
-    root.write("src/a.rs", &closed.concat())?;
+    root.write("src/main.rs", &format!("mod a;\nuse a::*;\n{}fn main() {{}}\n", opened.concat()))?;
+    root.write("src/a.rs", &format!("use super::*;\n{}", closed.concat()))?;
     let named = format!("{}:1", root.at("src/main.rs").display());
     assert_eq!(root.crate_graph_lines()?, Lines::from([named.as_str()]));
     Ok(())
