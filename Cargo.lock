@@ -1316,6 +1316,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1327,6 +1328,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1338,6 +1340,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1362,6 +1365,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -1424,6 +1428,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1435,6 +1440,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -1454,6 +1460,7 @@ name = "lint-file"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-sweep",
 ]
 
 [[package]]
@@ -1478,6 +1485,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "newtype",
  "proc-macro2",
  "syn 2.0.119",
@@ -1493,6 +1501,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1532,6 +1541,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "newtype",
  "proc-macro2",
  "syn 2.0.119",
@@ -1545,6 +1555,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1581,6 +1592,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -1594,6 +1606,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "newtype",
  "syn 2.0.119",
 ]
@@ -1606,6 +1619,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1617,6 +1631,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1649,6 +1664,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -1661,6 +1677,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1672,6 +1689,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1685,6 +1703,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -1710,6 +1729,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1749,6 +1769,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1764,6 +1785,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1801,6 +1823,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1826,6 +1849,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1851,6 +1875,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1863,6 +1888,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -1902,6 +1928,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "newtype",
  "proc-macro2",
  "quote",
@@ -1920,6 +1947,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1996,6 +2024,7 @@ dependencies = [
  "lint-rust-only",
  "lint-state-graph",
  "lint-store-queries",
+ "lint-sweep",
  "lint-test-budget",
  "lint-thin-main",
  "lint-transition-graph",
@@ -2028,6 +2057,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "newtype",
  "quote",
  "syn 2.0.119",
@@ -2048,6 +2078,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-sweep"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-test-budget"
 version = "0.1.0"
 dependencies = [
@@ -2060,6 +2099,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-process-starters",
+ "lint-sweep",
  "newtype",
  "proc-macro2",
  "syn 2.0.119",
@@ -2074,6 +2114,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -2107,6 +2148,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -2119,6 +2161,7 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 

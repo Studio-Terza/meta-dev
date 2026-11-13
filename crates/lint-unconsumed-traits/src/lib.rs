@@ -6,7 +6,7 @@ mod finding;
 use lint_core::{Headline, Parsed, Site, SourceFile, Violation};
 use lint_file::{ContextLint, Reads};
 
-use consumers::Consumers;
+use consumers::{Consumers, Consuming};
 use declared::Declared;
 use finding::Finding;
 
@@ -22,8 +22,10 @@ impl ContextLint for UnconsumedTraits {
     type Part<'head> = Consumers;
     type Context<'head> = Consumers;
 
-    fn contributed(parsed: Parsed<'_, '_>) -> Consumers {
-        parsed.file().shipped().map_or_default(Consumers::from)
+    type Gathering<'head> = Consuming;
+
+    fn gathering(parsed: Parsed<'_, '_>) -> Consuming {
+        Consuming::from(parsed.file())
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, consumers: &Consumers) -> Vec<Violation<'file>> {

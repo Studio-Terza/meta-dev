@@ -1,15 +1,12 @@
-mod fn_body;
-
 use lint_core::Headline;
-use lint_file::{FileLint, Reads};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::{Descend, Finds, Kind, Sweep, Watch};
 use std::collections::{BTreeMap, BTreeSet};
 
-use fn_body::FnBody;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::visit::Visit;
 
 use syn::{
     Attribute, BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, Ident,
@@ -18,7 +15,6 @@ use syn::{
 };
 
 use lint_core::Fix;
-use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
@@ -73,15 +69,13 @@ impl ExpressionFlow {
     }
 }
 
-impl FileLint for ExpressionFlow {
+impl SweptLint for ExpressionFlow {
     const HEADLINE: Headline =
         Headline::new("control flow is an expression; every branch yields the value the function returns");
     const READS: Reads = Reads::Shipped;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut flows = Flows { file, path: file.head().path(), violations: Vec::new() };
-        flows.visit_file(file.syntax());
-        flows.violations
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(Flows { file, path: file.head().path(), violations: Vec::new() })
     }
 }
 
@@ -98,17 +92,21 @@ impl Flows<'_> {
             .extend(spans.into_iter().map(|span| Violation::new(Site::new(path, LineNumber::from(span)), message)));
     }
 
-    fn function(&mut self, attributes: &[Attribute], signature: &Signature, body: Option<&Block>) {
-        Walk::enter(attributes, || FnBody::scanned_unless_const(signature, body).walked_by(self));
+    fn function(&mut self, attributes: &[Attribute], signature: &Signature, body: Option<&Block>) -> Descend {
+        let scanned = Descend::from(Walk::outside_tests(attributes))
+            .entered()
+            .and(body)
+            .filter(|_| signature.constness.is_none());
+        scanned.map_or(Descend::Over, |block| self.body(block))
     }
 
     fn lonely_if(expr: &ExprIf) -> Option<Span> {
         expr.else_branch.is_none().then_some(expr.if_token.span)
     }
 
-    fn visit_body(&mut self, body: &Block) {
-        let mut locals = MutableLocals { file: self.file, declared: BTreeMap::new(), touched: Vec::new() };
-        locals.visit_block(body);
+    fn body(&mut self, body: &Block) -> Descend {
+        let mut locals = MutableLocals { declared: BTreeMap::new(), touched: Vec::new() };
+        Sweep::through_block(self.file, body, &mut locals);
         self.report(
             locals.only_reassigned(),
             Message::new(
@@ -116,44 +114,69 @@ impl Flows<'_> {
                 Fix::new("a mutable binding is borrowed as &mut or has methods called on it"),
             ),
         );
-        self.visit_block(body);
+        Descend::Into
     }
 }
 
-impl<'ast> Visit<'ast> for Flows<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Flows<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[
+            Kind::ItemMod,
+            Kind::ItemImpl,
+            Kind::ItemTrait,
+            Kind::Macro,
+            Kind::ItemConst,
+            Kind::ImplItemConst,
+            Kind::ItemFn,
+            Kind::ImplItemFn,
+            Kind::TraitItemFn,
+            Kind::Block,
+            Kind::ExprIf,
+            Kind::ExprLoop,
+            Kind::ExprForLoop,
+            Kind::ExprWhile,
+            Kind::ExprAssign,
+            Kind::ExprBinary,
+        ]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        Walk::enter(&item.attrs, || syn::visit::visit_item_trait(self, item));
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_item_const(&mut self, _: &'ast ItemConst) {}
-
-    fn visit_impl_item_const(&mut self, _: &'ast ImplItemConst) {}
-
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.function(&function.attrs, &function.sig, Some(&function.block));
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        self.function(&function.attrs, &function.sig, Some(&function.block));
+    fn on_item_const(&mut self, _: &'ast ItemConst) -> Descend {
+        Descend::Over
     }
 
-    fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        self.function(&function.attrs, &function.sig, function.default.as_ref());
+    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst) -> Descend {
+        Descend::Over
     }
 
-    fn visit_block(&mut self, block: &'ast Block) {
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        self.function(&function.attrs, &function.sig, Some(&function.block))
+    }
+
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+        self.function(&function.attrs, &function.sig, Some(&function.block))
+    }
+
+    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn) -> Descend {
+        self.function(&function.attrs, &function.sig, function.default.as_ref())
+    }
+
+    fn on_block(&mut self, block: &'ast Block) -> Descend {
         let last = block.stmts.last();
         self.report(
             block.stmts.iter().filter_map(|statement| ExpressionFlow::dropped(statement, last)).map(Spanned::span),
@@ -162,10 +185,10 @@ impl<'ast> Visit<'ast> for Flows<'_> {
                 Fix::new("let it produce the value the function returns"),
             ),
         );
-        syn::visit::visit_block(self, block);
+        Descend::Into
     }
 
-    fn visit_expr_if(&mut self, expr: &'ast ExprIf) {
+    fn on_expr_if(&mut self, expr: &'ast ExprIf) -> Descend {
         self.report(
             Self::lonely_if(expr),
             Message::new(
@@ -173,26 +196,26 @@ impl<'ast> Visit<'ast> for Flows<'_> {
                 Fix::new("use then_some, filter, or an else branch that produces the value"),
             ),
         );
-        syn::visit::visit_expr_if(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
+    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
         self.report(
             [expr.loop_token.span],
             Message::new(Problem::new("loop"), Fix::new("drive an iterator with combinators, const fns excepted")),
         );
-        syn::visit::visit_expr_loop(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
         self.report(
             [expr.for_token.span],
             Message::new(Problem::new("for loop"), Fix::new("drive the iterator with combinators, const fns excepted")),
         );
-        syn::visit::visit_expr_for_loop(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_while(&mut self, expr: &'ast ExprWhile) {
+    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
         self.report(
             [expr.while_token.span],
             Message::new(
@@ -200,10 +223,10 @@ impl<'ast> Visit<'ast> for Flows<'_> {
                 Fix::new("drive an iterator with combinators, const fns excepted"),
             ),
         );
-        syn::visit::visit_expr_while(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_assign(&mut self, expr: &'ast ExprAssign) {
+    fn on_expr_assign(&mut self, expr: &'ast ExprAssign) -> Descend {
         self.report(
             ExpressionFlow::assigned_local(&expr.left).map(|_| expr.eq_token.span),
             Message::new(
@@ -211,10 +234,10 @@ impl<'ast> Visit<'ast> for Flows<'_> {
                 Fix::new("build the value in one expression or give its type an updater method"),
             ),
         );
-        syn::visit::visit_expr_assign(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_binary(&mut self, expr: &'ast ExprBinary) {
+    fn on_expr_binary(&mut self, expr: &'ast ExprBinary) -> Descend {
         self.report(
             ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op)).map(|_| expr.op.span()),
             Message::new(
@@ -222,17 +245,16 @@ impl<'ast> Visit<'ast> for Flows<'_> {
                 Fix::new("build the value in one expression or give its type an updater method"),
             ),
         );
-        syn::visit::visit_expr_binary(self, expr);
+        Descend::Into
     }
 }
 
-struct MutableLocals<'scan> {
-    file: &'scan SourceFile,
+struct MutableLocals {
     declared: BTreeMap<Name, Span>,
     touched: Vec<Name>,
 }
 
-impl MutableLocals<'_> {
+impl MutableLocals {
     const WRITING_MACROS: [&'static str; 2] = ["write", "writeln"];
 
     fn declared_mutable(local: &Local) -> Option<&PatIdent> {
@@ -271,20 +293,30 @@ impl MutableLocals<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for MutableLocals<'_> {
-    fn visit_local(&mut self, local: &'ast Local) {
+impl<'ast> Watch<'ast> for MutableLocals {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Local, Kind::Expr, Kind::Macro]
+    }
+
+    fn on_local(&mut self, local: &'ast Local) -> Descend {
         self.declared
             .extend(Self::declared_mutable(local).map(|binding| (Name::from(&binding.ident), local.let_token.span)));
-        syn::visit::visit_local(self, local);
+        Descend::Into
     }
 
-    fn visit_expr(&mut self, expr: &'ast Expr) {
+    fn on_expr(&mut self, expr: &'ast Expr) -> Descend {
         self.touched.extend(Self::touched_by(expr).map(Name::from));
-        syn::visit::visit_expr(self, expr);
+        Descend::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
         self.touched.extend(Self::written_to(invocation));
+        Descend::Expand
+    }
+}
+
+impl<'file> Finds<'file> for Flows<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.violations
     }
 }

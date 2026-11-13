@@ -1,4 +1,4 @@
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_literal_names::LiteralNames;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -45,5 +45,5 @@ const CASES: [Case; 7] = [
 
 #[test]
 fn function_names_that_name_nothing_are_flagged() {
-    assert_eq!(Sources::mismatches::<Filed<LiteralNames>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<LiteralNames>>(&CASES), Lines::default());
 }

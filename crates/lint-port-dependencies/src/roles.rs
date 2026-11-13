@@ -14,6 +14,7 @@ use lint_file::PrimedFacts;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_placement::{CrateName as PlacedName, Role as Placed};
+use lint_sweep::Unread;
 use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
@@ -58,7 +59,11 @@ impl PrimedFacts for RoleReading {
     type Part<'head> = RoleFile<'head>;
     type Context<'head> = RoleFacts<'head>;
 
-    fn primed(_parsed: Parsed<'_, '_>) {}
+    type Priming<'head> = Unread;
+
+    fn priming(_parsed: Parsed<'_, '_>) -> Unread {
+        Unread
+    }
 
     fn contributed<'head>(parsed: Parsed<'_, 'head>, (): &()) -> RoleFile<'head> {
         let head = parsed.head();

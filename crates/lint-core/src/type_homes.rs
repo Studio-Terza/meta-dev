@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
-use syn::visit::Visit;
 use syn::{ItemEnum, ItemMod, ItemStruct};
 
 use lint_layout::Name;
 
 use crate::declared_type::DeclaredType;
 use crate::home::Home;
-use crate::source_file::{Parsed, SourceFile};
+use crate::source_file::Parsed;
 use crate::walk::Walk;
+use crate::watch::{Descend, Kind, Watch};
 
 #[derive(Debug)]
 pub struct TypeHomes<'file> {
@@ -17,13 +17,6 @@ pub struct TypeHomes<'file> {
 }
 
 impl<'file> TypeHomes<'file> {
-    #[must_use]
-    pub fn declared_in(files: &[&'file SourceFile]) -> TypeHomes<'file> {
-        files
-            .iter()
-            .fold(TypeHomes { declared: BTreeMap::new(), reading: Home::NOWHERE }, |homes, file| homes.reading(file))
-    }
-
     #[must_use]
     pub fn resolve(&self, name: Name, from: Home<'file>) -> DeclaredType<'file> {
         DeclaredType::new(self.home_of(&name, from), name)
@@ -40,12 +33,6 @@ impl<'file> TypeHomes<'file> {
             .map_or(from, |home| *home)
     }
 
-    fn reading(self, file: &'file SourceFile) -> TypeHomes<'file> {
-        let mut homes = TypeHomes { reading: Home::containing(file), ..self };
-        homes.visit_file(file.syntax());
-        homes
-    }
-
     fn absorbed(self, part: TypeHomes<'file>) -> TypeHomes<'file> {
         let placed = part
             .declared
@@ -58,6 +45,12 @@ impl<'file> TypeHomes<'file> {
         })
     }
 
+    fn declared(&mut self, attributes: &[syn::Attribute], ident: &syn::Ident) -> Descend {
+        let entered = Descend::from(Walk::outside_tests(attributes)).entered();
+        entered.map(|_| Name::from(ident)).into_iter().for_each(|name| self.declare(name));
+        Descend::Over
+    }
+
     fn declare(&mut self, name: Name) {
         let known = self.declared.entry(name).or_default();
         let fresh = known.iter().find(|home| **home == self.reading).map_or(Some(self.reading), |_| None);
@@ -65,25 +58,27 @@ impl<'file> TypeHomes<'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for TypeHomes<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for TypeHomes<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemEnum]
     }
 
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        Walk::enter(&item.attrs, || self.declare(Name::from(&item.ident)));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        Walk::enter(&item.attrs, || self.declare(Name::from(&item.ident)));
+    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+        self.declared(&item.attrs, &item.ident)
+    }
+
+    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+        self.declared(&item.attrs, &item.ident)
     }
 }
 
 impl<'head> From<Parsed<'_, 'head>> for TypeHomes<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> TypeHomes<'head> {
-        let mut homes = TypeHomes { declared: BTreeMap::new(), reading: Home::from(parsed.head()) };
-        homes.visit_file(parsed.file().syntax());
-        homes
+        TypeHomes { declared: BTreeMap::new(), reading: Home::from(parsed.head()) }
     }
 }
 

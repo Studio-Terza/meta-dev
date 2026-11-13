@@ -1,17 +1,18 @@
 mod ungenerated;
 
-use lint_core::{Headline, SourceFile, Violation};
-use lint_file::{FileLint, Reads};
+use lint_core::{Headline, SourceFile};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::Finds;
 use ungenerated::Ungenerated;
 
 #[derive(Debug)]
 pub struct ArbitraryNewtypes;
 
-impl FileLint for ArbitraryNewtypes {
+impl SweptLint for ArbitraryNewtypes {
     const HEADLINE: Headline = Headline::new("a newtype that owns its value derives Arbitrary");
     const READS: Reads = Reads::Shipped;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        Vec::from(Ungenerated::from(file))
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(Ungenerated::from(file))
     }
 }

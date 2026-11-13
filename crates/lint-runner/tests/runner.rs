@@ -63,6 +63,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
                 + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
                 + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?
                 + Trees::occurrences(&workspace, &source, "impl FileLint for")?
+                + Trees::occurrences(&workspace, &source, "impl SweptLint for")?
                 + Trees::occurrences(&workspace, &source, "impl ContextLint for")?
                 + Trees::occurrences(&workspace, &source, "impl PrimedLint for")?,
         )

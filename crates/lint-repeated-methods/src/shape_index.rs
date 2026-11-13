@@ -5,15 +5,15 @@ mod repeated_shape;
 
 use std::collections::BTreeMap;
 
-use syn::visit::Visit;
 use syn::{ItemImpl, ItemMod, Visibility};
 
-use lint_core::{Bound, DeclaredType, Home, Parsed, Site, Syntax, TypeHomes, Violation, Walk};
+use lint_core::{Bound, DeclaredType, FileHead, Home, Parsed, Site, Syntax, TypeHomes, Violation, Walk};
 use lint_file::Concluded;
 use lint_layout::{Length, LineNumber, Name};
+use lint_sweep::{Descend, Gathers, Kind, Watch, Watching};
 
 use super::RepeatedMethods;
-use inners::Inners;
+use inners::{InnerTypes, Inners};
 use method_shape::{Erasure, MethodShape, SpelledMethod};
 use placed::Placed;
 use repeated_shape::RepeatedShape;
@@ -32,20 +32,47 @@ pub struct ImplSpellings<'head> {
     impls: Vec<SpelledImpl<'head>>,
 }
 
-impl<'head> From<Parsed<'_, 'head>> for ImplSpellings<'head> {
-    fn from(parsed: Parsed<'_, 'head>) -> ImplSpellings<'head> {
-        let mut reading = ImplReading { parsed, impls: Vec::new() };
-        reading.visit_file(parsed.file().syntax());
-        ImplSpellings { homes: TypeHomes::from(parsed), inners: Inners::from(parsed), impls: reading.impls }
+#[derive(Debug)]
+pub struct ShippedImpls<'head>(Option<ImplSpellings<'head>>);
+
+impl<'head> IntoIterator for ShippedImpls<'head> {
+    type Item = ImplSpellings<'head>;
+    type IntoIter = std::option::IntoIter<ImplSpellings<'head>>;
+
+    fn into_iter(self) -> std::option::IntoIter<ImplSpellings<'head>> {
+        self.0.into_iter()
     }
 }
 
 #[derive(Debug)]
-pub struct ShippedImpls<'head>(Option<ImplSpellings<'head>>);
+pub struct ImplGathering<'head> {
+    reading: ImplReading<'head>,
+    inners: InnerTypes,
+    homes: TypeHomes<'head>,
+    shipped: Option<Home<'head>>,
+}
 
-impl<'head> From<Parsed<'_, 'head>> for ShippedImpls<'head> {
-    fn from(parsed: Parsed<'_, 'head>) -> ShippedImpls<'head> {
-        ShippedImpls(parsed.file().shipped().map(|_| ImplSpellings::from(parsed)))
+impl<'head> From<Parsed<'_, 'head>> for ImplGathering<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> ImplGathering<'head> {
+        ImplGathering {
+            reading: ImplReading { head: parsed.head(), impls: Vec::new() },
+            inners: InnerTypes::default(),
+            homes: TypeHomes::from(parsed),
+            shipped: parsed.file().shipped().map(|_| Home::from(parsed.head())),
+        }
+    }
+}
+
+impl<'head> Gathers<ShippedImpls<'head>> for ImplGathering<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        let all: Vec<&mut Watching<'_>> = vec![&mut self.reading, &mut self.inners, &mut self.homes];
+        self.shipped.map_or_default(|_| all)
+    }
+
+    fn gathered(self) -> ShippedImpls<'head> {
+        let inners = self.inners.placed(self.shipped);
+        let impls = self.reading.impls;
+        ShippedImpls(self.shipped.map(|_| ImplSpellings { homes: self.homes, inners, impls }))
     }
 }
 
@@ -67,7 +94,7 @@ impl<'head> Gathered<'head> {
 
 impl<'head> FromIterator<ShippedImpls<'head>> for Concluded<'head> {
     fn from_iter<Parts: IntoIterator<Item = ShippedImpls<'head>>>(parts: Parts) -> Concluded<'head> {
-        let gathered = parts.into_iter().filter_map(|part| part.0).fold(Gathered::default(), Gathered::including);
+        let gathered = parts.into_iter().flatten().fold(Gathered::default(), Gathered::including);
         let homes: TypeHomes<'head> = gathered.homes.into_iter().collect();
         let inners: Inners<'head> = gathered.inners.into_iter().collect();
         let owners = gathered.impls.iter().fold(BTreeMap::new(), |mut owners, spelled| {
@@ -111,18 +138,23 @@ impl<'head> Owners<'head> {
     }
 }
 
-struct ImplReading<'file, 'head> {
-    parsed: Parsed<'file, 'head>,
+#[derive(Debug)]
+struct ImplReading<'head> {
+    head: &'head FileHead,
     impls: Vec<SpelledImpl<'head>>,
 }
 
-impl<'ast> Visit<'ast> for ImplReading<'_, '_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for ImplReading<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        let head = self.parsed.head();
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+    }
+
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        let head = self.head;
         let written = Name::of_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
         let spelled = written.map(|name| {
             let erasure = Erasure::around(&name);
@@ -139,5 +171,6 @@ impl<'ast> Visit<'ast> for ImplReading<'_, '_> {
             SpelledImpl { home: Home::from(head), written: name.clone(), methods }
         });
         self.impls.extend(spelled);
+        Descend::Over
     }
 }

@@ -10,7 +10,8 @@ use lint_file::Gleaning;
 use lint_placement::CrateName;
 use lint_process_starters::{CommandPaths, Scope};
 
-use crate_budget::CrateBudget;
+use crate_budget::{BudgetGathering, CrateBudget};
+use lint_sweep::{Gathers, Sweep, Watching};
 
 #[derive(Clone, Debug, Default)]
 pub struct TestBudget(BTreeMap<CrateName, CrateBudget>);
@@ -21,7 +22,7 @@ impl TestBudget {
         TestBudget(files.iter().fold(BTreeMap::new(), |mut crates, file| {
             let name = CrateName::from(file.head().placement().package().root());
             let budget: CrateBudget = crates.remove(&name).unwrap_or_default();
-            crates.insert(name, budget + CrateBudget::from(file));
+            crates.insert(name, budget + Sweep::gathered(file, BudgetGathering::from(file)));
             crates
         }))
     }
@@ -62,11 +63,26 @@ impl Gleaning for TestBudget {
     type Part<'head> = TestBudget;
     type Gleaned<'head> = TestBudget;
 
-    fn gleaned(parsed: Parsed<'_, '_>) -> TestBudget {
+    type Gleaner<'head> = Gleaner;
+
+    fn gleaner(parsed: Parsed<'_, '_>) -> Gleaner {
         let file = parsed.file();
-        TestBudget(BTreeMap::from([(
-            CrateName::from(file.head().placement().package().root()),
-            CrateBudget::from(file),
-        )]))
+        Gleaner { name: CrateName::from(file.head().placement().package().root()), budget: BudgetGathering::from(file) }
+    }
+}
+
+#[derive(Debug)]
+pub struct Gleaner {
+    name: CrateName,
+    budget: BudgetGathering,
+}
+
+impl Gathers<TestBudget> for Gleaner {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        self.budget.watching()
+    }
+
+    fn gathered(self) -> TestBudget {
+        TestBudget(BTreeMap::from([(self.name, self.budget.gathered())]))
     }
 }

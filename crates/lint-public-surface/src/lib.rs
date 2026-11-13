@@ -4,9 +4,10 @@ mod foreign_references;
 
 use export::Export;
 use finding::Finding;
-use foreign_references::ForeignReferences;
+use foreign_references::{ForeignReferences, Reading};
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
+use lint_sweep::{Gathers, Watching};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -18,6 +19,19 @@ pub struct PublicSurface;
 
 #[derive(Debug, Default)]
 pub struct References(ForeignReferences);
+
+#[derive(Debug)]
+pub struct ReferenceGathering(Reading);
+
+impl Gathers<References> for ReferenceGathering {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        self.0.watching()
+    }
+
+    fn gathered(self) -> References {
+        References(self.0.gathered())
+    }
+}
 
 impl FromIterator<References> for References {
     fn from_iter<Parts: IntoIterator<Item = References>>(parts: Parts) -> References {
@@ -32,8 +46,10 @@ impl ContextLint for PublicSurface {
     type Part<'head> = References;
     type Context<'head> = References;
 
-    fn contributed(parsed: Parsed<'_, '_>) -> References {
-        References(ForeignReferences::from(parsed.file()))
+    type Gathering<'head> = ReferenceGathering;
+
+    fn gathering(parsed: Parsed<'_, '_>) -> ReferenceGathering {
+        ReferenceGathering(Reading::from(parsed.file()))
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, references: &References) -> Vec<Violation<'file>> {

@@ -7,6 +7,7 @@ use lint_core::{Headline, Parsed, SourceFile, Violation};
 use lint_file::{ContextLint, Reads};
 use lint_layout::Name;
 use lint_placement::CrateName;
+use lint_sweep::{Gathers, Sweep, Watching};
 use name_uses::NameUses;
 use root_exports::RootExports;
 
@@ -17,6 +18,16 @@ pub struct NoParameterBags;
 pub struct BagUses<'head> {
     uses: Option<NameUses<'head>>,
     exports: RootExports,
+}
+
+impl<'head> Gathers<BagUses<'head>> for BagUses<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        self.uses.as_mut().map_or_default(|uses| Sweep::alone(uses))
+    }
+
+    fn gathered(self) -> BagUses<'head> {
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -50,7 +61,9 @@ impl ContextLint for NoParameterBags {
     type Part<'head> = BagUses<'head>;
     type Context<'head> = Bags<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> BagUses<'head> {
+    type Gathering<'head> = BagUses<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> BagUses<'head> {
         let shipped = parsed.file().shipped().map(|_| parsed);
         BagUses { uses: shipped.map(NameUses::from), exports: shipped.map_or_default(RootExports::from) }
     }

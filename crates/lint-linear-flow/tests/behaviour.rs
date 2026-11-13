@@ -1,5 +1,5 @@
 use lint_core::Lint;
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -183,17 +183,17 @@ const CONDITIONS: [Case; 3] = [
 
 #[test]
 fn bodies_with_if_match_or_loops_outside_a_router_are_flagged() {
-    assert_eq!(Sources::mismatches::<Filed<LinearBodies>>(&LINEAR), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<LinearBodies>>(&LINEAR), Lines::default());
 }
 
 #[test]
 fn routers_with_guards_value_patterns_or_logic_in_arms_are_flagged() {
-    assert_eq!(Sources::mismatches::<Filed<PureRouters>>(&ROUTERS), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<PureRouters>>(&ROUTERS), Lines::default());
 }
 
 #[test]
 fn boolean_operators_are_flagged_in_shipped_and_test_code() {
-    assert_eq!(Sources::mismatches::<Filed<PlainConditions>>(&CONDITIONS), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<PlainConditions>>(&CONDITIONS), Lines::default());
 }
 
 #[test]
@@ -216,7 +216,7 @@ fn messages_name_the_branch_and_its_fix() {
         Source::new(Located::new("b.rs"), Text::new(IF_LET_INSIDE)),
     ]);
     let shown: Vec<String> =
-        Filed::<LinearBodies>::report(&files).violations().iter().map(ToString::to_string).collect();
+        Swept::<LinearBodies>::report(&files).violations().iter().map(ToString::to_string).collect();
     assert_eq!(
         shown,
         [

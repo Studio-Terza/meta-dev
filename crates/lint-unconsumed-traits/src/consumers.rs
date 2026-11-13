@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
-use syn::visit::{self, Visit};
 use syn::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
 
 use lint_core::{SourceFile, Walk};
 use lint_layout::Name;
+use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
 
 #[derive(Debug, Default)]
 pub struct Consumers {
@@ -12,11 +12,28 @@ pub struct Consumers {
     called: BTreeSet<Name>,
 }
 
-impl From<&SourceFile> for Consumers {
-    fn from(file: &SourceFile) -> Consumers {
-        let mut scan = Consumers::default();
-        scan.visit_file(file.syntax());
-        scan
+#[derive(Debug)]
+pub struct Consuming {
+    consumers: Consumers,
+    kinds: &'static [Kind],
+}
+
+impl From<&SourceFile> for Consuming {
+    fn from(file: &SourceFile) -> Consuming {
+        let kinds = file
+            .shipped()
+            .map_or(&[][..], |_| &[Kind::ItemMod, Kind::TraitBound, Kind::ExprMethodCall, Kind::ExprPath][..]);
+        Consuming { consumers: Consumers::default(), kinds }
+    }
+}
+
+impl Gathers<Consumers> for Consuming {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> Consumers {
+        self.consumers
     }
 }
 
@@ -36,23 +53,27 @@ impl Consumers {
     }
 }
 
-impl<'ast> Visit<'ast> for Consumers {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Consuming {
+    fn kinds(&self) -> &'static [Kind] {
+        self.kinds
     }
 
-    fn visit_trait_bound(&mut self, bound: &'ast TraitBound) {
-        self.bounds.extend(bound.path.segments.last().map(|segment| Name::from(&segment.ident)));
-        visit::visit_trait_bound(self, bound);
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
-        self.called.insert(Name::from(&call.method));
-        visit::visit_expr_method_call(self, call);
+    fn on_trait_bound(&mut self, bound: &'ast TraitBound) -> Descend {
+        self.consumers.bounds.extend(bound.path.segments.last().map(|segment| Name::from(&segment.ident)));
+        Descend::Into
     }
 
-    fn visit_expr_path(&mut self, path: &'ast ExprPath) {
-        self.called.extend(
+    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
+        self.consumers.called.insert(Name::from(&call.method));
+        Descend::Into
+    }
+
+    fn on_expr_path(&mut self, path: &'ast ExprPath) -> Descend {
+        self.consumers.called.extend(
             path.path
                 .segments
                 .iter()
@@ -60,6 +81,6 @@ impl<'ast> Visit<'ast> for Consumers {
                 .and_then(|_| path.path.segments.last())
                 .map(|segment| Name::from(&segment.ident)),
         );
-        visit::visit_expr_path(self, path);
+        Descend::Into
     }
 }

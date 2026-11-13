@@ -3,19 +3,18 @@ mod nesting_depth;
 
 use finding::Finding;
 use lint_core::Headline;
-use lint_file::{FileLint, Reads};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::{Address, Descend, Finds, Kind, Watch};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
-use syn::visit::Visit;
 
 use syn::{
-    Arm, BinOp, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn, ItemFn,
-    ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, UnOp,
+    Arm, BinOp, Block, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn,
+    ItemFn, ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, UnOp,
 };
 
 use lint_core::Bound;
-use lint_core::Macros;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Syntax;
@@ -76,23 +75,40 @@ impl FnShape {
     }
 }
 
-impl FileLint for FnShape {
+impl SweptLint for FnShape {
     const HEADLINE: Headline =
         Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods");
     const READS: Reads = Reads::Shipped;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut shapes =
-            Shapes { file, path: file.head().path(), depth: NestingDepth::default(), violations: Vec::new() };
-        shapes.visit_file(file.syntax());
-        shapes.violations
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(Shapes {
+            path: file.head().path(),
+            depth: NestingDepth::default(),
+            nests: Vec::new(),
+            violations: Vec::new(),
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Nest {
+    at: Address,
+    span: Span,
+}
+
+impl Nest {
+    fn unchained(branch: &Expr) -> Option<Nest> {
+        match branch {
+            Expr::If(_) => None,
+            _ => Some(Nest { at: Address::from(branch), span: branch.span() }),
+        }
     }
 }
 
 struct Shapes<'scan> {
-    file: &'scan SourceFile,
     path: &'scan Path,
     depth: NestingDepth,
+    nests: Vec<Nest>,
     violations: Vec<Violation<'scan>>,
 }
 
@@ -101,61 +117,83 @@ impl<'scan> Shapes<'scan> {
         Violation::new(Site::new(path, LineNumber::from(span)), finding)
     }
 
-    fn otherwise(&mut self, branch: Option<&Expr>) {
-        match branch {
-            None => {}
-            Some(Expr::If(chained)) => self.visit_expr_if(chained),
-            Some(other) => self.nested(other.span(), |this| this.visit_expr(other)),
-        }
+    fn nesting(&mut self, at: Address) -> Descend {
+        self.nests.iter().rev().find(|nest| nest.at == at).copied().into_iter().for_each(|found| {
+            self.depth += NestingDepth::LEVEL;
+            let first_past = NestingDepth::beyond(FnShape::NESTING);
+            let deepest = (self.depth == first_past).then_some(found.span);
+            self.violations.extend(
+                deepest.map(|nested| Self::found(self.path, nested, Finding::DeepNesting { most: FnShape::NESTING })),
+            );
+        });
+        Descend::Into
     }
 
-    fn nested(&mut self, span: Span, visit: impl FnOnce(&mut Self)) {
-        self.depth += NestingDepth::LEVEL;
-        let first_past = NestingDepth::beyond(FnShape::NESTING);
-        let deepest = (self.depth == first_past).then_some(span);
-        self.violations.extend(
-            deepest.map(|nested| Self::found(self.path, nested, Finding::DeepNesting { most: FnShape::NESTING })),
-        );
-        visit(self);
-        self.depth -= NestingDepth::LEVEL;
+    fn unnesting(&mut self, at: Address) {
+        self.nests.iter().rposition(|nest| nest.at == at).into_iter().for_each(|index| {
+            self.nests.remove(index);
+            self.depth -= NestingDepth::LEVEL;
+        });
     }
 }
 
-impl<'ast> Visit<'ast> for Shapes<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Shapes<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[
+            Kind::ItemMod,
+            Kind::ItemImpl,
+            Kind::ItemTrait,
+            Kind::Macro,
+            Kind::ItemFn,
+            Kind::ImplItemFn,
+            Kind::Signature,
+            Kind::Local,
+            Kind::ExprMethodCall,
+            Kind::ExprIf,
+            Kind::Arm,
+            Kind::ExprForLoop,
+            Kind::ExprWhile,
+            Kind::ExprLoop,
+            Kind::ExprClosure,
+            Kind::Block,
+            Kind::Expr,
+        ]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        Walk::enter(&item.attrs, || syn::visit::visit_item_trait(self, item));
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        Walk::enter(&function.attrs, || syn::visit::visit_item_fn(self, function));
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        Walk::enter(&function.attrs, || syn::visit::visit_impl_item_fn(self, function));
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        Descend::from(Walk::outside_tests(&function.attrs))
     }
 
-    fn visit_signature(&mut self, signature: &'ast Signature) {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+        Descend::from(Walk::outside_tests(&function.attrs))
+    }
+
+    fn on_signature(&mut self, signature: &'ast Signature) -> Descend {
         let typed = signature.inputs.iter().filter(|argument| matches!(argument, FnArg::Typed(_))).count();
         let wide = FnShape::PARAMETERS.allows(Length::new(typed)).map_or(Some(signature.ident.span()), |_| None);
         self.violations.extend(
             wide.map(|span| Self::found(self.path, span, Finding::WideSignature { most: FnShape::PARAMETERS })),
         );
-        syn::visit::visit_signature(self, signature);
+        Descend::Into
     }
 
-    fn visit_local(&mut self, local: &'ast Local) {
+    fn on_local(&mut self, local: &'ast Local) -> Descend {
         self.violations.extend(
             FnShape::binds_bool(local).map(|binding| Self::found(self.path, binding.span(), Finding::BooleanLocal)),
         );
@@ -166,10 +204,10 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
                 .filter(|init| matches!(*init.expr, Expr::Tuple(_)))
                 .map(|_| Self::found(self.path, local.span(), Finding::TupleLocal)),
         );
-        syn::visit::visit_local(self, local);
+        Descend::Into
     }
 
-    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
+    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
         self.violations.extend(
             call.args
                 .first()
@@ -177,40 +215,59 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
                 .filter(|_| FnShape::FOLDS.iter().any(|fold| call.method == fold))
                 .map(|_| Self::found(self.path, call.method.span(), Finding::TupleAccumulator)),
         );
-        syn::visit::visit_expr_method_call(self, call);
+        Descend::Into
     }
 
-    fn visit_expr_if(&mut self, expr: &'ast ExprIf) {
-        self.visit_expr(&expr.cond);
-        self.nested(expr.if_token.span, |this| {
-            this.visit_block(&expr.then_branch);
-        });
-        self.otherwise(expr.else_branch.as_ref().map(|(_, branch)| &**branch));
+    fn on_expr_if(&mut self, expr: &'ast ExprIf) -> Descend {
+        self.nests.push(Nest { at: Address::from(&expr.then_branch), span: expr.if_token.span });
+        self.nests.extend(expr.else_branch.as_ref().and_then(|(_, branch)| Nest::unchained(branch)));
+        Descend::Into
     }
 
-    fn visit_arm(&mut self, arm: &'ast Arm) {
-        self.visit_pat(&arm.pat);
-        arm.guard.iter().map(|(_, guard)| guard).for_each(|guard| self.visit_expr(guard));
-        self.nested(arm.body.span(), |this| this.visit_expr(&arm.body));
+    fn on_arm(&mut self, arm: &'ast Arm) -> Descend {
+        self.nests.push(Nest { at: Address::from(&*arm.body), span: arm.body.span() });
+        Descend::Into
     }
 
-    fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
-        self.visit_expr(&expr.expr);
-        self.nested(expr.for_token.span, |this| this.visit_block(&expr.body));
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
+        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.for_token.span });
+        Descend::Into
     }
 
-    fn visit_expr_while(&mut self, expr: &'ast ExprWhile) {
-        self.visit_expr(&expr.cond);
-        self.nested(expr.while_token.span, |this| this.visit_block(&expr.body));
+    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
+        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.while_token.span });
+        Descend::Into
     }
 
-    fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
-        self.nested(expr.loop_token.span, |this| this.visit_block(&expr.body));
+    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
+        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.loop_token.span });
+        Descend::Into
     }
 
-    fn visit_expr_closure(&mut self, closure: &'ast ExprClosure) {
-        self.nested(closure.or1_token.span, |this| {
-            this.visit_expr(&closure.body);
-        });
+    fn on_expr_closure(&mut self, closure: &'ast ExprClosure) -> Descend {
+        self.nests.push(Nest { at: Address::from(&*closure.body), span: closure.or1_token.span });
+        Descend::Into
+    }
+
+    fn on_block(&mut self, block: &'ast Block) -> Descend {
+        self.nesting(Address::from(block))
+    }
+
+    fn off_block(&mut self, block: &'ast Block) {
+        self.unnesting(Address::from(block));
+    }
+
+    fn on_expr(&mut self, expr: &'ast Expr) -> Descend {
+        self.nesting(Address::from(expr))
+    }
+
+    fn off_expr(&mut self, expr: &'ast Expr) {
+        self.unnesting(Address::from(expr));
+    }
+}
+
+impl<'file> Finds<'file> for Shapes<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.violations
     }
 }

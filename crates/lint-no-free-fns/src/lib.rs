@@ -2,9 +2,9 @@ mod finding;
 
 use finding::Finding;
 use lint_core::Headline;
-use lint_file::{FileLint, Reads};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::{Descend, Finds, Kind, Watch};
 use std::path::Path as StdPath;
-use syn::visit::Visit;
 
 use syn::{Ident, ItemFn, Path};
 
@@ -34,35 +34,42 @@ impl NoFreeFns {
     }
 }
 
-impl FileLint for NoFreeFns {
+impl SweptLint for NoFreeFns {
     const HEADLINE: Headline =
         Headline::new("free functions are not allowed; make them associated functions or methods");
     const READS: Reads = Reads::Every;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut visitor = FreeFns { file, path: file.head().path(), found: Vec::new() };
-        visitor.visit_file(file.syntax());
-        visitor.found
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(FreeFns { path: file.head().path(), found: Vec::new() })
     }
 }
 
 struct FreeFns<'file> {
-    file: &'file SourceFile,
     path: &'file StdPath,
     found: Vec<Violation<'file>>,
 }
 
-impl<'ast> Visit<'ast> for FreeFns<'_> {
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+impl<'ast> Watch<'ast> for FreeFns<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemFn, Kind::Macro]
+    }
+
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
         let name = &function.sig.ident;
         self.found.extend(NoFreeFns::exemption(function).map_or_else(
             || Some(Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::FreeFn { name })),
             |_| None,
         ));
-        syn::visit::visit_item_fn(self, function);
+        Descend::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        lint_core::Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_macro(&mut self, _: &'ast syn::Macro) -> Descend {
+        Descend::Expand
+    }
+}
+
+impl<'file> Finds<'file> for FreeFns<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.found
     }
 }

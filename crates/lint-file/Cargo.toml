@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-sweep = { path = "../lint-sweep" }
 
 [lints]
 workspace = true

@@ -39,6 +39,12 @@ pub struct Occurrences<'head> {
     found: Vec<Occurrence<'head>>,
 }
 
+impl AsRef<Path> for Occurrences<'_> {
+    fn as_ref(&self) -> &Path {
+        self.path
+    }
+}
+
 impl<'head> FromIterator<Occurrences<'head>> for Listed<'head> {
     fn from_iter<Parts: IntoIterator<Item = Occurrences<'head>>>(parts: Parts) -> Listed<'head> {
         let (paths, found): (Vec<&'head Path>, Vec<Vec<Occurrence<'head>>>) =
@@ -56,8 +62,10 @@ impl ContextLint for RepeatedShapes {
     type Part<'head> = Occurrences<'head>;
     type Context<'head> = Listed<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Occurrences<'head> {
-        Occurrences { path: parsed.head().path(), found: Scan::of_file(parsed, Self::EQUIVALENCE) }
+    type Gathering<'head> = Scan<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Scan<'head> {
+        Scan::scanning(parsed, Self::EQUIVALENCE)
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, listed: &Listed<'head>) -> Vec<Violation<'file>> {

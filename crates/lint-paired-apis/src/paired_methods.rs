@@ -1,27 +1,28 @@
 use std::collections::BTreeMap;
 
-use syn::visit::{self, Visit};
 use syn::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
 
 use lint_core::Module;
 use lint_core::{FileHead, Parsed, Site, Syntax, Walk};
 use lint_layout::{LineNumber, Name};
+use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
 
 use crate::declared::Declared;
 use crate::owner::Owner;
 
+#[derive(Debug)]
 pub struct PairedMethods<'file> {
     head: &'file FileHead,
     module: Module<'file>,
     found: BTreeMap<Owner<'file>, Vec<Declared<'file>>>,
+    kinds: &'static [Kind],
 }
 
 impl<'file> PairedMethods<'file> {
-    pub fn of_file(parsed: Parsed<'_, 'file>) -> BTreeMap<Owner<'file>, Vec<Declared<'file>>> {
+    pub fn of_file(parsed: Parsed<'_, 'file>) -> PairedMethods<'file> {
         let head = parsed.head();
-        let mut scan = PairedMethods { head, module: Module::of_head(head), found: BTreeMap::new() };
-        scan.visit_file(parsed.file().syntax());
-        scan.found
+        let kinds = parsed.file().shipped().map_or(&[][..], |_| &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemTrait][..]);
+        PairedMethods { head, module: Module::of_head(head), found: BTreeMap::new(), kinds }
     }
 
     fn public_methods(block: &ItemImpl) -> Vec<&Ident> {
@@ -49,19 +50,37 @@ impl<'file> PairedMethods<'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for PairedMethods<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for PairedMethods<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        self.kinds
     }
 
-    fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+    }
+
+    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
         let methods = Syntax::inherent(block)
             .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
             .map_or_default(Self::public_methods);
         self.owned_by(Name::of_type(&block.self_ty), &methods);
+        Descend::Over
     }
 
-    fn visit_item_trait(&mut self, block: &'ast ItemTrait) {
-        Walk::enter(&block.attrs, || self.owned_by(Some(Name::from(&block.ident)), &Self::declared_methods(block)));
+    fn on_item_trait(&mut self, block: &'ast ItemTrait) -> Descend {
+        let entered = Descend::from(Walk::outside_tests(&block.attrs)).entered();
+        let declared = entered.map_or_default(|_| Self::declared_methods(block));
+        self.owned_by(entered.map(|_| Name::from(&block.ident)), &declared);
+        Descend::Over
+    }
+}
+
+impl<'file> Gathers<BTreeMap<Owner<'file>, Vec<Declared<'file>>>> for PairedMethods<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> BTreeMap<Owner<'file>, Vec<Declared<'file>>> {
+        self.found
     }
 }

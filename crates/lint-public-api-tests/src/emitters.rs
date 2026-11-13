@@ -1,11 +1,11 @@
 use std::collections::BTreeSet;
 
 use syn::ItemMacro;
-use syn::visit::{self, Visit};
 
 use lint_core::Macros;
 use lint_layout::Name;
 use lint_layout::TestMarks;
+use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
 
 #[derive(Debug, Default)]
 pub struct Emitters {
@@ -16,11 +16,13 @@ impl Emitters {
     const DEFINITION: &'static str = "macro_rules";
 }
 
-impl From<&syn::File> for Emitters {
-    fn from(file: &syn::File) -> Emitters {
-        let mut emitters = Emitters::default();
-        emitters.visit_file(file);
-        emitters
+impl Gathers<Emitters> for Emitters {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> Emitters {
+        self
     }
 }
 
@@ -36,8 +38,12 @@ impl AsRef<BTreeSet<Name>> for Emitters {
     }
 }
 
-impl<'ast> Visit<'ast> for Emitters {
-    fn visit_item_macro(&mut self, definition: &'ast ItemMacro) {
+impl<'ast> Watch<'ast> for Emitters {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMacro]
+    }
+
+    fn on_item_macro(&mut self, definition: &'ast ItemMacro) -> Descend {
         self.names.extend(
             definition
                 .ident
@@ -46,6 +52,6 @@ impl<'ast> Visit<'ast> for Emitters {
                 .filter(|_| Macros::attributes(&definition.mac).iter().find_map(TestMarks::test).is_some())
                 .map(Name::from),
         );
-        visit::visit_item_macro(self, definition);
+        Descend::Into
     }
 }

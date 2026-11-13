@@ -5,6 +5,7 @@ use std::fmt;
 use std::ops::Add;
 
 use lint_core::SourceFile;
+use lint_sweep::{Gathers, Sweep, Watching};
 use newtype::Counter;
 
 use count::Count;
@@ -37,9 +38,8 @@ pub struct CrateBudget {
 impl CrateBudget {
     const LINE_END: char = '\n';
 
-    fn measured(file: &SourceFile, share: TestShare) -> CrateBudget {
+    fn measured(file: &SourceFile, share: TestShare, scan: CrateBudget) -> CrateBudget {
         let lines = Count::new(file.text().as_ref().bytes().filter(|byte| char::from(*byte) == Self::LINE_END).count());
-        let scan = TestScan::measured(file.syntax());
         CrateBudget { files: Count::new(1), lines, test_lines: share.test_lines(scan.test_lines, lines), ..scan }
     }
 
@@ -48,13 +48,55 @@ impl CrateBudget {
     }
 }
 
-impl From<&SourceFile> for CrateBudget {
-    fn from(file: &SourceFile) -> CrateBudget {
+#[derive(Debug)]
+pub struct BudgetGathering {
+    file: CrateBudget,
+    share: TestShare,
+    tested: CrateBudget,
+    scan: TestScan,
+}
+
+impl From<&SourceFile> for BudgetGathering {
+    fn from(file: &SourceFile) -> BudgetGathering {
         let share = file.shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
-        file.test_modules()
-            .iter()
-            .map(|module| Self::measured(module, TestShare::WholeFile))
-            .fold(Self::measured(file, share), Add::add)
+        let tested = file.test_modules().iter().map(|module| {
+            let scan = Sweep::gathered(module, TestScan::default());
+            CrateBudget::measured(module, TestShare::WholeFile, scan)
+        });
+        let unscanned = CrateBudget::measured(file, share, CrateBudget::default());
+        BudgetGathering {
+            file: unscanned,
+            share,
+            tested: tested.fold(CrateBudget::default(), Add::add),
+            scan: TestScan::default(),
+        }
+    }
+}
+
+impl Gathers<CrateBudget> for BudgetGathering {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(&mut self.scan)
+    }
+
+    fn gathered(self) -> CrateBudget {
+        let share = self.share;
+        let unscanned = self.file;
+        let file = self.scan.counted(|tests, test_lines| CrateBudget {
+            test_lines: share.test_lines(test_lines, unscanned.lines),
+            tests,
+            ..unscanned
+        });
+        file + self.tested
+    }
+}
+
+impl Gathers<CrateBudget> for TestScan {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> CrateBudget {
+        self.counted(|tests, test_lines| CrateBudget { tests, test_lines, ..CrateBudget::default() })
     }
 }
 

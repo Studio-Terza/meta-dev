@@ -1,33 +1,36 @@
+use std::slice;
+
 mod gate;
 
 use proc_macro2::{Ident, TokenTree};
-use syn::visit::{self, Visit};
 use syn::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 
 use gate::Gate;
-use lint_core::Macros;
+use lint_core::{Macros, Walk};
+use lint_core::{Site, SourceFile, Violation};
+use lint_sweep::{Descend, Finds, Kind, Watch};
+
+use crate::NoIgnoredTests;
 use lint_layout::Name;
 use lint_layout::TestMarks;
 use lint_layout::Whole;
 use lint_layout::{LineNumber, Word, words};
 
-#[derive(Debug, Default)]
-pub(crate) struct SkipMarks {
+#[derive(Debug)]
+pub(crate) struct SkipMarks<'file> {
+    file: &'file SourceFile,
     lines: Vec<LineNumber>,
     gates: Vec<LineNumber>,
+    outer: Vec<Vec<LineNumber>>,
+    unrun: Option<Vec<LineNumber>>,
 }
 
-impl SkipMarks {
+impl<'file> SkipMarks<'file> {
     const CONDITIONAL_ATTRIBUTE: &str = "cfg_attr";
     const SKIPPING: [Word<'static>; 2] = words!["ignore", "skip"];
 
-    pub(crate) fn lines_in(file: &syn::File) -> Vec<LineNumber> {
-        let mut marks = SkipMarks::default();
-        marks.gates.extend(Gate::lines_in(&file.attrs));
-        marks.visit_file(file);
-        marks.lines.sort();
-        marks.lines.dedup();
-        marks.lines
+    pub(crate) fn new(file: &'file SourceFile, unrun: Option<Vec<LineNumber>>) -> SkipMarks<'file> {
+        SkipMarks { file, lines: Vec::new(), gates: Gate::lines_in(&file.syntax().attrs), outer: Vec::new(), unrun }
     }
 
     fn skip_named(list: &MetaList) -> Option<Word<'static>> {
@@ -85,21 +88,58 @@ impl Marked {
     }
 }
 
-impl<'ast> Visit<'ast> for SkipMarks {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let before = self.gates.len();
-        self.gates.extend(Gate::lines_in(&module.attrs));
-        visit::visit_item_mod(self, module);
-        self.gates.truncate(before);
+impl<'ast> Watch<'ast> for SkipMarks<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemFn, Kind::Macro, Kind::Attribute]
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        let inner: Vec<LineNumber> = self.gates.iter().copied().chain(Gate::lines_in(&module.attrs)).collect();
+        self.outer.push(std::mem::replace(&mut self.gates, inner));
+        Descend::Into
+    }
+
+    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+        self.gates = self.outer.pop().unwrap_or_default();
+    }
+
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
         self.record_skips(&function.attrs, Marked::among(&function.attrs, None));
-        visit::visit_item_fn(self, function);
+        Descend::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
+    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
         let attributes = Macros::attributes(invocation);
         self.record_skips(&attributes, Marked::among(&attributes, TestMarks::law(invocation)));
+        Descend::Over
+    }
+
+    fn on_attribute(&mut self, attribute: &'ast Attribute) -> Descend {
+        let gated = Some(attribute)
+            .filter(|candidate| Walk::outside_tests(slice::from_ref(*candidate)) == Walk::Skipped)
+            .map(|skipped| LineNumber::from(skipped.pound_token.span));
+        self.unrun.iter_mut().for_each(|unrun| unrun.extend(gated));
+        Descend::Into
+    }
+}
+
+impl<'file> Finds<'file> for SkipMarks<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        let path = self.file.head().path();
+        let unrun = self
+            .unrun
+            .unwrap_or_default()
+            .into_iter()
+            .map(|line| Violation::new(Site::new(path, line), NoIgnoredTests::UNRUN));
+        let target = self
+            .file
+            .head()
+            .switched_off()
+            .map(|switched| Violation::new(Site::of_file(switched), NoIgnoredTests::UNTESTED));
+        let mut lines = self.lines;
+        lines.sort();
+        lines.dedup();
+        let skipped = lines.into_iter().map(|line| Violation::new(Site::new(path, line), NoIgnoredTests::SKIPPED));
+        skipped.chain(target).chain(unrun).collect()
     }
 }

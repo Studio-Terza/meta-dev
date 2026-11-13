@@ -1,7 +1,6 @@
 mod vertex;
 
 use std::collections::{BTreeMap, BTreeSet};
-use syn::visit::Visit;
 use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
 
 use lint_core::Home;
@@ -10,6 +9,7 @@ use lint_core::TypeHomes;
 use lint_core::TypeName;
 use lint_core::Walk;
 use lint_layout::Name;
+use lint_sweep::{Descend, Gathers, Kind, Watch, Watching};
 pub use vertex::Vertex;
 
 #[derive(Debug)]
@@ -21,17 +21,49 @@ pub struct Declarations<'file> {
     reading: BTreeSet<Name>,
 }
 
-impl<'head> From<Parsed<'_, 'head>> for Declarations<'head> {
-    fn from(parsed: Parsed<'_, 'head>) -> Declarations<'head> {
-        let mut declarations = Declarations {
-            vertices: BTreeSet::new(),
-            aliases: BTreeMap::new(),
+#[derive(Debug, Default)]
+pub struct DeclarationReading {
+    vertices: BTreeSet<TypeName>,
+    aliases: BTreeMap<TypeName, TypeName>,
+    reading: BTreeSet<Name>,
+}
+
+#[derive(Debug)]
+pub struct DeclarationGathering<'head> {
+    reading: DeclarationReading,
+    homes: TypeHomes<'head>,
+    shipped: Option<Home<'head>>,
+}
+
+impl<'head> From<Parsed<'_, 'head>> for DeclarationGathering<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> DeclarationGathering<'head> {
+        DeclarationGathering {
+            reading: DeclarationReading::default(),
             homes: TypeHomes::from(parsed),
-            sum_types: BTreeMap::new(),
-            reading: BTreeSet::new(),
-        };
-        declarations.visit_file(parsed.file().syntax());
-        declarations.filed(Home::from(parsed.head()))
+            shipped: parsed.file().shipped().map(|_| Home::from(parsed.head())),
+        }
+    }
+}
+
+impl<'head> Gathers<Option<Declarations<'head>>> for DeclarationGathering<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        let all: Vec<&mut Watching<'_>> = vec![&mut self.reading, &mut self.homes];
+        self.shipped.map_or_default(|_| all)
+    }
+
+    fn gathered(self) -> Option<Declarations<'head>> {
+        let reading = self.reading;
+        let homes = self.homes;
+        self.shipped.map(|home| {
+            Declarations {
+                vertices: reading.vertices,
+                aliases: reading.aliases,
+                homes,
+                sum_types: BTreeMap::new(),
+                reading: reading.reading,
+            }
+            .filed(home)
+        })
     }
 }
 
@@ -110,23 +142,29 @@ impl<'file> Declarations<'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for Declarations<'_> {
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || {
-            self.vertices.extend(Self::vertex(item));
-            syn::visit::visit_item_impl(self, item);
-        });
+impl<'ast> Watch<'ast> for DeclarationReading {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemImpl, Kind::ItemType, Kind::ItemEnum, Kind::ItemMod]
     }
 
-    fn visit_item_type(&mut self, item: &'ast ItemType) {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        let descend = Descend::from(Walk::outside_tests(&item.attrs));
+        self.vertices.extend(descend.entered().and_then(|_| Declarations::vertex(item)));
+        descend
+    }
+
+    fn on_item_type(&mut self, item: &'ast ItemType) -> Descend {
         self.aliases.insert(TypeName::named(&item.ident), TypeName::from_type(&item.ty));
+        Descend::Over
     }
 
-    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        Walk::enter(&item.attrs, || self.reading.extend(Self::sum_type(item).map(|found| Name::from(&found.ident))));
+    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+        let entered = Descend::from(Walk::outside_tests(&item.attrs)).entered();
+        self.reading.extend(entered.and_then(|_| Declarations::sum_type(item)).map(|found| Name::from(&found.ident)));
+        Descend::Over
     }
 
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 }

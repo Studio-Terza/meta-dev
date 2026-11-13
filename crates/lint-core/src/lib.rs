@@ -20,6 +20,7 @@ mod test_file;
 mod type_homes;
 mod type_name;
 mod walk;
+mod watch;
 
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
@@ -44,5 +45,6 @@ pub use test_file::TestFile;
 pub use type_homes::TypeHomes;
 pub use type_name::TypeName;
 pub use walk::Walk;
+pub use watch::{Address, ByKind, Descend, Kind, Watch, Watching};
 
 pub use lint_layout::SourceText;

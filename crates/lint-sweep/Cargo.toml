@@ -1,0 +1,21 @@
+[package]
+name = "lint-sweep"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+syn.workspace = true
+
+[dev-dependencies]
+lint-core = { path = "../lint-core" }
+lint-fixtures = { path = "../lint-fixtures" }
+
+[lints]
+workspace = true

@@ -23,7 +23,8 @@ use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
 use lint_layout::Name;
 use lint_placement::PackageRoot;
-use mentions::{Ground, Mentions};
+use lint_sweep::{Gathers, Sweep, Watching};
+use mentions::Mentions;
 use offers::Offers;
 use test_features::TestFeatures;
 
@@ -59,6 +60,29 @@ pub struct TestOnly<'head> {
     manifests: BTreeMap<&'head PackageRoot, &'head Path>,
 }
 
+#[derive(Debug)]
+pub struct MentionGathering<'head> {
+    path: &'head Path,
+    package: &'head PackageRoot,
+    mentions: Mentions,
+}
+
+impl<'head> Gathers<FileMentions<'head>> for MentionGathering<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(&mut self.mentions)
+    }
+
+    fn gathered(self) -> FileMentions<'head> {
+        self.mentions.gathered().mentioned(self.path, self.package)
+    }
+}
+
+impl AsRef<Path> for FileMentions<'_> {
+    fn as_ref(&self) -> &Path {
+        self.path
+    }
+}
+
 impl<'head> FromIterator<FileMentions<'head>> for TestOnly<'head> {
     fn from_iter<Parts: IntoIterator<Item = FileMentions<'head>>>(parts: Parts) -> TestOnly<'head> {
         let mentions: Vec<FileMentions<'head>> = parts.into_iter().collect();
@@ -86,13 +110,13 @@ impl ContextLint for NoTestOnlyApi {
     type Part<'head> = FileMentions<'head>;
     type Context<'head> = TestOnly<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> FileMentions<'head> {
-        let file = parsed.file();
-        FileMentions {
+    type Gathering<'head> = MentionGathering<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> MentionGathering<'head> {
+        MentionGathering {
             path: parsed.head().path(),
             package: parsed.head().placement().package(),
-            shipped: Mentions::in_file(file, Ground::Shipped),
-            tested: Mentions::in_file(file, Ground::Tests),
+            mentions: Mentions::of_file(parsed.file()),
         }
     }
 

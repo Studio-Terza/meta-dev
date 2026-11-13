@@ -7,7 +7,7 @@ use lint_placement::CrateName;
 
 use crate::finding::Rule;
 use crate::function_flow::FunctionFlow;
-use collector::Collector;
+pub use collector::Collector;
 
 #[derive(Debug)]
 pub struct FileFlow<'file> {
@@ -19,8 +19,12 @@ impl<'file> FileFlow<'file> {
     pub fn of_file(file: &'file SourceFile) -> Vec<FileFlow<'file>> {
         iter::once(file)
             .chain(file.test_modules())
-            .map(|module| FileFlow { file: module, functions: Collector::collected(module) })
+            .map(|module| FileFlow::collected(module, Collector::collected(module)))
             .collect()
+    }
+
+    pub fn collected(file: &'file SourceFile, functions: Vec<FunctionFlow<'file>>) -> FileFlow<'file> {
+        FileFlow { file, functions }
     }
 
     pub fn crate_name(&self) -> CrateName {

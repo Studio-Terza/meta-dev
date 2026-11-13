@@ -10,7 +10,7 @@ use forwarders::Forwarders;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
 use syn::visit::Visit;
-use workspace_types::WorkspaceTypes;
+use workspace_types::{TypeGathering, WorkspaceTypes};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -27,8 +27,10 @@ impl ContextLint for NoForwarders {
     type Part<'head> = WorkspaceTypes;
     type Context<'head> = WorkspaceTypes;
 
-    fn contributed(parsed: Parsed<'_, '_>) -> WorkspaceTypes {
-        parsed.file().shipped().map_or_default(WorkspaceTypes::from)
+    type Gathering<'head> = TypeGathering;
+
+    fn gathering(parsed: Parsed<'_, '_>) -> TypeGathering {
+        TypeGathering::from(parsed.file())
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, types: &WorkspaceTypes) -> Vec<Violation<'file>> {

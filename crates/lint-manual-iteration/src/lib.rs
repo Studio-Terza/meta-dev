@@ -1,16 +1,15 @@
 use lint_core::Headline;
-use lint_file::{FileLint, Reads};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::{Descend, Finds, Kind, Sweep, Watch};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
-use syn::visit::Visit;
 
 use syn::{
     Block, Expr, ExprForLoop, ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Stmt,
 };
 
 use lint_core::Fix;
-use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
@@ -68,19 +67,16 @@ impl ManualIteration {
     }
 }
 
-impl FileLint for ManualIteration {
+impl SweptLint for ManualIteration {
     const HEADLINE: Headline = Headline::new("iterators are driven by combinators, not by hand");
     const READS: Reads = Reads::Shipped;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut iterations = Iterations { file, path: file.head().path(), violations: Vec::new() };
-        iterations.visit_file(file.syntax());
-        iterations.violations
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(Iterations { path: file.head().path(), violations: Vec::new() })
     }
 }
 
 struct Iterations<'scan> {
-    file: &'scan SourceFile,
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
 }
@@ -91,38 +87,51 @@ impl<'scan> Iterations<'scan> {
     }
 }
 
-impl<'ast> Visit<'ast> for Iterations<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Iterations<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[
+            Kind::ItemMod,
+            Kind::ItemImpl,
+            Kind::ItemTrait,
+            Kind::Macro,
+            Kind::ItemFn,
+            Kind::ImplItemFn,
+            Kind::Local,
+            Kind::ExprForLoop,
+        ]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        Walk::enter(&item.attrs, || syn::visit::visit_item_trait(self, item));
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        Walk::enter(&function.attrs, || syn::visit::visit_item_fn(self, function));
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        Walk::enter(&function.attrs, || syn::visit::visit_impl_item_fn(self, function));
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        Descend::from(Walk::outside_tests(&function.attrs))
     }
 
-    fn visit_local(&mut self, local: &'ast Local) {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+        Descend::from(Walk::outside_tests(&function.attrs))
+    }
+
+    fn on_local(&mut self, local: &'ast Local) -> Descend {
         let finding = Some(local)
             .filter(|candidate| matches!(&candidate.pat, Pat::Ident(binding) if binding.mutability.is_some()))
             .and_then(|mutable| mutable.init.as_ref())
             .filter(|init| {
                 let mut calls = IteratorCalls::default();
-                calls.visit_expr(&init.expr);
+                Sweep::through_expr(&init.expr, &mut calls);
                 calls.0 > 0
             })
             .map(|_| {
@@ -135,10 +144,10 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
                 )
             });
         self.violations.extend(finding);
-        syn::visit::visit_local(self, local);
+        Descend::Into
     }
 
-    fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
         let finding = ManualIteration::accumulator(&expr.body).map(|_| {
             self.violation(
                 expr.for_token.span,
@@ -149,17 +158,27 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
             )
         });
         self.violations.extend(finding);
-        syn::visit::visit_expr_for_loop(self, expr);
+        Descend::Into
+    }
+}
+
+impl<'file> Finds<'file> for Iterations<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.violations
     }
 }
 
 #[derive(Default)]
 struct IteratorCalls(usize);
 
-impl<'ast> Visit<'ast> for IteratorCalls {
-    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
+impl<'ast> Watch<'ast> for IteratorCalls {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ExprMethodCall]
+    }
+
+    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
         self.0 +=
             Name::from(&call.method).matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS).into_iter().count();
-        syn::visit::visit_expr_method_call(self, call);
+        Descend::Into
     }
 }

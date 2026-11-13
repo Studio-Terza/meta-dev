@@ -2,11 +2,11 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use syn::Ident;
-use syn::visit::Visit;
 
 use lint_core::Parsed;
 use lint_layout::Name;
 use lint_placement::CrateName;
+use lint_sweep::{Descend, Kind, Watch};
 
 #[derive(Debug)]
 pub struct NameUses<'head> {
@@ -18,13 +18,11 @@ pub struct NameUses<'head> {
 impl<'head> From<Parsed<'_, 'head>> for NameUses<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> NameUses<'head> {
         let head = parsed.head();
-        let mut uses = NameUses {
+        NameUses {
             path: head.path(),
             crate_name: CrateName::from(head.placement().crate_root()),
             names: BTreeSet::new(),
-        };
-        uses.visit_file(parsed.file().syntax());
-        uses
+        }
     }
 }
 
@@ -46,8 +44,13 @@ impl NameUses<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for NameUses<'_> {
-    fn visit_ident(&mut self, ident: &'ast Ident) {
+impl<'ast> Watch<'ast> for NameUses<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Ident]
+    }
+
+    fn on_ident(&mut self, ident: &'ast Ident) -> Descend {
         self.names.insert(Name::from(ident));
+        Descend::Into
     }
 }

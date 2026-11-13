@@ -1,5 +1,6 @@
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
+use lint_sweep::{Gathers, Sweep, Watching};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -24,6 +25,22 @@ pub struct NamedNumbers;
 #[derive(Debug, Default)]
 pub struct SupportPaths(BTreeSet<PathBuf>);
 
+#[derive(Debug)]
+pub struct SupportGathering<'head> {
+    file: &'head std::path::Path,
+    modules: SupportModules,
+}
+
+impl Gathers<SupportPaths> for SupportGathering<'_> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(&mut self.modules)
+    }
+
+    fn gathered(self) -> SupportPaths {
+        SupportPaths(self.modules.paths(self.file).into_iter().collect())
+    }
+}
+
 impl FromIterator<SupportPaths> for SupportPaths {
     fn from_iter<Parts: IntoIterator<Item = SupportPaths>>(parts: Parts) -> SupportPaths {
         SupportPaths(parts.into_iter().flat_map(|part| part.0).collect())
@@ -39,8 +56,10 @@ impl ContextLint for NamedNumbers {
     type Part<'head> = SupportPaths;
     type Context<'head> = SupportPaths;
 
-    fn contributed(parsed: Parsed<'_, '_>) -> SupportPaths {
-        SupportPaths(SupportModules::paths(parsed.file()).into_iter().collect())
+    type Gathering<'head> = SupportGathering<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> SupportGathering<'head> {
+        SupportGathering { file: parsed.head().path(), modules: SupportModules::default() }
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, support: &SupportPaths) -> Vec<Violation<'file>> {

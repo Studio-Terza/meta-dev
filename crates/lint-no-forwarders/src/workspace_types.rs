@@ -1,19 +1,24 @@
 use std::collections::BTreeSet;
 
-use syn::visit::Visit;
 use syn::{ItemEnum, ItemStruct, ItemTrait};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
+use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
 
 #[derive(Debug, Default)]
 pub struct WorkspaceTypes(BTreeSet<Name>);
 
-impl From<&SourceFile> for WorkspaceTypes {
-    fn from(file: &SourceFile) -> WorkspaceTypes {
-        let mut types = WorkspaceTypes::default();
-        types.visit_file(file.syntax());
-        types
+#[derive(Debug)]
+pub struct TypeGathering {
+    types: WorkspaceTypes,
+    kinds: &'static [Kind],
+}
+
+impl From<&SourceFile> for TypeGathering {
+    fn from(file: &SourceFile) -> TypeGathering {
+        let kinds = file.shipped().map_or(&[][..], |_| &[Kind::ItemStruct, Kind::ItemEnum, Kind::ItemTrait][..]);
+        TypeGathering { types: WorkspaceTypes::default(), kinds }
     }
 }
 
@@ -29,16 +34,37 @@ impl WorkspaceTypes {
     }
 }
 
-impl<'ast> Visit<'ast> for WorkspaceTypes {
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        self.0.insert(Name::from(&item.ident));
+impl TypeGathering {
+    fn declared(&mut self, name: &syn::Ident) -> Descend {
+        self.types.0.insert(Name::from(name));
+        Descend::Over
+    }
+}
+
+impl<'ast> Watch<'ast> for TypeGathering {
+    fn kinds(&self) -> &'static [Kind] {
+        self.kinds
     }
 
-    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        self.0.insert(Name::from(&item.ident));
+    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+        self.declared(&item.ident)
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        self.0.insert(Name::from(&item.ident));
+    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+        self.declared(&item.ident)
+    }
+
+    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
+        self.declared(&item.ident)
+    }
+}
+
+impl Gathers<WorkspaceTypes> for TypeGathering {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> WorkspaceTypes {
+        self.types
     }
 }
