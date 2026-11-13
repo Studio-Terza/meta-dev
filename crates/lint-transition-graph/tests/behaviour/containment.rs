@@ -1,3 +1,4 @@
+use code_reader::Reader;
 use law_facts::Laws;
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
@@ -16,7 +17,8 @@ impl Clustered {
         let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
         let laws = Laws::from(files.as_slice());
-        let system = TypeSystem::built_from(&extraction, &laws);
+        let model = Reader::read_files(&files);
+        let system = TypeSystem::built_from(&extraction, &laws, &model);
         report(&system).iter().map(ToString::to_string).collect()
     }
 
@@ -386,7 +388,7 @@ fn a_variant_path_names_its_enum_and_a_module_path_names_its_type() {
         ),
         Clustered::at(
             "crates/x/src/hub.rs",
-            "mod pull_request;\nuse crate::event::Event;\npub struct Hub;\nimpl Hub {\n    fn pulled(&self) {\n        Event::PullRequest;\n    }\n}\n",
+            "pub mod pull_request;\nuse crate::event::Event;\npub struct Hub;\nimpl Hub {\n    fn pulled(&self) {\n        Event::PullRequest;\n    }\n}\n",
         ),
         Clustered::at("crates/x/src/hub/pull_request.rs", "pub struct PullRequest;\n"),
         Clustered::at("crates/x/src/rule.rs", "pub enum Rule {\n    Linear(u8),\n    Plain { width: u8 },\n}\n"),

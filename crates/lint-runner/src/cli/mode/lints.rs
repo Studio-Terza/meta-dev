@@ -121,7 +121,7 @@ type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
 type Workspaced = for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>) -> Report<'file>;
 
-type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>) -> Vec<Report<'file>>;
+type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>, &'file Model) -> Vec<Report<'file>>;
 
 impl Lints {
     const LINTS: [Entry; 54] = [
@@ -176,8 +176,8 @@ impl Lints {
         <Filed<LinearBodies> as Registered>::ENTRY,
         <Filed<PureRouters> as Registered>::ENTRY,
         <Filed<PlainConditions> as Registered>::ENTRY,
-        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, laws| {
-            let system = TypeSystem::built_from(extraction, laws);
+        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, laws, model| {
+            let system = TypeSystem::built_from(extraction, laws, model);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
@@ -339,31 +339,43 @@ impl Work {
 
     fn settled(self, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Extracted(extracted) => Worked::rendering(
-                slot,
-                extracted(
-                    sources.gathering().extraction(),
-                    Priming::<LawReading>::primed(&Settled::from(sources.gathering())),
-                ),
-            ),
             Work::Survey => Worked::surveying(&Survey::settled(&Settled::from(sources.gathering()))),
-            Work::Described(described) => {
-                Self::described(described, slot, sources, &Settled::from(sources.gathering()))
+            Work::Extracted(_) | Work::Described(_) => {
+                self.grounded(slot, sources, &Settled::from(sources.gathering()))
             }
             Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) => Worked::default(),
         }
     }
 
-    fn described(
-        described: Workspaced,
+    fn grounded(
+        self,
         slot: Slot,
         sources: &Sources<impl Files, impl Cargo, impl Timer>,
         settled: &Settled<'_, '_>,
     ) -> Worked {
-        let workspaces = sources.located().done().as_ref().ok().map(Described::workspaces);
-        let heads = sources.gathering().heads();
-        let facts = Priming::<RoleReading>::primed(settled);
-        Worked::rendering(slot, workspaces.map(|found| described(heads, found, facts)).into_iter().collect())
+        match self {
+            Work::Extracted(extracted) => Worked::rendering(
+                slot,
+                sources.gathering().model().map_or_default(|model| {
+                    extracted(sources.gathering().extraction(), Priming::<LawReading>::primed(settled), model)
+                }),
+            ),
+            Work::Described(described) => Worked::rendering(
+                slot,
+                sources
+                    .located()
+                    .done()
+                    .as_ref()
+                    .ok()
+                    .map(|located| {
+                        let facts = Priming::<RoleReading>::primed(settled);
+                        described(sources.gathering().heads(), Described::workspaces(located), facts)
+                    })
+                    .into_iter()
+                    .collect(),
+            ),
+            Work::Checked(_) | Work::Modelled(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) => Worked::default(),
+        }
     }
 }
 

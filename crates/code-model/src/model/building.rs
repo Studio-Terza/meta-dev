@@ -51,11 +51,16 @@ impl Building {
     }
 
     pub fn path_use(&mut self, file: FileId, line: LineNumber, used: PathUse) {
-        self.model.uses.push(Filed::new(file, Found::new(line, used)));
+        let rows = used.mention().interpolated().map_or(&mut self.model.uses, |_| &mut self.model.interpolated);
+        rows.push(Filed::new(file, Found::new(line, used)));
     }
 
     pub fn call(&mut self, file: FileId, line: LineNumber, call: Call) {
         self.model.calls.push(Filed::new(file, Found::new(line, call)));
+    }
+
+    pub fn placed(&mut self, file: FileId, line: LineNumber, item: ItemId) {
+        self.model.placed.push(Filed::new(file, Found::new(line, item)));
     }
 
     pub fn declared(&mut self, item: Item) -> ItemId {
@@ -85,7 +90,9 @@ impl Building {
             functions: Filed::sorted(model.functions),
             holdings: model.holdings,
             calls: model.calls,
+            placed: Filed::sorted(model.placed),
             uses: Filed::sorted(model.uses),
+            interpolated: Filed::sorted(model.interpolated),
             declarations: Declarations::new(self.items, self.aliases, self.exports),
             roots: model.roots,
         }

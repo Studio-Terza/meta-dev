@@ -20,7 +20,7 @@ impl Elegance {
     pub fn reports<'read>(files: &'read [SourceFile], model: &'read Model) -> Vec<Report<'read>> {
         let extraction = Extraction::from(files);
         let laws = Laws::from(files);
-        let system = TypeSystem::built_from(&extraction, &laws);
+        let system = TypeSystem::built_from(&extraction, &laws, model);
         vec![
             Complexity::report(files),
             TransitionGraph::report_graph(&system),

@@ -1040,6 +1040,7 @@ dependencies = [
 name = "graph-query"
 version = "0.1.0"
 dependencies = [
+ "code-reader",
  "law-facts",
  "laws",
  "lint-core",
@@ -1532,7 +1533,6 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "proc-macro2",
- "quote",
  "syn 2.0.119",
 ]
 
@@ -2131,6 +2131,8 @@ version = "0.1.0"
 dependencies = [
  "body-lifts",
  "body-shape",
+ "code-model",
+ "code-reader",
  "equivalence",
  "law-facts",
  "laws",

@@ -29,6 +29,8 @@ pub struct Model {
     holdings: Vec<Filed<Holding>>,
     calls: Vec<Filed<Call>>,
     uses: Vec<Filed<PathUse>>,
+    interpolated: Vec<Filed<PathUse>>,
+    placed: Vec<Filed<ItemId>>,
     declarations: Declarations,
     roots: CrateRoots,
 }
@@ -94,6 +96,21 @@ impl<'model> Iterator for Calls<'model> {
 }
 
 #[derive(Debug)]
+pub struct PlacedItems<'model> {
+    files: &'model [FileModel],
+    rows: std::slice::Iter<'model, Filed<ItemId>>,
+}
+
+impl<'model> Iterator for PlacedItems<'model> {
+    type Item = Placed<'model, &'model ItemId>;
+
+    fn next(&mut self) -> Option<Placed<'model, &'model ItemId>> {
+        let files = self.files;
+        self.rows.find_map(|filed| filed.placed(files))
+    }
+}
+
+#[derive(Debug)]
 pub struct PathUses<'model> {
     files: &'model [FileModel],
     rows: std::slice::Iter<'model, Filed<PathUse>>,
@@ -132,6 +149,15 @@ impl Model {
     #[must_use]
     pub fn uses(&self) -> PathUses<'_> {
         PathUses { files: &self.files, rows: self.uses.iter() }
+    }
+
+    pub fn mentions(&self) -> impl Iterator<Item = Placed<'_, &PathUse>> {
+        self.uses().chain(PathUses { files: &self.files, rows: self.interpolated.iter() })
+    }
+
+    #[must_use]
+    pub fn items(&self) -> PlacedItems<'_> {
+        PlacedItems { files: &self.files, rows: self.placed.iter() }
     }
 
     #[must_use]

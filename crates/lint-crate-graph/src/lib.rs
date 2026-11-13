@@ -10,16 +10,6 @@ pub struct CrateGraph;
 
 impl ModelLint for CrateGraph {
     fn report(model: &Model) -> Report<'_> {
-        Report::new(
-            Headline::new("a crate whose items form one big cycle is split"),
-            model
-                .holdings()
-                .map(Links::from)
-                .chain(model.implementations().map(Links::from))
-                .chain(model.functions().map(Links::from))
-                .chain(model.uses().map(Links::from))
-                .collect::<Links<'_>>()
-                .violations(model),
-        )
+        Report::new(Headline::new("a crate whose items form one big cycle is split"), Links::from(model).violations())
     }
 }

@@ -1,7 +1,10 @@
 use syn::visit;
-use syn::{Ident, ItemImpl};
+use syn::visit::Visit;
+use syn::{Ident, ItemImpl, ItemMacro};
 
-use code_model::{ItemId, Region, Resolved, Seat, TypeRef};
+use code_model::{Building, FileId, ItemId, Region, Resolved, Seat, TypeRef};
+use lint_core::Macros;
+use lint_layout::{LineNumber, Position};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
@@ -25,6 +28,7 @@ struct OwnerRow {
     scope: ScopeId,
     name: UsePath,
     domain: Domain,
+    line: LineNumber,
 }
 
 impl OwnerRow {
@@ -54,9 +58,14 @@ impl PlaceRows {
             .iter()
             .map(|row| {
                 let subject = row.subject.and_then(|id| subjects.get(id.0)).cloned();
-                let declared = row.owner.as_ref().and_then(|owner| owner.settled(resolving));
-                let owner = declared.or_else(|| subject.as_ref()?.named().map(AsRef::<Resolved>::as_ref)?.crate_item());
-                Place { subject, owner }
+                let declared = row.owner.as_ref().and_then(|owner| {
+                    let item = owner.settled(resolving)?;
+                    Some(Declared { line: owner.line, item })
+                });
+                let owner = declared
+                    .map(|found| found.item)
+                    .or_else(|| subject.as_ref()?.named().map(AsRef::<Resolved>::as_ref)?.crate_item());
+                Place { subject, owner, declared }
             })
             .collect();
         Places(places)
@@ -67,16 +76,30 @@ impl PlaceRows {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Declared {
+    line: LineNumber,
+    item: ItemId,
+}
+
 #[derive(Debug)]
 struct Place {
     subject: Option<TypeRef>,
     owner: Option<ItemId>,
+    declared: Option<Declared>,
 }
 
 #[derive(Debug)]
 pub(super) struct Places(Vec<Place>);
 
 impl Places {
+    pub(super) fn placed(&self, file: FileId, building: Building) -> Building {
+        self.0.iter().filter_map(|place| place.declared).fold(building, |mut built, declared| {
+            built.placed(file, declared.line, declared.item);
+            built
+        })
+    }
+
     pub(super) fn seat(&self, region: Region, place: Option<PlaceId>) -> Seat {
         let found = place.and_then(|id| self.0.get(id.0));
         Seat::new(region, found.and_then(|seated| seated.subject.clone())).owned(found.and_then(|seated| seated.owner))
@@ -93,7 +116,8 @@ impl Lowering<'_> {
 
     pub(super) fn owning(&mut self, ident: &Ident, domain: Domain) -> PlaceId {
         let subject = self.lowered.rows.places.subject_of(self.context.place());
-        let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain };
+        let line = Position::from(ident.span()).line();
+        let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain, line };
         self.placed(PlaceRow { subject, owner: Some(owner) })
     }
 
@@ -103,8 +127,17 @@ impl Lowering<'_> {
         self.contextual(context, visited);
     }
 
+    pub(super) fn expanded(&mut self, item: &ItemMacro) {
+        visit::visit_item_macro(self, item);
+        Macros::items(&item.mac).iter().fold(self, |lowering, declared| {
+            lowering.visit_item(declared);
+            lowering
+        });
+    }
+
     pub(super) fn trait_owning(&mut self, ident: &Ident) -> PlaceId {
-        let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain: Domain::Types };
+        let line = Position::from(ident.span()).line();
+        let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain: Domain::Types, line };
         self.placed(PlaceRow { subject: None, owner: Some(owner) })
     }
 

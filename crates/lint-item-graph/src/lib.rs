@@ -1,11 +1,9 @@
-mod file_names;
+mod file_scopes;
 mod node_index;
-mod referenced_names;
 mod scope;
 mod traversal;
 
-pub use file_names::FileNames;
-pub use referenced_names::ReferencedNames;
+pub use file_scopes::FileScopes;
 pub use scope::Scope;
 pub use traversal::Traversal;
 
@@ -13,32 +11,10 @@ use node_index::NodeIndex;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lint_layout::Name;
-
-#[derive(Clone, Debug, Default)]
-pub struct ItemGraph<Node = Name> {
+#[derive(Clone, Debug)]
+pub struct ItemGraph<Node> {
     names: Vec<Node>,
     links: Vec<Vec<NodeIndex>>,
-    stand_ins: BTreeSet<NodeIndex>,
-}
-
-impl ItemGraph {
-    fn standing_in(self, names: &BTreeSet<Name>) -> ItemGraph {
-        let indexed = self.names.iter().enumerate().filter(|(_, name)| names.contains(*name));
-        ItemGraph { stand_ins: indexed.map(|(index, _)| NodeIndex::from(index)).collect(), ..self }
-    }
-
-    #[must_use]
-    pub fn stand_ins(&self) -> BTreeMap<&Name, Vec<&Name>> {
-        self.stand_ins
-            .iter()
-            .filter_map(|index| self.name_at(*index).map(|name| (name, self.used_by(*index))))
-            .collect()
-    }
-
-    fn used_by(&self, index: NodeIndex) -> Vec<&Name> {
-        self.links.get(index.into_inner()).into_iter().flatten().filter_map(|used| self.name_at(*used)).collect()
-    }
 }
 
 impl<Node: Ord> ItemGraph<Node> {
@@ -60,7 +36,7 @@ impl<Node: Ord> ItemGraph<Node> {
                 linked.into_iter().collect()
             })
             .collect();
-        ItemGraph { names: references.into_keys().collect(), links, stand_ins: BTreeSet::new() }
+        ItemGraph { names: references.into_keys().collect(), links }
     }
 
     fn name_at(&self, node: NodeIndex) -> Option<&Node> {
