@@ -1,23 +1,23 @@
-use law_facts::Package;
-use lint_core::FileHead;
 use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Subject<'file> {
-    package: Package<'file>,
+pub(crate) struct Subject<'model> {
+    krate: &'model Name,
     name: Name,
 }
 
-impl<'file> Subject<'file> {
-    pub(crate) fn new(head: &'file FileHead, name: Name) -> Subject<'file> {
-        Subject { package: Package::from(head), name }
+impl<'model> Subject<'model> {
+    pub(crate) fn new(krate: &'model Name, name: Name) -> Subject<'model> {
+        Subject { krate, name }
     }
 
-    pub(crate) fn package(&self) -> Package<'file> {
-        self.package
+    pub(crate) fn krate(&self) -> &'model Name {
+        self.krate
     }
+}
 
-    pub(crate) fn owner(&self) -> &Name {
+impl AsRef<Name> for Subject<'_> {
+    fn as_ref(&self) -> &Name {
         &self.name
     }
 }

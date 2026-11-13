@@ -75,13 +75,15 @@ pub trait Reading {
 
     fn layout(self, line: &Line) -> Self::Output;
 
-    fn heading(self, line: &Line, entry: &Entry) -> Self::Output;
+    fn entry(self, line: &Line, entry: &Entry, marking: Marking) -> Self::Output;
+}
 
-    fn ruling(self, line: &Line, entry: &Entry) -> Self::Output;
-
-    fn lead(self, line: &Line, entry: &Entry) -> Self::Output;
-
-    fn remark(self, line: &Line, entry: &Entry) -> Self::Output;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Marking {
+    Heading,
+    Ruling,
+    Lead,
+    Remark,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -246,8 +248,8 @@ impl Line {
     pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Reader::Output {
         match &self.form {
             Form::Layout(_) => reader.layout(self),
-            Form::Content(Content::Heading(entry)) => reader.heading(self, entry),
-            Form::Content(Content::Entry(entry)) => entry.kind.reading(reader, self, entry),
+            Form::Content(Content::Heading(entry)) => reader.entry(self, entry, Marking::Heading),
+            Form::Content(Content::Entry(entry)) => reader.entry(self, entry, entry.kind.marking()),
         }
     }
 }
@@ -286,11 +288,11 @@ impl Kind {
         lexed.iter().zip(before).find_map(|(piece, previous)| piece.kind_after(previous)).unwrap_or(Kind::Remark)
     }
 
-    fn reading<Reader: Reading>(self, reader: Reader, line: &Line, entry: &Entry) -> Reader::Output {
+    fn marking(self) -> Marking {
         match self {
-            Kind::Ruling => reader.ruling(line, entry),
-            Kind::Lead => reader.lead(line, entry),
-            Kind::Remark => reader.remark(line, entry),
+            Kind::Ruling => Marking::Ruling,
+            Kind::Lead => Marking::Lead,
+            Kind::Remark => Marking::Remark,
         }
     }
 }

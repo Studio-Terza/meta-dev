@@ -14,8 +14,8 @@ use syn::{
 };
 
 use lint_core::{Macros, SourceFile, Violation, Walk};
+use lint_core::{Module, Nested};
 use lint_layout::{LineNumber, Name};
-use lint_paths::{Module, Nested};
 use lint_placement::CrateName;
 
 use crate::holders::Holders;

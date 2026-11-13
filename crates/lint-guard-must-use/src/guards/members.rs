@@ -2,9 +2,9 @@ mod finding;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use lint_core::Module;
 use lint_core::{Site, Violation};
 use lint_layout::Name;
-use lint_paths::Module;
 
 use super::type_key::TypeKey;
 use finding::Finding;

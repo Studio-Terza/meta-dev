@@ -1,10 +1,9 @@
 use code_reader::Reader;
-use law_facts::Laws;
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{
     AcyclicQuotients, Clustered as ClusterReport, ConnectedClusters, Extraction, GraphLint, InterfaceByConsumers,
-    LowestCluster, TypeSystem,
+    LowestCluster, Transitions, TypeSystem,
 };
 
 struct Clustered;
@@ -16,9 +15,9 @@ impl Clustered {
     ) -> Vec<String> {
         let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
-        let laws = Laws::from(files.as_slice());
         let model = Reader::read_files(&files);
-        let system = TypeSystem::built_from(&extraction, &laws, &model);
+        let transitions = Transitions::from(&model);
+        let system = TypeSystem::built_from(&extraction, &transitions);
         report(&system).iter().map(ToString::to_string).collect()
     }
 

@@ -1,5 +1,4 @@
 use code_model::Model;
-use law_facts::Laws;
 use lint_complexity::Complexity;
 use lint_core::{Lint, ModelLint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
@@ -9,7 +8,7 @@ use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
     AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction, GraphLint,
     Homomorphisms, InterfaceByConsumers, LowestCluster, ParallelStructures, RepeatedRoutes, TransitionGraph,
-    TypeSystem,
+    Transitions, TypeSystem,
 };
 
 #[derive(Debug)]
@@ -19,8 +18,8 @@ impl Elegance {
     #[must_use]
     pub fn reports<'read>(files: &'read [SourceFile], model: &'read Model) -> Vec<Report<'read>> {
         let extraction = Extraction::from(files);
-        let laws = Laws::from(files);
-        let system = TypeSystem::built_from(&extraction, &laws, model);
+        let transitions = Transitions::from(model);
+        let system = TypeSystem::built_from(&extraction, &transitions);
         vec![
             Complexity::report(files),
             TransitionGraph::report_graph(&system),

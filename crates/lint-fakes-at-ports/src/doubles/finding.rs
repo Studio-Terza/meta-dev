@@ -1,12 +1,13 @@
 use std::fmt;
 
+use code_model::ItemPath;
 use lint_core::Fix;
-use lint_layout::{Name, UsePath};
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub enum Finding<'double> {
     Unported(&'double Name),
-    Beside(&'double Name, UsePath),
+    Beside(&'double Name, ItemPath),
 }
 
 impl fmt::Display for Finding<'_> {

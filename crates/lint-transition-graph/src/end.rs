@@ -4,20 +4,20 @@ use std::fmt;
 use crate::class::Class;
 use crate::count::Count;
 use crate::key::Key;
+use crate::transitions::Wrapping;
+use code_model::Mutation;
 use lint_layout::{Name, Whole, Word};
-use lint_placement::CrateName;
-use transition_facts::{Mutation, Wrapping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node<'found> {
-    krate: &'found CrateName,
+    krate: &'found Name,
     name: &'found Name,
 }
 
 impl<'found> Node<'found> {
     pub(crate) fn resolved(
-        declaring: &BTreeSet<&'found CrateName>,
-        from: &CrateName,
+        declaring: &BTreeSet<&'found Name>,
+        from: &Name,
         name: &'found Name,
     ) -> Option<Node<'found>> {
         let krate = declaring.get(from).or_else(|| declaring.first().filter(|_| declaring.len() == 1));
@@ -25,8 +25,8 @@ impl<'found> Node<'found> {
     }
 }
 
-impl AsRef<CrateName> for Node<'_> {
-    fn as_ref(&self) -> &CrateName {
+impl<'found> Node<'found> {
+    pub(crate) fn krate(&self) -> &'found Name {
         self.krate
     }
 }

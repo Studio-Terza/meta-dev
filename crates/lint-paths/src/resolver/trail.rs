@@ -1,4 +1,4 @@
-use crate::module::Module;
+use lint_core::Module;
 use lint_layout::Name;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

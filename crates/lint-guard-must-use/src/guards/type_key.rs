@@ -1,5 +1,5 @@
+use lint_core::Module;
 use lint_layout::Name;
-use lint_paths::Module;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeKey<'guards> {

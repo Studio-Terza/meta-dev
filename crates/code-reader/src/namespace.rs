@@ -3,6 +3,7 @@ mod binding;
 mod boundary;
 mod entries;
 mod items;
+mod port_macro;
 mod resolver;
 mod resolving;
 mod scope;
@@ -23,6 +24,7 @@ pub(crate) use boundary::ScopeId;
 pub(crate) use code_model::Domain;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Visibility};
 pub(crate) use items::ItemIds;
+pub(crate) use port_macro::PortMacro;
 pub(crate) use resolver::Resolver;
 pub(crate) use resolving::Resolving;
 use scope::ScopeRow;
@@ -155,7 +157,11 @@ impl<'read> Namespace<'read> {
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {
-        self.scopes.iter().map(|row| row.issued(building)).collect()
+        let roots: BTreeMap<ScopeId, &Name> = self.crates.iter().map(|(name, root)| (*root, *name)).collect();
+        self.scopes
+            .iter()
+            .map(|row| row.issued(building, row.outermost().and_then(|root| roots.get(&root).copied())))
+            .collect()
     }
 
     pub(super) fn anchors(&self, scope: ScopeId) -> Anchors {

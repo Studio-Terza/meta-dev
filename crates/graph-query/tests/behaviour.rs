@@ -1,15 +1,13 @@
+use code_model::MethodShape;
 use code_reader::Reader;
-use law_facts::Laws;
 use std::ffi::OsString;
 
 use graph_query::{Query, QueryFailure, Role, Term};
 use lint_core::SourceFile;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
-use lint_transition_graph::{Extraction, TypeSystem};
+use lint_transition_graph::{Extraction, Transitions, TypeSystem};
 use text_lines::Lines;
-use transition_facts::Transitions;
-use type_facts::{Facts, MethodShape};
 
 const SEARCH: &str = "pub trait Index {\n    fn insert(&mut self, item: Item);\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\npub struct TextIndex;\nimpl Index for TextIndex {\n    fn insert(&mut self, item: Item) {}\n    fn search(&self, query: &Query) -> Vec<Hit> {}\n}\npub struct Plain;\nimpl Plain {\n    pub fn search_text(&self) {}\n}\nimpl<T: Index> Lookup for T {\n    fn find(&self, query: &Query) -> Vec<Hit> {}\n}\nmod store {\n    pub struct Records;\n    impl Records {\n        pub fn insert(&mut self, record: Record) {}\n        pub fn all(&self) -> Vec<Record> {}\n    }\n}\nimpl<T> Holder<T> {\n    pub fn get(&self) -> Option<T> {}\n}\n";
 const FILES: &str = "pub trait Files {\n    fn read(&self, path: &Path) -> Result<Contents, Failure>;\n}\npub struct Disk;\nimpl Files for Disk {\n    fn read(&self, path: &Path) -> Result<Contents, Failure> {}\n}\n";
@@ -62,6 +60,7 @@ impl Asked {
     fn tree() -> Vec<SourceFile> {
         Sources::parsed(&[
             Source::new(Located::new("crates/search/src/lib.rs"), Text::new(SEARCH)),
+            Source::new(Located::new("crates/disk/src/lib.rs"), Text::new("pub mod ports;\n")),
             Source::new(Located::new("crates/disk/src/ports.rs"), Text::new(FILES)),
         ])
     }
@@ -85,19 +84,19 @@ impl Asked {
     fn answered_in(sources: &[Source], words: &&[&str]) -> Vec<String> {
         let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
-        let laws = Laws::from(files.as_slice());
         let model = Reader::read_files(&files);
-        let system = TypeSystem::built_from(&extraction, &laws, &model);
+        let transitions = Transitions::from(&model);
+        let system = TypeSystem::built_from(&extraction, &transitions);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
         query.reply(&system).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 
     fn lines(words: &&[&str]) -> Vec<String> {
         let files = Self::tree();
-        let facts = Facts::of_files(&files);
-        let transitions = Transitions::of_files(&files);
+        let model = Reader::read_files(&files);
+        let transitions = Transitions::from(&model);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
-        query.matches(&facts, &transitions).to_string().parse::<Lines>().into_iter().flatten().collect()
+        query.matches(&transitions).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 }
 
@@ -114,7 +113,7 @@ laws::table!(terms_rank_names_above_methods_and_implementers_and_label_ports_and
         "score 2: port Disk in disk at crates/disk/src/ports.rs:4; implements Files".to_owned(),
     ],
     &["insert", "records", "--top", "1"][..] => vec!["score 4: store Records in search at crates/search/src/lib.rs:18".to_owned()],
-    &["holder"][..] => vec!["score 3: generic impl Holder in search at crates/search/src/lib.rs:24".to_owned()],
+    &["holder"][..] => vec!["score 3: generic impl Holder<T> in search at crates/search/src/lib.rs:24".to_owned()],
     &["unrelated"][..] => vec!["no existing traits, generic impls, ports or stores match".to_owned()],
 ]);
 
@@ -172,6 +171,20 @@ fn a_role_agrees_on_receiver_arity_self_arguments_and_return_shape() {
         Ok("fn(&self, Self) -> Option".to_owned())
     );
 }
+
+laws::table!(
+    a_role_reads_through_references_parentheses_tuples_sequences_and_iterators,
+    |text: &&str| text.parse::<Role>().map(|parsed| AsRef::<MethodShape>::as_ref(&parsed).to_string()).ok(),
+    [
+        "fn f(other: (Self)) -> (Self)" => Some("fn(Self) -> Self".to_owned()),
+        "fn f() -> &Self" => Some("fn() -> Self".to_owned()),
+        "fn f() -> ()" => Some("fn()".to_owned()),
+        "fn f() -> (u8, u8)" => Some("fn() -> _".to_owned()),
+        "fn f() -> [u8; 2]" => Some("fn() -> many".to_owned()),
+        "fn f() -> impl Iterator<Item = u8>" => Some("fn() -> many".to_owned()),
+        "fn f() -> impl Sized + 'static" => Some("fn() -> _".to_owned()),
+    ]
+);
 
 laws::table!(impls_in_another_crate_resolve_to_the_indexed_type_keep_the_trait_path_and_spell_every_self_type, Asked::audited, [
     &["--implementers", "Audited", "--uses", "Cents", "--users", "Audited"][..] => vec![

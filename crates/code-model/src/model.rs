@@ -13,6 +13,7 @@ use crate::implementation::Implementation;
 use crate::item::Item;
 use crate::item_declaration::ItemDeclaration;
 use crate::item_path::ItemPath;
+use crate::law::Law;
 use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::resolved::Resolved;
@@ -32,6 +33,7 @@ pub struct Model {
     uses: Vec<Filed<PathUse>>,
     interpolated: Vec<Filed<PathUse>>,
     placed: Vec<Filed<ItemDeclaration>>,
+    laws: Vec<Filed<Law>>,
     declarations: Declarations,
     roots: CrateRoots,
 }
@@ -112,6 +114,21 @@ impl<'model> Iterator for PlacedItems<'model> {
 }
 
 #[derive(Debug)]
+pub struct Laws<'model> {
+    files: &'model [FileModel],
+    rows: std::slice::Iter<'model, Filed<Law>>,
+}
+
+impl<'model> Iterator for Laws<'model> {
+    type Item = Placed<'model, &'model Law>;
+
+    fn next(&mut self) -> Option<Placed<'model, &'model Law>> {
+        let files = self.files;
+        self.rows.find_map(|filed| filed.placed(files))
+    }
+}
+
+#[derive(Debug)]
 pub struct PathUses<'model> {
     files: &'model [FileModel],
     rows: std::slice::Iter<'model, Filed<PathUse>>,
@@ -154,6 +171,11 @@ impl Model {
 
     pub fn mentions(&self) -> impl Iterator<Item = Placed<'_, &PathUse>> {
         self.uses().chain(PathUses { files: &self.files, rows: self.interpolated.iter() })
+    }
+
+    #[must_use]
+    pub fn laws(&self) -> Laws<'_> {
+        Laws { files: &self.files, rows: self.laws.iter() }
     }
 
     #[must_use]

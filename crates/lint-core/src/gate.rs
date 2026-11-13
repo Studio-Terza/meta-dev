@@ -39,6 +39,11 @@ impl Gate {
             .map(|_| placement)
     }
 
+    #[must_use]
+    pub fn names_crate<'name>(&self, krate: &'name Name) -> Option<&'name Name> {
+        self.package_suffix.and_then(|suffix| krate.matches::<Suffix>(&[suffix])).map(|_| krate)
+    }
+
     pub fn enter_outside(&self, module: &ItemMod, visit: impl FnOnce()) {
         Walk::enter(&module.attrs, || self.names(module).map_or_else(visit, |_| ()));
     }

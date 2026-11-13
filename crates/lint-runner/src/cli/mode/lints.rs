@@ -9,7 +9,6 @@ use code_model::Model;
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
-use law_facts::{LawReading, Laws};
 use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads};
 use lint_port_dependencies::{RoleFacts, RoleReading};
@@ -60,7 +59,7 @@ use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_store_queries::StoreQueries;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, TypeSystem};
+use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, Transitions, TypeSystem};
 use lint_type_shape::TypeShape;
 use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
@@ -120,9 +119,10 @@ struct Filing {
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
-type Workspaced = for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>) -> Report<'file>;
+type Workspaced =
+    for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>, &'file Model) -> Report<'file>;
 
-type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>, &'file Model) -> Vec<Report<'file>>;
+type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Model) -> Vec<Report<'file>>;
 
 impl Lints {
     const LINTS: [Entry; 54] = [
@@ -154,14 +154,14 @@ impl Lints {
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
         <Filed<NoIgnoredTests> as Registered>::ENTRY,
-        <Filed<NoTestIo> as Registered>::ENTRY,
-        <Primed<FakesAtPorts> as Registered>::ENTRY,
+        Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
+        Entry::spelled::<FakesAtPorts>(Work::Modelled(<FakesAtPorts as ModelLint>::report)),
         <Primed<PortBatching> as Registered>::ENTRY,
-        Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _| {
-            <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &())
+        Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _, model| {
+            <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &(), model)
         })),
-        Entry::spelled::<KeyDependencyRoles>(Work::Described(|heads, workspaces, facts| {
-            <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts)
+        Entry::spelled::<KeyDependencyRoles>(Work::Described(|heads, workspaces, facts, model| {
+            <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts, model)
         })),
         Entry::spelled::<EffectsInFillers>(Work::Modelled(<EffectsInFillers as ModelLint>::report)),
         <Filed<CountedCalls> as Registered>::ENTRY,
@@ -169,7 +169,7 @@ impl Lints {
         <Filed<StoreQueries> as Registered>::ENTRY,
         <Filed<LongExactStrings> as Registered>::ENTRY,
         <Judged<RepeatedShapes> as Registered>::ENTRY,
-        <Judged<MandatoryLaws> as Registered>::ENTRY,
+        Entry::spelled::<MandatoryLaws>(Work::Modelled(<MandatoryLaws as ModelLint>::report)),
         <Filed<ArbitraryNewtypes> as Registered>::ENTRY,
         <Filed<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
@@ -177,8 +177,9 @@ impl Lints {
         <Filed<LinearBodies> as Registered>::ENTRY,
         <Filed<PureRouters> as Registered>::ENTRY,
         <Filed<PlainConditions> as Registered>::ENTRY,
-        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, laws, model| {
-            let system = TypeSystem::built_from(extraction, laws, model);
+        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, model| {
+            let transitions = Transitions::from(model);
+            let system = TypeSystem::built_from(extraction, &transitions);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
@@ -357,9 +358,7 @@ impl Work {
         match self {
             Work::Extracted(extracted) => Worked::rendering(
                 slot,
-                sources.gathering().model().map_or_default(|model| {
-                    extracted(sources.gathering().extraction(), Priming::<LawReading>::primed(settled), model)
-                }),
+                sources.gathering().model().map_or_default(|model| extracted(sources.gathering().extraction(), model)),
             ),
             Work::Described(described) => Worked::rendering(
                 slot,
@@ -368,9 +367,10 @@ impl Work {
                     .done()
                     .as_ref()
                     .ok()
-                    .map(|located| {
+                    .zip(sources.gathering().model())
+                    .map(|(located, model)| {
                         let facts = Priming::<RoleReading>::primed(settled);
-                        described(sources.gathering().heads(), Described::workspaces(located), facts)
+                        described(sources.gathering().heads(), Described::workspaces(located), facts, model)
                     })
                     .into_iter()
                     .collect(),

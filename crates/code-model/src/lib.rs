@@ -11,6 +11,7 @@ mod item;
 mod item_declaration;
 mod item_graph;
 mod item_path;
+mod law;
 mod member;
 mod model;
 mod path_use;
@@ -25,24 +26,28 @@ mod traversal;
 mod type_ref;
 mod unresolved;
 
-pub use boundary::{FileId, ItemId};
+pub use boundary::{CallOrder, FileId, ItemId};
 pub use call::{Call, Callee, MacroCall};
 pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
 pub use domain::Domain;
 pub use external::External;
 
 pub use found::Found;
-pub use function::{Entry, Function, Input, Output, Owner, Signature};
+pub use function::{
+    CallOwner, Definition, Entry, Function, Input, Invocation, MethodShape, Mutation, Output, Owner, Parameter,
+    Receiver, Receiving, Returned, Signature, Taken,
+};
 pub use holding::{Held, Holding};
-pub use implementation::{Implementation, Origin, Subject};
-pub use item::{Alias, AliasParameter, Item, ItemKind};
+pub use implementation::{Assigned, Implementation, Origin, Subject};
+pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind};
 pub use item_declaration::ItemDeclaration;
 pub use item_graph::ItemGraph;
 pub use item_path::ItemPath;
+pub use law::{Law, LawKind, Operation, OperationOwner, Property, Route, Side};
 pub use member::Member;
 pub use model::{Building, Model};
 pub use path_use::{Mention, PathUse};
-pub use placed::{FileHome, Placed};
+pub use placed::{FileHome, Harness, Placed};
 pub use primitive::Primitive;
 pub use references::References;
 pub use region::{Ground, Reach, Region, Seat, Within, Zone};
@@ -50,5 +55,5 @@ pub use resolved::Resolved;
 pub use site::Site;
 pub use sited::{Sited, Spelling};
 pub use traversal::Traversal;
-pub use type_ref::{Arrayed, Callable, Named, Projection, TypeRef, TypeUses};
+pub use type_ref::{Arrayed, Bounds, Callable, Element, Grouped, Named, Outline, Projection, TypeRef, TypeUses};
 pub use unresolved::Unresolved;

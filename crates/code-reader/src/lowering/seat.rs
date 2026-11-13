@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use code_model::{Building, Call, FileId, Found, Function, Holding, Implementation, Region};
+use code_model::{Building, Call, FileId, Found, Function, Holding, Implementation, Law, Region};
 use lint_layout::Position;
 
 use crate::namespace::{Resolving, ScopeId};
@@ -88,6 +88,11 @@ impl Located {
 
     pub(super) fn holding(self, footing: Footing<'_>, mut building: Building, holding: Holding) -> Building {
         building.holding(footing.file, self.position.line(), holding);
+        building
+    }
+
+    pub(super) fn law(self, footing: Footing<'_>, mut building: Building, law: Law) -> Building {
+        building.law(footing.file, self.position.line(), law);
         building
     }
 

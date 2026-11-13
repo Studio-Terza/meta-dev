@@ -1,7 +1,9 @@
 use std::fmt;
 
-use law_facts::law_path::{LawPath, Side};
-use law_facts::{Law, Property};
+use crate::laws::Law;
+use crate::laws::LawPath;
+use code_model::Property;
+use code_model::Side;
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -63,7 +65,7 @@ impl<'edge, 'found, 'file> InScope<'edge, 'found, 'file> {
     fn measured(
         self,
         algebras: &Algebras<'found, 'file>,
-        declarations: &'edge Declarations<'_, 'file>,
+        declarations: &'edge Declarations<'file>,
     ) -> CrateMorphisms<'edge, 'found, 'file> {
         let total = self.morphisms.len();
         let undeclared: Vec<Morphism<'edge, 'found, 'file>> =
@@ -110,10 +112,11 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
 
     fn undeclared(
         self,
-        declarations: &'edge Declarations<'_, 'file>,
+        declarations: &'edge Declarations<'file>,
         algebras: &Algebras<'found, 'file>,
     ) -> Option<Morphism<'edge, 'found, 'file>> {
         let verdicts: Vec<Vec<Shortfall<'edge, 'found, 'file>>> = declarations
+            .laws()
             .of_package(self.edge.site().path())
             .into_iter()
             .filter(|law| law.kind().property() == Some(Property::Preserves))

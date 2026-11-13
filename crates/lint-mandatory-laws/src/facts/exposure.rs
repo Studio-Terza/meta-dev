@@ -1,16 +1,14 @@
-use syn::Visibility;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Exposure {
     Private,
     Public,
 }
 
-impl Exposure {
-    pub(crate) fn declared_by(visibility: &Visibility) -> Exposure {
-        match visibility {
-            Visibility::Public(_) => Exposure::Public,
-            _ => Exposure::Private,
+impl From<code_model::Exposure> for Exposure {
+    fn from(exposure: code_model::Exposure) -> Exposure {
+        match exposure {
+            code_model::Exposure::Public => Exposure::Public,
+            code_model::Exposure::Hidden => Exposure::Private,
         }
     }
 }

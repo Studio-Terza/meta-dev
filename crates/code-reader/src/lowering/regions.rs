@@ -11,12 +11,15 @@ pub(super) struct Regions;
 
 impl Regions {
     pub(super) fn of_file(source: &SourceFile, reach: Reach) -> Region {
-        let ground = Gate::PORTS.admits(source.head()).map_or(Ground::Open, |_| Ground::Ports);
+        let head = source.head();
+        let ported = Gate::PORTS.admits(head).map(|_| Ground::Ports);
+        let ground = ported.or_else(|| Gate::STORE.admits(head).map(|_| Ground::Store)).unwrap_or(Ground::Open);
         Region::new(reach, Self::zone_of(source), Within::Own).grounded(ground)
     }
 
     pub(super) fn of_module(region: Region, item: &ItemMod) -> Region {
-        let ground = Gate::PORTS.names(item).map_or(Ground::Open, |_| Ground::Ports);
+        let ported = Gate::PORTS.names(item).map(|_| Ground::Ports);
+        let ground = ported.or_else(|| Gate::STORE.names(item).map(|_| Ground::Store)).unwrap_or(Ground::Open);
         let zone = Gate::BOUNDARY.names(item).map_or(Zone::Open, |_| Zone::Boundary);
         Self::tested(region, &item.attrs).zoned(zone).grounded(ground)
     }

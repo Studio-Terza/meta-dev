@@ -51,7 +51,7 @@ impl RawPaths {
 
     fn finding<'path>(used: &PathUse, path: &'path ItemPath, guards: &Guards<'_>) -> Option<Finding<'path>> {
         match AsRef::<Region>::as_ref(used).ground() {
-            Ground::Open => Some(Finding::OutsidePorts(path)),
+            Ground::Open | Ground::Store => Some(Finding::OutsidePorts(path)),
             Ground::Ports => Self::unguarded(guards.covering(used), path),
         }
     }

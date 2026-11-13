@@ -2,10 +2,11 @@ mod operators;
 
 use std::fmt;
 
+use crate::transitions::{Ground, Wrapping};
 use body_lifts::Body;
+use code_model::Mutation;
 use lint_layout::Name;
 use newtype::Counter;
-use transition_facts::{Ground, Mutation, Wrapping};
 
 use crate::algebra::Totality;
 use crate::count::Count;

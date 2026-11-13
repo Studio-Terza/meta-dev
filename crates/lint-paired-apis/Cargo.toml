@@ -13,7 +13,6 @@ doctest = false
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
-lint-paths = { path = "../lint-paths" }
 lint-placement = { path = "../lint-placement" }
 syn.workspace = true
 

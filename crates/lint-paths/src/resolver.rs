@@ -2,9 +2,9 @@ mod head;
 mod route;
 mod trail;
 
-use crate::module::Module;
 use crate::scopes::Scopes;
 use head::Head;
+use lint_core::Module;
 use lint_layout::{Name, UsePath};
 use route::Route;
 use trail::Trail;

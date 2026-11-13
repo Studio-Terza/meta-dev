@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
 use body_shape::{Reading, Shape};
@@ -45,7 +46,7 @@ impl<'file> Fillers<'file> {
     fn filled(&self, node: &Node<'_>) -> BTreeMap<&Name, &BTreeMap<Name, Shape>> {
         self.bodies
             .iter()
-            .filter(|(filled, _)| filled.krate == AsRef::<CrateName>::as_ref(node))
+            .filter(|(filled, _)| Borrow::<Name>::borrow(filled.krate) == node.krate())
             .filter(|(filled, _)| filled.filler == *AsRef::<Name>::as_ref(node))
             .map(|(filled, methods)| (&filled.interface, methods))
             .collect()

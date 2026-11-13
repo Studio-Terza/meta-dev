@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
+use crate::transitions::Transition;
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use transition_facts::Transition;
 
 use crate::end::Ends;
 use crate::form::Form;

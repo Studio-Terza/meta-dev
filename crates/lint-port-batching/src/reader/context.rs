@@ -2,9 +2,9 @@ use std::collections::BTreeSet;
 
 use syn::{Signature, Type};
 
+use lint_core::Module;
 use lint_core::Syntax;
 use lint_layout::Name;
-use lint_paths::Module;
 use lint_placement::CrateName;
 
 use super::scope::Scope;

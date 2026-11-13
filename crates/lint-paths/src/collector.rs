@@ -1,9 +1,9 @@
 use syn::visit::{self, Visit};
 use syn::{Ident, ItemImpl, ItemMod, ItemType, ItemUse, UseTree};
 
-use crate::module::Module;
 use crate::scopes::Scopes;
 use crate::walker::Walker;
+use lint_core::Module;
 use lint_core::{Parsed, SourceFile};
 use lint_layout::{Name, UsePath, Word};
 

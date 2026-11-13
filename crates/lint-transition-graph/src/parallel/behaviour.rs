@@ -2,11 +2,11 @@ mod step;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use code_model::Placed;
+use code_model::Property;
 use equivalence::{Equivalence, Move, Refinement};
-use law_facts::Property;
 use lint_core::Site;
 use lint_layout::Name;
-use lint_placement::CrateName;
 
 use crate::algebra::Operation;
 use crate::algebra_laws::attached::Attached;
@@ -14,6 +14,7 @@ use crate::count::Count;
 use crate::edge::Edge;
 use crate::end::Node;
 use crate::system::TypeSystem;
+use crate::workspace_types::WorkspaceTypes;
 use step::Step;
 
 type Moves<'found> = BTreeMap<Node<'found>, Vec<Move<Node<'found>, Step<'found>, Property>>>;
@@ -53,13 +54,17 @@ impl<'found, 'file> Behaviour<'found, 'file> {
     }
 
     fn declared(system: &TypeSystem<'found, 'file>, node: &Node<'found>) -> Option<Site<'file>> {
-        system
-            .facts()
-            .types()
-            .iter()
-            .filter(|found| AsRef::<Name>::as_ref(*found) == AsRef::<Name>::as_ref(node))
-            .find(|found| AsRef::<CrateName>::as_ref(*found) == AsRef::<CrateName>::as_ref(node))
-            .map(|found| *AsRef::<Site<'file>>::as_ref(found))
+        let model = system.model();
+        model
+            .items()
+            .filter(|placed| placed.krate() == node.krate())
+            .find(|placed| {
+                model
+                    .declared(placed.entity().declared())
+                    .filter(|item| WorkspaceTypes::TYPES.contains(&item.kind()))
+                    .is_some_and(|item| AsRef::<Name>::as_ref(item) == AsRef::<Name>::as_ref(node))
+            })
+            .map(Placed::site)
     }
 
     fn moved(moves: Moves<'found>, edge: &Edge<'found, '_>, step: Step<'found>, laws: &[Property]) -> Moves<'found> {

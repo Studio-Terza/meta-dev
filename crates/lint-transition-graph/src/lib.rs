@@ -13,12 +13,14 @@ mod form;
 mod graph_lint;
 mod homomorphism;
 mod key;
+mod laws;
 mod listed;
 mod mutation;
 mod parallel;
 mod routes;
 mod signatures;
 mod system;
+mod transitions;
 mod workspace_types;
 
 use lint_core::{Headline, Report};
@@ -37,6 +39,7 @@ pub use parallel::ParallelStructures;
 pub use routes::RepeatedRoutes;
 pub use signatures::Alike;
 pub use system::{Extraction, TypeSystem};
+pub use transitions::{Endpoint, Ground, Transition, Transitions};
 
 #[derive(Debug)]
 pub struct TransitionGraph;

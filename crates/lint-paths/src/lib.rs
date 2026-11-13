@@ -2,8 +2,6 @@ mod collector;
 mod cover;
 mod ground;
 mod imports;
-mod module;
-mod nested;
 mod resolver;
 mod scopes;
 mod uses;
@@ -20,9 +18,7 @@ use wanted::Wanted;
 pub use cover::Cover;
 pub use ground::Ground;
 pub use imports::Imports;
-pub use module::Module;
-pub use nested::Nested;
-pub use uses::Use;
+use uses::Use;
 
 #[derive(Debug)]
 pub struct Paths;

@@ -9,9 +9,9 @@ use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, MetaList, Token};
 
+use lint_core::Module;
 use lint_core::{Parsed, Site, Walk};
 use lint_layout::{LineNumber, Name, Word};
-use lint_paths::Module;
 
 use members::Members;
 pub use modules::Modules;

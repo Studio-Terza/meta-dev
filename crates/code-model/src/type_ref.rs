@@ -4,8 +4,12 @@ use std::fmt;
 
 use lint_layout::Name;
 
+mod outline;
+
 use crate::resolved::Resolved;
 use crate::sited::{Sited, Spelling};
+
+pub use outline::{Bounds, Element, Grouped, Outline};
 
 pub trait TypeUses {
     fn named(&mut self, named: &Named<Sited>);
@@ -51,6 +55,7 @@ pub struct Arrayed<Bound> {
 pub struct Projection<Bound> {
     subject: Box<TypeRef<Bound>>,
     arguments: Vec<TypeRef<Bound>>,
+    associated: Option<Name>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,11 +118,17 @@ impl AsRef<Resolved> for Named<Sited> {
 }
 
 impl Named<Sited> {
+    #[must_use]
+    pub fn iterated(&self) -> Option<Element<'_>> {
+        self.arguments.first().or(self.bindings.first()).map(Element::from)
+    }
+
     pub fn each_inner_use(&self, uses: &mut impl TypeUses) {
         self.parts().children().for_each(|ty| ty.each_use(uses));
     }
 
-    fn last_spelled(&self) -> Option<&Name> {
+    #[must_use]
+    pub fn last_spelled(&self) -> Option<&Name> {
         AsRef::<Spelling>::as_ref(&self.path).written()?.last()
     }
 }
@@ -142,8 +153,13 @@ impl<Bound> Arrayed<Bound> {
 
 impl<Bound> Projection<Bound> {
     #[must_use]
-    pub fn new(subject: TypeRef<Bound>, arguments: Vec<TypeRef<Bound>>) -> Projection<Bound> {
-        Projection { subject: Box::new(subject), arguments }
+    pub fn new(subject: TypeRef<Bound>, arguments: Vec<TypeRef<Bound>>, associated: Option<Name>) -> Projection<Bound> {
+        Projection { subject: Box::new(subject), arguments, associated }
+    }
+
+    #[must_use]
+    pub fn associated(&self) -> Option<&Name> {
+        self.associated.as_ref()
     }
 
     fn parts(&self) -> Parts<'_, Bound> {
@@ -154,6 +170,7 @@ impl<Bound> Projection<Bound> {
         Ok(Projection {
             subject: Box::new(rule.child(&self.subject)?),
             arguments: TypeRef::each_rebuilt(&self.arguments, rule)?,
+            associated: self.associated.clone(),
         })
     }
 }
@@ -192,6 +209,22 @@ impl<Bound> TypeRef<Bound> {
             | TypeRef::Projected(_)
             | TypeRef::Function(_)
             | TypeRef::Opaque => None,
+        }
+    }
+
+    #[must_use]
+    pub fn dereferenced(&self) -> &TypeRef<Bound> {
+        match self {
+            TypeRef::Reference(inner) => inner.dereferenced(),
+            TypeRef::Named(_)
+            | TypeRef::Tuple(_)
+            | TypeRef::Pointer(_)
+            | TypeRef::Slice(_)
+            | TypeRef::Array(_)
+            | TypeRef::Bounded(_)
+            | TypeRef::Projected(_)
+            | TypeRef::Function(_)
+            | TypeRef::Opaque => self,
         }
     }
 
@@ -265,6 +298,20 @@ impl TypeRef {
         match self.named() {
             Some(named) => uses.named(named),
             None => self.parts().children().for_each(|child| child.each_use(uses)),
+        }
+    }
+
+    pub fn outlined<Shape: Outline>(&self, outline: Shape) -> Shape::Kind {
+        match self {
+            TypeRef::Reference(inner) | TypeRef::Pointer(inner) => inner.outlined(outline),
+            TypeRef::Named(named) => outline.named(named),
+            TypeRef::Tuple(parts) => outline.grouped(Grouped::from(parts.as_slice())),
+            TypeRef::Slice(element) => outline.sequence(Element::from(element.as_ref())),
+            TypeRef::Array(arrayed) => outline.sequence(Element::from(arrayed.element.as_ref())),
+            TypeRef::Bounded(bounds) => outline.bounded(Bounds::from(bounds.as_slice())),
+            TypeRef::Projected(projection) => outline.projected(projection),
+            TypeRef::Function(callable) => outline.callable(callable),
+            TypeRef::Opaque => outline.other(),
         }
     }
 }

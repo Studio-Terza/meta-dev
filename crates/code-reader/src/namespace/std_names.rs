@@ -1,7 +1,7 @@
 use syn::Macro;
 
 use code_model::{Alias, AliasParameter, Building, ItemPath, Named, Primitive, Resolved, Sited, TypeRef};
-use lint_layout::{Name, Whole, Word, words};
+use lint_layout::{Name, TestMarks, Whole, Word, words};
 
 use super::binding::Binding;
 use super::tables::{Key, Keyed};
@@ -245,7 +245,38 @@ impl StdNames {
         Canonical::new(Word::new("cmp"), Word::new("PartialEq"), Kind::Trait),
         Canonical::new(Word::new("cmp"), Word::new("PartialOrd"), Kind::Trait),
     ];
-    const BEYOND_PRELUDE: [Canonical; 1] = [Canonical::new(Word::new("any"), Word::new("Any"), Kind::Trait)];
+    const BEYOND_PRELUDE: [Canonical; 30] = [
+        Canonical::new(Word::new("any"), Word::new("Any"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Add"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Sub"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Mul"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Div"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Rem"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Neg"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Not"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("BitAnd"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("BitOr"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("BitXor"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Shl"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Shr"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("AddAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("SubAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("MulAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("DivAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("RemAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("BitAndAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("BitOrAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("BitXorAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("ShlAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("ShrAssign"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Index"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("IndexMut"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("Deref"), Kind::Trait),
+        Canonical::new(Word::new("ops"), Word::new("DerefMut"), Kind::Trait),
+        Canonical::new(Word::new("str"), Word::new("FromStr"), Kind::Trait),
+        Canonical::new(Word::new("fmt"), Word::new("Display"), Kind::Trait),
+        Canonical::new(Word::new("fmt"), Word::new("Debug"), Kind::Trait),
+    ];
     const PRIMITIVES: [PrimitiveName; 17] = [
         PrimitiveName::new(Word::new("bool"), Primitive::Bool),
         PrimitiveName::new(Word::new("char"), Primitive::Char),
@@ -533,9 +564,9 @@ impl StdNames {
     }
 
     pub(super) fn expansion(invoked: &Macro) -> Expansion {
-        match invoked.path.get_ident().map(Name::from).and_then(|name| name.matches::<Whole>(&Self::STATEMENT_MACROS)) {
-            Some(_) => Expansion::Statement,
-            None => Expansion::Items,
-        }
+        let listed =
+            invoked.path.get_ident().map(Name::from).and_then(|name| name.matches::<Whole>(&Self::STATEMENT_MACROS));
+        let lawful = TestMarks::law(invoked).map(|_| Expansion::Statement);
+        listed.map(|_| Expansion::Statement).or(lawful).unwrap_or(Expansion::Items)
     }
 }

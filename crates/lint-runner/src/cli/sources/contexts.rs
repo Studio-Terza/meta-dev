@@ -1,12 +1,9 @@
 use super::gathering::Gathering;
-use law_facts::LawReading;
 use lint_clones::Clones;
 use lint_core::Parsed;
 use lint_enum_predicates::EnumPredicates;
-use lint_fakes_at_ports::FakesAtPorts;
 use lint_file::{ContextLint, Gleaning, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
-use lint_mandatory_laws::MandatoryLaws;
 use lint_module_nesting::ModuleNesting;
 use lint_named_numbers::NamedNumbers;
 use lint_no_forwarders::NoForwarders;
@@ -166,13 +163,10 @@ contexts! {
         repeated_methods: RepeatedMethods,
         public_api_tests: PublicApiTests,
         no_test_only_api: NoTestOnlyApi,
-        mandatory_laws: MandatoryLaws,
         repeated_shapes: RepeatedShapes,
     }
     primed: {
-        laws: LawReading,
         state_graph: StateGraph,
-        fakes_at_ports: FakesAtPorts,
         port_batching: PortBatching,
         roles: RoleReading,
     }

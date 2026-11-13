@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use lint_core::Module;
 use lint_core::{Site, Violation};
 use lint_file::Concluded;
 use lint_layout::Name;
-use lint_paths::Module;
 use lint_placement::CrateFile;
 
 use super::members::Members;

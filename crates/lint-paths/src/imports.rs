@@ -1,10 +1,10 @@
 use crate::collector::Collector;
-use crate::module::Module;
 use crate::resolver::Resolver;
 use crate::scopes::Scopes;
 use crate::uses::Use;
 use crate::walker::Walker;
 use crate::wanted::Wanted;
+use lint_core::Module;
 use lint_core::{Parsed, SourceFile};
 use lint_layout::{UsePath, Word};
 

@@ -6,13 +6,13 @@ use crate::query::matches::Matches;
 
 #[derive(Debug)]
 pub struct Reply<'view, 'found, 'file> {
-    matches: Option<Matches<'view, 'file>>,
+    matches: Option<Matches<'view>>,
     answers: Vec<Answer<'view, 'found, 'file>>,
 }
 
 impl<'view, 'found, 'file> Reply<'view, 'found, 'file> {
     pub(crate) fn new(
-        matches: Option<Matches<'view, 'file>>,
+        matches: Option<Matches<'view>>,
         answers: Vec<Answer<'view, 'found, 'file>>,
     ) -> Reply<'view, 'found, 'file> {
         Reply { matches, answers }

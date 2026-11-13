@@ -1,7 +1,9 @@
 mod attributes;
 mod boundary;
 mod calls;
+mod definition;
 mod held;
+mod laws;
 mod places;
 mod regions;
 mod seat;
@@ -22,10 +24,10 @@ use syn::{
 };
 
 use code_model::{
-    Alias, Building, Entry, FileId, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Reach, Region,
-    Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Assigned, Building, Entry, FileId, Function, Held, Implementation, Model, Mutation, Named, Origin, Output,
+    Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
-use lint_core::SourceFile;
+use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position, TestMarks, Whole, Word, words};
 
 use crate::namespace::{
@@ -37,11 +39,14 @@ use crate::planting::Files;
 use attributes::Attributes;
 use boundary::SelfType;
 use calls::CallRow;
+use definition::{LoweredDefinition, Mutations};
 use held::{Holder, HoldingRow, Link};
+use laws::LawRow;
 use places::{PlaceId, PlaceRows, Places};
 use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
-use signature::{DeclaredParameter, InScope, LoweredInput, Written};
+pub use signature::ReceiverSyntax;
+use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Written};
 use uses::UseRow;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -96,10 +101,19 @@ struct ImplRow {
     domain: Domain,
     origin: Origin,
     region: Region,
+    parameters: Vec<LoweredParameter>,
+    assigned: Vec<LoweredAssigned>,
+}
+
+#[derive(Debug)]
+struct LoweredAssigned {
+    name: Name,
+    ty: TypeRef<Written>,
 }
 
 impl ImplRow {
-    fn written(seat: &Seat, region: Region, block: &ItemImpl, ty: TypeRef<Written>) -> ImplRow {
+    fn written(seat: &Seat, region: Region, block: &ItemImpl, scope: &InScope) -> ImplRow {
+        let ty = scope.lowered(&block.self_ty);
         ImplRow {
             located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),
@@ -108,6 +122,16 @@ impl ImplRow {
             domain: Domain::Types,
             origin: Origin::Written,
             region,
+            parameters: LoweredParameter::declared(scope, &block.generics),
+            assigned: block
+                .items
+                .iter()
+                .filter_map(Syntax::impl_type)
+                .map(|associated| LoweredAssigned {
+                    name: Name::from(&associated.ident),
+                    ty: scope.lowered(&associated.ty),
+                })
+                .collect(),
         }
     }
 
@@ -121,6 +145,8 @@ impl ImplRow {
             domain: Domain::Macros,
             origin: Origin::Derived,
             region,
+            parameters: Vec::new(),
+            assigned: Vec::new(),
         }
     }
 
@@ -139,7 +165,15 @@ impl Built for ImplRow {
         });
         let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, located.scope()));
         let implementation =
-            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer()));
+            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer())).parameterised(
+                self.parameters.into_iter().map(|parameter| parameter.resolved(&resolving, located.scope())).collect(),
+                self.assigned
+                    .iter()
+                    .map(|assigned| {
+                        Assigned::new(assigned.name.clone(), Written::typed(&assigned.ty, &resolving, located.scope()))
+                    })
+                    .collect(),
+            );
         located.implementation(footing, building, implementation)
     }
 }
@@ -153,6 +187,9 @@ struct FnRow {
     inputs: Vec<LoweredInput>,
     output: Option<TypeRef<Written>>,
     constraints: Vec<TypeRef<Written>>,
+    parameters: Vec<LoweredParameter>,
+    mutation: Mutation,
+    definition: Option<LoweredDefinition>,
     region: Region,
     place: Option<PlaceId>,
 }
@@ -172,9 +209,12 @@ impl Built for FnRow {
         let resolving = &footing.resolving();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
-        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints);
+        let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
+        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints)
+            .generic(parameters, self.mutation);
         let function = Function::new(self.name, self.owner, self.entry, signature)
-            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place));
+            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place))
+            .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, building, function)
     }
 }
@@ -271,6 +311,7 @@ pub(crate) struct FileRows {
     holdings: Vec<HoldingRow>,
     calls: Vec<CallRow>,
     uses: Vec<UseRow>,
+    laws: Vec<LawRow>,
     places: PlaceRows,
 }
 
@@ -283,6 +324,7 @@ impl FileRows {
             holdings: Footed::appended(columns.holdings, footing, self.holdings),
             calls: Footed::appended(columns.calls, footing, self.calls),
             uses: Footed::appended(columns.uses, footing, self.uses),
+            laws: Footed::appended(columns.laws, footing, self.laws),
         }
     }
 }
@@ -370,6 +412,7 @@ struct Columns<'footing> {
     holdings: Vec<Footed<'footing, HoldingRow>>,
     calls: Vec<Footed<'footing, CallRow>>,
     uses: Vec<Footed<'footing, UseRow>>,
+    laws: Vec<Footed<'footing, LawRow>>,
 }
 
 impl Columns<'_> {
@@ -379,7 +422,8 @@ impl Columns<'_> {
         let with_functions = Footed::every_built(self.functions, with_impls);
         let with_holdings = Footed::every_built(self.holdings, with_functions);
         let with_calls = Footed::every_built(self.calls, with_holdings);
-        Footed::every_built(self.uses, with_calls)
+        let with_uses = Footed::every_built(self.uses, with_calls);
+        Footed::every_built(self.laws, with_uses)
     }
 }
 
@@ -481,7 +525,7 @@ impl Lowering<'_> {
         self.here = outer;
     }
 
-    fn function(&mut self, attributes: &[Attribute], signature: &SynSignature) -> InScope {
+    fn function(&mut self, attributes: &[Attribute], signature: &SynSignature, body: Option<&Block>) -> InScope {
         let generics = self.generics.extended(&signature.generics);
         let name = Name::from(&signature.ident);
         self.lowered.rows.functions.push(FnRow {
@@ -491,6 +535,9 @@ impl Lowering<'_> {
             inputs: generics.inputs(signature),
             output: generics.output(&signature.output),
             constraints: generics.constraints(&signature.generics),
+            parameters: LoweredParameter::declared(&generics, &signature.generics),
+            mutation: Mutations::signed(signature),
+            definition: body.map(|block| LoweredDefinition::of_body(&generics, signature, block)),
             region: self.context.region(),
             place: self.context.place(),
             name,
@@ -530,6 +577,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
         let generics = self.generics.subjectless().extended(&item.generics);
         self.trait_bounds(item, &generics);
         let place = self.trait_owning(&item.ident, &item.attrs);
+        self.filler_owning(item);
         let context = self.context.owned(place);
         self.contextual(context, |lowering| {
             lowering.enclosed(Enclosure::Trait, generics, |enclosed| visit::visit_item_trait(enclosed, item));
@@ -540,7 +588,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
         let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
         let tested = self.context.within_item(&item.attrs).owned(place);
         self.contextual(tested, |lowering| {
-            let generics = lowering.function(&item.attrs, &item.sig);
+            let generics = lowering.function(&item.attrs, &item.sig, Some(&item.block));
             lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_item_fn(enclosed, item));
         });
     }
@@ -548,19 +596,22 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
         let tested = self.context.within_item(&item.attrs);
         self.contextual(tested, |lowering| {
-            let generics = lowering.function(&item.attrs, &item.sig);
+            let generics = lowering.function(&item.attrs, &item.sig, Some(&item.block));
             lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_impl_item_fn(enclosed, item));
         });
     }
 
     fn visit_trait_item_fn(&mut self, item: &'ast TraitItemFn) {
-        let generics = self.function(&item.attrs, &item.sig);
-        self.enclosed(Enclosure::Body, generics, |lowering| visit::visit_trait_item_fn(lowering, item));
+        let tested = self.context.within_item(&item.attrs);
+        self.contextual(tested, |lowering| {
+            let generics = lowering.function(&item.attrs, &item.sig, item.default.as_ref());
+            lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_trait_item_fn(enclosed, item));
+        });
     }
 
     fn visit_foreign_item_fn(&mut self, item: &'ast ForeignItemFn) {
         let enclosing = std::mem::replace(&mut self.enclosure, Enclosure::Foreign);
-        let generics = self.function(&item.attrs, &item.sig);
+        let generics = self.function(&item.attrs, &item.sig, None);
         self.enclosure = enclosing;
         self.enclosed(Enclosure::Body, generics, |lowering| visit::visit_foreign_item_fn(lowering, item));
     }

@@ -162,6 +162,7 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 name = "code-model"
 version = "0.1.0"
 dependencies = [
+ "body-lifts",
  "lint-layout",
  "newtype",
 ]
@@ -170,6 +171,7 @@ dependencies = [
 name = "code-reader"
 version = "0.1.0"
 dependencies = [
+ "body-lifts",
  "code-model",
  "laws",
  "lint-core",
@@ -1040,8 +1042,8 @@ dependencies = [
 name = "graph-query"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "code-reader",
- "law-facts",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1053,8 +1055,6 @@ dependencies = [
  "syn 2.0.119",
  "text-lines",
  "thiserror",
- "transition-facts",
- "type-facts",
  "workspace-metadata",
 ]
 
@@ -1274,18 +1274,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
-name = "law-facts"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-layout",
- "lint-placement",
- "proc-macro2",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "laws"
 version = "0.1.0"
 dependencies = [
@@ -1455,8 +1443,8 @@ dependencies = [
 name = "lint-fakes-at-ports"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-paths",
@@ -1507,7 +1495,6 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
  "syn 2.0.119",
 ]
@@ -1581,13 +1568,12 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
- "law-facts",
+ "code-model",
+ "code-reader",
  "laws",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1747,13 +1733,14 @@ dependencies = [
 name = "lint-no-test-io"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "file-ports",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
+ "newtype",
 ]
 
 [[package]]
@@ -1779,7 +1766,6 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
  "syn 2.0.119",
 ]
@@ -1833,7 +1819,6 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
  "proc-macro2",
  "quote",
@@ -1979,7 +1964,6 @@ dependencies = [
  "file-ports",
  "golden",
  "graph-query",
- "law-facts",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",
@@ -2122,7 +2106,6 @@ dependencies = [
  "code-model",
  "code-reader",
  "equivalence",
- "law-facts",
  "laws",
  "lint-core",
  "lint-distinct-signatures",
@@ -2133,8 +2116,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
- "transition-facts",
- "type-facts",
 ]
 
 [[package]]
@@ -3290,31 +3271,6 @@ dependencies = [
  "serde_json",
  "text-lines",
  "thiserror",
-]
-
-[[package]]
-name = "transition-facts"
-version = "0.1.0"
-dependencies = [
- "body-lifts",
- "lint-core",
- "lint-fixtures",
- "lint-layout",
- "lint-placement",
- "newtype",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "type-facts"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-fixtures",
- "lint-layout",
- "lint-placement",
- "proc-macro2",
- "syn 2.0.119",
 ]
 
 [[package]]

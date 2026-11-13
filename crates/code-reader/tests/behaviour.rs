@@ -1,6 +1,6 @@
 use code_model::{
-    Domain, Entry, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited,
-    TypeRef, Unresolved,
+    Domain, Entry, Exposure, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved,
+    Sited, TypeRef, Unresolved,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -255,7 +255,7 @@ enum Seen {
 impl Seen {
     fn of(model: &Model, resolved: Resolved) -> Seen {
         match resolved.crate_item().and_then(|id| model.declared(id)) {
-            Some(item) => Seen::Item(item.clone()),
+            Some(item) => Seen::Item(item.clone().homed(None).exposed(Exposure::Hidden)),
             None => Seen::Resolved(resolved),
         }
     }
@@ -853,9 +853,10 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     SELF_PROJECTED => [TypeRef::Projected(Projection::new(
         Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()),
         Vec::new(),
+        Some(Name::from("Out")),
     ))],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
-    PROJECTED => [TypeRef::Projected(Projection::new(Expect::param("Self"), Vec::new()))],
+    PROJECTED => [TypeRef::Projected(Projection::new(Expect::param("Self"), Vec::new(), Some(Name::from("Out"))))],
 ]);
 
 const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";
@@ -950,4 +951,19 @@ fn an_implementation_reads_the_type_it_implements_for() {
             Expect::named(Expect::unknown(&["Wrap"]), vec![Expect::param("T")]),
         ]
     );
+}
+
+#[test]
+fn an_item_knows_the_library_crate_that_declares_it() {
+    let files: Vec<SourceFile> = DERIVE_MACROS.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+    let model = Reader::read_files(&files);
+    let homes: Vec<Option<Name>> = ["e", "d"]
+        .iter()
+        .map(|krate| [Name::from(*krate), Name::from("Shown")].into_iter().collect())
+        .map(|path| {
+            let resolved = model.exported(Domain::Macros, &path)?;
+            model.declared(resolved.crate_item()?)?.krate().cloned()
+        })
+        .collect();
+    assert_eq!(homes, [Some(Name::from("d")), Some(Name::from("d"))]);
 }

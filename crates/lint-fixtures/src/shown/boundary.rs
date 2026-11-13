@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use code_reader::Reader;
 use lint_core::{FileHead, Parsed, Report, SourceFile, WorkspaceLint};
 use newtype::Wrapping;
 use workspace_metadata::Metadata;
@@ -38,7 +39,8 @@ impl Shown {
         let files = Sources::placed(manifests, sources);
         let parsed: Vec<Parsed<'_, '_>> = files.iter().map(Parsed::from).collect();
         let heads: Vec<FileHead> = files.iter().map(|file| file.head().clone()).collect();
-        Self::listed(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed)))
+        let model = Reader::read_files(&files);
+        Self::listed(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed), &model))
     }
 
     #[must_use]

@@ -6,7 +6,8 @@ use newtype::{Arbitrary, Newtype};
 use super::walk::Walk;
 use crate::edge::Edge;
 use crate::end::{End, Hop};
-use transition_facts::{Owner, Wrapping};
+use crate::transitions::Wrapping;
+use code_model::CallOwner;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Stop(usize);
@@ -73,7 +74,7 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
         Option::<Hop<'found>>::from(edge.ends()).filter(|hop| hop.joins(from, to).is_some())
     }
 
-    fn resolved(&self, callee: &Name, owner: Owner<'_>) -> Option<&'graph Edge<'found, 'file>> {
+    fn resolved(&self, callee: &Name, owner: CallOwner<'_>) -> Option<&'graph Edge<'found, 'file>> {
         let candidates: Vec<&'graph Edge<'found, 'file>> = self
             .named
             .get(callee)

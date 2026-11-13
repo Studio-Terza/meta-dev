@@ -520,7 +520,10 @@ fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Err
     let fake = Script::new();
     let answer =
         scratch.answer(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo", "clippy", "--all-targets"]);
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+    );
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["clippy", "--all-targets"])]);
     let calls = fake.calls.borrow();
     assert_eq!(
@@ -579,7 +582,10 @@ fn libtest_seconds_are_appended_under_the_stage_name() -> Result<(), Box<dyn Err
     scratch.write("out.txt", "test result: ok. finished in 0.25s\n")?;
     let answer = scratch
         .answer(&Script::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.00", "test-run = 0.25"]);
     Ok(())
 }
@@ -630,7 +636,7 @@ fn off_a_pull_request_the_scope_is_the_whole_workspace() -> Result<(), Box<dyn E
     let fake = Script::new();
     let answer = scratch.answer(&fake, &Reach::on(&scratch, "push"));
     assert_eq!(
-        answer.lines(),
+        answer.lines().shown(),
         Printed { exit: ExitCode::SUCCESS, out: vec!["BUILD_SCOPE=--workspace"], err: Vec::<&str>::new() }
     );
     assert_eq!(Text::lines(&scratch.read("env")), ["BUILD_SCOPE=--workspace"]);
@@ -648,7 +654,10 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
     let scratch = Scratch::new()?;
     let fake = Script { changed: "crates/leaf/src/lib.rs\n".to_owned(), ..Script::new() };
     let answer = scratch.answer(&fake, &Reach::on(&scratch, "pull_request"));
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: LEAF_REPORT.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: LEAF_REPORT.to_vec(), err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&scratch.read("env")), LEAF_REPORT);
     assert_eq!(Text::lines(&scratch.read("sum")), LEAF_REPORT);
     assert_eq!(
@@ -828,7 +837,10 @@ fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box
     let page = Page::with(&[Page::unit("aaa", "0.25"), Page::unit("zzz", "1.5"), Page::unit("zzz", "0.5")].join(","));
     let Timings { answer, stored } = Page::timed(&page)?;
     let expected = vec!["compile time per crate, seconds, longest first, 2.25 in all:", "2.00 zzz", "0.25 aaa"];
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.clone(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: expected.clone(), err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&stored), expected);
     Ok(())
 }
@@ -898,7 +910,10 @@ fn the_graph_path_is_the_longest_chain_of_uncacheable_units_and_is_measured_besi
 -> Result<(), Box<dyn Error>> {
     let Graph { answer, measured, report, asked } = Graph::measured(&Page::listing(TIMINGS_UNITS), TIMINGS_METADATA)?;
     assert_eq!(asked, [Invocation::new("rustc", ["--print", "host-tuple"]), Graph::metadata_for(HOST)]);
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: GRAPH_PATH.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: GRAPH_PATH.to_vec(), err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&report), GRAPH_PATH);
     assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.50"]);
     Ok(())
@@ -1052,7 +1067,10 @@ fn the_graph_follows_only_the_dependencies_cargo_resolves_for_the_host_platform(
         "1.00 app (check)",
         "graph-work 3.50 seconds, the sum of the same units",
     ];
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&measured), ["clippy = 50.80", "graph-path = 2.00"]);
     assert_eq!(
         Text::lines(&report).last().map(String::as_str),
@@ -1069,7 +1087,10 @@ fn a_page_that_records_a_failed_build_is_skipped_and_nothing_is_measured() -> Re
     );
     let Graph { answer, measured, report, asked } = Graph::measured(&failed, TIMINGS_METADATA)?;
     let skipped = "graph-path skipped: the timings page records a failed build, so it times only part of the clippy units and nothing is measured";
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: vec![skipped], err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: vec![skipped], err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&report), [skipped]);
     assert_eq!(Text::lines(&measured), ["clippy = 50.80"]);
     assert_eq!(asked, Vec::<Invocation>::new());
@@ -1243,7 +1264,10 @@ fn the_tools_are_built_and_copied_to_the_tools_directory() -> Result<(), Box<dyn
     ["reach", "lint", "ci"].iter().try_for_each(|name| scratch.write(&format!("built/{name}"), name))?;
     let fake = Script::new();
     let answer = scratch.answer(&fake, &["tools", &scratch.file("built"), &scratch.file("a/b/tools")]);
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+    );
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", [BUILD.as_slice(), &["--bin", "ci"]].concat())]);
     assert_eq!(["reach", "lint", "ci"].map(|name| scratch.read(&format!("a/b/tools/{name}"))), ["reach", "lint", "ci"]);
     Ok(())
@@ -1308,7 +1332,10 @@ fn the_tools_key_lists_the_sources_of_the_tools_and_what_they_depend_on_and_no_o
     scratch.write("out", "KEPT=1\n")?;
     let fake = Script { metadata: TOOLS_WORKSPACE.to_owned(), ..Script::new() };
     let answer = scratch.answer(&fake, &["tools-key", &scratch.file("m/metadata.json"), &scratch.file("out")]);
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&scratch.read("out")), [["KEPT=1"].as_slice(), TOOLS_SOURCES.as_slice()].concat());
     Ok(())
 }
@@ -1330,7 +1357,7 @@ fn a_logged_program_is_run_with_its_log_and_its_exit() -> Result<(), Box<dyn Err
     let fake = Script { logged_text: "seen\n".to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
     let answer = scratch.answer(&fake, &["logged", &scratch.file("logs/test.txt"), "cargo", "test", "-p", "leaf"]);
     assert_eq!(
-        answer.lines(),
+        answer.lines().shown(),
         Printed { exit: ExitCode::from(FAILED_WITH.get()), out: Vec::<&str>::new(), err: Vec::<&str>::new() }
     );
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["test", "-p", "leaf"])]);
@@ -1413,7 +1440,10 @@ laws::table!(
 fn a_shard_runs_cargo_mutants_for_its_slice() {
     let fake = Script::new();
     let answer = Scratch::fresh().answer(&fake, &["mutants-shard", "3/8", "/tmp/out"]);
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+    );
     assert_eq!(*fake.calls.borrow(), [Cargo::mutants("3/8", "/tmp/out")]);
     let refused = Scratch::fresh().answer(&Script::refusing("cargo"), &["mutants-shard", "3/8", "out"]);
     assert_eq!(Text::lines(&refused.err), ["cannot run cargo: boom"]);
@@ -1435,7 +1465,7 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
         ],
     );
     assert_eq!(
-        answer.lines(),
+        answer.lines().shown(),
         Printed { exit: ExitCode::SUCCESS, out: vec!["mutants: none missed"], err: Vec::<&str>::new() }
     );
     assert_eq!(Text::lines(&scratch.read("tmp/c.diff")), ["+a line"]);
@@ -1496,7 +1526,7 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
     let fake = Script::new();
     let answer = Scratch::fresh().answer(&fake, &["mutants-changed", "c.diff", "out", "0/8"]);
     assert_eq!(
-        answer.lines(),
+        answer.lines().shown(),
         Printed {
             exit: ExitCode::SUCCESS,
             out: vec!["mutants: skipped, no crate is reached by this change, so nothing was tested"],
@@ -1524,7 +1554,7 @@ fn step_times_are_asked_of_github_for_the_job() {
     let fake = Script::answering(vec![Reply::to("gh api", "clippy: 12\ntest-run: 3\n")]);
     let answer = Scratch::fresh().answer(&fake, &["wall-times", "Studio-Terza/meta-dev", "77", "gates"]);
     assert_eq!(
-        answer.lines(),
+        answer.lines().shown(),
         Printed {
             exit: ExitCode::SUCCESS,
             out: vec!["wall time per step of gates, seconds:", "clippy: 12", "test-run: 3"],
@@ -1828,7 +1858,7 @@ fn files_are_shown_under_their_names_and_absent_ones_are_said_to_be_absent() -> 
     let answer = scratch.answer(&Script::new(), &["show", &scratch.file("a.txt"), &scratch.file("b.txt")]);
     let (shown, absent) = (format!("{}:", scratch.file("a.txt")), format!("{}:", scratch.file("b.txt")));
     let expected = vec![shown.as_str(), "one", absent.as_str(), "not produced"];
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected, err: Vec::<&str>::new() });
+    assert_eq!(answer.lines().shown(), Printed { exit: ExitCode::SUCCESS, out: expected, err: Vec::<&str>::new() });
     Ok(())
 }
 
@@ -2127,7 +2157,10 @@ fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result
     scratch.write("sum", "before\n")?;
     let answer = scratch.answer(&Script::new(), &["shard-summary", &scratch.file("shards"), &scratch.file("sum")]);
     let expected = ["caught: 3", "missed: 2", "timeout: 1", "unviable: 0", "```", "m1", "m2", "t1", "```"];
-    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&scratch.read("sum")), [["before"].as_slice(), expected.as_slice()].concat());
     Ok(())
 }
@@ -2259,12 +2292,6 @@ impl Printed<String> {
             out: self.out.iter().map(String::as_str).collect(),
             err: self.err.iter().map(String::as_str).collect(),
         }
-    }
-}
-
-impl PartialEq<Printed<&str>> for Printed<String> {
-    fn eq(&self, wanted: &Printed<&str>) -> bool {
-        self.shown() == *wanted
     }
 }
 

@@ -1,27 +1,30 @@
 use std::collections::BTreeSet;
 
-use crate::subject::Subject;
-use law_facts::{Kind, Law, Laws};
+use code_model::{LawKind, Model};
 use lint_layout::Name;
 
-#[derive(Debug, Default)]
-pub(crate) struct Coverage<'file> {
-    laws: Laws<'file>,
+use crate::subject::Subject;
+
+#[derive(Debug)]
+pub(crate) struct Coverage<'model> {
+    model: &'model Model,
 }
 
-impl<'file> From<Laws<'file>> for Coverage<'file> {
-    fn from(laws: Laws<'file>) -> Coverage<'file> {
-        Coverage { laws }
+impl<'model> From<&'model Model> for Coverage<'model> {
+    fn from(model: &'model Model) -> Coverage<'model> {
+        Coverage { model }
     }
 }
 
-impl Coverage<'_> {
-    pub(crate) fn roundtrips_naming(&self, subject: &Subject<'_>) -> Vec<&BTreeSet<Name>> {
-        self.laws
-            .naming(subject.package(), &[subject.owner()])
-            .into_iter()
-            .filter(|law| law.kind() == Kind::Roundtrip)
-            .map(Law::mentions)
+impl<'model> Coverage<'model> {
+    pub(crate) fn roundtrips_naming(&self, subject: &Subject<'_>) -> Vec<&'model BTreeSet<Name>> {
+        self.model
+            .laws()
+            .filter(|placed| placed.krate() == subject.krate())
+            .map(code_model::Placed::entity)
+            .filter(|law| law.kind() == LawKind::Roundtrip)
+            .map(code_model::Law::mentions)
+            .filter(|mentions| mentions.contains(AsRef::<Name>::as_ref(subject)))
             .collect()
     }
 }

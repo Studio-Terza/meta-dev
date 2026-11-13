@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
-use law_facts::Law;
-use law_facts::law_path::{LawPath, Side};
+use crate::laws::Law;
+use crate::laws::LawPath;
+use crate::transitions::{Transition, Wrapping};
+use code_model::Side;
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use transition_facts::{Transition, Wrapping};
 
 use crate::count::Count;
 use crate::edge::Edge;

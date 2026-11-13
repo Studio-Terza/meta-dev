@@ -1,6 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
-use grammar_notes::{Date, Ending, Entry, Line, Notes, Quote, Reading, Unclosed};
+use grammar_notes::{Date, Ending, Entry, Line, Marking, Notes, Quote, Reading, Unclosed};
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{Strategy, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
@@ -221,20 +221,13 @@ impl Reading for Shaped {
         "layout"
     }
 
-    fn heading(self, _line: &Line, _entry: &Entry) -> &'static str {
-        "heading"
-    }
-
-    fn ruling(self, _line: &Line, _entry: &Entry) -> &'static str {
-        "ruling"
-    }
-
-    fn lead(self, _line: &Line, _entry: &Entry) -> &'static str {
-        "lead"
-    }
-
-    fn remark(self, _line: &Line, _entry: &Entry) -> &'static str {
-        "remark"
+    fn entry(self, _line: &Line, _entry: &Entry, marking: Marking) -> &'static str {
+        match marking {
+            Marking::Heading => "heading",
+            Marking::Ruling => "ruling",
+            Marking::Lead => "lead",
+            Marking::Remark => "remark",
+        }
     }
 }
 
@@ -264,19 +257,7 @@ impl Reading for Named {
         Ok(<[Vec<String>; 3]>::default())
     }
 
-    fn heading(self, _line: &Line, entry: &Entry) -> Said {
-        Named::words(entry)
-    }
-
-    fn ruling(self, _line: &Line, entry: &Entry) -> Said {
-        Named::words(entry)
-    }
-
-    fn lead(self, _line: &Line, entry: &Entry) -> Said {
-        Named::words(entry)
-    }
-
-    fn remark(self, _line: &Line, entry: &Entry) -> Said {
+    fn entry(self, _line: &Line, entry: &Entry, _standing: Marking) -> Said {
         Named::words(entry)
     }
 }

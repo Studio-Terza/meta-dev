@@ -1,12 +1,12 @@
 use syn::visit;
 use syn::visit::Visit;
-use syn::{Attribute, Ident, ItemImpl, ItemMacro};
+use syn::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait};
 
 use code_model::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
 use lint_core::Macros;
 use lint_layout::{LineNumber, Name, Position};
 
-use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
+use crate::namespace::{Domain, PortMacro, Resolving, ScopeId, UsePath};
 
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
@@ -158,11 +158,27 @@ impl Lowering<'_> {
         self.placed(PlaceRow { subject: None, owner: Some(owner) })
     }
 
+    pub(super) fn filler_owning(&mut self, item: &ItemTrait) {
+        let line = Position::from(item.ident.span()).line();
+        let region = self.context.within_item(&item.attrs).region();
+        let owner = PortMacro::marked(item).map(|found| OwnerRow {
+            scope: self.here.scope(),
+            name: UsePath::suffixed(&found.ident, PortMacro::FILLER),
+            domain: Domain::Types,
+            line,
+            region,
+        });
+        owner.into_iter().fold(self, |lowering, found| {
+            lowering.placed(PlaceRow { subject: None, owner: Some(found) });
+            lowering
+        });
+    }
+
     pub(super) fn impl_visited(&mut self, block: &ItemImpl) {
         let declared = self.generics.extended(&block.generics);
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
-        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, subject.clone()));
+        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, &declared));
         let rows = &mut self.lowered.rows.places.subjects;
         let subjected = SubjectId(rows.len());
         let implemented =

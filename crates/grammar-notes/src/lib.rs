@@ -9,7 +9,7 @@ mod unclosed;
 
 use named_derive::Named;
 
-pub use boundary::{Entry, Line, Notes, Reading};
+pub use boundary::{Entry, Line, Marking, Notes, Reading};
 pub use cite::Cite;
 pub use date::Date;
 use layout::Layout;

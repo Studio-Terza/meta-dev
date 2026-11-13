@@ -2,15 +2,18 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syn::punctuated::Punctuated;
 use syn::{
-    Attribute, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemUse, Macro, Meta, Stmt, StmtMacro, Token,
-    VisRestricted,
+    Attribute, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, StmtMacro,
+    Token, VisRestricted,
 };
 
-use code_model::{Building, CrateExports, Domain, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved};
+use code_model::{
+    Building, CrateExports, Domain, Exposure, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved,
+};
 use lint_core::Macros;
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
+use super::PortMacro;
 use super::anchor::Anchor;
 use super::binding::Binding;
 use super::boundary::{GlobId, ScopeId};
@@ -138,15 +141,20 @@ pub(crate) struct Declared {
     kind: DeclaredKind,
     domain: Domain,
     marks: Vec<ItemPath>,
+    exposure: Exposure,
 }
 
 impl Declared {
     pub(crate) fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Declared {
-        Declared { name, visibility, kind, domain: Domain::Types, marks: Vec::new() }
+        Declared { name, visibility, kind, domain: Domain::Types, marks: Vec::new(), exposure: Exposure::Hidden }
     }
 
     fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Declared {
-        Declared::new(Name::from(ident), Visibility::from(visibility), DeclaredKind::Item(kind))
+        let exposure = Exposing::declared_by(visibility);
+        Declared {
+            exposure,
+            ..Declared::new(Name::from(ident), Visibility::from(visibility), DeclaredKind::Item(kind))
+        }
     }
 
     fn valued(self) -> Declared {
@@ -160,17 +168,59 @@ impl Declared {
         }
     }
 
-    fn issued(&self, building: &mut Building) -> Option<ItemId> {
+    fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Option<ItemId> {
         let kind = self.kind.item_kind()?;
-        Some(building.declared(ModelItem::new(self.name.clone(), kind).marked(self.marks.clone())))
+        Some(
+            building.declared(
+                ModelItem::new(self.name.clone(), kind)
+                    .marked(self.marks.clone())
+                    .homed(krate.cloned())
+                    .exposed(self.exposure),
+            ),
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Exposing;
+
+impl Exposing {
+    fn declared_by(visibility: &syn::Visibility) -> Exposure {
+        match visibility {
+            syn::Visibility::Public(_) => Exposure::Public,
+            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => Exposure::Hidden,
+        }
     }
 }
 
 #[derive(Debug)]
+struct TraitEntries<'item>(&'item ItemTrait);
+
+impl TraitEntries<'_> {
+    fn entries(self) -> Entries {
+        let trait_item = self.0;
+        let filler = PortMacro::filler(trait_item).map(|name| Declared {
+            name,
+            visibility: Visibility::from(&trait_item.vis),
+            kind: DeclaredKind::Item(ItemKind::Trait),
+            domain: Domain::Types,
+            marks: Vec::new(),
+            exposure: Exposing::declared_by(&trait_item.vis),
+        });
+        [Declared::named_item(&trait_item.ident, &trait_item.vis, ItemKind::Trait).marked(&trait_item.attrs)]
+            .into_iter()
+            .chain(filler)
+            .map(Entries::from)
+            .fold(Entries::default(), Entries::merged)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct DeriveMacro<'item>(&'item ItemFn);
 
 impl DeriveMacro<'_> {
     const ATTRIBUTE: [Word<'static>; 1] = words!["proc_macro_derive"];
+    const FUNCTION_LIKE: [Word<'static>; 2] = words!["proc_macro", "proc_macro_attribute"];
 
     fn declared(self) -> Vec<Declared> {
         let visibility = Visibility::from(&self.0.vis);
@@ -184,8 +234,24 @@ impl DeriveMacro<'_> {
                 kind: DeclaredKind::Item(ItemKind::Derive),
                 domain: Domain::Macros,
                 marks: Vec::new(),
+                exposure: Exposing::declared_by(&self.0.vis),
             })
+            .chain(self.function_like())
             .collect()
+    }
+
+    fn function_like(self) -> Option<Declared> {
+        let marked = self.0.attrs.iter().find_map(|attribute| {
+            attribute.path().get_ident().map(Name::from).and_then(|ident| ident.matches::<Whole>(&Self::FUNCTION_LIKE))
+        });
+        marked.map(|_| Declared {
+            name: Name::from(&self.0.sig.ident),
+            visibility: Visibility::from(&self.0.vis),
+            kind: DeclaredKind::Item(ItemKind::Macro),
+            domain: Domain::Macros,
+            marks: Vec::new(),
+            exposure: Exposing::declared_by(&self.0.vis),
+        })
     }
 
     fn named(attribute: &Attribute) -> Option<Name> {
@@ -388,9 +454,7 @@ impl From<&Item> for Entries {
             Item::Type(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Alias))
             }
-            Item::Trait(declared) => Entries::from(
-                Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait).marked(&declared.attrs),
-            ),
+            Item::Trait(declared) => TraitEntries(declared).entries(),
             Item::TraitAlias(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
             }
@@ -443,8 +507,8 @@ impl Entries {
         Entries { declared, ..self }
     }
 
-    pub(super) fn issued(&self, building: &mut Building) -> Vec<Option<ItemId>> {
-        self.declared.iter().map(|declared| declared.issued(building)).collect()
+    pub(super) fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Vec<Option<ItemId>> {
+        self.declared.iter().map(|declared| declared.issued(building, krate)).collect()
     }
 
     pub(super) fn exported(&self) -> impl Iterator<Item = Key<'_>> {
