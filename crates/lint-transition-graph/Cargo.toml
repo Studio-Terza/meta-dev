@@ -14,7 +14,7 @@ body-lifts = { path = "../body-lifts" }
 body-shape = { path = "../body-shape" }
 equivalence = { path = "../equivalence" }
 lint-core = { path = "../lint-core" }
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
@@ -24,7 +24,7 @@ syn.workspace = true
 
 [dev-dependencies]
 lint-distinct-signatures = { path = "../lint-distinct-signatures" }
-code-reader = { path = "../code-reader" }
+graph-reader = { path = "../graph-reader" }
 lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 laws = { path = "../laws" }

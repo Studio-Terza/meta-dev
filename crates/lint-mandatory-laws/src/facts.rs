@@ -4,7 +4,7 @@ mod reading;
 
 use std::collections::BTreeMap;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::Violation;
 
 use crate::coverage::Coverage;

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::num::NonZeroUsize;
 
-use code_model::{Function, Implementation, MethodShape, Placed, Site};
+use graph::{Function, Implementation, MethodShape, Placed, Site};
 use lint_layout::Name;
 use newtype::Wrapping;
 

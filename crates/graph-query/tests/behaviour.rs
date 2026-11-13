@@ -1,5 +1,5 @@
-use code_model::MethodShape;
-use code_reader::Reader;
+use graph::MethodShape;
+use graph_reader::Reader;
 use std::ffi::OsString;
 
 use graph_query::{Query, QueryFailure, Role, Term};

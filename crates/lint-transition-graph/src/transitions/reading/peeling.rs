@@ -1,4 +1,4 @@
-use code_model::{
+use graph::{
     Bounds, Callable, Element, Grouped, ItemPath, Named, Outline, Projection, Resolved as Target, Sited, TypeRef,
 };
 use lint_layout::{Name, Whole, Word, words};

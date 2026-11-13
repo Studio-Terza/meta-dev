@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use code_reader::Reader;
+use graph_reader::Reader;
 use lint_core::{Lint, ModelLint, Report, SourceFile};
 
 use crate::sources::{Lines, Sources};

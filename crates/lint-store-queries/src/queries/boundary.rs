@@ -1,7 +1,7 @@
 use sqlformat::{FormatOptions, QueryParams};
 use syn::LitStr;
 
-use code_model::Quote;
+use graph::Quote;
 
 use super::unformatted::Unformatted;
 

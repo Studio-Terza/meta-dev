@@ -8,10 +8,10 @@ use std::path::PathBuf;
 use std::thread::Scope;
 
 use cargo_ports::Cargo;
-use code_model::Model;
-use code_reader::Reader;
 use file_ports::Files;
+use graph::Model;
 use graph_query::{Answered, Query, QueryFailure};
+use graph_reader::Reader;
 use lint_clones::Clones;
 use lint_core::{Readout, Report, SourceFile};
 use lint_paired_apis::PairedApis;

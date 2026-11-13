@@ -1,4 +1,4 @@
-use code_model::{Call, Callee, ItemPath, Model, Placed};
+use graph::{Call, Callee, ItemPath, Model, Placed};
 use lint_core::Violation;
 use lint_layout::{Name, Whole, Word, words};
 

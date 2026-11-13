@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::{
+use graph::{
     Bounds, Callable, Element, Ground, Grouped, Held, Holding, ItemId, ItemKind, ItemPath, Model, Named, Outline,
     Owner, Parameter, Placed, Projection, Region, Resolved, Seat, Sited, TypeRef,
 };

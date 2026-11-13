@@ -1,6 +1,6 @@
 mod raw_paths;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report};
 use raw_paths::RawPaths;
 

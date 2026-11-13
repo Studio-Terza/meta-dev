@@ -159,30 +159,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
-name = "code-model"
-version = "0.1.0"
-dependencies = [
- "body-lifts",
- "lint-layout",
- "newtype",
-]
-
-[[package]]
-name = "code-reader"
-version = "0.1.0"
-dependencies = [
- "body-lifts",
- "code-model",
- "laws",
- "lint-core",
- "lint-layout",
- "lint-placement",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "console-ports"
 version = "0.1.0"
 dependencies = [
@@ -529,7 +505,7 @@ dependencies = [
 name = "equivalence"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "laws",
  "newtype",
 ]
@@ -1039,11 +1015,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "graph"
+version = "0.1.0"
+dependencies = [
+ "body-lifts",
+ "lint-layout",
+ "newtype",
+]
+
+[[package]]
 name = "graph-query"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
+ "graph",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1056,6 +1041,21 @@ dependencies = [
  "text-lines",
  "thiserror",
  "workspace-metadata",
+]
+
+[[package]]
+name = "graph-reader"
+version = "0.1.0"
+dependencies = [
+ "body-lifts",
+ "graph",
+ "laws",
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -1370,8 +1370,8 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
- "code-model",
  "file-ports",
+ "graph",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -1385,7 +1385,7 @@ dependencies = [
 name = "lint-crate-graph"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1405,8 +1405,8 @@ dependencies = [
 name = "lint-effect-sites"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
+ "graph",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1443,7 +1443,7 @@ dependencies = [
 name = "lint-fakes-at-ports"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1460,8 +1460,8 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
- "code-reader",
  "file-ports",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-placement",
@@ -1500,7 +1500,7 @@ dependencies = [
 name = "lint-hand-impls"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1565,8 +1565,8 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
+ "graph",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1624,7 +1624,7 @@ dependencies = [
 name = "lint-narrowed-returns"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1717,9 +1717,9 @@ dependencies = [
 name = "lint-no-plaintext"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
  "file-ports",
+ "graph",
+ "graph-reader",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1730,9 +1730,9 @@ dependencies = [
 name = "lint-no-test-io"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
  "file-ports",
+ "graph",
+ "graph-reader",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1782,8 +1782,8 @@ dependencies = [
 name = "lint-port-batching"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
+ "graph",
+ "graph-reader",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1793,7 +1793,7 @@ dependencies = [
 name = "lint-port-dependencies"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "laws",
  "lint-core",
  "lint-effect-sites",
@@ -1812,7 +1812,7 @@ dependencies = [
 name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1833,9 +1833,9 @@ dependencies = [
 name = "lint-process-starters"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
  "file-ports",
+ "graph",
+ "graph-reader",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -1870,7 +1870,7 @@ dependencies = [
 name = "lint-raw-resources"
 version = "0.1.0"
 dependencies = [
- "code-model",
+ "graph",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1939,11 +1939,11 @@ name = "lint-runner"
 version = "0.1.0"
 dependencies = [
  "cargo-ports",
- "code-model",
- "code-reader",
  "file-ports",
  "golden",
+ "graph",
  "graph-query",
+ "graph-reader",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",
@@ -2037,8 +2037,8 @@ dependencies = [
 name = "lint-store-queries"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
+ "graph",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -2051,8 +2051,8 @@ dependencies = [
 name = "lint-test-budget"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
+ "graph",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-file",
@@ -2084,9 +2084,9 @@ version = "0.1.0"
 dependencies = [
  "body-lifts",
  "body-shape",
- "code-model",
- "code-reader",
  "equivalence",
+ "graph",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-distinct-signatures",

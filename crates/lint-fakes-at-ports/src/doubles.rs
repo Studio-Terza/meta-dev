@@ -2,9 +2,7 @@ mod finding;
 
 use std::collections::BTreeMap;
 
-use code_model::{
-    Ground, Harness, Implementation, ItemId, ItemKind, ItemPath, Model, Placed, Region, Resolved, Spelling,
-};
+use graph::{Ground, Harness, Implementation, ItemId, ItemKind, ItemPath, Model, Placed, Region, Resolved, Spelling};
 use lint_core::{Site, Violation};
 use lint_layout::{CamelWord, Name, Whole, Word, words};
 

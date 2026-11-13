@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::{
+use graph::{
     Function, Holding, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Named, Origin, Placed, Reach,
     References, Region, Resolved, Seat, Sited, Traversal, TypeRef, TypeUses,
 };
@@ -122,7 +122,7 @@ impl<'file> Members<'file> {
     fn linked(&self, holder: Member<'file>, reached: Reached) -> Vec<Link<'file>> {
         let targets = self.references.targets();
         let standing = |item: ItemId| {
-            let kind = self.model.declared(item).map(code_model::Item::kind);
+            let kind = self.model.declared(item).map(graph::Item::kind);
             kind.filter(|found| Self::STANDING.contains(found)).map(|_| item)
         };
         let next = |item: ItemId| {

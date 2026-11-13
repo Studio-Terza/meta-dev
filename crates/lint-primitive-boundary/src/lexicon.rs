@@ -1,4 +1,4 @@
-use code_model::{External, ItemPath, Resolved};
+use graph::{External, ItemPath, Resolved};
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::finding::Finding;

@@ -3,7 +3,7 @@ mod ports;
 mod reserved_names;
 mod roles;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{FileLint, PrimedFacts, Reads};
 use workspace_metadata::{Graph, Metadata, Role};

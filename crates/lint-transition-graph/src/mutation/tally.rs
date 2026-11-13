@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::transitions::Ground;
-use code_model::Mutation;
+use graph::Mutation;
 use lint_core::Fix;
 use lint_core::{Site, Violation};
 use lint_layout::Name;

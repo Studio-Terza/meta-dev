@@ -10,7 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-code-reader = { path = "../code-reader" }
+graph-reader = { path = "../graph-reader" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
@@ -18,7 +18,7 @@ lint-transition-graph = { path = "../lint-transition-graph" }
 newtype = { path = "../newtype" }
 syn.workspace = true
 thiserror.workspace = true
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 workspace-metadata = { path = "../workspace-metadata" }
 
 [dev-dependencies]

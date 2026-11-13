@@ -1,4 +1,4 @@
-use code_model::{ItemPath, Mention, PathUse, Placed, Region};
+use graph::{ItemPath, Mention, PathUse, Placed, Region};
 use lint_layout::{Name, PathTail, Whole, Word, words};
 
 use super::called::Called;

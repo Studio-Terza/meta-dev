@@ -10,13 +10,13 @@ test = false
 doctest = false
 
 [dependencies]
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
 
 [dev-dependencies]
-code-reader = { path = "../code-reader" }
+graph-reader = { path = "../graph-reader" }
 file-ports = { path = "../file-ports" }
 lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }

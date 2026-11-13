@@ -2,7 +2,7 @@ use body_lifts::{Body, Branching};
 use lint_core::Site;
 use lint_layout::Name;
 
-use code_model::{Invocation, Mutation};
+use graph::{Invocation, Mutation};
 
 use super::resolved::Resolved;
 use super::wrapping::Wrapping;

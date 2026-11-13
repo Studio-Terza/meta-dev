@@ -1,0 +1,26 @@
+[package]
+name = "graph-reader"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+body-lifts = { path = "../body-lifts" }
+graph = { path = "../graph" }
+lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

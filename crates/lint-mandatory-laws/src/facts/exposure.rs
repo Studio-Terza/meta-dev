@@ -4,11 +4,11 @@ pub(crate) enum Exposure {
     Public,
 }
 
-impl From<code_model::Exposure> for Exposure {
-    fn from(exposure: code_model::Exposure) -> Exposure {
+impl From<graph::Exposure> for Exposure {
+    fn from(exposure: graph::Exposure) -> Exposure {
         match exposure {
-            code_model::Exposure::Public => Exposure::Public,
-            code_model::Exposure::Hidden => Exposure::Private,
+            graph::Exposure::Public => Exposure::Public,
+            graph::Exposure::Hidden => Exposure::Private,
         }
     }
 }

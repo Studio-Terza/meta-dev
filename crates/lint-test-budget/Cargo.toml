@@ -10,7 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 newtype = { path = "../newtype" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
@@ -21,7 +21,7 @@ proc-macro2.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
-code-reader = { path = "../code-reader" }
+graph-reader = { path = "../graph-reader" }
 lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 lint-placement = { path = "../lint-placement" }

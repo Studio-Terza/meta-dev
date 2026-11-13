@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use code_model::{MethodShape, Receiver, Returned, Taken};
-use code_reader::ReceiverSyntax;
+use graph::{MethodShape, Receiver, Returned, Taken};
+use graph_reader::ReceiverSyntax;
 use lint_layout::Name;
 use syn::{FnArg, ReturnType, Signature, Type, TypeParamBound};
 

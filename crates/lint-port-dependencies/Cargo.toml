@@ -11,7 +11,7 @@ doctest = false
 
 [dependencies]
 lint-core = { path = "../lint-core" }
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 lint-effect-sites = { path = "../lint-effect-sites" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }

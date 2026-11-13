@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use code_reader::Reader;
 use file_ports::{Bytes, Memory};
+use graph_reader::Reader;
 use lint_core::{ModelLint, Readout, SourceFile};
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_layout::{CrateSource, Crates, Dependencies, Failure, LibraryForm, Name, PackageName, SourceText};

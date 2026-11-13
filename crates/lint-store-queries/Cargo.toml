@@ -10,14 +10,14 @@ test = false
 doctest = false
 
 [dependencies]
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 sqlformat.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
-code-reader = { path = "../code-reader" }
+graph-reader = { path = "../graph-reader" }
 lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 laws = { path = "../laws" }

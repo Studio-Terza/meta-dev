@@ -10,7 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 newtype = { path = "../newtype" }
 
 [dev-dependencies]

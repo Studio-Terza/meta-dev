@@ -4,7 +4,7 @@ use std::mem::ManuallyDrop;
 use std::thread::Scope;
 
 use cargo_ports::Cargo;
-use code_model::Model;
+use graph::Model;
 
 use lint_hand_impls::HandImpls;
 

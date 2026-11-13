@@ -9,7 +9,7 @@ mod resolved;
 mod transition;
 mod wrapping;
 
-use code_model::Model;
+use graph::Model;
 
 pub use context::Context;
 pub use endpoint::Endpoint;

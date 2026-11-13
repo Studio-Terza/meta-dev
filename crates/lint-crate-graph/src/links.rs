@@ -1,5 +1,5 @@
-use code_model::ItemGraph;
-use code_model::{Model, References};
+use graph::ItemGraph;
+use graph::{Model, References};
 use lint_core::{Bound, Site, Violation};
 use lint_layout::Name;
 

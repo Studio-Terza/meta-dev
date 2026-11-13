@@ -1,4 +1,4 @@
-use code_model::Model;
+use graph::Model;
 
 use crate::report::Report;
 

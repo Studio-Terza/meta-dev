@@ -1,7 +1,7 @@
 mod ports;
 mod reader;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report};
 
 use ports::Ports;

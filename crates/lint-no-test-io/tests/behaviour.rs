@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use code_reader::Reader;
 use file_ports::{Bytes, Memory};
+use graph_reader::Reader;
 use lint_core::{ModelLint, SourceFile, SourceText};
 use lint_no_test_io::NoTestIo;
 use lint_placement::Placement;

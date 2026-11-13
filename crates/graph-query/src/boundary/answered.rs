@@ -1,6 +1,6 @@
 use std::fmt;
 
-use code_reader::Reader;
+use graph_reader::Reader;
 use lint_core::SourceFile;
 use lint_transition_graph::{Extraction, Transitions, TypeSystem};
 use workspace_metadata::Metadata;

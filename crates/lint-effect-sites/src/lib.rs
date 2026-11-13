@@ -1,6 +1,6 @@
 mod crate_effects;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report};
 
 use crate_effects::CrateEffects;

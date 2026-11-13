@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::iter;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Parsed, SourceFile};
 use lint_file::Gleaning;
 use lint_placement::CrateName;

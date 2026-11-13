@@ -1,7 +1,7 @@
 mod doubles;
 
-use code_model::Model;
 use doubles::Doubles;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report};
 
 #[derive(Debug)]

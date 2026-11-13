@@ -2,9 +2,9 @@ mod coverage;
 mod facts;
 mod subject;
 
-use code_model::Model;
 use coverage::Coverage;
 use facts::Facts;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report};
 
 #[derive(Debug)]

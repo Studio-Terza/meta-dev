@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::laws::Law;
 use crate::laws::LawPath;
-use code_model::Property;
-use code_model::Side;
+use graph::Property;
+use graph::Side;
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;

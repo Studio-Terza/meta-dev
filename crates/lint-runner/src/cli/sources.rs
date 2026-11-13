@@ -7,9 +7,9 @@ pub(crate) use gathering::{Claimed, Gathering};
 use std::sync::OnceLock;
 
 use cargo_ports::Cargo;
-use code_model::Model;
-use code_reader::{FileFacts, Reader};
 use file_ports::Files;
+use graph::Model;
+use graph_reader::{FileFacts, Reader};
 use lint_core::{FileHead, Readout};
 use lint_reader::{CrateSources, Described, Partition, SharedRead, Stage, Unlocated};
 

@@ -1,4 +1,4 @@
-use code_model::{Ground, Model, PathUse, Placed, Region};
+use graph::{Ground, Model, PathUse, Placed, Region};
 use lint_layout::{PathTail, Word, words};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

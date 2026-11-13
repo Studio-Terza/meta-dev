@@ -16,8 +16,8 @@ file-ports = { path = "../file-ports" }
 graph-query = { path = "../graph-query" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-complexity = { path = "../lint-complexity" }
-code-model = { path = "../code-model" }
-code-reader = { path = "../code-reader" }
+graph = { path = "../graph" }
+graph-reader = { path = "../graph-reader" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-hand-impls = { path = "../lint-hand-impls" }

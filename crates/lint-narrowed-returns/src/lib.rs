@@ -2,7 +2,7 @@ mod error_types;
 mod finding;
 mod narrowed;
 
-use code_model::{Function, Model, Placed};
+use graph::{Function, Model, Placed};
 use lint_core::{Headline, ModelLint, Report, Violation};
 
 use error_types::ErrorTypes;

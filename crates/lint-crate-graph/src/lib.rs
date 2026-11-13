@@ -1,6 +1,6 @@
 mod links;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report};
 
 use links::Links;

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use code_model::{
+use graph::{
     Held, Holding, ItemId, ItemPath, Model, Named, Placed, Primitive, Resolved, Sited, Spelling, TypeRef, TypeUses,
     Unresolved,
 };

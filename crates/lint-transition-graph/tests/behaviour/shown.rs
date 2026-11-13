@@ -1,5 +1,5 @@
-use code_model::Model;
-use code_reader::Reader;
+use graph::Model;
+use graph_reader::Reader;
 use std::marker::PhantomData;
 
 use lint_core::{Lint, Report, SourceFile};

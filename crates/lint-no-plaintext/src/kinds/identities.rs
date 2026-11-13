@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::{Domain, External, ItemPath, Model, Resolved};
+use graph::{Domain, External, ItemPath, Model, Resolved};
 use lint_layout::{PackageName, Word, words};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

@@ -13,7 +13,7 @@ doctest = false
 newtype = { path = "../newtype" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
-code-model = { path = "../code-model" }
+graph = { path = "../graph" }
 
 [dev-dependencies]
 lint-core = { path = "../lint-core" }

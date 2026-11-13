@@ -1,4 +1,4 @@
-use code_model::Site;
+use graph::Site;
 
 use crate::member::Keyed;
 

@@ -4,7 +4,7 @@ mod peeling;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use code_model::{
+use graph::{
     Entry, Function, Implementation, Input, ItemId, ItemKind, Model, Owner as Seated, Parameter, Placed, Reach, Region,
     Seat, TypeRef,
 };
@@ -147,7 +147,7 @@ impl<'file> Reading<'file> {
             .with_functions(functions)
     }
 
-    fn provided(&self, placed: Placed<'file, &'file code_model::ItemDeclaration>, name: &Name) -> Context<'file> {
+    fn provided(&self, placed: Placed<'file, &'file graph::ItemDeclaration>, name: &Name) -> Context<'file> {
         let scope = Scope { reading: self, selfish: Nature::Interface, parameters: Vec::new(), output: None };
         let functions: Vec<Transitive<'file>> = self
             .provided
