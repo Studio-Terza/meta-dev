@@ -1022,7 +1022,7 @@ fn a_tree_read_by_many_workers_reports_the_same_each_time() -> Result<(), Box<dy
         root.write(&format!("src/{name}/inner.rs"), DIRTY).map(|_| ())
     })?;
     let first = root.reported().err;
-    let runs: Vec<String> = (0..8).map(|_| root.reported().err).collect();
+    let runs: Vec<String> = std::iter::repeat_with(|| root.reported().err).take(8).collect();
     assert!(runs.iter().all(|run| *run == first), "{runs:?}");
     assert!(first.contains("src/first/inner.rs"), "{first}");
     Ok(())
