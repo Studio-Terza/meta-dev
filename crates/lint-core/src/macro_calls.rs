@@ -1,6 +1,6 @@
 use std::iter;
 
-use proc_macro2::TokenTree;
+use proc_macro2::{TokenStream, TokenTree};
 use syn::parse::discouraged::Speculative;
 use syn::parse::{Parse, ParseStream};
 use syn::{Macro, Token};
@@ -9,9 +9,24 @@ use syn::{Macro, Token};
 pub struct MacroCalls(Vec<Macro>);
 
 impl MacroCalls {
+    const BANG: char = '!';
+
     #[must_use]
     pub fn within(invocation: &Macro) -> Vec<Macro> {
-        syn::parse2::<MacroCalls>(invocation.tokens.clone()).map_or_default(|calls| calls.0)
+        Self::bangs(&invocation.tokens)
+            .map_or_default(|()| syn::parse2::<MacroCalls>(invocation.tokens.clone()).map_or_default(|calls| calls.0))
+    }
+
+    fn bangs(tokens: &TokenStream) -> Option<()> {
+        tokens.clone().into_iter().find_map(Self::bang)
+    }
+
+    fn bang(tree: TokenTree) -> Option<()> {
+        match tree {
+            TokenTree::Punct(punct) => Some(punct.as_char()).filter(|spelled| *spelled == Self::BANG).map(|_| ()),
+            TokenTree::Group(group) => Self::bangs(&group.stream()),
+            TokenTree::Ident(_) | TokenTree::Literal(_) => None,
+        }
     }
 
     fn step(input: ParseStream) -> syn::Result<Vec<Macro>> {
