@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::thread::Scope;
 
 use cargo_ports::Cargo;
-use code_model::Model;
 use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
@@ -121,12 +120,8 @@ pub(crate) struct Survey<'files> {
 }
 
 impl<'files> Survey<'files> {
-    pub(crate) fn measured(files: &'files [SourceFile], model: &Model) -> Survey<'files> {
-        Survey {
-            budget: TestBudget::measured(files, model),
-            paired: PairedApis::report(files),
-            clones: Clones::report(files),
-        }
+    pub(crate) fn measured(files: &'files [SourceFile]) -> Survey<'files> {
+        Survey { budget: TestBudget::measured(files), paired: PairedApis::report(files), clones: Clones::report(files) }
     }
 }
 

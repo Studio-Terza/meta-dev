@@ -1865,6 +1865,7 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
+ "lint-paths",
  "lint-placement",
 ]
 
@@ -2072,8 +2073,6 @@ dependencies = [
 name = "lint-test-budget"
 version = "0.1.0"
 dependencies = [
- "code-model",
- "code-reader",
  "laws",
  "lint-core",
  "lint-fixtures",

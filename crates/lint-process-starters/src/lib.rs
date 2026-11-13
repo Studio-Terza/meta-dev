@@ -11,7 +11,7 @@ impl ModelLint for ProcessStarters {
     fn report(model: &Model) -> Report<'_> {
         Report::new(
             Headline::new("only ports start processes"),
-            CommandPaths::across(model, Scope::OutsidePorts)
+            CommandPaths::queried(model, Scope::OutsidePorts)
                 .into_iter()
                 .map(|site| {
                     Violation::new(

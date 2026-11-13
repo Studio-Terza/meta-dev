@@ -239,7 +239,7 @@ fn every_start_is_counted_including_those_behind_ports() {
     let other = Sources::file("b.rs", Text::new(OTHER_COMMAND));
     let counts: Vec<usize> = [ported, inline, other]
         .iter()
-        .map(|file| CommandPaths::across(&Reader::read_files(std::slice::from_ref(file)), Scope::Everywhere).len())
+        .map(|file| CommandPaths::queried(&Reader::read_files(std::slice::from_ref(file)), Scope::Everywhere).len())
         .collect();
     assert_eq!(counts, vec![1, 1, 0]);
 }
