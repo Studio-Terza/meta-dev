@@ -2,8 +2,11 @@ use crate::collector::Collector;
 use crate::module::Module;
 use crate::resolver::Resolver;
 use crate::scopes::Scopes;
+use crate::uses::Use;
+use crate::walker::Walker;
+use crate::wanted::Wanted;
 use lint_core::{Parsed, SourceFile};
-use lint_layout::UsePath;
+use lint_layout::{UsePath, Word};
 
 #[derive(Debug)]
 pub struct Imports<'file>(Scopes<'file>);
@@ -18,6 +21,11 @@ impl<'file> Imports<'file> {
     #[must_use]
     pub fn candidates(&self, module: &Module<'_>, path: UsePath) -> Vec<UsePath> {
         Resolver::over(&self.0).candidates(module, path)
+    }
+
+    #[must_use]
+    pub fn read<'read>(&self, file: &'read SourceFile, finals: &[Word<'_>]) -> Vec<Use<'read>> {
+        Walker::walk(file, &self.0, &Wanted::among(&self.0, finals), &Resolver::over(&self.0))
     }
 }
 

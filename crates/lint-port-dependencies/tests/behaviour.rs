@@ -1,4 +1,4 @@
-use lint_file::Filed;
+use lint_file::{Filed, Primed};
 use lint_fixtures::{Lines, Located, Shown, Source, Sources, Text};
 use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 
@@ -797,7 +797,7 @@ laws::table!(
 
 laws::table!(
     in_a_port_crate_effects_sit_only_in_fillers,
-    Sources::flagged::<EffectsInFillers>,
+    Sources::flagged::<Primed<EffectsInFillers>>,
     [
         FILLED => Lines::default(),
         INHERENT => Lines::from(["crates/store-ports/src/lib.rs:8"]),

@@ -156,7 +156,7 @@ impl Lints {
         <Primed<PortBatching> as Registered>::ENTRY,
         Entry::spelled::<OwnedDependencies>(Work::Described(<OwnedDependencies as WorkspaceLint>::report)),
         Entry::spelled::<KeyDependencyRoles>(Work::Described(<KeyDependencyRoles as WorkspaceLint>::report)),
-        Entry::spelled::<EffectsInFillers>(Work::Checked(|readout| vec![EffectsInFillers::report(readout.files())])),
+        <Primed<EffectsInFillers> as Registered>::ENTRY,
         <Filed<CountedCalls> as Registered>::ENTRY,
         <Filed<HiddenSqlx> as Registered>::ENTRY,
         <Filed<StoreQueries> as Registered>::ENTRY,

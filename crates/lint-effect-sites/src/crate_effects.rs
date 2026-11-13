@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use code_model::{Ground, Model, Reach, Region};
 use lint_core::{Site, SourceFile, Violation};
-use lint_paths::Paths;
+use lint_paths::Imports;
 use lint_placement::CrateName;
 
 use file_scan::FileScan;
@@ -23,9 +23,9 @@ pub struct CrateEffects<'file>(Vec<EffectSite<'file>>);
 
 impl<'file> CrateEffects<'file> {
     #[must_use]
-    pub fn found(files: &[&'file SourceFile]) -> CrateEffects<'file> {
-        let called = Paths::read(files.iter().copied(), &Vocabulary::FINALS);
-        let scans: Vec<FileScan<'file>> = files.iter().map(|file| FileScan::scanned(file)).collect();
+    pub fn found_in(file: &'file SourceFile, imports: &Imports<'_>) -> CrateEffects<'file> {
+        let called = imports.read(file, &Vocabulary::FINALS);
+        let scans: Vec<FileScan<'file>> = vec![FileScan::scanned(file)];
         let tested: BTreeSet<Site<'file>> = scans.iter().flat_map(FileScan::tested).copied().collect();
         let reached: Vec<EffectSite<'file>> = called.iter().filter_map(Vocabulary::site_of).collect();
         let placed: BTreeSet<Site<'file>> = reached.iter().map(EffectSite::place).collect();
