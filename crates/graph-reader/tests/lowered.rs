@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use graph::{
     Arrayed, Callee, Held, ItemPath, MacroCall, Named, Owner, Primitive, Reach, Region, Resolved, Seat, Sited,
     Spelling, TypeRef, Within, Zone,
@@ -305,4 +307,27 @@ const SUPPORT: &str = "pub fn helper() {}\n";
 #[test]
 fn a_test_module_file_is_read_at_test_reach() {
     assert_eq!(Read::reaches(SUPPORTED, SUPPORT), [Reach::Shipped, Reach::Test]);
+}
+
+const GATED_ROOT: &str = "pub fn root() {}\n#[cfg(test)]\nmod gated;\n";
+const GATED: &str = "pub fn middle() {}\nmod deeper;\n";
+const DEEPER: &str = "pub fn deep() {}\n";
+
+#[test]
+fn a_module_file_below_a_test_gated_module_file_is_read_at_test_reach() {
+    let files = [("src/lib.rs", GATED_ROOT), ("src/gated.rs", GATED), ("src/gated/deeper.rs", DEEPER)]
+        .map(|(path, text)| SourceFile::parse(path, SourceText::new(text.to_owned())));
+    let parsed: Vec<SourceFile> = files.into_iter().filter_map(Result::ok).collect();
+    let reaches: BTreeSet<(String, Reach)> = Reader::read_files(&parsed)
+        .functions()
+        .map(|found| (found.site().to_string(), AsRef::<Region>::as_ref(found.entity()).reach()))
+        .collect();
+    assert_eq!(
+        reaches,
+        BTreeSet::from([
+            ("src/gated.rs:1".to_owned(), Reach::Test),
+            ("src/gated/deeper.rs:1".to_owned(), Reach::Test),
+            ("src/lib.rs:1".to_owned(), Reach::Shipped),
+        ])
+    );
 }
