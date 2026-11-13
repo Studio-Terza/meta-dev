@@ -13,9 +13,9 @@ impl ModelLint for ProcessStarters {
             Headline::new("only ports start processes"),
             CommandPaths::queried(model, Scope::OutsidePorts)
                 .into_iter()
-                .map(|site| {
+                .map(|placed| {
                     Violation::new(
-                        site,
+                        placed.site(),
                         Message::new(
                             Problem::new("starts a std::process::Command"),
                             Fix::new(

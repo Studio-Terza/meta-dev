@@ -1,16 +1,19 @@
+mod repetitions;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
 use syn::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, Type};
 
 use body_lifts::{Body, BodyReading, Branches, Branching, Propagation};
-use code_model::{CallOrder, Definition, Invocation, Mutation, Receiving, TypeRef};
+use code_model::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
 
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
+use repetitions::Repetitions;
 
 #[derive(Debug)]
 enum LoweredReceiving {
@@ -31,6 +34,7 @@ pub(super) struct LoweredDefinition {
     shape: Body,
     branching: Branching,
     invocations: Vec<LoweredInvocation>,
+    repetitions: Vec<Repetition>,
 }
 
 #[derive(Debug)]
@@ -62,13 +66,14 @@ impl LoweredDefinition {
             shape: BodyReading::classified(body),
             branching: Branches::scored(body, Propagation::Ambient),
             invocations: scan.made,
+            repetitions: Repetitions::of_body(signature, body),
         }
     }
 
     pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Definition {
         let invocations =
             self.invocations.into_iter().map(|invocation| invocation.resolved(resolving, scope)).collect();
-        Definition::new(self.shape, self.branching, invocations)
+        Definition::new(self.shape, self.branching, invocations).repeated(self.repetitions)
     }
 }
 

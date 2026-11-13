@@ -1447,9 +1447,6 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
- "lint-placement",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1798,14 +1795,11 @@ dependencies = [
 name = "lint-port-batching"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "lint-core",
- "lint-fakes-at-ports",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
- "lint-placement",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1858,7 +1852,6 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
 ]
 
@@ -2057,13 +2050,12 @@ dependencies = [
 name = "lint-store-queries"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "laws",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
- "proc-macro2",
  "sqlformat",
  "syn 2.0.119",
 ]
@@ -2072,6 +2064,8 @@ dependencies = [
 name = "lint-test-budget"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "laws",
  "lint-core",
  "lint-file",

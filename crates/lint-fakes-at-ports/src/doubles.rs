@@ -8,7 +8,6 @@ use code_model::{
 use lint_core::{Site, Violation};
 use lint_layout::{CamelWord, Name, Whole, Word, words};
 
-use crate::kind::Kind;
 use finding::Finding;
 
 #[derive(Debug)]
@@ -117,4 +116,11 @@ impl<'model> Doubles<'model> {
         let standard = first.filter(|module| module.matches::<Whole>(&Self::STD).is_some()).map(|_| Kind::Std);
         named.or(suffixed).or(standard).unwrap_or(Kind::Other)
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Kind {
+    Port,
+    Std,
+    Other,
 }

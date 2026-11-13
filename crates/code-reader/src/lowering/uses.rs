@@ -10,6 +10,7 @@ use crate::namespace::UsePath;
 
 use super::Lowering;
 use super::places::PlaceId;
+use super::quotes::QuoteRow;
 use super::seat::{Built, Footing, Located};
 use tokens::TokenPaths;
 
@@ -110,6 +111,8 @@ impl Lowering<'_> {
             .map_or_else(|| Position::from(invoked.path.span()), |last| Position::from(last.ident.span()));
         let law = self.law_row(invoked);
         self.lowered.rows.laws.extend(law);
+        let quotes = QuoteRow::found(invoked, &self.here);
+        self.lowered.rows.quotes.extend(quotes);
         self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
         let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
         let interpolated =

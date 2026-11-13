@@ -16,6 +16,7 @@ use crate::item_path::ItemPath;
 use crate::law::Law;
 use crate::path_use::PathUse;
 use crate::placed::FileHome;
+use crate::quoted::Quoted;
 use crate::resolved::Resolved;
 
 use super::{Aliases, Declarations, FileModel, Filed, Model};
@@ -46,6 +47,7 @@ impl Building {
         model.interpolated.extend(found.interpolated);
         model.placed.extend(found.placed);
         model.laws.extend(found.laws);
+        model.quoted.extend(found.quoted);
         Building { model, ..self }
     }
 
@@ -80,6 +82,10 @@ impl Building {
 
     pub fn law(&mut self, file: FileId, line: LineNumber, law: Law) {
         self.model.laws.push(Filed::new(file, Found::new(line, law)));
+    }
+
+    pub fn quoted(&mut self, file: FileId, line: LineNumber, quoted: Quoted) {
+        self.model.quoted.push(Filed::new(file, Found::new(line, quoted)));
     }
 
     pub fn call(&mut self, file: FileId, line: LineNumber, call: Call) {
@@ -121,6 +127,7 @@ impl Building {
             laws: Filed::sorted(model.laws),
             uses: Filed::sorted(model.uses),
             interpolated: Filed::sorted(model.interpolated),
+            quoted: Filed::sorted(model.quoted),
             declarations: Declarations::new(self.items, self.aliases, self.exports),
             roots: model.roots,
         }

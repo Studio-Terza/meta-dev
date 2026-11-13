@@ -1,7 +1,8 @@
-use lint_file::Primed;
+use code_reader::Reader;
+use lint_core::ModelLint;
 use lint_port_batching::PortBatching;
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 
 macro_rules! ported {
     ($body:literal) => {
@@ -80,10 +81,16 @@ const BOXED: &str = ported!(
     "fn f(store: Box<dyn Store>, ids: Vec<u8>) -> Vec<u8> {\n    ids.iter().map(|id| store.fetch(*id)).collect()\n}\n"
 );
 
+const IN_PORTS: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&self, id: u8) -> u8;\n    }\n    pub fn all(store: &impl Store, ids: Vec<u8>) -> Vec<u8> {\n        ids.iter().map(|id| store.fetch(*id)).collect()\n    }\n}\n";
 const HELD_IN_MODULE: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&self, id: u8) -> u8;\n    }\n}\nmod inner {\n    use crate::ports::Store;\n    struct Shelf<'a> {\n        store: &'a dyn Store,\n    }\n    impl Shelf<'_> {\n        fn all(&self, ids: &[u8]) {\n            for id in ids {\n                self.store.fetch(*id);\n            }\n        }\n    }\n}\n";
 const PASSED_IN_MODULE: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&self, id: u8) -> u8;\n    }\n}\nmod inner {\n    use crate::ports::Store;\n    fn f(store: &dyn Store, ids: Vec<u8>) {\n        for id in ids {\n            store.fetch(id);\n        }\n    }\n}\n";
 
-const CASES: [Case; 27] = [
+const CASES: [Case; 28] = [
+    Case::new(
+        Title::new("a port module mirrors through a port"),
+        &[Source::new(Located::new("a.rs"), Text::new(IN_PORTS))],
+        Flagged::new(&[]),
+    ),
     Case::new(
         Title::new("closure passed to map over an iterator"),
         &[Source::new(Located::new("a.rs"), Text::new(MAPPED))],
@@ -219,5 +226,23 @@ const CASES: [Case; 27] = [
 
 #[test]
 fn ports_called_per_element_are_flagged() {
-    assert_eq!(Sources::mismatches::<Primed<PortBatching>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<PortBatching>>(&CASES), Lines::default());
+}
+
+#[test]
+fn a_finding_names_the_port_and_where_it_repeats() {
+    let shown: Vec<bool> = [
+        (MAPPED, "lib.rs:9: port store is called inside the closure passed to map, once per element"),
+        (LOOPED, "lib.rs:10: port store is called inside a for loop body, once per iteration"),
+        (WHILE, "lib.rs:13: port store is called inside a while loop body, once per iteration"),
+        (BARE_LOOP, "lib.rs:10: port store is called inside a loop loop body, once per iteration"),
+        (HELD, "lib.rs:13: port self.store is called inside the closure passed to map, once per element"),
+    ]
+    .iter()
+    .map(|(text, line)| {
+        let files = Sources::parsed(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(text))]);
+        PortBatching::report(&Reader::read_files(&files)).to_string().contains(line)
+    })
+    .collect();
+    assert_eq!(shown, [true; 5]);
 }

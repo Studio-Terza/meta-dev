@@ -10,16 +10,13 @@ test = false
 doctest = false
 
 [dependencies]
+code-model = { path = "../code-model" }
 lint-core = { path = "../lint-core" }
-lint-file = { path = "../lint-file" }
-lint-fakes-at-ports = { path = "../lint-fakes-at-ports" }
 lint-layout = { path = "../lint-layout" }
-lint-paths = { path = "../lint-paths" }
-lint-placement = { path = "../lint-placement" }
-syn.workspace = true
 
 [dev-dependencies]
-lint-file = { path = "../lint-file" }
+code-reader = { path = "../code-reader" }
+lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 
 [lints]

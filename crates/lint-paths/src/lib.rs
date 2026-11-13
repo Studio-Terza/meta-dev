@@ -1,7 +1,6 @@
 mod collector;
 mod cover;
 mod ground;
-mod imports;
 mod resolver;
 mod scopes;
 mod uses;
@@ -17,7 +16,6 @@ use wanted::Wanted;
 
 pub use cover::Cover;
 pub use ground::Ground;
-pub use imports::Imports;
 use uses::Use;
 
 #[derive(Debug)]

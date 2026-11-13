@@ -1,7 +1,8 @@
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use quote::ToTokens;
-use syn::Type;
+use syn::{LitStr, Macro, Type};
 
+use code_model::Quote;
 use lint_layout::Name;
 
 #[derive(Clone, Copy, Debug)]
@@ -83,6 +84,26 @@ impl AsRef<str> for Piece {
     fn as_ref(&self) -> &str {
         match self {
             Piece::Word(text) | Piece::Mark(text) => text,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Quotation;
+
+impl Quotation {
+    pub(super) fn first(invoked: &Macro) -> Option<LitStr> {
+        invoked.tokens.clone().into_iter().find_map(Self::literal)
+    }
+
+    pub(super) fn quote(literal: &LitStr) -> Quote {
+        Quote::from(literal.token().to_string())
+    }
+
+    fn literal(tree: TokenTree) -> Option<LitStr> {
+        match tree {
+            TokenTree::Literal(literal) => syn::parse2(TokenTree::Literal(literal).into()).ok(),
+            TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Punct(_) => None,
         }
     }
 }
