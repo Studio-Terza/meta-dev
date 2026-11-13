@@ -8,7 +8,7 @@ use lint_transition_graph::Extraction;
 
 use super::contexts::{Contexts, Contributed, PrimedParts, Primings};
 
-use super::super::boundary::{FileOrder, Queue};
+use super::super::boundary::FileOrder;
 
 #[derive(Debug)]
 struct Claim<'listing, 'read, 'run> {
@@ -89,7 +89,6 @@ struct PrimedFile<'run> {
 #[derive(Debug)]
 pub(crate) struct Gathering<'run> {
     heads: &'run OnceLock<Vec<FileHead>>,
-    claims: Queue,
     deposited: Mutex<Vec<Gathered<'run>>>,
     primed: Mutex<Vec<PrimedFile<'run>>>,
     primings: OnceLock<Primings<'run>>,
@@ -102,7 +101,6 @@ impl<'run> Gathering<'run> {
     pub(crate) fn new(heads: &'run OnceLock<Vec<FileHead>>) -> Gathering<'run> {
         Gathering {
             heads,
-            claims: Queue::default(),
             deposited: Mutex::default(),
             primed: Mutex::default(),
             primings: OnceLock::new(),
@@ -112,22 +110,20 @@ impl<'run> Gathering<'run> {
         }
     }
 
-    pub(crate) fn gathered<'read>(&self, readout: &'read Readout) -> Share<'read, 'run> {
-        let heads = self.heads.get_or_init(|| readout.files().iter().map(|file| file.head().clone()).collect());
+    pub(crate) fn gathered<'read>(&self, readout: &'read Readout, table: &[FileHead]) -> Share<'read, 'run> {
+        let heads = self.heads.get_or_init(|| table.to_vec());
         let listing = Listing::of_files(readout.files());
         let claims: Vec<Claim<'_, 'read, 'run>> = listing
             .groups()
             .iter()
             .zip(readout.files())
-            .zip(heads)
-            .enumerate()
-            .map(|(index, ((group, file), head))| Claim { order: FileOrder::from(index), group, file, head })
+            .filter_map(|(group, file)| {
+                let index = heads.binary_search_by(|head| head.path().cmp(file.head().path())).ok()?;
+                Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)? })
+            })
             .collect();
-        let (claimed, parts): (Vec<Claimed<'read>>, Vec<Gathered<'run>>) = self
-            .claims
-            .claimed(&claims)
-            .map(|claim| (Claimed { order: claim.order, file: claim.file }, claim.gathered()))
-            .unzip();
+        let (claimed, parts): (Vec<Claimed<'read>>, Vec<Gathered<'run>>) =
+            claims.iter().map(|claim| (Claimed { order: claim.order, file: claim.file }, claim.gathered())).unzip();
         Share { claimed, merging: self.deposited(parts, heads) }
     }
 

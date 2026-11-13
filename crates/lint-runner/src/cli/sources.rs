@@ -11,7 +11,7 @@ use code_model::Model;
 use code_reader::{FileFacts, Reader};
 use file_ports::Files;
 use lint_core::{FileHead, Readout};
-use lint_reader::{CrateSources, Described, SourceFiles, Stage, Unlocated};
+use lint_reader::{CrateSources, Described, Partition, SharedRead, Stage, Unlocated};
 
 use timer_ports::Timer;
 
@@ -31,6 +31,7 @@ pub(crate) struct Wired<'run, F, C, T> {
 pub(crate) struct Sources<'run, F, C, T> {
     wired: &'run Wired<'run, F, C, T>,
     staged: &'run Measured<Stage<'run>>,
+    shared: &'run SharedRead<'run>,
     queue: Queue,
     located: OnceLock<Measured<Result<Described, Unlocated>>>,
     gathering: Gathering<'run>,
@@ -58,9 +59,17 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
     pub(crate) fn new(
         wired: &'run Wired<'run, F, C, T>,
         staged: &'run Measured<Stage<'run>>,
+        shared: &'run SharedRead<'run>,
         heads: &'run OnceLock<Vec<FileHead>>,
     ) -> Sources<'run, F, C, T> {
-        Sources { wired, staged, queue: Queue::default(), located: OnceLock::new(), gathering: Gathering::new(heads) }
+        Sources {
+            wired,
+            staged,
+            shared,
+            queue: Queue::default(),
+            located: OnceLock::new(),
+            gathering: Gathering::new(heads),
+        }
     }
 
     pub(crate) fn wired(&self) -> &'run Wired<'run, F, C, T> {
@@ -69,7 +78,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
 
     pub(crate) fn read(&self, worker: Worker) -> Measured<Readout> {
         Stopwatch::measured(self.wired.timer, Step::Read(worker), || {
-            SourceFiles::read_staged(self.wired.files, self.staged.done())
+            self.shared.read(self.wired.files, Partition::from(worker))
         })
     }
 
@@ -91,7 +100,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
 
     pub(crate) fn gathered<'read>(&self, readout: &'read Readout, worker: Worker) -> Lowering<'read> {
         let stopwatch = Stopwatch::started(self.wired.timer);
-        let share = self.gathering.gathered(readout);
+        let share = self.gathering.gathered(readout, self.shared.heads());
         let lowered = stopwatch.stopped(Step::Lower(worker));
         let claimed = share.claimed().to_vec();
         let merged = share.into_merging().map(|complete| {

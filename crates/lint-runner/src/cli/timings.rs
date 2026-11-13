@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt;
 
+use lint_reader::Partition;
 use timer_ports::{Elapsed, Moment, Timer};
 
 mod boundary;
@@ -174,5 +175,11 @@ impl fmt::Display for Rows<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "lint timings in milliseconds:")?;
         self.0.iter().try_for_each(|timing| writeln!(formatter, "{:>7}  {}", timing.took, timing.step))
+    }
+}
+
+impl From<Worker> for Partition {
+    fn from(worker: Worker) -> Partition {
+        Partition::from(worker.0)
     }
 }
