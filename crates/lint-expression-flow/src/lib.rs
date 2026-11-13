@@ -1,6 +1,6 @@
 mod fn_body;
 
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -21,7 +21,6 @@ use lint_core::Fix;
 use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -31,12 +30,6 @@ use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct ExpressionFlow;
-
-impl Lint for ExpressionFlow {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl ExpressionFlow {
     fn dropped<'block>(statement: &'block Stmt, last: Option<&Stmt>) -> Option<&'block Stmt> {

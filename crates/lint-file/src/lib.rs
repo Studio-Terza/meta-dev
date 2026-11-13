@@ -1,4 +1,11 @@
-use lint_core::{Headline, Report, SourceFile, Violation};
+mod concluded;
+
+use std::fmt::Debug;
+use std::marker::PhantomData;
+
+use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
+
+pub use concluded::Concluded;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {
@@ -21,9 +28,37 @@ pub trait FileLint {
     const READS: Reads;
 
     fn violations(file: &SourceFile) -> Vec<Violation<'_>>;
+}
 
-    fn reported(files: &[SourceFile]) -> Report<'_> {
-        let read = files.iter().filter_map(|file| Self::READS.admits(file));
-        Report::new(Self::HEADLINE, read.flat_map(Self::violations).collect())
+pub trait ContextLint {
+    const HEADLINE: Headline;
+    const READS: Reads;
+
+    type Part<'head>: Send + Debug;
+    type Context<'head>: FromIterator<Self::Part<'head>> + Send + Sync + Debug;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Self::Part<'head>;
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, context: &Self::Context<'head>) -> Vec<Violation<'file>>;
+}
+
+#[derive(Debug)]
+pub struct Filed<Checked>(PhantomData<Checked>);
+
+#[derive(Debug)]
+pub struct Judged<Checked>(PhantomData<Checked>);
+
+impl<Checked: FileLint> Lint for Filed<Checked> {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
+        Report::new(Checked::HEADLINE, read.flat_map(Checked::violations).collect())
+    }
+}
+
+impl<Checked: ContextLint> Lint for Judged<Checked> {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        let context: Checked::Context<'_> = files.iter().map(Parsed::from).map(Checked::contributed).collect();
+        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
+        Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &context)).collect())
     }
 }

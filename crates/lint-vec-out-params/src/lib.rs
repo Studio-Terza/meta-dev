@@ -1,25 +1,18 @@
 mod finding;
 
 use finding::Finding;
-use lint_core::Lint;
 use lint_file::{FileLint, Reads};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ItemImpl, ItemMod, PathSegment, Signature, Type, TypePath, TypeReference};
 
-use lint_core::{Headline, Macros, Report, Site, SourceFile, Syntax, Violation, Walk};
+use lint_core::{Headline, Macros, Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::{LineNumber, Name, Word};
 
 #[derive(Debug)]
 pub struct VecOutParams<'file> {
     file: &'file SourceFile,
     violations: Vec<Violation<'file>>,
-}
-
-impl Lint for VecOutParams<'_> {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
 }
 
 impl FileLint for VecOutParams<'_> {

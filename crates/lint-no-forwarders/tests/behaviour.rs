@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_no_forwarders::NoForwarders;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -154,5 +155,5 @@ const CASES: [Case; 23] = [
 
 #[test]
 fn methods_that_only_forward_to_another_type_of_ours_are_flagged() {
-    assert_eq!(Sources::mismatches::<NoForwarders>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<NoForwarders>>(&CASES), Lines::default());
 }

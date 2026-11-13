@@ -4,24 +4,17 @@ mod finding;
 use body_items::BodyItems;
 
 use finding::Finding;
-use lint_core::Lint;
 use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::{Item, ItemFn};
 
-use lint_core::{Headline, Report, Site, SourceFile, Violation};
+use lint_core::{Headline, Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 use lint_placement::Role;
 
 #[derive(Debug)]
 pub struct ThinMain;
-
-impl Lint for ThinMain {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl FileLint for ThinMain {
     const HEADLINE: Headline = Headline::new("a binary is a thin main over its library");

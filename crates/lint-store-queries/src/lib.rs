@@ -1,20 +1,20 @@
 mod queries;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, SourceFile, Violation};
+use lint_file::{FileLint, Reads};
 use lint_paths::Imports;
 use queries::Queries;
 
 #[derive(Debug)]
 pub struct StoreQueries;
 
-impl Lint for StoreQueries {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let imports = Imports::across(files);
-        Report::new(
-            Headline::new(
-                "every store_ports::query! writes its SQL as sqlformat formats it, starting at column 0 inside r#\"…\"#",
-            ),
-            files.iter().flat_map(|file| Queries::found(file, &imports)).collect(),
-        )
+impl FileLint for StoreQueries {
+    const HEADLINE: Headline = Headline::new(
+        "every store_ports::query! writes its SQL as sqlformat formats it, starting at column 0 inside r#\"…\"#",
+    );
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        Queries::found(file, &Imports::across([file]))
     }
 }

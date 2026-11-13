@@ -2,7 +2,7 @@ mod finding;
 mod nesting_depth;
 
 use finding::Finding;
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
@@ -16,7 +16,6 @@ use syn::{
 
 use lint_core::Bound;
 use lint_core::Macros;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Syntax;
@@ -29,12 +28,6 @@ use nesting_depth::NestingDepth;
 
 #[derive(Debug)]
 pub struct FnShape;
-
-impl Lint for FnShape {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl FnShape {
     const BOOLEAN_METHODS: &[Word<'static>] = &words!["contains", "all", "any", "starts_with", "ends_with", "eq", "ne"];

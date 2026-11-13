@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_public_surface::PublicSurface;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -93,5 +94,5 @@ const CASES: [Case; 19] = [
 
 #[test]
 fn exports_no_other_crate_names_are_flagged() {
-    assert_eq!(Sources::mismatches::<PublicSurface>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<PublicSurface>>(&CASES), Lines::default());
 }

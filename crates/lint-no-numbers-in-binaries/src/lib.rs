@@ -1,12 +1,11 @@
-use lint_core::{Headline, Lint};
+use lint_core::{Headline, Violation};
+use lint_file::{FileLint, Reads};
 use syn::visit::Visit;
 use syn::{ItemMod, LitFloat, LitInt};
 
-use lint_core::BinaryFiles;
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::SourceFile;
 use lint_core::Walk;
 use lint_layout::{LineNumber, Word};
@@ -15,26 +14,23 @@ use lint_named_numbers::{Literals, NamedNumbers};
 #[derive(Debug)]
 pub struct NoNumbersInBinaries;
 
-impl Lint for NoNumbersInBinaries {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let binaries = BinaryFiles::collect(files);
-        Report::new(
-            Headline::new("a binary is wiring: a number it needs is a setting in its config file"),
-            files
-                .iter()
-                .filter(|file| binaries.holding(file.head().path()).is_some())
-                .flat_map(|file| {
-                    NamedNumbers::flagged(
-                        file,
-                        Numbers::default(),
-                        Message::new(
-                            Problem::new("numeric literal in a binary"),
-                            Fix::new("read it from the settings file or its embedded defaults"),
-                        ),
-                    )
-                })
-                .collect(),
-        )
+impl FileLint for NoNumbersInBinaries {
+    const HEADLINE: Headline = Headline::new("a binary is wiring: a number it needs is a setting in its config file");
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let binary = Some(file).filter(|found| found.head().binary().is_some());
+        binary.map_or_default(|found: &SourceFile| {
+            NamedNumbers::flagged(
+                found,
+                Numbers::default(),
+                Message::new(
+                    Problem::new("numeric literal in a binary"),
+                    Fix::new("read it from the settings file or its embedded defaults"),
+                ),
+            )
+            .collect()
+        })
     }
 }
 

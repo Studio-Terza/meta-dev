@@ -16,6 +16,7 @@ lint-layout = { path = "../lint-layout" }
 syn.workspace = true
 
 [dev-dependencies]
+lint-file = { path = "../lint-file" }
 lint-fixtures = { path = "../lint-fixtures" }
 
 [lints]

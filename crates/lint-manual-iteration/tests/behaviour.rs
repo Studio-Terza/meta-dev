@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_manual_iteration::ManualIteration;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -60,5 +61,5 @@ const CASES: [Case; 9] = [
 
 #[test]
 fn iterators_driven_by_hand_are_flagged() {
-    assert_eq!(Sources::mismatches::<ManualIteration>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<ManualIteration>>(&CASES), Lines::default());
 }

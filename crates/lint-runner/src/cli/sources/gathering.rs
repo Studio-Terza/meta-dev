@@ -6,6 +6,8 @@ use code_reader::{FileFacts, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile};
 use lint_transition_graph::Extraction;
 
+use super::contexts::{Contexts, Contributed};
+
 use super::super::boundary::{FileOrder, Queue};
 
 #[derive(Debug)]
@@ -18,8 +20,9 @@ struct Claim<'listing, 'read, 'run> {
 
 impl<'run> Claim<'_, '_, 'run> {
     fn gathered(&self) -> Gathered<'run> {
-        let extraction = Extraction::from(Parsed::new(self.file, self.head));
-        Gathered { head: self.head, facts: self.group.lowered(), extraction }
+        let parsed = Parsed::new(self.file, self.head);
+        let extraction = Extraction::from(parsed);
+        Gathered { head: self.head, facts: self.group.lowered(), extraction, contexts: Contributed::from(parsed) }
     }
 }
 
@@ -28,6 +31,7 @@ struct Gathered<'run> {
     head: &'run FileHead,
     facts: Vec<FileFacts>,
     extraction: Extraction<'run>,
+    contexts: Contributed<'run>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -62,10 +66,18 @@ impl<'read, 'run> Share<'read, 'run> {
     }
 }
 
+#[derive(Debug, Default)]
+struct Splitting<'run> {
+    facts: Vec<FileFacts>,
+    extractions: Vec<Extraction<'run>>,
+    contexts: Vec<Contributed<'run>>,
+}
+
 #[derive(Debug)]
 pub(crate) struct Merging<'run> {
     facts: Vec<FileFacts>,
     extraction: Extraction<'run>,
+    contexts: Contexts<'run>,
 }
 
 #[derive(Debug)]
@@ -75,6 +87,7 @@ pub(crate) struct Gathering<'run> {
     deposited: Mutex<Vec<Gathered<'run>>>,
     model: OnceLock<Option<Model>>,
     extraction: OnceLock<Extraction<'run>>,
+    contexts: OnceLock<Contexts<'run>>,
 }
 
 impl<'run> Gathering<'run> {
@@ -85,6 +98,7 @@ impl<'run> Gathering<'run> {
             deposited: Mutex::default(),
             model: OnceLock::new(),
             extraction: OnceLock::new(),
+            contexts: OnceLock::new(),
         }
     }
 
@@ -109,11 +123,16 @@ impl<'run> Gathering<'run> {
 
     pub(crate) fn settled(&self, merging: Merging<'run>, model: impl FnOnce(Vec<FileFacts>) -> Option<Model>) {
         self.extraction.get_or_init(|| merging.extraction);
+        self.contexts.get_or_init(|| merging.contexts);
         self.model.get_or_init(|| model(merging.facts));
     }
 
     pub(crate) fn model(&self) -> Option<&Model> {
         self.model.wait().as_ref()
+    }
+
+    pub(crate) fn contexts(&self) -> &Contexts<'run> {
+        self.contexts.wait()
     }
 
     pub(crate) fn extraction(&self) -> &Extraction<'run> {
@@ -130,8 +149,16 @@ impl<'run> Gathering<'run> {
     fn merging(parts: Vec<Gathered<'run>>) -> Merging<'run> {
         let mut sorted = parts;
         sorted.sort_by(|earlier, later| earlier.head.path().cmp(later.head.path()));
-        let (facts, extractions): (Vec<Vec<FileFacts>>, Vec<Extraction<'run>>) =
-            sorted.into_iter().map(|part| (part.facts, part.extraction)).unzip();
-        Merging { facts: facts.into_iter().flatten().collect(), extraction: extractions.into_iter().collect() }
+        let split = sorted.into_iter().fold(Splitting::default(), |mut merging, part| {
+            merging.facts.extend(part.facts);
+            merging.extractions.push(part.extraction);
+            merging.contexts.push(part.contexts);
+            merging
+        });
+        Merging {
+            facts: split.facts,
+            extraction: split.extractions.into_iter().collect(),
+            contexts: split.contexts.into_iter().collect(),
+        }
     }
 }

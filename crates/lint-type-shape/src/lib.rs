@@ -1,4 +1,4 @@
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
@@ -14,7 +14,6 @@ use lint_core::Fix;
 use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Syntax;
@@ -24,12 +23,6 @@ use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct TypeShape;
-
-impl Lint for TypeShape {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl TypeShape {
     fn findings(ty: &Type) -> Vec<Message> {

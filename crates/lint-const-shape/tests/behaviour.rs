@@ -1,5 +1,6 @@
 use lint_const_shape::ConstShape;
 use lint_core::Lint;
+use lint_file::Filed;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const NOT_TEST: &str = "#[cfg(not(test))]\nmod real {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
@@ -8,10 +9,10 @@ const NESTED: &str = "pub struct A;\nconst _: () = {\n    impl A {\n        pub 
 #[test]
 fn non_test_modules_are_checked_and_const_context_stays_in_its_function() {
     let not_test = [Sources::file("a.rs", Text::new(NOT_TEST))];
-    let not_test_report = ConstShape::report(&not_test);
+    let not_test_report = Filed::<ConstShape>::report(&not_test);
     assert_eq!(Sources::lines(&not_test_report), Lines::from(["a.rs:3"]));
     let nested = [Sources::file("a.rs", Text::new(NESTED))];
-    let nested_report = ConstShape::report(&nested);
+    let nested_report = Filed::<ConstShape>::report(&nested);
     assert_eq!(Sources::lines(&nested_report), Lines::from(["a.rs:4"]));
 }
 
@@ -110,5 +111,5 @@ const CASES: [Case; 15] = [
 
 #[test]
 fn casts_are_allowed_only_inside_a_boundary_module() {
-    assert_eq!(Sources::mismatches::<ConstShape>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<ConstShape>>(&CASES), Lines::default());
 }

@@ -8,12 +8,12 @@ use lint_layout::{LineNumber, UsePath, Word, words};
 pub(super) struct Sql(LitStr);
 
 impl Sql {
-    const PATH: [Word<'static>; 2] = words!["store_ports", "query"];
+    const PATHS: [[Word<'static>; 2]; 2] = [words!["store_ports", "query"], words!["store_ports_macros", "query"]];
 
     pub(super) fn queried(invocation: &Macro, candidates: &[UsePath]) -> Option<Sql> {
         candidates
             .iter()
-            .find_map(|candidate| candidate.spells(&Self::PATH))
+            .find_map(|candidate| Self::PATHS.iter().find_map(|path| candidate.spells(path)))
             .map(|_| invocation)
             .and_then(|query| query.tokens.clone().into_iter().find_map(Self::literal))
             .map(Sql)

@@ -1,4 +1,5 @@
 use lint_core::Lint;
+use lint_file::Judged;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_unconsumed_traits::UnconsumedTraits;
 
@@ -98,13 +99,14 @@ const CASES: [Case; 19] = [
 
 #[test]
 fn traits_with_methods_and_no_consumer_are_flagged() {
-    assert_eq!(Sources::mismatches::<UnconsumedTraits>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<UnconsumedTraits>>(&CASES), Lines::default());
 }
 
 #[test]
 fn a_finding_names_the_trait_and_both_fixes() {
     let text =
-        UnconsumedTraits::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(BARE))])).to_string();
+        Judged::<UnconsumedTraits>::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(BARE))]))
+            .to_string();
     assert!(text.contains("trait Shape has methods but nothing consumes it"), "{text}");
     assert!(text.contains("delete the trait and keep its methods inherent, or give it a consumer"), "{text}");
     assert_eq!(text.matches("helper").count(), 0);

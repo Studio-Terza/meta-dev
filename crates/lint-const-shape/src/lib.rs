@@ -1,4 +1,4 @@
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
@@ -14,7 +14,6 @@ use lint_core::Gate;
 use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -23,12 +22,6 @@ use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct ConstShape;
-
-impl Lint for ConstShape {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl ConstShape {}
 

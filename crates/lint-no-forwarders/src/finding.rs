@@ -5,6 +5,7 @@ use syn::Ident;
 
 use lint_core::Fix;
 
+#[derive(Debug)]
 pub enum Finding<'file> {
     Forwards { name: &'file Ident, callee: Callee<'file> },
 }

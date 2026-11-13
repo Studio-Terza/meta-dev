@@ -1,14 +1,25 @@
 mod guards;
 
 use guards::Guards;
-use lint_core::{Headline, Lint, Report, SourceFile};
+use guards::Modules;
+use lint_core::{Headline, Parsed, SourceFile, Violation};
+use lint_file::{Concluded, ContextLint, Reads};
 
 #[derive(Debug)]
 pub struct GuardMustUse;
 
-impl Lint for GuardMustUse {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
-        Report::new(Headline::new("guard types are #[must_use]"), Guards::scanned(&shipped).violations())
+impl ContextLint for GuardMustUse {
+    const HEADLINE: Headline = Headline::new("guard types are #[must_use]");
+    const READS: Reads = Reads::Shipped;
+
+    type Part<'head> = Modules<'head>;
+    type Context<'head> = Concluded<'head>;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Modules<'head> {
+        parsed.file().shipped().map_or_default(|_| Guards::scanned(parsed))
+    }
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
+        concluded.found_in(file)
     }
 }

@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_thin_main::ThinMain;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -50,5 +51,5 @@ const CASES: [Case; 6] = [
 
 #[test]
 fn logic_is_reported_at_its_keyword_in_binary_roots_only() {
-    assert_eq!(Sources::mismatches::<ThinMain>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<ThinMain>>(&CASES), Lines::default());
 }

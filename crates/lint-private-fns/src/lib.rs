@@ -1,6 +1,6 @@
 mod finding;
 
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use std::collections::BTreeMap;
 
@@ -10,7 +10,6 @@ use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro, Visibility};
 
 use lint_core::Bound;
 use lint_core::Macros;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::TypeName;
@@ -20,12 +19,6 @@ use lint_layout::{Length, Name};
 
 #[derive(Debug)]
 pub struct PrivateFns;
-
-impl Lint for PrivateFns {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl FileLint for PrivateFns {
     const HEADLINE: Headline =

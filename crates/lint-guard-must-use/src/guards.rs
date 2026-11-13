@@ -9,7 +9,7 @@ use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, MetaList, Token};
 
-use lint_core::{Site, SourceFile, Walk};
+use lint_core::{Parsed, Site, Walk};
 use lint_layout::{LineNumber, Name, Word};
 use lint_paths::Module;
 
@@ -27,22 +27,17 @@ pub struct Guards<'file> {
 impl<'file> Guards<'file> {
     const DROP: &str = "Drop";
 
-    pub fn scanned(files: &[&'file SourceFile]) -> Modules<'file> {
-        let empty = Guards {
-            path: Path::new(""),
-            module: Module::UNPLACED,
+    pub fn scanned(parsed: Parsed<'_, 'file>) -> Modules<'file> {
+        let head = parsed.head();
+        let mut guards = Guards {
+            path: head.path(),
+            module: Module::of_head(head),
             members: Members::default(),
             modules: Modules::default(),
         };
-        files
-            .iter()
-            .fold(empty, |guards, file| {
-                let mut next = Guards { path: file.head().path(), module: Module::of_file(file), ..guards };
-                next.visit_file(file.syntax());
-                next.modules.file(mem::replace(&mut next.module, Module::UNPLACED), mem::take(&mut next.members));
-                next
-            })
-            .modules
+        guards.visit_file(parsed.file().syntax());
+        guards.modules.file(mem::replace(&mut guards.module, Module::UNPLACED), mem::take(&mut guards.members));
+        guards.modules
     }
 
     fn declared(&mut self, attributes: &[Attribute], name: &Ident) {

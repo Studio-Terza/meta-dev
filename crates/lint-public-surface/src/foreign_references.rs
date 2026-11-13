@@ -6,7 +6,6 @@ use syn::visit::Visit;
 use syn::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
 
 use super::export::Export;
-use lint_core::BinaryFiles;
 use lint_core::Macros;
 use lint_core::SourceFile;
 use lint_layout::Name;
@@ -14,7 +13,7 @@ use lint_placement::CrateName;
 
 use crate_reach::CrateReach;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ForeignReferences {
     own_crate: Option<CrateName>,
     crates: BTreeMap<CrateName, CrateReach>,
@@ -35,36 +34,35 @@ impl Leaf<'_> {
     }
 }
 
+impl From<&SourceFile> for ForeignReferences {
+    fn from(file: &SourceFile) -> ForeignReferences {
+        let head = file.head();
+        let package = head.placement().package().root();
+        let own_crate = head.binary().map_or_else(|| Some(CrateName::from(head.placement().crate_root())), |_| None);
+        let own_tests = Some(package.directory().join(ForeignReferences::TESTS))
+            .filter(|tests| head.placement().crate_root().directory().starts_with(tests))
+            .map(|_| CrateName::from(package));
+        let read = |reader_crate| {
+            let mut reading =
+                Reading { file, references: ForeignReferences { own_crate: reader_crate, crates: BTreeMap::new() } };
+            reading.visit_file(file.syntax());
+            reading.references
+        };
+        let tested = |tested: CrateName| ForeignReferences {
+            crates: read(None)
+                .crates
+                .remove_entry(&tested)
+                .map(|(name, reach)| (name, reach.names_only()))
+                .into_iter()
+                .collect(),
+            ..ForeignReferences::default()
+        };
+        file.shipped().map_or_else(|| own_tests.map_or_default(tested), |_| read(own_crate))
+    }
+}
+
 impl ForeignReferences {
     const TESTS: &'static str = "tests";
-
-    pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
-        let own_crate = binaries
-            .holding(file.head().path())
-            .map_or_else(|| Some(CrateName::from(file.head().placement().crate_root())), |_| None);
-        let mut reading = Reading { file, references: ForeignReferences { own_crate, crates: BTreeMap::new() } };
-        reading.visit_file(file.syntax());
-        reading.references
-    }
-
-    pub fn in_own_tests(file: &SourceFile) -> Option<ForeignReferences> {
-        let package = file.head().placement().package().root();
-        file.head().placement().crate_root().directory().starts_with(package.directory().join(Self::TESTS)).then(|| {
-            let tested = CrateName::from(package);
-            let mut reading = Reading { file, references: ForeignReferences::default() };
-            reading.visit_file(file.syntax());
-            ForeignReferences {
-                crates: reading
-                    .references
-                    .crates
-                    .remove_entry(&tested)
-                    .map(|(name, reach)| (name, reach.names_only()))
-                    .into_iter()
-                    .collect(),
-                ..ForeignReferences::default()
-            }
-        })
-    }
 
     pub fn absorb(mut self, other: ForeignReferences) -> ForeignReferences {
         other.crates.into_iter().for_each(|(crate_name, reach)| {

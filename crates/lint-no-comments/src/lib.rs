@@ -1,11 +1,10 @@
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
 
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -14,12 +13,6 @@ use lint_layout::SourceText;
 
 #[derive(Debug)]
 pub struct NoComments;
-
-impl Lint for NoComments {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl FileLint for NoComments {
     const HEADLINE: Headline = Headline::new("comments are not allowed in this repository");

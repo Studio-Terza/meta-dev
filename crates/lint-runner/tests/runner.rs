@@ -62,7 +62,9 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
                 + Trees::occurrences(&workspace, &source, "impl WorkspaceLint for")?
                 + Trees::occurrences(&workspace, &source, "impl ModelLint for")?
                 + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
-                + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?,
+                + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?
+                + Trees::occurrences(&workspace, &source, "impl FileLint for")?
+                + Trees::occurrences(&workspace, &source, "impl ContextLint for")?,
         )
     })?;
     let mode = include_str!("../src/cli/mode.rs");
@@ -76,7 +78,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         "::of_names(extraction.names())",
         "ModelLint>::report",
         "WorkspaceLint>::report",
-        "Entry::filed::<",
+        "as Registered>::ENTRY",
     ]
     .iter()
     .map(|call| runner.matches(call).count())

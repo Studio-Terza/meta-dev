@@ -8,75 +8,51 @@ use std::borrow::Cow;
 
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{ItemImpl, ItemMod, Macro, Type, TypePath};
+use syn::{ItemImpl, ItemMod, Macro};
 
-use lint_core::{Headline, Lint, Macros, Report, Site, SourceFile, Syntax, Violation};
+use lint_core::{Headline, Macros, Parsed, Site, SourceFile, Syntax, Violation};
+use lint_file::{ContextLint, Reads};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
 
-use declaration::Declaration;
+pub use declaration::Declaration;
 use declarations::Declarations;
 use finding::Finding;
 use kind::Kind;
-use known::Known;
+pub use known::Known;
 
-#[derive(Debug, Default)]
-pub struct EnumPredicates<'file> {
-    known: Known<'file>,
-}
+#[derive(Debug)]
+pub struct EnumPredicates;
 
-impl Lint for EnumPredicates<'_> {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let declarations: Vec<Declaration<'_>> = files.iter().flat_map(Declarations::in_file).collect();
-        let predicates =
-            EnumPredicates { known: declarations.iter().fold(Known::default(), |known, found| found.filed(known)) };
-        Report::new(
-            Headline::new(
-                "an enum method returning bool throws away the variant; return an enum or match where the answer is used",
-            ),
-            files.iter().flat_map(|file| predicates.violations(file)).collect(),
-        )
+impl ContextLint for EnumPredicates {
+    const HEADLINE: Headline = Headline::new(
+        "an enum method returning bool throws away the variant; return an enum or match where the answer is used",
+    );
+    const READS: Reads = Reads::Every;
+
+    type Part<'head> = Vec<Declaration<'head>>;
+    type Context<'head> = Known<'head>;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Vec<Declaration<'head>> {
+        Declarations::in_file(parsed)
     }
-}
 
-impl EnumPredicates<'_> {
-    fn violations<'file>(&self, file: &'file SourceFile) -> Vec<Violation<'file>> {
-        let mut scan = Predicates::new(self, file);
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, known: &Known<'head>) -> Vec<Violation<'file>> {
+        let mut scan = Predicates::new(known, file);
         scan.visit_file(file.syntax());
         scan.into_violations()
-    }
-
-    fn kind(&self, file: &SourceFile, module: &ModulePath, implemented: &Type) -> Kind {
-        match implemented {
-            Type::Path(path) => path
-                .path
-                .segments
-                .last()
-                .map_or(Kind::Other, |last| self.kind_named(file, module, path, &Name::from(&last.ident))),
-            _ => Kind::Other,
-        }
-    }
-
-    fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
-        let crate_root = file.head().placement().crate_root();
-        let local = Some(path)
-            .filter(|candidate| candidate.qself.is_none())
-            .filter(|unqualified| unqualified.path.segments.len() == 1)
-            .and_then(|_| self.known.placed(crate_root, module, name));
-        let enums = self.known.enumerated(crate_root, name);
-        local.or(enums).unwrap_or(Kind::Other)
     }
 }
 
 pub struct Predicates<'scan, 'file> {
-    known: &'scan EnumPredicates<'scan>,
+    known: &'scan Known<'scan>,
     file: &'file SourceFile,
     module: Cow<'file, ModulePath>,
     violations: Vec<Violation<'file>>,
 }
 
 impl<'scan, 'file> Predicates<'scan, 'file> {
-    pub fn new(known: &'scan EnumPredicates<'scan>, file: &'file SourceFile) -> Predicates<'scan, 'file> {
+    pub fn new(known: &'scan Known<'scan>, file: &'file SourceFile) -> Predicates<'scan, 'file> {
         Predicates { known, file, module: Cow::Borrowed(file.head().placement().module()), violations: Vec::new() }
     }
 

@@ -1,14 +1,13 @@
 mod finding;
 
 use finding::Finding;
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use std::path::Path as StdPath;
 use syn::visit::Visit;
 
 use syn::{Ident, ItemFn, Path};
 
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -16,12 +15,6 @@ use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct NoFreeFns;
-
-impl Lint for NoFreeFns {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl NoFreeFns {
     const REQUIRED_FREE: [&'static str; 4] = ["test", "proc_macro", "proc_macro_derive", "proc_macro_attribute"];

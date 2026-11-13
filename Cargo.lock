@@ -1430,6 +1430,7 @@ name = "lint-enum-predicates"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1500,6 +1501,7 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-paths",
@@ -1611,6 +1613,7 @@ name = "lint-module-nesting"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1634,6 +1637,7 @@ name = "lint-named-numbers"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
@@ -1677,6 +1681,7 @@ name = "lint-no-forwarders"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
@@ -1712,6 +1717,7 @@ name = "lint-no-numbers-in-binaries"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-named-numbers",
@@ -1887,6 +1893,7 @@ name = "lint-public-surface"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -2063,6 +2070,7 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-paths",
@@ -2139,6 +2147,7 @@ name = "lint-unconsumed-traits"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",

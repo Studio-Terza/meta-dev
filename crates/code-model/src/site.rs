@@ -24,6 +24,11 @@ impl<'file> Site<'file> {
     pub fn path(&self) -> &'file Path {
         self.path
     }
+
+    #[must_use]
+    pub fn moved(self, path: &Path) -> Site<'_> {
+        Site { path, line: self.line }
+    }
 }
 
 impl fmt::Display for Site<'_> {

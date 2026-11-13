@@ -1,19 +1,20 @@
 use syn::visit::Visit;
 use syn::{Ident, ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
 
-use lint_core::{Macros, SourceFile};
+use lint_core::{Macros, Parsed, SourceFile};
 
 use super::{Declaration, Kind};
 
-pub struct Declarations<'file> {
+pub struct Declarations<'file, 'head> {
     file: &'file SourceFile,
-    open: Vec<Declaration<'file>>,
-    closed: Vec<Declaration<'file>>,
+    open: Vec<Declaration<'head>>,
+    closed: Vec<Declaration<'head>>,
 }
 
-impl<'file> Declarations<'file> {
-    pub fn in_file(file: &'file SourceFile) -> Vec<Declaration<'file>> {
-        let placement = file.head().placement();
+impl<'file, 'head> Declarations<'file, 'head> {
+    pub fn in_file(parsed: Parsed<'file, 'head>) -> Vec<Declaration<'head>> {
+        let placement = parsed.head().placement();
+        let file = parsed.file();
         let mut scan = Declarations {
             file,
             open: vec![Declaration::new(placement.crate_root(), placement.module())],
@@ -28,7 +29,7 @@ impl<'file> Declarations<'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for Declarations<'_> {
+impl<'ast> Visit<'ast> for Declarations<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let inner = self.open.last().map(|outer| outer.nested(&module.ident));
         self.open.extend(inner);

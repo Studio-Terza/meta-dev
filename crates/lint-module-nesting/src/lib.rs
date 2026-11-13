@@ -1,22 +1,27 @@
 mod module_tree;
 
-use lint_core::Lint;
-use module_tree::ModuleTree;
+use module_tree::ShippedModule;
 
-use lint_core::SourceFile;
-use lint_core::{Bound, Headline, Report};
+use lint_core::{Bound, Headline, Parsed, SourceFile, Violation};
+use lint_file::{Concluded, ContextLint, Reads};
 
 #[derive(Debug)]
 pub struct ModuleNesting;
 
-impl Lint for ModuleNesting {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
-        let tree = ModuleTree::from(shipped.as_slice());
-        Report::new(
-            Headline::new("modules nest by use: a file used only inside one sibling belongs inside it"),
-            tree.violations().collect(),
-        )
+impl ContextLint for ModuleNesting {
+    const HEADLINE: Headline =
+        Headline::new("modules nest by use: a file used only inside one sibling belongs inside it");
+    const READS: Reads = Reads::Shipped;
+
+    type Part<'head> = ShippedModule<'head>;
+    type Context<'head> = Concluded<'head>;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> ShippedModule<'head> {
+        ShippedModule::from(parsed)
+    }
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
+        concluded.found_in(file)
     }
 }
 

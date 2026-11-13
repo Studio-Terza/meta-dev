@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_no_free_fns::NoFreeFns;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -20,5 +21,5 @@ const CASES: [Case; 2] = [
 
 #[test]
 fn free_functions_stay_flagged_behind_attributes_and_macros() {
-    assert_eq!(Sources::mismatches::<NoFreeFns>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<NoFreeFns>>(&CASES), Lines::default());
 }

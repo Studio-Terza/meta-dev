@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_type_shape::TypeShape;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -20,5 +21,5 @@ const CASES: [Case; 2] = [
 
 #[test]
 fn signatures_of_inherent_methods_are_checked() {
-    assert_eq!(Sources::mismatches::<TypeShape>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<TypeShape>>(&CASES), Lines::default());
 }

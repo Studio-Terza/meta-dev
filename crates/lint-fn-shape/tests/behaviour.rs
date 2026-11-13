@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_fn_shape::FnShape;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -99,5 +100,5 @@ const CASES: [Case; 16] = [
 
 #[test]
 fn hairy_control_flow_is_flagged() {
-    assert_eq!(Sources::mismatches::<FnShape>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<FnShape>>(&CASES), Lines::default());
 }

@@ -19,6 +19,7 @@ pub struct FileHead {
 
 impl FileHead {
     const MANIFEST: &'static str = "Cargo.toml";
+    const SOURCE: &'static str = "src";
 
     pub(super) fn new(path: PathBuf, located: Located, placement: Placement) -> FileHead {
         FileHead { crate_file: placement.crate_file(&path), path, located, placement, manifest: OnceLock::new() }
@@ -51,6 +52,13 @@ impl FileHead {
     #[must_use]
     pub fn shipped(&self) -> Option<&FileHead> {
         (self.placement.role() != Role::Target).then_some(self)
+    }
+
+    #[must_use]
+    pub fn binary(&self) -> Option<&CrateFile> {
+        let source = self.placement.crate_root().directory().join(Self::SOURCE);
+        let inside = self.crate_file.as_ref().strip_prefix(source).ok();
+        inside.map(Role::in_source).filter(|role| *role == Role::BinaryRoot).map(|_| &self.crate_file)
     }
 
     #[must_use]

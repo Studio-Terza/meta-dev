@@ -1,5 +1,6 @@
 use lint_core::Lint;
 use lint_enum_predicates::EnumPredicates;
+use lint_file::Judged;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const IMPL_ONLY: &str = "impl Mode {\n    fn is_a(&self) -> bool { true }\n}\n";
@@ -9,10 +10,10 @@ const DECLARES: &str = "pub enum Mode { A }\n";
 fn only_an_enum_of_that_name_in_reach_counts() {
     let apart =
         [Sources::file("x/src/mode.rs", Text::new(DECLARES)), Sources::file("y/src/impls.rs", Text::new(IMPL_ONLY))];
-    assert!(EnumPredicates::report(&apart).dirty().is_none());
+    assert!(Judged::<EnumPredicates>::report(&apart).dirty().is_none());
     let kinds =
         [Sources::file("x/src/a.rs", Text::new(STATUS_ENUM)), Sources::file("x/src/b.rs", Text::new(STATUS_STRUCT))];
-    assert!(EnumPredicates::report(&kinds).dirty().is_none());
+    assert!(Judged::<EnumPredicates>::report(&kinds).dirty().is_none());
 }
 
 const SHARED_TEST_NAME: &str = "enum Mode { A }\n";
@@ -26,7 +27,7 @@ fn integration_tests_are_separate_crates() {
         Sources::file("x/tests/a.rs", Text::new(SHARED_TEST_NAME)),
         Sources::file("y/tests/b.rs", Text::new(OTHER_TEST_CRATE)),
     ];
-    assert!(EnumPredicates::report(&files).dirty().is_none());
+    assert!(Judged::<EnumPredicates>::report(&files).dirty().is_none());
 }
 
 const SAME_NAME_NEARBY: &str = "mod b {\n    pub struct Mode;\n}\nmod a {\n    pub enum Mode { A }\n    impl Mode {\n        pub fn is_a(&self) -> bool { true }\n    }\n}\n";
@@ -67,5 +68,5 @@ const CASES: [Case; 5] = [
 
 #[test]
 fn a_name_resolves_to_the_nearest_declaration() {
-    assert_eq!(Sources::mismatches::<EnumPredicates>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<EnumPredicates>>(&CASES), Lines::default());
 }
