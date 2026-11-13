@@ -1,21 +1,13 @@
-mod callee;
-mod finding;
-mod forwarder;
 mod forwarders;
 mod workspace_types;
 
-use finding::Finding;
-use forwarder::Forwarder;
 use forwarders::Forwarders;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
-use syn::visit::Visit;
+use lint_sweep::Judgement;
 use workspace_types::{TypeGathering, WorkspaceTypes};
 
-use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::Violation;
-use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct NoForwarders;
@@ -33,23 +25,10 @@ impl ContextLint for NoForwarders {
         TypeGathering::from(parsed.file())
     }
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, types: &WorkspaceTypes) -> Vec<Violation<'file>> {
-        Self::forwarders(file, types)
-            .into_iter()
-            .map(|forwarder| {
-                Violation::new(
-                    Site::new(file.head().path(), LineNumber::from(forwarder.name().span())),
-                    Finding::Forwards { name: forwarder.name(), callee: forwarder.callee() },
-                )
-            })
-            .collect()
-    }
-}
-
-impl NoForwarders {
-    fn forwarders<'file>(file: &'file SourceFile, types: &WorkspaceTypes) -> Vec<Forwarder<'file>> {
-        let mut scan = Forwarders::new(types);
-        scan.visit_file(file.syntax());
-        scan.found()
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
+        file: &'file SourceFile,
+        types: &'run WorkspaceTypes,
+    ) -> Judgement<'file, 'run> {
+        Judgement::watching(Box::new(Forwarders::new(file.head().path(), types)))
     }
 }

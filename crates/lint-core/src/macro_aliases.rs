@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
-use syn::visit::Visit;
-use syn::{File, ItemUse, UseRename, UseTree};
+use syn::{ItemUse, UseRename, UseTree};
+
+use crate::watch::{Descend, Kind, Watch};
 
 use lint_layout::Name;
 use lint_layout::Word;
@@ -14,10 +15,8 @@ pub struct MacroAliases {
 
 impl MacroAliases {
     #[must_use]
-    pub fn in_file(file: &File, original: Word<'_>) -> MacroAliases {
-        let mut aliases = MacroAliases { names: BTreeSet::new(), original: Name::from(original) };
-        aliases.visit_file(file);
-        aliases
+    pub fn new(original: Word<'_>) -> MacroAliases {
+        MacroAliases { names: BTreeSet::new(), original: Name::from(original) }
     }
 
     #[must_use]
@@ -43,9 +42,14 @@ impl MacroAliases {
     }
 }
 
-impl<'ast> Visit<'ast> for MacroAliases {
-    fn visit_item_use(&mut self, item: &'ast ItemUse) {
+impl<'ast> Watch<'ast> for MacroAliases {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemUse]
+    }
+
+    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
         let renamed = self.renamed(&item.tree);
         self.names.extend(renamed);
+        Descend::Over
     }
 }

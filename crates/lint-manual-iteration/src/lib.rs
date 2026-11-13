@@ -76,6 +76,7 @@ impl SweptLint for ManualIteration {
     }
 }
 
+#[derive(Debug)]
 struct Iterations<'scan> {
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,

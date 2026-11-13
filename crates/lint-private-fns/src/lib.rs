@@ -46,6 +46,7 @@ impl PrivateFns {
     }
 }
 
+#[derive(Debug)]
 struct PrivateFnCounter<'file> {
     file: &'file SourceFile,
     found: BTreeMap<TypeName, Vec<Name>>,

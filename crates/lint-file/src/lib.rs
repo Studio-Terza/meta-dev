@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
-use lint_sweep::{Finds, Gathers, Sweep};
+use lint_sweep::{Finds, Gathers, Judgement, Sweep};
 
 pub use concluded::{Concluded, Listed};
 
@@ -49,7 +49,10 @@ pub trait ContextLint {
 
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Self::Gathering<'head>;
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, context: &Self::Context<'head>) -> Vec<Violation<'file>>;
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
+        file: &'file SourceFile,
+        context: &'run Self::Context<'head>,
+    ) -> Judgement<'file, 'run>;
 }
 
 #[derive(Debug)]
@@ -80,7 +83,10 @@ impl<Checked: ContextLint> Lint for Judged<Checked> {
         let context: Checked::Context<'_> =
             files.iter().map(|file| Sweep::gathered(file, Checked::gathering(Parsed::from(file)))).collect();
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
-        Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &context)).collect())
+        Report::new(
+            Checked::HEADLINE,
+            read.flat_map(|file| Checked::judgement(file, &context).violations(file)).collect(),
+        )
     }
 }
 
@@ -91,21 +97,25 @@ pub trait PrimedFacts {
     type Context<'head>: FromIterator<Self::Part<'head>> + Send + Sync + Debug;
 
     type Priming<'head>: Gathers<Self::PrimerPart<'head>>;
+    type Contribution<'run, 'head: 'run>: Gathers<Self::Part<'head>>;
 
     fn priming<'head>(parsed: Parsed<'_, 'head>) -> Self::Priming<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>, primer: &Self::Primer<'head>) -> Self::Part<'head>;
+    fn contribution<'run, 'head: 'run>(
+        parsed: Parsed<'_, 'head>,
+        primer: &'run Self::Primer<'head>,
+    ) -> Self::Contribution<'run, 'head>;
 }
 
 pub trait PrimedLint: PrimedFacts {
     const HEADLINE: Headline;
     const READS: Reads;
 
-    fn judged<'file, 'head: 'file>(
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
         file: &'file SourceFile,
-        primer: &Self::Primer<'head>,
-        context: &Self::Context<'head>,
-    ) -> Vec<Violation<'file>>;
+        primer: &'run Self::Primer<'head>,
+        context: &'run Self::Context<'head>,
+    ) -> Judgement<'file, 'run>;
 }
 
 #[derive(Debug)]
@@ -115,10 +125,15 @@ impl<Checked: PrimedLint> Lint for Primed<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let primer: Checked::Primer<'_> =
             files.iter().map(|file| Sweep::gathered(file, Checked::priming(Parsed::from(file)))).collect();
-        let context: Checked::Context<'_> =
-            files.iter().map(Parsed::from).map(|parsed| Checked::contributed(parsed, &primer)).collect();
+        let context: Checked::Context<'_> = files
+            .iter()
+            .map(|file| Sweep::gathered(file, Checked::contribution(Parsed::from(file), &primer)))
+            .collect();
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
-        Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &primer, &context)).collect())
+        Report::new(
+            Checked::HEADLINE,
+            read.flat_map(|file| Checked::judgement(file, &primer, &context).violations(file)).collect(),
+        )
     }
 }
 

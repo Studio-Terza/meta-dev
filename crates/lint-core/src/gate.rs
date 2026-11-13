@@ -8,6 +8,7 @@ use newtype::Wrapping;
 
 use crate::source_file::FileHead;
 use crate::walk::Walk;
+use crate::watch::Descend;
 use suffix::Suffix;
 
 #[derive(Debug)]
@@ -44,8 +45,10 @@ impl Gate {
         self.package_suffix.and_then(|suffix| krate.matches::<Suffix>(&[suffix])).map(|_| krate)
     }
 
-    pub fn enter_outside(&self, module: &ItemMod, visit: impl FnOnce()) {
-        Walk::enter(&module.attrs, || self.names(module).map_or_else(visit, |_| ()));
+    #[must_use]
+    pub fn outside(&self, module: &ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+            .then(|| self.names(module).map_or(Descend::Into, |_| Descend::Over))
     }
 
     #[must_use]

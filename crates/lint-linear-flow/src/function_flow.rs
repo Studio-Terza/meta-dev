@@ -7,6 +7,7 @@ use syn::Block;
 
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
+use lint_sweep::Sweep;
 
 use crate::finding::Rule;
 use crate::verdict::Verdict;
@@ -25,8 +26,8 @@ impl<'file> FunctionFlow<'file> {
     pub fn judged(file: &'file SourceFile, name: Span, body: &Block) -> FunctionFlow<'file> {
         let path = file.head().path();
         let root = Root::from(body);
-        let mut scan = Scan::new(file);
-        root.scanned_by(&mut scan);
+        let mut scan = Scan::new(file, root);
+        Sweep::through_block(file, body, &mut scan);
         FunctionFlow {
             site: Site::new(path, LineNumber::from(name)),
             shape: root.verdict(),

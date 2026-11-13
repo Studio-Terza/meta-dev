@@ -44,6 +44,7 @@ impl SweptLint for NoFreeFns {
     }
 }
 
+#[derive(Debug)]
 struct FreeFns<'file> {
     path: &'file StdPath,
     found: Vec<Violation<'file>>,

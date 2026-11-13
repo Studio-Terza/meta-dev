@@ -24,7 +24,7 @@ pub struct ConstShape;
 
 impl ConstShape {}
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Context {
     Surface,
     Const,
@@ -68,7 +68,7 @@ impl From<&Expr> for Looping {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Zone {
     Boundary,
     Elsewhere,
@@ -84,6 +84,7 @@ impl Zone {
     }
 }
 
+#[derive(Debug)]
 struct ConstContexts<'scan> {
     path: &'scan Path,
     context: Contexts,
@@ -118,6 +119,7 @@ impl<'scan> ConstContexts<'scan> {
     }
 }
 
+#[derive(Debug)]
 struct Contexts {
     current: Context,
     outer: Vec<Context>,

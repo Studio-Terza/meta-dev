@@ -60,6 +60,7 @@ impl SweptLint for TypeShape {
     }
 }
 
+#[derive(Debug)]
 struct TypeShapes<'scan> {
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,

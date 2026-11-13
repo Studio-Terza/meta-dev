@@ -1,14 +1,12 @@
 mod consumers;
-mod declaration;
 mod declared;
-mod finding;
 
-use lint_core::{Headline, Parsed, Site, SourceFile, Violation};
+use lint_core::{Headline, Parsed, SourceFile};
 use lint_file::{ContextLint, Reads};
+use lint_sweep::Judgement;
 
 use consumers::{Consumers, Consuming};
 use declared::Declared;
-use finding::Finding;
 
 #[derive(Debug)]
 pub struct UnconsumedTraits;
@@ -28,11 +26,10 @@ impl ContextLint for UnconsumedTraits {
         Consuming::from(parsed.file())
     }
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, consumers: &Consumers) -> Vec<Violation<'file>> {
-        Declared::of_file(file)
-            .into_iter()
-            .filter_map(|declaration| declaration.unconsumed(consumers))
-            .map(|declaration| Violation::new(*AsRef::<Site>::as_ref(&declaration), Finding::from(&declaration)))
-            .collect()
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
+        file: &'file SourceFile,
+        consumers: &'run Consumers,
+    ) -> Judgement<'file, 'run> {
+        Judgement::watching(Box::new(Declared::new(file, consumers)))
     }
 }

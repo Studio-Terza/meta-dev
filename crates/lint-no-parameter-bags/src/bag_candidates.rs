@@ -6,30 +6,30 @@ pub use candidate::Candidate;
 use std::collections::{BTreeMap, BTreeSet};
 
 use method_shape::MethodShape;
-use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
 
-use lint_core::SourceFile;
+use lint_core::{SourceFile, Violation};
+use lint_sweep::{Descend, Finds, Kind, Watch};
+
+use crate::Bags;
 use lint_core::Syntax;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
-#[derive(Default)]
-pub struct BagCandidates {
+#[derive(Debug)]
+pub struct BagCandidates<'file, 'run> {
+    file: &'file SourceFile,
+    bags: &'run Bags<'run>,
     structs: BTreeMap<Name, LineNumber>,
     disqualified: BTreeSet<Name>,
 }
 
-impl From<&SourceFile> for BagCandidates {
-    fn from(file: &SourceFile) -> BagCandidates {
-        let mut candidates = BagCandidates::default();
-        candidates.visit_file(file.syntax());
-        candidates
+impl<'file, 'run> BagCandidates<'file, 'run> {
+    pub fn new(file: &'file SourceFile, bags: &'run Bags<'run>) -> BagCandidates<'file, 'run> {
+        BagCandidates { file, bags, structs: BTreeMap::new(), disqualified: BTreeSet::new() }
     }
-}
 
-impl BagCandidates {
     pub fn candidates(&self) -> impl Iterator<Item = Candidate<'_>> {
         self.structs
             .iter()
@@ -49,16 +49,34 @@ impl BagCandidates {
     }
 }
 
-impl<'ast> Visit<'ast> for BagCandidates {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for BagCandidates<'_, '_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemImpl]
     }
 
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+    }
+
+    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
         self.structs.insert(Name::from(&item.ident), LineNumber::from(item.ident.span()));
+        Descend::Over
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
         self.disqualified.extend(Name::of_type(&item.self_ty).and_then(|name| Self::logic_carrier(item, name)));
+        Descend::Over
+    }
+}
+
+impl<'file> Finds<'file> for BagCandidates<'file, '_> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        let file = self.file;
+        let bags = self.bags;
+        self.candidates()
+            .filter(|candidate| bags.exports.exported(file, candidate.name()).is_none())
+            .filter(|candidate| bags.one_consumer(file, candidate.name()).is_some())
+            .map(|candidate| candidate.violation(file.head().path()))
+            .collect()
     }
 }

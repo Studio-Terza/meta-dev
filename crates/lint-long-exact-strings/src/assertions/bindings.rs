@@ -1,54 +1,45 @@
+mod boundary;
+
 use std::collections::BTreeMap;
 
-use syn::visit::{self, Visit};
-use syn::{Block, Expr, File, ItemConst, Local};
+use syn::{Expr, ItemConst, Local};
 
 use lint_core::Syntax;
 use lint_layout::Name;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum Scope {
-    #[default]
-    Items,
-    Body,
+pub use boundary::{BodyId, Scopes};
+
+#[derive(Debug)]
+pub struct Bound {
+    name: Name,
+    value: Expr,
+}
+
+impl Bound {
+    pub fn constant(item: &ItemConst) -> Bound {
+        Bound { name: Name::from(&item.ident), value: Expr::clone(&item.expr) }
+    }
+
+    pub fn local(local: &Local) -> Option<Bound> {
+        Syntax::pat_ident(&local.pat)
+            .zip(local.init.as_ref())
+            .map(|(name, init)| Bound { name: Name::from(&name.ident), value: Expr::clone(&init.expr) })
+    }
 }
 
 #[derive(Debug, Default)]
-pub struct Bindings<'ast> {
-    bound: BTreeMap<Name, &'ast Expr>,
-    scope: Scope,
+pub struct Bindings<'run> {
+    bound: BTreeMap<&'run Name, &'run Expr>,
 }
 
-impl<'ast> Bindings<'ast> {
-    pub fn constants(file: &'ast File) -> Bindings<'ast> {
-        let mut constants = Bindings::default();
-        constants.visit_file(file);
-        constants
+impl<'run> FromIterator<&'run Bound> for Bindings<'run> {
+    fn from_iter<Bounds: IntoIterator<Item = &'run Bound>>(bounds: Bounds) -> Bindings<'run> {
+        Bindings { bound: bounds.into_iter().map(|bound| (&bound.name, &bound.value)).collect() }
     }
+}
 
-    pub fn locals(block: &'ast Block) -> Bindings<'ast> {
-        let mut locals = Bindings { bound: BTreeMap::new(), scope: Scope::Body };
-        locals.visit_block(block);
-        locals
-    }
-
-    pub fn bound(&self, name: &Name) -> Option<&'ast Expr> {
+impl<'run> Bindings<'run> {
+    pub fn bound(&self, name: &Name) -> Option<&'run Expr> {
         self.bound.get(name).copied()
-    }
-}
-
-impl<'ast> Visit<'ast> for Bindings<'ast> {
-    fn visit_item_const(&mut self, item: &'ast ItemConst) {
-        self.bound.extend((self.scope == Scope::Items).then(|| (Name::from(&item.ident), &*item.expr)));
-        visit::visit_item_const(self, item);
-    }
-
-    fn visit_local(&mut self, local: &'ast Local) {
-        let bound = Syntax::pat_ident(&local.pat)
-            .zip(local.init.as_ref())
-            .filter(|_| self.scope == Scope::Body)
-            .map(|(name, init)| (Name::from(&name.ident), &*init.expr));
-        self.bound.extend(bound);
-        visit::visit_local(self, local);
     }
 }

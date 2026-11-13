@@ -13,7 +13,7 @@ use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile
 use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads, Swept, SweptLint};
 use lint_port_dependencies::{RoleFacts, RoleReading};
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Finds, Sweep};
+use lint_sweep::{Finds, Judgement, Sweep};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -68,7 +68,7 @@ use lint_workflow_run::WorkflowRun;
 
 use super::Survey;
 use crate::cli::boundary::{Helper, Helpers, Rendered, Slot, Surveyed, Worked, Workers};
-use crate::cli::sources::{Claimed, Holding, Priming, Settled};
+use crate::cli::sources::{Claimed, Gleans, Holding, Priming, Settled};
 use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
 use crate::cli::{Outcome, Sources, Verdict};
 
@@ -102,7 +102,8 @@ type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 type Scan = for<'file> fn(&'file SourceFile) -> Vec<Violation<'file>>;
 
-type Judge = for<'file, 'settled, 'run> fn(&'file SourceFile, &'file Settled<'settled, 'run>) -> Vec<Violation<'file>>;
+type Judge =
+    for<'file, 'settled, 'run> fn(&'file SourceFile, &'file Settled<'settled, 'run>) -> Judgement<'file, 'file>;
 
 #[derive(Clone, Copy, Debug)]
 struct Judging {
@@ -154,7 +155,7 @@ impl Lints {
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
-        <Filed<VecOutParams<'static>> as Registered>::ENTRY,
+        <Swept<VecOutParams> as Registered>::ENTRY,
         <Swept<NamedLifetimes> as Registered>::ENTRY,
         <Judged<EnumPredicates> as Registered>::ENTRY,
         <Swept<ConstShape> as Registered>::ENTRY,
@@ -166,7 +167,7 @@ impl Lints {
         <Judged<ModuleNesting> as Registered>::ENTRY,
         <Judged<NamedNumbers> as Registered>::ENTRY,
         <Judged<NoForwarders> as Registered>::ENTRY,
-        <Filed<NoNumbersInBinaries> as Registered>::ENTRY,
+        <Swept<NoNumbersInBinaries> as Registered>::ENTRY,
         <Judged<NoParameterBags> as Registered>::ENTRY,
         Entry::spelled::<PrimitiveBoundary>(Work::Modelled(<PrimitiveBoundary as ModelLint>::report)),
         <Swept<PrivateFns> as Registered>::ENTRY,
@@ -192,7 +193,7 @@ impl Lints {
         <Filed<CountedCalls> as Registered>::ENTRY,
         <Filed<HiddenSqlx> as Registered>::ENTRY,
         Entry::spelled::<StoreQueries>(Work::Modelled(<StoreQueries as ModelLint>::report)),
-        <Filed<LongExactStrings> as Registered>::ENTRY,
+        <Swept<LongExactStrings> as Registered>::ENTRY,
         <Judged<RepeatedShapes> as Registered>::ENTRY,
         Entry::spelled::<MandatoryLaws>(Work::Modelled(<MandatoryLaws as ModelLint>::report)),
         <Swept<ArbitraryNewtypes> as Registered>::ENTRY,
@@ -269,13 +270,7 @@ impl Lints {
         let queued: Worked = claimed.collect();
         let judging = Stopwatch::started(sources.wired().timer());
         let settled = Settled::from(sources.gathering());
-        let judged: Worked = Self::LINTS
-            .iter()
-            .enumerate()
-            .filter_map(|(index, entry)| {
-                entry.judging().map(|found| found.lines(Slot::from(index), lowered.claimed(), &settled))
-            })
-            .collect();
+        let judged: Worked = lowered.claimed().iter().map(|found| Judgers::judged(found, &settled)).collect();
         let judged_timing = judging.stopped(Step::Judged(worker));
         let timings = lowered.timings().iter().copied().chain([filed_timing, primed_timing, judged_timing]);
         timings.map(Worked::timed).chain([filed, queued, judged]).collect()
@@ -342,11 +337,32 @@ impl Entry {
     }
 }
 
-impl Judging {
-    fn lines(self, slot: Slot, claimed: &[Claimed<'_>], settled: &Settled<'_, '_>) -> Worked {
-        let read = claimed.iter().filter_map(|found| self.reads.admits(found.file()).map(|file| (found.order(), file)));
-        read.map(|(order, file)| Worked::filing(slot, order, &(self.judge)(file, settled))).collect()
+#[derive(Debug)]
+struct Judgers;
+
+impl Judgers {
+    fn judged(claimed: &Claimed<'_>, settled: &Settled<'_, '_>) -> Worked {
+        let file = claimed.file();
+        let judgements = Lints::LINTS
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| Some((Slot::from(index), entry.judging()?)))
+            .filter_map(|(slot, judging)| Some((slot, (judging.judge)(judging.reads.admits(file)?, settled))));
+        let mut rulings: Vec<Ruling<'_>> = judgements.map(|(slot, judgement)| Ruling { slot, judgement }).collect();
+        let mut groups: Vec<Vec<Box<dyn Finds<'_> + '_>>> =
+            rulings.iter_mut().map(|ruling| ruling.judgement.watchers()).collect();
+        Sweep::over_all(file, &mut groups);
+        let concluded = rulings.into_iter().zip(groups).map(|(ruling, group)| {
+            let violations = ruling.judgement.concluded(group.into_iter().flat_map(Finds::found));
+            Worked::filing(ruling.slot, claimed.order(), &violations)
+        });
+        concluded.collect()
     }
+}
+
+struct Ruling<'file> {
+    slot: Slot,
+    judgement: Judgement<'file, 'file>,
 }
 
 impl Work {
@@ -402,7 +418,7 @@ impl Work {
                     .ok()
                     .zip(sources.gathering().model())
                     .map(|(located, model)| {
-                        let facts = Priming::<RoleReading>::primer(settled);
+                        let facts = Gleans::<RoleReading>::gleaned(settled);
                         described(sources.gathering().heads(), Described::workspaces(located), facts, model)
                     })
                     .into_iter()
@@ -496,14 +512,16 @@ impl Sweepers {
             .filter_map(|(index, entry)| Some((Slot::from(index), entry.filing()?)))
             .filter_map(|(slot, filing)| Some((slot, filing.reads.admits(file).and(filing.scanning.swept())?)))
             .collect();
-        let mut watchers: Vec<Box<dyn Finds<'_> + '_>> = starts.iter().map(|(_, start)| start(file)).collect();
-        Sweep::over(file, &mut watchers);
-        let found = starts.into_iter().zip(watchers).map(|((slot, _), watcher)| (slot, watcher.found()));
+        let started: Vec<Box<dyn Finds<'_> + '_>> = starts.iter().map(|(_, start)| start(file)).collect();
+        let mut watchers = [started];
+        Sweep::over_all(file, &mut watchers);
+        let [swept] = watchers;
+        let found = starts.into_iter().zip(swept).map(|((slot, _), watcher)| (slot, watcher.found()));
         found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations)).collect()
     }
 }
 
-impl<Lint: ContextLint> Registered for Judged<Lint>
+impl<Lint: ContextLint + 'static> Registered for Judged<Lint>
 where
     Judged<Lint>: Judges,
 {
@@ -513,7 +531,7 @@ where
     };
 }
 
-impl<Lint: PrimedLint> Registered for Primed<Lint>
+impl<Lint: PrimedLint + 'static> Registered for Primed<Lint>
 where
     Primed<Lint>: Judges,
 {
@@ -524,23 +542,23 @@ where
 }
 
 trait Judges {
-    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Vec<Violation<'file>>;
+    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Judgement<'file, 'file>;
 }
 
-impl<Lint: ContextLint> Judges for Judged<Lint>
+impl<Lint: ContextLint + 'static> Judges for Judged<Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
-    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Vec<Violation<'file>> {
-        Lint::judged(file, settled.held())
+    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Judgement<'file, 'file> {
+        Lint::judgement(file, settled.held())
     }
 }
 
-impl<Lint: PrimedLint> Judges for Primed<Lint>
+impl<Lint: PrimedLint + 'static> Judges for Primed<Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Priming<'run, Lint>,
 {
-    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Vec<Violation<'file>> {
-        Lint::judged(file, settled.primer(), settled.primed())
+    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Judgement<'file, 'file> {
+        Lint::judgement(file, settled.primer(), settled.primed())
     }
 }

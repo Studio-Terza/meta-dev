@@ -1,15 +1,17 @@
+mod boundary;
+
+use boundary::Numeral;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
+use lint_sweep::{Descend, Finds, Judgement, Kind, Watch};
 use lint_sweep::{Gathers, Sweep, Watching};
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use syn::visit::Visit;
 use syn::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitInt, Macro, TraitItemConst};
 
 use lint_core::Fix;
 use lint_core::Gate;
-use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
@@ -62,21 +64,15 @@ impl ContextLint for NamedNumbers {
         SupportGathering { file: parsed.head().path(), modules: SupportModules::default() }
     }
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, support: &SupportPaths) -> Vec<Violation<'file>> {
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
+        file: &'file SourceFile,
+        support: &'run SupportPaths,
+    ) -> Judgement<'file, 'run> {
         let counted = Some(file)
             .filter(|found| Gate::BOUNDARY.admits(found.head()).is_none())
             .and_then(|found| support.0.get(found.head().path()).map_or(Some(found), |_| None));
-        counted.map_or_default(|found: &SourceFile| {
-            Self::flagged(
-                found,
-                Numbers { file: found, lines: Vec::new() },
-                Message::new(
-                    Problem::new("numeric literal outside a const item"),
-                    Fix::new("name it as a const so it can be found and tuned"),
-                ),
-            )
-            .collect()
-        })
+        let numbers = counted.map(|found| Numbers { path: found.head().path(), lines: Vec::new() });
+        numbers.map_or_else(|| Judgement::found(Vec::new()), |watched| Judgement::watching(Box::new(watched)))
     }
 }
 
@@ -84,67 +80,80 @@ impl NamedNumbers {
     const UNITS: &[Word<'static>] = &words!["0", "1", "0.0", "1.0", "-1", "-1.0"];
 
     #[must_use]
-    pub fn unnamed(digits: Word<'_>, line: LineNumber) -> Option<LineNumber> {
-        match Self::UNITS.iter().find(|unit| **unit == digits) {
-            Some(_) => None,
-            None => Some(line),
-        }
+    pub fn unnamed(literal: &impl Numeral) -> Option<LineNumber> {
+        let digits = Word::new(literal.digits());
+        Self::UNITS.iter().find(|unit| **unit == digits).map_or(Some(LineNumber::from(literal.spot())), |_| None)
     }
 
-    pub fn flagged(
-        file: &SourceFile,
-        mut found: impl Literals,
-        message: Message,
-    ) -> impl Iterator<Item = Violation<'_>> {
-        found.visit_file(file.syntax());
-        found.lines().into_iter().map(move |line| Violation::new(Site::new(file.head().path(), line), message))
-    }
+    const OUTSIDE_CONSTS: Message = Message::new(
+        Problem::new("numeric literal outside a const item"),
+        Fix::new("name it as a const so it can be found and tuned"),
+    );
 }
 
-pub trait Literals: for<'ast> Visit<'ast> {
-    fn lines(self) -> Vec<LineNumber>;
-}
-
-impl Literals for Numbers<'_> {
-    fn lines(self) -> Vec<LineNumber> {
-        self.lines
-    }
-}
-
+#[derive(Debug)]
 struct Numbers<'file> {
-    file: &'file SourceFile,
+    path: &'file Path,
     lines: Vec<LineNumber>,
 }
 
-impl<'ast> Visit<'ast> for Numbers<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::BOUNDARY.enter_outside(module, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Numbers<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[
+            Kind::ItemMod,
+            Kind::ItemImpl,
+            Kind::ItemConst,
+            Kind::ImplItemConst,
+            Kind::TraitItemConst,
+            Kind::ExprConst,
+            Kind::Macro,
+            Kind::LitInt,
+            Kind::LitFloat,
+        ]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        match Walk::outside_tests(&item.attrs) {
-            Walk::Entered => syn::visit::visit_item_impl(self, item),
-            Walk::Skipped => {}
-        }
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Gate::BOUNDARY.outside(module)
     }
 
-    fn visit_item_const(&mut self, _: &'ast ItemConst) {}
-
-    fn visit_impl_item_const(&mut self, _: &'ast ImplItemConst) {}
-
-    fn visit_trait_item_const(&mut self, _: &'ast TraitItemConst) {}
-
-    fn visit_expr_const(&mut self, _: &'ast ExprConst) {}
-
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_lit_int(&mut self, literal: &'ast LitInt) {
-        self.lines.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
+    fn on_item_const(&mut self, _: &'ast ItemConst) -> Descend {
+        Descend::Over
     }
 
-    fn visit_lit_float(&mut self, literal: &'ast LitFloat) {
-        self.lines.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
+    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst) -> Descend {
+        Descend::Over
+    }
+
+    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst) -> Descend {
+        Descend::Over
+    }
+
+    fn on_expr_const(&mut self, _: &'ast ExprConst) -> Descend {
+        Descend::Over
+    }
+
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
+    }
+
+    fn on_lit_int(&mut self, literal: &'ast LitInt) -> Descend {
+        self.lines.extend(NamedNumbers::unnamed(literal));
+        Descend::Into
+    }
+
+    fn on_lit_float(&mut self, literal: &'ast LitFloat) -> Descend {
+        self.lines.extend(NamedNumbers::unnamed(literal));
+        Descend::Into
+    }
+}
+
+impl<'file> Finds<'file> for Numbers<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        let path = self.path;
+        self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), NamedNumbers::OUTSIDE_CONSTS)).collect()
     }
 }

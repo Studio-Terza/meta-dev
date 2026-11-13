@@ -83,6 +83,7 @@ hooks! {
     ExprContinue on_expr_continue off_expr_continue visit_expr_continue syn::ExprContinue;
     ExprForLoop on_expr_for_loop off_expr_for_loop visit_expr_for_loop syn::ExprForLoop;
     ExprIf on_expr_if off_expr_if visit_expr_if syn::ExprIf;
+    ExprLet on_expr_let off_expr_let visit_expr_let syn::ExprLet;
     ExprLoop on_expr_loop off_expr_loop visit_expr_loop syn::ExprLoop;
     ExprMatch on_expr_match off_expr_match visit_expr_match syn::ExprMatch;
     ExprMethodCall on_expr_method_call off_expr_method_call visit_expr_method_call syn::ExprMethodCall;

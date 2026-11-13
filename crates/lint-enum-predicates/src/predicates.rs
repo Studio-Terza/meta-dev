@@ -7,13 +7,13 @@ mod known;
 use std::borrow::Cow;
 
 use syn::spanned::Spanned;
-use syn::visit::Visit;
 use syn::{ItemImpl, ItemMod, Macro};
 
-use lint_core::{Headline, Macros, Parsed, Site, SourceFile, Syntax, Violation};
+use lint_core::{Headline, Parsed, Site, SourceFile, Syntax, Violation};
 use lint_file::{ContextLint, Reads};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
+use lint_sweep::{Descend, Finds, Judgement, Kind as Node, Watch};
 
 pub use declaration::Declaration;
 use declarations::Declarations;
@@ -39,15 +39,18 @@ impl ContextLint for EnumPredicates {
         Declarations::in_file(parsed)
     }
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, known: &Known<'head>) -> Vec<Violation<'file>> {
-        let mut scan = Predicates::new(known, file);
-        scan.visit_file(file.syntax());
-        scan.into_violations()
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
+        file: &'file SourceFile,
+        known: &'run Known<'head>,
+    ) -> Judgement<'file, 'run> {
+        Judgement::watching(Box::new(Predicates::new(known, file)))
     }
 }
 
+#[derive(Debug)]
 pub struct Predicates<'scan, 'file> {
     known: &'scan Known<'scan>,
+    outer: Vec<Cow<'file, ModulePath>>,
     file: &'file SourceFile,
     module: Cow<'file, ModulePath>,
     violations: Vec<Violation<'file>>,
@@ -55,11 +58,13 @@ pub struct Predicates<'scan, 'file> {
 
 impl<'scan, 'file> Predicates<'scan, 'file> {
     pub fn new(known: &'scan Known<'scan>, file: &'file SourceFile) -> Predicates<'scan, 'file> {
-        Predicates { known, file, module: Cow::Borrowed(file.head().placement().module()), violations: Vec::new() }
-    }
-
-    pub fn into_violations(self) -> Vec<Violation<'file>> {
-        self.violations
+        Predicates {
+            known,
+            outer: Vec::new(),
+            file,
+            module: Cow::Borrowed(file.head().placement().module()),
+            violations: Vec::new(),
+        }
     }
 
     fn predicates(&self, block: &ItemImpl) -> Vec<Violation<'file>> {
@@ -83,23 +88,36 @@ impl<'scan, 'file> Predicates<'scan, 'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for Predicates<'_, '_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let inner = Cow::Owned(self.module.child(Name::from(&module.ident)));
-        let outer = std::mem::replace(&mut self.module, inner);
-        syn::visit::visit_item_mod(self, module);
-        self.module = outer;
+impl<'ast> Watch<'ast> for Predicates<'_, '_> {
+    fn kinds(&self) -> &'static [Node] {
+        &[Node::ItemMod, Node::ItemImpl, Node::Macro]
     }
 
-    fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        let inner = Cow::Owned(self.module.child(Name::from(&module.ident)));
+        self.outer.push(std::mem::replace(&mut self.module, inner));
+        Descend::Into
+    }
+
+    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+        self.module = self.outer.pop().unwrap_or_else(|| Cow::Borrowed(self.file.head().placement().module()));
+    }
+
+    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
         let found = Syntax::inherent(block)
             .filter(|candidate| self.known.kind(self.file, &self.module, &candidate.self_ty) == Kind::Enum)
             .map_or_default(|enum_impl| self.predicates(enum_impl));
         self.violations.extend(found);
-        syn::visit::visit_item_impl(self, block);
+        Descend::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
+    }
+}
+
+impl<'file> Finds<'file> for Predicates<'_, 'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.violations
     }
 }

@@ -2,7 +2,6 @@ mod role;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use syn::visit::Visit;
 use syn::{ImplItemFn, ItemImpl, ItemMod, Receiver};
 
 use super::declarations::Declarations;
@@ -17,8 +16,10 @@ use lint_core::Walk;
 use lint_core::{Bound, Site};
 use lint_file::Concluded;
 use lint_layout::{Length, Name};
+use lint_sweep::{Descend, Kind, Watch};
 use role::Role;
 
+#[derive(Debug)]
 pub struct EdgeScan<'scan, 'file> {
     declarations: &'scan Declarations<'scan>,
     path: &'file Path,
@@ -27,13 +28,8 @@ pub struct EdgeScan<'scan, 'file> {
 }
 
 impl<'scan, 'file> EdgeScan<'scan, 'file> {
-    pub fn new(declarations: &'scan Declarations<'scan>) -> Self {
-        EdgeScan { declarations, path: Path::new(""), edges: BTreeMap::new(), violations: Vec::new() }
-    }
-
-    pub fn scan(&mut self, path: &'file Path, syntax: &syn::File) {
-        self.path = path;
-        self.visit_file(syntax);
+    pub fn new(path: &'file Path, declarations: &'scan Declarations<'scan>) -> Self {
+        EdgeScan { declarations, path, edges: BTreeMap::new(), violations: Vec::new() }
     }
 
     pub fn into_edges(self) -> ScannedEdges<'file> {
@@ -88,24 +84,28 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for EdgeScan<'_, '_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for EdgeScan<'_, '_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || self.scanned(item));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+    }
+
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs)).then(|| self.scanned(item))
     }
 }
 
 impl EdgeScan<'_, '_> {
-    fn scanned(&mut self, item: &ItemImpl) {
+    fn scanned(&mut self, item: &ItemImpl) -> Descend {
         let context = ImplContext::describe(item, self.declarations);
         item.items
             .iter()
             .filter_map(FunctionShape::function)
             .for_each(|function| self.check_function(&context, function));
-        syn::visit::visit_item_impl(self, item);
+        Descend::Into
     }
 }
 

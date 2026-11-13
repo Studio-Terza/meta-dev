@@ -10,7 +10,7 @@ use std::path::Path;
 
 use graph::Model;
 use lint_core::{FileHead, Parsed, Site, Violation};
-use lint_file::PrimedFacts;
+use lint_file::Gleaning;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_placement::{CrateName as PlacedName, Role as Placed};
@@ -53,15 +53,13 @@ impl<'head> FromIterator<RoleFile<'head>> for RoleFacts<'head> {
 #[derive(Debug)]
 pub struct RoleReading;
 
-impl PrimedFacts for RoleReading {
-    type PrimerPart<'head> = RoleFile<'head>;
-    type Primer<'head> = RoleFacts<'head>;
-    type Part<'head> = ();
-    type Context<'head> = ();
+impl Gleaning for RoleReading {
+    type Part<'head> = RoleFile<'head>;
+    type Gleaned<'head> = RoleFacts<'head>;
 
-    type Priming<'head> = RootReading<'head>;
+    type Gleaner<'head> = RootReading<'head>;
 
-    fn priming<'head>(parsed: Parsed<'_, 'head>) -> RootReading<'head> {
+    fn gleaner<'head>(parsed: Parsed<'_, 'head>) -> RootReading<'head> {
         let head = parsed.head();
         let root = Some(head).filter(|found| found.placement().role() == Placed::LibraryRoot);
         let place = root.and_then(|found| {
@@ -69,8 +67,6 @@ impl PrimedFacts for RoleReading {
         });
         RootReading { place, denied: BTreeSet::new() }
     }
-
-    fn contributed(_: Parsed<'_, '_>, _: &RoleFacts<'_>) {}
 }
 
 #[derive(Debug)]
