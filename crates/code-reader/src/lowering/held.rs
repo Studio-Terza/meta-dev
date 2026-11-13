@@ -101,10 +101,8 @@ impl Lowering<'_> {
         let link = Link::declaring(&item.ident);
         let associated =
             item.items.iter().filter_map(Syntax::trait_type).map(|declared| scope.bounded(declared.bounds.iter()));
-        let bounds: Vec<TypeRef<Written>> =
-            [scope.bounded(item.supertraits.iter())].into_iter().chain(associated).collect();
         self.parameters(&holder, &item.generics, &link);
-        bounds.into_iter().fold(self, |lowering, ty| {
+        [scope.bounded(item.supertraits.iter())].into_iter().chain(associated).fold(self, |lowering, ty| {
             lowering.hold(holder.clone(), link.clone(), ty);
             lowering
         });

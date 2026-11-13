@@ -643,7 +643,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
         match &item.ident {
             Some(ident) => {
-                self.owned_by(ident, Domain::Macros, &item.attrs, |lowering| visit::visit_item_macro(lowering, item))
+                self.owned_by(ident, Domain::Macros, &item.attrs, |lowering| visit::visit_item_macro(lowering, item));
             }
             None => self.expanded(item),
         }

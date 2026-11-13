@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use code_model::{ItemId, Model, References};
 use lint_core::Site;
-use lint_item_graph::Traversal;
+use code_model::Traversal;
 use lint_layout::Name;
 
 use super::link::Link;

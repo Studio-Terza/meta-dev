@@ -1,6 +1,6 @@
+use code_model::ItemGraph;
 use code_model::{Model, References};
 use lint_core::{Bound, Site, Violation};
-use lint_item_graph::ItemGraph;
 use lint_layout::Name;
 
 mod tangle;

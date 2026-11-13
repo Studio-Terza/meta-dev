@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use lint_item_graph::Traversal;
+use code_model::Traversal;
 
 use crate::count::Count;
 

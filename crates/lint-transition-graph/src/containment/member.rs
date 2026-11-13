@@ -1,7 +1,6 @@
 use std::fmt;
 
 use lint_layout::Name;
-use lint_placement::CrateName;
 
 use super::cluster::Cluster;
 
@@ -12,7 +11,7 @@ pub(crate) struct Member<'found> {
 }
 
 impl<'found> Member<'found> {
-    pub(crate) fn declared(krate: &'found CrateName, name: &'found Name) -> Member<'found> {
+    pub(crate) fn declared(krate: &'found Name, name: &'found Name) -> Member<'found> {
         Member { name, cluster: Cluster::module(krate, &[]) }
     }
 

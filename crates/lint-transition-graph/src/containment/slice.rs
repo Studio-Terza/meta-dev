@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lint_item_graph::ItemGraph;
+use code_model::ItemGraph;
 
 use super::cluster::{Cluster, Part};
 use super::groups::Groups;

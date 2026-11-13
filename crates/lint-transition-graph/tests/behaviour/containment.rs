@@ -29,7 +29,7 @@ impl Clustered {
 
 const SPLIT: [Source; 4] = [
     Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A(B);\npub struct B;\npub struct C(std::A);\n"),
-    Clustered::at("crates/x/src/a/mod.rs", "mod b;\nmod c;\npub struct D(E);\n"),
+    Clustered::at("crates/x/src/a/mod.rs", "mod b;\nmod c;\npub struct D(E);\nuse b::E;\n"),
     Clustered::at("crates/x/src/a/b.rs", "pub struct E;\n"),
     Clustered::at("crates/x/src/a/c.rs", "pub struct F;\npub struct G;\n"),
 ];
@@ -210,7 +210,7 @@ fn a_name_declared_in_two_crates_resolves_to_its_qualifier_else_to_the_own_crate
 fn a_field_with_an_unqualified_name_and_a_method_signature_both_link_across_crates() {
     let apart = [
         Clustered::at("crates/x/src/lib.rs", "pub struct W;\n"),
-        Clustered::at("crates/y/src/lib.rs", "pub struct V(W);\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct V(W);\nuse x::W;\n"),
     ];
     let signed = [
         Clustered::at("crates/x/src/lib.rs", "pub struct B;\n"),
@@ -308,7 +308,7 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
         ),
         Clustered::at(
             "crates/x/src/a/mod.rs",
-            "mod deep;\nmod inner;\npub struct Platform;\npub struct Bench(self::inner::Seat);\n",
+            "mod deep;\nmod inner;\npub struct Platform;\npub struct Bench(self::inner::Seat);\npub use inner::Seat;\n",
         ),
         Clustered::at(
             "crates/x/src/a/inner.rs",
