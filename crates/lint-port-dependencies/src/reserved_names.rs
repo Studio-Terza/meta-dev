@@ -27,6 +27,7 @@ pub(crate) struct ReservedNames<'file, Kind> {
 impl<'file, Kind: Reserved> From<&'file SourceFile> for ReservedNames<'file, Kind> {
     fn from(file: &'file SourceFile) -> ReservedNames<'file, Kind> {
         let found = Self::outside_owners(file)
+            .filter(|outside| outside.text().mentioning(Kind::NAMES).is_some())
             .map_or_default(|outside| Self::lines(outside.syntax().to_token_stream()))
             .into_iter()
             .map(|line| Violation::new(Site::new(file.head().path(), line), Kind::default()))
