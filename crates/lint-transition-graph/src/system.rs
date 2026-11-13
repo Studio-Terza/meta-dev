@@ -100,7 +100,6 @@ pub struct TypeSystem<'found, 'file> {
     algebras: OnceCell<Algebras<'found, 'file>>,
     declarations: OnceCell<Declarations<'found, 'file>>,
     transitions: &'found Transitions<'file>,
-    facts: &'found Facts<'file>,
 }
 
 impl<'found, 'file> TypeSystem<'found, 'file> {
@@ -110,7 +109,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         laws: &'found Laws<'file>,
         model: &'file Model,
     ) -> TypeSystem<'found, 'file> {
-        let types = WorkspaceTypes::declared(extraction.facts(), extraction.transitions());
+        let types = WorkspaceTypes::declared(model, extraction.transitions());
         let edges = extraction.transitions().all().map(|found| types.edge(found)).collect();
         TypeSystem {
             types,
@@ -122,7 +121,6 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             algebras: OnceCell::new(),
             declarations: OnceCell::new(),
             transitions: extraction.transitions(),
-            facts: extraction.facts(),
         }
     }
 
@@ -152,8 +150,8 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         &self.edges
     }
 
-    pub(crate) fn facts(&self) -> &'found Facts<'file> {
-        self.facts
+    pub(crate) fn model(&self) -> &'file Model {
+        self.model
     }
 
     pub(crate) fn transitions(&self) -> &'found Transitions<'file> {

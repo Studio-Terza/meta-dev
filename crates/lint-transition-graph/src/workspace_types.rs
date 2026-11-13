@@ -1,64 +1,76 @@
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use code_model::{ItemKind, Model, Reach, Region};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::{Endpoint, Implementer, Inputs, Nature, Output, Transition, Transitions};
-use type_facts::Facts;
 
 use crate::count::Count;
 use crate::edge::Edge;
 use crate::end::{End, Ends, Node, Place};
 
+#[derive(Debug)]
+struct Spotted<'found> {
+    krate: &'found Name,
+    name: &'found Name,
+    kind: ItemKind,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct WorkspaceTypes<'found> {
-    types: BTreeMap<&'found Name, BTreeSet<&'found CrateName>>,
+    types: BTreeMap<&'found Name, BTreeSet<&'found Name>>,
     traits: BTreeSet<&'found Name>,
-    crates: BTreeSet<&'found CrateName>,
-    ambiguous: BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
+    crates: BTreeSet<&'found Name>,
+    ambiguous: BTreeMap<&'found Name, BTreeSet<&'found Name>>,
 }
 
 impl<'found> WorkspaceTypes<'found> {
-    pub(crate) fn declared(facts: &'found Facts<'_>, transitions: &'found Transitions<'_>) -> WorkspaceTypes<'found> {
+    pub(crate) const TYPES: [ItemKind; 2] = [ItemKind::Struct, ItemKind::Enum];
+
+    pub(crate) fn declared(model: &'found Model, transitions: &'found Transitions<'_>) -> WorkspaceTypes<'found> {
+        let declared: Vec<Spotted<'found>> = model
+            .items()
+            .filter(|placed| Some(AsRef::<Region>::as_ref(placed.entity()).reach()) == Some(Reach::Shipped))
+            .filter_map(|placed| {
+                let item = model.declared(placed.entity().declared())?;
+                Some(Spotted { krate: placed.krate(), name: item.as_ref(), kind: item.kind() })
+            })
+            .collect();
+        let types: Vec<&Spotted<'found>> = declared.iter().filter(|found| Self::TYPES.contains(&found.kind)).collect();
         WorkspaceTypes {
             crates: transitions
                 .all()
-                .map(|found| AsRef::<CrateName>::as_ref(found.context()))
-                .chain(facts.types().iter().map(AsRef::<CrateName>::as_ref))
+                .map(|found| Borrow::<Name>::borrow(AsRef::<CrateName>::as_ref(found.context())))
+                .chain(types.iter().map(|found| found.krate))
                 .collect(),
-            ambiguous: Self::ambiguous(facts),
-            types: facts.types().iter().fold(
-                BTreeMap::new(),
-                |mut names: BTreeMap<&Name, BTreeSet<&CrateName>>, found| {
-                    names.entry(found.as_ref()).or_default().insert(found.as_ref());
-                    names
-                },
-            ),
-            traits: facts.traits().iter().map(AsRef::as_ref).collect(),
+            ambiguous: Self::ambiguous(&types),
+            types: types.iter().fold(BTreeMap::new(), |mut names: BTreeMap<&Name, BTreeSet<&Name>>, found| {
+                names.entry(found.name).or_default().insert(found.krate);
+                names
+            }),
+            traits: declared.iter().filter(|found| found.kind == ItemKind::Trait).map(|found| found.name).collect(),
         }
     }
 
-    fn ambiguous(facts: &'found Facts<'_>) -> BTreeMap<&'found CrateName, BTreeSet<&'found Name>> {
-        let mut seen: BTreeMap<&CrateName, BTreeSet<&Name>> = BTreeMap::new();
-        facts.types().iter().fold(
-            BTreeMap::new(),
-            |mut twice: BTreeMap<&'found CrateName, BTreeSet<&'found Name>>, found| {
-                let krate: &'found CrateName = found.as_ref();
-                let name: &'found Name = found.as_ref();
-                let again = seen.entry(krate).or_default().replace(name);
-                twice.entry(krate).or_default().extend(again);
-                twice
-            },
-        )
+    fn ambiguous(types: &[&Spotted<'found>]) -> BTreeMap<&'found Name, BTreeSet<&'found Name>> {
+        let mut seen: BTreeMap<&Name, BTreeSet<&Name>> = BTreeMap::new();
+        types.iter().fold(BTreeMap::new(), |mut twice: BTreeMap<&'found Name, BTreeSet<&'found Name>>, found| {
+            let again = seen.entry(found.krate).or_default().replace(found.name);
+            twice.entry(found.krate).or_default().extend(again);
+            twice
+        })
     }
 
     pub(crate) fn declared_in(&self, krate: &CrateName) -> Count {
-        Count::new(self.types.values().filter(|crates| crates.contains(krate)).count())
+        let name: &Name = krate.borrow();
+        Count::new(self.types.values().filter(|crates| crates.contains(name)).count())
     }
 
     pub(crate) fn edge<'file>(&self, transition: Transition<'found, 'file>) -> Edge<'found, 'file> {
         let fixed_by =
             transition.context().trait_name().and_then(|name| self.traits.get(name).map_or(Some(name), |_| None));
-        let from: &CrateName = transition.as_ref();
+        let from: &Name = AsRef::<CrateName>::as_ref(&transition).borrow();
         let end = |endpoint: &'found Endpoint| self.end(from, endpoint, fixed_by);
         let implementer = transition.implementer().map(Implementer::endpoint).map(end);
         let ends =
@@ -69,13 +81,13 @@ impl<'found> WorkspaceTypes<'found> {
 
     pub(crate) fn owner(&self, transition: &Transition<'found, '_>) -> Option<End<'found>> {
         let context = transition.context();
-        let from: &CrateName = transition.as_ref();
+        let from: &Name = AsRef::<CrateName>::as_ref(transition).borrow();
         context.trait_name().map_or(context.subject(), |_| None).map(|subject| self.end(from, subject, None))
     }
 
-    fn end(&self, from: &CrateName, endpoint: &'found Endpoint, fixed_by: Option<&'found Name>) -> End<'found> {
+    fn end(&self, from: &Name, endpoint: &'found Endpoint, fixed_by: Option<&'found Name>) -> End<'found> {
         match endpoint.nature() {
-            Nature::Named => self.named(endpoint.origin().unwrap_or(from), endpoint.as_ref()),
+            Nature::Named => self.named(endpoint.origin().map_or(from, Borrow::borrow), endpoint.as_ref()),
             Nature::Interface => End::placed(Place::Interface, endpoint.as_ref()),
             Nature::Primitive => fixed_by.map_or_else(
                 || End::placed(Place::Primitive, endpoint.as_ref()),
@@ -85,7 +97,7 @@ impl<'found> WorkspaceTypes<'found> {
         }
     }
 
-    fn named(&self, from: &CrateName, name: &'found Name) -> End<'found> {
+    fn named(&self, from: &Name, name: &'found Name) -> End<'found> {
         let declaring = self.types.get(name).filter(|_| self.crates.contains(from));
         let resolved = declaring.map(|crates| Node::resolved(crates, from, name));
         resolved.map_or(End::placed(Place::External, name), |found| {
@@ -94,7 +106,7 @@ impl<'found> WorkspaceTypes<'found> {
     }
 
     fn unambiguous(&self, node: Node<'found>) -> Option<Node<'found>> {
-        let twice = self.ambiguous.get(AsRef::<CrateName>::as_ref(&node));
+        let twice = self.ambiguous.get(node.krate());
         twice.and_then(|names| names.get(AsRef::<Name>::as_ref(&node))).map_or(Some(node), |_| None)
     }
 }

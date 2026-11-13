@@ -78,7 +78,10 @@ fn counts_are_per_crate() {
 #[test]
 fn a_crate_counts_its_lawed_operations_in_the_total() {
     let text = Declared::of(&[
-        Declared::at("crates/x/src/lib.rs", ADD),
+        Declared::at(
+            "crates/x/src/lib.rs",
+            "mod other;\nstruct A;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A {}\n}\n",
+        ),
         Declared::at("crates/x/src/other.rs", "struct B;\nimpl B {\n    fn join(self, other: B) -> B {}\n}\n"),
         Declared::at("crates/x/tests/t.rs", CLEARING),
     ]);
