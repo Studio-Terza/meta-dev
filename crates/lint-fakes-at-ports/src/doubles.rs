@@ -38,7 +38,7 @@ impl<'file> Doubles<'file> {
     pub fn scan(&mut self, file: &'file SourceFile, imports: &Imports<'_>, ports: &PortTraits) {
         let mut reader = Reader {
             file,
-            target: file.placement().crate_root().directory(),
+            target: file.head().placement().crate_root().directory(),
             module: Module::of_file(file),
             imports,
             ports,
@@ -84,7 +84,7 @@ impl<'file> Reader<'file, '_> {
 
     fn declared(&mut self, name: &Ident) {
         let double = DoubleKey { target: self.target, name: Name::from(name) };
-        let site = Site::new(self.file.path(), LineNumber::from(name.span()));
+        let site = Site::new(self.file.head().path(), LineNumber::from(name.span()));
         self.doubles.declared.extend(double.name.matches::<CamelWord>(&Self::DOUBLES).map(|_| (double, site)));
     }
 
@@ -101,7 +101,7 @@ impl<'file> Reader<'file, '_> {
         let line = path.segments.first().map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
         Implemented {
             double,
-            site: Site::new(self.file.path(), line),
+            site: Site::new(self.file.head().path(), line),
             kind: bare.judged(&candidates, self.ports),
             trait_path: path,
         }

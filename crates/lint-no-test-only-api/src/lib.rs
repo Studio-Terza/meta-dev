@@ -32,7 +32,7 @@ pub struct NoTestOnlyApi;
 
 impl NoTestOnlyApi {
     fn in_manifest<'file>(package: &PackageRoot, file: &'file SourceFile) -> Vec<Violation<'file>> {
-        let manifest = file.manifest_file();
+        let manifest = file.head().manifest_file();
         package
             .key_lines()
             .features()
@@ -49,14 +49,14 @@ impl FileLint for NoTestOnlyApi {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let shipped =
             iter::once(file).filter_map(SourceFile::shipped).flat_map(|code| GatedItems::in_file(code.syntax()));
-        shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.path())).collect()
+        shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.head().path())).collect()
     }
 }
 
 impl Lint for NoTestOnlyApi {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
-            files.iter().rev().map(|file| (file.placement().package(), file)).collect();
+            files.iter().rev().map(|file| (file.head().placement().package(), file)).collect();
         let shipped: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Shipped)).collect();
         let tested: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Tests)).collect();
         let test_only: BTreeSet<&Name> = tested.difference(&shipped).collect();

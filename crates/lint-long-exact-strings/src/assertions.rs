@@ -30,7 +30,7 @@ pub struct Assertions<'file> {
 impl<'file> From<&'file SourceFile> for Assertions<'file> {
     fn from(file: &'file SourceFile) -> Assertions<'file> {
         let mut assertions = Assertions {
-            path: file.path(),
+            path: file.head().path(),
             constants: Bindings::constants(file.syntax()),
             locals: Bindings::default(),
             tables: MacroAliases::in_file(file.syntax(), Self::TABLE),

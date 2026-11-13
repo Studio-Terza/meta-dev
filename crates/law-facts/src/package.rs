@@ -8,6 +8,6 @@ pub struct Package<'file>(&'file Path);
 impl<'file> Package<'file> {
     #[must_use]
     pub fn containing(file: &'file SourceFile) -> Package<'file> {
-        Package(file.placement().package().root().directory())
+        Package(file.head().placement().package().root().directory())
     }
 }

@@ -85,7 +85,7 @@ impl ExpressionFlow {
 
 impl FileLint for ExpressionFlow {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut flows = Flows { file, path: file.path(), violations: Vec::new() };
+        let mut flows = Flows { file, path: file.head().path(), violations: Vec::new() };
         flows.visit_file(file.syntax());
         flows.violations
     }

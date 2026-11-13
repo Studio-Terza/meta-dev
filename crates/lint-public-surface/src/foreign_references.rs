@@ -40,16 +40,16 @@ impl ForeignReferences {
 
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
         let own_crate = binaries
-            .holding(file.path())
-            .map_or_else(|| Some(CrateName::from(file.placement().crate_root())), |_| None);
+            .holding(file.head().path())
+            .map_or_else(|| Some(CrateName::from(file.head().placement().crate_root())), |_| None);
         let mut reading = Reading { file, references: ForeignReferences { own_crate, crates: BTreeMap::new() } };
         reading.visit_file(file.syntax());
         reading.references
     }
 
     pub fn in_own_tests(file: &SourceFile) -> Option<ForeignReferences> {
-        let package = file.placement().package().root();
-        file.placement().crate_root().directory().starts_with(package.directory().join(Self::TESTS)).then(|| {
+        let package = file.head().placement().package().root();
+        file.head().placement().crate_root().directory().starts_with(package.directory().join(Self::TESTS)).then(|| {
             let tested = CrateName::from(package);
             let mut reading = Reading { file, references: ForeignReferences::default() };
             reading.visit_file(file.syntax());

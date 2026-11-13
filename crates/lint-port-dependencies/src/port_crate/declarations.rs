@@ -57,7 +57,7 @@ impl<'ast> Visit<'ast> for Declarations<'_, '_> {
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
         let lines = self.filled(block).map(|span| span.start().line..=span.end().line).into_iter().flatten();
-        let file = self.file.path();
+        let file = self.file.head().path();
         self.fillers.extend(lines.map(|line| Site::new(file, LineNumber::from(line))));
         visit::visit_item_impl(self, block);
     }

@@ -317,11 +317,11 @@ struct FileShape {
 
 impl From<&SourceFile> for FileShape {
     fn from(source: &SourceFile) -> FileShape {
-        let path = source.path();
+        let path = source.head().path();
         let parent = path.parent().unwrap_or_else(|| Path::new(""));
-        let rooted = Some(path).filter(|candidate| *candidate == AsRef::<Path>::as_ref(source.crate_file()));
+        let rooted = Some(path).filter(|candidate| *candidate == AsRef::<Path>::as_ref(source.head().crate_file()));
         let enclosure = rooted
-            .and_then(|root| source.placement().executable_root(source.located().within(root)))
+            .and_then(|root| source.head().placement().executable_root(source.head().located().within(root)))
             .map_or_default(|_| Enclosure::BinaryRoot);
         let module = rooted
             .map_or(Some(path), |_| None)

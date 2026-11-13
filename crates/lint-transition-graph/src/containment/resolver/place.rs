@@ -8,11 +8,11 @@ use super::target::Target;
 pub(crate) struct Place<'found> {
     krate: &'found CrateName,
     module: &'found [Name],
-    scope: Scope<'found>,
+    scope: &'found Scope,
 }
 
 impl<'found> Place<'found> {
-    pub(crate) fn new(krate: &'found CrateName, module: &'found [Name], scope: Scope<'found>) -> Place<'found> {
+    pub(crate) fn new(krate: &'found CrateName, module: &'found [Name], scope: &'found Scope) -> Place<'found> {
         Place { krate, module, scope }
     }
 
@@ -32,7 +32,7 @@ impl<'found> Place<'found> {
         self.module
     }
 
-    pub(crate) fn scope(&self) -> &Scope<'found> {
-        &self.scope
+    pub(crate) fn scope(&self) -> &'found Scope {
+        self.scope
     }
 }

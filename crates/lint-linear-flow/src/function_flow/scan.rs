@@ -19,7 +19,7 @@ pub struct Scan<'file> {
 
 impl<'file> Scan<'file> {
     pub fn new(file: &'file SourceFile) -> Scan<'file> {
-        Scan { file, path: file.path(), found: Vec::new() }
+        Scan { file, path: file.head().path(), found: Vec::new() }
     }
 
     pub fn into_found(self) -> Vec<Found<'file>> {

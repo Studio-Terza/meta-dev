@@ -21,10 +21,10 @@ pub(crate) struct Placing {
 
 impl From<&SourceFile> for Placing {
     fn from(source: &SourceFile) -> Placing {
-        let placement = source.placement();
+        let placement = source.head().placement();
         Placing {
-            path: source.path().to_path_buf(),
-            crate_file: AsRef::<Path>::as_ref(source.crate_file()).to_path_buf(),
+            path: source.head().path().to_path_buf(),
+            crate_file: AsRef::<Path>::as_ref(source.head().crate_file()).to_path_buf(),
             name: Self::library(placement),
             krate: Borrow::<Name>::borrow(placement.package().crate_name()).clone(),
             dependencies: placement.package().dependencies().clone(),

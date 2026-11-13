@@ -30,8 +30,8 @@ impl Lint for NamedNumbers {
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .filter(|file| Gate::BOUNDARY.admits(file).is_none())
-                .filter(|file| support.iter().all(|path| path != file.path()))
+                .filter(|file| Gate::BOUNDARY.admits(file.head()).is_none())
+                .filter(|file| support.iter().all(|path| path != file.head().path()))
                 .flat_map(|file| {
                     Self::flagged(
                         file,
@@ -64,7 +64,7 @@ impl NamedNumbers {
         message: Message,
     ) -> impl Iterator<Item = Violation<'_>> {
         found.visit_file(file.syntax());
-        found.lines().into_iter().map(move |line| Violation::new(Site::new(file.path(), line), message))
+        found.lines().into_iter().map(move |line| Violation::new(Site::new(file.head().path(), line), message))
     }
 }
 

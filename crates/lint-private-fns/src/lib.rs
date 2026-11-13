@@ -33,7 +33,7 @@ impl Lint for PrivateFns {
                         .filter(|(_, names)| Self::PER_TYPE.allows(Length::new(names.len())).is_none())
                         .map(move |(type_name, names)| {
                             Violation::new(
-                                Site::of_file(file.path()),
+                                Site::of_file(file.head().path()),
                                 Finding::TooManyPrivateFns { type_name, names, most: Self::PER_TYPE },
                             )
                         })

@@ -64,7 +64,7 @@ impl<'file> ShapeIndex<'file> {
     }
 
     fn reading(self, file: &'file SourceFile) -> ShapeIndex<'file> {
-        let mut index = ShapeIndex { file: file.path(), home: Home::containing(file), ..self };
+        let mut index = ShapeIndex { file: file.head().path(), home: Home::containing(file), ..self };
         index.visit_file(file.syntax());
         index
     }

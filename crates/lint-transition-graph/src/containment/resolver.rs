@@ -7,8 +7,8 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
-use lint_core::{Site, SourceFile};
-use lint_item_graph::{ReferencedNames, Scope, Traversal};
+use lint_core::{FileHead, Site};
+use lint_item_graph::{FileNames, ReferencedNames, Scope, Traversal};
 use lint_layout::{Name, UsePath};
 use lint_placement::CrateName;
 use transition_facts::{Endpoint, Nature, Transition};
@@ -32,22 +32,19 @@ pub(crate) struct Resolver<'found> {
 impl<'found> Resolver<'found> {
     pub(crate) fn of_members(
         members: impl Iterator<Item = Member<'found>>,
-        files: &[&'found SourceFile],
+        names: &'found FileNames<'_>,
         stand_ins: StandIns<'found>,
     ) -> Resolver<'found> {
-        let modules = files.iter().fold(BTreeMap::new(), |mut modules: BTreeMap<_, BTreeSet<_>>, file| {
-            let placement = file.placement();
+        let scoped: Vec<(&'found FileHead, &'found Scope)> = names.each(|head, scope, _| (head, scope)).collect();
+        let modules = scoped.iter().fold(BTreeMap::new(), |mut modules: BTreeMap<_, BTreeSet<_>>, (head, _)| {
+            let placement = head.placement();
             modules.entry(placement.package().crate_name()).or_default().extend(placement.module().segments());
             modules
         });
-        let places = files.iter().map(|file| {
-            let placement = file.placement();
-            let place = Place::new(
-                placement.package().crate_name(),
-                placement.module().segments(),
-                Scope::of_file(file.syntax()),
-            );
-            (file.path(), place)
+        let places = scoped.iter().map(|(head, scope)| {
+            let placement = head.placement();
+            let place = Place::new(placement.package().crate_name(), placement.module().segments(), scope);
+            (head.path(), place)
         });
         Resolver {
             declaring: members.fold(BTreeMap::new(), |mut declaring: BTreeMap<_, Vec<_>>, member| {
@@ -127,7 +124,7 @@ impl<'found> Resolver<'found> {
         }
     }
 
-    pub(crate) fn bodies(&self, file: &SourceFile, names: &ReferencedNames) -> Vec<Link<'found>> {
+    pub(crate) fn bodies(&self, file: &FileHead, names: &ReferencedNames) -> Vec<Link<'found>> {
         let krate = file.placement().package().crate_name();
         self.places
             .get(file.path())

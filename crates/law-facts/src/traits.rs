@@ -82,7 +82,7 @@ impl<'file> Traits<'file> {
     }
 
     fn read(mut self, file: &'file SourceFile) -> Traits<'file> {
-        let home = file.placement().package().crate_name();
+        let home = file.head().placement().package().crate_name();
         let mut declared = Declared::default();
         declared.visit_file(file.syntax());
         self.exports.declared.entry(home).or_default().extend(declared.traits);

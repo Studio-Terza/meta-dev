@@ -14,7 +14,7 @@ impl<'file> Home<'file> {
 
     #[must_use]
     pub fn containing(file: &'file SourceFile) -> Home<'file> {
-        Home { crate_file: file.crate_file(), module: file.placement().module() }
+        Home { crate_file: file.head().crate_file(), module: file.head().placement().module() }
     }
 
     #[must_use]

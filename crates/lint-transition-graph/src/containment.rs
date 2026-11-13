@@ -16,7 +16,7 @@ mod slice;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use lint_core::{Headline, Report, Site, SourceFile, Violation};
+use lint_core::{Headline, Report, Site, Violation};
 use lint_layout::Name;
 
 use crate::system::Extraction;
@@ -63,14 +63,11 @@ pub struct Containment<'found, 'file> {
 
 impl<'found, 'file> Containment<'found, 'file> {
     #[must_use]
-    pub fn clustered(files: &'found [SourceFile], extraction: &'found Extraction<'file>) -> Containment<'found, 'file> {
+    pub fn clustered(extraction: &'found Extraction<'file>) -> Containment<'found, 'file> {
         let facts = extraction.facts();
         let transitions = extraction.transitions();
-        let modules: BTreeMap<&Path, &[Name]> = files
-            .iter()
-            .filter_map(SourceFile::shipped)
-            .map(|file| (file.path(), file.placement().module().segments()))
-            .collect();
+        let modules: BTreeMap<&Path, &[Name]> =
+            extraction.names().each(|head, _, _| (head.path(), head.placement().module().segments())).collect();
         let declarations = Declaration::all(facts);
         let placed: BTreeMap<Member<'found>, &Declaration<'found, 'file>> = declarations
             .iter()
@@ -80,11 +77,10 @@ impl<'found, 'file> Containment<'found, 'file> {
                 modules.get(site.path()).and_then(|segments| named.within(segments)).map(|member| (member, declaration))
             })
             .collect();
-        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let graphs = extraction.names().graphs(|file| file.placement().package().crate_name());
         let stand_ins =
             graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
-        let resolver = &Resolver::of_members(placed.keys().copied(), &shipped, stand_ins);
+        let resolver = &Resolver::of_members(placed.keys().copied(), extraction.names(), stand_ins);
         let located: Vec<Located<'found, 'file>> =
             facts.outside_implementations().map(|outside| Located::resolved_by(resolver, outside)).collect();
         let implemented: BTreeSet<Link<'found>> = placed
@@ -109,7 +105,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             },
         );
         let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
-        let bodies = extraction.names().each(|file, names| resolver.bodies(file, names)).flatten();
+        let bodies = extraction.names().each(|file, _, names| resolver.bodies(file, names)).flatten();
         let links: BTreeSet<Link<'found>> =
             defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
         let users = Self::adjacency(links.iter().copied().map(Link::reversed));

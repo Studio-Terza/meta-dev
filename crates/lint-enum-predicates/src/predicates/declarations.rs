@@ -13,7 +13,7 @@ pub struct Declarations<'file> {
 
 impl<'file> Declarations<'file> {
     pub fn in_file(file: &'file SourceFile) -> Vec<Declaration<'file>> {
-        let placement = file.placement();
+        let placement = file.head().placement();
         let mut scan = Declarations {
             file,
             open: vec![Declaration::new(placement.crate_root(), placement.module())],

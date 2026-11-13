@@ -21,7 +21,7 @@ pub(crate) struct Offers<'file> {
 
 impl<'file> Offers<'file> {
     pub(crate) fn in_file(file: &'file SourceFile) -> Vec<Candidate<'file>> {
-        let mut offers = Offers { path: file.path(), found: Vec::new() };
+        let mut offers = Offers { path: file.head().path(), found: Vec::new() };
         file.shipped().into_iter().for_each(|shipped| offers.visit_file(shipped.syntax()));
         offers.found
     }

@@ -99,6 +99,8 @@ type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
 type Workspaced = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Report<'file>;
 
+type Extracting = for<'file> fn(&'file [SourceFile], &'file Extraction<'file>) -> Vec<Report<'file>>;
+
 impl Lints {
     const LINTS: [Entry; 51] = [
         Entry::spelled::<NoComments>(Work::Checked(|readout| vec![NoComments::report(readout.files())])),
@@ -151,9 +153,8 @@ impl Lints {
             let flows = Flows::from(readout.files());
             vec![flows.report::<LinearBodies>(), flows.report::<PureRouters>(), flows.report::<PlainConditions>()]
         })),
-        Entry::spelled::<TypeSystem>(Work::Checked(|readout| {
-            let extraction = Extraction::from(readout.files());
-            let system = TypeSystem::built_from(readout.files(), &extraction);
+        Entry::spelled::<TypeSystem>(Work::Extracted(|files, extraction| {
+            let system = TypeSystem::built_from(files, extraction);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
@@ -171,10 +172,16 @@ impl Lints {
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
     ) -> Crew<'scope> {
+        let probe = Helper::spawned(scope, move || Self::located(sources)).ok();
         let helpers = Workers::available()
             .helpers()
             .filter_map(|index| Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ok());
-        Crew { helpers: helpers.collect() }
+        Crew { helpers: probe.into_iter().chain(helpers).collect() }
+    }
+
+    fn located(sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+        sources.located();
+        Worked::default()
     }
 
     fn gathered<'run>(readout: &'run Readout, unlocated: Option<&'run Unlocated>, worked: Worked) -> Outcome<'run> {
@@ -189,7 +196,7 @@ impl Lints {
     }
 
     fn worked(readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
-        let lowered = sources.lowered(readout, worker);
+        let lowered = sources.gathered(readout, worker);
         let mut jobs: Vec<Job> = Self::LINTS
             .into_iter()
             .enumerate()
@@ -212,6 +219,7 @@ struct Entry {
 enum Work {
     Checked(Check),
     Modelled(Query),
+    Extracted(Extracting),
     Described(Workspaced),
     Survey,
 }
@@ -234,7 +242,8 @@ impl Work {
     ) -> Vec<Report<'run>> {
         match self {
             Work::Checked(check) => check(readout),
-            Work::Modelled(query) => sources.model().map(query).into_iter().collect(),
+            Work::Modelled(query) => sources.gathering().model().map(query).into_iter().collect(),
+            Work::Extracted(extracted) => extracted(readout.files(), sources.gathering().extraction()),
             Work::Described(described) => Self::described(described, readout, sources),
             Work::Survey => Vec::new(),
         }
@@ -243,7 +252,7 @@ impl Work {
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
             Work::Survey => Worked::surveying(&Survey::measured(readout.files())),
-            Work::Checked(_) | Work::Modelled(_) | Work::Described(_) => {
+            Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
         }
@@ -280,7 +289,7 @@ impl Job {
         match self.work {
             Work::Survey => Rank::Survey,
             Work::Checked(_) => Rank::Early(Reverse(self.slot)),
-            Work::Modelled(_) | Work::Described(_) => Rank::Late(self.slot),
+            Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => Rank::Late(self.slot),
         }
     }
 

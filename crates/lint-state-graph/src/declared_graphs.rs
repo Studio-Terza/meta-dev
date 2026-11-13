@@ -31,7 +31,7 @@ impl<'scan> DeclaredGraphs<'scan> {
 impl FileLint for DeclaredGraphs<'_> {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut graphs = DeclaredGraphs {
-            path: file.path(),
+            path: file.head().path(),
             names: MacroAliases::in_file(file.syntax(), Word::new(DeclaredGraphs::MACRO)),
             violations: Vec::new(),
         };

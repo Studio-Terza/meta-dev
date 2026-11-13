@@ -22,12 +22,15 @@ impl Lint for ThinMain {
             Headline::new("a binary is a thin main over its library"),
             files
                 .iter()
-                .filter(|file| file.placement().role() == Role::BinaryRoot)
+                .filter(|file| file.head().placement().role() == Role::BinaryRoot)
                 .flat_map(|file| {
                     let items = &file.syntax().items;
                     let inside_main = Self::mains(items).flat_map(BodyItems::declared_in);
                     items.iter().filter(|item| Self::thin(item).is_none()).chain(inside_main).map(|item| {
-                        Violation::new(Site::new(file.path(), LineNumber::from(Self::keyword(item))), Finding::Logic)
+                        Violation::new(
+                            Site::new(file.head().path(), LineNumber::from(Self::keyword(item))),
+                            Finding::Logic,
+                        )
                     })
                 })
                 .collect(),

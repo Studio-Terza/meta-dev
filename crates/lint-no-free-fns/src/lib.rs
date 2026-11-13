@@ -46,7 +46,7 @@ impl NoFreeFns {
 
 impl FileLint for NoFreeFns {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut visitor = FreeFns { file, path: file.path(), found: Vec::new() };
+        let mut visitor = FreeFns { file, path: file.head().path(), found: Vec::new() };
         visitor.visit_file(file.syntax());
         visitor.found
     }

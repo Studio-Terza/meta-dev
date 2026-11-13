@@ -11,7 +11,7 @@ pub(super) struct Regions;
 
 impl Regions {
     pub(super) fn of_file(source: &SourceFile, reach: Reach) -> Region {
-        let ground = Gate::PORTS.admits(source).map_or(Ground::Open, |_| Ground::Ports);
+        let ground = Gate::PORTS.admits(source.head()).map_or(Ground::Open, |_| Ground::Ports);
         Region::new(reach, Self::zone_of(source), Within::Own).grounded(ground)
     }
 
@@ -29,7 +29,7 @@ impl Regions {
     }
 
     fn zone_of(source: &SourceFile) -> Zone {
-        match Gate::BOUNDARY.admits(source) {
+        match Gate::BOUNDARY.admits(source.head()) {
             Some(_) => Zone::Boundary,
             None => Zone::Open,
         }

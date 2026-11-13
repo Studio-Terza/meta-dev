@@ -26,7 +26,10 @@ impl<'file> Scan<'file> {
 
     pub(crate) fn of_file(file: &'file SourceFile, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
         let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests, equivalence));
-        Self::scanned(file, Kind::of_role(file.placement().role()), equivalence).into_iter().chain(tests).collect()
+        Self::scanned(file, Kind::of_role(file.head().placement().role()), equivalence)
+            .into_iter()
+            .chain(tests)
+            .collect()
     }
 
     fn scanned(file: &'file SourceFile, kind: Kind, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
@@ -38,7 +41,7 @@ impl<'file> Scan<'file> {
     fn considered(&mut self, node: &(impl ToTokens + Spanned)) {
         let reading = Reading::erasing(node.to_token_stream(), self.equivalence);
         let span = node.span();
-        let site = Site::new(self.file.path(), LineNumber::from(span));
+        let site = Site::new(self.file.head().path(), LineNumber::from(span));
         let tokens = reading.shape().size();
         let occurrence = Occurrence::new(reading, site, Extent::from(span), self.kind);
         self.occurrences.extend(Self::FLOOR.allows(tokens).map(|_| occurrence));

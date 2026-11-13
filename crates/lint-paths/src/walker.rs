@@ -32,7 +32,7 @@ impl<'file, 'run> Walker<'file, 'run> {
         wanted: &'run Wanted<'run>,
         resolver: &'run Resolver<'run>,
     ) -> Vec<Use<'file>> {
-        let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
+        let ground = Gate::PORTS.admits(file.head()).map_or(Ground::Open, |_| Ground::Ports);
         let mut walker = Walker {
             file,
             scopes,
@@ -50,7 +50,7 @@ impl<'file, 'run> Walker<'file, 'run> {
     fn made(&self, path: UsePath, line: LineNumber) -> Option<Use<'file>> {
         self.wanted(&path).map(|_| ()).map(|()| {
             let candidates = self.resolver.candidates(&self.module, path);
-            Use::new(Site::new(self.file.path(), line), candidates, self.ground, self.cover)
+            Use::new(Site::new(self.file.head().path(), line), candidates, self.ground, self.cover)
         })
     }
 

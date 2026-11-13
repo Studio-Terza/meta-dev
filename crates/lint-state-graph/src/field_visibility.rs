@@ -20,7 +20,7 @@ pub struct FieldVisibility<'scan> {
 
 impl FileLint for FieldVisibility<'_> {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut fields = FieldVisibility { path: file.path(), violations: Vec::new() };
+        let mut fields = FieldVisibility { path: file.head().path(), violations: Vec::new() };
         fields.visit_file(file.syntax());
         fields.violations
     }

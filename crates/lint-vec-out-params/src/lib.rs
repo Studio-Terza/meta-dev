@@ -86,7 +86,7 @@ impl<'ast> Visit<'ast> for VecOutParams<'_> {
             signature.inputs.iter().filter_map(Syntax::typed).filter(|typed| Self::vec_out(&typed.ty).is_some()).map(
                 |typed| {
                     Violation::new(
-                        Site::new(file.path(), LineNumber::from(typed.pat.span())),
+                        Site::new(file.head().path(), LineNumber::from(typed.pat.span())),
                         Finding::VecOut { name: Name::from(&signature.ident) },
                     )
                 },

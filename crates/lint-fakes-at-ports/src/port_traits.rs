@@ -22,11 +22,15 @@ impl PortTraits {
     #[must_use]
     pub fn declared(files: &[SourceFile]) -> PortTraits {
         files.iter().filter_map(SourceFile::shipped).fold(PortTraits::default(), |found, file| {
-            let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
+            let ground = Gate::PORTS.admits(file.head()).map_or(Ground::Open, |_| Ground::Ports);
             let mut reader = Reader { ground, found, traits: BTreeSet::new() };
             reader.visit_file(file.syntax());
             let mut gathered = reader.found;
-            gathered.declared.entry(CrateName::from(file.placement().crate_root())).or_default().extend(reader.traits);
+            gathered
+                .declared
+                .entry(CrateName::from(file.head().placement().crate_root()))
+                .or_default()
+                .extend(reader.traits);
             gathered
         })
     }

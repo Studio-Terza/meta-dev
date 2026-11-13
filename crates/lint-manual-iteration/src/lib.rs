@@ -77,7 +77,7 @@ impl ManualIteration {
 
 impl FileLint for ManualIteration {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut iterations = Iterations { file, path: file.path(), violations: Vec::new() };
+        let mut iterations = Iterations { file, path: file.head().path(), violations: Vec::new() };
         iterations.visit_file(file.syntax());
         iterations.violations
     }

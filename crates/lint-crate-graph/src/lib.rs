@@ -1,6 +1,6 @@
 mod crate_summary;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{FileHead, Headline, Lint, Report, SourceFile};
 use lint_item_graph::FileNames;
 
 use crate_summary::CrateSummary;
@@ -14,7 +14,7 @@ impl CrateGraph {
         Report::new(
             Headline::new("a crate whose items form one big cycle is split"),
             names
-                .graphs(SourceFile::crate_file)
+                .graphs(FileHead::crate_file)
                 .into_iter()
                 .flat_map(|(crate_file, graph)| CrateSummary::of_graph(crate_file, &graph).violations())
                 .collect(),

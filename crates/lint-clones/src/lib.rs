@@ -15,7 +15,7 @@ impl Lint for Clones {
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .filter(|file| Gate::BOUNDARY.admits(file).is_none())
+                .filter(|file| Gate::BOUNDARY.admits(file.head()).is_none())
                 .flat_map(CloneSites::within)
                 .collect(),
         )

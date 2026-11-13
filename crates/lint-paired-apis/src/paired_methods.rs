@@ -40,7 +40,7 @@ impl<'file> PairedMethods<'file> {
     }
 
     fn owned_by(&mut self, owner: Option<Name>, methods: &[&Ident]) {
-        let path = self.file.path();
+        let path = self.file.head().path();
         let declared = methods
             .iter()
             .map(|method| Declared::new(Name::from(*method), Site::new(path, LineNumber::from(method.span()))));

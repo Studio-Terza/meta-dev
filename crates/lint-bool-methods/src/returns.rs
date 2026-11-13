@@ -22,7 +22,7 @@ impl<'file> Returns<'file> {
             .filter(|path| path.path.is_ident("bool"))
             .map(|_| {
                 Violation::new(
-                    Site::new(self.file.path(), LineNumber::from(signature.ident.span())),
+                    Site::new(self.file.head().path(), LineNumber::from(signature.ident.span())),
                     Finding::from(&signature.ident),
                 )
             })

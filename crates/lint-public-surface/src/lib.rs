@@ -36,13 +36,13 @@ impl Lint for PublicSurface {
             files
                 .iter()
                 .flat_map(|file| {
-                    let crate_name = CrateName::from(file.placement().crate_root());
+                    let crate_name = CrateName::from(file.head().placement().crate_root());
                     Export::in_root(file)
                         .into_iter()
                         .filter(move |export| references.unnamed(&crate_name, export).is_some())
                         .map(move |export| {
                             Violation::new(
-                                Site::new(file.path(), export.line()),
+                                Site::new(file.head().path(), export.line()),
                                 Finding::UnnamedExport { name: export.name() },
                             )
                         })

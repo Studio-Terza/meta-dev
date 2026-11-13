@@ -6,7 +6,7 @@ use lint_layout::{Name, Word};
 use lint_placement::Placement;
 use newtype::Wrapping;
 
-use crate::source_file::SourceFile;
+use crate::source_file::FileHead;
 use crate::walk::Walk;
 use suffix::Suffix;
 
@@ -22,7 +22,7 @@ impl Gate {
     pub const STORE: Gate = Gate { module: Word::new("store"), package_suffix: Some(Word::new("store")) };
 
     #[must_use]
-    pub fn admits<'file>(&self, file: &'file SourceFile) -> Option<&'file SourceFile> {
+    pub fn admits<'head>(&self, file: &'head FileHead) -> Option<&'head FileHead> {
         let placement = file.placement();
         self.package_suffix
             .and_then(|suffix| placement.crate_root().package()?.matches::<Suffix>(&[suffix]))

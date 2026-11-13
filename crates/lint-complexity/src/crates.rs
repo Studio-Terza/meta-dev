@@ -17,7 +17,7 @@ pub(crate) struct Crates<'file>(BTreeMap<CrateName, Vec<Function<'file>>>);
 impl<'file> Crates<'file> {
     pub(crate) fn grouped(files: &'file [SourceFile]) -> Crates<'file> {
         Crates(files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |mut crates, file| {
-            let name = CrateName::from(file.placement().package().root());
+            let name = CrateName::from(file.head().placement().package().root());
             crates.entry(name).or_default().extend(Functions::of_file(file));
             crates
         }))

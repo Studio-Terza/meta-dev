@@ -18,7 +18,7 @@ impl Holders {
         files.iter().fold(Holders::default(), |mut found, file| {
             let mut reader = Reader { module: Module::of_file(file), judge, owners: BTreeMap::new() };
             reader.visit_file(file.syntax());
-            let crate_owners = found.0.entry(CrateName::from(file.placement().crate_root())).or_default();
+            let crate_owners = found.0.entry(CrateName::from(file.head().placement().crate_root())).or_default();
             reader.owners.into_iter().for_each(|(owner, fields)| crate_owners.entry(owner).or_default().extend(fields));
             found
         })

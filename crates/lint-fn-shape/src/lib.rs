@@ -88,7 +88,8 @@ impl FnShape {
 
 impl FileLint for FnShape {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut shapes = Shapes { file, path: file.path(), depth: NestingDepth::default(), violations: Vec::new() };
+        let mut shapes =
+            Shapes { file, path: file.head().path(), depth: NestingDepth::default(), violations: Vec::new() };
         shapes.visit_file(file.syntax());
         shapes.violations
     }

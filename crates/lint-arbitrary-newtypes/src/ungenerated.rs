@@ -35,7 +35,7 @@ impl<'ast> Visit<'ast> for Ungenerated<'_> {
 
 impl FileLint for Ungenerated<'_> {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut ungenerated = Ungenerated { path: file.path(), found: Vec::new() };
+        let mut ungenerated = Ungenerated { path: file.head().path(), found: Vec::new() };
         ungenerated.visit_file(file.syntax());
         ungenerated.found
     }

@@ -25,9 +25,9 @@ pub struct ModulePath<'file> {
 impl<'file> ModulePath<'file> {
     pub fn of_file(file: &'file SourceFile) -> ModulePath<'file> {
         ModulePath {
-            crate_root: file.placement().crate_root(),
-            segments: file.placement().module().segments(),
-            file: file.path(),
+            crate_root: file.head().placement().crate_root(),
+            segments: file.head().placement().module().segments(),
+            file: file.head().path(),
         }
     }
 

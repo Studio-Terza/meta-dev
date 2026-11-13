@@ -36,7 +36,7 @@ impl<'ast> Visit<'ast> for CloneSites<'_> {
             .filter(|candidate| candidate.method == Self::CLONE)
             .filter(|clone| clone.args.is_empty())
             .map(|bare_clone| {
-                Violation::new(Site::new(self.file.path(), LineNumber::from(bare_clone.method.span())), Finding)
+                Violation::new(Site::new(self.file.head().path(), LineNumber::from(bare_clone.method.span())), Finding)
             });
         self.found.extend(cloned);
         visit::visit_expr_method_call(self, call);

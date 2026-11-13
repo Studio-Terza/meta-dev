@@ -45,7 +45,7 @@ impl FileLint for ConstShape {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut contexts = ConstContexts {
             file,
-            path: file.path(),
+            path: file.head().path(),
             context: Context::Surface,
             zone: Zone::of_file(file),
             violations: Vec::new(),
@@ -84,7 +84,7 @@ enum Zone {
 
 impl Zone {
     fn of_file(file: &SourceFile) -> Zone {
-        Gate::BOUNDARY.admits(file).map_or(Zone::Elsewhere, |_| Zone::Boundary)
+        Gate::BOUNDARY.admits(file.head()).map_or(Zone::Elsewhere, |_| Zone::Boundary)
     }
 
     fn entering(self, module: &ItemMod) -> Zone {
