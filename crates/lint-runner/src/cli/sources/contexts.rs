@@ -1,7 +1,8 @@
+use law_facts::LawReading;
 use lint_core::Parsed;
 use lint_enum_predicates::EnumPredicates;
 use lint_fakes_at_ports::FakesAtPorts;
-use lint_file::{ContextLint, PrimedLint};
+use lint_file::{ContextLint, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
 use lint_mandatory_laws::MandatoryLaws;
 use lint_module_nesting::ModuleNesting;
@@ -22,7 +23,7 @@ pub(crate) trait Holding<'run, Lint: ContextLint> {
     fn held(&self) -> &Lint::Context<'run>;
 }
 
-pub(crate) trait Priming<'run, Lint: PrimedLint> {
+pub(crate) trait Priming<'run, Lint: PrimedFacts> {
     fn primer(&self) -> &Lint::Primer<'run>;
 
     fn primed(&self) -> &Lint::Context<'run>;
@@ -48,26 +49,26 @@ macro_rules! contexts {
         #[derive(Debug)]
         pub(crate) struct Contexts<'run> {
             $($field: <$lint as ContextLint>::Context<'run>,)*
-            $($primed: <$prime as PrimedLint>::Primer<'run>,)*
+            $($primed: <$prime as PrimedFacts>::Primer<'run>,)*
         }
 
         #[derive(Debug)]
         pub(crate) struct Contributed<'run> {
             $($field: <$lint as ContextLint>::Part<'run>,)*
-            $($primed: <$prime as PrimedLint>::PrimerPart<'run>,)*
+            $($primed: <$prime as PrimedFacts>::PrimerPart<'run>,)*
         }
 
         #[derive(Debug, Default)]
         struct Parts<'run> {
             $($field: Vec<<$lint as ContextLint>::Part<'run>>,)*
-            $($primed: Vec<<$prime as PrimedLint>::PrimerPart<'run>>,)*
+            $($primed: Vec<<$prime as PrimedFacts>::PrimerPart<'run>>,)*
         }
 
         impl<'run> From<Parsed<'_, 'run>> for Contributed<'run> {
             fn from(parsed: Parsed<'_, 'run>) -> Contributed<'run> {
                 Contributed {
                     $($field: <$lint as ContextLint>::contributed(parsed),)*
-                    $($primed: <$prime as PrimedLint>::primed(parsed),)*
+                    $($primed: <$prime as PrimedFacts>::primed(parsed),)*
                 }
             }
         }
@@ -96,22 +97,22 @@ macro_rules! contexts {
 
         #[derive(Debug)]
         pub(crate) struct Primings<'run> {
-            $($primed: <$prime as PrimedLint>::Context<'run>,)*
+            $($primed: <$prime as PrimedFacts>::Context<'run>,)*
         }
 
         #[derive(Debug)]
         pub(crate) struct PrimedParts<'run> {
-            $($primed: <$prime as PrimedLint>::Part<'run>,)*
+            $($primed: <$prime as PrimedFacts>::Part<'run>,)*
         }
 
         #[derive(Debug, Default)]
         struct Primeds<'run> {
-            $($primed: Vec<<$prime as PrimedLint>::Part<'run>>,)*
+            $($primed: Vec<<$prime as PrimedFacts>::Part<'run>>,)*
         }
 
         impl<'run> Contexts<'run> {
             pub(crate) fn priming(&self, parsed: Parsed<'_, 'run>) -> PrimedParts<'run> {
-                PrimedParts { $($primed: <$prime as PrimedLint>::contributed(parsed, &self.$primed),)* }
+                PrimedParts { $($primed: <$prime as PrimedFacts>::contributed(parsed, &self.$primed),)* }
             }
         }
 
@@ -127,11 +128,11 @@ macro_rules! contexts {
 
         $(
             impl<'run> Priming<'run, $prime> for Settled<'_, 'run> {
-                fn primer(&self) -> &<$prime as PrimedLint>::Primer<'run> {
+                fn primer(&self) -> &<$prime as PrimedFacts>::Primer<'run> {
                     &self.contexts.$primed
                 }
 
-                fn primed(&self) -> &<$prime as PrimedLint>::Context<'run> {
+                fn primed(&self) -> &<$prime as PrimedFacts>::Context<'run> {
                     &self.primings.$primed
                 }
             }
@@ -156,6 +157,7 @@ contexts! {
         repeated_shapes: RepeatedShapes,
     }
     primed: {
+        laws: LawReading,
         state_graph: StateGraph,
         fakes_at_ports: FakesAtPorts,
         port_batching: PortBatching,

@@ -63,7 +63,7 @@ impl<'edge, 'found, 'file> InScope<'edge, 'found, 'file> {
     fn measured(
         self,
         algebras: &Algebras<'found, 'file>,
-        declarations: &'edge Declarations<'file>,
+        declarations: &'edge Declarations<'_, 'file>,
     ) -> CrateMorphisms<'edge, 'found, 'file> {
         let total = self.morphisms.len();
         let undeclared: Vec<Morphism<'edge, 'found, 'file>> =
@@ -110,7 +110,7 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
 
     fn undeclared(
         self,
-        declarations: &'edge Declarations<'file>,
+        declarations: &'edge Declarations<'_, 'file>,
         algebras: &Algebras<'found, 'file>,
     ) -> Option<Morphism<'edge, 'found, 'file>> {
         let verdicts: Vec<Vec<Shortfall<'edge, 'found, 'file>>> = declarations

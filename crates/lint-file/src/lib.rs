@@ -63,10 +63,7 @@ impl<Checked: ContextLint> Lint for Judged<Checked> {
     }
 }
 
-pub trait PrimedLint {
-    const HEADLINE: Headline;
-    const READS: Reads;
-
+pub trait PrimedFacts {
     type PrimerPart<'head>: Send + Debug;
     type Primer<'head>: FromIterator<Self::PrimerPart<'head>> + Send + Sync + Debug;
     type Part<'head>: Send + Debug;
@@ -75,6 +72,11 @@ pub trait PrimedLint {
     fn primed<'head>(parsed: Parsed<'_, 'head>) -> Self::PrimerPart<'head>;
 
     fn contributed<'head>(parsed: Parsed<'_, 'head>, primer: &Self::Primer<'head>) -> Self::Part<'head>;
+}
+
+pub trait PrimedLint: PrimedFacts {
+    const HEADLINE: Headline;
+    const READS: Reads;
 
     fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,

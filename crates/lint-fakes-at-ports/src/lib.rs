@@ -5,7 +5,7 @@ mod port_traits;
 use doubles::Doubles;
 pub use kind::Kind;
 use lint_core::{Headline, Parsed, SourceFile, TestFile, Violation};
-use lint_file::{Concluded, PrimedLint, Reads};
+use lint_file::{Concluded, PrimedFacts, PrimedLint, Reads};
 use lint_paths::Imports;
 pub use port_traits::PortTraits;
 
@@ -39,10 +39,7 @@ impl<'head> FromIterator<TestPorts<'head>> for TestPorts<'head> {
     }
 }
 
-impl PrimedLint for FakesAtPorts {
-    const HEADLINE: Headline = Headline::new("test doubles stand in for ports");
-    const READS: Reads = Reads::Every;
-
+impl PrimedFacts for FakesAtPorts {
     type PrimerPart<'head> = TestPorts<'head>;
     type Primer<'head> = TestPorts<'head>;
     type Part<'head> = Doubles<'head>;
@@ -61,6 +58,11 @@ impl PrimedLint for FakesAtPorts {
         let tested = TestFile::tested(parsed.file()).map(|_| parsed);
         tested.map_or_default(|found| Doubles::scanned(found, &primer.imports, &primer.ports))
     }
+}
+
+impl PrimedLint for FakesAtPorts {
+    const HEADLINE: Headline = Headline::new("test doubles stand in for ports");
+    const READS: Reads = Reads::Every;
 
     fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,

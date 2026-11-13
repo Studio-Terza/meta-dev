@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use body_shape::{Reading, Shape};
 use equivalence::Equivalence;
-use lint_core::{SourceFile, Syntax, Walk};
+use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use quote::ToTokens;
@@ -19,20 +19,22 @@ struct Filled<'file> {
 }
 
 #[derive(Debug, Default)]
-pub(super) struct Fillers<'file> {
+pub(crate) struct Fillers<'file> {
     bodies: BTreeMap<Filled<'file>, BTreeMap<Name, Shape>>,
 }
 
 impl<'file> Fillers<'file> {
-    pub(super) fn read(files: &'file [SourceFile], equivalence: Equivalence) -> Fillers<'file> {
-        files.iter().filter_map(SourceFile::shipped).fold(Fillers::default(), |fillers, file| {
-            let mut scan = Scan { krate: file.head().placement().package().crate_name(), equivalence, fillers };
-            scan.visit_file(file.syntax());
+    pub(crate) fn read(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Fillers<'file> {
+        let shipped = parsed.file().shipped().map(|_| parsed);
+        shipped.map_or_default(|found| {
+            let krate = found.head().placement().package().crate_name();
+            let mut scan = Scan { krate, equivalence, fillers: Fillers::default() };
+            scan.visit_file(found.file().syntax());
             scan.fillers
         })
     }
 
-    pub(super) fn alike<'found>(&self, first: Node<'found>, other: Node<'found>) -> Option<Node<'found>> {
+    pub(crate) fn alike<'found>(&self, first: Node<'found>, other: Node<'found>) -> Option<Node<'found>> {
         let ours = self.filled(&first);
         let theirs = self.filled(&other);
         ours.iter()
@@ -83,5 +85,11 @@ impl<'ast> Visit<'ast> for Scan<'_> {
         self.fillers
             .bodies
             .extend(filled.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered).map(|kept| (kept, methods)));
+    }
+}
+
+impl<'file> FromIterator<Fillers<'file>> for Fillers<'file> {
+    fn from_iter<Found: IntoIterator<Item = Fillers<'file>>>(parts: Found) -> Fillers<'file> {
+        Fillers { bodies: parts.into_iter().flat_map(|part| part.bodies).collect() }
     }
 }

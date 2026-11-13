@@ -1,4 +1,5 @@
 use code_model::Model;
+use law_facts::Laws;
 use lint_complexity::Complexity;
 use lint_core::{Lint, ModelLint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
@@ -18,7 +19,8 @@ impl Elegance {
     #[must_use]
     pub fn reports<'read>(files: &'read [SourceFile], model: &'read Model) -> Vec<Report<'read>> {
         let extraction = Extraction::from(files);
-        let system = TypeSystem::built_from(files, &extraction);
+        let laws = Laws::from(files);
+        let system = TypeSystem::built_from(&extraction, &laws);
         vec![
             Complexity::report(files),
             TransitionGraph::report_graph(&system),

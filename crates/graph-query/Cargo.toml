@@ -21,6 +21,7 @@ transition-facts = { path = "../transition-facts" }
 type-facts = { path = "../type-facts" }
 
 [dev-dependencies]
+law-facts = { path = "../law-facts" }
 laws = { path = "../laws" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }

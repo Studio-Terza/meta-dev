@@ -14,7 +14,7 @@ use declared_graphs::DeclaredGraphs;
 use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges};
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Parsed, SourceFile, Violation};
-use lint_file::{Concluded, PrimedLint, Reads};
+use lint_file::{Concluded, PrimedFacts, PrimedLint, Reads};
 use variant_matches::VariantMatches;
 
 #[derive(Debug)]
@@ -29,10 +29,7 @@ impl<'head> FromIterator<StateFile<'head>> for Concluded<'head> {
     }
 }
 
-impl PrimedLint for StateGraph {
-    const HEADLINE: Headline = Headline::new("state graph violated");
-    const READS: Reads = Reads::Shipped;
-
+impl PrimedFacts for StateGraph {
     type PrimerPart<'head> = Option<Declarations<'head>>;
     type Primer<'head> = Declarations<'head>;
     type Part<'head> = StateFile<'head>;
@@ -56,6 +53,11 @@ impl PrimedLint for StateGraph {
         });
         StateFile(shipped.unwrap_or_default())
     }
+}
+
+impl PrimedLint for StateGraph {
+    const HEADLINE: Headline = Headline::new("state graph violated");
+    const READS: Reads = Reads::Shipped;
 
     fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,

@@ -1,3 +1,4 @@
+use law_facts::Laws;
 use std::marker::PhantomData;
 
 use lint_core::{Lint, Report, SourceFile};
@@ -8,6 +9,7 @@ pub(crate) struct OnGraph<Graph>(PhantomData<Graph>);
 impl<Graph: GraphLint> Lint for OnGraph<Graph> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let extraction = Extraction::from(files);
-        Graph::report_graph(&TypeSystem::built_from(files, &extraction))
+        let laws = Laws::from(files);
+        Graph::report_graph(&TypeSystem::built_from(&extraction, &laws))
     }
 }

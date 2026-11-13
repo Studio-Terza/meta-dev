@@ -11,6 +11,7 @@ use cargo_ports::Cargo;
 use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
+use law_facts::Laws;
 use lint_clones::Clones;
 use lint_core::{Lint, Readout, Report, SourceFile};
 use lint_paired_apis::PairedApis;
@@ -107,7 +108,8 @@ impl Run<'_, '_> {
 
     fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
         let extraction = Extraction::from(files);
-        let system = TypeSystem::built_from(files, &extraction);
+        let laws = Laws::from(files);
+        let system = TypeSystem::built_from(&extraction, &laws);
         Outcome::Clean.surveyed(found.map(|query| query.reply(&system)).as_slice(), out, err)
     }
 }

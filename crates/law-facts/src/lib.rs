@@ -13,6 +13,7 @@ pub use operators::Operators;
 pub use package::Package;
 
 use lint_core::{Parsed, SourceFile};
+use lint_file::PrimedFacts;
 use lint_layout::Name;
 use reader::Reader;
 pub use traits::Traits;
@@ -63,5 +64,23 @@ impl<'file> Laws<'file> {
 impl<'file> FromIterator<Laws<'file>> for Laws<'file> {
     fn from_iter<Parts: IntoIterator<Item = Laws<'file>>>(parts: Parts) -> Laws<'file> {
         Laws { laws: parts.into_iter().flat_map(|part| part.laws).collect() }
+    }
+}
+
+#[derive(Debug)]
+pub struct LawReading;
+
+impl PrimedFacts for LawReading {
+    type PrimerPart<'head> = Traits<'head>;
+    type Primer<'head> = Traits<'head>;
+    type Part<'head> = Laws<'head>;
+    type Context<'head> = Laws<'head>;
+
+    fn primed<'head>(parsed: Parsed<'_, 'head>) -> Traits<'head> {
+        Traits::from(parsed)
+    }
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>, traits: &Traits<'head>) -> Laws<'head> {
+        Laws::read(parsed, traits)
     }
 }

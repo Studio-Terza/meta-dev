@@ -1,3 +1,4 @@
+use law_facts::Laws;
 use std::ffi::OsString;
 
 use graph_query::{Query, QueryFailure, Role, Term};
@@ -83,7 +84,8 @@ impl Asked {
     fn answered_in(sources: &[Source], words: &&[&str]) -> Vec<String> {
         let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
-        let system = TypeSystem::built_from(&files, &extraction);
+        let laws = Laws::from(files.as_slice());
+        let system = TypeSystem::built_from(&extraction, &laws);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
         query.reply(&system).to_string().parse::<Lines>().into_iter().flatten().collect()
     }

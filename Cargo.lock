@@ -1040,6 +1040,7 @@ dependencies = [
 name = "graph-query"
 version = "0.1.0"
 dependencies = [
+ "law-facts",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1274,6 +1275,7 @@ name = "law-facts"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -1986,6 +1988,7 @@ dependencies = [
  "file-ports",
  "golden",
  "graph-query",
+ "law-facts",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",

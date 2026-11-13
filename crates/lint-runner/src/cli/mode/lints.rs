@@ -8,6 +8,7 @@ use code_model::Model;
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
+use law_facts::{LawReading, Laws};
 use lint_core::{Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads};
 use lint_reader::{Described, Unlocated};
@@ -119,7 +120,7 @@ type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
 type Workspaced = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Report<'file>;
 
-type Extracting = for<'file> fn(&'file [SourceFile], &'file Extraction<'file>) -> Vec<Report<'file>>;
+type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>) -> Vec<Report<'file>>;
 
 impl Lints {
     const LINTS: [Entry; 53] = [
@@ -170,8 +171,8 @@ impl Lints {
         <Filed<LinearBodies> as Registered>::ENTRY,
         <Filed<PureRouters> as Registered>::ENTRY,
         <Filed<PlainConditions> as Registered>::ENTRY,
-        Entry::spelled::<TypeSystem>(Work::Extracted(|files, extraction| {
-            let system = TypeSystem::built_from(files, extraction);
+        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, laws| {
+            let system = TypeSystem::built_from(extraction, laws);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
@@ -318,22 +319,25 @@ impl Work {
         match self {
             Work::Checked(check) => check(readout),
             Work::Modelled(query) => sources.gathering().model().map(query).into_iter().collect(),
-            Work::Extracted(extracted) => extracted(readout.files(), sources.gathering().extraction()),
             Work::Described(described) => Self::described(described, readout, sources),
-            Work::Survey | Work::Filed(_) | Work::Judged(_) => Vec::new(),
+            Work::Extracted(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) => Vec::new(),
         }
     }
 
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
             Work::Survey => Worked::surveying(&Survey::measured(readout.files())),
-            Work::Checked(_)
-            | Work::Modelled(_)
-            | Work::Extracted(_)
-            | Work::Described(_)
-            | Work::Filed(_)
-            | Work::Judged(_) => Worked::rendering(slot, self.reported(readout, sources)),
+            Work::Extracted(extracted) => Self::typed(extracted, slot, sources),
+            Work::Checked(_) | Work::Modelled(_) | Work::Described(_) | Work::Filed(_) | Work::Judged(_) => {
+                Worked::rendering(slot, self.reported(readout, sources))
+            }
         }
+    }
+
+    fn typed(extracted: Extracting, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+        let gathering = sources.gathering();
+        let settled = Settled::new(gathering.contexts(), gathering.primings());
+        Worked::rendering(slot, extracted(gathering.extraction(), Priming::<LawReading>::primed(&settled)))
     }
 
     fn described<'run>(

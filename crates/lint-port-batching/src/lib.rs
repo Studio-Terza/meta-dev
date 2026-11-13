@@ -5,7 +5,7 @@ mod spelling;
 
 use lint_core::{Headline, Parsed, SourceFile, Violation};
 use lint_fakes_at_ports::PortTraits;
-use lint_file::{PrimedLint, Reads};
+use lint_file::{PrimedFacts, PrimedLint, Reads};
 use lint_paths::Imports;
 
 use holders::Holders;
@@ -42,10 +42,7 @@ impl<'head> FromIterator<ShippedPorts<'head>> for ShippedPorts<'head> {
     }
 }
 
-impl PrimedLint for PortBatching {
-    const HEADLINE: Headline = Headline::new("ports are called once per batch, not once per element");
-    const READS: Reads = Reads::Shipped;
-
+impl PrimedFacts for PortBatching {
     type PrimerPart<'head> = ShippedPorts<'head>;
     type Primer<'head> = ShippedPorts<'head>;
     type Part<'head> = Holders;
@@ -63,6 +60,11 @@ impl PrimedLint for PortBatching {
         let judge = Judge::new(&primer.imports, &primer.ports);
         parsed.file().shipped().map_or_default(|_| Holders::read(parsed, &judge))
     }
+}
+
+impl PrimedLint for PortBatching {
+    const HEADLINE: Headline = Headline::new("ports are called once per batch, not once per element");
+    const READS: Reads = Reads::Shipped;
 
     fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
