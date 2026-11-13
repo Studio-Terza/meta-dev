@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::panic;
+use std::sync::{Mutex, PoisonError};
 use std::thread::{self, Scope, ScopedJoinHandle};
 
 #[derive(Debug)]
@@ -28,6 +28,21 @@ impl<'scope, Work: Sync> Spawner<'scope, '_, Work> {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct Parked<Item>(Mutex<Option<Item>>);
+
+impl<Item> From<Item> for Parked<Item> {
+    fn from(item: Item) -> Parked<Item> {
+        Parked(Mutex::new(Some(item)))
+    }
+}
+
+impl<Item> Parked<Item> {
+    pub(crate) fn taken(&self) -> Option<Item> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).take()
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Parallel(usize);
 
@@ -41,32 +56,21 @@ impl Parallel {
         items: &[Item],
         map: impl Fn(&Item) -> Mapped + Sync,
     ) -> Vec<Mapped> {
-        let shares: Vec<&[Item]> = items.chunks(self.share(items.len())).collect();
-        let mapped = Self::joined(shares, |share: &[Item]| share.iter().map(&map).collect::<Vec<Mapped>>());
+        let mapped = self.shares(items).worked(|share: &[Item]| share.iter().map(&map).collect::<Vec<Mapped>>());
         mapped.into_iter().flatten().collect()
     }
 
-    pub(crate) fn consumed<Item: Send, Mapped: Send>(
-        self,
-        items: Vec<Item>,
-        map: impl Fn(Vec<Item>) -> Mapped + Sync,
-    ) -> Vec<Mapped> {
-        let share = self.share(items.len());
-        let shares = items.into_iter().enumerate().fold(
-            BTreeMap::new(),
-            |mut shares: BTreeMap<usize, Vec<Item>>, (at, item)| {
-                shares.entry(at / share).or_default().push(item);
-                shares
-            },
-        );
-        Self::joined(shares.into_values().collect(), map)
+    pub(crate) fn shares<Item>(self, items: &[Item]) -> Shares<'_, Item> {
+        Shares(items.chunks(items.len().div_ceil(self.0).max(1)).collect())
     }
+}
 
-    fn share(self, count: usize) -> usize {
-        count.div_ceil(self.0).max(1)
-    }
+#[derive(Debug)]
+pub(crate) struct Shares<'items, Item>(Vec<&'items [Item]>);
 
-    fn joined<Share: Send, Mapped: Send>(shares: Vec<Share>, work: impl Fn(Share) -> Mapped + Sync) -> Vec<Mapped> {
+impl<Item: Sync> Shares<'_, Item> {
+    pub(crate) fn worked<Mapped: Send>(self, work: impl Fn(&[Item]) -> Mapped + Sync) -> Vec<Mapped> {
+        let shares = self.0;
         thread::scope(|scope| {
             let spawner = Spawner { scope, work: &work };
             Running(shares.into_iter().map(|share| spawner.spawned(share)).collect()).joined()

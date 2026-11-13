@@ -1,3 +1,3 @@
 mod boundary;
 
-pub(crate) use boundary::Parallel;
+pub(crate) use boundary::{Parallel, Parked};

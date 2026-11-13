@@ -32,7 +32,7 @@ use crate::namespace::{
     Declared, DeclaredKind, Domain, Entries, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind, Seeds,
     StdNames, Top, UsePath, Visibility,
 };
-use crate::parallel::Parallel;
+use crate::parallel::{Parallel, Parked};
 use crate::planting::Files;
 use attributes::Attributes;
 use boundary::SelfType;
@@ -442,9 +442,10 @@ impl<'read> Plot<'read> {
             })
             .collect();
         let with_aliases = Footed::every_built(aliases, with_places);
-        let fragments = Parallel::available().consumed(footed, |share| {
-            let columns =
-                share.into_iter().fold(Columns::default(), |columns, file| file.row.spread(file.footing, columns));
+        let parked: Vec<Parked<Footed<'_, FileRows>>> = footed.into_iter().map(Parked::from).collect();
+        let fragments = Parallel::available().shares(&parked).worked(|share| {
+            let files = share.iter().filter_map(Parked::taken);
+            let columns = files.fold(Columns::default(), |columns, file| file.row.spread(file.footing, columns));
             columns.built(with_aliases.fragment())
         });
         fragments.into_iter().fold(with_aliases, Building::absorbed).built()
