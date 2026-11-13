@@ -10,6 +10,7 @@ use lint_core::{Readout, SourceFile};
 use lint_layout::Crates;
 
 pub use facts::{FileFacts, ListedGroup, Listing};
+pub use lowering::ReceiverSyntax;
 use root_reading::RootReading;
 
 #[derive(Debug)]

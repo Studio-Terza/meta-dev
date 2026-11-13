@@ -2,35 +2,46 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::num::NonZeroUsize;
 
-use lint_core::Site;
+use code_model::{Function, Implementation, MethodShape, Placed, Site};
 use lint_layout::Name;
-use lint_placement::CrateName;
 use newtype::Wrapping;
-use type_facts::{Facts, GenericImpl, Implementation, Method, TraitFact, TypeFact};
 
+use crate::query::catalog::{Catalog, Stocked};
 use crate::query::kind::Kind;
 use crate::query::term::Term;
 use crate::role::Role;
 use crate::score::Score;
 
+#[derive(Clone, Debug)]
+pub struct Offered<'model> {
+    name: &'model Name,
+    shape: MethodShape,
+}
+
 #[derive(Clone, Copy, Debug)]
-enum Label<'facts, 'file> {
-    Named(&'facts Name),
-    Generic(&'facts GenericImpl<'file>),
+enum Label<'model> {
+    Named(&'model Name),
+    Generic(&'model Implementation),
 }
 
 #[derive(Clone, Debug)]
-pub struct Candidate<'facts, 'file> {
+pub struct Candidate<'model> {
     kind: Kind,
-    krate: &'facts CrateName,
-    label: Label<'facts, 'file>,
-    site: &'facts Site<'file>,
-    names: Vec<&'facts Name>,
-    methods: Vec<&'facts Method>,
-    related: Vec<&'facts Name>,
+    krate: &'model Name,
+    label: Label<'model>,
+    site: Site<'model>,
+    names: Vec<&'model Name>,
+    methods: Vec<Offered<'model>>,
+    related: Vec<&'model Name>,
 }
 
-impl<'facts, 'file> Candidate<'facts, 'file> {
+impl<'model> From<&'model Function> for Offered<'model> {
+    fn from(function: &'model Function) -> Offered<'model> {
+        Offered { name: function.as_ref(), shape: MethodShape::from(function) }
+    }
+}
+
+impl<'model> Candidate<'model> {
     const NAMED: Score = Score::new(3);
     const MENTIONED: Score = Score::new(1);
     const CLOSE: Score = Score::new(3);
@@ -38,56 +49,39 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
     const SHOWN: usize = 5;
 
     #[must_use]
-    pub fn of_trait(
-        found: &'facts TraitFact<'file>,
-        kind: Kind,
-        facts: &'facts Facts<'file>,
-    ) -> Candidate<'facts, 'file> {
-        let name: &Name = found.as_ref();
-        let implementers: BTreeSet<&Name> = facts.implementers(name).into_iter().collect();
+    pub(crate) fn declared(stocked: Stocked<'model>, kind: Kind, catalog: &Catalog<'model>) -> Candidate<'model> {
+        let placed = stocked.placed();
+        let id = placed.entity().declared();
+        let implementers: BTreeSet<&Name> = catalog.implementers(id).collect();
         Candidate {
             kind,
-            krate: found.as_ref(),
-            label: Label::Named(name),
-            site: found.as_ref(),
-            names: vec![name],
-            methods: AsRef::<[Method]>::as_ref(found).iter().collect(),
-            related: implementers.into_iter().collect(),
+            krate: placed.krate(),
+            label: Label::Named(stocked.name()),
+            site: placed.site(),
+            names: vec![stocked.name()],
+            methods: Catalog::OWNERS.iter().flat_map(|owner| catalog.owned_by(id, *owner)).map(Offered::from).collect(),
+            related: implementers
+                .into_iter()
+                .chain(catalog.implemented_by(id).filter_map(Implementation::interface_name))
+                .collect(),
         }
     }
 
     #[must_use]
-    pub fn of_generic(found: &'facts GenericImpl<'file>) -> Candidate<'facts, 'file> {
+    pub(crate) fn of_generic(
+        placed: Placed<'model, &'model Implementation>,
+        catalog: &Catalog<'model>,
+    ) -> Candidate<'model> {
+        let implementation = placed.entity();
+        let implemented = Implementation::interface_name(implementation);
         Candidate {
             kind: Kind::GenericImpl,
-            krate: found.as_ref(),
-            label: Label::Generic(found),
-            site: found.as_ref(),
-            names: Some(found.as_ref()).into_iter().chain(found.implemented()).collect(),
-            methods: AsRef::<[Method]>::as_ref(found).iter().collect(),
+            krate: placed.krate(),
+            label: Label::Generic(implementation),
+            site: placed.site(),
+            names: Some(implementation.subject()).into_iter().chain(implemented).collect(),
+            methods: catalog.seated(placed).map(Offered::from).collect(),
             related: Vec::new(),
-        }
-    }
-
-    #[must_use]
-    pub fn of_type(
-        found: &'facts TypeFact<'file>,
-        kind: Kind,
-        facts: &'facts Facts<'file>,
-    ) -> Candidate<'facts, 'file> {
-        let implementations = facts.implementations(found);
-        Candidate {
-            kind,
-            krate: found.as_ref(),
-            label: Label::Named(found.as_ref()),
-            site: found.as_ref(),
-            names: vec![found.as_ref()],
-            methods: facts
-                .methods(found)
-                .iter()
-                .chain(implementations.iter().flat_map(Implementation::methods))
-                .collect(),
-            related: implementations.iter().map(AsRef::as_ref).collect(),
         }
     }
 
@@ -104,11 +98,10 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
     }
 
     #[must_use]
-    pub fn fitting(&self, role: &Role) -> Option<&'facts Method> {
+    pub fn fitting(&self, role: &Role) -> Option<&Offered<'model>> {
         self.methods
             .iter()
-            .copied()
-            .map(|method| (role.agreement(method.shape()), method))
+            .map(|method| (role.agreement(&method.shape), method))
             .filter(|(agreement, _)| *agreement >= Self::CLOSE)
             .max_by_key(|(agreement, _)| *agreement)
             .map(|(_, method)| method)
@@ -117,25 +110,38 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
     #[must_use]
     pub fn shaped(&self, role: &Role) -> Score {
         self.fitting(role).map_or_else(Score::default, |method| {
-            Score::new(role.agreement(method.shape()).into_inner().saturating_sub(Self::BELOW_CLOSE.into_inner()))
+            Score::new(role.agreement(&method.shape).into_inner().saturating_sub(Self::BELOW_CLOSE.into_inner()))
         })
     }
 
-    fn mentions(&self) -> impl Iterator<Item = &'facts Name> {
-        self.methods.iter().map(|method| AsRef::<Name>::as_ref(*method)).chain(self.related.iter().copied())
+    fn mentions(&self) -> impl Iterator<Item = &'model Name> {
+        self.methods.iter().map(|method| method.name).chain(self.related.iter().copied())
     }
 }
 
-impl fmt::Display for Label<'_, '_> {
+impl Label<'_> {
+    fn written(formatter: &mut fmt::Formatter<'_>, found: &Implementation) -> fmt::Result {
+        Implementation::interface_name(found).map_or(Ok(()), |implemented| write!(formatter, "{implemented} for "))?;
+        write!(formatter, "{}", found.subject())
+    }
+}
+
+impl fmt::Display for Offered<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {}", self.name, self.shape)
+    }
+}
+
+impl fmt::Display for Label<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Label::Named(name) => write!(formatter, "{name}"),
-            Label::Generic(found) => write!(formatter, "{found}"),
+            Label::Generic(found) => Label::written(formatter, found),
         }
     }
 }
 
-impl fmt::Display for Candidate<'_, '_> {
+impl fmt::Display for Candidate<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} {} in {} at {}", self.kind, self.label, self.krate, self.site)?;
         let shown: Vec<String> = self.related.iter().take(Self::SHOWN).map(ToString::to_string).collect();

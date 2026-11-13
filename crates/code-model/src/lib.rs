@@ -32,7 +32,7 @@ pub use domain::Domain;
 pub use external::External;
 
 pub use found::Found;
-pub use function::{Entry, Function, Input, Output, Owner, Signature};
+pub use function::{Entry, Function, Input, MethodShape, Output, Owner, Receiver, Returned, Signature, Taken};
 pub use holding::{Held, Holding};
 pub use implementation::{Implementation, Origin, Subject};
 pub use item::{Alias, AliasParameter, Item, ItemKind};

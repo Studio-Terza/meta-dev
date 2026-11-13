@@ -1040,6 +1040,7 @@ dependencies = [
 name = "graph-query"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "code-reader",
  "law-facts",
  "laws",
@@ -1053,7 +1054,6 @@ dependencies = [
  "text-lines",
  "thiserror",
  "transition-facts",
- "type-facts",
  "workspace-metadata",
 ]
 
@@ -2133,7 +2133,6 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "transition-facts",
- "type-facts",
 ]
 
 [[package]]

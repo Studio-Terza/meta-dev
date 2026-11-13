@@ -59,10 +59,10 @@ impl<'found, 'file> Behaviour<'found, 'file> {
             .items()
             .filter(|placed| placed.krate() == node.krate())
             .find(|placed| {
-                model.declared(placed.entity().declared()).is_some_and(|item| {
-                    WorkspaceTypes::TYPES.contains(&item.kind())
-                        && AsRef::<Name>::as_ref(item) == AsRef::<Name>::as_ref(node)
-                })
+                model
+                    .declared(placed.entity().declared())
+                    .filter(|item| WorkspaceTypes::TYPES.contains(&item.kind()))
+                    .is_some_and(|item| AsRef::<Name>::as_ref(item) == AsRef::<Name>::as_ref(node))
             })
             .map(Placed::site)
     }

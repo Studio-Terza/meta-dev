@@ -130,7 +130,8 @@ impl Resolved {
         }
     }
 
-    pub(crate) fn parameter(&self) -> Option<&Name> {
+    #[must_use]
+    pub fn parameter(&self) -> Option<&Name> {
         match self {
             Resolved::Param(name) => Some(name),
             Resolved::Std(_)

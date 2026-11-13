@@ -1,26 +1,29 @@
 mod boundary;
 mod candidate;
+mod catalog;
 mod kind;
 mod matches;
 mod reply;
 mod term;
 mod top;
 
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use code_model::{ItemKind, Model};
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_transition_graph::{Ask, Listed, TypeSystem};
 use newtype::Wrapping;
 use transition_facts::{Ground, Transitions};
-use type_facts::Facts;
 use workspace_metadata::Metadata;
 
 use crate::boundary::CrateSizes;
 use crate::role::Role;
 use candidate::Candidate;
+use catalog::{Catalog, Stocked};
 use kind::Kind;
 use matches::Matches;
 use reply::Reply;
@@ -86,7 +89,7 @@ impl Query {
         system: &'view TypeSystem<'found, 'file>,
     ) -> Reply<'view, 'found, 'file> {
         let extraction = system.extraction();
-        let matches = self.searches().map(|()| self.matches(extraction.facts(), extraction.transitions()));
+        let matches = self.searches().map(|()| self.matches(system.model(), extraction.transitions()));
         let listed = self.top.map(|top| Listed::new(top.into_inner()));
         Reply::new(matches, self.questions.iter().map(|ask| ask.answered(system.containment(), listed)).collect())
     }
@@ -105,28 +108,23 @@ impl Query {
     }
 
     #[must_use]
-    pub fn matches<'facts, 'file>(
-        &'facts self,
-        facts: &'facts Facts<'file>,
-        transitions: &Transitions<'file>,
-    ) -> Matches<'facts, 'file> {
-        let grounds: BTreeMap<(&CrateName, &Name), Ground> = transitions
+    pub fn matches<'view>(&'view self, model: &'view Model, transitions: &Transitions<'_>) -> Matches<'view> {
+        let grounds: BTreeMap<(&Name, &Name), Ground> = transitions
             .contexts()
             .iter()
             .filter_map(|context| {
-                context.subject().map(|subject| ((context.as_ref(), subject.as_ref()), *context.as_ref()))
+                let krate: &Name = AsRef::<CrateName>::as_ref(context).borrow();
+                context.subject().map(|subject| ((krate, subject.as_ref()), *context.as_ref()))
             })
             .collect();
-        let ground = |krate: &CrateName, name: &Name| grounds.get(&(krate, name)).copied();
-        let traits = facts
-            .traits()
-            .iter()
-            .map(|found| Candidate::of_trait(found, Kind::of_trait(ground(found.as_ref(), found.as_ref())), facts));
-        let generics = facts.generic_impls().iter().map(Candidate::of_generic);
-        let types = facts.types().iter().filter_map(|found| {
-            Kind::of_trait(ground(found.as_ref(), found.as_ref()))
-                .implementer()
-                .map(|kind| Candidate::of_type(found, kind, facts))
+        let ground = |stocked: Stocked<'_>| grounds.get(&(stocked.placed().krate(), stocked.name())).copied();
+        let catalog = Catalog::from(model);
+        let traits = catalog
+            .declared(&[ItemKind::Trait])
+            .map(|stocked| Candidate::declared(stocked, Kind::of_trait(ground(stocked)), &catalog));
+        let generics = catalog.generics().map(|placed| Candidate::of_generic(placed, &catalog));
+        let types = catalog.declared(&Catalog::TYPES).filter_map(|stocked| {
+            Kind::of_trait(ground(stocked)).implementer().map(|kind| Candidate::declared(stocked, kind, &catalog))
         });
         Matches::ranked(traits.chain(generics).chain(types), &self.terms, &self.roles, self.top.unwrap_or(Top::DEFAULT))
     }

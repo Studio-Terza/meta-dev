@@ -11,6 +11,20 @@ pub trait TypeUses {
     fn named(&mut self, named: &Named<Sited>);
 }
 
+pub(crate) trait Outline {
+    type Kind;
+
+    fn named(self, named: &Named<Sited>) -> Self::Kind;
+
+    fn grouped(self, parts: &[TypeRef]) -> Self::Kind;
+
+    fn sequence(self) -> Self::Kind;
+
+    fn bounded(self, bounds: &[TypeRef]) -> Self::Kind;
+
+    fn other(self) -> Self::Kind;
+}
+
 pub(crate) trait Rebuild<From> {
     type Into;
     type Fail;
@@ -196,6 +210,22 @@ impl<Bound> TypeRef<Bound> {
     }
 
     #[must_use]
+    pub fn dereferenced(&self) -> &TypeRef<Bound> {
+        match self {
+            TypeRef::Reference(inner) => inner.dereferenced(),
+            TypeRef::Named(_)
+            | TypeRef::Tuple(_)
+            | TypeRef::Pointer(_)
+            | TypeRef::Slice(_)
+            | TypeRef::Array(_)
+            | TypeRef::Bounded(_)
+            | TypeRef::Projected(_)
+            | TypeRef::Function(_)
+            | TypeRef::Opaque => self,
+        }
+    }
+
+    #[must_use]
     pub fn unit(&self) -> Option<&TypeRef<Bound>> {
         match self {
             TypeRef::Tuple(elements) => elements.first().xor(Some(self)),
@@ -265,6 +295,17 @@ impl TypeRef {
         match self.named() {
             Some(named) => uses.named(named),
             None => self.parts().children().for_each(|child| child.each_use(uses)),
+        }
+    }
+
+    pub(crate) fn outlined<Shape: Outline>(&self, outline: Shape) -> Shape::Kind {
+        match self {
+            TypeRef::Reference(inner) => inner.outlined(outline),
+            TypeRef::Named(named) => outline.named(named),
+            TypeRef::Tuple(parts) => outline.grouped(parts),
+            TypeRef::Slice(_) | TypeRef::Array(_) => outline.sequence(),
+            TypeRef::Bounded(bounds) => outline.bounded(bounds),
+            TypeRef::Pointer(_) | TypeRef::Projected(_) | TypeRef::Function(_) | TypeRef::Opaque => outline.other(),
         }
     }
 }

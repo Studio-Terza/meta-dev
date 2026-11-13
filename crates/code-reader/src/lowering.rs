@@ -41,6 +41,7 @@ use held::{Holder, HoldingRow, Link};
 use places::{PlaceId, PlaceRows, Places};
 use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
+pub use signature::ReceiverSyntax;
 use signature::{DeclaredParameter, InScope, LoweredInput, Written};
 use uses::UseRow;
 
@@ -96,6 +97,7 @@ struct ImplRow {
     domain: Domain,
     origin: Origin,
     region: Region,
+    parameters: Vec<Name>,
 }
 
 impl ImplRow {
@@ -108,6 +110,7 @@ impl ImplRow {
             domain: Domain::Types,
             origin: Origin::Written,
             region,
+            parameters: block.generics.type_params().map(|parameter| Name::from(&parameter.ident)).collect(),
         }
     }
 
@@ -121,6 +124,7 @@ impl ImplRow {
             domain: Domain::Macros,
             origin: Origin::Derived,
             region,
+            parameters: Vec::new(),
         }
     }
 
@@ -139,7 +143,8 @@ impl Built for ImplRow {
         });
         let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, located.scope()));
         let implementation =
-            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer()));
+            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer()))
+                .parameterised(self.parameters);
         located.implementation(footing, building, implementation)
     }
 }

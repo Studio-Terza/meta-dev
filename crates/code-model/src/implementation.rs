@@ -2,7 +2,7 @@ use lint_layout::Name;
 
 use crate::region::Region;
 use crate::resolved::Resolved;
-use crate::sited::Sited;
+use crate::sited::{Sited, Spelling};
 use crate::type_ref::TypeRef;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,12 +30,23 @@ pub struct Implementation {
     implemented: Option<Sited>,
     origin: Origin,
     region: Region,
+    parameters: Vec<Name>,
 }
 
 impl Implementation {
     #[must_use]
     pub fn new(subject: Subject, implemented: Option<Sited>, origin: Origin, region: Region) -> Implementation {
-        Implementation { subject, implemented, origin, region }
+        Implementation { subject, implemented, origin, region, parameters: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn parameterised(self, parameters: Vec<Name>) -> Implementation {
+        Implementation { parameters, ..self }
+    }
+
+    #[must_use]
+    pub fn parameters(&self) -> &[Name] {
+        &self.parameters
     }
 
     #[must_use]
@@ -54,6 +65,11 @@ impl Implementation {
     #[must_use]
     pub fn implemented(&self) -> Option<&Resolved> {
         self.implemented.as_ref().map(AsRef::as_ref)
+    }
+
+    #[must_use]
+    pub fn interface_name(&self) -> Option<&Name> {
+        AsRef::<Spelling>::as_ref(self.implemented.as_ref()?).written()?.last()
     }
 
     #[must_use]

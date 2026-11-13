@@ -1,49 +1,51 @@
 use std::cmp::Reverse;
 use std::fmt;
 
-use lint_layout::Name;
+use code_model::MethodShape;
 use newtype::Wrapping;
-use type_facts::{Method, MethodShape};
 
-use crate::query::candidate::Candidate;
+use crate::query::candidate::{Candidate, Offered};
 use crate::query::term::Term;
 use crate::query::top::Top;
 use crate::role::Role;
 use crate::score::Score;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Fit<'facts> {
     role: &'facts Role,
-    method: &'facts Method,
+    method: Offered<'facts>,
 }
 
 #[derive(Clone, Debug)]
-struct Ranked<'facts, 'file> {
+struct Ranked<'facts> {
     score: Score,
-    candidate: Candidate<'facts, 'file>,
+    candidate: Candidate<'facts>,
     fits: Vec<Fit<'facts>>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Matches<'facts, 'file>(Vec<Ranked<'facts, 'file>>);
+pub struct Matches<'facts>(Vec<Ranked<'facts>>);
 
-impl<'facts, 'file> Ranked<'facts, 'file> {
-    fn scored(candidate: Candidate<'facts, 'file>, terms: &[Term], roles: &'facts [Role]) -> Ranked<'facts, 'file> {
+impl<'facts> Ranked<'facts> {
+    fn scored(candidate: Candidate<'facts>, terms: &[Term], roles: &'facts [Role]) -> Ranked<'facts> {
         let shaped = roles.iter().map(|role| candidate.shaped(role)).fold(Score::default(), |sum, each| sum + each);
-        let fits = roles.iter().filter_map(|role| candidate.fitting(role).map(|method| Fit { role, method })).collect();
+        let fits = roles
+            .iter()
+            .filter_map(|role| candidate.fitting(role).map(|method| Fit { role, method: method.clone() }))
+            .collect();
         Ranked { score: candidate.named(terms) + shaped, candidate, fits }
     }
 }
 
-impl<'facts, 'file> Matches<'facts, 'file> {
+impl<'facts> Matches<'facts> {
     #[must_use]
     pub fn ranked(
-        candidates: impl Iterator<Item = Candidate<'facts, 'file>>,
+        candidates: impl Iterator<Item = Candidate<'facts>>,
         terms: &[Term],
         roles: &'facts [Role],
         top: Top,
-    ) -> Matches<'facts, 'file> {
-        let mut ranked: Vec<Ranked<'facts, 'file>> = candidates
+    ) -> Matches<'facts> {
+        let mut ranked: Vec<Ranked<'facts>> = candidates
             .map(|candidate| Ranked::scored(candidate, terms, roles))
             .filter(|ranked| ranked.score > Score::default())
             .collect();
@@ -56,18 +58,18 @@ impl<'facts, 'file> Matches<'facts, 'file> {
 impl fmt::Display for Fit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let wanted: &MethodShape = self.role.as_ref();
-        writeln!(formatter, "    {} {} fits {wanted}", AsRef::<Name>::as_ref(self.method), self.method.shape())
+        writeln!(formatter, "    {} fits {wanted}", self.method)
     }
 }
 
-impl fmt::Display for Ranked<'_, '_> {
+impl fmt::Display for Ranked<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "score {}: {}", self.score, self.candidate)?;
         self.fits.iter().try_for_each(|fit| write!(formatter, "{fit}"))
     }
 }
 
-impl fmt::Display for Matches<'_, '_> {
+impl fmt::Display for Matches<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.first() {
             None => writeln!(formatter, "no existing traits, generic impls, ports or stores match"),

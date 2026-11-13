@@ -1,7 +1,13 @@
+mod shape;
+
+use std::fmt;
+
 use lint_layout::Name;
 
 use crate::region::{Region, Seat};
 use crate::type_ref::TypeRef;
+
+pub use shape::{MethodShape, Returned, Taken};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
@@ -36,9 +42,26 @@ impl Output {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Receiver {
+    Owned,
+    Shared,
+    Mutable,
+}
+
+impl fmt::Display for Receiver {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Receiver::Owned => formatter.write_str("self"),
+            Receiver::Shared => formatter.write_str("&self"),
+            Receiver::Mutable => formatter.write_str("&mut self"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Input {
-    Receiver,
+    Receiver(Receiver),
     Typed(TypeRef),
 }
 
@@ -46,7 +69,15 @@ impl Input {
     fn typed(&self) -> Option<&TypeRef> {
         match self {
             Input::Typed(ty) => Some(ty),
-            Input::Receiver => None,
+            Input::Receiver(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn receiver(&self) -> Option<Receiver> {
+        match self {
+            Input::Receiver(receiver) => Some(*receiver),
+            Input::Typed(_) => None,
         }
     }
 }

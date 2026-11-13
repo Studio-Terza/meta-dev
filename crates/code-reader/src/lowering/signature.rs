@@ -6,7 +6,9 @@ use syn::{
     TypePath, WherePredicate,
 };
 
-use code_model::{AliasParameter, Arrayed, Callable, Input, Named, Projection, Resolved, Sited, Spelling, TypeRef};
+use code_model::{
+    AliasParameter, Arrayed, Callable, Input, Named, Projection, Receiver, Resolved, Sited, Spelling, TypeRef,
+};
 use lint_layout::{Name, Position, Whole, Word};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
@@ -89,23 +91,42 @@ impl TypeParameter {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ReceiverSyntax<'syn>(&'syn syn::Receiver);
+
+impl<'syn> From<&'syn syn::Receiver> for ReceiverSyntax<'syn> {
+    fn from(written: &'syn syn::Receiver) -> ReceiverSyntax<'syn> {
+        ReceiverSyntax(written)
+    }
+}
+
+impl From<ReceiverSyntax<'_>> for Receiver {
+    fn from(syntax: ReceiverSyntax<'_>) -> Receiver {
+        let written = syntax.0;
+        written
+            .reference
+            .as_ref()
+            .map_or(Receiver::Owned, |_| written.mutability.map_or(Receiver::Shared, |_| Receiver::Mutable))
+    }
+}
+
 #[derive(Debug)]
 pub(super) enum LoweredInput {
-    Receiver,
+    Receiver(Receiver),
     Typed(TypeRef<Written>),
 }
 
 impl LoweredInput {
     fn lowered(scope: &InScope, input: &FnArg) -> LoweredInput {
         match input {
-            FnArg::Receiver(_) => LoweredInput::Receiver,
+            FnArg::Receiver(receiver) => LoweredInput::Receiver(Receiver::from(ReceiverSyntax::from(receiver))),
             FnArg::Typed(typed) => LoweredInput::Typed(scope.lowered(&typed.ty)),
         }
     }
 
     pub(super) fn typed(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Input {
         match self {
-            LoweredInput::Receiver => Input::Receiver,
+            LoweredInput::Receiver(receiver) => Input::Receiver(receiver),
             LoweredInput::Typed(ty) => Input::Typed(Written::typed(&ty, resolving, scope)),
         }
     }
