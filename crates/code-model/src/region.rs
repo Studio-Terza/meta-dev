@@ -1,3 +1,5 @@
+use lint_layout::Name;
+
 use crate::boundary::ItemId;
 use crate::type_ref::TypeRef;
 
@@ -98,17 +100,28 @@ pub struct Seat {
     region: Region,
     subject: Option<TypeRef>,
     owner: Option<ItemId>,
+    implemented: Option<Name>,
 }
 
 impl Seat {
     #[must_use]
     pub fn new(region: Region, subject: Option<TypeRef>) -> Seat {
-        Seat { region, subject, owner: None }
+        Seat { region, subject, owner: None, implemented: None }
     }
 
     #[must_use]
     pub fn owned(self, owner: Option<ItemId>) -> Seat {
         Seat { owner, ..self }
+    }
+
+    #[must_use]
+    pub fn implementing(self, implemented: Option<Name>) -> Seat {
+        Seat { implemented, ..self }
+    }
+
+    #[must_use]
+    pub fn implemented(&self) -> Option<&Name> {
+        self.implemented.as_ref()
     }
 
     #[must_use]

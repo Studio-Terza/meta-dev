@@ -1,5 +1,4 @@
 use proc_macro2::{TokenStream, TokenTree};
-use syn::parse::Parse;
 use syn::visit::{self, Visit};
 use syn::{Block, ImplItemFn, ItemFn, Macro, Signature, TraitItemFn};
 
@@ -22,19 +21,18 @@ impl<'file> Collector<'file> {
     }
 
     fn declaring(invocation: &Macro) -> Option<&Macro> {
-        invocation
-            .parse_body_with(TokenStream::parse)
-            .into_iter()
-            .flat_map(TokenStream::into_iter)
-            .flat_map(Self::flattened)
-            .find(|tree| matches!(tree, TokenTree::Ident(ident) if ident == Self::FUNCTION))
-            .map(|_| invocation)
+        Self::declares(invocation.tokens.clone()).map(|()| invocation)
     }
 
-    fn flattened(tree: TokenTree) -> Vec<TokenTree> {
+    fn declares(tokens: TokenStream) -> Option<()> {
+        tokens.into_iter().find_map(Self::declared_in)
+    }
+
+    fn declared_in(tree: TokenTree) -> Option<()> {
         match tree {
-            TokenTree::Group(group) => group.stream().into_iter().flat_map(Self::flattened).collect(),
-            other => vec![other],
+            TokenTree::Group(group) => Self::declares(group.stream()),
+            TokenTree::Ident(ident) => Some(()).filter(|()| ident == Self::FUNCTION),
+            TokenTree::Punct(_) | TokenTree::Literal(_) => None,
         }
     }
 

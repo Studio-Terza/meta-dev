@@ -162,7 +162,7 @@ impl Lints {
         Entry::spelled::<KeyDependencyRoles>(Work::Described(|heads, workspaces, facts| {
             <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts)
         })),
-        <Primed<EffectsInFillers> as Registered>::ENTRY,
+        Entry::spelled::<EffectsInFillers>(Work::Modelled(<EffectsInFillers as ModelLint>::report)),
         <Filed<CountedCalls> as Registered>::ENTRY,
         <Filed<HiddenSqlx> as Registered>::ENTRY,
         <Filed<StoreQueries> as Registered>::ENTRY,

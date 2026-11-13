@@ -1,15 +1,16 @@
 mod owners;
-mod port_crate;
+mod ports;
 mod reserved_names;
 mod roles;
 
-use lint_core::{FileHead, Headline, Parsed, Report, SourceFile, Violation, WorkspaceLint};
-use lint_file::{FileLint, PrimedFacts, PrimedLint, Reads};
+use code_model::Model;
+use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, SourceFile, Violation, WorkspaceLint};
+use lint_file::{FileLint, PrimedFacts, Reads};
 use lint_paths::Imports;
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
-use port_crate::PortedCrates;
+use ports::Ports;
 use reserved_names::{CountedName, ReservedNames, SqlxName};
 use roles::Roles;
 pub use roles::{RoleFacts, RoleReading};
@@ -87,31 +88,14 @@ impl WorkspaceLint for KeyDependencyRoles {
     }
 }
 
-impl PrimedFacts for EffectsInFillers {
-    type PrimerPart<'head> = PortedCrates<'head>;
-    type Primer<'head> = PortedCrates<'head>;
-    type Part<'head> = ();
-    type Context<'head> = ();
-
-    fn primed<'head>(parsed: Parsed<'_, 'head>) -> PortedCrates<'head> {
-        PortedCrates::from(parsed)
-    }
-
-    fn contributed<'head>(_: Parsed<'_, 'head>, _: &PortedCrates<'head>) {}
-}
-
-impl PrimedLint for EffectsInFillers {
-    const HEADLINE: Headline = Headline::new(
-        "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler and impl Release blocks",
-    );
-    const READS: Reads = Reads::Shipped;
-
-    fn judged<'file, 'head: 'file>(
-        file: &'file SourceFile,
-        ported: &PortedCrates<'head>,
-        (): &(),
-    ) -> Vec<Violation<'file>> {
-        ported.stray_effects(file)
+impl ModelLint for EffectsInFillers {
+    fn report(model: &Model) -> Report<'_> {
+        Report::new(
+            Headline::new(
+                "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler and impl Release blocks",
+            ),
+            Ports::from(model).stray_effects(model),
+        )
     }
 }
 

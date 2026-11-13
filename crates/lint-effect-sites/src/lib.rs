@@ -3,7 +3,8 @@ mod crate_effects;
 use code_model::Model;
 use lint_core::{Headline, ModelLint, Report};
 
-pub use crate_effects::CrateEffects;
+use crate_effects::CrateEffects;
+pub use crate_effects::OutsideFillers;
 
 #[derive(Debug)]
 pub struct EffectSites;

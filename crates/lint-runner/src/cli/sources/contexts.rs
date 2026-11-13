@@ -14,7 +14,7 @@ use lint_no_parameter_bags::NoParameterBags;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_paired_apis::PairedApis;
 use lint_port_batching::PortBatching;
-use lint_port_dependencies::{EffectsInFillers, RoleReading};
+use lint_port_dependencies::RoleReading;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
@@ -174,7 +174,6 @@ contexts! {
         state_graph: StateGraph,
         fakes_at_ports: FakesAtPorts,
         port_batching: PortBatching,
-        effects_in_fillers: EffectsInFillers,
         roles: RoleReading,
     }
     gleaned: {
