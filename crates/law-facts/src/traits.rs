@@ -5,7 +5,7 @@ use syn::{ItemTrait, ItemUse, Visibility};
 
 use crate::operators::Operators;
 use crate::uses::{Place, Uses};
-use lint_core::SourceFile;
+use lint_core::Parsed;
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
 
@@ -44,17 +44,13 @@ impl Exports<'_> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Traits<'file> {
+pub struct Traits<'file> {
     exports: Exports<'file>,
     imports: BTreeMap<&'file CrateName, Uses>,
 }
 
 impl<'file> Traits<'file> {
     const CONVERSIONS: [Word<'static>; 4] = words!["From", "Into", "TryFrom", "TryInto"];
-
-    pub(crate) fn declared(files: &'file [SourceFile]) -> Traits<'file> {
-        files.iter().fold(Traits::default(), Traits::read)
-    }
 
     pub(crate) fn declaring<'name>(
         &'name self,
@@ -81,14 +77,29 @@ impl<'file> Traits<'file> {
             .or_else(|| self.exports.through(self.imports.get(home), home, name, hops))
     }
 
-    fn read(mut self, file: &'file SourceFile) -> Traits<'file> {
-        let home = file.head().placement().package().crate_name();
+    fn read(mut self, parsed: Parsed<'_, 'file>) -> Traits<'file> {
+        let home = parsed.head().placement().package().crate_name();
         let mut declared = Declared::default();
-        declared.visit_file(file.syntax());
+        declared.visit_file(parsed.file().syntax());
         self.exports.declared.entry(home).or_default().extend(declared.traits);
         self.exports.exports.entry(home).or_default().absorb(declared.exports);
         self.imports.entry(home).or_default().absorb(declared.imports);
-        file.test_modules().iter().fold(self, Traits::read)
+        parsed.test_modules().into_iter().fold(self, Traits::read)
+    }
+
+    fn absorbed(mut self, other: Traits<'file>) -> Traits<'file> {
+        other
+            .exports
+            .declared
+            .into_iter()
+            .for_each(|(home, traits)| self.exports.declared.entry(home).or_default().extend(traits));
+        other
+            .exports
+            .exports
+            .into_iter()
+            .for_each(|(home, uses)| self.exports.exports.entry(home).or_default().absorb(uses));
+        other.imports.into_iter().for_each(|(home, uses)| self.imports.entry(home).or_default().absorb(uses));
+        self
     }
 }
 
@@ -117,5 +128,17 @@ impl<'ast> Visit<'ast> for Declared {
     fn visit_item_use(&mut self, item: &'ast ItemUse) {
         self.kept(&item.vis).absorb(Uses::of_tree(&item.tree));
         visit::visit_item_use(self, item);
+    }
+}
+
+impl<'head> From<Parsed<'_, 'head>> for Traits<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> Traits<'head> {
+        Traits::default().read(parsed)
+    }
+}
+
+impl<'head> FromIterator<Traits<'head>> for Traits<'head> {
+    fn from_iter<Parts: IntoIterator<Item = Traits<'head>>>(parts: Parts) -> Traits<'head> {
+        parts.into_iter().fold(Traits::default(), Traits::absorbed)
     }
 }

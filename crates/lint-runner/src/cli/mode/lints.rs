@@ -9,7 +9,7 @@ use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
 use lint_core::{Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
-use lint_file::{ContextLint, FileLint, Filed, Judged, Reads};
+use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads};
 use lint_reader::{Described, Unlocated};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
@@ -25,7 +25,7 @@ use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
-use lint_linear_flow::{Flows, LinearBodies, PlainConditions, PureRouters};
+use lint_linear_flow::{LinearBodies, PlainConditions, PureRouters};
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
@@ -65,7 +65,7 @@ use lint_workflow_run::WorkflowRun;
 
 use super::Survey;
 use crate::cli::boundary::{Helper, Helpers, Rendered, Slot, Surveyed, Worked, Workers};
-use crate::cli::sources::{Claimed, Contexts, Holding};
+use crate::cli::sources::{Claimed, Holding, Priming, Settled};
 use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
 use crate::cli::{Outcome, Sources, Verdict};
 
@@ -99,7 +99,7 @@ type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 type Scan = for<'file> fn(&'file SourceFile) -> Vec<Violation<'file>>;
 
-type Judge = for<'file, 'run> fn(&'file SourceFile, &'file Contexts<'run>) -> Vec<Violation<'file>>;
+type Judge = for<'file, 'settled, 'run> fn(&'file SourceFile, &'file Settled<'settled, 'run>) -> Vec<Violation<'file>>;
 
 #[derive(Clone, Copy, Debug)]
 struct Judging {
@@ -122,7 +122,7 @@ type Workspaced = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Repor
 type Extracting = for<'file> fn(&'file [SourceFile], &'file Extraction<'file>) -> Vec<Report<'file>>;
 
 impl Lints {
-    const LINTS: [Entry; 51] = [
+    const LINTS: [Entry; 53] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Filed<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -146,7 +146,7 @@ impl Lints {
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
         <Judged<PublicSurface> as Registered>::ENTRY,
         <Judged<RepeatedMethods> as Registered>::ENTRY,
-        Entry::spelled::<StateGraph>(Work::Checked(|readout| vec![StateGraph::report(readout.files())])),
+        <Primed<StateGraph> as Registered>::ENTRY,
         <Judged<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
@@ -162,15 +162,14 @@ impl Lints {
         <Filed<StoreQueries> as Registered>::ENTRY,
         <Filed<LongExactStrings> as Registered>::ENTRY,
         Entry::spelled::<RepeatedShapes>(Work::Checked(|readout| vec![RepeatedShapes::report(readout.files())])),
-        Entry::spelled::<MandatoryLaws>(Work::Checked(|readout| vec![MandatoryLaws::report(readout.files())])),
+        <Judged<MandatoryLaws> as Registered>::ENTRY,
         <Filed<ArbitraryNewtypes> as Registered>::ENTRY,
         <Filed<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
         <Filed<NoEarlyExits> as Registered>::ENTRY,
-        Entry::spelled::<Flows>(Work::Checked(|readout| {
-            let flows = Flows::from(readout.files());
-            vec![flows.report::<LinearBodies>(), flows.report::<PureRouters>(), flows.report::<PlainConditions>()]
-        })),
+        <Filed<LinearBodies> as Registered>::ENTRY,
+        <Filed<PureRouters> as Registered>::ENTRY,
+        <Filed<PlainConditions> as Registered>::ENTRY,
         Entry::spelled::<TypeSystem>(Work::Extracted(|files, extraction| {
             let system = TypeSystem::built_from(files, extraction);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
@@ -216,6 +215,9 @@ impl Lints {
             .filter_map(|(index, entry)| entry.filing().map(|found| found.lines(Slot::from(index), lowered.claimed())))
             .collect();
         let filed_timing = filing.stopped(Step::Filed(worker));
+        let priming = Stopwatch::started(sources.wired().timer());
+        sources.gathering().primed(lowered.claimed());
+        let primed_timing = priming.stopped(Step::Primed(worker));
         let mut jobs: Vec<Job> = Self::LINTS
             .into_iter()
             .enumerate()
@@ -226,16 +228,16 @@ impl Lints {
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
         let queued: Worked = claimed.collect();
         let judging = Stopwatch::started(sources.wired().timer());
-        let contexts = sources.gathering().contexts();
+        let settled = Settled::new(sources.gathering().contexts(), sources.gathering().primings());
         let judged: Worked = Self::LINTS
             .iter()
             .enumerate()
             .filter_map(|(index, entry)| {
-                entry.judging().map(|found| found.lines(Slot::from(index), lowered.claimed(), contexts))
+                entry.judging().map(|found| found.lines(Slot::from(index), lowered.claimed(), &settled))
             })
             .collect();
         let judged_timing = judging.stopped(Step::Judged(worker));
-        let timings = lowered.timings().iter().copied().chain([filed_timing, judged_timing]);
+        let timings = lowered.timings().iter().copied().chain([filed_timing, primed_timing, judged_timing]);
         timings.map(Worked::timed).chain([filed, queued, judged]).collect()
     }
 }
@@ -301,19 +303,9 @@ impl Entry {
 }
 
 impl Judging {
-    fn judge<'file, 'run, Lint: ContextLint>(
-        file: &'file SourceFile,
-        contexts: &'file Contexts<'run>,
-    ) -> Vec<Violation<'file>>
-    where
-        for<'any> Contexts<'any>: Holding<'any, Lint>,
-    {
-        Lint::judged(file, contexts.held())
-    }
-
-    fn lines(self, slot: Slot, claimed: &[Claimed<'_>], contexts: &Contexts<'_>) -> Worked {
+    fn lines(self, slot: Slot, claimed: &[Claimed<'_>], settled: &Settled<'_, '_>) -> Worked {
         let read = claimed.iter().filter_map(|found| self.reads.admits(found.file()).map(|file| (found.order(), file)));
-        read.map(|(order, file)| Worked::filing(slot, order, &(self.judge)(file, contexts))).collect()
+        read.map(|(order, file)| Worked::filing(slot, order, &(self.judge)(file, settled))).collect()
     }
 }
 
@@ -406,10 +398,42 @@ impl<Lint: FileLint> Registered for Filed<Lint> {
 
 impl<Lint: ContextLint> Registered for Judged<Lint>
 where
-    for<'run> Contexts<'run>: Holding<'run, Lint>,
+    Judged<Lint>: Judges,
 {
     const ENTRY: Entry = Entry {
         name: Named::spelled::<Lint>(),
-        work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, judge: Judging::judge::<Lint> }),
+        work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, judge: Self::judged_by }),
     };
+}
+
+impl<Lint: PrimedLint> Registered for Primed<Lint>
+where
+    Primed<Lint>: Judges,
+{
+    const ENTRY: Entry = Entry {
+        name: Named::spelled::<Lint>(),
+        work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, judge: Self::judged_by }),
+    };
+}
+
+trait Judges {
+    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Vec<Violation<'file>>;
+}
+
+impl<Lint: ContextLint> Judges for Judged<Lint>
+where
+    for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
+{
+    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Vec<Violation<'file>> {
+        Lint::judged(file, settled.held())
+    }
+}
+
+impl<Lint: PrimedLint> Judges for Primed<Lint>
+where
+    for<'settled, 'run> Settled<'settled, 'run>: Priming<'run, Lint>,
+{
+    fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Vec<Violation<'file>> {
+        Lint::judged(file, settled.primed())
+    }
 }

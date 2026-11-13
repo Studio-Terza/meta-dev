@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::rc::Rc;
 
-use lint_core::{Macros, SourceFile, SourceText};
+use lint_core::{Macros, Parsed, SourceFile, SourceText};
 use syn::Macro;
 use syn::visit::Visit;
 
@@ -57,5 +57,19 @@ fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), Box<dyn
         .map(|text| syn::parse_str::<Macro>(text).map(|invocation| Macros::expanded(&file, &invocation).len()))
         .collect::<Result<Vec<usize>, syn::Error>>()?;
     assert_eq!(lengths, [1, 2, 3]);
+    Ok(())
+}
+
+#[test]
+fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), Box<dyn Error>> {
+    let module = SourceFile::parse("crates/x/src/tests.rs", SourceText::new("fn checked() {}\n".to_owned()))?;
+    let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new("mod tests;\n".to_owned()))?
+        .with_test_modules(vec![module]);
+    let paths: Vec<String> = Parsed::from(&file)
+        .test_modules()
+        .into_iter()
+        .map(|parsed| parsed.head().path().display().to_string())
+        .collect();
+    assert_eq!(paths, ["crates/x/src/tests.rs"]);
     Ok(())
 }

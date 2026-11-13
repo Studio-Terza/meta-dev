@@ -1,3 +1,4 @@
+use lint_file::Primed;
 use lint_state_graph::StateGraph;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -286,10 +287,10 @@ const CASES: [Case; 28] = [
 
 #[test]
 fn state_graph_rules_are_flagged() {
-    assert_eq!(Sources::mismatches::<StateGraph>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Primed<StateGraph>>(&CASES), Lines::default());
 }
 
-laws::table!(declared_graphs_that_hold_pass, Sources::flagged::<StateGraph>, [
+laws::table!(declared_graphs_that_hold_pass, Sources::flagged::<Primed<StateGraph>>, [
     [Source::new(Located::new("a.rs"), Text::new(IN_TEST_MODULE))] => Lines::default(),
     [Source::new(Located::new("x/tests/a.rs"), Text::new(UNREACHABLE))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(OTHER_MACRO))] => Lines::default(),
@@ -297,7 +298,7 @@ laws::table!(declared_graphs_that_hold_pass, Sources::flagged::<StateGraph>, [
     [Source::new(Located::new("a.rs"), Text::new(THE_DEFINITION))] => Lines::default(),
 ]);
 
-laws::table!(declared_graphs_that_break_are_flagged, Sources::flagged::<StateGraph>, [
+laws::table!(declared_graphs_that_break_are_flagged, Sources::flagged::<Primed<StateGraph>>, [
     [Source::new(Located::new("a.rs"), Text::new(NESTED))] => Lines::from(["a.rs:8", "a.rs:8"]),
     [Source::new(Located::new("a.rs"), Text::new(NO_START))] => Lines::from(["a.rs:3", "a.rs:4"]),
     [Source::new(Located::new("a.rs"), Text::new(NO_TERMINAL))] => Lines::from(["a.rs:3"]),

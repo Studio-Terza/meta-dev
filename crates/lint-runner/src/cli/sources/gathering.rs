@@ -6,7 +6,7 @@ use code_reader::{FileFacts, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile};
 use lint_transition_graph::Extraction;
 
-use super::contexts::{Contexts, Contributed};
+use super::contexts::{Contexts, Contributed, PrimedParts, Primings};
 
 use super::super::boundary::{FileOrder, Queue};
 
@@ -81,10 +81,18 @@ pub(crate) struct Merging<'run> {
 }
 
 #[derive(Debug)]
+struct PrimedFile<'run> {
+    head: &'run FileHead,
+    parts: PrimedParts<'run>,
+}
+
+#[derive(Debug)]
 pub(crate) struct Gathering<'run> {
     heads: &'run OnceLock<Vec<FileHead>>,
     claims: Queue,
     deposited: Mutex<Vec<Gathered<'run>>>,
+    primed: Mutex<Vec<PrimedFile<'run>>>,
+    primings: OnceLock<Primings<'run>>,
     model: OnceLock<Option<Model>>,
     extraction: OnceLock<Extraction<'run>>,
     contexts: OnceLock<Contexts<'run>>,
@@ -96,6 +104,8 @@ impl<'run> Gathering<'run> {
             heads,
             claims: Queue::default(),
             deposited: Mutex::default(),
+            primed: Mutex::default(),
+            primings: OnceLock::new(),
             model: OnceLock::new(),
             extraction: OnceLock::new(),
             contexts: OnceLock::new(),
@@ -133,6 +143,34 @@ impl<'run> Gathering<'run> {
 
     pub(crate) fn contexts(&self) -> &Contexts<'run> {
         self.contexts.wait()
+    }
+
+    pub(crate) fn primed(&self, claimed: &[Claimed<'_>]) -> Option<&Primings<'run>> {
+        let contexts = self.contexts.wait();
+        let heads = self.heads.get().map_or(&[][..], Vec::as_slice);
+        let parts: Vec<PrimedFile<'run>> = claimed
+            .iter()
+            .filter_map(|found| {
+                found
+                    .order
+                    .picked_from(heads)
+                    .map(|head| PrimedFile { head, parts: contexts.priming(Parsed::new(found.file, head)) })
+            })
+            .collect();
+        let mut held = self.primed.lock().unwrap_or_else(PoisonError::into_inner);
+        held.extend(parts);
+        let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
+        complete.map(Self::primings_of).map(|merged| self.primings.get_or_init(|| merged))
+    }
+
+    fn primings_of(files: Vec<PrimedFile<'run>>) -> Primings<'run> {
+        let mut sorted = files;
+        sorted.sort_by(|earlier, later| earlier.head.path().cmp(later.head.path()));
+        sorted.into_iter().map(|file| file.parts).collect()
+    }
+
+    pub(crate) fn primings(&self) -> &Primings<'run> {
+        self.primings.wait()
     }
 
     pub(crate) fn extraction(&self) -> &Extraction<'run> {
