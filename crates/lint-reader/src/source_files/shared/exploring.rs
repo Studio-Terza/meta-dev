@@ -56,7 +56,8 @@ impl<'tree> Exploring<'tree> {
 
     pub(super) fn waiting(&self, share: Partition) -> Option<Flights> {
         let claimable = self.queue.iter().find_map(|queued| queued.claimable(share));
-        claimable.map_or(Some(self.flights), |_| None).and_then(Flights::airborne)
+        let pending = self.queue.first().map(|_| self.flights);
+        claimable.map_or(Some(self.flights), |_| None).and_then(|flights| flights.airborne().or(pending))
     }
 
     pub(super) fn claimed(&mut self, share: Partition) -> Option<Queued<'tree>> {
