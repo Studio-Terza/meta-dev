@@ -8,13 +8,13 @@ use crate::resolved::Resolved;
 use crate::sited::Sited;
 use crate::type_ref::{Named, Rebuild, TypeRef};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct StdAlias {
     path: ItemPath,
     alias: Alias,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct Aliases {
     declared: BTreeMap<ItemId, Alias>,
     std: Vec<StdAlias>,

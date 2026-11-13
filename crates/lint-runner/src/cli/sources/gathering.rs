@@ -1,5 +1,6 @@
 use std::mem;
 use std::sync::{Mutex, OnceLock, PoisonError};
+use std::thread;
 
 use code_model::Model;
 use code_reader::{FileFacts, ListedGroup, Listing};
@@ -74,11 +75,7 @@ struct Splitting<'run> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Merging<'run> {
-    facts: Vec<FileFacts>,
-    extraction: Extraction<'run>,
-    contexts: Contexts<'run>,
-}
+pub(crate) struct Merging<'run>(Vec<Gathered<'run>>);
 
 #[derive(Debug)]
 struct PrimedFile<'run> {
@@ -128,9 +125,18 @@ impl<'run> Gathering<'run> {
     }
 
     pub(crate) fn settled(&self, merging: Merging<'run>, model: impl FnOnce(Vec<FileFacts>) -> Option<Model>) {
-        self.extraction.get_or_init(|| merging.extraction);
-        self.contexts.get_or_init(|| merging.contexts);
-        self.model.get_or_init(|| model(merging.facts));
+        let split = Self::split(merging);
+        let contexts = split.contexts;
+        let extractions = split.extractions;
+        thread::scope(|scope| {
+            scope.spawn(|| self.parts_settled(contexts, extractions));
+            self.model.get_or_init(|| model(split.facts));
+        });
+    }
+
+    fn parts_settled(&self, contexts: Vec<Contributed<'run>>, extractions: Vec<Extraction<'run>>) {
+        self.contexts.get_or_init(|| contexts.into_iter().collect());
+        self.extraction.get_or_init(|| extractions.into_iter().collect());
     }
 
     pub(crate) fn model(&self) -> Option<&Model> {
@@ -181,22 +187,17 @@ impl<'run> Gathering<'run> {
         let mut held = self.deposited.lock().unwrap_or_else(PoisonError::into_inner);
         held.extend(parts);
         let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
-        complete.map(Self::merging)
+        complete.map(Merging)
     }
 
-    fn merging(parts: Vec<Gathered<'run>>) -> Merging<'run> {
-        let mut sorted = parts;
+    fn split(merging: Merging<'run>) -> Splitting<'run> {
+        let mut sorted = merging.0;
         sorted.sort_by(|earlier, later| earlier.head.path().cmp(later.head.path()));
-        let split = sorted.into_iter().fold(Splitting::default(), |mut merging, part| {
-            merging.facts.extend(part.facts);
-            merging.extractions.push(part.extraction);
-            merging.contexts.push(part.contexts);
-            merging
-        });
-        Merging {
-            facts: split.facts,
-            extraction: split.extractions.into_iter().collect(),
-            contexts: split.contexts.into_iter().collect(),
-        }
+        sorted.into_iter().fold(Splitting::default(), |mut split, part| {
+            split.facts.extend(part.facts);
+            split.extractions.push(part.extraction);
+            split.contexts.push(part.contexts);
+            split
+        })
     }
 }
