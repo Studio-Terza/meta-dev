@@ -163,6 +163,7 @@ name = "code-model"
 version = "0.1.0"
 dependencies = [
  "lint-layout",
+ "newtype",
 ]
 
 [[package]]
@@ -1411,6 +1412,8 @@ dependencies = [
 name = "lint-effect-sites"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1856,6 +1859,8 @@ dependencies = [
 name = "lint-process-starters"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "file-ports",
  "lint-core",
  "lint-fixtures",
@@ -1890,11 +1895,11 @@ dependencies = [
 name = "lint-raw-resources"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "laws",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
 ]
 
 [[package]]

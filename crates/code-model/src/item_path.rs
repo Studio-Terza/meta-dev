@@ -1,4 +1,5 @@
-use lint_layout::{Name, Word};
+use lint_layout::{Name, PathTail, Word};
+use newtype::Wrapping;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ItemPath {
@@ -26,6 +27,15 @@ impl ItemPath {
     #[must_use]
     pub fn last(&self) -> Option<&Name> {
         self.segments.last()
+    }
+
+    #[must_use]
+    pub fn ends_with(&self, tail: PathTail<'_>) -> Option<&ItemPath> {
+        let words = tail.into_inner();
+        let start = self.segments.len().checked_sub(words.len())?;
+        let ending = self.segments.get(start..)?;
+        let mismatch = ending.iter().zip(words).find(|(segment, word)| **segment != Name::from(**word));
+        mismatch.map_or(Some(self), |_| None)
     }
 }
 

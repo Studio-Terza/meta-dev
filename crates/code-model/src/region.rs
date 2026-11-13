@@ -18,19 +18,37 @@ pub enum Within {
     TraitImpl,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Ground {
+    Open,
+    Ports,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Region {
     reach: Reach,
     zone: Zone,
     within: Within,
+    ground: Ground,
 }
 
 impl Region {
-    pub const SHIPPED: Region = Region { reach: Reach::Shipped, zone: Zone::Open, within: Within::Own };
+    pub const SHIPPED: Region =
+        Region { reach: Reach::Shipped, zone: Zone::Open, within: Within::Own, ground: Ground::Open };
 
     #[must_use]
     pub fn new(reach: Reach, zone: Zone, within: Within) -> Region {
-        Region { reach, zone, within }
+        Region { reach, zone, within, ground: Ground::Open }
+    }
+
+    #[must_use]
+    pub fn ground(self) -> Ground {
+        self.ground
+    }
+
+    #[must_use]
+    pub fn grounded(self, ground: Ground) -> Region {
+        Region { ground: self.ground.max(ground), ..self }
     }
 
     #[must_use]
@@ -50,17 +68,27 @@ impl Region {
 
     #[must_use]
     pub fn reached(self, reach: Reach) -> Region {
-        Region { reach: self.reach.max(reach), zone: self.zone, within: self.within }
+        Region { reach: self.reach.max(reach), ..self }
     }
 
     #[must_use]
     pub fn zoned(self, zone: Zone) -> Region {
-        Region { reach: self.reach, zone: self.zone.max(zone), within: self.within }
+        Region { zone: self.zone.max(zone), ..self }
     }
 
     #[must_use]
     pub fn inside(self, within: Within) -> Region {
-        Region { reach: self.reach, zone: self.zone, within: self.within.max(within) }
+        Region { within: self.within.max(within), ..self }
+    }
+
+    #[must_use]
+    pub fn joined(self, other: Region) -> Region {
+        self.reached(other.reach).zoned(other.zone).inside(other.within).grounded(other.ground)
+    }
+
+    #[must_use]
+    pub fn ungrounded(self) -> Region {
+        Region { ground: Ground::Open, ..self }
     }
 }
 

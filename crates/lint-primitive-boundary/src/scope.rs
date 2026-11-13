@@ -132,7 +132,7 @@ impl<'model> Scope<'model> {
     }
 
     fn own(region: Region) -> Option<Region> {
-        [region].into_iter().find(|own| *own == Region::SHIPPED)
+        [region.ungrounded()].into_iter().find(|own| *own == Region::SHIPPED)
     }
 
     fn open(region: Region) -> Option<Within> {

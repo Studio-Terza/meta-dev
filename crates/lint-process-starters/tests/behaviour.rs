@@ -1,11 +1,12 @@
 use std::path::PathBuf;
 
+use code_reader::Reader;
 use file_ports::{Bytes, Memory};
-use lint_core::{Lint, SourceFile, SourceText};
+use lint_core::{ModelLint, SourceFile, SourceText};
 use lint_placement::Placement;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 
 const IMPORTED: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
 const OTHER_COMMAND: &str = "use clap::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
@@ -222,7 +223,7 @@ const PACKAGES: [(&str, usize); 9] = [
 
 #[test]
 fn starting_a_process_is_flagged() {
-    assert_eq!(Sources::mismatches::<ProcessStarters>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<ProcessStarters>>(&CASES), Lines::default());
 }
 
 #[test]
@@ -238,7 +239,7 @@ fn every_start_is_counted_including_those_behind_ports() {
     let other = Sources::file("b.rs", Text::new(OTHER_COMMAND));
     let counts: Vec<usize> = [ported, inline, other]
         .iter()
-        .map(|file| CommandPaths::across(std::slice::from_ref(file), Scope::Everywhere).len())
+        .map(|file| CommandPaths::queried(&Reader::read_files(std::slice::from_ref(file)), Scope::Everywhere).len())
         .collect();
     assert_eq!(counts, vec![1, 1, 0]);
 }
@@ -252,6 +253,6 @@ impl Packages {
         let path = PathBuf::from("/r/src/lib.rs");
         let placement = Placement::locate(&files, &path);
         let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
-        parsed.map_or(usize::MAX, |file| ProcessStarters::report(&[file]).violations().len())
+        parsed.map_or(usize::MAX, |file| ProcessStarters::report(&Reader::read_files(&[file])).violations().len())
     }
 }

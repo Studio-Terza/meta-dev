@@ -1,25 +1,29 @@
 use std::marker::PhantomData;
 
 use code_reader::Reader;
-use lint_core::{Lint, ModelLint, SourceFile};
+use lint_core::{Lint, ModelLint, Report, SourceFile};
 
 use crate::sources::{Lines, Sources};
 
 pub trait Checks {
-    fn flagged(files: &[SourceFile]) -> Lines;
+    fn reported<Shown>(files: &[SourceFile], shown: impl FnOnce(&Report<'_>) -> Shown) -> Shown;
+
+    fn flagged(files: &[SourceFile]) -> Lines {
+        Self::reported(files, Sources::lines)
+    }
 }
 
 #[derive(Debug)]
 pub struct Queried<Checked>(PhantomData<Checked>);
 
 impl<Checked: Lint> Checks for Checked {
-    fn flagged(files: &[SourceFile]) -> Lines {
-        Sources::lines(&Checked::report(files))
+    fn reported<Shown>(files: &[SourceFile], shown: impl FnOnce(&Report<'_>) -> Shown) -> Shown {
+        shown(&Checked::report(files))
     }
 }
 
 impl<Checked: ModelLint> Checks for Queried<Checked> {
-    fn flagged(files: &[SourceFile]) -> Lines {
-        Sources::lines(&Checked::report(&Reader::read_files(files)))
+    fn reported<Shown>(files: &[SourceFile], shown: impl FnOnce(&Report<'_>) -> Shown) -> Shown {
+        shown(&Checked::report(&Reader::read_files(files)))
     }
 }

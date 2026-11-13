@@ -31,7 +31,7 @@ impl Elegance {
             <Clustered<ConnectedClusters>>::report_graph(&system),
             <Clustered<InterfaceByConsumers>>::report_graph(&system),
             <Clustered<LowestCluster>>::report_graph(&system),
-            EffectSites::report(files),
+            <EffectSites as ModelLint>::report(model),
             FlowShapes::report(files),
             NormalisedShapes::report(files),
             <NarrowedReturns as ModelLint>::report(model),

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use lint_layout::LineNumber;
+use lint_layout::{LineNumber, Name};
 
 use crate::boundary::{FileId, ItemId};
 use crate::call::Call;
@@ -12,6 +12,7 @@ use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::{Alias, Item};
 use crate::item_path::ItemPath;
+use crate::path_use::PathUse;
 use crate::resolved::Resolved;
 
 use super::{Aliases, Declarations, FileModel, Filed, Model};
@@ -25,9 +26,15 @@ pub struct Building {
 }
 
 impl Building {
-    pub fn file(&mut self, path: PathBuf) -> FileId {
+    #[must_use]
+    pub fn aliased(&self, path: &Resolved) -> Option<&Resolved> {
+        let alias = self.aliases.aliasing(path)?;
+        alias.target().named().map(AsRef::as_ref)
+    }
+
+    pub fn file(&mut self, path: PathBuf, krate: Name) -> FileId {
         let file = FileId::next(&self.model.files);
-        self.model.files.push(FileModel::from(path));
+        self.model.files.push(FileModel::new(path, krate));
         file
     }
 
@@ -41,6 +48,10 @@ impl Building {
 
     pub fn holding(&mut self, file: FileId, line: LineNumber, holding: Holding) {
         self.model.holdings.push(Filed::new(file, Found::new(line, holding)));
+    }
+
+    pub fn path_use(&mut self, file: FileId, line: LineNumber, used: PathUse) {
+        self.model.uses.push(Filed::new(file, Found::new(line, used)));
     }
 
     pub fn call(&mut self, file: FileId, line: LineNumber, call: Call) {
@@ -74,6 +85,7 @@ impl Building {
             functions: Filed::sorted(model.functions),
             holdings: model.holdings,
             calls: model.calls,
+            uses: Filed::sorted(model.uses),
             declarations: Declarations::new(self.items, self.aliases, self.exports),
             roots: model.roots,
         }

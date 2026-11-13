@@ -1,6 +1,7 @@
+use code_model::{Ground, Model, Placed, Region};
 use lint_core::{Site, SourceFile};
 use lint_layout::{PathTail, Word, words};
-use lint_paths::{Ground, Paths, Use};
+use lint_paths::{Ground as Spot, Paths};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -10,10 +11,10 @@ pub enum Scope {
 }
 
 impl Scope {
-    fn admits(self, ground: Ground) -> Option<Ground> {
+    fn admits<Grounded: PartialEq + Copy>(self, ground: Grounded, open: Grounded) -> Option<Grounded> {
         match self {
             Scope::Everywhere => Some(ground),
-            Scope::OutsidePorts => Some(ground).filter(|candidate| *candidate == Ground::Open),
+            Scope::OutsidePorts => Some(ground).filter(|candidate| *candidate == open),
         }
     }
 }
@@ -27,14 +28,21 @@ impl CommandPaths {
 
     #[must_use]
     pub fn across(files: &[SourceFile], scope: Scope) -> Vec<Site<'_>> {
-        Self::among(Paths::read(files, &Self::FINALS), scope)
+        Paths::read(files, &Self::FINALS)
+            .into_iter()
+            .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
+            .filter(|used| scope.admits(used.ground(), Spot::Open).is_some())
+            .map(|used| used.place())
+            .collect()
     }
 
-    fn among(uses: Vec<Use<'_>>, scope: Scope) -> Vec<Site<'_>> {
-        uses.into_iter()
-            .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
-            .filter(|used| scope.admits(used.ground()).is_some())
-            .map(|used| used.place())
+    #[must_use]
+    pub fn queried(model: &Model, scope: Scope) -> Vec<Site<'_>> {
+        model
+            .uses()
+            .filter(|placed| placed.entity().spelling(PathTail::new(&Self::STARTER)).is_some())
+            .filter(|placed| scope.admits(AsRef::<Region>::as_ref(placed.entity()).ground(), Ground::Open).is_some())
+            .map(Placed::site)
             .collect()
     }
 }

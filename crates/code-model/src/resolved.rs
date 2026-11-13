@@ -31,6 +31,15 @@ impl Resolved {
     }
 
     #[must_use]
+    pub fn joined(&self, segment: &Name) -> Option<Resolved> {
+        match self {
+            Resolved::Std(path) | Resolved::StdTrait(path) => Some(Resolved::Std(path.joined(segment))),
+            Resolved::External(external) => Some(Resolved::External(external.joined(segment))),
+            Resolved::Crate(_) | Resolved::Primitive(_) | Resolved::Param(_) | Resolved::Unknown(..) => None,
+        }
+    }
+
+    #[must_use]
     pub fn external(&self) -> Option<&External> {
         match self {
             Resolved::External(external) => Some(external),

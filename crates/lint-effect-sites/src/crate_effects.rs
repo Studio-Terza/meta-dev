@@ -5,10 +5,11 @@ mod file_scan;
 mod summary;
 mod vocabulary;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
+use code_model::{Ground, Model, Reach, Region};
 use lint_core::{Site, SourceFile, Violation};
-use lint_paths::{Ground, Paths};
+use lint_paths::Paths;
 use lint_placement::CrateName;
 
 use file_scan::FileScan;
@@ -34,6 +35,26 @@ impl<'file> CrateEffects<'file> {
             .filter(|site| untested.contains(&site.place()))
             .chain(scans.into_iter().flat_map(FileScan::into_printed))
             .collect();
+        sites.sort_by_key(EffectSite::place);
+        CrateEffects(sites)
+    }
+
+    #[must_use]
+    pub fn of_model(model: &'file Model) -> BTreeMap<CrateName, CrateEffects<'file>> {
+        let shipped = model.uses().filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped);
+        let grouped =
+            shipped.fold(BTreeMap::new(), |mut crates: BTreeMap<CrateName, Vec<EffectSite<'file>>>, placed| {
+                let found = Vocabulary::placed_site(placed);
+                crates.entry(CrateName::from(placed.krate())).or_default().extend(found);
+                crates
+            });
+        grouped
+            .into_iter()
+            .filter_map(|(krate, sites)| sites.first().map(|_| ()).map(|()| (krate, CrateEffects::sorted(sites))))
+            .collect()
+    }
+
+    fn sorted(mut sites: Vec<EffectSite<'file>>) -> CrateEffects<'file> {
         sites.sort_by_key(EffectSite::place);
         CrateEffects(sites)
     }

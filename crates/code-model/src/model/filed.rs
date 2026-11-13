@@ -24,6 +24,6 @@ impl<Entity> Filed<Entity> {
 
     pub(crate) fn placed<'model>(&'model self, files: &'model [FileModel]) -> Option<Placed<'model, &'model Entity>> {
         let file = self.file.within(files)?;
-        Some(Placed::new(Site::new(file.path(), self.found.line()), self.found.entity()))
+        Some(Placed::new(Site::new(file.path(), self.found.line()), file.krate(), self.found.entity()))
     }
 }

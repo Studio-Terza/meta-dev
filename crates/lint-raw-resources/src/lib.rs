@@ -1,17 +1,14 @@
 mod raw_paths;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
-use lint_paths::Paths;
+use code_model::Model;
+use lint_core::{Headline, ModelLint, Report};
 use raw_paths::RawPaths;
 
 #[derive(Debug)]
 pub struct RawResources;
 
-impl Lint for RawResources {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("only ports touch raw resources"),
-            RawPaths::found(&Paths::read(files, &RawPaths::FINALS)),
-        )
+impl ModelLint for RawResources {
+    fn report(model: &Model) -> Report<'_> {
+        Report::new(Headline::new("only ports touch raw resources"), RawPaths::found(model))
     }
 }

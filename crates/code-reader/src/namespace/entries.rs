@@ -115,6 +115,13 @@ impl DeclaredKind {
         }
     }
 
+    fn above(self, base: ScopeId) -> DeclaredKind {
+        match self {
+            DeclaredKind::Module(module) => DeclaredKind::Module(module.above(base)),
+            DeclaredKind::OpaqueModule | DeclaredKind::Item(_) => self,
+        }
+    }
+
     fn item_kind(self) -> Option<ItemKind> {
         match self {
             DeclaredKind::Item(kind) => Some(kind),
@@ -388,6 +395,15 @@ impl Entries {
 
     pub(super) fn declare(&mut self, declared: Declared) {
         self.declared.push(declared);
+    }
+
+    pub(super) fn above(self, base: ScopeId) -> Entries {
+        let declared = self
+            .declared
+            .into_iter()
+            .map(|declared| Declared { kind: declared.kind.above(base), ..declared })
+            .collect();
+        Entries { declared, ..self }
     }
 
     pub(super) fn issued(&self, building: &mut Building) -> Vec<Option<ItemId>> {

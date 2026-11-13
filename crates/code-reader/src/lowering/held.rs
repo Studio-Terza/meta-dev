@@ -8,7 +8,7 @@ use lint_layout::{Name, Position};
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
 use super::attributes::Attributes;
-use super::seat::{Built, Located};
+use super::seat::{Built, Footing, Located};
 use super::signature::{InScope, Written};
 use super::{ImplRow, Lowering};
 use code_model::{Region, TypeRef};
@@ -60,24 +60,25 @@ pub(super) struct HoldingRow {
 }
 
 impl Built for HoldingRow {
-    fn built(self, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
+    fn built(self, footing: Footing<'_>, building: Building) -> Building {
         let scope = self.located.scope();
+        let resolving = &footing.resolving();
         let declares = self.link.declares(resolving, scope);
         let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
-            .placed(self.region, declares);
-        self.located.holding(building, holding)
+            .placed(self.region.joined(footing.outer()), declares);
+        self.located.holding(footing, building, holding)
     }
 }
 
-impl Lowering<'_, '_> {
+impl Lowering<'_> {
     pub(super) fn hold(&mut self, holder: Holder, link: Link, ty: TypeRef<Written>) {
         let located = self.here.located(holder.position);
-        self.lowered.holdings.push(HoldingRow { located, holder, region: self.context.region(), link, ty });
+        self.lowered.rows.holdings.push(HoldingRow { located, holder, region: self.context.region(), link, ty });
     }
 
     pub(super) fn attributed(&mut self, attributes: &Attributes, ident: &Ident) {
         let rows = ImplRow::derives(&self.here, self.context.region(), attributes, ident);
-        self.lowered.rows.extend(rows);
+        self.lowered.rows.impls.extend(rows);
     }
 
     pub(super) fn parameters(&mut self, holder: &Holder, generics: &Generics, link: &Link) {
