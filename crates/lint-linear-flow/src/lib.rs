@@ -5,9 +5,10 @@ mod function_flow;
 mod tally;
 mod verdict;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, Lint, Report, SourceFile, Violation};
+use lint_file::{FileLint, Reads};
 
-pub use flows::Flows;
+use flows::Flows;
 
 use flows::FlowLint;
 
@@ -31,9 +32,12 @@ impl FlowLint for LinearBodies {
     const RULE: Rule = Rule::LinearBodies;
 }
 
-impl Lint for LinearBodies {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Flows::from(files).report::<Self>()
+impl FileLint for LinearBodies {
+    const HEADLINE: Headline = Headline::new(<Self as FlowLint>::HEADLINE);
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        Flows::flagged::<Self>(file)
     }
 }
 
@@ -42,9 +46,12 @@ impl FlowLint for PureRouters {
     const RULE: Rule = Rule::PureRouters;
 }
 
-impl Lint for PureRouters {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Flows::from(files).report::<Self>()
+impl FileLint for PureRouters {
+    const HEADLINE: Headline = Headline::new(<Self as FlowLint>::HEADLINE);
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        Flows::flagged::<Self>(file)
     }
 }
 
@@ -54,9 +61,12 @@ impl FlowLint for PlainConditions {
     const RULE: Rule = Rule::PlainConditions;
 }
 
-impl Lint for PlainConditions {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Flows::from(files).report::<Self>()
+impl FileLint for PlainConditions {
+    const HEADLINE: Headline = Headline::new(<Self as FlowLint>::HEADLINE);
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        Flows::flagged::<Self>(file)
     }
 }
 

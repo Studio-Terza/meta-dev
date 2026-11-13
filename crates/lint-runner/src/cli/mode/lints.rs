@@ -25,7 +25,7 @@ use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
-use lint_linear_flow::{Flows, LinearBodies, PlainConditions, PureRouters};
+use lint_linear_flow::{LinearBodies, PlainConditions, PureRouters};
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
@@ -122,7 +122,7 @@ type Workspaced = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Repor
 type Extracting = for<'file> fn(&'file [SourceFile], &'file Extraction<'file>) -> Vec<Report<'file>>;
 
 impl Lints {
-    const LINTS: [Entry; 51] = [
+    const LINTS: [Entry; 53] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Filed<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -146,7 +146,7 @@ impl Lints {
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
         <Judged<PublicSurface> as Registered>::ENTRY,
         <Judged<RepeatedMethods> as Registered>::ENTRY,
-        Entry::spelled::<StateGraph>(Work::Checked(|readout| vec![StateGraph::report(readout.files())])),
+        <Primed<StateGraph> as Registered>::ENTRY,
         <Judged<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
@@ -162,15 +162,14 @@ impl Lints {
         <Filed<StoreQueries> as Registered>::ENTRY,
         <Filed<LongExactStrings> as Registered>::ENTRY,
         Entry::spelled::<RepeatedShapes>(Work::Checked(|readout| vec![RepeatedShapes::report(readout.files())])),
-        <Primed<MandatoryLaws> as Registered>::ENTRY,
+        <Judged<MandatoryLaws> as Registered>::ENTRY,
         <Filed<ArbitraryNewtypes> as Registered>::ENTRY,
         <Filed<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
         <Filed<NoEarlyExits> as Registered>::ENTRY,
-        Entry::spelled::<Flows>(Work::Checked(|readout| {
-            let flows = Flows::from(readout.files());
-            vec![flows.report::<LinearBodies>(), flows.report::<PureRouters>(), flows.report::<PlainConditions>()]
-        })),
+        <Filed<LinearBodies> as Registered>::ENTRY,
+        <Filed<PureRouters> as Registered>::ENTRY,
+        <Filed<PlainConditions> as Registered>::ENTRY,
         Entry::spelled::<TypeSystem>(Work::Extracted(|files, extraction| {
             let system = TypeSystem::built_from(files, extraction);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]

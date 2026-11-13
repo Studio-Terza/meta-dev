@@ -1552,6 +1552,7 @@ name = "lint-linear-flow"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -2063,6 +2064,7 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "newtype",

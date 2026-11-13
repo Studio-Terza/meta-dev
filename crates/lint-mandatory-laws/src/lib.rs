@@ -6,7 +6,7 @@ use coverage::Coverage;
 use facts::{Facts, Profiles};
 use law_facts::{Laws, Traits};
 use lint_core::{Headline, Parsed, SourceFile, Violation};
-use lint_file::{Concluded, PrimedLint, Reads};
+use lint_file::{Concluded, ContextLint, Reads};
 
 #[derive(Debug)]
 pub struct MandatoryLaws;
@@ -40,21 +40,15 @@ impl<'head> FromIterator<LawFile<'head>> for Concluded<'head> {
     }
 }
 
-impl PrimedLint for MandatoryLaws {
+impl ContextLint for MandatoryLaws {
     const HEADLINE: Headline = Headline::new("conversions have roundtrip laws");
     const READS: Reads = Reads::Every;
 
-    type PrimerPart<'head> = Traits<'head>;
-    type Primer<'head> = Traits<'head>;
     type Part<'head> = LawFile<'head>;
     type Context<'head> = Concluded<'head>;
 
-    fn primed<'head>(parsed: Parsed<'_, 'head>) -> Traits<'head> {
-        Traits::from(parsed)
-    }
-
-    fn contributed<'head>(parsed: Parsed<'_, 'head>, traits: &Traits<'head>) -> LawFile<'head> {
-        LawFile { laws: Laws::read(parsed, traits), profiles: Profiles::from(parsed) }
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> LawFile<'head> {
+        LawFile { laws: Laws::read(parsed, &Traits::default()), profiles: Profiles::from(parsed) }
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {

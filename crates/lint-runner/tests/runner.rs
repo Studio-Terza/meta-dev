@@ -340,7 +340,7 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
         "  phase survey: test budget, paired apis and clones\n",
         "  lint lint_hand_impls::HandImpls\n",
         "  lint lint_port_dependencies::OwnedDependencies\n",
-        "  lint lint_linear_flow::flows::Flows<'_>\n",
+        "  lint lint_rust_only::RustOnly\n",
     ];
     assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 9], "{timed}");
     assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");

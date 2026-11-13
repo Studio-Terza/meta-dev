@@ -16,11 +16,10 @@ pub struct FileFlow<'file> {
 }
 
 impl<'file> FileFlow<'file> {
-    pub fn of_files(files: &'file [SourceFile]) -> Vec<FileFlow<'file>> {
-        files
-            .iter()
-            .flat_map(|file| iter::once(file).chain(file.test_modules()))
-            .map(|file| FileFlow { file, functions: Collector::collected(file) })
+    pub fn of_file(file: &'file SourceFile) -> Vec<FileFlow<'file>> {
+        iter::once(file)
+            .chain(file.test_modules())
+            .map(|module| FileFlow { file: module, functions: Collector::collected(module) })
             .collect()
     }
 

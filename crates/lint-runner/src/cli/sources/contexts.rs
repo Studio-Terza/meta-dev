@@ -11,6 +11,7 @@ use lint_no_test_only_api::NoTestOnlyApi;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
+use lint_state_graph::StateGraph;
 use lint_unconsumed_traits::UnconsumedTraits;
 
 pub(crate) trait Holding<'run, Lint: ContextLint> {
@@ -141,8 +142,9 @@ contexts! {
         repeated_methods: RepeatedMethods,
         public_api_tests: PublicApiTests,
         no_test_only_api: NoTestOnlyApi,
+        mandatory_laws: MandatoryLaws,
     }
     primed: {
-        mandatory_laws: MandatoryLaws,
+        state_graph: StateGraph,
     }
 }

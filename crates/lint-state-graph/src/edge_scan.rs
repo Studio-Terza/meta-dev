@@ -6,16 +6,16 @@ use syn::visit::Visit;
 use syn::{ImplItemFn, ItemImpl, ItemMod, Receiver};
 
 use super::declarations::Declarations;
-use super::edge::Edge;
+use super::edge::{Edge, EdgeKey};
 use super::edge_count::EdgeCount;
 use super::finding::Finding;
 use super::function_shape::{Body, FunctionShape, Returns};
 use super::impl_context::{ImplContext, ImplKind};
-use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_core::{Bound, Site};
+use lint_file::Concluded;
 use lint_layout::{Length, Name};
 use role::Role;
 
@@ -27,40 +27,20 @@ pub struct EdgeScan<'scan, 'file> {
 }
 
 impl<'scan, 'file> EdgeScan<'scan, 'file> {
-    const EDGES_PER_VERTEX: Bound = Bound::Most(4);
-
     pub fn new(declarations: &'scan Declarations<'scan>) -> Self {
         EdgeScan { declarations, path: Path::new(""), edges: BTreeMap::new(), violations: Vec::new() }
     }
 
-    pub fn scan(&mut self, file: &'file SourceFile) {
-        self.path = file.head().path();
-        self.visit_file(file.syntax());
+    pub fn scan(&mut self, path: &'file Path, syntax: &syn::File) {
+        self.path = path;
+        self.visit_file(syntax);
     }
 
-    pub fn violations(mut self) -> Vec<Violation<'file>> {
-        let most = Self::EDGES_PER_VERTEX;
-        let duplicates = self.edges.iter().filter(|(_, names)| names.len() > 1).filter_map(|(edge, names)| {
-            let site = *names.values().min()?;
-            Some(Violation::new(site, Finding::DuplicateEdge { edge, sites: names }))
+    pub fn into_edges(self) -> ScannedEdges<'file> {
+        let edges = self.edges.into_iter().flat_map(|(edge, names)| {
+            names.into_iter().map(move |(name, site)| EdgeRecord { key: EdgeKey::from(edge), name, site })
         });
-        let fan_out = self.edges.iter().fold(
-            BTreeMap::<&TypeName, BTreeMap<&Name, &Site<'file>>>::new(),
-            |mut fan_out, (edge, names)| {
-                fan_out.entry(edge.source()).or_default().extend(names.iter());
-                fan_out
-            },
-        );
-        let crowded = fan_out
-            .into_iter()
-            .filter(|(_, names)| most.allows(Length::new(names.len())).is_none())
-            .filter_map(|(source, names)| {
-                let site = **names.values().min()?;
-                Some(Violation::new(site, Finding::CrowdedVertex { source, edges: EdgeCount::new(names.len()), most }))
-            });
-        let structural: Vec<Violation<'file>> = duplicates.chain(crowded).collect();
-        self.violations.extend(structural);
-        self.violations
+        ScannedEdges { violations: self.violations, edges: edges.collect() }
     }
 
     fn check_function(&mut self, context: &ImplContext<'scan>, function: &ImplItemFn) {
@@ -126,5 +106,74 @@ impl EdgeScan<'_, '_> {
             .filter_map(FunctionShape::function)
             .for_each(|function| self.check_function(&context, function));
         syn::visit::visit_item_impl(self, item);
+    }
+}
+
+#[derive(Debug)]
+pub struct EdgeRecord<'file> {
+    key: EdgeKey,
+    name: Name,
+    site: Site<'file>,
+}
+
+#[derive(Debug, Default)]
+pub struct ScannedEdges<'file> {
+    violations: Vec<Violation<'file>>,
+    edges: Vec<EdgeRecord<'file>>,
+}
+
+impl<'file> ScannedEdges<'file> {
+    pub fn including(mut self, more: Vec<Violation<'file>>) -> ScannedEdges<'file> {
+        self.violations.extend(more);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct EdgeIndex<'file> {
+    violations: Vec<Violation<'file>>,
+    edges: BTreeMap<EdgeKey, BTreeMap<Name, Site<'file>>>,
+}
+
+impl<'file> FromIterator<ScannedEdges<'file>> for EdgeIndex<'file> {
+    fn from_iter<Parts: IntoIterator<Item = ScannedEdges<'file>>>(parts: Parts) -> EdgeIndex<'file> {
+        parts.into_iter().fold(EdgeIndex::default(), |mut index, part| {
+            index.violations.extend(part.violations);
+            part.edges.into_iter().for_each(|record| {
+                index.edges.entry(record.key).or_default().entry(record.name).or_insert(record.site);
+            });
+            index
+        })
+    }
+}
+
+impl EdgeIndex<'_> {
+    const EDGES_PER_VERTEX: Bound = Bound::Most(4);
+}
+
+impl<'file> From<EdgeIndex<'file>> for Concluded<'file> {
+    fn from(index: EdgeIndex<'file>) -> Concluded<'file> {
+        let most = EdgeIndex::EDGES_PER_VERTEX;
+        let duplicates = index.edges.iter().filter(|(_, names)| names.len() > 1).filter_map(|(key, names)| {
+            let site = *names.values().min()?;
+            let edge = Edge::from(key);
+            Some(Violation::new(site, Finding::DuplicateEdge { edge: &edge, sites: names }))
+        });
+        let fan_out = index.edges.iter().fold(
+            BTreeMap::<&TypeName, BTreeMap<&Name, &Site<'file>>>::new(),
+            |mut fan_out, (key, names)| {
+                fan_out.entry(key.source()).or_default().extend(names.iter());
+                fan_out
+            },
+        );
+        let crowded = fan_out
+            .into_iter()
+            .filter(|(_, names)| most.allows(Length::new(names.len())).is_none())
+            .filter_map(|(source, names)| {
+                let site = **names.values().min()?;
+                Some(Violation::new(site, Finding::CrowdedVertex { source, edges: EdgeCount::new(names.len()), most }))
+            });
+        let structural: Vec<Violation<'file>> = duplicates.chain(crowded).collect();
+        index.violations.into_iter().chain(structural).collect()
     }
 }
