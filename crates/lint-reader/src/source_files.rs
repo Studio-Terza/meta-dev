@@ -125,14 +125,14 @@ impl<'tree> SourceFiles<'tree> {
     }
 
     fn parsed(
-        self,
+        mut self,
         scope: &Scope<'tree>,
         file: &Path,
         children_directory: &Path,
         parsed: SourceFile,
     ) -> SourceFiles<'tree> {
         let mut modules = Modules::declared_in(self.shelf.survey(), file, children_directory, &parsed.syntax().items);
-        let tests = TestModules::read(&self.shelf, scope, modules.tests());
+        let tests = TestModules::read(&mut self.shelf, scope, modules.tests());
         let children = modules.take_children(self.shelf.survey());
         let with_file = SourceFiles { readout: self.readout.with_file(parsed.with_test_modules(tests)), ..self };
         let with_failures = modules.take_failures().into_iter().fold(with_file, |reading, failure| SourceFiles {

@@ -18,7 +18,7 @@ impl Opened {
         Opened { shown, file, text, placement }
     }
 
-    pub fn parsed(&self) -> Result<SourceFile, Failure> {
-        SourceFile::parse_at(self.shown.clone(), self.file.clone(), self.placement.clone(), self.text.clone())
+    pub fn parsed(self) -> Result<SourceFile, Failure> {
+        SourceFile::parse_at(self.shown, self.file, self.placement, self.text)
     }
 }

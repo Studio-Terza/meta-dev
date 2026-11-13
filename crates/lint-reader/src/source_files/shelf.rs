@@ -38,12 +38,6 @@ impl<'tree> Shelf<'tree> {
         self.shelved.get_mut(&Located::new(scope.tree(), scope.package(), file)).and_then(Shelved::take_parsed)
     }
 
-    #[must_use]
-    pub fn test_source(&self, scope: &Scope<'tree>, file: &Path) -> Option<SourceFile> {
-        let located = Located::new(scope.tree(), scope.package(), file);
-        self.shelved.get(&located).and_then(Shelved::opened).and_then(|opened| opened.parsed().ok())
-    }
-
     pub fn explored(self, files: &impl Files, level: &[Node<'tree>], earlier: BTreeSet<Node<'tree>>) -> Shelf<'tree> {
         let (_, unshelved): (Vec<&Located<'tree>>, Vec<&Located<'tree>>) =
             level.iter().map(Node::located).partition(|located| self.shelved.contains_key(*located));

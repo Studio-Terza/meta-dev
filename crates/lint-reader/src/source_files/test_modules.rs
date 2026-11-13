@@ -8,14 +8,14 @@ use lint_core::SourceFile;
 
 #[derive(Debug)]
 pub struct TestModules<'shelf, 'tree> {
-    shelf: &'shelf Shelf<'tree>,
+    shelf: &'shelf mut Shelf<'tree>,
     seen: BTreeSet<PathBuf>,
     files: Vec<SourceFile>,
 }
 
 impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
     #[must_use]
-    pub fn read(shelf: &'shelf Shelf<'tree>, scope: &Scope<'tree>, children: &[Child]) -> Vec<SourceFile> {
+    pub fn read(shelf: &'shelf mut Shelf<'tree>, scope: &Scope<'tree>, children: &[Child]) -> Vec<SourceFile> {
         let started = TestModules { shelf, seen: BTreeSet::new(), files: Vec::new() };
         children.iter().cloned().fold(started, |reading, child| reading.child(scope, child)).files
     }
@@ -29,7 +29,8 @@ impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
             .seen
             .insert(file.to_path_buf())
             .then_some(file)
-            .and_then(|unseen| self.shelf.test_source(scope, unseen));
+            .and_then(|unseen| self.shelf.source(scope, unseen))
+            .and_then(Result::ok);
         self.opened(scope, file, children_directory, source)
     }
 
