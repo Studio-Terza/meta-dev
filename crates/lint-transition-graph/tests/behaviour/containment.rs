@@ -582,3 +582,18 @@ fn a_cycle_closed_through_a_trait_impl_is_reported() {
         ]
     );
 }
+
+#[test]
+fn a_field_typed_by_an_alias_defines_the_type_the_alias_names() {
+    let aliased = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct A(crate::b::Named);\npub struct C;\n"),
+        Clustered::at("crates/x/src/b.rs", "pub type Named = B;\npub struct B(crate::a::C);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&aliased, |view| ClusterReport::<AcyclicQuotients>::report_graph(view).violations().to_vec()),
+        [
+            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through x::a::A -> x::b::B, x::b::B -> x::a::C; move the shared types into one part that the others use, so the parts form layers"
+        ]
+    );
+}
