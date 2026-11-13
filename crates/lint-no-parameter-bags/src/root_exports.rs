@@ -2,25 +2,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syn::{UseTree, Visibility};
 
-use lint_core::SourceFile;
-use lint_core::Syntax;
+use lint_core::{Parsed, SourceFile, Syntax};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_placement::Role;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RootExports(BTreeMap<CrateName, BTreeSet<Name>>);
 
 impl RootExports {
-    pub fn in_files(files: &[&SourceFile]) -> RootExports {
-        let mut exports = RootExports::default();
-        files
-            .iter()
-            .filter(|file| file.head().placement().role() == Role::LibraryRoot)
-            .for_each(|file| exports.record(file));
-        exports
-    }
-
     pub fn exported(&self, file: &SourceFile, name: &Name) -> Option<&Name> {
         self.0.get(&CrateName::from(file.head().placement().crate_root()))?.get(name)
     }
@@ -44,5 +34,28 @@ impl RootExports {
             UseTree::Rename(rename) => vec![Name::from(&rename.rename)],
             UseTree::Glob(_) => Vec::new(),
         }
+    }
+}
+
+impl From<Parsed<'_, '_>> for RootExports {
+    fn from(parsed: Parsed<'_, '_>) -> RootExports {
+        let exports = RootExports::default();
+        let root = Some(parsed.file()).filter(|file| file.head().placement().role() == Role::LibraryRoot);
+        root.into_iter().fold(exports, |mut found, file| {
+            found.record(file);
+            found
+        })
+    }
+}
+
+impl FromIterator<RootExports> for RootExports {
+    fn from_iter<Parts: IntoIterator<Item = RootExports>>(parts: Parts) -> RootExports {
+        RootExports(parts.into_iter().flat_map(|part| part.0).fold(
+            BTreeMap::new(),
+            |mut merged: BTreeMap<CrateName, BTreeSet<Name>>, (crate_name, names)| {
+                merged.entry(crate_name).or_default().extend(names);
+                merged
+            },
+        ))
     }
 }

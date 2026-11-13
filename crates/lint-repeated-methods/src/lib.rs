@@ -1,22 +1,28 @@
 mod shape_index;
 
-use lint_core::Lint;
-use lint_core::{Bound, Headline, Report, SourceFile};
+use lint_core::{Bound, Headline, Parsed, SourceFile, Violation};
+use lint_file::{Concluded, ContextLint, Reads};
 
-use shape_index::ShapeIndex;
+use shape_index::ShippedImpls;
 
 #[derive(Debug)]
 pub struct RepeatedMethods;
 
-impl Lint for RepeatedMethods {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new(
-                "one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive",
-            ),
-            ShapeIndex::of_files(&files.iter().filter_map(SourceFile::shipped).collect::<Vec<_>>())
-                .repeated(Self::TYPES_PER_SHAPE),
-        )
+impl ContextLint for RepeatedMethods {
+    const HEADLINE: Headline = Headline::new(
+        "one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive",
+    );
+    const READS: Reads = Reads::Shipped;
+
+    type Part<'head> = ShippedImpls<'head>;
+    type Context<'head> = Concluded<'head>;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> ShippedImpls<'head> {
+        ShippedImpls::from(parsed)
+    }
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
+        concluded.found_in(file)
     }
 }
 

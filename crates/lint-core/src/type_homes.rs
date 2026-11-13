@@ -7,7 +7,7 @@ use lint_layout::Name;
 
 use crate::declared_type::DeclaredType;
 use crate::home::Home;
-use crate::source_file::SourceFile;
+use crate::source_file::{Parsed, SourceFile};
 use crate::walk::Walk;
 
 #[derive(Debug)]
@@ -46,6 +46,18 @@ impl<'file> TypeHomes<'file> {
         homes
     }
 
+    fn absorbed(self, part: TypeHomes<'file>) -> TypeHomes<'file> {
+        let placed = part
+            .declared
+            .into_iter()
+            .flat_map(|(name, homes)| homes.into_iter().map(move |home| DeclaredType::new(home, name.clone())));
+        placed.fold(self, |merged, declared| {
+            let mut reading = TypeHomes { reading: declared.home(), ..merged };
+            reading.declare(declared.as_ref().clone());
+            reading
+        })
+    }
+
     fn declare(&mut self, name: Name) {
         let known = self.declared.entry(name).or_default();
         let fresh = known.iter().find(|home| **home == self.reading).map_or(Some(self.reading), |_| None);
@@ -64,5 +76,22 @@ impl<'ast> Visit<'ast> for TypeHomes<'_> {
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
         Walk::enter(&item.attrs, || self.declare(Name::from(&item.ident)));
+    }
+}
+
+impl<'head> From<Parsed<'_, 'head>> for TypeHomes<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> TypeHomes<'head> {
+        let mut homes = TypeHomes { declared: BTreeMap::new(), reading: Home::from(parsed.head()) };
+        homes.visit_file(parsed.file().syntax());
+        homes
+    }
+}
+
+impl<'head> FromIterator<TypeHomes<'head>> for TypeHomes<'head> {
+    fn from_iter<Parts: IntoIterator<Item = TypeHomes<'head>>>(parts: Parts) -> TypeHomes<'head> {
+        let merged = parts
+            .into_iter()
+            .fold(TypeHomes { declared: BTreeMap::new(), reading: Home::NOWHERE }, TypeHomes::absorbed);
+        TypeHomes { reading: Home::NOWHERE, ..merged }
     }
 }

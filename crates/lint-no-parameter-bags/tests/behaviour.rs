@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_no_parameter_bags::NoParameterBags;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -84,5 +85,5 @@ const CASES: [Case; 11] = [
 
 #[test]
 fn structs_without_logic_that_one_file_consumes_are_flagged() {
-    assert_eq!(Sources::mismatches::<NoParameterBags>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<NoParameterBags>>(&CASES), Lines::default());
 }

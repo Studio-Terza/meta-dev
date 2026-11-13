@@ -21,13 +21,15 @@ pub struct BagCandidates {
     disqualified: BTreeSet<Name>,
 }
 
-impl BagCandidates {
-    pub fn in_file(file: &SourceFile) -> BagCandidates {
+impl From<&SourceFile> for BagCandidates {
+    fn from(file: &SourceFile) -> BagCandidates {
         let mut candidates = BagCandidates::default();
         candidates.visit_file(file.syntax());
         candidates
     }
+}
 
+impl BagCandidates {
     pub fn candidates(&self) -> impl Iterator<Item = Candidate<'_>> {
         self.structs
             .iter()
