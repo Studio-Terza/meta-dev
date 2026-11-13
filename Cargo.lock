@@ -1049,6 +1049,7 @@ dependencies = [
  "lint-placement",
  "lint-transition-graph",
  "newtype",
+ "serde_json",
  "syn 2.0.119",
  "text-lines",
  "thiserror",
