@@ -567,33 +567,32 @@ fn field_and_variant_names_are_not_references_but_their_values_are() {
 }
 
 #[test]
-fn a_cycle_closed_through_a_trait_impl_is_reported() {
+fn a_cycle_closed_through_a_trait_impl_or_an_aliased_field_is_reported() {
     let implemented = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
         Clustered::at("crates/x/src/a.rs", "pub struct A;\nimpl crate::b::Tr for A {}\n"),
         Clustered::at("crates/x/src/b.rs", "pub trait Tr {}\npub struct B(crate::a::A);\n"),
     ];
-    assert_eq!(
-        Clustered::lines(&implemented, |view| ClusterReport::<AcyclicQuotients>::report_graph(view)
-            .violations()
-            .to_vec()),
-        [
-            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through x::a::A -> x::b::Tr, x::b::B -> x::a::A; move the shared types into one part that the others use, so the parts form layers"
-        ]
-    );
-}
-
-#[test]
-fn a_field_typed_by_an_alias_defines_the_type_the_alias_names() {
     let aliased = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
         Clustered::at("crates/x/src/a.rs", "pub struct A(crate::b::Named);\npub struct C;\n"),
         Clustered::at("crates/x/src/b.rs", "pub type Named = B;\npub struct B(crate::a::C);\n"),
     ];
+    let reported: Vec<Vec<String>> = [implemented, aliased]
+        .iter()
+        .map(|sources| {
+            Clustered::lines(sources, |view| {
+                ClusterReport::<AcyclicQuotients>::report_graph(view).violations().to_vec()
+            })
+        })
+        .collect();
+    let closing = |edges: &str| {
+        vec![format!(
+            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through {edges}; move the shared types into one part that the others use, so the parts form layers"
+        )]
+    };
     assert_eq!(
-        Clustered::lines(&aliased, |view| ClusterReport::<AcyclicQuotients>::report_graph(view).violations().to_vec()),
-        [
-            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through x::a::A -> x::b::B, x::b::B -> x::a::C; move the shared types into one part that the others use, so the parts form layers"
-        ]
+        reported,
+        [closing("x::a::A -> x::b::Tr, x::b::B -> x::a::A"), closing("x::a::A -> x::b::B, x::b::B -> x::a::C")]
     );
 }
