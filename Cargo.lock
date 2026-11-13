@@ -1834,7 +1834,6 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
  "proc-macro2",
  "quote",

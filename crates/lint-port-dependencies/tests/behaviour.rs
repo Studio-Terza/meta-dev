@@ -575,8 +575,14 @@ const STORE_PORT_ON_LEXER: Text = served!(
 macro_rules! expanding {
     ($path:literal, $text:literal) => {
         &[
-            Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub struct Store;\n")),
-            Source::new(Located::new("crates/store-ports-macros/src/lib.rs"), Text::new("pub struct Query;\n")),
+            Source::new(
+                Located::new("crates/store-ports/src/lib.rs"),
+                Text::new("pub struct Store;\npub use store_ports_macros::{Columns, migrate, query};\n"),
+            ),
+            Source::new(
+                Located::new("crates/store-ports-macros/src/lib.rs"),
+                Text::new("#[proc_macro]\npub fn query(input: TokenStream) -> TokenStream {\n    input\n}\n#[proc_macro]\npub fn migrate(input: TokenStream) -> TokenStream {\n    input\n}\n#[proc_macro_derive(Columns)]\npub fn columns(input: TokenStream) -> TokenStream {\n    input\n}\n"),
+            ),
             Source::new(Located::new($path), Text::new($text)),
         ]
     };

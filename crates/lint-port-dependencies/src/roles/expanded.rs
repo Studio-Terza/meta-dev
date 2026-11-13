@@ -1,89 +1,87 @@
-use std::path::Path;
+use std::collections::BTreeSet;
 
-use syn::visit::{self, Visit};
-use syn::{Attribute, ItemMod, Macro};
-
-use lint_core::{AttributeMacros, MacroCalls, Parsed, Walk};
-use lint_layout::{LineNumber, Name, UsePath};
-use lint_paths::{Imports, Module};
+use code_model::{
+    Implementation, ItemId, ItemPath, Mention, Model, PathUse, Placed, Reach, Region, Resolved, Spelling,
+};
+use lint_core::Site;
+use lint_layout::Name;
 
 #[derive(Debug)]
-struct Called {
-    candidates: Vec<UsePath>,
-    line: LineNumber,
+pub(super) struct Called<'model> {
+    site: Site<'model>,
+    krate: &'model Name,
+    candidates: Vec<Vec<Name>>,
 }
 
 #[derive(Debug)]
-pub struct FileCalls<'head> {
-    path: &'head Path,
-    package: Option<&'head Name>,
-    called: Vec<Called>,
+pub(super) struct ModelCalls<'model>(Vec<Called<'model>>);
+
+impl<'model> From<&'model Model> for ModelCalls<'model> {
+    fn from(model: &'model Model) -> ModelCalls<'model> {
+        let named = |id: ItemId| {
+            let item = model.declared(id)?;
+            Some(vec![item.krate()?.clone(), AsRef::<Name>::as_ref(item).clone()])
+        };
+        let invoked = model
+            .uses()
+            .filter(|placed| Self::MACROS.contains(&placed.entity().mention()))
+            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
+            .map(|placed| Called::invoked(placed, &named));
+        let derived = model
+            .implementations()
+            .filter(|placed| placed.entity().written().is_none())
+            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
+            .filter_map(|placed| Called::derived(placed, &named));
+        ModelCalls(invoked.chain(derived).collect())
+    }
 }
 
-impl<'head> FileCalls<'head> {
-    pub(super) fn read(parsed: Parsed<'_, 'head>, imports: &Imports<'_>) -> FileCalls<'head> {
-        let head = parsed.head();
-        let mut expanded = Expanded { module: Module::of_head(head), imports, called: Vec::new() };
-        expanded.visit_file(parsed.file().syntax());
-        FileCalls { path: head.path(), package: head.placement().package().root().package(), called: expanded.called }
-    }
+impl<'model> ModelCalls<'model> {
+    const MACROS: [Mention; 2] = [Mention::Invoked, Mention::InMacro];
 
-    pub(super) fn path(&self) -> &'head Path {
-        self.path
-    }
-
-    pub(super) fn admitted<'names>(&self, admitted: &'names std::collections::BTreeSet<Name>) -> Option<&'names Name> {
-        self.package.and_then(|name| admitted.get(name))
-    }
-
-    pub(super) fn lines(&self, wanted: &[UsePath]) -> Vec<LineNumber> {
-        self.called
+    pub(super) fn sites(&self, wanted: &[Vec<Name>], admitted: &BTreeSet<Name>) -> Vec<Site<'model>> {
+        self.0
             .iter()
+            .filter(|called| admitted.get(called.krate).is_none())
             .filter(|called| called.candidates.iter().any(|candidate| wanted.contains(candidate)))
-            .map(|called| called.line)
+            .map(|called| called.site)
             .collect()
     }
 }
 
-struct Expanded<'module, 'run> {
-    module: Module<'module>,
-    imports: &'run Imports<'run>,
-    called: Vec<Called>,
-}
-
-impl Expanded<'_, '_> {
-    fn met(&mut self, path: &syn::Path) {
-        let line = path.segments.first().map(|segment| LineNumber::from(segment.ident.span()));
-        let candidates = self.imports.candidates(&self.module, UsePath::from(path));
-        self.called.extend(line.map(|found| Called { candidates, line: found }));
+impl<'model> Called<'model> {
+    fn invoked(
+        placed: Placed<'model, &'model PathUse>,
+        named: &impl Fn(ItemId) -> Option<Vec<Name>>,
+    ) -> Called<'model> {
+        let used = placed.entity();
+        Called {
+            site: placed.site(),
+            krate: placed.krate(),
+            candidates: Self::candidates(used.written(), used.resolved(), named),
+        }
     }
 
-    fn invoked(&mut self, invocation: &Macro) {
-        self.met(&invocation.path);
-        MacroCalls::within(invocation).iter().fold(self, |expanded, nested| {
-            expanded.invoked(nested);
-            expanded
-        });
-    }
-}
-
-impl<'ast> Visit<'ast> for Expanded<'_, '_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || {
-            self.module.enter(Name::from(&module.ident));
-            visit::visit_item_mod(self, module);
-            self.module.leave();
-        });
+    fn derived(
+        placed: Placed<'model, &'model Implementation>,
+        named: &impl Fn(ItemId) -> Option<Vec<Name>>,
+    ) -> Option<Called<'model>> {
+        let interface = placed.entity().interface()?;
+        let written = AsRef::<Spelling>::as_ref(interface).written()?;
+        Some(Called {
+            site: placed.site(),
+            krate: placed.krate(),
+            candidates: Self::candidates(written, interface.as_ref(), named),
+        })
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        self.invoked(invocation);
-    }
-
-    fn visit_attribute(&mut self, attribute: &'ast Attribute) {
-        AttributeMacros::expanded(&attribute.meta).iter().fold(self, |expanded, path| {
-            expanded.met(path);
-            expanded
-        });
+    fn candidates(
+        written: &ItemPath,
+        resolved: &Resolved,
+        named: &impl Fn(ItemId) -> Option<Vec<Name>>,
+    ) -> Vec<Vec<Name>> {
+        let declared = resolved.crate_item().and_then(named);
+        let external = resolved.external().map(|found| AsRef::<[Name]>::as_ref(found.path()).to_vec());
+        [Some(AsRef::<[Name]>::as_ref(written).to_vec()), declared, external].into_iter().flatten().collect()
     }
 }

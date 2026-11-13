@@ -157,7 +157,11 @@ impl<'read> Namespace<'read> {
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {
-        self.scopes.iter().map(|row| row.issued(building)).collect()
+        let roots: BTreeMap<ScopeId, &Name> = self.crates.iter().map(|(name, root)| (*root, *name)).collect();
+        self.scopes
+            .iter()
+            .map(|row| row.issued(building, row.outermost().and_then(|root| roots.get(&root).copied())))
+            .collect()
     }
 
     pub(super) fn anchors(&self, scope: ScopeId) -> Anchors {

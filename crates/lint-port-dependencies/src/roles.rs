@@ -1,3 +1,4 @@
+mod boundary;
 mod breached;
 mod expanded;
 mod undenied;
@@ -7,17 +8,18 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use code_model::Model;
 use lint_core::{FileHead, Parsed, Site, Violation};
 use lint_file::PrimedFacts;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
-use lint_paths::Imports;
 use lint_placement::{CrateName as PlacedName, Role as Placed};
 use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
+use boundary::Underscored;
 use breached::{Breached, Fixed};
-pub use expanded::FileCalls;
+use expanded::ModelCalls;
 use undenied::Undenied;
 use unexpanded::Unexpanded;
 
@@ -31,20 +33,17 @@ pub struct RootDenial<'head> {
 #[derive(Debug)]
 pub struct RoleFile<'head> {
     root: Option<RootDenial<'head>>,
-    calls: Option<FileCalls<'head>>,
 }
 
 #[derive(Debug, Default)]
 pub struct RoleFacts<'head> {
     denials: BTreeMap<&'head Name, RootDenial<'head>>,
-    calls: Vec<FileCalls<'head>>,
 }
 
 impl<'head> FromIterator<RoleFile<'head>> for RoleFacts<'head> {
     fn from_iter<Parts: IntoIterator<Item = RoleFile<'head>>>(parts: Parts) -> RoleFacts<'head> {
         parts.into_iter().fold(RoleFacts::default(), |mut facts, part| {
             facts.denials.extend(part.root.map(|root| (root.package, root)));
-            facts.calls.extend(part.calls);
             facts
         })
     }
@@ -54,16 +53,14 @@ impl<'head> FromIterator<RoleFile<'head>> for RoleFacts<'head> {
 pub struct RoleReading;
 
 impl PrimedFacts for RoleReading {
-    type PrimerPart<'head> = Imports<'head>;
-    type Primer<'head> = Imports<'head>;
+    type PrimerPart<'head> = ();
+    type Primer<'head> = ();
     type Part<'head> = RoleFile<'head>;
     type Context<'head> = RoleFacts<'head>;
 
-    fn primed<'head>(parsed: Parsed<'_, 'head>) -> Imports<'head> {
-        Imports::from(parsed)
-    }
+    fn primed(_parsed: Parsed<'_, '_>) {}
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>, imports: &Imports<'head>) -> RoleFile<'head> {
+    fn contributed<'head>(parsed: Parsed<'_, 'head>, (): &()) -> RoleFile<'head> {
         let head = parsed.head();
         let root = Some(head).filter(|found| found.placement().role() == Placed::LibraryRoot);
         RoleFile {
@@ -71,7 +68,6 @@ impl PrimedFacts for RoleReading {
                 let package = found.placement().package().root().package()?;
                 Some(RootDenial { package, path: found.path(), denied: Undenied::denied(parsed.file().syntax()) })
             }),
-            calls: parsed.file().shipped().map(|_| FileCalls::read(parsed, imports)),
         }
     }
 }
@@ -118,37 +114,31 @@ impl<'file> Roles<'file> {
         served.iter().filter_map(denying).flatten().collect()
     }
 
-    pub(crate) fn unexpanded(&self, expansions: &[Expansion<'file>]) -> Vec<Violation<'file>> {
-        let expected: Vec<Expected<'file>> = expansions.iter().map(|expansion| self.expected(expansion)).collect();
-        expected.iter().flat_map(|wanted| self.facts.calls.iter().flat_map(|calls| wanted.found_in(calls))).collect()
+    pub(crate) fn unexpanded(&self, expansions: &[Expansion<'file>], model: &'file Model) -> Vec<Violation<'file>> {
+        let calls = ModelCalls::from(model);
+        expansions.iter().map(|expansion| self.expected(expansion)).flat_map(|wanted| wanted.found_in(&calls)).collect()
     }
 
     fn expected(&self, expansion: &Expansion<'file>) -> Expected<'file> {
-        let wanted: Vec<UsePath> = expansion.paths(|member, name| {
+        let wanted: Vec<Vec<Name>> = expansion.paths(|member, name| {
             let placed = PlacedName::from(self.owners.manifest(member)?.placement().package().root());
             let root: &Name = placed.borrow();
-            Some([root.clone(), Name::from(name.as_ref())].into_iter().collect())
+            Some(vec![root.clone(), Name::from(name.as_ref())])
         });
-        let admitted: BTreeSet<Name> = expansion.admitted().map(|name| Name::from(name.as_ref())).collect();
+        let admitted: BTreeSet<Name> = expansion.admitted().map(Underscored::crate_named).collect();
         Expected { wanted, admitted, finding: Unexpanded::new(expansion.port(), expansion.expanders().role()) }
     }
 }
 
 #[derive(Debug)]
 struct Expected<'file> {
-    wanted: Vec<UsePath>,
+    wanted: Vec<Vec<Name>>,
     admitted: BTreeSet<Name>,
     finding: Unexpanded<'file>,
 }
 
 impl<'file> Expected<'file> {
-    fn found_in(&self, calls: &FileCalls<'file>) -> Vec<Violation<'file>> {
-        let path = calls.path();
-        let admitted = calls.admitted(&self.admitted).map(|_| Vec::new());
-        admitted
-            .unwrap_or_else(|| calls.lines(&self.wanted))
-            .into_iter()
-            .map(|line| Violation::new(Site::new(path, line), self.finding))
-            .collect()
+    fn found_in(&self, calls: &ModelCalls<'file>) -> Vec<Violation<'file>> {
+        calls.sites(&self.wanted, &self.admitted).into_iter().map(|site| Violation::new(site, self.finding)).collect()
     }
 }

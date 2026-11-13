@@ -8,6 +8,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use code_reader::Reader;
 use file_ports::{Bytes, Memory};
 use lint_core::{FileHead, Parsed, Report, SourceFile, SourceText, WorkspaceLint};
 use lint_placement::Placement;
@@ -65,7 +66,8 @@ impl Sources {
         let files = Self::placed(manifests, sources);
         let parsed: Vec<Parsed<'_, '_>> = files.iter().map(Parsed::from).collect();
         let heads: Vec<FileHead> = files.iter().map(|file| file.head().clone()).collect();
-        Self::lines(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed)))
+        let model = Reader::read_files(&files);
+        Self::lines(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed), &model))
     }
 
     #[must_use]

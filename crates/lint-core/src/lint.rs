@@ -1,3 +1,4 @@
+use code_model::Model;
 use workspace_metadata::Metadata;
 
 use crate::report::Report;
@@ -17,5 +18,6 @@ pub trait WorkspaceLint {
         heads: &'file [FileHead],
         workspaces: &'file [Metadata],
         facts: &'file Self::Facts<'head>,
+        model: &'file Model,
     ) -> Report<'file>;
 }

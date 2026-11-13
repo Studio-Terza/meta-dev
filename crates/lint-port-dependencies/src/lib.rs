@@ -6,7 +6,6 @@ mod roles;
 use code_model::Model;
 use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{FileLint, PrimedFacts, Reads};
-use lint_paths::Imports;
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
@@ -39,6 +38,7 @@ impl WorkspaceLint for OwnedDependencies {
         heads: &'file [FileHead],
         workspaces: &'file [Metadata],
         (): &'file (),
+        _model: &'file Model,
     ) -> Report<'file> {
         Report::new(
             Headline::new(
@@ -59,14 +59,14 @@ impl WorkspaceLint for KeyDependencyRoles {
     type Facts<'head> = RoleFacts<'head>;
 
     fn gathered<'head>(parsed: &[Parsed<'_, 'head>]) -> RoleFacts<'head> {
-        let imports: Imports<'head> = parsed.iter().copied().map(RoleReading::primed).collect();
-        parsed.iter().map(|found| RoleReading::contributed(*found, &imports)).collect()
+        parsed.iter().map(|found| RoleReading::contributed(*found, &())).collect()
     }
 
     fn report<'file, 'head: 'file>(
         heads: &'file [FileHead],
         workspaces: &'file [Metadata],
         facts: &'file RoleFacts<'head>,
+        model: &'file Model,
     ) -> Report<'file> {
         let graph: Graph<'file> = workspaces.iter().collect();
         let breaches = graph.role_breaches();
@@ -80,7 +80,7 @@ impl WorkspaceLint for KeyDependencyRoles {
                 roles.breached(breaches.unleafed()),
                 roles.breached(breaches.reformatted()),
                 roles.breached(breaches.unported()),
-                roles.unexpanded(&graph.expansions()),
+                roles.unexpanded(&graph.expansions(), model),
                 roles.undenied(Role::Lexer, &graph.serving(Role::Lexer)),
             ]
             .concat(),

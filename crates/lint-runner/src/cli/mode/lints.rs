@@ -120,7 +120,8 @@ struct Filing {
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
-type Workspaced = for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>) -> Report<'file>;
+type Workspaced =
+    for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>, &'file Model) -> Report<'file>;
 
 type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>, &'file Model) -> Vec<Report<'file>>;
 
@@ -157,11 +158,11 @@ impl Lints {
         Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
         Entry::spelled::<FakesAtPorts>(Work::Modelled(<FakesAtPorts as ModelLint>::report)),
         <Primed<PortBatching> as Registered>::ENTRY,
-        Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _| {
-            <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &())
+        Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _, model| {
+            <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &(), model)
         })),
-        Entry::spelled::<KeyDependencyRoles>(Work::Described(|heads, workspaces, facts| {
-            <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts)
+        Entry::spelled::<KeyDependencyRoles>(Work::Described(|heads, workspaces, facts, model| {
+            <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts, model)
         })),
         Entry::spelled::<EffectsInFillers>(Work::Modelled(<EffectsInFillers as ModelLint>::report)),
         <Filed<CountedCalls> as Registered>::ENTRY,
@@ -369,9 +370,10 @@ impl Work {
                     .done()
                     .as_ref()
                     .ok()
-                    .map(|located| {
+                    .zip(sources.gathering().model())
+                    .map(|(located, model)| {
                         let facts = Priming::<RoleReading>::primed(settled);
-                        described(sources.gathering().heads(), Described::workspaces(located), facts)
+                        described(sources.gathering().heads(), Described::workspaces(located), facts, model)
                     })
                     .into_iter()
                     .collect(),

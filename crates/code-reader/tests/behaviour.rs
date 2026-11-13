@@ -255,7 +255,7 @@ enum Seen {
 impl Seen {
     fn of(model: &Model, resolved: Resolved) -> Seen {
         match resolved.crate_item().and_then(|id| model.declared(id)) {
-            Some(item) => Seen::Item(item.clone()),
+            Some(item) => Seen::Item(item.clone().homed(None)),
             None => Seen::Resolved(resolved),
         }
     }
@@ -951,4 +951,19 @@ fn an_implementation_reads_the_type_it_implements_for() {
             Expect::named(Expect::unknown(&["Wrap"]), vec![Expect::param("T")]),
         ]
     );
+}
+
+#[test]
+fn an_item_knows_the_library_crate_that_declares_it() {
+    let files: Vec<SourceFile> = DERIVE_MACROS.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+    let model = Reader::read_files(&files);
+    let homes: Vec<Option<Name>> = ["e", "d"]
+        .iter()
+        .map(|krate| [Name::from(*krate), Name::from("Shown")].into_iter().collect())
+        .map(|path| {
+            let resolved = model.exported(Domain::Macros, &path)?;
+            model.declared(resolved.crate_item()?)?.krate().cloned()
+        })
+        .collect();
+    assert_eq!(homes, [Some(Name::from("d")), Some(Name::from("d"))]);
 }

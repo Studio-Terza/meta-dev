@@ -161,9 +161,11 @@ impl Declared {
         }
     }
 
-    fn issued(&self, building: &mut Building) -> Option<ItemId> {
+    fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Option<ItemId> {
         let kind = self.kind.item_kind()?;
-        Some(building.declared(ModelItem::new(self.name.clone(), kind).marked(self.marks.clone())))
+        Some(
+            building.declared(ModelItem::new(self.name.clone(), kind).marked(self.marks.clone()).homed(krate.cloned())),
+        )
     }
 }
 
@@ -193,6 +195,7 @@ struct DeriveMacro<'item>(&'item ItemFn);
 
 impl DeriveMacro<'_> {
     const ATTRIBUTE: [Word<'static>; 1] = words!["proc_macro_derive"];
+    const FUNCTION_LIKE: [Word<'static>; 2] = words!["proc_macro", "proc_macro_attribute"];
 
     fn declared(self) -> Vec<Declared> {
         let visibility = Visibility::from(&self.0.vis);
@@ -207,7 +210,21 @@ impl DeriveMacro<'_> {
                 domain: Domain::Macros,
                 marks: Vec::new(),
             })
+            .chain(self.function_like())
             .collect()
+    }
+
+    fn function_like(self) -> Option<Declared> {
+        let marked = self.0.attrs.iter().find_map(|attribute| {
+            attribute.path().get_ident().map(Name::from).and_then(|ident| ident.matches::<Whole>(&Self::FUNCTION_LIKE))
+        });
+        marked.map(|_| Declared {
+            name: Name::from(&self.0.sig.ident),
+            visibility: Visibility::from(&self.0.vis),
+            kind: DeclaredKind::Item(ItemKind::Macro),
+            domain: Domain::Macros,
+            marks: Vec::new(),
+        })
     }
 
     fn named(attribute: &Attribute) -> Option<Name> {
@@ -463,8 +480,8 @@ impl Entries {
         Entries { declared, ..self }
     }
 
-    pub(super) fn issued(&self, building: &mut Building) -> Vec<Option<ItemId>> {
-        self.declared.iter().map(|declared| declared.issued(building)).collect()
+    pub(super) fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Vec<Option<ItemId>> {
+        self.declared.iter().map(|declared| declared.issued(building, krate)).collect()
     }
 
     pub(super) fn exported(&self) -> impl Iterator<Item = Key<'_>> {

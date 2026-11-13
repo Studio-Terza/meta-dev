@@ -26,17 +26,28 @@ pub struct Item {
     name: Name,
     kind: ItemKind,
     marks: Vec<ItemPath>,
+    krate: Option<Name>,
 }
 
 impl Item {
     #[must_use]
     pub fn new(name: Name, kind: ItemKind) -> Item {
-        Item { name, kind, marks: Vec::new() }
+        Item { name, kind, marks: Vec::new(), krate: None }
     }
 
     #[must_use]
     pub fn marked(self, marks: Vec<ItemPath>) -> Item {
         Item { marks, ..self }
+    }
+
+    #[must_use]
+    pub fn homed(self, krate: Option<Name>) -> Item {
+        Item { krate, ..self }
+    }
+
+    #[must_use]
+    pub fn krate(&self) -> Option<&Name> {
+        self.krate.as_ref()
     }
 
     #[must_use]
