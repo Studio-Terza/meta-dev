@@ -1,5 +1,7 @@
 mod boundary;
 
+use std::fmt;
+
 use syn::Macro;
 use syn::visit::{self, Visit};
 
@@ -13,7 +15,7 @@ pub trait Gathers<Part> {
     fn gathered(self) -> Part;
 }
 
-pub trait Finds<'file>: for<'ast> Watch<'ast> {
+pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
     fn found(self: Box<Self>) -> Vec<Violation<'file>>;
 }
 
@@ -21,9 +23,11 @@ pub trait Finds<'file>: for<'ast> Watch<'ast> {
 pub struct Sweep;
 
 impl Sweep {
-    pub fn over<'file>(file: &'file SourceFile, watchers: &mut [Box<dyn Finds<'file> + 'file>]) {
-        let watching: Vec<&mut Watching<'_>> =
-            watchers.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }).collect();
+    pub fn over_all<'file, 'run>(file: &'file SourceFile, groups: &mut [Vec<Box<dyn Finds<'file> + 'run>>]) {
+        let watching: Vec<&mut Watching<'_>> = groups
+            .iter_mut()
+            .flat_map(|group| group.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }))
+            .collect();
         Sweep::sweeping(Some(file), watching).visit_file(file.syntax());
     }
 
@@ -56,6 +60,10 @@ impl Sweep {
         Sweep::sweeping(None, vec![watcher]).visit_type(ty);
     }
 
+    pub fn through_pat(pat: &syn::Pat, watcher: &mut Watching<'_>) {
+        Sweep::sweeping(None, vec![watcher]).visit_pat(pat);
+    }
+
     fn sweeping<'file, 'run>(
         file: Option<&'file SourceFile>,
         watchers: Vec<&'run mut Watching<'run>>,
@@ -67,11 +75,11 @@ impl Sweep {
     }
 
     #[must_use]
-    pub fn found<'file>(file: &'file SourceFile, watcher: Box<dyn Finds<'file> + 'file>) -> Vec<Violation<'file>> {
-        let mut watchers = [watcher];
-        Sweep::over(file, &mut watchers);
+    pub fn found<'file, 'run>(file: &'file SourceFile, watcher: Box<dyn Finds<'file> + 'run>) -> Vec<Violation<'file>> {
+        let mut watchers = [vec![watcher]];
+        Sweep::over_all(file, &mut watchers);
         let [only] = watchers;
-        only.found()
+        only.into_iter().flat_map(Finds::found).collect()
     }
 }
 
@@ -142,4 +150,51 @@ impl<'ast> Visit<'ast> for Sweeping<'_, '_> {
     }
 
     lint_core::sweep_visits!();
+}
+
+#[derive(Debug)]
+pub struct Judgement<'file, 'run> {
+    watchers: Vec<Box<dyn Finds<'file> + 'run>>,
+    after: Vec<Violation<'file>>,
+}
+
+impl<'file, 'run> Judgement<'file, 'run> {
+    #[must_use]
+    pub fn found(after: Vec<Violation<'file>>) -> Judgement<'file, 'run> {
+        Judgement { watchers: Vec::new(), after }
+    }
+
+    #[must_use]
+    pub fn watching(watcher: Box<dyn Finds<'file> + 'run>) -> Judgement<'file, 'run> {
+        Judgement { watchers: vec![watcher], after: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn and(mut self, watcher: Box<dyn Finds<'file> + 'run>) -> Judgement<'file, 'run> {
+        self.watchers.push(watcher);
+        self
+    }
+
+    #[must_use]
+    pub fn then(mut self, after: impl IntoIterator<Item = Violation<'file>>) -> Judgement<'file, 'run> {
+        self.after.extend(after);
+        self
+    }
+
+    pub fn watchers(&mut self) -> Vec<Box<dyn Finds<'file> + 'run>> {
+        std::mem::take(&mut self.watchers)
+    }
+
+    #[must_use]
+    pub fn violations(mut self, file: &'file SourceFile) -> Vec<Violation<'file>> {
+        let mut watchers = [self.watchers()];
+        Sweep::over_all(file, &mut watchers);
+        let [swept] = watchers;
+        swept.into_iter().flat_map(Finds::found).chain(self.after).collect()
+    }
+
+    #[must_use]
+    pub fn concluded(self, swept: impl IntoIterator<Item = Violation<'file>>) -> Vec<Violation<'file>> {
+        swept.into_iter().chain(self.after).collect()
+    }
 }

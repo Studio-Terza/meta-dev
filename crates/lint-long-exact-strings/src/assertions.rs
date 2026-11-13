@@ -7,13 +7,13 @@ mod table_rows;
 use std::path::Path;
 
 use syn::punctuated::Punctuated;
-use syn::visit::{self, Visit};
-use syn::{BinOp, Expr, ImplItemFn, ItemFn, Macro, Token};
+use syn::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, Token};
 
-use lint_core::{MacroAliases, MacroCalls, Site, SourceFile, Violation};
+use lint_core::{MacroAliases, MacroCalls, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
+use lint_sweep::{Descend, Finds, Kind, Watch};
 
-use bindings::Bindings;
+use bindings::{Bindings, BodyId, Bound, Scopes};
 use compared::Compared;
 use finding::Finding;
 use table_rows::TableRows;
@@ -21,78 +21,108 @@ use table_rows::TableRows;
 #[derive(Debug)]
 pub struct Assertions<'file> {
     path: &'file Path,
-    constants: Bindings<'file>,
-    locals: Bindings<'file>,
+    kinds: &'static [Kind],
+    scopes: Scopes,
     tables: MacroAliases,
-    found: Vec<Violation<'file>>,
+    met: Vec<Met>,
 }
 
-impl<'file> From<&'file SourceFile> for Assertions<'file> {
-    fn from(file: &'file SourceFile) -> Assertions<'file> {
-        let mut assertions = Assertions {
-            path: file.head().path(),
-            constants: Bindings::constants(file.syntax()),
-            locals: Bindings::default(),
-            tables: MacroAliases::in_file(file.syntax(), Self::TABLE),
-            found: Vec::new(),
-        };
-        assertions.visit_file(file.syntax());
-        assertions
-    }
-}
-
-impl<'file> From<Assertions<'file>> for Vec<Violation<'file>> {
-    fn from(assertions: Assertions<'file>) -> Vec<Violation<'file>> {
-        assertions.found
-    }
+#[derive(Debug)]
+struct Met {
+    invocation: Macro,
+    body: Option<BodyId>,
 }
 
 impl<'file> Assertions<'file> {
     const TABLE: Word<'static> = Word::new("table");
+    const WATCHED: &'static [Kind] =
+        &[Kind::ItemFn, Kind::ImplItemFn, Kind::ItemConst, Kind::Local, Kind::ItemUse, Kind::Macro];
 
-    fn judged(&mut self, invocation: &Macro, compared: &[Expr]) {
-        let line =
-            invocation.path.segments.first().map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
-        let judge = Compared::new(&self.constants, &self.locals);
-        let pinned = compared.iter().find_map(|side| judge.pinning(side));
-        self.found.extend(pinned.map(|pinning| Violation::new(Site::new(self.path, line), Finding::from(pinning))));
+    pub fn new(path: &'file Path, asserting: Option<&'file Path>) -> Assertions<'file> {
+        Assertions {
+            path,
+            kinds: asserting.map_or(&[][..], |_| Self::WATCHED),
+            scopes: Scopes::default(),
+            tables: MacroAliases::new(Self::TABLE),
+            met: Vec::new(),
+        }
     }
 
-    fn within_body(&mut self, locals: Bindings<'file>, visit: impl FnOnce(&mut Self)) {
-        let outer = std::mem::replace(&mut self.locals, locals);
-        visit(self);
-        self.locals = outer;
-    }
-}
-
-impl<'file> Visit<'file> for Assertions<'file> {
-    fn visit_item_fn(&mut self, item: &'file ItemFn) {
-        self.within_body(Bindings::locals(&item.block), |assertions| visit::visit_item_fn(assertions, item));
-    }
-
-    fn visit_impl_item_fn(&mut self, item: &'file ImplItemFn) {
-        self.within_body(Bindings::locals(&item.block), |assertions| visit::visit_impl_item_fn(assertions, item));
-    }
-
-    fn visit_macro(&mut self, invocation: &'file Macro) {
-        self.met(invocation);
-    }
-}
-
-impl Assertions<'_> {
-    fn met(&mut self, invocation: &Macro) {
-        match Assertion::named(
+    fn judged(&self, invocation: &Macro, constants: &Bindings<'_>, locals: &Bindings<'_>) -> Vec<Violation<'file>> {
+        let compared = Assertion::named(
             &invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident)),
             &self.tables,
         )
-        .compared(invocation)
-        {
-            Some(compared) => self.judged(invocation, &compared),
-            None => MacroCalls::within(invocation).iter().for_each(|inner| self.met(inner)),
-        }
+        .compared(invocation);
+        compared.map_or_else(
+            || MacroCalls::within(invocation).iter().flat_map(|inner| self.judged(inner, constants, locals)).collect(),
+            |sides| {
+                let line = invocation
+                    .path
+                    .segments
+                    .first()
+                    .map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
+                let judge = Compared::new(constants, locals);
+                let pinned = sides.iter().find_map(|side| judge.pinning(side));
+                pinned
+                    .map(|pinning| Violation::new(Site::new(self.path, line), Finding::from(pinning)))
+                    .into_iter()
+                    .collect()
+            },
+        )
     }
 }
 
+impl<'ast> Watch<'ast> for Assertions<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        self.kinds
+    }
+
+    fn on_item_fn(&mut self, _: &'ast ItemFn) -> Descend {
+        self.scopes.opened()
+    }
+
+    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+        self.scopes.shut();
+    }
+
+    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn) -> Descend {
+        self.scopes.opened()
+    }
+
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+        self.scopes.shut();
+    }
+
+    fn on_item_const(&mut self, item: &'ast ItemConst) -> Descend {
+        self.scopes.constant(Bound::constant(item));
+        Descend::Into
+    }
+
+    fn on_local(&mut self, local: &'ast Local) -> Descend {
+        self.scopes.local(Bound::local(local));
+        Descend::Into
+    }
+
+    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
+        self.tables.on_item_use(item)
+    }
+
+    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+        self.met.push(Met { invocation: invocation.clone(), body: self.scopes.current() });
+        Descend::Over
+    }
+}
+
+impl<'file> Finds<'file> for Assertions<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        let constants = self.scopes.constants();
+        self.met
+            .iter()
+            .flat_map(|met| self.judged(&met.invocation, &constants, &self.scopes.locals(met.body)))
+            .collect()
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Assertion {
     Equality,

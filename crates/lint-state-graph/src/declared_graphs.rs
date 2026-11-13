@@ -2,11 +2,11 @@ mod graph;
 
 use std::path::Path;
 
-use syn::visit::Visit;
-use syn::{ItemMod, Macro};
+use syn::{ItemMod, ItemUse, Macro};
 
-use lint_core::{MacroAliases, MacroCalls, SourceFile, Violation, Walk};
+use lint_core::{MacroAliases, MacroCalls, Violation, Walk};
 use lint_layout::{Name, Word};
+use lint_sweep::{Descend, Kind, Watch};
 
 use graph::Graph;
 
@@ -14,11 +14,21 @@ use graph::Graph;
 pub struct DeclaredGraphs<'scan> {
     path: &'scan Path,
     names: MacroAliases,
-    violations: Vec<Violation<'scan>>,
+    gates: Vec<Walk>,
+    invocations: Vec<Macro>,
 }
 
 impl<'scan> DeclaredGraphs<'scan> {
     const MACRO: &'static str = "states";
+
+    pub fn new(path: &'scan Path) -> DeclaredGraphs<'scan> {
+        DeclaredGraphs {
+            path,
+            names: MacroAliases::new(Word::new(DeclaredGraphs::MACRO)),
+            gates: Vec::new(),
+            invocations: Vec::new(),
+        }
+    }
 
     fn found_in(&self, invocation: &Macro) -> Vec<Violation<'scan>> {
         match invocation.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))) {
@@ -28,31 +38,33 @@ impl<'scan> DeclaredGraphs<'scan> {
     }
 }
 
-impl<'scan> From<&'scan SourceFile> for DeclaredGraphs<'scan> {
-    fn from(file: &'scan SourceFile) -> DeclaredGraphs<'scan> {
-        let mut graphs = DeclaredGraphs {
-            path: file.head().path(),
-            names: MacroAliases::in_file(file.syntax(), Word::new(DeclaredGraphs::MACRO)),
-            violations: Vec::new(),
-        };
-        graphs.visit_file(file.syntax());
-        graphs
-    }
-}
-
-impl<'ast> Visit<'ast> for DeclaredGraphs<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for DeclaredGraphs<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemUse, Kind::Macro]
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        let found = self.found_in(invocation);
-        self.violations.extend(found);
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        self.gates.push(Walk::outside_tests(&module.attrs));
+        Descend::Into
+    }
+
+    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+        self.gates.pop();
+    }
+
+    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
+        self.names.on_item_use(item)
+    }
+
+    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+        let outside = self.gates.iter().all(|gate| *gate == Walk::Entered).then(|| invocation.clone());
+        self.invocations.extend(outside);
+        Descend::Over
     }
 }
 
 impl<'file> From<DeclaredGraphs<'file>> for Vec<Violation<'file>> {
     fn from(scan: DeclaredGraphs<'file>) -> Vec<Violation<'file>> {
-        scan.violations
+        scan.invocations.iter().flat_map(|invocation| scan.found_in(invocation)).collect()
     }
 }

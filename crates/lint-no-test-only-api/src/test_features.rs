@@ -3,31 +3,34 @@ use std::iter;
 
 use proc_macro2::{Group, Literal, TokenStream, TokenTree};
 use quote::ToTokens;
-use syn::visit::{self, Visit};
 use syn::{Attribute, Lit, Macro};
 
 use lint_core::Syntax;
 use lint_layout::LineNumber;
 use lint_layout::Name;
+use lint_sweep::{Descend, Finds, Kind, Watch};
+
+use std::path::Path;
+
+use lint_core::Violation;
 
 use crate::feature_word::FeatureWord;
 use crate::finding::Finding;
 use crate::flagged::Flagged;
 
-#[derive(Debug, Default)]
-pub(crate) struct TestFeatures {
+#[derive(Debug)]
+pub(crate) struct TestFeatures<'file> {
+    path: &'file Path,
     found: Vec<Flagged>,
 }
 
-impl TestFeatures {
+impl<'file> TestFeatures<'file> {
     const CONDITIONS: [&str; 2] = ["cfg", "cfg_attr"];
     const FEATURE: &str = "feature";
     const VALUE_INDEX: usize = 2;
 
-    pub(crate) fn in_file(file: &syn::File) -> Vec<Flagged> {
-        let mut features = TestFeatures::default();
-        features.visit_file(file);
-        features.found
+    pub(crate) fn new(path: &'file Path) -> TestFeatures<'file> {
+        TestFeatures { path, found: Vec::new() }
     }
 
     fn condition(path: &syn::Path) -> Option<&syn::Path> {
@@ -63,17 +66,29 @@ impl TestFeatures {
     }
 }
 
-impl<'ast> Visit<'ast> for TestFeatures {
-    fn visit_attribute(&mut self, attribute: &'ast Attribute) {
+impl<'ast> Watch<'ast> for TestFeatures<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Attribute, Kind::Macro]
+    }
+
+    fn on_attribute(&mut self, attribute: &'ast Attribute) -> Descend {
         self.found.extend(
             Self::condition(attribute.path()).into_iter().flat_map(|_| Self::scanned(attribute.to_token_stream())),
         );
-        visit::visit_attribute(self, attribute);
+        Descend::Into
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
+    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
         self.found.extend(
             Self::condition(&invocation.path).into_iter().flat_map(|_| Self::scanned(invocation.tokens.clone())),
         );
+        Descend::Over
+    }
+}
+
+impl<'file> Finds<'file> for TestFeatures<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        let path = self.path;
+        self.found.into_iter().map(|flagged| flagged.in_file(path)).collect()
     }
 }

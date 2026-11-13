@@ -1,16 +1,15 @@
 use std::path::Path;
 use syn::spanned::Spanned;
-use syn::visit::Visit;
 
 use syn::{Index, ItemMod, ItemStruct, Visibility};
 
 use super::finding::Finding;
 use lint_core::Site;
-use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
+use lint_sweep::{Descend, Kind, Watch};
 
 #[derive(Debug)]
 pub struct FieldVisibility<'scan> {
@@ -18,26 +17,12 @@ pub struct FieldVisibility<'scan> {
     violations: Vec<Violation<'scan>>,
 }
 
-impl<'scan> From<&'scan SourceFile> for FieldVisibility<'scan> {
-    fn from(file: &'scan SourceFile) -> FieldVisibility<'scan> {
-        let mut fields = FieldVisibility { path: file.head().path(), violations: Vec::new() };
-        fields.visit_file(file.syntax());
-        fields
-    }
-}
-
-impl<'ast> Visit<'ast> for FieldVisibility<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'scan> FieldVisibility<'scan> {
+    pub fn new(path: &'scan Path) -> FieldVisibility<'scan> {
+        FieldVisibility { path, violations: Vec::new() }
     }
 
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        Walk::enter(&item.attrs, || self.exposed(item));
-    }
-}
-
-impl FieldVisibility<'_> {
-    fn exposed(&mut self, item: &ItemStruct) {
+    fn exposed(&mut self, item: &ItemStruct) -> Descend {
         let exposed = item
             .fields
             .iter()
@@ -50,6 +35,21 @@ impl FieldVisibility<'_> {
                 )
             });
         self.violations.extend(exposed);
+        Descend::Over
+    }
+}
+
+impl<'ast> Watch<'ast> for FieldVisibility<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemStruct]
+    }
+
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+    }
+
+    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs)).then(|| self.exposed(item))
     }
 }
 

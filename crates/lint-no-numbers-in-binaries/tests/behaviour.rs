@@ -1,4 +1,4 @@
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -13,5 +13,5 @@ const CASES: [Case; 1] = [Case::new(
 
 #[test]
 fn numbers_in_a_binary_are_flagged() {
-    assert_eq!(Sources::mismatches::<Filed<NoNumbersInBinaries>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<NoNumbersInBinaries>>(&CASES), Lines::default());
 }

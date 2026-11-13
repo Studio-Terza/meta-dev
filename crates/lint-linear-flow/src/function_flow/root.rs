@@ -2,19 +2,19 @@ mod arms;
 
 use std::path::Path;
 
-use syn::visit::{self, Visit};
-use syn::{Block, Expr, ExprIf, Stmt};
+use std::ptr;
+
+use syn::{Block, Expr, ExprIf, ExprMatch, Stmt};
 
 use crate::function_flow::found::Found;
-use crate::function_flow::scan::Scan;
 use crate::verdict::Verdict;
 use arms::Arms;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Root<'ast> {
-    Match(&'ast syn::ExprMatch),
+    Match(&'ast ExprMatch),
     IfLet(&'ast ExprIf),
-    Body(&'ast Block),
+    Body,
 }
 
 impl<'ast> From<&'ast Block> for Root<'ast> {
@@ -22,38 +22,44 @@ impl<'ast> From<&'ast Block> for Root<'ast> {
         body.stmts
             .split_first()
             .and_then(|(only, rest)| rest.first().map_or(Some(only), |_| None))
-            .map_or(Root::Body(body), |only| Self::of_statement(only, body))
+            .map_or(Root::Body, Self::of_statement)
     }
 }
 
 impl<'ast> Root<'ast> {
-    fn of_statement(statement: &'ast Stmt, body: &'ast Block) -> Root<'ast> {
+    fn of_statement(statement: &'ast Stmt) -> Root<'ast> {
         match statement {
             Stmt::Expr(Expr::Match(routed), None) => Root::Match(routed),
-            Stmt::Expr(Expr::If(routed), None) => Self::of_if(routed, body),
-            _ => Root::Body(body),
+            Stmt::Expr(Expr::If(routed), None) => Self::of_if(routed),
+            _ => Root::Body,
         }
     }
 
-    fn of_if(routed: &'ast ExprIf, body: &'ast Block) -> Root<'ast> {
+    fn of_if(routed: &'ast ExprIf) -> Root<'ast> {
         match &*routed.cond {
             Expr::Let(_) => Root::IfLet(routed),
-            _ => Root::Body(body),
+            _ => Root::Body,
         }
     }
 
     pub fn verdict(self) -> Verdict {
         match self {
             Root::Match(_) | Root::IfLet(_) => Verdict::Router,
-            Root::Body(_) => Verdict::Pipeline,
+            Root::Body => Verdict::Pipeline,
         }
     }
 
-    pub fn scanned_by(self, scan: &mut Scan<'_>) {
+    pub fn routing_match(self, expr: &ExprMatch) -> Option<&'ast ExprMatch> {
         match self {
-            Root::Match(routed) => visit::visit_expr_match(scan, routed),
-            Root::IfLet(routed) => visit::visit_expr_if(scan, routed),
-            Root::Body(body) => scan.visit_block(body),
+            Root::Match(routed) => Some(routed).filter(|candidate| ptr::eq(*candidate, expr)),
+            Root::IfLet(_) | Root::Body => None,
+        }
+    }
+
+    pub fn routing_if(self, expr: &ExprIf) -> Option<&'ast ExprIf> {
+        match self {
+            Root::IfLet(routed) => Some(routed).filter(|candidate| ptr::eq(*candidate, expr)),
+            Root::Match(_) | Root::Body => None,
         }
     }
 
@@ -61,7 +67,7 @@ impl<'ast> Root<'ast> {
         match self {
             Root::Match(routed) => Arms::new(path).matched(routed),
             Root::IfLet(routed) => Arms::new(path).branched(routed),
-            Root::Body(_) => Vec::new(),
+            Root::Body => Vec::new(),
         }
     }
 }

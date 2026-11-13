@@ -44,6 +44,7 @@ impl SweptLint for LiteralNames {
     }
 }
 
+#[derive(Debug)]
 struct VagueNames<'file> {
     path: &'file Path,
     found: Vec<Violation<'file>>,

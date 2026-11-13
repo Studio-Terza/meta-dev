@@ -11,6 +11,7 @@ use super::FileFlow;
 use crate::finding::Rule;
 use crate::function_flow::FunctionFlow;
 
+#[derive(Debug)]
 pub struct Collector<'file> {
     file: &'file SourceFile,
     functions: Vec<FunctionFlow<'file>>,

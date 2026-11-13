@@ -1,4 +1,3 @@
-mod candidate;
 mod feature_word;
 mod finding;
 mod flagged;
@@ -9,10 +8,8 @@ mod test_features;
 
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter;
 use std::path::Path;
 
-use candidate::Candidate;
 use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
@@ -23,6 +20,7 @@ use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
 use lint_layout::Name;
 use lint_placement::PackageRoot;
+use lint_sweep::Judgement;
 use lint_sweep::{Gathers, Sweep, Watching};
 use mentions::Mentions;
 use offers::Offers;
@@ -120,20 +118,21 @@ impl ContextLint for NoTestOnlyApi {
         }
     }
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, test_only: &TestOnly<'head>) -> Vec<Violation<'file>> {
-        let only_tests = Offers::in_file(file)
-            .into_iter()
-            .filter(|candidate| test_only.names.contains(candidate.called()))
-            .map(Candidate::violation);
-        let gated =
-            iter::once(file).filter_map(SourceFile::shipped).flat_map(|code| GatedItems::in_file(code.syntax()));
-        let flagged = gated.chain(TestFeatures::in_file(file.syntax())).map(|found| found.in_file(file.head().path()));
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
+        file: &'file SourceFile,
+        test_only: &'run TestOnly<'head>,
+    ) -> Judgement<'file, 'run> {
+        let path = file.head().path();
+        let shipped = file.shipped().map(|_| ());
         let package = file.head().placement().package();
-        let manifest = test_only
-            .manifests
-            .get(package)
-            .filter(|last| **last == file.head().path())
-            .map(|_| Self::in_manifest(package, file));
-        flagged.chain(only_tests).chain(manifest.into_iter().flatten()).collect()
+        let manifest =
+            test_only.manifests.get(package).filter(|last| **last == path).map(|_| Self::in_manifest(package, file));
+        let gated = shipped
+            .into_iter()
+            .fold(Judgement::found(Vec::new()), |judged, ()| judged.and(Box::new(GatedItems::new(path))));
+        let featured = gated.and(Box::new(TestFeatures::new(path)));
+        let names = &test_only.names;
+        let offered = shipped.into_iter().fold(featured, |judged, ()| judged.and(Box::new(Offers::new(file, names))));
+        offered.then(manifest.into_iter().flatten())
     }
 }

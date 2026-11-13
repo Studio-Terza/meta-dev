@@ -105,6 +105,7 @@ impl Nest {
     }
 }
 
+#[derive(Debug)]
 struct Shapes<'scan> {
     path: &'scan Path,
     depth: NestingDepth,

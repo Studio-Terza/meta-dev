@@ -1,23 +1,24 @@
 use std::collections::HashMap;
 
-use syn::{Field, GenericArgument, Ident, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
+use syn::{Field, GenericArgument, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
 
 use lint_core::Syntax;
 use lint_layout::Name;
 
-pub struct StructFields<'file> {
+#[derive(Debug)]
+pub struct StructFields {
     generics: Vec<Name>,
-    fields: HashMap<FieldKey<'file>, Name>,
+    fields: HashMap<FieldKey, Name>,
 }
 
-#[derive(PartialEq, Eq, Hash)]
-enum FieldKey<'file> {
-    Named(&'file Ident),
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum FieldKey {
+    Named(Name),
     Unnamed(Index),
 }
 
-impl<'file> StructFields<'file> {
-    pub fn describe(item: &'file ItemStruct) -> StructFields<'file> {
+impl StructFields {
+    pub fn describe(item: &ItemStruct) -> StructFields {
         StructFields {
             generics: item
                 .generics
@@ -38,7 +39,7 @@ impl<'file> StructFields<'file> {
         }
     }
 
-    pub fn field_type<'name>(&'name self, member: &'file Member, concrete: &'name [Name]) -> Option<&'name Name> {
+    pub fn field_type<'name>(&'name self, member: &Member, concrete: &'name [Name]) -> Option<&'name Name> {
         let declared = self.fields.get(&FieldKey::from(member))?;
         self.generics
             .iter()
@@ -68,15 +69,15 @@ impl<'file> StructFields<'file> {
         }
     }
 
-    fn key_at(index: Index, field: &'file Field) -> FieldKey<'file> {
-        field.ident.as_ref().map_or(FieldKey::Unnamed(index), FieldKey::Named)
+    fn key_at(index: Index, field: &Field) -> FieldKey {
+        field.ident.as_ref().map_or(FieldKey::Unnamed(index), |ident| FieldKey::Named(Name::from(ident)))
     }
 }
 
-impl<'file> From<&'file Member> for FieldKey<'file> {
-    fn from(member: &'file Member) -> FieldKey<'file> {
+impl From<&Member> for FieldKey {
+    fn from(member: &Member) -> FieldKey {
         match member {
-            Member::Named(ident) => FieldKey::Named(ident),
+            Member::Named(ident) => FieldKey::Named(Name::from(ident)),
             Member::Unnamed(index) => FieldKey::Unnamed(Index { index: index.index, span: index.span }),
         }
     }

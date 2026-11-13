@@ -79,6 +79,7 @@ impl SweptLint for ExpressionFlow {
     }
 }
 
+#[derive(Debug)]
 struct Flows<'scan> {
     file: &'scan SourceFile,
     path: &'scan Path,

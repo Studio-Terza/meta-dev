@@ -1,35 +1,38 @@
-use syn::visit::Visit;
 use syn::{ExprPath, Pat, PatStruct, PatTupleStruct, Path};
 
 use lint_layout::Name;
+use lint_sweep::{Descend, Kind, Sweep, Watch};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct VariantPaths(Vec<Name>);
 
 impl VariantPaths {
     pub fn in_pat(pat: &Pat) -> Vec<Name> {
         let mut paths = VariantPaths::default();
-        paths.visit_pat(pat);
+        Sweep::through_pat(pat, &mut paths);
         paths.0
     }
 
-    fn record(&mut self, path: &Path) {
+    fn record(&mut self, path: &Path, descend: Descend) -> Descend {
         self.0.extend(path.segments.iter().nth_back(1).map(|parent| Name::from(&parent.ident)));
+        descend
     }
 }
 
-impl<'ast> Visit<'ast> for VariantPaths {
-    fn visit_expr_path(&mut self, pat: &'ast ExprPath) {
-        self.record(&pat.path);
+impl<'ast> Watch<'ast> for VariantPaths {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ExprPath, Kind::PatTupleStruct, Kind::PatStruct]
     }
 
-    fn visit_pat_tuple_struct(&mut self, pat: &'ast PatTupleStruct) {
-        self.record(&pat.path);
-        syn::visit::visit_pat_tuple_struct(self, pat);
+    fn on_expr_path(&mut self, pat: &'ast ExprPath) -> Descend {
+        self.record(&pat.path, Descend::Over)
     }
 
-    fn visit_pat_struct(&mut self, pat: &'ast PatStruct) {
-        self.record(&pat.path);
-        syn::visit::visit_pat_struct(self, pat);
+    fn on_pat_tuple_struct(&mut self, pat: &'ast PatTupleStruct) -> Descend {
+        self.record(&pat.path, Descend::Into)
+    }
+
+    fn on_pat_struct(&mut self, pat: &'ast PatStruct) -> Descend {
+        self.record(&pat.path, Descend::Into)
     }
 }

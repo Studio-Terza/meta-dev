@@ -3,10 +3,11 @@ mod name_uses;
 mod root_exports;
 
 use bag_candidates::BagCandidates;
-use lint_core::{Headline, Parsed, SourceFile, Violation};
+use lint_core::{Headline, Parsed, SourceFile};
 use lint_file::{ContextLint, Reads};
 use lint_layout::Name;
 use lint_placement::CrateName;
+use lint_sweep::Judgement;
 use lint_sweep::{Gathers, Sweep, Watching};
 use name_uses::NameUses;
 use root_exports::RootExports;
@@ -68,13 +69,10 @@ impl ContextLint for NoParameterBags {
         BagUses { uses: shipped.map(NameUses::from), exports: shipped.map_or_default(RootExports::from) }
     }
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, bags: &Bags<'head>) -> Vec<Violation<'file>> {
-        let candidates = BagCandidates::from(file);
-        candidates
-            .candidates()
-            .filter(|candidate| bags.exports.exported(file, candidate.name()).is_none())
-            .filter(|candidate| bags.one_consumer(file, candidate.name()).is_some())
-            .map(|candidate| candidate.violation(file.head().path()))
-            .collect()
+    fn judgement<'run, 'file: 'run, 'head: 'file>(
+        file: &'file SourceFile,
+        bags: &'run Bags<'head>,
+    ) -> Judgement<'file, 'run> {
+        Judgement::watching(Box::new(BagCandidates::new(file, bags)))
     }
 }

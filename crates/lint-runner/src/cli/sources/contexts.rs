@@ -131,6 +131,10 @@ macro_rules! contexts {
             $($primed: <$prime as PrimedFacts>::Part<'run>,)*
         }
 
+        struct Contributions<'settled, 'run: 'settled> {
+            $($primed: <$prime as PrimedFacts>::Contribution<'settled, 'run>,)*
+        }
+
         #[derive(Debug, Default)]
         struct Primeds<'run> {
             $($primed: Vec<<$prime as PrimedFacts>::Part<'run>>,)*
@@ -138,7 +142,13 @@ macro_rules! contexts {
 
         impl<'run> Contexts<'run> {
             pub(crate) fn priming(&self, parsed: Parsed<'_, 'run>) -> PrimedParts<'run> {
-                PrimedParts { $($primed: <$prime as PrimedFacts>::contributed(parsed, &self.$primed),)* }
+                let mut contributions = Contributions {
+                    $($primed: <$prime as PrimedFacts>::contribution(parsed, &self.$primed),)*
+                };
+                let mut watching: Vec<&mut Watching<'_>> = Vec::new();
+                $(watching.extend(contributions.$primed.watching());)*
+                Sweep::watching(parsed.file(), watching);
+                PrimedParts { $($primed: contributions.$primed.gathered(),)* }
             }
         }
 
@@ -183,12 +193,12 @@ contexts! {
     }
     primed: {
         state_graph: StateGraph,
-        roles: RoleReading,
     }
     gleaned: {
         test_budget: TestBudget,
         paired_apis: PairedApis,
         clones: Clones,
+        roles: RoleReading,
     }
 }
 

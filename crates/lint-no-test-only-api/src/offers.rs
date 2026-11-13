@@ -1,29 +1,31 @@
+mod candidate;
 mod constructor;
 
 use std::path::Path;
 
-use syn::visit::{self, Visit};
 use syn::{Ident, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Type, Visibility};
 
 use constructor::Constructor;
 use lint_core::{Site, Violation};
 use lint_core::{SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
+use lint_sweep::{Descend, Finds, Kind, Watch};
 
-use crate::candidate::Candidate;
+use std::collections::BTreeSet;
+
 use crate::finding::Finding;
+use candidate::Candidate;
 
 #[derive(Debug)]
-pub(crate) struct Offers<'file> {
+pub(crate) struct Offers<'file, 'run> {
     path: &'file Path,
+    names: &'run BTreeSet<Name>,
     found: Vec<Candidate<'file>>,
 }
 
-impl<'file> Offers<'file> {
-    pub(crate) fn in_file(file: &'file SourceFile) -> Vec<Candidate<'file>> {
-        let mut offers = Offers { path: file.head().path(), found: Vec::new() };
-        file.shipped().into_iter().for_each(|shipped| offers.visit_file(shipped.syntax()));
-        offers.found
+impl<'file, 'run> Offers<'file, 'run> {
+    pub(crate) fn new(file: &'file SourceFile, names: &'run BTreeSet<Name>) -> Offers<'file, 'run> {
+        Offers { path: file.head().path(), names, found: Vec::new() }
     }
 
     fn offered(&mut self, ident: &Ident, visibility: &Visibility) {
@@ -58,19 +60,36 @@ impl<'file> Offers<'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for Offers<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Offers<'_, '_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemEnum]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+    }
+
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
         let owner = Self::owner(item).filter(|_| Walk::inherent_impls(item) == Walk::Entered);
-        Walk::enter(&item.attrs, || owner.iter().for_each(|named| self.constructors(item, named)));
+        let entered = Descend::from(Walk::outside_tests(&item.attrs)).entered();
+        entered.and(owner).into_iter().for_each(|named| self.constructors(item, named));
+        Descend::Over
     }
 
-    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        Walk::enter(&item.attrs, || {
-            item.variants.iter().for_each(|variant| self.offered(&variant.ident, &item.vis));
-        });
+    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+        let entered = Descend::from(Walk::outside_tests(&item.attrs)).entered();
+        entered.into_iter().flat_map(|_| &item.variants).for_each(|variant| self.offered(&variant.ident, &item.vis));
+        Descend::Over
+    }
+}
+
+impl<'file> Finds<'file> for Offers<'file, '_> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        let names = self.names;
+        self.found
+            .into_iter()
+            .filter(|candidate| names.contains(candidate.called()))
+            .map(Candidate::violation)
+            .collect()
     }
 }

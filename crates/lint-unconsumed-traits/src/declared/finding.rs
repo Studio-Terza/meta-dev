@@ -3,7 +3,7 @@ use std::fmt;
 use lint_core::Fix;
 use lint_layout::Name;
 
-use crate::declaration::Declaration;
+use super::declaration::Declaration;
 
 pub(crate) struct Finding<'declaration>(&'declaration Declaration<'declaration>);
 

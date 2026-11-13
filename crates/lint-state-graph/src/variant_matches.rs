@@ -4,7 +4,6 @@ use variant_paths::VariantPaths;
 
 use std::path::Path;
 use syn::spanned::Spanned;
-use syn::visit::Visit;
 
 use syn::{Arm, Expr, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
 
@@ -12,12 +11,13 @@ use super::declarations::Declarations;
 use super::finding::Finding;
 use lint_core::Home;
 use lint_core::Site;
-use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
+use lint_sweep::{Descend, Kind, Watch};
 
+#[derive(Debug)]
 pub struct VariantMatches<'scan, 'file> {
     declarations: &'scan Declarations<'file>,
     path: &'file Path,
@@ -26,15 +26,12 @@ pub struct VariantMatches<'scan, 'file> {
 }
 
 impl<'scan, 'file> VariantMatches<'scan, 'file> {
-    pub fn violations(file: &'file SourceFile, declarations: &'scan Declarations<'file>) -> Vec<Violation<'file>> {
-        let mut matches = VariantMatches {
-            declarations,
-            path: file.head().path(),
-            home: Home::containing(file),
-            violations: Vec::new(),
-        };
-        matches.visit_file(file.syntax());
-        matches.violations
+    pub fn new(path: &'file Path, home: Home<'file>, declarations: &'scan Declarations<'file>) -> Self {
+        VariantMatches { declarations, path, home, violations: Vec::new() }
+    }
+
+    pub fn violations(self) -> Vec<Violation<'file>> {
+        self.violations
     }
 
     fn foreign_variant(&self, pat: &Pat) -> Option<Name> {
@@ -66,36 +63,40 @@ impl<'scan, 'file> VariantMatches<'scan, 'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for VariantMatches<'_, '_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for VariantMatches<'_, '_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemFn, Kind::ImplItemFn, Kind::ExprMatch, Kind::ExprLet, Kind::Local]
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        Walk::enter(&function.attrs, || syn::visit::visit_item_fn(self, function));
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs))
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        Walk::enter(&function.attrs, || syn::visit::visit_impl_item_fn(self, function));
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        Descend::from(Walk::outside_tests(&function.attrs))
     }
 
-    fn visit_expr_match(&mut self, expr: &'ast ExprMatch) {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+        Descend::from(Walk::outside_tests(&function.attrs))
+    }
+
+    fn on_expr_match(&mut self, expr: &'ast ExprMatch) -> Descend {
         let found: Vec<Violation> = expr.arms.iter().filter_map(|arm| self.foreign_match(arm)).collect();
         self.violations.extend(found);
-        syn::visit::visit_expr_match(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_let(&mut self, expr: &'ast ExprLet) {
+    fn on_expr_let(&mut self, expr: &'ast ExprLet) -> Descend {
         let found = self.foreign_variant(&expr.pat).map(|enum_name| self.violation(&expr.pat, &enum_name));
         self.violations.extend(found);
-        syn::visit::visit_expr_let(self, expr);
+        Descend::Into
     }
 
-    fn visit_local(&mut self, local: &'ast Local) {
+    fn on_local(&mut self, local: &'ast Local) -> Descend {
         let found = local
             .init
             .as_ref()
@@ -103,6 +104,6 @@ impl<'ast> Visit<'ast> for VariantMatches<'_, '_> {
             .and_then(|_| self.foreign_variant(&local.pat))
             .map(|enum_name| self.violation(&local.pat, &enum_name));
         self.violations.extend(found);
-        syn::visit::visit_local(self, local);
+        Descend::Into
     }
 }

@@ -31,6 +31,7 @@ impl SweptLint for NamedLifetimes {
     }
 }
 
+#[derive(Debug)]
 struct ShortLifetimes<'file> {
     path: &'file Path,
     found: Vec<Violation<'file>>,

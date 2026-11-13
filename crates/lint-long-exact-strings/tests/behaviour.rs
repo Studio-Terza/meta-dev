@@ -1,4 +1,4 @@
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_long_exact_strings::LongExactStrings;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -210,5 +210,5 @@ const CASES: [Case; 33] = [
 
 #[test]
 fn assertions_that_pin_long_text_are_flagged() {
-    assert_eq!(Sources::mismatches::<Filed<LongExactStrings>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<LongExactStrings>>(&CASES), Lines::default());
 }
