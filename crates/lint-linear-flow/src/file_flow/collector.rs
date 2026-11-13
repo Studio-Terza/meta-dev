@@ -1,4 +1,3 @@
-use proc_macro2::{Ident, TokenStream, TokenTree};
 use syn::{
     Block, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, ImplItemFn, Item, ItemFn, Local,
     Macro, Signature, TraitItemFn,
@@ -18,25 +17,6 @@ use crate::function_flow::{FunctionFlow, Opened};
 enum Frame<'file> {
     Function(Opened<'file>),
     Item,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Keyword;
-
-impl Keyword {
-    const FUNCTION: &'static str = "fn";
-
-    fn in_tokens(tokens: TokenStream) -> Option<Ident> {
-        tokens.into_iter().find_map(Self::in_tree)
-    }
-
-    fn in_tree(tree: TokenTree) -> Option<Ident> {
-        match tree {
-            TokenTree::Group(group) => Self::in_tokens(group.stream()),
-            TokenTree::Ident(ident) => Some(ident).filter(|found| *found == Self::FUNCTION),
-            TokenTree::Punct(_) | TokenTree::Literal(_) => None,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -157,10 +137,8 @@ impl<'ast> Watch<'ast> for Collector<'_> {
         Descend::Into
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
-        let keyword = Keyword::in_tokens(invocation.tokens.clone()).map(|_| Descend::Expand);
-        let body = self.inside().map(|_| Descend::Expand);
-        body.or(keyword).unwrap_or(Descend::Over)
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
     }
 
     fn on_expr_if(&mut self, expr: &'ast ExprIf) -> Descend {
