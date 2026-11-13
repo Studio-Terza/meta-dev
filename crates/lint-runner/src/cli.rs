@@ -133,7 +133,7 @@ impl Cli {
     ) -> Verdict {
         thread::scope(|scope| {
             let run = self.mode.started(scope, sources);
-            run.verdict_of(&sources.read(Worker::MAIN), sources, out, err)
+            run.verdict_of(&ManuallyDrop::new(sources.read(Worker::MAIN)), sources, out, err)
         })
     }
 }
