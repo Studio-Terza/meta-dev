@@ -168,8 +168,8 @@ impl<'ast> Watch<'ast> for Repetitions {
     fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
         let reached = self.reached(&call.receiver);
         let skipped = reached.as_ref().map(|_| Address::from(call.receiver.as_ref()));
-        let line = LineNumber::from(call.receiver.span());
-        let found = reached.and_then(|at| self.repetition(at, line, Some(Name::from(&call.method))));
+        let found = reached
+            .and_then(|at| self.repetition(at, LineNumber::from(call.receiver.span()), Some(Name::from(&call.method))));
         self.found.extend(found);
         let adaptor = PerElement::adaptor(call).map(Repeating::Closure);
         let arguments = call
