@@ -295,3 +295,10 @@ laws::table!(module_cycles_inside_a_crate_are_listed_by_definitions_and_by_uses,
         "  through uses: 0".to_owned(),
     ],
 ]);
+
+#[test]
+fn the_crates_flag_alone_asks_for_crate_sizes() {
+    let files = Asked::tree();
+    let answered = Asked::query(&["--crates"]).map(|query| query.answered(&files, &[]).to_string());
+    assert!(answered.is_ok_and(|text| text.contains("crates by size and place on the compile chain:")));
+}

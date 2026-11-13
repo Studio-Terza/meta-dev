@@ -27,6 +27,7 @@ enum Expecting {
     Item(Item),
     From,
     To(Name),
+    Crates,
 }
 
 #[derive(Debug)]
@@ -46,7 +47,7 @@ impl Query {
 }
 
 impl Expecting {
-    const FLAGS: [(&'static str, Expecting); 11] = [
+    const FLAGS: [(&'static str, Expecting); 12] = [
         ("--in", Expecting::Root),
         ("--role", Expecting::Role),
         ("--top", Expecting::Top),
@@ -58,6 +59,7 @@ impl Expecting {
         ("--exports", Expecting::Item(Item::Exports)),
         ("--path", Expecting::From),
         ("--cycles", Expecting::Item(Item::Cycles)),
+        ("--crates", Expecting::Crates),
     ];
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -82,7 +84,7 @@ impl Item {
 impl Reading {
     fn next(self, word: &str) -> Result<Reading, QueryFailure> {
         match self.expecting {
-            Expecting::Word => self.flagged(Expecting::flag(word), word),
+            Expecting::Word | Expecting::Crates => self.flagged(Expecting::flag(word), word),
             Expecting::Root => {
                 Ok(Reading { query: self.query.with_root(PathBuf::from(word)), expecting: Expecting::Word })
             }
@@ -101,6 +103,7 @@ impl Reading {
 
     fn flagged(self, flag: Option<Expecting>, word: &str) -> Result<Reading, QueryFailure> {
         match flag {
+            Some(Expecting::Crates) => Ok(Reading { query: self.query.with_crates(), expecting: Expecting::Word }),
             Some(expecting) => Ok(Reading { query: self.query, expecting }),
             None => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
         }
@@ -114,7 +117,8 @@ impl Reading {
             | Expecting::Top
             | Expecting::Item(_)
             | Expecting::From
-            | Expecting::To(_) => Err(QueryFailure::Unfinished),
+            | Expecting::To(_)
+            | Expecting::Crates => Err(QueryFailure::Unfinished),
         }
     }
 
