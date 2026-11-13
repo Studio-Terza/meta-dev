@@ -1395,11 +1395,11 @@ dependencies = [
 name = "lint-crate-graph"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
  "lint-fixtures",
  "lint-item-graph",
  "lint-layout",
- "lint-placement",
  "newtype",
 ]
 

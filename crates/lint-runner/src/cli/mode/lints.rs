@@ -124,7 +124,7 @@ type Workspaced = for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'f
 type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>) -> Vec<Report<'file>>;
 
 impl Lints {
-    const LINTS: [Entry; 53] = [
+    const LINTS: [Entry; 54] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Filed<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -181,13 +181,13 @@ impl Lints {
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
-                .chain([CrateGraph::of_names(extraction.names())])
                 .collect()
         })),
         <Judged<UnconsumedTraits> as Registered>::ENTRY,
         Entry::spelled::<RustOnly>(Work::Checked(|readout| vec![RustOnly::report(readout.repo_files())])),
         Entry::spelled::<WorkflowRun>(Work::Checked(|readout| vec![WorkflowRun::report(readout.repo_files())])),
         Entry::spelled::<HandImpls>(Work::Modelled(<HandImpls as ModelLint>::report)),
+        Entry::spelled::<CrateGraph>(Work::Modelled(<CrateGraph as ModelLint>::report)),
         Entry::spelled::<NoPlaintext>(Work::Modelled(<NoPlaintext as ModelLint>::report)),
     ];
 

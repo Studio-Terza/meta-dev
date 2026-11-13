@@ -5,7 +5,7 @@ use quote::quote;
 use syn::parse::discouraged::Speculative;
 use syn::parse::{ParseStream, Parser};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Block, Expr, Macro, Stmt, Token};
+use syn::{Attribute, Block, Expr, Item, Macro, Stmt, Token};
 
 use crate::source_file::SourceFile;
 use crate::syntax::Syntax;
@@ -19,6 +19,11 @@ pub struct Macros;
 
 impl Macros {
     const ARROW_END: char = '>';
+
+    #[must_use]
+    pub fn items(invocation: &Macro) -> Vec<Item> {
+        syn::parse2::<syn::File>(invocation.tokens.clone()).map_or_else(|_| Vec::new(), |file| file.items)
+    }
 
     #[must_use]
     pub fn statements(invocation: &Macro) -> Vec<Stmt> {

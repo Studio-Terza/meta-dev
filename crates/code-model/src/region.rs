@@ -1,3 +1,4 @@
+use crate::boundary::ItemId;
 use crate::type_ref::TypeRef;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -96,17 +97,28 @@ impl Region {
 pub struct Seat {
     region: Region,
     subject: Option<TypeRef>,
+    owner: Option<ItemId>,
 }
 
 impl Seat {
     #[must_use]
     pub fn new(region: Region, subject: Option<TypeRef>) -> Seat {
-        Seat { region, subject }
+        Seat { region, subject, owner: None }
+    }
+
+    #[must_use]
+    pub fn owned(self, owner: Option<ItemId>) -> Seat {
+        Seat { owner, ..self }
     }
 
     #[must_use]
     pub fn subject(&self) -> Option<&TypeRef> {
         self.subject.as_ref()
+    }
+
+    #[must_use]
+    pub fn owner(&self) -> Option<ItemId> {
+        self.owner
     }
 }
 

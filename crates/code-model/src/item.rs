@@ -14,6 +14,9 @@ pub enum ItemKind {
     Trait,
     Alias,
     Derive,
+    Function,
+    Const,
+    Static,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,6 +29,12 @@ impl Item {
     #[must_use]
     pub fn new(name: Name, kind: ItemKind) -> Item {
         Item { name, kind }
+    }
+}
+
+impl AsRef<Name> for Item {
+    fn as_ref(&self) -> &Name {
+        &self.name
     }
 }
 

@@ -135,7 +135,7 @@ impl<'read> Planting<'read> {
             .zip(bodies)
             .map(|(placing, lowered)| Unplanted {
                 placing,
-                file: building.file(placing.path.clone(), placing.krate.clone()),
+                file: building.file(placing.path.clone(), placing.krate.clone(), placing.crate_file.clone()),
                 lowered,
             })
             .collect();

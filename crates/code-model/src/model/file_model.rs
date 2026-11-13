@@ -1,23 +1,23 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use lint_layout::Name;
+use lint_layout::{LineNumber, Name};
+
+use crate::placed::Placed;
+use crate::site::Site;
 
 #[derive(Debug)]
 pub(crate) struct FileModel {
     path: PathBuf,
     krate: Name,
+    root: PathBuf,
 }
 
 impl FileModel {
-    pub(crate) fn new(path: PathBuf, krate: Name) -> FileModel {
-        FileModel { path, krate }
+    pub(crate) fn new(path: PathBuf, krate: Name, root: PathBuf) -> FileModel {
+        FileModel { path, krate, root }
     }
 
-    pub(crate) fn path(&self) -> &Path {
-        &self.path
-    }
-
-    pub(crate) fn krate(&self) -> &Name {
-        &self.krate
+    pub(crate) fn placed<Entity: Copy>(&self, line: LineNumber, entity: Entity) -> Placed<'_, Entity> {
+        Placed::new(Site::new(&self.path, line), &self.krate, &self.root, entity)
     }
 }

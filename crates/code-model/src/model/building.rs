@@ -32,9 +32,9 @@ impl Building {
         alias.target().named().map(AsRef::as_ref)
     }
 
-    pub fn file(&mut self, path: PathBuf, krate: Name) -> FileId {
+    pub fn file(&mut self, path: PathBuf, krate: Name, root: PathBuf) -> FileId {
         let file = FileId::next(&self.model.files);
-        self.model.files.push(FileModel::new(path, krate));
+        self.model.files.push(FileModel::new(path, krate, root));
         file
     }
 

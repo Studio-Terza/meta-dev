@@ -6,20 +6,20 @@ use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
 use super::Lowering;
+use super::places::PlaceId;
 use super::seat::{Built, Footing, Located};
-use super::subjects::SubjectId;
 
 #[derive(Debug)]
 pub(super) struct CallRow {
     located: Located,
     callee: Callee,
     region: Region,
-    subject: Option<SubjectId>,
+    place: Option<PlaceId>,
 }
 
 impl Built for CallRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let seat = footing.subjects().seat(self.region.joined(footing.outer()), self.subject);
+        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);
         self.located.call(footing, building, Call::new(self.callee, seat))
     }
 }
@@ -63,7 +63,7 @@ impl Lowering<'_> {
 
     fn called(&mut self, position: Position, callee: Callee) {
         let located = self.here.located(position);
-        let row = CallRow { located, callee, region: self.context.region(), subject: self.context.subject() };
+        let row = CallRow { located, callee, region: self.context.region(), place: self.context.place() };
         self.lowered.rows.calls.push(row);
     }
 }

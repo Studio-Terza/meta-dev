@@ -1,29 +1,25 @@
-mod crate_summary;
+mod links;
 
-use lint_core::{FileHead, Headline, Lint, Report, SourceFile};
-use lint_item_graph::FileNames;
+use code_model::Model;
+use lint_core::{Headline, ModelLint, Report};
 
-use crate_summary::CrateSummary;
+use links::Links;
 
 #[derive(Debug)]
 pub struct CrateGraph;
 
-impl CrateGraph {
-    #[must_use]
-    pub fn of_names<'file>(names: &FileNames<'file>) -> Report<'file> {
+impl ModelLint for CrateGraph {
+    fn report(model: &Model) -> Report<'_> {
         Report::new(
             Headline::new("a crate whose items form one big cycle is split"),
-            names
-                .graphs(FileHead::crate_file)
-                .into_iter()
-                .flat_map(|(crate_file, graph)| CrateSummary::of_graph(crate_file, &graph).violations())
-                .collect(),
+            model
+                .holdings()
+                .map(Links::from)
+                .chain(model.implementations().map(Links::from))
+                .chain(model.functions().map(Links::from))
+                .chain(model.uses().map(Links::from))
+                .collect::<Links<'_>>()
+                .violations(model),
         )
-    }
-}
-
-impl Lint for CrateGraph {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::of_names(&FileNames::from(files))
     }
 }
