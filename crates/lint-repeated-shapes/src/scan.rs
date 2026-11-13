@@ -41,13 +41,15 @@ impl<'file> Scan<'file> {
         scan.occurrences
     }
 
-    fn considered(&mut self, node: &(impl ToTokens + Spanned)) {
+    fn considered(&mut self, node: &(impl ToTokens + Spanned)) -> Option<Bound> {
         let reading = Reading::erasing(node.to_token_stream(), self.equivalence);
         let span = node.span();
         let site = Site::new(self.path, LineNumber::from(span));
         let tokens = reading.shape().size();
         let occurrence = Occurrence::new(reading, site, Extent::from(span), self.kind);
-        self.occurrences.extend(Self::FLOOR.allows(tokens).map(|_| occurrence));
+        let large = Self::FLOOR.allows(tokens).map(|_| Self::FLOOR);
+        self.occurrences.extend(large.map(|_| occurrence));
+        large
     }
 
     fn within(&mut self, attributes: &[Attribute], visit: impl FnOnce(&mut Self)) {
@@ -84,17 +86,23 @@ impl<'ast> Visit<'ast> for Scan<'_> {
     }
 
     fn visit_block(&mut self, block: &'ast Block) {
-        self.considered(block);
-        visit::visit_block(self, block);
+        self.considered(block).into_iter().fold(self, |scan, _| {
+            visit::visit_block(scan, block);
+            scan
+        });
     }
 
     fn visit_expr_match(&mut self, found: &'ast ExprMatch) {
-        self.considered(found);
-        visit::visit_expr_match(self, found);
+        self.considered(found).into_iter().fold(self, |scan, _| {
+            visit::visit_expr_match(scan, found);
+            scan
+        });
     }
 
     fn visit_expr_closure(&mut self, found: &'ast ExprClosure) {
-        self.considered(found);
-        visit::visit_expr_closure(self, found);
+        self.considered(found).into_iter().fold(self, |scan, _| {
+            visit::visit_expr_closure(scan, found);
+            scan
+        });
     }
 }
