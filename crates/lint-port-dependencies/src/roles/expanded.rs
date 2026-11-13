@@ -1,42 +1,74 @@
-use syn::visit::{self, Visit};
-use syn::{Attribute, ItemMod, Macro, Path};
+use std::path::Path;
 
-use lint_core::{AttributeMacros, MacroCalls, SourceFile, Walk};
+use syn::visit::{self, Visit};
+use syn::{Attribute, ItemMod, Macro};
+
+use lint_core::{AttributeMacros, MacroCalls, Parsed, Walk};
 use lint_layout::{LineNumber, Name, UsePath};
 use lint_paths::{Imports, Module};
 
-pub(super) struct Expanded<'file, 'run> {
-    module: Module<'file>,
-    imports: &'run Imports<'run>,
-    wanted: &'run [UsePath],
-    found: Vec<LineNumber>,
+#[derive(Debug)]
+struct Called {
+    candidates: Vec<UsePath>,
+    line: LineNumber,
 }
 
-impl<'file, 'run> Expanded<'file, 'run> {
-    pub(super) fn lines(
-        file: &'file SourceFile,
-        imports: &'run Imports<'run>,
-        wanted: &'run [UsePath],
-    ) -> Vec<LineNumber> {
-        let mut expanded = Expanded { module: Module::of_file(file), imports, wanted, found: Vec::new() };
-        expanded.visit_file(file.syntax());
-        expanded.found
+#[derive(Debug)]
+pub struct FileCalls<'head> {
+    path: &'head Path,
+    package: Option<&'head Name>,
+    called: Vec<Called>,
+}
+
+impl<'head> FileCalls<'head> {
+    pub(super) fn read(parsed: Parsed<'_, 'head>, imports: &Imports<'_>) -> FileCalls<'head> {
+        let head = parsed.head();
+        let mut expanded = Expanded { module: Module::of_head(head), imports, called: Vec::new() };
+        expanded.visit_file(parsed.file().syntax());
+        FileCalls { path: head.path(), package: head.placement().package().root().package(), called: expanded.called }
     }
 
-    fn met(&self, path: &Path) -> Option<LineNumber> {
+    pub(super) fn path(&self) -> &'head Path {
+        self.path
+    }
+
+    pub(super) fn admitted<'names>(&self, admitted: &'names std::collections::BTreeSet<Name>) -> Option<&'names Name> {
+        self.package.and_then(|name| admitted.get(name))
+    }
+
+    pub(super) fn lines(&self, wanted: &[UsePath]) -> Vec<LineNumber> {
+        self.called
+            .iter()
+            .filter(|called| called.candidates.iter().any(|candidate| wanted.contains(candidate)))
+            .map(|called| called.line)
+            .collect()
+    }
+}
+
+struct Expanded<'module, 'run> {
+    module: Module<'module>,
+    imports: &'run Imports<'run>,
+    called: Vec<Called>,
+}
+
+impl Expanded<'_, '_> {
+    fn met(&mut self, path: &syn::Path) {
         let line = path.segments.first().map(|segment| LineNumber::from(segment.ident.span()));
         let candidates = self.imports.candidates(&self.module, UsePath::from(path));
-        candidates.iter().find(|candidate| self.wanted.contains(candidate)).and(line)
+        self.called.extend(line.map(|found| Called { candidates, line: found }));
     }
 
-    fn called(&self, invocation: &Macro) -> Vec<LineNumber> {
-        let inner = MacroCalls::within(invocation);
-        self.met(&invocation.path).into_iter().chain(inner.iter().flat_map(|nested| self.called(nested))).collect()
+    fn invoked(&mut self, invocation: &Macro) {
+        self.met(&invocation.path);
+        MacroCalls::within(invocation).iter().fold(self, |expanded, nested| {
+            expanded.invoked(nested);
+            expanded
+        });
     }
 }
 
-impl<'file> Visit<'file> for Expanded<'file, '_> {
-    fn visit_item_mod(&mut self, module: &'file ItemMod) {
+impl<'ast> Visit<'ast> for Expanded<'_, '_> {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || {
             self.module.enter(Name::from(&module.ident));
             visit::visit_item_mod(self, module);
@@ -44,14 +76,14 @@ impl<'file> Visit<'file> for Expanded<'file, '_> {
         });
     }
 
-    fn visit_macro(&mut self, invocation: &'file Macro) {
-        let found = self.called(invocation);
-        self.found.extend(found);
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        self.invoked(invocation);
     }
 
-    fn visit_attribute(&mut self, attribute: &'file Attribute) {
-        let found: Vec<LineNumber> =
-            AttributeMacros::expanded(&attribute.meta).iter().filter_map(|path| self.met(path)).collect();
-        self.found.extend(found);
+    fn visit_attribute(&mut self, attribute: &'ast Attribute) {
+        AttributeMacros::expanded(&attribute.meta).iter().fold(self, |expanded, path| {
+            expanded.met(path);
+            expanded
+        });
     }
 }

@@ -5,8 +5,10 @@ mod unexpanded;
 
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
-use lint_core::{Site, SourceFile, Violation};
+use lint_core::{FileHead, Parsed, Site, Violation};
+use lint_file::PrimedFacts;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_paths::Imports;
@@ -15,19 +17,74 @@ use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
 use breached::{Breached, Fixed};
-use expanded::Expanded;
+pub use expanded::FileCalls;
 use undenied::Undenied;
 use unexpanded::Unexpanded;
 
 #[derive(Debug)]
+pub struct RootDenial<'head> {
+    package: &'head Name,
+    path: &'head Path,
+    denied: BTreeSet<UsePath>,
+}
+
+#[derive(Debug)]
+pub struct RoleFile<'head> {
+    root: Option<RootDenial<'head>>,
+    calls: Option<FileCalls<'head>>,
+}
+
+#[derive(Debug, Default)]
+pub struct RoleFacts<'head> {
+    denials: BTreeMap<&'head Name, RootDenial<'head>>,
+    calls: Vec<FileCalls<'head>>,
+}
+
+impl<'head> FromIterator<RoleFile<'head>> for RoleFacts<'head> {
+    fn from_iter<Parts: IntoIterator<Item = RoleFile<'head>>>(parts: Parts) -> RoleFacts<'head> {
+        parts.into_iter().fold(RoleFacts::default(), |mut facts, part| {
+            facts.denials.extend(part.root.map(|root| (root.package, root)));
+            facts.calls.extend(part.calls);
+            facts
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct RoleReading;
+
+impl PrimedFacts for RoleReading {
+    type PrimerPart<'head> = Imports<'head>;
+    type Primer<'head> = Imports<'head>;
+    type Part<'head> = RoleFile<'head>;
+    type Context<'head> = RoleFacts<'head>;
+
+    fn primed<'head>(parsed: Parsed<'_, 'head>) -> Imports<'head> {
+        Imports::from(parsed)
+    }
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>, imports: &Imports<'head>) -> RoleFile<'head> {
+        let head = parsed.head();
+        let root = Some(head).filter(|found| found.placement().role() == Placed::LibraryRoot);
+        RoleFile {
+            root: root.and_then(|found| {
+                let package = found.placement().package().root().package()?;
+                Some(RootDenial { package, path: found.path(), denied: Undenied::denied(parsed.file().syntax()) })
+            }),
+            calls: parsed.file().shipped().map(|_| FileCalls::read(parsed, imports)),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Roles<'file> {
-    files: &'file [SourceFile],
     owners: Owners<'file>,
+    facts: &'file RoleFacts<'file>,
 }
 
 impl<'file> Roles<'file> {
-    pub(crate) fn new(files: &'file [SourceFile], owners: Owners<'file>) -> Roles<'file> {
-        Roles { files, owners }
+    pub(crate) fn new(heads: &'file [FileHead], facts: &'file RoleFacts<'file>) -> Roles<'file> {
+        Roles { owners: Owners::declared(heads), facts }
     }
 
     pub(crate) fn breached<'meta, Breach: Fixed<'meta>>(&self, breaches: &[Breach]) -> Vec<Violation<'file>> {
@@ -35,67 +92,63 @@ impl<'file> Roles<'file> {
             .iter()
             .filter_map(|breach| Some((self.owners.manifest(breach.as_ref().dependent())?, breach)))
             .flat_map(|(file, breach)| {
-                let package = file.head().placement().package();
+                let package = file.placement().package();
                 let lines = Some(breach.lines(package))
                     .filter(|found| found.first().is_some())
                     .unwrap_or_else(|| BTreeSet::from([package.dependency_sites().header()]));
-                let manifest = file.head().manifest_file().as_ref();
+                let manifest = file.manifest_file().as_ref();
                 lines.into_iter().map(move |line| Violation::new(Site::new(manifest, line), Breached::new(breach)))
             })
             .collect()
     }
 
     pub(crate) fn undenied(&self, role: Role, served: &[&CrateName]) -> Vec<Violation<'file>> {
-        let roots: BTreeMap<&Name, &'file SourceFile> = self
-            .files
-            .iter()
-            .filter(|file| file.head().placement().role() == Placed::LibraryRoot)
-            .filter_map(|file| Some((file.head().placement().package().root().package()?, file)))
-            .collect();
-        served.iter().filter_map(|name| self.denying(&roots, name, role)).flatten().collect()
-    }
-
-    fn denying(
-        &self,
-        roots: &BTreeMap<&Name, &'file SourceFile>,
-        name: &CrateName,
-        role: Role,
-    ) -> Option<Vec<Violation<'file>>> {
-        let (site, missing) = roots.get(&Name::from(name.as_ref())).map_or_else(
-            || {
-                Some((
-                    Site::new(self.owners.manifest(name)?.head().manifest_file().as_ref(), LineNumber::FIRST),
-                    Undenied::all(role),
-                ))
-            },
-            |root| Some((Site::new(root.head().path(), LineNumber::FIRST), Undenied::missing(role, root))),
-        )?;
-        Some(missing.into_iter().map(|undenied| Violation::new(site, undenied)).collect())
+        let denying = |name: &&CrateName| {
+            let (site, missing) = self.facts.denials.get(&Name::from(name.as_ref())).map_or_else(
+                || {
+                    Some((
+                        Site::new(self.owners.manifest(name)?.manifest_file().as_ref(), LineNumber::FIRST),
+                        Undenied::all(role),
+                    ))
+                },
+                |root| Some((Site::new(root.path, LineNumber::FIRST), Undenied::missing(role, &root.denied))),
+            )?;
+            Some(missing.into_iter().map(move |undenied| Violation::new(site, undenied)))
+        };
+        served.iter().filter_map(denying).flatten().collect()
     }
 
     pub(crate) fn unexpanded(&self, expansions: &[Expansion<'file>]) -> Vec<Violation<'file>> {
-        let imports = Imports::across(self.files);
-        expansions.iter().flat_map(|expansion| self.expanded_outside(expansion, &imports)).collect()
+        let expected: Vec<Expected<'file>> = expansions.iter().map(|expansion| self.expected(expansion)).collect();
+        expected.iter().flat_map(|wanted| self.facts.calls.iter().flat_map(|calls| wanted.found_in(calls))).collect()
     }
 
-    fn expanded_outside(&self, expansion: &Expansion<'file>, imports: &Imports<'_>) -> Vec<Violation<'file>> {
+    fn expected(&self, expansion: &Expansion<'file>) -> Expected<'file> {
         let wanted: Vec<UsePath> = expansion.paths(|member, name| {
-            let placed = PlacedName::from(self.owners.manifest(member)?.head().placement().package().root());
+            let placed = PlacedName::from(self.owners.manifest(member)?.placement().package().root());
             let root: &Name = placed.borrow();
             Some([root.clone(), Name::from(name.as_ref())].into_iter().collect())
         });
         let admitted: BTreeSet<Name> = expansion.admitted().map(|name| Name::from(name.as_ref())).collect();
-        let finding = Unexpanded::new(expansion.port(), expansion.expanders().role());
-        self.files
-            .iter()
-            .filter_map(SourceFile::shipped)
-            .filter(|file| {
-                file.head().placement().package().root().package().and_then(|name| admitted.get(name)).is_none()
-            })
-            .flat_map(|file| {
-                let lines = Expanded::lines(file, imports, &wanted);
-                lines.into_iter().map(move |line| Violation::new(Site::new(file.head().path(), line), finding))
-            })
+        Expected { wanted, admitted, finding: Unexpanded::new(expansion.port(), expansion.expanders().role()) }
+    }
+}
+
+#[derive(Debug)]
+struct Expected<'file> {
+    wanted: Vec<UsePath>,
+    admitted: BTreeSet<Name>,
+    finding: Unexpanded<'file>,
+}
+
+impl<'file> Expected<'file> {
+    fn found_in(&self, calls: &FileCalls<'file>) -> Vec<Violation<'file>> {
+        let path = calls.path();
+        let admitted = calls.admitted(&self.admitted).map(|_| Vec::new());
+        admitted
+            .unwrap_or_else(|| calls.lines(&self.wanted))
+            .into_iter()
+            .map(|line| Violation::new(Site::new(path, line), self.finding))
             .collect()
     }
 }

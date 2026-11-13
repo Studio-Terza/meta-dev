@@ -3,7 +3,7 @@ mod stale_owns;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lint_core::{Site, SourceFile, Violation};
+use lint_core::{FileHead, Site, Violation};
 use lint_layout::{LineNumber, Name, TableKey};
 use workspace_metadata::{Bypass, Bypasses, CrateName as PackageName, Stale};
 
@@ -12,21 +12,21 @@ use stale_owns::StaleOwns;
 
 #[derive(Debug)]
 pub(crate) struct Owners<'file> {
-    manifests: BTreeMap<Name, &'file SourceFile>,
+    manifests: BTreeMap<Name, &'file FileHead>,
 }
 
 impl<'file> Owners<'file> {
-    pub(crate) fn declared(files: &'file [SourceFile]) -> Owners<'file> {
+    pub(crate) fn declared(heads: &'file [FileHead]) -> Owners<'file> {
         Owners {
-            manifests: files
+            manifests: heads
                 .iter()
                 .rev()
-                .filter_map(|file| Some((file.head().placement().package().root().package()?.clone(), file)))
+                .filter_map(|head| Some((head.placement().package().root().package()?.clone(), head)))
                 .collect(),
         }
     }
 
-    pub(crate) fn manifest(&self, package: &PackageName) -> Option<&'file SourceFile> {
+    pub(crate) fn manifest(&self, package: &PackageName) -> Option<&'file FileHead> {
         self.manifests.get(&Name::from(package.as_ref())).copied()
     }
 
@@ -47,8 +47,8 @@ impl<'file> Owners<'file> {
                 let file = *self.manifests.get(&Name::from(declarer.as_ref()))?;
                 Some((
                     Site::new(
-                        file.head().manifest_file().as_ref(),
-                        file.head().placement().package().key_lines().line(TableKey::PortOwns)?,
+                        file.manifest_file().as_ref(),
+                        file.placement().package().key_lines().line(TableKey::PortOwns)?,
                     ),
                     owned,
                 ))
@@ -59,22 +59,18 @@ impl<'file> Owners<'file> {
             .collect()
     }
 
-    fn bypassing(
-        file: &'file SourceFile,
-        package: &'file PackageName,
-        bypass: &Bypass<'file>,
-    ) -> Vec<Violation<'file>> {
+    fn bypassing(file: &'file FileHead, package: &'file PackageName, bypass: &Bypass<'file>) -> Vec<Violation<'file>> {
         Self::sites(file, bypass)
             .into_iter()
             .map(|line| {
-                let site = Site::new(file.head().manifest_file().as_ref(), line);
+                let site = Site::new(file.manifest_file().as_ref(), line);
                 Violation::new(site, ForeignDependency::new(package, bypass.owners().clone()))
             })
             .collect()
     }
 
-    fn sites(file: &SourceFile, bypass: &Bypass<'_>) -> BTreeSet<LineNumber> {
-        let dependencies = file.head().placement().package().dependency_sites();
+    fn sites(file: &FileHead, bypass: &Bypass<'_>) -> BTreeSet<LineNumber> {
+        let dependencies = file.placement().package().dependency_sites();
         Some(dependencies.sites(bypass.keys()))
             .filter(|found| found.first().is_some())
             .unwrap_or_else(|| BTreeSet::from([dependencies.header()]))

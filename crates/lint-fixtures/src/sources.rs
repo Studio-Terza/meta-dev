@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use file_ports::{Bytes, Memory};
-use lint_core::{Report, SourceFile, SourceText, WorkspaceLint};
+use lint_core::{FileHead, Parsed, Report, SourceFile, SourceText, WorkspaceLint};
 use lint_placement::Placement;
 use newtype::Wrapping;
 use workspace_metadata::Metadata;
@@ -62,7 +62,10 @@ impl Sources {
     #[must_use]
     pub fn placed_in<Checked: WorkspaceLint>(manifests: &[Source], sources: &[Source], workspace: Text<'_>) -> Lines {
         let workspaces = [Self::kept(Metadata::from_str(workspace.into_inner()))];
-        Self::lines(&Checked::report(&Self::placed(manifests, sources), &workspaces))
+        let files = Self::placed(manifests, sources);
+        let parsed: Vec<Parsed<'_, '_>> = files.iter().map(Parsed::from).collect();
+        let heads: Vec<FileHead> = files.iter().map(|file| file.head().clone()).collect();
+        Self::lines(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed)))
     }
 
     #[must_use]
