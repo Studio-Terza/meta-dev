@@ -8,6 +8,7 @@ mod verdict;
 
 use std::ffi::OsString;
 use std::io::Write;
+use std::mem::ManuallyDrop;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::OnceLock;
@@ -110,9 +111,16 @@ impl Cli {
         err: &mut impl Write,
     ) -> Verdict {
         match staged {
-            Ok(stage) => {
-                self.sourced(&Sources::new(wired, &stage, &SharedRead::new(stage.done()), &OnceLock::new()), out, err)
-            }
+            Ok(stage) => self.sourced(
+                &ManuallyDrop::new(Sources::new(
+                    wired,
+                    &stage,
+                    &ManuallyDrop::new(SharedRead::new(stage.done())),
+                    &OnceLock::new(),
+                )),
+                out,
+                err,
+            ),
             Err(failure) => Verdict::refused(&failure, err),
         }
     }
@@ -125,7 +133,7 @@ impl Cli {
     ) -> Verdict {
         thread::scope(|scope| {
             let run = self.mode.started(scope, sources);
-            run.verdict_of(&sources.read(Worker::MAIN), sources, out, err)
+            run.verdict_of(&ManuallyDrop::new(sources.read(Worker::MAIN)), sources, out, err)
         })
     }
 }
