@@ -1,8 +1,10 @@
+use super::gathering::Gathering;
 use law_facts::LawReading;
+use lint_clones::Clones;
 use lint_core::Parsed;
 use lint_enum_predicates::EnumPredicates;
 use lint_fakes_at_ports::FakesAtPorts;
-use lint_file::{ContextLint, PrimedFacts};
+use lint_file::{ContextLint, Gleaning, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
 use lint_mandatory_laws::MandatoryLaws;
 use lint_module_nesting::ModuleNesting;
@@ -10,17 +12,23 @@ use lint_named_numbers::NamedNumbers;
 use lint_no_forwarders::NoForwarders;
 use lint_no_parameter_bags::NoParameterBags;
 use lint_no_test_only_api::NoTestOnlyApi;
+use lint_paired_apis::PairedApis;
 use lint_port_batching::PortBatching;
-use lint_port_dependencies::EffectsInFillers;
+use lint_port_dependencies::{EffectsInFillers, RoleReading};
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_state_graph::StateGraph;
+use lint_test_budget::TestBudget;
 use lint_unconsumed_traits::UnconsumedTraits;
 
 pub(crate) trait Holding<'run, Lint: ContextLint> {
     fn held(&self) -> &Lint::Context<'run>;
+}
+
+pub(crate) trait Gleans<'run, Glean: Gleaning> {
+    fn gleaned(&self) -> &Glean::Gleaned<'run>;
 }
 
 pub(crate) trait Priming<'run, Lint: PrimedFacts> {
@@ -35,33 +43,27 @@ pub(crate) struct Settled<'settled, 'run> {
     primings: &'settled Primings<'run>,
 }
 
-impl<'settled, 'run> Settled<'settled, 'run> {
-    pub(crate) fn new(
-        contexts: &'settled Contexts<'run>,
-        primings: &'settled Primings<'run>,
-    ) -> Settled<'settled, 'run> {
-        Settled { contexts, primings }
-    }
-}
-
 macro_rules! contexts {
-    (judged: { $($field:ident: $lint:ty),* $(,)? } primed: { $($primed:ident: $prime:ty),* $(,)? }) => {
+    (judged: { $($field:ident: $lint:ty),* $(,)? } primed: { $($primed:ident: $prime:ty),* $(,)? } gleaned: { $($gleaned:ident: $glean:ty),* $(,)? }) => {
         #[derive(Debug)]
         pub(crate) struct Contexts<'run> {
             $($field: <$lint as ContextLint>::Context<'run>,)*
             $($primed: <$prime as PrimedFacts>::Primer<'run>,)*
+            $($gleaned: <$glean as Gleaning>::Gleaned<'run>,)*
         }
 
         #[derive(Debug)]
         pub(crate) struct Contributed<'run> {
             $($field: <$lint as ContextLint>::Part<'run>,)*
             $($primed: <$prime as PrimedFacts>::PrimerPart<'run>,)*
+            $($gleaned: <$glean as Gleaning>::Part<'run>,)*
         }
 
         #[derive(Debug, Default)]
         struct Parts<'run> {
             $($field: Vec<<$lint as ContextLint>::Part<'run>>,)*
             $($primed: Vec<<$prime as PrimedFacts>::PrimerPart<'run>>,)*
+            $($gleaned: Vec<<$glean as Gleaning>::Part<'run>>,)*
         }
 
         impl<'run> From<Parsed<'_, 'run>> for Contributed<'run> {
@@ -69,6 +71,7 @@ macro_rules! contexts {
                 Contributed {
                     $($field: <$lint as ContextLint>::contributed(parsed),)*
                     $($primed: <$prime as PrimedFacts>::primed(parsed),)*
+                    $($gleaned: <$glean as Gleaning>::gleaned(parsed),)*
                 }
             }
         }
@@ -78,11 +81,13 @@ macro_rules! contexts {
                 let split = found.into_iter().fold(Parts::default(), |mut split, part| {
                     $(split.$field.push(part.$field);)*
                     $(split.$primed.push(part.$primed);)*
+                    $(split.$gleaned.push(part.$gleaned);)*
                     split
                 });
                 Contexts {
                     $($field: split.$field.into_iter().collect(),)*
                     $($primed: split.$primed.into_iter().collect(),)*
+                    $($gleaned: split.$gleaned.into_iter().collect(),)*
                 }
             }
         }
@@ -91,6 +96,14 @@ macro_rules! contexts {
             impl<'run> Holding<'run, $lint> for Settled<'_, 'run> {
                 fn held(&self) -> &<$lint as ContextLint>::Context<'run> {
                     &self.contexts.$field
+                }
+            }
+        )*
+
+        $(
+            impl<'run> Gleans<'run, $glean> for Settled<'_, 'run> {
+                fn gleaned(&self) -> &<$glean as Gleaning>::Gleaned<'run> {
+                    &self.contexts.$gleaned
                 }
             }
         )*
@@ -162,5 +175,17 @@ contexts! {
         fakes_at_ports: FakesAtPorts,
         port_batching: PortBatching,
         effects_in_fillers: EffectsInFillers,
+        roles: RoleReading,
+    }
+    gleaned: {
+        test_budget: TestBudget,
+        paired_apis: PairedApis,
+        clones: Clones,
+    }
+}
+
+impl<'settled, 'run> From<&'settled Gathering<'run>> for Settled<'settled, 'run> {
+    fn from(gathering: &'settled Gathering<'run>) -> Settled<'settled, 'run> {
+        Settled { contexts: gathering.contexts(), primings: gathering.primings() }
     }
 }

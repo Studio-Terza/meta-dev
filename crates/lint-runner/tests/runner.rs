@@ -69,8 +69,9 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         )
     })?;
     let mode = include_str!("../src/cli/mode.rs");
-    let listed_by_the_mode =
-        mode.matches("::report(files)").count() + mode.matches("::report(files, readout.workspaces())").count();
+    let listed_by_the_mode = mode.matches("::report(files)").count()
+        + mode.matches("::report(files, readout.workspaces())").count()
+        + mode.matches("Report::from(Gleans::<").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
     let listed_by_the_runner = [
         "::report(readout.files())",

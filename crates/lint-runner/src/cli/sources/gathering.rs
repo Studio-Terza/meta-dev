@@ -141,6 +141,10 @@ impl<'run> Gathering<'run> {
         self.model.wait().as_ref()
     }
 
+    pub(crate) fn heads(&self) -> &'run [FileHead] {
+        self.heads.get().map_or(&[][..], Vec::as_slice)
+    }
+
     pub(crate) fn contexts(&self) -> &Contexts<'run> {
         self.contexts.wait()
     }

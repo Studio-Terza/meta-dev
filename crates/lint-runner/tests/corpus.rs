@@ -117,6 +117,7 @@ impl Corpus {
         .map(|call| runner.matches(call).count())
         .sum::<usize>()
             + include_str!("../src/cli/mode.rs").matches("::report(files)").count()
+            + include_str!("../src/cli/mode.rs").matches("Report::from(Gleans::<").count()
     }
 
     fn violation(line: &str) -> Option<Violation<'_>> {

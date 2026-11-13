@@ -4,7 +4,7 @@ use std::fmt;
 use syn::punctuated::Punctuated;
 use syn::{Path, Token};
 
-use lint_core::{Finding, Fix, SourceFile};
+use lint_core::{Finding, Fix};
 use lint_layout::{Name, UsePath, Word, words};
 use workspace_metadata::Role;
 
@@ -19,23 +19,20 @@ impl Undenied {
     const LEVELS: [&'static str; 2] = ["deny", "forbid"];
 
     pub(super) fn all(role: Role) -> Vec<Undenied> {
-        Self::missing_from(role, &BTreeSet::new())
+        Self::missing(role, &BTreeSet::new())
     }
 
-    pub(super) fn missing(role: Role, root: &SourceFile) -> Vec<Undenied> {
-        let denied: BTreeSet<UsePath> = root
-            .syntax()
-            .attrs
+    pub(super) fn denied(root: &syn::File) -> BTreeSet<UsePath> {
+        root.attrs
             .iter()
             .filter(|attribute| Self::LEVELS.iter().any(|level| attribute.path().is_ident(level)))
             .filter_map(|attribute| attribute.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
             .flatten()
             .map(|path| UsePath::from(&path))
-            .collect();
-        Self::missing_from(role, &denied)
+            .collect()
     }
 
-    fn missing_from(role: Role, denied: &BTreeSet<UsePath>) -> Vec<Undenied> {
+    pub(super) fn missing(role: Role, denied: &BTreeSet<UsePath>) -> Vec<Undenied> {
         let required: BTreeSet<UsePath> =
             Self::DENIED.iter().map(|lint| lint.iter().map(|segment| Name::from(*segment)).collect()).collect();
         required.difference(denied).map(|lint| Undenied { role, lint: lint.clone() }).collect()

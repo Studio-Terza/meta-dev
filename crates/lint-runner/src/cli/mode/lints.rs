@@ -9,8 +9,9 @@ use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
 use law_facts::{LawReading, Laws};
-use lint_core::{Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
+use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads};
+use lint_port_dependencies::{RoleFacts, RoleReading};
 use lint_reader::{Described, Unlocated};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
@@ -118,7 +119,7 @@ struct Filing {
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
-type Workspaced = for<'file> fn(&'file [SourceFile], &'file [Metadata]) -> Report<'file>;
+type Workspaced = for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>) -> Report<'file>;
 
 type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>) -> Vec<Report<'file>>;
 
@@ -155,8 +156,12 @@ impl Lints {
         <Filed<NoTestIo> as Registered>::ENTRY,
         <Primed<FakesAtPorts> as Registered>::ENTRY,
         <Primed<PortBatching> as Registered>::ENTRY,
-        Entry::spelled::<OwnedDependencies>(Work::Described(<OwnedDependencies as WorkspaceLint>::report)),
-        Entry::spelled::<KeyDependencyRoles>(Work::Described(<KeyDependencyRoles as WorkspaceLint>::report)),
+        Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _| {
+            <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &())
+        })),
+        Entry::spelled::<KeyDependencyRoles>(Work::Described(|heads, workspaces, facts| {
+            <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts)
+        })),
         <Primed<EffectsInFillers> as Registered>::ENTRY,
         <Filed<CountedCalls> as Registered>::ENTRY,
         <Filed<HiddenSqlx> as Registered>::ENTRY,
@@ -229,7 +234,7 @@ impl Lints {
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
         let queued: Worked = claimed.collect();
         let judging = Stopwatch::started(sources.wired().timer());
-        let settled = Settled::new(sources.gathering().contexts(), sources.gathering().primings());
+        let settled = Settled::from(sources.gathering());
         let judged: Worked = Self::LINTS
             .iter()
             .enumerate()
@@ -319,34 +324,46 @@ impl Work {
         match self {
             Work::Checked(check) => check(readout),
             Work::Modelled(query) => sources.gathering().model().map(query).into_iter().collect(),
-            Work::Described(described) => Self::described(described, readout, sources),
-            Work::Extracted(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) => Vec::new(),
+            Work::Described(_) | Work::Extracted(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) => Vec::new(),
         }
     }
 
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Survey => Worked::surveying(&Survey::measured(readout.files())),
-            Work::Extracted(extracted) => Self::typed(extracted, slot, sources),
-            Work::Checked(_) | Work::Modelled(_) | Work::Described(_) | Work::Filed(_) | Work::Judged(_) => {
+            Work::Survey | Work::Extracted(_) | Work::Described(_) => self.settled(slot, sources),
+            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
         }
     }
 
-    fn typed(extracted: Extracting, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
-        let gathering = sources.gathering();
-        let settled = Settled::new(gathering.contexts(), gathering.primings());
-        Worked::rendering(slot, extracted(gathering.extraction(), Priming::<LawReading>::primed(&settled)))
+    fn settled(self, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+        match self {
+            Work::Extracted(extracted) => Worked::rendering(
+                slot,
+                extracted(
+                    sources.gathering().extraction(),
+                    Priming::<LawReading>::primed(&Settled::from(sources.gathering())),
+                ),
+            ),
+            Work::Survey => Worked::surveying(&Survey::settled(&Settled::from(sources.gathering()))),
+            Work::Described(described) => {
+                Self::described(described, slot, sources, &Settled::from(sources.gathering()))
+            }
+            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) => Worked::default(),
+        }
     }
 
-    fn described<'run>(
+    fn described(
         described: Workspaced,
-        readout: &'run Readout,
-        sources: &'run Sources<impl Files, impl Cargo, impl Timer>,
-    ) -> Vec<Report<'run>> {
+        slot: Slot,
+        sources: &Sources<impl Files, impl Cargo, impl Timer>,
+        settled: &Settled<'_, '_>,
+    ) -> Worked {
         let workspaces = sources.located().done().as_ref().ok().map(Described::workspaces);
-        workspaces.map(|found| described(readout.files(), found)).into_iter().collect()
+        let heads = sources.gathering().heads();
+        let facts = Priming::<RoleReading>::primed(settled);
+        Worked::rendering(slot, workspaces.map(|found| described(heads, found, facts)).into_iter().collect())
     }
 }
 

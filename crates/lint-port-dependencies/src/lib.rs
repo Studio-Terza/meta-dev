@@ -3,14 +3,16 @@ mod port_crate;
 mod reserved_names;
 mod roles;
 
-use lint_core::{Headline, Parsed, Report, SourceFile, Violation, WorkspaceLint};
+use lint_core::{FileHead, Headline, Parsed, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{FileLint, PrimedFacts, PrimedLint, Reads};
+use lint_paths::Imports;
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
 use port_crate::PortedCrates;
 use reserved_names::{CountedName, ReservedNames, SqlxName};
 use roles::Roles;
+pub use roles::{RoleFacts, RoleReading};
 
 #[derive(Debug)]
 pub struct OwnedDependencies;
@@ -28,12 +30,20 @@ pub struct CountedCalls;
 pub struct HiddenSqlx;
 
 impl WorkspaceLint for OwnedDependencies {
-    fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
+    type Facts<'head> = ();
+
+    fn gathered(_: &[Parsed<'_, '_>]) {}
+
+    fn report<'file, 'head: 'file>(
+        heads: &'file [FileHead],
+        workspaces: &'file [Metadata],
+        (): &'file (),
+    ) -> Report<'file> {
         Report::new(
             Headline::new(
                 "only the owning unit, which is a port together with the workspace proc-macro crates it depends on, depends directly on a package its [package.metadata.port] owns or on a package in that package's closure, unless the unit declares the package shared; and every owns entry names a package its unit depends on",
             ),
-            Self::flagged(&Owners::declared(files), &workspaces.iter().collect()),
+            Self::flagged(&Owners::declared(heads), &workspaces.iter().collect()),
         )
     }
 }
@@ -45,10 +55,21 @@ impl OwnedDependencies {
 }
 
 impl WorkspaceLint for KeyDependencyRoles {
-    fn report<'file>(files: &'file [SourceFile], workspaces: &'file [Metadata]) -> Report<'file> {
+    type Facts<'head> = RoleFacts<'head>;
+
+    fn gathered<'head>(parsed: &[Parsed<'_, 'head>]) -> RoleFacts<'head> {
+        let imports: Imports<'head> = parsed.iter().copied().map(RoleReading::primed).collect();
+        parsed.iter().map(|found| RoleReading::contributed(*found, &imports)).collect()
+    }
+
+    fn report<'file, 'head: 'file>(
+        heads: &'file [FileHead],
+        workspaces: &'file [Metadata],
+        facts: &'file RoleFacts<'head>,
+    ) -> Report<'file> {
         let graph: Graph<'file> = workspaces.iter().collect();
         let breaches = graph.role_breaches();
-        let roles = Roles::new(files, Owners::declared(files));
+        let roles = Roles::new(heads, facts);
         Report::new(
             Headline::new(
                 "a key dependency is used only in its role: a port that names dependents is depended on only by crates declaring that role, a lexer crate is a leaf lexing one format, a crate that expands a port's macros declares the role the port names for its expanders, a lexer crate, the port naming lexers as dependents and every crate only they depend on deny at their crate root each lint the crate the lexers came from denied, and a workspace proc-macro reaches an owned package only through its own unit or a crate declaring the owning port's dependents role",

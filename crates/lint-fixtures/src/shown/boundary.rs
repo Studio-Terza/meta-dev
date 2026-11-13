@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use lint_core::{Report, SourceFile, WorkspaceLint};
+use lint_core::{FileHead, Parsed, Report, SourceFile, WorkspaceLint};
 use newtype::Wrapping;
 use workspace_metadata::Metadata;
 
@@ -36,7 +36,9 @@ impl Shown {
     ) -> Vec<String> {
         let workspaces = [Sources::kept(Metadata::from_str(workspace.into_inner()))];
         let files = Sources::placed(manifests, sources);
-        Self::listed(&Checked::report(&files, &workspaces))
+        let parsed: Vec<Parsed<'_, '_>> = files.iter().map(Parsed::from).collect();
+        let heads: Vec<FileHead> = files.iter().map(|file| file.head().clone()).collect();
+        Self::listed(&Checked::report(&heads, &workspaces, &Checked::gathered(&parsed)))
     }
 
     #[must_use]
