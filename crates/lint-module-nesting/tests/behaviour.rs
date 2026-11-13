@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_module_nesting::ModuleNesting;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -49,5 +50,5 @@ const CASES: [Case; 7] = [
 
 #[test]
 fn modules_that_belong_inside_another_are_flagged() {
-    assert_eq!(Sources::mismatches::<ModuleNesting>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<ModuleNesting>>(&CASES), Lines::default());
 }

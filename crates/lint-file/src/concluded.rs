@@ -8,7 +8,7 @@ pub struct Concluded<'head>(BTreeMap<&'head Path, Vec<Violation<'head>>>);
 
 impl<'head> Concluded<'head> {
     #[must_use]
-    pub fn of<'file>(&self, file: &SourceFile) -> Vec<Violation<'file>>
+    pub fn found_in<'file>(&self, file: &SourceFile) -> Vec<Violation<'file>>
     where
         'head: 'file,
     {

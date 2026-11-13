@@ -1430,6 +1430,7 @@ name = "lint-enum-predicates"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1612,6 +1613,7 @@ name = "lint-module-nesting"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",

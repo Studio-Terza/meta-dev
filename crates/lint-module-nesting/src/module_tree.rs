@@ -4,16 +4,16 @@ mod reexport_count;
 mod users;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 use super::ModuleNesting;
 use finding::Finding;
 use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
 
-use lint_core::Site;
-use lint_core::SourceFile;
-use lint_core::Violation;
-use lint_layout::UseEdges;
-use lint_layout::UsePath;
+use lint_core::{Parsed, Site, Violation};
+use lint_file::Concluded;
+use lint_layout::{Name, UseEdges, UsePath};
+use lint_placement::CrateRoot;
 use reexport_count::ReexportCount;
 use users::Users;
 
@@ -24,15 +24,82 @@ pub struct ModuleTree<'file> {
     reexports: BTreeMap<ModulePath<'file>, ReexportCount>,
 }
 
-impl<'file> From<&[&'file SourceFile]> for ModuleTree<'file> {
-    fn from(files: &[&'file SourceFile]) -> ModuleTree<'file> {
+#[derive(Debug)]
+pub struct TestUses {
+    segments: Vec<Name>,
+    uses: Vec<UsePath>,
+}
+
+#[derive(Debug)]
+pub struct ModuleUses<'head> {
+    file: &'head Path,
+    crate_root: &'head CrateRoot,
+    segments: &'head [Name],
+    reexports: ReexportCount,
+    uses: Vec<UsePath>,
+    tests: Vec<TestUses>,
+}
+
+impl<'head> From<Parsed<'_, 'head>> for ModuleUses<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> ModuleUses<'head> {
+        let head = parsed.head();
+        let file = parsed.file();
+        let tests = file.test_modules().iter().map(|test| TestUses {
+            segments: test.head().placement().module().segments().to_vec(),
+            uses: UsePaths::written_in(test.syntax()),
+        });
+        ModuleUses {
+            file: head.path(),
+            crate_root: head.placement().crate_root(),
+            segments: head.placement().module().segments(),
+            reexports: ReexportCount::of_file(file.syntax()),
+            uses: UsePaths::written_in(file.syntax()),
+            tests: tests.collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ShippedModule<'head>(Option<ModuleUses<'head>>);
+
+impl<'head> From<Parsed<'_, 'head>> for ShippedModule<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> ShippedModule<'head> {
+        ShippedModule(parsed.file().shipped().map(|_| ModuleUses::from(parsed)))
+    }
+}
+
+impl<'head> FromIterator<ShippedModule<'head>> for Concluded<'head> {
+    fn from_iter<Parts: IntoIterator<Item = ShippedModule<'head>>>(parts: Parts) -> Concluded<'head> {
+        let modules: Vec<ModuleUses<'head>> = parts.into_iter().filter_map(|part| part.0).collect();
+        let heads: BTreeMap<&Path, &'head Path> = modules.iter().map(|module| (module.file, module.file)).collect();
+        let tree = ModuleTree::from(modules.as_slice());
+        tree.violations()
+            .filter_map(|violation| heads.get(violation.site().path()).map(|head| violation.moved(head)))
+            .collect()
+    }
+}
+
+struct UsePaths;
+
+impl UsePaths {
+    fn written_in(syntax: &syn::File) -> Vec<UsePath> {
+        let mut found = Vec::new();
+        UseEdges::each(syntax, |path| found.push(path.clone()));
+        found
+    }
+}
+
+impl<'file> From<&'file [ModuleUses<'file>]> for ModuleTree<'file> {
+    fn from(files: &'file [ModuleUses<'file>]) -> ModuleTree<'file> {
         let empty = ModuleTree {
-            modules: ModuleIndex::from(files.iter().map(|file| ModulePath::of_file(file)).collect::<Vec<_>>()),
+            modules: ModuleIndex::from(
+                files.iter().map(|file| ModulePath::new(file.crate_root, file.segments, file.file)).collect::<Vec<_>>(),
+            ),
             users: Users::default(),
             deep_uses: Vec::new(),
             reexports: BTreeMap::new(),
         };
-        files.iter().fold(empty, |tree, file| tree.absorbed(file))
+        files.iter().fold(empty, ModuleTree::absorbed)
     }
 }
 
@@ -59,11 +126,11 @@ impl<'file> ModuleTree<'file> {
             .chain(crowded)
     }
 
-    fn absorbed(mut self, file: &'file SourceFile) -> ModuleTree<'file> {
-        let module = ModulePath::of_file(file);
-        self.reexports.insert(module, ReexportCount::of_file(file.syntax()));
-        self.users.add_tests(&self.modules, file.test_modules());
-        UseEdges::each(file.syntax(), |path| self.absorb(module, path));
+    fn absorbed(mut self, file: &'file ModuleUses<'file>) -> ModuleTree<'file> {
+        let module = ModulePath::new(file.crate_root, file.segments, file.file);
+        self.reexports.insert(module, file.reexports);
+        file.tests.iter().for_each(|test| test.recorded(&mut self.users, &self.modules, file.crate_root));
+        file.uses.iter().for_each(|path| self.absorb(module, path));
         self
     }
 
@@ -89,5 +156,20 @@ impl<'file> ModuleTree<'file> {
                 (homes.len() == 1).then(|| homes.into_iter().next()).flatten()
             })
             .flatten()
+    }
+}
+
+impl TestUses {
+    fn recorded<'file>(
+        &'file self,
+        users: &mut Users<'file>,
+        modules: &ModuleIndex<'file>,
+        crate_root: &'file CrateRoot,
+    ) {
+        let caller = ModulePath::new(crate_root, &self.segments, Path::new(""));
+        self.uses.iter().for_each(|path| {
+            let home = Target::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules));
+            users.record(home, caller);
+        });
     }
 }

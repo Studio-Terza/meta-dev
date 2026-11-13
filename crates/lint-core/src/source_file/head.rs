@@ -55,10 +55,10 @@ impl FileHead {
     }
 
     #[must_use]
-    pub fn binary(&self) -> Option<&FileHead> {
+    pub fn binary(&self) -> Option<&CrateFile> {
         let source = self.placement.crate_root().directory().join(Self::SOURCE);
         let inside = self.crate_file.as_ref().strip_prefix(source).ok();
-        inside.map(Role::in_source).filter(|role| *role == Role::BinaryRoot).map(|_| self)
+        inside.map(Role::in_source).filter(|role| *role == Role::BinaryRoot).map(|_| &self.crate_file)
     }
 
     #[must_use]

@@ -1,7 +1,7 @@
 mod guards;
 
 use guards::Guards;
-pub use guards::Modules;
+use guards::Modules;
 use lint_core::{Headline, Parsed, SourceFile, Violation};
 use lint_file::{Concluded, ContextLint, Reads};
 
@@ -20,6 +20,6 @@ impl ContextLint for GuardMustUse {
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
-        concluded.of(file)
+        concluded.found_in(file)
     }
 }

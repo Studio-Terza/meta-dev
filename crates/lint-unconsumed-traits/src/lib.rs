@@ -6,7 +6,7 @@ mod finding;
 use lint_core::{Headline, Parsed, Site, SourceFile, Violation};
 use lint_file::{ContextLint, Reads};
 
-pub use consumers::Consumers;
+use consumers::Consumers;
 use declared::Declared;
 use finding::Finding;
 

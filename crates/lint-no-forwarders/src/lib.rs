@@ -4,7 +4,7 @@ mod forwarder;
 mod forwarders;
 mod workspace_types;
 
-pub use finding::Finding;
+use finding::Finding;
 use forwarder::Forwarder;
 use forwarders::Forwarders;
 use lint_core::{Headline, Parsed};

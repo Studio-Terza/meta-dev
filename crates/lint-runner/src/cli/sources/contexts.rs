@@ -1,6 +1,8 @@
 use lint_core::Parsed;
+use lint_enum_predicates::EnumPredicates;
 use lint_file::ContextLint;
 use lint_guard_must_use::GuardMustUse;
+use lint_module_nesting::ModuleNesting;
 use lint_named_numbers::NamedNumbers;
 use lint_no_forwarders::NoForwarders;
 use lint_public_surface::PublicSurface;
@@ -59,4 +61,6 @@ contexts! {
     no_forwarders: NoForwarders,
     unconsumed_traits: UnconsumedTraits,
     guard_must_use: GuardMustUse,
+    enum_predicates: EnumPredicates,
+    module_nesting: ModuleNesting,
 }

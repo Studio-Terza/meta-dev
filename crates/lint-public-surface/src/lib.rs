@@ -33,11 +33,7 @@ impl ContextLint for PublicSurface {
     type Context<'head> = References;
 
     fn contributed(parsed: Parsed<'_, '_>) -> References {
-        let file = parsed.file();
-        let found = file
-            .shipped()
-            .map_or_else(|| ForeignReferences::in_own_tests(file), |shipped| Some(ForeignReferences::in_file(shipped)));
-        References(found.unwrap_or_default())
+        References(ForeignReferences::from(parsed.file()))
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, references: &References) -> Vec<Violation<'file>> {

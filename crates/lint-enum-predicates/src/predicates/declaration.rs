@@ -35,7 +35,7 @@ impl<'file> Declaration<'file> {
         self.types.push(Declared::new(Name::from(ident), kind));
     }
 
-    pub fn filed<'scan>(&'scan self, known: Known<'scan>) -> Known<'scan> {
+    pub fn filed(self, known: Known<'file>) -> Known<'file> {
         self.types.iter().fold(known, |filing, declared| {
             filing.recorded(self.crate_root, &self.module, declared.as_ref(), Kind::from(declared))
         })

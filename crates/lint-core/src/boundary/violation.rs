@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::Path;
 
 use super::{Finding, Fix};
 use code_model::Site;
@@ -18,6 +19,11 @@ impl<'file> Violation<'file> {
     #[must_use]
     pub fn site(&self) -> &Site<'file> {
         &self.site
+    }
+
+    #[must_use]
+    pub fn moved(self, path: &Path) -> Violation<'_> {
+        Violation { site: self.site.moved(path), problem: self.problem, fix: self.fix }
     }
 }
 
