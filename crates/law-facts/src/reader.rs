@@ -10,24 +10,25 @@ use crate::kind::Kind;
 use crate::law::{Law, Origin};
 use crate::package::Package;
 use crate::traits::Traits;
-use lint_core::{Site, SourceFile};
+use lint_core::{FileHead, Parsed, Site};
 use lint_layout::{LineNumber, Name};
 use mentions::Mentions;
 use routes::{Routes, Within};
 use scope::Scope;
 
 pub(crate) struct Reader<'file, 'traits> {
-    file: &'file SourceFile,
+    head: &'file FileHead,
     traits: &'traits Traits<'file>,
     scopes: Vec<Scope>,
     laws: Vec<Law<'file>>,
 }
 
 impl<'file, 'traits> Reader<'file, 'traits> {
-    pub(crate) fn read(file: &'file SourceFile, traits: &'traits Traits<'file>) -> Vec<Law<'file>> {
-        let outer = Scope::default().within(file.syntax().items.iter());
-        let mut reader = Reader { file, traits, scopes: Vec::from([outer]), laws: Vec::new() };
-        reader.visit_file(file.syntax());
+    pub(crate) fn read(parsed: Parsed<'_, 'file>, traits: &'traits Traits<'file>) -> Vec<Law<'file>> {
+        let syntax = parsed.file().syntax();
+        let outer = Scope::default().within(syntax.items.iter());
+        let mut reader = Reader { head: parsed.head(), traits, scopes: Vec::from([outer]), laws: Vec::new() };
+        reader.visit_file(syntax);
         reader.laws
     }
 
@@ -37,11 +38,11 @@ impl<'file, 'traits> Reader<'file, 'traits> {
 
     fn law(&self, invocation: &Macro, kind: Kind) -> Law<'file> {
         let scope = self.scope();
-        let within = Within::new(&scope, self.traits, self.file.head().placement().package().crate_name());
+        let within = Within::new(&scope, self.traits, self.head.placement().package().crate_name());
         let name = invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident));
-        let site = Site::new(self.file.head().path(), LineNumber::from(invocation.path.span()));
+        let site = Site::new(self.head.path(), LineNumber::from(invocation.path.span()));
         Law::new(
-            Origin::new(Package::containing(self.file), site, name),
+            Origin::new(Package::from(self.head), site, name),
             kind,
             Mentions::beyond_title(invocation.tokens.clone(), kind),
             Routes::read(invocation, &within, kind),

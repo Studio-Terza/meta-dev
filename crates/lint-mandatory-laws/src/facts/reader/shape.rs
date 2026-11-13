@@ -6,8 +6,8 @@ use super::super::exposure::Exposure;
 use super::super::profile::Profile;
 use crate::subject::Subject;
 use derives::Derives;
+use lint_core::FileHead;
 use lint_core::Site;
-use lint_core::SourceFile;
 use lint_core::Syntax;
 use lint_layout::Name;
 use lint_layout::Whole;
@@ -21,21 +21,21 @@ impl Shape {
     const METHODS: [Word<'static>; 2] = words!["encode", "decode"];
     const LEADS: [Word<'static>; 2] = words!["to", "from"];
 
-    pub(crate) fn of_struct<'file>(file: &'file SourceFile, item: &ItemStruct) -> Profile<'file> {
-        Self::declared(file, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
+    pub(crate) fn of_struct<'file>(head: &'file FileHead, item: &ItemStruct) -> Profile<'file> {
+        Self::declared(head, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
     }
 
-    pub(crate) fn of_enum<'file>(file: &'file SourceFile, item: &ItemEnum) -> Profile<'file> {
-        Self::declared(file, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
+    pub(crate) fn of_enum<'file>(head: &'file FileHead, item: &ItemEnum) -> Profile<'file> {
+        Self::declared(head, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
     }
 
-    pub(crate) fn of_impl<'file>(file: &'file SourceFile, item: &ItemImpl) -> Option<Profile<'file>> {
-        Self::owner(&item.self_ty).map(|owner| Self::declared(file, owner, Exposure::Private, Self::implemented(item)))
+    pub(crate) fn of_impl<'file>(head: &'file FileHead, item: &ItemImpl) -> Option<Profile<'file>> {
+        Self::owner(&item.self_ty).map(|owner| Self::declared(head, owner, Exposure::Private, Self::implemented(item)))
     }
 
-    fn declared<'file>(file: &'file SourceFile, owner: &Ident, exposure: Exposure, facts: Vec<Name>) -> Profile<'file> {
-        let site = Site::new(file.head().path(), LineNumber::from(owner.span()));
-        Profile::declared(Subject::new(file, Name::from(owner)), site, exposure, facts)
+    fn declared<'file>(head: &'file FileHead, owner: &Ident, exposure: Exposure, facts: Vec<Name>) -> Profile<'file> {
+        let site = Site::new(head.path(), LineNumber::from(owner.span()));
+        Profile::declared(Subject::new(head, Name::from(owner)), site, exposure, facts)
     }
 
     fn owner(ty: &Type) -> Option<&Ident> {

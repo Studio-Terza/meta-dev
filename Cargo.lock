@@ -1591,6 +1591,7 @@ dependencies = [
  "law-facts",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",

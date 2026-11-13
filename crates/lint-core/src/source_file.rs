@@ -53,7 +53,8 @@ impl SourceFile {
 
     #[must_use]
     pub fn with_test_modules(self, test_modules: Vec<SourceFile>) -> SourceFile {
-        SourceFile { test_modules, ..self }
+        let tests = test_modules.iter().map(|module| module.head.clone()).collect();
+        SourceFile { head: self.head.with_tests(tests), test_modules, ..self }
     }
 
     #[must_use]
@@ -112,6 +113,11 @@ impl<'syntax, 'head> Parsed<'syntax, 'head> {
     #[must_use]
     pub fn head(self) -> &'head FileHead {
         self.head
+    }
+
+    #[must_use]
+    pub fn test_modules(self) -> Vec<Parsed<'syntax, 'head>> {
+        self.file.test_modules.iter().zip(self.head.test_heads()).map(|(file, head)| Parsed::new(file, head)).collect()
     }
 }
 

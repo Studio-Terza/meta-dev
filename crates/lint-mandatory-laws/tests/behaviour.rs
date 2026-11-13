@@ -1,4 +1,5 @@
 use lint_core::Lint;
+use lint_file::Primed;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_mandatory_laws::MandatoryLaws;
 
@@ -263,20 +264,20 @@ const LAW_FOR_PAIR: &str = "laws::law!(a, any::<A>(), value, { check(value) });\
 
 #[test]
 fn missing_laws_are_flagged() {
-    assert_eq!(Sources::mismatches::<MandatoryLaws>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Primed<MandatoryLaws>>(&CASES), Lines::default());
 }
 
 #[test]
 fn a_plain_law_does_not_stand_in_for_a_roundtrip() {
     let files = [Sources::file("src/a.rs", Text::new(ENCODING)), Sources::file("tests/a.rs", Text::new(LAW_FOR_PAIR))];
-    let report = MandatoryLaws::report(&files);
+    let report = Primed::<MandatoryLaws>::report(&files);
     assert!(report.dirty().is_some());
 }
 
 #[test]
 fn the_message_names_the_fix() {
     let encoding = [Sources::file("src/a.rs", Text::new(ENCODING))];
-    let pair = MandatoryLaws::report(&encoding);
+    let pair = Primed::<MandatoryLaws>::report(&encoding);
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
     assert!(pair.dirty().is_some());

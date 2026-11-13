@@ -49,6 +49,7 @@ pub(crate) enum Step {
     Lower(Worker),
     Filed(Worker),
     Judged(Worker),
+    Primed(Worker),
     Model,
     Lint(Named),
     Survey,
@@ -67,6 +68,9 @@ impl fmt::Display for Step {
             }
             Step::Judged(Worker(index)) => {
                 write!(formatter, "phase judged lints: judge its share of files on worker {index}")
+            }
+            Step::Primed(Worker(index)) => {
+                write!(formatter, "phase primed: read primed parts of its share of files on worker {index}")
             }
             Step::Model => formatter.write_str("phase model: merge the lowered files into the code model"),
             Step::Lint(name) => write!(formatter, "lint {name}"),

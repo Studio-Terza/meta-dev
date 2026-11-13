@@ -1,5 +1,5 @@
 use law_facts::Package;
-use lint_core::SourceFile;
+use lint_core::FileHead;
 use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -9,8 +9,8 @@ pub(crate) struct Subject<'file> {
 }
 
 impl<'file> Subject<'file> {
-    pub(crate) fn new(file: &'file SourceFile, name: Name) -> Subject<'file> {
-        Subject { package: Package::containing(file), name }
+    pub(crate) fn new(head: &'file FileHead, name: Name) -> Subject<'file> {
+        Subject { package: Package::from(head), name }
     }
 
     pub(crate) fn package(&self) -> Package<'file> {

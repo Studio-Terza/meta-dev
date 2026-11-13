@@ -62,3 +62,32 @@ impl<Checked: ContextLint> Lint for Judged<Checked> {
         Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &context)).collect())
     }
 }
+
+pub trait PrimedLint {
+    const HEADLINE: Headline;
+    const READS: Reads;
+
+    type PrimerPart<'head>: Send + Debug;
+    type Primer<'head>: FromIterator<Self::PrimerPart<'head>> + Send + Sync + Debug;
+    type Part<'head>: Send + Debug;
+    type Context<'head>: FromIterator<Self::Part<'head>> + Send + Sync + Debug;
+
+    fn primed<'head>(parsed: Parsed<'_, 'head>) -> Self::PrimerPart<'head>;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>, primer: &Self::Primer<'head>) -> Self::Part<'head>;
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, context: &Self::Context<'head>) -> Vec<Violation<'file>>;
+}
+
+#[derive(Debug)]
+pub struct Primed<Checked>(PhantomData<Checked>);
+
+impl<Checked: PrimedLint> Lint for Primed<Checked> {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        let primer: Checked::Primer<'_> = files.iter().map(Parsed::from).map(Checked::primed).collect();
+        let context: Checked::Context<'_> =
+            files.iter().map(Parsed::from).map(|parsed| Checked::contributed(parsed, &primer)).collect();
+        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
+        Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &context)).collect())
+    }
+}

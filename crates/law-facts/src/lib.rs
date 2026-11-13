@@ -12,10 +12,10 @@ pub use law::Law;
 pub use operators::Operators;
 pub use package::Package;
 
-use lint_core::SourceFile;
+use lint_core::{Parsed, SourceFile};
 use lint_layout::Name;
 use reader::Reader;
-use traits::Traits;
+pub use traits::Traits;
 
 #[derive(Debug, Default)]
 pub struct Laws<'file> {
@@ -24,8 +24,8 @@ pub struct Laws<'file> {
 
 impl<'file> From<&'file [SourceFile]> for Laws<'file> {
     fn from(files: &'file [SourceFile]) -> Laws<'file> {
-        let traits = Traits::declared(files);
-        files.iter().fold(Laws::default(), |laws, file| laws.read(file, &traits))
+        let traits: Traits<'file> = files.iter().map(Parsed::from).map(Traits::from).collect();
+        files.iter().map(|file| Laws::read(Parsed::from(file), &traits)).collect()
     }
 }
 
@@ -53,8 +53,15 @@ impl<'file> Laws<'file> {
         self.laws.iter()
     }
 
-    fn read(mut self, file: &'file SourceFile, traits: &Traits<'file>) -> Laws<'file> {
-        self.laws.extend(Reader::read(file, traits));
-        file.test_modules().iter().fold(self, |laws, module| laws.read(module, traits))
+    #[must_use]
+    pub fn read(parsed: Parsed<'_, 'file>, traits: &Traits<'file>) -> Laws<'file> {
+        let tested = parsed.test_modules().into_iter().map(|module| Laws::read(module, traits));
+        Laws { laws: Reader::read(parsed, traits).into_iter().chain(tested.flat_map(|laws| laws.laws)).collect() }
+    }
+}
+
+impl<'file> FromIterator<Laws<'file>> for Laws<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Laws<'file>>>(parts: Parts) -> Laws<'file> {
+        Laws { laws: parts.into_iter().flat_map(|part| part.laws).collect() }
     }
 }

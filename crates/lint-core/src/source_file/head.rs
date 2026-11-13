@@ -15,6 +15,7 @@ pub struct FileHead {
     placement: Placement,
     crate_file: CrateFile,
     manifest: OnceLock<ManifestFile>,
+    tests: Vec<FileHead>,
 }
 
 impl FileHead {
@@ -22,11 +23,27 @@ impl FileHead {
     const SOURCE: &'static str = "src";
 
     pub(super) fn new(path: PathBuf, located: Located, placement: Placement) -> FileHead {
-        FileHead { crate_file: placement.crate_file(&path), path, located, placement, manifest: OnceLock::new() }
+        FileHead {
+            crate_file: placement.crate_file(&path),
+            path,
+            located,
+            placement,
+            manifest: OnceLock::new(),
+            tests: Vec::new(),
+        }
     }
 
     pub(super) fn in_crate_file(self, crate_file: CrateFile) -> FileHead {
         FileHead { crate_file, ..self }
+    }
+
+    pub(super) fn with_tests(self, tests: Vec<FileHead>) -> FileHead {
+        FileHead { tests, ..self }
+    }
+
+    #[must_use]
+    pub fn test_heads(&self) -> &[FileHead] {
+        &self.tests
     }
 
     #[must_use]
