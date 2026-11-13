@@ -27,6 +27,25 @@ pub struct Building {
 
 impl Building {
     #[must_use]
+    pub fn fragment(&self) -> Building {
+        Building { aliases: self.aliases.clone(), ..Building::default() }
+    }
+
+    #[must_use]
+    pub fn absorbed(self, fragment: Building) -> Building {
+        let mut model = self.model;
+        let found = fragment.model;
+        model.implementations.extend(found.implementations);
+        model.functions.extend(found.functions);
+        model.holdings.extend(found.holdings);
+        model.calls.extend(found.calls);
+        model.uses.extend(found.uses);
+        model.interpolated.extend(found.interpolated);
+        model.placed.extend(found.placed);
+        Building { model, ..self }
+    }
+
+    #[must_use]
     pub fn aliased(&self, path: &Resolved) -> Option<&Resolved> {
         let alias = self.aliases.aliasing(path)?;
         alias.target().named().map(AsRef::as_ref)

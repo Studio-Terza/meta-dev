@@ -1,6 +1,7 @@
 mod facts;
 mod lowering;
 mod namespace;
+mod parallel;
 mod planting;
 mod root_reading;
 

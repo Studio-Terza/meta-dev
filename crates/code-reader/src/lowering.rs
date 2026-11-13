@@ -9,6 +9,7 @@ mod signature;
 mod uses;
 
 use std::ffi::OsStr;
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -31,6 +32,7 @@ use crate::namespace::{
     Declared, DeclaredKind, Domain, Entries, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind, Seeds,
     StdNames, Top, UsePath, Visibility,
 };
+use crate::parallel::{Parallel, Parked};
 use crate::planting::Files;
 use attributes::Attributes;
 use boundary::SelfType;
@@ -417,16 +419,36 @@ impl<'read> Plot<'read> {
         let with_exports =
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
         let places: Vec<Places> =
-            self.grown.iter().map(|grown| grown.rows.places.settled(&resolving.based(grown.base))).collect();
+            Parallel::available().mapped(&self.grown, |grown| grown.rows.places.settled(&resolving.based(grown.base)));
         let with_places = self
             .grown
             .iter()
             .zip(&places)
             .fold(with_exports, |built, (grown, seated)| seated.placed(grown.file, built));
-        let columns = self.grown.into_iter().zip(&places).fold(Columns::default(), |columns, (grown, seated)| {
-            grown.rows.spread(Footing::new(resolving.based(grown.base), grown.file, grown.outer, seated), columns)
+        let mut footed: Vec<Footed<'_, FileRows>> = self
+            .grown
+            .into_iter()
+            .zip(&places)
+            .map(|(grown, seated)| Footed {
+                footing: Footing::new(resolving.based(grown.base), grown.file, grown.outer, seated),
+                row: grown.rows,
+            })
+            .collect();
+        let aliases: Vec<Footed<'_, AliasRow>> = footed
+            .iter_mut()
+            .flat_map(|file| {
+                let footing = file.footing;
+                mem::take(&mut file.row.aliases).into_iter().map(move |row| Footed { footing, row })
+            })
+            .collect();
+        let with_aliases = Footed::every_built(aliases, with_places);
+        let parked: Vec<Parked<Footed<'_, FileRows>>> = footed.into_iter().map(Parked::from).collect();
+        let fragments = Parallel::available().shares(&parked).worked(|share| {
+            let files = share.iter().filter_map(Parked::taken);
+            let columns = files.fold(Columns::default(), |columns, file| file.row.spread(file.footing, columns));
+            columns.built(with_aliases.fragment())
         });
-        columns.built(with_places).built()
+        fragments.into_iter().fold(with_aliases, Building::absorbed).built()
     }
 }
 
