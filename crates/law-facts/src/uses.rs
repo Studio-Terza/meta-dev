@@ -53,6 +53,11 @@ impl Uses {
         self
     }
 
+    pub(crate) fn declared(self) -> Option<Uses> {
+        let named = self.named.first_key_value().map(|_| ());
+        named.or_else(|| self.globs.first().map(|_| ())).map(|()| self)
+    }
+
     pub(crate) fn absorb(&mut self, other: Uses) {
         self.named.extend(other.named);
         self.globs.extend(other.globs);
