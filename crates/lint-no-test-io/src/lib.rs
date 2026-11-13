@@ -1,9 +1,7 @@
-mod boundary;
 mod effect_paths;
 mod finding;
 
-use boundary::TestTarget;
-use code_model::Model;
+use code_model::{Harness, Model};
 use effect_paths::EffectPaths;
 use finding::Finding;
 use lint_core::{Gate, Headline, ModelLint, Report, Violation};
@@ -18,7 +16,7 @@ impl ModelLint for NoTestIo {
             Headline::new("unit tests do no I/O and start no process"),
             model
                 .uses()
-                .filter(|placed| TestTarget::rooted(placed.root()).is_some())
+                .filter(|placed| placed.harness() == Harness::TestTarget)
                 .filter(|placed| Gate::PORTS.names_crate(placed.krate()).is_none())
                 .filter_map(|placed| {
                     paths.effect(placed.entity()).map(|path| Violation::new(placed.site(), Finding::from(path.clone())))

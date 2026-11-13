@@ -155,7 +155,7 @@ impl Lints {
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
         <Filed<NoIgnoredTests> as Registered>::ENTRY,
         Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
-        <Primed<FakesAtPorts> as Registered>::ENTRY,
+        Entry::spelled::<FakesAtPorts>(Work::Modelled(<FakesAtPorts as ModelLint>::report)),
         <Primed<PortBatching> as Registered>::ENTRY,
         Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _| {
             <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &())

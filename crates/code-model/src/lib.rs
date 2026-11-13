@@ -45,7 +45,7 @@ pub use item_path::ItemPath;
 pub use member::Member;
 pub use model::{Building, Model};
 pub use path_use::{Mention, PathUse};
-pub use placed::{FileHome, Placed};
+pub use placed::{FileHome, Harness, Placed};
 pub use primitive::Primitive;
 pub use references::References;
 pub use region::{Ground, Reach, Region, Seat, Within, Zone};

@@ -3,7 +3,6 @@ use law_facts::LawReading;
 use lint_clones::Clones;
 use lint_core::Parsed;
 use lint_enum_predicates::EnumPredicates;
-use lint_fakes_at_ports::FakesAtPorts;
 use lint_file::{ContextLint, Gleaning, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
 use lint_mandatory_laws::MandatoryLaws;
@@ -172,7 +171,6 @@ contexts! {
     primed: {
         laws: LawReading,
         state_graph: StateGraph,
-        fakes_at_ports: FakesAtPorts,
         port_batching: PortBatching,
         roles: RoleReading,
     }

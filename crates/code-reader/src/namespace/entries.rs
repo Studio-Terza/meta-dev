@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syn::punctuated::Punctuated;
 use syn::{
-    Attribute, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemUse, Macro, Meta, Stmt, StmtMacro, Token,
-    VisRestricted,
+    Attribute, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, StmtMacro,
+    Token, VisRestricted,
 };
 
 use code_model::{Building, CrateExports, Domain, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved};
@@ -11,6 +11,7 @@ use lint_core::Macros;
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
+use super::PortMacro;
 use super::anchor::Anchor;
 use super::binding::Binding;
 use super::boundary::{GlobId, ScopeId};
@@ -167,6 +168,27 @@ impl Declared {
 }
 
 #[derive(Debug)]
+struct TraitEntries<'item>(&'item ItemTrait);
+
+impl TraitEntries<'_> {
+    fn entries(self) -> Entries {
+        let trait_item = self.0;
+        let filler = PortMacro::filler(trait_item).map(|name| Declared {
+            name,
+            visibility: Visibility::from(&trait_item.vis),
+            kind: DeclaredKind::Item(ItemKind::Trait),
+            domain: Domain::Types,
+            marks: Vec::new(),
+        });
+        [Declared::named_item(&trait_item.ident, &trait_item.vis, ItemKind::Trait).marked(&trait_item.attrs)]
+            .into_iter()
+            .chain(filler)
+            .map(Entries::from)
+            .fold(Entries::default(), Entries::merged)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct DeriveMacro<'item>(&'item ItemFn);
 
 impl DeriveMacro<'_> {
@@ -388,9 +410,7 @@ impl From<&Item> for Entries {
             Item::Type(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Alias))
             }
-            Item::Trait(declared) => Entries::from(
-                Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait).marked(&declared.attrs),
-            ),
+            Item::Trait(declared) => TraitEntries(declared).entries(),
             Item::TraitAlias(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
             }

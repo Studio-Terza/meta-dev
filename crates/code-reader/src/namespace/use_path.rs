@@ -266,6 +266,14 @@ impl UsePath {
         UsePath { segments: self.segments.iter().chain(&rest.segments).cloned().collect(), ..self.clone() }
     }
 
+    pub(crate) fn suffixed(ident: &Ident, ending: Word<'_>) -> UsePath {
+        UsePath {
+            leading: Leading::Relative,
+            reading: Reading::Written,
+            segments: vec![Name::from(ident).suffixed(ending)],
+        }
+    }
+
     pub(super) fn global(krate: &Name) -> UsePath {
         UsePath { leading: Leading::Global, reading: Reading::Written, segments: vec![krate.clone()] }
     }

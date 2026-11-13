@@ -571,6 +571,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
         let generics = self.generics.subjectless().extended(&item.generics);
         self.trait_bounds(item, &generics);
         let place = self.trait_owning(&item.ident, &item.attrs);
+        self.filler_owning(item);
         let context = self.context.owned(place);
         self.contextual(context, |lowering| {
             lowering.enclosed(Enclosure::Trait, generics, |enclosed| visit::visit_item_trait(enclosed, item));

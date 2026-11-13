@@ -1,156 +1,120 @@
 mod finding;
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
-use syn::visit::{self, Visit};
-use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath};
-
-use lint_file::Concluded;
-
-use lint_core::{FileHead, Parsed, Site, Violation, Walk};
-use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
-use lint_paths::{Imports, Module, Nested};
+use code_model::{
+    Ground, Harness, Implementation, ItemId, ItemKind, ItemPath, Model, Placed, Region, Resolved, Spelling,
+};
+use lint_core::{Site, Violation};
+use lint_layout::{CamelWord, Name, Whole, Word, words};
 
 use crate::kind::Kind;
-use crate::port_traits::PortTraits;
 use finding::Finding;
 
-#[derive(Debug, Default)]
-pub struct Doubles<'file> {
-    declared: BTreeMap<DoubleKey<'file>, Site<'file>>,
-    implemented: Vec<Implemented<'file>>,
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct DoubleKey<'file> {
-    target: &'file Path,
-    name: Name,
+#[derive(Debug)]
+struct Double<'model> {
+    name: &'model Name,
+    site: Site<'model>,
 }
 
 #[derive(Debug)]
-struct Implemented<'file> {
-    double: DoubleKey<'file>,
-    site: Site<'file>,
-    written: UsePath,
+struct Implemented<'model> {
+    double: ItemId,
+    placed: Placed<'model, &'model Implementation>,
     kind: Kind,
 }
 
-impl<'file> Doubles<'file> {
-    pub fn scanned(parsed: Parsed<'_, 'file>, imports: &Imports<'_>, ports: &PortTraits) -> Doubles<'file> {
-        let head = parsed.head();
-        let mut doubles = Doubles::default();
-        let mut reader = Reader {
-            head,
-            target: head.placement().crate_root().directory(),
-            module: Module::of_head(head),
-            imports,
-            ports,
-            doubles: &mut doubles,
-        };
-        reader.visit_file(parsed.file().syntax());
-        doubles
-    }
+#[derive(Debug)]
+pub(crate) struct Doubles<'model> {
+    declared: BTreeMap<ItemId, Double<'model>>,
+    ported: BTreeMap<ItemId, Ground>,
+}
 
-    fn violations(self) -> Vec<Violation<'file>> {
+impl<'model> From<&'model Model> for Doubles<'model> {
+    fn from(model: &'model Model) -> Doubles<'model> {
+        let declared = model
+            .items()
+            .filter(|placed| placed.harness() == Harness::TestTarget)
+            .filter_map(|placed| {
+                let id = placed.entity().declared();
+                let item = model.declared(id).filter(|item| Self::TYPES.contains(&item.kind()))?;
+                let name: &Name = item.as_ref();
+                name.matches::<CamelWord>(&Self::DOUBLES).map(|_| (id, Double { name, site: placed.site() }))
+            })
+            .collect();
+        let ported = model
+            .items()
+            .map(|placed| (placed.entity().declared(), AsRef::<Region>::as_ref(placed.entity()).ground()))
+            .collect();
+        Doubles { declared, ported }
+    }
+}
+
+impl<'model> Doubles<'model> {
+    const TYPES: [ItemKind; 3] = [ItemKind::Struct, ItemKind::Enum, ItemKind::Union];
+    const DOUBLES: [Word<'static>; 5] = words!["fake", "stub", "mock", "spy", "dummy"];
+    const PORTS: Word<'static> = Word::new("ports");
+    const STD: [Word<'static>; 3] = words!["std", "core", "alloc"];
+
+    pub(crate) fn violations(&self, model: &'model Model) -> Vec<Violation<'model>> {
+        let implemented: Vec<Implemented<'model>> = model
+            .implementations()
+            .filter(|placed| placed.entity().written().is_some())
+            .filter_map(|placed| {
+                let implementation = placed.entity();
+                let target: &Resolved = implementation.subject_type().named()?.as_ref();
+                let id = target.crate_item().filter(|id| self.declared.contains_key(id))?;
+                implementation.implemented().map(|_| Implemented {
+                    double: id,
+                    placed,
+                    kind: self.kind(implementation),
+                })
+            })
+            .collect();
         let unported = self
             .declared
             .iter()
-            .filter(|(double, _)| {
-                self.implemented
-                    .iter()
-                    .filter(|implemented| implemented.double == **double)
-                    .all(|implemented| implemented.kind != Kind::Port)
+            .filter(|(id, _)| {
+                implemented.iter().filter(|found| found.double == **id).all(|found| found.kind != Kind::Port)
             })
-            .map(|(double, site)| Violation::new(*site, Finding::Unported(&double.name)));
-        let beside = self.implemented.iter().filter(|implemented| implemented.kind == Kind::Other).map(|implemented| {
-            Violation::new(implemented.site, Finding::Beside(&implemented.double.name, implemented.written.clone()))
+            .map(|(_, double)| Violation::new(double.site, Finding::Unported(double.name)));
+        let beside = implemented.iter().filter(|found| found.kind == Kind::Other).filter_map(|found| {
+            let placed = found.placed;
+            let written = Self::written(placed.entity())?;
+            self.declared
+                .get(&found.double)
+                .map(|double| Violation::new(placed.site(), Finding::Beside(double.name, written.clone())))
         });
-        let mut violations: Vec<Violation<'file>> = unported.chain(beside).collect();
+        let mut violations: Vec<Violation<'model>> = unported.chain(beside).collect();
         violations.sort_by(|left, right| left.site().cmp(right.site()));
         violations
     }
-}
 
-struct Reader<'file, 'run> {
-    head: &'file FileHead,
-    target: &'file Path,
-    module: Module<'file>,
-    imports: &'run Imports<'run>,
-    ports: &'run PortTraits,
-    doubles: &'run mut Doubles<'file>,
-}
-
-impl<'file> Reader<'file, '_> {
-    const DOUBLES: [Word<'static>; 5] = words!["fake", "stub", "mock", "spy", "dummy"];
-
-    fn declared(&mut self, name: &Ident) {
-        let double = DoubleKey { target: self.target, name: Name::from(name) };
-        let site = Site::new(self.head.path(), LineNumber::from(name.span()));
-        self.doubles.declared.extend(double.name.matches::<CamelWord>(&Self::DOUBLES).map(|_| (double, site)));
+    fn kind(&self, implementation: &Implementation) -> Kind {
+        let resolved = implementation.implemented();
+        let standard = resolved.and_then(Resolved::std).map(|_| Kind::Std);
+        let declared = || resolved.and_then(Resolved::crate_item).map(|id| self.grounded(id));
+        let external = || resolved.and_then(Resolved::external).map(|found| Self::pathed(found.path()));
+        let written = || Self::written(implementation).map(Self::pathed);
+        standard.or_else(declared).or_else(external).or_else(written).unwrap_or(Kind::Other)
     }
 
-    fn double_of(&self, item: &ItemImpl) -> Option<DoubleKey<'file>> {
-        Name::of_type(&item.self_ty)
-            .filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
-            .map(|name| DoubleKey { target: self.target, name })
+    fn grounded(&self, id: ItemId) -> Kind {
+        self.ported.get(&id).filter(|ground| **ground == Ground::Ports).map_or(Kind::Other, |_| Kind::Port)
     }
 
-    fn implementation(&self, double: DoubleKey<'file>, path: &TraitPath) -> Implemented<'file> {
-        let written = UsePath::from(path);
-        let bare = Kind::written(&written);
-        let candidates = self.imports.candidates(&self.module, written.clone());
-        let line = path.segments.first().map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
-        Implemented {
-            double,
-            site: Site::new(self.head.path(), line),
-            kind: bare.judged(&candidates, self.ports),
-            written,
-        }
-    }
-}
-
-impl<'file> Nested<'file> for Reader<'file, '_> {
-    fn module(&mut self) -> &mut Module<'file> {
-        &mut self.module
-    }
-}
-
-impl<'ast> Visit<'ast> for Reader<'_, '_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.nested(module, |reader| visit::visit_item_mod(reader, module));
+    fn written(implementation: &Implementation) -> Option<&ItemPath> {
+        AsRef::<Spelling>::as_ref(implementation.interface()?).written()
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || {
-            let found = self
-                .double_of(item)
-                .zip(item.trait_.as_ref())
-                .map(|(double, (_, path, _))| self.implementation(double, path));
-            self.doubles.implemented.extend(found);
-        });
-    }
-
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        Walk::enter(&item.attrs, || self.declared(&item.ident));
-    }
-
-    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        Walk::enter(&item.attrs, || self.declared(&item.ident));
-    }
-
-    fn visit_item_union(&mut self, item: &'ast ItemUnion) {
-        Walk::enter(&item.attrs, || self.declared(&item.ident));
-    }
-}
-
-impl<'file> FromIterator<Doubles<'file>> for Concluded<'file> {
-    fn from_iter<Parts: IntoIterator<Item = Doubles<'file>>>(parts: Parts) -> Concluded<'file> {
-        let merged = parts.into_iter().fold(Doubles::default(), |mut merged, part| {
-            merged.declared.extend(part.declared);
-            merged.implemented.extend(part.implemented);
-            merged
-        });
-        merged.violations().into_iter().collect()
+    fn pathed(path: &ItemPath) -> Kind {
+        let segments: &[Name] = path.as_ref();
+        let modules = segments.split_last().map_or(&[][..], |(_, modules)| modules);
+        let first = modules.first();
+        let named = modules.iter().find(|module| **module == Name::from(Self::PORTS)).map(|_| Kind::Port);
+        let suffixed =
+            first.filter(|module| module.words().last() == Some(&Name::from(Self::PORTS))).map(|_| Kind::Port);
+        let standard = first.filter(|module| module.matches::<Whole>(&Self::STD).is_some()).map(|_| Kind::Std);
+        named.or(suffixed).or(standard).unwrap_or(Kind::Other)
     }
 }

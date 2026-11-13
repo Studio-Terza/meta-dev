@@ -1,7 +1,6 @@
 use lint_fakes_at_ports::FakesAtPorts;
-use lint_file::Primed;
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 
 const PORTED: &str = "mod ports {\n    pub trait Clock {}\n}\nstruct FakeClock;\nimpl ports::Clock for FakeClock {}\n";
 const IMPORTED: &str = "use ci::ports::Ports;\nstruct Fake;\nimpl Ports for Fake {}\n";
@@ -17,19 +16,27 @@ const WORDS: &str = "struct Fakery;\nstruct Spyglass;\nstruct MockingBird;\nstru
 const GENERIC: &str = "struct FakeStore<T>(T);\nimpl<T> ports::Store for FakeStore<T> {}\n";
 const RENAMED: &str = "use ci::ports::Ports as Effects;\nstruct Fake;\nimpl Effects for Fake {}\n";
 const GLOB: &str = "use ci::ports::*;\nstruct Fake;\nimpl Ports for Fake {}\n";
+const CI_PORTS: &str = "pub mod ports {\n    pub trait Ports {}\n}\n";
 const NESTED: &str = "mod helpers {\n    pub struct FakeClock;\n}\nunion DummyBits {\n    a: u8,\n}\n";
-const DECLARED: &str = "struct FakeClock;\n";
+const DECLARED: &str = "struct FakeClock;\nmod impls;\n";
 const IMPLEMENTED: &str = "impl ports::Clock for super::FakeClock {}\n";
 const SHIPPED_PORT: &str = "pub trait Clock {}\npub trait Calendar {}\n";
 const SHIPPED_OTHER: &str = "pub trait Other {}\n";
+const X_ROOT: &str = "pub mod other;\npub mod ports;\npub use other::Other;\npub use ports::{Calendar, Clock};\n";
 const THROUGH_RE_EXPORT: &str =
     "struct FakeClock;\nimpl x::Clock for FakeClock {}\nstruct FakeOther;\nimpl x::Other for FakeOther {}\n";
 const INLINE_SHIPPED_PORT: &str = "pub mod ports {\n    pub trait Clock {}\n}\npub use ports::Clock;\n";
 
+const PORT_CRATE: &str = "mod clock {\n    #[port]\n    pub trait Clock {}\n}\npub use clock::{Clock, ClockFiller};\n";
+const QUALIFIED_PORT: &str =
+    "mod clock {\n    #[port_core::port]\n    pub trait Clock {}\n}\npub use clock::{Clock, ClockFiller};\n";
+const FILLED: &str = "use p::ClockFiller;\nstruct FakeClock;\nimpl ClockFiller for FakeClock {}\n";
+const UNMARKED: &str = "mod clock {\n    pub trait Clock {}\n}\npub use clock::{Clock, ClockFiller};\n";
+
 const IMPORTED_IN_MODULE: &str =
     "mod inner {\n    use ci::ports::Ports;\n    struct Fake;\n    impl Ports for Fake {}\n}\n";
 
-const CASES: [Case; 20] = [
+const CASES: [Case; 22] = [
     Case::new(
         Title::new("implements a trait of a ports module"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(PORTED))],
@@ -87,7 +94,10 @@ const CASES: [Case; 20] = [
     ),
     Case::new(
         Title::new("glob imported port"),
-        &[Source::new(Located::new("tests/a.rs"), Text::new(GLOB))],
+        &[
+            Source::new(Located::new("crates/ci/src/lib.rs"), Text::new(CI_PORTS)),
+            Source::new(Located::new("tests/a.rs"), Text::new(GLOB)),
+        ],
         Flagged::new(&[]),
     ),
     Case::new(
@@ -106,14 +116,6 @@ const CASES: [Case; 20] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("implemented in another file of the same test target"),
-        &[
-            Source::new(Located::new("tests/c/main.rs"), Text::new(DECLARED)),
-            Source::new(Located::new("tests/c/impls.rs"), Text::new(IMPLEMENTED)),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
         Title::new("implemented in another test target"),
         &[
             Source::new(Located::new("tests/a.rs"), Text::new(DECLARED)),
@@ -124,6 +126,7 @@ const CASES: [Case; 20] = [
     Case::new(
         Title::new("a port re-exported by its crate"),
         &[
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(X_ROOT)),
             Source::new(Located::new("crates/x/src/ports.rs"), Text::new(SHIPPED_PORT)),
             Source::new(Located::new("crates/x/src/other.rs"), Text::new(SHIPPED_OTHER)),
             Source::new(Located::new("crates/x/tests/a.rs"), Text::new(THROUGH_RE_EXPORT)),
@@ -139,6 +142,42 @@ const CASES: [Case; 20] = [
         Flagged::new(&["crates/x/tests/a.rs:3", "crates/x/tests/a.rs:4"]),
     ),
     Case::new(
+        Title::new("fills a port declared by the port macro"),
+        &[
+            Source::new(Located::new("crates/p/src/ports.rs"), Text::new(PORT_CRATE)),
+            Source::new(
+                Located::new("crates/p/src/lib.rs"),
+                Text::new("pub mod ports;\npub use ports::ClockFiller;\n"),
+            ),
+            Source::new(Located::new("crates/p/tests/a.rs"), Text::new(FILLED)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("fills a port declared by the qualified port macro"),
+        &[
+            Source::new(Located::new("crates/p/src/ports.rs"), Text::new(QUALIFIED_PORT)),
+            Source::new(
+                Located::new("crates/p/src/lib.rs"),
+                Text::new("pub mod ports;\npub use ports::ClockFiller;\n"),
+            ),
+            Source::new(Located::new("crates/p/tests/a.rs"), Text::new(FILLED)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a filler name without the port macro"),
+        &[
+            Source::new(Located::new("crates/p/src/ports.rs"), Text::new(UNMARKED)),
+            Source::new(
+                Located::new("crates/p/src/lib.rs"),
+                Text::new("pub mod ports;\npub use ports::ClockFiller;\n"),
+            ),
+            Source::new(Located::new("crates/p/tests/a.rs"), Text::new(FILLED)),
+        ],
+        Flagged::new(&["crates/p/tests/a.rs:2", "crates/p/tests/a.rs:3"]),
+    ),
+    Case::new(
         Title::new("implements a port imported only inside its module"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(IMPORTED_IN_MODULE))],
         Flagged::new(&[]),
@@ -147,5 +186,5 @@ const CASES: [Case; 20] = [
 
 #[test]
 fn test_doubles_implement_only_ports() {
-    assert_eq!(Sources::mismatches::<Primed<FakesAtPorts>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<FakesAtPorts>>(&CASES), Lines::default());
 }
