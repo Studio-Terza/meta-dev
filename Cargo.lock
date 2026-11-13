@@ -1273,18 +1273,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
-name = "law-facts"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-file",
- "lint-layout",
- "lint-placement",
- "proc-macro2",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "laws"
 version = "0.1.0"
 dependencies = [
@@ -3282,31 +3270,6 @@ dependencies = [
  "serde_json",
  "text-lines",
  "thiserror",
-]
-
-[[package]]
-name = "transition-facts"
-version = "0.1.0"
-dependencies = [
- "body-lifts",
- "lint-core",
- "lint-fixtures",
- "lint-layout",
- "lint-placement",
- "newtype",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "type-facts"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-fixtures",
- "lint-layout",
- "lint-placement",
- "proc-macro2",
- "syn 2.0.119",
 ]
 
 [[package]]
