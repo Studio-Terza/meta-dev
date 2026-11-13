@@ -304,3 +304,38 @@ fn the_crates_flag_alone_asks_for_crate_sizes() {
     let answered = Asked::query(&["--crates"]).map(|query| query.answered(&files, &[]).to_string());
     assert!(answered.is_ok_and(|text| text.contains("crates by size and place on the compile chain:")));
 }
+
+const SIZED_METADATA: &str = concat!(
+    "{\"workspace_root\": \"/w\", \"workspace_members\": [\"shop\", \"bank\"], \"packages\": [",
+    "{\"name\": \"shop\", \"id\": \"shop\", \"manifest_path\": \"/w/crates/shop/Cargo.toml\", \"dependencies\": []}, ",
+    "{\"name\": \"bank\", \"id\": \"bank\", \"manifest_path\": \"/w/crates/bank/Cargo.toml\", \"dependencies\": []}",
+    "], \"resolve\": {\"nodes\": [",
+    "{\"id\": \"bank\", \"dependencies\": [\"shop\"], \"deps\": [{\"name\": \"shop\", \"pkg\": \"shop\", ",
+    "\"dep_kinds\": [{\"kind\": null, \"target\": null}]}]}, ",
+    "{\"id\": \"shop\", \"dependencies\": [], \"deps\": []}]}}"
+);
+
+#[test]
+fn crate_sizes_count_files_and_lines_and_place_each_crate_on_the_compile_chain()
+-> Result<(), Box<dyn std::error::Error>> {
+    let metadata: workspace_metadata::Metadata = serde_json::from_str(SIZED_METADATA)?;
+    let files = Sources::parsed(&[
+        Source::new(
+            Located::new("crates/shop/src/lib.rs"),
+            Text::new("mod till;\npub struct Cents;\npub struct Basket;\n"),
+        ),
+        Source::new(Located::new("crates/shop/src/till.rs"), Text::new("pub struct Line;\npub struct Till;\n")),
+        Source::new(Located::new("crates/bank/src/lib.rs"), Text::new("pub struct Ledger;\n")),
+    ]);
+    let query = Asked::query(&["--crates"]).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+    let answer = query.answered(&files, std::slice::from_ref(&metadata)).to_string();
+    assert_eq!(
+        answer.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>(),
+        [
+            "crates by size and place on the compile chain:",
+            "  shop: 2 files, 5 lines; depth 1 on the compile chain, 0 workspace crates below it, 1 above it",
+            "  bank: 1 files, 1 lines; depth 2 on the compile chain, 1 workspace crates below it, 0 above it",
+        ]
+    );
+    Ok(())
+}
