@@ -1,24 +1,38 @@
-use syn::visit::Visit;
+use proc_macro2::Span;
 use syn::{Item, ItemFn};
 
+use lint_core::SourceFile;
+use lint_sweep::{Descend, Kind, Sweep, Watch};
+
+use crate::ThinMain;
+
 #[derive(Debug, Default)]
-pub(crate) struct BodyItems<'ast> {
-    found: Vec<&'ast Item>,
+pub(crate) struct BodyItems {
+    found: Vec<Span>,
 }
 
-impl<'ast> BodyItems<'ast> {
-    pub(crate) fn declared_in(main: &'ast ItemFn) -> Vec<&'ast Item> {
+impl BodyItems {
+    fn declared(item: &Item) -> Option<Span> {
+        match item {
+            Item::Use(_) => None,
+            _ => Some(ThinMain::keyword(item)),
+        }
+    }
+
+    pub(crate) fn declared_in(file: &SourceFile, main: &ItemFn) -> Vec<Span> {
         let mut items = BodyItems::default();
-        items.visit_block(&main.block);
+        Sweep::through_block(file, &main.block, &mut items);
         items.found
     }
 }
 
-impl<'ast> Visit<'ast> for BodyItems<'ast> {
-    fn visit_item(&mut self, item: &'ast Item) {
-        match item {
-            Item::Use(_) => {}
-            declared => self.found.push(declared),
-        }
+impl<'ast> Watch<'ast> for BodyItems {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Item]
+    }
+
+    fn on_item(&mut self, item: &'ast Item) -> Descend {
+        self.found.extend(Self::declared(item));
+        Descend::Over
     }
 }

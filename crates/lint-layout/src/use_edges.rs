@@ -1,19 +1,20 @@
-use syn::visit::Visit;
-use syn::{ItemUse, UseTree};
+use syn::UseTree;
 
 use crate::name::Name;
 use crate::use_path::UsePath;
 
-#[derive(Debug)]
-pub struct UseEdges<Edge: FnMut(&UsePath)> {
+#[derive(Debug, Default)]
+pub struct UseEdges {
     prefix: UsePath,
-    edge: Edge,
+    found: Vec<UsePath>,
 }
 
-impl<Edge: FnMut(&UsePath)> UseEdges<Edge> {
-    pub fn each(file: &syn::File, edge: Edge) {
-        let mut edges = UseEdges { prefix: UsePath::default(), edge };
-        edges.visit_file(file);
+impl UseEdges {
+    #[must_use]
+    pub fn of_tree(tree: &UseTree) -> Vec<UsePath> {
+        let mut edges = UseEdges::default();
+        edges.walk(tree);
+        edges.found
     }
 
     fn walk_path(&mut self, path: &syn::UsePath) {
@@ -26,13 +27,7 @@ impl<Edge: FnMut(&UsePath)> UseEdges<Edge> {
         match tree {
             UseTree::Path(path) => self.walk_path(path),
             UseTree::Group(group) => group.items.iter().for_each(|item| self.walk(item)),
-            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => (self.edge)(&self.prefix),
+            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => self.found.push(self.prefix.clone()),
         }
-    }
-}
-
-impl<'ast, Edge: FnMut(&UsePath)> Visit<'ast> for UseEdges<Edge> {
-    fn visit_item_use(&mut self, item: &'ast ItemUse) {
-        self.walk(&item.tree);
     }
 }

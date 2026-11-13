@@ -1,18 +1,15 @@
 mod skip_marks;
-mod test_gates;
 
 use lint_core::Fix;
 use lint_core::Headline;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::Violation;
-use lint_file::{FileLint, Reads};
+use lint_file::{Reads, SweptLint};
 use lint_layout::LibraryTests;
 use lint_placement::Role;
+use lint_sweep::Finds;
 use skip_marks::SkipMarks;
-use test_gates::TestGates;
 
 #[derive(Debug)]
 pub struct NoIgnoredTests;
@@ -43,22 +40,12 @@ impl NoIgnoredTests {
     }
 }
 
-impl FileLint for NoIgnoredTests {
+impl SweptLint for NoIgnoredTests {
     const HEADLINE: Headline = Headline::new("every test runs");
     const READS: Reads = Reads::Every;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let path = file.head().path();
-        let skipped = SkipMarks::lines_in(file.syntax())
-            .into_iter()
-            .map(|line| Violation::new(Site::new(path, line), Self::SKIPPED));
-        let target = file.head().switched_off().map(|switched| Violation::new(Site::of_file(switched), Self::UNTESTED));
-        let unrun = file
-            .shipped()
-            .and_then(Self::never_tested)
-            .map_or_default(|shipped| TestGates::lines_in(shipped.syntax()))
-            .into_iter()
-            .map(|line| Violation::new(Site::new(path, line), Self::UNRUN));
-        skipped.chain(target).chain(unrun).collect()
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        let unrun = file.shipped().and_then(Self::never_tested).map(|_| Vec::new());
+        Box::new(SkipMarks::new(file, unrun))
     }
 }

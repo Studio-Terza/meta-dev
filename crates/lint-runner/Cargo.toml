@@ -11,6 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
+lint-sweep = { path = "../lint-sweep" }
 cargo-ports = { path = "../cargo-ports" }
 file-ports = { path = "../file-ports" }
 graph-query = { path = "../graph-query" }

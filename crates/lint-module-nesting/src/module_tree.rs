@@ -14,7 +14,9 @@ use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
 use lint_placement::CrateRoot;
+use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
 use reexport_count::ReexportCount;
+use syn::ItemUse;
 use users::Users;
 
 pub struct ModuleTree<'file> {
@@ -40,37 +42,61 @@ pub struct ModuleUses<'head> {
     tests: Vec<TestUses>,
 }
 
-impl<'head> From<Parsed<'_, 'head>> for ModuleUses<'head> {
-    fn from(parsed: Parsed<'_, 'head>) -> ModuleUses<'head> {
-        let head = parsed.head();
-        let file = parsed.file();
-        let tests = file.test_modules().iter().map(|test| TestUses {
-            segments: test.head().placement().module().segments().to_vec(),
-            uses: UsePaths::written_in(test.syntax()),
-        });
-        ModuleUses {
-            file: head.path(),
-            crate_root: head.placement().crate_root(),
-            segments: head.placement().module().segments(),
-            reexports: ReexportCount::of_file(file.syntax()),
-            uses: UsePaths::written_in(file.syntax()),
-            tests: tests.collect(),
-        }
+#[derive(Debug)]
+pub struct ShippedModule<'head>(Option<ModuleUses<'head>>);
+
+impl<'head> IntoIterator for ShippedModule<'head> {
+    type Item = ModuleUses<'head>;
+    type IntoIter = std::option::IntoIter<ModuleUses<'head>>;
+
+    fn into_iter(self) -> std::option::IntoIter<ModuleUses<'head>> {
+        self.0.into_iter()
     }
 }
 
 #[derive(Debug)]
-pub struct ShippedModule<'head>(Option<ModuleUses<'head>>);
+pub struct ModuleGathering<'head> {
+    uses: UsePaths,
+    module: Option<ModuleUses<'head>>,
+}
 
-impl<'head> From<Parsed<'_, 'head>> for ShippedModule<'head> {
-    fn from(parsed: Parsed<'_, 'head>) -> ShippedModule<'head> {
-        ShippedModule(parsed.file().shipped().map(|_| ModuleUses::from(parsed)))
+impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> ModuleGathering<'head> {
+        let head = parsed.head();
+        let file = parsed.file();
+        let module = file.shipped().map(|_| {
+            let tests = file.test_modules().iter().map(|test| TestUses {
+                segments: test.head().placement().module().segments().to_vec(),
+                uses: Sweep::gathered(test, UsePaths::default()),
+            });
+            ModuleUses {
+                file: head.path(),
+                crate_root: head.placement().crate_root(),
+                segments: head.placement().module().segments(),
+                reexports: ReexportCount::of_file(file.syntax()),
+                uses: Vec::new(),
+                tests: tests.collect(),
+            }
+        });
+        ModuleGathering { uses: UsePaths::default(), module }
+    }
+}
+
+impl<'head> Gathers<ShippedModule<'head>> for ModuleGathering<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        let module = self.module.as_ref();
+        module.map_or_default(|_| Sweep::alone(&mut self.uses))
+    }
+
+    fn gathered(self) -> ShippedModule<'head> {
+        let uses = self.uses.0;
+        ShippedModule(self.module.map(|module| ModuleUses { uses, ..module }))
     }
 }
 
 impl<'head> FromIterator<ShippedModule<'head>> for Concluded<'head> {
     fn from_iter<Parts: IntoIterator<Item = ShippedModule<'head>>>(parts: Parts) -> Concluded<'head> {
-        let modules: Vec<ModuleUses<'head>> = parts.into_iter().filter_map(|part| part.0).collect();
+        let modules: Vec<ModuleUses<'head>> = parts.into_iter().flatten().collect();
         let heads: BTreeMap<&Path, &'head Path> = modules.iter().map(|module| (module.file, module.file)).collect();
         let tree = ModuleTree::from(modules.as_slice());
         tree.violations()
@@ -79,13 +105,27 @@ impl<'head> FromIterator<ShippedModule<'head>> for Concluded<'head> {
     }
 }
 
-struct UsePaths;
+#[derive(Debug, Default)]
+pub struct UsePaths(Vec<UsePath>);
 
-impl UsePaths {
-    fn written_in(syntax: &syn::File) -> Vec<UsePath> {
-        let mut found = Vec::new();
-        UseEdges::each(syntax, |path| found.push(path.clone()));
-        found
+impl<'ast> Watch<'ast> for UsePaths {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemUse]
+    }
+
+    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
+        self.0.extend(UseEdges::of_tree(&item.tree));
+        Descend::Over
+    }
+}
+
+impl Gathers<Vec<UsePath>> for UsePaths {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> Vec<UsePath> {
+        self.0
     }
 }
 

@@ -24,12 +24,11 @@ impl FileLint for ThinMain {
         let binary = Some(file).filter(|found| found.head().placement().role() == Role::BinaryRoot);
         binary.map_or_default(|root| {
             let items = &root.syntax().items;
-            let inside_main = Self::mains(items).flat_map(BodyItems::declared_in);
-            let logic = items.iter().filter(|item| Self::thin(item).is_none()).chain(inside_main);
+            let inside_main = Self::mains(items).flat_map(|main| BodyItems::declared_in(root, main));
+            let outside = items.iter().filter(|item| Self::thin(item).is_none()).map(Self::keyword);
+            let logic = outside.chain(inside_main);
             logic
-                .map(|item| {
-                    Violation::new(Site::new(root.head().path(), LineNumber::from(Self::keyword(item))), Finding::Logic)
-                })
+                .map(|span| Violation::new(Site::new(root.head().path(), LineNumber::from(span)), Finding::Logic))
                 .collect()
         })
     }

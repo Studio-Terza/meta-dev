@@ -33,7 +33,9 @@ impl ContextLint for EnumPredicates {
     type Part<'head> = Vec<Declaration<'head>>;
     type Context<'head> = Known<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Vec<Declaration<'head>> {
+    type Gathering<'head> = Declarations<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Declarations<'head> {
         Declarations::in_file(parsed)
     }
 

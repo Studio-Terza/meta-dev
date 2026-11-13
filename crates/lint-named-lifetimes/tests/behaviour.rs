@@ -1,4 +1,4 @@
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_named_lifetimes::NamedLifetimes;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -21,5 +21,5 @@ const CASES: [Case; 2] = [
 
 #[test]
 fn only_one_letter_lifetimes_are_flagged_also_inside_macros() {
-    assert_eq!(Sources::mismatches::<Filed<NamedLifetimes>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<NamedLifetimes>>(&CASES), Lines::default());
 }

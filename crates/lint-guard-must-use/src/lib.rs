@@ -15,8 +15,10 @@ impl ContextLint for GuardMustUse {
     type Part<'head> = Modules<'head>;
     type Context<'head> = Concluded<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Modules<'head> {
-        parsed.file().shipped().map_or_default(|_| Guards::scanned(parsed))
+    type Gathering<'head> = Guards<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Guards<'head> {
+        Guards::scanning(parsed)
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {

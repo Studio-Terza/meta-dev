@@ -1,4 +1,4 @@
-use lint_core::{SourceFile, Violation};
+use lint_core::SourceFile;
 
 use crate::file_flow::FileFlow;
 use crate::finding::Rule;
@@ -16,13 +16,6 @@ pub struct Flows<'file> {
 impl<'file> From<&'file [SourceFile]> for Flows<'file> {
     fn from(files: &'file [SourceFile]) -> Flows<'file> {
         Flows { files: files.iter().flat_map(FileFlow::of_file).collect() }
-    }
-}
-
-impl<'file> Flows<'file> {
-    #[must_use]
-    pub fn flagged<L: FlowLint>(file: &'file SourceFile) -> Vec<Violation<'file>> {
-        FileFlow::violations(&FileFlow::of_file(file), L::RULE)
     }
 }
 

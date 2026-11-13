@@ -1,6 +1,6 @@
 use lint_bool_methods::BoolMethods;
 use lint_core::Lint;
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const LISTED: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n    pub fn has_room(&self) -> bool { true }\n}\n";
@@ -100,12 +100,12 @@ const CASES: [Case; 16] = [
 
 #[test]
 fn every_function_returning_bool_is_flagged() {
-    assert_eq!(Sources::mismatches::<Filed<BoolMethods>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<BoolMethods>>(&CASES), Lines::default());
 }
 
 #[test]
 fn the_message_names_the_replacements() {
-    let shown = Filed::<BoolMethods>::report(&[Sources::file("a.rs", Text::new(LISTED))]).to_string();
+    let shown = Swept::<BoolMethods>::report(&[Sources::file("a.rs", Text::new(LISTED))]).to_string();
     assert!(
         ["Option", "Result", "enum", "match", "NonEmpty", "fn is_on -> bool"].iter().all(|word| shown.contains(word))
     );

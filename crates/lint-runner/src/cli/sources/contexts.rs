@@ -16,6 +16,7 @@ use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_state_graph::StateGraph;
+use lint_sweep::{Gathers, Sweep, Watching};
 use lint_test_budget::TestBudget;
 use lint_unconsumed_traits::UnconsumedTraits;
 
@@ -62,12 +63,28 @@ macro_rules! contexts {
             $($gleaned: Vec<<$glean as Gleaning>::Part<'run>>,)*
         }
 
+        struct Gatherings<'run> {
+            $($field: <$lint as ContextLint>::Gathering<'run>,)*
+            $($primed: <$prime as PrimedFacts>::Priming<'run>,)*
+            $($gleaned: <$glean as Gleaning>::Gleaner<'run>,)*
+        }
+
         impl<'run> From<Parsed<'_, 'run>> for Contributed<'run> {
             fn from(parsed: Parsed<'_, 'run>) -> Contributed<'run> {
+                let mut gatherings = Gatherings {
+                    $($field: <$lint as ContextLint>::gathering(parsed),)*
+                    $($primed: <$prime as PrimedFacts>::priming(parsed),)*
+                    $($gleaned: <$glean as Gleaning>::gleaner(parsed),)*
+                };
+                let mut watching: Vec<&mut Watching<'_>> = Vec::new();
+                $(watching.extend(gatherings.$field.watching());)*
+                $(watching.extend(gatherings.$primed.watching());)*
+                $(watching.extend(gatherings.$gleaned.watching());)*
+                Sweep::watching(parsed.file(), watching);
                 Contributed {
-                    $($field: <$lint as ContextLint>::contributed(parsed),)*
-                    $($primed: <$prime as PrimedFacts>::primed(parsed),)*
-                    $($gleaned: <$glean as Gleaning>::gleaned(parsed),)*
+                    $($field: gatherings.$field.gathered(),)*
+                    $($primed: gatherings.$primed.gathered(),)*
+                    $($gleaned: gatherings.$gleaned.gathered(),)*
                 }
             }
         }

@@ -10,9 +10,10 @@ use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
 use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
-use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads};
+use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads, Swept, SweptLint};
 use lint_port_dependencies::{RoleFacts, RoleReading};
 use lint_reader::{Described, Unlocated};
+use lint_sweep::{Finds, Sweep};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -114,8 +115,32 @@ struct Judging {
 struct Filing {
     headline: Headline,
     reads: Reads,
-    scan: Scan,
+    scanning: Scanning,
 }
+
+#[derive(Clone, Copy, Debug)]
+enum Scanning {
+    Alone(Scan),
+    Swept(Start),
+}
+
+impl Scanning {
+    fn alone(self) -> Option<Scan> {
+        match self {
+            Scanning::Alone(scan) => Some(scan),
+            Scanning::Swept(_) => None,
+        }
+    }
+
+    fn swept(self) -> Option<Start> {
+        match self {
+            Scanning::Swept(start) => Some(start),
+            Scanning::Alone(_) => None,
+        }
+    }
+}
+
+type Start = for<'file> fn(&'file SourceFile) -> Box<dyn Finds<'file> + 'file>;
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
@@ -127,24 +152,24 @@ type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 impl Lints {
     const LINTS: [Entry; 54] = [
         <Filed<NoComments> as Registered>::ENTRY,
-        <Filed<NoFreeFns> as Registered>::ENTRY,
+        <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
         <Filed<VecOutParams<'static>> as Registered>::ENTRY,
-        <Filed<NamedLifetimes> as Registered>::ENTRY,
+        <Swept<NamedLifetimes> as Registered>::ENTRY,
         <Judged<EnumPredicates> as Registered>::ENTRY,
-        <Filed<ConstShape> as Registered>::ENTRY,
-        <Filed<TypeShape> as Registered>::ENTRY,
-        <Filed<ExpressionFlow> as Registered>::ENTRY,
-        <Filed<FnShape> as Registered>::ENTRY,
-        <Filed<LiteralNames> as Registered>::ENTRY,
-        <Filed<ManualIteration> as Registered>::ENTRY,
+        <Swept<ConstShape> as Registered>::ENTRY,
+        <Swept<TypeShape> as Registered>::ENTRY,
+        <Swept<ExpressionFlow> as Registered>::ENTRY,
+        <Swept<FnShape> as Registered>::ENTRY,
+        <Swept<LiteralNames> as Registered>::ENTRY,
+        <Swept<ManualIteration> as Registered>::ENTRY,
         <Judged<ModuleNesting> as Registered>::ENTRY,
         <Judged<NamedNumbers> as Registered>::ENTRY,
         <Judged<NoForwarders> as Registered>::ENTRY,
         <Filed<NoNumbersInBinaries> as Registered>::ENTRY,
         <Judged<NoParameterBags> as Registered>::ENTRY,
         Entry::spelled::<PrimitiveBoundary>(Work::Modelled(<PrimitiveBoundary as ModelLint>::report)),
-        <Filed<PrivateFns> as Registered>::ENTRY,
+        <Swept<PrivateFns> as Registered>::ENTRY,
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
         <Judged<PublicSurface> as Registered>::ENTRY,
@@ -153,7 +178,7 @@ impl Lints {
         <Judged<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
-        <Filed<NoIgnoredTests> as Registered>::ENTRY,
+        <Swept<NoIgnoredTests> as Registered>::ENTRY,
         Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
         Entry::spelled::<FakesAtPorts>(Work::Modelled(<FakesAtPorts as ModelLint>::report)),
         Entry::spelled::<PortBatching>(Work::Modelled(<PortBatching as ModelLint>::report)),
@@ -170,13 +195,13 @@ impl Lints {
         <Filed<LongExactStrings> as Registered>::ENTRY,
         <Judged<RepeatedShapes> as Registered>::ENTRY,
         Entry::spelled::<MandatoryLaws>(Work::Modelled(<MandatoryLaws as ModelLint>::report)),
-        <Filed<ArbitraryNewtypes> as Registered>::ENTRY,
-        <Filed<BoolMethods> as Registered>::ENTRY,
+        <Swept<ArbitraryNewtypes> as Registered>::ENTRY,
+        <Swept<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
-        <Filed<NoEarlyExits> as Registered>::ENTRY,
-        <Filed<LinearBodies> as Registered>::ENTRY,
-        <Filed<PureRouters> as Registered>::ENTRY,
-        <Filed<PlainConditions> as Registered>::ENTRY,
+        <Swept<NoEarlyExits> as Registered>::ENTRY,
+        <Swept<LinearBodies> as Registered>::ENTRY,
+        <Swept<PureRouters> as Registered>::ENTRY,
+        <Swept<PlainConditions> as Registered>::ENTRY,
         Entry::spelled::<TypeSystem>(Work::Extracted(|model| {
             let extraction = Extraction::default();
             let transitions = Transitions::from(model);
@@ -227,6 +252,7 @@ impl Lints {
             .iter()
             .enumerate()
             .filter_map(|(index, entry)| entry.filing().map(|found| found.lines(Slot::from(index), lowered.claimed())))
+            .chain([Sweepers::worked(lowered.claimed())])
             .collect();
         let filed_timing = filing.stopped(Step::Filed(worker));
         let priming = Stopwatch::started(sources.wired().timer());
@@ -376,7 +402,7 @@ impl Work {
                     .ok()
                     .zip(sources.gathering().model())
                     .map(|(located, model)| {
-                        let facts = Priming::<RoleReading>::primed(settled);
+                        let facts = Priming::<RoleReading>::primer(settled);
                         described(sources.gathering().heads(), Described::workspaces(located), facts, model)
                     })
                     .into_iter()
@@ -421,8 +447,10 @@ impl Job {
 
 impl Filing {
     fn lines(self, slot: Slot, claimed: &[Claimed<'_>]) -> Worked {
+        let scanned = self.scanning.alone();
         let read = claimed.iter().filter_map(|found| self.reads.admits(found.file()).map(|file| (found.order(), file)));
-        read.map(|(order, file)| Worked::filing(slot, order, &(self.scan)(file))).collect()
+        let scans = read.filter_map(|(order, file)| scanned.map(|scan| (order, scan(file))));
+        scans.map(|(order, violations)| Worked::filing(slot, order, &violations)).collect()
     }
 }
 
@@ -433,8 +461,46 @@ trait Registered {
 impl<Lint: FileLint> Registered for Filed<Lint> {
     const ENTRY: Entry = Entry {
         name: Named::spelled::<Lint>(),
-        work: Work::Filed(Filing { headline: Lint::HEADLINE, reads: Lint::READS, scan: Lint::violations }),
+        work: Work::Filed(Filing {
+            headline: Lint::HEADLINE,
+            reads: Lint::READS,
+            scanning: Scanning::Alone(Lint::violations),
+        }),
     };
+}
+
+impl<Lint: SweptLint> Registered for Swept<Lint> {
+    const ENTRY: Entry = Entry {
+        name: Named::spelled::<Lint>(),
+        work: Work::Filed(Filing {
+            headline: Lint::HEADLINE,
+            reads: Lint::READS,
+            scanning: Scanning::Swept(Lint::watcher),
+        }),
+    };
+}
+
+#[derive(Debug)]
+struct Sweepers;
+
+impl Sweepers {
+    fn worked(claimed: &[Claimed<'_>]) -> Worked {
+        claimed.iter().map(Sweepers::swept).collect()
+    }
+
+    fn swept(claimed: &Claimed<'_>) -> Worked {
+        let file = claimed.file();
+        let starts: Vec<(Slot, Start)> = Lints::LINTS
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| Some((Slot::from(index), entry.filing()?)))
+            .filter_map(|(slot, filing)| Some((slot, filing.reads.admits(file).and(filing.scanning.swept())?)))
+            .collect();
+        let mut watchers: Vec<Box<dyn Finds<'_> + '_>> = starts.iter().map(|(_, start)| start(file)).collect();
+        Sweep::over(file, &mut watchers);
+        let found = starts.into_iter().zip(watchers).map(|((slot, _), watcher)| (slot, watcher.found()));
+        found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations)).collect()
+    }
 }
 
 impl<Lint: ContextLint> Registered for Judged<Lint>

@@ -9,7 +9,7 @@ mod function_shape;
 mod impl_context;
 mod variant_matches;
 
-use declarations::Declarations;
+use declarations::{DeclarationGathering, Declarations};
 use declared_graphs::DeclaredGraphs;
 use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges};
 use field_visibility::FieldVisibility;
@@ -35,8 +35,10 @@ impl PrimedFacts for StateGraph {
     type Part<'head> = StateFile<'head>;
     type Context<'head> = Concluded<'head>;
 
-    fn primed<'head>(parsed: Parsed<'_, 'head>) -> Option<Declarations<'head>> {
-        parsed.file().shipped().map(|_| Declarations::from(parsed))
+    type Priming<'head> = DeclarationGathering<'head>;
+
+    fn priming<'head>(parsed: Parsed<'_, 'head>) -> DeclarationGathering<'head> {
+        DeclarationGathering::from(parsed)
     }
 
     fn contributed<'head>(parsed: Parsed<'_, 'head>, declarations: &Declarations<'head>) -> StateFile<'head> {

@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use declared::Declared;
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile};
 use lint_file::Gleaning;
+use lint_sweep::{Gathers, Sweep, Watching};
 use owner::Owner;
 use paired_methods::PairedMethods;
 use pairs::Pairs;
@@ -23,7 +24,8 @@ impl PairedApis {
 
 impl Lint for PairedApis {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let declared: PairedOwners<'_> = files.iter().map(Parsed::from).map(PairedApis::gleaned).collect();
+        let declared: PairedOwners<'_> =
+            files.iter().map(|file| Sweep::gathered(file, PairedApis::gleaner(Parsed::from(file)))).collect();
         Report::from(&declared)
     }
 }
@@ -49,11 +51,26 @@ impl<'head> From<&PairedOwners<'head>> for Report<'head> {
     }
 }
 
+#[derive(Debug)]
+pub struct PairedGleaner<'head>(PairedMethods<'head>);
+
+impl<'head> Gathers<PairedOwners<'head>> for PairedGleaner<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        self.0.watching()
+    }
+
+    fn gathered(self) -> PairedOwners<'head> {
+        PairedOwners(self.0.gathered())
+    }
+}
+
 impl Gleaning for PairedApis {
     type Part<'head> = PairedOwners<'head>;
     type Gleaned<'head> = PairedOwners<'head>;
 
-    fn gleaned<'head>(parsed: Parsed<'_, 'head>) -> PairedOwners<'head> {
-        PairedOwners(parsed.file().shipped().map_or_default(|_| PairedMethods::of_file(parsed)))
+    type Gleaner<'head> = PairedGleaner<'head>;
+
+    fn gleaner<'head>(parsed: Parsed<'_, 'head>) -> PairedGleaner<'head> {
+        PairedGleaner(PairedMethods::of_file(parsed))
     }
 }

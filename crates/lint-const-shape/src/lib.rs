@@ -1,8 +1,8 @@
 use lint_core::Headline;
-use lint_file::{FileLint, Reads};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::{Address, Descend, Finds, Kind, Watch};
 use proc_macro2::Span;
 use std::path::Path;
-use syn::visit::Visit;
 
 use syn::{
     Expr, ExprCast, ExprConst, ExprForLoop, ExprLoop, ExprRepeat, ExprWhile, ImplItemConst, ImplItemFn, ItemConst,
@@ -11,7 +11,6 @@ use syn::{
 
 use lint_core::Fix;
 use lint_core::Gate;
-use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
@@ -31,21 +30,20 @@ enum Context {
     Const,
 }
 
-impl FileLint for ConstShape {
+impl SweptLint for ConstShape {
     const HEADLINE: Headline =
         Headline::new("casts live in const fns or boundary modules, and const loops walk slices");
     const READS: Reads = Reads::Every;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut contexts = ConstContexts {
-            file,
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(ConstContexts {
             path: file.head().path(),
-            context: Context::Surface,
+            context: Contexts { current: Context::Surface, outer: Vec::new() },
             zone: Zone::of_file(file),
+            zones: Vec::new(),
+            pending: Vec::new(),
             violations: Vec::new(),
-        };
-        contexts.visit_file(file.syntax());
-        contexts.violations
+        })
     }
 }
 
@@ -87,10 +85,11 @@ impl Zone {
 }
 
 struct ConstContexts<'scan> {
-    file: &'scan SourceFile,
     path: &'scan Path,
-    context: Context,
+    context: Contexts,
     zone: Zone,
+    zones: Vec<Zone>,
+    pending: Vec<Address>,
     violations: Vec<Violation<'scan>>,
 }
 
@@ -99,15 +98,11 @@ impl<'scan> ConstContexts<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
-    fn within(&mut self, context: Context, visit: impl FnOnce(&mut Self)) {
-        let outer = std::mem::replace(&mut self.context, context);
-        visit(self);
-        self.context = outer;
-    }
-
     fn cast_finding(&self, cast: &ExprCast) -> Option<Violation<'scan>> {
-        Some(self).filter(|scan| scan.context == Context::Surface).filter(|scan| scan.zone == Zone::Elsewhere).map(
-            |scan| {
+        Some(self)
+            .filter(|scan| scan.context.current == Context::Surface)
+            .filter(|scan| scan.zone == Zone::Elsewhere)
+            .map(|scan| {
                 scan.violation(
                     cast.as_token.span,
                     Message::new(
@@ -115,86 +110,168 @@ impl<'scan> ConstContexts<'scan> {
                         Fix::new("use From, TryFrom, or an EnumMap"),
                     ),
                 )
-            },
-        )
+            })
     }
 
     fn loop_finding(&self, span: Span, message: Message) -> Option<Violation<'scan>> {
-        (self.context == Context::Const).then(|| self.violation(span, message))
+        (self.context.current == Context::Const).then(|| self.violation(span, message))
     }
 }
 
-impl<'ast> Visit<'ast> for ConstContexts<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let outer = self.zone;
+struct Contexts {
+    current: Context,
+    outer: Vec<Context>,
+}
+
+impl Contexts {
+    fn within(&mut self, context: Context) -> Descend {
+        self.outer.push(std::mem::replace(&mut self.current, context));
+        Descend::Into
+    }
+
+    fn restored(&mut self) {
+        self.current = self.outer.pop().unwrap_or(Context::Surface);
+    }
+}
+
+impl<'ast> Watch<'ast> for ConstContexts<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[
+            Kind::ItemMod,
+            Kind::ItemFn,
+            Kind::ImplItemFn,
+            Kind::TraitItemFn,
+            Kind::ItemConst,
+            Kind::ItemStatic,
+            Kind::ImplItemConst,
+            Kind::TraitItemConst,
+            Kind::ExprConst,
+            Kind::TypeArray,
+            Kind::ExprRepeat,
+            Kind::Variant,
+            Kind::Macro,
+            Kind::ExprCast,
+            Kind::ExprWhile,
+            Kind::ExprLoop,
+            Kind::ExprForLoop,
+            Kind::Expr,
+        ]
+    }
+
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        self.zones.push(self.zone);
         self.zone = self.zone.entering(module);
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
-        self.zone = outer;
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let context = Context::of_fn(function.sig.constness.as_ref());
-        self.within(context, |this| syn::visit::visit_item_fn(this, function));
+    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+        self.zone = self.zones.pop().unwrap_or(self.zone);
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        let context = Context::of_fn(function.sig.constness.as_ref());
-        self.within(context, |this| syn::visit::visit_impl_item_fn(this, function));
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        self.context.within(Context::of_fn(function.sig.constness.as_ref()))
     }
 
-    fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        self.within(Context::Surface, |this| syn::visit::visit_trait_item_fn(this, function));
+    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+        self.context.restored();
     }
 
-    fn visit_item_const(&mut self, item: &'ast ItemConst) {
-        self.within(Context::Const, |this| syn::visit::visit_item_const(this, item));
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+        self.context.within(Context::of_fn(function.sig.constness.as_ref()))
     }
 
-    fn visit_item_static(&mut self, item: &'ast ItemStatic) {
-        self.within(Context::Const, |this| syn::visit::visit_item_static(this, item));
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+        self.context.restored();
     }
 
-    fn visit_impl_item_const(&mut self, item: &'ast ImplItemConst) {
-        self.within(Context::Const, |this| syn::visit::visit_impl_item_const(this, item));
+    fn on_trait_item_fn(&mut self, _: &'ast TraitItemFn) -> Descend {
+        self.context.within(Context::Surface)
     }
 
-    fn visit_trait_item_const(&mut self, item: &'ast TraitItemConst) {
-        self.within(Context::Const, |this| syn::visit::visit_trait_item_const(this, item));
+    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn) {
+        self.context.restored();
     }
 
-    fn visit_expr_const(&mut self, block: &'ast ExprConst) {
-        self.within(Context::Const, |this| syn::visit::visit_expr_const(this, block));
+    fn on_item_const(&mut self, _: &'ast ItemConst) -> Descend {
+        self.context.within(Context::Const)
     }
 
-    fn visit_type_array(&mut self, array: &'ast TypeArray) {
-        self.visit_type(&array.elem);
-        self.within(Context::Const, |this| this.visit_expr(&array.len));
+    fn off_item_const(&mut self, _: &'ast ItemConst) {
+        self.context.restored();
     }
 
-    fn visit_expr_repeat(&mut self, repeat: &'ast ExprRepeat) {
-        self.visit_expr(&repeat.expr);
-        self.within(Context::Const, |this| this.visit_expr(&repeat.len));
+    fn on_item_static(&mut self, _: &'ast ItemStatic) -> Descend {
+        self.context.within(Context::Const)
     }
 
-    fn visit_variant(&mut self, variant: &'ast Variant) {
-        self.visit_fields(&variant.fields);
-        variant
-            .discriminant
-            .iter()
-            .for_each(|(_, discriminant)| self.within(Context::Const, |this| this.visit_expr(discriminant)));
+    fn off_item_static(&mut self, _: &'ast ItemStatic) {
+        self.context.restored();
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst) -> Descend {
+        self.context.within(Context::Const)
     }
 
-    fn visit_expr_cast(&mut self, cast: &'ast ExprCast) {
+    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst) {
+        self.context.restored();
+    }
+
+    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst) -> Descend {
+        self.context.within(Context::Const)
+    }
+
+    fn off_trait_item_const(&mut self, _: &'ast TraitItemConst) {
+        self.context.restored();
+    }
+
+    fn on_expr_const(&mut self, _: &'ast ExprConst) -> Descend {
+        self.context.within(Context::Const)
+    }
+
+    fn off_expr_const(&mut self, _: &'ast ExprConst) {
+        self.context.restored();
+    }
+
+    fn on_type_array(&mut self, array: &'ast TypeArray) -> Descend {
+        self.pending.push(Address::from(&array.len));
+        Descend::Into
+    }
+
+    fn on_expr_repeat(&mut self, repeat: &'ast ExprRepeat) -> Descend {
+        self.pending.push(Address::from(&*repeat.len));
+        Descend::Into
+    }
+
+    fn on_variant(&mut self, variant: &'ast Variant) -> Descend {
+        self.pending.extend(variant.discriminant.iter().map(|(_, discriminant)| Address::from(discriminant)));
+        Descend::Into
+    }
+
+    fn on_expr(&mut self, expr: &'ast Expr) -> Descend {
+        let at = Address::from(expr);
+        let pending = self.pending.iter().rposition(|waiting| *waiting == at);
+        pending.map_or(Descend::Into, |_| self.context.within(Context::Const))
+    }
+
+    fn off_expr(&mut self, expr: &'ast Expr) {
+        let at = Address::from(expr);
+        self.pending.iter().rposition(|waiting| *waiting == at).into_iter().for_each(|index| {
+            self.pending.remove(index);
+            self.context.restored();
+        });
+    }
+
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
+    }
+
+    fn on_expr_cast(&mut self, cast: &'ast ExprCast) -> Descend {
         let finding = self.cast_finding(cast);
         self.violations.extend(finding);
-        syn::visit::visit_expr_cast(self, cast);
+        Descend::Into
     }
 
-    fn visit_expr_while(&mut self, expr: &'ast ExprWhile) {
+    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
         let finding = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted).map(|_| {
             self.loop_finding(
                 expr.while_token.span,
@@ -205,10 +282,10 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
             )
         });
         self.violations.extend(finding.flatten());
-        syn::visit::visit_expr_while(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
+    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
         let finding = self.loop_finding(
             expr.loop_token.span,
             Message::new(
@@ -217,10 +294,10 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
             ),
         );
         self.violations.extend(finding);
-        syn::visit::visit_expr_loop(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
         let finding = self.loop_finding(
             expr.for_token.span,
             Message::new(
@@ -229,6 +306,12 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
             ),
         );
         self.violations.extend(finding);
-        syn::visit::visit_expr_for_loop(self, expr);
+        Descend::Into
+    }
+}
+
+impl<'file> Finds<'file> for ConstContexts<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.violations
     }
 }

@@ -2,14 +2,13 @@ mod finding;
 
 use finding::Finding;
 use lint_core::Headline;
-use lint_file::{FileLint, Reads};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::{Descend, Finds, Kind, Watch};
 use std::path::Path;
 
-use syn::visit::Visit;
-use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
+use syn::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use lint_core::Bound;
-use lint_core::Macros;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -36,61 +35,59 @@ impl LiteralNames {
     }
 }
 
-impl FileLint for LiteralNames {
+impl SweptLint for LiteralNames {
     const HEADLINE: Headline = Headline::new("function names say what the function does");
     const READS: Reads = Reads::Shipped;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut names = VagueNames { file, path: file.head().path(), found: Vec::new() };
-        names.visit_file(file.syntax());
-        names.found
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(VagueNames { path: file.head().path(), found: Vec::new() })
     }
 }
 
 struct VagueNames<'file> {
-    file: &'file SourceFile,
     path: &'file Path,
     found: Vec<Violation<'file>>,
 }
 
 impl VagueNames<'_> {
-    fn inherent(&mut self, item: &ItemImpl) {
-        match Walk::inherent_impls(item) {
-            Walk::Entered => syn::visit::visit_item_impl(self, item),
-            Walk::Skipped => {}
-        }
-    }
-
-    fn note(&mut self, ident: &Ident) {
+    fn noted(&mut self, attributes: &[Attribute], ident: &Ident) -> Descend {
+        let descend = Descend::from(Walk::outside_tests(attributes));
         let site = Site::new(self.path, LineNumber::from(ident.span()));
-        self.found.extend(LiteralNames::vague(&Name::from(ident)).map(|finding| Violation::new(site, finding)));
+        let name = Name::from(ident);
+        let vague = descend.entered().and_then(|_| LiteralNames::vague(&name));
+        self.found.extend(vague.map(|finding| Violation::new(site, finding)));
+        descend
     }
 }
 
-impl<'ast> Visit<'ast> for VagueNames<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for VagueNames<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl, Kind::ItemFn, Kind::ImplItemFn]
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(self.file, invocation, |statement| self.visit_stmt(statement));
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || self.inherent(item));
+    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+        Descend::Expand
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        Walk::enter(&function.attrs, || {
-            self.note(&function.sig.ident);
-            syn::visit::visit_item_fn(self, function);
-        });
+    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)))
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        Walk::enter(&function.attrs, || {
-            self.note(&function.sig.ident);
-            syn::visit::visit_impl_item_fn(self, function);
-        });
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        self.noted(&function.attrs, &function.sig.ident)
+    }
+
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+        self.noted(&function.attrs, &function.sig.ident)
+    }
+}
+
+impl<'file> Finds<'file> for VagueNames<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.found
     }
 }

@@ -35,8 +35,10 @@ impl ContextLint for PublicApiTests {
     type Part<'head> = Emitters;
     type Context<'head> = Emitters;
 
-    fn contributed(parsed: Parsed<'_, '_>) -> Emitters {
-        Emitters::from(parsed.file().syntax())
+    type Gathering<'head> = Emitters;
+
+    fn gathering(_: Parsed<'_, '_>) -> Emitters {
+        Emitters::default()
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, emitters: &Emitters) -> Vec<Violation<'file>> {

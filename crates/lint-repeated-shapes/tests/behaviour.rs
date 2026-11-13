@@ -164,6 +164,25 @@ const TESTS: &[Source] = &[
 const MIXED: &[Source] =
     &[Source::new(Located::new("a.rs"), Text::new(BODY)), Source::new(Located::new("tests/b.rs"), Text::new(RENAMED))];
 
+const AFTER_TESTS_TEXT: &str = concat!(
+    "#[cfg(test)]\nmod t {}\n#[cfg(test)]\nimpl X {}\n#[cfg(test)]\nfn t() {}\nstruct X;\nimpl X {\n    #[cfg(test)]\n    fn u() {}\n",
+    "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n",
+    "}\ntrait Y {\n    #[cfg(test)]\n    fn v() {}\n    fn w() {\n        h();\n    }\n}\n"
+);
+const AFTER_TRAIT_TESTS_TEXT: &str = concat!(
+    "trait Y {\n    #[cfg(test)]\n    fn v() {}\n",
+    "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n",
+    "}\n"
+);
+const AFTER_TRAIT_TESTS: &[Source] = &[
+    Source::new(Located::new("a.rs"), Text::new(AFTER_TRAIT_TESTS_TEXT)),
+    Source::new(Located::new("b.rs"), Text::new(RENAMED)),
+];
+const AFTER_TESTS: &[Source] = &[
+    Source::new(Located::new("a.rs"), Text::new(AFTER_TESTS_TEXT)),
+    Source::new(Located::new("b.rs"), Text::new(RENAMED)),
+];
+
 struct Findings;
 
 impl Findings {
@@ -188,6 +207,8 @@ laws::table!(
         SHIPPED => "a.rs:1: 46 tokens in 2 shipped copies, also at b.rs:1, differing literals: 4; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
         TESTS => "tests/a.rs:1: 46 tokens in 2 test copies, also at tests/b.rs:1, differing literals: 4; make the copies rows of one laws::table!, or state the property they share with a law macro such as laws::roundtrip! or laws::idempotent!",
         MIXED => "a.rs:1: 46 tokens in 2 test and shipped copies, also at tests/b.rs:1, differing literals: 4; the test re-implements shipped logic; test through the shipped code instead of copying it",
+        AFTER_TESTS => "a.rs:11: 46 tokens in 2 shipped copies, also at b.rs:1, differing literals: 4; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
+        AFTER_TRAIT_TESTS => "a.rs:4: 46 tokens in 2 shipped copies, also at b.rs:1, differing literals: 4; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
     ]
 );
 

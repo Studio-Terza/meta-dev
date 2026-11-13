@@ -1,6 +1,6 @@
 mod module_tree;
 
-use module_tree::ShippedModule;
+use module_tree::{ModuleGathering, ShippedModule};
 
 use lint_core::{Bound, Headline, Parsed, SourceFile, Violation};
 use lint_file::{Concluded, ContextLint, Reads};
@@ -16,8 +16,10 @@ impl ContextLint for ModuleNesting {
     type Part<'head> = ShippedModule<'head>;
     type Context<'head> = Concluded<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> ShippedModule<'head> {
-        ShippedModule::from(parsed)
+    type Gathering<'head> = ModuleGathering<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> ModuleGathering<'head> {
+        ModuleGathering::from(parsed)
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {

@@ -1,6 +1,6 @@
 use lint_const_shape::ConstShape;
 use lint_core::Lint;
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const NOT_TEST: &str = "#[cfg(not(test))]\nmod real {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
@@ -9,10 +9,10 @@ const NESTED: &str = "pub struct A;\nconst _: () = {\n    impl A {\n        pub 
 #[test]
 fn non_test_modules_are_checked_and_const_context_stays_in_its_function() {
     let not_test = [Sources::file("a.rs", Text::new(NOT_TEST))];
-    let not_test_report = Filed::<ConstShape>::report(&not_test);
+    let not_test_report = Swept::<ConstShape>::report(&not_test);
     assert_eq!(Sources::lines(&not_test_report), Lines::from(["a.rs:3"]));
     let nested = [Sources::file("a.rs", Text::new(NESTED))];
-    let nested_report = Filed::<ConstShape>::report(&nested);
+    let nested_report = Swept::<ConstShape>::report(&nested);
     assert_eq!(Sources::lines(&nested_report), Lines::from(["a.rs:4"]));
 }
 
@@ -111,5 +111,30 @@ const CASES: [Case; 15] = [
 
 #[test]
 fn casts_are_allowed_only_inside_a_boundary_module() {
-    assert_eq!(Sources::mismatches::<Filed<ConstShape>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<ConstShape>>(&CASES), Lines::default());
+}
+
+const AFTER_CONST: &str = "const A: u8 = 1;\nwrap! { x as u32 }\n";
+const AFTER_STATIC: &str = "static S: u8 = 1;\nwrap! { x as u32 }\n";
+const AFTER_IMPL_CONST: &str = "impl A {\n    const X: u8 = 1;\n}\nwrap! { x as u32 }\n";
+const AFTER_TRAIT_CONST: &str = "trait T {\n    const X: u8;\n}\nwrap! { x as u32 }\n";
+const AFTER_CONST_BLOCK: &str = "fn f(x: u8) -> u32 {\n    const { 1 };\n    x as u32\n}\n";
+const AFTER_ARRAY_LENGTH: &str = "fn f(x: u8) -> u32 {\n    let _a: [u8; 2] = [0; 2];\n    x as u32\n}\n";
+
+#[test]
+fn const_context_ends_with_its_const_item_or_block() {
+    let reported =
+        [AFTER_CONST, AFTER_STATIC, AFTER_IMPL_CONST, AFTER_TRAIT_CONST, AFTER_CONST_BLOCK, AFTER_ARRAY_LENGTH]
+            .map(|text| Sources::lines(&Swept::<ConstShape>::report(&[Sources::file("a.rs", Text::new(text))])));
+    assert_eq!(
+        reported,
+        [
+            Lines::from(["a.rs:2"]),
+            Lines::from(["a.rs:2"]),
+            Lines::from(["a.rs:4"]),
+            Lines::from(["a.rs:4"]),
+            Lines::from(["a.rs:3"]),
+            Lines::from(["a.rs:3"]),
+        ]
+    );
 }

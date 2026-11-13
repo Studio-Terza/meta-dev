@@ -1,6 +1,6 @@
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_core::Lint;
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_fixtures::{Lines, Located, Source, Sources, Text};
 
 const COUNT: &str = "#[derive(Newtype, Clone, Copy)]\npub struct Count(usize);\n";
@@ -14,14 +14,14 @@ const BORROWING: &str = "#[derive(Newtype)]\npub struct Text<'text>(Cow<'text, s
 const PARSER: &str = "#[derive(Newtype)]\npub struct Parser(fn(&str) -> usize);\n";
 const PLAIN: &str = "#[derive(Clone, Copy)]\npub struct Count(usize);\n";
 
-laws::table!(a_newtype_that_owns_its_value_needs_a_generator, Sources::flagged::<Filed<ArbitraryNewtypes>>, [
+laws::table!(a_newtype_that_owns_its_value_needs_a_generator, Sources::flagged::<Swept<ArbitraryNewtypes>>, [
     [Source::new(Located::new("a.rs"), Text::new(COUNT))] => Lines::from(["a.rs:2"]),
     [Source::new(Located::new("a.rs"), Text::new(NAMED))] => Lines::from(["a.rs:2"]),
     [Source::new(Located::new("a.rs"), Text::new(QUALIFIED))] => Lines::from(["a.rs:2"]),
     [Source::new(Located::new("a.rs"), Text::new(NESTED))] => Lines::from(["a.rs:3"]),
 ]);
 
-laws::table!(generated_borrowing_and_plain_types_pass, Sources::flagged::<Filed<ArbitraryNewtypes>>, [
+laws::table!(generated_borrowing_and_plain_types_pass, Sources::flagged::<Swept<ArbitraryNewtypes>>, [
     [Source::new(Located::new("a.rs"), Text::new(GENERATED))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(GENERATED_ELSEWHERE))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(BORROWED))] => Lines::default(),
@@ -34,7 +34,7 @@ laws::table!(generated_borrowing_and_plain_types_pass, Sources::flagged::<Filed<
 #[test]
 fn the_message_names_the_type_and_the_derive_to_add() {
     let report =
-        Filed::<ArbitraryNewtypes>::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(COUNT))]))
+        Swept::<ArbitraryNewtypes>::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(COUNT))]))
             .to_string();
     assert!(report.contains("Count has no generator; add `Arbitrary` to its derives"));
 }

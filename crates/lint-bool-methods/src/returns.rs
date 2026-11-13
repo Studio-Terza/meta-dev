@@ -1,10 +1,10 @@
 mod finding;
 
-use syn::visit::{self, Visit};
-use syn::{ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
+use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;
+use lint_sweep::{Descend, Finds, Kind, Watch};
 
 use finding::Finding;
 
@@ -28,60 +28,52 @@ impl<'file> Returns<'file> {
             })
     }
 
-    fn record(&mut self, signature: &Signature) {
-        let flagged = self.flagged(signature);
+    fn opened(&mut self, attributes: &[Attribute], signature: &Signature) -> Descend {
+        let descend = Descend::from(Walk::outside_tests(attributes));
+        let flagged = descend.entered().and_then(|_| self.flagged(signature));
         self.found.extend(flagged);
+        descend
     }
 }
 
 impl<'file> From<&'file SourceFile> for Returns<'file> {
     fn from(file: &'file SourceFile) -> Returns<'file> {
-        let mut scan = Returns { file, found: Vec::new() };
-        scan.visit_file(file.syntax());
-        scan
+        Returns { file, found: Vec::new() }
     }
 }
 
-impl<'ast> Visit<'ast> for Returns<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Returns<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemFn, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemTrait, Kind::TraitItemFn]
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        Walk::enter(&function.attrs, || {
-            self.record(&function.sig);
-            visit::visit_item_fn(self, function);
-        });
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        match Walk::inherent_impls(block) {
-            Walk::Entered => Walk::enter(&block.attrs, || visit::visit_item_impl(self, block)),
-            Walk::Skipped => {}
-        }
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        self.opened(&function.attrs, &function.sig)
     }
 
-    fn visit_impl_item_fn(&mut self, method: &'ast ImplItemFn) {
-        Walk::enter(&method.attrs, || {
-            self.record(&method.sig);
-            visit::visit_impl_item_fn(self, method);
-        });
+    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
+        Descend::from(Walk::inherent_impls(block)).then(|| Descend::from(Walk::outside_tests(&block.attrs)))
     }
 
-    fn visit_item_trait(&mut self, block: &'ast ItemTrait) {
-        Walk::enter(&block.attrs, || visit::visit_item_trait(self, block));
+    fn on_impl_item_fn(&mut self, method: &'ast ImplItemFn) -> Descend {
+        self.opened(&method.attrs, &method.sig)
     }
 
-    fn visit_trait_item_fn(&mut self, method: &'ast TraitItemFn) {
-        Walk::enter(&method.attrs, || {
-            self.record(&method.sig);
-            visit::visit_trait_item_fn(self, method);
-        });
+    fn on_item_trait(&mut self, block: &'ast ItemTrait) -> Descend {
+        Descend::from(Walk::outside_tests(&block.attrs))
+    }
+
+    fn on_trait_item_fn(&mut self, method: &'ast TraitItemFn) -> Descend {
+        self.opened(&method.attrs, &method.sig)
     }
 }
 
-impl<'file> From<Returns<'file>> for Vec<Violation<'file>> {
-    fn from(scan: Returns<'file>) -> Vec<Violation<'file>> {
-        scan.found
+impl<'file> Finds<'file> for Returns<'file> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.found
     }
 }

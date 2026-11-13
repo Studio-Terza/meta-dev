@@ -5,8 +5,11 @@ mod function_flow;
 mod tally;
 mod verdict;
 
-use lint_core::{Headline, Lint, Report, SourceFile, Violation};
-use lint_file::{FileLint, Reads};
+use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_file::{Reads, SweptLint};
+use lint_sweep::Finds;
+
+use file_flow::Collector;
 
 use flows::Flows;
 
@@ -32,12 +35,12 @@ impl FlowLint for LinearBodies {
     const RULE: Rule = Rule::LinearBodies;
 }
 
-impl FileLint for LinearBodies {
+impl SweptLint for LinearBodies {
     const HEADLINE: Headline = Headline::new(<Self as FlowLint>::HEADLINE);
     const READS: Reads = Reads::Every;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        Flows::flagged::<Self>(file)
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(Collector::ruled(file, <Self as FlowLint>::RULE))
     }
 }
 
@@ -46,12 +49,12 @@ impl FlowLint for PureRouters {
     const RULE: Rule = Rule::PureRouters;
 }
 
-impl FileLint for PureRouters {
+impl SweptLint for PureRouters {
     const HEADLINE: Headline = Headline::new(<Self as FlowLint>::HEADLINE);
     const READS: Reads = Reads::Every;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        Flows::flagged::<Self>(file)
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(Collector::ruled(file, <Self as FlowLint>::RULE))
     }
 }
 
@@ -61,12 +64,12 @@ impl FlowLint for PlainConditions {
     const RULE: Rule = Rule::PlainConditions;
 }
 
-impl FileLint for PlainConditions {
+impl SweptLint for PlainConditions {
     const HEADLINE: Headline = Headline::new(<Self as FlowLint>::HEADLINE);
     const READS: Reads = Reads::Every;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        Flows::flagged::<Self>(file)
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(Collector::ruled(file, <Self as FlowLint>::RULE))
     }
 }
 

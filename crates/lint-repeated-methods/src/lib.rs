@@ -3,7 +3,7 @@ mod shape_index;
 use lint_core::{Bound, Headline, Parsed, SourceFile, Violation};
 use lint_file::{Concluded, ContextLint, Reads};
 
-use shape_index::ShippedImpls;
+use shape_index::{ImplGathering, ShippedImpls};
 
 #[derive(Debug)]
 pub struct RepeatedMethods;
@@ -17,8 +17,10 @@ impl ContextLint for RepeatedMethods {
     type Part<'head> = ShippedImpls<'head>;
     type Context<'head> = Concluded<'head>;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> ShippedImpls<'head> {
-        ShippedImpls::from(parsed)
+    type Gathering<'head> = ImplGathering<'head>;
+
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> ImplGathering<'head> {
+        ImplGathering::from(parsed)
     }
 
     fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {

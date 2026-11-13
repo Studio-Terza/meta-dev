@@ -1,4 +1,4 @@
-use lint_file::Filed;
+use lint_file::Swept;
 use lint_no_ignored_tests::NoIgnoredTests;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -101,7 +101,7 @@ const CASES: [Case; 15] = [
 
 #[test]
 fn skipped_tests_are_flagged() {
-    assert_eq!(Sources::mismatches::<Filed<NoIgnoredTests>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Swept<NoIgnoredTests>>(&CASES), Lines::default());
 }
 
 const SWITCHED_OFF: Source =
@@ -122,7 +122,7 @@ struct Library(&'static [Source], &'static [Source]);
 
 impl Library {
     fn flagged(&self) -> Lines {
-        Sources::placed_flagged::<Filed<NoIgnoredTests>>(self.0, self.1)
+        Sources::placed_flagged::<Swept<NoIgnoredTests>>(self.0, self.1)
     }
 }
 

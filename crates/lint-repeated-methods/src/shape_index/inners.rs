@@ -1,24 +1,16 @@
 use std::collections::BTreeMap;
 
 use syn::ItemStruct;
-use syn::visit::Visit;
 
-use lint_core::{Home, Parsed};
+use lint_core::Home;
 use lint_layout::Name;
+use lint_sweep::{Descend, Kind, Watch};
 
 use super::method_shape::Spelling;
 
 #[derive(Debug, Default)]
 pub struct Inners<'head> {
     by_home: BTreeMap<Home<'head>, BTreeMap<Name, Spelling>>,
-}
-
-impl<'head> From<Parsed<'_, 'head>> for Inners<'head> {
-    fn from(parsed: Parsed<'_, 'head>) -> Inners<'head> {
-        let mut reading = InnerTypes::default();
-        reading.visit_file(parsed.file().syntax());
-        Inners { by_home: BTreeMap::from([(Home::from(parsed.head()), reading.0)]) }
-    }
 }
 
 impl<'head> FromIterator<Inners<'head>> for Inners<'head> {
@@ -41,11 +33,22 @@ impl<'head> Inners<'head> {
 }
 
 #[derive(Debug, Default)]
-struct InnerTypes(BTreeMap<Name, Spelling>);
+pub struct InnerTypes(BTreeMap<Name, Spelling>);
 
-impl<'ast> Visit<'ast> for InnerTypes {
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
+impl InnerTypes {
+    pub fn placed(self, home: Option<Home<'_>>) -> Inners<'_> {
+        Inners { by_home: home.map(|placed| (placed, self.0)).into_iter().collect() }
+    }
+}
+
+impl<'ast> Watch<'ast> for InnerTypes {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemStruct]
+    }
+
+    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
         let only = Some(&item.fields).filter(|fields| fields.len() == 1).and_then(|fields| fields.iter().next());
         self.0.extend(only.map(|field| (Name::from(&item.ident), Spelling::from(&field.ty))));
+        Descend::Over
     }
 }

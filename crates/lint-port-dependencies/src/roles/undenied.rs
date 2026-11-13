@@ -22,11 +22,11 @@ impl Undenied {
         Self::missing(role, &BTreeSet::new())
     }
 
-    pub(super) fn denied(root: &syn::File) -> BTreeSet<UsePath> {
-        root.attrs
-            .iter()
-            .filter(|attribute| Self::LEVELS.iter().any(|level| attribute.path().is_ident(level)))
-            .filter_map(|attribute| attribute.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
+    pub(super) fn denied_by(attribute: &syn::Attribute) -> Vec<UsePath> {
+        Some(attribute)
+            .filter(|leveled| Self::LEVELS.iter().any(|level| leveled.path().is_ident(level)))
+            .and_then(|kept| kept.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
+            .into_iter()
             .flatten()
             .map(|path| UsePath::from(&path))
             .collect()

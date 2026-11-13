@@ -3,6 +3,7 @@ mod clone_sites;
 use clone_sites::CloneSites;
 use lint_core::{Gate, Headline, Lint, Parsed, Report, SourceFile, Violation};
 use lint_file::Gleaning;
+use lint_sweep::{Gathers, Sweep, Watching};
 
 #[derive(Debug)]
 pub struct Clones;
@@ -15,7 +16,8 @@ impl Clones {
 
 impl Lint for Clones {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let findings: CloneFindings<'_> = files.iter().map(Parsed::from).map(Clones::gleaned).collect();
+        let findings: CloneFindings<'_> =
+            files.iter().map(|file| Sweep::gathered(file, Clones::gleaner(Parsed::from(file)))).collect();
         Report::from(&findings)
     }
 }
@@ -39,11 +41,20 @@ impl Gleaning for Clones {
     type Part<'head> = CloneFindings<'head>;
     type Gleaned<'head> = CloneFindings<'head>;
 
-    fn gleaned<'head>(parsed: Parsed<'_, 'head>) -> CloneFindings<'head> {
-        let path = parsed.head().path();
+    type Gleaner<'head> = CloneSites<'head>;
+
+    fn gleaner<'head>(parsed: Parsed<'_, 'head>) -> CloneSites<'head> {
         let core = parsed.file().shipped().filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
-        CloneFindings(
-            core.map_or_default(|found| CloneSites::within(found).map(|violation| violation.moved(path)).collect()),
-        )
+        CloneSites::new(parsed.head().path(), core.map(|_| ()))
+    }
+}
+
+impl<'head> Gathers<CloneFindings<'head>> for CloneSites<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> CloneFindings<'head> {
+        CloneFindings(self.found())
     }
 }
