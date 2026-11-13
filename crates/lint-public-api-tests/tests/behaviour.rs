@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_public_api_tests::PublicApiTests;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -159,5 +160,5 @@ const CASES: [Case; 26] = [
 
 #[test]
 fn test_code_in_src_is_flagged() {
-    assert_eq!(Sources::mismatches::<PublicApiTests>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<PublicApiTests>>(&CASES), Lines::default());
 }

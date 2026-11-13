@@ -11,11 +11,13 @@ doctest = false
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 syn.workspace = true
 
 [dev-dependencies]
+lint-file = { path = "../lint-file" }
 lint-fixtures = { path = "../lint-fixtures" }
 
 [lints]

@@ -3,50 +3,65 @@ mod name_uses;
 mod root_exports;
 
 use bag_candidates::BagCandidates;
-use lint_core::{Headline, Lint};
+use lint_core::{Headline, Parsed, SourceFile, Violation};
+use lint_file::{ContextLint, Reads};
+use lint_layout::Name;
+use lint_placement::CrateName;
 use name_uses::NameUses;
 use root_exports::RootExports;
-
-use lint_core::Report;
-use lint_core::SourceFile;
-use lint_core::Violation;
-use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct NoParameterBags;
 
-impl Lint for NoParameterBags {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
-        let uses: Vec<NameUses> = shipped.iter().map(|file| NameUses::in_file(file)).collect();
-        let exports = RootExports::in_files(&shipped);
-        Report::new(
-            Headline::new("a struct with no logic of its own that one other file consumes is a parameter bag"),
-            shipped
-                .iter()
-                .zip(&uses)
-                .flat_map(|(file, own)| {
-                    let candidates = BagCandidates::in_file(file);
-                    candidates
-                        .candidates()
-                        .filter(|candidate| exports.exported(file, candidate.name()).is_none())
-                        .filter(|candidate| Self::one_consumer_besides(&uses, own, candidate.name()).is_some())
-                        .map(|candidate| candidate.violation(file.head().path()))
-                        .collect::<Vec<Violation>>()
-                })
-                .collect(),
-        )
+#[derive(Debug)]
+pub struct BagUses<'head> {
+    uses: Option<NameUses<'head>>,
+    exports: RootExports,
+}
+
+#[derive(Debug)]
+pub struct Bags<'head> {
+    uses: Vec<NameUses<'head>>,
+    exports: RootExports,
+}
+
+impl<'head> FromIterator<BagUses<'head>> for Bags<'head> {
+    fn from_iter<Parts: IntoIterator<Item = BagUses<'head>>>(parts: Parts) -> Bags<'head> {
+        let (uses, exports): (Vec<Option<NameUses<'head>>>, Vec<RootExports>) =
+            parts.into_iter().map(|part| (part.uses, part.exports)).unzip();
+        Bags { uses: uses.into_iter().flatten().collect(), exports: exports.into_iter().collect() }
     }
 }
 
-impl NoParameterBags {
-    fn one_consumer_besides<'uses>(uses: &'uses [NameUses], own: &NameUses, name: &Name) -> Option<&'uses NameUses> {
-        let consumers: Vec<&NameUses> = uses
-            .iter()
-            .filter(|file_uses| std::ptr::from_ref(*file_uses) != std::ptr::from_ref(own))
-            .filter_map(|file_uses| file_uses.sharing_crate(own))
-            .filter_map(|file_uses| file_uses.mentions(name).map(|_| file_uses))
-            .collect();
+impl Bags<'_> {
+    fn one_consumer(&self, file: &SourceFile, name: &Name) -> Option<&NameUses<'_>> {
+        let crate_name = CrateName::from(file.head().placement().crate_root());
+        let consumers: Vec<&NameUses<'_>> =
+            self.uses.iter().filter_map(|uses| uses.consumes(file.head().path(), &crate_name, name)).collect();
         Some(consumers).filter(|candidates| candidates.len() == 1).and_then(|sole| sole.into_iter().next())
+    }
+}
+
+impl ContextLint for NoParameterBags {
+    const HEADLINE: Headline =
+        Headline::new("a struct with no logic of its own that one other file consumes is a parameter bag");
+    const READS: Reads = Reads::Shipped;
+
+    type Part<'head> = BagUses<'head>;
+    type Context<'head> = Bags<'head>;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> BagUses<'head> {
+        let shipped = parsed.file().shipped().map(|_| parsed);
+        BagUses { uses: shipped.map(NameUses::from), exports: shipped.map_or_default(RootExports::from) }
+    }
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, bags: &Bags<'head>) -> Vec<Violation<'file>> {
+        let candidates = BagCandidates::from(file);
+        candidates
+            .candidates()
+            .filter(|candidate| bags.exports.exported(file, candidate.name()).is_none())
+            .filter(|candidate| bags.one_consumer(file, candidate.name()).is_some())
+            .map(|candidate| candidate.violation(file.head().path()))
+            .collect()
     }
 }

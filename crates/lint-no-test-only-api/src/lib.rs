@@ -10,16 +10,17 @@ mod test_features;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
+use std::path::Path;
 
 use candidate::Candidate;
 use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::{Headline, Lint};
+use lint_core::{Headline, Parsed};
+use lint_file::{ContextLint, Reads};
 use lint_layout::Name;
 use lint_placement::PackageRoot;
 use mentions::{Ground, Mentions};
@@ -44,32 +45,71 @@ impl NoTestOnlyApi {
     }
 }
 
-impl Lint for NoTestOnlyApi {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let packages: BTreeMap<&PackageRoot, &SourceFile> =
-            files.iter().rev().map(|file| (file.head().placement().package(), file)).collect();
-        let shipped: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Shipped)).collect();
-        let tested: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Tests)).collect();
-        let test_only: BTreeSet<&Name> = tested.difference(&shipped).collect();
-        let only_tests = files
+#[derive(Debug)]
+pub struct FileMentions<'head> {
+    path: &'head Path,
+    package: &'head PackageRoot,
+    shipped: BTreeSet<Name>,
+    tested: BTreeSet<Name>,
+}
+
+#[derive(Debug)]
+pub struct TestOnly<'head> {
+    names: BTreeSet<Name>,
+    manifests: BTreeMap<&'head PackageRoot, &'head Path>,
+}
+
+impl<'head> FromIterator<FileMentions<'head>> for TestOnly<'head> {
+    fn from_iter<Parts: IntoIterator<Item = FileMentions<'head>>>(parts: Parts) -> TestOnly<'head> {
+        let mentions: Vec<FileMentions<'head>> = parts.into_iter().collect();
+        let shipped: BTreeSet<&Name> = mentions.iter().flat_map(|part| &part.shipped).collect();
+        let names = mentions
             .iter()
-            .flat_map(Offers::in_file)
-            .filter(|candidate| test_only.contains(candidate.called()))
+            .flat_map(|part| &part.tested)
+            .filter(|name| shipped.contains(name).then_some(()).is_none())
+            .cloned()
+            .collect();
+        let manifests =
+            mentions.iter().fold(BTreeMap::new(), |mut last: BTreeMap<&'head PackageRoot, &'head Path>, part| {
+                let kept = last.get(part.package).copied().filter(|held| *held > part.path).unwrap_or(part.path);
+                last.insert(part.package, kept);
+                last
+            });
+        TestOnly { names, manifests }
+    }
+}
+
+impl ContextLint for NoTestOnlyApi {
+    const HEADLINE: Headline = Headline::new("shipped code has no test-only API");
+    const READS: Reads = Reads::Every;
+
+    type Part<'head> = FileMentions<'head>;
+    type Context<'head> = TestOnly<'head>;
+
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> FileMentions<'head> {
+        let file = parsed.file();
+        FileMentions {
+            path: parsed.head().path(),
+            package: parsed.head().placement().package(),
+            shipped: Mentions::in_file(file, Ground::Shipped),
+            tested: Mentions::in_file(file, Ground::Tests),
+        }
+    }
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, test_only: &TestOnly<'head>) -> Vec<Violation<'file>> {
+        let only_tests = Offers::in_file(file)
+            .into_iter()
+            .filter(|candidate| test_only.names.contains(candidate.called()))
             .map(Candidate::violation);
-        Report::new(
-            Headline::new("shipped code has no test-only API"),
-            files
-                .iter()
-                .flat_map(|file| {
-                    let gated = iter::once(file)
-                        .filter_map(SourceFile::shipped)
-                        .flat_map(|code| GatedItems::in_file(code.syntax()));
-                    let flagged = gated.chain(TestFeatures::in_file(file.syntax()));
-                    flagged.map(|found| found.in_file(file.head().path())).collect::<Vec<Violation<'_>>>()
-                })
-                .chain(only_tests)
-                .chain(packages.into_iter().flat_map(|(package, file)| Self::in_manifest(package, file)))
-                .collect(),
-        )
+        let gated =
+            iter::once(file).filter_map(SourceFile::shipped).flat_map(|code| GatedItems::in_file(code.syntax()));
+        let flagged = gated.chain(TestFeatures::in_file(file.syntax())).map(|found| found.in_file(file.head().path()));
+        let package = file.head().placement().package();
+        let manifest = test_only
+            .manifests
+            .get(package)
+            .filter(|last| **last == file.head().path())
+            .map(|_| Self::in_manifest(package, file));
+        flagged.chain(only_tests).chain(manifest.into_iter().flatten()).collect()
     }
 }

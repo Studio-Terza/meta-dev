@@ -6,11 +6,11 @@ use emitters::Emitters;
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::{Headline, Lint};
+use lint_core::{Headline, Parsed};
+use lint_file::{ContextLint, Reads};
 use path_reach::PathReach;
 use test_code::TestCode;
 
@@ -28,22 +28,22 @@ impl PublicApiTests {
     );
 }
 
-impl Lint for PublicApiTests {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let syntax: Vec<&syn::File> = files.iter().map(SourceFile::syntax).collect();
-        let emitters = Emitters::defined_in(&syntax);
-        Report::new(
-            Headline::new("tests go through public APIs"),
-            files
-                .iter()
-                .flat_map(|file| {
-                    let (lines, message) = file.shipped().map_or_else(
-                        || (PathReach::lines_in(file), Self::REACH),
-                        |shipped| (TestCode::lines_in(shipped.syntax(), &emitters), Self::IN_SOURCE),
-                    );
-                    lines.into_iter().map(move |line| Violation::new(Site::new(file.head().path(), line), message))
-                })
-                .collect(),
-        )
+impl ContextLint for PublicApiTests {
+    const HEADLINE: Headline = Headline::new("tests go through public APIs");
+    const READS: Reads = Reads::Every;
+
+    type Part<'head> = Emitters;
+    type Context<'head> = Emitters;
+
+    fn contributed(parsed: Parsed<'_, '_>) -> Emitters {
+        Emitters::from(parsed.file().syntax())
+    }
+
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, emitters: &Emitters) -> Vec<Violation<'file>> {
+        let (lines, message) = file.shipped().map_or_else(
+            || (PathReach::lines_in(file), Self::REACH),
+            |shipped| (TestCode::lines_in(shipped.syntax(), emitters.as_ref()), Self::IN_SOURCE),
+        );
+        lines.into_iter().map(|line| Violation::new(Site::new(file.head().path(), line), message)).collect()
     }
 }

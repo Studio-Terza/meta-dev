@@ -1,4 +1,5 @@
 use lint_core::Lint;
+use lint_file::Judged;
 use lint_repeated_methods::RepeatedMethods;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -24,6 +25,8 @@ const SHOWN_THE_SAME: &str = "pub struct A(usize);\npub struct B(usize);\npub st
 
 const DIFFERENT_PARAMS: &str = "pub struct A;\npub struct B;\npub struct C;\nimpl A {\n    pub fn f(&self, x: Foo) {}\n}\nimpl B {\n    pub fn f(&self, x: Bar) {}\n}\nimpl C {\n    pub fn f(&self, x: Baz) {}\n}\n";
 
+const ONE_INNER_INPUT: &str = "pub struct A(u8);\npub struct B(u16);\npub struct C(u32);\nimpl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u8) -> Self { B(u16::from(inner)) }\n}\nimpl C {\n    pub fn new(inner: u8) -> Self { C(u32::from(inner)) }\n}\n";
+
 const SHOW_ON_A: &str = "struct A;\nimpl A {\n    pub fn show(&self) -> u8 { 1 }\n}\n";
 const SHOW_ON_B: &str = "struct B;\nimpl B {\n    pub fn show(&self) -> u8 { 1 }\n}\n";
 const WRAPPED_A: Source = Source::new(Located::new("crates/x/src/a.rs"), Text::new("pub struct A(u8);\n"));
@@ -31,7 +34,12 @@ const WRAPPED_B: Source = Source::new(Located::new("crates/x/src/b.rs"), Text::n
 const WRAPPED_C: Source = Source::new(Located::new("crates/x/src/c.rs"), Text::new("pub struct C(u32);\n"));
 const CONSTRUCTORS_ELSEWHERE: &str = "impl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner) }\n}\n";
 
-const CASES: [Case; 18] = [
+const CASES: [Case; 19] = [
+    Case::new(
+        Title::new("only the input of the inner type is the inner"),
+        &[Source::new(Located::new("a.rs"), Text::new(ONE_INNER_INPUT))],
+        Flagged::new(&[]),
+    ),
     Case::new(
         Title::new("private methods"),
         &[Source::new(Located::new("a.rs"), Text::new(PRIVATE))],
@@ -140,13 +148,15 @@ const CASES: [Case; 18] = [
 
 #[test]
 fn one_method_shape_on_many_types_is_flagged() {
-    assert_eq!(Sources::mismatches::<RepeatedMethods>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<RepeatedMethods>>(&CASES), Lines::default());
 }
 
 #[test]
 fn a_report_names_the_method_and_the_types_that_repeat_it() {
-    let constructors =
-        RepeatedMethods::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(CONSTRUCTORS))]))
-            .to_string();
+    let constructors = Judged::<RepeatedMethods>::report(&Sources::parsed(&[Source::new(
+        Located::new("a.rs"),
+        Text::new(CONSTRUCTORS),
+    )]))
+    .to_string();
     assert!(constructors.contains("fn new(Inner) -> Self on A, B, C"));
 }

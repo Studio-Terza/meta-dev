@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use file_ports::{Bytes, Memory};
 use lint_core::{Lint, SourceFile, SourceText};
+use lint_file::Filed;
 use lint_no_test_io::NoTestIo;
 use lint_placement::Placement;
 
@@ -176,7 +177,7 @@ const CASES: [Case; 28] = [
 
 #[test]
 fn effects_and_real_ports_in_test_code_are_flagged_outside_ports_crates() {
-    assert_eq!(Sources::mismatches::<NoTestIo>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<NoTestIo>>(&CASES), Lines::default());
 }
 
 #[test]
@@ -190,7 +191,7 @@ fn tests_of_a_crate_whose_name_ends_in_ports_check_its_real_fillers() {
             let path = PathBuf::from("/r/tests/a.rs");
             let placement = Placement::locate(&files, &path);
             SourceFile::parse_at(path.clone(), path, placement, SourceText::new(DISK.to_owned()))
-                .map_or(usize::MAX, |file| NoTestIo::report(&[file]).violations().len())
+                .map_or(usize::MAX, |file| Filed::<NoTestIo>::report(&[file]).violations().len())
         })
         .collect();
     assert_eq!(flagged, [0, 1]);

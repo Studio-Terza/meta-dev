@@ -1729,6 +1729,7 @@ name = "lint-no-parameter-bags"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1754,6 +1755,7 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-paths",
@@ -1765,6 +1767,7 @@ name = "lint-no-test-only-api"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1883,6 +1886,7 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
@@ -1933,6 +1937,7 @@ name = "lint-repeated-methods"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "newtype",
