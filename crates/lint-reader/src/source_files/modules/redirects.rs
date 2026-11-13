@@ -26,7 +26,7 @@ impl Redirects {
             .flat_map(Self::conditional_paths)
             .map(|path| file_directory.join(path))
             .map(|file| {
-                let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
+                let children = file.parent().map_or_default(Path::to_path_buf);
                 Child::new(file, children)
             })
             .collect()

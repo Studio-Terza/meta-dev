@@ -595,7 +595,7 @@ fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
         .map(|(package, library)| {
             let manifest = scratch.write_below(package, "Cargo.toml", MANIFEST)?;
             scratch.write_below(package, "src/lib.rs", library)?;
-            Ok(manifest.parent().map(Path::to_path_buf).unwrap_or_default())
+            Ok(manifest.parent().map_or_default(Path::to_path_buf))
         })
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
     assert_eq!(Trees::reported_through(&scratch.files, &roots).exit, ExitCode::FAILURE);
@@ -700,7 +700,7 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
             root.write_below(layout, "src/b.rs", "use crate::a::Tool;\npub struct User(Tool);\n")?;
             root.write_below(layout, "tests/flow.rs", flow)?;
             root.write_below(layout, "build.rs", build)?;
-            Ok(manifest.parent().map(Path::to_path_buf).unwrap_or_default())
+            Ok(manifest.parent().map_or_default(Path::to_path_buf))
         })
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
     let counts: Vec<usize> = projects

@@ -10,7 +10,7 @@ impl Disk {
     const MANIFEST: &'static str = "CARGO_MANIFEST_DIR";
 
     pub fn manifest() -> PathBuf {
-        env::var_os(Self::MANIFEST).map(PathBuf::from).unwrap_or_default()
+        env::var_os(Self::MANIFEST).map_or_default(PathBuf::from)
     }
 
     pub fn text(path: &Path) -> io::Result<String> {

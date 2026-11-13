@@ -37,11 +37,11 @@ impl<'found> From<&'found [SourceFile]> for Declarations<'found> {
 
 impl<'found> Declarations<'found> {
     pub(crate) fn routing(&self, path: &Path, owner: &Name, member: &Name) -> Vec<&Law<'found>> {
-        self.packages.get(path).map(|package| self.laws.routing(*package, owner, member)).unwrap_or_default()
+        self.packages.get(path).map_or_default(|package| self.laws.routing(*package, owner, member))
     }
 
     pub(crate) fn of_package(&self, path: &Path) -> Vec<&Law<'found>> {
-        self.packages.get(path).map(|package| self.laws.of_package(*package)).unwrap_or_default()
+        self.packages.get(path).map_or_default(|package| self.laws.of_package(*package))
     }
 
     pub(crate) fn unresolved<'site>(

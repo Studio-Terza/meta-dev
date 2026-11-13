@@ -17,7 +17,7 @@ impl TokenPaths {
     const ACCESS: char = '.';
 
     pub(crate) fn within(tokens: TokenStream) -> Vec<Spelled> {
-        syn::parse2::<TokenPaths>(tokens).map(|paths| paths.0).unwrap_or_default()
+        syn::parse2::<TokenPaths>(tokens).map_or_default(|paths| paths.0)
     }
 
     fn attempted(input: ParseStream, attempt: &ParseBuffer) -> syn::Result<Vec<Spelled>> {

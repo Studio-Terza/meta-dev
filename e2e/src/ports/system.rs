@@ -14,7 +14,7 @@ impl System {
     const TARGET: &'static str = "E2E_REPORT";
 
     pub fn root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).parent().map(Path::to_path_buf).unwrap_or_default()
+        Path::new(env!("CARGO_MANIFEST_DIR")).parent().map_or_default(Path::to_path_buf)
     }
 
     pub fn manifests() -> Result<Memory, FileFailure> {

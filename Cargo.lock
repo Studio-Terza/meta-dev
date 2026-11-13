@@ -278,7 +278,6 @@ dependencies = [
  "design-store",
  "dispatch-ports",
  "e2e",
- "exit",
  "file-ports",
  "golden",
  "grammar-cited",

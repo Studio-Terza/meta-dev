@@ -58,8 +58,7 @@ impl<'ast> Visit<'ast> for PairedMethods<'_> {
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
         let methods = Syntax::inherent(block)
             .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
-            .map(Self::public_methods)
-            .unwrap_or_default();
+            .map_or_default(Self::public_methods);
         self.owned_by(Name::of_type(&block.self_ty), &methods);
     }
 

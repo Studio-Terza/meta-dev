@@ -52,7 +52,7 @@ impl Staged {
             .iter()
             .flat_map(|target| {
                 target.files().iter().map(move |file| {
-                    let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
+                    let children = file.parent().map_or_default(Path::to_path_buf);
                     Located::new(tree, target.package(), file).node(&children)
                 })
             })

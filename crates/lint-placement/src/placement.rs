@@ -94,8 +94,7 @@ impl Placement {
             .or_else(|| Self::named_ancestor(path, &Self::TARGET_DIRECTORIES.map(Word::new)))
             .and_then(Path::parent)
             .or_else(|| path.parent())
-            .map(Path::to_path_buf)
-            .unwrap_or_default()
+            .map_or_default(Path::to_path_buf)
     }
 
     fn unplaced(crate_root: CrateRoot) -> Placement {

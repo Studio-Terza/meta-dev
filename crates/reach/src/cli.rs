@@ -17,7 +17,6 @@ use request::Request;
 pub struct Cli;
 
 impl Cli {
-    #[must_use]
     pub fn answer(
         arguments: impl Iterator<Item = OsString>,
         files: &impl Files,

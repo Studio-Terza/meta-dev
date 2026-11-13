@@ -17,7 +17,7 @@ impl TableRows {
         let rows = tokens.clone().into_iter().filter_map(|tree| {
             Syntax::group(&tree).filter(|group| group.delimiter() == Delimiter::Bracket).map(Group::stream)
         });
-        rows.last().map(|last| Self::split(&last.into_iter().collect::<Vec<TokenTree>>())).unwrap_or_default()
+        rows.last().map_or_default(|last| Self::split(&last.into_iter().collect::<Vec<TokenTree>>()))
     }
 
     fn split(rows: &[TokenTree]) -> Vec<Expr> {

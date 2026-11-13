@@ -40,7 +40,7 @@ impl<'items> Declaration<'items> {
                 ]
             },
             |file| {
-                let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
+                let children = file.parent().map_or_default(Path::to_path_buf);
                 vec![Child::new(file, children)]
             },
         )

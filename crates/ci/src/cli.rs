@@ -13,7 +13,6 @@ use ports::Ports;
 pub struct Cli;
 
 impl Cli {
-    #[must_use]
     pub fn answer(
         arguments: impl Iterator<Item = OsString>,
         ports: &impl Ports,

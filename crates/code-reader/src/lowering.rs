@@ -265,8 +265,7 @@ impl<'read> Lowered<'read> {
             .source()
             .placement()
             .executable_root(read.source().located().within(read.source().path()))
-            .map(|_| Enclosure::BinaryRoot)
-            .unwrap_or_default();
+            .map_or_default(|_| Enclosure::BinaryRoot);
         self.root_lowered(read, name, form, enclosure)
     }
 

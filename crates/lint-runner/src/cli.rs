@@ -57,7 +57,6 @@ impl Cli {
         Cli { roots, mode, timings }
     }
 
-    #[must_use]
     pub fn report_to(
         &self,
         ports: Ports<'_, impl Files + Sync, impl CargoFiller + Sync, impl TimerFiller + Sync>,

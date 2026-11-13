@@ -116,8 +116,7 @@ impl<'ast> Visit<'ast> for Predicates<'_, '_> {
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
         let found = Syntax::inherent(block)
             .filter(|candidate| self.known.kind(self.file, &self.module, &candidate.self_ty) == Kind::Enum)
-            .map(|enum_impl| self.predicates(enum_impl))
-            .unwrap_or_default();
+            .map_or_default(|enum_impl| self.predicates(enum_impl));
         self.violations.extend(found);
         syn::visit::visit_item_impl(self, block);
     }

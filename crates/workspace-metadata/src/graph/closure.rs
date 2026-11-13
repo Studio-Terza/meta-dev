@@ -30,8 +30,7 @@ impl<'meta> Closure<'meta> {
                     .map(|unseen| (seen.union(&unseen).copied().collect(), unseen))
             })
             .last()
-            .map(|(seen, _)| seen)
-            .unwrap_or_default(),
+            .map_or_default(|(seen, _)| seen),
         )
     }
 }

@@ -24,7 +24,7 @@ impl Described {
             .methods(found)
             .iter()
             .map(|method| {
-                let returns = method.returns().map(ToString::to_string).unwrap_or_default();
+                let returns = method.returns().map_or_default(ToString::to_string);
                 format!("{}->{returns}", AsRef::<Name>::as_ref(method))
             })
             .collect()
@@ -35,7 +35,7 @@ impl Described {
             .implementations(found)
             .iter()
             .map(|each| {
-                let argument = each.argument().map(ToString::to_string).unwrap_or_default();
+                let argument = each.argument().map_or_default(ToString::to_string);
                 format!("{}<{argument}>", AsRef::<Name>::as_ref(each))
             })
             .collect()
@@ -297,7 +297,7 @@ fn fields_variants_and_bounds_are_dependencies() {
         dependencies
             .iter()
             .map(|dependency| {
-                let qualifier = dependency.qualifier().map(ToString::to_string).unwrap_or_default();
+                let qualifier = dependency.qualifier().map_or_default(ToString::to_string);
                 format!(
                     "{qualifier}{}:{}:{}",
                     AsRef::<Name>::as_ref(dependency),

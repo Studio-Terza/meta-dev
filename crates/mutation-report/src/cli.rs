@@ -12,7 +12,6 @@ use report::{Failure, Report};
 pub struct Cli;
 
 impl Cli {
-    #[must_use]
     pub fn answer(arguments: &[impl AsRef<OsStr>], files: &impl Files, err: &mut impl Write) -> ExitCode {
         Report::from_arguments(arguments)
             .and_then(|report| report.write_summary(files))

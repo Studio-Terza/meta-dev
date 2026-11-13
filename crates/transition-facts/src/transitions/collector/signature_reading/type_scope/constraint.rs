@@ -33,8 +33,7 @@ impl<'generics> Constraint<'generics> {
 
     fn typed(typed: &'generics PredicateType) -> Vec<Constraint<'generics>> {
         Self::ident_of(&typed.bounded_ty)
-            .map(|name| typed.bounds.iter().map(|bound| Constraint { name, bound }).collect())
-            .unwrap_or_default()
+            .map_or_default(|name| typed.bounds.iter().map(|bound| Constraint { name, bound }).collect())
     }
 
     fn ident_of(bounded: &Type) -> Option<&Ident> {

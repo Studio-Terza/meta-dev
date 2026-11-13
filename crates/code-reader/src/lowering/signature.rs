@@ -289,7 +289,7 @@ impl Bracketed<'_> {
     }
 
     fn last_listed(self, path: &syn::Path) -> Arguments {
-        path.segments.last().map(|last| self.listed(&last.arguments)).unwrap_or_default()
+        path.segments.last().map_or_default(|last| self.listed(&last.arguments))
     }
 
     fn listed(self, arguments: &PathArguments) -> Arguments {

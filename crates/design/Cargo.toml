@@ -15,7 +15,6 @@ design-model = { path = "../design-model" }
 design-runs = { path = "../design-runs" }
 design-store = { path = "../design-store" }
 dispatch-ports = { path = "../dispatch-ports" }
-exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 grammar-cited = { path = "../grammar-cited" }
 grammar-flag = { path = "../grammar-flag" }

@@ -81,8 +81,7 @@ struct Spent {
 
 impl From<Option<Usage>> for Spent {
     fn from(usage: Option<Usage>) -> Spent {
-        let [input, output, cache_written, cache_read] =
-            usage.map(|reported| reported.spent().map(Some)).unwrap_or_default();
+        let [input, output, cache_written, cache_read] = usage.map_or_default(|reported| reported.spent().map(Some));
         Spent { input, output, cache_written, cache_read }
     }
 }

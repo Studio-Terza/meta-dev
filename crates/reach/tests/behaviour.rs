@@ -63,8 +63,7 @@ impl Answer {
         Some(answer)
             .filter(|candidate| candidate.exit == ExitCode::FAILURE)
             .filter(|failed| failed.out.is_empty())
-            .map(|refused| refused.err)
-            .unwrap_or_default()
+            .map_or_default(|refused| refused.err)
     }
 }
 

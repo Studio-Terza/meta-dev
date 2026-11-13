@@ -35,7 +35,7 @@ impl fmt::Display for Named {
                 formatter,
                 "{}: {}",
                 self.file.as_deref().unwrap_or(Path::new(Self::UNKNOWN_FILE)).display(),
-                self.replacement.as_ref().map(ToString::to_string).unwrap_or_default()
+                self.replacement.as_ref().map_or_default(ToString::to_string)
             ),
         }
     }

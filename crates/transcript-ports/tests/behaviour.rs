@@ -163,7 +163,7 @@ struct Cases;
 
 impl Cases {
     fn classified(line: &str) -> Vec<String> {
-        Transcript::holding(line).read(Cursor::default()).map(|read| Gathered::from(read).classes).unwrap_or_default()
+        Transcript::holding(line).read(Cursor::default()).map_or_default(|read| Gathered::from(read).classes)
     }
 
     fn kind(kind: &&str) -> Vec<String> {

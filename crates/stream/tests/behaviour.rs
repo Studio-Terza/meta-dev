@@ -118,11 +118,9 @@ impl Fixture {
     }
 
     fn related(relation: Relation, said: &[Say<'_>]) -> Vec<String> {
-        Self::stream(said)
-            .map(|stream| {
-                stream.links().iter().filter(|link| link.relation() == relation).map(ToString::to_string).collect()
-            })
-            .unwrap_or_default()
+        Self::stream(said).map_or_default(|stream| {
+            stream.links().iter().filter(|link| link.relation() == relation).map(ToString::to_string).collect()
+        })
     }
 
     fn first(text: &str) -> Result<Message, Box<dyn Error>> {
@@ -151,21 +149,19 @@ impl Cases {
     }
 
     fn shapes(text: &&str) -> Vec<String> {
-        Fixture::first(text)
-            .map(|message| message.segments().iter().map(|segment| Shape::from(segment.form()).to_string()).collect())
-            .unwrap_or_default()
+        Fixture::first(text).map_or_default(|message| {
+            message.segments().iter().map(|segment| Shape::from(segment.form()).to_string()).collect()
+        })
     }
 
     fn bodies(text: &&str) -> Vec<String> {
-        Fixture::first(text)
-            .map(|message| {
-                message
-                    .segments()
-                    .iter()
-                    .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default()
+        Fixture::first(text).map_or_default(|message| {
+            message
+                .segments()
+                .iter()
+                .map(|segment| segment.text(&message).map_or_else(|nul| nul.to_string(), |body| body.to_string()))
+                .collect()
+        })
     }
 
     fn resends(texts: &[&str]) -> Vec<String> {
@@ -187,9 +183,9 @@ impl Cases {
     }
 
     fn unrecognised(chain: &[Turn]) -> Vec<String> {
-        Fixture::stream(&Self::said(chain))
-            .map(|stream| stream.unrecognised().iter().map(|unrecognised| unrecognised.kind().to_string()).collect())
-            .unwrap_or_default()
+        Fixture::stream(&Self::said(chain)).map_or_default(|stream| {
+            stream.unrecognised().iter().map(|unrecognised| unrecognised.kind().to_string()).collect()
+        })
     }
 
     fn ids(chain: &[Turn]) -> Vec<String> {
