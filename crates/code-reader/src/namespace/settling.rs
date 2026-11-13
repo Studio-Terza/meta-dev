@@ -1,6 +1,5 @@
 use code_model::ItemPath;
 
-use super::{Namespace, ScopeRow};
 use super::binding::Binding;
 use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::{Sight, Visibility};
@@ -8,6 +7,7 @@ use super::resolver::{Resolution, Resolver};
 use super::std_names::{Listed, StdNames};
 use super::tables::{Exposed, GlobView, Key, Keyed, Layer, ModuleGlob, Row, Tables};
 use super::view::View;
+use super::{Namespace, ScopeRow};
 use crate::parallel::Parallel;
 
 #[derive(Debug)]
@@ -139,11 +139,11 @@ impl Seeds<'_> {
     pub(crate) fn tables<'rows>(&'rows self, settling: &'rows [ScopeSettling]) -> Tables<'rows> {
         let scopes = &self.space.scopes;
         let ids: Vec<ScopeId> = ScopeId::ids(scopes).collect();
-        let explicit = Parallel::default().mapped(&ids, |scope| {
+        let explicit = Parallel::available().mapped(&ids, |scope| {
             let row = scope.row(scopes).map(ScopeRow::entries);
             let seeds = scope.row(&self.scopes).map_or(&[][..], Vec::as_slice);
             let imports = scope.row(settling).map_or(&[][..], |settled| settled.imports.as_slice());
-            row.map(|entries| entries.explicit(seeds, imports)).unwrap_or_default()
+            row.map_or_default(|entries| entries.explicit(seeds, imports))
         });
         let fixed = scopes.iter().zip(settling).map(|(row, settled)| row.entries().fixed(&settled.targets));
         let modules = scopes.iter().zip(settling).map(|(row, settled)| row.entries().modules(&settled.targets));
@@ -155,8 +155,11 @@ impl Seeds<'_> {
         let resolver = Resolver::new(self.space, &tables);
         let scopes = &self.space.scopes;
         let ids: Vec<ScopeId> = ScopeId::ids(scopes).collect();
-        Parallel::default().mapped(&ids, |scope| {
-            scope.row(scopes).map(|row| row.entries().settled(*scope, &resolver)).unwrap_or_else(|| ScopeSettling::new(Vec::new(), Vec::new()))
+        Parallel::available().mapped(&ids, |scope| {
+            scope.row(scopes).map_or_else(
+                || ScopeSettling::new(Vec::new(), Vec::new()),
+                |row| row.entries().settled(*scope, &resolver),
+            )
         })
     }
 }
