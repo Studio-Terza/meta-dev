@@ -15,10 +15,12 @@ lint-core = { path = "../lint-core" }
 lint-placement = { path = "../lint-placement" }
 lint-layout = { path = "../lint-layout" }
 lint-process-starters = { path = "../lint-process-starters" }
+code-model = { path = "../code-model" }
 proc-macro2.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
+code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 lint-placement = { path = "../lint-placement" }

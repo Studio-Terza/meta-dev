@@ -243,7 +243,7 @@ impl UsePath {
         }
     }
 
-    pub(super) fn tail(&self) -> &[Name] {
+    pub(crate) fn tail(&self) -> &[Name] {
         self.segments.get(1..).unwrap_or_default()
     }
 
@@ -253,6 +253,15 @@ impl UsePath {
 
     pub(crate) fn written(&self) -> ItemPath {
         self.segments.iter().cloned().collect()
+    }
+
+    pub(crate) fn parent(&self) -> Option<UsePath> {
+        let (_, kept) = self.segments.split_last()?;
+        kept.first().map(|_| UsePath { segments: kept.to_vec(), ..self.clone() })
+    }
+
+    pub(crate) fn extended(&self, rest: &UsePath) -> UsePath {
+        UsePath { segments: self.segments.iter().chain(&rest.segments).cloned().collect(), ..self.clone() }
     }
 
     pub(super) fn global(krate: &Name) -> UsePath {

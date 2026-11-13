@@ -1,4 +1,5 @@
-use lint_layout::{PathTail, Word, words};
+use code_model::{Ground, ItemPath, Mention, PathUse, Placed, Region};
+use lint_layout::{Name, PathTail, Whole, Word, words};
 use lint_paths::Use;
 
 use super::called::Called;
@@ -22,10 +23,15 @@ impl Tail {
 
     fn site_of<'file>(&self, used: &Use<'file>) -> Option<EffectSite<'file>> {
         let place = used.place();
-        let ground = used.ground();
+        let ground = Vocabulary::grounded(used.ground());
         used.spelling(PathTail::new(self.words))
             .cloned()
             .map(|path| EffectSite::new(place, self.effect, Called::Path(path), ground))
+    }
+
+    fn effected(&self, used: &PathUse) -> Option<Effected> {
+        let path = used.spelling(PathTail::new(self.words))?;
+        Some(Effected { effect: self.effect, called: Called::Path(path.as_ref().iter().cloned().collect()) })
     }
 }
 
@@ -139,4 +145,37 @@ impl Vocabulary {
             .or_else(|| Self::SHORT.iter().find_map(|tail| tail.spelled_in(used)))
             .and_then(|tail| tail.site_of(used))
     }
+
+    pub(super) fn placed_site<'model>(placed: Placed<'model, &'model PathUse>) -> Option<EffectSite<'model>> {
+        let used = placed.entity();
+        let effected = Self::effected(used)?;
+        let ground = AsRef::<Region>::as_ref(used).ground();
+        Some(EffectSite::new(placed.site(), effected.effect, effected.called, ground))
+    }
+
+    fn effected(used: &PathUse) -> Option<Effected> {
+        match used.mention() {
+            Mention::Invoked => Self::printed(used.written()),
+            Mention::Expression | Mention::InMacro => Self::LONG.iter().chain(&Self::SHORT).find_map(|tail| tail.effected(used)),
+        }
+    }
+
+    fn printed(written: &ItemPath) -> Option<Effected> {
+        let name: &Name = written.last()?;
+        name.matches::<Whole>(&Self::MACROS)?;
+        Some(Effected { effect: Effect::Stdio, called: Called::Macro(name.clone()) })
+    }
+
+    fn grounded(ground: lint_paths::Ground) -> Ground {
+        match ground {
+            lint_paths::Ground::Open => Ground::Open,
+            lint_paths::Ground::Ports => Ground::Ports,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Effected {
+    effect: Effect,
+    called: Called,
 }

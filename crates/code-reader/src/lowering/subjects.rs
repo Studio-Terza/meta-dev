@@ -1,9 +1,12 @@
+use syn::ItemImpl;
+use syn::visit;
+
 use code_model::{Region, Seat, TypeRef};
 
 use crate::namespace::{Resolving, ScopeId};
 
-use super::Lowering;
 use super::signature::Written;
+use super::{Enclosure, ImplRow, Lowering};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct SubjectId(usize);
@@ -38,5 +41,17 @@ impl Lowering<'_> {
         let subject = SubjectId(rows.len());
         rows.push(SubjectRow { scope: self.here.scope(), ty });
         subject
+    }
+
+    pub(super) fn impl_visited(&mut self, block: &ItemImpl) {
+        let declared = self.generics.extended(&block.generics);
+        let subject = declared.lowered(&block.self_ty);
+        let generics = declared.subject(subject.clone());
+        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, subject.clone()));
+        let subjected = self.subjected(subject);
+        let context = self.context.of_impl(block, subjected);
+        self.contextual(context, |lowering| {
+            lowering.enclosed(Enclosure::of_impl(block), generics, |enclosed| visit::visit_item_impl(enclosed, block));
+        });
     }
 }

@@ -122,8 +122,8 @@ impl Lints {
         Entry::spelled::<NoParameterBags>(Work::Checked(|readout| vec![NoParameterBags::report(readout.files())])),
         Entry::spelled::<PrimitiveBoundary>(Work::Modelled(<PrimitiveBoundary as ModelLint>::report)),
         Entry::spelled::<PrivateFns>(Work::Checked(|readout| vec![PrivateFns::report(readout.files())])),
-        Entry::spelled::<ProcessStarters>(Work::Checked(|readout| vec![ProcessStarters::report(readout.files())])),
-        Entry::spelled::<RawResources>(Work::Checked(|readout| vec![RawResources::report(readout.files())])),
+        Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
+        Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
         Entry::spelled::<PublicSurface>(Work::Checked(|readout| vec![PublicSurface::report(readout.files())])),
         Entry::spelled::<RepeatedMethods>(Work::Checked(|readout| vec![RepeatedMethods::report(readout.files())])),
         Entry::spelled::<StateGraph>(Work::Checked(|readout| vec![StateGraph::report(readout.files())])),
@@ -145,7 +145,7 @@ impl Lints {
         Entry::spelled::<MandatoryLaws>(Work::Checked(|readout| vec![MandatoryLaws::report(readout.files())])),
         Entry::spelled::<ArbitraryNewtypes>(Work::Checked(|readout| vec![ArbitraryNewtypes::report(readout.files())])),
         Entry::spelled::<BoolMethods>(Work::Checked(|readout| vec![BoolMethods::report(readout.files())])),
-        Entry::spelled::<EffectsInPorts>(Work::Checked(|readout| vec![EffectsInPorts::report(readout.files())])),
+        Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
         Entry::spelled::<NoEarlyExits>(Work::Checked(|readout| vec![NoEarlyExits::report(readout.files())])),
         Entry::spelled::<Flows>(Work::Checked(|readout| {
             let flows = Flows::from(readout.files());
@@ -242,7 +242,7 @@ impl Work {
 
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Survey => Worked::surveying(&Survey::measured(readout.files())),
+            Work::Survey => sources.model().map_or_default(|model| Worked::surveying(&Survey::measured(readout.files(), model))),
             Work::Checked(_) | Work::Modelled(_) | Work::Described(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
@@ -261,8 +261,8 @@ impl Work {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Rank {
-    Survey,
     Early(Reverse<Slot>),
+    Survey,
     Late(Slot),
 }
 

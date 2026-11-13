@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
-use lint_core::{Lint, Report, SourceFile, WorkspaceLint};
+use lint_core::{Report, SourceFile, WorkspaceLint};
 use newtype::Wrapping;
 use workspace_metadata::Metadata;
 
-use crate::{Source, Sources, Text};
+use crate::{Checks, Source, Sources, Text};
 
 #[derive(Debug)]
 pub struct Shown;
@@ -24,8 +24,8 @@ impl Shown {
     }
 
     #[must_use]
-    pub fn reported<Checked: Lint>(pair: &[&str]) -> Vec<String> {
-        Self::filtered(pair, |files| Self::listed(&Checked::report(files)))
+    pub fn reported<Checked: Checks>(pair: &[&str]) -> Vec<String> {
+        Self::filtered(pair, |files| Checked::reported(files, Self::listed))
     }
 
     #[must_use]

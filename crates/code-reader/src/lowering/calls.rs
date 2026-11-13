@@ -1,5 +1,5 @@
 use syn::spanned::Spanned;
-use syn::{ExprCall, ExprMethodCall, Macro};
+use syn::{ExprCall, ExprMacro, ExprMethodCall};
 
 use code_model::{Building, Call, Callee, ItemPath, MacroCall, Region};
 use lint_core::Syntax;
@@ -55,7 +55,8 @@ impl Lowering<'_> {
         });
     }
 
-    pub(super) fn macro_called(&mut self, invoked: &Macro) {
+    pub(super) fn macro_called(&mut self, expression: &ExprMacro) {
+        let invoked = &expression.mac;
         let called = CallPath { path: &invoked.path };
         self.called(Position::from(invoked.path.span()), Callee::Macro(MacroCall::from(called.written())));
     }

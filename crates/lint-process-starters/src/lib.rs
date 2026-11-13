@@ -1,17 +1,17 @@
 mod command_paths;
 
+use code_model::Model;
 pub use command_paths::{CommandPaths, Scope};
-use lint_core::Lint;
-use lint_core::{Fix, Headline, Message, Problem, Report, SourceFile, Violation};
+use lint_core::{Fix, Headline, Message, ModelLint, Problem, Report, Violation};
 
 #[derive(Debug)]
 pub struct ProcessStarters;
 
-impl Lint for ProcessStarters {
-    fn report(files: &[SourceFile]) -> Report<'_> {
+impl ModelLint for ProcessStarters {
+    fn report(model: &Model) -> Report<'_> {
         Report::new(
             Headline::new("only ports start processes"),
-            CommandPaths::across(files, Scope::OutsidePorts)
+            CommandPaths::across(model, Scope::OutsidePorts)
                 .into_iter()
                 .map(|site| {
                     Violation::new(

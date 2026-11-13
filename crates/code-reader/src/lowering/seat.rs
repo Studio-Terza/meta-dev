@@ -41,6 +41,10 @@ impl<'grown> Footing<'grown> {
     pub(super) fn outer(self) -> Region {
         self.outer
     }
+
+    pub(super) fn file(self) -> FileId {
+        self.file
+    }
 }
 
 #[derive(Clone, Debug)]

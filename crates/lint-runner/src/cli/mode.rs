@@ -12,6 +12,7 @@ use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;
+use code_model::Model;
 use lint_core::{Lint, Readout, Report, SourceFile};
 use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
@@ -120,8 +121,8 @@ pub(crate) struct Survey<'files> {
 }
 
 impl<'files> Survey<'files> {
-    pub(crate) fn measured(files: &'files [SourceFile]) -> Survey<'files> {
-        Survey { budget: TestBudget::measured(files), paired: PairedApis::report(files), clones: Clones::report(files) }
+    pub(crate) fn measured(files: &'files [SourceFile], model: &Model) -> Survey<'files> {
+        Survey { budget: TestBudget::measured(files, model), paired: PairedApis::report(files), clones: Clones::report(files) }
     }
 }
 

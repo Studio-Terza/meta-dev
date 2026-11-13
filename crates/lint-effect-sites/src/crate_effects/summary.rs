@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use lint_core::Fix;
-use lint_paths::Ground;
+use code_model::Ground;
 use lint_placement::CrateName;
 use newtype::{Arbitrary, Counter, Display, Newtype};
 

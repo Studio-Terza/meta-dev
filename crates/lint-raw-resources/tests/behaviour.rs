@@ -1,4 +1,4 @@
-use lint_fixtures::{Lines, Located, Source, Sources, Text};
+use lint_fixtures::{Lines, Located, Queried, Source, Sources, Text};
 use lint_raw_resources::RawResources;
 
 const QUALIFIED: &str = "fn f() {\n    std::fs::remove_dir_all(\"x\");\n}\n";
@@ -26,7 +26,7 @@ const TYPE_ALIAS_CALL: &str = "use std::mem;\nfn f(x: u8) {\n    let leak = mem:
 const SIBLING_IMPORT: &str = "mod a {\n    pub use std::mem::forget;\n}\nmod b {\n    fn forget(_x: u8) {}\n    pub fn f() {\n        forget(1);\n    }\n}\n";
 const INLINE_OTHER: &str = "mod adapters {\n    fn f(x: u8) {\n        std::mem::forget(x);\n    }\n}\n";
 
-laws::table!(raw_calls_are_flagged, Sources::flagged::<RawResources>, [
+laws::table!(raw_calls_are_flagged, Sources::flagged::<Queried<RawResources>>, [
     [Source::new(Located::new("a.rs"), Text::new(FUNCTION_IMPORT))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(RENAMED))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(MODULE_RENAMED))] => Lines::from(["a.rs:3"]),
@@ -48,7 +48,7 @@ laws::table!(raw_calls_are_flagged, Sources::flagged::<RawResources>, [
     [Source::new(Located::new("a.rs"), Text::new(TYPE_ALIAS_CALL))] => Lines::from(["a.rs:3"]),
 ]);
 
-laws::table!(other_calls_and_ports_are_not, Sources::flagged::<RawResources>, [
+laws::table!(other_calls_and_ports_are_not, Sources::flagged::<Queried<RawResources>>, [
     [Source::new(Located::new("a.rs"), Text::new(OWN_FORGET))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(INLINE_PORTS))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(SIBLING_IMPORT))] => Lines::default(),

@@ -12,6 +12,7 @@ use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::Item;
 use crate::item_path::ItemPath;
+use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
@@ -27,6 +28,7 @@ pub struct Model {
     functions: Vec<Filed<Function>>,
     holdings: Vec<Filed<Holding>>,
     calls: Vec<Filed<Call>>,
+    uses: Vec<Filed<PathUse>>,
     declarations: Declarations,
     roots: CrateRoots,
 }
@@ -91,6 +93,21 @@ impl<'model> Iterator for Calls<'model> {
     }
 }
 
+#[derive(Debug)]
+pub struct PathUses<'model> {
+    files: &'model [FileModel],
+    rows: std::slice::Iter<'model, Filed<PathUse>>,
+}
+
+impl<'model> Iterator for PathUses<'model> {
+    type Item = Placed<'model, &'model PathUse>;
+
+    fn next(&mut self) -> Option<Placed<'model, &'model PathUse>> {
+        let files = self.files;
+        self.rows.find_map(|filed| filed.placed(files))
+    }
+}
+
 impl Model {
     #[must_use]
     pub fn implementations(&self) -> Implementations<'_> {
@@ -110,6 +127,11 @@ impl Model {
     #[must_use]
     pub fn calls(&self) -> Calls<'_> {
         Calls { files: &self.files, rows: self.calls.iter() }
+    }
+
+    #[must_use]
+    pub fn uses(&self) -> PathUses<'_> {
+        PathUses { files: &self.files, rows: self.uses.iter() }
     }
 
     #[must_use]

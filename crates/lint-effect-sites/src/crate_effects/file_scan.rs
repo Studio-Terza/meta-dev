@@ -7,7 +7,7 @@ use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use lint_core::{Gate, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, Whole};
-use lint_paths::Ground;
+use code_model::Ground;
 
 use super::called::Called;
 use super::effect::Effect;

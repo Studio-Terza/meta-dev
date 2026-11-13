@@ -6,6 +6,7 @@ mod regions;
 mod seat;
 mod signature;
 mod subjects;
+mod uses;
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -14,8 +15,8 @@ use std::sync::Arc;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ForeignItemFn, Ident, ImplItemFn, ItemEnum, ItemFn,
-    ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Signature as SynSignature, TraitItemFn,
+    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemFn, ItemEnum, ItemFn,
+    ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Macro, Signature as SynSignature, TraitItemFn,
 };
 
 use code_model::{
@@ -38,6 +39,7 @@ use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
 use signature::{DeclaredParameter, InScope, LoweredInput, Written};
 use subjects::{SubjectId, SubjectRows, Subjects};
+use uses::UseRow;
 
 #[derive(Clone, Copy, Debug, Default)]
 enum Enclosure {
@@ -264,6 +266,7 @@ pub(crate) struct FileRows {
     aliases: Vec<AliasRow>,
     holdings: Vec<HoldingRow>,
     calls: Vec<CallRow>,
+    uses: Vec<UseRow>,
     subjects: SubjectRows,
 }
 
@@ -275,6 +278,7 @@ impl FileRows {
             functions: Footed::appended(columns.functions, footing, self.functions),
             holdings: Footed::appended(columns.holdings, footing, self.holdings),
             calls: Footed::appended(columns.calls, footing, self.calls),
+            uses: Footed::appended(columns.uses, footing, self.uses),
         }
     }
 }
@@ -286,8 +290,9 @@ struct Footed<'footing, Row> {
 }
 
 impl<'footing, Row: Built> Footed<'footing, Row> {
-    fn appended(column: Vec<Self>, footing: Footing<'footing>, rows: Vec<Row>) -> Vec<Self> {
-        column.into_iter().chain(rows.into_iter().map(|row| Footed { footing, row })).collect()
+    fn appended(mut column: Vec<Self>, footing: Footing<'footing>, rows: Vec<Row>) -> Vec<Self> {
+        column.extend(rows.into_iter().map(|row| Footed { footing, row }));
+        column
     }
 
     fn every_built(column: Vec<Self>, building: Building) -> Building {
@@ -357,6 +362,7 @@ struct Columns<'footing> {
     functions: Vec<Footed<'footing, FnRow>>,
     holdings: Vec<Footed<'footing, HoldingRow>>,
     calls: Vec<Footed<'footing, CallRow>>,
+    uses: Vec<Footed<'footing, UseRow>>,
 }
 
 impl Columns<'_> {
@@ -365,7 +371,8 @@ impl Columns<'_> {
         let with_impls = Footed::every_built(self.impls, with_aliases);
         let with_functions = Footed::every_built(self.functions, with_impls);
         let with_holdings = Footed::every_built(self.holdings, with_functions);
-        Footed::every_built(self.calls, with_holdings)
+        let with_calls = Footed::every_built(self.calls, with_holdings);
+        Footed::every_built(self.uses, with_calls)
     }
 }
 
@@ -483,15 +490,8 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let declared = self.generics.extended(&block.generics);
-        let subject = declared.lowered(&block.self_ty);
-        let generics = declared.subject(subject.clone());
-        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, subject.clone()));
-        let subjected = self.subjected(subject);
-        let context = self.context.of_impl(block, subjected);
-        self.contextual(context, |lowering| {
-            lowering.enclosed(Enclosure::of_impl(block), generics, |enclosed| visit::visit_item_impl(enclosed, block));
-        });
+        let tested = self.context.within_item(&block.attrs);
+        self.contextual(tested, |lowering| lowering.impl_visited(block));
     }
 
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
@@ -503,13 +503,19 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     }
 
     fn visit_item_fn(&mut self, item: &'ast ItemFn) {
-        let generics = self.function(&item.attrs, &item.sig);
-        self.enclosed(Enclosure::Body, generics, |lowering| visit::visit_item_fn(lowering, item));
+        let tested = self.context.within_item(&item.attrs);
+        self.contextual(tested, |lowering| {
+            let generics = lowering.function(&item.attrs, &item.sig);
+            lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_item_fn(enclosed, item));
+        });
     }
 
     fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
-        let generics = self.function(&item.attrs, &item.sig);
-        self.enclosed(Enclosure::Body, generics, |lowering| visit::visit_impl_item_fn(lowering, item));
+        let tested = self.context.within_item(&item.attrs);
+        self.contextual(tested, |lowering| {
+            let generics = lowering.function(&item.attrs, &item.sig);
+            lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_impl_item_fn(enclosed, item));
+        });
     }
 
     fn visit_trait_item_fn(&mut self, item: &'ast TraitItemFn) {
@@ -577,7 +583,17 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     }
 
     fn visit_expr_macro(&mut self, expr: &'ast ExprMacro) {
-        self.macro_called(&expr.mac);
+        self.macro_called(expr);
         visit::visit_expr_macro(self, expr);
+    }
+
+    fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
+        self.path_used(expression);
+        visit::visit_expr_path(self, expression);
+    }
+
+    fn visit_macro(&mut self, invoked: &'ast Macro) {
+        self.macro_used(invoked);
+        visit::visit_macro(self, invoked);
     }
 }

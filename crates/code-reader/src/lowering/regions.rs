@@ -1,6 +1,6 @@
 use syn::{Attribute, ItemImpl, ItemMod};
 
-use code_model::{Reach, Region, Within, Zone};
+use code_model::{Ground, Reach, Region, Within, Zone};
 use lint_core::{Gate, SourceFile, Walk};
 
 use super::Lowering;
@@ -11,14 +11,14 @@ pub(super) struct Regions;
 
 impl Regions {
     pub(super) fn of_file(source: &SourceFile, reach: Reach) -> Region {
-        Region::new(reach, Self::zone_of(source), Within::Own)
+        let ground = Gate::PORTS.admits(source).map_or(Ground::Open, |_| Ground::Ports);
+        Region::new(reach, Self::zone_of(source), Within::Own).grounded(ground)
     }
 
     pub(super) fn of_module(region: Region, item: &ItemMod) -> Region {
-        match Gate::BOUNDARY.names(item) {
-            Some(_) => Self::tested(region, &item.attrs).zoned(Zone::Boundary),
-            None => Self::tested(region, &item.attrs),
-        }
+        let ground = Gate::PORTS.names(item).map_or(Ground::Open, |_| Ground::Ports);
+        let zone = Gate::BOUNDARY.names(item).map_or(Zone::Open, |_| Zone::Boundary);
+        Self::tested(region, &item.attrs).zoned(zone).grounded(ground)
     }
 
     fn tested(region: Region, attributes: &[Attribute]) -> Region {
@@ -45,6 +45,10 @@ pub(super) struct Context {
 impl Context {
     pub(super) fn outermost(region: Region) -> Context {
         Context { region, subject: None }
+    }
+
+    pub(super) fn within_item(&self, attributes: &[Attribute]) -> Context {
+        Context { region: Regions::tested(self.region, attributes), subject: self.subject }
     }
 
     pub(super) fn within_module(&self, item: &ItemMod) -> Context {

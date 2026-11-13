@@ -1,6 +1,6 @@
-use lint_core::{Site, SourceFile};
+use code_model::{Ground, Model, Placed, Region};
+use lint_core::Site;
 use lint_layout::{PathTail, Word, words};
-use lint_paths::{Ground, Paths, Use};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -22,19 +22,15 @@ impl Scope {
 pub struct CommandPaths;
 
 impl CommandPaths {
-    const FINALS: [Word<'static>; 1] = words!["new"];
     const STARTER: [Word<'static>; 3] = words!["process", "Command", "new"];
 
     #[must_use]
-    pub fn across(files: &[SourceFile], scope: Scope) -> Vec<Site<'_>> {
-        Self::among(Paths::read(files, &Self::FINALS), scope)
-    }
-
-    fn among(uses: Vec<Use<'_>>, scope: Scope) -> Vec<Site<'_>> {
-        uses.into_iter()
-            .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
-            .filter(|used| scope.admits(used.ground()).is_some())
-            .map(|used| used.place())
+    pub fn across(model: &Model, scope: Scope) -> Vec<Site<'_>> {
+        model
+            .uses()
+            .filter(|placed| placed.entity().spelling(PathTail::new(&Self::STARTER)).is_some())
+            .filter(|placed| scope.admits(AsRef::<Region>::as_ref(placed.entity()).ground()).is_some())
+            .map(Placed::site)
             .collect()
     }
 }

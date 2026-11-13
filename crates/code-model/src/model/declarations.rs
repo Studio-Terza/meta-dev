@@ -33,7 +33,7 @@ impl Aliases {
         Expanding { aliases: self, steps: Steps::LIMIT }.child(ty).unwrap_or_else(|_| ty.clone())
     }
 
-    fn aliasing(&self, path: &Resolved) -> Option<&Alias> {
+    pub(crate) fn aliasing(&self, path: &Resolved) -> Option<&Alias> {
         let declared = path.crate_item().and_then(|item| self.declared.get(&item));
         declared.or_else(|| {
             let std = path.std()?;

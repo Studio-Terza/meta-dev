@@ -15,6 +15,7 @@ pub(crate) struct Placing {
     path: PathBuf,
     crate_file: PathBuf,
     name: Option<Name>,
+    krate: Name,
     dependencies: Dependencies,
 }
 
@@ -25,6 +26,7 @@ impl From<&SourceFile> for Placing {
             path: source.path().to_path_buf(),
             crate_file: AsRef::<Path>::as_ref(source.crate_file()).to_path_buf(),
             name: Self::library(placement),
+            krate: Borrow::<Name>::borrow(placement.package().crate_name()).clone(),
             dependencies: placement.package().dependencies().clone(),
         }
     }
@@ -131,7 +133,11 @@ impl<'read> Planting<'read> {
         let unplanted = placings
             .iter()
             .zip(bodies)
-            .map(|(placing, lowered)| Unplanted { placing, file: building.file(placing.path.clone()), lowered })
+            .map(|(placing, lowered)| Unplanted {
+                placing,
+                file: building.file(placing.path.clone(), placing.krate.clone()),
+                lowered,
+            })
             .collect();
         Planting::new(unplanted).planted().built(building)
     }

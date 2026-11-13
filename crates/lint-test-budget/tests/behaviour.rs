@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use code_reader::Reader;
 use lint_core::SourceFile;
 use lint_fixtures::{Sources, Text};
 use lint_placement::CrateName;
@@ -20,7 +21,7 @@ struct Budgets;
 impl Budgets {
     fn of_crate(files: &[SourceFile], name: &str) -> Option<String> {
         let crate_name = CrateName::from(&CrateRoot::new(PathBuf::from(name)));
-        TestBudget::measured(files).of_crate(&crate_name).map(|budget| budget.to_string())
+        TestBudget::measured(files, &Reader::read_files(files)).of_crate(&crate_name).map(|budget| budget.to_string())
     }
 
     fn of_test_file(text: &&str) -> Option<String> {
@@ -91,7 +92,8 @@ fn files_of_a_package_add_up_and_packages_stay_apart() {
 
 #[test]
 fn the_report_lists_each_crate() {
-    let report = TestBudget::measured(&[Sources::file("crates/a/tests/t.rs", Text::new(TESTS))]).to_string();
+    let files = [Sources::file("crates/a/tests/t.rs", Text::new(TESTS))];
+    let report = TestBudget::measured(&files, &Reader::read_files(&files)).to_string();
     assert!(report.contains("a: "));
     assert!(report.contains("report only"));
 }
