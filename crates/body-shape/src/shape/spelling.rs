@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::fmt;
 
 use equivalence::{Equivalence, Erased};

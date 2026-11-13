@@ -45,6 +45,10 @@ const RENAMED: &[Source] = &[Source::new(
     Located::new("crates/store/src/lib.rs"),
     Text::new("use store_ports::query as q;\nfn f() {\n    s.rows(q!(Row, \"select id from nodes\"));\n}\n"),
 )];
+const NESTED_RENAMED: &[Source] = &[Source::new(
+    Located::new("crates/store/src/lib.rs"),
+    Text::new("use store_ports::query as q;\nfn f() {\n    vec![q!(\"select id from nodes\")];\n}\n"),
+)];
 const GLOBBED: &[Source] = &[
     Source::new(
         Located::new("crates/store/src/lib.rs"),
@@ -94,6 +98,7 @@ laws::table!(
         NESTED => Lines::from(["crates/store/src/lib.rs:2"]),
         OTHER => Lines::from(["crates/store/src/lib.rs:4"]),
         RENAMED => Lines::from(["crates/store/src/lib.rs:3"]),
+        NESTED_RENAMED => Lines::from(["crates/store/src/lib.rs:3"]),
         GLOBBED => Lines::from(["crates/store/src/lib.rs:3"]),
         LOOKALIKE => Lines::default(),
         FROM_THE_MACROS_CRATE => Lines::from(["crates/store/src/lib.rs:2"]),

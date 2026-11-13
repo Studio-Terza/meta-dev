@@ -122,7 +122,7 @@ type Query = for<'model> fn(&'model Model) -> Report<'model>;
 type Workspaced =
     for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>, &'file Model) -> Report<'file>;
 
-type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Model) -> Vec<Report<'file>>;
+type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
     const LINTS: [Entry; 54] = [
@@ -177,9 +177,10 @@ impl Lints {
         <Filed<LinearBodies> as Registered>::ENTRY,
         <Filed<PureRouters> as Registered>::ENTRY,
         <Filed<PlainConditions> as Registered>::ENTRY,
-        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, model| {
+        Entry::spelled::<TypeSystem>(Work::Extracted(|model| {
+            let extraction = Extraction::default();
             let transitions = Transitions::from(model);
-            let system = TypeSystem::built_from(extraction, &transitions);
+            let system = TypeSystem::built_from(&extraction, &transitions);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
@@ -363,10 +364,9 @@ impl Work {
         settled: &Settled<'_, '_>,
     ) -> Worked {
         match self {
-            Work::Extracted(extracted) => Worked::rendering(
-                slot,
-                sources.gathering().model().map_or_default(|model| extracted(sources.gathering().extraction(), model)),
-            ),
+            Work::Extracted(extracted) => {
+                Worked::rendering(slot, sources.gathering().model().map_or_default(extracted))
+            }
             Work::Described(described) => Worked::rendering(
                 slot,
                 sources

@@ -1,4 +1,4 @@
-use proc_macro2::{Delimiter, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 
 use equivalence::{Equivalence, Erased};
 use lint_layout::Name;
@@ -18,7 +18,7 @@ pub(crate) enum RawToken {
 
 impl RawToken {
     pub(crate) fn flattened(tokens: TokenStream) -> Vec<RawToken> {
-        tokens.into_iter().flat_map(Self::of_tree).collect()
+        tokens.into_iter().fold(Flattening(Vec::new()), Flattening::gathered).0
     }
 
     pub(crate) fn shaped<'raw>(
@@ -42,21 +42,12 @@ impl RawToken {
         }
     }
 
-    fn of_tree(tree: TokenTree) -> Vec<RawToken> {
-        match tree {
-            TokenTree::Literal(literal) => vec![RawToken::Literal(Spelling::new(literal.to_string()))],
-            TokenTree::Punct(punct) => vec![RawToken::Mark(Mark::new(punct.as_char()))],
-            TokenTree::Ident(ident) => vec![RawToken::Word(Name::from(&ident))],
-            TokenTree::Group(group) => Self::delimited(group.delimiter(), Self::flattened(group.stream())),
-        }
-    }
-
-    fn delimited(delimiter: Delimiter, inner: Vec<RawToken>) -> Vec<RawToken> {
+    fn marks(delimiter: Delimiter) -> Option<Brackets> {
         match delimiter {
-            Delimiter::Parenthesis => Self::between(Mark::OPEN_PAREN, inner, Mark::CLOSE_PAREN),
-            Delimiter::Brace => Self::between(Mark::OPEN_BRACE, inner, Mark::CLOSE_BRACE),
-            Delimiter::Bracket => Self::between(Mark::OPEN_BRACKET, inner, Mark::CLOSE_BRACKET),
-            Delimiter::None => inner,
+            Delimiter::Parenthesis => Some(Brackets { open: Mark::OPEN_PAREN, close: Mark::CLOSE_PAREN }),
+            Delimiter::Brace => Some(Brackets { open: Mark::OPEN_BRACE, close: Mark::CLOSE_BRACE }),
+            Delimiter::Bracket => Some(Brackets { open: Mark::OPEN_BRACKET, close: Mark::CLOSE_BRACKET }),
+            Delimiter::None => None,
         }
     }
 
@@ -67,8 +58,36 @@ impl RawToken {
             .filter(|_| equivalence.erases(Erased::Literals).is_some())
             .map_or(Some(ShapeToken::Mark(mark)), |_| None)
     }
+}
 
-    fn between(open: Mark, inner: Vec<RawToken>, close: Mark) -> Vec<RawToken> {
-        [RawToken::Mark(open)].into_iter().chain(inner).chain([RawToken::Mark(close)]).collect()
+#[derive(Clone, Copy, Debug)]
+struct Brackets {
+    open: Mark,
+    close: Mark,
+}
+
+#[derive(Debug)]
+struct Flattening(Vec<RawToken>);
+
+impl Flattening {
+    fn gathered(self, tree: TokenTree) -> Flattening {
+        match tree {
+            TokenTree::Literal(literal) => self.pushed(RawToken::Literal(Spelling::from(&literal))),
+            TokenTree::Punct(punct) => self.pushed(RawToken::Mark(Mark::new(punct.as_char()))),
+            TokenTree::Ident(ident) => self.pushed(RawToken::Word(Name::from(&ident))),
+            TokenTree::Group(group) => self.grouped(&group),
+        }
+    }
+
+    fn pushed(mut self, token: RawToken) -> Flattening {
+        self.0.push(token);
+        self
+    }
+
+    fn grouped(self, group: &Group) -> Flattening {
+        let marks = RawToken::marks(group.delimiter());
+        let opened = marks.into_iter().fold(self, |flat, brackets| flat.pushed(RawToken::Mark(brackets.open)));
+        let inner = group.stream().into_iter().fold(opened, Flattening::gathered);
+        marks.into_iter().fold(inner, |flat, brackets| flat.pushed(RawToken::Mark(brackets.close)))
     }
 }
