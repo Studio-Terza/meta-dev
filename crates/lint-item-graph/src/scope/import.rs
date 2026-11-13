@@ -1,5 +1,4 @@
 use std::borrow::Borrow;
-use std::collections::BTreeSet;
 
 use lint_layout::Name;
 use proc_macro2::Ident;
@@ -47,15 +46,6 @@ impl Import {
     pub fn itself(path: &[&Ident]) -> Option<Import> {
         let (leaf, rest) = path.split_last()?;
         Some(Import::renamed(rest, leaf, leaf))
-    }
-
-    pub fn rooted_in(&self, local_roots: &BTreeSet<Name>) -> Option<&Name> {
-        let root = self.path.first().unwrap_or(&self.original);
-        local_roots.get(root).map(|_| root)
-    }
-
-    pub fn original(&self) -> &Name {
-        &self.original
     }
 
     pub fn spelled_path(&self) -> Vec<Name> {

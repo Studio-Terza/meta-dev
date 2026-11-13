@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::mem;
 
 use lint_layout::Name;
@@ -18,10 +18,6 @@ impl Imports {
 
     pub fn path_of(&self, name: &Name) -> Option<Vec<Name>> {
         self.naming(name).first().map(Import::spelled_path)
-    }
-
-    pub fn local_item(&self, name: &Name, local_roots: &BTreeSet<Name>) -> Option<&Imports> {
-        self.naming(name).iter().all(|import| import.rooted_in(local_roots).is_some()).then_some(self)
     }
 
     pub fn naming(&self, name: &Name) -> &[Import] {

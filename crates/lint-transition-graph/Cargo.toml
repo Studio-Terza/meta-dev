@@ -16,6 +16,7 @@ equivalence = { path = "../equivalence" }
 law-facts = { path = "../law-facts" }
 lint-core = { path = "../lint-core" }
 lint-item-graph = { path = "../lint-item-graph" }
+code-model = { path = "../code-model" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
@@ -27,6 +28,7 @@ syn.workspace = true
 
 [dev-dependencies]
 lint-distinct-signatures = { path = "../lint-distinct-signatures" }
+code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 laws = { path = "../laws" }
