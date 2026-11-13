@@ -143,14 +143,3 @@ impl<'ast> Visit<'ast> for Sweeping<'_, '_> {
 
     lint_core::sweep_visits!();
 }
-
-#[derive(Debug)]
-pub struct Unread;
-
-impl Gathers<()> for Unread {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        Vec::new()
-    }
-
-    fn gathered(self) {}
-}

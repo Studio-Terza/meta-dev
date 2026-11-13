@@ -33,6 +33,7 @@ const STAGED_TEST: &str = "fn t() {\n    A::staged();\n}\n";
 const STAGED_SHIPPED: &str = "fn run() {\n    A::staged();\n}\n";
 const STAGED_MACRO: &str = "fn run() {\n    show!(A::staged());\n}\n";
 const STAGED_INLINE_TEST: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> A {\n        A\n    }\n}\n#[cfg(test)]\nmod tests {\n    fn t() {\n        super::A::staged();\n    }\n}\n";
+const STAGED_AFTER_TESTS: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> A {\n        A\n    }\n}\n#[cfg(test)]\nimpl A {\n    fn t() {\n        A::staged();\n    }\n}\n#[cfg(test)]\nmod tests {\n    fn t() {\n        super::A::staged();\n    }\n}\n#[cfg(test)]\nfn t() {\n    A::staged();\n}\nstruct B;\nimpl B {\n    #[cfg(test)]\n    fn t() {\n        A::staged();\n    }\n    fn run() {\n        A::staged();\n    }\n}\n";
 const STOPPED: &str = "pub enum Clock {\n    Live,\n    Stopped,\n}\n";
 const STOPPED_TEST: &str = "fn t() {\n    Clock::Stopped;\n}\n";
 const STOPPED_SHIPPED: &str = "fn run() -> Clock {\n    Clock::Stopped\n}\n";
@@ -53,7 +54,7 @@ const RECEIVER_SELF: &str = "pub struct A;\nimpl A {\n    pub fn staged(&self) -
 const PLAIN_RETURN: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> u8 {\n        1\n    }\n}\n";
 const SELF_RETURN: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> Self {\n        A\n    }\n}\n";
 
-const CASES: [Case; 41] = [
+const CASES: [Case; 42] = [
     Case::new(
         Title::new("shipped caller inside an impl"),
         &[
@@ -148,6 +149,11 @@ const CASES: [Case; 41] = [
         Title::new("constructor called in a test module"),
         &[Source::new(Located::new("src/a.rs"), Text::new(STAGED_INLINE_TEST))],
         Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("shipped code after test code keeps its own ground"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(STAGED_AFTER_TESTS))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("variant only tests name"),

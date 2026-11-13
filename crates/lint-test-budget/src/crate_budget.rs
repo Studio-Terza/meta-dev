@@ -96,7 +96,7 @@ impl Gathers<CrateBudget> for TestScan {
     }
 
     fn gathered(self) -> CrateBudget {
-        self.counted(|tests, test_lines| CrateBudget { tests, test_lines, ..CrateBudget::default() })
+        self.counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
     }
 }
 

@@ -113,3 +113,28 @@ const CASES: [Case; 15] = [
 fn casts_are_allowed_only_inside_a_boundary_module() {
     assert_eq!(Sources::mismatches::<Swept<ConstShape>>(&CASES), Lines::default());
 }
+
+const AFTER_CONST: &str = "const A: u8 = 1;\nwrap! { x as u32 }\n";
+const AFTER_STATIC: &str = "static S: u8 = 1;\nwrap! { x as u32 }\n";
+const AFTER_IMPL_CONST: &str = "impl A {\n    const X: u8 = 1;\n}\nwrap! { x as u32 }\n";
+const AFTER_TRAIT_CONST: &str = "trait T {\n    const X: u8;\n}\nwrap! { x as u32 }\n";
+const AFTER_CONST_BLOCK: &str = "fn f(x: u8) -> u32 {\n    const { 1 };\n    x as u32\n}\n";
+const AFTER_ARRAY_LENGTH: &str = "fn f(x: u8) -> u32 {\n    let _a: [u8; 2] = [0; 2];\n    x as u32\n}\n";
+
+#[test]
+fn const_context_ends_with_its_const_item_or_block() {
+    let reported =
+        [AFTER_CONST, AFTER_STATIC, AFTER_IMPL_CONST, AFTER_TRAIT_CONST, AFTER_CONST_BLOCK, AFTER_ARRAY_LENGTH]
+            .map(|text| Sources::lines(&Swept::<ConstShape>::report(&[Sources::file("a.rs", Text::new(text))])));
+    assert_eq!(
+        reported,
+        [
+            Lines::from(["a.rs:2"]),
+            Lines::from(["a.rs:2"]),
+            Lines::from(["a.rs:4"]),
+            Lines::from(["a.rs:4"]),
+            Lines::from(["a.rs:3"]),
+            Lines::from(["a.rs:3"]),
+        ]
+    );
+}

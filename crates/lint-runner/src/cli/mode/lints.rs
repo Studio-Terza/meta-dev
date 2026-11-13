@@ -402,7 +402,7 @@ impl Work {
                     .ok()
                     .zip(sources.gathering().model())
                     .map(|(located, model)| {
-                        let facts = Priming::<RoleReading>::primed(settled);
+                        let facts = Priming::<RoleReading>::primer(settled);
                         described(sources.gathering().heads(), Described::workspaces(located), facts, model)
                     })
                     .into_iter()

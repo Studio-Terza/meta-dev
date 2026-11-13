@@ -14,7 +14,7 @@ use lint_file::PrimedFacts;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_placement::{CrateName as PlacedName, Role as Placed};
-use lint_sweep::Unread;
+use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
 use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
@@ -54,26 +54,61 @@ impl<'head> FromIterator<RoleFile<'head>> for RoleFacts<'head> {
 pub struct RoleReading;
 
 impl PrimedFacts for RoleReading {
-    type PrimerPart<'head> = ();
-    type Primer<'head> = ();
-    type Part<'head> = RoleFile<'head>;
-    type Context<'head> = RoleFacts<'head>;
+    type PrimerPart<'head> = RoleFile<'head>;
+    type Primer<'head> = RoleFacts<'head>;
+    type Part<'head> = ();
+    type Context<'head> = ();
 
-    type Priming<'head> = Unread;
+    type Priming<'head> = RootReading<'head>;
 
-    fn priming(_parsed: Parsed<'_, '_>) -> Unread {
-        Unread
-    }
-
-    fn contributed<'head>(parsed: Parsed<'_, 'head>, (): &()) -> RoleFile<'head> {
+    fn priming<'head>(parsed: Parsed<'_, 'head>) -> RootReading<'head> {
         let head = parsed.head();
         let root = Some(head).filter(|found| found.placement().role() == Placed::LibraryRoot);
-        RoleFile {
-            root: root.and_then(|found| {
-                let package = found.placement().package().root().package()?;
-                Some(RootDenial { package, path: found.path(), denied: Undenied::denied(parsed.file().syntax()) })
-            }),
-        }
+        let place = root.and_then(|found| {
+            Some(RootPlace { package: found.placement().package().root().package()?, path: found.path() })
+        });
+        RootReading { place, denied: BTreeSet::new() }
+    }
+
+    fn contributed(_: Parsed<'_, '_>, _: &RoleFacts<'_>) {}
+}
+
+#[derive(Debug)]
+struct RootPlace<'head> {
+    package: &'head Name,
+    path: &'head Path,
+}
+
+#[derive(Debug)]
+pub struct RootReading<'head> {
+    place: Option<RootPlace<'head>>,
+    denied: BTreeSet<UsePath>,
+}
+
+impl<'ast> Watch<'ast> for RootReading<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Attribute, Kind::Item]
+    }
+
+    fn on_attribute(&mut self, attribute: &'ast syn::Attribute) -> Descend {
+        self.denied.extend(Undenied::denied_by(attribute));
+        Descend::Over
+    }
+
+    fn on_item(&mut self, _: &'ast syn::Item) -> Descend {
+        Descend::Over
+    }
+}
+
+impl<'head> Gathers<RoleFile<'head>> for RootReading<'head> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        let rooted = self.place.as_ref().map(|_| ());
+        rooted.map_or_default(|()| Sweep::alone(self))
+    }
+
+    fn gathered(self) -> RoleFile<'head> {
+        let denied = self.denied;
+        RoleFile { root: self.place.map(|place| RootDenial { package: place.package, path: place.path, denied }) }
     }
 }
 

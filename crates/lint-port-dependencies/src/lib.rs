@@ -6,6 +6,7 @@ mod roles;
 use graph::Model;
 use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{FileLint, PrimedFacts, Reads};
+use lint_sweep::Sweep;
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
@@ -59,7 +60,7 @@ impl WorkspaceLint for KeyDependencyRoles {
     type Facts<'head> = RoleFacts<'head>;
 
     fn gathered<'head>(parsed: &[Parsed<'_, 'head>]) -> RoleFacts<'head> {
-        parsed.iter().map(|found| RoleReading::contributed(*found, &())).collect()
+        parsed.iter().map(|found| Sweep::gathered(found.file(), RoleReading::priming(*found))).collect()
     }
 
     fn report<'file, 'head: 'file>(
