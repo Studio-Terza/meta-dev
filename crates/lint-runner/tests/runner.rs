@@ -332,7 +332,7 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
         "  phase total\n",
         "  phase stage: list the trees and their packages\n",
         "  phase locate: describe the workspaces through cargo metadata\n",
-        "  phase model: build the code model\n",
+        "  phase model: merge the lowered files into the code model\n",
         "  phase survey: test budget, paired apis and clones\n",
         "  lint lint_no_comments::NoComments\n",
         "  lint lint_hand_impls::HandImpls\n",
@@ -341,6 +341,7 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
     ];
     assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 10], "{timed}");
     assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");
+    assert_eq!(timed.matches("  phase lower: lower its share of files on worker ").count(), workers, "{timed}");
     assert_eq!(untimed.matches("lint timings").count(), 0, "{untimed}");
     Ok(())
 }

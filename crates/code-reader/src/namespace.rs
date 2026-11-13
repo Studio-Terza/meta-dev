@@ -45,6 +45,43 @@ impl Export {
     }
 }
 
+#[derive(Debug)]
+struct Opening {
+    parent: ScopeId,
+    kind: ScopeKind,
+    entries: Entries,
+}
+
+#[derive(Debug)]
+pub(crate) struct Openings {
+    top: Entries,
+    nested: Vec<Opening>,
+}
+
+impl Openings {
+    pub(crate) fn new(top: Entries) -> Openings {
+        Openings { top, nested: Vec::new() }
+    }
+
+    pub(crate) fn opened(&mut self, parent: ScopeId, kind: ScopeKind, entries: Entries) -> ScopeId {
+        let scope = ScopeId::after(&self.nested).nested();
+        self.nested.push(Opening { parent, kind, entries });
+        scope
+    }
+
+    pub(crate) fn declare(&mut self, scope: ScopeId, declared: Declared) {
+        let top = &mut self.top;
+        let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
+        nested.map_or(top, |opening| &mut opening.entries).declare(declared);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum Top<'read> {
+    Root { form: CrateForm, name: Option<&'read Name>, dependencies: &'read Dependencies },
+    Child { parent: ScopeId, name: Name, visibility: Visibility },
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Namespace<'read> {
     scopes: Vec<ScopeRow>,
@@ -53,21 +90,41 @@ pub(crate) struct Namespace<'read> {
 }
 
 impl<'read> Namespace<'read> {
-    pub(crate) fn planted(
+    pub(crate) fn placed(&mut self, top: Top<'read>, openings: Openings) -> ScopeId {
+        let base = ScopeId::after(&self.scopes);
+        self.topped(top, openings.top.above(base));
+        openings.nested.into_iter().fold(base, |placed, opening| {
+            self.opened(opening.parent.above(placed), opening.kind, opening.entries.above(placed));
+            placed
+        })
+    }
+
+    fn topped(&mut self, top: Top<'read>, entries: Entries) {
+        match top {
+            Top::Root { form, name, dependencies } => self.planted(form, name, dependencies, entries),
+            Top::Child { parent, name, visibility } => self.child_opened(parent, name, visibility, entries),
+        }
+    }
+
+    fn child_opened(&mut self, parent: ScopeId, name: Name, visibility: Visibility, entries: Entries) {
+        let scope = self.opened(parent, ScopeKind::Module, entries);
+        self.declare(parent, Declared::new(name, visibility, DeclaredKind::Module(scope)));
+    }
+
+    fn planted(
         &mut self,
         form: CrateForm,
         name: Option<&'read Name>,
         dependencies: &'read Dependencies,
         entries: Entries,
-    ) -> ScopeId {
+    ) {
         let root = ScopeId::after(&self.scopes);
         self.scopes.push(ScopeRow::root(root, form, entries));
         self.crates.extend(name.map(|crate_name| (crate_name, root)));
         self.dependencies.insert(root, dependencies);
-        root
     }
 
-    pub(crate) fn opened(&mut self, parent: ScopeId, kind: ScopeKind, entries: Entries) -> ScopeId {
+    fn opened(&mut self, parent: ScopeId, kind: ScopeKind, entries: Entries) -> ScopeId {
         let scope = ScopeId::after(&self.scopes);
         let child = parent.row(&self.scopes).map(|row| kind.opened(row, scope, entries));
         self.scopes.extend(child);

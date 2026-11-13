@@ -6,6 +6,8 @@ use std::ops::ControlFlow;
 pub(crate) struct ScopeId(usize);
 
 impl ScopeId {
+    pub(crate) const FIRST: ScopeId = ScopeId(0);
+
     pub(super) fn after<Row>(rows: &[Row]) -> ScopeId {
         ScopeId(rows.len())
     }
@@ -20,6 +22,18 @@ impl ScopeId {
 
     pub(super) fn row_mut<Row>(self, rows: &mut [Row]) -> Option<&mut Row> {
         rows.get_mut(self.0)
+    }
+
+    pub(crate) fn above(self, base: ScopeId) -> ScopeId {
+        ScopeId(self.0 + base.0)
+    }
+
+    pub(super) fn nested(self) -> ScopeId {
+        ScopeId(self.0 + 1)
+    }
+
+    pub(super) fn below_top(self) -> Option<ScopeId> {
+        self.0.checked_sub(1).map(ScopeId)
     }
 }
 

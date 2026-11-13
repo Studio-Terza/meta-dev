@@ -62,6 +62,11 @@ impl Region {
     pub fn inside(self, within: Within) -> Region {
         Region { reach: self.reach, zone: self.zone, within: self.within.max(within) }
     }
+
+    #[must_use]
+    pub fn joined(self, other: Region) -> Region {
+        self.reached(other.reach).zoned(other.zone).inside(other.within)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

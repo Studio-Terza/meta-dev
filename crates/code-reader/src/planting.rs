@@ -1,128 +1,120 @@
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use code_model::{Building, FileId, Reach};
+use code_model::{Building, FileId, Model};
 use lint_core::SourceFile;
-use lint_layout::Name;
-use lint_placement::Role;
+use lint_layout::{Dependencies, Name};
+use lint_placement::{Placement, Role};
 
-use crate::lowering::{Lowered, Slot};
-use crate::namespace::CrateForm;
+use crate::lowering::{Lowered, Plot, Slot};
+use crate::namespace::{CrateForm, Top};
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Listed<'read> {
-    source: &'read SourceFile,
-    reach: Reach,
+#[derive(Debug)]
+pub(crate) struct Placing {
+    path: PathBuf,
+    crate_file: PathBuf,
+    name: Option<Name>,
+    dependencies: Dependencies,
 }
 
-impl<'read> From<&'read SourceFile> for Listed<'read> {
-    fn from(source: &'read SourceFile) -> Listed<'read> {
-        Listed { source, reach: Listed::reach_of(source) }
-    }
-}
-
-impl<'read> Listed<'read> {
-    pub(crate) fn tested(self) -> Listed<'read> {
-        Listed { source: self.source, reach: Reach::Test }
-    }
-
-    fn reach_of(source: &SourceFile) -> Reach {
-        match source.shipped() {
-            Some(_) => Reach::Shipped,
-            None => Reach::Test,
+impl From<&SourceFile> for Placing {
+    fn from(source: &SourceFile) -> Placing {
+        let placement = source.placement();
+        Placing {
+            path: source.path().to_path_buf(),
+            crate_file: AsRef::<Path>::as_ref(source.crate_file()).to_path_buf(),
+            name: Self::library(placement),
+            dependencies: placement.package().dependencies().clone(),
         }
     }
-
-    pub(crate) fn read(self, building: &mut Building) -> ReadFile<'read> {
-        ReadFile { source: self.source, file: building.file(self.source.path().to_path_buf()), reach: self.reach }
-    }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct ReadFile<'read> {
-    source: &'read SourceFile,
-    file: FileId,
-    reach: Reach,
-}
-
-impl<'read> ReadFile<'read> {
-    pub(crate) fn reach(self) -> Reach {
-        self.reach
-    }
-
-    pub(crate) fn source(self) -> &'read SourceFile {
-        self.source
-    }
-
-    pub(crate) fn file(self) -> FileId {
-        self.file
-    }
-
-    fn named(self) -> Option<&'read Name> {
-        match self.source.placement().role() {
-            Role::LibraryRoot => Some(Borrow::<Name>::borrow(self.source.placement().package().crate_name())),
+impl Placing {
+    fn library(placement: &Placement) -> Option<Name> {
+        match placement.role() {
+            Role::LibraryRoot => Some(Borrow::<Name>::borrow(placement.package().crate_name()).clone()),
             Role::BinaryRoot | Role::Target | Role::BuildScript | Role::Other => None,
         }
     }
+
+    fn top(&self, form: CrateForm) -> Top<'_> {
+        Top::Root { form, name: self.name.as_ref(), dependencies: &self.dependencies }
+    }
+
+    fn island(&self) -> Top<'_> {
+        Top::Root { form: CrateForm::Island, name: None, dependencies: &self.dependencies }
+    }
+}
+
+#[derive(Debug)]
+struct Unplanted<'read> {
+    placing: &'read Placing,
+    file: FileId,
+    lowered: Lowered,
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Files<'read>(BTreeMap<&'read Path, ReadFile<'read>>);
+pub(crate) struct Files<'read>(BTreeMap<&'read Path, Unplanted<'read>>);
 
 impl<'read> Files<'read> {
-    pub(crate) fn present(&self, path: &Path) -> Option<ReadFile<'read>> {
-        self.0.get(path).copied()
+    pub(crate) fn present(&self, path: &Path) -> Option<FileId> {
+        self.0.get(path).map(|unplanted| unplanted.file)
     }
 
-    fn filled(self, lowered: &mut Lowered<'read>, slots: Vec<Slot>) -> Files<'read> {
+    fn filled(self, planted: &mut Plot<'read>, slots: Vec<Slot>) -> Files<'read> {
         slots.into_iter().fold(self, |mut files, slot| {
-            files.slot_filled(lowered, slot);
+            files.slot_filled(planted, slot);
             files
         })
     }
 
-    fn rooted(self, lowered: &mut Lowered<'read>, root: ReadFile<'read>, name: Option<&'read Name>) -> Files<'read> {
-        let slots = lowered.rooted(root, name, CrateForm::Planted);
-        self.filled(lowered, slots)
+    fn rooted(self, planted: &mut Plot<'read>, root: Unplanted<'read>) -> Files<'read> {
+        let slots = planted.rooted(root.placing.top(CrateForm::Planted), root.file, root.lowered);
+        self.filled(planted, slots)
     }
 
-    fn slot_filled(&mut self, lowered: &mut Lowered<'read>, slot: Slot) {
+    fn slot_filled(&mut self, planted: &mut Plot<'read>, slot: Slot) {
         match slot.found(self) {
-            Some(path) => self.planted_at(lowered, slot, &path),
-            None => lowered.opaque(slot),
+            Some(path) => self.planted_at(planted, slot, &path),
+            None => planted.opaque(slot),
         }
     }
 
-    fn planted_at(&mut self, lowered: &mut Lowered<'read>, slot: Slot, path: &Path) {
+    fn planted_at(&mut self, planted: &mut Plot<'read>, slot: Slot, path: &Path) {
         let child = self.0.remove(path);
-        let slots = child.map_or_default(|removed| lowered.planted(slot, removed));
-        *self = std::mem::take(self).filled(lowered, slots);
+        let slots = child.map_or_default(|removed| planted.planted(slot, removed.file, removed.lowered));
+        *self = std::mem::take(self).filled(planted, slots);
     }
 }
 
 #[derive(Debug)]
 struct CrateFiles<'read> {
-    root: Option<ReadFile<'read>>,
+    root: Option<Unplanted<'read>>,
     files: Files<'read>,
-    name: Option<&'read Name>,
 }
 
 impl<'read> CrateFiles<'read> {
-    fn new(crate_file: &Path, read: Vec<ReadFile<'read>>) -> CrateFiles<'read> {
-        let mut files: BTreeMap<&'read Path, ReadFile<'read>> =
-            read.into_iter().map(|file| (file.source.path(), file)).collect();
+    fn new(crate_file: &Path, unplanted: Vec<Unplanted<'read>>) -> CrateFiles<'read> {
+        let mut files: BTreeMap<&'read Path, Unplanted<'read>> =
+            unplanted.into_iter().map(|file| (file.placing.path.as_path(), file)).collect();
         let root = files.remove(crate_file);
-        CrateFiles { name: root.and_then(ReadFile::named), root, files: Files(files) }
+        CrateFiles { root, files: Files(files) }
     }
 
-    fn planted(self, lowered: &mut Lowered<'read>) {
-        self.remaining(lowered).0.into_values().for_each(|island| lowered.island(island));
+    fn planted(self, planted: &mut Plot<'read>) {
+        self.remaining(planted).0.into_values().for_each(|island| {
+            let slots = planted.rooted(island.placing.island(), island.file, island.lowered);
+            slots.into_iter().fold(&mut *planted, |opaqued, slot| {
+                opaqued.opaque(slot);
+                opaqued
+            });
+        });
     }
 
-    fn remaining(self, lowered: &mut Lowered<'read>) -> Files<'read> {
+    fn remaining(self, planted: &mut Plot<'read>) -> Files<'read> {
         match self.root {
-            Some(root) => self.files.rooted(lowered, root, self.name),
+            Some(root) => self.files.rooted(planted, root),
             None => self.files,
         }
     }
@@ -134,19 +126,31 @@ pub(crate) struct Planting<'read> {
 }
 
 impl<'read> Planting<'read> {
-    pub(crate) fn new(read: &[ReadFile<'read>]) -> Planting<'read> {
-        let grouped =
-            read.iter().fold(BTreeMap::new(), |mut grouped: BTreeMap<&'read Path, Vec<ReadFile<'read>>>, file| {
-                grouped.entry(file.source.crate_file().as_ref()).or_default().push(*file);
+    pub(crate) fn merged(placings: &'read [Placing], bodies: Vec<Lowered>) -> Model {
+        let mut building = Building::default();
+        let unplanted = placings
+            .iter()
+            .zip(bodies)
+            .map(|(placing, lowered)| Unplanted { placing, file: building.file(placing.path.clone()), lowered })
+            .collect();
+        Planting::new(unplanted).planted().built(building)
+    }
+
+    fn new(unplanted: Vec<Unplanted<'read>>) -> Planting<'read> {
+        let grouped = unplanted.into_iter().fold(
+            BTreeMap::new(),
+            |mut grouped: BTreeMap<&'read Path, Vec<Unplanted<'read>>>, file| {
+                grouped.entry(file.placing.crate_file.as_path()).or_default().push(file);
                 grouped
-            });
+            },
+        );
         Planting { crates: grouped.into_iter().map(|(crate_file, files)| CrateFiles::new(crate_file, files)).collect() }
     }
 
-    pub(crate) fn lowered(self) -> Lowered<'read> {
-        self.crates.into_iter().fold(Lowered::default(), |mut lowered, krate| {
-            krate.planted(&mut lowered);
-            lowered
+    fn planted(self) -> Plot<'read> {
+        self.crates.into_iter().fold(Plot::default(), |mut planted, krate| {
+            krate.planted(&mut planted);
+            planted
         })
     }
 }

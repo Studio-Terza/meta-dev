@@ -6,8 +6,8 @@ use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
 use super::Lowering;
-use super::seat::Located;
-use super::subjects::{SubjectId, Subjects};
+use super::seat::{Built, Footing, Located};
+use super::subjects::SubjectId;
 
 #[derive(Debug)]
 pub(super) struct CallRow {
@@ -17,9 +17,10 @@ pub(super) struct CallRow {
     subject: Option<SubjectId>,
 }
 
-impl CallRow {
-    pub(super) fn built(self, subjects: &Subjects, building: Building) -> Building {
-        self.located.call(building, Call::new(self.callee, subjects.seat(self.region, self.subject)))
+impl Built for CallRow {
+    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+        let seat = footing.subjects().seat(self.region.joined(footing.outer()), self.subject);
+        self.located.call(footing, building, Call::new(self.callee, seat))
     }
 }
 
@@ -41,7 +42,7 @@ impl CallPath<'_> {
     }
 }
 
-impl Lowering<'_, '_> {
+impl Lowering<'_> {
     pub(super) fn method_called(&mut self, call: &ExprMethodCall) {
         self.called(Position::from(call.method.span()), Callee::Method(Name::from(&call.method)));
     }
@@ -62,6 +63,6 @@ impl Lowering<'_, '_> {
     fn called(&mut self, position: Position, callee: Callee) {
         let located = self.here.located(position);
         let row = CallRow { located, callee, region: self.context.region(), subject: self.context.subject() };
-        self.lowered.calls.push(row);
+        self.lowered.rows.calls.push(row);
     }
 }

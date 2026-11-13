@@ -83,7 +83,7 @@ impl Crew<'_> {
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
-        let mine = Lints::worked(readout.done(), sources);
+        let mine = Lints::worked(readout.done(), sources, Worker::MAIN);
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
         let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()));
@@ -185,18 +185,20 @@ impl Lints {
 
     fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
         let readout = sources.read(worker);
-        [Self::worked(readout.done(), sources), Worked::timed(readout.timing())].into_iter().collect()
+        [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 
-    fn worked(readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+    fn worked(readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
+        let lowered = sources.lowered(readout, worker);
         let mut jobs: Vec<Job> = Self::LINTS
             .into_iter()
             .enumerate()
             .map(|(index, entry)| entry.job(Slot::from(index)))
-            .chain([Job::MODEL, Job::SURVEY])
+            .chain([Job::SURVEY])
             .collect();
         jobs.sort_by_key(Job::rank);
-        sources.queue().claimed(&jobs).map(|job| job.done(readout, sources)).collect()
+        let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
+        lowered.into_iter().map(Worked::timed).chain(claimed).collect()
     }
 }
 
@@ -211,7 +213,6 @@ enum Work {
     Checked(Check),
     Modelled(Query),
     Described(Workspaced),
-    Model,
     Survey,
 }
 
@@ -233,9 +234,8 @@ impl Work {
     ) -> Vec<Report<'run>> {
         match self {
             Work::Checked(check) => check(readout),
-            Work::Modelled(query) => sources.model(readout).map(query).into_iter().collect(),
+            Work::Modelled(query) => sources.model().map(query).into_iter().collect(),
             Work::Described(described) => Self::described(described, readout, sources),
-            Work::Model => sources.model(readout).map_or_default(|_| Vec::new()),
             Work::Survey => Vec::new(),
         }
     }
@@ -243,7 +243,7 @@ impl Work {
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
             Work::Survey => Worked::surveying(&Survey::measured(readout.files())),
-            Work::Checked(_) | Work::Modelled(_) | Work::Described(_) | Work::Model => {
+            Work::Checked(_) | Work::Modelled(_) | Work::Described(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
         }
@@ -261,7 +261,6 @@ impl Work {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Rank {
-    Model,
     Survey,
     Early(Reverse<Slot>),
     Late(Slot),
@@ -275,12 +274,10 @@ struct Job {
 }
 
 impl Job {
-    const MODEL: Job = Job { slot: Slot::NONE, step: Step::Model, work: Work::Model };
     const SURVEY: Job = Job { slot: Slot::NONE, step: Step::Survey, work: Work::Survey };
 
     fn rank(&self) -> Rank {
         match self.work {
-            Work::Model => Rank::Model,
             Work::Survey => Rank::Survey,
             Work::Checked(_) => Rank::Early(Reverse(self.slot)),
             Work::Modelled(_) | Work::Described(_) => Rank::Late(self.slot),

@@ -1,47 +1,74 @@
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
-use code_model::{Building, Call, FileId, Found, Function, Holding, Implementation};
+use code_model::{Building, Call, FileId, Found, Function, Holding, Implementation, Region};
 use lint_layout::Position;
 
 use crate::namespace::{Resolving, ScopeId};
 
+use super::subjects::Subjects;
+
 pub(super) trait Built {
-    fn built(self, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building;
+    fn built(self, footing: Footing<'_>, building: Building) -> Building;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Footing<'grown> {
+    resolving: Resolving<'grown, 'grown, 'grown>,
+    file: FileId,
+    outer: Region,
+    subjects: &'grown Subjects,
+}
+
+impl<'grown> Footing<'grown> {
+    pub(super) fn new(
+        resolving: Resolving<'grown, 'grown, 'grown>,
+        file: FileId,
+        outer: Region,
+        subjects: &'grown Subjects,
+    ) -> Footing<'grown> {
+        Footing { resolving, file, outer, subjects }
+    }
+
+    pub(super) fn resolving(self) -> Resolving<'grown, 'grown, 'grown> {
+        self.resolving
+    }
+
+    pub(super) fn subjects(self) -> &'grown Subjects {
+        self.subjects
+    }
+
+    pub(super) fn outer(self) -> Region {
+        self.outer
+    }
 }
 
 #[derive(Clone, Debug)]
 pub(super) struct Seat {
-    file: FileId,
     scope: ScopeId,
-    children: Rc<Path>,
+    children: Arc<Path>,
 }
 
 impl Seat {
-    pub(super) fn new(file: FileId, scope: ScopeId, children: Rc<Path>) -> Seat {
-        Seat { file, scope, children }
-    }
-
-    pub(super) fn inner(&self, scope: ScopeId, children: Rc<Path>) -> Seat {
-        Seat { file: self.file, scope, children }
+    pub(super) fn new(scope: ScopeId, children: Arc<Path>) -> Seat {
+        Seat { scope, children }
     }
 
     pub(super) fn scope(&self) -> ScopeId {
         self.scope
     }
 
-    pub(super) fn children(&self) -> Rc<Path> {
-        Rc::clone(&self.children)
+    pub(super) fn children(&self) -> Arc<Path> {
+        Arc::clone(&self.children)
     }
 
     pub(super) fn located(&self, position: Position) -> Located {
-        Located { file: self.file, position, scope: self.scope }
+        Located { position, scope: self.scope }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Located {
-    file: FileId,
     position: Position,
     scope: ScopeId,
 }
@@ -55,23 +82,28 @@ impl Located {
         self.position
     }
 
-    pub(super) fn holding(self, mut building: Building, holding: Holding) -> Building {
-        building.holding(self.file, self.position.line(), holding);
+    pub(super) fn holding(self, footing: Footing<'_>, mut building: Building, holding: Holding) -> Building {
+        building.holding(footing.file, self.position.line(), holding);
         building
     }
 
-    pub(super) fn call(self, mut building: Building, call: Call) -> Building {
-        building.call(self.file, self.position.line(), call);
+    pub(super) fn call(self, footing: Footing<'_>, mut building: Building, call: Call) -> Building {
+        building.call(footing.file, self.position.line(), call);
         building
     }
 
-    pub(super) fn implementation(self, mut building: Building, implementation: Implementation) -> Building {
-        building.implementation(self.file, Found::new(self.position.line(), implementation));
+    pub(super) fn implementation(
+        self,
+        footing: Footing<'_>,
+        mut building: Building,
+        implementation: Implementation,
+    ) -> Building {
+        building.implementation(footing.file, Found::new(self.position.line(), implementation));
         building
     }
 
-    pub(super) fn function(self, mut building: Building, function: Function) -> Building {
-        building.function(self.file, self.position.line(), function);
+    pub(super) fn function(self, footing: Footing<'_>, mut building: Building, function: Function) -> Building {
+        building.function(footing.file, self.position.line(), function);
         building
     }
 }

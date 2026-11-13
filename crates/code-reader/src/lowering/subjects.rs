@@ -18,8 +18,8 @@ struct SubjectRow {
 pub(super) struct SubjectRows(Vec<SubjectRow>);
 
 impl SubjectRows {
-    pub(super) fn settled(self, resolving: &Resolving<'_, '_, '_>) -> Subjects {
-        Subjects(self.0.into_iter().map(|row| Written::typed(&row.ty, resolving, row.scope)).collect())
+    pub(super) fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Subjects {
+        Subjects(self.0.iter().map(|row| Written::typed(&row.ty, resolving, row.scope)).collect())
     }
 }
 
@@ -32,9 +32,9 @@ impl Subjects {
     }
 }
 
-impl Lowering<'_, '_> {
+impl Lowering<'_> {
     pub(super) fn subjected(&mut self, ty: TypeRef<Written>) -> SubjectId {
-        let rows = &mut self.lowered.subjects.0;
+        let rows = &mut self.lowered.rows.subjects.0;
         let subject = SubjectId(rows.len());
         rows.push(SubjectRow { scope: self.here.scope(), ty });
         subject
