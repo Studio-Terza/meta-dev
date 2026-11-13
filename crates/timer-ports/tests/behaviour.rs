@@ -21,6 +21,15 @@ laws::table!(
     ]
 );
 
+laws::table!(
+    two_elapsed_times_add_up_to_their_sum,
+    |(first, second): &(u64, u64)| Elapsed::from(Duration::from_millis(*first)) + Elapsed::from(Duration::from_millis(*second)),
+    [
+        (1_200, 300) => Elapsed::from(Duration::from_millis(1_500)),
+        (0, 40) => Elapsed::from(Duration::from_millis(40)),
+    ]
+);
+
 #[test]
 fn the_monotonic_clock_moves_forward_with_time() {
     let run = port_core::Run::root();
