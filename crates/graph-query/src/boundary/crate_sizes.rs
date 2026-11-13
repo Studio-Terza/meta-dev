@@ -20,8 +20,12 @@ impl<'files> CrateSizes<'files> {
     #[must_use]
     pub fn measured(files: &[SourceFile], workspaces: &'files [Metadata]) -> CrateSizes<'files> {
         let grouped = files.iter().fold(BTreeMap::new(), |mut grouped: BTreeMap<String, Vec<&SourceFile>>, file| {
+            let root = file.head().placement().package().root();
+            let named = root.package().map(ToString::to_string);
             grouped
-                .entry(file.head().placement().package().root().package().map_or_default(ToString::to_string))
+                .entry(
+                    named.unwrap_or_else(|| root.directory_name().unwrap_or_default().to_string_lossy().into_owned()),
+                )
                 .or_default()
                 .push(file);
             grouped

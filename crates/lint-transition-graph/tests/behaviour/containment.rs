@@ -587,7 +587,12 @@ fn a_cycle_closed_through_a_trait_impl_an_aliased_field_or_a_bound_is_reported()
         Clustered::at("crates/x/src/a.rs", "pub enum A<T: crate::b::B> {\n    Held(T),\n}\npub struct C;\n"),
         Clustered::at("crates/x/src/b.rs", "pub trait B {}\npub struct D(crate::a::C);\n"),
     ];
-    let reported: Vec<Vec<String>> = [implemented, aliased, supertrait, bounded]
+    let associated = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub trait A {\n    type Item: crate::b::B;\n}\npub struct C;\n"),
+        Clustered::at("crates/x/src/b.rs", "pub trait B {}\npub struct D(crate::a::C);\n"),
+    ];
+    let reported: Vec<Vec<String>> = [implemented, aliased, supertrait, bounded, associated]
         .iter()
         .map(|sources| {
             Clustered::lines(sources, |view| {
@@ -605,6 +610,7 @@ fn a_cycle_closed_through_a_trait_impl_an_aliased_field_or_a_bound_is_reported()
         [
             closing("x::a::A -> x::b::Tr, x::b::B -> x::a::A"),
             closing("x::a::A -> x::b::B, x::b::B -> x::a::C"),
+            closing("x::a::A -> x::b::B, x::b::D -> x::a::C"),
             closing("x::a::A -> x::b::B, x::b::D -> x::a::C"),
             closing("x::a::A -> x::b::B, x::b::D -> x::a::C"),
         ]
