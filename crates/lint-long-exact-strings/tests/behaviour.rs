@@ -36,11 +36,12 @@ const MESSAGE: &str =
 const ONE_LINE_TABLE: &str = "laws::table!(t, f, [\"a\\nb\" => 1]);\n";
 const OTHER_MACRO: &str = "fn t() {\n    println!(\"a\\nb {:?}\", 1);\n    let a = format!(\"{:?}\", 1);\n}\n";
 const ANOTHER_BODY: &str = "fn a() {\n    let w = \"a\\nb\";\n}\nfn t() {\n    assert_eq!(f(), w);\n}\n";
+const LATER_BODY: &str = "fn t() {\n    let w = \"a\\nb\";\n    assert_eq!(f(), w);\n}\nfn u() {\n    let w = 1;\n}\n";
 const TRAILING: &str = "fn t() {\n    assert_eq!(f(), format!(\"{}a\", 1));\n}\n";
 const LESS: &str = "fn t() {\n    assert!(f() < \"a\\nb\");\n}\n";
 const LOOPED: &str = "const A: &str = B;\nconst B: &str = A;\nfn t() {\n    let c = c;\n    assert_eq!(f(), A);\n    assert_eq!(f(), c);\n}\n";
 
-const CASES: [Case; 33] = [
+const CASES: [Case; 34] = [
     Case::new(
         Title::new("escaped line break"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(ESCAPED))],
@@ -155,6 +156,11 @@ const CASES: [Case; 33] = [
         Title::new("a local of another body"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(ANOTHER_BODY))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a later body binds the same name"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(LATER_BODY))],
+        Flagged::new(&["tests/a.rs:3"]),
     ),
     Case::new(
         Title::new("one letter after a placeholder"),
