@@ -25,10 +25,13 @@ pub struct CommandPaths;
 impl CommandPaths {
     const FINALS: [Word<'static>; 1] = words!["new"];
     const STARTER: [Word<'static>; 3] = words!["process", "Command", "new"];
+    const MENTIONED: [Word<'static>; 1] = words!["Command"];
 
     #[must_use]
     pub fn across(files: &[SourceFile], scope: Scope) -> Vec<Site<'_>> {
-        Paths::read(files, &Self::FINALS)
+        let mentioned = files.iter().find(|file| file.text().mentioning(&Self::MENTIONED).is_some());
+        mentioned
+            .map_or_default(|_| Paths::read(files, &Self::FINALS))
             .into_iter()
             .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
             .filter(|used| scope.admits(used.ground(), Spot::Open).is_some())
