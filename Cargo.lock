@@ -1747,13 +1747,14 @@ dependencies = [
 name = "lint-no-test-io"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "file-ports",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
+ "newtype",
 ]
 
 [[package]]

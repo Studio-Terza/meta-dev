@@ -154,7 +154,7 @@ impl Lints {
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
         <Filed<NoIgnoredTests> as Registered>::ENTRY,
-        <Filed<NoTestIo> as Registered>::ENTRY,
+        Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
         <Primed<FakesAtPorts> as Registered>::ENTRY,
         <Primed<PortBatching> as Registered>::ENTRY,
         Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _| {

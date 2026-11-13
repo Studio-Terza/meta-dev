@@ -1,24 +1,24 @@
 use std::fmt;
 
+use code_model::ItemPath;
 use lint_core::Fix;
-use lint_layout::UsePath;
 
 #[derive(Debug)]
-pub struct Finding<'path>(&'path UsePath);
+pub struct Finding(ItemPath);
 
-impl<'path> From<&'path UsePath> for Finding<'path> {
-    fn from(path: &'path UsePath) -> Finding<'path> {
+impl From<ItemPath> for Finding {
+    fn from(path: ItemPath) -> Finding {
         Finding(path)
     }
 }
 
-impl fmt::Display for Finding<'_> {
+impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "calls {} in test code", self.0)
     }
 }
 
-impl lint_core::Finding for Finding<'_> {
+impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
         Fix::new("use a fake of the port or a library API such as golden!")
     }

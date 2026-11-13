@@ -1,14 +1,15 @@
 use std::path::PathBuf;
 
+use code_reader::Reader;
 use file_ports::{Bytes, Memory};
-use lint_core::{Lint, SourceFile, SourceText};
-use lint_file::Filed;
+use lint_core::{ModelLint, SourceFile, SourceText};
 use lint_no_test_io::NoTestIo;
 use lint_placement::Placement;
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 
 const READ: &str = "fn f() {\n    std::fs::read_to_string(\"a\");\n}\n";
+const PARENT: &str = "fn f() {\n    std::fs::read_to_string(\"a\");\n}\nmod b;\n";
 const IMPORTED: &str = "use std::fs;\nfn f() {\n    fs::write(\"a\", \"b\");\n}\n";
 const TYPE: &str = "use std::fs::File;\nfn f() {\n    File::open(\"a\");\n}\n";
 const GLOB: &str = "use std::env::*;\nfn f() {\n    var(\"A\");\n}\n";
@@ -84,7 +85,10 @@ const CASES: [Case; 28] = [
     ),
     Case::new(
         Title::new("module of a test target"),
-        &[Source::new(Located::new("tests/behaviour/a.rs"), Text::new(READ))],
+        &[
+            Source::new(Located::new("tests/behaviour/main.rs"), Text::new("mod a;\n")),
+            Source::new(Located::new("tests/behaviour/a.rs"), Text::new(READ)),
+        ],
         Flagged::new(&["tests/behaviour/a.rs:2"]),
     ),
     Case::new(
@@ -142,10 +146,10 @@ const CASES: [Case; 28] = [
     Case::new(
         Title::new("test target named ports"),
         &[
-            Source::new(Located::new("tests/ports.rs"), Text::new(READ)),
+            Source::new(Located::new("tests/ports.rs"), Text::new(PARENT)),
             Source::new(Located::new("tests/ports/b.rs"), Text::new(READ)),
         ],
-        Flagged::new(&["tests/ports.rs:2", "tests/ports/b.rs:2"]),
+        Flagged::new(&["tests/ports/b.rs:2", "tests/ports.rs:2"]),
     ),
     Case::new(
         Title::new("test target whose name only contains ports"),
@@ -153,15 +157,16 @@ const CASES: [Case; 28] = [
             Source::new(Located::new("tests/reports.rs"), Text::new(READ)),
             Source::new(Located::new("tests/disk_ports.rs"), Text::new(READ)),
         ],
-        Flagged::new(&["tests/reports.rs:2", "tests/disk_ports.rs:2"]),
+        Flagged::new(&["tests/disk_ports.rs:2", "tests/reports.rs:2"]),
     ),
     Case::new(
         Title::new("module named ports"),
         &[
-            Source::new(Located::new("tests/behaviour/ports.rs"), Text::new(READ)),
+            Source::new(Located::new("tests/behaviour/main.rs"), Text::new("mod ports;\n")),
+            Source::new(Located::new("tests/behaviour/ports.rs"), Text::new(PARENT)),
             Source::new(Located::new("tests/behaviour/ports/b.rs"), Text::new(READ)),
         ],
-        Flagged::new(&["tests/behaviour/ports.rs:2", "tests/behaviour/ports/b.rs:2"]),
+        Flagged::new(&["tests/behaviour/ports/b.rs:2", "tests/behaviour/ports.rs:2"]),
     ),
     Case::new(
         Title::new("inline module named ports"),
@@ -177,7 +182,7 @@ const CASES: [Case; 28] = [
 
 #[test]
 fn effects_and_real_ports_in_test_code_are_flagged_outside_ports_crates() {
-    assert_eq!(Sources::mismatches::<Filed<NoTestIo>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<NoTestIo>>(&CASES), Lines::default());
 }
 
 #[test]
@@ -191,7 +196,7 @@ fn tests_of_a_crate_whose_name_ends_in_ports_check_its_real_fillers() {
             let path = PathBuf::from("/r/tests/a.rs");
             let placement = Placement::locate(&files, &path);
             SourceFile::parse_at(path.clone(), path, placement, SourceText::new(DISK.to_owned()))
-                .map_or(usize::MAX, |file| Filed::<NoTestIo>::report(&[file]).violations().len())
+                .map_or(usize::MAX, |file| NoTestIo::report(&Reader::read_files(&[file])).violations().len())
         })
         .collect();
     assert_eq!(flagged, [0, 1]);

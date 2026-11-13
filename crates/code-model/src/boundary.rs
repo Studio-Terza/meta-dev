@@ -2,6 +2,7 @@ use std::fmt;
 
 use lint_layout::Name;
 
+use crate::item_path::ItemPath;
 use crate::type_ref::TypeRef;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -55,5 +56,12 @@ impl CallOrder {
 impl fmt::Display for CallOrder {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "#{}", self.0)
+    }
+}
+
+impl fmt::Display for ItemPath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let segments: Vec<String> = AsRef::<[Name]>::as_ref(self).iter().map(ToString::to_string).collect();
+        formatter.write_str(&segments.join("::"))
     }
 }
