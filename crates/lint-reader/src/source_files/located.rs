@@ -4,9 +4,10 @@ use file_ports::{FileFailure, Files, Text};
 use lint_core::SourceText;
 use lint_layout::Failure;
 use lint_placement::{Packages, Placement};
-use lint_roots::Tree;
+use lint_roots::{Survey, Tree};
 use newtype::Wrapping;
 
+use super::modules::Child;
 use super::opened::Opened;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -74,6 +75,11 @@ impl<'tree> Node<'tree> {
     #[must_use]
     pub fn children(&self) -> &Path {
         &self.children
+    }
+
+    #[must_use]
+    pub fn child_of(&self, child: &Child, survey: &Survey) -> Node<'tree> {
+        child.clone().canonical(survey).visit(|file, children| self.child(file, children))
     }
 
     #[must_use]

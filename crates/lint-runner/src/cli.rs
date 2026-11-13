@@ -16,7 +16,7 @@ use std::thread;
 use cargo_ports::{Cargo, CargoFiller};
 use file_ports::{Cached, Files};
 use lint_layout::Failure;
-use lint_reader::{SourceFiles, Stage};
+use lint_reader::{SharedRead, SourceFiles, Stage};
 use port_core::Run;
 use timer_ports::{Timer, TimerFiller};
 
@@ -110,7 +110,9 @@ impl Cli {
         err: &mut impl Write,
     ) -> Verdict {
         match staged {
-            Ok(stage) => self.sourced(&Sources::new(wired, &stage, &OnceLock::new()), out, err),
+            Ok(stage) => {
+                self.sourced(&Sources::new(wired, &stage, &SharedRead::new(stage.done()), &OnceLock::new()), out, err)
+            }
             Err(failure) => Verdict::refused(&failure, err),
         }
     }

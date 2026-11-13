@@ -1010,3 +1010,20 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
         Ok(())
     })
 }
+
+#[test]
+fn a_tree_read_by_many_workers_reports_the_same_each_time() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "mod first;\nmod second;\n#[cfg(test)]\nmod tests;\n")?;
+    root.write("src/tests.rs", DIRTY)?;
+    ["first", "second"].iter().try_for_each(|name| {
+        root.write(&format!("src/{name}.rs"), "mod inner;\n#[cfg(test)]\nmod tests;\n")?;
+        root.write(&format!("src/{name}/tests.rs"), DIRTY)?;
+        root.write(&format!("src/{name}/inner.rs"), DIRTY).map(|_| ())
+    })?;
+    let first = root.reported().err;
+    let runs: Vec<String> = std::iter::repeat_with(|| root.reported().err).take(8).collect();
+    assert!(runs.iter().all(|run| *run == first), "{runs:?}");
+    assert!(first.contains("src/first/inner.rs"), "{first}");
+    Ok(())
+}
