@@ -1,6 +1,5 @@
 mod behaviour;
 mod coloured;
-mod fillers;
 mod structure;
 
 use equivalence::{Equivalence, Erased, Laws};
@@ -12,14 +11,13 @@ use crate::graph_lint::GraphLint;
 use crate::system::TypeSystem;
 use behaviour::Behaviour;
 use coloured::Coloured;
-use fillers::Fillers;
 use structure::{Structure, Tally};
 
 #[derive(Debug)]
 pub struct ParallelStructures;
 
 impl ParallelStructures {
-    const EQUIVALENCE: Equivalence =
+    pub(crate) const EQUIVALENCE: Equivalence =
         Equivalence::erasing(&[Erased::Names, Erased::Literals]).comparing(Laws::WhereDeclared);
 }
 
@@ -27,7 +25,7 @@ impl GraphLint for ParallelStructures {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         let attached = Attached::declared(system);
         let behaviour = Behaviour::read(system, &attached, Self::EQUIVALENCE);
-        let fillers = Fillers::read(system.files(), Self::EQUIVALENCE);
+        let fillers = system.extraction().fillers();
         let coloured = Coloured::refined(behaviour.refinement());
         let structures: Vec<Structure<'_, 'file>> = behaviour
             .refinement()

@@ -4,7 +4,7 @@ mod reserved_names;
 mod roles;
 
 use lint_core::{Headline, Parsed, Report, SourceFile, Violation, WorkspaceLint};
-use lint_file::{FileLint, PrimedLint, Reads};
+use lint_file::{FileLint, PrimedFacts, PrimedLint, Reads};
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
@@ -66,12 +66,7 @@ impl WorkspaceLint for KeyDependencyRoles {
     }
 }
 
-impl PrimedLint for EffectsInFillers {
-    const HEADLINE: Headline = Headline::new(
-        "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler and impl Release blocks",
-    );
-    const READS: Reads = Reads::Shipped;
-
+impl PrimedFacts for EffectsInFillers {
     type PrimerPart<'head> = PortedCrates<'head>;
     type Primer<'head> = PortedCrates<'head>;
     type Part<'head> = ();
@@ -82,6 +77,13 @@ impl PrimedLint for EffectsInFillers {
     }
 
     fn contributed<'head>(_: Parsed<'_, 'head>, _: &PortedCrates<'head>) {}
+}
+
+impl PrimedLint for EffectsInFillers {
+    const HEADLINE: Headline = Headline::new(
+        "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler and impl Release blocks",
+    );
+    const READS: Reads = Reads::Shipped;
 
     fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
