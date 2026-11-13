@@ -31,6 +31,7 @@ use crate::namespace::{
     Declared, DeclaredKind, Domain, Entries, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind, Seeds,
     StdNames, Top, UsePath, Visibility,
 };
+use crate::parallel::Parallel;
 use crate::planting::Files;
 use attributes::Attributes;
 use boundary::SelfType;
@@ -417,7 +418,7 @@ impl<'read> Plot<'read> {
         let with_exports =
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
         let places: Vec<Places> =
-            self.grown.iter().map(|grown| grown.rows.places.settled(&resolving.based(grown.base))).collect();
+            Parallel::default().mapped(&self.grown, |grown| grown.rows.places.settled(&resolving.based(grown.base)));
         let columns = self.grown.into_iter().zip(&places).fold(Columns::default(), |columns, (grown, seated)| {
             grown.rows.spread(Footing::new(resolving.based(grown.base), grown.file, grown.outer, seated), columns)
         });
