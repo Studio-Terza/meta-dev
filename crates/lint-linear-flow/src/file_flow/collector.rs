@@ -1,5 +1,3 @@
-mod boundary;
-
 use proc_macro2::{Ident, TokenStream, TokenTree};
 use syn::{
     Block, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, ImplItemFn, Item, ItemFn, Local,
@@ -15,11 +13,10 @@ use lint_sweep::Finds;
 use super::FileFlow;
 use crate::finding::{Finding, Rule};
 use crate::function_flow::{FunctionFlow, Opened};
-use boundary::Order;
 
 #[derive(Debug)]
 enum Frame<'file> {
-    Function { order: Order, opened: Opened<'file> },
+    Function(Opened<'file>),
     Item,
 }
 
@@ -43,47 +40,35 @@ impl Keyword {
 }
 
 #[derive(Debug)]
-struct Closed<'file> {
-    order: Order,
-    flow: FunctionFlow<'file>,
-}
-
-#[derive(Debug)]
 pub struct Collector<'file> {
     file: &'file SourceFile,
     rule: Option<Rule>,
-    next: Order,
     frames: Vec<Frame<'file>>,
-    closed: Vec<Closed<'file>>,
+    closed: Vec<FunctionFlow<'file>>,
 }
 
 impl<'file> Collector<'file> {
     pub fn collected(file: &'file SourceFile) -> Vec<FunctionFlow<'file>> {
-        let mut collector =
-            Collector { file, rule: None, next: Order::default(), frames: Vec::new(), closed: Vec::new() };
+        let mut collector = Collector { file, rule: None, frames: Vec::new(), closed: Vec::new() };
         Sweep::through_file(file, &mut collector);
         collector.functions()
     }
 
     pub fn ruled(file: &'file SourceFile, rule: Rule) -> Collector<'file> {
-        Collector { file, rule: Some(rule), next: Order::default(), frames: Vec::new(), closed: Vec::new() }
+        Collector { file, rule: Some(rule), frames: Vec::new(), closed: Vec::new() }
     }
 
     fn functions(self) -> Vec<FunctionFlow<'file>> {
-        let mut closed = self.closed;
-        closed.sort_by_key(|function| function.order);
-        closed.into_iter().map(|function| function.flow).collect()
+        self.closed
     }
 }
 
 impl<'file> Collector<'file> {
     fn opened(&mut self, signature: &Signature, body: Option<&Block>) -> Descend {
         let path = self.file.head().path();
-        let order = self.next;
         let opened = body
             .filter(|_| signature.constness.is_none())
-            .map(|block| Frame::Function { order, opened: Opened::new(path, signature.ident.span(), block) });
-        self.next = opened.as_ref().map_or(self.next, |_| self.next.next());
+            .map(|block| Frame::Function(Opened::new(path, signature.ident.span(), block)));
         self.frames.push(opened.unwrap_or(Frame::Item));
         Descend::Into
     }
@@ -99,16 +84,16 @@ impl<'file> Collector<'file> {
 }
 
 impl<'file> Frame<'file> {
-    fn closed(self) -> Option<Closed<'file>> {
+    fn closed(self) -> Option<FunctionFlow<'file>> {
         match self {
-            Frame::Function { order, opened } => Some(Closed { order, flow: opened.closed() }),
+            Frame::Function(opened) => Some(opened.closed()),
             Frame::Item => None,
         }
     }
 
     fn opened(&mut self) -> Option<&mut Opened<'file>> {
         match self {
-            Frame::Function { opened, .. } => Some(opened),
+            Frame::Function(opened) => Some(opened),
             Frame::Item => None,
         }
     }
