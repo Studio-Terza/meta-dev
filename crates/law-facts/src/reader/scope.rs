@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use syn::{Item, Stmt, Type};
 
 use crate::uses::{Import, Place, Uses};
@@ -5,7 +7,7 @@ use lint_layout::Name;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Scope {
-    uses: Uses,
+    uses: Rc<Uses>,
     self_type: Option<Name>,
 }
 
@@ -13,7 +15,8 @@ impl Scope {
     const SELF: &'static str = "Self";
 
     pub(crate) fn within<'item>(&self, items: impl Iterator<Item = &'item Item>) -> Scope {
-        self.clone().using(items.map(Self::item_uses).fold(Uses::default(), Uses::merged))
+        let added = items.map(Self::item_uses).fold(Uses::default(), Uses::merged);
+        added.declared().map_or_else(|| self.clone(), |found| self.using(found))
     }
 
     pub(crate) fn within_statements(&self, statements: &[Stmt]) -> Scope {
@@ -52,8 +55,8 @@ impl Scope {
         }
     }
 
-    fn using(self, uses: Uses) -> Scope {
-        Scope { uses: self.uses.merged(uses), ..self }
+    fn using(&self, uses: Uses) -> Scope {
+        Scope { uses: Rc::new(Uses::clone(&self.uses).merged(uses)), self_type: self.self_type.clone() }
     }
 
     fn statement_item(statement: &Stmt) -> Option<&Item> {
