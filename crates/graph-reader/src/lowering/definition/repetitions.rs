@@ -155,8 +155,12 @@ impl<'ast> Watch<'ast> for Repetitions {
 
     fn on_block(&mut self, block: &'ast Block) -> Descend {
         let at = Address::from(block);
-        let looping =
-            self.loops.last().filter(|pending| pending.at == at).and_then(|pending| pending.repeating.clone());
+        let looping = self
+            .loops
+            .iter()
+            .position(|pending| pending.at == at)
+            .map(|found| self.loops.swap_remove(found))
+            .and_then(|pending| pending.repeating);
         self.within = self.bodies.entered(at, looping, self.within.take());
         Descend::Into
     }
@@ -203,24 +207,12 @@ impl<'ast> Watch<'ast> for Repetitions {
         self.looped(&expr.body, Looping::For)
     }
 
-    fn off_expr_for_loop(&mut self, _: &'ast ExprForLoop) {
-        self.loops.pop();
-    }
-
     fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
         self.looped(&expr.body, Looping::While)
     }
 
-    fn off_expr_while(&mut self, _: &'ast ExprWhile) {
-        self.loops.pop();
-    }
-
     fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
         self.looped(&expr.body, Looping::Bare)
-    }
-
-    fn off_expr_loop(&mut self, _: &'ast ExprLoop) {
-        self.loops.pop();
     }
 
     fn on_expr_path(&mut self, path: &'ast ExprPath) -> Descend {
