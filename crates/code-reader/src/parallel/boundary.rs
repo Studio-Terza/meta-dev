@@ -47,8 +47,10 @@ impl<Item> Parked<Item> {
 pub(crate) struct Parallel(usize);
 
 impl Parallel {
+    const MOST_SHARES: usize = 4;
+
     pub(crate) fn available() -> Parallel {
-        Parallel(thread::available_parallelism().map_or(1, NonZeroUsize::get))
+        Parallel(thread::available_parallelism().map_or(1, NonZeroUsize::get).min(Self::MOST_SHARES))
     }
 
     pub(crate) fn mapped<Item: Sync, Mapped: Send>(
