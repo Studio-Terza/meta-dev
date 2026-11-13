@@ -156,7 +156,7 @@ impl Lints {
         <Filed<NoIgnoredTests> as Registered>::ENTRY,
         Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
         Entry::spelled::<FakesAtPorts>(Work::Modelled(<FakesAtPorts as ModelLint>::report)),
-        <Primed<PortBatching> as Registered>::ENTRY,
+        Entry::spelled::<PortBatching>(Work::Modelled(<PortBatching as ModelLint>::report)),
         Entry::spelled::<OwnedDependencies>(Work::Described(|heads, workspaces, _, model| {
             <OwnedDependencies as WorkspaceLint>::report(heads, workspaces, &(), model)
         })),
@@ -166,7 +166,7 @@ impl Lints {
         Entry::spelled::<EffectsInFillers>(Work::Modelled(<EffectsInFillers as ModelLint>::report)),
         <Filed<CountedCalls> as Registered>::ENTRY,
         <Filed<HiddenSqlx> as Registered>::ENTRY,
-        <Filed<StoreQueries> as Registered>::ENTRY,
+        Entry::spelled::<StoreQueries>(Work::Modelled(<StoreQueries as ModelLint>::report)),
         <Filed<LongExactStrings> as Registered>::ENTRY,
         <Judged<RepeatedShapes> as Registered>::ENTRY,
         Entry::spelled::<MandatoryLaws>(Work::Modelled(<MandatoryLaws as ModelLint>::report)),
@@ -341,7 +341,9 @@ impl Work {
 
     fn settled(self, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Survey => Worked::surveying(&Survey::settled(&Settled::from(sources.gathering()))),
+            Work::Survey => {
+                Worked::surveying(&Survey::settled(&Settled::from(sources.gathering()), sources.gathering().model()))
+            }
             Work::Extracted(_) | Work::Described(_) => {
                 self.grounded(slot, sources, &Settled::from(sources.gathering()))
             }

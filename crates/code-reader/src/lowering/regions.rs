@@ -62,6 +62,10 @@ impl Context {
         Context { region: self.region.inside(Self::within(block)), place: Some(place) }
     }
 
+    pub(super) fn transcribed(&self) -> Context {
+        Context { region: self.region.reached(Reach::Transcribed), place: self.place }
+    }
+
     pub(super) fn owned(&self, place: PlaceId) -> Context {
         Context { region: self.region, place: Some(place) }
     }

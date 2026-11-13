@@ -5,7 +5,6 @@ use std::fmt;
 use std::ops::Add;
 
 use lint_core::SourceFile;
-use lint_process_starters::{CommandPaths, Scope};
 use newtype::Counter;
 
 use count::Count;
@@ -41,13 +40,11 @@ impl CrateBudget {
     fn measured(file: &SourceFile, share: TestShare) -> CrateBudget {
         let lines = Count::new(file.text().as_ref().bytes().filter(|byte| char::from(*byte) == Self::LINE_END).count());
         let scan = TestScan::measured(file.syntax());
-        CrateBudget {
-            files: Count::new(1),
-            lines,
-            starts: Count::new(CommandPaths::across(std::slice::from_ref(file), Scope::Everywhere).len()),
-            test_lines: share.test_lines(scan.test_lines, lines),
-            ..scan
-        }
+        CrateBudget { files: Count::new(1), lines, test_lines: share.test_lines(scan.test_lines, lines), ..scan }
+    }
+
+    pub(crate) fn start() -> CrateBudget {
+        CrateBudget { starts: Count::new(1), ..CrateBudget::default() }
     }
 }
 

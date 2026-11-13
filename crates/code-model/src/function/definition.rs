@@ -1,9 +1,9 @@
 use std::fmt;
 
 use body_lifts::{Body, Branching};
-use lint_layout::{Casing, Name, Whole, Word};
+use lint_layout::{Casing, LineNumber, Name, Whole, Word};
 
-use crate::boundary::CallOrder;
+use crate::boundary::{CallOrder, ParamIndex};
 use crate::type_ref::{Named, TypeRef};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,12 +32,23 @@ pub struct Definition {
     shape: Body,
     branching: Branching,
     invocations: Vec<Invocation>,
+    repetitions: Vec<Repetition>,
 }
 
 impl Definition {
     #[must_use]
     pub fn new(shape: Body, branching: Branching, invocations: Vec<Invocation>) -> Definition {
-        Definition { shape, branching, invocations }
+        Definition { shape, branching, invocations, repetitions: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn repeated(self, repetitions: Vec<Repetition>) -> Definition {
+        Definition { repetitions, ..self }
+    }
+
+    #[must_use]
+    pub fn repetitions(&self) -> &[Repetition] {
+        &self.repetitions
     }
 
     #[must_use]
@@ -135,6 +146,98 @@ impl fmt::Display for Invocation {
             Invocation::Method { receiver, name } => write!(formatter, "{receiver}.{name}"),
             Invocation::Path { owner: Some(owner), name } => write!(formatter, "{owner}::{name}"),
             Invocation::Path { owner: None, name } => write!(formatter, "{name}"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Looping {
+    For,
+    While,
+    Bare,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Repeating {
+    Closure(Name),
+    Loop(Looping),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Reached {
+    Parameter { index: ParamIndex, name: Name },
+    Field(Name),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Repetition {
+    reach: Reached,
+    line: LineNumber,
+    repeating: Repeating,
+    method: Option<Name>,
+}
+
+impl Repetition {
+    #[must_use]
+    pub fn new(reach: Reached, line: LineNumber, repeating: Repeating, method: Option<Name>) -> Repetition {
+        Repetition { reach, line, repeating, method }
+    }
+
+    #[must_use]
+    pub fn reach(&self) -> &Reached {
+        &self.reach
+    }
+
+    #[must_use]
+    pub fn repeating(&self) -> &Repeating {
+        &self.repeating
+    }
+
+    #[must_use]
+    pub fn method(&self) -> Option<&Name> {
+        self.method.as_ref()
+    }
+}
+
+impl AsRef<LineNumber> for Repetition {
+    fn as_ref(&self) -> &LineNumber {
+        &self.line
+    }
+}
+
+impl Reached {
+    #[must_use]
+    pub fn index(&self) -> Option<ParamIndex> {
+        match self {
+            Reached::Parameter { index, .. } => Some(*index),
+            Reached::Field(_) => None,
+        }
+    }
+}
+
+impl AsRef<Name> for Reached {
+    fn as_ref(&self) -> &Name {
+        match self {
+            Reached::Parameter { name, .. } | Reached::Field(name) => name,
+        }
+    }
+}
+
+impl fmt::Display for Looping {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Looping::For => formatter.write_str("for"),
+            Looping::While => formatter.write_str("while"),
+            Looping::Bare => formatter.write_str("loop"),
+        }
+    }
+}
+
+impl fmt::Display for Repeating {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Repeating::Closure(adaptor) => write!(formatter, "the closure passed to {adaptor}, once per element"),
+            Repeating::Loop(looping) => write!(formatter, "a {looping} loop body, once per iteration"),
         }
     }
 }

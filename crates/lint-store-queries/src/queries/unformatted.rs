@@ -3,7 +3,7 @@ use std::fmt;
 use lint_core::{Finding, Fix};
 
 #[derive(Debug)]
-pub(super) struct Unformatted;
+pub(crate) struct Unformatted;
 
 impl fmt::Display for Unformatted {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

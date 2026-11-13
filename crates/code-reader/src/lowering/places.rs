@@ -1,9 +1,9 @@
 use syn::visit;
 use syn::visit::Visit;
-use syn::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait};
+use syn::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Stmt};
 
 use code_model::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
-use lint_core::Macros;
+use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
 use crate::namespace::{Domain, PortMacro, Resolving, ScopeId, UsePath};
@@ -140,6 +140,16 @@ impl Lowering<'_> {
         let place = self.owning(ident, domain, attributes);
         let context = self.context.owned(place);
         self.contextual(context, visited);
+    }
+
+    pub(super) fn transcribed(&mut self, statements: &[Stmt]) {
+        let transcribed = self.context.transcribed();
+        self.contextual(transcribed, |lowering| {
+            statements.iter().filter_map(Syntax::stmt_item).fold(lowering, |inner, declared| {
+                inner.visit_item(declared);
+                inner
+            });
+        });
     }
 
     pub(super) fn expanded(&mut self, item: &ItemMacro) {

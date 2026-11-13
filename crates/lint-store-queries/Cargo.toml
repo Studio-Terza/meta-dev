@@ -10,16 +10,15 @@ test = false
 doctest = false
 
 [dependencies]
+code-model = { path = "../code-model" }
 lint-core = { path = "../lint-core" }
-lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
-lint-paths = { path = "../lint-paths" }
-proc-macro2.workspace = true
 sqlformat.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
-lint-file = { path = "../lint-file" }
+code-reader = { path = "../code-reader" }
+lint-core = { path = "../lint-core" }
 lint-fixtures = { path = "../lint-fixtures" }
 laws = { path = "../laws" }
 

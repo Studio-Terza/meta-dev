@@ -6,6 +6,7 @@ use crate::type_ref::TypeRef;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reach {
     Shipped,
+    Transcribed,
     Test,
 }
 

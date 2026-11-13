@@ -65,3 +65,34 @@ impl fmt::Display for ItemPath {
         formatter.write_str(&segments.join("::"))
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ParamIndex(usize);
+
+impl From<usize> for ParamIndex {
+    fn from(index: usize) -> ParamIndex {
+        ParamIndex(index)
+    }
+}
+
+impl ParamIndex {
+    #[must_use]
+    pub fn entry<Item>(self, items: &[Item]) -> Option<&Item> {
+        items.get(self.0)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Quote(String);
+
+impl From<String> for Quote {
+    fn from(written: String) -> Quote {
+        Quote(written)
+    }
+}
+
+impl AsRef<str> for Quote {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}

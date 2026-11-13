@@ -1,34 +1,24 @@
-use proc_macro2::TokenTree;
 use sqlformat::{FormatOptions, QueryParams};
-use syn::{LitStr, Macro};
+use syn::LitStr;
 
-use lint_layout::{LineNumber, UsePath, Word, words};
+use code_model::Quote;
+
+use super::unformatted::Unformatted;
 
 #[derive(Debug)]
-pub(super) struct Sql(LitStr);
+pub(super) struct Sql<'model>(&'model Quote);
 
-impl Sql {
-    const PATHS: [[Word<'static>; 2]; 2] = [words!["store_ports", "query"], words!["store_ports_macros", "query"]];
-
-    pub(super) fn queried(invocation: &Macro, candidates: &[UsePath]) -> Option<Sql> {
-        candidates
-            .iter()
-            .find_map(|candidate| Self::PATHS.iter().find_map(|path| candidate.spells(path)))
-            .map(|_| invocation)
-            .and_then(|query| query.tokens.clone().into_iter().find_map(Self::literal))
-            .map(Sql)
+impl<'model> From<&'model Quote> for Sql<'model> {
+    fn from(quote: &'model Quote) -> Sql<'model> {
+        Sql(quote)
     }
+}
 
-    pub(super) fn unformatted(&self) -> Option<LineNumber> {
-        let written = self.0.token().to_string();
-        let formatted = sqlformat::format(&self.0.value(), &QueryParams::None, &FormatOptions::default());
-        (written != format!("r#\"\n{formatted}\n\"#")).then_some(LineNumber::from(self.0.span()))
-    }
-
-    fn literal(tree: TokenTree) -> Option<LitStr> {
-        match tree {
-            TokenTree::Literal(literal) => syn::parse2(TokenTree::Literal(literal).into()).ok(),
-            TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Punct(_) => None,
-        }
+impl Sql<'_> {
+    pub(super) fn unformatted(&self) -> Option<Unformatted> {
+        let written: &str = self.0.as_ref();
+        let literal = syn::parse_str::<LitStr>(written).ok()?;
+        let formatted = sqlformat::format(&literal.value(), &QueryParams::None, &FormatOptions::default());
+        (written != format!("r#\"\n{formatted}\n\"#")).then_some(Unformatted)
     }
 }

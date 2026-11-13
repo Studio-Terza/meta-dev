@@ -10,7 +10,6 @@ use lint_no_forwarders::NoForwarders;
 use lint_no_parameter_bags::NoParameterBags;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_paired_apis::PairedApis;
-use lint_port_batching::PortBatching;
 use lint_port_dependencies::RoleReading;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
@@ -167,7 +166,6 @@ contexts! {
     }
     primed: {
         state_graph: StateGraph,
-        port_batching: PortBatching,
         roles: RoleReading,
     }
     gleaned: {

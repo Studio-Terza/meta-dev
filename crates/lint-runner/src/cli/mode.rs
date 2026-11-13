@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::thread::Scope;
 
 use cargo_ports::Cargo;
+use code_model::Model;
 use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Answered, Query, QueryFailure};
@@ -123,18 +124,18 @@ impl Run<'_, '_> {
 
 #[derive(Debug)]
 pub(crate) struct Survey<'files> {
-    budget: &'files TestBudget,
+    budget: TestBudget,
     paired: Report<'files>,
     clones: Report<'files>,
 }
 
 impl<'files> Survey<'files> {
-    pub(crate) fn settled<'run: 'files, Held>(settled: &'files Held) -> Survey<'files>
+    pub(crate) fn settled<'run: 'files, Held>(settled: &'files Held, model: Option<&Model>) -> Survey<'files>
     where
         Held: Gleans<'run, TestBudget> + Gleans<'run, PairedApis> + Gleans<'run, Clones>,
     {
         Survey {
-            budget: Gleans::<TestBudget>::gleaned(settled),
+            budget: Gleans::<TestBudget>::gleaned(settled).started(model),
             paired: Report::from(Gleans::<PairedApis>::gleaned(settled)),
             clones: Report::from(Gleans::<Clones>::gleaned(settled)),
         }

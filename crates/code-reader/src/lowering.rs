@@ -5,6 +5,7 @@ mod definition;
 mod held;
 mod laws;
 mod places;
+mod quotes;
 mod regions;
 mod seat;
 mod signature;
@@ -27,7 +28,7 @@ use code_model::{
     Alias, Assigned, Building, Entry, FileId, Function, Held, Implementation, Model, Mutation, Named, Origin, Output,
     Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
-use lint_core::{SourceFile, Syntax};
+use lint_core::{Macros, SourceFile, Syntax};
 use lint_layout::{Name, Position, TestMarks, Whole, Word, words};
 
 use crate::namespace::{
@@ -43,6 +44,7 @@ use definition::{LoweredDefinition, Mutations};
 use held::{Holder, HoldingRow, Link};
 use laws::LawRow;
 use places::{PlaceId, PlaceRows, Places};
+use quotes::QuoteRow;
 use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
 pub use signature::ReceiverSyntax;
@@ -312,6 +314,7 @@ pub(crate) struct FileRows {
     calls: Vec<CallRow>,
     uses: Vec<UseRow>,
     laws: Vec<LawRow>,
+    quotes: Vec<QuoteRow>,
     places: PlaceRows,
 }
 
@@ -325,6 +328,7 @@ impl FileRows {
             calls: Footed::appended(columns.calls, footing, self.calls),
             uses: Footed::appended(columns.uses, footing, self.uses),
             laws: Footed::appended(columns.laws, footing, self.laws),
+            quotes: Footed::appended(columns.quotes, footing, self.quotes),
         }
     }
 }
@@ -413,6 +417,7 @@ struct Columns<'footing> {
     calls: Vec<Footed<'footing, CallRow>>,
     uses: Vec<Footed<'footing, UseRow>>,
     laws: Vec<Footed<'footing, LawRow>>,
+    quotes: Vec<Footed<'footing, QuoteRow>>,
 }
 
 impl Columns<'_> {
@@ -423,7 +428,8 @@ impl Columns<'_> {
         let with_holdings = Footed::every_built(self.holdings, with_functions);
         let with_calls = Footed::every_built(self.calls, with_holdings);
         let with_uses = Footed::every_built(self.uses, with_calls);
-        Footed::every_built(self.laws, with_uses)
+        let with_laws = Footed::every_built(self.laws, with_uses);
+        Footed::every_built(self.quotes, with_laws)
     }
 }
 
@@ -694,7 +700,10 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
         match &item.ident {
             Some(ident) => {
-                self.owned_by(ident, Domain::Macros, &item.attrs, |lowering| visit::visit_item_macro(lowering, item));
+                self.owned_by(ident, Domain::Macros, &item.attrs, |lowering| {
+                    visit::visit_item_macro(lowering, item);
+                    lowering.transcribed(&Macros::statements(&item.mac));
+                });
             }
             None => self.expanded(item),
         }

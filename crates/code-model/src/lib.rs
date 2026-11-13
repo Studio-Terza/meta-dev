@@ -17,6 +17,7 @@ mod model;
 mod path_use;
 mod placed;
 mod primitive;
+mod quoted;
 mod references;
 mod region;
 mod resolved;
@@ -26,16 +27,16 @@ mod traversal;
 mod type_ref;
 mod unresolved;
 
-pub use boundary::{CallOrder, FileId, ItemId};
+pub use boundary::{CallOrder, FileId, ItemId, ParamIndex, Quote};
 pub use call::{Call, Callee, MacroCall};
 pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
 pub use domain::Domain;
 pub use external::External;
 
 pub use found::Found;
+pub use function::definition::{CallOwner, Definition, Invocation, Looping, Reached, Receiving, Repeating, Repetition};
 pub use function::{
-    CallOwner, Definition, Entry, Function, Input, Invocation, MethodShape, Mutation, Output, Owner, Parameter,
-    Receiver, Receiving, Returned, Signature, Taken,
+    Entry, Function, Input, MethodShape, Mutation, Output, Owner, Parameter, Receiver, Returned, Signature, Taken,
 };
 pub use holding::{Held, Holding};
 pub use implementation::{Assigned, Implementation, Origin, Subject};
@@ -49,6 +50,7 @@ pub use model::{Building, Model};
 pub use path_use::{Mention, PathUse};
 pub use placed::{FileHome, Harness, Placed};
 pub use primitive::Primitive;
+pub use quoted::Quoted;
 pub use references::References;
 pub use region::{Ground, Reach, Region, Seat, Within, Zone};
 pub use resolved::Resolved;

@@ -1,4 +1,4 @@
-mod definition;
+pub(crate) mod definition;
 mod shape;
 
 use std::fmt;
@@ -8,7 +8,7 @@ use lint_layout::Name;
 use crate::region::{Region, Seat};
 use crate::type_ref::TypeRef;
 
-pub use definition::{CallOwner, Definition, Invocation, Receiving};
+use definition::Definition;
 pub use shape::{MethodShape, Returned, Taken};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

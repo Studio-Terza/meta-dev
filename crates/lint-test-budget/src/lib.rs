@@ -2,14 +2,17 @@ mod crate_budget;
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::iter;
 
+use code_model::Model;
 use lint_core::{Parsed, SourceFile};
 use lint_file::Gleaning;
 use lint_placement::CrateName;
+use lint_process_starters::{CommandPaths, Scope};
 
 use crate_budget::CrateBudget;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct TestBudget(BTreeMap<CrateName, CrateBudget>);
 
 impl TestBudget {
@@ -21,6 +24,15 @@ impl TestBudget {
             crates.insert(name, budget + CrateBudget::from(file));
             crates
         }))
+    }
+
+    #[must_use]
+    pub fn started(&self, model: Option<&Model>) -> TestBudget {
+        let starts = model.map_or_default(|found| CommandPaths::queried(found, Scope::Everywhere));
+        let parts = starts
+            .iter()
+            .map(|placed| TestBudget(BTreeMap::from([(CrateName::from(placed.krate()), CrateBudget::start())])));
+        iter::once(self.clone()).chain(parts).collect()
     }
 
     #[must_use]
