@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::io::Write;
+use std::mem::ManuallyDrop;
 use std::thread::Scope;
 
 use cargo_ports::Cargo;
@@ -208,7 +209,7 @@ impl Lints {
     }
 
     fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
-        let readout = sources.read(worker);
+        let readout = ManuallyDrop::new(sources.read(worker));
         [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 
