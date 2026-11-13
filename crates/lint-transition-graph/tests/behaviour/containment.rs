@@ -614,15 +614,25 @@ fn a_cycle_closed_through_a_trait_impl_an_aliased_field_or_a_bound_is_reported()
 
 #[test]
 fn a_type_declared_for_tests_uses_nothing() {
-    let tested = [
-        Clustered::at(
-            "crates/x/src/lib.rs",
-            "mod a;\npub struct A;\n#[cfg(test)]\nmod tests {\n    pub struct T(crate::A);\n}\n",
-        ),
-        Clustered::at("crates/x/src/a.rs", "pub struct B;\n"),
+    let in_tests = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A;\n"),
+        Clustered::at("crates/x/src/a.rs", "#[cfg(test)]\nmod tests {\n    pub struct T(crate::A);\n}\n"),
     ];
+    let shipped = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub mod tests {\n    pub struct T(crate::A);\n}\n"),
+    ];
+    let reported: Vec<Vec<String>> = [in_tests, shipped]
+        .iter()
+        .map(|sources| {
+            Clustered::lines(sources, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec())
+        })
+        .collect();
     assert_eq!(
-        Clustered::lines(&tested, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
-        Vec::<String>::new()
+        reported,
+        [
+            Vec::<String>::new(),
+            vec!["crates/x/src/lib.rs:2: x::A is used only within x::a; move it into the lowest cluster that holds all its users".to_owned()],
+        ]
     );
 }
