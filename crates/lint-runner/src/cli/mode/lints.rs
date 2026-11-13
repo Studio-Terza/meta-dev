@@ -403,11 +403,7 @@ where
 {
     const ENTRY: Entry = Entry {
         name: Named::spelled::<Lint>(),
-        work: Work::Judged(Judging {
-            headline: Lint::HEADLINE,
-            reads: Lint::READS,
-            judge: Self::judged_by,
-        }),
+        work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, judge: Self::judged_by }),
     };
 }
 
@@ -417,11 +413,7 @@ where
 {
     const ENTRY: Entry = Entry {
         name: Named::spelled::<Lint>(),
-        work: Work::Judged(Judging {
-            headline: Lint::HEADLINE,
-            reads: Lint::READS,
-            judge: Self::judged_by,
-        }),
+        work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, judge: Self::judged_by }),
     };
 }
 
