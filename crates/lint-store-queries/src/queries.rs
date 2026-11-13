@@ -4,9 +4,10 @@ mod unformatted;
 use syn::visit::{self, Visit};
 use syn::{ItemMod, Macro};
 
+use lint_core::Module;
 use lint_core::{MacroCalls, Site, SourceFile, Violation};
 use lint_layout::{Name, UsePath};
-use lint_paths::{Imports, Module};
+use lint_paths::Imports;
 
 use boundary::Sql;
 use unformatted::Unformatted;

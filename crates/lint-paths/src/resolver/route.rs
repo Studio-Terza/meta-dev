@@ -1,7 +1,7 @@
 use super::Resolver;
 use super::trail::{Globbing, Trail};
-use crate::module::Module;
 use crate::scopes::Scopes;
+use lint_core::Module;
 use lint_layout::{Name, UsePath};
 
 #[derive(Debug)]

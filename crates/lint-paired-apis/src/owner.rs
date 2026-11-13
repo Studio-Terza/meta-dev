@@ -1,5 +1,5 @@
+use lint_core::Module;
 use lint_layout::Name;
-use lint_paths::Module;
 use lint_placement::CrateFile;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]

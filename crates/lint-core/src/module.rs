@@ -1,4 +1,4 @@
-use lint_core::{FileHead, SourceFile};
+use crate::source_file::{FileHead, SourceFile};
 use lint_layout::Name;
 use lint_placement::CrateFile;
 
@@ -34,7 +34,8 @@ impl<'file> Module<'file> {
         self.path.pop();
     }
 
-    pub(crate) fn parent(&self) -> Option<Module<'file>> {
+    #[must_use]
+    pub fn parent(&self) -> Option<Module<'file>> {
         let outer = self.path.len().checked_sub(1)?;
         Some(Module { crate_file: self.crate_file, path: self.path.iter().take(outer).cloned().collect() })
     }

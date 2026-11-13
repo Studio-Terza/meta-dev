@@ -2,10 +2,11 @@ use std::collections::BTreeSet;
 
 use syn::{GenericParam, Generics, Type, TypeParamBound, WherePredicate};
 
+use lint_core::Module;
 use lint_core::Syntax;
 use lint_fakes_at_ports::{Kind, PortTraits};
 use lint_layout::Name;
-use lint_paths::{Imports, Module};
+use lint_paths::Imports;
 
 use crate::spelling::Spelling;
 

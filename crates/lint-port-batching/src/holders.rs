@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use syn::visit::{self, Visit};
 use syn::{ItemMod, ItemStruct};
 
+use lint_core::{Module, Nested};
 use lint_core::{Parsed, Walk};
 use lint_layout::Name;
-use lint_paths::{Module, Nested};
 use lint_placement::CrateName;
 
 use crate::judge::Judge;

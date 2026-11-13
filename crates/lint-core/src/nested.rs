@@ -1,6 +1,6 @@
 use syn::ItemMod;
 
-use lint_core::Walk;
+use crate::walk::Walk;
 use lint_layout::Name;
 
 use crate::module::Module;

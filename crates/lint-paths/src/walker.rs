@@ -5,11 +5,11 @@ use syn::{ExprPath, ItemImpl, ItemMod, Macro, Path, QSelf, Type};
 
 use crate::cover::Cover;
 use crate::ground::Ground;
-use crate::module::Module;
 use crate::resolver::Resolver;
 use crate::scopes::Scopes;
 use crate::uses::Use;
 use crate::wanted::Wanted;
+use lint_core::Module;
 use lint_core::{Gate, Site, SourceFile};
 use lint_layout::{LineNumber, Name, UsePath};
 use token_paths::TokenPaths;

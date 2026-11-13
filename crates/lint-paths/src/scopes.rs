@@ -3,7 +3,7 @@ mod scope;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
-use crate::module::Module;
+use lint_core::Module;
 use lint_layout::{Name, UsePath, Word};
 use lint_placement::CrateFile;
 use scope::Scope;

@@ -2,7 +2,7 @@ use std::iter;
 
 use super::Resolver;
 use super::trail::Trail;
-use crate::module::Module;
+use lint_core::Module;
 use lint_layout::{Name, UsePath};
 use lint_placement::CrateFile;
 

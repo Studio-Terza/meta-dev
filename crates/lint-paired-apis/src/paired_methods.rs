@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 use syn::visit::{self, Visit};
 use syn::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
 
+use lint_core::Module;
 use lint_core::{FileHead, Parsed, Site, Syntax, Walk};
 use lint_layout::{LineNumber, Name};
-use lint_paths::Module;
 
 use crate::declared::Declared;
 use crate::owner::Owner;

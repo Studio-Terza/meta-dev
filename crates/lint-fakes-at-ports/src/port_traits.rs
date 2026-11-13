@@ -3,9 +3,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use syn::visit::{self, Visit};
 use syn::{ItemMod, ItemTrait, Path as TraitPath, TraitItemFn};
 
+use lint_core::Module;
 use lint_core::{Gate, SourceFile, Syntax, Walk};
 use lint_layout::{Name, UsePath};
-use lint_paths::{Ground, Imports, Module};
+use lint_paths::{Ground, Imports};
 use lint_placement::CrateName;
 
 use crate::kind::Kind;
