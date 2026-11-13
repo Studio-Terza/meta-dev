@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use lint_layout::{LineNumber, Name};
+use lint_layout::LineNumber;
 
 use crate::boundary::{FileId, ItemId};
 use crate::call::Call;
@@ -11,8 +11,10 @@ use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::{Alias, Item};
+use crate::item_declaration::ItemDeclaration;
 use crate::item_path::ItemPath;
 use crate::path_use::PathUse;
+use crate::placed::FileHome;
 use crate::resolved::Resolved;
 
 use super::{Aliases, Declarations, FileModel, Filed, Model};
@@ -51,9 +53,9 @@ impl Building {
         alias.target().named().map(AsRef::as_ref)
     }
 
-    pub fn file(&mut self, path: PathBuf, krate: Name, root: PathBuf) -> FileId {
+    pub fn file(&mut self, path: PathBuf, home: FileHome) -> FileId {
         let file = FileId::next(&self.model.files);
-        self.model.files.push(FileModel::new(path, krate, root));
+        self.model.files.push(FileModel::new(path, home));
         file
     }
 
@@ -78,7 +80,7 @@ impl Building {
         self.model.calls.push(Filed::new(file, Found::new(line, call)));
     }
 
-    pub fn placed(&mut self, file: FileId, line: LineNumber, item: ItemId) {
+    pub fn placed(&mut self, file: FileId, line: LineNumber, item: ItemDeclaration) {
         self.model.placed.push(Filed::new(file, Found::new(line, item)));
     }
 

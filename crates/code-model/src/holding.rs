@@ -13,6 +13,7 @@ pub enum Held {
     StructParameter,
     Alias,
     Value,
+    Bound,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

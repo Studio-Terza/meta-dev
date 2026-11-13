@@ -528,7 +528,8 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
 
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
         let generics = self.generics.subjectless().extended(&item.generics);
-        let place = self.trait_owning(&item.ident);
+        self.trait_bounds(item, &generics);
+        let place = self.trait_owning(&item.ident, &item.attrs);
         let context = self.context.owned(place);
         self.contextual(context, |lowering| {
             lowering.enclosed(Enclosure::Trait, generics, |enclosed| visit::visit_item_trait(enclosed, item));
@@ -536,7 +537,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     }
 
     fn visit_item_fn(&mut self, item: &'ast ItemFn) {
-        let place = self.owning(&item.sig.ident, Domain::Values);
+        let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
         let tested = self.context.within_item(&item.attrs).owned(place);
         self.contextual(tested, |lowering| {
             let generics = lowering.function(&item.attrs, &item.sig);
@@ -574,7 +575,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
             parameters: generics.declarations(&item.generics),
             target,
         });
-        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_type(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_type(lowering, item));
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
@@ -583,19 +584,20 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
         self.struct_held(item, &scope, link);
-        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_struct(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_struct(lowering, item));
     }
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
+        self.parameters(&Holder::named(&item.ident, Held::Bound), &item.generics, &link);
         item.variants.iter().fold(&mut *self, |lowering, variant| {
             let holder = Holder::named(&variant.ident, Held::EnumField);
             lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
             lowering
         });
-        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_enum(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_enum(lowering, item));
     }
 
     fn visit_item_union(&mut self, item: &'ast ItemUnion) {
@@ -603,19 +605,19 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.fields_held(&Holder::named(&item.ident, Held::UnionField), &link, item.fields.named.iter(), &scope);
-        self.owned_by(&item.ident, Domain::Types, |lowering| visit::visit_item_union(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_union(lowering, item));
     }
 
     fn visit_item_const(&mut self, item: &'ast ItemConst) {
         let target = self.generics.lowered(&item.ty);
         self.hold(Holder::named(&item.ident, Held::Value), Link::declaring(&item.ident).valued(), target);
-        self.owned_by(&item.ident, Domain::Values, |lowering| visit::visit_item_const(lowering, item));
+        self.owned_by(&item.ident, Domain::Values, &item.attrs, |lowering| visit::visit_item_const(lowering, item));
     }
 
     fn visit_item_static(&mut self, item: &'ast ItemStatic) {
         let target = self.generics.lowered(&item.ty);
         self.hold(Holder::named(&item.ident, Held::Value), Link::declaring(&item.ident).valued(), target);
-        self.owned_by(&item.ident, Domain::Values, |lowering| visit::visit_item_static(lowering, item));
+        self.owned_by(&item.ident, Domain::Values, &item.attrs, |lowering| visit::visit_item_static(lowering, item));
     }
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
@@ -640,7 +642,9 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
 
     fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
         match &item.ident {
-            Some(ident) => self.owned_by(ident, Domain::Macros, |lowering| visit::visit_item_macro(lowering, item)),
+            Some(ident) => {
+                self.owned_by(ident, Domain::Macros, &item.attrs, |lowering| visit::visit_item_macro(lowering, item))
+            }
             None => self.expanded(item),
         }
     }

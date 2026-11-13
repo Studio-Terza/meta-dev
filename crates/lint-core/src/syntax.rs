@@ -3,8 +3,8 @@ use syn::punctuated::Punctuated;
 use syn::{
     AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, Field, Fields, FnArg, GenericArgument, GenericParam,
     Ident, ImplItem, ImplItemFn, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, Pat, PatIdent, PatType,
-    PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, Type, TypeParam, TypeParamBound,
-    TypePath,
+    PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, TraitItemType, Type, TypeParam,
+    TypeParamBound, TypePath,
 };
 
 #[derive(Debug)]
@@ -23,6 +23,14 @@ impl Syntax {
     pub fn trait_fn(member: &TraitItem) -> Option<&TraitItemFn> {
         match member {
             TraitItem::Fn(function) => Some(function),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn trait_type(member: &TraitItem) -> Option<&TraitItemType> {
+        match member {
+            TraitItem::Type(declared) => Some(declared),
             _ => None,
         }
     }

@@ -32,7 +32,7 @@ impl<'model> From<&'model Model> for Ports<'model> {
         model
             .items()
             .filter_map(|placed| {
-                let item = model.declared(*placed.entity()).filter(|found| found.kind() == ItemKind::Trait)?;
+                let item = model.declared(placed.entity().declared()).filter(|found| found.kind() == ItemKind::Trait)?;
                 item.marks().iter().find(|mark| marks.contains(*mark))?;
                 Some(Filler { krate: placed.krate(), name: AsRef::<Name>::as_ref(item).suffixed(Self::FILLER) })
             })

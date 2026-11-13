@@ -152,6 +152,10 @@ impl InScope {
         signature.inputs.iter().map(|input| LoweredInput::lowered(self, input)).collect()
     }
 
+    pub(super) fn bounded<'bound>(&self, bounds: impl Iterator<Item = &'bound TypeParamBound>) -> TypeRef<Written> {
+        Bounding { scope: self }.lowered(bounds)
+    }
+
     pub(super) fn constraints(&self, generics: &Generics) -> Vec<TypeRef<Written>> {
         let constraints = Constraints { scope: self };
         let parameters = generics.params.iter().flat_map(|parameter| constraints.of_parameter(parameter));

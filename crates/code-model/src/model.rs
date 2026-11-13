@@ -11,6 +11,7 @@ use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::Item;
+use crate::item_declaration::ItemDeclaration;
 use crate::item_path::ItemPath;
 use crate::path_use::PathUse;
 use crate::placed::Placed;
@@ -30,7 +31,7 @@ pub struct Model {
     calls: Vec<Filed<Call>>,
     uses: Vec<Filed<PathUse>>,
     interpolated: Vec<Filed<PathUse>>,
-    placed: Vec<Filed<ItemId>>,
+    placed: Vec<Filed<ItemDeclaration>>,
     declarations: Declarations,
     roots: CrateRoots,
 }
@@ -98,13 +99,13 @@ impl<'model> Iterator for Calls<'model> {
 #[derive(Debug)]
 pub struct PlacedItems<'model> {
     files: &'model [FileModel],
-    rows: std::slice::Iter<'model, Filed<ItemId>>,
+    rows: std::slice::Iter<'model, Filed<ItemDeclaration>>,
 }
 
 impl<'model> Iterator for PlacedItems<'model> {
-    type Item = Placed<'model, &'model ItemId>;
+    type Item = Placed<'model, &'model ItemDeclaration>;
 
-    fn next(&mut self) -> Option<Placed<'model, &'model ItemId>> {
+    fn next(&mut self) -> Option<Placed<'model, &'model ItemDeclaration>> {
         let files = self.files;
         self.rows.find_map(|filed| filed.placed(files))
     }

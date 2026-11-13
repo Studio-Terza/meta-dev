@@ -1,5 +1,5 @@
 use syn::spanned::Spanned;
-use syn::{Field, Generics, Ident, ItemStruct};
+use syn::{Field, Generics, Ident, ItemStruct, ItemTrait};
 
 use code_model::{Building, Held, Holding, ItemId};
 use lint_core::Syntax;
@@ -91,6 +91,20 @@ impl Lowering<'_> {
     pub(super) fn parameters(&mut self, holder: &Holder, generics: &Generics, link: &Link) {
         let scope = self.generics.extended(generics);
         scope.constraints(generics).into_iter().fold(self, |lowering, ty| {
+            lowering.hold(holder.clone(), link.clone(), ty);
+            lowering
+        });
+    }
+
+    pub(super) fn trait_bounds(&mut self, item: &ItemTrait, scope: &InScope) {
+        let holder = Holder::named(&item.ident, Held::Bound);
+        let link = Link::declaring(&item.ident);
+        let associated =
+            item.items.iter().filter_map(Syntax::trait_type).map(|declared| scope.bounded(declared.bounds.iter()));
+        let bounds: Vec<TypeRef<Written>> =
+            [scope.bounded(item.supertraits.iter())].into_iter().chain(associated).collect();
+        self.parameters(&holder, &item.generics, &link);
+        bounds.into_iter().fold(self, |lowering, ty| {
             lowering.hold(holder.clone(), link.clone(), ty);
             lowering
         });

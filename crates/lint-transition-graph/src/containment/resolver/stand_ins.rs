@@ -31,7 +31,7 @@ impl<'found> StandIns<'found> {
         model
             .items()
             .filter_map(|placed| {
-                let item = *placed.entity();
+                let item = placed.entity().declared();
                 let declared = model.declared(item).filter(|found| Self::STANDING.contains(&found.kind()))?;
                 let targets = references.targets().get(&item).into_iter().flatten();
                 let used = targets.filter_map(|target| model.declared(*target)).map(AsRef::<Name>::as_ref).collect();

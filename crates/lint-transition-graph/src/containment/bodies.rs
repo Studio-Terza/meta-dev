@@ -24,13 +24,13 @@ impl<'found> Bodies<'found> {
         let members = model
             .items()
             .filter_map(|placed| {
-                let item = *placed.entity();
+                let item = placed.entity().declared();
                 let name: &Name = model.declared(item)?.as_ref();
                 let member = declared.get(&placed.site())?.iter().find(|member| member.name() == name)?;
                 Some((item, *member))
             })
             .collect();
-        let crates = model.items().map(|placed| (*placed.entity(), placed.krate())).collect();
+        let crates = model.items().map(|placed| (placed.entity().declared(), placed.krate())).collect();
         Bodies { model, members, crates }
     }
 
