@@ -1,4 +1,4 @@
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{Ident, TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{Block, ImplItemFn, ItemFn, Macro, Signature, TraitItemFn};
 
@@ -21,17 +21,17 @@ impl<'file> Collector<'file> {
     }
 
     fn declaring(invocation: &Macro) -> Option<&Macro> {
-        Self::declares(invocation.tokens.clone()).map(|()| invocation)
+        Self::function_keyword(invocation.tokens.clone()).map(|_| invocation)
     }
 
-    fn declares(tokens: TokenStream) -> Option<()> {
-        tokens.into_iter().find_map(Self::declared_in)
+    fn function_keyword(tokens: TokenStream) -> Option<Ident> {
+        tokens.into_iter().find_map(Self::keyword_in)
     }
 
-    fn declared_in(tree: TokenTree) -> Option<()> {
+    fn keyword_in(tree: TokenTree) -> Option<Ident> {
         match tree {
-            TokenTree::Group(group) => Self::declares(group.stream()),
-            TokenTree::Ident(ident) => Some(()).filter(|()| ident == Self::FUNCTION),
+            TokenTree::Group(group) => Self::function_keyword(group.stream()),
+            TokenTree::Ident(ident) => Some(ident).filter(|found| *found == Self::FUNCTION),
             TokenTree::Punct(_) | TokenTree::Literal(_) => None,
         }
     }
