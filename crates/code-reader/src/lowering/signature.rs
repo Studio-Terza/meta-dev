@@ -1,14 +1,16 @@
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics,
-    ParenthesizedGenericArguments, PathArguments, QSelf, ReturnType, Signature, Type, TypeParam, TypeParamBound,
-    TypePath, WherePredicate,
+    AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics, Ident,
+    ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, Type, TypeParam,
+    TypeParamBound, TypePath, WherePredicate,
 };
 
 use code_model::{
-    AliasParameter, Arrayed, Callable, Input, Named, Projection, Receiver, Resolved, Sited, Spelling, TypeRef,
+    AliasParameter, Arrayed, Callable, Input, Named, Parameter, Projection, Receiver, Resolved, Sited, Spelling,
+    TypeRef,
 };
+use lint_core::Syntax;
 use lint_layout::{Name, Position, Whole, Word};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
@@ -334,13 +336,17 @@ struct Projecting<'scope> {
 impl Projecting<'_> {
     fn held(self, held: TypeRef<Written>, path: &syn::Path) -> TypeRef<Written> {
         match path.segments.get(1) {
-            Some(_) => TypeRef::Projected(Projection::new(held, self.carried(path))),
+            Some(_) => TypeRef::Projected(Projection::new(held, self.carried(path), Self::associated(path))),
             None => held,
         }
     }
 
     fn qualified(self, qself: &QSelf, path: &syn::Path) -> TypeRef<Written> {
-        TypeRef::Projected(Projection::new(self.scope.lowered(&qself.ty), self.carried(path)))
+        TypeRef::Projected(Projection::new(self.scope.lowered(&qself.ty), self.carried(path), Self::associated(path)))
+    }
+
+    fn associated(path: &syn::Path) -> Option<Name> {
+        path.segments.last().map(|last| Name::from(&last.ident))
     }
 
     fn carried(self, path: &syn::Path) -> Vec<TypeRef<Written>> {
@@ -416,5 +422,59 @@ impl Associated<'_> {
             GenericArgument::Const(expression) => Measured::types(self.scope, expression),
             _ => Vec::new(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct LoweredParameter {
+    name: Name,
+    bounds: Vec<TypeRef<Written>>,
+}
+
+impl LoweredParameter {
+    pub(super) fn declared(scope: &InScope, generics: &Generics) -> Vec<LoweredParameter> {
+        let predicates: Vec<&PredicateType> = generics
+            .where_clause
+            .iter()
+            .flat_map(|clause| clause.predicates.iter())
+            .filter_map(Requirement::typed)
+            .collect();
+        generics
+            .type_params()
+            .map(|declared| {
+                let required = predicates
+                    .iter()
+                    .filter_map(|typed| Requirement::bounding(typed, &declared.ident))
+                    .flat_map(|typed| typed.bounds.iter());
+                let bounding = Bounding { scope };
+                LoweredParameter {
+                    name: Name::from(&declared.ident),
+                    bounds: declared.bounds.iter().chain(required).filter_map(|bound| bounding.bound(bound)).collect(),
+                }
+            })
+            .collect()
+    }
+
+    pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Parameter {
+        Parameter::new(self.name, self.bounds.iter().map(|ty| Written::typed(ty, resolving, scope)).collect())
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Requirement;
+
+impl Requirement {
+    fn typed(predicate: &WherePredicate) -> Option<&PredicateType> {
+        match predicate {
+            WherePredicate::Type(typed) => Some(typed),
+            _ => None,
+        }
+    }
+
+    fn bounding<'predicate>(typed: &'predicate PredicateType, name: &Ident) -> Option<&'predicate PredicateType> {
+        Syntax::type_path(&typed.bounded_ty)
+            .and_then(|path| path.path.get_ident())
+            .filter(|ident| *ident == name)
+            .map(|_| typed)
     }
 }

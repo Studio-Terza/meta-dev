@@ -22,7 +22,7 @@ pub(super) struct Summary<'name> {
 
 impl<'name> Summary<'name> {
     pub(super) fn counted(name: &'name CrateName, sites: &[EffectSite<'_>]) -> Summary<'name> {
-        let outside = sites.iter().filter(|site| site.ground() == Ground::Open).fold(
+        let outside = sites.iter().filter(|site| site.ground() != Ground::Ports).fold(
             BTreeMap::new(),
             |mut counts: BTreeMap<Effect, Count>, site| {
                 let counted = counts.entry(site.effect()).or_default();

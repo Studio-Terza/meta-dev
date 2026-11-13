@@ -11,10 +11,10 @@ pub enum Scope {
 }
 
 impl Scope {
-    fn admits<Grounded: PartialEq + Copy>(self, ground: Grounded, open: Grounded) -> Option<Grounded> {
+    fn admits<Grounded: PartialEq + Copy>(self, ground: Grounded, ports: Grounded) -> Option<Grounded> {
         match self {
             Scope::Everywhere => Some(ground),
-            Scope::OutsidePorts => Some(ground).filter(|candidate| *candidate == open),
+            Scope::OutsidePorts => Some(ground).filter(|candidate| *candidate != ports),
         }
     }
 }
@@ -34,7 +34,7 @@ impl CommandPaths {
             .map_or_default(|_| Paths::read(files, &Self::FINALS))
             .into_iter()
             .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
-            .filter(|used| scope.admits(used.ground(), Spot::Open).is_some())
+            .filter(|used| scope.admits(used.ground(), Spot::Ports).is_some())
             .map(|used| used.place())
             .collect()
     }
@@ -44,7 +44,7 @@ impl CommandPaths {
         model
             .uses()
             .filter(|placed| placed.entity().spelling(PathTail::new(&Self::STARTER)).is_some())
-            .filter(|placed| scope.admits(AsRef::<Region>::as_ref(placed.entity()).ground(), Ground::Open).is_some())
+            .filter(|placed| scope.admits(AsRef::<Region>::as_ref(placed.entity()).ground(), Ground::Ports).is_some())
             .map(Placed::site)
             .collect()
     }

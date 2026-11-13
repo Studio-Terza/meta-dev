@@ -1,3 +1,4 @@
+mod definition;
 mod shape;
 
 use std::fmt;
@@ -7,6 +8,7 @@ use lint_layout::Name;
 use crate::region::{Region, Seat};
 use crate::type_ref::TypeRef;
 
+pub use definition::{Definition, Invocation, Receiving};
 pub use shape::{MethodShape, Returned, Taken};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,23 +84,77 @@ impl Input {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Mutation {
+    Absent,
+    ThroughSelf,
+    ThroughParameter,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Parameter {
+    name: Name,
+    bounds: Vec<TypeRef>,
+}
+
+impl Parameter {
+    #[must_use]
+    pub fn new(name: Name, bounds: Vec<TypeRef>) -> Parameter {
+        Parameter { name, bounds }
+    }
+
+    #[must_use]
+    pub fn bounds(&self) -> &[TypeRef] {
+        &self.bounds
+    }
+}
+
+impl AsRef<Name> for Parameter {
+    fn as_ref(&self) -> &Name {
+        &self.name
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Signature {
     inputs: Vec<Input>,
     output: Output,
     constraints: Vec<TypeRef>,
+    parameters: Vec<Parameter>,
+    mutation: Mutation,
 }
 
 impl From<Output> for Signature {
     fn from(output: Output) -> Signature {
-        Signature { inputs: Vec::new(), output, constraints: Vec::new() }
+        Signature {
+            inputs: Vec::new(),
+            output,
+            constraints: Vec::new(),
+            parameters: Vec::new(),
+            mutation: Mutation::Absent,
+        }
     }
 }
 
 impl Signature {
     #[must_use]
     pub fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Signature {
-        Signature { inputs, output, constraints }
+        Signature { inputs, output, constraints, parameters: Vec::new(), mutation: Mutation::Absent }
+    }
+
+    #[must_use]
+    pub fn generic(self, parameters: Vec<Parameter>, mutation: Mutation) -> Signature {
+        Signature { parameters, mutation, ..self }
+    }
+
+    #[must_use]
+    pub fn parameters(&self) -> &[Parameter] {
+        &self.parameters
+    }
+
+    #[must_use]
+    pub fn mutation(&self) -> Mutation {
+        self.mutation
     }
 
     #[must_use]
@@ -123,17 +179,28 @@ pub struct Function {
     entry: Entry,
     signature: Signature,
     seat: Seat,
+    definition: Option<Definition>,
 }
 
 impl Function {
     #[must_use]
     pub fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Function {
-        Function { name, owner, entry, signature, seat: Seat::new(Region::SHIPPED, None) }
+        Function { name, owner, entry, signature, seat: Seat::new(Region::SHIPPED, None), definition: None }
     }
 
     #[must_use]
     pub fn seated(self, seat: Seat) -> Function {
-        Function { name: self.name, owner: self.owner, entry: self.entry, signature: self.signature, seat }
+        Function { seat, ..self }
+    }
+
+    #[must_use]
+    pub fn defined(self, definition: Option<Definition>) -> Function {
+        Function { definition, ..self }
+    }
+
+    #[must_use]
+    pub fn definition(&self) -> Option<&Definition> {
+        self.definition.as_ref()
     }
 
     #[must_use]

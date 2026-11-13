@@ -853,9 +853,10 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     SELF_PROJECTED => [TypeRef::Projected(Projection::new(
         Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()),
         Vec::new(),
+        Some(Name::from("Out")),
     ))],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
-    PROJECTED => [TypeRef::Projected(Projection::new(Expect::param("Self"), Vec::new()))],
+    PROJECTED => [TypeRef::Projected(Projection::new(Expect::param("Self"), Vec::new(), Some(Name::from("Out"))))],
 ]);
 
 const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";

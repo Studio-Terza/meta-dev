@@ -25,16 +25,19 @@ mod traversal;
 mod type_ref;
 mod unresolved;
 
-pub use boundary::{FileId, ItemId};
+pub use boundary::{CallOrder, FileId, ItemId};
 pub use call::{Call, Callee, MacroCall};
 pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
 pub use domain::Domain;
 pub use external::External;
 
 pub use found::Found;
-pub use function::{Entry, Function, Input, MethodShape, Output, Owner, Receiver, Returned, Signature, Taken};
+pub use function::{
+    Definition, Entry, Function, Input, Invocation, MethodShape, Mutation, Output, Owner, Parameter, Receiver,
+    Receiving, Returned, Signature, Taken,
+};
 pub use holding::{Held, Holding};
-pub use implementation::{Implementation, Origin, Subject};
+pub use implementation::{Assigned, Implementation, Origin, Subject};
 pub use item::{Alias, AliasParameter, Item, ItemKind};
 pub use item_declaration::ItemDeclaration;
 pub use item_graph::ItemGraph;
@@ -50,5 +53,5 @@ pub use resolved::Resolved;
 pub use site::Site;
 pub use sited::{Sited, Spelling};
 pub use traversal::Traversal;
-pub use type_ref::{Arrayed, Callable, Named, Projection, TypeRef, TypeUses};
+pub use type_ref::{Arrayed, Callable, Named, Outline, Projection, TypeRef, TypeUses};
 pub use unresolved::Unresolved;

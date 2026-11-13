@@ -5,7 +5,7 @@ use lint_layout::{Name, Whole, Word, words};
 use crate::region::Seat;
 use crate::resolved::Resolved;
 use crate::sited::Sited;
-use crate::type_ref::{Named, Outline, TypeRef};
+use crate::type_ref::{Named, Outline, Projection, TypeRef};
 
 use super::{Function, Input, Receiver};
 
@@ -113,12 +113,20 @@ impl Outline for Selfhood<'_> {
         parts.first().map_or(Returned::Nothing, |_| Returned::Value)
     }
 
-    fn sequence(self) -> Returned {
+    fn sequence(self, _element: &TypeRef) -> Returned {
         Returned::Many
     }
 
     fn bounded(self, bounds: &[TypeRef]) -> Returned {
         bounds.iter().filter_map(TypeRef::named).find_map(Self::std_named).unwrap_or(Returned::Value)
+    }
+
+    fn projected(self, _projection: &Projection<Sited>) -> Returned {
+        Returned::Value
+    }
+
+    fn callable(self) -> Returned {
+        Returned::Value
     }
 
     fn other(self) -> Returned {

@@ -47,7 +47,7 @@ impl<'file> CrateEffects<'file> {
     pub(crate) fn outside_ports(&self) -> Vec<Violation<'file>> {
         self.0
             .iter()
-            .filter(|site| site.ground() == Ground::Open)
+            .filter(|site| site.ground() != Ground::Ports)
             .map(|site| site.violation(Confinement::Ports))
             .collect()
     }

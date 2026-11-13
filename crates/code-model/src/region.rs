@@ -24,6 +24,7 @@ pub enum Within {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ground {
     Open,
+    Store,
     Ports,
 }
 

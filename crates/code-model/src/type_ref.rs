@@ -11,16 +11,20 @@ pub trait TypeUses {
     fn named(&mut self, named: &Named<Sited>);
 }
 
-pub(crate) trait Outline {
+pub trait Outline {
     type Kind;
 
     fn named(self, named: &Named<Sited>) -> Self::Kind;
 
     fn grouped(self, parts: &[TypeRef]) -> Self::Kind;
 
-    fn sequence(self) -> Self::Kind;
+    fn sequence(self, element: &TypeRef) -> Self::Kind;
 
     fn bounded(self, bounds: &[TypeRef]) -> Self::Kind;
+
+    fn projected(self, projection: &Projection<Sited>) -> Self::Kind;
+
+    fn callable(self) -> Self::Kind;
 
     fn other(self) -> Self::Kind;
 }
@@ -65,6 +69,7 @@ pub struct Arrayed<Bound> {
 pub struct Projection<Bound> {
     subject: Box<TypeRef<Bound>>,
     arguments: Vec<TypeRef<Bound>>,
+    associated: Option<Name>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -156,8 +161,13 @@ impl<Bound> Arrayed<Bound> {
 
 impl<Bound> Projection<Bound> {
     #[must_use]
-    pub fn new(subject: TypeRef<Bound>, arguments: Vec<TypeRef<Bound>>) -> Projection<Bound> {
-        Projection { subject: Box::new(subject), arguments }
+    pub fn new(subject: TypeRef<Bound>, arguments: Vec<TypeRef<Bound>>, associated: Option<Name>) -> Projection<Bound> {
+        Projection { subject: Box::new(subject), arguments, associated }
+    }
+
+    #[must_use]
+    pub fn associated(&self) -> Option<&Name> {
+        self.associated.as_ref()
     }
 
     fn parts(&self) -> Parts<'_, Bound> {
@@ -168,6 +178,7 @@ impl<Bound> Projection<Bound> {
         Ok(Projection {
             subject: Box::new(rule.child(&self.subject)?),
             arguments: TypeRef::each_rebuilt(&self.arguments, rule)?,
+            associated: self.associated.clone(),
         })
     }
 }
@@ -298,14 +309,17 @@ impl TypeRef {
         }
     }
 
-    pub(crate) fn outlined<Shape: Outline>(&self, outline: Shape) -> Shape::Kind {
+    pub fn outlined<Shape: Outline>(&self, outline: Shape) -> Shape::Kind {
         match self {
-            TypeRef::Reference(inner) => inner.outlined(outline),
+            TypeRef::Reference(inner) | TypeRef::Pointer(inner) => inner.outlined(outline),
             TypeRef::Named(named) => outline.named(named),
             TypeRef::Tuple(parts) => outline.grouped(parts),
-            TypeRef::Slice(_) | TypeRef::Array(_) => outline.sequence(),
+            TypeRef::Slice(element) => outline.sequence(element),
+            TypeRef::Array(arrayed) => outline.sequence(&arrayed.element),
             TypeRef::Bounded(bounds) => outline.bounded(bounds),
-            TypeRef::Pointer(_) | TypeRef::Projected(_) | TypeRef::Function(_) | TypeRef::Opaque => outline.other(),
+            TypeRef::Projected(projection) => outline.projected(projection),
+            TypeRef::Function(_) => outline.callable(),
+            TypeRef::Opaque => outline.other(),
         }
     }
 }

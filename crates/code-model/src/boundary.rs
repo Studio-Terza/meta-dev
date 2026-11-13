@@ -34,3 +34,18 @@ impl TypeRef {
         Name::from(self.innermost().to_string().as_str())
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CallOrder(usize);
+
+impl CallOrder {
+    #[must_use]
+    pub fn of<Row>(earlier: &[Row]) -> Option<CallOrder> {
+        earlier.len().checked_sub(1).map(CallOrder)
+    }
+
+    #[must_use]
+    pub fn typed_in<'name>(self, earlier: &[Option<&'name Name>]) -> Option<&'name Name> {
+        earlier.get(self.0).copied().flatten()
+    }
+}
