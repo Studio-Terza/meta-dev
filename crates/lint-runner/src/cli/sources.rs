@@ -1,6 +1,6 @@
 mod gathering;
 
-pub(crate) use gathering::Gathering;
+pub(crate) use gathering::{Claimed, Gathering};
 
 use std::sync::OnceLock;
 
@@ -87,16 +87,17 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         })
     }
 
-    pub(crate) fn gathered(&self, readout: &Readout, worker: Worker) -> Lowering {
-        let lowering = Stopwatch::started(self.wired.timer);
-        let merging = self.gathering.gathered(readout);
-        let lowered = lowering.stopped(Step::Lower(worker));
-        let merged = merging.map(|complete| {
-            let stopwatch = Stopwatch::started(self.wired.timer);
+    pub(crate) fn gathered<'read>(&self, readout: &'read Readout, worker: Worker) -> Lowering<'read> {
+        let stopwatch = Stopwatch::started(self.wired.timer);
+        let share = self.gathering.gathered(readout);
+        let lowered = stopwatch.stopped(Step::Lower(worker));
+        let claimed = share.claimed().to_vec();
+        let merged = share.into_merging().map(|complete| {
+            let merging = Stopwatch::started(self.wired.timer);
             self.gathering.settled(complete, |facts| self.merged(facts));
-            stopwatch.stopped(Step::Model)
+            merging.stopped(Step::Model)
         });
-        Lowering { timings: [lowered].into_iter().chain(merged).collect() }
+        Lowering { timings: [lowered].into_iter().chain(merged).collect(), claimed }
     }
 
     fn merged(&self, facts: Vec<FileFacts>) -> Option<Model> {
@@ -110,12 +111,17 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Lowering {
+pub(crate) struct Lowering<'read> {
     timings: Vec<Timing>,
+    claimed: Vec<Claimed<'read>>,
 }
 
-impl Lowering {
+impl<'read> Lowering<'read> {
     pub(crate) fn timings(&self) -> &[Timing] {
         &self.timings
+    }
+
+    pub(crate) fn claimed(&self) -> &[Claimed<'read>] {
+        &self.claimed
     }
 }

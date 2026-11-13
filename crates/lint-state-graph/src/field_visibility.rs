@@ -9,20 +9,20 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_file::FileLint;
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
+#[derive(Debug)]
 pub struct FieldVisibility<'scan> {
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
 }
 
-impl FileLint for FieldVisibility<'_> {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+impl<'scan> From<&'scan SourceFile> for FieldVisibility<'scan> {
+    fn from(file: &'scan SourceFile) -> FieldVisibility<'scan> {
         let mut fields = FieldVisibility { path: file.head().path(), violations: Vec::new() };
         fields.visit_file(file.syntax());
-        fields.violations
+        fields
     }
 }
 
@@ -50,5 +50,11 @@ impl FieldVisibility<'_> {
                 )
             });
         self.violations.extend(exposed);
+    }
+}
+
+impl<'file> From<FieldVisibility<'file>> for Vec<Violation<'file>> {
+    fn from(scan: FieldVisibility<'file>) -> Vec<Violation<'file>> {
+        scan.violations
     }
 }

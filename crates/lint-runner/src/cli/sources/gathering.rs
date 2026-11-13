@@ -6,16 +6,17 @@ use code_reader::{FileFacts, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile};
 use lint_transition_graph::Extraction;
 
-use super::super::boundary::Queue;
+use super::super::boundary::{FileOrder, Queue};
 
 #[derive(Debug)]
-struct Claim<'read, 'run> {
-    group: &'read ListedGroup<'read>,
+struct Claim<'listing, 'read, 'run> {
+    order: FileOrder,
+    group: &'listing ListedGroup<'read>,
     file: &'read SourceFile,
     head: &'run FileHead,
 }
 
-impl<'run> Claim<'_, 'run> {
+impl<'run> Claim<'_, '_, 'run> {
     fn gathered(&self) -> Gathered<'run> {
         let extraction = Extraction::from(Parsed::new(self.file, self.head));
         Gathered { head: self.head, facts: self.group.lowered(), extraction }
@@ -27,6 +28,38 @@ struct Gathered<'run> {
     head: &'run FileHead,
     facts: Vec<FileFacts>,
     extraction: Extraction<'run>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Claimed<'read> {
+    order: FileOrder,
+    file: &'read SourceFile,
+}
+
+impl<'read> Claimed<'read> {
+    pub(crate) fn order(self) -> FileOrder {
+        self.order
+    }
+
+    pub(crate) fn file(self) -> &'read SourceFile {
+        self.file
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Share<'read, 'run> {
+    claimed: Vec<Claimed<'read>>,
+    merging: Option<Merging<'run>>,
+}
+
+impl<'read, 'run> Share<'read, 'run> {
+    pub(crate) fn claimed(&self) -> &[Claimed<'read>] {
+        &self.claimed
+    }
+
+    pub(crate) fn into_merging(self) -> Option<Merging<'run>> {
+        self.merging
+    }
 }
 
 #[derive(Debug)]
@@ -55,18 +88,23 @@ impl<'run> Gathering<'run> {
         }
     }
 
-    pub(crate) fn gathered(&self, readout: &Readout) -> Option<Merging<'run>> {
+    pub(crate) fn gathered<'read>(&self, readout: &'read Readout) -> Share<'read, 'run> {
         let heads = self.heads.get_or_init(|| readout.files().iter().map(|file| file.head().clone()).collect());
         let listing = Listing::of_files(readout.files());
-        let claims: Vec<Claim<'_, 'run>> = listing
+        let claims: Vec<Claim<'_, 'read, 'run>> = listing
             .groups()
             .iter()
             .zip(readout.files())
             .zip(heads)
-            .map(|((group, file), head)| Claim { group, file, head })
+            .enumerate()
+            .map(|(index, ((group, file), head))| Claim { order: FileOrder::from(index), group, file, head })
             .collect();
-        let parts: Vec<Gathered<'run>> = self.claims.claimed(&claims).map(Claim::gathered).collect();
-        self.deposited(parts, heads)
+        let (claimed, parts): (Vec<Claimed<'read>>, Vec<Gathered<'run>>) = self
+            .claims
+            .claimed(&claims)
+            .map(|claim| (Claimed { order: claim.order, file: claim.file }, claim.gathered()))
+            .unzip();
+        Share { claimed, merging: self.deposited(parts, heads) }
     }
 
     pub(crate) fn settled(&self, merging: Merging<'run>, model: impl FnOnce(Vec<FileFacts>) -> Option<Model>) {

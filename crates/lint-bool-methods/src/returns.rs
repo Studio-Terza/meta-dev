@@ -4,11 +4,11 @@ use syn::visit::{self, Visit};
 use syn::{ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
-use lint_file::FileLint;
 use lint_layout::LineNumber;
 
 use finding::Finding;
 
+#[derive(Debug)]
 pub struct Returns<'file> {
     file: &'file SourceFile,
     found: Vec<Violation<'file>>,
@@ -34,11 +34,11 @@ impl<'file> Returns<'file> {
     }
 }
 
-impl FileLint for Returns<'_> {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+impl<'file> From<&'file SourceFile> for Returns<'file> {
+    fn from(file: &'file SourceFile) -> Returns<'file> {
         let mut scan = Returns { file, found: Vec::new() };
         scan.visit_file(file.syntax());
-        scan.found
+        scan
     }
 }
 
@@ -77,5 +77,11 @@ impl<'ast> Visit<'ast> for Returns<'_> {
             self.record(&method.sig);
             visit::visit_trait_item_fn(self, method);
         });
+    }
+}
+
+impl<'file> From<Returns<'file>> for Vec<Violation<'file>> {
+    fn from(scan: Returns<'file>) -> Vec<Violation<'file>> {
+        scan.found
     }
 }

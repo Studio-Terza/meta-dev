@@ -1,5 +1,5 @@
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -26,7 +26,7 @@ pub struct ManualIteration;
 
 impl Lint for ManualIteration {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(Headline::new("iterators are driven by combinators, not by hand"), Self::in_shipped(files))
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -76,6 +76,9 @@ impl ManualIteration {
 }
 
 impl FileLint for ManualIteration {
+    const HEADLINE: Headline = Headline::new("iterators are driven by combinators, not by hand");
+    const READS: Reads = Reads::Shipped;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut iterations = Iterations { file, path: file.head().path(), violations: Vec::new() };
         iterations.visit_file(file.syntax());

@@ -7,7 +7,9 @@ use std::panic::resume_unwind;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, Scope, ScopedJoinHandle};
 
-use lint_core::Report;
+use std::collections::BTreeMap;
+
+use lint_core::{Headline, Report, Violation};
 
 use super::stack_size::StackSize;
 use super::timings::Timing;
@@ -17,6 +19,10 @@ pub(crate) struct Slot(usize);
 
 impl Slot {
     pub(crate) const NONE: Slot = Slot(usize::MAX);
+
+    pub(crate) fn picked<Item>(self, items: &[Item]) -> Option<&Item> {
+        items.get(self.0)
+    }
 }
 
 impl From<usize> for Slot {
@@ -47,9 +53,26 @@ impl fmt::Display for Rendered {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct FileOrder(usize);
+
+impl From<usize> for FileOrder {
+    fn from(index: usize) -> FileOrder {
+        FileOrder(index)
+    }
+}
+
+#[derive(Debug)]
+struct FileLines {
+    slot: Slot,
+    order: FileOrder,
+    text: String,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Worked {
     rendered: Vec<Rendered>,
+    filed: Vec<FileLines>,
     timings: Vec<Timing>,
     surveyed: Vec<String>,
 }
@@ -58,9 +81,21 @@ pub(crate) struct Worked {
 pub(crate) struct Surveyed(Vec<String>);
 
 impl Worked {
+    const LINE_END: char = '\n';
+
     pub(crate) fn rendering(slot: Slot, reports: Vec<Report<'_>>) -> Worked {
         let rendered = reports.into_iter().filter_map(|report| Rendered::dirty(slot, report)).collect();
         Worked { rendered, ..Worked::default() }
+    }
+
+    pub(crate) fn filing(slot: Slot, order: FileOrder, violations: &[Violation<'_>]) -> Worked {
+        let text = violations.iter().map(ToString::to_string).fold(String::new(), |mut text, line| {
+            text.push_str(&line);
+            text.push(Self::LINE_END);
+            text
+        });
+        let filed = violations.first().map(|_| FileLines { slot, order, text });
+        Worked { filed: filed.into_iter().collect(), ..Worked::default() }
     }
 
     pub(crate) fn surveying(survey: &impl fmt::Display) -> Worked {
@@ -75,8 +110,17 @@ impl Worked {
         &self.timings
     }
 
-    pub(crate) fn into_rendered(self) -> Vec<Rendered> {
-        self.rendered
+    pub(crate) fn into_rendered(self, headline: impl Fn(Slot) -> Option<Headline>) -> Vec<Rendered> {
+        let mut filed = self.filed;
+        filed.sort_by_key(|part| (part.slot, part.order));
+        let grouped = filed.into_iter().fold(BTreeMap::new(), |mut slots: BTreeMap<Slot, String>, part| {
+            slots.entry(part.slot).or_default().push_str(&part.text);
+            slots
+        });
+        let assembled = grouped.into_iter().filter_map(|(slot, lines)| {
+            headline(slot).map(|title| Rendered { slot, text: format!("{title}:\n{lines}") })
+        });
+        self.rendered.into_iter().chain(assembled).collect()
     }
 }
 
@@ -84,6 +128,7 @@ impl FromIterator<Worked> for Worked {
     fn from_iter<Parts: IntoIterator<Item = Worked>>(parts: Parts) -> Worked {
         parts.into_iter().fold(Worked::default(), |mut whole, part| {
             whole.rendered.extend(part.rendered);
+            whole.filed.extend(part.filed);
             whole.timings.extend(part.timings);
             whole.surveyed.extend(part.surveyed);
             whole

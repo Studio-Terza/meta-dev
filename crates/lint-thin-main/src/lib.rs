@@ -5,6 +5,7 @@ use body_items::BodyItems;
 
 use finding::Finding;
 use lint_core::Lint;
+use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::{Item, ItemFn};
@@ -18,23 +19,26 @@ pub struct ThinMain;
 
 impl Lint for ThinMain {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("a binary is a thin main over its library"),
-            files
-                .iter()
-                .filter(|file| file.head().placement().role() == Role::BinaryRoot)
-                .flat_map(|file| {
-                    let items = &file.syntax().items;
-                    let inside_main = Self::mains(items).flat_map(BodyItems::declared_in);
-                    items.iter().filter(|item| Self::thin(item).is_none()).chain(inside_main).map(|item| {
-                        Violation::new(
-                            Site::new(file.head().path(), LineNumber::from(Self::keyword(item))),
-                            Finding::Logic,
-                        )
-                    })
+        <Self as FileLint>::reported(files)
+    }
+}
+
+impl FileLint for ThinMain {
+    const HEADLINE: Headline = Headline::new("a binary is a thin main over its library");
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let binary = Some(file).filter(|found| found.head().placement().role() == Role::BinaryRoot);
+        binary.map_or_default(|root| {
+            let items = &root.syntax().items;
+            let inside_main = Self::mains(items).flat_map(BodyItems::declared_in);
+            let logic = items.iter().filter(|item| Self::thin(item).is_none()).chain(inside_main);
+            logic
+                .map(|item| {
+                    Violation::new(Site::new(root.head().path(), LineNumber::from(Self::keyword(item))), Finding::Logic)
                 })
-                .collect(),
-        )
+                .collect()
+        })
     }
 }
 

@@ -5,7 +5,7 @@ mod roles;
 
 use lint_core::{Headline, Lint, Report, SourceFile, Violation, WorkspaceLint};
 use lint_effect_sites::EffectSites;
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
@@ -84,22 +84,34 @@ impl Lint for EffectsInFillers {
 
 impl Lint for CountedCalls {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new(
-                "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
-            ),
-            files.iter().flat_map(ReservedNames::<CountedName>::violations).collect(),
-        )
+        <Self as FileLint>::reported(files)
+    }
+}
+
+impl FileLint for CountedCalls {
+    const HEADLINE: Headline = Headline::new(
+        "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
+    );
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        Vec::from(ReservedNames::<CountedName>::from(file))
     }
 }
 
 impl Lint for HiddenSqlx {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new(
-                "__sqlx is named only in store-ports and store-ports-macros, so every query goes through store_ports::query! and no crate reaches sqlx through the re-export",
-            ),
-            files.iter().flat_map(ReservedNames::<SqlxName>::violations).collect(),
-        )
+        <Self as FileLint>::reported(files)
+    }
+}
+
+impl FileLint for HiddenSqlx {
+    const HEADLINE: Headline = Headline::new(
+        "__sqlx is named only in store-ports and store-ports-macros, so every query goes through store_ports::query! and no crate reaches sqlx through the re-export",
+    );
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        Vec::from(ReservedNames::<SqlxName>::from(file))
     }
 }

@@ -111,6 +111,7 @@ impl Corpus {
             "::of_names(extraction.names())",
             "ModelLint>::report",
             "WorkspaceLint>::report",
+            "Entry::filed::<",
         ]
         .iter()
         .map(|call| runner.matches(call).count())

@@ -2,7 +2,7 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use std::path::Path as StdPath;
 use syn::visit::Visit;
 
@@ -19,10 +19,7 @@ pub struct NoFreeFns;
 
 impl Lint for NoFreeFns {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("free functions are not allowed; make them associated functions or methods"),
-            files.iter().flat_map(<Self as FileLint>::violations).collect(),
-        )
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -45,6 +42,10 @@ impl NoFreeFns {
 }
 
 impl FileLint for NoFreeFns {
+    const HEADLINE: Headline =
+        Headline::new("free functions are not allowed; make them associated functions or methods");
+    const READS: Reads = Reads::Every;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut visitor = FreeFns { file, path: file.head().path(), found: Vec::new() };
         visitor.visit_file(file.syntax());

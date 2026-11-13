@@ -2,6 +2,7 @@ mod finding;
 
 use finding::Finding;
 use lint_core::Lint;
+use lint_file::{FileLint, Reads};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ItemImpl, ItemMod, PathSegment, Signature, Type, TypePath, TypeReference};
@@ -17,19 +18,20 @@ pub struct VecOutParams<'file> {
 
 impl Lint for VecOutParams<'_> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new(
-                "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules",
-            ),
-            files
-                .iter()
-                .flat_map(|file| {
-                    let mut scan = VecOutParams { file, violations: Vec::new() };
-                    scan.visit_file(file.syntax());
-                    scan.violations
-                })
-                .collect(),
-        )
+        <Self as FileLint>::reported(files)
+    }
+}
+
+impl FileLint for VecOutParams<'_> {
+    const HEADLINE: Headline = Headline::new(
+        "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules",
+    );
+    const READS: Reads = Reads::Every;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut scan = VecOutParams { file, violations: Vec::new() };
+        scan.visit_file(file.syntax());
+        scan.violations
     }
 }
 

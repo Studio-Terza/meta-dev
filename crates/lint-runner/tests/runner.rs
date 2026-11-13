@@ -76,6 +76,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         "::of_names(extraction.names())",
         "ModelLint>::report",
         "WorkspaceLint>::report",
+        "Entry::filed::<",
     ]
     .iter()
     .map(|call| runner.matches(call).count())
@@ -334,14 +335,14 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
         "  phase locate: describe the workspaces through cargo metadata\n",
         "  phase model: merge the lowered files into the code model\n",
         "  phase survey: test budget, paired apis and clones\n",
-        "  lint lint_no_comments::NoComments\n",
         "  lint lint_hand_impls::HandImpls\n",
         "  lint lint_port_dependencies::OwnedDependencies\n",
         "  lint lint_linear_flow::flows::Flows<'_>\n",
     ];
-    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 10], "{timed}");
+    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 9], "{timed}");
     assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");
     assert_eq!(timed.matches("  phase lower: lower its share of files on worker ").count(), workers, "{timed}");
+    assert_eq!(timed.matches("  phase file lints: lint its share of files on worker ").count(), workers, "{timed}");
     assert_eq!(untimed.matches("lint timings").count(), 0, "{untimed}");
     Ok(())
 }

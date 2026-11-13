@@ -1,5 +1,5 @@
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::visit::Visit;
@@ -26,10 +26,7 @@ pub struct ConstShape;
 
 impl Lint for ConstShape {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("casts live in const fns or boundary modules, and const loops walk slices"),
-            files.iter().flat_map(Self::violations).collect(),
-        )
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -42,6 +39,10 @@ enum Context {
 }
 
 impl FileLint for ConstShape {
+    const HEADLINE: Headline =
+        Headline::new("casts live in const fns or boundary modules, and const loops walk slices");
+    const READS: Reads = Reads::Every;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut contexts = ConstContexts {
             file,

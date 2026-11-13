@@ -8,7 +8,6 @@ use proc_macro2::{Ident, TokenStream, TokenTree};
 use quote::ToTokens;
 
 use lint_core::{Finding, Site, SourceFile, Violation};
-use lint_file::FileLint;
 use lint_layout::{LineNumber, Name, Whole, Word};
 
 pub(crate) use counted_name::CountedName;
@@ -20,19 +19,23 @@ pub(crate) trait Reserved: Finding + Default {
 }
 
 #[derive(Debug)]
-pub(crate) struct ReservedNames<Kind>(PhantomData<Kind>);
+pub(crate) struct ReservedNames<'file, Kind> {
+    found: Vec<Violation<'file>>,
+    kind: PhantomData<Kind>,
+}
 
-impl<Kind: Reserved> FileLint for ReservedNames<Kind> {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        Self::outside_owners(file)
+impl<'file, Kind: Reserved> From<&'file SourceFile> for ReservedNames<'file, Kind> {
+    fn from(file: &'file SourceFile) -> ReservedNames<'file, Kind> {
+        let found = Self::outside_owners(file)
             .map_or_default(|outside| Self::lines(outside.syntax().to_token_stream()))
             .into_iter()
             .map(|line| Violation::new(Site::new(file.head().path(), line), Kind::default()))
-            .collect()
+            .collect();
+        ReservedNames { found, kind: PhantomData }
     }
 }
 
-impl<Kind: Reserved> ReservedNames<Kind> {
+impl<Kind: Reserved> ReservedNames<'_, Kind> {
     fn outside_owners(file: &SourceFile) -> Option<&SourceFile> {
         let name: &Name = file.head().placement().package().crate_name().borrow();
         name.matches::<Whole>(&Kind::OWNERS).map_or(Some(file), |_| None)
@@ -52,5 +55,11 @@ impl<Kind: Reserved> ReservedNames<Kind> {
 
     fn reserved(ident: &Ident) -> Option<LineNumber> {
         Name::from(ident).matches::<Whole>(Kind::NAMES).map(|_| LineNumber::from(ident.span()))
+    }
+}
+
+impl<'file, Kind> From<ReservedNames<'file, Kind>> for Vec<Violation<'file>> {
+    fn from(names: ReservedNames<'file, Kind>) -> Vec<Violation<'file>> {
+        names.found
     }
 }

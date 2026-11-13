@@ -3,7 +3,7 @@ mod nesting_depth;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -32,10 +32,7 @@ pub struct FnShape;
 
 impl Lint for FnShape {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods"),
-            Self::in_shipped(files),
-        )
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -87,6 +84,10 @@ impl FnShape {
 }
 
 impl FileLint for FnShape {
+    const HEADLINE: Headline =
+        Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods");
+    const READS: Reads = Reads::Shipped;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut shapes =
             Shapes { file, path: file.head().path(), depth: NestingDepth::default(), violations: Vec::new() };
