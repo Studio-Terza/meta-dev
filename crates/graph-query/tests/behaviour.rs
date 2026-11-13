@@ -172,6 +172,20 @@ fn a_role_agrees_on_receiver_arity_self_arguments_and_return_shape() {
     );
 }
 
+laws::table!(
+    a_role_reads_through_references_parentheses_tuples_sequences_and_iterators,
+    |text: &&str| text.parse::<Role>().map(|parsed| AsRef::<MethodShape>::as_ref(&parsed).to_string()).ok(),
+    [
+        "fn f(other: (Self)) -> (Self)" => Some("fn(Self) -> Self".to_owned()),
+        "fn f() -> &Self" => Some("fn() -> Self".to_owned()),
+        "fn f() -> ()" => Some("fn()".to_owned()),
+        "fn f() -> (u8, u8)" => Some("fn() -> _".to_owned()),
+        "fn f() -> [u8; 2]" => Some("fn() -> many".to_owned()),
+        "fn f() -> impl Iterator<Item = u8>" => Some("fn() -> many".to_owned()),
+        "fn f() -> impl Sized + 'static" => Some("fn() -> _".to_owned()),
+    ]
+);
+
 laws::table!(impls_in_another_crate_resolve_to_the_indexed_type_keep_the_trait_path_and_spell_every_self_type, Asked::audited, [
     &["--implementers", "Audited", "--uses", "Cents", "--users", "Audited"][..] => vec![
         "implementers of Audited:".to_owned(),

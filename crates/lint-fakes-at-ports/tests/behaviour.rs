@@ -31,7 +31,8 @@ const PORT_CRATE: &str = "mod clock {\n    #[port]\n    pub trait Clock {}\n}\np
 const QUALIFIED_PORT: &str =
     "mod clock {\n    #[port_core::port]\n    pub trait Clock {}\n}\npub use clock::{Clock, ClockFiller};\n";
 const FILLED: &str = "use p::ClockFiller;\nstruct FakeClock;\nimpl ClockFiller for FakeClock {}\n";
-const UNMARKED: &str = "mod clock {\n    pub trait Clock {}\n}\npub use clock::{Clock, ClockFiller};\n";
+const UNMARKED: &str =
+    "mod clock {\n    #[doc = \"clock\"]\n    pub trait Clock {}\n}\npub use clock::{Clock, ClockFiller};\n";
 
 const IMPORTED_IN_MODULE: &str =
     "mod inner {\n    use ci::ports::Ports;\n    struct Fake;\n    impl Ports for Fake {}\n}\n";
