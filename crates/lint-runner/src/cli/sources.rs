@@ -83,7 +83,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
     }
 
     pub(crate) fn earlier(&self) -> impl Iterator<Item = Timing> {
-        [self.staged.timing(), self.located().timing()].into_iter()
+        [self.staged.timing()].into_iter()
     }
 
     pub(crate) fn queue(&self) -> &Queue {

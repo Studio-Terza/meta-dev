@@ -200,13 +200,18 @@ impl Lints {
         let helpers = Workers::available()
             .helpers()
             .filter_map(|index| Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ok());
-        Crew { helpers: helpers.collect() }
+        let locating = Helper::spawned(scope, move || Self::locating(sources)).ok();
+        Crew { helpers: locating.into_iter().chain(helpers).collect() }
     }
 
     fn gathered<'run>(readout: &'run Readout, unlocated: Option<&'run Unlocated>, worked: Worked) -> Outcome<'run> {
         let mut rendered = worked.into_rendered(|slot| slot.picked(&Self::LINTS).and_then(Entry::headline));
         rendered.sort_by_key(Rendered::slot);
         unlocated.map_or_else(|| Outcome::from_rendered(rendered, readout.failures()), Outcome::Unlocated)
+    }
+
+    fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+        Worked::timed(sources.located().timing())
     }
 
     fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
