@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_no_test_only_api::NoTestOnlyApi;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -321,5 +322,5 @@ const CASES: [Case; 41] = [
 
 #[test]
 fn test_only_api_is_flagged() {
-    assert_eq!(Sources::mismatches::<NoTestOnlyApi>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<NoTestOnlyApi>>(&CASES), Lines::default());
 }

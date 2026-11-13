@@ -6,6 +6,8 @@ use lint_module_nesting::ModuleNesting;
 use lint_named_numbers::NamedNumbers;
 use lint_no_forwarders::NoForwarders;
 use lint_no_parameter_bags::NoParameterBags;
+use lint_no_test_only_api::NoTestOnlyApi;
+use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
 use lint_unconsumed_traits::UnconsumedTraits;
@@ -67,4 +69,6 @@ contexts! {
     module_nesting: ModuleNesting,
     no_parameter_bags: NoParameterBags,
     repeated_methods: RepeatedMethods,
+    public_api_tests: PublicApiTests,
+    no_test_only_api: NoTestOnlyApi,
 }
