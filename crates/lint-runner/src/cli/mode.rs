@@ -13,9 +13,11 @@ use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use law_facts::Laws;
 use lint_clones::Clones;
-use lint_core::{Lint, Readout, Report, SourceFile};
+use lint_core::{Readout, Report, SourceFile};
 use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
+
+use crate::cli::sources::Gleans;
 use lint_transition_graph::{Extraction, TypeSystem};
 use timer_ports::Timer;
 
@@ -116,14 +118,21 @@ impl Run<'_, '_> {
 
 #[derive(Debug)]
 pub(crate) struct Survey<'files> {
-    budget: TestBudget,
+    budget: &'files TestBudget,
     paired: Report<'files>,
     clones: Report<'files>,
 }
 
 impl<'files> Survey<'files> {
-    pub(crate) fn measured(files: &'files [SourceFile]) -> Survey<'files> {
-        Survey { budget: TestBudget::measured(files), paired: PairedApis::report(files), clones: Clones::report(files) }
+    pub(crate) fn settled<'run: 'files, Held>(settled: &'files Held) -> Survey<'files>
+    where
+        Held: Gleans<'run, TestBudget> + Gleans<'run, PairedApis> + Gleans<'run, Clones>,
+    {
+        Survey {
+            budget: Gleans::<TestBudget>::gleaned(settled),
+            paired: Report::from(Gleans::<PairedApis>::gleaned(settled)),
+            clones: Report::from(Gleans::<Clones>::gleaned(settled)),
+        }
     }
 }
 

@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 lint-core = { path = "../lint-core" }
+lint-file = { path = "../lint-file" }
 lint-placement = { path = "../lint-placement" }
 lint-layout = { path = "../lint-layout" }
 lint-process-starters = { path = "../lint-process-starters" }

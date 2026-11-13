@@ -97,3 +97,10 @@ impl<Checked: PrimedLint> Lint for Primed<Checked> {
         Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &primer, &context)).collect())
     }
 }
+
+pub trait Gleaning {
+    type Part<'head>: Send + Debug;
+    type Gleaned<'head>: FromIterator<Self::Part<'head>> + Send + Sync + Debug;
+
+    fn gleaned<'head>(parsed: Parsed<'_, 'head>) -> Self::Part<'head>;
+}

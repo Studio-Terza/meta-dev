@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use syn::visit::{self, Visit};
 use syn::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
 
-use lint_core::{Site, SourceFile, Syntax, Walk};
+use lint_core::{FileHead, Parsed, Site, Syntax, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_paths::Module;
 
@@ -11,18 +11,17 @@ use crate::declared::Declared;
 use crate::owner::Owner;
 
 pub struct PairedMethods<'file> {
-    file: &'file SourceFile,
+    head: &'file FileHead,
     module: Module<'file>,
     found: BTreeMap<Owner<'file>, Vec<Declared<'file>>>,
 }
 
 impl<'file> PairedMethods<'file> {
-    pub fn of_files(files: &'file [SourceFile]) -> BTreeMap<Owner<'file>, Vec<Declared<'file>>> {
-        files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |found, file| {
-            let mut scan = PairedMethods { file, module: Module::of_file(file), found };
-            scan.visit_file(file.syntax());
-            scan.found
-        })
+    pub fn of_file(parsed: Parsed<'_, 'file>) -> BTreeMap<Owner<'file>, Vec<Declared<'file>>> {
+        let head = parsed.head();
+        let mut scan = PairedMethods { head, module: Module::of_head(head), found: BTreeMap::new() };
+        scan.visit_file(parsed.file().syntax());
+        scan.found
     }
 
     fn public_methods(block: &ItemImpl) -> Vec<&Ident> {
@@ -40,7 +39,7 @@ impl<'file> PairedMethods<'file> {
     }
 
     fn owned_by(&mut self, owner: Option<Name>, methods: &[&Ident]) {
-        let path = self.file.head().path();
+        let path = self.head.path();
         let declared = methods
             .iter()
             .map(|method| Declared::new(Name::from(*method), Site::new(path, LineNumber::from(method.span()))));

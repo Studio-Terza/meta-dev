@@ -1,7 +1,7 @@
 mod contexts;
 mod gathering;
 
-pub(crate) use contexts::{Holding, Priming, Settled};
+pub(crate) use contexts::{Gleans, Holding, Priming, Settled};
 pub(crate) use gathering::{Claimed, Gathering};
 
 use std::sync::OnceLock;

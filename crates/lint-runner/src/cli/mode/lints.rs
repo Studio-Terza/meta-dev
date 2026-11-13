@@ -229,7 +229,7 @@ impl Lints {
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
         let queued: Worked = claimed.collect();
         let judging = Stopwatch::started(sources.wired().timer());
-        let settled = Settled::new(sources.gathering().contexts(), sources.gathering().primings());
+        let settled = Settled::from(sources.gathering());
         let judged: Worked = Self::LINTS
             .iter()
             .enumerate()
@@ -326,18 +326,27 @@ impl Work {
 
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Survey => Worked::surveying(&Survey::measured(readout.files())),
-            Work::Extracted(extracted) => Self::typed(extracted, slot, sources),
+            Work::Survey | Work::Extracted(_) => self.settled(slot, sources),
             Work::Checked(_) | Work::Modelled(_) | Work::Described(_) | Work::Filed(_) | Work::Judged(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
         }
     }
 
-    fn typed(extracted: Extracting, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
-        let gathering = sources.gathering();
-        let settled = Settled::new(gathering.contexts(), gathering.primings());
-        Worked::rendering(slot, extracted(gathering.extraction(), Priming::<LawReading>::primed(&settled)))
+    fn settled(self, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+        match self {
+            Work::Extracted(extracted) => Worked::rendering(
+                slot,
+                extracted(
+                    sources.gathering().extraction(),
+                    Priming::<LawReading>::primed(&Settled::from(sources.gathering())),
+                ),
+            ),
+            Work::Survey => Worked::surveying(&Survey::settled(&Settled::from(sources.gathering()))),
+            Work::Checked(_) | Work::Modelled(_) | Work::Described(_) | Work::Filed(_) | Work::Judged(_) => {
+                Worked::default()
+            }
+        }
     }
 
     fn described<'run>(
