@@ -1,10 +1,7 @@
 mod crate_effects;
 
-use std::collections::BTreeMap;
-
 use code_model::Model;
-use lint_core::{Headline, ModelLint, Report, SourceFile};
-use lint_placement::CrateName;
+use lint_core::{Headline, ModelLint, Report};
 
 pub use crate_effects::CrateEffects;
 
@@ -22,16 +19,6 @@ impl ModelLint for EffectsInPorts {
             ),
             CrateEffects::of_model(model).values().flat_map(CrateEffects::outside_ports).collect(),
         )
-    }
-}
-
-impl EffectSites {
-    #[must_use]
-    pub fn crates(files: &[SourceFile]) -> BTreeMap<CrateName, Vec<&SourceFile>> {
-        files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |mut crates, file| {
-            crates.entry(CrateName::from(file.head().placement().package().root())).or_insert_with(Vec::new).push(file);
-            crates
-        })
     }
 }
 

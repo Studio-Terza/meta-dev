@@ -3,13 +3,12 @@ mod port_crate;
 mod reserved_names;
 mod roles;
 
-use lint_core::{Headline, Lint, Report, SourceFile, Violation, WorkspaceLint};
-use lint_effect_sites::EffectSites;
-use lint_file::{FileLint, Reads};
+use lint_core::{Headline, Parsed, Report, SourceFile, Violation, WorkspaceLint};
+use lint_file::{FileLint, PrimedLint, Reads};
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
-use port_crate::PortCrate;
+use port_crate::PortedCrates;
 use reserved_names::{CountedName, ReservedNames, SqlxName};
 use roles::Roles;
 
@@ -67,18 +66,29 @@ impl WorkspaceLint for KeyDependencyRoles {
     }
 }
 
-impl Lint for EffectsInFillers {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new(
-                "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler and impl Release blocks",
-            ),
-            EffectSites::crates(files)
-                .values()
-                .filter_map(|found| PortCrate::declared(found))
-                .flat_map(|ported| ported.stray_effects())
-                .collect(),
-        )
+impl PrimedLint for EffectsInFillers {
+    const HEADLINE: Headline = Headline::new(
+        "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler and impl Release blocks",
+    );
+    const READS: Reads = Reads::Shipped;
+
+    type PrimerPart<'head> = PortedCrates<'head>;
+    type Primer<'head> = PortedCrates<'head>;
+    type Part<'head> = ();
+    type Context<'head> = ();
+
+    fn primed<'head>(parsed: Parsed<'_, 'head>) -> PortedCrates<'head> {
+        PortedCrates::from(parsed)
+    }
+
+    fn contributed<'head>(_: Parsed<'_, 'head>, _: &PortedCrates<'head>) {}
+
+    fn judged<'file, 'head: 'file>(
+        file: &'file SourceFile,
+        ported: &PortedCrates<'head>,
+        (): &(),
+    ) -> Vec<Violation<'file>> {
+        ported.stray_effects(file)
     }
 }
 

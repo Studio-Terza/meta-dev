@@ -1,4 +1,5 @@
 use lint_core::Lint;
+use lint_file::Judged;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_repeated_shapes::{NormalisedShapes, RepeatedShapes};
 
@@ -167,13 +168,17 @@ struct Findings;
 
 impl Findings {
     fn of(sources: &&[Source]) -> String {
-        RepeatedShapes::report(&Sources::parsed(sources)).violations().iter().map(ToString::to_string).collect()
+        Judged::<RepeatedShapes>::report(&Sources::parsed(sources))
+            .violations()
+            .iter()
+            .map(ToString::to_string)
+            .collect()
     }
 }
 
 #[test]
 fn bodies_repeated_with_names_and_literals_erased_are_listed_once_per_family() {
-    assert_eq!(Sources::mismatches::<RepeatedShapes>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<RepeatedShapes>>(&CASES), Lines::default());
 }
 
 laws::table!(
@@ -189,7 +194,8 @@ laws::table!(
 #[test]
 fn a_finding_lists_its_size_and_its_copies_in_order() {
     let text =
-        RepeatedShapes::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(THREE))])).to_string();
+        Judged::<RepeatedShapes>::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(THREE))]))
+            .to_string();
     assert!(
         text.contains("46 tokens in 3 shipped copies, also at a.rs:15, a.rs:29, differing literals: 3; "),
         "{text}"
@@ -203,13 +209,13 @@ fn a_nested_family_is_not_listed_beside_its_outer_family() {
         Source::new(Located::new("a.rs"), Text::new(NESTED_A)),
         Source::new(Located::new("b.rs"), Text::new(NESTED_B)),
     ]);
-    let report = RepeatedShapes::report(&files);
+    let report = Judged::<RepeatedShapes>::report(&files);
     assert_eq!(report.violations().len(), 1);
 }
 
 #[test]
 fn copies_that_differ_only_in_local_names_say_so() {
-    let text = RepeatedShapes::report(&Sources::parsed(&[
+    let text = Judged::<RepeatedShapes>::report(&Sources::parsed(&[
         Source::new(Located::new("a.rs"), Text::new(BODY)),
         Source::new(Located::new("b.rs"), Text::new(LOCALS_ONLY)),
     ]))
@@ -223,14 +229,14 @@ fn bodies_that_differ_only_in_callee_names_are_reported_once_names_are_normalise
         Source::new(Located::new("a.rs"), Text::new(CALLEE_A)),
         Source::new(Located::new("b.rs"), Text::new(CALLEE_B)),
     ]);
-    assert_eq!(RepeatedShapes::report(&files).violations().len(), 0);
+    assert_eq!(Judged::<RepeatedShapes>::report(&files).violations().len(), 0);
     let text = NormalisedShapes::report(&files).to_string();
     assert!(text.contains("a.rs:1: 49 tokens in 2 shipped copies, also at b.rs:1, identical up to names; "), "{text}");
 }
 
 #[test]
 fn copies_that_differ_in_true_and_false_count_it_as_a_differing_literal() {
-    let text = RepeatedShapes::report(&Sources::parsed(&[
+    let text = Judged::<RepeatedShapes>::report(&Sources::parsed(&[
         Source::new(Located::new("a.rs"), Text::new(FLAG_ON)),
         Source::new(Located::new("b.rs"), Text::new(FLAG_OFF)),
     ]))

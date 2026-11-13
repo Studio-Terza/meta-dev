@@ -6,7 +6,9 @@ use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath};
 
-use lint_core::{Site, SourceFile, Violation, Walk};
+use lint_file::Concluded;
+
+use lint_core::{FileHead, Parsed, Site, Violation, Walk};
 use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
 use lint_paths::{Imports, Module, Nested};
 
@@ -30,24 +32,27 @@ struct DoubleKey<'file> {
 struct Implemented<'file> {
     double: DoubleKey<'file>,
     site: Site<'file>,
-    trait_path: &'file TraitPath,
+    written: UsePath,
     kind: Kind,
 }
 
 impl<'file> Doubles<'file> {
-    pub fn scan(&mut self, file: &'file SourceFile, imports: &Imports<'_>, ports: &PortTraits) {
+    pub fn scanned(parsed: Parsed<'_, 'file>, imports: &Imports<'_>, ports: &PortTraits) -> Doubles<'file> {
+        let head = parsed.head();
+        let mut doubles = Doubles::default();
         let mut reader = Reader {
-            file,
-            target: file.head().placement().crate_root().directory(),
-            module: Module::of_file(file),
+            head,
+            target: head.placement().crate_root().directory(),
+            module: Module::of_head(head),
             imports,
             ports,
-            doubles: self,
+            doubles: &mut doubles,
         };
-        reader.visit_file(file.syntax());
+        reader.visit_file(parsed.file().syntax());
+        doubles
     }
 
-    pub fn violations(self) -> Vec<Violation<'file>> {
+    fn violations(self) -> Vec<Violation<'file>> {
         let unported = self
             .declared
             .iter()
@@ -59,10 +64,7 @@ impl<'file> Doubles<'file> {
             })
             .map(|(double, site)| Violation::new(*site, Finding::Unported(&double.name)));
         let beside = self.implemented.iter().filter(|implemented| implemented.kind == Kind::Other).map(|implemented| {
-            Violation::new(
-                implemented.site,
-                Finding::Beside(&implemented.double.name, UsePath::from(implemented.trait_path)),
-            )
+            Violation::new(implemented.site, Finding::Beside(&implemented.double.name, implemented.written.clone()))
         });
         let mut violations: Vec<Violation<'file>> = unported.chain(beside).collect();
         violations.sort_by(|left, right| left.site().cmp(right.site()));
@@ -71,7 +73,7 @@ impl<'file> Doubles<'file> {
 }
 
 struct Reader<'file, 'run> {
-    file: &'file SourceFile,
+    head: &'file FileHead,
     target: &'file Path,
     module: Module<'file>,
     imports: &'run Imports<'run>,
@@ -84,7 +86,7 @@ impl<'file> Reader<'file, '_> {
 
     fn declared(&mut self, name: &Ident) {
         let double = DoubleKey { target: self.target, name: Name::from(name) };
-        let site = Site::new(self.file.head().path(), LineNumber::from(name.span()));
+        let site = Site::new(self.head.path(), LineNumber::from(name.span()));
         self.doubles.declared.extend(double.name.matches::<CamelWord>(&Self::DOUBLES).map(|_| (double, site)));
     }
 
@@ -94,16 +96,16 @@ impl<'file> Reader<'file, '_> {
             .map(|name| DoubleKey { target: self.target, name })
     }
 
-    fn implementation(&self, double: DoubleKey<'file>, path: &'file TraitPath) -> Implemented<'file> {
+    fn implementation(&self, double: DoubleKey<'file>, path: &TraitPath) -> Implemented<'file> {
         let written = UsePath::from(path);
         let bare = Kind::written(&written);
-        let candidates = self.imports.candidates(&self.module, written);
+        let candidates = self.imports.candidates(&self.module, written.clone());
         let line = path.segments.first().map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
         Implemented {
             double,
-            site: Site::new(self.file.head().path(), line),
+            site: Site::new(self.head.path(), line),
             kind: bare.judged(&candidates, self.ports),
-            trait_path: path,
+            written,
         }
     }
 }
@@ -114,12 +116,12 @@ impl<'file> Nested<'file> for Reader<'file, '_> {
     }
 }
 
-impl<'file> Visit<'file> for Reader<'file, '_> {
-    fn visit_item_mod(&mut self, module: &'file ItemMod) {
+impl<'ast> Visit<'ast> for Reader<'_, '_> {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         self.nested(module, |reader| visit::visit_item_mod(reader, module));
     }
 
-    fn visit_item_impl(&mut self, item: &'file ItemImpl) {
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         Walk::enter(&item.attrs, || {
             let found = self
                 .double_of(item)
@@ -129,15 +131,26 @@ impl<'file> Visit<'file> for Reader<'file, '_> {
         });
     }
 
-    fn visit_item_struct(&mut self, item: &'file ItemStruct) {
+    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         Walk::enter(&item.attrs, || self.declared(&item.ident));
     }
 
-    fn visit_item_enum(&mut self, item: &'file ItemEnum) {
+    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
         Walk::enter(&item.attrs, || self.declared(&item.ident));
     }
 
-    fn visit_item_union(&mut self, item: &'file ItemUnion) {
+    fn visit_item_union(&mut self, item: &'ast ItemUnion) {
         Walk::enter(&item.attrs, || self.declared(&item.ident));
+    }
+}
+
+impl<'file> FromIterator<Doubles<'file>> for Concluded<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Doubles<'file>>>(parts: Parts) -> Concluded<'file> {
+        let merged = parts.into_iter().fold(Doubles::default(), |mut merged, part| {
+            merged.declared.extend(part.declared);
+            merged.implemented.extend(part.implemented);
+            merged
+        });
+        merged.violations().into_iter().collect()
     }
 }

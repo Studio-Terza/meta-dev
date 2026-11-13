@@ -1,4 +1,5 @@
 use lint_fakes_at_ports::FakesAtPorts;
+use lint_file::Primed;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
@@ -146,5 +147,5 @@ const CASES: [Case; 20] = [
 
 #[test]
 fn test_doubles_implement_only_ports() {
-    assert_eq!(Sources::mismatches::<FakesAtPorts>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Primed<FakesAtPorts>>(&CASES), Lines::default());
 }

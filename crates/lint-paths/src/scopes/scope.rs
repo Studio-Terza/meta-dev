@@ -33,3 +33,13 @@ impl Scope {
         &self.globs
     }
 }
+
+impl FromIterator<Scope> for Scope {
+    fn from_iter<Parts: IntoIterator<Item = Scope>>(parts: Parts) -> Scope {
+        parts.into_iter().fold(Scope::default(), |mut merged, part| {
+            merged.imports.extend(part.imports);
+            merged.globs.extend(part.globs);
+            merged
+        })
+    }
+}

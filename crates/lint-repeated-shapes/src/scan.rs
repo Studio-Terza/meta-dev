@@ -7,7 +7,9 @@ use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl
 
 use body_shape::Reading;
 use equivalence::Equivalence;
-use lint_core::{Bound, Site, SourceFile, Walk};
+use std::path::Path;
+
+use lint_core::{Bound, Parsed, Site, Walk};
 use lint_layout::{LineNumber, TestMarks};
 
 use crate::extent::Extent;
@@ -15,7 +17,7 @@ use crate::kind::Kind;
 use crate::occurrence::Occurrence;
 
 pub(crate) struct Scan<'file> {
-    file: &'file SourceFile,
+    path: &'file Path,
     kind: Kind,
     equivalence: Equivalence,
     occurrences: Vec<Occurrence<'file>>,
@@ -24,24 +26,25 @@ pub(crate) struct Scan<'file> {
 impl<'file> Scan<'file> {
     const FLOOR: Bound = Bound::Least(40);
 
-    pub(crate) fn of_file(file: &'file SourceFile, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
-        let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests, equivalence));
-        Self::scanned(file, Kind::of_role(file.head().placement().role()), equivalence)
+    pub(crate) fn of_file(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
+        let tests =
+            parsed.test_modules().into_iter().flat_map(|module| Self::scanned(module, Kind::Tests, equivalence));
+        Self::scanned(parsed, Kind::of_role(parsed.head().placement().role()), equivalence)
             .into_iter()
             .chain(tests)
             .collect()
     }
 
-    fn scanned(file: &'file SourceFile, kind: Kind, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
-        let mut scan = Scan { file, kind, equivalence, occurrences: Vec::new() };
-        scan.visit_file(file.syntax());
+    fn scanned(parsed: Parsed<'_, 'file>, kind: Kind, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
+        let mut scan = Scan { path: parsed.head().path(), kind, equivalence, occurrences: Vec::new() };
+        scan.visit_file(parsed.file().syntax());
         scan.occurrences
     }
 
     fn considered(&mut self, node: &(impl ToTokens + Spanned)) {
         let reading = Reading::erasing(node.to_token_stream(), self.equivalence);
         let span = node.span();
-        let site = Site::new(self.file.head().path(), LineNumber::from(span));
+        let site = Site::new(self.path, LineNumber::from(span));
         let tokens = reading.shape().size();
         let occurrence = Occurrence::new(reading, site, Extent::from(span), self.kind);
         self.occurrences.extend(Self::FLOOR.allows(tokens).map(|_| occurrence));

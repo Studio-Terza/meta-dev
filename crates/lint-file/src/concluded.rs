@@ -12,7 +12,8 @@ impl<'head> Concluded<'head> {
     where
         'head: 'file,
     {
-        self.0.get(file.head().path()).cloned().unwrap_or_default()
+        let paths = std::iter::once(file).chain(file.test_modules()).map(|found| found.head().path());
+        paths.filter_map(|path| self.0.get(path)).flatten().cloned().collect()
     }
 }
 
@@ -25,5 +26,26 @@ impl<'head> FromIterator<Violation<'head>> for Concluded<'head> {
                 filed
             },
         ))
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Listed<'head> {
+    at: Option<&'head Path>,
+    violations: Vec<Violation<'head>>,
+}
+
+impl<'head> Listed<'head> {
+    #[must_use]
+    pub fn new(files: impl IntoIterator<Item = &'head Path>, violations: Vec<Violation<'head>>) -> Listed<'head> {
+        Listed { at: files.into_iter().min(), violations }
+    }
+
+    #[must_use]
+    pub fn found_in<'file>(&self, file: &SourceFile) -> Vec<Violation<'file>>
+    where
+        'head: 'file,
+    {
+        self.at.filter(|at| *at == file.head().path()).map_or_default(|_| self.violations.clone())
     }
 }

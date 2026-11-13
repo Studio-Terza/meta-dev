@@ -4,7 +4,7 @@ use syn::{Ident, ItemImpl, ItemMod, ItemType, ItemUse, UseTree};
 use crate::module::Module;
 use crate::scopes::Scopes;
 use crate::walker::Walker;
-use lint_core::SourceFile;
+use lint_core::{Parsed, SourceFile};
 use lint_layout::{Name, UsePath, Word};
 
 pub(crate) struct Collector<'file> {
@@ -17,13 +17,14 @@ impl<'file> Collector<'file> {
     const DROP: &'static str = "Drop";
 
     pub(crate) fn collect(files: &[&'file SourceFile]) -> Scopes<'file> {
-        files.iter().fold(Scopes::default(), |scopes, file| {
-            let module = Module::of_file(file);
-            let mut collector = Collector { scopes, module };
-            collector.scopes.declare(&collector.module);
-            collector.visit_file(file.syntax());
-            collector.scopes
-        })
+        files.iter().map(|file| Collector::collected(Parsed::from(*file))).collect()
+    }
+
+    pub(crate) fn collected(parsed: Parsed<'_, 'file>) -> Scopes<'file> {
+        let mut collector = Collector { scopes: Scopes::default(), module: Module::of_head(parsed.head()) };
+        collector.scopes.declare(&collector.module);
+        collector.visit_file(parsed.file().syntax());
+        collector.scopes
     }
 
     fn imported(&mut self, prefix: UsePath, tree: &UseTree) {

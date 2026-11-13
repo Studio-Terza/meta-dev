@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use syn::visit::{self, Visit};
 use syn::{ItemMod, ItemStruct};
 
-use lint_core::{SourceFile, Walk};
+use lint_core::{Parsed, Walk};
 use lint_layout::Name;
 use lint_paths::{Module, Nested};
 use lint_placement::CrateName;
@@ -14,18 +14,24 @@ use crate::judge::Judge;
 pub struct Holders(BTreeMap<CrateName, BTreeMap<Name, BTreeSet<Name>>>);
 
 impl Holders {
-    pub fn declared(files: &[&SourceFile], judge: &Judge<'_>) -> Holders {
-        files.iter().fold(Holders::default(), |mut found, file| {
-            let mut reader = Reader { module: Module::of_file(file), judge, owners: BTreeMap::new() };
-            reader.visit_file(file.syntax());
-            let crate_owners = found.0.entry(CrateName::from(file.head().placement().crate_root())).or_default();
-            reader.owners.into_iter().for_each(|(owner, fields)| crate_owners.entry(owner).or_default().extend(fields));
-            found
-        })
+    pub fn read(parsed: Parsed<'_, '_>, judge: &Judge<'_>) -> Holders {
+        let mut reader = Reader { module: Module::of_head(parsed.head()), judge, owners: BTreeMap::new() };
+        reader.visit_file(parsed.file().syntax());
+        Holders(BTreeMap::from([(CrateName::from(parsed.head().placement().crate_root()), reader.owners)]))
     }
 
     pub fn fields(&self, crate_name: &CrateName, owner: &Name) -> Option<&BTreeSet<Name>> {
         self.0.get(crate_name)?.get(owner)
+    }
+
+    fn absorbed(self, part: Holders) -> Holders {
+        let fields = part.0.into_iter().flat_map(|(crate_name, owners)| {
+            owners.into_iter().map(move |(owner, held)| (crate_name.clone(), owner, held))
+        });
+        fields.fold(self, |mut merged, (crate_name, owner, held)| {
+            merged.0.entry(crate_name).or_default().entry(owner).or_default().extend(held);
+            merged
+        })
     }
 }
 
@@ -59,5 +65,11 @@ impl<'ast> Visit<'ast> for Reader<'_, '_> {
                     owners
                 });
         });
+    }
+}
+
+impl FromIterator<Holders> for Holders {
+    fn from_iter<Parts: IntoIterator<Item = Holders>>(parts: Parts) -> Holders {
+        parts.into_iter().fold(Holders::default(), Holders::absorbed)
     }
 }

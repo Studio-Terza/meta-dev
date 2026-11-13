@@ -20,22 +20,6 @@ impl PortTraits {
     const PACING: &str = "Pacing";
 
     #[must_use]
-    pub fn declared(files: &[SourceFile]) -> PortTraits {
-        files.iter().filter_map(SourceFile::shipped).fold(PortTraits::default(), |found, file| {
-            let ground = Gate::PORTS.admits(file.head()).map_or(Ground::Open, |_| Ground::Ports);
-            let mut reader = Reader { ground, found, traits: BTreeSet::new() };
-            reader.visit_file(file.syntax());
-            let mut gathered = reader.found;
-            gathered
-                .declared
-                .entry(CrateName::from(file.head().placement().crate_root()))
-                .or_default()
-                .extend(reader.traits);
-            gathered
-        })
-    }
-
-    #[must_use]
     pub fn declares(&self, crate_name: &Name, trait_name: &Name) -> Option<&Name> {
         self.declared.get(crate_name)?.get(trait_name)
     }
@@ -83,5 +67,32 @@ impl<'ast> Visit<'ast> for Reader {
             ported.iter().flat_map(|_| &item.items).filter_map(Syntax::trait_fn).filter_map(PortTraits::paced_by);
         self.found.paced.extend(paced);
         self.traits.extend(ported);
+    }
+}
+
+impl From<&SourceFile> for PortTraits {
+    fn from(file: &SourceFile) -> PortTraits {
+        let ground = Gate::PORTS.admits(file.head()).map_or(Ground::Open, |_| Ground::Ports);
+        let mut reader = Reader { ground, found: PortTraits::default(), traits: BTreeSet::new() };
+        reader.visit_file(file.syntax());
+        let mut gathered = reader.found;
+        gathered
+            .declared
+            .entry(CrateName::from(file.head().placement().crate_root()))
+            .or_default()
+            .extend(reader.traits);
+        gathered
+    }
+}
+
+impl FromIterator<PortTraits> for PortTraits {
+    fn from_iter<Parts: IntoIterator<Item = PortTraits>>(parts: Parts) -> PortTraits {
+        parts.into_iter().fold(PortTraits::default(), |mut merged, part| {
+            part.declared
+                .into_iter()
+                .for_each(|(crate_name, traits)| merged.declared.entry(crate_name).or_default().extend(traits));
+            merged.paced.extend(part.paced);
+            merged
+        })
     }
 }

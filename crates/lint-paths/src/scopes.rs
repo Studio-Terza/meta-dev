@@ -54,3 +54,18 @@ impl<'file> Scopes<'file> {
         self.guards.get(<&CrateFile>::from(module))?.get(name)
     }
 }
+
+impl<'file> FromIterator<Scopes<'file>> for Scopes<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Scopes<'file>>>(parts: Parts) -> Scopes<'file> {
+        parts.into_iter().fold(Scopes::default(), |mut merged, part| {
+            part.scopes.into_iter().for_each(|(module, scope)| {
+                let held = merged.scopes.remove(&module).unwrap_or_default();
+                merged.scopes.insert(module, [held, scope].into_iter().collect());
+            });
+            part.guards
+                .into_iter()
+                .for_each(|(crate_file, names)| merged.guards.entry(crate_file).or_default().extend(names));
+            merged
+        })
+    }
+}

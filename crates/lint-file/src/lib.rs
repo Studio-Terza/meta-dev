@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
 
-pub use concluded::Concluded;
+pub use concluded::{Concluded, Listed};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {
@@ -76,7 +76,11 @@ pub trait PrimedLint {
 
     fn contributed<'head>(parsed: Parsed<'_, 'head>, primer: &Self::Primer<'head>) -> Self::Part<'head>;
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, context: &Self::Context<'head>) -> Vec<Violation<'file>>;
+    fn judged<'file, 'head: 'file>(
+        file: &'file SourceFile,
+        primer: &Self::Primer<'head>,
+        context: &Self::Context<'head>,
+    ) -> Vec<Violation<'file>>;
 }
 
 #[derive(Debug)]
@@ -88,6 +92,6 @@ impl<Checked: PrimedLint> Lint for Primed<Checked> {
         let context: Checked::Context<'_> =
             files.iter().map(Parsed::from).map(|parsed| Checked::contributed(parsed, &primer)).collect();
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
-        Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &context)).collect())
+        Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::judged(file, &primer, &context)).collect())
     }
 }
