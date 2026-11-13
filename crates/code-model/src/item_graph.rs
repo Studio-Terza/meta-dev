@@ -1,15 +1,9 @@
-mod file_scopes;
-mod node_index;
-mod scope;
-mod traversal;
-
-pub use file_scopes::FileScopes;
-pub use scope::Scope;
-pub use traversal::Traversal;
-
-use node_index::NodeIndex;
-
 use std::collections::{BTreeMap, BTreeSet};
+
+mod node_index;
+
+use crate::traversal::Traversal;
+use node_index::NodeIndex;
 
 #[derive(Clone, Debug)]
 pub struct ItemGraph<Node> {

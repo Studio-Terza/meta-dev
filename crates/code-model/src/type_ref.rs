@@ -1,7 +1,11 @@
 use std::convert::Infallible;
 
+use std::fmt;
+
+use lint_layout::Name;
+
 use crate::resolved::Resolved;
-use crate::sited::Sited;
+use crate::sited::{Sited, Spelling};
 
 pub trait TypeUses {
     fn named(&mut self, named: &Named<Sited>);
@@ -111,6 +115,10 @@ impl AsRef<Resolved> for Named<Sited> {
 impl Named<Sited> {
     pub fn each_inner_use(&self, uses: &mut impl TypeUses) {
         self.parts().children().for_each(|ty| ty.each_use(uses));
+    }
+
+    fn last_spelled(&self) -> Option<&Name> {
+        AsRef::<Spelling>::as_ref(&self.path).written()?.last()
     }
 }
 
@@ -276,5 +284,92 @@ impl<From, Into, Resolve: FnMut(&From) -> Into> Rebuild<From> for Mapping<'_, Re
 
     fn child(&mut self, ty: &TypeRef<From>) -> Result<TypeRef<Into>, Infallible> {
         ty.rebuilt(self)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Brief<'ty>(&'ty TypeRef);
+
+#[derive(Clone, Copy, Debug)]
+enum Separator {
+    Comma,
+    Plus,
+}
+
+impl fmt::Display for Separator {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Separator::Comma => formatter.write_str(", "),
+            Separator::Plus => formatter.write_str(" + "),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Listed<'ty> {
+    separator: Separator,
+    items: &'ty [TypeRef],
+}
+
+impl fmt::Display for Listed<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.items.split_first().into_iter().try_for_each(|(first, rest)| {
+            write!(formatter, "{}", Brief(first))?;
+            rest.iter().try_for_each(|item| write!(formatter, "{}{}", self.separator, Brief(item)))
+        })
+    }
+}
+
+impl fmt::Display for Brief<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            TypeRef::Named(named) => write!(formatter, "{}", named.last_spelled().unwrap_or(&Name::from("_"))),
+            TypeRef::Tuple(items) => write!(formatter, "({})", Listed { separator: Separator::Comma, items }),
+            TypeRef::Reference(inner) => write!(formatter, "&{}", Brief(inner)),
+            TypeRef::Pointer(inner) => write!(formatter, "*const {}", Brief(inner)),
+            TypeRef::Slice(inner) => write!(formatter, "[{}]", Brief(inner)),
+            TypeRef::Array(arrayed) => write!(formatter, "[{}; _]", Brief(&arrayed.element)),
+            TypeRef::Bounded(bounds) => {
+                write!(formatter, "dyn {}", Listed { separator: Separator::Plus, items: bounds })
+            }
+            TypeRef::Function(callable) => write!(formatter, "{callable}"),
+            TypeRef::Projected(_) | TypeRef::Opaque => formatter.write_str("_"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Returned<'ty>(Option<&'ty TypeRef>);
+
+impl fmt::Display for Returned<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Some(returned) => write!(formatter, " -> {}", Brief(returned)),
+            None => Ok(()),
+        }
+    }
+}
+
+impl fmt::Display for Callable<Sited> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let returned = Returned(Some(self.output.as_ref()).filter(|output| output.unit().is_none()));
+        write!(formatter, "fn({}){returned}", Listed { separator: Separator::Comma, items: &self.inputs })
+    }
+}
+
+impl TypeRef {
+    pub(crate) fn innermost(&self) -> Brief<'_> {
+        match self {
+            TypeRef::Reference(inner) => inner.innermost(),
+            TypeRef::Named(_)
+            | TypeRef::Tuple(_)
+            | TypeRef::Pointer(_)
+            | TypeRef::Slice(_)
+            | TypeRef::Array(_)
+            | TypeRef::Bounded(_)
+            | TypeRef::Projected(_)
+            | TypeRef::Function(_)
+            | TypeRef::Opaque => Brief(self),
+        }
     }
 }

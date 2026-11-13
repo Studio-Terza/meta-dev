@@ -1,9 +1,8 @@
 mod collector;
 mod members;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::mem;
-use std::ops::Not;
 
 use lint_core::{Parsed, SourceFile};
 use lint_layout::Name;
@@ -12,7 +11,6 @@ use lint_placement::CrateName;
 use crate::generic_impl::GenericImpl;
 use crate::implementation::Implementation;
 use crate::method::Method;
-use crate::outside::Outside;
 use crate::trait_fact::TraitFact;
 use crate::type_fact::TypeFact;
 use collector::{Collector, ImplBlock};
@@ -78,15 +76,6 @@ impl<'file> Facts<'file> {
             })
             .map(|(name, _)| name)
             .collect()
-    }
-
-    pub fn outside_implementations(&self) -> impl Iterator<Item = Outside<'_, 'file>> + '_ {
-        let declared: BTreeSet<(&CrateName, &Name)> =
-            self.types.iter().map(|found| (AsRef::as_ref(found), AsRef::as_ref(found))).collect();
-        let named = self.members.iter().flat_map(|(krate, named)| named.iter().map(move |each| (*krate, each)));
-        named
-            .filter(move |(krate, (name, _))| declared.contains(&(*krate, *name)).not())
-            .flat_map(|(_, (name, members))| members.implementations().iter().map(move |each| Outside::new(name, each)))
     }
 
     #[must_use]

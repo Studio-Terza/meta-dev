@@ -1,3 +1,4 @@
+use code_model::Model;
 use code_reader::Reader;
 use law_facts::Laws;
 use std::marker::PhantomData;
@@ -11,7 +12,7 @@ impl<Graph: GraphLint> Lint for OnGraph<Graph> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let extraction = Extraction::from(files);
         let laws = Laws::from(files);
-        let model = Reader::read_files(files);
-        Graph::report_graph(&TypeSystem::built_from(&extraction, &laws, &model))
+        let model: &Model = Box::leak(Box::new(Reader::read_files(files)));
+        Graph::report_graph(&TypeSystem::built_from(&extraction, &laws, model))
     }
 }

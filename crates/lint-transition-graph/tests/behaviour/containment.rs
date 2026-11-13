@@ -29,7 +29,7 @@ impl Clustered {
 
 const SPLIT: [Source; 4] = [
     Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A(B);\npub struct B;\npub struct C(std::A);\n"),
-    Clustered::at("crates/x/src/a/mod.rs", "mod b;\nmod c;\npub struct D(E);\n"),
+    Clustered::at("crates/x/src/a/mod.rs", "mod b;\nmod c;\npub struct D(E);\nuse b::E;\n"),
     Clustered::at("crates/x/src/a/b.rs", "pub struct E;\n"),
     Clustered::at("crates/x/src/a/c.rs", "pub struct F;\npub struct G;\n"),
 ];
@@ -210,7 +210,7 @@ fn a_name_declared_in_two_crates_resolves_to_its_qualifier_else_to_the_own_crate
 fn a_field_with_an_unqualified_name_and_a_method_signature_both_link_across_crates() {
     let apart = [
         Clustered::at("crates/x/src/lib.rs", "pub struct W;\n"),
-        Clustered::at("crates/y/src/lib.rs", "pub struct V(W);\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct V(W);\nuse x::W;\n"),
     ];
     let signed = [
         Clustered::at("crates/x/src/lib.rs", "pub struct B;\n"),
@@ -308,7 +308,7 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
         ),
         Clustered::at(
             "crates/x/src/a/mod.rs",
-            "mod deep;\nmod inner;\npub struct Platform;\npub struct Bench(self::inner::Seat);\n",
+            "mod deep;\nmod inner;\npub struct Platform;\npub struct Bench(self::inner::Seat);\npub use inner::Seat;\n",
         ),
         Clustered::at(
             "crates/x/src/a/inner.rs",
@@ -567,7 +567,7 @@ fn field_and_variant_names_are_not_references_but_their_values_are() {
 }
 
 #[test]
-fn a_cycle_closed_through_a_trait_impl_or_an_aliased_field_is_reported() {
+fn a_cycle_closed_through_a_trait_impl_an_aliased_field_or_a_bound_is_reported() {
     let implemented = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
         Clustered::at("crates/x/src/a.rs", "pub struct A;\nimpl crate::b::Tr for A {}\n"),
@@ -578,7 +578,22 @@ fn a_cycle_closed_through_a_trait_impl_or_an_aliased_field_is_reported() {
         Clustered::at("crates/x/src/a.rs", "pub struct A(crate::b::Named);\npub struct C;\n"),
         Clustered::at("crates/x/src/b.rs", "pub type Named = B;\npub struct B(crate::a::C);\n"),
     ];
-    let reported: Vec<Vec<String>> = [implemented, aliased]
+    let supertrait = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub trait A: crate::b::B {}\npub struct C;\n"),
+        Clustered::at("crates/x/src/b.rs", "pub trait B {}\npub struct D(crate::a::C);\n"),
+    ];
+    let bounded = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub enum A<T: crate::b::B> {\n    Held(T),\n}\npub struct C;\n"),
+        Clustered::at("crates/x/src/b.rs", "pub trait B {}\npub struct D(crate::a::C);\n"),
+    ];
+    let associated = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub trait A {\n    type Item: crate::b::B;\n}\npub struct C;\n"),
+        Clustered::at("crates/x/src/b.rs", "pub trait B {}\npub struct D(crate::a::C);\n"),
+    ];
+    let reported: Vec<Vec<String>> = [implemented, aliased, supertrait, bounded, associated]
         .iter()
         .map(|sources| {
             Clustered::lines(sources, |view| {
@@ -593,6 +608,37 @@ fn a_cycle_closed_through_a_trait_impl_or_an_aliased_field_is_reported() {
     };
     assert_eq!(
         reported,
-        [closing("x::a::A -> x::b::Tr, x::b::B -> x::a::A"), closing("x::a::A -> x::b::B, x::b::B -> x::a::C")]
+        [
+            closing("x::a::A -> x::b::Tr, x::b::B -> x::a::A"),
+            closing("x::a::A -> x::b::B, x::b::B -> x::a::C"),
+            closing("x::a::A -> x::b::B, x::b::D -> x::a::C"),
+            closing("x::a::A -> x::b::B, x::b::D -> x::a::C"),
+            closing("x::a::A -> x::b::B, x::b::D -> x::a::C"),
+        ]
+    );
+}
+
+#[test]
+fn a_type_declared_for_tests_uses_nothing() {
+    let in_tests = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A;\n"),
+        Clustered::at("crates/x/src/a.rs", "#[cfg(test)]\nmod tests {\n    pub struct T(crate::A);\n}\n"),
+    ];
+    let shipped = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub mod tests {\n    pub struct T(crate::A);\n}\n"),
+    ];
+    let reported: Vec<Vec<String>> = [in_tests, shipped]
+        .iter()
+        .map(|sources| {
+            Clustered::lines(sources, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec())
+        })
+        .collect();
+    assert_eq!(
+        reported,
+        [
+            Vec::<String>::new(),
+            vec!["crates/x/src/lib.rs:2: x::A is used only within x::a; move it into the lowest cluster that holds all its users".to_owned()],
+        ]
     );
 }

@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use code_model::{Building, FileId, Model};
+use code_model::{Building, FileHome, FileId, Model};
 use lint_core::SourceFile;
 use lint_layout::{Dependencies, Name};
 use lint_placement::{Placement, Role};
@@ -16,6 +16,7 @@ pub(crate) struct Placing {
     crate_file: PathBuf,
     name: Option<Name>,
     krate: Name,
+    module: Vec<Name>,
     dependencies: Dependencies,
 }
 
@@ -27,6 +28,7 @@ impl From<&SourceFile> for Placing {
             crate_file: AsRef::<Path>::as_ref(source.head().crate_file()).to_path_buf(),
             name: Self::library(placement),
             krate: Borrow::<Name>::borrow(placement.package().crate_name()).clone(),
+            module: placement.module().segments().to_vec(),
             dependencies: placement.package().dependencies().clone(),
         }
     }
@@ -135,7 +137,10 @@ impl<'read> Planting<'read> {
             .zip(bodies)
             .map(|(placing, lowered)| Unplanted {
                 placing,
-                file: building.file(placing.path.clone(), placing.krate.clone(), placing.crate_file.clone()),
+                file: building.file(
+                    placing.path.clone(),
+                    FileHome::new(placing.krate.clone(), placing.crate_file.clone(), placing.module.clone()),
+                ),
                 lowered,
             })
             .collect();

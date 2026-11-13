@@ -1,3 +1,7 @@
+use lint_layout::Name;
+
+use crate::type_ref::TypeRef;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileId(usize);
 
@@ -21,5 +25,12 @@ impl ItemId {
 
     pub(crate) fn index(self) -> usize {
         self.0
+    }
+}
+
+impl TypeRef {
+    #[must_use]
+    pub fn brief(&self) -> Name {
+        Name::from(self.innermost().to_string().as_str())
     }
 }

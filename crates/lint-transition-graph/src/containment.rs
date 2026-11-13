@@ -1,36 +1,27 @@
 mod ask;
-mod bodies;
 mod cluster;
 mod connected;
-mod declaration;
 mod groups;
 mod interface;
 mod layered;
 mod link;
-mod located;
 mod member;
+mod members;
 mod outsider;
 mod placed;
-mod resolver;
 mod slice;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
-use code_model::{Model, References};
+use code_model::Model;
 use lint_core::{Headline, Report, Site, Violation};
 use lint_layout::Name;
 
-use crate::system::Extraction;
-
-use bodies::Bodies;
 use cluster::Cluster;
-use declaration::Declaration;
 use link::Link;
-use located::Located;
 use member::Member;
+use members::{Implemented, Members};
 use outsider::Outsider;
-use resolver::{Resolver, StandIns};
 use slice::Slice;
 
 pub use ask::{Answer, Ask, Listed};
@@ -66,64 +57,29 @@ pub struct Containment<'found, 'file> {
 
 impl<'found, 'file> Containment<'found, 'file> {
     #[must_use]
-    pub fn clustered(extraction: &'found Extraction<'file>, model: &'found Model) -> Containment<'found, 'file> {
-        let facts = extraction.facts();
-        let transitions = extraction.transitions();
-        let modules: BTreeMap<&Path, &[Name]> =
-            extraction.scopes().each(|head, _| (head.path(), head.placement().module().segments())).collect();
-        let declarations = Declaration::all(facts);
-        let placed: BTreeMap<Member<'found>, &Declaration<'found, 'file>> = declarations
-            .iter()
-            .filter_map(|declaration| {
-                let site: &Site<'file> = declaration.as_ref();
-                let named: &Member<'found> = declaration.as_ref();
-                modules.get(site.path()).and_then(|segments| named.within(segments)).map(|member| (member, declaration))
-            })
-            .collect();
-        let references = References::from(model);
-        let stand_ins = StandIns::of_model(model, &references);
-        let resolver = &Resolver::of_members(placed.keys().copied(), extraction.scopes(), stand_ins);
-        let located: Vec<Located<'found, 'file>> =
-            facts.outside_implementations().map(|outside| Located::resolved_by(resolver, outside)).collect();
-        let implemented: BTreeSet<Link<'found>> = placed
-            .iter()
-            .flat_map(|(member, declaration)| {
-                declaration.implemented(*member, resolver).into_iter().map(|used| Link::new(*member, used))
-            })
-            .chain(located.iter().flat_map(Located::links))
-            .filter_map(Link::apart)
-            .collect();
-        let defined: BTreeSet<Link<'found>> = placed
-            .iter()
-            .flat_map(|(member, declaration)| declaration.held(*member, resolver))
-            .filter_map(Link::apart)
-            .chain(implemented.iter().copied())
-            .collect();
-        let outsiders = located.iter().flat_map(Located::outsiders).fold(
+    pub fn clustered(model: &'file Model) -> Containment<'found, 'file>
+    where
+        'file: 'found,
+    {
+        let members = Members::from(model);
+        let located = members.implemented();
+        let implemented: BTreeSet<Link<'found>> =
+            located.iter().filter_map(Implemented::link).filter_map(Link::apart).collect();
+        let defined: BTreeSet<Link<'found>> =
+            members.held().into_iter().filter_map(Link::apart).chain(implemented.iter().copied()).collect();
+        let outsiders = located.iter().filter_map(Implemented::outsider).fold(
             BTreeMap::new(),
             |mut outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>, outsider| {
                 outsiders.entry(outsider.holder()).or_default().insert(outsider);
                 outsiders
             },
         );
-        let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
-        let declared = placed.iter().fold(
-            BTreeMap::new(),
-            |mut declared: BTreeMap<Site<'file>, Vec<Member<'found>>>, (member, declaration)| {
-                declared.entry(*AsRef::<Site<'file>>::as_ref(*declaration)).or_default().push(*member);
-                declared
-            },
-        );
-        let bodies = Bodies::placed(model, &declared).links(&references);
         let links: BTreeSet<Link<'found>> =
-            defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
+            defined.iter().copied().chain(members.used()).filter_map(Link::apart).collect();
         let users = Self::adjacency(links.iter().copied().map(Link::reversed));
         Containment {
-            slices: Slice::all(placed.keys().copied(), &users),
-            sites: placed
-                .iter()
-                .map(|(member, declaration)| (*member, *AsRef::<Site<'file>>::as_ref(*declaration)))
-                .collect(),
+            slices: Slice::all(members.declared(), &users),
+            sites: members.sites().iter().map(|(member, site)| (*member, *site)).collect(),
             uses: Self::adjacency(links.iter().copied()),
             users,
             defines: Self::adjacency(defined.into_iter()),
@@ -162,7 +118,7 @@ impl<'found, 'file> Containment<'found, 'file> {
         Some(toward)
             .filter(|candidate| *candidate == Toward::Implementers)
             .into_iter()
-            .flat_map(move |_| self.outsiders.get(&member).into_iter().flatten().copied())
+            .flat_map(move |_| self.outsiders.get(&member).into_iter().flatten().cloned())
     }
 
     pub(crate) fn site(&self, member: Member<'found>) -> Option<Site<'file>> {

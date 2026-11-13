@@ -8,7 +8,6 @@ use std::path::Path;
 use code_model::Model;
 use law_facts::{Laws, Package};
 use lint_core::{Parsed, SourceFile};
-use lint_item_graph::FileScopes;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -24,7 +23,6 @@ use fillers::Fillers;
 pub struct Extraction<'file> {
     facts: Facts<'file>,
     transitions: Transitions<'file>,
-    scopes: FileScopes<'file>,
     fillers: Fillers<'file>,
     packages: BTreeMap<&'file Path, Package<'file>>,
 }
@@ -43,7 +41,6 @@ impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
         Extraction {
             facts: Facts::from(parsed),
             transitions: Transitions::from(parsed),
-            scopes: FileScopes::from(parsed),
             fillers: Fillers::default(),
             packages: BTreeMap::from([(parsed.head().path(), Package::from(parsed.head()))]),
         }
@@ -54,7 +51,6 @@ impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
 struct Parts<'file> {
     facts: Vec<Facts<'file>>,
     transitions: Vec<Transitions<'file>>,
-    scopes: Vec<FileScopes<'file>>,
     fillers: Vec<Fillers<'file>>,
     packages: BTreeMap<&'file Path, Package<'file>>,
 }
@@ -64,7 +60,6 @@ impl<'file> FromIterator<Extraction<'file>> for Extraction<'file> {
         let split = parts.into_iter().fold(Parts::default(), |mut split, part| {
             split.facts.push(part.facts);
             split.transitions.push(part.transitions);
-            split.scopes.push(part.scopes);
             split.fillers.push(part.fillers);
             split.packages.extend(part.packages);
             split
@@ -72,7 +67,6 @@ impl<'file> FromIterator<Extraction<'file>> for Extraction<'file> {
         Extraction {
             facts: split.facts.into_iter().collect(),
             transitions: split.transitions.into_iter().collect(),
-            scopes: split.scopes.into_iter().collect(),
             fillers: split.fillers.into_iter().collect(),
             packages: split.packages,
         }
@@ -90,11 +84,6 @@ impl<'file> Extraction<'file> {
         &self.transitions
     }
 
-    #[must_use]
-    pub fn scopes(&self) -> &FileScopes<'file> {
-        &self.scopes
-    }
-
     pub(crate) fn fillers(&self) -> &Fillers<'file> {
         &self.fillers
     }
@@ -106,7 +95,7 @@ pub struct TypeSystem<'found, 'file> {
     edges: Vec<Edge<'found, 'file>>,
     laws: &'found Laws<'file>,
     extraction: &'found Extraction<'file>,
-    model: &'found Model,
+    model: &'file Model,
     containment: OnceCell<Containment<'found, 'file>>,
     algebras: OnceCell<Algebras<'found, 'file>>,
     declarations: OnceCell<Declarations<'found, 'file>>,
@@ -119,7 +108,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
     pub fn built_from(
         extraction: &'found Extraction<'file>,
         laws: &'found Laws<'file>,
-        model: &'found Model,
+        model: &'file Model,
     ) -> TypeSystem<'found, 'file> {
         let types = WorkspaceTypes::declared(extraction.facts(), extraction.transitions());
         let edges = extraction.transitions().all().map(|found| types.edge(found)).collect();
@@ -139,7 +128,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
 
     #[must_use]
     pub fn containment(&self) -> &Containment<'found, 'file> {
-        self.containment.get_or_init(|| Containment::clustered(self.extraction, self.model))
+        self.containment.get_or_init(|| Containment::clustered(self.model))
     }
 
     #[must_use]

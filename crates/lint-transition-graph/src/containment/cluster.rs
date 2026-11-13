@@ -1,9 +1,7 @@
-use std::borrow::Borrow;
 use std::fmt;
 use std::iter;
 
 use lint_layout::Name;
-use lint_placement::CrateName;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Level {
@@ -14,14 +12,14 @@ pub(crate) enum Level {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Cluster<'found> {
-    krate: Option<&'found CrateName>,
+    krate: Option<&'found Name>,
     segments: &'found [Name],
 }
 
 impl<'found> Cluster<'found> {
     pub(crate) const WORKSPACE: Cluster<'static> = Cluster { krate: None, segments: &[] };
 
-    pub(crate) fn module(krate: &'found CrateName, segments: &'found [Name]) -> Cluster<'found> {
+    pub(crate) fn module(krate: &'found Name, segments: &'found [Name]) -> Cluster<'found> {
         Cluster { krate: Some(krate), segments }
     }
 
@@ -51,11 +49,11 @@ impl<'found> Cluster<'found> {
     }
 
     pub(crate) fn named(self, name: &Name) -> Option<Cluster<'found>> {
-        let own = self.segments.last().or_else(|| self.krate.map(Borrow::borrow));
+        let own = self.segments.last().or(self.krate);
         own.filter(|candidate| *candidate == name).map(|_| self)
     }
 
-    pub(crate) fn krate(&self) -> Option<&'found CrateName> {
+    pub(crate) fn krate(&self) -> Option<&'found Name> {
         self.krate
     }
 
@@ -67,8 +65,8 @@ impl<'found> Cluster<'found> {
 #[derive(Debug)]
 enum Whereabouts<'found> {
     Workspace,
-    Crate(&'found CrateName),
-    Module(&'found CrateName, Segments<'found>),
+    Crate(&'found Name),
+    Module(&'found Name, Segments<'found>),
 }
 
 impl<'found> Whereabouts<'found> {
@@ -79,7 +77,7 @@ impl<'found> Whereabouts<'found> {
         }
     }
 
-    fn within(krate: &'found CrateName, segments: &'found [Name]) -> Whereabouts<'found> {
+    fn within(krate: &'found Name, segments: &'found [Name]) -> Whereabouts<'found> {
         match segments.first() {
             None => Whereabouts::Crate(krate),
             Some(_) => Whereabouts::Module(krate, Segments(segments)),
