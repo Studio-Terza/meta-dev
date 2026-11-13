@@ -35,7 +35,12 @@ impl<'read> Listing<'read> {
             let reach = file.shipped().map_or(Reach::Test, |_| Reach::Shipped);
             std::iter::once((file, reach)).chain(file.test_modules().iter().map(|module| (module, Reach::Test)))
         });
-        Listing(reached.enumerate().map(|(index, (source, reach))| ListedFile { source, reach, order: Order(index) }).collect())
+        Listing(
+            reached
+                .enumerate()
+                .map(|(index, (source, reach))| ListedFile { source, reach, order: Order(index) })
+                .collect(),
+        )
     }
 
     #[must_use]

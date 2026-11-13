@@ -33,7 +33,9 @@ impl UseRow {
     fn kept<'resolved>(&self, resolved: &'resolved Resolved) -> Option<&'resolved Resolved> {
         match self.mention {
             Mention::Invoked => Some(resolved),
-            Mention::Expression | Mention::InMacro => self.written.tail().first().map(|_| resolved).or_else(|| resolved.known()),
+            Mention::Expression | Mention::InMacro => {
+                self.written.tail().first().map(|_| resolved).or_else(|| resolved.known())
+            }
         }
     }
 }
@@ -64,10 +66,10 @@ struct Qualified;
 
 impl Qualified {
     fn written(expression: &ExprPath) -> Option<UsePath> {
-        expression.qself.as_ref().map_or_else(
-            || Some(UsePath::from(&expression.path)),
-            |qself| Self::under_type(qself, &expression.path),
-        )
+        expression
+            .qself
+            .as_ref()
+            .map_or_else(|| Some(UsePath::from(&expression.path)), |qself| Self::under_type(qself, &expression.path))
     }
 
     fn under_type(qself: &QSelf, path: &syn::Path) -> Option<UsePath> {
@@ -95,10 +97,11 @@ impl Lowering<'_> {
     }
 
     pub(super) fn macro_used(&mut self, invoked: &Macro) {
-        let position = invoked.path.segments.last().map_or_else(
-            || Position::from(invoked.path.span()),
-            |last| Position::from(last.ident.span()),
-        );
+        let position = invoked
+            .path
+            .segments
+            .last()
+            .map_or_else(|| Position::from(invoked.path.span()), |last| Position::from(last.ident.span()));
         self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
         TokenPaths::within(invoked.tokens.clone()).into_iter().fold(self, |lowering, spelled| {
             spelled.handed(|path, at| lowering.used(path, at, Mention::InMacro));

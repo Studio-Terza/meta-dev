@@ -15,13 +15,14 @@ use std::sync::Arc;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemFn, ItemEnum, ItemFn,
-    ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Macro, Signature as SynSignature, TraitItemFn,
+    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemFn, ItemEnum,
+    ItemFn, ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Macro, Signature as SynSignature,
+    TraitItemFn,
 };
 
 use code_model::{
-    Alias, Building, Entry, FileId, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Reach,
-    Region, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Building, Entry, FileId, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Reach, Region,
+    Signature, Sited, Spelling, Subject, TypeRef,
 };
 use lint_core::SourceFile;
 use lint_layout::{Name, Position, TestMarks, Whole, Word, words};
@@ -135,7 +136,8 @@ impl Built for ImplRow {
             Sited::new(resolving.path(located.scope(), &path, self.domain), spelling)
         });
         let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, located.scope()));
-        let implementation = Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer()));
+        let implementation =
+            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer()));
         located.implementation(footing, building, implementation)
     }
 }
@@ -333,8 +335,11 @@ impl Lowered {
     pub(crate) fn of_file(source: &SourceFile, reach: Reach) -> Lowered {
         let syntax = source.syntax();
         let shape = FileShape::from(source);
-        let mut lowered =
-            Lowered { openings: Openings::new(Entries::of_items(&syntax.items)), slots: Vec::new(), rows: FileRows::default() };
+        let mut lowered = Lowered {
+            openings: Openings::new(Entries::of_items(&syntax.items)),
+            slots: Vec::new(),
+            rows: FileRows::default(),
+        };
         let mut lowering = Lowering {
             lowered: &mut lowered,
             here: Seat::new(ScopeId::FIRST, shape.children),

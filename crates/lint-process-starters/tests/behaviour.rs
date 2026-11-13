@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use file_ports::{Bytes, Memory};
 use code_reader::Reader;
+use file_ports::{Bytes, Memory};
 use lint_core::{ModelLint, SourceFile, SourceText};
 use lint_placement::Placement;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};

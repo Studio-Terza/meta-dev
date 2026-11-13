@@ -1,7 +1,7 @@
 mod stray;
 
-use lint_core::{Site, Violation};
 use code_model::Ground;
+use lint_core::{Site, Violation};
 
 use super::called::Called;
 use super::effect::Effect;

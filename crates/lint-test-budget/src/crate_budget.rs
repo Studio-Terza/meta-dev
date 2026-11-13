@@ -79,7 +79,6 @@ impl CrateBudget {
     }
 }
 
-
 impl Add for CrateBudget {
     type Output = CrateBudget;
 

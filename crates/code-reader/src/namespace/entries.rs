@@ -398,8 +398,11 @@ impl Entries {
     }
 
     pub(super) fn above(self, base: ScopeId) -> Entries {
-        let declared =
-            self.declared.into_iter().map(|declared| Declared { kind: declared.kind.above(base), ..declared }).collect();
+        let declared = self
+            .declared
+            .into_iter()
+            .map(|declared| Declared { kind: declared.kind.above(base), ..declared })
+            .collect();
         Entries { declared, ..self }
     }
 

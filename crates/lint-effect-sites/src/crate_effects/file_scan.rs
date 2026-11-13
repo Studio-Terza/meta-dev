@@ -5,9 +5,9 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
+use code_model::Ground;
 use lint_core::{Gate, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, Whole};
-use code_model::Ground;
 
 use super::called::Called;
 use super::effect::Effect;

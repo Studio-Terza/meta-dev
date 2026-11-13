@@ -7,8 +7,8 @@ mod vocabulary;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lint_core::{Site, SourceFile, Violation};
 use code_model::{Ground, Model, Reach, Region};
+use lint_core::{Site, SourceFile, Violation};
 use lint_paths::Paths;
 use lint_placement::CrateName;
 
@@ -42,11 +42,12 @@ impl<'file> CrateEffects<'file> {
     #[must_use]
     pub fn of_model(model: &'file Model) -> BTreeMap<CrateName, CrateEffects<'file>> {
         let shipped = model.uses().filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped);
-        let grouped = shipped.fold(BTreeMap::new(), |mut crates: BTreeMap<CrateName, Vec<EffectSite<'file>>>, placed| {
-            let found = Vocabulary::placed_site(placed);
-            crates.entry(CrateName::from(placed.krate())).or_default().extend(found);
-            crates
-        });
+        let grouped =
+            shipped.fold(BTreeMap::new(), |mut crates: BTreeMap<CrateName, Vec<EffectSite<'file>>>, placed| {
+                let found = Vocabulary::placed_site(placed);
+                crates.entry(CrateName::from(placed.krate())).or_default().extend(found);
+                crates
+            });
         grouped
             .into_iter()
             .filter_map(|(krate, sites)| sites.first().map(|_| ()).map(|()| (krate, CrateEffects::sorted(sites))))

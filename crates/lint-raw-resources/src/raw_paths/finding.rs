@@ -1,7 +1,7 @@
 use std::fmt;
 
-use lint_core::Fix;
 use code_model::ItemPath;
+use lint_core::Fix;
 use lint_layout::UsePath;
 
 pub enum Finding<'path> {

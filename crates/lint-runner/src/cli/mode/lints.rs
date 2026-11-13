@@ -242,7 +242,9 @@ impl Work {
 
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Survey => sources.model().map_or_default(|model| Worked::surveying(&Survey::measured(readout.files(), model))),
+            Work::Survey => {
+                sources.model().map_or_default(|model| Worked::surveying(&Survey::measured(readout.files(), model)))
+            }
             Work::Checked(_) | Work::Modelled(_) | Work::Described(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
