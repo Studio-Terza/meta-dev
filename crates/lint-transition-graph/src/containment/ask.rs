@@ -9,6 +9,7 @@ use std::fmt;
 
 use lint_layout::Name;
 
+use super::layered::CrateCycles;
 use super::{Containment, Toward};
 use exported::Exported;
 use home::Home;
@@ -26,6 +27,7 @@ pub enum Ask {
     Cluster(Name),
     Exports(Name),
     Path(Name, Name),
+    Cycles(Name),
 }
 
 #[derive(Debug)]
@@ -62,6 +64,7 @@ impl fmt::Display for Ask {
             Ask::Cluster(name) => write!(formatter, "cluster of {name}:"),
             Ask::Exports(name) => write!(formatter, "exports of {name}:"),
             Ask::Path(from, to) => write!(formatter, "use path from {from} to {to}:"),
+            Ask::Cycles(krate) => write!(formatter, "module cycles in {krate}:"),
         }
     }
 }
@@ -82,6 +85,7 @@ impl fmt::Display for Answer<'_, '_, '_> {
             Ask::Cluster(name) => write!(formatter, "{}\n{}", self.ask, Home::from(Named::new(self.view, name))),
             Ask::Exports(name) => write!(formatter, "{}\n{}", self.ask, Exported::new(self.view, name, self.listed)),
             Ask::Path(from, to) => write!(formatter, "{}\n{}", self.ask, Route::new(self.view, from, to, self.listed)),
+            Ask::Cycles(krate) => write!(formatter, "{}\n{}", self.ask, CrateCycles::new(self.view, krate)),
         }
     }
 }

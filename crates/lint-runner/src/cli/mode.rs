@@ -10,16 +10,16 @@ use std::thread::Scope;
 use cargo_ports::Cargo;
 use code_reader::Reader;
 use file_ports::Files;
-use graph_query::{Query, QueryFailure};
-use law_facts::Laws;
+use graph_query::{Answered, Query, QueryFailure};
 use lint_clones::Clones;
 use lint_core::{Readout, Report, SourceFile};
 use lint_paired_apis::PairedApis;
+use lint_reader::Described;
 use lint_test_budget::TestBudget;
 
 use crate::cli::sources::Gleans;
-use lint_transition_graph::{Extraction, TypeSystem};
 use timer_ports::Timer;
+use workspace_metadata::Metadata;
 
 use super::timings::Measured;
 use super::{Outcome, Sources, Verdict};
@@ -99,7 +99,11 @@ impl Run<'_, '_> {
         match self {
             Run::Gate(crew) => crew.gated(readout, sources, out, err),
             Run::Report => Self::reported(readout.done().files(), out, err),
-            Run::Query(found) => Self::queried(found, readout.done().files(), out, err),
+            Run::Query(found) => Self::queried(
+                found.map(|query| query.answered(readout.done().files(), Self::workspaces(sources))).as_ref(),
+                out,
+                err,
+            ),
         }
     }
 
@@ -108,11 +112,12 @@ impl Run<'_, '_> {
         Outcome::Clean.surveyed(&Elegance::reports(files, &model), out, err)
     }
 
-    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
-        let extraction = Extraction::from(files);
-        let laws = Laws::from(files);
-        let system = TypeSystem::built_from(&extraction, &laws);
-        Outcome::Clean.surveyed(found.map(|query| query.reply(&system)).as_slice(), out, err)
+    fn queried(answered: Option<&Answered>, out: &mut impl Write, err: &mut impl Write) -> Verdict {
+        Outcome::Clean.surveyed(answered.as_slice(), out, err)
+    }
+
+    fn workspaces<'run>(sources: &'run Sources<impl Files, impl Cargo, impl Timer>) -> &'run [Metadata] {
+        sources.located().done().as_ref().ok().map_or(&[][..], Described::workspaces)
     }
 }
 

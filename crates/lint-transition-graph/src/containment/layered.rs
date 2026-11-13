@@ -1,5 +1,8 @@
+use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::fmt;
+
+use lint_layout::Name;
 
 use lint_core::{Fix, Headline, Violation};
 
@@ -20,7 +23,7 @@ impl ClusterLint for AcyclicQuotients {
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
         view.slices()
             .filter(|slice| slice.cluster().level() != Level::Workspace)
-            .flat_map(|slice| Cycle::all(view, slice))
+            .flat_map(|slice| Cycle::all(view, slice, Toward::Defined))
             .filter_map(|cycle| view.first_site(&cycle.members).map(|site| Violation::new(site, &cycle)))
             .collect()
     }
@@ -35,9 +38,9 @@ struct Cycle<'found> {
 }
 
 impl<'found> Cycle<'found> {
-    fn all(view: &Containment<'found, '_>, slice: &Slice<'found>) -> Vec<Cycle<'found>> {
+    fn all(view: &Containment<'found, '_>, slice: &Slice<'found>, toward: Toward) -> Vec<Cycle<'found>> {
         let cluster = slice.cluster();
-        slice.quotient(view, Toward::Defined).cycles(|parts, crossing| Cycle::closed(cluster, parts, crossing))
+        slice.quotient(view, toward).cycles(|parts, crossing| Cycle::closed(cluster, parts, crossing))
     }
 }
 
@@ -67,5 +70,40 @@ impl fmt::Display for Cycle<'_> {
 impl lint_core::Finding for Cycle<'_> {
     fn fix(&self) -> Fix {
         Fix::new("move the shared types into one part that the others use, so the parts form layers")
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct CrateCycles<'view, 'found, 'file> {
+    view: &'view Containment<'found, 'file>,
+    krate: &'view Name,
+}
+
+impl<'view, 'found, 'file> CrateCycles<'view, 'found, 'file> {
+    pub(crate) fn new(
+        view: &'view Containment<'found, 'file>,
+        krate: &'view Name,
+    ) -> CrateCycles<'view, 'found, 'file> {
+        CrateCycles { view, krate }
+    }
+
+    fn found(&self, toward: Toward) -> Vec<Cycle<'found>> {
+        self.view
+            .slices()
+            .filter(|slice| slice.cluster().krate().is_some_and(|krate| Borrow::<Name>::borrow(krate) == self.krate))
+            .flat_map(|slice| Cycle::all(self.view, slice, toward))
+            .filter(|cycle| cycle.members.first().is_some())
+            .collect()
+    }
+}
+
+impl fmt::Display for CrateCycles<'_, '_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let defined = self.found(Toward::Defined);
+        let used = self.found(Toward::Used);
+        writeln!(formatter, "  through definitions: {}", defined.len())?;
+        defined.iter().try_for_each(|cycle| writeln!(formatter, "    {cycle}"))?;
+        writeln!(formatter, "  through uses: {}", used.len())?;
+        used.iter().try_for_each(|cycle| writeln!(formatter, "    {cycle}"))
     }
 }

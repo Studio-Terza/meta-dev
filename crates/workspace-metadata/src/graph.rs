@@ -1,4 +1,5 @@
 mod bypasses;
+mod chain;
 mod claims;
 mod closure;
 mod requires;
@@ -17,6 +18,8 @@ use crate::metadata::{Metadata, Package, PortTable};
 use crate::package_id::PackageId;
 use crate::role::Role;
 pub use bypasses::{Bypass, Bypasses, DependencyKeys};
+use chain::Chain;
+pub use chain::Chained;
 use claims::Claims;
 use closure::Closure;
 use requires::Requires;
@@ -52,6 +55,15 @@ impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
 }
 
 impl<'meta> Graph<'meta> {
+    #[must_use]
+    pub fn chained(&self) -> Vec<Chained<'meta>> {
+        let below = self.members.iter().map(|id| {
+            let reached = Closure::reached(&self.normal, BTreeSet::from([*id])).into_inner();
+            (*id, reached.intersection(&self.members).copied().filter(|other| other != id).collect())
+        });
+        Chain::from(below.collect::<BTreeMap<_, _>>()).placed(|id| self.packages.get(id).map(|package| package.name()))
+    }
+
     #[must_use]
     pub fn bypasses(&self) -> Bypasses<'meta> {
         let units = self.units();

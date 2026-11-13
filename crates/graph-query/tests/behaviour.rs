@@ -280,3 +280,25 @@ laws::table!(a_path_is_the_shortest_from_any_type_of_the_starting_name, Asked::c
         "  shop::Cents at crates/shop/src/lib.rs:1".to_owned(),
     ],
 ]);
+
+laws::table!(module_cycles_inside_a_crate_are_listed_by_definitions_and_by_uses, Asked::answered, [
+    &["--cycles", "shop"][..] => vec![
+        "module cycles in shop:".to_owned(),
+        "  through definitions: 1".to_owned(),
+        "    in crate shop, the parts crate shop own file, shop::till use one another in a cycle, through shop::Basket -> shop::till::Line, shop::till::Line -> shop::Cents, shop::till::Line -> shop::Priced".to_owned(),
+        "  through uses: 1".to_owned(),
+        "    in crate shop, the parts crate shop own file, shop::till use one another in a cycle, through shop::Basket -> shop::till::Line, shop::till::Line -> shop::Cents, shop::till::Line -> shop::Priced".to_owned(),
+    ],
+    &["--cycles", "bank"][..] => vec![
+        "module cycles in bank:".to_owned(),
+        "  through definitions: 0".to_owned(),
+        "  through uses: 0".to_owned(),
+    ],
+]);
+
+#[test]
+fn the_crates_flag_alone_asks_for_crate_sizes() {
+    let files = Asked::tree();
+    let answered = Asked::query(&["--crates"]).map(|query| query.answered(&files, &[]).to_string());
+    assert!(answered.is_ok_and(|text| text.contains("crates by size and place on the compile chain:")));
+}
