@@ -2,13 +2,12 @@ mod arms;
 
 use std::path::Path;
 
-use std::ptr;
-
 use syn::{Block, Expr, ExprIf, ExprMatch, Stmt};
 
 use crate::function_flow::found::Found;
 use crate::verdict::Verdict;
 use arms::Arms;
+use lint_sweep::Address;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Root<'ast> {
@@ -49,17 +48,11 @@ impl<'ast> Root<'ast> {
         }
     }
 
-    pub fn routing_match(self, expr: &ExprMatch) -> Option<&'ast ExprMatch> {
+    pub fn address(self) -> Option<Address> {
         match self {
-            Root::Match(routed) => Some(routed).filter(|candidate| ptr::eq(*candidate, expr)),
-            Root::IfLet(_) | Root::Body => None,
-        }
-    }
-
-    pub fn routing_if(self, expr: &ExprIf) -> Option<&'ast ExprIf> {
-        match self {
-            Root::IfLet(routed) => Some(routed).filter(|candidate| ptr::eq(*candidate, expr)),
-            Root::Match(_) | Root::Body => None,
+            Root::Match(routed) => Some(Address::from(routed)),
+            Root::IfLet(routed) => Some(Address::from(routed)),
+            Root::Body => None,
         }
     }
 

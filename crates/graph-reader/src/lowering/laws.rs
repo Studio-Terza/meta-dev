@@ -147,7 +147,7 @@ impl Built for LawRow {
     }
 }
 
-impl Lowering<'_> {
+impl Lowering {
     pub(super) fn law_row(&self, invocation: &Macro) -> Option<LawRow> {
         Kinds::of_macro(invocation).map(|kind| {
             let title = invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident));

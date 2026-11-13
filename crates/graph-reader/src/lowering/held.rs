@@ -1,5 +1,5 @@
 use syn::spanned::Spanned;
-use syn::{Field, Generics, Ident, ItemStruct, ItemTrait};
+use syn::{Attribute, Field, Generics, Ident, ItemStruct, ItemTrait, Type};
 
 use graph::{Building, Held, Holding, ItemId};
 use lint_core::Syntax;
@@ -12,6 +12,7 @@ use super::seat::{Built, Footing, Located};
 use super::signature::{InScope, Written};
 use super::{ImplRow, Lowering};
 use graph::{Region, TypeRef};
+use lint_sweep::Descend;
 
 #[derive(Clone, Debug)]
 pub(super) struct Holder {
@@ -77,7 +78,13 @@ impl Built for HoldingRow {
     }
 }
 
-impl Lowering<'_> {
+impl Lowering {
+    pub(super) fn valued(&mut self, ident: &Ident, ty: &Type, attributes: &[Attribute]) -> Descend {
+        let target = self.generics.lowered(ty);
+        self.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
+        self.owned_by(ident, Domain::Values, attributes)
+    }
+
     pub(super) fn hold(&mut self, holder: Holder, link: Link, ty: TypeRef<Written>) {
         let located = self.here.located(holder.position);
         self.lowered.rows.holdings.push(HoldingRow { located, holder, region: self.context.region(), link, ty });

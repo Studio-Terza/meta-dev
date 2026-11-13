@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use graph::{Model, Reach};
 use lint_core::SourceFile;
 
-use crate::lowering::Lowered;
+use crate::lowering::{Lowered, Lowering};
 use crate::planting::{Placing, Planting};
+use lint_sweep::{Gathers, Sweep, Watching};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Index(usize);
@@ -23,23 +24,60 @@ struct ListedFile<'read> {
     order: Order,
 }
 
-impl ListedFile<'_> {
-    fn lowered(&self) -> FileFacts {
-        FileFacts {
+impl<'read> ListedFile<'read> {
+    fn lowering(&self) -> FileLowering<'read> {
+        FileLowering {
+            source: self.source,
             order: self.order.clone(),
-            placing: Placing::from(self.source),
-            lowered: Lowered::of_file(self.source, self.reach),
+            lowering: Lowering::of_file(self.source, self.reach),
         }
+    }
+}
+
+#[derive(Debug)]
+struct FileLowering<'read> {
+    source: &'read SourceFile,
+    order: Order,
+    lowering: Lowering,
+}
+
+impl Gathers<FileFacts> for FileLowering<'_> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(&mut self.lowering)
+    }
+
+    fn gathered(self) -> FileFacts {
+        FileFacts { order: self.order, placing: Placing::from(self.source), lowered: self.lowering.lowered() }
+    }
+}
+
+#[derive(Debug)]
+pub struct GroupLowering<'read> {
+    head: Option<FileLowering<'read>>,
+    modules: Vec<FileLowering<'read>>,
+}
+
+impl Gathers<Vec<FileFacts>> for GroupLowering<'_> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        self.head.as_mut().map_or_default(Gathers::watching)
+    }
+
+    fn gathered(self) -> Vec<FileFacts> {
+        let swept = self.modules.into_iter().map(|module| Sweep::gathered(module.source, module));
+        self.head.into_iter().map(Gathers::gathered).chain(swept).collect()
     }
 }
 
 #[derive(Debug)]
 pub struct ListedGroup<'read>(Vec<ListedFile<'read>>);
 
-impl ListedGroup<'_> {
+impl<'read> ListedGroup<'read> {
     #[must_use]
-    pub fn lowered(&self) -> Vec<FileFacts> {
-        self.0.iter().map(ListedFile::lowered).collect()
+    pub fn lowering(&self) -> GroupLowering<'read> {
+        GroupLowering {
+            head: self.0.first().map(ListedFile::lowering),
+            modules: self.0.iter().skip(1).map(ListedFile::lowering).collect(),
+        }
     }
 }
 

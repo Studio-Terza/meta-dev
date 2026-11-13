@@ -1,99 +1,86 @@
+mod root;
+
 use std::path::Path;
 
 use proc_macro2::Span;
 use syn::spanned::Spanned;
-use syn::{ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, Item, Local, Macro};
+use syn::{Block, ExprBinary, ExprIf, ExprMatch, ExprUnary, Local};
 
-use lint_core::{Site, SourceFile};
+use lint_core::Site;
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::Address;
 
+use super::FunctionFlow;
 use crate::finding::Finding;
 use crate::function_flow::found::Found;
-use crate::function_flow::root::Root;
+use crate::verdict::Verdict;
+use root::Root;
 
 #[derive(Debug)]
-pub struct Scan<'file, 'body> {
+pub struct Opened<'file> {
     path: &'file Path,
-    root: Root<'body>,
+    body: Option<Address>,
+    site: Site<'file>,
+    shape: Verdict,
+    root: Option<Address>,
     found: Vec<Found<'file>>,
+    faults: Vec<Found<'file>>,
 }
 
-impl<'file, 'body> Scan<'file, 'body> {
-    pub fn new(file: &'file SourceFile, root: Root<'body>) -> Scan<'file, 'body> {
-        Scan { path: file.head().path(), root, found: Vec::new() }
+impl<'file> Opened<'file> {
+    pub fn new(path: &'file Path, name: Span, body: &Block) -> Opened<'file> {
+        let root = Root::from(body);
+        Opened {
+            path,
+            body: Some(Address::from(body)),
+            site: Site::new(path, LineNumber::from(name)),
+            shape: root.verdict(),
+            root: root.address(),
+            found: Vec::new(),
+            faults: root.faults(path),
+        }
     }
 
-    pub fn into_found(self) -> Vec<Found<'file>> {
-        self.found
+    pub fn entered(&mut self, block: &Block) {
+        self.body = self.body.filter(|body| *body != Address::from(block));
     }
 
-    fn record(&mut self, span: Span, finding: Option<Finding>) -> Descend {
-        self.found.extend(finding.map(|flagged| Found::new(Site::new(self.path, LineNumber::from(span)), flagged)));
-        Descend::Into
-    }
-}
-
-impl<'ast> Watch<'ast> for Scan<'_, '_> {
-    fn kinds(&self) -> &'static [Kind] {
-        &[
-            Kind::Item,
-            Kind::Macro,
-            Kind::ExprIf,
-            Kind::ExprMatch,
-            Kind::ExprWhile,
-            Kind::ExprForLoop,
-            Kind::ExprLoop,
-            Kind::Local,
-            Kind::ExprBinary,
-            Kind::ExprUnary,
-        ]
+    pub fn active(&mut self) -> Option<&mut Opened<'file>> {
+        self.body.map_or(Some(self), |_| None)
     }
 
-    fn on_item(&mut self, _: &'ast Item) -> Descend {
-        Descend::Over
+    pub fn closed(self) -> FunctionFlow<'file> {
+        FunctionFlow { site: self.site, shape: self.shape, found: self.found.into_iter().chain(self.faults).collect() }
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
-        Descend::Expand
+    pub fn record(&mut self, span: Span, finding: Option<Finding>) {
+        let path = self.path;
+        self.found.extend(finding.map(|flagged| Found::new(Site::new(path, LineNumber::from(span)), flagged)));
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf) -> Descend {
-        let finding = self.root.routing_if(expr).map_or_else(|| Some(Finding::branching(&expr.cond)), |_| None);
-        self.record(expr.if_token.span, finding)
+    pub fn branched(&mut self, expr: &ExprIf) {
+        let rooted = self.root.filter(|root| *root == Address::from(expr));
+        self.record(expr.if_token.span, rooted.map_or_else(|| Some(Finding::branching(&expr.cond)), |_| None));
     }
 
-    fn on_expr_match(&mut self, expr: &'ast ExprMatch) -> Descend {
-        let finding = self.root.routing_match(expr).map_or(Some(Finding::Match), |_| None);
-        self.record(expr.match_token.span, finding)
+    pub fn matched(&mut self, expr: &ExprMatch) {
+        let rooted = self.root.filter(|root| *root == Address::from(expr));
+        self.record(expr.match_token.span, rooted.map_or(Some(Finding::Match), |_| None));
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
-        self.record(expr.while_token.span, Some(Finding::While))
-    }
-
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
-        self.record(expr.for_token.span, Some(Finding::For))
-    }
-
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
-        self.record(expr.loop_token.span, Some(Finding::Loop))
-    }
-
-    fn on_local(&mut self, local: &'ast Local) -> Descend {
+    pub fn bound(&mut self, local: &Local) {
         let otherwise = local.init.as_ref().and_then(|init| init.diverge.as_ref());
-        self.found.extend(
-            otherwise
-                .map(|(token, _)| Found::new(Site::new(self.path, LineNumber::from(token.span)), Finding::LetElse)),
+        self.record(
+            otherwise.map_or_else(Span::call_site, |(token, _)| token.span),
+            otherwise.map(|_| Finding::LetElse),
         );
-        Descend::Into
     }
 
-    fn on_expr_binary(&mut self, expr: &'ast ExprBinary) -> Descend {
-        self.record(expr.op.span(), Finding::joining(expr.op))
+    pub fn joined(&mut self, expr: &ExprBinary) {
+        self.record(expr.op.span(), Finding::joining(expr.op));
     }
 
-    fn on_expr_unary(&mut self, expr: &'ast ExprUnary) -> Descend {
-        self.record(expr.op.span(), Finding::negating(expr.op))
+    pub fn negated(&mut self, expr: &ExprUnary) {
+        self.record(expr.op.span(), Finding::negating(expr.op));
     }
 }

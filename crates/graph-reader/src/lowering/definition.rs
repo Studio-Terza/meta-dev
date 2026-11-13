@@ -2,14 +2,15 @@ mod repetitions;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::visit::{self, Visit};
 use syn::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, Type};
 
-use body_lifts::{Body, BodyReading, Branches, Branching, Propagation};
+use body_lifts::{Body, BodyReading, Branching};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
+use lint_sweep::{Address, Descend, Kind, Sweep, Watch};
 
+use crate::branches::{Branches, Propagation};
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
@@ -18,6 +19,7 @@ use repetitions::Repetitions;
 #[derive(Debug)]
 enum LoweredReceiving {
     Owner,
+    Named(Name),
     Bound(TypeRef<Written>),
     Call(CallOrder),
     Unknown,
@@ -38,9 +40,15 @@ pub(super) struct LoweredDefinition {
 }
 
 #[derive(Debug)]
+struct Calling {
+    receiver: Option<Address>,
+    called: Option<CallOrder>,
+}
+
+#[derive(Debug, Default)]
 struct Invocations {
-    bound: BTreeMap<Name, TypeRef<Written>>,
     made: Vec<LoweredInvocation>,
+    calling: Vec<Calling>,
 }
 
 #[derive(Debug, Default)]
@@ -48,7 +56,11 @@ struct Rebound(BTreeSet<Name>);
 
 impl LoweredDefinition {
     pub(super) fn of_body(scope: &InScope, signature: &Signature, body: &Block) -> LoweredDefinition {
-        let rebound = Rebound::bindings_in(body);
+        let mut rebound = Rebound::default();
+        let mut invocations = Invocations::default();
+        let mut branches = Branches::new(Propagation::Ambient);
+        let mut repetitions = Repetitions::of_signature(signature);
+        Sweep::over_block(body, vec![&mut rebound, &mut invocations, &mut branches, &mut repetitions]);
         let parameters: BTreeMap<Name, TypeRef<Written>> = signature
             .inputs
             .iter()
@@ -56,17 +68,15 @@ impl LoweredDefinition {
             .filter_map(|typed| Some((Name::from(&Syntax::pat_ident(&typed.pat)?.ident), &typed.ty)))
             .map(|(name, ty)| (name, scope.lowered(ty).dereferenced().clone()))
             .collect();
-        let bound = rebound.iter().fold(parameters, |mut kept: BTreeMap<Name, TypeRef<Written>>, name| {
+        let bound = rebound.0.iter().fold(parameters, |mut kept: BTreeMap<Name, TypeRef<Written>>, name| {
             kept.remove(name);
             kept
         });
-        let mut scan = Invocations { bound, made: Vec::new() };
-        scan.visit_block(body);
         LoweredDefinition {
             shape: BodyReading::classified(body),
-            branching: Branches::scored(body, Propagation::Ambient),
-            invocations: scan.made,
-            repetitions: Repetitions::of_body(signature, body),
+            branching: branches.score(),
+            invocations: invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
+            repetitions: repetitions.found(),
         }
     }
 
@@ -86,6 +96,15 @@ impl LoweredInvocation {
             LoweredInvocation::Path { owner, name } => Invocation::Path { owner, name },
         }
     }
+
+    fn bound(self, bound: &BTreeMap<Name, TypeRef<Written>>) -> LoweredInvocation {
+        match self {
+            LoweredInvocation::Method { receiver, name } => {
+                LoweredInvocation::Method { receiver: receiver.bound(bound), name }
+            }
+            LoweredInvocation::Path { .. } => self,
+        }
+    }
 }
 
 impl LoweredReceiving {
@@ -94,18 +113,36 @@ impl LoweredReceiving {
             LoweredReceiving::Owner => Receiving::Owner,
             LoweredReceiving::Bound(ty) => Receiving::Bound(Written::typed(&ty, resolving, scope)),
             LoweredReceiving::Call(order) => Receiving::Call(order),
-            LoweredReceiving::Unknown => Receiving::Unknown,
+            LoweredReceiving::Named(_) | LoweredReceiving::Unknown => Receiving::Unknown,
         }
+    }
+
+    fn bound(self, bound: &BTreeMap<Name, TypeRef<Written>>) -> LoweredReceiving {
+        match self {
+            LoweredReceiving::Named(name) => {
+                bound.get(&name).map_or(LoweredReceiving::Unknown, |ty| LoweredReceiving::Bound(ty.clone()))
+            }
+            LoweredReceiving::Owner
+            | LoweredReceiving::Bound(_)
+            | LoweredReceiving::Call(_)
+            | LoweredReceiving::Unknown => self,
+        }
+    }
+}
+
+impl Calling {
+    fn marked(&mut self, latest: Option<CallOrder>) {
+        self.called = latest;
     }
 }
 
 impl Invocations {
     const OWNER: Word<'static> = Word::new("self");
 
-    fn receiver(&self, found: &Expr, called: Option<CallOrder>) -> LoweredReceiving {
+    fn receiver(found: &Expr, called: Option<CallOrder>) -> LoweredReceiving {
         match found {
             Expr::Path(path) => {
-                path.path.get_ident().map_or(LoweredReceiving::Unknown, |ident| self.named(&Name::from(ident)))
+                path.path.get_ident().map_or(LoweredReceiving::Unknown, |ident| Self::named(Name::from(ident)))
             }
             Expr::MethodCall(_) => called.map_or(LoweredReceiving::Unknown, LoweredReceiving::Call),
             Expr::Call(call) => {
@@ -115,48 +152,71 @@ impl Invocations {
         }
     }
 
-    fn named(&self, name: &Name) -> LoweredReceiving {
-        name.matches::<Whole>(&[Self::OWNER]).map_or_else(
-            || self.bound.get(name).map_or(LoweredReceiving::Unknown, |ty| LoweredReceiving::Bound(ty.clone())),
-            |_| LoweredReceiving::Owner,
-        )
+    fn named(name: Name) -> LoweredReceiving {
+        name.matches::<Whole>(&[Self::OWNER]).map_or(LoweredReceiving::Named(name), |_| LoweredReceiving::Owner)
+    }
+
+    fn made(&mut self, made: Option<LoweredInvocation>, at: Address) -> Descend {
+        self.made.extend(made);
+        let latest = CallOrder::latest(&self.made);
+        self.calling
+            .last_mut()
+            .into_iter()
+            .filter(|calling| calling.receiver == Some(at))
+            .for_each(|calling| calling.marked(latest));
+        Descend::Into
+    }
+
+    fn receiving(receiver: &Expr) -> Option<Address> {
+        match receiver {
+            Expr::MethodCall(inner) => Some(Address::from(inner)),
+            Expr::Call(inner) => Some(Address::from(inner)),
+            _ => None,
+        }
     }
 }
 
-impl<'ast> Visit<'ast> for Invocations {
-    fn visit_item(&mut self, _nested: &'ast Item) {}
-
-    fn visit_expr_method_call(&mut self, found: &'ast ExprMethodCall) {
-        self.visit_expr(&found.receiver);
-        let called = CallOrder::latest(&self.made);
-        let receiver = self.receiver(&found.receiver, called);
-        found.args.iter().for_each(|argument| self.visit_expr(argument));
-        self.made.push(LoweredInvocation::Method { receiver, name: Name::from(&found.method) });
+impl<'ast> Watch<'ast> for Invocations {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Item, Kind::ExprMethodCall, Kind::ExprCall]
     }
 
-    fn visit_expr_call(&mut self, found: &'ast ExprCall) {
-        visit::visit_expr_call(self, found);
+    fn on_item(&mut self, _: &'ast Item) -> Descend {
+        Descend::Over
+    }
+
+    fn on_expr_method_call(&mut self, found: &'ast ExprMethodCall) -> Descend {
+        self.calling.push(Calling { receiver: Self::receiving(&found.receiver), called: None });
+        Descend::Into
+    }
+
+    fn off_expr_method_call(&mut self, found: &'ast ExprMethodCall) {
+        let called = self.calling.pop().and_then(|calling| calling.called);
+        let receiver = Self::receiver(&found.receiver, called);
+        self.made(Some(LoweredInvocation::Method { receiver, name: Name::from(&found.method) }), Address::from(found));
+    }
+
+    fn off_expr_call(&mut self, found: &'ast ExprCall) {
         let segments: Vec<Name> = Syntax::expr_path(&found.func)
             .map_or_default(|path| path.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect());
         let owner = segments.iter().rev().nth(1).cloned();
-        self.made.extend(segments.last().cloned().map(|name| LoweredInvocation::Path { owner, name }));
+        let made = segments.last().cloned().map(|name| LoweredInvocation::Path { owner, name });
+        self.made(made, Address::from(found));
     }
 }
 
-impl Rebound {
-    fn bindings_in(body: &Block) -> BTreeSet<Name> {
-        let mut scan = Rebound::default();
-        scan.visit_block(body);
-        scan.0
+impl<'ast> Watch<'ast> for Rebound {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Item, Kind::PatIdent]
     }
-}
 
-impl<'ast> Visit<'ast> for Rebound {
-    fn visit_item(&mut self, _nested: &'ast Item) {}
+    fn on_item(&mut self, _: &'ast Item) -> Descend {
+        Descend::Over
+    }
 
-    fn visit_pat_ident(&mut self, found: &'ast PatIdent) {
+    fn on_pat_ident(&mut self, found: &'ast PatIdent) -> Descend {
         self.0.insert(Name::from(&found.ident));
-        visit::visit_pat_ident(self, found);
+        Descend::Into
     }
 }
 

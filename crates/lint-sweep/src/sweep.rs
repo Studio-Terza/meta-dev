@@ -52,6 +52,10 @@ impl Sweep {
         Sweep::sweeping(Some(file), vec![watcher]).visit_block(block);
     }
 
+    pub fn over_block<'run>(block: &syn::Block, watchers: Vec<&'run mut Watching<'run>>) {
+        Sweep::sweeping(None, watchers).visit_block(block);
+    }
+
     pub fn through_expr(expr: &syn::Expr, watcher: &mut Watching<'_>) {
         Sweep::sweeping(None, vec![watcher]).visit_expr(expr);
     }
@@ -62,6 +66,10 @@ impl Sweep {
 
     pub fn through_pat(pat: &syn::Pat, watcher: &mut Watching<'_>) {
         Sweep::sweeping(None, vec![watcher]).visit_pat(pat);
+    }
+
+    pub fn through_item(item: &syn::Item, watcher: &mut Watching<'_>) {
+        Sweep::sweeping(None, vec![watcher]).visit_item(item);
     }
 
     fn sweeping<'file, 'run>(
@@ -143,6 +151,7 @@ struct Entered {
 
 impl<'ast> Visit<'ast> for Sweeping<'_, '_> {
     fn visit_macro(&mut self, node: &'ast Macro) {
+        self.file.map_or_default(|file| Macros::pin(file, node));
         let entered = self.entered(Kind::Macro, |watcher| watcher.on_macro(node));
         self.muting.awake().into_iter().for_each(|_| visit::visit_macro(self, node));
         entered.expanding.first().into_iter().for_each(|_| self.expanded(&entered, node));
