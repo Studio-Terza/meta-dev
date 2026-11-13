@@ -1523,16 +1523,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-item-graph"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-layout",
- "proc-macro2",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "lint-layout"
 version = "0.1.0"
 dependencies = [
