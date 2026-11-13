@@ -30,7 +30,10 @@ pub struct Extraction<'file> {
 
 impl<'file> From<&'file [SourceFile]> for Extraction<'file> {
     fn from(files: &'file [SourceFile]) -> Extraction<'file> {
-        files.iter().map(Parsed::from).map(Extraction::from).collect()
+        let extraction: Extraction<'file> = files.iter().map(Parsed::from).map(Extraction::from).collect();
+        let fillers =
+            files.iter().map(|file| Fillers::read(Parsed::from(file), ParallelStructures::EQUIVALENCE)).collect();
+        Extraction { fillers, ..extraction }
     }
 }
 
@@ -40,7 +43,7 @@ impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
             facts: Facts::from(parsed),
             transitions: Transitions::from(parsed),
             names: FileNames::from(parsed),
-            fillers: Fillers::read(parsed, ParallelStructures::EQUIVALENCE),
+            fillers: Fillers::default(),
             packages: BTreeMap::from([(parsed.head().path(), Package::from(parsed.head()))]),
         }
     }
