@@ -7,19 +7,30 @@ use lint_core::{SourceFile, Walk};
 use lint_layout::Name;
 
 #[derive(Debug, Default)]
-pub(crate) struct Consumers {
+pub struct Consumers {
     bounds: BTreeSet<Name>,
     called: BTreeSet<Name>,
 }
 
-impl Consumers {
-    pub(crate) fn of_files<'file>(files: impl Iterator<Item = &'file SourceFile>) -> Consumers {
-        files.fold(Consumers::default(), |mut scan, file| {
-            scan.visit_file(file.syntax());
-            scan
+impl From<&SourceFile> for Consumers {
+    fn from(file: &SourceFile) -> Consumers {
+        let mut scan = Consumers::default();
+        scan.visit_file(file.syntax());
+        scan
+    }
+}
+
+impl FromIterator<Consumers> for Consumers {
+    fn from_iter<Parts: IntoIterator<Item = Consumers>>(parts: Parts) -> Consumers {
+        parts.into_iter().fold(Consumers::default(), |mut merged, part| {
+            merged.bounds.extend(part.bounds);
+            merged.called.extend(part.called);
+            merged
         })
     }
+}
 
+impl Consumers {
     pub(crate) fn consuming<'name>(&'name self, name: &'name Name, provided: &'name [Name]) -> Option<&'name Name> {
         self.bounds.get(name).or_else(|| provided.iter().find(|method| self.called.contains(*method)))
     }

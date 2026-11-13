@@ -1,4 +1,4 @@
-use lint_core::SourceFile;
+use lint_core::{FileHead, SourceFile};
 use lint_layout::Name;
 use lint_placement::CrateFile;
 
@@ -13,7 +13,12 @@ impl<'file> Module<'file> {
 
     #[must_use]
     pub fn of_file(file: &'file SourceFile) -> Module<'file> {
-        Module { crate_file: file.head().crate_file(), path: file.head().placement().module().segments().to_vec() }
+        Module::of_head(file.head())
+    }
+
+    #[must_use]
+    pub fn of_head(head: &'file FileHead) -> Module<'file> {
+        Module { crate_file: head.crate_file(), path: head.placement().module().segments().to_vec() }
     }
 
     #[must_use]

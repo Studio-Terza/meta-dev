@@ -36,13 +36,14 @@ impl ContextLint for NamedNumbers {
     );
     const READS: Reads = Reads::Shipped;
 
+    type Part<'head> = SupportPaths;
     type Context<'head> = SupportPaths;
 
     fn contributed(parsed: Parsed<'_, '_>) -> SupportPaths {
         SupportPaths(SupportModules::paths(parsed.file()).into_iter().collect())
     }
 
-    fn judged<'file>(file: &'file SourceFile, support: &SupportPaths) -> Vec<Violation<'file>> {
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, support: &SupportPaths) -> Vec<Violation<'file>> {
         let counted = Some(file)
             .filter(|found| Gate::BOUNDARY.admits(found.head()).is_none())
             .and_then(|found| support.0.get(found.head().path()).map_or(Some(found), |_| None));

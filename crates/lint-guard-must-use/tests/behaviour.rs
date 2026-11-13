@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_fixtures::{Lines, Located, Source, Sources, Text};
 use lint_guard_must_use::GuardMustUse;
 
@@ -29,7 +30,7 @@ const ALIASED: &str = "pub struct Lock;\ntype Held = Lock;\nimpl Drop for Held {
 const UNION: &str = "pub union Lock {\n    a: u8,\n}\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const MARKED_HERE: &str = "#[must_use]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 
-laws::table!(unmarked_guards_are_flagged, Sources::flagged::<GuardMustUse>, [
+laws::table!(unmarked_guards_are_flagged, Sources::flagged::<Judged<GuardMustUse>>, [
     [Source::new(Located::new("a.rs"), Text::new(UNMARKED_ENUM))] => Lines::from(["a.rs:1"]),
     [Source::new(Located::new("a.rs"), Text::new(GENERIC))] => Lines::from(["a.rs:1"]),
     [Source::new(Located::new("a.rs"), Text::new(QUALIFIED))] => Lines::from(["a.rs:1"]),
@@ -42,7 +43,7 @@ laws::table!(unmarked_guards_are_flagged, Sources::flagged::<GuardMustUse>, [
     [Source::new(Located::new("a.rs"), Text::new(MARK_AS_ARGUMENT))] => Lines::from(["a.rs:2"]),
 ]);
 
-laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<GuardMustUse>, [
+laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<Judged<GuardMustUse>>, [
     [Source::new(Located::new("a.rs"), Text::new(MARKED_REASON))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(INHERENT))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(DROP_OF_REFERENCE))] => Lines::default(),
@@ -56,7 +57,7 @@ laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<GuardMust
     [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(MARKED_HERE)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => Lines::default(),
 ]);
 
-laws::table!(a_guard_in_another_crate_is_not_this_one, Sources::flagged::<GuardMustUse>, [
+laws::table!(a_guard_in_another_crate_is_not_this_one, Sources::flagged::<Judged<GuardMustUse>>, [
     [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(DROP_IMPL)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => Lines::default(),
     [Source::new(Located::new("crates/one/src/lib.rs"), Text::new(UNMARKED)), Source::new(Located::new("crates/two/src/lib.rs"), Text::new(PLAIN))] => Lines::from(["crates/one/src/lib.rs:1"]),
 ]);

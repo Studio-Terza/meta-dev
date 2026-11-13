@@ -6,7 +6,7 @@ use code_reader::{FileFacts, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile};
 use lint_transition_graph::Extraction;
 
-use super::contexts::Contexts;
+use super::contexts::{Contexts, Contributed};
 
 use super::super::boundary::{FileOrder, Queue};
 
@@ -22,7 +22,7 @@ impl<'run> Claim<'_, '_, 'run> {
     fn gathered(&self) -> Gathered<'run> {
         let parsed = Parsed::new(self.file, self.head);
         let extraction = Extraction::from(parsed);
-        Gathered { head: self.head, facts: self.group.lowered(), extraction, contexts: Contexts::from(parsed) }
+        Gathered { head: self.head, facts: self.group.lowered(), extraction, contexts: Contributed::from(parsed) }
     }
 }
 
@@ -31,7 +31,7 @@ struct Gathered<'run> {
     head: &'run FileHead,
     facts: Vec<FileFacts>,
     extraction: Extraction<'run>,
-    contexts: Contexts<'run>,
+    contexts: Contributed<'run>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -70,7 +70,7 @@ impl<'read, 'run> Share<'read, 'run> {
 struct Splitting<'run> {
     facts: Vec<FileFacts>,
     extractions: Vec<Extraction<'run>>,
-    contexts: Vec<Contexts<'run>>,
+    contexts: Vec<Contributed<'run>>,
 }
 
 #[derive(Debug)]

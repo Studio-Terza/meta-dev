@@ -6,15 +6,20 @@ use syn::{ItemEnum, ItemStruct, ItemTrait};
 use lint_core::SourceFile;
 use lint_layout::Name;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct WorkspaceTypes(BTreeSet<Name>);
 
-impl From<&[&SourceFile]> for WorkspaceTypes {
-    fn from(files: &[&SourceFile]) -> WorkspaceTypes {
-        files.iter().fold(WorkspaceTypes::default(), |mut types, file| {
-            types.visit_file(file.syntax());
-            types
-        })
+impl From<&SourceFile> for WorkspaceTypes {
+    fn from(file: &SourceFile) -> WorkspaceTypes {
+        let mut types = WorkspaceTypes::default();
+        types.visit_file(file.syntax());
+        types
+    }
+}
+
+impl FromIterator<WorkspaceTypes> for WorkspaceTypes {
+    fn from_iter<Parts: IntoIterator<Item = WorkspaceTypes>>(parts: Parts) -> WorkspaceTypes {
+        WorkspaceTypes(parts.into_iter().flat_map(|part| part.0).collect())
     }
 }
 

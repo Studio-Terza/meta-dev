@@ -1,6 +1,10 @@
 use lint_core::Parsed;
 use lint_file::ContextLint;
+use lint_guard_must_use::GuardMustUse;
 use lint_named_numbers::NamedNumbers;
+use lint_no_forwarders::NoForwarders;
+use lint_public_surface::PublicSurface;
+use lint_unconsumed_traits::UnconsumedTraits;
 
 pub(crate) trait Holding<'run, Lint: ContextLint> {
     fn held(&self) -> &Lint::Context<'run>;
@@ -13,19 +17,24 @@ macro_rules! contexts {
             $($field: <$lint as ContextLint>::Context<'run>,)*
         }
 
-        #[derive(Debug, Default)]
-        struct Parts<'run> {
-            $($field: Vec<<$lint as ContextLint>::Context<'run>>,)*
+        #[derive(Debug)]
+        pub(crate) struct Contributed<'run> {
+            $($field: <$lint as ContextLint>::Part<'run>,)*
         }
 
-        impl<'run> From<Parsed<'_, 'run>> for Contexts<'run> {
-            fn from(parsed: Parsed<'_, 'run>) -> Contexts<'run> {
-                Contexts { $($field: <$lint as ContextLint>::contributed(parsed),)* }
+        #[derive(Debug, Default)]
+        struct Parts<'run> {
+            $($field: Vec<<$lint as ContextLint>::Part<'run>>,)*
+        }
+
+        impl<'run> From<Parsed<'_, 'run>> for Contributed<'run> {
+            fn from(parsed: Parsed<'_, 'run>) -> Contributed<'run> {
+                Contributed { $($field: <$lint as ContextLint>::contributed(parsed),)* }
             }
         }
 
-        impl<'run> FromIterator<Contexts<'run>> for Contexts<'run> {
-            fn from_iter<Found: IntoIterator<Item = Contexts<'run>>>(found: Found) -> Contexts<'run> {
+        impl<'run> FromIterator<Contributed<'run>> for Contexts<'run> {
+            fn from_iter<Found: IntoIterator<Item = Contributed<'run>>>(found: Found) -> Contexts<'run> {
                 let split = found.into_iter().fold(Parts::default(), |mut split, part| {
                     $(split.$field.push(part.$field);)*
                     split
@@ -46,4 +55,8 @@ macro_rules! contexts {
 
 contexts! {
     named_numbers: NamedNumbers,
+    public_surface: PublicSurface,
+    no_forwarders: NoForwarders,
+    unconsumed_traits: UnconsumedTraits,
+    guard_must_use: GuardMustUse,
 }

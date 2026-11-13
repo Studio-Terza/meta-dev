@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Site, Violation};
+use lint_file::Concluded;
 use lint_layout::Name;
 use lint_paths::Module;
 use lint_placement::CrateFile;
@@ -10,6 +11,15 @@ use super::type_key::TypeKey;
 
 #[derive(Debug, Default)]
 pub struct Modules<'file>(BTreeMap<Module<'file>, Members<'file>>);
+
+impl<'file> FromIterator<Modules<'file>> for Modules<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Modules<'file>>>(parts: Parts) -> Modules<'file> {
+        parts.into_iter().flat_map(|part| part.0).fold(Modules::default(), |mut merged, (module, members)| {
+            merged.file(module, members);
+            merged
+        })
+    }
+}
 
 impl<'file> Modules<'file> {
     pub fn file(&mut self, module: Module<'file>, members: Members<'file>) {
@@ -51,5 +61,11 @@ impl<'file> Modules<'file> {
                 .collect()
         };
         members.declares(name).map_or_else(shared, |_| vec![TypeKey::new(module, name)])
+    }
+}
+
+impl<'file> FromIterator<Modules<'file>> for Concluded<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Modules<'file>>>(parts: Parts) -> Concluded<'file> {
+        parts.into_iter().collect::<Modules<'file>>().violations().into_iter().collect()
     }
 }

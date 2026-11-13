@@ -99,7 +99,7 @@ type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 type Scan = for<'file> fn(&'file SourceFile) -> Vec<Violation<'file>>;
 
-type Judge = for<'file, 'run> fn(&'file SourceFile, &Contexts<'run>) -> Vec<Violation<'file>>;
+type Judge = for<'file, 'run> fn(&'file SourceFile, &'file Contexts<'run>) -> Vec<Violation<'file>>;
 
 #[derive(Clone, Copy, Debug)]
 struct Judging {
@@ -137,19 +137,17 @@ impl Lints {
         <Filed<ManualIteration> as Registered>::ENTRY,
         Entry::spelled::<ModuleNesting>(Work::Checked(|readout| vec![ModuleNesting::report(readout.files())])),
         <Judged<NamedNumbers> as Registered>::ENTRY,
-        Entry::spelled::<NoForwarders>(Work::Checked(|readout| vec![NoForwarders::report(readout.files())])),
-        Entry::spelled::<NoNumbersInBinaries>(Work::Checked(|readout| {
-            vec![NoNumbersInBinaries::report(readout.files())]
-        })),
+        <Judged<NoForwarders> as Registered>::ENTRY,
+        <Filed<NoNumbersInBinaries> as Registered>::ENTRY,
         Entry::spelled::<NoParameterBags>(Work::Checked(|readout| vec![NoParameterBags::report(readout.files())])),
         Entry::spelled::<PrimitiveBoundary>(Work::Modelled(<PrimitiveBoundary as ModelLint>::report)),
         <Filed<PrivateFns> as Registered>::ENTRY,
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
-        Entry::spelled::<PublicSurface>(Work::Checked(|readout| vec![PublicSurface::report(readout.files())])),
+        <Judged<PublicSurface> as Registered>::ENTRY,
         Entry::spelled::<RepeatedMethods>(Work::Checked(|readout| vec![RepeatedMethods::report(readout.files())])),
         Entry::spelled::<StateGraph>(Work::Checked(|readout| vec![StateGraph::report(readout.files())])),
-        Entry::spelled::<GuardMustUse>(Work::Checked(|readout| vec![GuardMustUse::report(readout.files())])),
+        <Judged<GuardMustUse> as Registered>::ENTRY,
         Entry::spelled::<PublicApiTests>(Work::Checked(|readout| vec![PublicApiTests::report(readout.files())])),
         Entry::spelled::<NoTestOnlyApi>(Work::Checked(|readout| vec![NoTestOnlyApi::report(readout.files())])),
         <Filed<NoIgnoredTests> as Registered>::ENTRY,
@@ -161,7 +159,7 @@ impl Lints {
         Entry::spelled::<EffectsInFillers>(Work::Checked(|readout| vec![EffectsInFillers::report(readout.files())])),
         <Filed<CountedCalls> as Registered>::ENTRY,
         <Filed<HiddenSqlx> as Registered>::ENTRY,
-        Entry::spelled::<StoreQueries>(Work::Checked(|readout| vec![StoreQueries::report(readout.files())])),
+        <Filed<StoreQueries> as Registered>::ENTRY,
         <Filed<LongExactStrings> as Registered>::ENTRY,
         Entry::spelled::<RepeatedShapes>(Work::Checked(|readout| vec![RepeatedShapes::report(readout.files())])),
         Entry::spelled::<MandatoryLaws>(Work::Checked(|readout| vec![MandatoryLaws::report(readout.files())])),
@@ -181,7 +179,7 @@ impl Lints {
                 .chain([CrateGraph::of_names(extraction.names())])
                 .collect()
         })),
-        Entry::spelled::<UnconsumedTraits>(Work::Checked(|readout| vec![UnconsumedTraits::report(readout.files())])),
+        <Judged<UnconsumedTraits> as Registered>::ENTRY,
         Entry::spelled::<RustOnly>(Work::Checked(|readout| vec![RustOnly::report(readout.repo_files())])),
         Entry::spelled::<WorkflowRun>(Work::Checked(|readout| vec![WorkflowRun::report(readout.repo_files())])),
         Entry::spelled::<HandImpls>(Work::Modelled(<HandImpls as ModelLint>::report)),
@@ -305,7 +303,7 @@ impl Entry {
 impl Judging {
     fn judge<'file, 'run, Lint: ContextLint>(
         file: &'file SourceFile,
-        contexts: &Contexts<'run>,
+        contexts: &'file Contexts<'run>,
     ) -> Vec<Violation<'file>>
     where
         for<'any> Contexts<'any>: Holding<'any, Lint>,

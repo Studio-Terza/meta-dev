@@ -6,7 +6,6 @@ use syn::visit::Visit;
 use syn::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
 
 use super::export::Export;
-use lint_core::BinaryFiles;
 use lint_core::Macros;
 use lint_core::SourceFile;
 use lint_layout::Name;
@@ -14,7 +13,7 @@ use lint_placement::CrateName;
 
 use crate_reach::CrateReach;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ForeignReferences {
     own_crate: Option<CrateName>,
     crates: BTreeMap<CrateName, CrateReach>,
@@ -38,10 +37,9 @@ impl Leaf<'_> {
 impl ForeignReferences {
     const TESTS: &'static str = "tests";
 
-    pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
-        let own_crate = binaries
-            .holding(file.head().path())
-            .map_or_else(|| Some(CrateName::from(file.head().placement().crate_root())), |_| None);
+    pub fn in_file(file: &SourceFile) -> ForeignReferences {
+        let own_crate =
+            file.head().binary().map_or_else(|| Some(CrateName::from(file.head().placement().crate_root())), |_| None);
         let mut reading = Reading { file, references: ForeignReferences { own_crate, crates: BTreeMap::new() } };
         reading.visit_file(file.syntax());
         reading.references

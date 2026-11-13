@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_fixtures::{Lines, Located, Source, Sources, Text};
 use lint_store_queries::StoreQueries;
 
@@ -49,6 +50,10 @@ const GLOBBED: &[Source] = &[Source::new(
     Located::new("crates/store/src/lib.rs"),
     Text::new("use store_ports::*;\nfn f() {\n    s.rows(query!(Row, \"select id from nodes\"));\n}\n"),
 )];
+const FROM_THE_MACROS_CRATE: &[Source] = &[Source::new(
+    Located::new("crates/store/src/lib.rs"),
+    Text::new("fn f() {\n    s.rows(store_ports_macros::query!(Row, \"SELECT id FROM nodes\"));\n}\n"),
+)];
 const UNIMPORTED: &[Source] = &[Source::new(
     Located::new("crates/store/src/lib.rs"),
     Text::new("fn f() {\n    query!(\"SELECT id FROM nodes\");\n}\n"),
@@ -62,7 +67,7 @@ const IMPORTED_IN_MODULE: &[Source] = &[Source::new(
 
 laws::table!(
     a_store_query_is_flagged_unless_its_sql_is_as_sqlformat_formats_it_at_column_zero_inside_a_raw_string,
-    Sources::flagged::<StoreQueries>,
+    Sources::flagged::<Filed<StoreQueries>>,
     [
         FORMATTED => Lines::default(),
         WRITTEN => Lines::default(),
@@ -74,6 +79,7 @@ laws::table!(
         OTHER => Lines::from(["crates/store/src/lib.rs:4"]),
         RENAMED => Lines::from(["crates/store/src/lib.rs:3"]),
         GLOBBED => Lines::from(["crates/store/src/lib.rs:3"]),
+        FROM_THE_MACROS_CRATE => Lines::from(["crates/store/src/lib.rs:2"]),
         UNIMPORTED => Lines::default(),
         IMPORTED_IN_MODULE => Lines::from(["crates/store/src/lib.rs:4"]),
     ]

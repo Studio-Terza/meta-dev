@@ -1,7 +1,11 @@
+mod concluded;
+
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
+
+pub use concluded::Concluded;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {
@@ -30,11 +34,12 @@ pub trait ContextLint {
     const HEADLINE: Headline;
     const READS: Reads;
 
-    type Context<'head>: FromIterator<Self::Context<'head>> + Send + Debug;
+    type Part<'head>: Send + Debug;
+    type Context<'head>: FromIterator<Self::Part<'head>> + Send + Sync + Debug;
 
-    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Self::Context<'head>;
+    fn contributed<'head>(parsed: Parsed<'_, 'head>) -> Self::Part<'head>;
 
-    fn judged<'file>(file: &'file SourceFile, context: &Self::Context<'_>) -> Vec<Violation<'file>>;
+    fn judged<'file, 'head: 'file>(file: &'file SourceFile, context: &Self::Context<'head>) -> Vec<Violation<'file>>;
 }
 
 #[derive(Debug)]
