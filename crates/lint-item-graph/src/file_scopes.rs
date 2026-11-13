@@ -1,4 +1,4 @@
-use lint_core::{FileHead, Parsed, SourceFile};
+use lint_core::{FileHead, Parsed};
 
 use crate::Scope;
 
@@ -11,12 +11,6 @@ pub struct FileScopes<'file> {
 struct ScopedFile<'file> {
     head: &'file FileHead,
     scope: Scope,
-}
-
-impl<'file> From<&'file [SourceFile]> for FileScopes<'file> {
-    fn from(files: &'file [SourceFile]) -> FileScopes<'file> {
-        files.iter().map(Parsed::from).map(FileScopes::from).collect()
-    }
 }
 
 impl<'head> From<Parsed<'_, 'head>> for FileScopes<'head> {
