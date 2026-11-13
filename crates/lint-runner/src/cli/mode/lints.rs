@@ -60,7 +60,7 @@ use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_store_queries::StoreQueries;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, TypeSystem};
+use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, Transitions, TypeSystem};
 use lint_type_shape::TypeShape;
 use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
@@ -178,7 +178,8 @@ impl Lints {
         <Filed<PureRouters> as Registered>::ENTRY,
         <Filed<PlainConditions> as Registered>::ENTRY,
         Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, laws, model| {
-            let system = TypeSystem::built_from(extraction, laws, model);
+            let transitions = Transitions::from(model);
+            let system = TypeSystem::built_from(extraction, laws, &transitions);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()

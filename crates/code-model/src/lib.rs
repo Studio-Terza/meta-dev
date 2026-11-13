@@ -33,8 +33,8 @@ pub use external::External;
 
 pub use found::Found;
 pub use function::{
-    Definition, Entry, Function, Input, Invocation, MethodShape, Mutation, Output, Owner, Parameter, Receiver,
-    Receiving, Returned, Signature, Taken,
+    CallOwner, Definition, Entry, Function, Input, Invocation, MethodShape, Mutation, Output, Owner, Parameter,
+    Receiver, Receiving, Returned, Signature, Taken,
 };
 pub use holding::{Held, Holding};
 pub use implementation::{Assigned, Implementation, Origin, Subject};
@@ -53,5 +53,5 @@ pub use resolved::Resolved;
 pub use site::Site;
 pub use sited::{Sited, Spelling};
 pub use traversal::Traversal;
-pub use type_ref::{Arrayed, Callable, Named, Outline, Projection, TypeRef, TypeUses};
+pub use type_ref::{Arrayed, Bounds, Callable, Element, Grouped, Named, Outline, Projection, TypeRef, TypeUses};
 pub use unresolved::Unresolved;

@@ -4,8 +4,9 @@ use std::fmt;
 use crate::class::Class;
 use crate::count::Count;
 use crate::key::Key;
+use crate::transitions::Wrapping;
+use code_model::Mutation;
 use lint_layout::{Name, Whole, Word};
-use transition_facts::{Mutation, Wrapping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node<'found> {

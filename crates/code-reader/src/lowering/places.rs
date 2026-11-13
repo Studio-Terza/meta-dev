@@ -162,13 +162,7 @@ impl Lowering<'_> {
         let declared = self.generics.extended(&block.generics);
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
-        self.lowered.rows.impls.push(ImplRow::written(
-            &self.here,
-            self.context.region(),
-            block,
-            &declared,
-            subject.clone(),
-        ));
+        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, &declared));
         let rows = &mut self.lowered.rows.places.subjects;
         let subjected = SubjectId(rows.len());
         let implemented =

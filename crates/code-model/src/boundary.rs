@@ -1,3 +1,5 @@
+use std::fmt;
+
 use lint_layout::Name;
 
 use crate::type_ref::TypeRef;
@@ -40,12 +42,18 @@ pub struct CallOrder(usize);
 
 impl CallOrder {
     #[must_use]
-    pub fn of<Row>(earlier: &[Row]) -> Option<CallOrder> {
+    pub fn latest<Row>(earlier: &[Row]) -> Option<CallOrder> {
         earlier.len().checked_sub(1).map(CallOrder)
     }
 
     #[must_use]
     pub fn typed_in<'name>(self, earlier: &[Option<&'name Name>]) -> Option<&'name Name> {
         earlier.get(self.0).copied().flatten()
+    }
+}
+
+impl fmt::Display for CallOrder {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "#{}", self.0)
     }
 }

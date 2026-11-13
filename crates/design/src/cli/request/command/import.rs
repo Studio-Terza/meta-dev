@@ -10,7 +10,7 @@ use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
 };
 use file_ports::{Files, Text};
-use grammar_notes::{self as notes, Cite, Date, Ending, Notes, Quote, Reading, Unclosed};
+use grammar_notes::{self as notes, Cite, Date, Ending, Marking, Notes, Quote, Reading, Unclosed};
 use newtype::{Counter, Wrapping};
 use store_ports::Store;
 use transcript_ports::{Authorship, Uuid};
@@ -384,19 +384,7 @@ impl Reading for Entries {
         None
     }
 
-    fn heading(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
-        Some(entry.clone())
-    }
-
-    fn ruling(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
-        Some(entry.clone())
-    }
-
-    fn lead(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
-        Some(entry.clone())
-    }
-
-    fn remark(self, _line: &notes::Line, entry: &notes::Entry) -> Option<notes::Entry> {
+    fn entry(self, _line: &notes::Line, entry: &notes::Entry, _marking: Marking) -> Option<notes::Entry> {
         Some(entry.clone())
     }
 }
@@ -430,24 +418,22 @@ impl Reading for Taking<'_> {
         self.draft
     }
 
-    fn heading(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
+    fn entry(self, line: &notes::Line, entry: &notes::Entry, marking: Marking) -> Draft {
+        match marking {
+            Marking::Heading => self.headed(line, entry),
+            Marking::Ruling => self.entered(line, entry, Voice::Ruling),
+            Marking::Lead | Marking::Remark => self.entered(line, entry, Voice::Remark),
+        }
+    }
+}
+
+impl Taking<'_> {
+    fn headed(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
         let Taking { draft, heard, project } = self;
         let rooted = Taking { draft: Draft { section: heard.root, ..draft }, heard, project };
         let node = rooted.node(heard.root, line);
         let section = Parent { node: node.identity(), casting: node.casting() };
         Draft { section, ..rooted.entered(line, entry, Voice::Remark) }
-    }
-
-    fn ruling(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
-        self.entered(line, entry, Voice::Ruling)
-    }
-
-    fn lead(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
-        self.entered(line, entry, Voice::Remark)
-    }
-
-    fn remark(self, line: &notes::Line, entry: &notes::Entry) -> Draft {
-        self.entered(line, entry, Voice::Remark)
     }
 }
 

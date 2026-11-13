@@ -1,8 +1,8 @@
 use std::fmt;
 
+use crate::transitions::Transitions;
 use lint_core::Fix;
 use lint_core::{Site, Violation};
-use transition_facts::Transitions;
 
 use super::family::Family;
 use crate::class::Class;

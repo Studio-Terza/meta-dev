@@ -19,7 +19,6 @@ lint-transition-graph = { path = "../lint-transition-graph" }
 newtype = { path = "../newtype" }
 syn.workspace = true
 thiserror.workspace = true
-transition-facts = { path = "../transition-facts" }
 code-model = { path = "../code-model" }
 workspace-metadata = { path = "../workspace-metadata" }
 

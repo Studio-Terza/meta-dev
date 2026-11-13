@@ -7,9 +7,8 @@ use graph_query::{Query, QueryFailure, Role, Term};
 use lint_core::SourceFile;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
-use lint_transition_graph::{Extraction, TypeSystem};
+use lint_transition_graph::{Extraction, Transitions, TypeSystem};
 use text_lines::Lines;
-use transition_facts::Transitions;
 
 const SEARCH: &str = "pub trait Index {\n    fn insert(&mut self, item: Item);\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\npub struct TextIndex;\nimpl Index for TextIndex {\n    fn insert(&mut self, item: Item) {}\n    fn search(&self, query: &Query) -> Vec<Hit> {}\n}\npub struct Plain;\nimpl Plain {\n    pub fn search_text(&self) {}\n}\nimpl<T: Index> Lookup for T {\n    fn find(&self, query: &Query) -> Vec<Hit> {}\n}\nmod store {\n    pub struct Records;\n    impl Records {\n        pub fn insert(&mut self, record: Record) {}\n        pub fn all(&self) -> Vec<Record> {}\n    }\n}\nimpl<T> Holder<T> {\n    pub fn get(&self) -> Option<T> {}\n}\n";
 const FILES: &str = "pub trait Files {\n    fn read(&self, path: &Path) -> Result<Contents, Failure>;\n}\npub struct Disk;\nimpl Files for Disk {\n    fn read(&self, path: &Path) -> Result<Contents, Failure> {}\n}\n";
@@ -88,7 +87,8 @@ impl Asked {
         let extraction = Extraction::from(files.as_slice());
         let laws = Laws::from(files.as_slice());
         let model = Reader::read_files(&files);
-        let system = TypeSystem::built_from(&extraction, &laws, &model);
+        let transitions = Transitions::from(&model);
+        let system = TypeSystem::built_from(&extraction, &laws, &transitions);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
         query.reply(&system).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
@@ -96,9 +96,9 @@ impl Asked {
     fn lines(words: &&[&str]) -> Vec<String> {
         let files = Self::tree();
         let model = Reader::read_files(&files);
-        let transitions = Transitions::of_files(&files);
+        let transitions = Transitions::from(&model);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
-        query.matches(&model, &transitions).to_string().parse::<Lines>().into_iter().flatten().collect()
+        query.matches(&transitions).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 }
 

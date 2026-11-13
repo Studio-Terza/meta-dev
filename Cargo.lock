@@ -1055,7 +1055,6 @@ dependencies = [
  "syn 2.0.119",
  "text-lines",
  "thiserror",
- "transition-facts",
  "workspace-metadata",
 ]
 
@@ -2134,7 +2133,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
- "transition-facts",
 ]
 
 [[package]]

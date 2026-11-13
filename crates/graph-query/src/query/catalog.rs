@@ -1,5 +1,6 @@
 use code_model::{
-    Function, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Owner, Placed, Reach, Region, Resolved, Seat,
+    Function, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Owner, Parameter, Placed, Reach, Region,
+    Resolved, Seat,
 };
 use lint_layout::Name;
 
@@ -62,7 +63,10 @@ impl<'model> Catalog<'model> {
     }
 
     pub(crate) fn generics(&self) -> impl Iterator<Item = Placed<'model, &'model Implementation>> + '_ {
-        self.implementations.iter().copied().filter_map(|placed| placed.entity().parameters().first().map(|_| placed))
+        self.implementations
+            .iter()
+            .copied()
+            .filter_map(|placed| AsRef::<[Parameter]>::as_ref(placed.entity()).first().map(|_| placed))
     }
 
     pub(crate) fn owned_by(&self, id: ItemId, owner: Owner) -> impl Iterator<Item = &'model Function> + '_ {

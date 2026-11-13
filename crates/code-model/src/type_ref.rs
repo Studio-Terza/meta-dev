@@ -4,29 +4,15 @@ use std::fmt;
 
 use lint_layout::Name;
 
+mod outline;
+
 use crate::resolved::Resolved;
 use crate::sited::{Sited, Spelling};
 
+pub use outline::{Bounds, Element, Grouped, Outline};
+
 pub trait TypeUses {
     fn named(&mut self, named: &Named<Sited>);
-}
-
-pub trait Outline {
-    type Kind;
-
-    fn named(self, named: &Named<Sited>) -> Self::Kind;
-
-    fn grouped(self, parts: &[TypeRef]) -> Self::Kind;
-
-    fn sequence(self, element: &TypeRef) -> Self::Kind;
-
-    fn bounded(self, bounds: &[TypeRef]) -> Self::Kind;
-
-    fn projected(self, projection: &Projection<Sited>) -> Self::Kind;
-
-    fn callable(self) -> Self::Kind;
-
-    fn other(self) -> Self::Kind;
 }
 
 pub(crate) trait Rebuild<From> {
@@ -132,11 +118,17 @@ impl AsRef<Resolved> for Named<Sited> {
 }
 
 impl Named<Sited> {
+    #[must_use]
+    pub fn iterated(&self) -> Option<Element<'_>> {
+        self.arguments.first().or(self.bindings.first()).map(Element::from)
+    }
+
     pub fn each_inner_use(&self, uses: &mut impl TypeUses) {
         self.parts().children().for_each(|ty| ty.each_use(uses));
     }
 
-    fn last_spelled(&self) -> Option<&Name> {
+    #[must_use]
+    pub fn last_spelled(&self) -> Option<&Name> {
         AsRef::<Spelling>::as_ref(&self.path).written()?.last()
     }
 }
@@ -313,12 +305,12 @@ impl TypeRef {
         match self {
             TypeRef::Reference(inner) | TypeRef::Pointer(inner) => inner.outlined(outline),
             TypeRef::Named(named) => outline.named(named),
-            TypeRef::Tuple(parts) => outline.grouped(parts),
-            TypeRef::Slice(element) => outline.sequence(element),
-            TypeRef::Array(arrayed) => outline.sequence(&arrayed.element),
-            TypeRef::Bounded(bounds) => outline.bounded(bounds),
+            TypeRef::Tuple(parts) => outline.grouped(Grouped::from(parts.as_slice())),
+            TypeRef::Slice(element) => outline.sequence(Element::from(element.as_ref())),
+            TypeRef::Array(arrayed) => outline.sequence(Element::from(arrayed.element.as_ref())),
+            TypeRef::Bounded(bounds) => outline.bounded(Bounds::from(bounds.as_slice())),
             TypeRef::Projected(projection) => outline.projected(projection),
-            TypeRef::Function(_) => outline.callable(),
+            TypeRef::Function(callable) => outline.callable(callable),
             TypeRef::Opaque => outline.other(),
         }
     }

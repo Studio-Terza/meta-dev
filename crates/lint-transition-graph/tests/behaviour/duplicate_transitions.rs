@@ -79,8 +79,8 @@ fn duplicates_are_found_across_crates() {
 #[test]
 fn a_name_declared_in_several_crates_resolves_through_its_import() {
     let text = Duplicates::of(&[
-        Duplicates::at("crates/x/src/lib.rs", "struct Report;\n"),
-        Duplicates::at("crates/y/src/lib.rs", "struct Report;\nstruct File;\n"),
+        Duplicates::at("crates/x/src/lib.rs", "pub struct Report;\n"),
+        Duplicates::at("crates/y/src/lib.rs", "pub struct Report;\npub struct File;\n"),
         Duplicates::at(
             "crates/z/src/lib.rs",
             "use y::{File, Report};\nstruct One;\nimpl One {\n    fn report(file: &File) -> Report {}\n}\nstruct Two;\nimpl Two {\n    fn report(file: &File) -> y::Report {}\n}\n",

@@ -8,19 +8,18 @@ use std::path::Path;
 use code_model::Model;
 use law_facts::{Laws, Package};
 use lint_core::{Parsed, SourceFile};
-use transition_facts::Transitions;
 
 use crate::algebra::Algebras;
 use crate::containment::Containment;
 use crate::declarations::Declarations;
 use crate::edge::Edge;
 use crate::parallel::ParallelStructures;
+use crate::transitions::Transitions;
 use crate::workspace_types::WorkspaceTypes;
 use fillers::Fillers;
 
 #[derive(Debug, Default)]
 pub struct Extraction<'file> {
-    transitions: Transitions<'file>,
     fillers: Fillers<'file>,
     packages: BTreeMap<&'file Path, Package<'file>>,
 }
@@ -37,7 +36,6 @@ impl<'file> From<&'file [SourceFile]> for Extraction<'file> {
 impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> Extraction<'head> {
         Extraction {
-            transitions: Transitions::from(parsed),
             fillers: Fillers::default(),
             packages: BTreeMap::from([(parsed.head().path(), Package::from(parsed.head()))]),
         }
@@ -46,7 +44,6 @@ impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
 
 #[derive(Debug, Default)]
 struct Parts<'file> {
-    transitions: Vec<Transitions<'file>>,
     fillers: Vec<Fillers<'file>>,
     packages: BTreeMap<&'file Path, Package<'file>>,
 }
@@ -54,25 +51,15 @@ struct Parts<'file> {
 impl<'file> FromIterator<Extraction<'file>> for Extraction<'file> {
     fn from_iter<Extractions: IntoIterator<Item = Extraction<'file>>>(parts: Extractions) -> Extraction<'file> {
         let split = parts.into_iter().fold(Parts::default(), |mut split, part| {
-            split.transitions.push(part.transitions);
             split.fillers.push(part.fillers);
             split.packages.extend(part.packages);
             split
         });
-        Extraction {
-            transitions: split.transitions.into_iter().collect(),
-            fillers: split.fillers.into_iter().collect(),
-            packages: split.packages,
-        }
+        Extraction { fillers: split.fillers.into_iter().collect(), packages: split.packages }
     }
 }
 
 impl<'file> Extraction<'file> {
-    #[must_use]
-    pub fn transitions(&self) -> &Transitions<'file> {
-        &self.transitions
-    }
-
     pub(crate) fn fillers(&self) -> &Fillers<'file> {
         &self.fillers
     }
@@ -96,10 +83,11 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
     pub fn built_from(
         extraction: &'found Extraction<'file>,
         laws: &'found Laws<'file>,
-        model: &'file Model,
+        transitions: &'found Transitions<'file>,
     ) -> TypeSystem<'found, 'file> {
-        let types = WorkspaceTypes::declared(model, extraction.transitions());
-        let edges = extraction.transitions().all().map(|found| types.edge(found)).collect();
+        let model = transitions.model();
+        let types = WorkspaceTypes::declared(model, transitions);
+        let edges = transitions.all().map(|found| types.edge(found)).collect();
         TypeSystem {
             types,
             edges,
@@ -109,7 +97,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             containment: OnceCell::new(),
             algebras: OnceCell::new(),
             declarations: OnceCell::new(),
-            transitions: extraction.transitions(),
+            transitions,
         }
     }
 
@@ -144,7 +132,8 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         self.model
     }
 
-    pub(crate) fn transitions(&self) -> &'found Transitions<'file> {
+    #[must_use]
+    pub fn transitions(&self) -> &'found Transitions<'file> {
         self.transitions
     }
 }

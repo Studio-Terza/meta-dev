@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+use crate::transitions::Transition;
 use lint_core::Fix;
 use lint_core::{Site, Violation};
 use lint_layout::{Name, Whole, Word, words};
-use transition_facts::Transition;
 
 use crate::count::Count;
 use crate::edge::Edge;

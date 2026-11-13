@@ -1,6 +1,6 @@
 use std::fmt;
 
-use transition_facts::Ground;
+use lint_transition_graph::Ground;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {

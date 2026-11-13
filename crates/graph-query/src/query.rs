@@ -11,13 +11,12 @@ use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use code_model::{ItemKind, Model};
+use code_model::ItemKind;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_transition_graph::{Ask, Listed, TypeSystem};
+use lint_transition_graph::{Ask, Ground, Listed, Transitions, TypeSystem};
 use newtype::Wrapping;
-use transition_facts::{Ground, Transitions};
 use workspace_metadata::Metadata;
 
 use crate::boundary::CrateSizes;
@@ -88,8 +87,7 @@ impl Query {
         &'view self,
         system: &'view TypeSystem<'found, 'file>,
     ) -> Reply<'view, 'found, 'file> {
-        let extraction = system.extraction();
-        let matches = self.searches().map(|()| self.matches(system.model(), extraction.transitions()));
+        let matches = self.searches().map(|()| self.matches(system.transitions()));
         let listed = self.top.map(|top| Listed::new(top.into_inner()));
         Reply::new(matches, self.questions.iter().map(|ask| ask.answered(system.containment(), listed)).collect())
     }
@@ -108,7 +106,8 @@ impl Query {
     }
 
     #[must_use]
-    pub fn matches<'view>(&'view self, model: &'view Model, transitions: &Transitions<'_>) -> Matches<'view> {
+    pub fn matches<'view>(&'view self, transitions: &Transitions<'view>) -> Matches<'view> {
+        let model = transitions.model();
         let grounds: BTreeMap<(&Name, &Name), Ground> = transitions
             .contexts()
             .iter()

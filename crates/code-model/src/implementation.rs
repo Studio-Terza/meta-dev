@@ -72,11 +72,6 @@ impl Implementation {
     }
 
     #[must_use]
-    pub fn parameters(&self) -> &[Parameter] {
-        &self.parameters
-    }
-
-    #[must_use]
     pub fn assigned(&self) -> &[Assigned] {
         &self.assigned
     }
@@ -123,5 +118,11 @@ impl Implementation {
 impl AsRef<Region> for Implementation {
     fn as_ref(&self) -> &Region {
         &self.region
+    }
+}
+
+impl AsRef<[Parameter]> for Implementation {
+    fn as_ref(&self) -> &[Parameter] {
+        &self.parameters
     }
 }

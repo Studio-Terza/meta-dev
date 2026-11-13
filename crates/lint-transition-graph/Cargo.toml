@@ -19,7 +19,6 @@ code-model = { path = "../code-model" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
-transition-facts = { path = "../transition-facts" }
 proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true

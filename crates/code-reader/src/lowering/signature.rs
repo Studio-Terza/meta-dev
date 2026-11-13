@@ -2,8 +2,8 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
     AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics, Ident,
-    ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, Type, TypeParam,
-    TypeParamBound, TypePath, WherePredicate,
+    ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, TraitBoundModifier,
+    Type, TypeParam, TypeParamBound, TypePath, WherePredicate,
 };
 
 use code_model::{
@@ -449,7 +449,13 @@ impl LoweredParameter {
                 let bounding = Bounding { scope };
                 LoweredParameter {
                     name: Name::from(&declared.ident),
-                    bounds: declared.bounds.iter().chain(required).filter_map(|bound| bounding.bound(bound)).collect(),
+                    bounds: declared
+                        .bounds
+                        .iter()
+                        .chain(required)
+                        .filter_map(Requirement::plain)
+                        .filter_map(|bound| bounding.bound(bound))
+                        .collect(),
                 }
             })
             .collect()
@@ -464,6 +470,20 @@ impl LoweredParameter {
 struct Requirement;
 
 impl Requirement {
+    fn plain(bound: &TypeParamBound) -> Option<&TypeParamBound> {
+        match bound {
+            TypeParamBound::Trait(traited) => Requirement::unrelaxed(traited.modifier).map(|()| bound),
+            _ => Some(bound),
+        }
+    }
+
+    fn unrelaxed(modifier: TraitBoundModifier) -> Option<()> {
+        match modifier {
+            TraitBoundModifier::None => Some(()),
+            TraitBoundModifier::Maybe(_) => None,
+        }
+    }
+
     fn typed(predicate: &WherePredicate) -> Option<&PredicateType> {
         match predicate {
             WherePredicate::Type(typed) => Some(typed),

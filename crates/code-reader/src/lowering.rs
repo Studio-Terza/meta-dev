@@ -110,7 +110,8 @@ struct LoweredAssigned {
 }
 
 impl ImplRow {
-    fn written(seat: &Seat, region: Region, block: &ItemImpl, scope: &InScope, ty: TypeRef<Written>) -> ImplRow {
+    fn written(seat: &Seat, region: Region, block: &ItemImpl, scope: &InScope) -> ImplRow {
+        let ty = scope.lowered(&block.self_ty);
         ImplRow {
             located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),
@@ -529,7 +530,7 @@ impl Lowering<'_> {
             output: generics.output(&signature.output),
             constraints: generics.constraints(&signature.generics),
             parameters: LoweredParameter::declared(&generics, &signature.generics),
-            mutation: Mutations::of(signature),
+            mutation: Mutations::signed(signature),
             definition: body.map(|block| LoweredDefinition::of_body(&generics, signature, block)),
             region: self.context.region(),
             place: self.context.place(),
@@ -594,8 +595,11 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     }
 
     fn visit_trait_item_fn(&mut self, item: &'ast TraitItemFn) {
-        let generics = self.function(&item.attrs, &item.sig, item.default.as_ref());
-        self.enclosed(Enclosure::Body, generics, |lowering| visit::visit_trait_item_fn(lowering, item));
+        let tested = self.context.within_item(&item.attrs);
+        self.contextual(tested, |lowering| {
+            let generics = lowering.function(&item.attrs, &item.sig, item.default.as_ref());
+            lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_trait_item_fn(enclosed, item));
+        });
     }
 
     fn visit_foreign_item_fn(&mut self, item: &'ast ForeignItemFn) {

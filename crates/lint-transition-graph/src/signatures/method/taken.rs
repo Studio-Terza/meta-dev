@@ -1,6 +1,6 @@
 use std::fmt;
 
-use transition_facts::Wrapping;
+use crate::transitions::Wrapping;
 
 use crate::end::End;
 

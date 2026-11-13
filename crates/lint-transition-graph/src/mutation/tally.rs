@@ -1,10 +1,11 @@
 use std::fmt;
 
+use crate::transitions::Ground;
+use code_model::Mutation;
 use lint_core::Fix;
 use lint_core::{Site, Violation};
 use lint_layout::Name;
 use newtype::Counter;
-use transition_facts::{Ground, Mutation};
 
 use crate::count::Count;
 use crate::edge::Edge;

@@ -1,10 +1,11 @@
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::transitions::endpoint::Nature;
+use crate::transitions::{Endpoint, Implementer, Inputs, Output, Transition, Transitions};
 use code_model::{ItemKind, Model, Reach, Region};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use transition_facts::{Endpoint, Implementer, Inputs, Nature, Output, Transition, Transitions};
 
 use crate::count::Count;
 use crate::edge::Edge;

@@ -3,11 +3,11 @@ mod taken;
 
 use std::fmt;
 
+use code_model::Mutation;
 use equivalence::{Equivalence, Erased, Keyed};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use transition_facts::Mutation;
 
 use crate::edge::Edge;
 use crate::listed::Listed;

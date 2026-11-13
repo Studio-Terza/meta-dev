@@ -8,7 +8,7 @@ use lint_layout::Name;
 use crate::region::{Region, Seat};
 use crate::type_ref::TypeRef;
 
-pub use definition::{Definition, Invocation, Receiving};
+pub use definition::{CallOwner, Definition, Invocation, Receiving};
 pub use shape::{MethodShape, Returned, Taken};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,7 +68,8 @@ pub enum Input {
 }
 
 impl Input {
-    fn typed(&self) -> Option<&TypeRef> {
+    #[must_use]
+    pub fn typed(&self) -> Option<&TypeRef> {
         match self {
             Input::Typed(ty) => Some(ty),
             Input::Receiver(_) => None,
@@ -145,11 +146,6 @@ impl Signature {
     #[must_use]
     pub fn generic(self, parameters: Vec<Parameter>, mutation: Mutation) -> Signature {
         Signature { parameters, mutation, ..self }
-    }
-
-    #[must_use]
-    pub fn parameters(&self) -> &[Parameter] {
-        &self.parameters
     }
 
     #[must_use]
@@ -250,5 +246,11 @@ impl AsRef<Region> for Function {
 impl AsRef<Name> for Function {
     fn as_ref(&self) -> &Name {
         &self.name
+    }
+}
+
+impl AsRef<[Parameter]> for Signature {
+    fn as_ref(&self) -> &[Parameter] {
+        &self.parameters
     }
 }
