@@ -22,7 +22,7 @@ impl Lint for NoNumbersInBinaries {
             Headline::new("a binary is wiring: a number it needs is a setting in its config file"),
             files
                 .iter()
-                .filter(|file| binaries.holding(file.path()).is_some())
+                .filter(|file| binaries.holding(file.head().path()).is_some())
                 .flat_map(|file| {
                     NamedNumbers::flagged(
                         file,

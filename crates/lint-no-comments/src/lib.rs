@@ -23,7 +23,7 @@ impl Lint for NoComments {
                 .flat_map(|file| {
                     Self::comment_lines(file.text())
                         .into_iter()
-                        .map(move |line| Violation::new(Site::new(file.path(), line), Self::COMMENT))
+                        .map(move |line| Violation::new(Site::new(file.head().path(), line), Self::COMMENT))
                 })
                 .collect(),
         )

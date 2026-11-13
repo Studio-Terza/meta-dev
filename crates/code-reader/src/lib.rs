@@ -8,7 +8,7 @@ use code_model::Model;
 use lint_core::{Readout, SourceFile};
 use lint_layout::Crates;
 
-pub use facts::{FileFacts, ListedFile, Listing};
+pub use facts::{FileFacts, ListedGroup, Listing};
 use root_reading::RootReading;
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ impl Reader {
 
     #[must_use]
     pub fn read_files(files: &[SourceFile]) -> Model {
-        FileFacts::merged(Listing::of_files(files).entries().iter().map(ListedFile::lowered).collect())
+        FileFacts::merged(Listing::of_files(files).groups().iter().flat_map(ListedGroup::lowered).collect())
     }
 
     #[must_use]

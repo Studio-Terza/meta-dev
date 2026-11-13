@@ -17,7 +17,7 @@ impl Lint for NoTestIo {
                 files
                     .iter()
                     .filter_map(TestFile::tested)
-                    .filter(|test| Gate::PORTS.owns(test.file().placement()).is_none())
+                    .filter(|test| Gate::PORTS.owns(test.file().head().placement()).is_none())
                     .map(TestFile::file),
             )
             .iter()

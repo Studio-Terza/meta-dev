@@ -25,9 +25,9 @@ impl PathReach {
     }
 
     fn beside(file: &SourceFile) -> PathReach {
-        let package = AsRef::<Path>::as_ref(file.manifest_file()).parent().map_or_default(Path::to_path_buf);
+        let package = AsRef::<Path>::as_ref(file.head().manifest_file()).parent().map_or_default(Path::to_path_buf);
         PathReach {
-            directory: file.path().parent().map_or_default(Path::to_path_buf),
+            directory: file.head().path().parent().map_or_default(Path::to_path_buf),
             source: Self::lexical(&package.join(Self::SOURCE_DIRECTORY)),
             lines: Vec::new(),
         }

@@ -4,7 +4,9 @@ mod signature_reading;
 use syn::visit::{self, Visit};
 use syn::{Ident, ImplItem, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
-use lint_core::{Site, SourceFile, Walk};
+use std::path::Path;
+
+use lint_core::{FileHead, Site, SourceFile, Walk};
 use lint_layout::LineNumber;
 
 use crate::context::Context;
@@ -13,26 +15,26 @@ use origins::Origins;
 use signature_reading::SignatureReading;
 
 pub(super) struct Collector<'file> {
-    file: &'file SourceFile,
+    file: &'file Path,
     origins: Origins<'file>,
     ground: Ground,
     contexts: Vec<Context<'file>>,
 }
 
 impl<'file> Collector<'file> {
-    pub(super) fn collected(file: &'file SourceFile) -> Vec<Context<'file>> {
+    pub(super) fn collected(source: &SourceFile, head: &'file FileHead) -> Vec<Context<'file>> {
         let mut scan = Collector {
-            file,
-            origins: Origins::of_file(file.placement().package().crate_name(), file.syntax()),
-            ground: Ground::gated(file),
+            file: head.path(),
+            origins: Origins::of_file(head.placement().package().crate_name(), source.syntax()),
+            ground: Ground::gated(head),
             contexts: Vec::new(),
         };
-        scan.visit_file(file.syntax());
+        scan.visit_file(source.syntax());
         scan.contexts
     }
 
-    fn site(file: &'file SourceFile, name: &Ident) -> Site<'file> {
-        Site::new(file.path(), LineNumber::from(name.span()))
+    fn site(file: &'file Path, name: &Ident) -> Site<'file> {
+        Site::new(file, LineNumber::from(name.span()))
     }
 
     fn trait_function(item: &TraitItem) -> Option<&TraitItemFn> {

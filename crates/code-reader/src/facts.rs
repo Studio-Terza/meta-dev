@@ -1,3 +1,5 @@
+use std::iter;
+
 use code_model::{Model, Reach};
 use lint_core::SourceFile;
 
@@ -5,18 +7,23 @@ use crate::lowering::Lowered;
 use crate::planting::{Placing, Planting};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Order(usize);
+struct Index(usize);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Order {
+    file: Index,
+    module: Index,
+}
 
 #[derive(Clone, Copy, Debug)]
-pub struct ListedFile<'read> {
+struct ListedFile<'read> {
     source: &'read SourceFile,
     reach: Reach,
     order: Order,
 }
 
 impl ListedFile<'_> {
-    #[must_use]
-    pub fn lowered(&self) -> FileFacts {
+    fn lowered(&self) -> FileFacts {
         FileFacts {
             order: self.order,
             placing: Placing::from(self.source),
@@ -26,25 +33,46 @@ impl ListedFile<'_> {
 }
 
 #[derive(Debug)]
-pub struct Listing<'read>(Vec<ListedFile<'read>>);
+pub struct ListedGroup<'read>(Vec<ListedFile<'read>>);
+
+impl ListedGroup<'_> {
+    #[must_use]
+    pub fn lowered(&self) -> Vec<FileFacts> {
+        self.0.iter().map(ListedFile::lowered).collect()
+    }
+}
+
+#[derive(Debug)]
+pub struct Listing<'read>(Vec<ListedGroup<'read>>);
 
 impl<'read> Listing<'read> {
     #[must_use]
     pub fn of_files(files: &'read [SourceFile]) -> Listing<'read> {
-        let reached = files.iter().flat_map(|file| {
-            let reach = file.shipped().map_or(Reach::Test, |_| Reach::Shipped);
-            std::iter::once((file, reach)).chain(file.test_modules().iter().map(|module| (module, Reach::Test)))
-        });
         Listing(
-            reached
+            files
+                .iter()
                 .enumerate()
-                .map(|(index, (source, reach))| ListedFile { source, reach, order: Order(index) })
+                .map(|(file, source)| {
+                    let reach = source.shipped().map_or(Reach::Test, |_| Reach::Shipped);
+                    let members = iter::once((source, reach))
+                        .chain(source.test_modules().iter().map(|module| (module, Reach::Test)));
+                    ListedGroup(
+                        members
+                            .enumerate()
+                            .map(|(module, (listed, reached))| ListedFile {
+                                source: listed,
+                                reach: reached,
+                                order: Order { file: Index(file), module: Index(module) },
+                            })
+                            .collect(),
+                    )
+                })
                 .collect(),
         )
     }
 
     #[must_use]
-    pub fn entries(&self) -> &[ListedFile<'read>] {
+    pub fn groups(&self) -> &[ListedGroup<'read>] {
         &self.0
     }
 }

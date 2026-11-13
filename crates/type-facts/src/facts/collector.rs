@@ -6,7 +6,9 @@ use proc_macro2::Span;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta, punctuated::Punctuated};
 
-use lint_core::{Site, SourceFile, Walk};
+use std::path::Path;
+
+use lint_core::{FileHead, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_placement::CrateName;
 
@@ -25,20 +27,20 @@ pub(crate) use impl_block::ImplBlock;
 use referenced::Referenced;
 
 pub(crate) struct Collector<'file> {
-    file: &'file SourceFile,
+    path: &'file Path,
     krate: &'file CrateName,
     facts: Facts<'file>,
 }
 
 impl<'file> Collector<'file> {
-    pub(crate) fn collected(facts: Facts<'file>, file: &'file SourceFile) -> Facts<'file> {
-        let mut scan = Collector { file, krate: file.placement().package().crate_name(), facts };
+    pub(crate) fn collected(facts: Facts<'file>, file: &SourceFile, head: &'file FileHead) -> Facts<'file> {
+        let mut scan = Collector { path: head.path(), krate: head.placement().package().crate_name(), facts };
         scan.visit_file(file.syntax());
         scan.facts
     }
 
     fn site_at(&self, span: Span) -> Site<'file> {
-        Site::new(self.file.path(), LineNumber::from(span))
+        Site::new(self.path, LineNumber::from(span))
     }
 
     fn derives(attributes: &[Attribute]) -> Vec<Name> {
@@ -70,7 +72,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
 
     fn visit_item_struct(&mut self, found: &'ast ItemStruct) {
         let shape = Shape::from(&found.fields);
-        let dependencies = Referenced::started(self.file.path(), &found.ident, &found.generics).of_fields(
+        let dependencies = Referenced::started(self.path, &found.ident, &found.generics).of_fields(
             Via::Field,
             found.fields.iter(),
             &found.generics,
@@ -80,7 +82,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
 
     fn visit_item_enum(&mut self, found: &'ast ItemEnum) {
         let fields = found.variants.iter().flat_map(|variant| variant.fields.iter());
-        let dependencies = Referenced::started(self.file.path(), &found.ident, &found.generics).of_fields(
+        let dependencies = Referenced::started(self.path, &found.ident, &found.generics).of_fields(
             Via::Variant,
             fields,
             &found.generics,
@@ -95,7 +97,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
                 self.krate,
                 Name::from(&found.ident),
                 self.site_at(found.ident.span()),
-                Referenced::started(self.file.path(), &found.ident, &found.generics).of_trait(found),
+                Referenced::started(self.path, &found.ident, &found.generics).of_trait(found),
             )
             .with_methods(methods)
         });

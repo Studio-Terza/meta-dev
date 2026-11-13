@@ -34,7 +34,7 @@ impl Shape {
     }
 
     fn declared<'file>(file: &'file SourceFile, owner: &Ident, exposure: Exposure, facts: Vec<Name>) -> Profile<'file> {
-        let site = Site::new(file.path(), LineNumber::from(owner.span()));
+        let site = Site::new(file.head().path(), LineNumber::from(owner.span()));
         Profile::declared(Subject::new(file, Name::from(owner)), site, exposure, facts)
     }
 

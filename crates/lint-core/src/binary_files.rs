@@ -19,11 +19,11 @@ impl BinaryFiles {
 
     #[must_use]
     pub fn collect(files: &[SourceFile]) -> BinaryFiles {
-        let by_path: BTreeMap<&Path, &SourceFile> = files.iter().map(|file| (file.path(), file)).collect();
+        let by_path: BTreeMap<&Path, &SourceFile> = files.iter().map(|file| (file.head().path(), file)).collect();
         BinaryFiles(
             files
                 .iter()
-                .filter(|file| file.placement().role() == Role::BinaryRoot)
+                .filter(|file| file.head().placement().role() == Role::BinaryRoot)
                 .fold(BTreeSet::new(), |members, root| Self::gather(root, &by_path, members)),
         )
     }
@@ -38,11 +38,13 @@ impl BinaryFiles {
         by_path: &BTreeMap<&Path, &SourceFile>,
         members: BTreeSet<PathBuf>,
     ) -> BTreeSet<PathBuf> {
-        match members.get(file.path()).map(|_| ()) {
+        match members.get(file.head().path()).map(|_| ()) {
             Some(()) => members,
             None => Self::children(file, by_path)
                 .into_iter()
-                .fold(Self::joined_by(members, file.path()), |gathered, child| Self::gather(child, by_path, gathered)),
+                .fold(Self::joined_by(members, file.head().path()), |gathered, child| {
+                    Self::gather(child, by_path, gathered)
+                }),
         }
     }
 
@@ -56,7 +58,7 @@ impl BinaryFiles {
             .items
             .iter()
             .filter_map(Syntax::item_mod)
-            .flat_map(|module| Self::declared_files(file.path(), module))
+            .flat_map(|module| Self::declared_files(file.head().path(), module))
             .filter_map(|candidate| by_path.get(candidate.as_path()).copied())
             .collect()
     }

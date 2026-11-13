@@ -25,7 +25,7 @@ impl<'file> FileFlow<'file> {
     }
 
     pub fn crate_name(&self) -> CrateName {
-        CrateName::from(self.file.placement().package().root())
+        CrateName::from(self.file.head().placement().package().root())
     }
 
     pub fn functions(&self) -> &[FunctionFlow<'file>] {

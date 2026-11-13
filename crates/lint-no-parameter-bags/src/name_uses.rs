@@ -14,8 +14,10 @@ pub struct NameUses {
 
 impl NameUses {
     pub fn in_file(file: &SourceFile) -> NameUses {
-        let mut uses =
-            NameUses { crate_name: Some(CrateName::from(file.placement().crate_root())), names: BTreeSet::new() };
+        let mut uses = NameUses {
+            crate_name: Some(CrateName::from(file.head().placement().crate_root())),
+            names: BTreeSet::new(),
+        };
         uses.visit_file(file.syntax());
         uses
     }

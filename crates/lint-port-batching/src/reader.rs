@@ -39,7 +39,7 @@ impl<'run, 'file> Reader<'run, 'file> {
         judge: &'run Judge<'run>,
         holders: &'run Holders,
     ) -> Vec<Violation<'file>> {
-        let crate_name = CrateName::from(file.placement().crate_root());
+        let crate_name = CrateName::from(file.head().placement().crate_root());
         let mut reader = Reader {
             file,
             module: Module::of_file(file),
@@ -48,7 +48,7 @@ impl<'run, 'file> Reader<'run, 'file> {
             found: BTreeMap::new(),
         };
         reader.visit_file(file.syntax());
-        reader.found.into_iter().map(|(spot, within)| spot.violation(file.path(), within)).collect()
+        reader.found.into_iter().map(|(spot, within)| spot.violation(file.head().path(), within)).collect()
     }
 
     fn scoped(&mut self, scope: Scope<'run>, visit: impl FnOnce(&mut Self)) {

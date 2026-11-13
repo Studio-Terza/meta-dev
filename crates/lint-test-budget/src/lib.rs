@@ -15,7 +15,7 @@ impl TestBudget {
     #[must_use]
     pub fn measured(files: &[SourceFile]) -> TestBudget {
         TestBudget(files.iter().fold(BTreeMap::new(), |mut crates, file| {
-            let name = CrateName::from(file.placement().package().root());
+            let name = CrateName::from(file.head().placement().package().root());
             let budget: CrateBudget = crates.remove(&name).unwrap_or_default();
             crates.insert(name, budget + CrateBudget::from(file));
             crates

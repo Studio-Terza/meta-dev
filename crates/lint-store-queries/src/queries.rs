@@ -38,7 +38,7 @@ impl<'file, 'run> Queries<'file, 'run> {
     }
 
     fn checked(&mut self, sql: &Sql) {
-        let path = self.file.path();
+        let path = self.file.head().path();
         self.found.extend(sql.unformatted().map(|line| Violation::new(Site::new(path, line), Unformatted)));
     }
 }

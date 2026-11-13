@@ -41,7 +41,7 @@ impl Lint for PublicApiTests {
                         || (PathReach::lines_in(file), Self::REACH),
                         |shipped| (TestCode::lines_in(shipped.syntax(), &emitters), Self::IN_SOURCE),
                     );
-                    lines.into_iter().map(move |line| Violation::new(Site::new(file.path(), line), message))
+                    lines.into_iter().map(move |line| Violation::new(Site::new(file.head().path(), line), message))
                 })
                 .collect(),
         )

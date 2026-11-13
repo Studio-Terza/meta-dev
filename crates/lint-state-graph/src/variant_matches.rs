@@ -27,8 +27,12 @@ pub struct VariantMatches<'scan, 'file> {
 
 impl<'scan, 'file> VariantMatches<'scan, 'file> {
     pub fn violations(file: &'file SourceFile, declarations: &'scan Declarations<'file>) -> Vec<Violation<'file>> {
-        let mut matches =
-            VariantMatches { declarations, path: file.path(), home: Home::containing(file), violations: Vec::new() };
+        let mut matches = VariantMatches {
+            declarations,
+            path: file.head().path(),
+            home: Home::containing(file),
+            violations: Vec::new(),
+        };
         matches.visit_file(file.syntax());
         matches.violations
     }

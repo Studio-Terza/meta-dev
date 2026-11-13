@@ -250,6 +250,15 @@ const FREE: &[Source] = &[
         Text::new("fn load() {\n    std::env::var(\"A\");\n}\n"),
     ),
 ];
+const PRINTED: &[Source] = &[
+    Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("mod store;\nmod load;\n")),
+    Source::new(
+        Located::new("crates/store-ports/src/store.rs"),
+        Text::new("#[port_core::port]\npub trait Store {\n    fn read(&self);\n}\n"),
+    ),
+    Source::new(Located::new("crates/store-ports/src/load.rs"), Text::new("fn load() {\n    println!(\"a\");\n}\n")),
+];
+
 const OTHER_TRAIT: &[Source] = &[Source::new(
     Located::new("crates/store-ports/src/lib.rs"),
     Text::new(
@@ -792,6 +801,7 @@ laws::table!(
         FILLED => Lines::default(),
         INHERENT => Lines::from(["crates/store-ports/src/lib.rs:8"]),
         FREE => Lines::from(["crates/store-ports/src/load.rs:2"]),
+        PRINTED => Lines::from(["crates/store-ports/src/load.rs:2"]),
         OTHER_TRAIT => Lines::from(["crates/store-ports/src/lib.rs:8"]),
         UNPORTED_FILLER => Lines::from(["crates/store-ports/src/lib.rs:12"]),
         RELEASED => Lines::default(),

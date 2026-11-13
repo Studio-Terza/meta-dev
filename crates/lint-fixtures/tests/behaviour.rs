@@ -20,9 +20,9 @@ impl Lint for EveryDependency {
         let named = OneLine::try_new(String::from("logos")).map(CrateName::new);
         let logos: DependencyKeys<'_> = named.iter().collect();
         let flagged = files.iter().flat_map(|file| {
-            file.placement().package().dependency_sites().sites(&logos).into_iter().map(|line| {
+            file.head().placement().package().dependency_sites().sites(&logos).into_iter().map(|line| {
                 Violation::new(
-                    Site::new(file.manifest_file().as_ref(), line),
+                    Site::new(file.head().manifest_file().as_ref(), line),
                     Message::new(Problem::new("depends"), Fix::new("drop it")),
                 )
             })
@@ -34,7 +34,10 @@ impl Lint for EveryDependency {
 impl Lint for EveryFile {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let flagged = files.iter().map(|file| {
-            Violation::new(Site::of_file(file.path()), Message::new(Problem::new("flagged"), Fix::new("unflag it")))
+            Violation::new(
+                Site::of_file(file.head().path()),
+                Message::new(Problem::new("flagged"), Fix::new("unflag it")),
+            )
         });
         Report::new(Headline::new("every file"), flagged.collect())
     }

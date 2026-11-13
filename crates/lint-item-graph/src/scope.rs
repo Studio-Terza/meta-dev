@@ -8,22 +8,22 @@ use lint_core::Walk;
 use lint_layout::Name;
 use proc_macro2::{Ident, TokenTree};
 use syn::visit::{self, Visit};
-use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UseTree};
+use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UsePath, UseTree};
 
 use import::Import;
 use imports::Imports;
 
 #[derive(Debug, Default)]
-pub struct Scope<'file> {
+pub struct Scope {
     local_roots: BTreeSet<Name>,
-    imports: Imports<'file>,
+    imports: Imports,
 }
 
-impl<'file> Scope<'file> {
+impl Scope {
     const LOCAL_ROOTS: [&str; 3] = ["crate", "self", "super"];
 
     #[must_use]
-    pub fn of_file(file: &'file syn::File) -> Scope<'file> {
+    pub fn of_file(file: &syn::File) -> Scope {
         let mut scope = Scope::default();
         scope.local_roots.extend(Self::LOCAL_ROOTS.map(Name::from));
         scope.visit_file(file);
@@ -61,7 +61,7 @@ impl<'file> Scope<'file> {
             Some(_) => self
                 .imports
                 .local_item(&name, &self.local_roots)
-                .map(|imports| imports.naming(&name).first().map(Import::original).map_or(name, Name::from)),
+                .map(|imports| imports.naming(&name).first().map(Import::original).cloned().unwrap_or(name)),
             None => self.reaches(ident).map(|_| name),
         }
     }
@@ -79,34 +79,39 @@ impl<'file> Scope<'file> {
         })
     }
 
-    fn import(&mut self, path: Vec<&'file Ident>, tree: &'file UseTree) {
+    fn stepped(&mut self, path: &[&Ident], step: &UsePath) {
+        let longer: Vec<&Ident> = path.iter().copied().chain([&step.ident]).collect();
+        self.import(&longer, &step.tree);
+    }
+
+    fn import(&mut self, path: &[&Ident], tree: &UseTree) {
         match tree {
-            UseTree::Path(step) => self.import(path.into_iter().chain([&step.ident]).collect(), &step.tree),
+            UseTree::Path(step) => self.stepped(path, step),
             UseTree::Name(name) => self.imports.add(Import::named(path, &name.ident)),
             UseTree::Rename(rename) => self.imports.add(Some(Import::renamed(path, &rename.rename, &rename.ident))),
-            UseTree::Group(group) => group.items.iter().for_each(|item| self.import(path.clone(), item)),
+            UseTree::Group(group) => group.items.iter().for_each(|item| self.import(path, item)),
             UseTree::Glob(_) => {}
         }
     }
 }
 
-impl<'file> Visit<'file> for Scope<'file> {
-    fn visit_item_mod(&mut self, module: &'file ItemMod) {
+impl<'ast> Visit<'ast> for Scope {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || {
             self.local_roots.insert(Name::from(&module.ident));
             visit::visit_item_mod(self, module);
         });
     }
 
-    fn visit_item_use(&mut self, item: &'file ItemUse) {
-        Walk::enter(&item.attrs, || self.import(Vec::new(), &item.tree));
+    fn visit_item_use(&mut self, item: &'ast ItemUse) {
+        Walk::enter(&item.attrs, || self.import(&[], &item.tree));
     }
 
-    fn visit_item_fn(&mut self, item: &'file ItemFn) {
+    fn visit_item_fn(&mut self, item: &'ast ItemFn) {
         Walk::enter(&item.attrs, || visit::visit_item_fn(self, item));
     }
 
-    fn visit_item_impl(&mut self, item: &'file ItemImpl) {
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         Walk::enter(&item.attrs, || visit::visit_item_impl(self, item));
     }
 }

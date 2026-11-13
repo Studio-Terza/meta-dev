@@ -23,7 +23,7 @@ pub struct FunctionFlow<'file> {
 
 impl<'file> FunctionFlow<'file> {
     pub fn judged(file: &'file SourceFile, name: Span, body: &Block) -> FunctionFlow<'file> {
-        let path = file.path();
+        let path = file.head().path();
         let root = Root::from(body);
         let mut scan = Scan::new(file);
         root.scanned_by(&mut scan);

@@ -1,6 +1,6 @@
 use std::cell::OnceCell;
 
-use lint_core::SourceFile;
+use lint_core::{Parsed, SourceFile};
 use lint_item_graph::FileNames;
 use transition_facts::Transitions;
 use type_facts::Facts;
@@ -11,7 +11,7 @@ use crate::declarations::Declarations;
 use crate::edge::Edge;
 use crate::workspace_types::WorkspaceTypes;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Extraction<'file> {
     facts: Facts<'file>,
     transitions: Transitions<'file>,
@@ -20,10 +20,39 @@ pub struct Extraction<'file> {
 
 impl<'file> From<&'file [SourceFile]> for Extraction<'file> {
     fn from(files: &'file [SourceFile]) -> Extraction<'file> {
+        files.iter().map(Parsed::from).map(Extraction::from).collect()
+    }
+}
+
+impl<'head> From<Parsed<'_, 'head>> for Extraction<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> Extraction<'head> {
         Extraction {
-            facts: Facts::of_files(files),
-            transitions: Transitions::of_files(files),
-            names: FileNames::from(files),
+            facts: Facts::from(parsed),
+            transitions: Transitions::from(parsed),
+            names: FileNames::from(parsed),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Parts<'file> {
+    facts: Vec<Facts<'file>>,
+    transitions: Vec<Transitions<'file>>,
+    names: Vec<FileNames<'file>>,
+}
+
+impl<'file> FromIterator<Extraction<'file>> for Extraction<'file> {
+    fn from_iter<Extractions: IntoIterator<Item = Extraction<'file>>>(parts: Extractions) -> Extraction<'file> {
+        let split = parts.into_iter().fold(Parts::default(), |mut split, part| {
+            split.facts.push(part.facts);
+            split.transitions.push(part.transitions);
+            split.names.push(part.names);
+            split
+        });
+        Extraction {
+            facts: split.facts.into_iter().collect(),
+            transitions: split.transitions.into_iter().collect(),
+            names: split.names.into_iter().collect(),
         }
     }
 }
@@ -78,7 +107,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
 
     #[must_use]
     pub fn containment(&self) -> &Containment<'found, 'file> {
-        self.containment.get_or_init(|| Containment::clustered(self.files, self.extraction))
+        self.containment.get_or_init(|| Containment::clustered(self.extraction))
     }
 
     #[must_use]

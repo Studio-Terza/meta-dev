@@ -31,7 +31,7 @@ impl Lint for NoParameterBags {
                         .candidates()
                         .filter(|candidate| exports.exported(file, candidate.name()).is_none())
                         .filter(|candidate| Self::one_consumer_besides(&uses, own, candidate.name()).is_some())
-                        .map(|candidate| candidate.violation(file.path()))
+                        .map(|candidate| candidate.violation(file.head().path()))
                         .collect::<Vec<Violation>>()
                 })
                 .collect(),

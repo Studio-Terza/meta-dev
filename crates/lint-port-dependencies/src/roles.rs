@@ -35,11 +35,11 @@ impl<'file> Roles<'file> {
             .iter()
             .filter_map(|breach| Some((self.owners.manifest(breach.as_ref().dependent())?, breach)))
             .flat_map(|(file, breach)| {
-                let package = file.placement().package();
+                let package = file.head().placement().package();
                 let lines = Some(breach.lines(package))
                     .filter(|found| found.first().is_some())
                     .unwrap_or_else(|| BTreeSet::from([package.dependency_sites().header()]));
-                let manifest = file.manifest_file().as_ref();
+                let manifest = file.head().manifest_file().as_ref();
                 lines.into_iter().map(move |line| Violation::new(Site::new(manifest, line), Breached::new(breach)))
             })
             .collect()
@@ -49,8 +49,8 @@ impl<'file> Roles<'file> {
         let roots: BTreeMap<&Name, &'file SourceFile> = self
             .files
             .iter()
-            .filter(|file| file.placement().role() == Placed::LibraryRoot)
-            .filter_map(|file| Some((file.placement().package().root().package()?, file)))
+            .filter(|file| file.head().placement().role() == Placed::LibraryRoot)
+            .filter_map(|file| Some((file.head().placement().package().root().package()?, file)))
             .collect();
         served.iter().filter_map(|name| self.denying(&roots, name, role)).flatten().collect()
     }
@@ -64,11 +64,11 @@ impl<'file> Roles<'file> {
         let (site, missing) = roots.get(&Name::from(name.as_ref())).map_or_else(
             || {
                 Some((
-                    Site::new(self.owners.manifest(name)?.manifest_file().as_ref(), LineNumber::FIRST),
+                    Site::new(self.owners.manifest(name)?.head().manifest_file().as_ref(), LineNumber::FIRST),
                     Undenied::all(role),
                 ))
             },
-            |root| Some((Site::new(root.path(), LineNumber::FIRST), Undenied::missing(role, root))),
+            |root| Some((Site::new(root.head().path(), LineNumber::FIRST), Undenied::missing(role, root))),
         )?;
         Some(missing.into_iter().map(|undenied| Violation::new(site, undenied)).collect())
     }
@@ -80,7 +80,7 @@ impl<'file> Roles<'file> {
 
     fn expanded_outside(&self, expansion: &Expansion<'file>, imports: &Imports<'_>) -> Vec<Violation<'file>> {
         let wanted: Vec<UsePath> = expansion.paths(|member, name| {
-            let placed = PlacedName::from(self.owners.manifest(member)?.placement().package().root());
+            let placed = PlacedName::from(self.owners.manifest(member)?.head().placement().package().root());
             let root: &Name = placed.borrow();
             Some([root.clone(), Name::from(name.as_ref())].into_iter().collect())
         });
@@ -89,10 +89,12 @@ impl<'file> Roles<'file> {
         self.files
             .iter()
             .filter_map(SourceFile::shipped)
-            .filter(|file| file.placement().package().root().package().and_then(|name| admitted.get(name)).is_none())
+            .filter(|file| {
+                file.head().placement().package().root().package().and_then(|name| admitted.get(name)).is_none()
+            })
             .flat_map(|file| {
                 let lines = Expanded::lines(file, imports, &wanted);
-                lines.into_iter().map(move |line| Violation::new(Site::new(file.path(), line), finding))
+                lines.into_iter().map(move |line| Violation::new(Site::new(file.head().path(), line), finding))
             })
             .collect()
     }

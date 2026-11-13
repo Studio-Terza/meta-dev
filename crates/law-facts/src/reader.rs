@@ -37,9 +37,9 @@ impl<'file, 'traits> Reader<'file, 'traits> {
 
     fn law(&self, invocation: &Macro, kind: Kind) -> Law<'file> {
         let scope = self.scope();
-        let within = Within::new(&scope, self.traits, self.file.placement().package().crate_name());
+        let within = Within::new(&scope, self.traits, self.file.head().placement().package().crate_name());
         let name = invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident));
-        let site = Site::new(self.file.path(), LineNumber::from(invocation.path.span()));
+        let site = Site::new(self.file.head().path(), LineNumber::from(invocation.path.span()));
         Law::new(
             Origin::new(Package::containing(self.file), site, name),
             kind,

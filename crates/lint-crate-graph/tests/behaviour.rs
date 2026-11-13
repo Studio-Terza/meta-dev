@@ -138,3 +138,22 @@ fn items_inside_a_macro_rules_definition_are_not_declared() {
     let defined = Items::ring_with_first_item_in("macro_rules! m {\n    () => {\n", "    };\n}\n", BIG_RING);
     assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&defined))]), Lines::default());
 }
+
+#[test]
+fn a_cycle_closed_through_a_self_import_in_another_module_is_flagged() {
+    let last = BIG_RING - 1;
+    let link = |Link { index, next }: Link| {
+        let called = Some(next)
+            .filter(|candidate| *candidate != last)
+            .map_or_else(|| format!("crate::b::R{last}"), |target| format!("R{target}"));
+        format!("pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        {called}::f();\n    }}\n}}\n")
+    };
+    let first: Vec<String> = Items::links(BIG_RING).take(last).map(link).collect();
+    let closing = format!(
+        "use crate::a::{{self}};\npub struct R{last};\nimpl R{last} {{\n    pub fn f() {{\n        a::R0::f();\n    }}\n}}\n"
+    );
+    let root = Sources::file(ONE, Text::new("pub mod a;\npub mod b;\n"));
+    let opened = Sources::file("crates/one/src/a.rs", Text::new(&first.concat()));
+    let closed = Sources::file("crates/one/src/b.rs", Text::new(&closing));
+    assert_eq!(Items::flagged(&[root, opened, closed]), Lines::from(FLAGGED));
+}

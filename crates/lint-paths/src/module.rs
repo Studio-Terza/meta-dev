@@ -13,7 +13,7 @@ impl<'file> Module<'file> {
 
     #[must_use]
     pub fn of_file(file: &'file SourceFile) -> Module<'file> {
-        Module { crate_file: file.crate_file(), path: file.placement().module().segments().to_vec() }
+        Module { crate_file: file.head().crate_file(), path: file.head().placement().module().segments().to_vec() }
     }
 
     #[must_use]

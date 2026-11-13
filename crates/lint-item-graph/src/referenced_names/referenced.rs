@@ -25,7 +25,7 @@ pub struct Referenced {
 }
 
 impl Referenced {
-    pub fn of_tokens(scope: &Scope<'_>, tokens: TokenStream) -> Referenced {
+    pub fn of_tokens(scope: &Scope, tokens: TokenStream) -> Referenced {
         let path = PathTokens::new(tokens);
         let idents: Vec<(&TokenTree, &TokenTree, Name)> = path
             .as_ref()

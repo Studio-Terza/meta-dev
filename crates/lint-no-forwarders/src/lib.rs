@@ -31,7 +31,7 @@ impl Lint for NoForwarders {
                 .flat_map(|file| {
                     Self::forwarders(file, &types).into_iter().map(move |forwarder| {
                         Violation::new(
-                            Site::new(file.path(), LineNumber::from(forwarder.name().span())),
+                            Site::new(file.head().path(), LineNumber::from(forwarder.name().span())),
                             Finding::Forwards { name: forwarder.name(), callee: forwarder.callee() },
                         )
                     })

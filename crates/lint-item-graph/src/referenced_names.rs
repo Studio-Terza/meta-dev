@@ -11,7 +11,7 @@ use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{Attribute, Item, ItemImpl};
 
-use lint_core::{SourceFile, Walk};
+use lint_core::Walk;
 use lint_layout::{Name, UsePath};
 
 use crate::ItemGraph;
@@ -35,16 +35,11 @@ impl ReferencedNames {
     const UNNAMED: &str = "_";
 
     #[must_use]
-    pub(crate) fn of_file(file: &SourceFile) -> ReferencedNames {
-        Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()))
-    }
-
-    #[must_use]
     pub fn uses(&self) -> BTreeMap<&Name, BTreeSet<&UsePath>> {
         self.across.iter().map(|(owner, uses)| (owner, uses.iter().collect())).collect()
     }
 
-    pub(crate) fn of_items(items: &[Item], scope: &Scope<'_>) -> ReferencedNames {
+    pub(crate) fn of_items(items: &[Item], scope: &Scope) -> ReferencedNames {
         items.iter().fold(ReferencedNames::default(), |names, item| names.with_item(item, scope))
     }
 
@@ -82,12 +77,12 @@ impl ReferencedNames {
         })
     }
 
-    fn with_item(self, item: &Item, scope: &Scope<'_>) -> ReferencedNames {
+    fn with_item(self, item: &Item, scope: &Scope) -> ReferencedNames {
         let own = Parts::of_item(item).entered().map(|parts| parts.referenced(scope));
         self.merged(own.unwrap_or_default())
     }
 
-    fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
+    fn named(owner: Option<Name>, scope: &Scope, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
         owner
             .filter(|candidate| *candidate != Name::from(Self::UNNAMED))
             .map_or_else(ReferencedNames::default, |named| {
@@ -138,7 +133,7 @@ impl<'item> Parts<'item> {
         (Walk::outside_tests(self.attributes) == Walk::Entered).then_some(self)
     }
 
-    pub fn referenced(self, scope: &Scope<'_>) -> ReferencedNames {
+    pub fn referenced(self, scope: &Scope) -> ReferencedNames {
         let parameters = Parameters::of_item(self.item);
         let nested = ReferencedNames::of_items(&self.nested, scope);
         self.own(scope, &parameters).merged(nested)
@@ -148,7 +143,7 @@ impl<'item> Parts<'item> {
         Parts { item, attributes, owner: Some(Name::from(ident)), nested: Cow::Borrowed(&[]) }
     }
 
-    fn own(self, scope: &Scope<'_>, parameters: &Parameters) -> ReferencedNames {
+    fn own(self, scope: &Scope, parameters: &Parameters) -> ReferencedNames {
         match self.item {
             Item::Impl(found) => Self::implementing(found, scope, parameters),
             _ => Kind::of_item(self.item).declaring(self.owner.clone()).merged(ReferencedNames::named(
@@ -160,7 +155,7 @@ impl<'item> Parts<'item> {
         }
     }
 
-    fn implementing(found: &ItemImpl, scope: &Scope<'_>, parameters: &Parameters) -> ReferencedNames {
+    fn implementing(found: &ItemImpl, scope: &Scope, parameters: &Parameters) -> ReferencedNames {
         let read = ReferencedNames::named(Name::of_type(&found.self_ty), scope, parameters, found);
         ReferencedNames { implemented: read.declared, declared: BTreeMap::new(), ..read }
     }

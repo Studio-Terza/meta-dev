@@ -45,7 +45,7 @@ impl LiteralNames {
 
 impl FileLint for LiteralNames {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut names = VagueNames { file, path: file.path(), found: Vec::new() };
+        let mut names = VagueNames { file, path: file.head().path(), found: Vec::new() };
         names.visit_file(file.syntax());
         names.found
     }

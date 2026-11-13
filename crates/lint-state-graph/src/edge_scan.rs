@@ -34,7 +34,7 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
     }
 
     pub fn scan(&mut self, file: &'file SourceFile) {
-        self.path = file.path();
+        self.path = file.head().path();
         self.visit_file(file.syntax());
     }
 

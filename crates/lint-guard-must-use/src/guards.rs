@@ -37,7 +37,7 @@ impl<'file> Guards<'file> {
         files
             .iter()
             .fold(empty, |guards, file| {
-                let mut next = Guards { path: file.path(), module: Module::of_file(file), ..guards };
+                let mut next = Guards { path: file.head().path(), module: Module::of_file(file), ..guards };
                 next.visit_file(file.syntax());
                 next.modules.file(mem::replace(&mut next.module, Module::UNPLACED), mem::take(&mut next.members));
                 next

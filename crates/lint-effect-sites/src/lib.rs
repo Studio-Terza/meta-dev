@@ -29,7 +29,7 @@ impl EffectSites {
     #[must_use]
     pub fn crates(files: &[SourceFile]) -> BTreeMap<CrateName, Vec<&SourceFile>> {
         files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |mut crates, file| {
-            crates.entry(CrateName::from(file.placement().package().root())).or_insert_with(Vec::new).push(file);
+            crates.entry(CrateName::from(file.head().placement().package().root())).or_insert_with(Vec::new).push(file);
             crates
         })
     }

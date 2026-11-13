@@ -52,7 +52,7 @@ impl<'ast> Visit<'ast> for Declared<'_> {
     }
 
     fn visit_item_trait(&mut self, block: &'ast ItemTrait) {
-        let site = Site::new(self.file.path(), LineNumber::from(block.ident.span()));
+        let site = Site::new(self.file.head().path(), LineNumber::from(block.ident.span()));
         let declaration = Declaration::new(Name::from(&block.ident), Self::provided(block), site);
         self.found.extend(
             Self::with_methods(block)

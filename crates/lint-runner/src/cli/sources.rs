@@ -1,12 +1,16 @@
-use std::mem;
-use std::sync::{Mutex, OnceLock, PoisonError};
+mod gathering;
+
+pub(crate) use gathering::Gathering;
+
+use std::sync::OnceLock;
 
 use cargo_ports::Cargo;
 use code_model::Model;
-use code_reader::{FileFacts, ListedFile, Listing, Reader};
+use code_reader::{FileFacts, Reader};
 use file_ports::Files;
-use lint_core::Readout;
+use lint_core::{FileHead, Readout};
 use lint_reader::{CrateSources, Described, SourceFiles, Stage, Unlocated};
+
 use timer_ports::Timer;
 
 use super::boundary::Queue;
@@ -27,22 +31,7 @@ pub(crate) struct Sources<'run, F, C, T> {
     staged: &'run Measured<Stage<'run>>,
     queue: Queue,
     located: OnceLock<Measured<Result<Described, Unlocated>>>,
-    gathering: Gathering,
-}
-
-#[derive(Debug, Default)]
-struct Gathering {
-    claims: Queue,
-    deposited: Mutex<Vec<FileFacts>>,
-    model: OnceLock<Option<Model>>,
-}
-
-impl Gathering {
-    fn deposited(&self, facts: Vec<FileFacts>, listing: &Listing<'_>) -> Option<Vec<FileFacts>> {
-        let mut held = self.deposited.lock().unwrap_or_else(PoisonError::into_inner);
-        held.extend(facts);
-        Some(held.len()).filter(|count| *count == listing.entries().len()).map(|_| mem::take(&mut *held))
-    }
+    gathering: Gathering<'run>,
 }
 
 impl<'run, F: Files, C: Cargo, T: Timer> Wired<'run, F, C, T> {
@@ -67,8 +56,9 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
     pub(crate) fn new(
         wired: &'run Wired<'run, F, C, T>,
         staged: &'run Measured<Stage<'run>>,
+        heads: &'run OnceLock<Vec<FileHead>>,
     ) -> Sources<'run, F, C, T> {
-        Sources { wired, staged, queue: Queue::default(), located: OnceLock::new(), gathering: Gathering::default() }
+        Sources { wired, staged, queue: Queue::default(), located: OnceLock::new(), gathering: Gathering::new(heads) }
     }
 
     pub(crate) fn wired(&self) -> &'run Wired<'run, F, C, T> {
@@ -97,17 +87,16 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         })
     }
 
-    pub(crate) fn lowered(&self, readout: &Readout, worker: Worker) -> Vec<Timing> {
-        let listing = Listing::of_files(readout.files());
+    pub(crate) fn gathered(&self, readout: &Readout, worker: Worker) -> Lowering {
         let lowering = Stopwatch::started(self.wired.timer);
-        let facts: Vec<FileFacts> = self.gathering.claims.claimed(listing.entries()).map(ListedFile::lowered).collect();
+        let merging = self.gathering.gathered(readout);
         let lowered = lowering.stopped(Step::Lower(worker));
-        let merged = self.gathering.deposited(facts, &listing).map(|complete| {
-            let merging = Stopwatch::started(self.wired.timer);
-            self.gathering.model.get_or_init(|| self.merged(complete));
-            merging.stopped(Step::Model)
+        let merged = merging.map(|complete| {
+            let stopwatch = Stopwatch::started(self.wired.timer);
+            self.gathering.settled(complete, |facts| self.merged(facts));
+            stopwatch.stopped(Step::Model)
         });
-        [lowered].into_iter().chain(merged).collect()
+        Lowering { timings: [lowered].into_iter().chain(merged).collect() }
     }
 
     fn merged(&self, facts: Vec<FileFacts>) -> Option<Model> {
@@ -115,7 +104,18 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         self.located().done().as_ref().ok().map(|described| Reader::rooted(model, described.crates()))
     }
 
-    pub(crate) fn model(&self) -> Option<&Model> {
-        self.gathering.model.wait().as_ref()
+    pub(crate) fn gathering(&self) -> &Gathering<'run> {
+        &self.gathering
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Lowering {
+    timings: Vec<Timing>,
+}
+
+impl Lowering {
+    pub(crate) fn timings(&self) -> &[Timing] {
+        &self.timings
     }
 }

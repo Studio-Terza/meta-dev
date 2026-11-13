@@ -21,7 +21,7 @@ impl<'file> Owners<'file> {
             manifests: files
                 .iter()
                 .rev()
-                .filter_map(|file| Some((file.placement().package().root().package()?.clone(), file)))
+                .filter_map(|file| Some((file.head().placement().package().root().package()?.clone(), file)))
                 .collect(),
         }
     }
@@ -47,8 +47,8 @@ impl<'file> Owners<'file> {
                 let file = *self.manifests.get(&Name::from(declarer.as_ref()))?;
                 Some((
                     Site::new(
-                        file.manifest_file().as_ref(),
-                        file.placement().package().key_lines().line(TableKey::PortOwns)?,
+                        file.head().manifest_file().as_ref(),
+                        file.head().placement().package().key_lines().line(TableKey::PortOwns)?,
                     ),
                     owned,
                 ))
@@ -67,14 +67,14 @@ impl<'file> Owners<'file> {
         Self::sites(file, bypass)
             .into_iter()
             .map(|line| {
-                let site = Site::new(file.manifest_file().as_ref(), line);
+                let site = Site::new(file.head().manifest_file().as_ref(), line);
                 Violation::new(site, ForeignDependency::new(package, bypass.owners().clone()))
             })
             .collect()
     }
 
     fn sites(file: &SourceFile, bypass: &Bypass<'_>) -> BTreeSet<LineNumber> {
-        let dependencies = file.placement().package().dependency_sites();
+        let dependencies = file.head().placement().package().dependency_sites();
         Some(dependencies.sites(bypass.keys()))
             .filter(|found| found.first().is_some())
             .unwrap_or_else(|| BTreeSet::from([dependencies.header()]))

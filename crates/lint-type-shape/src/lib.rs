@@ -63,7 +63,7 @@ impl TypeShape {
 
 impl FileLint for TypeShape {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut shapes = TypeShapes { file, path: file.path(), violations: Vec::new() };
+        let mut shapes = TypeShapes { file, path: file.head().path(), violations: Vec::new() };
         shapes.visit_file(file.syntax());
         shapes.violations
     }

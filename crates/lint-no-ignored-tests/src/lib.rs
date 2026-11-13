@@ -35,12 +35,11 @@ impl NoIgnoredTests {
 
 impl NoIgnoredTests {
     fn never_tested(file: &SourceFile) -> Option<&SourceFile> {
-        match file.placement().role() {
-            Role::BinaryRoot => file.switched_off().map(|_switched_off| file),
+        match file.head().placement().role() {
+            Role::BinaryRoot => file.head().switched_off().map(|_switched_off| file),
             Role::BuildScript => Some(file),
-            Role::LibraryRoot | Role::Other | Role::Target => {
-                Some(file).filter(|library| library.placement().package().library_tests() == LibraryTests::SwitchedOff)
-            }
+            Role::LibraryRoot | Role::Other | Role::Target => Some(file)
+                .filter(|library| library.head().placement().package().library_tests() == LibraryTests::SwitchedOff),
         }
     }
 }
@@ -51,7 +50,7 @@ impl FileLint for NoIgnoredTests {
             .and_then(Self::never_tested)
             .map_or_default(|shipped| TestGates::lines_in(shipped.syntax()))
             .into_iter()
-            .map(|line| Violation::new(Site::new(file.path(), line), Self::UNRUN))
+            .map(|line| Violation::new(Site::new(file.head().path(), line), Self::UNRUN))
             .collect()
     }
 }
@@ -63,10 +62,11 @@ impl Lint for NoIgnoredTests {
             files
                 .iter()
                 .flat_map(|file| {
-                    let target = file.switched_off().map(|path| Violation::new(Site::of_file(path), Self::UNTESTED));
+                    let target =
+                        file.head().switched_off().map(|path| Violation::new(Site::of_file(path), Self::UNTESTED));
                     SkipMarks::lines_in(file.syntax())
                         .into_iter()
-                        .map(move |line| Violation::new(Site::new(file.path(), line), Self::SKIPPED))
+                        .map(move |line| Violation::new(Site::new(file.head().path(), line), Self::SKIPPED))
                         .chain(target)
                 })
                 .chain(Self::in_shipped(files))

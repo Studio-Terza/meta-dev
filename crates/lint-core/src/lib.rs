@@ -39,7 +39,7 @@ pub use model_lint::ModelLint;
 pub use readout::Readout;
 pub use repo_file::RepoFile;
 pub use report::Report;
-pub use source_file::SourceFile;
+pub use source_file::{FileHead, Parsed, SourceFile};
 pub use support_modules::SupportModules;
 pub use syntax::Syntax;
 pub use test_file::TestFile;

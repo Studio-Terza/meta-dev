@@ -1,38 +1,30 @@
 mod boundary;
+mod head;
 mod located;
-mod manifest_file;
 
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::path::PathBuf;
 
 use crate::macros::Expansions;
 use boundary::Nesting;
 use file_ports::Absent;
+pub use head::FileHead;
 use lint_layout::Failure;
 use lint_layout::LineNumber;
 use lint_layout::SourceText;
 use lint_placement::CrateFile;
 use lint_placement::Placement;
-use lint_placement::Role;
 use located::Located;
-pub use manifest_file::ManifestFile;
 
 #[derive(Debug)]
 pub struct SourceFile {
-    path: PathBuf,
-    located: Located,
-    placement: Placement,
-    crate_file: CrateFile,
+    head: FileHead,
     text: SourceText,
     syntax: syn::File,
     test_modules: Vec<SourceFile>,
-    manifest: OnceLock<ManifestFile>,
     expansions: Expansions,
 }
 
 impl SourceFile {
-    const MANIFEST: &'static str = "Cargo.toml";
-
     pub fn parse(path: impl Into<PathBuf>, text: SourceText) -> Result<Self, Failure> {
         let file_path = path.into();
         let placement = Placement::locate(&Absent, &file_path);
@@ -49,14 +41,10 @@ impl SourceFile {
             .and_then(|bounded| syn::parse_file(bounded.as_ref()))
         {
             Ok(syntax) => Ok(Self {
-                crate_file: placement.crate_file(&path),
-                path,
-                located,
-                placement,
+                head: FileHead::new(path, located, placement),
                 text,
                 syntax,
                 test_modules: Vec::new(),
-                manifest: OnceLock::new(),
                 expansions: Expansions::default(),
             }),
             Err(source) => Err(Failure::Parse { path, line: LineNumber::from(source.span()), source }),
@@ -70,12 +58,12 @@ impl SourceFile {
 
     #[must_use]
     pub fn in_crate_file(self, crate_file: CrateFile) -> SourceFile {
-        SourceFile { crate_file, ..self }
+        SourceFile { head: self.head.in_crate_file(crate_file), ..self }
     }
 
     #[must_use]
-    pub fn crate_file(&self) -> &CrateFile {
-        &self.crate_file
+    pub fn head(&self) -> &FileHead {
+        &self.head
     }
 
     #[must_use]
@@ -84,37 +72,8 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    #[must_use]
-    pub fn located(&self) -> &Located {
-        &self.located
-    }
-
-    #[must_use]
-    pub fn switched_off(&self) -> Option<&Path> {
-        self.placement.package().untested().holds(self.located.within(&self.path)).map(|_| self.path.as_path())
-    }
-
-    #[must_use]
-    pub fn manifest_file(&self) -> &ManifestFile {
-        self.manifest.get_or_init(|| {
-            let inside = self.located.within(&self.path).strip_prefix(self.placement.package().root().directory()).ok();
-            let depth = inside.map_or(0, |relative| relative.components().count());
-            ManifestFile::from(self.path.ancestors().nth(depth).unwrap_or(&self.path).join(Self::MANIFEST))
-        })
-    }
-
-    #[must_use]
-    pub fn placement(&self) -> &Placement {
-        &self.placement
-    }
-
-    #[must_use]
     pub fn shipped(&self) -> Option<&SourceFile> {
-        (self.placement.role() != Role::Target).then_some(self)
+        self.head.shipped().map(|_| self)
     }
 
     #[must_use]
@@ -130,5 +89,34 @@ impl SourceFile {
     #[must_use]
     pub(crate) fn expansions(&self) -> &Expansions {
         &self.expansions
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Parsed<'syntax, 'head> {
+    file: &'syntax SourceFile,
+    head: &'head FileHead,
+}
+
+impl<'syntax, 'head> Parsed<'syntax, 'head> {
+    #[must_use]
+    pub fn new(file: &'syntax SourceFile, head: &'head FileHead) -> Parsed<'syntax, 'head> {
+        Parsed { file, head }
+    }
+
+    #[must_use]
+    pub fn file(self) -> &'syntax SourceFile {
+        self.file
+    }
+
+    #[must_use]
+    pub fn head(self) -> &'head FileHead {
+        self.head
+    }
+}
+
+impl<'file> From<&'file SourceFile> for Parsed<'file, 'file> {
+    fn from(file: &'file SourceFile) -> Parsed<'file, 'file> {
+        Parsed { file, head: &file.head }
     }
 }

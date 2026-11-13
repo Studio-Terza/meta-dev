@@ -17,7 +17,7 @@ pub struct Exits<'file> {
 
 impl Exits<'_> {
     fn record(&mut self, span: Span, finding: Finding) {
-        self.found.push(Violation::new(Site::new(self.file.path(), LineNumber::from(span)), finding));
+        self.found.push(Violation::new(Site::new(self.file.head().path(), LineNumber::from(span)), finding));
     }
 }
 

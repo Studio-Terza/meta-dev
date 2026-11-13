@@ -10,6 +10,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::OnceLock;
 use std::thread;
 
 use cargo_ports::{Cargo, CargoFiller};
@@ -109,7 +110,7 @@ impl Cli {
         err: &mut impl Write,
     ) -> Verdict {
         match staged {
-            Ok(stage) => self.sourced(&Sources::new(wired, &stage), out, err),
+            Ok(stage) => self.sourced(&Sources::new(wired, &stage, &OnceLock::new()), out, err),
             Err(failure) => Verdict::refused(&failure, err),
         }
     }

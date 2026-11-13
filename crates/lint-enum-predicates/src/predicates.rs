@@ -58,7 +58,7 @@ impl EnumPredicates<'_> {
     }
 
     fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
-        let crate_root = file.placement().crate_root();
+        let crate_root = file.head().placement().crate_root();
         let local = Some(path)
             .filter(|candidate| candidate.qself.is_none())
             .filter(|unqualified| unqualified.path.segments.len() == 1)
@@ -77,7 +77,7 @@ pub struct Predicates<'scan, 'file> {
 
 impl<'scan, 'file> Predicates<'scan, 'file> {
     pub fn new(known: &'scan EnumPredicates<'scan>, file: &'file SourceFile) -> Predicates<'scan, 'file> {
-        Predicates { known, file, module: Cow::Borrowed(file.placement().module()), violations: Vec::new() }
+        Predicates { known, file, module: Cow::Borrowed(file.head().placement().module()), violations: Vec::new() }
     }
 
     pub fn into_violations(self) -> Vec<Violation<'file>> {
@@ -97,7 +97,7 @@ impl<'scan, 'file> Predicates<'scan, 'file> {
             })
             .map(|signature| {
                 Violation::new(
-                    Site::new(self.file.path(), LineNumber::from(signature.span())),
+                    Site::new(self.file.head().path(), LineNumber::from(signature.span())),
                     Finding::BoolPredicate { name: Name::from(&signature.ident) },
                 )
             })

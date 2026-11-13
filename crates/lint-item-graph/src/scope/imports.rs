@@ -6,10 +6,10 @@ use lint_layout::Name;
 use super::import::{Import, Leaf};
 
 #[derive(Debug, Default)]
-pub struct Imports<'file>(BTreeMap<Leaf, Vec<Import<'file>>>);
+pub struct Imports(BTreeMap<Leaf, Vec<Import>>);
 
-impl<'file> Imports<'file> {
-    pub fn add(&mut self, import: Option<Import<'file>>) {
+impl Imports {
+    pub fn add(&mut self, import: Option<Import>) {
         self.0 = import.into_iter().fold(mem::take(&mut self.0), |mut grouped, found| {
             grouped.entry(Leaf::from(&found)).or_default().push(found);
             grouped
@@ -20,11 +20,11 @@ impl<'file> Imports<'file> {
         self.naming(name).first().map(Import::spelled_path)
     }
 
-    pub fn local_item(&self, name: &Name, local_roots: &BTreeSet<Name>) -> Option<&Imports<'file>> {
+    pub fn local_item(&self, name: &Name, local_roots: &BTreeSet<Name>) -> Option<&Imports> {
         self.naming(name).iter().all(|import| import.rooted_in(local_roots).is_some()).then_some(self)
     }
 
-    pub fn naming(&self, name: &Name) -> &[Import<'file>] {
+    pub fn naming(&self, name: &Name) -> &[Import] {
         self.0.get(name).map_or(&[], Vec::as_slice)
     }
 }

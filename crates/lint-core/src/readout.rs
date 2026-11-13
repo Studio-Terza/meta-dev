@@ -48,7 +48,7 @@ impl Readout {
 
     #[must_use]
     pub fn sorted(mut self) -> Readout {
-        self.files.sort_by(|left, right| left.path().cmp(right.path()));
+        self.files.sort_by(|left, right| left.head().path().cmp(right.head().path()));
         self.repo_files.sort();
         self.repo_files.dedup();
         self

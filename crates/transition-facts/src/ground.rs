@@ -1,6 +1,6 @@
 use syn::ItemMod;
 
-use lint_core::{Gate, SourceFile};
+use lint_core::{FileHead, Gate};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ground {
@@ -13,7 +13,7 @@ pub enum Ground {
 impl Ground {
     const GATED: [Ground; 3] = [Ground::Ports, Ground::Boundary, Ground::Store];
 
-    pub(crate) fn gated(file: &SourceFile) -> Ground {
+    pub(crate) fn gated(file: &FileHead) -> Ground {
         Self::GATED
             .into_iter()
             .find(|ground| ground.gate().and_then(|gate| gate.admits(file)).is_some())

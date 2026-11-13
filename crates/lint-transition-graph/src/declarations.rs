@@ -30,7 +30,7 @@ impl<'found> From<&'found [SourceFile]> for Declarations<'found> {
     fn from(files: &'found [SourceFile]) -> Declarations<'found> {
         Declarations {
             laws: Laws::from(files),
-            packages: files.iter().map(|file| (file.path(), Package::containing(file))).collect(),
+            packages: files.iter().map(|file| (file.head().path(), Package::containing(file))).collect(),
         }
     }
 }

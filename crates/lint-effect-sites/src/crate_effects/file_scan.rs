@@ -23,7 +23,7 @@ pub(super) struct FileScan<'file> {
 
 impl<'file> FileScan<'file> {
     pub(super) fn scanned(file: &'file SourceFile) -> FileScan<'file> {
-        let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
+        let ground = Gate::PORTS.admits(file.head()).map_or(Ground::Open, |_| Ground::Ports);
         let mut scan = FileScan { file, ground, printed: Vec::new(), tested: BTreeSet::new() };
         scan.visit_file(file.syntax());
         scan
@@ -39,7 +39,7 @@ impl<'file> FileScan<'file> {
 
     fn skipping(&mut self, attributes: &[Attribute], span: Span) {
         let lines = span.start().line..=span.end().line;
-        let tested = lines.map(|line| Site::new(self.file.path(), LineNumber::from(line)));
+        let tested = lines.map(|line| Site::new(self.file.head().path(), LineNumber::from(line)));
         self.tested.extend(tested.filter(|_| Walk::outside_tests(attributes) == Walk::Skipped));
     }
 }
@@ -76,7 +76,12 @@ impl<'ast> Visit<'ast> for FileScan<'_> {
             .map(|last| (Name::from(&last.ident), LineNumber::from(last.ident.span())))
             .filter(|(name, _)| name.matches::<Whole>(&Vocabulary::MACROS).is_some())
             .map(|(name, line)| {
-                EffectSite::new(Site::new(self.file.path(), line), Effect::Stdio, Called::Macro(name), self.ground)
+                EffectSite::new(
+                    Site::new(self.file.head().path(), line),
+                    Effect::Stdio,
+                    Called::Macro(name),
+                    self.ground,
+                )
             });
         self.printed.extend(printed);
         visit::visit_macro(self, invocation);

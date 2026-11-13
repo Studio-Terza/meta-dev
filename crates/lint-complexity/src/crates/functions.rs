@@ -23,7 +23,7 @@ impl<'file> Functions<'file> {
         let function = |block: &Block| {
             Function::new(
                 Name::from(name),
-                Site::new(self.file.path(), LineNumber::from(name.span())),
+                Site::new(self.file.head().path(), LineNumber::from(name.span())),
                 Branches::scored(block, Propagation::Branch),
             )
         };

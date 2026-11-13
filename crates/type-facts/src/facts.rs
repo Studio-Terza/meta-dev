@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::ops::Not;
 
-use lint_core::SourceFile;
+use lint_core::{Parsed, SourceFile};
 use lint_layout::Name;
 use lint_placement::CrateName;
 
@@ -29,7 +29,7 @@ pub struct Facts<'file> {
 impl<'file> Facts<'file> {
     #[must_use]
     pub fn of_files(files: &'file [SourceFile]) -> Facts<'file> {
-        files.iter().filter_map(SourceFile::shipped).fold(Facts::default(), Collector::collected)
+        files.iter().map(Parsed::from).map(Facts::from).collect()
     }
 
     pub(crate) fn add_type(&mut self, found: Option<TypeFact<'file>>) {
@@ -103,5 +103,27 @@ impl<'file> Facts<'file> {
         let krate: &CrateName = found.as_ref();
         let name: &Name = found.as_ref();
         self.members.get(krate)?.get(name)
+    }
+}
+
+impl<'head> From<Parsed<'_, 'head>> for Facts<'head> {
+    fn from(parsed: Parsed<'_, 'head>) -> Facts<'head> {
+        let head = parsed.head();
+        head.shipped().map_or_default(|_| Collector::collected(Facts::default(), parsed.file(), head))
+    }
+}
+
+impl<'file> FromIterator<Facts<'file>> for Facts<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Facts<'file>>>(parts: Parts) -> Facts<'file> {
+        parts.into_iter().fold(Facts::default(), |mut whole, part| {
+            whole.types.extend(part.types);
+            whole.traits.extend(part.traits);
+            whole.generic_impls.extend(part.generic_impls);
+            let members = part
+                .members
+                .into_iter()
+                .fold(whole.members, |crates, (krate, named)| Members::absorbed_into(crates, krate, named));
+            Facts { members, ..whole }
+        })
     }
 }
