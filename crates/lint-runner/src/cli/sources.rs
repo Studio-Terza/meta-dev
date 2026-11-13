@@ -87,7 +87,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         })
     }
 
-    pub(crate) fn gathered(&self, readout: &Readout, worker: Worker) -> Vec<Timing> {
+    pub(crate) fn gathered(&self, readout: &Readout, worker: Worker) -> Lowering {
         let lowering = Stopwatch::started(self.wired.timer);
         let merging = self.gathering.gathered(readout);
         let lowered = lowering.stopped(Step::Lower(worker));
@@ -96,7 +96,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
             self.gathering.settled(complete, |facts| self.merged(facts));
             stopwatch.stopped(Step::Model)
         });
-        [lowered].into_iter().chain(merged).collect()
+        Lowering { timings: [lowered].into_iter().chain(merged).collect() }
     }
 
     fn merged(&self, facts: Vec<FileFacts>) -> Option<Model> {
@@ -106,5 +106,16 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
 
     pub(crate) fn gathering(&self) -> &Gathering<'run> {
         &self.gathering
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Lowering {
+    timings: Vec<Timing>,
+}
+
+impl Lowering {
+    pub(crate) fn timings(&self) -> &[Timing] {
+        &self.timings
     }
 }

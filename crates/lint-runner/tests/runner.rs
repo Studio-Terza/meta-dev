@@ -771,6 +771,21 @@ fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Bo
 }
 
 #[test]
+fn a_binary_and_its_module_files_are_judged_as_one_crate() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    let links: Vec<String> = (0..RING)
+        .zip((0..RING).cycle().skip(1))
+        .map(|(index, next)| format!("pub struct R{index}(R{next});\n"))
+        .collect();
+    let (opened, closed) = links.split_at(RING / 2);
+    root.write("src/main.rs", &format!("mod a;\n{}fn main() {{}}\n", opened.concat()))?;
+    root.write("src/a.rs", &closed.concat())?;
+    let named = format!("{}:1", root.at("src/main.rs").display());
+    assert_eq!(root.crate_graph_lines()?, Lines::from([named.as_str()]));
+    Ok(())
+}
+
+#[test]
 fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Box<dyn Error>> {
     let layouts = [
         ("mod outer {\n    mod inner;\n}\n", "src/outer/inner.rs"),

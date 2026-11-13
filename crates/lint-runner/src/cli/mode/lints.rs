@@ -172,16 +172,10 @@ impl Lints {
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
     ) -> Crew<'scope> {
-        let probe = Helper::spawned(scope, move || Self::located(sources)).ok();
         let helpers = Workers::available()
             .helpers()
             .filter_map(|index| Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ok());
-        Crew { helpers: probe.into_iter().chain(helpers).collect() }
-    }
-
-    fn located(sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
-        sources.located();
-        Worked::default()
+        Crew { helpers: helpers.collect() }
     }
 
     fn gathered<'run>(readout: &'run Readout, unlocated: Option<&'run Unlocated>, worked: Worked) -> Outcome<'run> {
@@ -205,7 +199,7 @@ impl Lints {
             .collect();
         jobs.sort_by_key(Job::rank);
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
-        lowered.into_iter().map(Worked::timed).chain(claimed).collect()
+        lowered.timings().iter().copied().map(Worked::timed).chain(claimed).collect()
     }
 }
 
