@@ -1,5 +1,6 @@
 use lint_core::Parsed;
 use lint_enum_predicates::EnumPredicates;
+use lint_fakes_at_ports::FakesAtPorts;
 use lint_file::{ContextLint, PrimedLint};
 use lint_guard_must_use::GuardMustUse;
 use lint_mandatory_laws::MandatoryLaws;
@@ -8,6 +9,7 @@ use lint_named_numbers::NamedNumbers;
 use lint_no_forwarders::NoForwarders;
 use lint_no_parameter_bags::NoParameterBags;
 use lint_no_test_only_api::NoTestOnlyApi;
+use lint_port_batching::PortBatching;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
@@ -19,6 +21,8 @@ pub(crate) trait Holding<'run, Lint: ContextLint> {
 }
 
 pub(crate) trait Priming<'run, Lint: PrimedLint> {
+    fn primer(&self) -> &Lint::Primer<'run>;
+
     fn primed(&self) -> &Lint::Context<'run>;
 }
 
@@ -121,6 +125,10 @@ macro_rules! contexts {
 
         $(
             impl<'run> Priming<'run, $prime> for Settled<'_, 'run> {
+                fn primer(&self) -> &<$prime as PrimedLint>::Primer<'run> {
+                    &self.contexts.$primed
+                }
+
                 fn primed(&self) -> &<$prime as PrimedLint>::Context<'run> {
                     &self.primings.$primed
                 }
@@ -146,5 +154,7 @@ contexts! {
     }
     primed: {
         state_graph: StateGraph,
+        fakes_at_ports: FakesAtPorts,
+        port_batching: PortBatching,
     }
 }

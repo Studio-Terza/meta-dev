@@ -57,7 +57,11 @@ impl PrimedLint for StateGraph {
         StateFile(shipped.unwrap_or_default())
     }
 
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
+    fn judged<'file, 'head: 'file>(
+        file: &'file SourceFile,
+        _: &Declarations<'head>,
+        concluded: &Concluded<'head>,
+    ) -> Vec<Violation<'file>> {
         concluded.found_in(file)
     }
 }

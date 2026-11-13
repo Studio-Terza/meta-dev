@@ -152,8 +152,8 @@ impl Lints {
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
         <Filed<NoIgnoredTests> as Registered>::ENTRY,
         <Filed<NoTestIo> as Registered>::ENTRY,
-        Entry::spelled::<FakesAtPorts>(Work::Checked(|readout| vec![FakesAtPorts::report(readout.files())])),
-        Entry::spelled::<PortBatching>(Work::Checked(|readout| vec![PortBatching::report(readout.files())])),
+        <Primed<FakesAtPorts> as Registered>::ENTRY,
+        <Primed<PortBatching> as Registered>::ENTRY,
         Entry::spelled::<OwnedDependencies>(Work::Described(<OwnedDependencies as WorkspaceLint>::report)),
         Entry::spelled::<KeyDependencyRoles>(Work::Described(<KeyDependencyRoles as WorkspaceLint>::report)),
         Entry::spelled::<EffectsInFillers>(Work::Checked(|readout| vec![EffectsInFillers::report(readout.files())])),
@@ -434,6 +434,6 @@ where
     for<'settled, 'run> Settled<'settled, 'run>: Priming<'run, Lint>,
 {
     fn judged_by<'file>(file: &'file SourceFile, settled: &'file Settled<'_, '_>) -> Vec<Violation<'file>> {
-        Lint::judged(file, settled.primed())
+        Lint::judged(file, settled.primer(), settled.primed())
     }
 }

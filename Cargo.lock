@@ -1454,6 +1454,7 @@ name = "lint-fakes-at-ports"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-paths",
@@ -1821,6 +1822,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-fakes-at-ports",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-paths",
