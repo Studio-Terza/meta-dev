@@ -1,5 +1,5 @@
-use lint_file::{Filed, Primed};
-use lint_fixtures::{Lines, Located, Shown, Source, Sources, Text};
+use lint_file::Filed;
+use lint_fixtures::{Lines, Located, Queried, Shown, Source, Sources, Text};
 use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 
 const UNIT_CRATES: &[Source] = &[
@@ -797,7 +797,7 @@ laws::table!(
 
 laws::table!(
     in_a_port_crate_effects_sit_only_in_fillers,
-    Sources::flagged::<Primed<EffectsInFillers>>,
+    Sources::flagged::<Queried<EffectsInFillers>>,
     [
         FILLED => Lines::default(),
         INHERENT => Lines::from(["crates/store-ports/src/lib.rs:8"]),

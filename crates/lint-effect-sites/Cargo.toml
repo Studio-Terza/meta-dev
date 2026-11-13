@@ -12,12 +12,9 @@ doctest = false
 [dependencies]
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
-lint-paths = { path = "../lint-paths" }
 code-model = { path = "../code-model" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
-proc-macro2.workspace = true
-syn.workspace = true
 
 [dev-dependencies]
 code-reader = { path = "../code-reader" }

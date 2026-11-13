@@ -1,6 +1,5 @@
-use code_model::{Ground, ItemPath, Mention, PathUse, Placed, Region};
+use code_model::{ItemPath, Mention, PathUse, Placed, Region};
 use lint_layout::{Name, PathTail, Whole, Word, words};
-use lint_paths::Use;
 
 use super::called::Called;
 use super::effect::Effect;
@@ -17,18 +16,6 @@ impl Tail {
         Tail { effect, words }
     }
 
-    fn spelled_in(&self, used: &Use<'_>) -> Option<&Tail> {
-        used.spelling(PathTail::new(self.words)).map(|_| self)
-    }
-
-    fn site_of<'file>(&self, used: &Use<'file>) -> Option<EffectSite<'file>> {
-        let place = used.place();
-        let ground = Vocabulary::grounded(used.ground());
-        used.spelling(PathTail::new(self.words))
-            .cloned()
-            .map(|path| EffectSite::new(place, self.effect, Called::Path(path), ground))
-    }
-
     fn effected(&self, used: &PathUse) -> Option<Effected> {
         let path = used.spelling(PathTail::new(self.words))?;
         Some(Effected { effect: self.effect, called: Called::Path(path.as_ref().iter().cloned().collect()) })
@@ -39,51 +26,6 @@ impl Tail {
 pub(super) struct Vocabulary;
 
 impl Vocabulary {
-    pub(super) const FINALS: [Word<'static>; 43] = words![
-        "read",
-        "read_to_string",
-        "write",
-        "create_dir",
-        "create_dir_all",
-        "remove_file",
-        "remove_dir",
-        "remove_dir_all",
-        "copy",
-        "rename",
-        "metadata",
-        "read_dir",
-        "canonicalize",
-        "hard_link",
-        "set_permissions",
-        "read_link",
-        "open",
-        "create",
-        "new",
-        "var",
-        "var_os",
-        "vars",
-        "vars_os",
-        "set_var",
-        "remove_var",
-        "args",
-        "args_os",
-        "current_dir",
-        "set_current_dir",
-        "temp_dir",
-        "current_exe",
-        "now",
-        "sleep",
-        "connect",
-        "bind",
-        "exit",
-        "abort",
-        "random",
-        "thread_rng",
-        "rng",
-        "stdin",
-        "stdout",
-        "stderr",
-    ];
     pub(super) const MACROS: [Word<'static>; 5] = words!["print", "println", "eprint", "eprintln", "dbg"];
     const SHORT: [Tail; 39] = [
         Tail::new(Effect::Files, &words!["fs", "read"]),
@@ -138,14 +80,6 @@ impl Vocabulary {
         Tail::new(Effect::Clock, &words!["chrono", "Utc", "now"]),
     ];
 
-    pub(super) fn site_of<'file>(used: &Use<'file>) -> Option<EffectSite<'file>> {
-        Self::LONG
-            .iter()
-            .find_map(|tail| tail.spelled_in(used))
-            .or_else(|| Self::SHORT.iter().find_map(|tail| tail.spelled_in(used)))
-            .and_then(|tail| tail.site_of(used))
-    }
-
     pub(super) fn placed_site<'model>(placed: Placed<'model, &'model PathUse>) -> Option<EffectSite<'model>> {
         let used = placed.entity();
         let effected = Self::effected(used)?;
@@ -166,13 +100,6 @@ impl Vocabulary {
         let name: &Name = written.last()?;
         name.matches::<Whole>(&Self::MACROS)?;
         Some(Effected { effect: Effect::Stdio, called: Called::Macro(name.clone()) })
-    }
-
-    fn grounded(ground: lint_paths::Ground) -> Ground {
-        match ground {
-            lint_paths::Ground::Open => Ground::Open,
-            lint_paths::Ground::Ports => Ground::Ports,
-        }
     }
 }
 

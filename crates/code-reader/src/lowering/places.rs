@@ -4,7 +4,7 @@ use syn::{Ident, ItemImpl, ItemMacro};
 
 use code_model::{Building, FileId, ItemId, Region, Resolved, Seat, TypeRef};
 use lint_core::Macros;
-use lint_layout::{LineNumber, Position};
+use lint_layout::{LineNumber, Name, Position};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
@@ -21,6 +21,7 @@ struct SubjectId(usize);
 struct SubjectRow {
     scope: ScopeId,
     ty: TypeRef<Written>,
+    implemented: Option<Name>,
 }
 
 #[derive(Debug)]
@@ -65,7 +66,9 @@ impl PlaceRows {
                 let owner = declared
                     .map(|found| found.item)
                     .or_else(|| subject.as_ref()?.named().map(AsRef::<Resolved>::as_ref)?.crate_item());
-                Place { subject, owner, declared }
+                let implemented =
+                    row.subject.and_then(|id| self.subjects.get(id.0)).and_then(|found| found.implemented.clone());
+                Place { subject, owner, declared, implemented }
             })
             .collect();
         Places(places)
@@ -87,6 +90,7 @@ struct Place {
     subject: Option<TypeRef>,
     owner: Option<ItemId>,
     declared: Option<Declared>,
+    implemented: Option<Name>,
 }
 
 #[derive(Debug)]
@@ -102,7 +106,9 @@ impl Places {
 
     pub(super) fn seat(&self, region: Region, place: Option<PlaceId>) -> Seat {
         let found = place.and_then(|id| self.0.get(id.0));
-        Seat::new(region, found.and_then(|seated| seated.subject.clone())).owned(found.and_then(|seated| seated.owner))
+        Seat::new(region, found.and_then(|seated| seated.subject.clone()))
+            .owned(found.and_then(|seated| seated.owner))
+            .implementing(found.and_then(|seated| seated.implemented.clone()))
     }
 }
 
@@ -148,7 +154,9 @@ impl Lowering<'_> {
         self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, subject.clone()));
         let rows = &mut self.lowered.rows.places.subjects;
         let subjected = SubjectId(rows.len());
-        rows.push(SubjectRow { scope: self.here.scope(), ty: subject });
+        let implemented =
+            block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
+        rows.push(SubjectRow { scope: self.here.scope(), ty: subject, implemented });
         let place = self.placed(PlaceRow { subject: Some(subjected), owner: None });
         let context = self.context.of_impl(block, place);
         self.contextual(context, |lowering| {

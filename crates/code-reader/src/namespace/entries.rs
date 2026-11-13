@@ -6,7 +6,7 @@ use syn::{
     VisRestricted,
 };
 
-use code_model::{Building, CrateExports, Domain, Item as ModelItem, ItemId, ItemKind, Reexport, Unresolved};
+use code_model::{Building, CrateExports, Domain, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved};
 use lint_core::Macros;
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
@@ -137,11 +137,12 @@ pub(crate) struct Declared {
     visibility: Visibility,
     kind: DeclaredKind,
     domain: Domain,
+    marks: Vec<ItemPath>,
 }
 
 impl Declared {
     pub(crate) fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Declared {
-        Declared { name, visibility, kind, domain: Domain::Types }
+        Declared { name, visibility, kind, domain: Domain::Types, marks: Vec::new() }
     }
 
     fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Declared {
@@ -152,9 +153,16 @@ impl Declared {
         Declared { domain: Domain::Values, ..self }
     }
 
+    fn marked(self, attributes: &[Attribute]) -> Declared {
+        Declared {
+            marks: attributes.iter().map(|attribute| UsePath::from(attribute.path()).written()).collect(),
+            ..self
+        }
+    }
+
     fn issued(&self, building: &mut Building) -> Option<ItemId> {
         let kind = self.kind.item_kind()?;
-        Some(building.declared(ModelItem::new(self.name.clone(), kind)))
+        Some(building.declared(ModelItem::new(self.name.clone(), kind).marked(self.marks.clone())))
     }
 }
 
@@ -175,6 +183,7 @@ impl DeriveMacro<'_> {
                 visibility,
                 kind: DeclaredKind::Item(ItemKind::Derive),
                 domain: Domain::Macros,
+                marks: Vec::new(),
             })
             .collect()
     }
@@ -379,9 +388,9 @@ impl From<&Item> for Entries {
             Item::Type(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Alias))
             }
-            Item::Trait(declared) => {
-                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
-            }
+            Item::Trait(declared) => Entries::from(
+                Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait).marked(&declared.attrs),
+            ),
             Item::TraitAlias(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
             }

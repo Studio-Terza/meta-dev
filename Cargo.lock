@@ -1423,11 +1423,8 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
- "lint-paths",
  "lint-placement",
  "newtype",
- "proc-macro2",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1839,6 +1836,7 @@ dependencies = [
 name = "lint-port-dependencies"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "laws",
  "lint-core",
  "lint-effect-sites",

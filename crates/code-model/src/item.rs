@@ -2,6 +2,7 @@ use std::convert::Infallible;
 
 use lint_layout::Name;
 
+use crate::item_path::ItemPath;
 use crate::resolved::Resolved;
 use crate::sited::Sited;
 use crate::type_ref::{Named, Rebuild, TypeRef};
@@ -24,12 +25,23 @@ pub enum ItemKind {
 pub struct Item {
     name: Name,
     kind: ItemKind,
+    marks: Vec<ItemPath>,
 }
 
 impl Item {
     #[must_use]
     pub fn new(name: Name, kind: ItemKind) -> Item {
-        Item { name, kind }
+        Item { name, kind, marks: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn marked(self, marks: Vec<ItemPath>) -> Item {
+        Item { marks, ..self }
+    }
+
+    #[must_use]
+    pub fn marks(&self) -> &[ItemPath] {
+        &self.marks
     }
 
     #[must_use]
