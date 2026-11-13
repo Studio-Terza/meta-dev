@@ -27,6 +27,8 @@ workspace-metadata = { path = "../workspace-metadata" }
 laws = { path = "../laws" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }
+serde_json.workspace = true
+workspace-metadata = { path = "../workspace-metadata" }
 
 [lints]
 workspace = true
