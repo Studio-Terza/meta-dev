@@ -82,12 +82,6 @@ impl Lint for EffectsInFillers {
     }
 }
 
-impl Lint for CountedCalls {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
-
 impl FileLint for CountedCalls {
     const HEADLINE: Headline = Headline::new(
         "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
@@ -96,12 +90,6 @@ impl FileLint for CountedCalls {
 
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         Vec::from(ReservedNames::<CountedName>::from(file))
-    }
-}
-
-impl Lint for HiddenSqlx {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
     }
 }
 

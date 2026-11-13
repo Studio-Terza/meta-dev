@@ -1,17 +1,11 @@
 mod returns;
 
-use lint_core::{Headline, Lint, Report, SourceFile, Violation};
+use lint_core::{Headline, SourceFile, Violation};
 use lint_file::{FileLint, Reads};
 use returns::Returns;
 
 #[derive(Debug)]
 pub struct BoolMethods;
-
-impl Lint for BoolMethods {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl FileLint for BoolMethods {
     const HEADLINE: Headline =

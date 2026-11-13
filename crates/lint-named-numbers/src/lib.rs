@@ -1,4 +1,6 @@
-use lint_core::{Headline, Lint};
+use lint_core::{Headline, Parsed};
+use lint_file::{ContextLint, Reads};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use syn::visit::Visit;
@@ -9,7 +11,6 @@ use lint_core::Gate;
 use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::SupportModules;
@@ -20,30 +21,42 @@ use lint_layout::{LineNumber, Word, words};
 #[derive(Debug)]
 pub struct NamedNumbers;
 
-impl Lint for NamedNumbers {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
-        Report::new(
-            Headline::new(
-                "a number has a name: outside tests and boundary modules, a literal other than 0 and 1 sits in a const item",
-            ),
-            files
-                .iter()
-                .filter_map(SourceFile::shipped)
-                .filter(|file| Gate::BOUNDARY.admits(file.head()).is_none())
-                .filter(|file| support.iter().all(|path| path != file.head().path()))
-                .flat_map(|file| {
-                    Self::flagged(
-                        file,
-                        Numbers { file, lines: Vec::new() },
-                        Message::new(
-                            Problem::new("numeric literal outside a const item"),
-                            Fix::new("name it as a const so it can be found and tuned"),
-                        ),
-                    )
-                })
-                .collect(),
-        )
+#[derive(Debug, Default)]
+pub struct SupportPaths(BTreeSet<PathBuf>);
+
+impl FromIterator<SupportPaths> for SupportPaths {
+    fn from_iter<Parts: IntoIterator<Item = SupportPaths>>(parts: Parts) -> SupportPaths {
+        SupportPaths(parts.into_iter().flat_map(|part| part.0).collect())
+    }
+}
+
+impl ContextLint for NamedNumbers {
+    const HEADLINE: Headline = Headline::new(
+        "a number has a name: outside tests and boundary modules, a literal other than 0 and 1 sits in a const item",
+    );
+    const READS: Reads = Reads::Shipped;
+
+    type Context<'head> = SupportPaths;
+
+    fn contributed(parsed: Parsed<'_, '_>) -> SupportPaths {
+        SupportPaths(SupportModules::paths(parsed.file()).into_iter().collect())
+    }
+
+    fn judged<'file>(file: &'file SourceFile, support: &SupportPaths) -> Vec<Violation<'file>> {
+        let counted = Some(file)
+            .filter(|found| Gate::BOUNDARY.admits(found.head()).is_none())
+            .and_then(|found| support.0.get(found.head().path()).map_or(Some(found), |_| None));
+        counted.map_or_default(|found: &SourceFile| {
+            Self::flagged(
+                found,
+                Numbers { file: found, lines: Vec::new() },
+                Message::new(
+                    Problem::new("numeric literal outside a const item"),
+                    Fix::new("name it as a const so it can be found and tuned"),
+                ),
+            )
+            .collect()
+        })
     }
 }
 

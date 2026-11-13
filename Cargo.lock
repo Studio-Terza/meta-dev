@@ -1634,6 +1634,7 @@ name = "lint-named-numbers"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",

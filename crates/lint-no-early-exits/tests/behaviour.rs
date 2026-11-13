@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_no_early_exits::NoEarlyExits;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -63,5 +64,5 @@ const CASES: [Case; 10] = [
 
 #[test]
 fn return_break_and_continue_are_flagged_in_every_body_and_the_question_mark_is_not() {
-    assert_eq!(Sources::mismatches::<NoEarlyExits>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<NoEarlyExits>>(&CASES), Lines::default());
 }

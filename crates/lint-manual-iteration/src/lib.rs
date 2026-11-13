@@ -1,4 +1,4 @@
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
@@ -13,7 +13,6 @@ use lint_core::Fix;
 use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -23,12 +22,6 @@ use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Debug)]
 pub struct ManualIteration;
-
-impl Lint for ManualIteration {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl ManualIteration {
     const ITERATOR_CONSTRUCTORS: [Word<'static>; 16] = words![

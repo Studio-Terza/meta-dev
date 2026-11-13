@@ -1,4 +1,5 @@
 use lint_expression_flow::ExpressionFlow;
+use lint_file::Filed;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
@@ -76,5 +77,5 @@ const CASES: [Case; 12] = [
 
 #[test]
 fn control_flow_that_is_not_an_expression_is_flagged() {
-    assert_eq!(Sources::mismatches::<ExpressionFlow>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<ExpressionFlow>>(&CASES), Lines::default());
 }

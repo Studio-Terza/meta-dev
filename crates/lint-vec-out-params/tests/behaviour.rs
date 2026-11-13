@@ -1,3 +1,4 @@
+use lint_file::Filed;
 use lint_vec_out_params::VecOutParams;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -20,5 +21,5 @@ const CASES: [Case; 2] = [
 
 #[test]
 fn vec_out_parameters_are_found_in_inline_modules() {
-    assert_eq!(Sources::mismatches::<VecOutParams>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Filed<VecOutParams>>(&CASES), Lines::default());
 }

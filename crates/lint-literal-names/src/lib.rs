@@ -1,7 +1,7 @@
 mod finding;
 
 use finding::Finding;
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use std::path::Path;
 
@@ -10,7 +10,6 @@ use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use lint_core::Bound;
 use lint_core::Macros;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -20,12 +19,6 @@ use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Debug)]
 pub struct LiteralNames;
-
-impl Lint for LiteralNames {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl LiteralNames {
     const SHORTEST: Bound = Bound::Least(3);

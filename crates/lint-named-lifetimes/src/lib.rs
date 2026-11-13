@@ -1,7 +1,7 @@
 mod finding;
 
 use finding::Finding;
-use lint_core::{Headline, Lint};
+use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use syn::visit::Visit;
 
@@ -9,7 +9,6 @@ use std::path::Path;
 
 use syn::LifetimeParam;
 
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -18,12 +17,6 @@ use lint_layout::{Length, Name};
 
 #[derive(Debug)]
 pub struct NamedLifetimes;
-
-impl Lint for NamedLifetimes {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
-    }
-}
 
 impl NamedLifetimes {
     const MINIMUM_LENGTH: Length = Length::new(2);

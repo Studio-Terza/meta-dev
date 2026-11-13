@@ -1,3 +1,4 @@
+use lint_file::Judged;
 use lint_named_numbers::NamedNumbers;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -128,5 +129,5 @@ const CASES: [Case; 18] = [
 
 #[test]
 fn numbers_outside_const_items_are_flagged() {
-    assert_eq!(Sources::mismatches::<NamedNumbers>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Judged<NamedNumbers>>(&CASES), Lines::default());
 }

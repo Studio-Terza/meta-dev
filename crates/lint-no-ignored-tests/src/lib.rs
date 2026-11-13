@@ -2,13 +2,12 @@ mod skip_marks;
 mod test_gates;
 
 use lint_core::Fix;
+use lint_core::Headline;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::{Headline, Lint};
 use lint_file::{FileLint, Reads};
 use lint_layout::LibraryTests;
 use lint_placement::Role;
@@ -61,11 +60,5 @@ impl FileLint for NoIgnoredTests {
             .into_iter()
             .map(|line| Violation::new(Site::new(path, line), Self::UNRUN));
         skipped.chain(target).chain(unrun).collect()
-    }
-}
-
-impl Lint for NoIgnoredTests {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        <Self as FileLint>::reported(files)
     }
 }
