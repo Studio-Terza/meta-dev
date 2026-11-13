@@ -10,14 +10,6 @@ struct Size {
     lines: usize,
 }
 
-impl std::ops::Add for Size {
-    type Output = Size;
-
-    fn add(self, other: Size) -> Size {
-        Size { files: self.files + other.files, lines: self.lines + other.lines }
-    }
-}
-
 #[derive(Debug)]
 pub struct CrateSizes<'files> {
     sizes: BTreeMap<String, Size>,
@@ -27,13 +19,20 @@ pub struct CrateSizes<'files> {
 impl<'files> CrateSizes<'files> {
     #[must_use]
     pub fn measured(files: &[SourceFile], workspaces: &'files [Metadata]) -> CrateSizes<'files> {
-        let sizes = files.iter().fold(BTreeMap::new(), |mut sizes: BTreeMap<String, Size>, file| {
-            let name = file.head().placement().package().root().package().map_or_default(ToString::to_string);
-            let measured = Size { files: 1, lines: file.text().as_ref().matches('\n').count() };
-            let held = sizes.remove(&name).unwrap_or_default();
-            sizes.insert(name, held + measured);
-            sizes
+        let grouped = files.iter().fold(BTreeMap::new(), |mut grouped: BTreeMap<String, Vec<&SourceFile>>, file| {
+            grouped
+                .entry(file.head().placement().package().root().package().map_or_default(ToString::to_string))
+                .or_default()
+                .push(file);
+            grouped
         });
+        let sizes = grouped
+            .into_iter()
+            .map(|(name, found)| {
+                let lines = found.iter().map(|file| file.text().as_ref().matches('\n').count()).sum();
+                (name, Size { files: found.len(), lines })
+            })
+            .collect();
         CrateSizes { sizes, chained: workspaces.iter().collect::<Graph<'files>>().chained() }
     }
 }
