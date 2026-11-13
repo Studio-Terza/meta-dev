@@ -12,7 +12,6 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 lint-core = { path = "../lint-core" }
-lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 quote.workspace = true
 syn.workspace = true

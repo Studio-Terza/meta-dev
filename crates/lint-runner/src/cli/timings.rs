@@ -1,4 +1,5 @@
 use std::cmp::Reverse;
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt;
 
@@ -46,6 +47,7 @@ pub(crate) enum Step {
     Locate,
     Read(Worker),
     Lower(Worker),
+    Filed(Worker),
     Model,
     Lint(Named),
     Survey,
@@ -59,6 +61,9 @@ impl fmt::Display for Step {
             Step::Locate => formatter.write_str("phase locate: describe the workspaces through cargo metadata"),
             Step::Read(Worker(index)) => write!(formatter, "phase read: read and parse the sources on worker {index}"),
             Step::Lower(Worker(index)) => write!(formatter, "phase lower: lower its share of files on worker {index}"),
+            Step::Filed(Worker(index)) => {
+                write!(formatter, "phase file lints: lint its share of files on worker {index}")
+            }
             Step::Model => formatter.write_str("phase model: merge the lowered files into the code model"),
             Step::Lint(name) => write!(formatter, "lint {name}"),
             Step::Survey => formatter.write_str("phase survey: test budget, paired apis and clones"),
@@ -70,6 +75,12 @@ impl fmt::Display for Step {
 pub(crate) struct Timing {
     step: Step,
     took: Elapsed,
+}
+
+impl Timing {
+    fn joined(self, later: Timing) -> Timing {
+        Timing { step: self.step, took: self.took + later.took }
+    }
 }
 
 #[derive(Debug)]
@@ -125,7 +136,12 @@ pub(crate) struct Table {
 
 impl Table {
     pub(crate) fn new(shown: Timings, timings: Vec<Timing>) -> Table {
-        Table { shown, timings }
+        let summed = timings.into_iter().fold(BTreeMap::new(), |mut steps: BTreeMap<String, Timing>, timing| {
+            let held = steps.remove(&timing.step.to_string()).map_or(timing, |earlier| earlier.joined(timing));
+            steps.insert(held.step.to_string(), held);
+            steps
+        });
+        Table { shown, timings: summed.into_values().collect() }
     }
 
     fn rows(&self) -> Vec<&Timing> {

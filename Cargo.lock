@@ -1575,6 +1575,7 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "proc-macro2",
@@ -1653,6 +1654,7 @@ name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "ra-ap-rustc_lexer",
  "syn 2.0.119",
@@ -1757,7 +1759,6 @@ name = "lint-no-test-only-api"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1850,6 +1851,7 @@ name = "lint-private-fns"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
@@ -1979,6 +1981,7 @@ dependencies = [
  "lint-enum-predicates",
  "lint-expression-flow",
  "lint-fakes-at-ports",
+ "lint-file",
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
@@ -2047,7 +2050,6 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
  "newtype",
@@ -2089,6 +2091,7 @@ name = "lint-thin-main"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -2146,6 +2149,7 @@ name = "lint-vec-out-params"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",

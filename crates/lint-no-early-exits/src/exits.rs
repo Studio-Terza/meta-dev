@@ -5,11 +5,11 @@ use syn::visit::{self, Visit};
 use syn::{ExprBreak, ExprContinue, ExprReturn, Macro};
 
 use lint_core::{Macros, Site, SourceFile, Violation};
-use lint_file::FileLint;
 use lint_layout::LineNumber;
 
 use finding::Finding;
 
+#[derive(Debug)]
 pub struct Exits<'file> {
     file: &'file SourceFile,
     found: Vec<Violation<'file>>,
@@ -21,12 +21,12 @@ impl Exits<'_> {
     }
 }
 
-impl FileLint for Exits<'_> {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+impl<'file> From<&'file SourceFile> for Exits<'file> {
+    fn from(file: &'file SourceFile) -> Exits<'file> {
         let mut scan = Exits { file, found: Vec::new() };
         scan.visit_file(file.syntax());
-        scan.found.extend(file.test_modules().iter().flat_map(Exits::violations));
-        scan.found
+        scan.found.extend(file.test_modules().iter().flat_map(|module| Vec::from(Exits::from(module))));
+        scan
     }
 }
 
@@ -48,5 +48,11 @@ impl<'ast> Visit<'ast> for Exits<'_> {
     fn visit_expr_continue(&mut self, expr: &'ast ExprContinue) {
         self.record(expr.continue_token.span, Finding::Continue);
         visit::visit_expr_continue(self, expr);
+    }
+}
+
+impl<'file> From<Exits<'file>> for Vec<Violation<'file>> {
+    fn from(scan: Exits<'file>) -> Vec<Violation<'file>> {
+        scan.found
     }
 }

@@ -1,5 +1,5 @@
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -27,10 +27,7 @@ pub struct TypeShape;
 
 impl Lint for TypeShape {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("types carry their meaning: no bool fields, no tuples in signatures, no String errors"),
-            files.iter().flat_map(Self::violations).collect(),
-        )
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -62,6 +59,10 @@ impl TypeShape {
 }
 
 impl FileLint for TypeShape {
+    const HEADLINE: Headline =
+        Headline::new("types carry their meaning: no bool fields, no tuples in signatures, no String errors");
+    const READS: Reads = Reads::Every;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut shapes = TypeShapes { file, path: file.head().path(), violations: Vec::new() };
         shapes.visit_file(file.syntax());

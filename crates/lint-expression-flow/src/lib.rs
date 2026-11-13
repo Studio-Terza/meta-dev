@@ -1,7 +1,7 @@
 mod fn_body;
 
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use std::collections::{BTreeMap, BTreeSet};
 
 use fn_body::FnBody;
@@ -34,10 +34,7 @@ pub struct ExpressionFlow;
 
 impl Lint for ExpressionFlow {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("control flow is an expression; every branch yields the value the function returns"),
-            Self::in_shipped(files),
-        )
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -84,6 +81,10 @@ impl ExpressionFlow {
 }
 
 impl FileLint for ExpressionFlow {
+    const HEADLINE: Headline =
+        Headline::new("control flow is an expression; every branch yields the value the function returns");
+    const READS: Reads = Reads::Shipped;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut flows = Flows { file, path: file.head().path(), violations: Vec::new() };
         flows.visit_file(file.syntax());

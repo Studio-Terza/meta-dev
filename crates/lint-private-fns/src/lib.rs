@@ -1,6 +1,7 @@
 mod finding;
 
 use lint_core::{Headline, Lint};
+use lint_file::{FileLint, Reads};
 use std::collections::BTreeMap;
 
 use finding::Finding;
@@ -22,24 +23,26 @@ pub struct PrivateFns;
 
 impl Lint for PrivateFns {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("too many private fns; a type's logic belongs in its interface or in more types"),
-            files
-                .iter()
-                .filter_map(SourceFile::shipped)
-                .flat_map(|file| {
-                    Self::private_fns(file)
-                        .into_iter()
-                        .filter(|(_, names)| Self::PER_TYPE.allows(Length::new(names.len())).is_none())
-                        .map(move |(type_name, names)| {
-                            Violation::new(
-                                Site::of_file(file.head().path()),
-                                Finding::TooManyPrivateFns { type_name, names, most: Self::PER_TYPE },
-                            )
-                        })
-                })
-                .collect(),
-        )
+        <Self as FileLint>::reported(files)
+    }
+}
+
+impl FileLint for PrivateFns {
+    const HEADLINE: Headline =
+        Headline::new("too many private fns; a type's logic belongs in its interface or in more types");
+    const READS: Reads = Reads::Shipped;
+
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        Self::private_fns(file)
+            .into_iter()
+            .filter(|(_, names)| Self::PER_TYPE.allows(Length::new(names.len())).is_none())
+            .map(|(type_name, names)| {
+                Violation::new(
+                    Site::of_file(file.head().path()),
+                    Finding::TooManyPrivateFns { type_name, names, most: Self::PER_TYPE },
+                )
+            })
+            .collect()
     }
 }
 

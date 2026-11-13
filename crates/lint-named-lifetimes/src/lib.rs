@@ -2,7 +2,7 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use syn::visit::Visit;
 
 use std::path::Path;
@@ -21,10 +21,7 @@ pub struct NamedLifetimes;
 
 impl Lint for NamedLifetimes {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("lifetimes are named with a word, never a letter"),
-            files.iter().flat_map(<Self as FileLint>::violations).collect(),
-        )
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -33,6 +30,9 @@ impl NamedLifetimes {
 }
 
 impl FileLint for NamedLifetimes {
+    const HEADLINE: Headline = Headline::new("lifetimes are named with a word, never a letter");
+    const READS: Reads = Reads::Every;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut visitor = ShortLifetimes { file, path: file.head().path(), found: Vec::new() };
         visitor.visit_file(file.syntax());

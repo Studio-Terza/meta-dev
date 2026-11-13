@@ -9,7 +9,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use lint_layout::LibraryTests;
 use lint_placement::Role;
 use skip_marks::SkipMarks;
@@ -45,32 +45,27 @@ impl NoIgnoredTests {
 }
 
 impl FileLint for NoIgnoredTests {
+    const HEADLINE: Headline = Headline::new("every test runs");
+    const READS: Reads = Reads::Every;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        file.shipped()
+        let path = file.head().path();
+        let skipped = SkipMarks::lines_in(file.syntax())
+            .into_iter()
+            .map(|line| Violation::new(Site::new(path, line), Self::SKIPPED));
+        let target = file.head().switched_off().map(|switched| Violation::new(Site::of_file(switched), Self::UNTESTED));
+        let unrun = file
+            .shipped()
             .and_then(Self::never_tested)
             .map_or_default(|shipped| TestGates::lines_in(shipped.syntax()))
             .into_iter()
-            .map(|line| Violation::new(Site::new(file.head().path(), line), Self::UNRUN))
-            .collect()
+            .map(|line| Violation::new(Site::new(path, line), Self::UNRUN));
+        skipped.chain(target).chain(unrun).collect()
     }
 }
 
 impl Lint for NoIgnoredTests {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("every test runs"),
-            files
-                .iter()
-                .flat_map(|file| {
-                    let target =
-                        file.head().switched_off().map(|path| Violation::new(Site::of_file(path), Self::UNTESTED));
-                    SkipMarks::lines_in(file.syntax())
-                        .into_iter()
-                        .map(move |line| Violation::new(Site::new(file.head().path(), line), Self::SKIPPED))
-                        .chain(target)
-                })
-                .chain(Self::in_shipped(files))
-                .collect(),
-        )
+        <Self as FileLint>::reported(files)
     }
 }

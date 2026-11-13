@@ -20,7 +20,6 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
 use lint_layout::Name;
 use lint_placement::PackageRoot;
 use mentions::{Ground, Mentions};
@@ -45,14 +44,6 @@ impl NoTestOnlyApi {
     }
 }
 
-impl FileLint for NoTestOnlyApi {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let shipped =
-            iter::once(file).filter_map(SourceFile::shipped).flat_map(|code| GatedItems::in_file(code.syntax()));
-        shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.head().path())).collect()
-    }
-}
-
 impl Lint for NoTestOnlyApi {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
@@ -69,7 +60,13 @@ impl Lint for NoTestOnlyApi {
             Headline::new("shipped code has no test-only API"),
             files
                 .iter()
-                .flat_map(Self::violations)
+                .flat_map(|file| {
+                    let gated = iter::once(file)
+                        .filter_map(SourceFile::shipped)
+                        .flat_map(|code| GatedItems::in_file(code.syntax()));
+                    let flagged = gated.chain(TestFeatures::in_file(file.syntax()));
+                    flagged.map(|found| found.in_file(file.head().path())).collect::<Vec<Violation<'_>>>()
+                })
                 .chain(only_tests)
                 .chain(packages.into_iter().flat_map(|(package, file)| Self::in_manifest(package, file)))
                 .collect(),

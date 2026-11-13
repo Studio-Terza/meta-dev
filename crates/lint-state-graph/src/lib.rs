@@ -14,7 +14,6 @@ use declared_graphs::DeclaredGraphs;
 use edge_scan::EdgeScan;
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
 use variant_matches::VariantMatches;
 
 use lint_core::Report;
@@ -36,10 +35,10 @@ impl Lint for StateGraph {
             files
                 .iter()
                 .flat_map(|file| {
-                    FieldVisibility::violations(file)
+                    Vec::from(FieldVisibility::from(*file))
                         .into_iter()
                         .chain(VariantMatches::violations(file, &declarations))
-                        .chain(DeclaredGraphs::violations(file))
+                        .chain(Vec::from(DeclaredGraphs::from(*file)))
                 })
                 .chain(edges.violations())
                 .collect(),

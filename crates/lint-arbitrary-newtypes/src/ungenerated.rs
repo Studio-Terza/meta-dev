@@ -11,7 +11,6 @@ use borrows::Borrows;
 use derived::Derived;
 use finding::Finding;
 use lint_core::{Site, SourceFile, Violation};
-use lint_file::FileLint;
 use lint_layout::{LineNumber, Name};
 
 #[derive(Debug)]
@@ -33,10 +32,16 @@ impl<'ast> Visit<'ast> for Ungenerated<'_> {
     }
 }
 
-impl FileLint for Ungenerated<'_> {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+impl<'file> From<&'file SourceFile> for Ungenerated<'file> {
+    fn from(file: &'file SourceFile) -> Ungenerated<'file> {
         let mut ungenerated = Ungenerated { path: file.head().path(), found: Vec::new() };
         ungenerated.visit_file(file.syntax());
-        ungenerated.found
+        ungenerated
+    }
+}
+
+impl<'file> From<Ungenerated<'file>> for Vec<Violation<'file>> {
+    fn from(scan: Ungenerated<'file>) -> Vec<Violation<'file>> {
+        scan.found
     }
 }

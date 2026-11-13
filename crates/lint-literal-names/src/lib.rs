@@ -2,7 +2,7 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
-use lint_file::FileLint;
+use lint_file::{FileLint, Reads};
 use std::path::Path;
 
 use syn::visit::Visit;
@@ -23,7 +23,7 @@ pub struct LiteralNames;
 
 impl Lint for LiteralNames {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(Headline::new("function names say what the function does"), Self::in_shipped(files))
+        <Self as FileLint>::reported(files)
     }
 }
 
@@ -44,6 +44,9 @@ impl LiteralNames {
 }
 
 impl FileLint for LiteralNames {
+    const HEADLINE: Headline = Headline::new("function names say what the function does");
+    const READS: Reads = Reads::Shipped;
+
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut names = VagueNames { file, path: file.head().path(), found: Vec::new() };
         names.visit_file(file.syntax());

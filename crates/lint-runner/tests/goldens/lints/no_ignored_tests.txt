@@ -5,9 +5,9 @@ report only, a clone in the core allocates where a borrow could share; take a re
 tests go through public APIs:
 src/lib.rs:2: test code in src; move it to the package's tests directory and call the public API from there
 every test runs:
+src/lib.rs:1: #[cfg(test)] code in a target that is never built for tests, so it never runs; move the tests into the crate's tests directory and test through the public API
 tests/ignored.rs:2: test skipped by an attribute; remove the attribute and make the test pass, or delete the test
 tests/ignored.rs:5: test skipped by an attribute; remove the attribute and make the test pass, or delete the test
 tests/off.rs:1: test target switched off in Cargo.toml; remove `test = false` and make the tests pass
 tests/other.rs:1: test target switched off in Cargo.toml; remove `test = false` and make the tests pass
-src/lib.rs:1: #[cfg(test)] code in a target that is never built for tests, so it never runs; move the tests into the crate's tests directory and test through the public API
 fails
