@@ -1053,6 +1053,8 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
+ "newtype",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1349,11 +1351,13 @@ name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "graph-reader",
  "laws",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "syn 2.0.119",
 ]
 
@@ -2137,6 +2141,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-sweep",
  "newtype",
  "proc-macro2",
  "quote",

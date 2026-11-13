@@ -1,6 +1,4 @@
-use syn::visit;
-use syn::visit::Visit;
-use syn::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Stmt};
+use syn::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
 
 use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
 use lint_core::{Macros, Syntax};
@@ -8,8 +6,10 @@ use lint_layout::{LineNumber, Name, Position};
 
 use crate::namespace::{Domain, PortMacro, Resolving, ScopeId, UsePath};
 
+use super::frames::Frame;
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
+use lint_sweep::{Descend, Sweep};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct PlaceId(usize);
@@ -114,7 +114,7 @@ impl Places {
     }
 }
 
-impl Lowering<'_> {
+impl Lowering {
     fn placed(&mut self, row: PlaceRow) -> PlaceId {
         let places = &mut self.lowered.rows.places.places;
         let place = PlaceId(places.len());
@@ -130,34 +130,36 @@ impl Lowering<'_> {
         self.placed(PlaceRow { subject, owner: Some(owner) })
     }
 
-    pub(super) fn owned_by(
-        &mut self,
-        ident: &Ident,
-        domain: Domain,
-        attributes: &[Attribute],
-        visited: impl FnOnce(&mut Self),
-    ) {
+    pub(super) fn owned_by(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> Descend {
+        let frame = self.frame();
         let place = self.owning(ident, domain, attributes);
-        let context = self.context.owned(place);
-        self.contextual(context, visited);
+        self.context = self.context.owned(place);
+        self.saved(frame)
     }
 
-    pub(super) fn transcribed(&mut self, statements: &[Stmt]) {
-        let transcribed = self.context.transcribed();
-        self.contextual(transcribed, |lowering| {
-            statements.iter().filter_map(Syntax::stmt_item).fold(lowering, |inner, declared| {
-                inner.visit_item(declared);
-                inner
-            });
+    pub(super) fn macro_left(&mut self, item: &ItemMacro) -> &mut Self {
+        match &item.ident {
+            Some(_) => self.transcribed(&Macros::statements(&item.mac)),
+            None => self.expanded(&item.mac),
+        }
+    }
+
+    fn transcribed(&mut self, statements: &[Stmt]) -> &mut Self {
+        let outer = self.context;
+        self.context = self.context.transcribed();
+        statements.iter().filter_map(Syntax::stmt_item).fold(&mut *self, |inner, declared| {
+            Sweep::through_item(declared, inner);
+            inner
         });
+        self.context = outer;
+        self
     }
 
-    pub(super) fn expanded(&mut self, item: &ItemMacro) {
-        visit::visit_item_macro(self, item);
-        Macros::items(&item.mac).iter().fold(self, |lowering, declared| {
-            lowering.visit_item(declared);
+    fn expanded(&mut self, invocation: &Macro) -> &mut Self {
+        Macros::items(invocation).iter().fold(self, |lowering, declared| {
+            Sweep::through_item(declared, lowering);
             lowering
-        });
+        })
     }
 
     pub(super) fn trait_owning(&mut self, ident: &Ident, attributes: &[Attribute]) -> PlaceId {
@@ -184,7 +186,7 @@ impl Lowering<'_> {
         });
     }
 
-    pub(super) fn impl_visited(&mut self, block: &ItemImpl) {
+    pub(super) fn impl_entered(&mut self, block: &ItemImpl, frame: Frame) -> Descend {
         let declared = self.generics.extended(&block.generics);
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
@@ -195,9 +197,7 @@ impl Lowering<'_> {
             block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
         rows.push(SubjectRow { scope: self.here.scope(), ty: subject, implemented });
         let place = self.placed(PlaceRow { subject: Some(subjected), owner: None });
-        let context = self.context.of_impl(block, place);
-        self.contextual(context, |lowering| {
-            lowering.enclosed(Enclosure::of_impl(block), generics, |enclosed| visit::visit_item_impl(enclosed, block));
-        });
+        self.context = self.context.of_impl(block, place);
+        self.enclosed(Enclosure::of_impl(block), generics, frame)
     }
 }

@@ -93,7 +93,7 @@ impl Qualified {
     }
 }
 
-impl Lowering<'_> {
+impl Lowering {
     pub(super) fn path_used(&mut self, expression: &ExprPath) {
         let position = expression.path.segments.first().map(|first| Position::from(first.ident.span()));
         let found = Qualified::written(expression).zip(position);

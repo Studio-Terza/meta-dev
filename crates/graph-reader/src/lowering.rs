@@ -2,6 +2,7 @@ mod attributes;
 mod boundary;
 mod calls;
 mod definition;
+mod frames;
 mod held;
 mod laws;
 mod places;
@@ -17,7 +18,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use syn::spanned::Spanned;
-use syn::visit::{self, Visit};
 use syn::{
     Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemFn, ItemConst,
     ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, Macro,
@@ -28,8 +28,8 @@ use graph::{
     Alias, Assigned, Building, Entry, FileId, Function, Held, Implementation, Model, Mutation, Named, Origin, Output,
     Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
-use lint_core::{Macros, SourceFile, Syntax};
-use lint_layout::{Name, Position, TestMarks, Whole, Word, words};
+use lint_core::{SourceFile, Syntax};
+use lint_layout::{Name, Position};
 
 use crate::namespace::{
     Declared, DeclaredKind, Domain, Entries, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind, Seeds,
@@ -41,8 +41,10 @@ use attributes::Attributes;
 use boundary::SelfType;
 use calls::CallRow;
 use definition::{LoweredDefinition, Mutations};
+use frames::{Enclosure, Frame};
 use held::{Holder, HoldingRow, Link};
 use laws::LawRow;
+use lint_sweep::{Descend, Kind, Watch};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
@@ -50,49 +52,6 @@ use seat::{Built, Footing, Located, Seat};
 pub use signature::ReceiverSyntax;
 use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Written};
 use uses::UseRow;
-
-#[derive(Clone, Copy, Debug, Default)]
-enum Enclosure {
-    BinaryRoot,
-    #[default]
-    Module,
-    Body,
-    Impl(Owner),
-    Trait,
-    Foreign,
-}
-
-impl Enclosure {
-    const MAIN: [Word<'static>; 1] = words!["main"];
-
-    fn of_impl(block: &ItemImpl) -> Enclosure {
-        match block.trait_ {
-            Some(_) => Enclosure::Impl(Owner::TraitImpl),
-            None => Enclosure::Impl(Owner::Inherent),
-        }
-    }
-
-    fn owner(self) -> Owner {
-        match self {
-            Enclosure::BinaryRoot | Enclosure::Module => Owner::Free,
-            Enclosure::Body => Owner::Nested,
-            Enclosure::Impl(owner) => owner,
-            Enclosure::Trait => Owner::TraitDecl,
-            Enclosure::Foreign => Owner::Foreign,
-        }
-    }
-
-    fn entry(self, attributes: &[Attribute], name: &Name) -> Entry {
-        TestMarks::mark_test(attributes).map(|_| Entry::Test).or_else(|| self.main(name)).unwrap_or(Entry::Called)
-    }
-
-    fn main(self, name: &Name) -> Option<Entry> {
-        match self {
-            Enclosure::BinaryRoot => name.matches::<Whole>(&Self::MAIN).map(|_| Entry::Main),
-            Enclosure::Module | Enclosure::Body | Enclosure::Impl(_) | Enclosure::Trait | Enclosure::Foreign => None,
-        }
-    }
-}
 
 #[derive(Debug)]
 struct ImplRow {
@@ -379,24 +338,27 @@ impl From<&SourceFile> for FileShape {
     }
 }
 
-impl Lowered {
-    pub(crate) fn of_file(source: &SourceFile, reach: Reach) -> Lowered {
+impl Lowering {
+    pub(crate) fn of_file(source: &SourceFile, reach: Reach) -> Lowering {
         let syntax = source.syntax();
         let shape = FileShape::from(source);
-        let mut lowered = Lowered {
+        let lowered = Lowered {
             openings: Openings::new(Entries::of_items(&syntax.items)),
             slots: Vec::new(),
             rows: FileRows::default(),
         };
-        let mut lowering = Lowering {
-            lowered: &mut lowered,
+        Lowering {
+            lowered,
             here: Seat::new(ScopeId::FIRST, shape.children),
             enclosure: shape.enclosure,
-            generics: InScope::outside(),
+            generics: Arc::new(InScope::outside()),
             context: Context::outermost(Regions::of_file(source, reach)),
-        };
-        lowering.visit_file(syntax);
-        lowered
+            frames: Vec::new(),
+        }
+    }
+
+    pub(crate) fn lowered(self) -> Lowered {
+        self.lowered
     }
 }
 
@@ -503,32 +465,32 @@ impl<'read> Plot<'read> {
 }
 
 #[derive(Debug)]
-struct Lowering<'low> {
-    lowered: &'low mut Lowered,
+pub(crate) struct Lowering {
+    lowered: Lowered,
     here: Seat,
     enclosure: Enclosure,
-    generics: InScope,
+    generics: Arc<InScope>,
     context: Context,
+    frames: Vec<Frame>,
 }
 
-impl Lowering<'_> {
+impl Lowering {
     fn entered(&mut self, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Seat {
         let scope = self.lowered.openings.opened(self.here.scope(), kind, entries);
         let inner = Seat::new(scope, children);
         std::mem::replace(&mut self.here, inner)
     }
 
-    fn module_visited(&mut self, item: &ItemMod, items: &[syn::Item]) {
+    fn module_entered(&mut self, item: &ItemMod, items: &[syn::Item]) -> Descend {
+        let frame = self.frame();
         let name = Name::from(&item.ident);
         let children = Arc::from(self.here.children().join(&name));
         let outer = self.entered(ScopeKind::Module, Entries::of_items(items), children);
         let module = Declared::new(name, Visibility::from(&item.vis), DeclaredKind::Module(self.here.scope()));
         self.lowered.openings.declare(outer.scope(), module);
-        let enclosing = std::mem::replace(&mut self.enclosure, Enclosure::Module);
-        let context = self.context.within_module(item);
-        self.contextual(context, |lowering| visit::visit_item_mod(lowering, item));
-        self.enclosure = enclosing;
-        self.here = outer;
+        self.enclosure = Enclosure::Module;
+        self.context = self.context.within_module(item);
+        self.saved(frame)
     }
 
     fn function(&mut self, attributes: &[Attribute], signature: &SynSignature, body: Option<&Block>) -> InScope {
@@ -551,78 +513,137 @@ impl Lowering<'_> {
         generics
     }
 
-    fn enclosed(&mut self, enclosure: Enclosure, generics: InScope, visited: impl FnOnce(&mut Self)) {
-        let enclosing = std::mem::replace(&mut self.enclosure, enclosure);
-        let outer = std::mem::replace(&mut self.generics, generics);
-        visited(self);
-        self.generics = outer;
-        self.enclosure = enclosing;
+    pub(super) fn method_entered(
+        &mut self,
+        attributes: &[Attribute],
+        signature: &SynSignature,
+        body: Option<&Block>,
+    ) -> Descend {
+        let frame = self.frame();
+        self.context = self.context.within_item(attributes);
+        let generics = self.function(attributes, signature, body);
+        self.enclosed(Enclosure::Body, generics, frame)
+    }
+
+    fn enclosed(&mut self, enclosure: Enclosure, generics: InScope, frame: Frame) -> Descend {
+        self.enclosure = enclosure;
+        self.generics = Arc::new(generics);
+        self.saved(frame)
     }
 }
 
-impl<'ast> Visit<'ast> for Lowering<'_> {
-    fn visit_item_mod(&mut self, item: &'ast ItemMod) {
+impl<'ast> Watch<'ast> for Lowering {
+    fn kinds(&self) -> &'static [Kind] {
+        &[
+            Kind::ItemMod,
+            Kind::Block,
+            Kind::ItemImpl,
+            Kind::ItemTrait,
+            Kind::ItemFn,
+            Kind::ImplItemFn,
+            Kind::TraitItemFn,
+            Kind::ForeignItemFn,
+            Kind::ItemType,
+            Kind::ItemStruct,
+            Kind::ItemEnum,
+            Kind::ItemUnion,
+            Kind::ItemConst,
+            Kind::ItemStatic,
+            Kind::ExprMethodCall,
+            Kind::ExprCall,
+            Kind::ExprMacro,
+            Kind::ExprPath,
+            Kind::ItemMacro,
+            Kind::Macro,
+        ]
+    }
+
+    fn on_item_mod(&mut self, item: &'ast ItemMod) -> Descend {
         match &item.content {
-            Some((_, items)) => self.module_visited(item, items),
-            None => self.lowered.slots.push(Slot::new(&self.here, self.context.region(), item)),
+            Some((_, items)) => self.module_entered(item, items),
+            None => self.slotted(item),
         }
     }
 
-    fn visit_block(&mut self, block: &'ast Block) {
-        let outer = self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
-        visit::visit_block(self, block);
-        self.here = outer;
+    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+        self.restored();
     }
 
-    fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let tested = self.context.within_item(&block.attrs);
-        self.contextual(tested, |lowering| lowering.impl_visited(block));
+    fn on_block(&mut self, block: &'ast Block) -> Descend {
+        let frame = self.frame();
+        self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
+        self.saved(frame)
     }
 
-    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
+    fn off_block(&mut self, _: &'ast Block) {
+        self.restored();
+    }
+
+    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
+        let frame = self.frame();
+        self.context = self.context.within_item(&block.attrs);
+        self.impl_entered(block, frame)
+    }
+
+    fn off_item_impl(&mut self, _: &'ast ItemImpl) {
+        self.restored();
+    }
+
+    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
+        let frame = self.frame();
         let generics = self.generics.subjectless().extended(&item.generics);
         self.trait_bounds(item, &generics);
         let place = self.trait_owning(&item.ident, &item.attrs);
         self.filler_owning(item);
-        let context = self.context.owned(place);
-        self.contextual(context, |lowering| {
-            lowering.enclosed(Enclosure::Trait, generics, |enclosed| visit::visit_item_trait(enclosed, item));
-        });
+        self.context = self.context.owned(place);
+        self.enclosed(Enclosure::Trait, generics, frame)
     }
 
-    fn visit_item_fn(&mut self, item: &'ast ItemFn) {
+    fn off_item_trait(&mut self, _: &'ast ItemTrait) {
+        self.restored();
+    }
+
+    fn on_item_fn(&mut self, item: &'ast ItemFn) -> Descend {
+        let frame = self.frame();
         let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
-        let tested = self.context.within_item(&item.attrs).owned(place);
-        self.contextual(tested, |lowering| {
-            let generics = lowering.function(&item.attrs, &item.sig, Some(&item.block));
-            lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_item_fn(enclosed, item));
-        });
+        self.context = self.context.within_item(&item.attrs).owned(place);
+        let generics = self.function(&item.attrs, &item.sig, Some(&item.block));
+        self.enclosed(Enclosure::Body, generics, frame)
     }
 
-    fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
-        let tested = self.context.within_item(&item.attrs);
-        self.contextual(tested, |lowering| {
-            let generics = lowering.function(&item.attrs, &item.sig, Some(&item.block));
-            lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_impl_item_fn(enclosed, item));
-        });
+    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+        self.restored();
     }
 
-    fn visit_trait_item_fn(&mut self, item: &'ast TraitItemFn) {
-        let tested = self.context.within_item(&item.attrs);
-        self.contextual(tested, |lowering| {
-            let generics = lowering.function(&item.attrs, &item.sig, item.default.as_ref());
-            lowering.enclosed(Enclosure::Body, generics, |enclosed| visit::visit_trait_item_fn(enclosed, item));
-        });
+    fn on_impl_item_fn(&mut self, item: &'ast ImplItemFn) -> Descend {
+        self.method_entered(&item.attrs, &item.sig, Some(&item.block))
     }
 
-    fn visit_foreign_item_fn(&mut self, item: &'ast ForeignItemFn) {
-        let enclosing = std::mem::replace(&mut self.enclosure, Enclosure::Foreign);
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+        self.restored();
+    }
+
+    fn on_trait_item_fn(&mut self, item: &'ast TraitItemFn) -> Descend {
+        self.method_entered(&item.attrs, &item.sig, item.default.as_ref())
+    }
+
+    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn) {
+        self.restored();
+    }
+
+    fn on_foreign_item_fn(&mut self, item: &'ast ForeignItemFn) -> Descend {
+        let frame = self.frame();
+        self.enclosure = Enclosure::Foreign;
         let generics = self.function(&item.attrs, &item.sig, None);
-        self.enclosure = enclosing;
-        self.enclosed(Enclosure::Body, generics, |lowering| visit::visit_foreign_item_fn(lowering, item));
+        self.enclosure = frame.enclosure();
+        self.enclosed(Enclosure::Body, generics, frame)
     }
 
-    fn visit_item_type(&mut self, item: &'ast ItemType) {
+    fn off_foreign_item_fn(&mut self, _: &'ast ForeignItemFn) {
+        self.restored();
+    }
+
+    fn on_item_type(&mut self, item: &'ast ItemType) -> Descend {
         let generics = InScope::outside().extended(&item.generics);
         let target = generics.lowered(&item.ty);
         self.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
@@ -632,19 +653,27 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
             parameters: generics.declarations(&item.generics),
             target,
         });
-        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_type(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
+    fn off_item_type(&mut self, _: &'ast ItemType) {
+        self.restored();
+    }
+
+    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
         self.struct_held(item, &scope, link);
-        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_struct(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
+    fn off_item_struct(&mut self, _: &'ast ItemStruct) {
+        self.restored();
+    }
+
+    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
@@ -654,63 +683,74 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
             lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
             lowering
         });
-        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_enum(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn visit_item_union(&mut self, item: &'ast ItemUnion) {
+    fn off_item_enum(&mut self, _: &'ast ItemEnum) {
+        self.restored();
+    }
+
+    fn on_item_union(&mut self, item: &'ast ItemUnion) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.fields_held(&Holder::named(&item.ident, Held::UnionField), &link, item.fields.named.iter(), &scope);
-        self.owned_by(&item.ident, Domain::Types, &item.attrs, |lowering| visit::visit_item_union(lowering, item));
+        self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn visit_item_const(&mut self, item: &'ast ItemConst) {
-        let target = self.generics.lowered(&item.ty);
-        self.hold(Holder::named(&item.ident, Held::Value), Link::declaring(&item.ident).valued(), target);
-        self.owned_by(&item.ident, Domain::Values, &item.attrs, |lowering| visit::visit_item_const(lowering, item));
+    fn off_item_union(&mut self, _: &'ast ItemUnion) {
+        self.restored();
     }
 
-    fn visit_item_static(&mut self, item: &'ast ItemStatic) {
-        let target = self.generics.lowered(&item.ty);
-        self.hold(Holder::named(&item.ident, Held::Value), Link::declaring(&item.ident).valued(), target);
-        self.owned_by(&item.ident, Domain::Values, &item.attrs, |lowering| visit::visit_item_static(lowering, item));
+    fn on_item_const(&mut self, item: &'ast ItemConst) -> Descend {
+        self.valued(&item.ident, &item.ty, &item.attrs)
     }
 
-    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
+    fn off_item_const(&mut self, _: &'ast ItemConst) {
+        self.restored();
+    }
+
+    fn on_item_static(&mut self, item: &'ast ItemStatic) -> Descend {
+        self.valued(&item.ident, &item.ty, &item.attrs)
+    }
+
+    fn off_item_static(&mut self, _: &'ast ItemStatic) {
+        self.restored();
+    }
+
+    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
         self.method_called(call);
-        visit::visit_expr_method_call(self, call);
+        Descend::Into
     }
 
-    fn visit_expr_call(&mut self, call: &'ast ExprCall) {
+    fn on_expr_call(&mut self, call: &'ast ExprCall) -> Descend {
         self.path_called(call);
-        visit::visit_expr_call(self, call);
+        Descend::Into
     }
 
-    fn visit_expr_macro(&mut self, expr: &'ast ExprMacro) {
+    fn on_expr_macro(&mut self, expr: &'ast ExprMacro) -> Descend {
         self.macro_called(expr);
-        visit::visit_expr_macro(self, expr);
+        Descend::Into
     }
 
-    fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
+    fn on_expr_path(&mut self, expression: &'ast ExprPath) -> Descend {
         self.path_used(expression);
-        visit::visit_expr_path(self, expression);
+        Descend::Into
     }
 
-    fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
+    fn on_item_macro(&mut self, item: &'ast ItemMacro) -> Descend {
         match &item.ident {
-            Some(ident) => {
-                self.owned_by(ident, Domain::Macros, &item.attrs, |lowering| {
-                    visit::visit_item_macro(lowering, item);
-                    lowering.transcribed(&Macros::statements(&item.mac));
-                });
-            }
-            None => self.expanded(item),
+            Some(ident) => self.owned_by(ident, Domain::Macros, &item.attrs),
+            None => self.saved(self.frame()),
         }
     }
 
-    fn visit_macro(&mut self, invoked: &'ast Macro) {
+    fn off_item_macro(&mut self, item: &'ast ItemMacro) {
+        self.macro_left(item).restored();
+    }
+
+    fn on_macro(&mut self, invoked: &'ast Macro) -> Descend {
         self.macro_used(invoked);
-        visit::visit_macro(self, invoked);
+        Descend::Into
     }
 }

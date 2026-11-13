@@ -76,11 +76,15 @@ hooks! {
     ExprAssign on_expr_assign off_expr_assign visit_expr_assign syn::ExprAssign;
     ExprBinary on_expr_binary off_expr_binary visit_expr_binary syn::ExprBinary;
     ExprBreak on_expr_break off_expr_break visit_expr_break syn::ExprBreak;
+    ExprCall on_expr_call off_expr_call visit_expr_call syn::ExprCall;
+    ExprMacro on_expr_macro off_expr_macro visit_expr_macro syn::ExprMacro;
+    ForeignItemFn on_foreign_item_fn off_foreign_item_fn visit_foreign_item_fn syn::ForeignItemFn;
     ExprCast on_expr_cast off_expr_cast visit_expr_cast syn::ExprCast;
     ExprClosure on_expr_closure off_expr_closure visit_expr_closure syn::ExprClosure;
     Expr on_expr off_expr visit_expr syn::Expr;
     ExprConst on_expr_const off_expr_const visit_expr_const syn::ExprConst;
     ExprContinue on_expr_continue off_expr_continue visit_expr_continue syn::ExprContinue;
+    ExprField on_expr_field off_expr_field visit_expr_field syn::ExprField;
     ExprForLoop on_expr_for_loop off_expr_for_loop visit_expr_for_loop syn::ExprForLoop;
     ExprIf on_expr_if off_expr_if visit_expr_if syn::ExprIf;
     ExprLet on_expr_let off_expr_let visit_expr_let syn::ExprLet;
@@ -115,6 +119,7 @@ hooks! {
     LitFloat on_lit_float off_lit_float visit_lit_float syn::LitFloat;
     LitInt on_lit_int off_lit_int visit_lit_int syn::LitInt;
     Local on_local off_local visit_local syn::Local;
+    PatIdent on_pat_ident off_pat_ident visit_pat_ident syn::PatIdent;
     PatStruct on_pat_struct off_pat_struct visit_pat_struct syn::PatStruct;
     PatTupleStruct on_pat_tuple_struct off_pat_tuple_struct visit_pat_tuple_struct syn::PatTupleStruct;
     Path on_path off_path visit_path syn::Path;
@@ -124,6 +129,7 @@ hooks! {
     TraitItemConst on_trait_item_const off_trait_item_const visit_trait_item_const syn::TraitItemConst;
     TraitItemFn on_trait_item_fn off_trait_item_fn visit_trait_item_fn syn::TraitItemFn;
     TypeArray on_type_array off_type_array visit_type_array syn::TypeArray;
+    Type on_type off_type visit_type syn::Type;
     TypePath on_type_path off_type_path visit_type_path syn::TypePath;
     TypeReference on_type_reference off_type_reference visit_type_reference syn::TypeReference;
     TypeTuple on_type_tuple off_type_tuple visit_type_tuple syn::TypeTuple;

@@ -69,14 +69,15 @@ macro_rules! contexts {
             $($gleaned: <$glean as Gleaning>::Gleaner<'run>,)*
         }
 
-        impl<'run> From<Parsed<'_, 'run>> for Contributed<'run> {
-            fn from(parsed: Parsed<'_, 'run>) -> Contributed<'run> {
+        impl<'run> Contributed<'run> {
+            pub(crate) fn joined(parsed: Parsed<'_, 'run>, joining: Vec<&mut Watching<'_>>) -> Contributed<'run> {
                 let mut gatherings = Gatherings {
                     $($field: <$lint as ContextLint>::gathering(parsed),)*
                     $($primed: <$prime as PrimedFacts>::priming(parsed),)*
                     $($gleaned: <$glean as Gleaning>::gleaner(parsed),)*
                 };
-                let mut watching: Vec<&mut Watching<'_>> = Vec::new();
+                let mut watching: Vec<&mut Watching<'_>> =
+                    joining.into_iter().map(|joined| -> &mut Watching<'_> { joined }).collect();
                 $(watching.extend(gatherings.$field.watching());)*
                 $(watching.extend(gatherings.$primed.watching());)*
                 $(watching.extend(gatherings.$gleaned.watching());)*

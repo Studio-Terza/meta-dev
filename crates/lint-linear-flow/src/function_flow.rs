@@ -1,19 +1,12 @@
 mod found;
-mod root;
 mod scan;
 
-use proc_macro2::Span;
-use syn::Block;
-
-use lint_core::{Site, SourceFile, Violation};
-use lint_layout::LineNumber;
-use lint_sweep::Sweep;
+use lint_core::{Site, Violation};
 
 use crate::finding::Rule;
 use crate::verdict::Verdict;
 use found::Found;
-use root::Root;
-use scan::Scan;
+pub use scan::Opened;
 
 #[derive(Debug)]
 pub struct FunctionFlow<'file> {
@@ -23,18 +16,6 @@ pub struct FunctionFlow<'file> {
 }
 
 impl<'file> FunctionFlow<'file> {
-    pub fn judged(file: &'file SourceFile, name: Span, body: &Block) -> FunctionFlow<'file> {
-        let path = file.head().path();
-        let root = Root::from(body);
-        let mut scan = Scan::new(file, root);
-        Sweep::through_block(file, body, &mut scan);
-        FunctionFlow {
-            site: Site::new(path, LineNumber::from(name)),
-            shape: root.verdict(),
-            found: scan.into_found().into_iter().chain(root.faults(path)).collect(),
-        }
-    }
-
     pub fn verdict(&self) -> Verdict {
         self.found.first().map_or(self.shape, |_| Verdict::Neither)
     }
