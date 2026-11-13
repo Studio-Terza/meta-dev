@@ -4,7 +4,7 @@ mod scope;
 mod signatures;
 mod texts;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report, Violation};
 
 use lexicon::Lexicon;

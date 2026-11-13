@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use code_model::{LawKind, Model};
+use graph::{LawKind, Model};
 use lint_layout::Name;
 
 use crate::subject::Subject;
@@ -21,9 +21,9 @@ impl<'model> Coverage<'model> {
         self.model
             .laws()
             .filter(|placed| placed.krate() == subject.krate())
-            .map(code_model::Placed::entity)
+            .map(graph::Placed::entity)
             .filter(|law| law.kind() == LawKind::Roundtrip)
-            .map(code_model::Law::mentions)
+            .map(graph::Law::mentions)
             .filter(|mentions| mentions.contains(AsRef::<Name>::as_ref(subject)))
             .collect()
     }

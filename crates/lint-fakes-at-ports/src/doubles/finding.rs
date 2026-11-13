@@ -1,6 +1,6 @@
 use std::fmt;
 
-use code_model::ItemPath;
+use graph::ItemPath;
 use lint_core::Fix;
 use lint_layout::Name;
 

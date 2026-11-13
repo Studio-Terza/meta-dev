@@ -1,6 +1,6 @@
 mod stray;
 
-use code_model::Ground;
+use graph::Ground;
 use lint_core::{Site, Violation};
 
 use super::called::Called;

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::transitions::endpoint::Nature;
 use crate::transitions::{Endpoint, Implementer, Inputs, Output, Transition, Transitions};
-use code_model::{ItemKind, Model, Reach, Region};
+use graph::{ItemKind, Model, Reach, Region};
 use lint_layout::Name;
 use lint_placement::CrateName;
 

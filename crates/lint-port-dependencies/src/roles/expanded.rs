@@ -1,8 +1,6 @@
 use std::collections::BTreeSet;
 
-use code_model::{
-    Implementation, ItemId, ItemPath, Mention, Model, PathUse, Placed, Reach, Region, Resolved, Spelling,
-};
+use graph::{Implementation, ItemId, ItemPath, Mention, Model, PathUse, Placed, Reach, Region, Resolved, Spelling};
 use lint_core::Site;
 use lint_layout::Name;
 

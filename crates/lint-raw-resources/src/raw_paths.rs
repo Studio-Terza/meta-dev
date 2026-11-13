@@ -2,7 +2,7 @@ mod finding;
 
 use std::collections::BTreeSet;
 
-use code_model::{Ground, ItemPath, Model, PathUse, Placed, Region, Resolved, Seat, TypeRef};
+use graph::{Ground, ItemPath, Model, PathUse, Placed, Region, Resolved, Seat, TypeRef};
 use lint_core::Violation;
 use lint_layout::{PathTail, Word, words};
 

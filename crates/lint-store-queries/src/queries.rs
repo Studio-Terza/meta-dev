@@ -1,7 +1,7 @@
 mod boundary;
 mod unformatted;
 
-use code_model::{ItemKind, ItemPath, Model, Placed, Quoted, Resolved};
+use graph::{ItemKind, ItemPath, Model, Placed, Quoted, Resolved};
 use lint_core::Site;
 use lint_layout::{Word, words};
 

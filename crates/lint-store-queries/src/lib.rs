@@ -2,7 +2,7 @@ mod queries;
 
 use std::collections::BTreeSet;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Headline, ModelLint, Report, Site, Violation};
 
 use queries::{Queries, Unformatted};

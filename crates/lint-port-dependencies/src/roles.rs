@@ -8,7 +8,7 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{FileHead, Parsed, Site, Violation};
 use lint_file::PrimedFacts;
 use lint_layout::LineNumber;

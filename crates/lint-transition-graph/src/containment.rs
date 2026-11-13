@@ -13,7 +13,7 @@ mod slice;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Headline, Report, Site, Violation};
 use lint_layout::Name;
 

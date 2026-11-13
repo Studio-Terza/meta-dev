@@ -2,7 +2,7 @@ pub(crate) mod fillers;
 
 use std::cell::OnceCell;
 
-use code_model::Model;
+use graph::Model;
 use lint_core::{Parsed, SourceFile};
 
 use crate::algebra::Algebras;

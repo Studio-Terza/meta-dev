@@ -1,4 +1,4 @@
-use code_model::{Ground as Grounded, Region, Zone};
+use graph::{Ground as Grounded, Region, Zone};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ground {

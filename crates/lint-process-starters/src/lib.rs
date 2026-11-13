@@ -1,7 +1,7 @@
 mod command_paths;
 
-use code_model::Model;
 pub use command_paths::{CommandPaths, Scope};
+use graph::Model;
 use lint_core::{Fix, Headline, Message, ModelLint, Problem, Report, Violation};
 
 #[derive(Debug)]

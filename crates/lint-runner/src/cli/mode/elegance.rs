@@ -1,4 +1,4 @@
-use code_model::Model;
+use graph::Model;
 use lint_complexity::Complexity;
 use lint_core::{Lint, ModelLint, Report, SourceFile};
 use lint_effect_sites::EffectSites;

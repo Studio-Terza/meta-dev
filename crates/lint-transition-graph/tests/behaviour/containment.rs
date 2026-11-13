@@ -1,4 +1,4 @@
-use code_reader::Reader;
+use graph_reader::Reader;
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{

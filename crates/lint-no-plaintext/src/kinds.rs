@@ -2,7 +2,7 @@ mod identities;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::{Implementation, ItemId, Model, Origin, Placed, Resolved, Site};
+use graph::{Implementation, ItemId, Model, Origin, Placed, Resolved, Site};
 use lint_core::Violation;
 use lint_layout::Name;
 

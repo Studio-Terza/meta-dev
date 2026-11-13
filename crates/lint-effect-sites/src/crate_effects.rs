@@ -6,7 +6,7 @@ mod vocabulary;
 
 use std::collections::BTreeMap;
 
-use code_model::{Ground, Model, PathUse, Placed, Reach, Region};
+use graph::{Ground, Model, PathUse, Placed, Reach, Region};
 use lint_core::Violation;
 use lint_placement::CrateName;
 

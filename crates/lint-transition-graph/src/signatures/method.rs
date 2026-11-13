@@ -3,8 +3,8 @@ mod taken;
 
 use std::fmt;
 
-use code_model::Mutation;
 use equivalence::{Equivalence, Erased, Keyed};
+use graph::Mutation;
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;

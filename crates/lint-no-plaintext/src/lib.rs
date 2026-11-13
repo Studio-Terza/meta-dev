@@ -4,7 +4,7 @@ mod texts;
 
 use std::collections::BTreeSet;
 
-use code_model::{Held, Holding, ItemId, Model, Placed, Site, TypeRef};
+use graph::{Held, Holding, ItemId, Model, Placed, Site, TypeRef};
 use lint_core::{Headline, ModelLint, Report, Violation};
 use lint_layout::Name;
 

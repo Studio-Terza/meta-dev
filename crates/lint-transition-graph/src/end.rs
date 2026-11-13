@@ -5,7 +5,7 @@ use crate::class::Class;
 use crate::count::Count;
 use crate::key::Key;
 use crate::transitions::Wrapping;
-use code_model::Mutation;
+use graph::Mutation;
 use lint_layout::{Name, Whole, Word};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

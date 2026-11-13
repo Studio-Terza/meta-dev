@@ -2,9 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
-use code_model::{
-    ItemKind, ItemPath, LawKind, Model, OperationOwner, Placed, Resolved, Route as Written, Side, TypeRef,
-};
+use graph::{ItemKind, ItemPath, LawKind, Model, OperationOwner, Placed, Resolved, Route as Written, Side, TypeRef};
 use lint_core::{Finding, Fix, Site};
 use lint_layout::Name;
 
@@ -28,7 +26,7 @@ pub(crate) struct Route {
 
 #[derive(Debug)]
 pub(crate) struct Law<'file> {
-    placed: Placed<'file, &'file code_model::Law>,
+    placed: Placed<'file, &'file graph::Law>,
     site: Site<'file>,
     routes: Vec<Route>,
 }

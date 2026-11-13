@@ -1,4 +1,4 @@
-use code_model::Model;
+use graph::Model;
 use workspace_metadata::Metadata;
 
 use crate::report::Report;

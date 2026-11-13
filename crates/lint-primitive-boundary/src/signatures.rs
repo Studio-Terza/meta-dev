@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use code_model::{ItemPath, Model, Named, Resolved, Site, Sited, Spelling, TypeRef, TypeUses};
+use graph::{ItemPath, Model, Named, Resolved, Site, Sited, Spelling, TypeRef, TypeUses};
 use lint_core::Violation;
 use lint_layout::{Name, Position};
 

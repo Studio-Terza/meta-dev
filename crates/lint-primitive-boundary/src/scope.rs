@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use code_model::{
+use graph::{
     Call, Function, Held, Holding, Implementation, ItemId, ItemPath, Model, Owner, Placed, Region, Resolved, Seat,
     Spelling, TypeRef, Within,
 };

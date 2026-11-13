@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::laws::Law;
 use crate::laws::LawPath;
 use crate::transitions::{Transition, Wrapping};
-use code_model::Side;
+use graph::Side;
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;

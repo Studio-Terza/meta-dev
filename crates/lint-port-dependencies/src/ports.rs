@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::{ItemKind, ItemPath, Model, PathUse, Placed, Reach, Region, Seat};
+use graph::{ItemKind, ItemPath, Model, PathUse, Placed, Reach, Region, Seat};
 use lint_core::Violation;
 use lint_effect_sites::OutsideFillers;
 use lint_layout::{Name, Whole, Word, words};

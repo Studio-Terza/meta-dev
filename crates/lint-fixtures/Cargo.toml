@@ -10,7 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
-code-reader = { path = "../code-reader" }
+graph-reader = { path = "../graph-reader" }
 file-ports = { path = "../file-ports" }
 lint-core = { path = "../lint-core" }
 lint-placement = { path = "../lint-placement" }

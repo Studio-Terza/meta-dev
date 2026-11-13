@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use code_reader::Reader;
+use graph_reader::Reader;
 use lint_core::SourceFile;
 use lint_fixtures::{Sources, Text};
 use lint_placement::CrateName;

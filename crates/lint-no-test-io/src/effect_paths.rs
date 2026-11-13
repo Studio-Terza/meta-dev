@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use code_model::{External, ItemId, ItemPath, Model, PathUse, Resolved};
+use graph::{External, ItemId, ItemPath, Model, PathUse, Resolved};
 use lint_layout::{Name, PathTail, Word, words};
 use newtype::Wrapping;
 

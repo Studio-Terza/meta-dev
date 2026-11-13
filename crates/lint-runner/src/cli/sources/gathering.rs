@@ -2,8 +2,8 @@ use std::mem;
 use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
 
-use code_model::Model;
-use code_reader::{FileFacts, ListedGroup, Listing};
+use graph::Model;
+use graph_reader::{FileFacts, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile};
 use lint_transition_graph::Extraction;
 

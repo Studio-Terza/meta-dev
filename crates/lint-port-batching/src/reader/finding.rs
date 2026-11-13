@@ -1,6 +1,6 @@
 use std::fmt;
 
-use code_model::Repeating;
+use graph::Repeating;
 use lint_core::Fix;
 use lint_layout::Name;
 

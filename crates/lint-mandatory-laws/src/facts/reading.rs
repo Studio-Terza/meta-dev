@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use code_model::{Function, Implementation, ItemId, ItemKind, Model, Owner, Reach, Region, Resolved, Seat};
+use graph::{Function, Implementation, ItemId, ItemKind, Model, Owner, Reach, Region, Resolved, Seat};
 use lint_core::Site;
 use lint_layout::{Name, Whole, Word, words};
 

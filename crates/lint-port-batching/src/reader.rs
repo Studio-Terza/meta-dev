@@ -3,9 +3,7 @@ mod finding;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use code_model::{
-    Function, Ground, Implementation, Model, Parameter, Placed, Reach, Reached, Region, Repetition, Seat,
-};
+use graph::{Function, Ground, Implementation, Model, Parameter, Placed, Reach, Reached, Region, Repetition, Seat};
 use lint_core::{Site, Violation};
 use lint_layout::{LineNumber, Name};
 

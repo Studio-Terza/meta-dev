@@ -2,9 +2,9 @@ mod step;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::Placed;
-use code_model::Property;
 use equivalence::{Equivalence, Move, Refinement};
+use graph::Placed;
+use graph::Property;
 use lint_core::Site;
 use lint_layout::Name;
 

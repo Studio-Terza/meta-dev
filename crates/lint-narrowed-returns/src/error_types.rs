@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use code_model::{External, Implementation, ItemId, ItemPath, Model, Placed, Resolved, TypeRef};
+use graph::{External, Implementation, ItemId, ItemPath, Model, Placed, Resolved, TypeRef};
 use lint_layout::{Word, words};
 
 #[derive(Debug)]

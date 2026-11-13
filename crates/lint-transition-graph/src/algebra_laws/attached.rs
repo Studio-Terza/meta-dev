@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use code_model::Property;
+use graph::Property;
 use lint_core::Site;
 use lint_layout::Name;
 

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use code_model::{LawKind, Model, Property};
+use graph::{LawKind, Model, Property};
 use lint_core::{Site, Violation};
 
 use crate::laws::{Law, Laws};

@@ -1,4 +1,4 @@
-use code_reader::Reader;
+use graph_reader::Reader;
 use lint_core::ModelLint;
 use lint_port_batching::PortBatching;
 

@@ -1,4 +1,4 @@
-use code_model::{ItemPath, Model, Named, Output, Primitive, Resolved, Sited, TypeRef};
+use graph::{ItemPath, Model, Named, Output, Primitive, Resolved, Sited, TypeRef};
 use lint_layout::{Word, words};
 
 use crate::error_types::ErrorTypes;

@@ -1,9 +1,9 @@
 mod effect_paths;
 mod finding;
 
-use code_model::{Harness, Model};
 use effect_paths::EffectPaths;
 use finding::Finding;
+use graph::{Harness, Model};
 use lint_core::{Gate, Headline, ModelLint, Report, Violation};
 
 #[derive(Debug)]

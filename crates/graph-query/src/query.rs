@@ -11,7 +11,7 @@ use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use code_model::ItemKind;
+use graph::ItemKind;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;

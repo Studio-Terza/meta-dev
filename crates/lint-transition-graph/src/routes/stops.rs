@@ -7,7 +7,7 @@ use super::walk::Walk;
 use crate::edge::Edge;
 use crate::end::{End, Hop};
 use crate::transitions::Wrapping;
-use code_model::CallOwner;
+use graph::CallOwner;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Stop(usize);

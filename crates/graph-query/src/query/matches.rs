@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::fmt;
 
-use code_model::MethodShape;
+use graph::MethodShape;
 use newtype::Wrapping;
 
 use crate::query::candidate::{Candidate, Offered};

@@ -1,4 +1,4 @@
-use code_model::{
+use graph::{
     Function, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Owner, Parameter, Placed, Reach, Region,
     Resolved, Seat,
 };

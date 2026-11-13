@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use code_reader::Reader;
+use graph_reader::Reader;
 use lint_core::{FileHead, Parsed, Report, SourceFile, WorkspaceLint};
 use newtype::Wrapping;
 use workspace_metadata::Metadata;

@@ -22,10 +22,10 @@ mod type_name;
 mod walk;
 
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
-pub use code_model::Site;
 pub use contents::Contents;
 pub use declared_type::DeclaredType;
 pub use gate::Gate;
+pub use graph::Site;
 pub use headline::Headline;
 pub use home::Home;
 pub use lint::{Lint, WorkspaceLint};
