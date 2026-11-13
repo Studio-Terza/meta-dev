@@ -17,8 +17,12 @@ impl Opened {
     pub fn new(shown: PathBuf, file: PathBuf, text: SourceText, placement: Placement) -> Opened {
         Opened { shown, file, text, placement }
     }
+}
 
-    pub fn parsed(self) -> Result<SourceFile, Failure> {
-        SourceFile::parse_at(self.shown, self.file, self.placement, self.text)
+impl TryFrom<Opened> for SourceFile {
+    type Error = Failure;
+
+    fn try_from(opened: Opened) -> Result<SourceFile, Failure> {
+        SourceFile::parse_at(opened.shown, opened.file, opened.placement, opened.text)
     }
 }

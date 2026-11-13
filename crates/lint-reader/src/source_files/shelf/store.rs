@@ -20,6 +20,6 @@ impl Shelved {
 
 impl From<Result<Opened, Failure>> for Shelved {
     fn from(opened: Result<Opened, Failure>) -> Shelved {
-        Shelved { parsed: Some(opened.and_then(|file| file.parsed())) }
+        Shelved { parsed: Some(opened.and_then(SourceFile::try_from)) }
     }
 }
