@@ -22,7 +22,7 @@ impl fmt::Display for Obligation<'_, '_> {
         write!(
             formatter,
             "`{}` has the conversion pair {} (Display and FromStr, Serialize and Deserialize, encode and decode, or to_x and from_x)",
-            self.subject.owner(),
+            AsRef::<lint_layout::Name>::as_ref(self.subject),
             self.pair
         )
     }

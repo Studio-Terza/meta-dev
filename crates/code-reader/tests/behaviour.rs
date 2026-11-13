@@ -1,6 +1,6 @@
 use code_model::{
-    Domain, Entry, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited,
-    TypeRef, Unresolved,
+    Domain, Entry, Exposure, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved,
+    Sited, TypeRef, Unresolved,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -255,7 +255,7 @@ enum Seen {
 impl Seen {
     fn of(model: &Model, resolved: Resolved) -> Seen {
         match resolved.crate_item().and_then(|id| model.declared(id)) {
-            Some(item) => Seen::Item(item.clone().homed(None)),
+            Some(item) => Seen::Item(item.clone().homed(None).exposed(Exposure::Hidden)),
             None => Seen::Resolved(resolved),
         }
     }

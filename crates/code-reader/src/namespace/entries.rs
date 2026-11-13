@@ -6,7 +6,9 @@ use syn::{
     Token, VisRestricted,
 };
 
-use code_model::{Building, CrateExports, Domain, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved};
+use code_model::{
+    Building, CrateExports, Domain, Exposure, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved,
+};
 use lint_core::Macros;
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
@@ -139,15 +141,20 @@ pub(crate) struct Declared {
     kind: DeclaredKind,
     domain: Domain,
     marks: Vec<ItemPath>,
+    exposure: Exposure,
 }
 
 impl Declared {
     pub(crate) fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Declared {
-        Declared { name, visibility, kind, domain: Domain::Types, marks: Vec::new() }
+        Declared { name, visibility, kind, domain: Domain::Types, marks: Vec::new(), exposure: Exposure::Hidden }
     }
 
     fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Declared {
-        Declared::new(Name::from(ident), Visibility::from(visibility), DeclaredKind::Item(kind))
+        let exposure = Exposing::declared_by(visibility);
+        Declared {
+            exposure,
+            ..Declared::new(Name::from(ident), Visibility::from(visibility), DeclaredKind::Item(kind))
+        }
     }
 
     fn valued(self) -> Declared {
@@ -164,8 +171,25 @@ impl Declared {
     fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Option<ItemId> {
         let kind = self.kind.item_kind()?;
         Some(
-            building.declared(ModelItem::new(self.name.clone(), kind).marked(self.marks.clone()).homed(krate.cloned())),
+            building.declared(
+                ModelItem::new(self.name.clone(), kind)
+                    .marked(self.marks.clone())
+                    .homed(krate.cloned())
+                    .exposed(self.exposure),
+            ),
         )
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Exposing;
+
+impl Exposing {
+    fn declared_by(visibility: &syn::Visibility) -> Exposure {
+        match visibility {
+            syn::Visibility::Public(_) => Exposure::Public,
+            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => Exposure::Hidden,
+        }
     }
 }
 
@@ -181,6 +205,7 @@ impl TraitEntries<'_> {
             kind: DeclaredKind::Item(ItemKind::Trait),
             domain: Domain::Types,
             marks: Vec::new(),
+            exposure: Exposing::declared_by(&trait_item.vis),
         });
         [Declared::named_item(&trait_item.ident, &trait_item.vis, ItemKind::Trait).marked(&trait_item.attrs)]
             .into_iter()
@@ -209,6 +234,7 @@ impl DeriveMacro<'_> {
                 kind: DeclaredKind::Item(ItemKind::Derive),
                 domain: Domain::Macros,
                 marks: Vec::new(),
+                exposure: Exposing::declared_by(&self.0.vis),
             })
             .chain(self.function_like())
             .collect()
@@ -224,6 +250,7 @@ impl DeriveMacro<'_> {
             kind: DeclaredKind::Item(ItemKind::Macro),
             domain: Domain::Macros,
             marks: Vec::new(),
+            exposure: Exposing::declared_by(&self.0.vis),
         })
     }
 

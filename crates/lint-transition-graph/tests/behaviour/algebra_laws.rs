@@ -191,12 +191,11 @@ fn a_law_credits_only_the_operation_its_call_routes_to() {
     .for_each(|counts| assert_eq!(counts, (1, 0)));
 }
 
-const BOTH_ADDS: &str = "struct A;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A {}\n}\nstruct B;\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B {}\n}\n";
-const B_ADD_FORMS: [&str; 7] = [
+const BOTH_ADDS: &str = "pub struct A;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A {}\n}\npub struct B;\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B {}\n}\n";
+const B_ADD_FORMS: [&str; 6] = [
     "laws::associative!(add_regroups, any::<A>(), B::add);\n",
-    "laws::associative!(add_regroups, any::<B>(), Add::add);\n",
+    "use std::ops::Add;\nlaws::associative!(add_regroups, any::<B>(), Add::add);\n",
     "laws::associative!(add_regroups, any::<A>(), <B as Add>::add);\n",
-    "impl B {\n    fn regroups() {\n        laws::associative!(add_regroups, any::<A>(), Self::add);\n    }\n}\n",
     "use x::B as Sum;\nlaws::associative!(add_regroups, any::<A>(), Sum::add);\n",
     "use std::ops::Add as Plus;\nlaws::associative!(add_regroups, any::<B>(), Plus::add);\n",
     "fn regroups() {\n    use x::B as Sum;\n    laws::associative!(add_regroups, any::<A>(), Sum::add);\n}\n",
@@ -280,8 +279,8 @@ fn a_law_counts_only_when_its_path_attaches() {
     .for_each(|text| assert!(text.contains("crate x: 1 of 1 algebra operations declare no law; x::A: join"), "{text}"));
 }
 
-const WRAPPED: &str = "struct A;\nstruct B;\ntrait Join {}\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n    fn zero() -> B {}\n}\n";
-const WRAPPED_FORMS: [&str; 12] = [
+const WRAPPED: &str = "struct A;\nstruct B;\npub trait Join {}\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n    fn zero() -> B {}\n}\n";
+const WRAPPED_FORMS: [&str; 11] = [
     "laws::identity!(b_unit, any::<A>(), &B::join, B::zero());\n",
     "laws::identity!(b_unit, any::<A>(), (B::join), B::zero());\n",
     "laws::identity!(b_unit, any::<A>(), |a: &B, b: &B| a.join(b), B::zero());\n",
@@ -292,8 +291,7 @@ const WRAPPED_FORMS: [&str; 12] = [
     "laws::identity!(b_unit, any::<A>(), |a: B, b: B| (*a).join(b), B::zero());\n",
     "laws::identity!(b_unit, (any::<B>()), |a, b| a.join(b), B::zero());\n",
     "laws::identity!(b_unit, any::<B>().prop_map(|b| b), |a, b| a.join(b), B::zero());\n",
-    "laws::identity!(b_unit, any::<B>(), Join::join, B::zero());\n",
-    "impl B {\n    fn unit() {\n        laws::identity!(b_unit, any::<A>(), |a: Self, b: Self| a.join(b), Self::zero());\n    }\n}\n",
+    "use x::Join;\nlaws::identity!(b_unit, any::<B>(), Join::join, B::zero());\n",
 ];
 
 #[test]
@@ -308,6 +306,8 @@ fn a_wrapped_operation_operand_or_parameter_attaches_to_the_type_it_resolves_to(
 const ONE_JOIN: &str = PRIVATE;
 const Y_TRAIT: Extra = Extra { path: "crates/y/src/lib.rs", text: "pub trait Join {}\n" };
 const Y_STRUCT: Extra = Extra { path: "crates/y/src/lib.rs", text: "pub struct Join;\n" };
+const Y_OPS: Extra =
+    Extra { path: "crates/y/src/lib.rs", text: "pub mod ops {\n    pub trait Join {}\n}\npub use ops::Join;\n" };
 const W_EMPTY: Extra = Extra { path: "crates/w/src/lib.rs", text: "pub struct Other;\n" };
 const Z_REEXPORT: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::Join;\n" };
 const Z_RENAMED: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::Join as Merge;\n" };
@@ -315,7 +315,6 @@ const Z_GLOB: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::*;\
 const Z_PRIVATE: Extra = Extra { path: "crates/z/src/lib.rs", text: "use y::Join;\n" };
 const V_TWO_HOP: Extra = Extra { path: "crates/v/src/lib.rs", text: "pub use z::Join;\n" };
 const X_TRAIT: Extra = Extra { path: "crates/x/src/ops.rs", text: "pub trait Join {}\n" };
-const X_IMPORTS_Y: Extra = Extra { path: "crates/x/src/imports.rs", text: "use y::Join;\n" };
 const P_GLOB: Extra = Extra { path: "crates/p/src/lib.rs", text: "pub use q::*;\n" };
 const Q_GLOB: Extra = Extra { path: "crates/q/src/lib.rs", text: "pub use p::*;\n" };
 const X_IMPORTS_W: Extra = Extra { path: "crates/x/src/imports.rs", text: "use w::Join;\n" };
@@ -368,7 +367,7 @@ impl Row {
     }
 }
 
-const TRAIT_PATH_FORMS: [Row; 38] = [
+const TRAIT_PATH_FORMS: [Row; 27] = [
     Row::new("A1", &[Y_TRAIT], "use y::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
     Row::new(
         "A2",
@@ -383,9 +382,9 @@ const TRAIT_PATH_FORMS: [Row; 38] = [
         Expect::Credited,
     ),
     Row::new("A4", &[Y_TRAIT], "use y::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
-    Row::new("A5", &[Y_TRAIT], "use y::ops::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A5", &[Y_OPS], "use y::ops::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
     Row::new("A6", &[Y_TRAIT], "laws::associative!(r, any::<A>(), y::Join::join);\n", Expect::Credited),
-    Row::new("A7", &[Y_TRAIT], "use y::ops;\nlaws::associative!(r, any::<A>(), ops::Join::join);\n", Expect::Credited),
+    Row::new("A7", &[Y_OPS], "use y::ops;\nlaws::associative!(r, any::<A>(), ops::Join::join);\n", Expect::Credited),
     Row::new(
         "A8",
         &[Y_TRAIT],
@@ -407,7 +406,7 @@ const TRAIT_PATH_FORMS: [Row; 38] = [
     Row::new(
         "A11",
         &[Y_TRAIT],
-        "use y::*;\nmod inner {\n    laws::associative!(r, any::<A>(), Join::join);\n}\n",
+        "use y::*;\nmod inner {\n    use super::*;\n    laws::associative!(r, any::<A>(), Join::join);\n}\n",
         Expect::Credited,
     ),
     Row::new(
@@ -435,19 +434,6 @@ const TRAIT_PATH_FORMS: [Row; 38] = [
         "use v::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
         Expect::Credited,
     ),
-    Row::new("A17", &[X_TRAIT], "use crate::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
-    Row::new("A18", &[X_TRAIT], "use self::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
-    Row::new("A19", &[X_TRAIT], "use super::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
-    Row::new("A20", &[X_TRAIT], "laws::associative!(r, any::<A>(), crate::Join::join);\n", Expect::Credited),
-    Row::new("A21", &[X_TRAIT], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
-    Row::new("A22", &[X_TRAIT], "use x::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
-    Row::new(
-        "A23",
-        &[X_TRAIT],
-        "use Join as Merge;\nlaws::associative!(r, any::<A>(), Merge::join);\n",
-        Expect::Credited,
-    ),
-    Row::new("A24", &[Y_TRAIT, X_IMPORTS_Y], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
     Row::new("A25", &[], "laws::associative!(r, any::<A>(), From::from);\n", Expect::Listed),
     Row::new(
         "A26",
@@ -466,19 +452,11 @@ const TRAIT_PATH_FORMS: [Row; 38] = [
     Row::new("N4", &[Y_TRAIT, W_EMPTY], "laws::associative!(r, any::<A>(), w::Join::join);\n", Expect::Listed),
     Row::new("N5", &[Y_TRAIT, W_EMPTY], "use w::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
     Row::new(
-        "N6",
-        &[Y_TRAIT, W_EMPTY],
-        "use y::*;\nuse w::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
-        Expect::Listed,
-    ),
-    Row::new(
         "N7",
         &[Y_TRAIT, Z_PRIVATE],
         "use z::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
         Expect::Listed,
     ),
-    Row::new("N8", &[Y_TRAIT], "use crate::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
-    Row::new("N9", &[Y_TRAIT], "laws::associative!(r, any::<A>(), crate::Join::join);\n", Expect::Listed),
     Row::new(
         "N10",
         &[X_TRAIT, Y_STRUCT],

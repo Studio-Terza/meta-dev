@@ -221,9 +221,9 @@ const ADDED: &str = "struct A;\nstruct B;\nimpl Add for A {\n    type Output = A
 #[test]
 fn an_output_side_trait_path_or_untyped_closure_resolves_to_the_output_type() {
     let listed: Vec<String> = [
-        "laws::preserves!(keeps, any::<A>(), A::add, Add::add, A::into_b);\n",
-        "laws::preserves!(keeps, any::<A>(), A::add, |b| Add::add(b, b), A::into_b);\n",
-        "laws::preserves!(keeps, any::<A>(), Add::add, |a, b| a.add(b), A::into_b);\n",
+        "use std::ops::Add;\nlaws::preserves!(keeps, any::<A>(), A::add, Add::add, A::into_b);\n",
+        "use std::ops::Add;\nlaws::preserves!(keeps, any::<A>(), A::add, |b| Add::add(b, b), A::into_b);\n",
+        "use std::ops::Add;\nlaws::preserves!(keeps, any::<A>(), Add::add, |a, b| a.add(b), A::into_b);\n",
     ]
     .iter()
     .map(|law| Mapped::lawed(ADDED, law))

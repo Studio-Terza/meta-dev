@@ -1,6 +1,6 @@
-use lint_core::Lint;
-use lint_file::Judged;
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use code_reader::Reader;
+use lint_core::ModelLint;
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 use lint_mandatory_laws::MandatoryLaws;
 
 const TEXT_PAIR: &str = "pub struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\n";
@@ -22,7 +22,7 @@ const TITLE_ONLY: &str = "laws::roundtrip!(A, any::<u8>(), B::encode, B::decode)
 const BOTH_PAIRS: &str = "pub struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
 const CODED_ROUNDTRIP: &str = "laws::roundtrip!(coded, any::<A>(), A::encode, A::decode);\n";
 const TEXT_ROUNDTRIP: &str = "laws::roundtrip!(text, any::<A>(), ToString::to_string, A::from_str);\n";
-const DISPLAY_FILE: &str = "pub struct A;\nimpl std::fmt::Display for crate::A {}\n";
+const DISPLAY_FILE: &str = "pub struct A;\nimpl std::fmt::Display for crate::A {}\nmod b;\n";
 const FROM_STR_FILE: &str = "impl std::str::FromStr for crate::A {}\n";
 const CONDITIONAL_SERDE: &str = "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]\npub struct A;\n";
 const CODEC: &str = "pub struct A;\ntrait Codec {\n    fn encode(&self);\n    fn decode();\n}\nimpl Codec for A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
@@ -43,61 +43,61 @@ const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize,
 const CASES: [Case; 33] = [
     Case::new(
         Title::new("display and from_str"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(TEXT_PAIR))],
-        Flagged::new(&["src/a.rs:1"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_PAIR))],
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("display alone"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(DISPLAY_ONLY))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(DISPLAY_ONLY))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("serde pair"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(SERDE_PAIR))],
-        Flagged::new(&["src/a.rs:2"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(SERDE_PAIR))],
+        Flagged::new(&["src/lib.rs:2"]),
     ),
     Case::new(
         Title::new("serde enum"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(SERDE_ENUM))],
-        Flagged::new(&["src/a.rs:2"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(SERDE_ENUM))],
+        Flagged::new(&["src/lib.rs:2"]),
     ),
     Case::new(
         Title::new("pair split across types"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(SPLIT_TYPES))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(SPLIT_TYPES))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("unrelated macro"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(UNRELATED_MACRO)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("serialize alone"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(SERDE_ONE))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(SERDE_ONE))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("encode and decode"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(ENCODING))],
-        Flagged::new(&["src/a.rs:1"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(ENCODING))],
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("to and from"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(FORMS))],
-        Flagged::new(&["src/a.rs:1"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(FORMS))],
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("to and from of different forms"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(MISMATCHED_FORMS))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(MISMATCHED_FORMS))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("roundtrip in a test"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(ROUNDTRIP)),
         ],
         Flagged::new(&[]),
@@ -105,31 +105,31 @@ const CASES: [Case; 33] = [
     Case::new(
         Title::new("law for another type"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(OTHER_TYPE)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("the title is not a mention"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(TITLE_ONLY)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("one roundtrip does not cover two pairs"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(BOTH_PAIRS)),
+            Source::new(Located::new("src/lib.rs"), Text::new(BOTH_PAIRS)),
             Source::new(Located::new("tests/a.rs"), Text::new(CODED_ROUNDTRIP)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("a roundtrip for each pair"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(BOTH_PAIRS)),
+            Source::new(Located::new("src/lib.rs"), Text::new(BOTH_PAIRS)),
             Source::new(Located::new("tests/a.rs"), Text::new(CODED_ROUNDTRIP)),
             Source::new(Located::new("tests/b.rs"), Text::new(TEXT_ROUNDTRIP)),
         ],
@@ -138,10 +138,10 @@ const CASES: [Case; 33] = [
     Case::new(
         Title::new("the text roundtrip alone leaves the methods bare"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(BOTH_PAIRS)),
+            Source::new(Located::new("src/lib.rs"), Text::new(BOTH_PAIRS)),
             Source::new(Located::new("tests/a.rs"), Text::new(TEXT_ROUNDTRIP)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("a law in another package"),
@@ -165,25 +165,25 @@ const CASES: [Case; 33] = [
     Case::new(
         Title::new("a pair split across files"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(DISPLAY_FILE)),
+            Source::new(Located::new("src/lib.rs"), Text::new(DISPLAY_FILE)),
             Source::new(Located::new("src/b.rs"), Text::new(FROM_STR_FILE)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("serde behind cfg_attr"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(CONDITIONAL_SERDE))],
-        Flagged::new(&["src/a.rs:2"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(CONDITIONAL_SERDE))],
+        Flagged::new(&["src/lib.rs:2"]),
     ),
     Case::new(
         Title::new("a codec trait"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(CODEC))],
-        Flagged::new(&["src/a.rs:1"]),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(CODEC))],
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("a codec trait with a roundtrip"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(CODEC)),
+            Source::new(Located::new("src/lib.rs"), Text::new(CODEC)),
             Source::new(Located::new("tests/a.rs"), Text::new(CODED_ROUNDTRIP)),
         ],
         Flagged::new(&[]),
@@ -191,72 +191,72 @@ const CASES: [Case; 33] = [
     Case::new(
         Title::new("a roundtrip naming one method"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(HALF_ROUNDTRIP)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("a roundtrip from another crate"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(FOREIGN_ROUNDTRIP)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("a plain law naming both methods"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(LAW_NAMING_BOTH)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("a title with an attribute"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(ATTRIBUTED_TITLE)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
     Case::new(
         Title::new("encode alone"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(ENCODE_ONLY))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(ENCODE_ONLY))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("decode alone"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(DECODE_ONLY))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(DECODE_ONLY))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("derive-like attribute under cfg_attr"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_ATTRIBUTE_LIST))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(OTHER_ATTRIBUTE_LIST))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("a private type with a conversion pair"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(PRIVATE_TEXT_PAIR))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(PRIVATE_TEXT_PAIR))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("a crate-private type with a conversion pair"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(CRATE_ENCODING))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(CRATE_ENCODING))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("a private type with public methods"),
-        &[Source::new(Located::new("src/a.rs"), Text::new(PRIVATE_TYPE_PUBLIC_IMPL))],
+        &[Source::new(Located::new("src/lib.rs"), Text::new(PRIVATE_TYPE_PUBLIC_IMPL))],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("a roundtrip for the right type only"),
         &[
-            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("src/lib.rs"), Text::new(ENCODING)),
             Source::new(Located::new("tests/a.rs"), Text::new(OTHER_TYPE)),
         ],
-        Flagged::new(&["src/a.rs:1"]),
+        Flagged::new(&["src/lib.rs:1"]),
     ),
 ];
 
@@ -264,20 +264,23 @@ const LAW_FOR_PAIR: &str = "laws::law!(a, any::<A>(), value, { check(value) });\
 
 #[test]
 fn missing_laws_are_flagged() {
-    assert_eq!(Sources::mismatches::<Judged<MandatoryLaws>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<MandatoryLaws>>(&CASES), Lines::default());
 }
 
 #[test]
 fn a_plain_law_does_not_stand_in_for_a_roundtrip() {
-    let files = [Sources::file("src/a.rs", Text::new(ENCODING)), Sources::file("tests/a.rs", Text::new(LAW_FOR_PAIR))];
-    let report = Judged::<MandatoryLaws>::report(&files);
+    let files =
+        [Sources::file("src/lib.rs", Text::new(ENCODING)), Sources::file("tests/a.rs", Text::new(LAW_FOR_PAIR))];
+    let model = Reader::read_files(&files);
+    let report = MandatoryLaws::report(&model);
     assert!(report.dirty().is_some());
 }
 
 #[test]
 fn the_message_names_the_fix() {
-    let encoding = [Sources::file("src/a.rs", Text::new(ENCODING))];
-    let pair = Judged::<MandatoryLaws>::report(&encoding);
+    let encoding = [Sources::file("src/lib.rs", Text::new(ENCODING))];
+    let model = Reader::read_files(&encoding);
+    let pair = MandatoryLaws::report(&model);
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
     assert!(pair.dirty().is_some());

@@ -1,5 +1,4 @@
 use code_reader::Reader;
-use law_facts::Laws;
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{
@@ -16,10 +15,9 @@ impl Clustered {
     ) -> Vec<String> {
         let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
-        let laws = Laws::from(files.as_slice());
         let model = Reader::read_files(&files);
         let transitions = Transitions::from(&model);
-        let system = TypeSystem::built_from(&extraction, &laws, &transitions);
+        let system = TypeSystem::built_from(&extraction, &transitions);
         report(&system).iter().map(ToString::to_string).collect()
     }
 

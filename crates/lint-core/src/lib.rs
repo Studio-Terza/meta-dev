@@ -1,4 +1,3 @@
-mod attribute_macros;
 mod boundary;
 mod contents;
 mod declared_type;
@@ -23,7 +22,6 @@ mod type_homes;
 mod type_name;
 mod walk;
 
-pub use attribute_macros::AttributeMacros;
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use code_model::Site;
 pub use contents::Contents;

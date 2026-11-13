@@ -13,7 +13,6 @@ doctest = false
 body-lifts = { path = "../body-lifts" }
 body-shape = { path = "../body-shape" }
 equivalence = { path = "../equivalence" }
-law-facts = { path = "../law-facts" }
 lint-core = { path = "../lint-core" }
 code-model = { path = "../code-model" }
 lint-layout = { path = "../lint-layout" }

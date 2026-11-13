@@ -1044,7 +1044,6 @@ version = "0.1.0"
 dependencies = [
  "code-model",
  "code-reader",
- "law-facts",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1580,13 +1579,12 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
- "law-facts",
+ "code-model",
+ "code-reader",
  "laws",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -1977,7 +1975,6 @@ dependencies = [
  "file-ports",
  "golden",
  "graph-query",
- "law-facts",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",
@@ -2120,7 +2117,6 @@ dependencies = [
  "code-model",
  "code-reader",
  "equivalence",
- "law-facts",
  "laws",
  "lint-core",
  "lint-distinct-signatures",

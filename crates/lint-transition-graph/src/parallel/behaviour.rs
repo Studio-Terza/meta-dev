@@ -3,8 +3,8 @@ mod step;
 use std::collections::{BTreeMap, BTreeSet};
 
 use code_model::Placed;
+use code_model::Property;
 use equivalence::{Equivalence, Move, Refinement};
-use law_facts::Property;
 use lint_core::Site;
 use lint_layout::Name;
 

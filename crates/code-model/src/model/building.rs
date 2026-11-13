@@ -13,6 +13,7 @@ use crate::implementation::Implementation;
 use crate::item::{Alias, Item};
 use crate::item_declaration::ItemDeclaration;
 use crate::item_path::ItemPath;
+use crate::law::Law;
 use crate::path_use::PathUse;
 use crate::placed::FileHome;
 use crate::resolved::Resolved;
@@ -44,6 +45,7 @@ impl Building {
         model.uses.extend(found.uses);
         model.interpolated.extend(found.interpolated);
         model.placed.extend(found.placed);
+        model.laws.extend(found.laws);
         Building { model, ..self }
     }
 
@@ -74,6 +76,10 @@ impl Building {
     pub fn path_use(&mut self, file: FileId, line: LineNumber, used: PathUse) {
         let rows = used.mention().interpolated().map_or(&mut self.model.uses, |_| &mut self.model.interpolated);
         rows.push(Filed::new(file, Found::new(line, used)));
+    }
+
+    pub fn law(&mut self, file: FileId, line: LineNumber, law: Law) {
+        self.model.laws.push(Filed::new(file, Found::new(line, law)));
     }
 
     pub fn call(&mut self, file: FileId, line: LineNumber, call: Call) {
@@ -112,6 +118,7 @@ impl Building {
             holdings: model.holdings,
             calls: model.calls,
             placed: Filed::sorted(model.placed),
+            laws: Filed::sorted(model.laws),
             uses: Filed::sorted(model.uses),
             interpolated: Filed::sorted(model.interpolated),
             declarations: Declarations::new(self.items, self.aliases, self.exports),

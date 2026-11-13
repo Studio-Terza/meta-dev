@@ -10,7 +10,6 @@ test = false
 doctest = false
 
 [dependencies]
-law-facts = { path = "../law-facts" }
 code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }

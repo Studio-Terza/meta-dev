@@ -13,6 +13,7 @@ mod form;
 mod graph_lint;
 mod homomorphism;
 mod key;
+mod laws;
 mod listed;
 mod mutation;
 mod parallel;

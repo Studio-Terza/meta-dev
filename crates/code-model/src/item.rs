@@ -21,18 +21,25 @@ pub enum ItemKind {
     Macro,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Exposure {
+    Public,
+    Hidden,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {
     name: Name,
     kind: ItemKind,
     marks: Vec<ItemPath>,
     krate: Option<Name>,
+    exposure: Exposure,
 }
 
 impl Item {
     #[must_use]
     pub fn new(name: Name, kind: ItemKind) -> Item {
-        Item { name, kind, marks: Vec::new(), krate: None }
+        Item { name, kind, marks: Vec::new(), krate: None, exposure: Exposure::Hidden }
     }
 
     #[must_use]
@@ -43,6 +50,16 @@ impl Item {
     #[must_use]
     pub fn homed(self, krate: Option<Name>) -> Item {
         Item { krate, ..self }
+    }
+
+    #[must_use]
+    pub fn exposed(self, exposure: Exposure) -> Item {
+        Item { exposure, ..self }
+    }
+
+    #[must_use]
+    pub fn exposure(&self) -> Exposure {
+        self.exposure
     }
 
     #[must_use]

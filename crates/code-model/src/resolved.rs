@@ -34,6 +34,20 @@ impl Resolved {
     }
 
     #[must_use]
+    pub fn std_trait(&self) -> Option<StdTrait<'_>> {
+        match self {
+            Resolved::StdTrait(path) => Some(StdTrait(path)),
+            Resolved::Std(_)
+            | Resolved::Crate(_)
+            | Resolved::Member(_)
+            | Resolved::External(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_)
+            | Resolved::Unknown(..) => None,
+        }
+    }
+
+    #[must_use]
     pub fn joined(&self, segment: &Name) -> Option<Resolved> {
         match self {
             Resolved::Std(path) | Resolved::StdTrait(path) => Some(Resolved::Std(path.joined(segment))),
@@ -142,5 +156,14 @@ impl Resolved {
             | Resolved::Primitive(_)
             | Resolved::Unknown(..) => None,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StdTrait<'path>(&'path ItemPath);
+
+impl AsRef<ItemPath> for StdTrait<'_> {
+    fn as_ref(&self) -> &ItemPath {
+        self.0
     }
 }

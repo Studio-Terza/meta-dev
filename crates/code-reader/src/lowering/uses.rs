@@ -108,6 +108,8 @@ impl Lowering<'_> {
             .segments
             .last()
             .map_or_else(|| Position::from(invoked.path.span()), |last| Position::from(last.ident.span()));
+        let law = self.law_row(invoked);
+        self.lowered.rows.laws.extend(law);
         self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
         let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
         let interpolated =

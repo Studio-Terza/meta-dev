@@ -1,7 +1,6 @@
 use std::fmt;
 
 use code_reader::Reader;
-use law_facts::Laws;
 use lint_core::SourceFile;
 use lint_transition_graph::{Extraction, Transitions, TypeSystem};
 use workspace_metadata::Metadata;
@@ -15,10 +14,9 @@ impl Query {
     #[must_use]
     pub fn answered(&self, files: &[SourceFile], workspaces: &[Metadata]) -> Answered {
         let extraction = Extraction::from(files);
-        let laws = Laws::from(files);
         let model = Reader::read_files(files);
         let transitions = Transitions::from(&model);
-        let system = TypeSystem::built_from(&extraction, &laws, &transitions);
+        let system = TypeSystem::built_from(&extraction, &transitions);
         let sized = self.sized(files, workspaces).map_or_default(|sizes| sizes.to_string());
         Answered(format!("{}{sized}", self.reply(&system)))
     }

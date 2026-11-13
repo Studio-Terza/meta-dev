@@ -3,6 +3,7 @@ mod boundary;
 mod calls;
 mod definition;
 mod held;
+mod laws;
 mod places;
 mod regions;
 mod seat;
@@ -40,6 +41,7 @@ use boundary::SelfType;
 use calls::CallRow;
 use definition::{LoweredDefinition, Mutations};
 use held::{Holder, HoldingRow, Link};
+use laws::LawRow;
 use places::{PlaceId, PlaceRows, Places};
 use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
@@ -309,6 +311,7 @@ pub(crate) struct FileRows {
     holdings: Vec<HoldingRow>,
     calls: Vec<CallRow>,
     uses: Vec<UseRow>,
+    laws: Vec<LawRow>,
     places: PlaceRows,
 }
 
@@ -321,6 +324,7 @@ impl FileRows {
             holdings: Footed::appended(columns.holdings, footing, self.holdings),
             calls: Footed::appended(columns.calls, footing, self.calls),
             uses: Footed::appended(columns.uses, footing, self.uses),
+            laws: Footed::appended(columns.laws, footing, self.laws),
         }
     }
 }
@@ -408,6 +412,7 @@ struct Columns<'footing> {
     holdings: Vec<Footed<'footing, HoldingRow>>,
     calls: Vec<Footed<'footing, CallRow>>,
     uses: Vec<Footed<'footing, UseRow>>,
+    laws: Vec<Footed<'footing, LawRow>>,
 }
 
 impl Columns<'_> {
@@ -417,7 +422,8 @@ impl Columns<'_> {
         let with_functions = Footed::every_built(self.functions, with_impls);
         let with_holdings = Footed::every_built(self.holdings, with_functions);
         let with_calls = Footed::every_built(self.calls, with_holdings);
-        Footed::every_built(self.uses, with_calls)
+        let with_uses = Footed::every_built(self.uses, with_calls);
+        Footed::every_built(self.laws, with_uses)
     }
 }
 

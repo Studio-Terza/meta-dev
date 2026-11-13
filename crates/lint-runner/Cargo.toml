@@ -20,7 +20,6 @@ code-model = { path = "../code-model" }
 code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
-law-facts = { path = "../law-facts" }
 lint-hand-impls = { path = "../lint-hand-impls" }
 lint-narrowed-returns = { path = "../lint-narrowed-returns" }
 lint-reader = { path = "../lint-reader" }

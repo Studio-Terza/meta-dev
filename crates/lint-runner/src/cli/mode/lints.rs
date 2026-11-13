@@ -9,7 +9,6 @@ use code_model::Model;
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
-use law_facts::{LawReading, Laws};
 use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads};
 use lint_port_dependencies::{RoleFacts, RoleReading};
@@ -123,7 +122,7 @@ type Query = for<'model> fn(&'model Model) -> Report<'model>;
 type Workspaced =
     for<'file, 'head> fn(&'file [FileHead], &'file [Metadata], &'file RoleFacts<'head>, &'file Model) -> Report<'file>;
 
-type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Laws<'file>, &'file Model) -> Vec<Report<'file>>;
+type Extracting = for<'file> fn(&'file Extraction<'file>, &'file Model) -> Vec<Report<'file>>;
 
 impl Lints {
     const LINTS: [Entry; 54] = [
@@ -170,7 +169,7 @@ impl Lints {
         <Filed<StoreQueries> as Registered>::ENTRY,
         <Filed<LongExactStrings> as Registered>::ENTRY,
         <Judged<RepeatedShapes> as Registered>::ENTRY,
-        <Judged<MandatoryLaws> as Registered>::ENTRY,
+        Entry::spelled::<MandatoryLaws>(Work::Modelled(<MandatoryLaws as ModelLint>::report)),
         <Filed<ArbitraryNewtypes> as Registered>::ENTRY,
         <Filed<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
@@ -178,9 +177,9 @@ impl Lints {
         <Filed<LinearBodies> as Registered>::ENTRY,
         <Filed<PureRouters> as Registered>::ENTRY,
         <Filed<PlainConditions> as Registered>::ENTRY,
-        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, laws, model| {
+        Entry::spelled::<TypeSystem>(Work::Extracted(|extraction, model| {
             let transitions = Transitions::from(model);
-            let system = TypeSystem::built_from(extraction, laws, &transitions);
+            let system = TypeSystem::built_from(extraction, &transitions);
             [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
                 .into_iter()
                 .flatten()
@@ -359,9 +358,7 @@ impl Work {
         match self {
             Work::Extracted(extracted) => Worked::rendering(
                 slot,
-                sources.gathering().model().map_or_default(|model| {
-                    extracted(sources.gathering().extraction(), Priming::<LawReading>::primed(settled), model)
-                }),
+                sources.gathering().model().map_or_default(|model| extracted(sources.gathering().extraction(), model)),
             ),
             Work::Described(described) => Worked::rendering(
                 slot,

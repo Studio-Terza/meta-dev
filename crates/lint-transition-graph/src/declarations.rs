@@ -1,9 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 
-use law_facts::{Kind, Law, Laws, Package, Property};
+use code_model::{LawKind, Model, Property};
 use lint_core::{Site, Violation};
-use lint_layout::Name;
+
+use crate::laws::{Law, Laws};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Checked {
@@ -12,7 +13,7 @@ pub(crate) enum Checked {
 }
 
 impl Checked {
-    fn reporting(kind: Kind) -> Checked {
+    fn reporting(kind: LawKind) -> Checked {
         match kind.property() {
             Some(Property::Preserves) => Checked::Preservation,
             Some(_) | None => Checked::Operations,
@@ -21,25 +22,19 @@ impl Checked {
 }
 
 #[derive(Debug)]
-pub(crate) struct Declarations<'found, 'file> {
-    laws: &'found Laws<'file>,
-    packages: BTreeMap<&'file Path, Package<'file>>,
+pub(crate) struct Declarations<'file> {
+    laws: Laws<'file>,
 }
 
-impl<'found, 'file> Declarations<'found, 'file> {
-    pub(crate) fn new(
-        laws: &'found Laws<'file>,
-        packages: &BTreeMap<&'file Path, Package<'file>>,
-    ) -> Declarations<'found, 'file> {
-        Declarations { laws, packages: packages.clone() }
+impl<'file> From<&'file Model> for Declarations<'file> {
+    fn from(model: &'file Model) -> Declarations<'file> {
+        Declarations { laws: Laws::from(model) }
     }
+}
 
-    pub(crate) fn routing(&self, path: &Path, owner: &Name, member: &Name) -> Vec<&Law<'file>> {
-        self.packages.get(path).map_or_default(|package| self.laws.routing(*package, owner, member))
-    }
-
-    pub(crate) fn of_package(&self, path: &Path) -> Vec<&Law<'file>> {
-        self.packages.get(path).map_or_default(|package| self.laws.of_package(*package))
+impl<'file> Declarations<'file> {
+    pub(crate) fn laws(&self) -> &Laws<'file> {
+        &self.laws
     }
 
     pub(crate) fn unresolved<'site>(
@@ -47,12 +42,11 @@ impl<'found, 'file> Declarations<'found, 'file> {
         sites: impl Iterator<Item = Site<'site>>,
         checked: Checked,
     ) -> Vec<Violation<'file>> {
-        let packages: BTreeSet<Package<'file>> =
-            sites.filter_map(|site| self.packages.get(site.path())).copied().collect();
+        let paths: BTreeSet<&Path> = sites.map(|site| site.path()).collect();
+        let listed: Vec<&Path> = paths.into_iter().collect();
         self.laws
-            .all()
+            .of_crates(&listed)
             .filter(|law| Checked::reporting(law.kind()) == checked)
-            .filter(|law| packages.iter().any(|package| law.of_package(*package).is_some()))
             .filter_map(Law::unresolved)
             .map(|unresolved| Violation::new(*AsRef::<Site<'file>>::as_ref(&unresolved), &unresolved))
             .collect()
