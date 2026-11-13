@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
 
-pub use concluded::Concluded;
+pub use concluded::{Concluded, Listed};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {

@@ -1958,6 +1958,7 @@ dependencies = [
  "equivalence",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",

@@ -14,6 +14,7 @@ use lint_port_dependencies::EffectsInFillers;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
+use lint_repeated_shapes::RepeatedShapes;
 use lint_state_graph::StateGraph;
 use lint_unconsumed_traits::UnconsumedTraits;
 
@@ -152,6 +153,7 @@ contexts! {
         public_api_tests: PublicApiTests,
         no_test_only_api: NoTestOnlyApi,
         mandatory_laws: MandatoryLaws,
+        repeated_shapes: RepeatedShapes,
     }
     primed: {
         state_graph: StateGraph,

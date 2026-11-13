@@ -161,7 +161,7 @@ impl Lints {
         <Filed<HiddenSqlx> as Registered>::ENTRY,
         <Filed<StoreQueries> as Registered>::ENTRY,
         <Filed<LongExactStrings> as Registered>::ENTRY,
-        Entry::spelled::<RepeatedShapes>(Work::Checked(|readout| vec![RepeatedShapes::report(readout.files())])),
+        <Judged<RepeatedShapes> as Registered>::ENTRY,
         <Judged<MandatoryLaws> as Registered>::ENTRY,
         <Filed<ArbitraryNewtypes> as Registered>::ENTRY,
         <Filed<BoolMethods> as Registered>::ENTRY,
