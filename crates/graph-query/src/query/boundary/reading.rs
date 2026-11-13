@@ -15,6 +15,7 @@ enum Item {
     Implementers,
     Cluster,
     Exports,
+    Cycles,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -45,7 +46,7 @@ impl Query {
 }
 
 impl Expecting {
-    const FLAGS: [(&'static str, Expecting); 10] = [
+    const FLAGS: [(&'static str, Expecting); 11] = [
         ("--in", Expecting::Root),
         ("--role", Expecting::Role),
         ("--top", Expecting::Top),
@@ -56,6 +57,7 @@ impl Expecting {
         ("--cluster", Expecting::Item(Item::Cluster)),
         ("--exports", Expecting::Item(Item::Exports)),
         ("--path", Expecting::From),
+        ("--cycles", Expecting::Item(Item::Cycles)),
     ];
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -72,6 +74,7 @@ impl Item {
             Item::Implementers => Ask::Implementers(name),
             Item::Cluster => Ask::Cluster(name),
             Item::Exports => Ask::Exports(name),
+            Item::Cycles => Ask::Cycles(name),
         }
     }
 }
