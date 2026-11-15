@@ -1,6 +1,6 @@
 use std::path::{Component, Path, PathBuf};
 
-use syn::ItemMod;
+use syntax::ItemMod;
 
 use super::PublicApiTests;
 use lint_core::{Site, SourceFile, Syntax, Violation};

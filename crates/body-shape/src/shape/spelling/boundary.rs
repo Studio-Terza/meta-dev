@@ -1,4 +1,4 @@
-use proc_macro2::Literal;
+use syntax::Literal;
 
 use super::Spelling;
 

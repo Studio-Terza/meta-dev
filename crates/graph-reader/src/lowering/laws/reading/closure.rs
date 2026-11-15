@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use syn::punctuated::Punctuated;
-use syn::{Expr, ExprClosure, ExprMethodCall, ExprPath, Pat, PatType, Stmt, Token};
+use syntax::Punctuated;
+use syntax::{Expr, ExprClosure, ExprMethodCall, ExprPath, Pat, PatType, Stmt, Token};
 
 use lint_layout::Name;
 

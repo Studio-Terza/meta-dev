@@ -1,4 +1,4 @@
-use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
+use syntax::{Delimiter, Group, TokenStream, TokenTree};
 
 use equivalence::{Equivalence, Erased};
 use lint_layout::Name;

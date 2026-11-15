@@ -2,8 +2,8 @@ mod reading;
 
 use std::collections::BTreeSet;
 
-use proc_macro2::{TokenStream, TokenTree};
-use syn::Macro;
+use syntax::Macro;
+use syntax::{TokenStream, TokenTree};
 
 use graph::{Building, Law, LawKind, Operation, OperationOwner, Property, Route, Side, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
@@ -152,7 +152,7 @@ impl Lowering<'_> {
         Kinds::of_macro(invocation).map(|kind| {
             let title = invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident));
             LawRow {
-                located: self.here.located(lint_layout::Position::from(syn::spanned::Spanned::span(&invocation.path))),
+                located: self.here.located(lint_layout::Position::from(syntax::Spanned::span(&invocation.path))),
                 kind,
                 title,
                 mentions: Mentions::beyond_title(invocation.tokens.clone(), kind),

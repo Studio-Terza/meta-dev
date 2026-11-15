@@ -35,6 +35,8 @@ pub enum Uncached {
     Usage,
     #[error("cannot use {}: {source}", path.display())]
     Io { path: PathBuf, source: io::Error },
+    #[error("cannot read the workspace: {0}")]
+    Unread(lint_layout::Failure),
     #[error("cannot start the runtime: {0}")]
     Runtime(io::Error),
     #[error("cannot open the scratch database: {0}")]
@@ -53,11 +55,11 @@ impl QueryCache {
     const MEMORY: &'static str = "sqlite::memory:";
 
     pub fn prepared(&self, out: &mut impl io::Write) -> Result<(), Uncached> {
-        let queries = Sources::under(&self.root)?.queries()?;
+        let queries = Sources::queries(&self.root)?;
         let mut scratch = Scratch::migrated(&self.migrations)?;
         let kept = queries
             .iter()
-            .map(|query| self.kept(&mut scratch, query, out))
+            .map(|query| self.kept(&mut scratch, query.as_ref(), out))
             .collect::<Result<BTreeSet<PathBuf>, Uncached>>()?;
         self.pruned(&kept, out)
     }

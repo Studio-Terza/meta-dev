@@ -15,8 +15,7 @@ lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
-proc-macro2.workspace = true
-syn.workspace = true
+syntax = { path = "../syntax" }
 
 [dev-dependencies]
 lint-file = { path = "../lint-file" }

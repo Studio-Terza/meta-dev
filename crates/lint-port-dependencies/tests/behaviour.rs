@@ -494,6 +494,24 @@ const MACRO_THROUGH_MODEL: Text = roles!(
     node!("design-model", "grammar", "grammar-notes"),
     node!("port-derive", "design-model", "grammar-ident")
 );
+const LEXER_ON_MACROS: Text = roles!(
+    node!("grammar-notes", "grammar", "store-ports-macros"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "grammar-ident")
+);
+const MACRO_ON_OWNED: Text = roles!(
+    node!("grammar-notes", "grammar"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "logos")
+);
+const MACRO_ON_MACROS: Text = roles!(
+    node!("grammar-notes", "grammar"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "store-ports-macros")
+);
 const MACRO_THROUGH_PORT: Text = roles!(
     node!("grammar-notes", "grammar"),
     "null",
@@ -689,6 +707,7 @@ laws::table!(
         Placed::new(&[PORT, MACROS, WORKSPACE_RENAMED], UNIT_CRATES, STORE_ON_DATABASE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
         Placed::new(&[PORT, MACROS, ON_MACRO_CLOSURE], UNIT_CRATES, STORE_ON_SQLX_CORE) => Lines::from(["crates/design-store/Cargo.toml:5"]),
         Placed::new(&[PORT, MACROS, ON_OWNED], UNIT_CRATES, STORE_UNDECLARED) => Lines::from(["crates/design-store/Cargo.toml:4"]),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_ON_OWNED) => Lines::from(["crates/port-derive/Cargo.toml:4"]),
     ]
 );
 
@@ -752,6 +771,7 @@ laws::table!(
     [
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, LEXER_ON_STORE) => Lines::from(["crates/grammar-notes/Cargo.toml:9"]),
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, SHARED_FORMAT) => Lines::from(["crates/grammar-ident/Cargo.toml:5", "crates/grammar-notes/Cargo.toml:5"]),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, LEXER_ON_MACROS) => Lines::default(),
     ]
 );
 
@@ -761,6 +781,8 @@ laws::table!(
     [
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_THROUGH_MODEL) => Lines::from(["crates/design-model/Cargo.toml:5", "crates/port-derive/Cargo.toml:5"]),
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_THROUGH_PORT) => Lines::from(["crates/grammar-ident/Cargo.toml:8", "crates/port-derive/Cargo.toml:6"]),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_ON_OWNED) => Lines::default(),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, MACRO_ON_MACROS) => Lines::default(),
     ]
 );
 

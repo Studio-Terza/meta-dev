@@ -3,7 +3,7 @@ mod repetitions;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, Type};
+use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, Type};
 
 use body_lifts::{Body, BodyReading, Branching};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};

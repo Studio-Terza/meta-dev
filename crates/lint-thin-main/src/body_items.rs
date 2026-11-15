@@ -1,5 +1,5 @@
-use proc_macro2::Span;
-use syn::{Item, ItemFn};
+use syntax::Span;
+use syntax::{Item, ItemFn};
 
 use lint_core::SourceFile;
 use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};

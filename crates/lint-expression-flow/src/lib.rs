@@ -3,12 +3,12 @@ use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
 use std::collections::{BTreeMap, BTreeSet};
 
-use proc_macro2::Span;
 use std::path::Path;
-use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
+use syntax::Punctuated;
+use syntax::Span;
+use syntax::Spanned;
 
-use syn::{
+use syntax::{
     Attribute, BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, Ident,
     ImplItemConst, ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, PatIdent, Signature,
     Stmt, Token, TraitItemFn,

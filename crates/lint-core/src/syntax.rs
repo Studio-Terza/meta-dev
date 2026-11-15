@@ -1,18 +1,18 @@
-use proc_macro2::{Group, Literal, Punct, TokenTree};
-use syn::punctuated::Punctuated;
-use syn::{
+use syntax::Punctuated;
+use syntax::{
     AngleBracketedGenericArguments, Expr, ExprCall, ExprClosure, ExprLit, ExprPath, Field, Fields, FnArg,
     GenericArgument, GenericParam, Ident, ImplItem, ImplItemFn, ImplItemType, Item, ItemImpl, ItemMod, ItemUse, Lit,
     LitStr, Member, Pat, PatIdent, PatType, PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn,
     TraitItemType, Type, TypeParam, TypeParamBound, TypePath,
 };
+use syntax::{Group, Literal, Punct, TokenTree};
 
 #[derive(Debug)]
 pub struct Syntax;
 
 impl Syntax {
     #[must_use]
-    pub fn item_macro(item: &Item) -> Option<&syn::Macro> {
+    pub fn item_macro(item: &Item) -> Option<&syntax::Macro> {
         match item {
             Item::Macro(found) => found.ident.as_ref().map_or(Some(&found.mac), |_| None),
             _ => None,

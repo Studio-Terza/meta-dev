@@ -1,4 +1,4 @@
-use syn::{
+use syntax::{
     Attribute, ExprMethodCall, Field, ForeignItemFn, ImplItemConst, ImplItemFn, ItemConst, ItemEnum, ItemFn, ItemImpl,
     ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, ItemUse, LitFloat, LitInt, Local,
     Signature, TraitItemConst, TraitItemFn,
@@ -19,7 +19,7 @@ pub trait Numbered {
 
     fn digits(&self) -> &str;
 
-    fn spot(&self) -> proc_macro2::Span;
+    fn spot(&self) -> syntax::Span;
 }
 
 macro_rules! attributed {
@@ -81,7 +81,7 @@ impl Numbered for LitInt {
         self.base10_digits()
     }
 
-    fn spot(&self) -> proc_macro2::Span {
+    fn spot(&self) -> syntax::Span {
         self.span()
     }
 }
@@ -91,7 +91,7 @@ impl Numbered for LitFloat {
         self.base10_digits()
     }
 
-    fn spot(&self) -> proc_macro2::Span {
+    fn spot(&self) -> syntax::Span {
         self.span()
     }
 }

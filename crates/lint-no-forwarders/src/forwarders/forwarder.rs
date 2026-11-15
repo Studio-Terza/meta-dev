@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use syn::Ident;
+use syntax::Ident;
 
 mod finding;
 

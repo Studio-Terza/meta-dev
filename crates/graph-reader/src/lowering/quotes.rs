@@ -1,5 +1,5 @@
-use syn::Macro;
-use syn::spanned::Spanned;
+use syntax::Macro;
+use syntax::Spanned;
 
 use graph::{Building, Domain, Quote, Quoted};
 use lint_core::{Macros, SourceFile};

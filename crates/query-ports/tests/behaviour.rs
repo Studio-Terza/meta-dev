@@ -19,6 +19,14 @@ fn kept() {
 const FIXTURE: &str = r#"fn fixture() { store_ports::query!("SELECT 3 AS three"); }"#;
 const NOTES: &str = r#"store_ports::query!("SELECT 4 AS four")"#;
 const STALE: &str = "query-stale.json";
+const WORKSPACE: &str = "[workspace]\nresolver = \"3\"\nmembers = [\"crates/*\"]\n";
+const MANIFEST: &str = "[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nstore-ports = { path = \"../store-ports\" }\n";
+const PORT_MANIFEST: &str = "[package]\nname = \"store-ports\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nstore-ports-macros = { path = \"../store-ports-macros\" }\n";
+const PORT: &str = "pub use store_ports_macros::query;\n";
+const MACROS_MANIFEST: &str =
+    "[package]\nname = \"store-ports-macros\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[lib]\nproc-macro = true\n";
+const MACROS: &str =
+    "use proc_macro::TokenStream;\n\n#[proc_macro]\npub fn query(input: TokenStream) -> TokenStream {\n    input\n}\n";
 
 struct Workspace(TempDir);
 
@@ -30,6 +38,12 @@ impl Workspace {
             fs::create_dir_all(path.parent().ok_or("no parent")?)?;
             Ok(fs::write(path, text)?)
         };
+        written("Cargo.toml", WORKSPACE)?;
+        written("crates/a/Cargo.toml", MANIFEST)?;
+        written("crates/store-ports/Cargo.toml", PORT_MANIFEST)?;
+        written("crates/store-ports/src/lib.rs", PORT)?;
+        written("crates/store-ports-macros/Cargo.toml", MACROS_MANIFEST)?;
+        written("crates/store-ports-macros/src/lib.rs", MACROS)?;
         written("crates/a/src/lib.rs", SOURCE)?;
         written("crates/a/tests/fixtures/src/lib.rs", FIXTURE)?;
         written("crates/a/notes.txt", NOTES)?;

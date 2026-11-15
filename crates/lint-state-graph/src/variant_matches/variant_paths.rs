@@ -1,4 +1,4 @@
-use syn::{ExprPath, Pat, PatStruct, PatTupleStruct, Path};
+use syntax::{ExprPath, Pat, PatStruct, PatTupleStruct, Path};
 
 use lint_layout::Name;
 use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};

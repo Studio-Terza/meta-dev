@@ -2,7 +2,7 @@ mod arms;
 
 use std::path::Path;
 
-use syn::{Block, Expr, ExprIf, ExprMatch, Stmt};
+use syntax::{Block, Expr, ExprIf, ExprMatch, Stmt};
 
 use crate::function_flow::found::Found;
 use crate::verdict::Verdict;

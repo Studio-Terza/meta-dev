@@ -1,6 +1,6 @@
 mod finding;
 
-use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
+use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;

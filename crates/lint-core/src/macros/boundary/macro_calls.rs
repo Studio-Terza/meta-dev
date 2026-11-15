@@ -1,9 +1,9 @@
 use std::iter;
 
-use proc_macro2::{Punct, TokenStream, TokenTree};
-use syn::parse::discouraged::Speculative;
-use syn::parse::{Parse, ParseStream};
-use syn::{Macro, Token};
+use syntax::parse::Speculative;
+use syntax::parse::{Parse, ParseStream};
+use syntax::{Macro, Token};
+use syntax::{Punct, TokenStream, TokenTree};
 
 #[derive(Debug)]
 pub struct MacroCalls(Vec<Macro>);
@@ -14,7 +14,7 @@ impl MacroCalls {
     #[must_use]
     pub fn within(invocation: &Macro) -> Vec<Macro> {
         Self::banged(invocation.tokens.clone())
-            .map_or_default(|tokens| syn::parse2::<MacroCalls>(tokens).map_or_default(|calls| calls.0))
+            .map_or_default(|tokens| syntax::parse::parse2::<MacroCalls>(tokens).map_or_default(|calls| calls.0))
     }
 
     fn banged(tokens: TokenStream) -> Option<TokenStream> {
@@ -29,7 +29,7 @@ impl MacroCalls {
         }
     }
 
-    fn step(input: ParseStream) -> syn::Result<Vec<Macro>> {
+    fn step(input: ParseStream) -> syntax::Result<Vec<Macro>> {
         let metavariable = input.parse::<Option<Token![$]>>()?;
         let attempt = input.fork();
         attempt.parse::<Macro>().map_or_else(
@@ -41,17 +41,19 @@ impl MacroCalls {
         )
     }
 
-    fn skipped(tree: TokenTree) -> syn::Result<Vec<Macro>> {
+    fn skipped(tree: TokenTree) -> syntax::Result<Vec<Macro>> {
         match tree {
-            TokenTree::Group(group) => syn::parse2::<MacroCalls>(group.stream()).map(|calls| calls.0),
+            TokenTree::Group(group) => syntax::parse::parse2::<MacroCalls>(group.stream()).map(|calls| calls.0),
             _ => Ok(Vec::new()),
         }
     }
 }
 
 impl Parse for MacroCalls {
-    fn parse(input: ParseStream) -> syn::Result<MacroCalls> {
+    fn parse(input: ParseStream) -> syntax::Result<MacroCalls> {
         let steps = iter::from_fn(|| input.cursor().token_tree().map(|_| Self::step(input)));
-        steps.collect::<syn::Result<Vec<Vec<Macro>>>>().map(|parsed| MacroCalls(parsed.into_iter().flatten().collect()))
+        steps
+            .collect::<syntax::Result<Vec<Vec<Macro>>>>()
+            .map(|parsed| MacroCalls(parsed.into_iter().flatten().collect()))
     }
 }

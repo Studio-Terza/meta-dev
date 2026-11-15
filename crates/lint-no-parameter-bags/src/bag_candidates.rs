@@ -6,7 +6,7 @@ pub use candidate::Candidate;
 use std::collections::{BTreeMap, BTreeSet};
 
 use method_shape::MethodShape;
-use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
+use syntax::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
 
 use lint_core::{SourceFile, Violation};
 use lint_sweep::{Descend, Facts, Finds, Kind, Watch};

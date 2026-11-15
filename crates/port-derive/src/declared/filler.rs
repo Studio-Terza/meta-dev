@@ -1,5 +1,5 @@
-use proc_macro2::TokenStream;
-use quote::quote;
+use syntax::TokenStream;
+use syntax::quote;
 
 use super::method::Method;
 use super::names::OpsName;

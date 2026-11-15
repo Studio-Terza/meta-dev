@@ -7,7 +7,7 @@ pub use returns::Returns;
 use crate::declarations::Vertex;
 use std::path::Path;
 
-use syn::{FnArg, ImplItem, ImplItemFn, PatType, Type};
+use syntax::{FnArg, ImplItem, ImplItemFn, PatType, Type};
 
 use super::declarations::Declarations;
 use super::impl_context::ImplContext;

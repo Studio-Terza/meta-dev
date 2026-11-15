@@ -1,6 +1,6 @@
-use proc_macro2::Ident;
-use quote::format_ident;
-use syn::{ReturnType, Type};
+use syntax::Ident;
+use syntax::format_ident;
+use syntax::{ReturnType, Type};
 
 use named::{Named, Slot};
 

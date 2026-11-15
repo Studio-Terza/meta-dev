@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use syn::{Field, GenericArgument, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
+use syntax::{Field, GenericArgument, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
 
 use lint_core::Syntax;
 use lint_layout::Name;

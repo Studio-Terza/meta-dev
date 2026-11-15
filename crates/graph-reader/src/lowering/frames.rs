@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use syn::{Attribute, ItemImpl, ItemMod};
+use syntax::{Attribute, ItemImpl, ItemMod};
 
 use lint_sweep::Descend;
 

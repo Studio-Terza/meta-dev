@@ -1,4 +1,4 @@
-use syn::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
+use syntax::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
 use graph_reader::{Branches, Propagation};
 use lint_core::{Site, SourceFile, Walk};

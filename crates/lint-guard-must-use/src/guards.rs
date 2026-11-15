@@ -5,8 +5,8 @@ mod type_key;
 use std::mem;
 use std::path::Path;
 
-use syn::punctuated::Punctuated;
-use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, MetaList, Token};
+use syntax::Punctuated;
+use syntax::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, MetaList, Token};
 
 use lint_core::Module;
 use lint_core::{Parsed, Site, Walk};

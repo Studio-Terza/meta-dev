@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use syn::{ItemEnum, ItemStruct, ItemTrait};
+use syntax::{ItemEnum, ItemStruct, ItemTrait};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
@@ -35,7 +35,7 @@ impl WorkspaceTypes {
 }
 
 impl TypeGathering {
-    fn declared(&mut self, name: &syn::Ident) -> Descend {
+    fn declared(&mut self, name: &syntax::Ident) -> Descend {
         self.types.0.insert(Name::from(name));
         Descend::Over
     }

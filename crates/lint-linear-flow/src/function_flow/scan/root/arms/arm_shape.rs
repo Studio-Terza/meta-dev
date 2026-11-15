@@ -1,4 +1,4 @@
-use syn::{Block, Expr, Stmt};
+use syntax::{Block, Expr, Stmt};
 
 use crate::finding::Finding;
 

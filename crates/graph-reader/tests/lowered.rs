@@ -331,3 +331,13 @@ fn a_module_file_below_a_test_gated_module_file_is_read_at_test_reach() {
         ])
     );
 }
+
+#[test]
+fn a_macro_in_statement_position_quotes_its_first_literal_like_one_in_an_expression() {
+    let model = Read::model(
+        "fn f() {\n    other::query!(Row, \"SELECT 1\", id: Id);\n    g(other::query!(Row, \"SELECT 2\"));\n}\n",
+    );
+    let quoted: Vec<String> =
+        model.quotations().map(|placed| AsRef::<graph::Quote>::as_ref(placed.entity()).as_ref().to_owned()).collect();
+    assert_eq!(quoted, vec!["\"SELECT 1\"".to_owned(), "\"SELECT 2\"".to_owned()]);
+}

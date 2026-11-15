@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use syn::ItemMod;
+use syntax::ItemMod;
 
 use crate::walk::Walk;
 use crate::watch::{Descend, Facts, Kind, Watch};

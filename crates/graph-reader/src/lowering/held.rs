@@ -1,5 +1,5 @@
-use syn::spanned::Spanned;
-use syn::{Attribute, Field, Generics, Ident, ItemStruct, ItemTrait, Type};
+use syntax::Spanned;
+use syntax::{Attribute, Field, Generics, Ident, ItemStruct, ItemTrait, Type};
 
 use graph::{Building, Held, Holding, ItemId};
 use lint_core::Syntax;

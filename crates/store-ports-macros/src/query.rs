@@ -1,14 +1,16 @@
 mod bound;
+mod typed;
 
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-use syn::{LitStr, Token, Type};
+use syntax::Punctuated;
+use syntax::TokenStream;
+use syntax::parse::{Parse, ParseStream};
+use syntax::quote;
+use syntax::{LitStr, Token, Type};
 
 use crate::expanded::Expanding;
 use bound::Bound;
 use query_cache::{Entry, Unexpanded};
+use typed::{ColumnName, Typed};
 
 #[derive(Debug)]
 pub struct Query {
@@ -18,10 +20,10 @@ pub struct Query {
 }
 
 impl Expanding for Query {
-    fn expansion(self) -> syn::Result<TokenStream> {
+    fn expansion(self) -> syntax::Result<TokenStream> {
         let Query { row, source, bounds } = self;
-        let failed = |unexpanded: Unexpanded| syn::Error::new(source.span(), unexpanded);
-        let entry = Entry::found(&source).map_err(failed)?;
+        let failed = |unexpanded: Unexpanded| syntax::Error::new(source.span(), unexpanded);
+        let entry: Entry<ColumnName> = Entry::found(&source.value()).map_err(failed)?;
         entry.bound(bounds.len()).map_err(failed)?;
         let sql = LitStr::new(&source.value(), source.span());
         let arguments: Vec<TokenStream> = bounds.iter().map(Bound::encoded).collect();
@@ -32,7 +34,10 @@ impl Expanding for Query {
                 Ok(quote!(#written(#sql, #values)))
             },
             |columns| {
-                entry.columns().map_err(failed).map(|typed| {
+                let described = entry.columns();
+                let columned: syntax::Result<Vec<Typed>> =
+                    described.iter().map(|column| Typed::described(column, source.span())).collect();
+                columned.map(|typed| {
                     let read = quote!(::store_ports::Prepared::read);
                     let taken = quote!(::store_ports::Values);
                     let rows = quote!(::store_ports::Columns);
@@ -51,7 +56,7 @@ impl Expanding for Query {
 }
 
 impl Query {
-    fn row(input: ParseStream<'_>) -> syn::Result<Option<Type>> {
+    fn row(input: ParseStream<'_>) -> syntax::Result<Option<Type>> {
         input.fork().parse::<LitStr>().map_or_else(
             |_| {
                 let row = input.parse::<Type>()?;
@@ -64,7 +69,7 @@ impl Query {
 }
 
 impl Parse for Query {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Query> {
+    fn parse(input: ParseStream<'_>) -> syntax::Result<Query> {
         let row = Query::row(input)?;
         let source = input.parse()?;
         input.parse::<Option<Token![,]>>()?;

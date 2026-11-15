@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::punctuated::Punctuated;
-use syn::{
+use syntax::Punctuated;
+use syntax::{
     Attribute, File, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, StmtMacro,
     Token, VisRestricted,
 };
@@ -31,12 +31,12 @@ pub(crate) enum Visibility {
     Restricted,
 }
 
-impl From<&syn::Visibility> for Visibility {
-    fn from(visibility: &syn::Visibility) -> Visibility {
+impl From<&syntax::Visibility> for Visibility {
+    fn from(visibility: &syntax::Visibility) -> Visibility {
         match visibility {
-            syn::Visibility::Inherited => Visibility::Private,
-            syn::Visibility::Public(_) => Visibility::Visible,
-            syn::Visibility::Restricted(restricted) => Visibility::from(restricted),
+            syntax::Visibility::Inherited => Visibility::Private,
+            syntax::Visibility::Public(_) => Visibility::Visible,
+            syntax::Visibility::Restricted(restricted) => Visibility::from(restricted),
         }
     }
 }
@@ -149,7 +149,7 @@ impl Declared {
         Declared { name, visibility, kind, domain: Domain::Types, marks: Vec::new(), exposure: Exposure::Hidden }
     }
 
-    fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Declared {
+    fn named_item(ident: &Ident, visibility: &syntax::Visibility, kind: ItemKind) -> Declared {
         let exposure = Exposing::declared_by(visibility);
         Declared {
             exposure,
@@ -185,10 +185,10 @@ impl Declared {
 struct Exposing;
 
 impl Exposing {
-    fn declared_by(visibility: &syn::Visibility) -> Exposure {
+    fn declared_by(visibility: &syntax::Visibility) -> Exposure {
         match visibility {
-            syn::Visibility::Public(_) => Exposure::Public,
-            syn::Visibility::Restricted(_) | syn::Visibility::Inherited => Exposure::Hidden,
+            syntax::Visibility::Public(_) => Exposure::Public,
+            syntax::Visibility::Restricted(_) | syntax::Visibility::Inherited => Exposure::Hidden,
         }
     }
 }
@@ -440,7 +440,7 @@ impl From<&Item> for Entries {
             Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
             Item::Macro(ItemMacro { ident: Some(ident), .. }) => Entries::from(Declared {
                 domain: Domain::Macros,
-                ..Declared::named_item(ident, &syn::Visibility::Inherited, ItemKind::Macro)
+                ..Declared::named_item(ident, &syntax::Visibility::Inherited, ItemKind::Macro)
             }),
             Item::Struct(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))

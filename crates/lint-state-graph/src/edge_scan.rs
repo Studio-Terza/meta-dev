@@ -2,7 +2,7 @@ mod role;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use syn::{ImplItemFn, ItemImpl, ItemMod, Receiver};
+use syntax::{ImplItemFn, ItemImpl, ItemMod, Receiver};
 
 use super::declarations::Declarations;
 use super::edge::{Edge, EdgeKey};

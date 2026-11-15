@@ -2,9 +2,9 @@ mod root;
 
 use std::path::Path;
 
-use proc_macro2::Span;
-use syn::spanned::Spanned;
-use syn::{Block, ExprBinary, ExprIf, ExprMatch, ExprUnary, Local};
+use syntax::Span;
+use syntax::Spanned;
+use syntax::{Block, ExprBinary, ExprIf, ExprMatch, ExprUnary, Local};
 
 use lint_core::Site;
 use lint_layout::LineNumber;

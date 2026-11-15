@@ -1,6 +1,6 @@
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::{DeriveInput, Generics, Ident};
+use syntax::TokenStream;
+use syntax::quote;
+use syntax::{DeriveInput, Generics, Ident};
 
 pub struct Marked<'item> {
     ident: &'item Ident,
@@ -13,7 +13,7 @@ impl<'item> Marked<'item> {
     }
 
     pub fn spelled(tokens: TokenStream) -> TokenStream {
-        syn::parse2::<DeriveInput>(tokens).map_or_else(
+        syntax::parse::parse2::<DeriveInput>(tokens).map_or_else(
             |error| error.to_compile_error(),
             |input| Marked::new(&input.ident, &input.generics).stored(&quote!(::newtype::Spelled)),
         )

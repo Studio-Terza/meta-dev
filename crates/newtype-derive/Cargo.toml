@@ -11,9 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
-proc-macro2.workspace = true
-quote.workspace = true
-syn.workspace = true
+syntax = { path = "../syntax" }
 
 [lints]
 workspace = true

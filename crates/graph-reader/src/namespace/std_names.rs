@@ -1,4 +1,4 @@
-use syn::Macro;
+use syntax::Macro;
 
 use graph::{Alias, AliasParameter, Building, ItemPath, Named, Primitive, Resolved, Sited, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};

@@ -19,7 +19,7 @@ use located::Located;
 pub struct SourceFile {
     head: FileHead,
     text: SourceText,
-    syntax: syn::File,
+    syntax: syntax::File,
     test_modules: Vec<SourceFile>,
     expansions: Expansions,
 }
@@ -37,8 +37,8 @@ impl SourceFile {
 
     fn parsed(path: PathBuf, located: Located, placement: Placement, text: SourceText) -> Result<Self, Failure> {
         match Nesting::within_limit(&text)
-            .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), Nesting))
-            .and_then(|bounded| syn::parse_file(bounded.as_ref()))
+            .ok_or_else(|| syntax::Error::new(syntax::Span::call_site(), Nesting))
+            .and_then(|bounded| syntax::parse::parse_file(bounded.as_ref()))
         {
             Ok(syntax) => Ok(Self {
                 head: FileHead::new(path, located, placement),
@@ -83,7 +83,7 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn syntax(&self) -> &syn::File {
+    pub fn syntax(&self) -> &syntax::File {
         &self.syntax
     }
 

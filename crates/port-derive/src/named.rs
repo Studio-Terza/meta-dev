@@ -1,6 +1,6 @@
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::{DeriveInput, Generics, Ident};
+use syntax::TokenStream;
+use syntax::quote;
+use syntax::{DeriveInput, Generics, Ident};
 
 use super::declared::{Constant, Spelling};
 
@@ -36,7 +36,7 @@ impl Derived {
 
 impl Named {
     pub fn expanded(tokens: TokenStream, derived: Derived) -> TokenStream {
-        syn::parse2::<DeriveInput>(tokens)
+        syntax::parse::parse2::<DeriveInput>(tokens)
             .map(|DeriveInput { ident, generics, .. }| Named { ident, generics })
             .map_or_else(|error| error.to_compile_error(), |named| named.implementing(derived))
     }

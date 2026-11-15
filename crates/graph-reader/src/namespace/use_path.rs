@@ -1,4 +1,4 @@
-use syn::{Ident, ItemUse, Path, Token, UseTree};
+use syntax::{Ident, ItemUse, Path, Token, UseTree};
 
 use std::collections::BTreeSet;
 
@@ -89,6 +89,13 @@ impl Shape {
             .or_else(|| StdNames::root(first))
             .or_else(|| self.prelude(first).map(Binding::Std));
         Outer::known_or(known, || self.unbound(reading, Binding::external(first, space.dependencies(viewer))))
+    }
+
+    pub(super) fn builtin(self, first: &Name, reading: Reading, space: &Namespace, viewer: ScopeId) -> Option<Binding> {
+        match self {
+            Shape::Single => StdNames::primitive(first).map(Binding::Primitive),
+            Shape::Multiple => self.fallback(first, reading, space, viewer).known_binding(),
+        }
     }
 
     pub(super) fn primitive(self, first: &Name) -> Option<Primitive> {

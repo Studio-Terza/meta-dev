@@ -6,7 +6,7 @@ struct Binding(usize);
 
 impl Binding {
     fn refused(&self) -> Option<String> {
-        serde_json::from_str::<Entry>(TWO_PARAMETERS)
+        serde_json::from_str::<Entry<String>>(TWO_PARAMETERS)
             .ok()
             .and_then(|entry| entry.bound(self.0).err())
             .map(|refusal| refusal.to_string())

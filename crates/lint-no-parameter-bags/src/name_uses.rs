@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use syn::Ident;
+use syntax::Ident;
 
 use lint_core::Parsed;
 use lint_layout::Name;

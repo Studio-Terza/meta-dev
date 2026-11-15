@@ -1,6 +1,6 @@
 use std::fmt;
 
-use syn::{BinOp, Expr, UnOp};
+use syntax::{BinOp, Expr, UnOp};
 
 use lint_core::Fix;
 use lint_sweep::Member;

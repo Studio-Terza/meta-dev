@@ -6,7 +6,7 @@ use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use std::path::Path;
 
-use syn::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
+use syntax::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use lint_core::Bound;
 use lint_core::Site;

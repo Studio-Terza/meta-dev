@@ -1,4 +1,4 @@
-use syn::{Block, Expr, ExprField, ExprPath, Stmt};
+use syntax::{Block, Expr, ExprField, ExprPath, Stmt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Body {

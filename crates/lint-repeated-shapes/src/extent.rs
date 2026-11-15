@@ -1,4 +1,4 @@
-use proc_macro2::{LineColumn, Span};
+use syntax::{LineColumn, Span};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Extent {

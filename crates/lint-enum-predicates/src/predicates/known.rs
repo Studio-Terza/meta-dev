@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use syn::{Type, TypePath};
+use syntax::{Type, TypePath};
 
 use lint_core::SourceFile;
 use lint_layout::Name;

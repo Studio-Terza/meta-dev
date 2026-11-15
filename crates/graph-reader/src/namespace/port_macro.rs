@@ -1,4 +1,4 @@
-use syn::{Attribute, ItemTrait};
+use syntax::{Attribute, ItemTrait};
 
 use lint_layout::{Name, Word, words};
 

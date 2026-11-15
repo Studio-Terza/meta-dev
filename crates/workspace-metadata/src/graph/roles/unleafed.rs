@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::crate_name::CrateName;
@@ -45,8 +44,9 @@ impl<'meta> Unleafed<'meta> {
             .and_then(PortTable::dependents)
             .filter(|role| *role == Role::Lexer)
             .or_else(|| dependency.declares(Role::Lexer));
+        let at_compile = admitted.map(|_| ()).or(dependency.proc_macro().map(|_| ()));
         let held =
-            admitted.map_or_else(|| owned.first_in(&graph.normal_reach(required, &BTreeSet::new())), |_| None)?;
+            at_compile.map_or_else(|| owned.first_in(&graph.normal_reach(required, owned.compiled())), |()| None)?;
         let breaching = Breaching::new(lexer.name(), lexer.keys(dependency.name()).collect());
         Some(Unleafed { breaching, dependency: dependency.name(), owned: graph.package(held)?.name() })
     }

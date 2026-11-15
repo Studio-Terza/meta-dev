@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use std::iter;
 
-use proc_macro2::{Group, Literal, TokenStream, TokenTree};
-use quote::ToTokens;
-use syn::{Attribute, Lit, Macro};
+use syntax::ToTokens;
+use syntax::{Attribute, Lit, Macro};
+use syntax::{Group, Literal, TokenStream, TokenTree};
 
 use lint_core::Syntax;
 use lint_layout::LineNumber;
@@ -33,7 +33,7 @@ impl<'file> TestFeatures<'file> {
         TestFeatures { path, found: Vec::new() }
     }
 
-    fn condition(path: &syn::Path) -> Option<&syn::Path> {
+    fn condition(path: &syntax::Path) -> Option<&syntax::Path> {
         Self::CONDITIONS.iter().find(|condition| path.is_ident(condition)).map(|_| path)
     }
 

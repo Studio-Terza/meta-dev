@@ -2,7 +2,7 @@ mod declared;
 
 use std::borrow::Cow;
 
-use syn::Ident;
+use syntax::Ident;
 
 use lint_layout::Name;
 use lint_placement::{CrateRoot, ModulePath};

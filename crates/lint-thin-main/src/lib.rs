@@ -5,9 +5,9 @@ use body_items::BodyItems;
 
 use finding::Finding;
 use lint_file::{FileLint, Reads};
-use proc_macro2::Span;
-use syn::spanned::Spanned;
-use syn::{Item, ItemFn};
+use syntax::Span;
+use syntax::Spanned;
+use syntax::{Item, ItemFn};
 
 use lint_core::{Headline, Site, SourceFile, Violation};
 use lint_layout::LineNumber;

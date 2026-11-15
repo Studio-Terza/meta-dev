@@ -84,6 +84,16 @@ const IMPORTED_IN_MODULE: &[Source] = &[Source::new(
         "mod rows {\n    use store_ports::query;\n    fn f() {\n        query!(\"SELECT id FROM nodes\");\n    }\n}\nfn g() {\n    query!(\"SELECT id FROM nodes\");\n}\n",
     ),
 )];
+const STATEMENT: &[Source] = &[
+    Source::new(
+        Located::new("crates/store/src/lib.rs"),
+        Text::new("fn f() {\n    store_ports::query!(Row, \"SELECT id FROM nodes\", id: NodeId);\n}\n"),
+    ),
+    Source::new(
+        Located::new("crates/store_ports/src/lib.rs"),
+        Text::new("#[proc_macro]\npub fn query(input: TokenStream) -> TokenStream {\n    input\n}\n"),
+    ),
+];
 
 laws::table!(
     a_store_query_is_flagged_unless_its_sql_is_as_sqlformat_formats_it_at_column_zero_inside_a_raw_string,
@@ -104,5 +114,6 @@ laws::table!(
         FROM_THE_MACROS_CRATE => Lines::from(["crates/store/src/lib.rs:2"]),
         UNIMPORTED => Lines::default(),
         IMPORTED_IN_MODULE => Lines::from(["crates/store/src/lib.rs:4"]),
+        STATEMENT => Lines::from(["crates/store/src/lib.rs:2"]),
     ]
 );

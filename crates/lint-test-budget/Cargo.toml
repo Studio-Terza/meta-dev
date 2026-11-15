@@ -18,8 +18,7 @@ lint-file = { path = "../lint-file" }
 lint-placement = { path = "../lint-placement" }
 lint-layout = { path = "../lint-layout" }
 lint-process-starters = { path = "../lint-process-starters" }
-proc-macro2.workspace = true
-syn.workspace = true
+syntax = { path = "../syntax" }
 
 [dev-dependencies]
 graph-reader = { path = "../graph-reader" }

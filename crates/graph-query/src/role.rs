@@ -3,7 +3,7 @@ use std::str::FromStr;
 use graph::{MethodShape, Receiver, Returned, Taken};
 use graph_reader::ReceiverSyntax;
 use lint_layout::Name;
-use syn::{FnArg, ReturnType, Signature, Type, TypeParamBound};
+use syntax::{FnArg, ReturnType, Signature, Type, TypeParamBound};
 
 use crate::boundary::QueryFailure;
 use crate::score::Score;
@@ -106,7 +106,7 @@ impl FromStr for Role {
     type Err = QueryFailure;
 
     fn from_str(text: &str) -> Result<Role, QueryFailure> {
-        syn::parse_str::<Signature>(text)
+        syntax::parse::parse_str::<Signature>(text)
             .map(|signature| Role::from(&signature))
             .map_err(|failure| QueryFailure::Role { text: text.to_owned(), reason: failure.to_string() })
     }

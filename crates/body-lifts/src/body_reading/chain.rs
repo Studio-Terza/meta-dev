@@ -1,4 +1,4 @@
-use syn::{Expr, ExprMethodCall};
+use syntax::{Expr, ExprMethodCall};
 
 use lint_layout::{Name, Whole, Word, words};
 

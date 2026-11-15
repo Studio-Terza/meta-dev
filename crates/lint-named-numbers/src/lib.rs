@@ -8,7 +8,7 @@ use lint_sweep::{Gathers, Sweep, Watching};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use syn::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitInt, Macro, TraitItemConst};
+use syntax::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitInt, Macro, TraitItemConst};
 
 use lint_core::Fix;
 use lint_core::Gate;

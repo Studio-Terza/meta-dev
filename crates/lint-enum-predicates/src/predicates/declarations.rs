@@ -1,4 +1,4 @@
-use syn::{Ident, ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
+use syntax::{Ident, ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
 
 use lint_core::Parsed;
 use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Sweep, Watch, Watching};

@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use proc_macro2::{Group, TokenStream, TokenTree};
-use quote::quote;
-use syn::parse::discouraged::Speculative;
-use syn::parse::{ParseStream, Parser};
-use syn::punctuated::Punctuated;
-use syn::{Attribute, Block, Expr, Item, Macro, Stmt, Token};
+use syntax::Punctuated;
+use syntax::parse::Speculative;
+use syntax::parse::{ParseStream, Parser};
+use syntax::quote;
+use syntax::{Attribute, Block, Expr, Item, Macro, Stmt, Token};
+use syntax::{Group, TokenStream, TokenTree};
 
 use crate::source_file::SourceFile;
 use crate::syntax::Syntax;
@@ -23,7 +23,7 @@ impl Macros {
 
     #[must_use]
     pub fn items(invocation: &Macro) -> Vec<Item> {
-        syn::parse2::<syn::File>(invocation.tokens.clone()).map_or_else(|_| Vec::new(), |file| file.items)
+        syntax::parse::parse2::<syntax::File>(invocation.tokens.clone()).map_or_else(|_| Vec::new(), |file| file.items)
     }
 
     #[must_use]
@@ -88,7 +88,7 @@ impl Macros {
         here.flatten().chain(nested.flat_map(Self::attributes_in)).collect()
     }
 
-    fn statements_or_expressions(input: ParseStream) -> syn::Result<Vec<Stmt>> {
+    fn statements_or_expressions(input: ParseStream) -> syntax::Result<Vec<Stmt>> {
         let attempt = input.fork();
         Block::parse_within(&attempt).map_or_else(
             |_| Punctuated::<Expr, Token![,]>::parse_terminated(input).map(Self::expressions),

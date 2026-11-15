@@ -5,7 +5,7 @@ mod redirects;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use syn::Item;
+use syntax::Item;
 
 use lint_core::Walk;
 use lint_layout::Failure;

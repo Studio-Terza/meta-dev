@@ -1,7 +1,7 @@
 use std::fmt;
 
 use lint_core::Fix;
-use syn::Ident;
+use syntax::Ident;
 
 pub enum Finding<'name> {
     FreeFn { name: &'name Ident },

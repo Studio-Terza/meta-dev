@@ -3,9 +3,9 @@ use std::io;
 use std::path::PathBuf;
 
 use grammar_migration::MigrationFile;
-use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
-use syn::LitStr;
+use syntax::LitStr;
+use syntax::TokenStream;
+use syntax::{ToTokens, quote};
 
 use query_cache::Disk;
 

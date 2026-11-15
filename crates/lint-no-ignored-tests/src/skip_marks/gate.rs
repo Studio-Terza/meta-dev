@@ -1,4 +1,4 @@
-use syn::{Attribute, Meta};
+use syntax::{Attribute, Meta};
 
 use lint_layout::LineNumber;
 

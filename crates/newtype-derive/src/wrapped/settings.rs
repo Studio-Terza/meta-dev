@@ -1,7 +1,8 @@
 mod setting;
 
-use syn::punctuated::Punctuated;
-use syn::{Attribute, Expr, Stmt, Token, Type, WherePredicate, parse_quote};
+use syntax::Punctuated;
+use syntax::parse::parse_quote;
+use syntax::{Attribute, Expr, Stmt, Token, Type, WherePredicate};
 
 use setting::Setting;
 
@@ -19,12 +20,12 @@ pub struct Settings {
 impl Settings {
     const ATTRIBUTE: &'static str = "newtype";
 
-    pub fn declared(attributes: &[Attribute]) -> syn::Result<Settings> {
+    pub fn declared(attributes: &[Attribute]) -> syntax::Result<Settings> {
         let lists = attributes
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE))
             .map(|attribute| attribute.parse_args_with(Punctuated::<Setting, Token![,]>::parse_terminated))
-            .collect::<syn::Result<Vec<_>>>()?;
+            .collect::<syntax::Result<Vec<_>>>()?;
         let settings: Vec<Setting> = lists.into_iter().flatten().collect();
         let checking = settings.iter().find_map(Setting::checking).unwrap_or(Checking::Unchecked);
         let strategy = settings.iter().find_map(Setting::strategy).cloned();

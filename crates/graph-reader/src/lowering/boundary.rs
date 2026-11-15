@@ -1,6 +1,6 @@
-use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
-use quote::ToTokens;
-use syn::{LitStr, Macro, Type};
+use syntax::ToTokens;
+use syntax::{Delimiter, Group, TokenStream, TokenTree};
+use syntax::{LitStr, Macro, Type};
 
 use graph::Quote;
 use lint_layout::Name;
@@ -102,7 +102,7 @@ impl Quotation {
 
     fn literal(tree: TokenTree) -> Option<LitStr> {
         match tree {
-            TokenTree::Literal(literal) => syn::parse2(TokenTree::Literal(literal).into()).ok(),
+            TokenTree::Literal(literal) => syntax::parse::parse2(TokenTree::Literal(literal).into()).ok(),
             TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Punct(_) => None,
         }
     }

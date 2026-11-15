@@ -3,7 +3,7 @@ mod erasure;
 
 use std::fmt;
 
-use syn::{FnArg, Signature};
+use syntax::{FnArg, Signature};
 
 use lint_core::{Site, Syntax};
 

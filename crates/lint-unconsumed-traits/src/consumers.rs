@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use syn::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
+use syntax::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
 
 use lint_core::SourceFile;
 use lint_layout::Name;

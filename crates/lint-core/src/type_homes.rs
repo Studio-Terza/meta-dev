@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use syn::{ItemEnum, ItemMod, ItemStruct};
+use syntax::{ItemEnum, ItemMod, ItemStruct};
 
 use lint_layout::Name;
 
@@ -50,7 +50,7 @@ impl<'file> TypeHomes<'file> {
         })
     }
 
-    fn declared(&mut self, attributes: &[syn::Attribute], ident: &syn::Ident) -> Descend {
+    fn declared(&mut self, attributes: &[syntax::Attribute], ident: &syntax::Ident) -> Descend {
         let entered = Descend::from(Walk::outside_tests(attributes)).entered();
         entered.map(|_| Name::from(ident)).into_iter().for_each(|name| self.declare(name));
         Descend::Over

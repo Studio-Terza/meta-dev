@@ -2,8 +2,7 @@ mod boundary;
 
 use std::fmt;
 
-use syn::Macro;
-use syn::visit::{self, Visit};
+use syntax::{Around, Macro, Node, Walk};
 
 use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Violation, Watch, Watching};
 use lint_layout::Name;
@@ -34,7 +33,7 @@ impl Sweep {
             .iter_mut()
             .flat_map(|group| group.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }))
             .collect();
-        Sweep::sweeping(Some(file), watching).visit_file(file.syntax());
+        Walk::file(&mut Sweep::sweeping(Some(file), watching), file.syntax());
     }
 
     pub fn over_leads<'file, 'run>(
@@ -44,15 +43,15 @@ impl Sweep {
     ) {
         let found = finds.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });
         let sorting = sorts.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });
-        Sweep::sweeping(Some(file), found.chain(sorting).collect()).visit_file(file.syntax());
+        Walk::file(&mut Sweep::sweeping(Some(file), found.chain(sorting).collect()), file.syntax());
     }
 
     pub fn through_file(file: &SourceFile, watcher: &mut Watching<'_>) {
-        Sweep::sweeping(Some(file), vec![watcher]).visit_file(file.syntax());
+        Walk::file(&mut Sweep::sweeping(Some(file), vec![watcher]), file.syntax());
     }
 
     pub fn gathered<Part>(file: &SourceFile, mut gathering: impl Gathers<Part>) -> Part {
-        Sweep::sweeping(Some(file), gathering.watching()).visit_file(file.syntax());
+        Walk::file(&mut Sweep::sweeping(Some(file), gathering.watching()), file.syntax());
         gathering.gathered()
     }
 
@@ -61,31 +60,31 @@ impl Sweep {
     }
 
     pub fn watching<'run>(file: &SourceFile, watchers: Vec<&'run mut Watching<'run>>) {
-        Sweep::sweeping(Some(file), watchers).visit_file(file.syntax());
+        Walk::file(&mut Sweep::sweeping(Some(file), watchers), file.syntax());
     }
 
-    pub fn through_block(file: &SourceFile, block: &syn::Block, watcher: &mut Watching<'_>) {
-        Sweep::sweeping(Some(file), vec![watcher]).visit_block(block);
+    pub fn through_block(file: &SourceFile, block: &syntax::Block, watcher: &mut Watching<'_>) {
+        Walk::block(&mut Sweep::sweeping(Some(file), vec![watcher]), block);
     }
 
-    pub fn over_block<'run>(block: &syn::Block, watchers: Vec<&'run mut Watching<'run>>) {
-        Sweep::sweeping(None, watchers).visit_block(block);
+    pub fn over_block<'run>(block: &syntax::Block, watchers: Vec<&'run mut Watching<'run>>) {
+        Walk::block(&mut Sweep::sweeping(None, watchers), block);
     }
 
-    pub fn through_expr(expr: &syn::Expr, watcher: &mut Watching<'_>) {
-        Sweep::sweeping(None, vec![watcher]).visit_expr(expr);
+    pub fn through_expr(expr: &syntax::Expr, watcher: &mut Watching<'_>) {
+        Walk::expr(&mut Sweep::sweeping(None, vec![watcher]), expr);
     }
 
-    pub fn through_type(ty: &syn::Type, watcher: &mut Watching<'_>) {
-        Sweep::sweeping(None, vec![watcher]).visit_type(ty);
+    pub fn through_type(ty: &syntax::Type, watcher: &mut Watching<'_>) {
+        Walk::type_node(&mut Sweep::sweeping(None, vec![watcher]), ty);
     }
 
-    pub fn through_pat(pat: &syn::Pat, watcher: &mut Watching<'_>) {
-        Sweep::sweeping(None, vec![watcher]).visit_pat(pat);
+    pub fn through_pat(pat: &syntax::Pat, watcher: &mut Watching<'_>) {
+        Walk::pat(&mut Sweep::sweeping(None, vec![watcher]), pat);
     }
 
-    pub fn through_item(item: &syn::Item, watcher: &mut Watching<'_>) {
-        Sweep::sweeping(None, vec![watcher]).visit_item(item);
+    pub fn through_item(item: &syntax::Item, watcher: &mut Watching<'_>) {
+        Walk::item_node(&mut Sweep::sweeping(None, vec![watcher]), item);
     }
 
     fn sweeping<'file, 'run>(
@@ -139,22 +138,22 @@ impl<'run> Sweeping<'_, 'run> {
         self.muting.leaving(&entered.called);
     }
 
-    fn around(
+    fn around_kind(
         &mut self,
         kind: Kind,
         enter: impl Fn(&mut Watching<'run>) -> Descend,
-        descend: impl FnOnce(&mut Self),
+        descend: &mut dyn FnMut(&mut Self),
         leave: impl Fn(&mut Watching<'run>),
     ) {
         let entered = self.entered(kind, enter);
-        self.muting.awake().map(|_| descend).into_iter().for_each(|go| go(self));
+        self.muting.awake().into_iter().for_each(|_| descend(self));
         self.left(&entered, leave);
     }
 
     fn expanded(&mut self, entered: &Entered, invocation: &Macro) {
         let statements = self.file.map_or_default(|file| Macros::expanded(file, invocation));
         let saved = self.muting.hushed(&entered.expanding);
-        statements.iter().for_each(|statement| self.visit_stmt(statement));
+        statements.iter().for_each(|statement| Walk::stmt(self, statement));
         self.muting.restored(saved);
     }
 }
@@ -165,29 +164,31 @@ struct Entered {
     called: Vec<Index>,
 }
 
-impl<'ast> Visit<'ast> for Sweeping<'_, '_> {
-    fn visit_macro(&mut self, node: &'ast Macro) {
+impl Sweeping<'_, '_> {
+    fn macro_around(&mut self, node: &Macro, descend: &mut dyn FnMut(&mut Self)) {
         self.file.map_or_default(|file| Macros::pin(file, node));
         let facts = Facts::new(node);
         let entered = self.entered(Kind::Macro, |watcher| watcher.on_macro(node, &facts));
-        self.muting.awake().into_iter().for_each(|_| visit::visit_macro(self, node));
+        self.muting.awake().into_iter().for_each(|_| descend(self));
         entered.expanding.first().into_iter().for_each(|_| self.expanded(&entered, node));
         self.left(&entered, |watcher| watcher.off_macro(node, &facts));
     }
 
-    fn visit_ident(&mut self, node: &'ast syn::Ident) {
+    fn ident_around(&mut self, node: &syntax::Ident) {
         let heard = self.listening.get(Kind::Ident).first().map(|_| Name::from(node));
         heard.map_or_default(|name| {
-            self.around(
+            self.around_kind(
                 Kind::Ident,
                 |watcher| watcher.on_ident(node, &name),
-                |_| {},
+                &mut |_| {},
                 |watcher| watcher.off_ident(node),
             );
         });
     }
+}
 
-    lint_core::sweep_visits!();
+impl Around for Sweeping<'_, '_> {
+    lint_core::sweep_nodes!();
 }
 
 #[derive(Debug)]

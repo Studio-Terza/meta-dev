@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use syn::{Attribute, Item, Macro, Stmt};
+use syntax::{Attribute, Item, Macro, Stmt};
 
 use super::Macros;
 use crate::watch::Address;

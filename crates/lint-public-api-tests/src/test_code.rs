@@ -1,4 +1,4 @@
-use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
+use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use std::collections::BTreeSet;
 

@@ -1,4 +1,4 @@
-use proc_macro2::Span;
+use syntax::Span;
 
 use crate::line_number::LineNumber;
 

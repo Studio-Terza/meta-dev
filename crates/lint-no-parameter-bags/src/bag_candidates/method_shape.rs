@@ -1,4 +1,4 @@
-use syn::{Expr, ExprStruct, ImplItemFn, Stmt};
+use syntax::{Expr, ExprStruct, ImplItemFn, Stmt};
 
 use lint_core::Syntax;
 use lint_layout::Name;

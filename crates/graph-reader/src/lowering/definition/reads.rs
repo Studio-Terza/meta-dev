@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::{Block, Expr, ExprCall, ExprMethodCall, Item, Signature, Type};
+use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, Signature, Type};
 
 use graph::{ParamIndex, Read, Reader, Resolved};
 use lint_core::Syntax;
@@ -38,7 +38,7 @@ impl Rooted {
         }
     }
 
-    fn through(self, member: &syn::Member) -> Option<Rooted> {
+    fn through(self, member: &syntax::Member) -> Option<Rooted> {
         Syntax::named_member(member)
             .map(|named| Rooted { fields: self.fields.into_iter().chain([Name::from(named)]).collect(), ..self })
     }

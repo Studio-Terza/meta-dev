@@ -1,4 +1,4 @@
-use syn::{Ident, LitStr, Variant};
+use syntax::{Ident, LitStr, Variant};
 
 pub struct Row {
     variant: Ident,
@@ -8,7 +8,7 @@ pub struct Row {
 impl Row {
     const ATTRIBUTE: &'static str = "name";
 
-    pub fn declared(variant: &Variant) -> syn::Result<Vec<Row>> {
+    pub fn declared(variant: &Variant) -> syntax::Result<Vec<Row>> {
         variant
             .attrs
             .iter()

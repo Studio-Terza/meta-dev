@@ -1,7 +1,7 @@
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::parse::{Parse, ParseStream};
-use syn::{Ident, Token, Type};
+use syntax::TokenStream;
+use syntax::parse::{Parse, ParseStream};
+use syntax::quote;
+use syntax::{Ident, Token, Type};
 
 #[derive(Debug)]
 pub struct Bound {
@@ -19,7 +19,7 @@ impl Bound {
 }
 
 impl Parse for Bound {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Bound> {
+    fn parse(input: ParseStream<'_>) -> syntax::Result<Bound> {
         let name = input.parse()?;
         input.parse::<Token![:]>()?;
         let column = input.parse()?;

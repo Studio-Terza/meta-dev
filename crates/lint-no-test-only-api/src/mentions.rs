@@ -3,8 +3,8 @@ mod ground;
 use std::collections::BTreeSet;
 use std::mem;
 
-use proc_macro2::TokenTree;
-use syn::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, Signature, Variant, Visibility};
+use syntax::TokenTree;
+use syntax::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, Signature, Variant, Visibility};
 
 use lint_core::{SourceFile, Walk};
 use std::path::Path;

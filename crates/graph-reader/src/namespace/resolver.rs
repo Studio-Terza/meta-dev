@@ -41,6 +41,13 @@ impl Outer {
         }
     }
 
+    pub(super) fn known_binding(self) -> Option<Binding> {
+        match self {
+            Outer::Known(binding) => Some(binding),
+            Outer::Assumed(_) => None,
+        }
+    }
+
     pub(super) fn known(self) -> Resolution {
         match self {
             Outer::Known(binding) => Resolution::Bound(binding),
@@ -168,7 +175,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     pub(super) fn macro_named(&self, first: &Name, viewer: ScopeId) -> Resolution {
         let derive = StdNames::canonical(Table::Derives, first);
         self.chained(viewer, Key::new(Domain::Macros, first), Reading::Written).contested(
-            derive.map(|found| Binding::Std(found.path())),
+            || derive.map(|found| Binding::Std(found.path())),
             || Outer::from(derive),
             || self.space.expanded(viewer),
         )
@@ -176,7 +183,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
 
     pub(super) fn keyed(&self, key: Key<'_>, viewer: ScopeId) -> Resolution {
         self.chained(viewer, key, Reading::Written).contested(
-            None,
+            || None,
             || Outer::Assumed(Binding::UNBOUND),
             || self.space.expanded(viewer),
         )
@@ -184,7 +191,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
 
     pub(super) fn named(&self, first: &Name, shape: Shape, reading: Reading, viewer: ScopeId) -> Resolution {
         self.chained(viewer, Key::new(Domain::Types, first), reading).contested(
-            shape.primitive(first).map(Binding::Primitive),
+            || shape.builtin(first, reading, self.space, viewer),
             || shape.fallback(first, reading, self.space, viewer),
             || self.space.expanded(viewer),
         )

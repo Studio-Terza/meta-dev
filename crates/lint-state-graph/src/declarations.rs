@@ -1,7 +1,7 @@
 mod vertex;
 
 use std::collections::{BTreeMap, BTreeSet};
-use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
+use syntax::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
 
 use lint_core::Home;
 use lint_core::Parsed;

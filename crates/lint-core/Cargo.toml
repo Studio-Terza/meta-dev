@@ -14,14 +14,11 @@ graph = { path = "../graph" }
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 lint-placement = { path = "../lint-placement" }
-proc-macro2.workspace = true
-quote.workspace = true
-syn.workspace = true
+syntax = { path = "../syntax" }
 lint-layout = { path = "../lint-layout" }
 workspace-metadata = { path = "../workspace-metadata" }
 
 [dev-dependencies]
-syn.workspace = true
 
 [lints]
 workspace = true

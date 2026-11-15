@@ -1,7 +1,7 @@
 use std::path::Path;
-use syn::spanned::Spanned;
+use syntax::Spanned;
 
-use syn::{Index, ItemMod, ItemStruct, Visibility};
+use syntax::{Index, ItemMod, ItemStruct, Visibility};
 
 use super::finding::Finding;
 use lint_core::Site;

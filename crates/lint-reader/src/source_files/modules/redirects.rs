@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use syn::punctuated::Punctuated;
-use syn::{Attribute, Expr, ExprLit, ItemMod, Lit, Meta, Token};
+use syntax::Punctuated;
+use syntax::{Attribute, Expr, ExprLit, ItemMod, Lit, Meta, Token};
 
 use super::child::Child;
 

@@ -1,7 +1,7 @@
 mod finding;
 
-use proc_macro2::Span;
-use syn::{ExprBreak, ExprContinue, ExprReturn, Macro};
+use syntax::Span;
+use syntax::{ExprBreak, ExprContinue, ExprReturn, Macro};
 
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;

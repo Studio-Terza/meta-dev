@@ -1,5 +1,5 @@
-use syn::punctuated::Punctuated;
-use syn::{Expr, FnArg, Ident, Path, Token};
+use syntax::Punctuated;
+use syntax::{Expr, FnArg, Ident, Path, Token};
 
 use lint_core::Syntax;
 

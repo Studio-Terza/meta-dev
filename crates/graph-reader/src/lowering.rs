@@ -17,8 +17,8 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use syn::spanned::Spanned;
-use syn::{
+use syntax::Spanned;
+use syntax::{
     Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemConst, ImplItemFn,
     ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion,
     Macro, Signature as SynSignature, TraitItemFn,
@@ -96,7 +96,7 @@ impl ImplRow {
         }
     }
 
-    fn derived(seat: &Seat, region: Region, path: &syn::Path, subject: &Ident) -> ImplRow {
+    fn derived(seat: &Seat, region: Region, path: &syntax::Path, subject: &Ident) -> ImplRow {
         let position = Position::from(path.span());
         ImplRow {
             located: seat.located(position),
@@ -487,7 +487,7 @@ impl Lowering<'_> {
         std::mem::replace(&mut self.here, inner)
     }
 
-    fn module_entered(&mut self, item: &ItemMod, items: &[syn::Item]) -> Descend {
+    fn module_entered(&mut self, item: &ItemMod, items: &[syntax::Item]) -> Descend {
         let name = Name::from(&item.ident);
         let children = Arc::from(self.here.children().join(&name));
         let outer = self.entered(ScopeKind::Module, Entries::of_items(items), children);
@@ -566,15 +566,15 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         ]
     }
 
-    fn on_item(&mut self, _: &'ast syn::Item, _: &Facts<'_, syn::Item>) -> Descend {
+    fn on_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) -> Descend {
         self.saved()
     }
 
-    fn off_item(&mut self, _: &'ast syn::Item, _: &Facts<'_, syn::Item>) {
+    fn off_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) {
         self.restored();
     }
 
-    fn on_type(&mut self, ty: &'ast syn::Type, _: &Facts<'_, syn::Type>) -> Descend {
+    fn on_type(&mut self, ty: &'ast syntax::Type, _: &Facts<'_, syntax::Type>) -> Descend {
         self.objects_used(ty);
         Descend::Into
     }

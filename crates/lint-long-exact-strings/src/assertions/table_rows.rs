@@ -1,8 +1,8 @@
 use std::iter;
 
 use lint_core::Syntax;
-use proc_macro2::{Delimiter, Group, Spacing, TokenStream, TokenTree};
-use syn::Expr;
+use syntax::Expr;
+use syntax::{Delimiter, Group, Spacing, TokenStream, TokenTree};
 
 #[derive(Debug)]
 pub struct TableRows;
@@ -34,7 +34,7 @@ impl TableRows {
 
     fn wanted(row: &[TokenTree]) -> Option<Expr> {
         let arrow = row.iter().zip(row.iter().skip(1)).position(|(start, end)| Self::arrow(start, end).is_some())?;
-        syn::parse2(row.iter().skip(arrow.checked_add(Self::ARROW_LENGTH)?).cloned().collect()).ok()
+        syntax::parse::parse2(row.iter().skip(arrow.checked_add(Self::ARROW_LENGTH)?).cloned().collect()).ok()
     }
 
     fn arrow<'end>(start: &TokenTree, end: &'end TokenTree) -> Option<&'end TokenTree> {

@@ -3,7 +3,7 @@ mod finding;
 
 use std::path::Path;
 
-use syn::{ItemStruct, Lifetime, TypeReference};
+use syntax::{ItemStruct, Lifetime, TypeReference};
 
 use derived::Derived;
 use finding::Finding;

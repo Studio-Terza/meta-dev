@@ -1,6 +1,6 @@
 mod item_head;
 
-use syn::{Field, Item, ItemImpl, ItemMod};
+use syntax::{Field, Item, ItemImpl, ItemMod};
 
 use item_head::ItemHead;
 use std::path::Path;

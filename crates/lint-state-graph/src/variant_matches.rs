@@ -3,9 +3,9 @@ mod variant_paths;
 use variant_paths::VariantPaths;
 
 use std::path::Path;
-use syn::spanned::Spanned;
+use syntax::Spanned;
 
-use syn::{Arm, Expr, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
+use syntax::{Arm, Expr, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
 
 use super::declarations::Declarations;
 use super::finding::Finding;

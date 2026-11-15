@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::fmt;
 
-use syn::Ident;
+use syntax::Ident;
 
 use crate::crate_root::CrateRoot;
 use lint_layout::Name;

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use syn::Path;
+use syntax::Path;
 
 use crate::name::Name;
 use crate::path_tail::PathTail;

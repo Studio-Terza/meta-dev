@@ -12,7 +12,7 @@ doctest = false
 [dependencies]
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
-syn.workspace = true
+syntax = { path = "../syntax" }
 
 [lints]
 workspace = true

@@ -4,6 +4,7 @@ use lint_core::{Lint, ModelLint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
 use lint_narrowed_returns::NarrowedReturns;
+use lint_node_recursion::NodeRecursion;
 use lint_repeated_reads::RepeatedReads;
 use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
@@ -38,6 +39,7 @@ impl Elegance {
             NormalisedShapes::report(files),
             <NarrowedReturns as ModelLint>::report(model),
             <RepeatedReads as ModelLint>::report(model),
+            <NodeRecursion as ModelLint>::report(model),
         ]
     }
 }

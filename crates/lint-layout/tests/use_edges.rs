@@ -1,7 +1,7 @@
 use lint_layout::UseEdges;
 
 laws::table!(each_use_edge_is_the_path_before_its_leaf, |text: &&str| {
-    let edges = syn::parse_str::<syn::ItemUse>(text).map(|item| {
+    let edges = syntax::parse::parse_str::<syntax::ItemUse>(text).map(|item| {
         UseEdges::of_tree(&item.tree).iter().map(ToString::to_string).collect::<Vec<String>>()
     });
     edges.unwrap_or_default()

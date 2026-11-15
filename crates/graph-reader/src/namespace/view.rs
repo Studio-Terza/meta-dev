@@ -140,12 +140,12 @@ impl<'rows> View<'rows> {
 
     pub(super) fn contested(
         self,
-        builtin: Option<Binding>,
+        builtin: impl FnOnce() -> Option<Binding>,
         absent: impl FnOnce() -> Outer,
         expanded: impl FnOnce() -> Unresolved,
     ) -> Resolution {
         match self.found {
-            Found::Conflict => builtin.map_or_else(|| self.settled(absent, expanded), Resolution::Bound),
+            Found::Conflict => builtin().map_or_else(|| self.settled(absent, expanded), Resolution::Bound),
             Found::Nothing | Found::One(_) => self.settled(absent, expanded),
         }
     }

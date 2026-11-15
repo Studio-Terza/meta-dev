@@ -1,9 +1,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use proc_macro2::Ident;
 use sha2::{Digest, Sha256};
-use syn::LitStr;
 
 #[derive(Debug)]
 pub struct CacheFile(String);
@@ -18,13 +16,11 @@ pub enum Unexpanded {
     Unparsed { path: PathBuf, source: serde_json::Error },
     #[error("the query takes {wanted} parameters but {given} are bound")]
     Unbound { wanted: usize, given: usize },
-    #[error("column {0} is described with a type that maps to no Rust type; name its type, as in \"{0}!: String\"")]
-    Unmapped(Ident),
 }
 
-impl From<&LitStr> for CacheFile {
-    fn from(source: &LitStr) -> CacheFile {
-        CacheFile(hex::encode(Sha256::digest(source.value().as_bytes())))
+impl From<&str> for CacheFile {
+    fn from(sql: &str) -> CacheFile {
+        CacheFile(hex::encode(Sha256::digest(sql.as_bytes())))
     }
 }
 

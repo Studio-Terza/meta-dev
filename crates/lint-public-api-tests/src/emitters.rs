@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use syn::ItemMacro;
+use syntax::ItemMacro;
 
 use lint_core::Macros;
 use lint_layout::Name;
