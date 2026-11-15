@@ -32,6 +32,9 @@ tokio = { version = "1.54.1", default-features = false, features = ["rt"] }
 [profile.dev]
 debug = "line-tables-only"
 
+[profile.dev.package."*"]
+opt-level = 3
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
