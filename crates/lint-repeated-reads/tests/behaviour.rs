@@ -1,4 +1,4 @@
-use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Shown, Source, Sources, Text, Title};
 use lint_repeated_reads::RepeatedReads;
 
 const OBJECTS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
@@ -12,9 +12,11 @@ const FORWARDS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntr
 const PRIMITIVES: &str = "fn fact(c: u8) -> u8 { c }\ntrait Lint { fn run(&self, c: u8) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: u8) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: u8) -> u8 { fact(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const TABLE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nconst RUNS: [fn(&Ctx) -> u8; 2] = [<A as Lint>::run, <B as Lint>::run];\n";
 const VALUE_OUTSIDE_TABLE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nfn pick() -> fn(&Ctx) -> u8 { <A as Lint>::run }\n";
+const BOUNDED_CONST: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { const NAMES: &'static [&'static str]; fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { const NAMES: &'static [&'static str] = &[]; fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { const NAMES: &'static [&'static str] = &[]; fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nstruct Table<P>(P);\nimpl<P: Lint> Table<P> { const NAMES: &'static [&'static str] = P::NAMES; }\n";
+const BOUNDED_METHOD: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nstruct Table<P>(P);\nimpl<P: Lint> Table<P> { const RUN: fn(&Ctx) -> u8 = P::run; }\n";
 const METHOD_CALLS: &str = "struct Ctx { a: u8 }\nimpl Ctx { fn fact(&self) -> u8 { self.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { c.fact() + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.fact() + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 
-const CASES: [Case; 12] = [
+const CASES: [Case; 14] = [
     Case::new(
         Title::new("two implementations of a dyn trait read the same fact"),
         &[Source::new(Located::new("a.rs"), Text::new(OBJECTS))],
@@ -75,9 +77,39 @@ const CASES: [Case; 12] = [
         &[Source::new(Located::new("a.rs"), Text::new(METHOD_CALLS))],
         Flagged::new(&[]),
     ),
+    Case::new(
+        Title::new("an associated const reached through a bounded parameter in a table"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUNDED_CONST))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a method reached through a bounded parameter in a table"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUNDED_METHOD))],
+        Flagged::new(&["a.rs:6"]),
+    ),
 ];
 
 #[test]
 fn implementations_run_together_do_not_each_read_the_same_fact() {
     assert_eq!(Sources::mismatches::<Queried<RepeatedReads>>(&CASES), Lines::default());
+}
+
+#[test]
+fn a_finding_names_the_trait_method_the_reader_its_fields_and_every_site() {
+    assert_eq!(
+        Shown::reported::<Queried<RepeatedReads>>(&[FIELDS, "Lint::run"]),
+        vec![
+            "crates/x/src/lib.rs:7: Lint::run is implemented by types that each read fact on parameter 1.a; at crates/x/src/lib.rs:7 crates/x/src/lib.rs:8; compute it once where the method is called and pass it in"
+        ]
+    );
+}
+
+#[test]
+fn a_finding_names_an_associated_reader_by_its_owner() {
+    assert_eq!(
+        Shown::reported::<Queried<RepeatedReads>>(&[ASSOCIATED, "Lint::run"]),
+        vec![
+            "crates/x/src/lib.rs:7: Lint::run is implemented by types that each read Facts::of on parameter 1; at crates/x/src/lib.rs:7 crates/x/src/lib.rs:8; compute it once where the method is called and pass it in"
+        ]
+    );
 }
