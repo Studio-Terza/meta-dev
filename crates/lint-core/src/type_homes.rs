@@ -10,13 +10,18 @@ use crate::source_file::Parsed;
 use crate::walk::Walk;
 use crate::watch::{Descend, Facts, Kind, Watch};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TypeHomes<'file> {
     declared: BTreeMap<Name, Vec<Home<'file>>>,
     reading: Home<'file>,
 }
 
 impl<'file> TypeHomes<'file> {
+    #[must_use]
+    pub fn empty() -> TypeHomes<'file> {
+        TypeHomes { declared: BTreeMap::new(), reading: Home::NOWHERE }
+    }
+
     #[must_use]
     pub fn resolve(&self, name: Name, from: Home<'file>) -> DeclaredType<'file> {
         DeclaredType::new(self.home_of(&name, from), name)
@@ -84,9 +89,7 @@ impl<'head> From<Parsed<'_, 'head>> for TypeHomes<'head> {
 
 impl<'head> FromIterator<TypeHomes<'head>> for TypeHomes<'head> {
     fn from_iter<Parts: IntoIterator<Item = TypeHomes<'head>>>(parts: Parts) -> TypeHomes<'head> {
-        let merged = parts
-            .into_iter()
-            .fold(TypeHomes { declared: BTreeMap::new(), reading: Home::NOWHERE }, TypeHomes::absorbed);
+        let merged = parts.into_iter().fold(TypeHomes::empty(), TypeHomes::absorbed);
         TypeHomes { reading: Home::NOWHERE, ..merged }
     }
 }

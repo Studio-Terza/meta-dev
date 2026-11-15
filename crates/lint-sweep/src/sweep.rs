@@ -8,6 +8,7 @@ use syn::visit::{self, Visit};
 use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Violation, Watch, Watching};
 use lint_layout::Name;
 
+pub use boundary::Member;
 use boundary::{Index, Muting};
 
 pub trait Gathers<Part> {
@@ -17,7 +18,15 @@ pub trait Gathers<Part> {
 }
 
 pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>>;
+    #[must_use]
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.sorted().into_iter().next().unwrap_or_default()
+    }
+
+    #[must_use]
+    fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>> {
+        vec![self.found()]
+    }
 }
 
 #[derive(Debug)]
@@ -89,6 +98,17 @@ impl Sweep {
         Sweep::over_all(file, &mut watchers);
         let [only] = watchers;
         only.into_iter().flat_map(Finds::found).collect()
+    }
+
+    pub fn sorted_for<'file, 'run>(
+        file: &'file SourceFile,
+        watcher: Box<dyn Finds<'file> + 'run>,
+        member: Member,
+    ) -> Vec<Violation<'file>> {
+        let mut watchers = [vec![watcher]];
+        Sweep::over_all(file, &mut watchers);
+        let [only] = watchers;
+        only.into_iter().flat_map(Finds::sorted).nth(member.index()).unwrap_or_default()
     }
 }
 

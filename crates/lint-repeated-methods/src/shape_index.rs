@@ -35,6 +35,12 @@ pub struct ImplSpellings<'head> {
 #[derive(Debug)]
 pub struct ShippedImpls<'head>(Option<ImplSpellings<'head>>);
 
+impl<'head> ShippedImpls<'head> {
+    pub fn homed(self, homes: &TypeHomes<'head>) -> ShippedImpls<'head> {
+        ShippedImpls(self.0.map(|spellings| ImplSpellings { homes: homes.clone(), ..spellings }))
+    }
+}
+
 impl<'head> IntoIterator for ShippedImpls<'head> {
     type Item = ImplSpellings<'head>;
     type IntoIter = std::option::IntoIter<ImplSpellings<'head>>;
@@ -48,7 +54,6 @@ impl<'head> IntoIterator for ShippedImpls<'head> {
 pub struct ImplGathering<'head> {
     reading: ImplReading<'head>,
     inners: InnerTypes,
-    homes: TypeHomes<'head>,
     shipped: Option<Home<'head>>,
 }
 
@@ -57,7 +62,6 @@ impl<'head> From<Parsed<'_, 'head>> for ImplGathering<'head> {
         ImplGathering {
             reading: ImplReading { head: parsed.head(), impls: Vec::new() },
             inners: InnerTypes::default(),
-            homes: TypeHomes::from(parsed),
             shipped: parsed.file().shipped().map(|_| Home::from(parsed.head())),
         }
     }
@@ -65,14 +69,14 @@ impl<'head> From<Parsed<'_, 'head>> for ImplGathering<'head> {
 
 impl<'head> Gathers<ShippedImpls<'head>> for ImplGathering<'head> {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        let all: Vec<&mut Watching<'_>> = vec![&mut self.reading, &mut self.inners, &mut self.homes];
+        let all: Vec<&mut Watching<'_>> = vec![&mut self.reading, &mut self.inners];
         self.shipped.map_or_default(|_| all)
     }
 
     fn gathered(self) -> ShippedImpls<'head> {
         let inners = self.inners.placed(self.shipped);
         let impls = self.reading.impls;
-        ShippedImpls(self.shipped.map(|_| ImplSpellings { homes: self.homes, inners, impls }))
+        ShippedImpls(self.shipped.map(|_| ImplSpellings { homes: TypeHomes::empty(), inners, impls }))
     }
 }
 

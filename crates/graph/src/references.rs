@@ -1,12 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::boundary::ItemId;
 use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::member::Member;
-use crate::model::Model;
 use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::region::{Reach, Region, Seat};
@@ -80,51 +79,39 @@ impl From<&PathUse> for Owned {
 }
 
 #[derive(Debug, Default)]
-pub struct References<'model> {
+pub struct References {
     targets: BTreeMap<ItemId, BTreeSet<ItemId>>,
-    roots: BTreeMap<ItemId, &'model Path>,
+    roots: BTreeMap<ItemId, PathBuf>,
 }
 
-impl<'model> References<'model> {
+impl References {
     #[must_use]
     pub fn targets(&self) -> &BTreeMap<ItemId, BTreeSet<ItemId>> {
         &self.targets
     }
 
     #[must_use]
-    pub fn root(&self, item: ItemId) -> Option<&'model Path> {
-        self.roots.get(&item).copied()
+    pub fn root(&self, item: ItemId) -> Option<&Path> {
+        self.roots.get(&item).map(PathBuf::as_path)
     }
 }
 
-impl<'model> From<&'model Model> for References<'model> {
-    fn from(model: &'model Model) -> References<'model> {
-        model
-            .holdings()
-            .map(References::from)
-            .chain(model.implementations().map(References::from))
-            .chain(model.functions().map(References::from))
-            .chain(model.mentions().map(References::from))
-            .collect()
-    }
-}
-
-impl<'model, Entity> From<Placed<'model, Entity>> for References<'model>
+impl<Entity> From<Placed<'_, Entity>> for References
 where
     Entity: Copy,
     Owned: From<Entity>,
 {
-    fn from(placed: Placed<'model, Entity>) -> References<'model> {
+    fn from(placed: Placed<'_, Entity>) -> References {
         let Owned { owner, reached } = Owned::from(placed.entity());
         owner.map_or_default(|found| References {
             targets: BTreeMap::from([(found, reached.0)]),
-            roots: BTreeMap::from([(found, placed.root())]),
+            roots: BTreeMap::from([(found, placed.root().to_path_buf())]),
         })
     }
 }
 
-impl<'model> FromIterator<References<'model>> for References<'model> {
-    fn from_iter<Parts: IntoIterator<Item = References<'model>>>(parts: Parts) -> References<'model> {
+impl FromIterator<References> for References {
+    fn from_iter<Parts: IntoIterator<Item = References>>(parts: Parts) -> References {
         parts.into_iter().fold(References::default(), |mut references, part| {
             part.targets
                 .into_iter()

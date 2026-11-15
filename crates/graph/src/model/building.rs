@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 use lint_layout::LineNumber;
 
@@ -144,6 +145,7 @@ impl Building {
             quoted: Filed::sorted(model.quoted),
             declarations: Declarations::new(self.items, self.aliases, self.exports),
             roots: model.roots,
+            references: OnceLock::new(),
         }
     }
 }

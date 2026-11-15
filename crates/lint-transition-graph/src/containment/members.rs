@@ -40,7 +40,7 @@ struct Declared<'file> {
 #[derive(Debug)]
 pub(crate) struct Members<'file> {
     model: &'file Model,
-    references: References<'file>,
+    references: &'file References,
     declarations: BTreeMap<ItemId, Member<'file>>,
     sites: BTreeMap<Member<'file>, Site<'file>>,
     crates: BTreeMap<ItemId, &'file Name>,
@@ -52,7 +52,7 @@ impl<'file> From<&'file Model> for Members<'file> {
         let found: Vec<Declared<'file>> = declared.iter().filter_map(|placed| Self::member(model, *placed)).collect();
         Members {
             model,
-            references: References::from(model),
+            references: model.references(),
             declarations: found.iter().map(|each| (each.item, each.member)).collect(),
             sites: found.iter().map(|each| (each.member, each.site)).collect(),
             crates: declared.iter().map(|placed| (placed.entity().declared(), placed.krate())).collect(),

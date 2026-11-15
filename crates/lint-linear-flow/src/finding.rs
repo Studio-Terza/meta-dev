@@ -3,12 +3,28 @@ use std::fmt;
 use syn::{BinOp, Expr, UnOp};
 
 use lint_core::Fix;
+use lint_sweep::Member;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rule {
     LinearBodies,
     PureRouters,
     PlainConditions,
+}
+
+impl Rule {
+    pub const ALL: [Rule; 3] = [Rule::LinearBodies, Rule::PureRouters, Rule::PlainConditions];
+
+    const ROUTERS: Member = Member::new(1);
+    const CONDITIONS: Member = Member::new(2);
+
+    pub const fn member(self) -> Member {
+        match self {
+            Rule::LinearBodies => Member::FIRST,
+            Rule::PureRouters => Self::ROUTERS,
+            Rule::PlainConditions => Self::CONDITIONS,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

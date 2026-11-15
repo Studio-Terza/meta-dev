@@ -5,13 +5,13 @@ mod roles;
 
 use graph::Model;
 use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, SourceFile, Violation, WorkspaceLint};
-use lint_file::{FileLint, Gleaning, Reads};
-use lint_sweep::Sweep;
+use lint_file::{Gleaning, KinLint, Reads, SweptLint};
+use lint_sweep::{Finds, Member, Sweep};
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
 use ports::Ports;
-use reserved_names::{CountedName, ReservedNames, SqlxName};
+use reserved_names::ReservedNames;
 use roles::Roles;
 pub use roles::{RoleFacts, RoleReading};
 
@@ -100,24 +100,23 @@ impl ModelLint for EffectsInFillers {
     }
 }
 
-impl FileLint for CountedCalls {
+impl SweptLint for CountedCalls {
     const HEADLINE: Headline = Headline::new(
         "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
     );
     const READS: Reads = Reads::Every;
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        Vec::from(ReservedNames::<CountedName>::from(file))
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
+        Box::new(ReservedNames::from(file))
     }
 }
 
-impl FileLint for HiddenSqlx {
+impl KinLint for HiddenSqlx {
     const HEADLINE: Headline = Headline::new(
         "__sqlx is named only in store-ports and store-ports-macros, so every query goes through store_ports::query! and no crate reaches sqlx through the re-export",
     );
     const READS: Reads = Reads::Every;
+    const MEMBER: Member = Member::new(1);
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        Vec::from(ReservedNames::<SqlxName>::from(file))
-    }
+    type Leader = CountedCalls;
 }
