@@ -10,12 +10,12 @@ use tangle::Tangle;
 #[derive(Debug)]
 pub(crate) struct Links<'model> {
     model: &'model Model,
-    references: References<'model>,
+    references: &'model References,
 }
 
 impl<'model> From<&'model Model> for Links<'model> {
     fn from(model: &'model Model) -> Links<'model> {
-        Links { model, references: References::from(model) }
+        Links { model, references: model.references() }
     }
 }
 

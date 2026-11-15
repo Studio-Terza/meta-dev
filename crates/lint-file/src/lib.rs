@@ -1,12 +1,16 @@
 mod concluded;
+mod file_facts;
+mod lead;
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
-use lint_sweep::{Finds, Gathers, Judgement, Sweep};
+use lint_sweep::{Finds, Gathers, Judgement, Member, Sweep};
 
 pub use concluded::{Concluded, Listed};
+pub use file_facts::FileFacts;
+pub use lead::{Lead, Leader, SortStart, Start};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {
@@ -38,6 +42,14 @@ pub trait SweptLint {
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_>;
 }
 
+pub trait KinLint {
+    const HEADLINE: Headline;
+    const READS: Reads;
+    const MEMBER: Member;
+
+    type Leader: Leader;
+}
+
 pub trait ContextLint {
     const HEADLINE: Headline;
     const READS: Reads;
@@ -48,6 +60,10 @@ pub trait ContextLint {
     type Gathering<'head>: Gathers<Self::Part<'head>>;
 
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Self::Gathering<'head>;
+
+    fn completed<'head>(part: Self::Part<'head>, _: &FileFacts<'head>) -> Self::Part<'head> {
+        part
+    }
 
     fn judgement<'run, 'file: 'run, 'head: 'file>(
         file: &'file SourceFile,
@@ -62,7 +78,18 @@ pub struct Filed<Checked>(PhantomData<Checked>);
 pub struct Swept<Checked>(PhantomData<Checked>);
 
 #[derive(Debug)]
+pub struct Kin<Checked>(PhantomData<Checked>);
+
+#[derive(Debug)]
 pub struct Judged<Checked>(PhantomData<Checked>);
+
+impl<Checked: FileLint + 'static> Leader for Filed<Checked> {
+    const LEAD: Lead = Lead::Filed(Checked::violations);
+}
+
+impl<Checked: SweptLint + 'static> Leader for Swept<Checked> {
+    const LEAD: Lead = Lead::Swept(Checked::watcher);
+}
 
 impl<Checked: FileLint> Lint for Filed<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
@@ -78,10 +105,23 @@ impl<Checked: SweptLint> Lint for Swept<Checked> {
     }
 }
 
+impl<Checked: KinLint> Lint for Kin<Checked> {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
+        let found = read.flat_map(|file| Checked::Leader::LEAD.member_of(file, Checked::MEMBER));
+        Report::new(Checked::HEADLINE, found.collect())
+    }
+}
+
 impl<Checked: ContextLint> Lint for Judged<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let context: Checked::Context<'_> =
-            files.iter().map(|file| Sweep::gathered(file, Checked::gathering(Parsed::from(file)))).collect();
+        let context: Checked::Context<'_> = files
+            .iter()
+            .map(|file| {
+                let parsed = Parsed::from(file);
+                FileFacts::completed(file, parsed, Checked::gathering(parsed), Checked::completed)
+            })
+            .collect();
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
         Report::new(
             Checked::HEADLINE,
@@ -100,6 +140,10 @@ pub trait PrimedFacts {
     type Contribution<'run, 'head: 'run>: Gathers<Self::Part<'head>>;
 
     fn priming<'head>(parsed: Parsed<'_, 'head>) -> Self::Priming<'head>;
+
+    fn primer_completed<'head>(part: Self::PrimerPart<'head>, _: &FileFacts<'head>) -> Self::PrimerPart<'head> {
+        part
+    }
 
     fn contribution<'run, 'head: 'run>(
         parsed: Parsed<'run, 'head>,
@@ -123,8 +167,13 @@ pub struct Primed<Checked>(PhantomData<Checked>);
 
 impl<Checked: PrimedLint> Lint for Primed<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let primer: Checked::Primer<'_> =
-            files.iter().map(|file| Sweep::gathered(file, Checked::priming(Parsed::from(file)))).collect();
+        let primer: Checked::Primer<'_> = files
+            .iter()
+            .map(|file| {
+                let parsed = Parsed::from(file);
+                FileFacts::completed(file, parsed, Checked::priming(parsed), Checked::primer_completed)
+            })
+            .collect();
         let context: Checked::Context<'_> = files
             .iter()
             .map(|file| Sweep::gathered(file, Checked::contribution(Parsed::from(file), &primer)))

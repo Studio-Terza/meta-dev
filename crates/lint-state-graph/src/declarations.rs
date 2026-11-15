@@ -30,7 +30,6 @@ pub struct DeclarationReading {
 #[derive(Debug)]
 pub struct DeclarationGathering<'head> {
     reading: DeclarationReading,
-    homes: TypeHomes<'head>,
     shipped: Option<Home<'head>>,
 }
 
@@ -38,7 +37,6 @@ impl<'head> From<Parsed<'_, 'head>> for DeclarationGathering<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> DeclarationGathering<'head> {
         DeclarationGathering {
             reading: DeclarationReading::default(),
-            homes: TypeHomes::from(parsed),
             shipped: parsed.file().shipped().map(|_| Home::from(parsed.head())),
         }
     }
@@ -46,23 +44,28 @@ impl<'head> From<Parsed<'_, 'head>> for DeclarationGathering<'head> {
 
 impl<'head> Gathers<Option<Declarations<'head>>> for DeclarationGathering<'head> {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        let all: Vec<&mut Watching<'_>> = vec![&mut self.reading, &mut self.homes];
+        let all: Vec<&mut Watching<'_>> = vec![&mut self.reading];
         self.shipped.map_or_default(|_| all)
     }
 
     fn gathered(self) -> Option<Declarations<'head>> {
         let reading = self.reading;
-        let homes = self.homes;
         self.shipped.map(|home| {
             Declarations {
                 vertices: reading.vertices,
                 aliases: reading.aliases,
-                homes,
+                homes: TypeHomes::empty(),
                 sum_types: BTreeMap::new(),
                 reading: reading.reading,
             }
             .filed(home)
         })
+    }
+}
+
+impl<'file> Declarations<'file> {
+    pub fn homed(self, homes: &TypeHomes<'file>) -> Declarations<'file> {
+        Declarations { homes: homes.clone(), ..self }
     }
 }
 

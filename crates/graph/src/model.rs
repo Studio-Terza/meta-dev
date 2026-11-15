@@ -3,6 +3,8 @@ mod declarations;
 mod file_model;
 mod filed;
 
+use std::sync::OnceLock;
+
 use crate::boundary::ItemId;
 use crate::call::Call;
 use crate::crate_root::CrateRoots;
@@ -18,6 +20,7 @@ use crate::law::Law;
 use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::quoted::Quoted;
+use crate::references::References;
 use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
 pub use building::Building;
@@ -40,6 +43,7 @@ pub struct Model {
     laws: Vec<Filed<Law>>,
     declarations: Declarations,
     roots: CrateRoots,
+    references: OnceLock<References>,
 }
 
 #[derive(Debug)]
@@ -186,6 +190,17 @@ impl Model {
     #[must_use]
     pub fn uses(&self) -> PathUses<'_> {
         PathUses { files: &self.files, rows: self.uses.iter() }
+    }
+
+    pub fn references(&self) -> &References {
+        self.references.get_or_init(|| {
+            self.holdings()
+                .map(References::from)
+                .chain(self.implementations().map(References::from))
+                .chain(self.functions().map(References::from))
+                .chain(self.mentions().map(References::from))
+                .collect()
+        })
     }
 
     #[must_use]

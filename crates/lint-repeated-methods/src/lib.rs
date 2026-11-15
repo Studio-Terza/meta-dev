@@ -1,7 +1,7 @@
 mod shape_index;
 
 use lint_core::{Bound, Headline, Parsed, SourceFile};
-use lint_file::{Concluded, ContextLint, Reads};
+use lint_file::{Concluded, ContextLint, FileFacts, Reads};
 use lint_sweep::Judgement;
 
 use shape_index::{ImplGathering, ShippedImpls};
@@ -22,6 +22,10 @@ impl ContextLint for RepeatedMethods {
 
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> ImplGathering<'head> {
         ImplGathering::from(parsed)
+    }
+
+    fn completed<'head>(part: ShippedImpls<'head>, facts: &FileFacts<'head>) -> ShippedImpls<'head> {
+        part.homed(facts.as_ref())
     }
 
     fn judgement<'run, 'file: 'run, 'head: 'file>(

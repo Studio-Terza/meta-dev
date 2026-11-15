@@ -14,7 +14,7 @@ use declared_graphs::DeclaredGraphs;
 use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges};
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Home, Parsed, SourceFile};
-use lint_file::{Concluded, PrimedFacts, PrimedLint, Reads};
+use lint_file::{Concluded, FileFacts, PrimedFacts, PrimedLint, Reads};
 use lint_sweep::{Gathers, Judgement, Watching};
 use variant_matches::VariantMatches;
 
@@ -41,6 +41,13 @@ impl PrimedFacts for StateGraph {
 
     fn priming<'head>(parsed: Parsed<'_, 'head>) -> DeclarationGathering<'head> {
         DeclarationGathering::from(parsed)
+    }
+
+    fn primer_completed<'head>(
+        part: Option<Declarations<'head>>,
+        facts: &FileFacts<'head>,
+    ) -> Option<Declarations<'head>> {
+        part.map(|declarations| declarations.homed(facts.as_ref()))
     }
 
     fn contribution<'run, 'head: 'run>(

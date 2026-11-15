@@ -7,7 +7,7 @@ use lint_core::SourceFile;
 use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 
 use lint_core::Violation;
-use lint_sweep::Finds;
+use lint_sweep::Sorts;
 
 use super::FileFlow;
 use crate::finding::{Finding, Rule};
@@ -22,20 +22,19 @@ enum Frame<'file> {
 #[derive(Debug)]
 pub struct Collector<'file> {
     file: &'file SourceFile,
-    rule: Option<Rule>,
     frames: Vec<Frame<'file>>,
     closed: Vec<FunctionFlow<'file>>,
 }
 
 impl<'file> Collector<'file> {
     pub fn collected(file: &'file SourceFile) -> Vec<FunctionFlow<'file>> {
-        let mut collector = Collector { file, rule: None, frames: Vec::new(), closed: Vec::new() };
+        let mut collector = Collector { file, frames: Vec::new(), closed: Vec::new() };
         Sweep::through_file(file, &mut collector);
         collector.functions()
     }
 
-    pub fn ruled(file: &'file SourceFile, rule: Rule) -> Collector<'file> {
-        Collector { file, rule: Some(rule), frames: Vec::new(), closed: Vec::new() }
+    pub fn watching(file: &'file SourceFile) -> Collector<'file> {
+        Collector { file, frames: Vec::new(), closed: Vec::new() }
     }
 
     fn functions(self) -> Vec<FunctionFlow<'file>> {
@@ -182,13 +181,12 @@ impl<'ast> Watch<'ast> for Collector<'_> {
     }
 }
 
-impl<'file> Finds<'file> for Collector<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+impl<'file> Sorts<'file> for Collector<'file> {
+    fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>> {
         let file = self.file;
-        let rule = self.rule;
         let tested = file.test_modules().iter().map(|module| FileFlow::collected(module, Collector::collected(module)));
         let flows: Vec<FileFlow<'file>> =
             [FileFlow::collected(file, self.functions())].into_iter().chain(tested).collect();
-        rule.map_or_default(|ruled| FileFlow::violations(&flows, ruled))
+        Rule::ALL.iter().map(|rule| FileFlow::violations(&flows, *rule)).collect()
     }
 }

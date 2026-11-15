@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::{Block, Expr, ExprCall, ExprMethodCall, Item, Signature};
+use syn::{Block, Expr, ExprCall, ExprMethodCall, Item, Signature, Type};
 
 use graph::{ParamIndex, Read, Reader, Resolved};
 use lint_core::Syntax;
@@ -26,7 +26,9 @@ struct Rooted {
 impl Rooted {
     fn from_argument(expr: &Expr) -> Option<Rooted> {
         match expr {
-            Expr::Reference(reference) => Rooted::from_argument(&reference.expr),
+            Expr::Reference(reference) => {
+                reference.mutability.map_or_else(|| Rooted::from_argument(&reference.expr), |_| None)
+            }
             Expr::Paren(inner) => Rooted::from_argument(&inner.expr),
             Expr::Field(field) => Rooted::from_argument(&field.base).and_then(|rooted| rooted.through(&field.member)),
             Expr::Path(path) => {
@@ -108,6 +110,7 @@ impl Reads {
             .enumerate()
             .filter_map(|(index, input)| {
                 let typed = Syntax::typed(input)?;
+                Self::shared(&typed.ty)?;
                 Some((Name::from(&Syntax::pat_ident(&typed.pat)?.ident), ParamIndex::from(index)))
             })
             .filter(|(name, _)| rebound.get(name).is_none())
@@ -120,6 +123,13 @@ impl Reads {
             Some(LoweredReadAt { spelled, parameter, fields: read.rooted.fields, line: read.line })
         });
         ReadsLowered(settled.collect())
+    }
+
+    fn shared(ty: &Type) -> Option<&Type> {
+        match ty {
+            Type::Reference(reference) => reference.mutability.map_or(Some(ty), |_| None),
+            _ => Some(ty),
+        }
     }
 
     fn tail_call(body: &Block) -> Option<Address> {

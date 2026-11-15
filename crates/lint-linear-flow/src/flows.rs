@@ -1,12 +1,6 @@
 use lint_core::SourceFile;
 
 use crate::file_flow::FileFlow;
-use crate::finding::Rule;
-
-pub trait FlowLint {
-    const HEADLINE: &'static str;
-    const RULE: Rule;
-}
 
 #[derive(Debug)]
 pub struct Flows<'file> {

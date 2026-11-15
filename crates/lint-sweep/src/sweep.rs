@@ -8,6 +8,7 @@ use syn::visit::{self, Visit};
 use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Violation, Watch, Watching};
 use lint_layout::Name;
 
+pub use boundary::Member;
 use boundary::{Index, Muting};
 
 pub trait Gathers<Part> {
@@ -20,6 +21,10 @@ pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
     fn found(self: Box<Self>) -> Vec<Violation<'file>>;
 }
 
+pub trait Sorts<'file>: for<'ast> Watch<'ast> + fmt::Debug {
+    fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>>;
+}
+
 #[derive(Debug)]
 pub struct Sweep;
 
@@ -30,6 +35,16 @@ impl Sweep {
             .flat_map(|group| group.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }))
             .collect();
         Sweep::sweeping(Some(file), watching).visit_file(file.syntax());
+    }
+
+    pub fn over_leads<'file, 'run>(
+        file: &'file SourceFile,
+        finds: &mut [Box<dyn Finds<'file> + 'run>],
+        sorts: &mut [Box<dyn Sorts<'file> + 'run>],
+    ) {
+        let found = finds.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });
+        let sorting = sorts.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });
+        Sweep::sweeping(Some(file), found.chain(sorting).collect()).visit_file(file.syntax());
     }
 
     pub fn through_file(file: &SourceFile, watcher: &mut Watching<'_>) {

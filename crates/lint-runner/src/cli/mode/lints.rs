@@ -1,4 +1,6 @@
+use std::any::TypeId;
 use std::cmp::Reverse;
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::mem::ManuallyDrop;
 use std::thread::Scope;
@@ -10,10 +12,13 @@ use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
 use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
-use lint_file::{ContextLint, FileLint, Filed, Judged, Primed, PrimedLint, Reads, Swept, SweptLint};
+use lint_file::{
+    ContextLint, FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, Primed, PrimedLint, Reads, SortStart, Start,
+    Swept, SweptLint,
+};
 use lint_port_dependencies::{RoleFacts, RoleReading};
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Finds, Judgement, Sweep};
+use lint_sweep::{Finds, Judgement, Member, Sorts, Sweep};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -100,8 +105,6 @@ impl Crew<'_> {
 
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
-type Scan = for<'file> fn(&'file SourceFile) -> Vec<Violation<'file>>;
-
 type Judge =
     for<'file, 'settled, 'run> fn(&'file SourceFile, &'file Settled<'settled, 'run>) -> Judgement<'file, 'file>;
 
@@ -116,32 +119,15 @@ struct Judging {
 struct Filing {
     headline: Headline,
     reads: Reads,
-    scanning: Scanning,
+    source: Source,
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Scanning {
-    Alone(Scan),
-    Swept(Start),
+struct Source {
+    key: fn() -> TypeId,
+    lead: Lead,
+    member: Member,
 }
-
-impl Scanning {
-    fn alone(self) -> Option<Scan> {
-        match self {
-            Scanning::Alone(scan) => Some(scan),
-            Scanning::Swept(_) => None,
-        }
-    }
-
-    fn swept(self) -> Option<Start> {
-        match self {
-            Scanning::Swept(start) => Some(start),
-            Scanning::Alone(_) => None,
-        }
-    }
-}
-
-type Start = for<'file> fn(&'file SourceFile) -> Box<dyn Finds<'file> + 'file>;
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
@@ -190,8 +176,8 @@ impl Lints {
             <KeyDependencyRoles as WorkspaceLint>::report(heads, workspaces, facts, model)
         })),
         Entry::spelled::<EffectsInFillers>(Work::Modelled(<EffectsInFillers as ModelLint>::report)),
-        <Filed<CountedCalls> as Registered>::ENTRY,
-        <Filed<HiddenSqlx> as Registered>::ENTRY,
+        <Kin<CountedCalls> as Registered>::ENTRY,
+        <Kin<HiddenSqlx> as Registered>::ENTRY,
         Entry::spelled::<StoreQueries>(Work::Modelled(<StoreQueries as ModelLint>::report)),
         <Swept<LongExactStrings> as Registered>::ENTRY,
         <Judged<RepeatedShapes> as Registered>::ENTRY,
@@ -200,9 +186,9 @@ impl Lints {
         <Swept<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
         <Swept<NoEarlyExits> as Registered>::ENTRY,
-        <Swept<LinearBodies> as Registered>::ENTRY,
-        <Swept<PureRouters> as Registered>::ENTRY,
-        <Swept<PlainConditions> as Registered>::ENTRY,
+        <Kin<LinearBodies> as Registered>::ENTRY,
+        <Kin<PureRouters> as Registered>::ENTRY,
+        <Kin<PlainConditions> as Registered>::ENTRY,
         Entry::spelled::<TypeSystem>(Work::Extracted(|model| {
             let extraction = Extraction::default();
             let transitions = Transitions::from(model);
@@ -249,12 +235,7 @@ impl Lints {
     fn worked(readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
         let lowered = sources.gathered(readout, worker);
         let filing = Stopwatch::started(sources.wired().timer());
-        let filed: Worked = Self::LINTS
-            .iter()
-            .enumerate()
-            .filter_map(|(index, entry)| entry.filing().map(|found| found.lines(Slot::from(index), lowered.claimed())))
-            .chain([Sweepers::worked(lowered.claimed())])
-            .collect();
+        let filed = Sweepers::worked(lowered.claimed());
         let filed_timing = filing.stopped(Step::Filed(worker));
         let priming = Stopwatch::started(sources.wired().timer());
         sources.gathering().primed(lowered.claimed());
@@ -461,37 +442,51 @@ impl Job {
     }
 }
 
-impl Filing {
-    fn lines(self, slot: Slot, claimed: &[Claimed<'_>]) -> Worked {
-        let scanned = self.scanning.alone();
-        let read = claimed.iter().filter_map(|found| self.reads.admits(found.file()).map(|file| (found.order(), file)));
-        let scans = read.filter_map(|(order, file)| scanned.map(|scan| (order, scan(file))));
-        scans.map(|(order, violations)| Worked::filing(slot, order, &violations)).collect()
-    }
-}
-
 trait Registered {
     const ENTRY: Entry;
 }
 
-impl<Lint: FileLint> Registered for Filed<Lint> {
+impl<Lint: FileLint + 'static> Registered for Filed<Lint> {
     const ENTRY: Entry = Entry {
         name: Named::spelled::<Lint>(),
         work: Work::Filed(Filing {
             headline: Lint::HEADLINE,
             reads: Lint::READS,
-            scanning: Scanning::Alone(Lint::violations),
+            source: Source {
+                key: TypeId::of::<Filed<Lint>>,
+                lead: <Filed<Lint> as Leader>::LEAD,
+                member: Member::FIRST,
+            },
         }),
     };
 }
 
-impl<Lint: SweptLint> Registered for Swept<Lint> {
+impl<Lint: SweptLint + 'static> Registered for Swept<Lint> {
     const ENTRY: Entry = Entry {
         name: Named::spelled::<Lint>(),
         work: Work::Filed(Filing {
             headline: Lint::HEADLINE,
             reads: Lint::READS,
-            scanning: Scanning::Swept(Lint::watcher),
+            source: Source {
+                key: TypeId::of::<Swept<Lint>>,
+                lead: <Swept<Lint> as Leader>::LEAD,
+                member: Member::FIRST,
+            },
+        }),
+    };
+}
+
+impl<Lint: KinLint + 'static> Registered for Kin<Lint> {
+    const ENTRY: Entry = Entry {
+        name: Named::spelled::<Lint>(),
+        work: Work::Filed(Filing {
+            headline: Lint::HEADLINE,
+            reads: Lint::READS,
+            source: Source {
+                key: TypeId::of::<Lint::Leader>,
+                lead: <Lint::Leader as Leader>::LEAD,
+                member: Lint::MEMBER,
+            },
         }),
     };
 }
@@ -506,18 +501,33 @@ impl Sweepers {
 
     fn swept(claimed: &Claimed<'_>) -> Worked {
         let file = claimed.file();
-        let starts: Vec<(Slot, Start)> = Lints::LINTS
+        let admitted: Vec<(Slot, Source)> = Lints::LINTS
             .iter()
             .enumerate()
             .filter_map(|(index, entry)| Some((Slot::from(index), entry.filing()?)))
-            .filter_map(|(slot, filing)| Some((slot, filing.reads.admits(file).and(filing.scanning.swept())?)))
+            .filter_map(|(slot, filing)| Some((slot, filing.reads.admits(file).map(|_| filing.source)?)))
             .collect();
-        let started: Vec<Box<dyn Finds<'_> + '_>> = starts.iter().map(|(_, start)| start(file)).collect();
-        let mut watchers = [started];
-        Sweep::over_all(file, &mut watchers);
-        let [swept] = watchers;
-        let found = starts.into_iter().zip(swept).map(|((slot, _), watcher)| (slot, watcher.found()));
+        let leads: BTreeMap<TypeId, Lead> = admitted.iter().map(|(_, source)| ((source.key)(), source.lead)).collect();
+        let starts: Vec<(TypeId, Start)> = leads.iter().filter_map(|(key, lead)| Some((*key, lead.swept()?))).collect();
+        let sorting: Vec<(TypeId, SortStart)> =
+            leads.iter().filter_map(|(key, lead)| Some((*key, lead.sorting()?))).collect();
+        let mut finds: Vec<Box<dyn Finds<'_> + '_>> = starts.iter().map(|(_, start)| start(file)).collect();
+        let mut sorts: Vec<Box<dyn Sorts<'_> + '_>> = sorting.iter().map(|(_, start)| start(file)).collect();
+        Sweep::over_leads(file, &mut finds, &mut sorts);
+        let listed = starts.into_iter().zip(finds).map(|((key, _), watcher)| (key, vec![watcher.found()]));
+        let watched = listed.chain(sorting.into_iter().zip(sorts).map(|((key, _), watcher)| (key, watcher.sorted())));
+        let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));
+        let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
+        let found = admitted.into_iter().map(|(slot, source)| (slot, Self::taken(&mut sorted, source)));
         found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations)).collect()
+    }
+
+    fn taken<'file>(
+        sorted: &mut BTreeMap<TypeId, Vec<Vec<Violation<'file>>>>,
+        source: Source,
+    ) -> Vec<Violation<'file>> {
+        let kept = sorted.get_mut(&(source.key)()).and_then(|lists| lists.get_mut(source.member.index()));
+        kept.map_or_default(std::mem::take)
     }
 }
 

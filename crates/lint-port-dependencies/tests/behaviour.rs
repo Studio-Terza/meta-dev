@@ -1,4 +1,4 @@
-use lint_file::Filed;
+use lint_file::Kin;
 use lint_fixtures::{Lines, Located, Queried, Shown, Source, Sources, Text};
 use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 
@@ -822,7 +822,7 @@ laws::table!(
 
 laws::table!(
     counted_call_and_counted_acquire_are_named_only_in_port_core_and_port_derive,
-    Sources::flagged::<Filed<CountedCalls>>,
+    Sources::flagged::<Kin<CountedCalls>>,
     [
         IN_PORT_CORE => Lines::default(),
         IN_PORT_DERIVE => Lines::default(),
@@ -835,7 +835,7 @@ laws::table!(
 
 laws::table!(
     the_sqlx_store_ports_re_exports_is_named_only_in_store_ports_and_its_macros,
-    Sources::flagged::<Filed<HiddenSqlx>>,
+    Sources::flagged::<Kin<HiddenSqlx>>,
     [
         IN_STORE_PORTS => Lines::default(),
         IN_STORE_PORTS_MACROS => Lines::default(),
