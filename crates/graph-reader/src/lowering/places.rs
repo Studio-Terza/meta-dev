@@ -6,7 +6,6 @@ use lint_layout::{LineNumber, Name, Position};
 
 use crate::namespace::{Domain, PortMacro, Resolving, ScopeId, UsePath};
 
-use super::frames::Frame;
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
 use lint_sweep::{Descend, Sweep};
@@ -131,10 +130,9 @@ impl Lowering {
     }
 
     pub(super) fn owned_by(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> Descend {
-        let frame = self.frame();
         let place = self.owning(ident, domain, attributes);
         self.context = self.context.owned(place);
-        self.saved(frame)
+        Descend::Into
     }
 
     pub(super) fn macro_left(&mut self, item: &ItemMacro) -> &mut Self {
@@ -186,7 +184,7 @@ impl Lowering {
         });
     }
 
-    pub(super) fn impl_entered(&mut self, block: &ItemImpl, frame: Frame) -> Descend {
+    pub(super) fn impl_entered(&mut self, block: &ItemImpl) -> Descend {
         let declared = self.generics.extended(&block.generics);
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
@@ -198,6 +196,6 @@ impl Lowering {
         rows.push(SubjectRow { scope: self.here.scope(), ty: subject, implemented });
         let place = self.placed(PlaceRow { subject: Some(subjected), owner: None });
         self.context = self.context.of_impl(block, place);
-        self.enclosed(Enclosure::of_impl(block), generics, frame)
+        self.enclosed(Enclosure::of_impl(block), generics)
     }
 }

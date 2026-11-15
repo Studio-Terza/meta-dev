@@ -482,7 +482,6 @@ impl Lowering {
     }
 
     fn module_entered(&mut self, item: &ItemMod, items: &[syn::Item]) -> Descend {
-        let frame = self.frame();
         let name = Name::from(&item.ident);
         let children = Arc::from(self.here.children().join(&name));
         let outer = self.entered(ScopeKind::Module, Entries::of_items(items), children);
@@ -490,7 +489,7 @@ impl Lowering {
         self.lowered.openings.declare(outer.scope(), module);
         self.enclosure = Enclosure::Module;
         self.context = self.context.within_module(item);
-        self.saved(frame)
+        Descend::Into
     }
 
     fn function(&mut self, attributes: &[Attribute], signature: &SynSignature, body: Option<&Block>) -> InScope {
@@ -519,22 +518,23 @@ impl Lowering {
         signature: &SynSignature,
         body: Option<&Block>,
     ) -> Descend {
-        let frame = self.frame();
+        self.saved();
         self.context = self.context.within_item(attributes);
         let generics = self.function(attributes, signature, body);
-        self.enclosed(Enclosure::Body, generics, frame)
+        self.enclosed(Enclosure::Body, generics)
     }
 
-    fn enclosed(&mut self, enclosure: Enclosure, generics: InScope, frame: Frame) -> Descend {
+    fn enclosed(&mut self, enclosure: Enclosure, generics: InScope) -> Descend {
         self.enclosure = enclosure;
         self.generics = Arc::new(generics);
-        self.saved(frame)
+        Descend::Into
     }
 }
 
 impl<'ast> Watch<'ast> for Lowering {
     fn kinds(&self) -> &'static [Kind] {
         &[
+            Kind::Item,
             Kind::ItemMod,
             Kind::Block,
             Kind::ItemImpl,
@@ -558,6 +558,14 @@ impl<'ast> Watch<'ast> for Lowering {
         ]
     }
 
+    fn on_item(&mut self, _: &'ast syn::Item) -> Descend {
+        self.saved()
+    }
+
+    fn off_item(&mut self, _: &'ast syn::Item) {
+        self.restored();
+    }
+
     fn on_item_mod(&mut self, item: &'ast ItemMod) -> Descend {
         match &item.content {
             Some((_, items)) => self.module_entered(item, items),
@@ -565,14 +573,10 @@ impl<'ast> Watch<'ast> for Lowering {
         }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
-        self.restored();
-    }
-
     fn on_block(&mut self, block: &'ast Block) -> Descend {
-        let frame = self.frame();
+        self.saved();
         self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
-        self.saved(frame)
+        Descend::Into
     }
 
     fn off_block(&mut self, _: &'ast Block) {
@@ -580,39 +584,24 @@ impl<'ast> Watch<'ast> for Lowering {
     }
 
     fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
-        let frame = self.frame();
         self.context = self.context.within_item(&block.attrs);
-        self.impl_entered(block, frame)
-    }
-
-    fn off_item_impl(&mut self, _: &'ast ItemImpl) {
-        self.restored();
+        self.impl_entered(block)
     }
 
     fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
-        let frame = self.frame();
         let generics = self.generics.subjectless().extended(&item.generics);
         self.trait_bounds(item, &generics);
         let place = self.trait_owning(&item.ident, &item.attrs);
         self.filler_owning(item);
         self.context = self.context.owned(place);
-        self.enclosed(Enclosure::Trait, generics, frame)
-    }
-
-    fn off_item_trait(&mut self, _: &'ast ItemTrait) {
-        self.restored();
+        self.enclosed(Enclosure::Trait, generics)
     }
 
     fn on_item_fn(&mut self, item: &'ast ItemFn) -> Descend {
-        let frame = self.frame();
         let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
         self.context = self.context.within_item(&item.attrs).owned(place);
         let generics = self.function(&item.attrs, &item.sig, Some(&item.block));
-        self.enclosed(Enclosure::Body, generics, frame)
-    }
-
-    fn off_item_fn(&mut self, _: &'ast ItemFn) {
-        self.restored();
+        self.enclosed(Enclosure::Body, generics)
     }
 
     fn on_impl_item_fn(&mut self, item: &'ast ImplItemFn) -> Descend {
@@ -632,15 +621,9 @@ impl<'ast> Watch<'ast> for Lowering {
     }
 
     fn on_foreign_item_fn(&mut self, item: &'ast ForeignItemFn) -> Descend {
-        let frame = self.frame();
         self.enclosure = Enclosure::Foreign;
-        let generics = self.function(&item.attrs, &item.sig, None);
-        self.enclosure = frame.enclosure();
-        self.enclosed(Enclosure::Body, generics, frame)
-    }
-
-    fn off_foreign_item_fn(&mut self, _: &'ast ForeignItemFn) {
-        self.restored();
+        self.function(&item.attrs, &item.sig, None);
+        Descend::Into
     }
 
     fn on_item_type(&mut self, item: &'ast ItemType) -> Descend {
@@ -656,10 +639,6 @@ impl<'ast> Watch<'ast> for Lowering {
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn off_item_type(&mut self, _: &'ast ItemType) {
-        self.restored();
-    }
-
     fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
@@ -667,10 +646,6 @@ impl<'ast> Watch<'ast> for Lowering {
         self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
         self.struct_held(item, &scope, link);
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
-    }
-
-    fn off_item_struct(&mut self, _: &'ast ItemStruct) {
-        self.restored();
     }
 
     fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
@@ -686,10 +661,6 @@ impl<'ast> Watch<'ast> for Lowering {
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn off_item_enum(&mut self, _: &'ast ItemEnum) {
-        self.restored();
-    }
-
     fn on_item_union(&mut self, item: &'ast ItemUnion) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
@@ -698,24 +669,12 @@ impl<'ast> Watch<'ast> for Lowering {
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn off_item_union(&mut self, _: &'ast ItemUnion) {
-        self.restored();
-    }
-
     fn on_item_const(&mut self, item: &'ast ItemConst) -> Descend {
         self.valued(&item.ident, &item.ty, &item.attrs)
     }
 
-    fn off_item_const(&mut self, _: &'ast ItemConst) {
-        self.restored();
-    }
-
     fn on_item_static(&mut self, item: &'ast ItemStatic) -> Descend {
         self.valued(&item.ident, &item.ty, &item.attrs)
-    }
-
-    fn off_item_static(&mut self, _: &'ast ItemStatic) {
-        self.restored();
     }
 
     fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
@@ -741,12 +700,12 @@ impl<'ast> Watch<'ast> for Lowering {
     fn on_item_macro(&mut self, item: &'ast ItemMacro) -> Descend {
         match &item.ident {
             Some(ident) => self.owned_by(ident, Domain::Macros, &item.attrs),
-            None => self.saved(self.frame()),
+            None => Descend::Into,
         }
     }
 
     fn off_item_macro(&mut self, item: &'ast ItemMacro) {
-        self.macro_left(item).restored();
+        self.macro_left(item);
     }
 
     fn on_macro(&mut self, invoked: &'ast Macro) -> Descend {

@@ -967,3 +967,30 @@ fn an_item_knows_the_library_crate_that_declares_it() {
         .collect();
     assert_eq!(homes, [Some(Name::from("d")), Some(Name::from("d"))]);
 }
+
+const AFTER_GENERIC_FN: &str = "struct Out;\nfn host<Out>() {}\nfn after() -> Out { todo!() }\n";
+const AFTER_BLOCK: &str =
+    "fn host() {\n    {\n        struct Hidden;\n    }\n    fn after() -> Hidden { todo!() }\n}\n";
+const AFTER_GENERIC_METHOD: &str =
+    "struct Out;\nimpl Out {\n    fn first<Out>() {}\n    fn second() -> Out { todo!() }\n}\n";
+const AFTER_GENERIC_DECLARED: &str = "struct Out;\ntrait T {\n    fn first<Out>();\n    fn second() -> Out;\n}\n";
+
+laws::table!(an_item_after_a_scope_reads_as_if_the_scope_had_closed, |text: &&str| Read::outputs(text), [
+    AFTER_GENERIC_FN => [Expect::named(Expect::item("Out", ItemKind::Struct), Vec::new())],
+    AFTER_BLOCK => [Expect::named(Expect::unknown(&["Hidden"]), Vec::new())],
+    AFTER_GENERIC_METHOD => [Expect::named(Expect::item("Out", ItemKind::Struct), Vec::new())],
+    AFTER_GENERIC_DECLARED => [Expect::named(Expect::item("Out", ItemKind::Struct), Vec::new())],
+]);
+
+const MACRO_BODIES: &str = "outer! {\n    fn inside() -> u8 { 0 }\n}\nmacro_rules! make {\n    () => {\n        fn made() -> char { 'a' }\n    };\n}\n";
+
+#[test]
+fn functions_written_inside_macro_bodies_are_read() {
+    assert_eq!(
+        Read::functions(MACRO_BODIES),
+        [
+            Expect::function("inside", Owner::Free, Entry::Called, Some(Expect::primitive(Primitive::Integer))),
+            Expect::function("made", Owner::Free, Entry::Called, Some(Expect::primitive(Primitive::Char))),
+        ]
+    );
+}

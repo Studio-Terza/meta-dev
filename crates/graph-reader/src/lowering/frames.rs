@@ -62,29 +62,25 @@ pub(super) struct Frame {
     context: Context,
 }
 
-impl Frame {
-    pub(super) fn enclosure(&self) -> Enclosure {
-        self.enclosure
+impl From<&Lowering> for Frame {
+    fn from(lowering: &Lowering) -> Frame {
+        Frame {
+            here: lowering.here.clone(),
+            enclosure: lowering.enclosure,
+            generics: Arc::clone(&lowering.generics),
+            context: lowering.context,
+        }
     }
 }
 
 impl Lowering {
-    pub(super) fn frame(&self) -> Frame {
-        Frame {
-            here: self.here.clone(),
-            enclosure: self.enclosure,
-            generics: Arc::clone(&self.generics),
-            context: self.context,
-        }
-    }
-
-    pub(super) fn saved(&mut self, frame: Frame) -> Descend {
-        self.frames.push(frame);
+    pub(super) fn saved(&mut self) -> Descend {
+        self.frames.push(Frame::from(&*self));
         Descend::Into
     }
 
     pub(super) fn restored(&mut self) {
-        let frame = self.frames.pop().unwrap_or_else(|| self.frame());
+        let frame = self.frames.pop().unwrap_or_else(|| Frame::from(&*self));
         self.here = frame.here;
         self.enclosure = frame.enclosure;
         self.generics = frame.generics;
@@ -93,7 +89,6 @@ impl Lowering {
 
     pub(super) fn slotted(&mut self, item: &ItemMod) -> Descend {
         self.lowered.slots.push(Slot::new(&self.here, self.context.region(), item));
-        self.frames.push(self.frame());
         Descend::Over
     }
 }
