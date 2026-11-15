@@ -6,7 +6,7 @@ mod tally;
 mod verdict;
 
 use lint_core::{Headline, Lint, Report, SourceFile};
-use lint_file::{KinLint, Reads, SweptLint};
+use lint_file::{KinLint, Reads, Swept, SweptLint};
 use lint_sweep::{Finds, Member};
 
 use file_flow::Collector;
@@ -46,7 +46,7 @@ impl KinLint for PureRouters {
     const READS: Reads = Reads::Every;
     const MEMBER: Member = Rule::PureRouters.member();
 
-    type Leader = LinearBodies;
+    type Leader = Swept<LinearBodies>;
 }
 
 impl KinLint for PlainConditions {
@@ -56,7 +56,7 @@ impl KinLint for PlainConditions {
     const READS: Reads = Reads::Every;
     const MEMBER: Member = Rule::PlainConditions.member();
 
-    type Leader = LinearBodies;
+    type Leader = Swept<LinearBodies>;
 }
 
 impl Lint for FlowShapes {

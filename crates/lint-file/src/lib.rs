@@ -1,5 +1,6 @@
 mod concluded;
 mod file_facts;
+mod lead;
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -9,6 +10,7 @@ use lint_sweep::{Finds, Gathers, Judgement, Member, Sweep};
 
 pub use concluded::{Concluded, Listed};
 pub use file_facts::FileFacts;
+pub use lead::{Lead, Leader, Start};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {
@@ -45,7 +47,7 @@ pub trait KinLint {
     const READS: Reads;
     const MEMBER: Member;
 
-    type Leader: SweptLint;
+    type Leader: Leader;
 }
 
 pub trait ContextLint {
@@ -81,6 +83,14 @@ pub struct Kin<Checked>(PhantomData<Checked>);
 #[derive(Debug)]
 pub struct Judged<Checked>(PhantomData<Checked>);
 
+impl<Checked: FileLint + 'static> Leader for Filed<Checked> {
+    const LEAD: Lead = Lead::Filed(Checked::violations);
+}
+
+impl<Checked: SweptLint + 'static> Leader for Swept<Checked> {
+    const LEAD: Lead = Lead::Swept(Checked::watcher);
+}
+
 impl<Checked: FileLint> Lint for Filed<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
@@ -98,7 +108,7 @@ impl<Checked: SweptLint> Lint for Swept<Checked> {
 impl<Checked: KinLint> Lint for Kin<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
-        let found = read.flat_map(|file| Sweep::sorted_for(file, Checked::Leader::watcher(file), Checked::MEMBER));
+        let found = read.flat_map(|file| Checked::Leader::LEAD.member_of(file, Checked::MEMBER));
         Report::new(Checked::HEADLINE, found.collect())
     }
 }

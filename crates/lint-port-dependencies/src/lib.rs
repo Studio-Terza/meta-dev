@@ -4,9 +4,9 @@ mod reserved_names;
 mod roles;
 
 use graph::Model;
-use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, SourceFile, Violation, WorkspaceLint};
-use lint_file::{Gleaning, KinLint, Reads, SweptLint};
-use lint_sweep::{Finds, Member, Sweep};
+use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, Violation, WorkspaceLint};
+use lint_file::{Gleaning, KinLint, Reads};
+use lint_sweep::{Member, Sweep};
 use workspace_metadata::{Graph, Metadata, Role};
 
 use owners::Owners;
@@ -100,15 +100,14 @@ impl ModelLint for EffectsInFillers {
     }
 }
 
-impl SweptLint for CountedCalls {
+impl KinLint for CountedCalls {
     const HEADLINE: Headline = Headline::new(
         "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
     );
     const READS: Reads = Reads::Every;
+    const MEMBER: Member = Member::FIRST;
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(ReservedNames::from(file))
-    }
+    type Leader = ReservedNames;
 }
 
 impl KinLint for HiddenSqlx {
@@ -116,7 +115,7 @@ impl KinLint for HiddenSqlx {
         "__sqlx is named only in store-ports and store-ports-macros, so every query goes through store_ports::query! and no crate reaches sqlx through the re-export",
     );
     const READS: Reads = Reads::Every;
-    const MEMBER: Member = Member::new(1);
+    const MEMBER: Member = ReservedNames::SQLX;
 
-    type Leader = CountedCalls;
+    type Leader = ReservedNames;
 }

@@ -99,17 +99,6 @@ impl Sweep {
         let [only] = watchers;
         only.into_iter().flat_map(Finds::found).collect()
     }
-
-    pub fn sorted_for<'file, 'run>(
-        file: &'file SourceFile,
-        watcher: Box<dyn Finds<'file> + 'run>,
-        member: Member,
-    ) -> Vec<Violation<'file>> {
-        let mut watchers = [vec![watcher]];
-        Sweep::over_all(file, &mut watchers);
-        let [only] = watchers;
-        only.into_iter().flat_map(Finds::sorted).nth(member.index()).unwrap_or_default()
-    }
 }
 
 struct Sweeping<'file, 'run> {

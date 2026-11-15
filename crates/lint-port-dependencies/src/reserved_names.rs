@@ -7,8 +7,9 @@ use proc_macro2::{TokenStream, TokenTree};
 use quote::ToTokens;
 
 use lint_core::{Finding, Site, SourceFile, Violation};
+use lint_file::{Lead, Leader};
 use lint_layout::{LineNumber, Name, Whole, Word};
-use lint_sweep::{Finds, Watch};
+use lint_sweep::Member;
 
 pub(crate) use counted_name::CountedName;
 pub(crate) use sqlx_name::SqlxName;
@@ -25,21 +26,20 @@ struct Spelled {
 }
 
 #[derive(Debug)]
-pub(crate) struct ReservedNames<'file> {
-    file: &'file SourceFile,
+pub struct ReservedNames;
+
+impl Leader for ReservedNames {
+    const LEAD: Lead = Lead::Scanned(ReservedNames::sorted);
 }
 
-impl<'file> From<&'file SourceFile> for ReservedNames<'file> {
-    fn from(file: &'file SourceFile) -> ReservedNames<'file> {
-        ReservedNames { file }
-    }
-}
+impl ReservedNames {
+    pub(crate) const SQLX: Member = Member::new(1);
 
-impl<'file> ReservedNames<'file> {
-    fn spelled(&self) -> Vec<Spelled> {
-        let text = self.file.text();
+    fn sorted(file: &SourceFile) -> Vec<Vec<Violation<'_>>> {
+        let text = file.text();
         let mentioned = text.mentioning(CountedName::NAMES).or_else(|| text.mentioning(SqlxName::NAMES));
-        mentioned.map_or_default(|_| Self::idents(self.file.syntax().to_token_stream()))
+        let spelled = mentioned.map_or_default(|_| Self::idents(file.syntax().to_token_stream()));
+        vec![Self::kept::<CountedName>(file, &spelled), Self::kept::<SqlxName>(file, &spelled)]
     }
 
     fn idents(tokens: TokenStream) -> Vec<Spelled> {
@@ -54,21 +54,12 @@ impl<'file> ReservedNames<'file> {
         }
     }
 
-    fn kept<Reserving: Reserved>(&self, spelled: &[Spelled]) -> Vec<Violation<'file>> {
-        let path = self.file.head().path();
-        let name: &Name = self.file.head().placement().package().crate_name().borrow();
+    fn kept<'file, Reserving: Reserved>(file: &'file SourceFile, spelled: &[Spelled]) -> Vec<Violation<'file>> {
+        let path = file.head().path();
+        let name: &Name = file.head().placement().package().crate_name().borrow();
         let outside = name.matches::<Whole>(&Reserving::OWNERS).map_or(Some(spelled), |_| None);
         let named =
             outside.into_iter().flatten().filter(|found| found.name.matches::<Whole>(Reserving::NAMES).is_some());
         named.map(|found| Violation::new(Site::new(path, found.line), Reserving::default())).collect()
-    }
-}
-
-impl Watch<'_> for ReservedNames<'_> {}
-
-impl<'file> Finds<'file> for ReservedNames<'file> {
-    fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>> {
-        let spelled = self.spelled();
-        vec![self.kept::<CountedName>(&spelled), self.kept::<SqlxName>(&spelled)]
     }
 }

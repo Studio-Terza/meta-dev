@@ -1,4 +1,4 @@
-use lint_file::{Kin, Swept};
+use lint_file::Kin;
 use lint_fixtures::{Lines, Located, Queried, Shown, Source, Sources, Text};
 use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 
@@ -822,7 +822,7 @@ laws::table!(
 
 laws::table!(
     counted_call_and_counted_acquire_are_named_only_in_port_core_and_port_derive,
-    Sources::flagged::<Swept<CountedCalls>>,
+    Sources::flagged::<Kin<CountedCalls>>,
     [
         IN_PORT_CORE => Lines::default(),
         IN_PORT_DERIVE => Lines::default(),
