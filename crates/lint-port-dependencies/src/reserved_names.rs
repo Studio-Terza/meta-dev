@@ -8,7 +8,7 @@ use quote::ToTokens;
 
 use lint_core::{Finding, Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word};
-use lint_sweep::{Finds, Kind, Watch};
+use lint_sweep::{Finds, Watch};
 
 pub(crate) use counted_name::CountedName;
 pub(crate) use sqlx_name::SqlxName;
@@ -64,11 +64,7 @@ impl<'file> ReservedNames<'file> {
     }
 }
 
-impl Watch<'_> for ReservedNames<'_> {
-    fn kinds(&self) -> &'static [Kind] {
-        &[]
-    }
-}
+impl Watch<'_> for ReservedNames<'_> {}
 
 impl<'file> Finds<'file> for ReservedNames<'file> {
     fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>> {

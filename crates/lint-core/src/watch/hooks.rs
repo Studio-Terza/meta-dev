@@ -40,7 +40,9 @@ macro_rules! hooks {
         }
 
         pub trait Watch<'ast> {
-            fn kinds(&self) -> &'static [Kind];
+            fn kinds(&self) -> &'static [Kind] {
+                &[]
+            }
 
             fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
                 Descend::Into

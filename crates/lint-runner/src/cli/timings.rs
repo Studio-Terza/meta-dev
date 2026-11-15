@@ -8,7 +8,7 @@ use timer_ports::{Elapsed, Moment, Timer};
 
 mod boundary;
 
-pub(crate) use boundary::{Named, Spelling};
+pub(crate) use boundary::Named;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Timings {
