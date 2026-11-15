@@ -8,7 +8,7 @@ use super::export::Export;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 
 use crate_reach::CrateReach;
 
@@ -148,16 +148,16 @@ impl<'ast> Watch<'ast> for Reading {
         }
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
+    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
         self.references.walk(None, &item.tree);
         Descend::Over
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Unfold
     }
 
-    fn on_path(&mut self, path: &'ast Path) -> Descend {
+    fn on_path(&mut self, path: &'ast Path, _: &Facts<'_, Path>) -> Descend {
         path.segments.first().zip(path.segments.iter().nth(1)).into_iter().for_each(|(first, second)| {
             self.references.record(Some(&first.ident), Leaf::Named(&second.ident));
         });

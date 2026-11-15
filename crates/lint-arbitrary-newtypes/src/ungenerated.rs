@@ -8,8 +8,8 @@ use syn::{ItemStruct, Lifetime, TypeReference};
 use derived::Derived;
 use finding::Finding;
 use lint_core::{Site, SourceFile, Violation};
-use lint_layout::{LineNumber, Name};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_layout::LineNumber;
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Holding {
@@ -48,28 +48,25 @@ impl<'ast> Watch<'ast> for Ungenerated<'_> {
         &[Kind::ItemStruct, Kind::TypeReference, Kind::Lifetime]
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
         let derived = Derived::from(item.attrs.as_slice());
-        let flagged = derived.lacks_generator().map(|_| {
-            Violation::new(
-                Site::new(self.path, LineNumber::from(item.struct_token.span)),
-                Finding::from(Name::from(&item.ident)),
-            )
+        let flagged = derived.lacks_generator().zip(facts.name()).map(|(_, name)| {
+            Violation::new(Site::new(self.path, LineNumber::from(item.struct_token.span)), Finding::from(name.clone()))
         });
         self.open.push(Open { flagged, holding: Holding::Owning });
         Descend::Into
     }
 
-    fn off_item_struct(&mut self, _: &'ast ItemStruct) {
+    fn off_item_struct(&mut self, _: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) {
         let closed = self.open.pop().filter(|open| open.holding == Holding::Owning);
         self.found.extend(closed.and_then(|open| open.flagged));
     }
 
-    fn on_type_reference(&mut self, _: &'ast TypeReference) -> Descend {
+    fn on_type_reference(&mut self, _: &'ast TypeReference, _: &Facts<'_, TypeReference>) -> Descend {
         self.borrowed()
     }
 
-    fn on_lifetime(&mut self, _: &'ast Lifetime) -> Descend {
+    fn on_lifetime(&mut self, _: &'ast Lifetime, _: &Facts<'_, Lifetime>) -> Descend {
         self.borrowed()
     }
 }

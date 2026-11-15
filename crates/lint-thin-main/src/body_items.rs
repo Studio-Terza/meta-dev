@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use syn::{Item, ItemFn};
 
 use lint_core::SourceFile;
-use lint_sweep::{Descend, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 
 use crate::ThinMain;
 
@@ -31,7 +31,7 @@ impl<'ast> Watch<'ast> for BodyItems {
         &[Kind::Item]
     }
 
-    fn on_item(&mut self, item: &'ast Item) -> Descend {
+    fn on_item(&mut self, item: &'ast Item, _: &Facts<'_, Item>) -> Descend {
         self.found.extend(Self::declared(item));
         Descend::Over
     }

@@ -10,7 +10,7 @@ use syn::{ItemImpl, ItemMod, Visibility};
 use lint_core::{Bound, DeclaredType, FileHead, Home, Parsed, Site, Syntax, TypeHomes, Violation, Walk};
 use lint_file::Concluded;
 use lint_layout::{Length, LineNumber, Name};
-use lint_sweep::{Descend, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
 
 use super::RepeatedMethods;
 use inners::{InnerTypes, Inners};
@@ -149,16 +149,17 @@ impl<'ast> Watch<'ast> for ImplReading<'_> {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
         let head = self.head;
-        let written = Name::of_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
+        let written = facts.name().cloned().filter(|_| facts.gate() == Walk::Entered);
         let spelled = written.map(|name| {
             let erasure = Erasure::around(&name);
-            let methods = Syntax::inherent(item)
+            let methods = facts
+                .inherent()
                 .into_iter()
                 .flat_map(|inherent| inherent.items.iter().filter_map(Syntax::impl_fn))
                 .filter(|function| matches!(function.vis, Visibility::Public(_) | Visibility::Restricted(_)))

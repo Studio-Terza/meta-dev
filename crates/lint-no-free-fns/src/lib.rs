@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use std::path::Path as StdPath;
 
 use syn::{Ident, ItemFn, Path};
@@ -55,7 +55,7 @@ impl<'ast> Watch<'ast> for FreeFns<'_> {
         &[Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         let name = &function.sig.ident;
         self.found.extend(NoFreeFns::exemption(function).map_or_else(
             || Some(Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::FreeFn { name })),
@@ -64,7 +64,7 @@ impl<'ast> Watch<'ast> for FreeFns<'_> {
         Descend::Into
     }
 
-    fn on_macro(&mut self, _: &'ast syn::Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast syn::Macro, _: &Facts<'_, syn::Macro>) -> Descend {
         Descend::Expand
     }
 }

@@ -1,3 +1,4 @@
+mod reads;
 mod repetitions;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -8,12 +9,13 @@ use body_lifts::{Body, BodyReading, Branching};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
-use lint_sweep::{Address, Descend, Kind, Sweep, Watch};
+use lint_sweep::{Address, Descend, Facts, Kind, Sweep, Watch};
 
 use crate::branches::{Branches, Propagation};
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
+use reads::{Reads, ReadsLowered};
 use repetitions::Repetitions;
 
 #[derive(Debug)]
@@ -37,6 +39,7 @@ pub(super) struct LoweredDefinition {
     branching: Branching,
     invocations: Vec<LoweredInvocation>,
     repetitions: Vec<Repetition>,
+    reads: ReadsLowered,
 }
 
 #[derive(Debug)]
@@ -60,7 +63,9 @@ impl LoweredDefinition {
         let mut invocations = Invocations::default();
         let mut branches = Branches::new(Propagation::Ambient);
         let mut repetitions = Repetitions::of_signature(signature);
-        Sweep::over_block(body, vec![&mut rebound, &mut invocations, &mut branches, &mut repetitions]);
+        let mut reads = Reads::default();
+        Sweep::over_block(body, vec![&mut rebound, &mut invocations, &mut branches, &mut repetitions, &mut reads]);
+        let read = reads.settled(scope, signature, body, &rebound.0);
         let parameters: BTreeMap<Name, TypeRef<Written>> = signature
             .inputs
             .iter()
@@ -77,13 +82,16 @@ impl LoweredDefinition {
             branching: branches.score(),
             invocations: invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
             repetitions: repetitions.found(),
+            reads: read,
         }
     }
 
     pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Definition {
         let invocations =
             self.invocations.into_iter().map(|invocation| invocation.resolved(resolving, scope)).collect();
-        Definition::new(self.shape, self.branching, invocations).repeated(self.repetitions)
+        Definition::new(self.shape, self.branching, invocations)
+            .repeated(self.repetitions)
+            .reading(self.reads.resolved(resolving, scope))
     }
 }
 
@@ -181,22 +189,22 @@ impl<'ast> Watch<'ast> for Invocations {
         &[Kind::Item, Kind::ExprMethodCall, Kind::ExprCall]
     }
 
-    fn on_item(&mut self, _: &'ast Item) -> Descend {
+    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
         Descend::Over
     }
 
-    fn on_expr_method_call(&mut self, found: &'ast ExprMethodCall) -> Descend {
+    fn on_expr_method_call(&mut self, found: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
         self.calling.push(Calling { receiver: Self::receiving(&found.receiver), called: None });
         Descend::Into
     }
 
-    fn off_expr_method_call(&mut self, found: &'ast ExprMethodCall) {
+    fn off_expr_method_call(&mut self, found: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) {
         let called = self.calling.pop().and_then(|calling| calling.called);
         let receiver = Self::receiver(&found.receiver, called);
         self.made(Some(LoweredInvocation::Method { receiver, name: Name::from(&found.method) }), Address::from(found));
     }
 
-    fn off_expr_call(&mut self, found: &'ast ExprCall) {
+    fn off_expr_call(&mut self, found: &'ast ExprCall, _: &Facts<'_, ExprCall>) {
         let segments: Vec<Name> = Syntax::expr_path(&found.func)
             .map_or_default(|path| path.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect());
         let owner = segments.iter().rev().nth(1).cloned();
@@ -210,11 +218,11 @@ impl<'ast> Watch<'ast> for Rebound {
         &[Kind::Item, Kind::PatIdent]
     }
 
-    fn on_item(&mut self, _: &'ast Item) -> Descend {
+    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
         Descend::Over
     }
 
-    fn on_pat_ident(&mut self, found: &'ast PatIdent) -> Descend {
+    fn on_pat_ident(&mut self, found: &'ast PatIdent, _: &Facts<'_, PatIdent>) -> Descend {
         self.0.insert(Name::from(&found.ident));
         Descend::Into
     }

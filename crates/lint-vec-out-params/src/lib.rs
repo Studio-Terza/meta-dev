@@ -4,11 +4,11 @@ use std::path::Path;
 
 use finding::Finding;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use syn::spanned::Spanned;
 use syn::{ItemImpl, ItemMod, Macro, PathSegment, Signature, Type, TypePath, TypeReference};
 
-use lint_core::{Headline, Site, SourceFile, Syntax, Violation, Walk};
+use lint_core::{Headline, Site, SourceFile, Syntax, Violation};
 use lint_layout::{LineNumber, Name, Word};
 
 #[derive(Debug)]
@@ -67,19 +67,19 @@ impl<'ast> Watch<'ast> for OutParams<'_> {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::Macro, Kind::Signature]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::inherent_impls(item))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        facts.inherent().map_or(Descend::Over, |_| Descend::Into)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature) -> Descend {
+    fn on_signature(&mut self, signature: &'ast Signature, facts: &Facts<'_, Signature>) -> Descend {
         let path = self.path;
         self.violations.extend(
             signature
@@ -87,11 +87,9 @@ impl<'ast> Watch<'ast> for OutParams<'_> {
                 .iter()
                 .filter_map(Syntax::typed)
                 .filter(|typed| VecOutParams::vec_out(&typed.ty).is_some())
-                .map(|typed| {
-                    Violation::new(
-                        Site::new(path, LineNumber::from(typed.pat.span())),
-                        Finding::VecOut { name: Name::from(&signature.ident) },
-                    )
+                .filter_map(|typed| {
+                    let name = facts.name()?.clone();
+                    Some(Violation::new(Site::new(path, LineNumber::from(typed.pat.span())), Finding::VecOut { name }))
                 }),
         );
         Descend::Over

@@ -1,9 +1,11 @@
 mod boundary;
+mod facts;
 mod hooks;
 
 use crate::walk::Walk;
 
 pub use boundary::Address;
+pub use facts::Facts;
 pub use hooks::{ByKind, Kind, Watch};
 
 pub type Watching<'run> = dyn for<'ast> Watch<'ast> + 'run;

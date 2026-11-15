@@ -1,7 +1,7 @@
 mod tokens;
 
 use syn::spanned::Spanned;
-use syn::{ExprPath, Macro, QSelf, Type};
+use syn::{ExprPath, Macro, QSelf, Type, TypeParamBound};
 
 use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved};
 use lint_layout::Position;
@@ -12,6 +12,7 @@ use super::Lowering;
 use super::places::PlaceId;
 use super::quotes::QuoteRow;
 use super::seat::{Built, Footing, Located};
+use lint_sweep::Address;
 use tokens::TokenPaths;
 
 #[derive(Debug)]
@@ -27,13 +28,13 @@ impl UseRow {
     fn domain(&self) -> Domain {
         match self.mention {
             Mention::Invoked => Domain::Macros,
-            Mention::Expression | Mention::InMacro | Mention::Interpolated => Domain::Types,
+            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Dispatched => Domain::Types,
         }
     }
 
     fn kept<'resolved>(&self, resolved: &'resolved Resolved) -> Option<&'resolved Resolved> {
         match self.mention {
-            Mention::Invoked => Some(resolved),
+            Mention::Invoked | Mention::Dispatched => Some(resolved),
             Mention::Expression | Mention::InMacro | Mention::Interpolated => {
                 self.written.tail().first().map(|_| resolved).or_else(|| resolved.known())
             }
@@ -69,6 +70,34 @@ impl Built for UseRow {
     }
 }
 #[derive(Debug)]
+struct Dispatch;
+
+impl Dispatch {
+    const OWNED_MEMBER: usize = 2;
+
+    fn objects(ty: &Type) -> Vec<UsePath> {
+        match ty {
+            Type::TraitObject(object) => object.bounds.iter().filter_map(Self::traited).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn traited(bound: &TypeParamBound) -> Option<UsePath> {
+        match bound {
+            TypeParamBound::Trait(traited) => Some(UsePath::from(&traited.path)),
+            _ => None,
+        }
+    }
+
+    fn qualified(qself: &QSelf, path: &syn::Path) -> Option<UsePath> {
+        let segments: syn::punctuated::Punctuated<syn::PathSegment, syn::Token![::]> =
+            path.segments.iter().take(qself.position).cloned().collect();
+        let present = segments.first().map(|_| ());
+        present.map(|()| UsePath::from(&syn::Path { leading_colon: path.leading_colon, segments }))
+    }
+}
+
+#[derive(Debug)]
 struct Qualified;
 
 impl Qualified {
@@ -96,11 +125,39 @@ impl Qualified {
 impl Lowering<'_> {
     pub(super) fn path_used(&mut self, expression: &ExprPath) {
         let position = expression.path.segments.first().map(|first| Position::from(first.ident.span()));
+        let called = self.calling.take().filter(|at| *at == Address::from(expression));
+        let tabled = called.map_or(Some(()), |_| None).and(self.tables.last()).map(|_| ());
+        let dispatched = tabled.map_or_default(|()| self.dispatched(expression));
+        dispatched.into_iter().zip(position).fold(&mut *self, |lowering, (path, at)| {
+            lowering.used(path, at, Mention::Dispatched);
+            lowering
+        });
         let found = Qualified::written(expression).zip(position);
         found.into_iter().fold(self, |lowering, (path, at)| {
             lowering.used(path, at, Mention::Expression);
             lowering
         });
+    }
+
+    pub(super) fn objects_used(&mut self, ty: &Type) {
+        let position = Position::from(ty.span());
+        let traits = Dispatch::objects(ty);
+        traits.into_iter().fold(self, |lowering, path| {
+            lowering.used(path, position, Mention::Dispatched);
+            lowering
+        });
+    }
+
+    fn dispatched(&self, expression: &ExprPath) -> Vec<UsePath> {
+        let member = expression.path.segments.last().map(|last| UsePath::from(&last.ident));
+        let qualified = expression.qself.as_ref().and_then(|qself| Dispatch::qualified(qself, &expression.path));
+        let head =
+            expression.path.segments.first().filter(|_| expression.path.segments.len() == Dispatch::OWNED_MEMBER);
+        let bounded: Vec<UsePath> = head.map_or_default(|first| {
+            self.generics.traits_of(&lint_layout::Name::from(&first.ident)).into_iter().cloned().collect()
+        });
+        let traits = qualified.into_iter().chain(bounded);
+        member.map_or_default(|named| traits.map(|traited| traited.extended(&named)).collect())
     }
 
     pub(super) fn macro_used(&mut self, invoked: &Macro) {

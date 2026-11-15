@@ -195,7 +195,7 @@ impl StdNames {
     const CANONICAL_SEGMENTS: usize = 3;
     const STD: Word<'static> = Word::new("std");
     const STD_ROOTS: [Word<'static>; 3] = words!["std", "core", "alloc"];
-    const PRELUDE: [Canonical; 37] = [
+    const PRELUDE: [Canonical; 41] = [
         Canonical::new(Word::new("marker"), Word::new("Copy"), Kind::Trait),
         Canonical::new(Word::new("marker"), Word::new("Send"), Kind::Trait),
         Canonical::new(Word::new("marker"), Word::new("Sized"), Kind::Trait),
@@ -229,7 +229,11 @@ impl StdNames {
         Canonical::new(Word::new("iter"), Word::new("ExactSizeIterator"), Kind::Trait),
         Canonical::new(Word::new("iter"), Word::new("FromIterator"), Kind::Trait),
         Canonical::new(Word::new("option"), Word::new("Option"), Kind::Type),
+        Canonical::new(Word::new("option"), Word::new("Some"), Kind::Type),
+        Canonical::new(Word::new("option"), Word::new("None"), Kind::Type),
         Canonical::new(Word::new("result"), Word::new("Result"), Kind::Type),
+        Canonical::new(Word::new("result"), Word::new("Ok"), Kind::Type),
+        Canonical::new(Word::new("result"), Word::new("Err"), Kind::Type),
         Canonical::new(Word::new("string"), Word::new("String"), Kind::Type),
         Canonical::new(Word::new("string"), Word::new("ToString"), Kind::Trait),
         Canonical::new(Word::new("vec"), Word::new("Vec"), Kind::Type),

@@ -14,7 +14,7 @@ use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
 use lint_placement::CrateRoot;
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 use reexport_count::ReexportCount;
 use syn::ItemUse;
 use users::Users;
@@ -113,7 +113,7 @@ impl<'ast> Watch<'ast> for UsePaths {
         &[Kind::ItemUse]
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
+    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
         self.0.extend(UseEdges::of_tree(&item.tree));
         Descend::Over
     }

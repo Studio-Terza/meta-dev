@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use syn::ItemMod;
 
 use crate::walk::Walk;
-use crate::watch::{Descend, Kind, Watch};
+use crate::watch::{Descend, Facts, Kind, Watch};
 use lint_layout::Name;
 
 #[derive(Debug, Default)]
@@ -43,7 +43,7 @@ impl<'ast> Watch<'ast> for SupportModules {
         &[Kind::ItemMod]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
         self.names.extend(
             module
                 .content

@@ -8,6 +8,7 @@ use lint_layout::{Name, Position};
 use super::Lowering;
 use super::places::PlaceId;
 use super::seat::{Built, Footing, Located};
+use lint_sweep::Address;
 
 #[derive(Debug)]
 pub(super) struct CallRow {
@@ -48,6 +49,7 @@ impl Lowering<'_> {
     }
 
     pub(super) fn path_called(&mut self, call: &ExprCall) {
+        self.calling = Syntax::expr_path(&call.func).map(Address::from);
         Syntax::expr_path(&call.func).into_iter().fold(self, |lowering, path| {
             let called = CallPath { path: &path.path };
             lowering.called(called.position(), Callee::Path(called.written()));

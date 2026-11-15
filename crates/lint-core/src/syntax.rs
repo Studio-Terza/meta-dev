@@ -1,10 +1,10 @@
 use proc_macro2::{Group, Literal, Punct, TokenTree};
 use syn::punctuated::Punctuated;
 use syn::{
-    AngleBracketedGenericArguments, Expr, ExprClosure, ExprLit, ExprPath, Field, Fields, FnArg, GenericArgument,
-    GenericParam, Ident, ImplItem, ImplItemFn, ImplItemType, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member,
-    Pat, PatIdent, PatType, PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, TraitItemType,
-    Type, TypeParam, TypeParamBound, TypePath,
+    AngleBracketedGenericArguments, Expr, ExprCall, ExprClosure, ExprLit, ExprPath, Field, Fields, FnArg,
+    GenericArgument, GenericParam, Ident, ImplItem, ImplItemFn, ImplItemType, Item, ItemImpl, ItemMod, ItemUse, Lit,
+    LitStr, Member, Pat, PatIdent, PatType, PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn,
+    TraitItemType, Type, TypeParam, TypeParamBound, TypePath,
 };
 
 #[derive(Debug)]
@@ -145,6 +145,14 @@ impl Syntax {
         match member {
             Member::Named(named) => Some(named),
             Member::Unnamed(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn expr_call(expr: &Expr) -> Option<&ExprCall> {
+        match expr {
+            Expr::Call(call) => Some(call),
+            _ => None,
         }
     }
 

@@ -3,7 +3,7 @@ use syn::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 use graph_reader::{Branches, Propagation};
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
-use lint_sweep::{Descend, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 
 use super::function::Function;
 
@@ -42,19 +42,19 @@ impl<'ast> Watch<'ast> for Functions<'_> {
         &[Kind::ItemMod, Kind::ItemFn, Kind::ImplItemFn, Kind::TraitItemFn]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.recorded(&function.attrs, &function.sig.ident, Some(&function.block))
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.recorded(&function.attrs, &function.sig.ident, Some(&function.block))
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn) -> Descend {
+    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
         self.recorded(&function.attrs, &function.sig.ident, function.default.as_ref())
     }
 }

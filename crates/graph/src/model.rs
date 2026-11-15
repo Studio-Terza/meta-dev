@@ -6,6 +6,7 @@ mod filed;
 use crate::boundary::ItemId;
 use crate::call::Call;
 use crate::crate_root::CrateRoots;
+use crate::dispatch::Dispatch;
 use crate::domain::Domain;
 use crate::function::Function;
 use crate::holding::Holding;
@@ -33,6 +34,7 @@ pub struct Model {
     calls: Vec<Filed<Call>>,
     uses: Vec<Filed<PathUse>>,
     interpolated: Vec<Filed<PathUse>>,
+    dispatched: Vec<Dispatch>,
     quoted: Vec<Filed<Quoted>>,
     placed: Vec<Filed<ItemDeclaration>>,
     laws: Vec<Filed<Law>>,
@@ -184,6 +186,11 @@ impl Model {
     #[must_use]
     pub fn uses(&self) -> PathUses<'_> {
         PathUses { files: &self.files, rows: self.uses.iter() }
+    }
+
+    #[must_use]
+    pub fn dispatches(&self) -> &[Dispatch] {
+        &self.dispatched
     }
 
     pub fn mentions(&self) -> impl Iterator<Item = Placed<'_, &PathUse>> {

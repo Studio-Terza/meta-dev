@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -17,7 +17,6 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Syntax;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::LineNumber;
 
 #[derive(Debug)]
@@ -106,34 +105,34 @@ impl<'ast> Watch<'ast> for TypeShapes<'_> {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemStruct, Kind::ItemEnum, Kind::ItemType, Kind::Macro, Kind::Signature]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::inherent_impls(item))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        facts.inherent().map_or(Descend::Over, |_| Descend::Into)
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
         self.check_fields(&item.fields);
         Descend::Over
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
         item.variants.iter().for_each(|variant| self.check_fields(&variant.fields));
         Descend::Over
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType) -> Descend {
+    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
         self.check_type(&item.ty);
         Descend::Over
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature) -> Descend {
+    fn on_signature(&mut self, signature: &'ast Signature, _: &Facts<'_, Signature>) -> Descend {
         signature
             .inputs
             .iter()
@@ -159,7 +158,7 @@ impl<'ast> Watch<'ast> for TypeFindings {
         &[Kind::TypeTuple, Kind::TypePath]
     }
 
-    fn on_type_tuple(&mut self, tuple: &'ast TypeTuple) -> Descend {
+    fn on_type_tuple(&mut self, tuple: &'ast TypeTuple, _: &Facts<'_, TypeTuple>) -> Descend {
         self.0.extend(tuple.elems.first().map(|_| {
             Message::new(
                 Problem::new("tuple in a signature or field"),
@@ -169,7 +168,7 @@ impl<'ast> Watch<'ast> for TypeFindings {
         Descend::Into
     }
 
-    fn on_type_path(&mut self, path: &'ast TypePath) -> Descend {
+    fn on_type_path(&mut self, path: &'ast TypePath, _: &Facts<'_, TypePath>) -> Descend {
         self.0.extend(TypeShape::string_error(path));
         Descend::Into
     }

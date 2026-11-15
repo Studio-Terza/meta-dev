@@ -2,7 +2,7 @@ mod finding;
 
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use std::collections::BTreeMap;
 
 use finding::Finding;
@@ -82,15 +82,15 @@ impl<'ast> Watch<'ast> for PrivateFnCounter<'_> {
         &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
         self.inherent(item)
     }
 }

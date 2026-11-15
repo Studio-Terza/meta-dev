@@ -9,11 +9,10 @@ use method_shape::MethodShape;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
 
 use lint_core::{SourceFile, Violation};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use crate::Bags;
 use lint_core::Syntax;
-use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
@@ -54,17 +53,17 @@ impl<'ast> Watch<'ast> for BagCandidates<'_, '_> {
         &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
-        self.structs.insert(Name::from(&item.ident), LineNumber::from(item.ident.span()));
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
+        self.structs.extend(facts.name().map(|name| (name.clone(), LineNumber::from(item.ident.span()))));
         Descend::Over
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        self.disqualified.extend(Name::of_type(&item.self_ty).and_then(|name| Self::logic_carrier(item, name)));
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        self.disqualified.extend(facts.name().cloned().and_then(|name| Self::logic_carrier(item, name)));
         Descend::Over
     }
 }

@@ -3,7 +3,7 @@ mod boundary;
 use boundary::Numeral;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
-use lint_sweep::{Descend, Finds, Judgement, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Judgement, Kind, Watch};
 use lint_sweep::{Gathers, Sweep, Watching};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,6 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::SupportModules;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::{LineNumber, Word, words};
 
 #[derive(Debug)]
@@ -112,41 +111,41 @@ impl<'ast> Watch<'ast> for Numbers<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
         Gate::BOUNDARY.outside(module)
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst) -> Descend {
+    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
         Descend::Over
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst) -> Descend {
+    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
         Descend::Over
     }
 
-    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst) -> Descend {
+    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Descend {
         Descend::Over
     }
 
-    fn on_expr_const(&mut self, _: &'ast ExprConst) -> Descend {
+    fn on_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) -> Descend {
         Descend::Over
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_lit_int(&mut self, literal: &'ast LitInt) -> Descend {
-        self.lines.extend(NamedNumbers::unnamed(literal));
+    fn on_lit_int(&mut self, _: &'ast LitInt, facts: &Facts<'_, LitInt>) -> Descend {
+        self.lines.extend(facts.unnamed());
         Descend::Into
     }
 
-    fn on_lit_float(&mut self, literal: &'ast LitFloat) -> Descend {
-        self.lines.extend(NamedNumbers::unnamed(literal));
+    fn on_lit_float(&mut self, _: &'ast LitFloat, facts: &Facts<'_, LitFloat>) -> Descend {
+        self.lines.extend(facts.unnamed());
         Descend::Into
     }
 }

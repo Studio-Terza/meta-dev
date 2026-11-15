@@ -4,7 +4,7 @@ use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature
 
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use finding::Finding;
 
@@ -47,27 +47,27 @@ impl<'ast> Watch<'ast> for Returns<'_> {
         &[Kind::ItemMod, Kind::ItemFn, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemTrait, Kind::TraitItemFn]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.opened(&function.attrs, &function.sig)
     }
 
-    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::inherent_impls(block)).then(|| Descend::from(Walk::outside_tests(&block.attrs)))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        facts.inherent().map_or(Descend::Over, |_| Descend::Into).then(|| Descend::from(facts.gate()))
     }
 
-    fn on_impl_item_fn(&mut self, method: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, method: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.opened(&method.attrs, &method.sig)
     }
 
-    fn on_item_trait(&mut self, block: &'ast ItemTrait) -> Descend {
-        Descend::from(Walk::outside_tests(&block.attrs))
+    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_trait_item_fn(&mut self, method: &'ast TraitItemFn) -> Descend {
+    fn on_trait_item_fn(&mut self, method: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
         self.opened(&method.attrs, &method.sig)
     }
 }

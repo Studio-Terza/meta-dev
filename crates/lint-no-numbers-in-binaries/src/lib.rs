@@ -2,7 +2,7 @@ use std::path::Path;
 
 use lint_core::{Headline, Violation};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use syn::{ItemMod, LitFloat, LitInt};
 
 use lint_core::Fix;
@@ -10,9 +10,7 @@ use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::Walk;
 use lint_layout::LineNumber;
-use lint_named_numbers::NamedNumbers;
 
 #[derive(Debug)]
 pub struct NoNumbersInBinaries;
@@ -46,17 +44,17 @@ impl<'ast> Watch<'ast> for Numbers<'_> {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_lit_int(&mut self, literal: &'ast LitInt) -> Descend {
-        self.lines.extend(NamedNumbers::unnamed(literal));
+    fn on_lit_int(&mut self, _: &'ast LitInt, facts: &Facts<'_, LitInt>) -> Descend {
+        self.lines.extend(facts.unnamed());
         Descend::Into
     }
 
-    fn on_lit_float(&mut self, literal: &'ast LitFloat) -> Descend {
-        self.lines.extend(NamedNumbers::unnamed(literal));
+    fn on_lit_float(&mut self, _: &'ast LitFloat, facts: &Facts<'_, LitFloat>) -> Descend {
+        self.lines.extend(facts.unnamed());
         Descend::Into
     }
 }

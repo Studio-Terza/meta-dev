@@ -13,7 +13,7 @@ use lint_layout::Name;
 use lint_placement::PackageRoot;
 
 use crate::FileMentions;
-use lint_sweep::{Address, Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 
 pub(crate) use ground::Ground;
 
@@ -130,59 +130,59 @@ impl<'ast> Watch<'ast> for Mentions {
         Descend::Into
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         invocation.tokens.clone().into_iter().for_each(|tree| self.scanned(tree));
         Descend::Into
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
         self.grounds.entered(&module.attrs)
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.grounds.left();
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.function(&function.attrs, &function.vis)
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
         self.grounds.left();
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
         self.grounds.entered(&item.attrs)
     }
 
-    fn off_item_impl(&mut self, _: &'ast ItemImpl) {
+    fn off_item_impl(&mut self, _: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) {
         self.grounds.left();
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.function(&function.attrs, &function.vis)
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
         self.grounds.left();
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature) -> Descend {
+    fn on_signature(&mut self, signature: &'ast Signature, _: &Facts<'_, Signature>) -> Descend {
         self.skips.0.push(Address::from(&signature.ident));
         Descend::Into
     }
 
-    fn on_variant(&mut self, variant: &'ast Variant) -> Descend {
+    fn on_variant(&mut self, variant: &'ast Variant, _: &Facts<'_, Variant>) -> Descend {
         self.skips.0.push(Address::from(&variant.ident));
         self.skips.0.extend(variant.attrs.iter().map(Address::from));
         Descend::Into
     }
 
-    fn on_attribute(&mut self, attribute: &'ast Attribute) -> Descend {
+    fn on_attribute(&mut self, attribute: &'ast Attribute, _: &Facts<'_, Attribute>) -> Descend {
         self.skips.passed(Address::from(attribute))
     }
 
-    fn on_visibility(&mut self, visibility: &'ast Visibility) -> Descend {
+    fn on_visibility(&mut self, visibility: &'ast Visibility, _: &Facts<'_, Visibility>) -> Descend {
         self.skips.passed(Address::from(visibility))
     }
 }

@@ -5,8 +5,7 @@ use syn::ItemMod;
 use super::PublicApiTests;
 use lint_core::{Site, SourceFile, Syntax, Violation};
 use lint_layout::LineNumber;
-use lint_layout::Name;
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 #[derive(Debug)]
 pub(crate) struct PathReach<'file> {
@@ -61,17 +60,17 @@ impl<'ast> Watch<'ast> for PathReach<'_> {
         &[Kind::ItemMod]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
         self.lines.extend(
             Self::target(module)
                 .filter(|target| Self::lexical(&self.directory.join(target)).starts_with(&self.source))
                 .map(|_| LineNumber::from(module.ident.span())),
         );
-        self.directory.push(Name::from(&module.ident));
+        self.directory.extend(facts.name());
         Descend::Into
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.directory.pop();
     }
 }

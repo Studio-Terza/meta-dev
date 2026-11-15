@@ -11,7 +11,7 @@ use std::path::Path;
 
 use lint_core::{Bound, Parsed, Site, Walk};
 use lint_layout::{Length, LineNumber, TestMarks};
-use lint_sweep::{Descend, Gathers, Kind as Node, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Sweep, Watch, Watching};
 use spread::Spread;
 
 use crate::Occurrences;
@@ -95,55 +95,55 @@ impl<'ast> Watch<'ast> for Scan<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
         self.within(&module.attrs)
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.without();
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
         self.within(&item.attrs)
     }
 
-    fn off_item_impl(&mut self, _: &'ast ItemImpl) {
+    fn off_item_impl(&mut self, _: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) {
         self.without();
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.within(&function.attrs)
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
         self.without();
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.within(&function.attrs)
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
         self.without();
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn) -> Descend {
+    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
         self.within(&function.attrs)
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn) {
+    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
         self.without();
     }
 
-    fn on_block(&mut self, block: &'ast Block) -> Descend {
+    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
         self.considered(block).map_or(Descend::Over, |_| Descend::Into)
     }
 
-    fn on_expr_match(&mut self, found: &'ast ExprMatch) -> Descend {
+    fn on_expr_match(&mut self, found: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {
         self.considered(found).map_or(Descend::Over, |_| Descend::Into)
     }
 
-    fn on_expr_closure(&mut self, found: &'ast ExprClosure) -> Descend {
+    fn on_expr_closure(&mut self, found: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) -> Descend {
         self.considered(found).map_or(Descend::Over, |_| Descend::Into)
     }
 }

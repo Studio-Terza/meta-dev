@@ -21,6 +21,13 @@ struct SubjectRow {
     scope: ScopeId,
     ty: TypeRef<Written>,
     implemented: Option<Name>,
+    traited: Option<UsePath>,
+}
+
+impl SubjectRow {
+    fn implemented_trait(&self, resolving: &Resolving<'_, '_, '_>) -> Option<Resolved> {
+        self.traited.as_ref().map(|path| resolving.path(self.scope, path, Domain::Types))
+    }
 }
 
 #[derive(Debug)]
@@ -66,9 +73,10 @@ impl PlaceRows {
                 let owner = declared
                     .map(|found| found.item)
                     .or_else(|| subject.as_ref()?.named().map(AsRef::<Resolved>::as_ref)?.crate_item());
-                let implemented =
-                    row.subject.and_then(|id| self.subjects.get(id.0)).and_then(|found| found.implemented.clone());
-                Place { subject, owner, declared, implemented }
+                let subjected = row.subject.and_then(|id| self.subjects.get(id.0));
+                let implemented = subjected.and_then(|found| found.implemented.clone());
+                let traited = subjected.and_then(|found| found.implemented_trait(resolving));
+                Place { subject, owner, declared, implemented, traited }
             })
             .collect();
         Places(places)
@@ -92,6 +100,7 @@ struct Place {
     owner: Option<ItemId>,
     declared: Option<Declared>,
     implemented: Option<Name>,
+    traited: Option<Resolved>,
 }
 
 #[derive(Debug)]
@@ -110,6 +119,7 @@ impl Places {
         Seat::new(region, found.and_then(|seated| seated.subject.clone()))
             .owned(found.and_then(|seated| seated.owner))
             .implementing(found.and_then(|seated| seated.implemented.clone()))
+            .traited(found.and_then(|seated| seated.traited.clone()))
     }
 }
 
@@ -195,7 +205,8 @@ impl Lowering<'_> {
         let subjected = SubjectId(rows.len());
         let implemented =
             block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
-        rows.push(SubjectRow { scope: self.here.scope(), ty: subject, implemented });
+        let traited = block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path));
+        rows.push(SubjectRow { scope: self.here.scope(), ty: subject, implemented, traited });
         let place = self.placed(PlaceRow { subject: Some(subjected), owner: None });
         self.context = self.context.of_impl(block, place);
         self.enclosed(Enclosure::of_impl(block), generics)

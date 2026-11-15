@@ -5,7 +5,7 @@ use std::fmt;
 use syn::Macro;
 use syn::visit::{self, Visit};
 
-use lint_core::{ByKind, Descend, Kind, Macros, SourceFile, Violation, Watch, Watching};
+use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Violation, Watch, Watching};
 use lint_layout::Name;
 
 use boundary::{Index, Muting};
@@ -153,10 +153,11 @@ struct Entered {
 impl<'ast> Visit<'ast> for Sweeping<'_, '_> {
     fn visit_macro(&mut self, node: &'ast Macro) {
         self.file.map_or_default(|file| Macros::pin(file, node));
-        let entered = self.entered(Kind::Macro, |watcher| watcher.on_macro(node));
+        let facts = Facts::new(node);
+        let entered = self.entered(Kind::Macro, |watcher| watcher.on_macro(node, &facts));
         self.muting.awake().into_iter().for_each(|_| visit::visit_macro(self, node));
         entered.expanding.first().into_iter().for_each(|_| self.expanded(&entered, node));
-        self.left(&entered, |watcher| watcher.off_macro(node));
+        self.left(&entered, |watcher| watcher.off_macro(node, &facts));
     }
 
     fn visit_ident(&mut self, node: &'ast syn::Ident) {

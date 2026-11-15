@@ -7,9 +7,8 @@ use lint_core::Home;
 use lint_core::Parsed;
 use lint_core::TypeHomes;
 use lint_core::TypeName;
-use lint_core::Walk;
 use lint_layout::Name;
-use lint_sweep::{Descend, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
 pub use vertex::Vertex;
 
 #[derive(Debug)]
@@ -147,24 +146,24 @@ impl<'ast> Watch<'ast> for DeclarationReading {
         &[Kind::ItemImpl, Kind::ItemType, Kind::ItemEnum, Kind::ItemMod]
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        let descend = Descend::from(Walk::outside_tests(&item.attrs));
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        let descend = Descend::from(facts.gate());
         self.vertices.extend(descend.entered().and_then(|_| Declarations::vertex(item)));
         descend
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType) -> Descend {
+    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
         self.aliases.insert(TypeName::named(&item.ident), TypeName::from_type(&item.ty));
         Descend::Over
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
-        let entered = Descend::from(Walk::outside_tests(&item.attrs)).entered();
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, facts: &Facts<'_, ItemEnum>) -> Descend {
+        let entered = Descend::from(facts.gate()).entered();
         self.reading.extend(entered.and_then(|_| Declarations::sum_type(item)).map(|found| Name::from(&found.ident)));
         Descend::Over
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 }

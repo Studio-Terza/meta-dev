@@ -6,7 +6,7 @@ use equivalence::Equivalence;
 use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 use quote::ToTokens;
 use syn::{ItemImpl, ItemMod};
 
@@ -73,14 +73,14 @@ impl<'ast> Watch<'ast> for Scan<'_> {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, found: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, found: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
         let interface =
             found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
-        let filled = interface.zip(Name::of_type(&found.self_ty)).map(|(trait_name, filler)| Filled {
+        let filled = interface.zip(facts.name().cloned()).map(|(trait_name, filler)| Filled {
             krate: self.krate,
             filler,
             interface: trait_name,
@@ -96,9 +96,7 @@ impl<'ast> Watch<'ast> for Scan<'_> {
                 )
             })
             .collect();
-        self.fillers
-            .bodies
-            .extend(filled.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered).map(|kept| (kept, methods)));
+        self.fillers.bodies.extend(filled.filter(|_| facts.gate() == Walk::Entered).map(|kept| (kept, methods)));
         Descend::Over
     }
 }

@@ -4,7 +4,7 @@ mod nesting_depth;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Address, Descend, Finds, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -19,7 +19,6 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Syntax;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::{Length, Name, Prefix, Whole, Word, words};
 
@@ -161,31 +160,31 @@ impl<'ast> Watch<'ast> for Shapes<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
-        Descend::from(Walk::outside_tests(&function.attrs))
+    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
-        Descend::from(Walk::outside_tests(&function.attrs))
+    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, facts: &Facts<'_, ImplItemFn>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature) -> Descend {
+    fn on_signature(&mut self, signature: &'ast Signature, _: &Facts<'_, Signature>) -> Descend {
         let typed = signature.inputs.iter().filter(|argument| matches!(argument, FnArg::Typed(_))).count();
         let wide = FnShape::PARAMETERS.allows(Length::new(typed)).map_or(Some(signature.ident.span()), |_| None);
         self.violations.extend(
@@ -194,7 +193,7 @@ impl<'ast> Watch<'ast> for Shapes<'_> {
         Descend::Into
     }
 
-    fn on_local(&mut self, local: &'ast Local) -> Descend {
+    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
         self.violations.extend(
             FnShape::binds_bool(local).map(|binding| Self::found(self.path, binding.span(), Finding::BooleanLocal)),
         );
@@ -208,7 +207,7 @@ impl<'ast> Watch<'ast> for Shapes<'_> {
         Descend::Into
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
+    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
         self.violations.extend(
             call.args
                 .first()
@@ -219,51 +218,51 @@ impl<'ast> Watch<'ast> for Shapes<'_> {
         Descend::Into
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf) -> Descend {
+    fn on_expr_if(&mut self, expr: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
         self.nests.push(Nest { at: Address::from(&expr.then_branch), span: expr.if_token.span });
         self.nests.extend(expr.else_branch.as_ref().and_then(|(_, branch)| Nest::unchained(branch)));
         Descend::Into
     }
 
-    fn on_arm(&mut self, arm: &'ast Arm) -> Descend {
+    fn on_arm(&mut self, arm: &'ast Arm, _: &Facts<'_, Arm>) -> Descend {
         self.nests.push(Nest { at: Address::from(&*arm.body), span: arm.body.span() });
         Descend::Into
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
         self.nests.push(Nest { at: Address::from(&expr.body), span: expr.for_token.span });
         Descend::Into
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
+    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
         self.nests.push(Nest { at: Address::from(&expr.body), span: expr.while_token.span });
         Descend::Into
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
+    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
         self.nests.push(Nest { at: Address::from(&expr.body), span: expr.loop_token.span });
         Descend::Into
     }
 
-    fn on_expr_closure(&mut self, closure: &'ast ExprClosure) -> Descend {
+    fn on_expr_closure(&mut self, closure: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) -> Descend {
         self.nests.push(Nest { at: Address::from(&*closure.body), span: closure.or1_token.span });
         Descend::Into
     }
 
-    fn on_block(&mut self, block: &'ast Block) -> Descend {
-        self.nesting(Address::from(block))
+    fn on_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) -> Descend {
+        self.nesting(facts.address())
     }
 
-    fn off_block(&mut self, block: &'ast Block) {
-        self.unnesting(Address::from(block));
+    fn off_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) {
+        self.unnesting(facts.address());
     }
 
-    fn on_expr(&mut self, expr: &'ast Expr) -> Descend {
-        self.nesting(Address::from(expr))
+    fn on_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) -> Descend {
+        self.nesting(facts.address())
     }
 
-    fn off_expr(&mut self, expr: &'ast Expr) {
-        self.unnesting(Address::from(expr));
+    fn off_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) {
+        self.unnesting(facts.address());
     }
 }
 

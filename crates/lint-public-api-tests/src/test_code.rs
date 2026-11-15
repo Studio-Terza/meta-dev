@@ -9,7 +9,7 @@ use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 use lint_layout::Name;
 use lint_layout::TestMarks;
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 #[derive(Debug)]
 pub(crate) struct TestCode<'run, 'file> {
@@ -37,30 +37,30 @@ impl<'ast> Watch<'ast> for TestCode<'_, '_> {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        let walk = Walk::outside_tests(&module.attrs);
+    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        let walk = facts.gate();
         self.lines.extend((walk == Walk::Skipped).then(|| LineNumber::from(module.ident.span())));
         Descend::from(walk)
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
         self.gated(&item.attrs, LineNumber::from(item.impl_token.span))
     }
 
-    fn on_impl_item_fn(&mut self, method: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, method: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.gated(&method.attrs, LineNumber::from(method.sig.ident.span()))
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
         let line = LineNumber::from(function.sig.ident.span());
         let descend = self.gated(&function.attrs, line);
-        self.lines.extend(TestMarks::mark_test(&function.attrs).filter(|_| descend == Descend::Into).map(|_| line));
+        self.lines.extend(facts.test_mark().filter(|_| descend == Descend::Into).map(|_| line));
         descend
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
         let line = LineNumber::from(invocation.bang_token.span);
-        let law = TestMarks::law(invocation).map(|_| line);
+        let law = facts.law().map(|_| line);
         let called =
             Some(invocation).filter(|candidate| candidate.path.get_ident().is_none_or(|name| name != Self::DEFINITION));
         let marked = called.and_then(|call| {

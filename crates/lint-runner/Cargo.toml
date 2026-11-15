@@ -74,6 +74,7 @@ lint-transition-graph = { path = "../lint-transition-graph" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
+lint-repeated-reads = { path = "../lint-repeated-reads" }
 lint-workflow-run = { path = "../lint-workflow-run" }
 port-core = { path = "../port-core" }
 timer-ports = { path = "../timer-ports" }

@@ -4,7 +4,7 @@ use syn::ItemStruct;
 
 use lint_core::Home;
 use lint_layout::Name;
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 
 use super::method_shape::Spelling;
 
@@ -46,9 +46,9 @@ impl<'ast> Watch<'ast> for InnerTypes {
         &[Kind::ItemStruct]
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
         let only = Some(&item.fields).filter(|fields| fields.len() == 1).and_then(|fields| fields.iter().next());
-        self.0.extend(only.map(|field| (Name::from(&item.ident), Spelling::from(&field.ty))));
+        self.0.extend(only.zip(facts.name()).map(|(field, name)| (name.clone(), Spelling::from(&field.ty))));
         Descend::Over
     }
 }

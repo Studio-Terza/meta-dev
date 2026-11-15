@@ -8,7 +8,7 @@ use syn::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 use gate::Gate;
 use lint_core::{Macros, Walk};
 use lint_core::{Site, SourceFile, Violation};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use crate::NoIgnoredTests;
 use lint_layout::Name;
@@ -93,28 +93,28 @@ impl<'ast> Watch<'ast> for SkipMarks<'_> {
         &[Kind::ItemMod, Kind::ItemFn, Kind::Macro, Kind::Attribute]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
         let inner: Vec<LineNumber> = self.gates.iter().copied().chain(Gate::lines_in(&module.attrs)).collect();
         self.outer.push(std::mem::replace(&mut self.gates, inner));
         Descend::Into
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.gates = self.outer.pop().unwrap_or_default();
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.record_skips(&function.attrs, Marked::among(&function.attrs, None));
         Descend::Into
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
         let attributes = Macros::attributes_in_file(self.file, invocation);
-        self.record_skips(&attributes, Marked::among(&attributes, TestMarks::law(invocation)));
+        self.record_skips(&attributes, Marked::among(&attributes, facts.law()));
         Descend::Over
     }
 
-    fn on_attribute(&mut self, attribute: &'ast Attribute) -> Descend {
+    fn on_attribute(&mut self, attribute: &'ast Attribute, _: &Facts<'_, Attribute>) -> Descend {
         let gated = Some(attribute)
             .filter(|candidate| Walk::outside_tests(slice::from_ref(*candidate)) == Walk::Skipped)
             .map(|skipped| LineNumber::from(skipped.pound_token.span));

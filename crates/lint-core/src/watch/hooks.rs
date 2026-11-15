@@ -3,6 +3,7 @@ use syn::{Ident, Macro};
 use lint_layout::Name;
 
 use super::Descend;
+use super::facts::Facts;
 
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ty;)*) => {
@@ -41,11 +42,11 @@ macro_rules! hooks {
         pub trait Watch<'ast> {
             fn kinds(&self) -> &'static [Kind];
 
-            fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+            fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
                 Descend::Into
             }
 
-            fn off_macro(&mut self, _: &'ast Macro) {}
+            fn off_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) {}
 
             fn on_ident(&mut self, _: &'ast Ident, _: &Name) -> Descend {
                 Descend::Into
@@ -54,11 +55,11 @@ macro_rules! hooks {
             fn off_ident(&mut self, _: &'ast Ident) {}
 
             $(
-                fn $on(&mut self, _: &'ast $node) -> Descend {
+                fn $on(&mut self, _: &'ast $node, _: &Facts<'_, $node>) -> Descend {
                     Descend::Into
                 }
 
-                fn $off(&mut self, _: &'ast $node) {}
+                fn $off(&mut self, _: &'ast $node, _: &Facts<'_, $node>) {}
             )*
         }
 
@@ -67,11 +68,12 @@ macro_rules! hooks {
             () => {
                 $(
                     fn $visit(&mut self, node: &'ast $node) {
+                        let facts = $crate::Facts::new(node);
                         self.around(
                             $crate::Kind::$kind,
-                            |watcher| watcher.$on(node),
+                            |watcher| watcher.$on(node, &facts),
                             |sweep| syn::visit::$visit(sweep, node),
-                            |watcher| watcher.$off(node),
+                            |watcher| watcher.$off(node, &facts),
                         );
                     }
                 )*

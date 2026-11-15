@@ -12,11 +12,10 @@ use super::function_shape::{Body, FunctionShape, Returns};
 use super::impl_context::{ImplContext, ImplKind};
 use lint_core::TypeName;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_core::{Bound, Site};
 use lint_file::Concluded;
 use lint_layout::{Length, Name};
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 use role::Role;
 
 #[derive(Debug)]
@@ -89,12 +88,12 @@ impl<'ast> Watch<'ast> for EdgeScan<'_, '_> {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs)).then(|| self.scanned(item))
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate()).then(|| self.scanned(item))
     }
 }
 

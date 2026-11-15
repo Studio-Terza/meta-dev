@@ -11,7 +11,7 @@ use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, I
 use lint_core::Module;
 use lint_core::{Parsed, Site, Walk};
 use lint_layout::{LineNumber, Name, Word};
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 
 use members::Members;
 pub use modules::Modules;
@@ -91,48 +91,49 @@ impl<'ast> Watch<'ast> for Guards<'_> {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        let inner = self.module.within(Name::from(&module.ident));
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        let inner = facts.name().map_or_else(|| self.module.clone(), |name| self.module.within(name.clone()));
         let outer = mem::replace(&mut self.module, inner);
         let around = mem::take(&mut self.members);
         self.outer.push(Frame { module: outer, members: around });
-        Descend::from(Walk::outside_tests(&module.attrs))
+        Descend::from(facts.gate())
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         let frame = self.outer.pop().unwrap_or(Frame { module: Module::UNPLACED, members: Members::default() });
         let visited = mem::replace(&mut self.module, frame.module);
         let within = mem::replace(&mut self.members, frame.members);
         self.modules.file(visited, within);
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate())
             .entered()
             .into_iter()
             .for_each(|_| self.members.drop_implemented(Name::implementing(item, Word::new(Self::DROP))));
         Descend::Over
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
         self.declared(&item.attrs, &item.ident)
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
         self.declared(&item.attrs, &item.ident)
     }
 
-    fn on_item_union(&mut self, item: &'ast ItemUnion) -> Descend {
+    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
         self.declared(&item.attrs, &item.ident)
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType) -> Descend {
+    fn on_item_type(&mut self, item: &'ast ItemType, facts: &Facts<'_, ItemType>) -> Descend {
         let target = Name::of_type(&item.ty);
-        Descend::from(Walk::outside_tests(&item.attrs))
+        Descend::from(facts.gate())
             .entered()
             .map(|_| target)
             .into_iter()
-            .for_each(|aliased| self.members.alias(Name::from(&item.ident), aliased));
+            .zip(facts.name())
+            .for_each(|(aliased, name)| self.members.alias(name.clone(), aliased));
         Descend::Over
     }
 }
