@@ -63,21 +63,21 @@ impl Gleaning for TestBudget {
     type Part<'head> = TestBudget;
     type Gleaned<'head> = TestBudget;
 
-    type Gleaner<'head> = Gleaner;
+    type Gleaner<'run, 'head: 'run> = Gleaner<'run>;
 
-    fn gleaner(parsed: Parsed<'_, '_>) -> Gleaner {
+    fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Gleaner<'run> {
         let file = parsed.file();
         Gleaner { name: CrateName::from(file.head().placement().package().root()), budget: BudgetGathering::from(file) }
     }
 }
 
 #[derive(Debug)]
-pub struct Gleaner {
+pub struct Gleaner<'file> {
     name: CrateName,
-    budget: BudgetGathering,
+    budget: BudgetGathering<'file>,
 }
 
-impl Gathers<TestBudget> for Gleaner {
+impl Gathers<TestBudget> for Gleaner<'_> {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
         self.budget.watching()
     }

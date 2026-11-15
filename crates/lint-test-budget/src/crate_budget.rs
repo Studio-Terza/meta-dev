@@ -49,18 +49,18 @@ impl CrateBudget {
 }
 
 #[derive(Debug)]
-pub struct BudgetGathering {
+pub struct BudgetGathering<'file> {
     file: CrateBudget,
     share: TestShare,
     tested: CrateBudget,
-    scan: TestScan,
+    scan: TestScan<'file>,
 }
 
-impl From<&SourceFile> for BudgetGathering {
-    fn from(file: &SourceFile) -> BudgetGathering {
+impl<'file> From<&'file SourceFile> for BudgetGathering<'file> {
+    fn from(file: &'file SourceFile) -> BudgetGathering<'file> {
         let share = file.shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
         let tested = file.test_modules().iter().map(|module| {
-            let scan = Sweep::gathered(module, TestScan::default());
+            let scan = Sweep::gathered(module, TestScan::new(module));
             CrateBudget::measured(module, TestShare::WholeFile, scan)
         });
         let unscanned = CrateBudget::measured(file, share, CrateBudget::default());
@@ -68,12 +68,12 @@ impl From<&SourceFile> for BudgetGathering {
             file: unscanned,
             share,
             tested: tested.fold(CrateBudget::default(), Add::add),
-            scan: TestScan::default(),
+            scan: TestScan::new(file),
         }
     }
 }
 
-impl Gathers<CrateBudget> for BudgetGathering {
+impl Gathers<CrateBudget> for BudgetGathering<'_> {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
         Sweep::alone(&mut self.scan)
     }
@@ -90,7 +90,7 @@ impl Gathers<CrateBudget> for BudgetGathering {
     }
 }
 
-impl Gathers<CrateBudget> for TestScan {
+impl Gathers<CrateBudget> for TestScan<'_> {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
         Sweep::alone(self)
     }

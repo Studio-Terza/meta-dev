@@ -44,7 +44,7 @@ impl PrimedFacts for StateGraph {
     }
 
     fn contribution<'run, 'head: 'run>(
-        parsed: Parsed<'_, 'head>,
+        parsed: Parsed<'run, 'head>,
         declarations: &'run Declarations<'head>,
     ) -> StateContribution<'run, 'head> {
         let path = parsed.head().path();
@@ -52,7 +52,7 @@ impl PrimedFacts for StateGraph {
             edges: EdgeScan::new(path, declarations),
             fields: FieldVisibility::new(path),
             matches: VariantMatches::new(path, Home::from(parsed.head()), declarations),
-            graphs: DeclaredGraphs::new(path),
+            graphs: DeclaredGraphs::new(parsed.file(), path),
         });
         StateContribution { watchers }
     }
@@ -68,7 +68,7 @@ struct StateWatchers<'run, 'head> {
     edges: EdgeScan<'run, 'head>,
     fields: FieldVisibility<'head>,
     matches: VariantMatches<'run, 'head>,
-    graphs: DeclaredGraphs<'head>,
+    graphs: DeclaredGraphs<'run, 'head>,
 }
 
 impl<'head> Gathers<StateFile<'head>> for StateContribution<'_, 'head> {

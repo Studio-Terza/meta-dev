@@ -41,9 +41,9 @@ impl Gleaning for Clones {
     type Part<'head> = CloneFindings<'head>;
     type Gleaned<'head> = CloneFindings<'head>;
 
-    type Gleaner<'head> = CloneSites<'head>;
+    type Gleaner<'run, 'head: 'run> = CloneSites<'head>;
 
-    fn gleaner<'head>(parsed: Parsed<'_, 'head>) -> CloneSites<'head> {
+    fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> CloneSites<'head> {
         let core = parsed.file().shipped().filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
         CloneSites::new(parsed.head().path(), core.map(|_| ()))
     }

@@ -57,9 +57,9 @@ impl Gleaning for RoleReading {
     type Part<'head> = RoleFile<'head>;
     type Gleaned<'head> = RoleFacts<'head>;
 
-    type Gleaner<'head> = RootReading<'head>;
+    type Gleaner<'run, 'head: 'run> = RootReading<'head>;
 
-    fn gleaner<'head>(parsed: Parsed<'_, 'head>) -> RootReading<'head> {
+    fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> RootReading<'head> {
         let head = parsed.head();
         let root = Some(head).filter(|found| found.placement().role() == Placed::LibraryRoot);
         let place = root.and_then(|found| {

@@ -19,6 +19,6 @@ impl SweptLint for LongExactStrings {
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
         let asserting = file.text().mentioning(&Self::NAMED).map(|_| file.head().path());
-        Box::new(Assertions::new(file.head().path(), asserting))
+        Box::new(Assertions::new(file, asserting))
     }
 }

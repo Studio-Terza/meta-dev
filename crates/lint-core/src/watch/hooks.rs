@@ -1,4 +1,6 @@
-use syn::Macro;
+use syn::{Ident, Macro};
+
+use lint_layout::Name;
 
 use super::Descend;
 
@@ -7,27 +9,30 @@ macro_rules! hooks {
         #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
         pub enum Kind {
             Macro,
+            Ident,
             $($kind,)*
         }
 
         impl Kind {
-            pub const ALL: &'static [Kind] = &[Kind::Macro, $(Kind::$kind,)*];
+            pub const ALL: &'static [Kind] = &[Kind::Macro, Kind::Ident, $(Kind::$kind,)*];
         }
 
         #[derive(Debug)]
         pub struct ByKind<Value> {
             on_macro: Value,
+            on_ident: Value,
             $($on: Value,)*
         }
 
         impl<Value> ByKind<Value> {
             pub fn filled(mut fill: impl FnMut(Kind) -> Value) -> ByKind<Value> {
-                ByKind { on_macro: fill(Kind::Macro), $($on: fill(Kind::$kind),)* }
+                ByKind { on_macro: fill(Kind::Macro), on_ident: fill(Kind::Ident), $($on: fill(Kind::$kind),)* }
             }
 
             pub fn get(&self, kind: Kind) -> &Value {
                 match kind {
                     Kind::Macro => &self.on_macro,
+                    Kind::Ident => &self.on_ident,
                     $(Kind::$kind => &self.$on,)*
                 }
             }
@@ -41,6 +46,12 @@ macro_rules! hooks {
             }
 
             fn off_macro(&mut self, _: &'ast Macro) {}
+
+            fn on_ident(&mut self, _: &'ast Ident, _: &Name) -> Descend {
+                Descend::Into
+            }
+
+            fn off_ident(&mut self, _: &'ast Ident) {}
 
             $(
                 fn $on(&mut self, _: &'ast $node) -> Descend {
@@ -98,7 +109,6 @@ hooks! {
     ExprUnary on_expr_unary off_expr_unary visit_expr_unary syn::ExprUnary;
     ExprWhile on_expr_while off_expr_while visit_expr_while syn::ExprWhile;
     Field on_field off_field visit_field syn::Field;
-    Ident on_ident off_ident visit_ident syn::Ident;
     ImplItemConst on_impl_item_const off_impl_item_const visit_impl_item_const syn::ImplItemConst;
     ImplItemFn on_impl_item_fn off_impl_item_fn visit_impl_item_fn syn::ImplItemFn;
     Item on_item off_item visit_item syn::Item;

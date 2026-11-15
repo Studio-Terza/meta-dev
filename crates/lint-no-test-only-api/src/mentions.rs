@@ -124,8 +124,8 @@ impl<'ast> Watch<'ast> for Mentions {
         ]
     }
 
-    fn on_ident(&mut self, ident: &'ast Ident) -> Descend {
-        let named = self.skips.passed(Address::from(ident)).entered().map(|_| Name::from(ident));
+    fn on_ident(&mut self, ident: &'ast Ident, name: &Name) -> Descend {
+        let named = self.skips.passed(Address::from(ident)).entered().map(|_| name.clone());
         self.named.names(self.grounds.ground).extend(named);
         Descend::Into
     }

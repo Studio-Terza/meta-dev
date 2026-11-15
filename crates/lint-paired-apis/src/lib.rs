@@ -68,9 +68,9 @@ impl Gleaning for PairedApis {
     type Part<'head> = PairedOwners<'head>;
     type Gleaned<'head> = PairedOwners<'head>;
 
-    type Gleaner<'head> = PairedGleaner<'head>;
+    type Gleaner<'run, 'head: 'run> = PairedGleaner<'head>;
 
-    fn gleaner<'head>(parsed: Parsed<'_, 'head>) -> PairedGleaner<'head> {
+    fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> PairedGleaner<'head> {
         PairedGleaner(PairedMethods::of_file(parsed))
     }
 }

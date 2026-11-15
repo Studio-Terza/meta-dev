@@ -2,7 +2,7 @@ use syn::Macro;
 use syn::spanned::Spanned;
 
 use graph::{Building, Domain, Quote, Quoted};
-use lint_core::MacroCalls;
+use lint_core::{Macros, SourceFile};
 use lint_layout::{LineNumber, Position};
 
 use crate::namespace::UsePath;
@@ -31,15 +31,17 @@ impl Built for QuoteRow {
 }
 
 impl QuoteRow {
-    pub(super) fn found(invoked: &Macro, here: &Seat) -> Vec<QuoteRow> {
+    pub(super) fn found(source: &SourceFile, invoked: &Macro, here: &Seat) -> Vec<QuoteRow> {
         let row = Quotation::first(invoked).map(|literal| QuoteRow {
             located: here.located(Position::from(invoked.path.span())),
             written: UsePath::from(&invoked.path),
             line: LineNumber::from(literal.span()),
             quote: Quotation::quote(&literal),
         });
-        let nested =
-            MacroCalls::within(invoked).iter().flat_map(|inner| QuoteRow::found(inner, here)).collect::<Vec<_>>();
+        let nested = Macros::nested(source, invoked)
+            .iter()
+            .flat_map(|inner| QuoteRow::found(source, inner, here))
+            .collect::<Vec<_>>();
         row.into_iter().chain(nested).collect()
     }
 }
