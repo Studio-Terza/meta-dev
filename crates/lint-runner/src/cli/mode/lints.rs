@@ -13,12 +13,12 @@ use lint_hand_impls::HandImpls;
 use file_ports::Files;
 use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{
-    ContextLint, FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, Primed, PrimedLint, Reads, Start, Swept,
-    SweptLint,
+    ContextLint, FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, Primed, PrimedLint, Reads, SortStart, Start,
+    Swept, SweptLint,
 };
 use lint_port_dependencies::{RoleFacts, RoleReading};
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Finds, Judgement, Member, Sweep};
+use lint_sweep::{Finds, Judgement, Member, Sorts, Sweep};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -186,7 +186,7 @@ impl Lints {
         <Swept<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
         <Swept<NoEarlyExits> as Registered>::ENTRY,
-        <Swept<LinearBodies> as Registered>::ENTRY,
+        <Kin<LinearBodies> as Registered>::ENTRY,
         <Kin<PureRouters> as Registered>::ENTRY,
         <Kin<PlainConditions> as Registered>::ENTRY,
         Entry::spelled::<TypeSystem>(Work::Extracted(|model| {
@@ -509,11 +509,13 @@ impl Sweepers {
             .collect();
         let leads: BTreeMap<TypeId, Lead> = admitted.iter().map(|(_, source)| ((source.key)(), source.lead)).collect();
         let starts: Vec<(TypeId, Start)> = leads.iter().filter_map(|(key, lead)| Some((*key, lead.swept()?))).collect();
-        let started: Vec<Box<dyn Finds<'_> + '_>> = starts.iter().map(|(_, start)| start(file)).collect();
-        let mut watchers = [started];
-        Sweep::over_all(file, &mut watchers);
-        let [swept] = watchers;
-        let watched = starts.into_iter().zip(swept).map(|((key, _), watcher)| (key, watcher.sorted()));
+        let sorting: Vec<(TypeId, SortStart)> =
+            leads.iter().filter_map(|(key, lead)| Some((*key, lead.sorting()?))).collect();
+        let mut finds: Vec<Box<dyn Finds<'_> + '_>> = starts.iter().map(|(_, start)| start(file)).collect();
+        let mut sorts: Vec<Box<dyn Sorts<'_> + '_>> = sorting.iter().map(|(_, start)| start(file)).collect();
+        Sweep::over_leads(file, &mut finds, &mut sorts);
+        let listed = starts.into_iter().zip(finds).map(|((key, _), watcher)| (key, vec![watcher.found()]));
+        let watched = listed.chain(sorting.into_iter().zip(sorts).map(|((key, _), watcher)| (key, watcher.sorted())));
         let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));
         let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
         let found = admitted.into_iter().map(|(slot, source)| (slot, Self::taken(&mut sorted, source)));

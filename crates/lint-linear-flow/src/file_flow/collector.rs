@@ -7,7 +7,7 @@ use lint_core::SourceFile;
 use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 
 use lint_core::Violation;
-use lint_sweep::Finds;
+use lint_sweep::Sorts;
 
 use super::FileFlow;
 use crate::finding::{Finding, Rule};
@@ -181,7 +181,7 @@ impl<'ast> Watch<'ast> for Collector<'_> {
     }
 }
 
-impl<'file> Finds<'file> for Collector<'file> {
+impl<'file> Sorts<'file> for Collector<'file> {
     fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>> {
         let file = self.file;
         let tested = file.test_modules().iter().map(|module| FileFlow::collected(module, Collector::collected(module)));

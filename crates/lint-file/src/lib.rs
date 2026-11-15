@@ -10,7 +10,7 @@ use lint_sweep::{Finds, Gathers, Judgement, Member, Sweep};
 
 pub use concluded::{Concluded, Listed};
 pub use file_facts::FileFacts;
-pub use lead::{Lead, Leader, Start};
+pub use lead::{Lead, Leader, SortStart, Start};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {

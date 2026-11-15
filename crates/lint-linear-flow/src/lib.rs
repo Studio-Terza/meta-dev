@@ -6,8 +6,8 @@ mod tally;
 mod verdict;
 
 use lint_core::{Headline, Lint, Report, SourceFile};
-use lint_file::{KinLint, Reads, Swept, SweptLint};
-use lint_sweep::{Finds, Member};
+use lint_file::{KinLint, Lead, Leader, Reads};
+use lint_sweep::{Member, Sorts};
 
 use file_flow::Collector;
 
@@ -28,15 +28,27 @@ pub struct PlainConditions;
 #[derive(Debug)]
 pub struct FlowShapes;
 
-impl SweptLint for LinearBodies {
+#[derive(Debug)]
+pub struct FlowRules;
+
+impl FlowRules {
+    fn watcher(file: &SourceFile) -> Box<dyn Sorts<'_> + '_> {
+        Box::new(Collector::watching(file))
+    }
+}
+
+impl Leader for FlowRules {
+    const LEAD: Lead = Lead::Sorting(FlowRules::watcher);
+}
+
+impl KinLint for LinearBodies {
     const HEADLINE: Headline = Headline::new(
         "linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let",
     );
     const READS: Reads = Reads::Every;
+    const MEMBER: Member = Rule::LinearBodies.member();
 
-    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Collector::watching(file))
-    }
+    type Leader = FlowRules;
 }
 
 impl KinLint for PureRouters {
@@ -46,7 +58,7 @@ impl KinLint for PureRouters {
     const READS: Reads = Reads::Every;
     const MEMBER: Member = Rule::PureRouters.member();
 
-    type Leader = Swept<LinearBodies>;
+    type Leader = FlowRules;
 }
 
 impl KinLint for PlainConditions {
@@ -56,7 +68,7 @@ impl KinLint for PlainConditions {
     const READS: Reads = Reads::Every;
     const MEMBER: Member = Rule::PlainConditions.member();
 
-    type Leader = Swept<LinearBodies>;
+    type Leader = FlowRules;
 }
 
 impl Lint for FlowShapes {

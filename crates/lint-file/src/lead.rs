@@ -1,7 +1,9 @@
 use lint_core::{SourceFile, Violation};
-use lint_sweep::{Finds, Member, Sweep};
+use lint_sweep::{Finds, Member, Sorts, Sweep};
 
 pub type Start = for<'file> fn(&'file SourceFile) -> Box<dyn Finds<'file> + 'file>;
+
+pub type SortStart = for<'file> fn(&'file SourceFile) -> Box<dyn Sorts<'file> + 'file>;
 
 pub type Scan = for<'file> fn(&'file SourceFile) -> Vec<Violation<'file>>;
 
@@ -10,6 +12,7 @@ pub type SortedScan = for<'file> fn(&'file SourceFile) -> Vec<Vec<Violation<'fil
 #[derive(Clone, Copy, Debug)]
 pub enum Lead {
     Swept(Start),
+    Sorting(SortStart),
     Scanned(SortedScan),
     Filed(Scan),
 }
@@ -19,7 +22,15 @@ impl Lead {
     pub fn swept(self) -> Option<Start> {
         match self {
             Lead::Swept(start) => Some(start),
-            Lead::Scanned(_) | Lead::Filed(_) => None,
+            Lead::Sorting(_) | Lead::Scanned(_) | Lead::Filed(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn sorting(self) -> Option<SortStart> {
+        match self {
+            Lead::Sorting(start) => Some(start),
+            Lead::Swept(_) | Lead::Scanned(_) | Lead::Filed(_) => None,
         }
     }
 
@@ -28,21 +39,20 @@ impl Lead {
         match self {
             Lead::Scanned(scan) => Some(scan(file)),
             Lead::Filed(scan) => Some(vec![scan(file)]),
-            Lead::Swept(_) => None,
+            Lead::Swept(_) | Lead::Sorting(_) => None,
         }
-    }
-
-    fn watched(file: &SourceFile, start: Start) -> Vec<Vec<Violation<'_>>> {
-        let mut watchers = [vec![start(file)]];
-        Sweep::over_all(file, &mut watchers);
-        let [only] = watchers;
-        only.into_iter().flat_map(Finds::sorted).collect()
     }
 
     #[must_use]
     pub fn member_of(self, file: &SourceFile, member: Member) -> Vec<Violation<'_>> {
-        let sorted = self.scanned(file).or_else(|| self.swept().map(|start| Self::watched(file, start)));
-        sorted.unwrap_or_default().into_iter().nth(member.index()).unwrap_or_default()
+        let lists = self.scanned(file).unwrap_or_else(|| {
+            let mut finds: Vec<Box<dyn Finds<'_> + '_>> = self.swept().map(|start| start(file)).into_iter().collect();
+            let mut sorts: Vec<Box<dyn Sorts<'_> + '_>> = self.sorting().map(|start| start(file)).into_iter().collect();
+            Sweep::over_leads(file, &mut finds, &mut sorts);
+            let found = finds.into_iter().map(|watcher| vec![watcher.found()]);
+            found.chain(sorts.into_iter().map(Sorts::sorted)).next().unwrap_or_default()
+        });
+        lists.into_iter().nth(member.index()).unwrap_or_default()
     }
 }
 
