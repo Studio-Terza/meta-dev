@@ -4,7 +4,7 @@ use syn::{ItemEnum, ItemStruct, ItemTrait};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 
 #[derive(Debug, Default)]
 pub struct WorkspaceTypes(BTreeSet<Name>);
@@ -46,15 +46,15 @@ impl<'ast> Watch<'ast> for TypeGathering {
         self.kinds
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
         self.declared(&item.ident)
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
         self.declared(&item.ident)
     }
 
-    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
+    fn on_item_trait(&mut self, item: &'ast ItemTrait, _: &Facts<'_, ItemTrait>) -> Descend {
         self.declared(&item.ident)
     }
 }

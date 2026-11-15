@@ -6,7 +6,7 @@ use syn::{ItemMod, ItemUse, Macro};
 
 use lint_core::{Address, MacroAliases, Macros, SourceFile, Violation, Walk};
 use lint_layout::{Name, Word};
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 
 use graph::Graph;
 
@@ -54,25 +54,25 @@ impl<'ast> Watch<'ast> for DeclaredGraphs<'_, '_> {
         &[Kind::ItemMod, Kind::ItemUse, Kind::Macro]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        self.gates.push(Walk::outside_tests(&module.attrs));
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        self.gates.push(facts.gate());
         Descend::Into
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.gates.pop();
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
-        self.names.on_item_use(item)
+    fn on_item_use(&mut self, item: &'ast ItemUse, facts: &Facts<'_, ItemUse>) -> Descend {
+        self.names.on_item_use(item, facts)
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
         let outside = self
             .gates
             .iter()
             .all(|gate| *gate == Walk::Entered)
-            .then(|| Invoked { invocation: invocation.clone(), at: Address::from(invocation) });
+            .then(|| Invoked { invocation: invocation.clone(), at: facts.address() });
         self.invocations.extend(outside);
         Descend::Over
     }

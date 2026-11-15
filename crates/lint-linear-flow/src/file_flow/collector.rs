@@ -4,7 +4,7 @@ use syn::{
 };
 
 use lint_core::SourceFile;
-use lint_sweep::{Descend, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 
 use lint_core::Violation;
 use lint_sweep::Finds;
@@ -99,84 +99,84 @@ impl<'ast> Watch<'ast> for Collector<'_> {
         ]
     }
 
-    fn on_item(&mut self, _: &'ast Item) -> Descend {
+    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
         self.frames.push(Frame::Item);
         Descend::Into
     }
 
-    fn off_item(&mut self, _: &'ast Item) {
+    fn off_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) {
         self.frames.pop();
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.opened(&function.sig, Some(&function.block))
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
         self.shut();
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.opened(&function.sig, Some(&function.block))
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
         self.shut();
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn) -> Descend {
+    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
         self.opened(&function.sig, function.default.as_ref())
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn) {
+    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
         self.shut();
     }
 
-    fn on_block(&mut self, block: &'ast Block) -> Descend {
+    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
         self.frames.last_mut().and_then(Frame::opened).into_iter().for_each(|opened| opened.entered(block));
         Descend::Into
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf) -> Descend {
+    fn on_expr_if(&mut self, expr: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.branched(expr));
         Descend::Into
     }
 
-    fn on_expr_match(&mut self, expr: &'ast ExprMatch) -> Descend {
+    fn on_expr_match(&mut self, expr: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.matched(expr));
         Descend::Into
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
+    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.record(expr.while_token.span, Some(Finding::While)));
         Descend::Into
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.record(expr.for_token.span, Some(Finding::For)));
         Descend::Into
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
+    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.record(expr.loop_token.span, Some(Finding::Loop)));
         Descend::Into
     }
 
-    fn on_local(&mut self, local: &'ast Local) -> Descend {
+    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.bound(local));
         Descend::Into
     }
 
-    fn on_expr_binary(&mut self, expr: &'ast ExprBinary) -> Descend {
+    fn on_expr_binary(&mut self, expr: &'ast ExprBinary, _: &Facts<'_, ExprBinary>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.joined(expr));
         Descend::Into
     }
 
-    fn on_expr_unary(&mut self, expr: &'ast ExprUnary) -> Descend {
+    fn on_expr_unary(&mut self, expr: &'ast ExprUnary, _: &Facts<'_, ExprUnary>) -> Descend {
         self.inside().into_iter().for_each(|opened| opened.negated(expr));
         Descend::Into
     }

@@ -5,6 +5,7 @@ use lint_layout::LineNumber;
 
 use crate::boundary::{FileId, ItemId};
 use crate::call::Call;
+use crate::dispatch::Dispatch;
 use crate::domain::Domain;
 use crate::found::Found;
 use crate::function::Function;
@@ -14,7 +15,7 @@ use crate::item::{Alias, Item};
 use crate::item_declaration::ItemDeclaration;
 use crate::item_path::ItemPath;
 use crate::law::Law;
-use crate::path_use::PathUse;
+use crate::path_use::{Mention, PathUse};
 use crate::placed::FileHome;
 use crate::quoted::Quoted;
 use crate::resolved::Resolved;
@@ -27,6 +28,18 @@ pub struct Building {
     items: Vec<Item>,
     aliases: Aliases,
     exports: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
+}
+
+impl Model {
+    fn filed(&mut self, file: FileId, line: LineNumber, used: PathUse) {
+        match used.mention() {
+            Mention::Interpolated => self.interpolated.push(Filed::new(file, Found::new(line, used))),
+            Mention::Dispatched => self.dispatched.push(Dispatch::from(&used)),
+            Mention::Expression | Mention::Invoked | Mention::InMacro => {
+                self.uses.push(Filed::new(file, Found::new(line, used)));
+            }
+        }
+    }
 }
 
 impl Building {
@@ -45,6 +58,7 @@ impl Building {
         model.calls.extend(found.calls);
         model.uses.extend(found.uses);
         model.interpolated.extend(found.interpolated);
+        model.dispatched.extend(found.dispatched);
         model.placed.extend(found.placed);
         model.laws.extend(found.laws);
         model.quoted.extend(found.quoted);
@@ -76,8 +90,7 @@ impl Building {
     }
 
     pub fn path_use(&mut self, file: FileId, line: LineNumber, used: PathUse) {
-        let rows = used.mention().interpolated().map_or(&mut self.model.uses, |_| &mut self.model.interpolated);
-        rows.push(Filed::new(file, Found::new(line, used)));
+        self.model.filed(file, line, used);
     }
 
     pub fn law(&mut self, file: FileId, line: LineNumber, law: Law) {
@@ -127,6 +140,7 @@ impl Building {
             laws: Filed::sorted(model.laws),
             uses: Filed::sorted(model.uses),
             interpolated: Filed::sorted(model.interpolated),
+            dispatched: model.dispatched,
             quoted: Filed::sorted(model.quoted),
             declarations: Declarations::new(self.items, self.aliases, self.exports),
             roots: model.roots,

@@ -1,7 +1,7 @@
 use syn::{Ident, ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
 
 use lint_core::Parsed;
-use lint_sweep::{Descend, Gathers, Kind as Node, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Sweep, Watch, Watching};
 
 use super::{Declaration, Kind};
 
@@ -28,29 +28,29 @@ impl<'ast> Watch<'ast> for Declarations<'_> {
         &[Node::ItemMod, Node::ItemEnum, Node::ItemStruct, Node::ItemUnion, Node::Macro]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
         let inner = self.open.last().map(|outer| outer.nested(&module.ident));
         self.open.extend(inner);
         Descend::Into
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.closed.extend(self.open.pop());
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
         self.record(&item.ident, Kind::Enum)
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
         self.record(&item.ident, Kind::Other)
     }
 
-    fn on_item_union(&mut self, item: &'ast ItemUnion) -> Descend {
+    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
         self.record(&item.ident, Kind::Other)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 }

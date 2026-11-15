@@ -1,6 +1,7 @@
 mod boundary;
 mod call;
 mod crate_root;
+mod dispatch;
 mod domain;
 mod external;
 mod found;
@@ -30,11 +31,14 @@ mod unresolved;
 pub use boundary::{CallOrder, FileId, ItemId, ParamIndex, Quote};
 pub use call::{Call, Callee, MacroCall};
 pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
+pub use dispatch::Dispatch;
 pub use domain::Domain;
 pub use external::External;
 
 pub use found::Found;
-pub use function::definition::{CallOwner, Definition, Invocation, Looping, Reached, Receiving, Repeating, Repetition};
+pub use function::definition::{
+    CallOwner, Definition, Invocation, Looping, Reached, Read, Reader, Receiving, Repeating, Repetition,
+};
 pub use function::{
     Entry, Function, Input, MethodShape, Mutation, Output, Owner, Parameter, Receiver, Returned, Signature, Taken,
 };

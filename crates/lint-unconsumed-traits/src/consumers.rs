@@ -2,9 +2,9 @@ use std::collections::BTreeSet;
 
 use syn::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
 
-use lint_core::{SourceFile, Walk};
+use lint_core::SourceFile;
 use lint_layout::Name;
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 
 #[derive(Debug, Default)]
 pub struct Consumers {
@@ -58,21 +58,21 @@ impl<'ast> Watch<'ast> for Consuming {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_trait_bound(&mut self, bound: &'ast TraitBound) -> Descend {
+    fn on_trait_bound(&mut self, bound: &'ast TraitBound, _: &Facts<'_, TraitBound>) -> Descend {
         self.consumers.bounds.extend(bound.path.segments.last().map(|segment| Name::from(&segment.ident)));
         Descend::Into
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
-        self.consumers.called.insert(Name::from(&call.method));
+    fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
+        self.consumers.called.extend(facts.name().cloned());
         Descend::Into
     }
 
-    fn on_expr_path(&mut self, path: &'ast ExprPath) -> Descend {
+    fn on_expr_path(&mut self, path: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
         self.consumers.called.extend(
             path.path
                 .segments

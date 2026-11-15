@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use std::path::Path;
 
@@ -42,7 +42,7 @@ impl<'ast> Watch<'ast> for ShortLifetimes<'_> {
         &[Kind::LifetimeParam, Kind::Macro]
     }
 
-    fn on_lifetime_param(&mut self, parameter: &'ast LifetimeParam) -> Descend {
+    fn on_lifetime_param(&mut self, parameter: &'ast LifetimeParam, _: &Facts<'_, LifetimeParam>) -> Descend {
         let name = &parameter.lifetime.ident;
         self.found.extend((Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| {
             Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::ShortLifetime { name })
@@ -50,7 +50,7 @@ impl<'ast> Watch<'ast> for ShortLifetimes<'_> {
         Descend::Over
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 }

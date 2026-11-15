@@ -5,7 +5,7 @@ use syn::{ExprBreak, ExprContinue, ExprReturn, Macro};
 
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
 
 use finding::Finding;
 
@@ -33,19 +33,19 @@ impl<'ast> Watch<'ast> for Exits<'_> {
         &[Kind::Macro, Kind::ExprReturn, Kind::ExprBreak, Kind::ExprContinue]
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_expr_return(&mut self, expr: &'ast ExprReturn) -> Descend {
+    fn on_expr_return(&mut self, expr: &'ast ExprReturn, _: &Facts<'_, ExprReturn>) -> Descend {
         self.record(expr.return_token.span, Finding::Return)
     }
 
-    fn on_expr_break(&mut self, expr: &'ast ExprBreak) -> Descend {
+    fn on_expr_break(&mut self, expr: &'ast ExprBreak, _: &Facts<'_, ExprBreak>) -> Descend {
         self.record(expr.break_token.span, Finding::Break)
     }
 
-    fn on_expr_continue(&mut self, expr: &'ast ExprContinue) -> Descend {
+    fn on_expr_continue(&mut self, expr: &'ast ExprContinue, _: &Facts<'_, ExprContinue>) -> Descend {
         self.record(expr.continue_token.span, Finding::Continue)
     }
 }

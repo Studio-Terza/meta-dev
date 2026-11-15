@@ -4,9 +4,9 @@ use std::path::Path;
 
 use syn::{ExprMethodCall, ItemMod};
 
-use lint_core::{Gate, Site, Violation, Walk};
+use lint_core::{Gate, Site, Violation};
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 
 use finding::Finding;
 
@@ -35,13 +35,11 @@ impl<'ast> Watch<'ast> for CloneSites<'_> {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Gate::BOUNDARY
-            .names(module)
-            .map_or_else(|| Descend::from(Walk::outside_tests(&module.attrs)), |_| Descend::Over)
+    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Gate::BOUNDARY.names(module).map_or_else(|| Descend::from(facts.gate()), |_| Descend::Over)
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
+    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
         let cloned =
             Some(call).filter(|candidate| candidate.method == Self::CLONE).filter(|clone| clone.args.is_empty()).map(
                 |bare_clone| Violation::new(Site::new(self.path, LineNumber::from(bare_clone.method.span())), Finding),

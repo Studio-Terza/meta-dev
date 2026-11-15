@@ -1,7 +1,7 @@
 use syn::{ExprPath, Pat, PatStruct, PatTupleStruct, Path};
 
 use lint_layout::Name;
-use lint_sweep::{Descend, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 
 #[derive(Debug, Default)]
 pub struct VariantPaths(Vec<Name>);
@@ -24,15 +24,15 @@ impl<'ast> Watch<'ast> for VariantPaths {
         &[Kind::ExprPath, Kind::PatTupleStruct, Kind::PatStruct]
     }
 
-    fn on_expr_path(&mut self, pat: &'ast ExprPath) -> Descend {
+    fn on_expr_path(&mut self, pat: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
         self.record(&pat.path, Descend::Over)
     }
 
-    fn on_pat_tuple_struct(&mut self, pat: &'ast PatTupleStruct) -> Descend {
+    fn on_pat_tuple_struct(&mut self, pat: &'ast PatTupleStruct, _: &Facts<'_, PatTupleStruct>) -> Descend {
         self.record(&pat.path, Descend::Into)
     }
 
-    fn on_pat_struct(&mut self, pat: &'ast PatStruct) -> Descend {
+    fn on_pat_struct(&mut self, pat: &'ast PatStruct, _: &Facts<'_, PatStruct>) -> Descend {
         self.record(&pat.path, Descend::Into)
     }
 }

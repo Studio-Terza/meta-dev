@@ -14,7 +14,6 @@ lint-sweep = { path = "../lint-sweep" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
-lint-named-numbers = { path = "../lint-named-numbers" }
 syn.workspace = true
 
 [dev-dependencies]

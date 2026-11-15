@@ -6,10 +6,9 @@ use syn::{Index, ItemMod, ItemStruct, Visibility};
 use super::finding::Finding;
 use lint_core::Site;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 
 #[derive(Debug)]
 pub struct FieldVisibility<'scan> {
@@ -44,12 +43,12 @@ impl<'ast> Watch<'ast> for FieldVisibility<'_> {
         &[Kind::ItemMod, Kind::ItemStruct]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs)).then(|| self.exposed(item))
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
+        Descend::from(facts.gate()).then(|| self.exposed(item))
     }
 }
 

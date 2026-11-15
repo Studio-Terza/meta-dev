@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -15,7 +15,6 @@ use lint_core::Problem;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::{Name, Whole, Word, words};
 
@@ -102,31 +101,31 @@ impl<'ast> Watch<'ast> for Iterations<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
-        Descend::from(Walk::outside_tests(&function.attrs))
+    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
-        Descend::from(Walk::outside_tests(&function.attrs))
+    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, facts: &Facts<'_, ImplItemFn>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_local(&mut self, local: &'ast Local) -> Descend {
+    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
         let finding = Some(local)
             .filter(|candidate| matches!(&candidate.pat, Pat::Ident(binding) if binding.mutability.is_some()))
             .and_then(|mutable| mutable.init.as_ref())
@@ -148,7 +147,7 @@ impl<'ast> Watch<'ast> for Iterations<'_> {
         Descend::Into
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
         let finding = ManualIteration::accumulator(&expr.body).map(|_| {
             self.violation(
                 expr.for_token.span,
@@ -177,9 +176,12 @@ impl<'ast> Watch<'ast> for IteratorCalls {
         &[Kind::ExprMethodCall]
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
-        self.0 +=
-            Name::from(&call.method).matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS).into_iter().count();
+    fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
+        self.0 += facts
+            .name()
+            .and_then(|name| name.matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS))
+            .into_iter()
+            .count();
         Descend::Into
     }
 }

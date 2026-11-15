@@ -4,7 +4,7 @@ mod finding;
 use syn::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use crate::Consumers;
 use finding::Finding;
@@ -57,17 +57,17 @@ impl<'ast> Watch<'ast> for Declared<'_, '_> {
         &[Kind::ItemMod, Kind::ItemTrait]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_trait(&mut self, block: &'ast ItemTrait) -> Descend {
+    fn on_item_trait(&mut self, block: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
         let site = Site::new(self.path, LineNumber::from(block.ident.span()));
-        let declaration = Declaration::new(Name::from(&block.ident), Self::provided(block), site);
+        let declaration = facts.name().map(|name| Declaration::new(name.clone(), Self::provided(block), site));
         self.found.extend(
             Self::with_methods(block)
                 .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
-                .map(|_| declaration),
+                .and(declaration),
         );
         Descend::Over
     }

@@ -1,7 +1,7 @@
 use syn::{BinOp, Block, ExprBinary, ExprForLoop, ExprIf, ExprMatch, ExprTry, ExprWhile, Item};
 
 use body_lifts::Branching;
-use lint_sweep::{Descend, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 use newtype::Counter;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,31 +53,31 @@ impl<'ast> Watch<'ast> for Branches {
         ]
     }
 
-    fn on_item(&mut self, _: &'ast Item) -> Descend {
+    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
         Descend::Over
     }
 
-    fn on_expr_if(&mut self, _: &'ast ExprIf) -> Descend {
+    fn on_expr_if(&mut self, _: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
         self.counted(Branching::new(1))
     }
 
-    fn on_expr_while(&mut self, _: &'ast ExprWhile) -> Descend {
+    fn on_expr_while(&mut self, _: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
         self.counted(Branching::new(1))
     }
 
-    fn on_expr_for_loop(&mut self, _: &'ast ExprForLoop) -> Descend {
+    fn on_expr_for_loop(&mut self, _: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
         self.counted(Branching::new(1))
     }
 
-    fn on_expr_try(&mut self, _: &'ast ExprTry) -> Descend {
+    fn on_expr_try(&mut self, _: &'ast ExprTry, _: &Facts<'_, ExprTry>) -> Descend {
         self.counted(Branching::new(usize::from(self.propagation == Propagation::Branch)))
     }
 
-    fn on_expr_match(&mut self, found: &'ast ExprMatch) -> Descend {
+    fn on_expr_match(&mut self, found: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {
         self.counted(Branching::new(found.arms.len().saturating_sub(1)))
     }
 
-    fn on_expr_binary(&mut self, found: &'ast ExprBinary) -> Descend {
+    fn on_expr_binary(&mut self, found: &'ast ExprBinary, _: &Facts<'_, ExprBinary>) -> Descend {
         self.counted(Branching::new(usize::from(matches!(found.op, BinOp::And(_) | BinOp::Or(_)))))
     }
 }

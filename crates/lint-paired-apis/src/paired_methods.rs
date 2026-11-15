@@ -5,7 +5,7 @@ use syn::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
 use lint_core::Module;
 use lint_core::{FileHead, Parsed, Site, Syntax, Walk};
 use lint_layout::{LineNumber, Name};
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 
 use crate::declared::Declared;
 use crate::owner::Owner;
@@ -55,22 +55,23 @@ impl<'ast> Watch<'ast> for PairedMethods<'_> {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
-        let methods = Syntax::inherent(block)
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        let methods = facts
+            .inherent()
             .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
             .map_or_default(Self::public_methods);
-        self.owned_by(Name::of_type(&block.self_ty), &methods);
+        self.owned_by(facts.name().cloned(), &methods);
         Descend::Over
     }
 
-    fn on_item_trait(&mut self, block: &'ast ItemTrait) -> Descend {
-        let entered = Descend::from(Walk::outside_tests(&block.attrs)).entered();
+    fn on_item_trait(&mut self, block: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+        let entered = Descend::from(facts.gate()).entered();
         let declared = entered.map_or_default(|_| Self::declared_methods(block));
-        self.owned_by(entered.map(|_| Name::from(&block.ident)), &declared);
+        self.owned_by(entered.and_then(|_| facts.name().cloned()), &declared);
         Descend::Over
     }
 }

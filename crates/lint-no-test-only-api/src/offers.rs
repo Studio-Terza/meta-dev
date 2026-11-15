@@ -9,7 +9,7 @@ use constructor::Constructor;
 use lint_core::{Site, Violation};
 use lint_core::{SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use std::collections::BTreeSet;
 
@@ -65,19 +65,20 @@ impl<'ast> Watch<'ast> for Offers<'_, '_> {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemEnum]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        let owner = Self::owner(item).filter(|_| Walk::inherent_impls(item) == Walk::Entered);
-        let entered = Descend::from(Walk::outside_tests(&item.attrs)).entered();
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        let owner =
+            Self::owner(item).filter(|_| facts.inherent().map_or(Walk::Skipped, |_| Walk::Entered) == Walk::Entered);
+        let entered = Descend::from(facts.gate()).entered();
         entered.and(owner).into_iter().for_each(|named| self.constructors(item, named));
         Descend::Over
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
-        let entered = Descend::from(Walk::outside_tests(&item.attrs)).entered();
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, facts: &Facts<'_, ItemEnum>) -> Descend {
+        let entered = Descend::from(facts.gate()).entered();
         entered.into_iter().flat_map(|_| &item.variants).for_each(|variant| self.offered(&variant.ident, &item.vis));
         Descend::Over
     }

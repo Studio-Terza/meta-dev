@@ -1722,7 +1722,6 @@ dependencies = [
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-named-numbers",
  "lint-sweep",
  "syn 2.0.119",
 ]
@@ -1943,6 +1942,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-repeated-reads"
+version = "0.1.0"
+dependencies = [
+ "graph",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+]
+
+[[package]]
 name = "lint-repeated-shapes"
 version = "0.1.0"
 dependencies = [
@@ -2027,6 +2036,7 @@ dependencies = [
  "lint-raw-resources",
  "lint-reader",
  "lint-repeated-methods",
+ "lint-repeated-reads",
  "lint-repeated-shapes",
  "lint-rust-only",
  "lint-state-graph",

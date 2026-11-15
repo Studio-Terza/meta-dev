@@ -14,7 +14,7 @@ use lint_file::Gleaning;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_placement::{CrateName as PlacedName, Role as Placed};
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
@@ -86,12 +86,12 @@ impl<'ast> Watch<'ast> for RootReading<'_> {
         &[Kind::Attribute, Kind::Item]
     }
 
-    fn on_attribute(&mut self, attribute: &'ast syn::Attribute) -> Descend {
+    fn on_attribute(&mut self, attribute: &'ast syn::Attribute, _: &Facts<'_, syn::Attribute>) -> Descend {
         self.denied.extend(Undenied::denied_by(attribute));
         Descend::Over
     }
 
-    fn on_item(&mut self, _: &'ast syn::Item) -> Descend {
+    fn on_item(&mut self, _: &'ast syn::Item, _: &Facts<'_, syn::Item>) -> Descend {
         Descend::Over
     }
 }

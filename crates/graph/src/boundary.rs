@@ -75,6 +75,12 @@ impl From<usize> for ParamIndex {
     }
 }
 
+impl fmt::Display for ParamIndex {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 impl ParamIndex {
     #[must_use]
     pub fn entry<Item>(self, items: &[Item]) -> Option<&Item> {

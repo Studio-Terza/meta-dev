@@ -13,7 +13,7 @@ use lint_core::{Headline, Parsed, Site, SourceFile, Syntax, Violation};
 use lint_file::{ContextLint, Reads};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
-use lint_sweep::{Descend, Finds, Judgement, Kind as Node, Watch};
+use lint_sweep::{Descend, Facts, Finds, Judgement, Kind as Node, Watch};
 
 pub use declaration::Declaration;
 use declarations::Declarations;
@@ -93,25 +93,27 @@ impl<'ast> Watch<'ast> for Predicates<'_, '_> {
         &[Node::ItemMod, Node::ItemImpl, Node::Macro]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        let inner = Cow::Owned(self.module.child(Name::from(&module.ident)));
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        let inner =
+            facts.name().map_or_else(|| self.module.clone(), |name| Cow::Owned(self.module.child(name.clone())));
         self.outer.push(std::mem::replace(&mut self.module, inner));
         Descend::Into
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.module = self.outer.pop().unwrap_or_else(|| Cow::Borrowed(self.file.head().placement().module()));
     }
 
-    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
-        let found = Syntax::inherent(block)
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        let found = facts
+            .inherent()
             .filter(|candidate| self.known.kind(self.file, &self.module, &candidate.self_ty) == Kind::Enum)
             .map_or_default(|enum_impl| self.predicates(enum_impl));
         self.violations.extend(found);
         Descend::Into
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 }

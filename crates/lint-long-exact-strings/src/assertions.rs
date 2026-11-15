@@ -13,7 +13,7 @@ use syn::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, Tok
 
 use lint_core::{MacroAliases, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use bindings::{Bindings, BodyId, Bound, Scopes};
 use compared::Compared;
@@ -90,42 +90,38 @@ impl<'ast> Watch<'ast> for Assertions<'_> {
         self.kinds
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.scopes.opened()
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
         self.scopes.shut();
     }
 
-    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.scopes.opened()
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
         self.scopes.shut();
     }
 
-    fn on_item_const(&mut self, item: &'ast ItemConst) -> Descend {
+    fn on_item_const(&mut self, item: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
         self.scopes.constant(Bound::constant(item));
         Descend::Into
     }
 
-    fn on_local(&mut self, local: &'ast Local) -> Descend {
+    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
         self.scopes.local(Bound::local(local));
         Descend::Into
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
-        self.tables.on_item_use(item)
+    fn on_item_use(&mut self, item: &'ast ItemUse, facts: &Facts<'_, ItemUse>) -> Descend {
+        self.tables.on_item_use(item, facts)
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
-        self.met.push(Met {
-            invocation: invocation.clone(),
-            at: Address::from(invocation),
-            body: self.scopes.current(),
-        });
+    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
+        self.met.push(Met { invocation: invocation.clone(), at: facts.address(), body: self.scopes.current() });
         Descend::Over
     }
 }

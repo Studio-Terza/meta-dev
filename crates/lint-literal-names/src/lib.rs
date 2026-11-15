@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use std::path::Path;
 
 use syn::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
@@ -66,23 +66,23 @@ impl<'ast> Watch<'ast> for VagueNames<'_> {
         &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl, Kind::ItemFn, Kind::ImplItemFn]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate()).then(|| facts.inherent().map_or(Descend::Over, |_| Descend::Into))
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.noted(&function.attrs, &function.sig.ident)
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.noted(&function.attrs, &function.sig.ident)
     }
 }

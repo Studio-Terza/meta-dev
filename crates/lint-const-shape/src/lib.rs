@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Address, Descend, Finds, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
 use proc_macro2::Span;
 use std::path::Path;
 
@@ -16,7 +16,6 @@ use lint_core::Problem;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::LineNumber;
 
 #[derive(Debug)]
@@ -160,120 +159,120 @@ impl<'ast> Watch<'ast> for ConstContexts<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
         self.zones.push(self.zone);
         self.zone = self.zone.entering(module);
-        Descend::from(Walk::outside_tests(&module.attrs))
+        Descend::from(facts.gate())
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod) {
+    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
         self.zone = self.zones.pop().unwrap_or(self.zone);
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.context.within(Context::of_fn(function.sig.constness.as_ref()))
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn) {
+    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
         self.context.restored();
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.context.within(Context::of_fn(function.sig.constness.as_ref()))
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
         self.context.restored();
     }
 
-    fn on_trait_item_fn(&mut self, _: &'ast TraitItemFn) -> Descend {
+    fn on_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
         self.context.within(Context::Surface)
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn) {
+    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
         self.context.restored();
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst) -> Descend {
+    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
         self.context.within(Context::Const)
     }
 
-    fn off_item_const(&mut self, _: &'ast ItemConst) {
+    fn off_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) {
         self.context.restored();
     }
 
-    fn on_item_static(&mut self, _: &'ast ItemStatic) -> Descend {
+    fn on_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) -> Descend {
         self.context.within(Context::Const)
     }
 
-    fn off_item_static(&mut self, _: &'ast ItemStatic) {
+    fn off_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) {
         self.context.restored();
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst) -> Descend {
+    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
         self.context.within(Context::Const)
     }
 
-    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst) {
+    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) {
         self.context.restored();
     }
 
-    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst) -> Descend {
+    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Descend {
         self.context.within(Context::Const)
     }
 
-    fn off_trait_item_const(&mut self, _: &'ast TraitItemConst) {
+    fn off_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) {
         self.context.restored();
     }
 
-    fn on_expr_const(&mut self, _: &'ast ExprConst) -> Descend {
+    fn on_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) -> Descend {
         self.context.within(Context::Const)
     }
 
-    fn off_expr_const(&mut self, _: &'ast ExprConst) {
+    fn off_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) {
         self.context.restored();
     }
 
-    fn on_type_array(&mut self, array: &'ast TypeArray) -> Descend {
+    fn on_type_array(&mut self, array: &'ast TypeArray, _: &Facts<'_, TypeArray>) -> Descend {
         self.pending.push(Address::from(&array.len));
         Descend::Into
     }
 
-    fn on_expr_repeat(&mut self, repeat: &'ast ExprRepeat) -> Descend {
+    fn on_expr_repeat(&mut self, repeat: &'ast ExprRepeat, _: &Facts<'_, ExprRepeat>) -> Descend {
         self.pending.push(Address::from(&*repeat.len));
         Descend::Into
     }
 
-    fn on_variant(&mut self, variant: &'ast Variant) -> Descend {
+    fn on_variant(&mut self, variant: &'ast Variant, _: &Facts<'_, Variant>) -> Descend {
         self.pending.extend(variant.discriminant.iter().map(|(_, discriminant)| Address::from(discriminant)));
         Descend::Into
     }
 
-    fn on_expr(&mut self, expr: &'ast Expr) -> Descend {
-        let at = Address::from(expr);
+    fn on_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) -> Descend {
+        let at = facts.address();
         let pending = self.pending.iter().rposition(|waiting| *waiting == at);
         pending.map_or(Descend::Into, |_| self.context.within(Context::Const))
     }
 
-    fn off_expr(&mut self, expr: &'ast Expr) {
-        let at = Address::from(expr);
+    fn off_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) {
+        let at = facts.address();
         self.pending.iter().rposition(|waiting| *waiting == at).into_iter().for_each(|index| {
             self.pending.remove(index);
             self.context.restored();
         });
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_expr_cast(&mut self, cast: &'ast ExprCast) -> Descend {
+    fn on_expr_cast(&mut self, cast: &'ast ExprCast, _: &Facts<'_, ExprCast>) -> Descend {
         let finding = self.cast_finding(cast);
         self.violations.extend(finding);
         Descend::Into
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
+    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
         let finding = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted).map(|_| {
             self.loop_finding(
                 expr.while_token.span,
@@ -287,7 +286,7 @@ impl<'ast> Watch<'ast> for ConstContexts<'_> {
         Descend::Into
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
+    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
         let finding = self.loop_finding(
             expr.loop_token.span,
             Message::new(
@@ -299,7 +298,7 @@ impl<'ast> Watch<'ast> for ConstContexts<'_> {
         Descend::Into
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
         let finding = self.loop_finding(
             expr.for_token.span,
             Message::new(

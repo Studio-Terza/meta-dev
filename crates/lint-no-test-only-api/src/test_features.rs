@@ -8,7 +8,7 @@ use syn::{Attribute, Lit, Macro};
 use lint_core::Syntax;
 use lint_layout::LineNumber;
 use lint_layout::Name;
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use std::path::Path;
 
@@ -71,14 +71,14 @@ impl<'ast> Watch<'ast> for TestFeatures<'_> {
         &[Kind::Attribute, Kind::Macro]
     }
 
-    fn on_attribute(&mut self, attribute: &'ast Attribute) -> Descend {
+    fn on_attribute(&mut self, attribute: &'ast Attribute, _: &Facts<'_, Attribute>) -> Descend {
         self.found.extend(
             Self::condition(attribute.path()).into_iter().flat_map(|_| Self::scanned(attribute.to_token_stream())),
         );
         Descend::Into
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         self.found.extend(
             Self::condition(&invocation.path).into_iter().flat_map(|_| Self::scanned(invocation.tokens.clone())),
         );

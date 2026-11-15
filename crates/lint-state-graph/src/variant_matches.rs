@@ -12,10 +12,9 @@ use super::finding::Finding;
 use lint_core::Home;
 use lint_core::Site;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 
 #[derive(Debug)]
 pub struct VariantMatches<'scan, 'file> {
@@ -68,35 +67,35 @@ impl<'ast> Watch<'ast> for VariantMatches<'_, '_> {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemFn, Kind::ImplItemFn, Kind::ExprMatch, Kind::ExprLet, Kind::Local]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
-        Descend::from(Walk::outside_tests(&function.attrs))
+    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
-        Descend::from(Walk::outside_tests(&function.attrs))
+    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, facts: &Facts<'_, ImplItemFn>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_expr_match(&mut self, expr: &'ast ExprMatch) -> Descend {
+    fn on_expr_match(&mut self, expr: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {
         let found: Vec<Violation> = expr.arms.iter().filter_map(|arm| self.foreign_match(arm)).collect();
         self.violations.extend(found);
         Descend::Into
     }
 
-    fn on_expr_let(&mut self, expr: &'ast ExprLet) -> Descend {
+    fn on_expr_let(&mut self, expr: &'ast ExprLet, _: &Facts<'_, ExprLet>) -> Descend {
         let found = self.foreign_variant(&expr.pat).map(|enum_name| self.violation(&expr.pat, &enum_name));
         self.violations.extend(found);
         Descend::Into
     }
 
-    fn on_local(&mut self, local: &'ast Local) -> Descend {
+    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
         let found = local
             .init
             .as_ref()

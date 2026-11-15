@@ -1,3 +1,5 @@
+mod read;
+
 use std::fmt;
 
 use body_lifts::{Body, Branching};
@@ -5,6 +7,7 @@ use lint_layout::{Casing, LineNumber, Name, Whole, Word};
 
 use crate::boundary::{CallOrder, ParamIndex};
 use crate::type_ref::{Named, TypeRef};
+pub use read::{Read, Reader};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Receiving {
@@ -33,17 +36,28 @@ pub struct Definition {
     branching: Branching,
     invocations: Vec<Invocation>,
     repetitions: Vec<Repetition>,
+    reads: Vec<Read>,
 }
 
 impl Definition {
     #[must_use]
     pub fn new(shape: Body, branching: Branching, invocations: Vec<Invocation>) -> Definition {
-        Definition { shape, branching, invocations, repetitions: Vec::new() }
+        Definition { shape, branching, invocations, repetitions: Vec::new(), reads: Vec::new() }
     }
 
     #[must_use]
     pub fn repeated(self, repetitions: Vec<Repetition>) -> Definition {
         Definition { repetitions, ..self }
+    }
+
+    #[must_use]
+    pub fn reading(self, reads: Vec<Read>) -> Definition {
+        Definition { reads, ..self }
+    }
+
+    #[must_use]
+    pub fn reads(&self) -> &[Read] {
+        &self.reads
     }
 
     #[must_use]

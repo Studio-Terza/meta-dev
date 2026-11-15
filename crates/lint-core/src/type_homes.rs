@@ -8,7 +8,7 @@ use crate::declared_type::DeclaredType;
 use crate::home::Home;
 use crate::source_file::Parsed;
 use crate::walk::Walk;
-use crate::watch::{Descend, Kind, Watch};
+use crate::watch::{Descend, Facts, Kind, Watch};
 
 #[derive(Debug)]
 pub struct TypeHomes<'file> {
@@ -63,15 +63,15 @@ impl<'ast> Watch<'ast> for TypeHomes<'_> {
         &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemEnum]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
         self.declared(&item.attrs, &item.ident)
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
         self.declared(&item.attrs, &item.ident)
     }
 }

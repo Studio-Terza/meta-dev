@@ -19,9 +19,9 @@ use std::sync::Arc;
 
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemFn, ItemConst,
-    ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, Macro,
-    Signature as SynSignature, TraitItemFn,
+    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemConst, ImplItemFn,
+    ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion,
+    Macro, Signature as SynSignature, TraitItemFn,
 };
 
 use graph::{
@@ -44,7 +44,7 @@ use definition::{LoweredDefinition, Mutations};
 use frames::{Enclosure, Frame};
 use held::{Holder, HoldingRow, Link};
 use laws::LawRow;
-use lint_sweep::{Descend, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Kind, Watch};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
@@ -355,6 +355,8 @@ impl<'read> Lowering<'read> {
             generics: Arc::new(InScope::outside()),
             context: Context::outermost(Regions::of_file(source, reach)),
             frames: Vec::new(),
+            calling: None,
+            tables: Vec::new(),
         }
     }
 
@@ -474,6 +476,8 @@ pub(crate) struct Lowering<'read> {
     generics: Arc<InScope>,
     context: Context,
     frames: Vec<Frame>,
+    calling: Option<Address>,
+    tables: Vec<Address>,
 }
 
 impl Lowering<'_> {
@@ -537,6 +541,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::Item,
+            Kind::Type,
             Kind::ItemMod,
             Kind::Block,
             Kind::ItemImpl,
@@ -551,6 +556,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
             Kind::ItemUnion,
             Kind::ItemConst,
             Kind::ItemStatic,
+            Kind::ImplItemConst,
             Kind::ExprMethodCall,
             Kind::ExprCall,
             Kind::ExprMacro,
@@ -560,37 +566,42 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         ]
     }
 
-    fn on_item(&mut self, _: &'ast syn::Item) -> Descend {
+    fn on_item(&mut self, _: &'ast syn::Item, _: &Facts<'_, syn::Item>) -> Descend {
         self.saved()
     }
 
-    fn off_item(&mut self, _: &'ast syn::Item) {
+    fn off_item(&mut self, _: &'ast syn::Item, _: &Facts<'_, syn::Item>) {
         self.restored();
     }
 
-    fn on_item_mod(&mut self, item: &'ast ItemMod) -> Descend {
+    fn on_type(&mut self, ty: &'ast syn::Type, _: &Facts<'_, syn::Type>) -> Descend {
+        self.objects_used(ty);
+        Descend::Into
+    }
+
+    fn on_item_mod(&mut self, item: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
         match &item.content {
             Some((_, items)) => self.module_entered(item, items),
             None => self.slotted(item),
         }
     }
 
-    fn on_block(&mut self, block: &'ast Block) -> Descend {
+    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
         self.saved();
         self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
         Descend::Into
     }
 
-    fn off_block(&mut self, _: &'ast Block) {
+    fn off_block(&mut self, _: &'ast Block, _: &Facts<'_, Block>) {
         self.restored();
     }
 
-    fn on_item_impl(&mut self, block: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, block: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
         self.context = self.context.within_item(&block.attrs);
         self.impl_entered(block)
     }
 
-    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
+    fn on_item_trait(&mut self, item: &'ast ItemTrait, _: &Facts<'_, ItemTrait>) -> Descend {
         let generics = self.generics.subjectless().extended(&item.generics);
         self.trait_bounds(item, &generics);
         let place = self.trait_owning(&item.ident, &item.attrs);
@@ -599,36 +610,36 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.enclosed(Enclosure::Trait, generics)
     }
 
-    fn on_item_fn(&mut self, item: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, item: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
         self.context = self.context.within_item(&item.attrs).owned(place);
         let generics = self.function(&item.attrs, &item.sig, Some(&item.block));
         self.enclosed(Enclosure::Body, generics)
     }
 
-    fn on_impl_item_fn(&mut self, item: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, item: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.method_entered(&item.attrs, &item.sig, Some(&item.block))
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn) {
+    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
         self.restored();
     }
 
-    fn on_trait_item_fn(&mut self, item: &'ast TraitItemFn) -> Descend {
+    fn on_trait_item_fn(&mut self, item: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
         self.method_entered(&item.attrs, &item.sig, item.default.as_ref())
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn) {
+    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
         self.restored();
     }
 
-    fn on_foreign_item_fn(&mut self, item: &'ast ForeignItemFn) -> Descend {
+    fn on_foreign_item_fn(&mut self, item: &'ast ForeignItemFn, _: &Facts<'_, ForeignItemFn>) -> Descend {
         self.enclosure = Enclosure::Foreign;
         self.function(&item.attrs, &item.sig, None);
         Descend::Into
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType) -> Descend {
+    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
         let generics = InScope::outside().extended(&item.generics);
         let target = generics.lowered(&item.ty);
         self.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
@@ -641,7 +652,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
@@ -650,7 +661,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum) -> Descend {
+    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
@@ -663,7 +674,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn on_item_union(&mut self, item: &'ast ItemUnion) -> Descend {
+    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
         let scope = self.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
@@ -671,46 +682,65 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.owned_by(&item.ident, Domain::Types, &item.attrs)
     }
 
-    fn on_item_const(&mut self, item: &'ast ItemConst) -> Descend {
+    fn on_item_const(&mut self, item: &'ast ItemConst, facts: &Facts<'_, ItemConst>) -> Descend {
+        self.tables.push(facts.address());
         self.valued(&item.ident, &item.ty, &item.attrs)
     }
 
-    fn on_item_static(&mut self, item: &'ast ItemStatic) -> Descend {
+    fn on_item_static(&mut self, item: &'ast ItemStatic, facts: &Facts<'_, ItemStatic>) -> Descend {
+        self.tables.push(facts.address());
         self.valued(&item.ident, &item.ty, &item.attrs)
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall) -> Descend {
+    fn off_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) {
+        self.tables.pop();
+    }
+
+    fn off_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) {
+        self.tables.pop();
+    }
+
+    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, facts: &Facts<'_, ImplItemConst>) -> Descend {
+        self.tables.push(facts.address());
+        Descend::Into
+    }
+
+    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) {
+        self.tables.pop();
+    }
+
+    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
         self.method_called(call);
         Descend::Into
     }
 
-    fn on_expr_call(&mut self, call: &'ast ExprCall) -> Descend {
+    fn on_expr_call(&mut self, call: &'ast ExprCall, _: &Facts<'_, ExprCall>) -> Descend {
         self.path_called(call);
         Descend::Into
     }
 
-    fn on_expr_macro(&mut self, expr: &'ast ExprMacro) -> Descend {
+    fn on_expr_macro(&mut self, expr: &'ast ExprMacro, _: &Facts<'_, ExprMacro>) -> Descend {
         self.macro_called(expr);
         Descend::Into
     }
 
-    fn on_expr_path(&mut self, expression: &'ast ExprPath) -> Descend {
+    fn on_expr_path(&mut self, expression: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
         self.path_used(expression);
         Descend::Into
     }
 
-    fn on_item_macro(&mut self, item: &'ast ItemMacro) -> Descend {
+    fn on_item_macro(&mut self, item: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) -> Descend {
         match &item.ident {
             Some(ident) => self.owned_by(ident, Domain::Macros, &item.attrs),
             None => Descend::Into,
         }
     }
 
-    fn off_item_macro(&mut self, item: &'ast ItemMacro) {
+    fn off_item_macro(&mut self, item: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) {
         self.macro_left(item);
     }
 
-    fn on_macro(&mut self, invoked: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, invoked: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         self.macro_used(invoked);
         Descend::Into
     }

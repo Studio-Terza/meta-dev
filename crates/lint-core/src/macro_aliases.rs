@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use syn::{ItemUse, UseRename, UseTree};
 
-use crate::watch::{Descend, Kind, Watch};
+use crate::watch::{Descend, Facts, Kind, Watch};
 
 use lint_layout::Name;
 use lint_layout::Word;
@@ -47,7 +47,7 @@ impl<'ast> Watch<'ast> for MacroAliases {
         &[Kind::ItemUse]
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse) -> Descend {
+    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
         let renamed = self.renamed(&item.tree);
         self.names.extend(renamed);
         Descend::Over

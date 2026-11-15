@@ -17,9 +17,8 @@ use callee::Callee;
 use forwarder::Forwarder;
 use lint_core::Syntax;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_layout::{Casing, Name};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 #[derive(Debug)]
 pub struct Forwarders<'run, 'file> {
@@ -112,20 +111,20 @@ impl<'ast> Watch<'ast> for Forwarders<'_, '_> {
         &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemImpl, Kind::ImplItemFn]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct) -> Descend {
-        self.structs.insert(Name::from(&item.ident), StructFields::describe(item));
+    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
+        self.structs.extend(facts.name().map(|name| (name.clone(), StructFields::describe(item))));
         Descend::Over
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
         ImplTarget::describe(item).walked_by(self)
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         let path = self.path;
         self.found.extend(self.classify(function).map(|forwarder| forwarder.violation(path)));
         Descend::Into

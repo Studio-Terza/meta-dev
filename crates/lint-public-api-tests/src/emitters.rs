@@ -5,7 +5,7 @@ use syn::ItemMacro;
 use lint_core::Macros;
 use lint_layout::Name;
 use lint_layout::TestMarks;
-use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 
 #[derive(Debug, Default)]
 pub struct Emitters {
@@ -43,7 +43,7 @@ impl<'ast> Watch<'ast> for Emitters {
         &[Kind::ItemMacro]
     }
 
-    fn on_item_macro(&mut self, definition: &'ast ItemMacro) -> Descend {
+    fn on_item_macro(&mut self, definition: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) -> Descend {
         self.names.extend(
             definition
                 .ident

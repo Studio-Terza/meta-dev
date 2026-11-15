@@ -1,4 +1,6 @@
-use lint_sweep::{Descend, Kind, Sweep, Watch};
+mod bounds;
+
+use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 use syn::spanned::Spanned;
 use syn::{
     AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics, Ident,
@@ -14,6 +16,7 @@ use lint_core::Syntax;
 use lint_layout::{Name, Position, Whole, Word};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
+pub(super) use bounds::ParamBounds;
 
 #[derive(Clone, Debug)]
 enum Referent {
@@ -138,22 +141,39 @@ impl LoweredInput {
 pub(super) struct InScope {
     parameters: Vec<Name>,
     subject: TypeRef<Written>,
+    bounds: Vec<ParamBounds>,
 }
 
 impl InScope {
     const SELF: Word<'static> = Word::new("Self");
 
     pub(super) fn outside() -> InScope {
-        InScope { parameters: Vec::new(), subject: Written::parameter(Name::from(InScope::SELF), Spelling::Implied) }
+        InScope {
+            parameters: Vec::new(),
+            subject: Written::parameter(Name::from(InScope::SELF), Spelling::Implied),
+            bounds: Vec::new(),
+        }
     }
 
     pub(super) fn extended(&self, generics: &Generics) -> InScope {
         let declared = generics.params.iter().filter_map(TypeParameter::named);
-        InScope { parameters: self.parameters.iter().cloned().chain(declared).collect(), subject: self.subject.clone() }
+        InScope {
+            parameters: self.parameters.iter().cloned().chain(declared).collect(),
+            subject: self.subject.clone(),
+            bounds: self.bounds.iter().cloned().chain(ParamBounds::declared(generics)).collect(),
+        }
     }
 
     pub(super) fn subject(&self, subject: TypeRef<Written>) -> InScope {
-        InScope { parameters: self.parameters.clone(), subject }
+        InScope { parameters: self.parameters.clone(), subject, bounds: self.bounds.clone() }
+    }
+
+    pub(super) fn generic(&self, name: &Name) -> Option<&Name> {
+        self.parameters.iter().find(|parameter| *parameter == name)
+    }
+
+    pub(super) fn traits_of(&self, param: &Name) -> Vec<&UsePath> {
+        self.bounds.iter().filter(|bound| bound.param() == param).flat_map(ParamBounds::traits).collect()
     }
 
     pub(super) fn subjectless(&self) -> InScope {
@@ -215,7 +235,7 @@ impl InScope {
     }
 
     fn with_parameters(self, scope: &InScope) -> InScope {
-        InScope { parameters: scope.parameters.clone(), subject: self.subject }
+        InScope { parameters: scope.parameters.clone(), subject: self.subject, bounds: scope.bounds.clone() }
     }
 
     fn type_path_lowered(&self, path: &TypePath) -> TypeRef<Written> {
@@ -227,7 +247,7 @@ impl InScope {
 
     fn held(&self, path: &syn::Path, position: Position) -> Option<TypeRef<Written>> {
         let first = path.segments.first().map(|first| Name::from(&first.ident));
-        let declared = first.as_ref().and_then(|head| self.parameters.iter().find(|parameter| *parameter == head));
+        let declared = first.as_ref().and_then(|head| self.generic(head));
         let parameter = declared.map(|name| {
             Written::parameter(name.clone(), Spelling::Written([name.clone()].into_iter().collect(), position))
         });
@@ -258,7 +278,7 @@ impl<'ast> Watch<'ast> for Measured<'_> {
         &[Kind::Type]
     }
 
-    fn on_type(&mut self, ty: &'ast Type) -> Descend {
+    fn on_type(&mut self, ty: &'ast Type, _: &Facts<'_, Type>) -> Descend {
         self.found.push(self.scope.lowered(ty));
         Descend::Over
     }

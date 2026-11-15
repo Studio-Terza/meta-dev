@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
 use std::collections::{BTreeMap, BTreeSet};
 
 use proc_macro2::Span;
@@ -141,43 +141,43 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_trait(&mut self, item: &'ast ItemTrait) -> Descend {
-        Descend::from(Walk::outside_tests(&item.attrs))
+    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_macro(&mut self, _: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         Descend::Expand
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst) -> Descend {
+    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
         Descend::Over
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst) -> Descend {
+    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
         Descend::Over
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         self.function(&function.attrs, &function.sig, Some(&function.block))
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
         self.function(&function.attrs, &function.sig, Some(&function.block))
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn) -> Descend {
+    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
         self.function(&function.attrs, &function.sig, function.default.as_ref())
     }
 
-    fn on_block(&mut self, block: &'ast Block) -> Descend {
+    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
         let last = block.stmts.last();
         self.report(
             block.stmts.iter().filter_map(|statement| ExpressionFlow::dropped(statement, last)).map(Spanned::span),
@@ -189,7 +189,7 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         Descend::Into
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf) -> Descend {
+    fn on_expr_if(&mut self, expr: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
         self.report(
             Self::lonely_if(expr),
             Message::new(
@@ -200,7 +200,7 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         Descend::Into
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop) -> Descend {
+    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
         self.report(
             [expr.loop_token.span],
             Message::new(Problem::new("loop"), Fix::new("drive an iterator with combinators, const fns excepted")),
@@ -208,7 +208,7 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         Descend::Into
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop) -> Descend {
+    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
         self.report(
             [expr.for_token.span],
             Message::new(Problem::new("for loop"), Fix::new("drive the iterator with combinators, const fns excepted")),
@@ -216,7 +216,7 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         Descend::Into
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile) -> Descend {
+    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
         self.report(
             [expr.while_token.span],
             Message::new(
@@ -227,7 +227,7 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         Descend::Into
     }
 
-    fn on_expr_assign(&mut self, expr: &'ast ExprAssign) -> Descend {
+    fn on_expr_assign(&mut self, expr: &'ast ExprAssign, _: &Facts<'_, ExprAssign>) -> Descend {
         self.report(
             ExpressionFlow::assigned_local(&expr.left).map(|_| expr.eq_token.span),
             Message::new(
@@ -238,7 +238,7 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         Descend::Into
     }
 
-    fn on_expr_binary(&mut self, expr: &'ast ExprBinary) -> Descend {
+    fn on_expr_binary(&mut self, expr: &'ast ExprBinary, _: &Facts<'_, ExprBinary>) -> Descend {
         self.report(
             ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op)).map(|_| expr.op.span()),
             Message::new(
@@ -295,18 +295,18 @@ impl<'ast> Watch<'ast> for MutableLocals {
         &[Kind::Local, Kind::Expr, Kind::Macro]
     }
 
-    fn on_local(&mut self, local: &'ast Local) -> Descend {
+    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
         self.declared
             .extend(Self::declared_mutable(local).map(|binding| (Name::from(&binding.ident), local.let_token.span)));
         Descend::Into
     }
 
-    fn on_expr(&mut self, expr: &'ast Expr) -> Descend {
+    fn on_expr(&mut self, expr: &'ast Expr, _: &Facts<'_, Expr>) -> Descend {
         self.touched.extend(Self::touched_by(expr).map(Name::from));
         Descend::Into
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
+    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         self.touched.extend(Self::written_to(invocation));
         Descend::Expand
     }

@@ -5,8 +5,8 @@ use syn::{Field, Item, ItemImpl, ItemMod};
 use item_head::ItemHead;
 use std::path::Path;
 
-use lint_core::{Violation, Walk};
-use lint_sweep::{Descend, Finds, Kind, Watch};
+use lint_core::Violation;
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use crate::flagged::Flagged;
 
@@ -27,22 +27,22 @@ impl<'ast> Watch<'ast> for GatedItems<'_> {
         &[Kind::Item, Kind::ItemMod, Kind::ItemImpl, Kind::Field]
     }
 
-    fn on_item(&mut self, item: &'ast Item) -> Descend {
+    fn on_item(&mut self, item: &'ast Item, _: &Facts<'_, Item>) -> Descend {
         self.found.extend(ItemHead::of_item(item).and_then(|head| head.flagged(None)));
         Descend::Into
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs))
+    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+        Descend::from(facts.gate())
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl) -> Descend {
+    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
         let gated = ItemHead::gate_of(&item.attrs);
         self.found.extend(item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated)));
         Descend::Into
     }
 
-    fn on_field(&mut self, field: &'ast Field) -> Descend {
+    fn on_field(&mut self, field: &'ast Field, _: &Facts<'_, Field>) -> Descend {
         self.found.extend(ItemHead::of_field(field).flagged(None));
         Descend::Into
     }

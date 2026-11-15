@@ -1,6 +1,7 @@
 use lint_layout::Name;
 
 use crate::boundary::ItemId;
+use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -103,12 +104,13 @@ pub struct Seat {
     subject: Option<TypeRef>,
     owner: Option<ItemId>,
     implemented: Option<Name>,
+    traited: Option<Resolved>,
 }
 
 impl Seat {
     #[must_use]
     pub fn new(region: Region, subject: Option<TypeRef>) -> Seat {
-        Seat { region, subject, owner: None, implemented: None }
+        Seat { region, subject, owner: None, implemented: None, traited: None }
     }
 
     #[must_use]
@@ -119,6 +121,16 @@ impl Seat {
     #[must_use]
     pub fn implementing(self, implemented: Option<Name>) -> Seat {
         Seat { implemented, ..self }
+    }
+
+    #[must_use]
+    pub fn traited(self, traited: Option<Resolved>) -> Seat {
+        Seat { traited, ..self }
+    }
+
+    #[must_use]
+    pub fn implemented_trait(&self) -> Option<&Resolved> {
+        self.traited.as_ref()
     }
 
     #[must_use]
