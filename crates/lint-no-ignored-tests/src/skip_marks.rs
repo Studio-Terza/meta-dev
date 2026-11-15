@@ -109,7 +109,7 @@ impl<'ast> Watch<'ast> for SkipMarks<'_> {
     }
 
     fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
-        let attributes = Macros::attributes(invocation);
+        let attributes = Macros::attributes_in_file(self.file, invocation);
         self.record_skips(&attributes, Marked::among(&attributes, TestMarks::law(invocation)));
         Descend::Over
     }

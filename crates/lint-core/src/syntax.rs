@@ -12,6 +12,14 @@ pub struct Syntax;
 
 impl Syntax {
     #[must_use]
+    pub fn item_macro(item: &Item) -> Option<&syn::Macro> {
+        match item {
+            Item::Macro(found) => found.ident.as_ref().map_or(Some(&found.mac), |_| None),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn impl_fn(member: &ImplItem) -> Option<&ImplItemFn> {
         match member {
             ImplItem::Fn(function) => Some(function),

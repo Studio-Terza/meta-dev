@@ -6,10 +6,12 @@ mod table_rows;
 
 use std::path::Path;
 
+use lint_core::{Address, Macros, SourceFile};
+
 use syn::punctuated::Punctuated;
 use syn::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, Token};
 
-use lint_core::{MacroAliases, MacroCalls, Site, Violation};
+use lint_core::{MacroAliases, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
 use lint_sweep::{Descend, Finds, Kind, Watch};
 
@@ -20,7 +22,7 @@ use table_rows::TableRows;
 
 #[derive(Debug)]
 pub struct Assertions<'file> {
-    path: &'file Path,
+    file: &'file SourceFile,
     kinds: &'static [Kind],
     scopes: Scopes,
     tables: MacroAliases,
@@ -30,6 +32,7 @@ pub struct Assertions<'file> {
 #[derive(Debug)]
 struct Met {
     invocation: Macro,
+    at: Address,
     body: Option<BodyId>,
 }
 
@@ -38,9 +41,9 @@ impl<'file> Assertions<'file> {
     const WATCHED: &'static [Kind] =
         &[Kind::ItemFn, Kind::ImplItemFn, Kind::ItemConst, Kind::Local, Kind::ItemUse, Kind::Macro];
 
-    pub fn new(path: &'file Path, asserting: Option<&'file Path>) -> Assertions<'file> {
+    pub fn new(file: &'file SourceFile, asserting: Option<&'file Path>) -> Assertions<'file> {
         Assertions {
-            path,
+            file,
             kinds: asserting.map_or(&[][..], |_| Self::WATCHED),
             scopes: Scopes::default(),
             tables: MacroAliases::new(Self::TABLE),
@@ -48,14 +51,23 @@ impl<'file> Assertions<'file> {
         }
     }
 
-    fn judged(&self, invocation: &Macro, constants: &Bindings<'_>, locals: &Bindings<'_>) -> Vec<Violation<'file>> {
+    fn judged(
+        &self,
+        invocation: &Macro,
+        at: Address,
+        constants: &Bindings<'_>,
+        locals: &Bindings<'_>,
+    ) -> Vec<Violation<'file>> {
         let compared = Assertion::named(
             &invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident)),
             &self.tables,
         )
         .compared(invocation);
         compared.map_or_else(
-            || MacroCalls::within(invocation).iter().flat_map(|inner| self.judged(inner, constants, locals)).collect(),
+            || {
+                let nested = Macros::nested_at(self.file, at, invocation);
+                nested.iter().flat_map(|inner| self.judged(inner, Address::from(inner), constants, locals)).collect()
+            },
             |sides| {
                 let line = invocation
                     .path
@@ -65,7 +77,7 @@ impl<'file> Assertions<'file> {
                 let judge = Compared::new(constants, locals);
                 let pinned = sides.iter().find_map(|side| judge.pinning(side));
                 pinned
-                    .map(|pinning| Violation::new(Site::new(self.path, line), Finding::from(pinning)))
+                    .map(|pinning| Violation::new(Site::new(self.file.head().path(), line), Finding::from(pinning)))
                     .into_iter()
                     .collect()
             },
@@ -109,7 +121,11 @@ impl<'ast> Watch<'ast> for Assertions<'_> {
     }
 
     fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
-        self.met.push(Met { invocation: invocation.clone(), body: self.scopes.current() });
+        self.met.push(Met {
+            invocation: invocation.clone(),
+            at: Address::from(invocation),
+            body: self.scopes.current(),
+        });
         Descend::Over
     }
 }
@@ -119,7 +135,7 @@ impl<'file> Finds<'file> for Assertions<'file> {
         let constants = self.scopes.constants();
         self.met
             .iter()
-            .flat_map(|met| self.judged(&met.invocation, &constants, &self.scopes.locals(met.body)))
+            .flat_map(|met| self.judged(&met.invocation, met.at, &constants, &self.scopes.locals(met.body)))
             .collect()
     }
 }

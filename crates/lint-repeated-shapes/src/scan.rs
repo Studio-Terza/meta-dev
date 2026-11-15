@@ -1,7 +1,8 @@
+mod spread;
+
 use std::mem;
 
 use quote::ToTokens;
-use syn::spanned::Spanned;
 use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
 
 use body_shape::Reading;
@@ -9,8 +10,9 @@ use equivalence::Equivalence;
 use std::path::Path;
 
 use lint_core::{Bound, Parsed, Site, Walk};
-use lint_layout::{LineNumber, TestMarks};
+use lint_layout::{Length, LineNumber, TestMarks};
 use lint_sweep::{Descend, Gathers, Kind as Node, Sweep, Watch, Watching};
+use spread::Spread;
 
 use crate::Occurrences;
 use crate::extent::Extent;
@@ -50,14 +52,17 @@ impl<'file> Scan<'file> {
         Scan { path: parsed.head().path(), kind, outer: Vec::new(), equivalence, occurrences: Vec::new(), tested }
     }
 
-    fn considered(&mut self, node: &(impl ToTokens + Spanned)) -> Option<Bound> {
-        let reading = Reading::erasing(node.to_token_stream(), self.equivalence);
-        let span = node.span();
+    fn considered(&mut self, node: &impl ToTokens) -> Option<Bound> {
+        let tokens = node.to_token_stream();
+        let span = Spread::joined(&tokens);
+        let wide = Self::FLOOR.allows(Length::new(span.byte_range().len())).map(|_| tokens);
+        let reading = wide.map(|printed| Reading::erasing(printed, self.equivalence));
+        let large = reading.as_ref().and_then(|read| Self::FLOOR.allows(read.shape().size())).map(|_| Self::FLOOR);
         let site = Site::new(self.path, LineNumber::from(span));
-        let tokens = reading.shape().size();
-        let occurrence = Occurrence::new(reading, site, Extent::from(span), self.kind);
-        let large = Self::FLOOR.allows(tokens).map(|_| Self::FLOOR);
-        self.occurrences.extend(large.map(|_| occurrence));
+        let kind = self.kind;
+        let occurrence =
+            reading.filter(|_| large.is_some()).map(|read| Occurrence::new(read, site, Extent::from(span), kind));
+        self.occurrences.extend(occurrence);
         large
     }
 

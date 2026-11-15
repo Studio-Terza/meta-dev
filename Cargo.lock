@@ -2090,6 +2090,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-fixtures",
+ "lint-layout",
  "syn 2.0.119",
 ]
 

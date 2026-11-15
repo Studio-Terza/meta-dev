@@ -6,6 +6,7 @@ use syn::Macro;
 use syn::visit::{self, Visit};
 
 use lint_core::{ByKind, Descend, Kind, Macros, SourceFile, Violation, Watch, Watching};
+use lint_layout::Name;
 
 use boundary::{Index, Muting};
 
@@ -156,6 +157,18 @@ impl<'ast> Visit<'ast> for Sweeping<'_, '_> {
         self.muting.awake().into_iter().for_each(|_| visit::visit_macro(self, node));
         entered.expanding.first().into_iter().for_each(|_| self.expanded(&entered, node));
         self.left(&entered, |watcher| watcher.off_macro(node));
+    }
+
+    fn visit_ident(&mut self, node: &'ast syn::Ident) {
+        let heard = self.listening.get(Kind::Ident).first().map(|_| Name::from(node));
+        heard.map_or_default(|name| {
+            self.around(
+                Kind::Ident,
+                |watcher| watcher.on_ident(node, &name),
+                |_| {},
+                |watcher| watcher.off_ident(node),
+            );
+        });
     }
 
     lint_core::sweep_visits!();

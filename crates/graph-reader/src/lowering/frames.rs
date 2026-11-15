@@ -62,8 +62,8 @@ pub(super) struct Frame {
     context: Context,
 }
 
-impl From<&Lowering> for Frame {
-    fn from(lowering: &Lowering) -> Frame {
+impl From<&Lowering<'_>> for Frame {
+    fn from(lowering: &Lowering<'_>) -> Frame {
         Frame {
             here: lowering.here.clone(),
             enclosure: lowering.enclosure,
@@ -73,7 +73,7 @@ impl From<&Lowering> for Frame {
     }
 }
 
-impl Lowering {
+impl Lowering<'_> {
     pub(super) fn saved(&mut self) -> Descend {
         self.frames.push(Frame::from(&*self));
         Descend::Into

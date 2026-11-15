@@ -46,7 +46,7 @@ impl ContextLint for PublicApiTests {
     ) -> Judgement<'file, 'run> {
         file.shipped().map_or_else(
             || Judgement::watching(Box::new(PathReach::beside(file))),
-            |_| Judgement::watching(Box::new(TestCode::new(file.head().path(), emitters.as_ref()))),
+            |_| Judgement::watching(Box::new(TestCode::new(file, emitters.as_ref()))),
         )
     }
 }

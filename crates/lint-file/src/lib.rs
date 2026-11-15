@@ -102,7 +102,7 @@ pub trait PrimedFacts {
     fn priming<'head>(parsed: Parsed<'_, 'head>) -> Self::Priming<'head>;
 
     fn contribution<'run, 'head: 'run>(
-        parsed: Parsed<'_, 'head>,
+        parsed: Parsed<'run, 'head>,
         primer: &'run Self::Primer<'head>,
     ) -> Self::Contribution<'run, 'head>;
 }
@@ -141,7 +141,7 @@ pub trait Gleaning {
     type Part<'head>: Send + Debug;
     type Gleaned<'head>: FromIterator<Self::Part<'head>> + Send + Sync + Debug;
 
-    type Gleaner<'head>: Gathers<Self::Part<'head>>;
+    type Gleaner<'run, 'head: 'run>: Gathers<Self::Part<'head>>;
 
-    fn gleaner<'head>(parsed: Parsed<'_, 'head>) -> Self::Gleaner<'head>;
+    fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Self::Gleaner<'run, 'head>;
 }

@@ -338,8 +338,8 @@ impl From<&SourceFile> for FileShape {
     }
 }
 
-impl Lowering {
-    pub(crate) fn of_file(source: &SourceFile, reach: Reach) -> Lowering {
+impl<'read> Lowering<'read> {
+    pub(crate) fn of_file(source: &'read SourceFile, reach: Reach) -> Lowering<'read> {
         let syntax = source.syntax();
         let shape = FileShape::from(source);
         let lowered = Lowered {
@@ -348,6 +348,7 @@ impl Lowering {
             rows: FileRows::default(),
         };
         Lowering {
+            source,
             lowered,
             here: Seat::new(ScopeId::FIRST, shape.children),
             enclosure: shape.enclosure,
@@ -465,7 +466,8 @@ impl<'read> Plot<'read> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Lowering {
+pub(crate) struct Lowering<'read> {
+    source: &'read SourceFile,
     lowered: Lowered,
     here: Seat,
     enclosure: Enclosure,
@@ -474,7 +476,7 @@ pub(crate) struct Lowering {
     frames: Vec<Frame>,
 }
 
-impl Lowering {
+impl Lowering<'_> {
     fn entered(&mut self, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Seat {
         let scope = self.lowered.openings.opened(self.here.scope(), kind, entries);
         let inner = Seat::new(scope, children);
@@ -531,7 +533,7 @@ impl Lowering {
     }
 }
 
-impl<'ast> Watch<'ast> for Lowering {
+impl<'ast> Watch<'ast> for Lowering<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::Item,

@@ -49,8 +49,9 @@ impl<'ast> Watch<'ast> for NameUses<'_> {
         &[Kind::Ident]
     }
 
-    fn on_ident(&mut self, ident: &'ast Ident) -> Descend {
-        self.names.insert(Name::from(ident));
+    fn on_ident(&mut self, _: &'ast Ident, name: &Name) -> Descend {
+        let fresh = self.names.get(name).map_or(Some(name), |_| None).cloned();
+        self.names.extend(fresh);
         Descend::Into
     }
 }

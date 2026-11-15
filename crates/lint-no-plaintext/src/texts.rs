@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::iter;
 
 use graph::{
     Held, Holding, ItemId, ItemPath, Model, Named, Placed, Primitive, Resolved, Sited, Spelling, TypeRef, TypeUses,
@@ -62,7 +63,11 @@ impl Texts {
 
     pub(crate) fn settled(model: &Model, kinds: &Kinds<'_>) -> Texts {
         let wrappers = Wrapper::read(model, kinds);
-        wrappers.iter().fold(Texts::default(), |settled, _| settled.widened(&wrappers))
+        let rounds = iter::successors(Some(Texts::default()), |settled| {
+            let widened = settled.widened(&wrappers);
+            Some(widened).filter(|next| next != settled)
+        });
+        rounds.take(wrappers.len() + 1).last().unwrap_or_default()
     }
 
     pub(crate) fn content(&self, ty: &TypeRef) -> Option<Content> {

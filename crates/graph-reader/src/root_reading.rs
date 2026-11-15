@@ -64,7 +64,7 @@ impl RootFile {
 
     fn exports(file: &File, dependencies: &Dependencies) -> CrateExports {
         let modules: Vec<Name> = file.items.iter().filter_map(Self::module).collect();
-        Entries::of_items(&file.items).crate_exports(dependencies, &modules)
+        Entries::of_root(file).crate_exports(dependencies, &modules)
     }
 
     fn module(item: &Item) -> Option<Name> {

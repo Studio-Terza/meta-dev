@@ -71,6 +71,12 @@ impl Openings {
         scope
     }
 
+    pub(crate) fn absorb(&mut self, scope: ScopeId, entries: Entries) {
+        let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
+        let held = nested.map_or(&mut self.top, |opening| &mut opening.entries);
+        *held = std::mem::take(held).merged(entries);
+    }
+
     pub(crate) fn declare(&mut self, scope: ScopeId, declared: Declared) {
         let top = &mut self.top;
         let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
