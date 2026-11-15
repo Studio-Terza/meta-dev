@@ -277,14 +277,10 @@ impl MutableLocals {
     }
 
     fn written_to(invocation: &Macro) -> Option<Name> {
-        let arguments = invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).ok()?;
-        Self::WRITING_MACROS
-            .iter()
-            .any(|name| invocation.path.is_ident(name))
-            .then_some(arguments)?
-            .first()
-            .and_then(ExpressionFlow::assigned_local)
-            .map(Name::from)
+        let writing = Self::WRITING_MACROS.iter().find(|name| invocation.path.is_ident(name));
+        let arguments =
+            writing.and_then(|_| invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).ok());
+        arguments?.first().and_then(ExpressionFlow::assigned_local).map(Name::from)
     }
 
     fn only_reassigned(&self) -> Vec<Span> {

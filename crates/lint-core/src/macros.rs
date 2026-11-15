@@ -9,6 +9,7 @@ use syn::{Attribute, Block, Expr, Item, Macro, Stmt, Token};
 
 use crate::source_file::SourceFile;
 use crate::syntax::Syntax;
+use crate::watch::Address;
 
 mod boundary;
 
@@ -41,6 +42,26 @@ impl Macros {
     #[must_use]
     pub fn expanded(file: &SourceFile, invocation: &Macro) -> Rc<[Stmt]> {
         file.expansions().statements(invocation)
+    }
+
+    #[must_use]
+    pub fn nested(file: &SourceFile, invocation: &Macro) -> Rc<[Macro]> {
+        file.expansions().calls(Address::from(invocation), invocation)
+    }
+
+    #[must_use]
+    pub fn nested_at(file: &SourceFile, at: Address, copy: &Macro) -> Rc<[Macro]> {
+        file.expansions().calls(at, copy)
+    }
+
+    #[must_use]
+    pub fn items_in_file(file: &SourceFile, invocation: &Macro) -> Rc<[Item]> {
+        file.expansions().items(invocation)
+    }
+
+    #[must_use]
+    pub fn attributes_in_file(file: &SourceFile, invocation: &Macro) -> Rc<[Attribute]> {
+        file.expansions().attributes(invocation)
     }
 
     pub fn pin(file: &SourceFile, invocation: &Macro) {

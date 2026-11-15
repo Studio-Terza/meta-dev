@@ -38,7 +38,7 @@ impl<'read> ListedFile<'read> {
 struct FileLowering<'read> {
     source: &'read SourceFile,
     order: Order,
-    lowering: Lowering,
+    lowering: Lowering<'read>,
 }
 
 impl Gathers<FileFacts> for FileLowering<'_> {

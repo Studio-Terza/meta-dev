@@ -2,23 +2,28 @@ use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::{ItemFn, ItemMod, Macro, PathSegment};
 
-use lint_core::Macros;
 use lint_core::Walk;
+use lint_core::{Macros, SourceFile};
 use lint_layout::TestMarks;
 use lint_sweep::{Descend, Kind, Watch};
 use newtype::Counter;
 
 use super::count::Count;
 
-#[derive(Debug, Default)]
-pub struct TestScan {
+#[derive(Debug)]
+pub struct TestScan<'file> {
+    file: &'file SourceFile,
     tests: Count,
     test_lines: Count,
     before: Vec<Count>,
 }
 
-impl TestScan {
+impl<'file> TestScan<'file> {
     const PROPERTY_BLOCK: &str = "proptest";
+
+    pub(super) fn new(file: &'file SourceFile) -> TestScan<'file> {
+        TestScan { file, tests: Count::default(), test_lines: Count::default(), before: Vec::new() }
+    }
 
     pub(super) fn counted<Out>(self, into: impl FnOnce(Count, Count) -> Out) -> Out {
         into(self.tests, self.test_lines)
@@ -32,18 +37,21 @@ impl TestScan {
         invocation.path.segments.last().filter(|segment| segment.ident == Self::PROPERTY_BLOCK)
     }
 
-    fn tests_in(invocation: &Macro) -> Count {
+    fn tests_in(&self, invocation: &Macro) -> Count {
         TestMarks::law(invocation)
             .map(|_| Count::new(1))
             .or_else(|| {
-                Self::property_block(invocation)
-                    .map(|_| Count::new(Macros::attributes(invocation).iter().filter_map(TestMarks::test).count()))
+                Self::property_block(invocation).map(|_| {
+                    Count::new(
+                        Macros::attributes_in_file(self.file, invocation).iter().filter_map(TestMarks::test).count(),
+                    )
+                })
             })
             .unwrap_or_default()
     }
 }
 
-impl<'ast> Watch<'ast> for TestScan {
+impl<'ast> Watch<'ast> for TestScan<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemFn, Kind::ItemMod, Kind::Macro]
     }
@@ -66,7 +74,7 @@ impl<'ast> Watch<'ast> for TestScan {
     }
 
     fn on_macro(&mut self, invocation: &'ast Macro) -> Descend {
-        self.tests = self.tests.plus(Self::tests_in(invocation));
+        self.tests = self.tests.plus(self.tests_in(invocation));
         Descend::Over
     }
 }

@@ -78,7 +78,7 @@ impl Built for HoldingRow {
     }
 }
 
-impl Lowering {
+impl Lowering<'_> {
     pub(super) fn valued(&mut self, ident: &Ident, ty: &Type, attributes: &[Attribute]) -> Descend {
         let target = self.generics.lowered(ty);
         self.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);

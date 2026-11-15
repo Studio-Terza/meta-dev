@@ -82,3 +82,18 @@ fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), Box<dy
     assert_eq!(paths, ["crates/x/src/tests.rs"]);
     Ok(())
 }
+
+#[test]
+fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> Result<(), Box<dyn Error>> {
+    let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
+    let outer = file.syntax().items.iter().find_map(Invocations::in_item).ok_or("no macro in the file")?;
+    let copied = outer.clone();
+    Macros::pin(&file, outer);
+    let nested = Macros::nested(&file, outer);
+    let inner = nested.first().ok_or("no macro nested in the call")?;
+    assert!(Rc::ptr_eq(&nested, &Macros::nested(&file, outer)));
+    assert!(Rc::ptr_eq(&Macros::nested(&file, inner), &Macros::nested(&file, inner)));
+    assert_ne!(Rc::as_ptr(&Macros::nested(&file, &copied)), Rc::as_ptr(&Macros::nested(&file, &copied)));
+    assert_eq!(Macros::nested(&file, &copied).len(), nested.len());
+    Ok(())
+}

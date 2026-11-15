@@ -4,7 +4,7 @@ use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, T
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
-use crate::namespace::{Domain, PortMacro, Resolving, ScopeId, UsePath};
+use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};
 
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
@@ -113,7 +113,7 @@ impl Places {
     }
 }
 
-impl Lowering {
+impl Lowering<'_> {
     fn placed(&mut self, row: PlaceRow) -> PlaceId {
         let places = &mut self.lowered.rows.places.places;
         let place = PlaceId(places.len());
@@ -137,7 +137,7 @@ impl Lowering {
 
     pub(super) fn macro_left(&mut self, item: &ItemMacro) -> &mut Self {
         match &item.ident {
-            Some(_) => self.transcribed(&Macros::statements(&item.mac)),
+            Some(_) => self.transcribed(&Macros::expanded(self.source, &item.mac)),
             None => self.expanded(&item.mac),
         }
     }
@@ -154,7 +154,9 @@ impl Lowering {
     }
 
     fn expanded(&mut self, invocation: &Macro) -> &mut Self {
-        Macros::items(invocation).iter().fold(self, |lowering, declared| {
+        let items = Macros::items_in_file(self.source, invocation);
+        self.lowered.openings.absorb(self.here.scope(), Entries::of_items(&items));
+        items.iter().fold(self, |lowering, declared| {
             Sweep::through_item(declared, lowering);
             lowering
         })

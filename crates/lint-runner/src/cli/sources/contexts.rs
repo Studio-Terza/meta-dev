@@ -63,10 +63,10 @@ macro_rules! contexts {
             $($gleaned: Vec<<$glean as Gleaning>::Part<'run>>,)*
         }
 
-        struct Gatherings<'run> {
+        struct Gatherings<'file, 'run: 'file> {
             $($field: <$lint as ContextLint>::Gathering<'run>,)*
             $($primed: <$prime as PrimedFacts>::Priming<'run>,)*
-            $($gleaned: <$glean as Gleaning>::Gleaner<'run>,)*
+            $($gleaned: <$glean as Gleaning>::Gleaner<'file, 'run>,)*
         }
 
         impl<'run> Contributed<'run> {

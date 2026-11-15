@@ -1,6 +1,6 @@
 use std::ptr;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Address(usize);
 
 impl<Node> From<&Node> for Address {

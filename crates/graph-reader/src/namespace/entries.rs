@@ -2,14 +2,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syn::punctuated::Punctuated;
 use syn::{
-    Attribute, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, StmtMacro,
+    Attribute, File, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, StmtMacro,
     Token, VisRestricted,
 };
 
 use graph::{
     Building, CrateExports, Domain, Exposure, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved,
 };
-use lint_core::Macros;
+use lint_core::{Macros, Syntax};
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
@@ -437,9 +437,7 @@ impl From<&Item> for Entries {
         match item {
             Item::Use(used) => Entries::from(used),
             Item::ExternCrate(declared) => Entries::from(declared),
-            Item::Macro(ItemMacro { ident: None, mac, .. }) => {
-                Entries::from(mac).merged(Entries::of_items(&Macros::items(mac)))
-            }
+            Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
             Item::Macro(ItemMacro { ident: Some(ident), .. }) => Entries::from(Declared {
                 domain: Domain::Macros,
                 ..Declared::named_item(ident, &syn::Visibility::Inherited, ItemKind::Macro)
@@ -488,6 +486,15 @@ impl From<&Stmt> for Entries {
 impl Entries {
     pub(crate) fn of_items(items: &[Item]) -> Entries {
         items.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
+    }
+
+    pub(crate) fn of_root(file: &File) -> Entries {
+        let inside = file
+            .items
+            .iter()
+            .filter_map(Syntax::item_macro)
+            .map(|mac| Entries::of_root(&File { shebang: None, attrs: Vec::new(), items: Macros::items(mac) }));
+        inside.fold(Entries::of_items(&file.items), Entries::merged)
     }
 
     pub(crate) fn of_block(statements: &[Stmt]) -> Entries {
@@ -623,7 +630,7 @@ impl Entries {
         globs.fold(with_named, CrateExports::with_glob)
     }
 
-    fn merged(mut self, other: Entries) -> Entries {
+    pub(crate) fn merged(mut self, other: Entries) -> Entries {
         self.declared.extend(other.declared);
         self.imports.extend(other.imports);
         other.externs.into_iter().for_each(|(name, externs)| self.externs.entry(name).or_default().extend(externs));
