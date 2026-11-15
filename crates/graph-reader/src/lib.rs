@@ -1,3 +1,4 @@
+mod branches;
 mod facts;
 mod lowering;
 mod namespace;
@@ -9,7 +10,9 @@ use graph::Model;
 use lint_core::{Readout, SourceFile};
 use lint_layout::Crates;
 
-pub use facts::{FileFacts, ListedGroup, Listing};
+pub use branches::{Branches, Propagation};
+pub use facts::{FileFacts, GroupLowering, ListedGroup, Listing};
+use lint_sweep::Sweep;
 pub use lowering::ReceiverSyntax;
 use root_reading::RootReading;
 
@@ -24,7 +27,10 @@ impl Reader {
 
     #[must_use]
     pub fn read_files(files: &[SourceFile]) -> Model {
-        FileFacts::merged(Listing::of_files(files).groups().iter().flat_map(ListedGroup::lowered).collect())
+        let listing = Listing::of_files(files);
+        let facts =
+            listing.groups().iter().zip(files).flat_map(|(group, file)| Sweep::gathered(file, group.lowering()));
+        FileFacts::merged(facts.collect())
     }
 
     #[must_use]

@@ -6,8 +6,8 @@ use equivalence::Equivalence;
 use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
+use lint_sweep::{Descend, Gathers, Kind, Sweep, Watch, Watching};
 use quote::ToTokens;
-use syn::visit::{self, Visit};
 use syn::{ItemImpl, ItemMod};
 
 use crate::end::Node;
@@ -29,9 +29,7 @@ impl<'file> Fillers<'file> {
         let shipped = parsed.file().shipped().map(|_| parsed);
         shipped.map_or_default(|found| {
             let krate = found.head().placement().package().crate_name();
-            let mut scan = Scan { krate, equivalence, fillers: Fillers::default() };
-            scan.visit_file(found.file().syntax());
-            scan.fillers
+            Sweep::gathered(found.file(), Scan { krate, equivalence, fillers: Fillers::default() })
         })
     }
 
@@ -53,18 +51,33 @@ impl<'file> Fillers<'file> {
     }
 }
 
+#[derive(Debug)]
 struct Scan<'file> {
     krate: &'file CrateName,
     equivalence: Equivalence,
     fillers: Fillers<'file>,
 }
 
-impl<'ast> Visit<'ast> for Scan<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
+impl<'file> Gathers<Fillers<'file>> for Scan<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        Sweep::alone(self)
     }
 
-    fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
+    fn gathered(self) -> Fillers<'file> {
+        self.fillers
+    }
+}
+
+impl<'ast> Watch<'ast> for Scan<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemImpl]
+    }
+
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
+    }
+
+    fn on_item_impl(&mut self, found: &'ast ItemImpl) -> Descend {
         let interface =
             found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
         let filled = interface.zip(Name::of_type(&found.self_ty)).map(|(trait_name, filler)| Filled {
@@ -86,6 +99,7 @@ impl<'ast> Visit<'ast> for Scan<'_> {
         self.fillers
             .bodies
             .extend(filled.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered).map(|kept| (kept, methods)));
+        Descend::Over
     }
 }
 

@@ -1,5 +1,5 @@
+use lint_sweep::{Descend, Kind, Sweep, Watch};
 use syn::spanned::Spanned;
-use syn::visit::Visit;
 use syn::{
     AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics, Ident,
     ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, TraitBoundModifier,
@@ -248,14 +248,19 @@ struct Measured<'scope> {
 impl Measured<'_> {
     fn types(scope: &InScope, length: &Expr) -> Vec<TypeRef<Written>> {
         let mut measured = Measured { scope, found: Vec::new() };
-        measured.visit_expr(length);
+        Sweep::through_expr(length, &mut measured);
         measured.found
     }
 }
 
-impl<'ast> Visit<'ast> for Measured<'_> {
-    fn visit_type(&mut self, ty: &'ast Type) {
+impl<'ast> Watch<'ast> for Measured<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Type]
+    }
+
+    fn on_type(&mut self, ty: &'ast Type) -> Descend {
         self.found.push(self.scope.lowered(ty));
+        Descend::Over
     }
 }
 

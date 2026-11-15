@@ -85,7 +85,16 @@ const IN_PORTS: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&se
 const HELD_IN_MODULE: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&self, id: u8) -> u8;\n    }\n}\nmod inner {\n    use crate::ports::Store;\n    struct Shelf<'a> {\n        store: &'a dyn Store,\n    }\n    impl Shelf<'_> {\n        fn all(&self, ids: &[u8]) {\n            for id in ids {\n                self.store.fetch(*id);\n            }\n        }\n    }\n}\n";
 const PASSED_IN_MODULE: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&self, id: u8) -> u8;\n    }\n}\nmod inner {\n    use crate::ports::Store;\n    fn f(store: &dyn Store, ids: Vec<u8>) {\n        for id in ids {\n            store.fetch(id);\n        }\n    }\n}\n";
 
-const CASES: [Case; 28] = [
+const AFTER_LOOP: &str = ported!(
+    "fn f(store: &impl Store, ids: Vec<u8>) -> u8 {\n    for id in ids {\n        drop(id);\n    }\n    store.fetch(1)\n}\n"
+);
+
+const CASES: [Case; 29] = [
+    Case::new(
+        Title::new("a call after a loop has ended"),
+        &[Source::new(Located::new("a.rs"), Text::new(AFTER_LOOP))],
+        Flagged::new(&[]),
+    ),
     Case::new(
         Title::new("a port module mirrors through a port"),
         &[Source::new(Located::new("a.rs"), Text::new(IN_PORTS))],

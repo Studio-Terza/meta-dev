@@ -40,7 +40,11 @@ impl Macros {
 
     #[must_use]
     pub fn expanded(file: &SourceFile, invocation: &Macro) -> Rc<[Stmt]> {
-        file.expansions().statements(file.syntax(), invocation)
+        file.expansions().statements(invocation)
+    }
+
+    pub fn pin(file: &SourceFile, invocation: &Macro) {
+        file.expansions().pin(invocation);
     }
 
     pub fn walk(file: &SourceFile, invocation: &Macro, visit: impl FnMut(&Stmt)) {

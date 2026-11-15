@@ -42,7 +42,7 @@ impl CallPath<'_> {
     }
 }
 
-impl Lowering<'_> {
+impl Lowering {
     pub(super) fn method_called(&mut self, call: &ExprMethodCall) {
         self.called(Position::from(call.method.span()), Callee::Method(Name::from(&call.method)));
     }

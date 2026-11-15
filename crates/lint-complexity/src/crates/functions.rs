@@ -1,12 +1,13 @@
-use syn::visit::{self, Visit};
 use syn::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
-use body_lifts::{Branches, Propagation};
+use graph_reader::{Branches, Propagation};
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
+use lint_sweep::{Descend, Kind, Sweep, Watch};
 
 use super::function::Function;
 
+#[derive(Debug)]
 pub(crate) struct Functions<'file> {
     file: &'file SourceFile,
     found: Vec<Function<'file>>,
@@ -15,11 +16,11 @@ pub(crate) struct Functions<'file> {
 impl<'file> Functions<'file> {
     pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Function<'file>> {
         let mut scan = Functions { file, found: Vec::new() };
-        scan.visit_file(file.syntax());
+        Sweep::through_file(file, &mut scan);
         scan.found
     }
 
-    fn recorded(&mut self, attributes: &[Attribute], name: &Ident, body: Option<&Block>) {
+    fn recorded(&mut self, attributes: &[Attribute], name: &Ident, body: Option<&Block>) -> Descend {
         let function = |block: &Block| {
             Function::new(
                 Name::from(name),
@@ -32,26 +33,28 @@ impl<'file> Functions<'file> {
             .filter(|_| TestMarks::mark_test(attributes).is_none())
             .map(function);
         self.found.extend(found);
+        Descend::Into
     }
 }
 
-impl<'ast> Visit<'ast> for Functions<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
+impl<'ast> Watch<'ast> for Functions<'_> {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::ItemMod, Kind::ItemFn, Kind::ImplItemFn, Kind::TraitItemFn]
     }
 
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.recorded(&function.attrs, &function.sig.ident, Some(&function.block));
-        visit::visit_item_fn(self, function);
+    fn on_item_mod(&mut self, module: &'ast ItemMod) -> Descend {
+        Descend::from(Walk::outside_tests(&module.attrs))
     }
 
-    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        self.recorded(&function.attrs, &function.sig.ident, Some(&function.block));
-        visit::visit_impl_item_fn(self, function);
+    fn on_item_fn(&mut self, function: &'ast ItemFn) -> Descend {
+        self.recorded(&function.attrs, &function.sig.ident, Some(&function.block))
     }
 
-    fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        self.recorded(&function.attrs, &function.sig.ident, function.default.as_ref());
-        visit::visit_trait_item_fn(self, function);
+    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn) -> Descend {
+        self.recorded(&function.attrs, &function.sig.ident, Some(&function.block))
+    }
+
+    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn) -> Descend {
+        self.recorded(&function.attrs, &function.sig.ident, function.default.as_ref())
     }
 }

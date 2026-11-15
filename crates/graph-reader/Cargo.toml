@@ -10,6 +10,8 @@ test = false
 doctest = false
 
 [dependencies]
+lint-sweep = { path = "../lint-sweep" }
+newtype = { path = "../newtype" }
 body-lifts = { path = "../body-lifts" }
 graph = { path = "../graph" }
 lint-core = { path = "../lint-core" }

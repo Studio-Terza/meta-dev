@@ -3,8 +3,9 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
 
 use graph::Model;
-use graph_reader::{FileFacts, ListedGroup, Listing};
+use graph_reader::{FileFacts, GroupLowering, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile};
+use lint_sweep::Gathers;
 
 use super::contexts::{Contexts, Contributed, PrimedParts, Primings};
 
@@ -21,7 +22,9 @@ struct Claim<'listing, 'read, 'run> {
 impl<'run> Claim<'_, '_, 'run> {
     fn gathered(&self) -> Gathered<'run> {
         let parsed = Parsed::new(self.file, self.head);
-        Gathered { head: self.head, facts: self.group.lowered(), contexts: Contributed::from(parsed) }
+        let mut lowering: GroupLowering<'_> = self.group.lowering();
+        let contexts = Contributed::joined(parsed, lowering.watching());
+        Gathered { head: self.head, facts: lowering.gathered(), contexts }
     }
 }
 

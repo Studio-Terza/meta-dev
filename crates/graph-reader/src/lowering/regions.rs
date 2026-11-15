@@ -3,7 +3,6 @@ use syn::{Attribute, ItemImpl, ItemMod};
 use graph::{Ground, Reach, Region, Within, Zone};
 use lint_core::{Gate, SourceFile, Walk};
 
-use super::Lowering;
 use super::places::PlaceId;
 
 #[derive(Clone, Copy, Debug)]
@@ -39,7 +38,7 @@ impl Regions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct Context {
     region: Region,
     place: Option<PlaceId>,
@@ -83,13 +82,5 @@ impl Context {
             Some(_) => Within::TraitImpl,
             None => Within::Own,
         }
-    }
-}
-
-impl Lowering<'_> {
-    pub(super) fn contextual(&mut self, context: Context, visited: impl FnOnce(&mut Self)) {
-        let outer = std::mem::replace(&mut self.context, context);
-        visited(self);
-        self.context = outer;
     }
 }
