@@ -3,7 +3,7 @@ mod finding;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use graph::{Function, Ground, Implementation, Model, Parameter, Placed, Reach, Reached, Region, Repetition, Seat};
+use graph::{Function, Implementation, Model, Parameter, Placed, Reached, Repetition, Seat};
 use lint_core::{Site, Violation};
 use lint_layout::{LineNumber, Name};
 
@@ -12,7 +12,6 @@ use finding::{Finding, Port};
 
 #[derive(Debug)]
 pub(crate) struct Reader<'run, 'model> {
-    model: &'model Model,
     ports: &'run Ports<'model>,
     impls: BTreeMap<&'model Path, Vec<&'model Implementation>>,
 }
@@ -23,8 +22,11 @@ struct Spot<'model> {
     port: Port,
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct Found<'model>(BTreeMap<Spot<'model>, Finding>);
+
 #[derive(Debug)]
-struct Flagged<'model> {
+pub(crate) struct Flagged<'model> {
     spot: Spot<'model>,
     finding: Finding,
 }
@@ -43,24 +45,10 @@ impl<'run, 'model> Reader<'run, 'model> {
             impls.entry(<&Path>::from(placed.site())).or_default().push(placed.entity());
             impls
         });
-        Reader { model, ports, impls }
+        Reader { ports, impls }
     }
 
-    pub(crate) fn violations(&self) -> Vec<Violation<'model>> {
-        let found: BTreeMap<Spot<'model>, Finding> = self
-            .model
-            .functions()
-            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() != Reach::Test)
-            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).ground() != Ground::Ports)
-            .flat_map(|placed| self.found(placed))
-            .fold(BTreeMap::new(), |mut found, flagged| {
-                found.entry(flagged.spot).or_insert(flagged.finding);
-                found
-            });
-        found.into_iter().map(|(spot, finding)| Violation::new(spot.site, finding)).collect()
-    }
-
-    fn found(&self, placed: Placed<'model, &'model Function>) -> Vec<Flagged<'model>> {
+    pub(crate) fn found(&self, placed: Placed<'model, &'model Function>) -> Vec<Flagged<'model>> {
         let function = placed.entity();
         let seat: &Seat = function.as_ref();
         let implemented = seat.subject().and_then(|subject| {
@@ -108,5 +96,25 @@ impl<'model> Body<'_, 'model> {
     fn field(self, reached: &Reached) -> Option<Port> {
         let name: &Name = reached.as_ref();
         self.held.filter(|fields| fields.contains(name)).map(|_| Port::Field(name.clone()))
+    }
+}
+
+impl<'model> FromIterator<Flagged<'model>> for Found<'model> {
+    fn from_iter<Flags: IntoIterator<Item = Flagged<'model>>>(flags: Flags) -> Found<'model> {
+        Found(flags.into_iter().fold(BTreeMap::new(), |mut found, flagged| {
+            found.entry(flagged.spot).or_insert(flagged.finding);
+            found
+        }))
+    }
+}
+
+impl<'model> IntoIterator for Found<'model> {
+    type Item = Violation<'model>;
+    type IntoIter = std::vec::IntoIter<Violation<'model>>;
+
+    fn into_iter(self) -> std::vec::IntoIter<Violation<'model>> {
+        let violations: Vec<Violation<'model>> =
+            self.0.into_iter().map(|(spot, finding)| Violation::new(spot.site, finding)).collect();
+        violations.into_iter()
     }
 }
