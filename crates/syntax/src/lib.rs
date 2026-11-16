@@ -5,7 +5,7 @@ pub use proc_macro2::{Delimiter, Group, Ident, LineColumn, Literal, Punct, Spaci
 pub use quote::{ToTokens, format_ident, quote, quote_spanned};
 pub use readers::applied::Applied;
 pub use readers::block_items::BlockItems;
-pub use readers::boundary::{Past, PatEdge, PatReached, PatSpine, PatTree, Spine, TypeSpine};
+pub use readers::boundary::{ExprShape, Past, PatEdge, PatReached, PatSpine, PatTree, Spine, TypeSpine};
 pub use readers::expr_shapes::{Application, Constant, Constructed};
 pub use readers::macro_tree::MacroTree;
 pub use readers::nested::Nested;

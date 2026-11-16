@@ -28,7 +28,7 @@ mod traversal;
 mod type_ref;
 mod unresolved;
 
-pub use boundary::{CallOrder, FileId, ItemId, ParamIndex, Quote};
+pub use boundary::{CallOrder, FileId, ItemId, ParamIndex, Quote, ShapeText};
 pub use call::{Call, Callee, MacroCall};
 pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
 pub use dispatch::Dispatch;

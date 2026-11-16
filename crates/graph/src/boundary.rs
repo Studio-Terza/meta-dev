@@ -102,3 +102,12 @@ impl AsRef<str> for Quote {
         &self.0
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ShapeText(String);
+
+impl From<&str> for ShapeText {
+    fn from(text: &str) -> ShapeText {
+        ShapeText(text.to_owned())
+    }
+}

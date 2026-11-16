@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, Signature, Spine, Type};
+use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, ExprShape, Item, Signature, Spine, Type};
 
-use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
+use graph::{Argument, ParamIndex, Read, Reader, Resolved, ShapeText, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name, Whole, Word};
 use lint_sweep::{Address, Descend, Facts, Kind, Watch};
@@ -62,25 +62,28 @@ impl Rooted {
 enum Passed {
     Rooted(Rooted),
     Named(UsePath),
+    Shape(ExprShape),
 }
 
 impl Passed {
-    fn from_argument(expr: &Expr) -> Option<Passed> {
+    fn from_argument(expr: &Expr) -> Passed {
         let rooted = Rooted::from_argument(expr).map(Passed::Rooted);
-        rooted.or_else(|| Syntax::expr_path(expr).map(|found| Passed::Named(UsePath::from(&found.path))))
+        let named = rooted.or_else(|| Syntax::expr_path(expr).map(|found| Passed::Named(UsePath::from(&found.path))));
+        named.unwrap_or_else(|| Passed::Shape(ExprShape::from(expr)))
     }
 
     fn rooted(&self) -> Option<Rooted> {
         match self {
             Passed::Rooted(rooted) => Some(rooted.clone()),
-            Passed::Named(_) => None,
+            Passed::Named(_) | Passed::Shape(_) => None,
         }
     }
 
-    fn lowered(self, parameters: &BTreeMap<Name, ParamIndex>, scope: &InScope) -> Option<LoweredArgument> {
+    fn lowered(self, parameters: &BTreeMap<Name, ParamIndex>, scope: &InScope) -> LoweredArgument {
         match self {
             Passed::Rooted(rooted) => LoweredArgument::rooted(rooted, parameters),
-            Passed::Named(path) => Some(LoweredArgument::Named(Spelled::under(path, scope))),
+            Passed::Named(path) => LoweredArgument::Named(Spelled::under(path, scope)),
+            Passed::Shape(shape) => LoweredArgument::shaped(&shape, parameters),
         }
     }
 }
@@ -89,18 +92,34 @@ impl Passed {
 enum LoweredArgument {
     Parameter { parameter: ParamIndex, fields: Vec<Name> },
     Named(Spelled),
+    Shape { text: ShapeText, parameters: Vec<ParamIndex> },
+    Opaque,
 }
 
 impl LoweredArgument {
-    fn rooted(rooted: Rooted, parameters: &BTreeMap<Name, ParamIndex>) -> Option<LoweredArgument> {
-        let parameter = *parameters.get(&rooted.root)?;
-        Some(LoweredArgument::Parameter { parameter, fields: rooted.fields })
+    fn rooted(rooted: Rooted, parameters: &BTreeMap<Name, ParamIndex>) -> LoweredArgument {
+        let parameter = parameters.get(&rooted.root).copied();
+        parameter.map_or(LoweredArgument::Opaque, |found| LoweredArgument::Parameter {
+            parameter: found,
+            fields: rooted.fields,
+        })
+    }
+
+    fn shaped(shape: &ExprShape, parameters: &BTreeMap<Name, ParamIndex>) -> LoweredArgument {
+        let indices: Option<Vec<ParamIndex>> =
+            shape.leaves().iter().map(|leaf| parameters.get(&Name::from(leaf)).copied()).collect();
+        indices.map_or(LoweredArgument::Opaque, |found| LoweredArgument::Shape {
+            text: ShapeText::from(shape.text()),
+            parameters: found,
+        })
     }
 
     fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Argument {
         match self {
             LoweredArgument::Parameter { parameter, fields } => Argument::Parameter { parameter, fields },
             LoweredArgument::Named(spelled) => Argument::Named(spelled.reader(resolving, scope)),
+            LoweredArgument::Shape { text, parameters } => Argument::Shape { text, parameters },
+            LoweredArgument::Opaque => Argument::Opaque,
         }
     }
 }
@@ -187,7 +206,7 @@ impl Reads {
         let settled = kept.filter_map(|read| {
             let parameter = *parameters.get(&read.rooted.root)?;
             let arguments: Vec<LoweredArgument> =
-                read.passed.into_iter().map(|passed| passed.lowered(&parameters, scope)).collect::<Option<_>>()?;
+                read.passed.into_iter().map(|passed| passed.lowered(&parameters, scope)).collect();
             let spelled = Spelled::under(read.path, scope);
             Some(LoweredReadAt { spelled, parameter, fields: read.rooted.fields, arguments, line: read.line })
         });
@@ -207,11 +226,10 @@ impl Reads {
     }
 
     fn recorded(&mut self, path: impl Fn() -> UsePath, arguments: &[&Expr], line: LineNumber) -> Descend {
-        let passed: Option<Vec<Passed>> = arguments.iter().copied().map(Passed::from_argument).collect();
-        let roots = passed.iter().flat_map(|all| all.iter().filter_map(Passed::rooted));
-        let found: Vec<LoweredRead> = roots
-            .map(|rooted| LoweredRead { path: path(), rooted, passed: passed.clone().unwrap_or_default(), line })
-            .collect();
+        let passed: Vec<Passed> = arguments.iter().copied().map(Passed::from_argument).collect();
+        let roots = passed.iter().filter_map(Passed::rooted);
+        let found: Vec<LoweredRead> =
+            roots.map(|rooted| LoweredRead { path: path(), rooted, passed: passed.clone(), line }).collect();
         self.found.extend(found);
         Descend::Into
     }

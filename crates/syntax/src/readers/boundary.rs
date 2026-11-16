@@ -207,3 +207,68 @@ impl PatTree {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExprShape {
+    text: String,
+    leaves: Vec<syn::Ident>,
+}
+
+#[derive(Default)]
+struct Leaves(Vec<syn::Ident>);
+
+impl<'expr> syn::visit::Visit<'expr> for Leaves {
+    fn visit_expr_path(&mut self, path: &'expr syn::ExprPath) {
+        self.0.extend(path.path.get_ident().cloned());
+    }
+}
+
+impl From<&Expr> for ExprShape {
+    fn from(expr: &Expr) -> ExprShape {
+        let mut leaves = Leaves::default();
+        syn::visit::Visit::visit_expr(&mut leaves, expr);
+        let text = ExprShape::rendered(quote::ToTokens::to_token_stream(expr), &leaves.0);
+        ExprShape { text, leaves: leaves.0 }
+    }
+}
+
+impl ExprShape {
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    #[must_use]
+    pub fn leaves(&self) -> &[syn::Ident] {
+        &self.leaves
+    }
+
+    fn rendered(tokens: proc_macro2::TokenStream, leaves: &[syn::Ident]) -> String {
+        tokens.into_iter().map(|token| Self::token(token, leaves)).collect::<Vec<String>>().join(" ")
+    }
+
+    fn token(token: proc_macro2::TokenTree, leaves: &[syn::Ident]) -> String {
+        match token {
+            proc_macro2::TokenTree::Ident(ident) => {
+                leaves.iter().find(|leaf| **leaf == ident).map_or_else(|| ident.to_string(), |_| "_".to_owned())
+            }
+            proc_macro2::TokenTree::Group(group) => Self::group(&group, leaves),
+            proc_macro2::TokenTree::Punct(punct) => punct.as_char().to_string(),
+            proc_macro2::TokenTree::Literal(literal) => literal.to_string(),
+        }
+    }
+
+    fn group(group: &proc_macro2::Group, leaves: &[syn::Ident]) -> String {
+        let [open, close] = Self::delimiters(group.delimiter());
+        [open, Self::rendered(group.stream(), leaves).as_str(), close].concat()
+    }
+
+    fn delimiters(delimiter: proc_macro2::Delimiter) -> [&'static str; 2] {
+        match delimiter {
+            proc_macro2::Delimiter::Parenthesis => ["(", ")"],
+            proc_macro2::Delimiter::Brace => ["{", "}"],
+            proc_macro2::Delimiter::Bracket => ["[", "]"],
+            proc_macro2::Delimiter::None => ["", ""],
+        }
+    }
+}

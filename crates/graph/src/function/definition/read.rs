@@ -1,6 +1,6 @@
 use lint_layout::{LineNumber, Name};
 
-use crate::boundary::ParamIndex;
+use crate::boundary::{ParamIndex, ShapeText};
 use crate::resolved::Resolved;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -40,6 +40,8 @@ impl Reader {
 pub enum Argument {
     Parameter { parameter: ParamIndex, fields: Vec<Name> },
     Named(Reader),
+    Shape { text: ShapeText, parameters: Vec<ParamIndex> },
+    Opaque,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -63,8 +65,9 @@ impl Read {
     }
 
     #[must_use]
-    pub fn arguments(&self) -> &[Argument] {
-        &self.arguments
+    pub fn comparable(&self) -> Option<&[Argument]> {
+        let opaque = self.arguments.iter().find(|argument| matches!(argument, Argument::Opaque));
+        opaque.map_or(Some(self.arguments.as_slice()), |_| None)
     }
 
     #[must_use]
