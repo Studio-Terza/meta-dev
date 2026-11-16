@@ -103,13 +103,12 @@ impl Outline for Endpoints<'_, '_, '_> {
     }
 
     fn grouped(self, parts: Grouped<'_>) -> Resolved {
-        let selfish = self.scope.selfish;
         let elements = parts.as_ref();
         elements.first().map_or(Resolved::Found(Endpoint::from(Unnamed::Unit)), |_| {
             elements
                 .iter()
                 .map(|part| part.outlined(self))
-                .find(|resolved| resolved.nature(selfish) == Nature::Primitive)
+                .find(|resolved| resolved.nature() == Nature::Primitive)
                 .unwrap_or(Resolved::Found(Endpoint::from(Unnamed::Opaque)))
         })
     }

@@ -38,7 +38,6 @@ struct Homed<'file> {
 #[derive(Clone, Debug)]
 pub(crate) struct Scope<'look, 'file> {
     reading: &'look Reading<'file>,
-    selfish: Nature,
     parameters: Vec<&'file Parameter>,
     output: Option<&'file TypeRef>,
 }
@@ -97,7 +96,7 @@ impl<'file> Reading<'file> {
             .filter(|placed| placed.entity().owner() == Seated::Free)
             .filter(|placed| placed.entity().entry() != Entry::Test)
             .map(|placed| {
-                let scope = Scope { reading: self, selfish: Nature::Boxed, parameters: Vec::new(), output: None };
+                let scope = Scope { reading: self, parameters: Vec::new(), output: None };
                 Context::new(
                     placed.krate(),
                     Endpoint::from(Unnamed::Opaque),
@@ -116,7 +115,6 @@ impl<'file> Reading<'file> {
         let implementation = placed.entity();
         let outer = Scope {
             reading: self,
-            selfish: Nature::Boxed,
             parameters: AsRef::<[Parameter]>::as_ref(implementation).iter().collect(),
             output: None,
         };
@@ -126,7 +124,7 @@ impl<'file> Reading<'file> {
             .iter()
             .find(|assigned| AsRef::<Name>::as_ref(*assigned).matches::<Whole>(&Self::OUTPUT).is_some())
             .map(AsRef::<TypeRef>::as_ref);
-        let scope = Scope { selfish: selfish.nature(), output, ..outer };
+        let scope = Scope { output, ..outer };
         let filler = implementation.interface_name().cloned().map_or(Filler::Inherent, Filler::Implemented);
         let seated = self
             .seated
@@ -148,7 +146,7 @@ impl<'file> Reading<'file> {
     }
 
     fn provided(&self, placed: Placed<'file, &'file graph::ItemDeclaration>, name: &Name) -> Context<'file> {
-        let scope = Scope { reading: self, selfish: Nature::Interface, parameters: Vec::new(), output: None };
+        let scope = Scope { reading: self, parameters: Vec::new(), output: None };
         let functions: Vec<Transitive<'file>> = self
             .provided
             .get(&placed.entity().declared())
