@@ -1479,44 +1479,49 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
             err: Vec::<&str>::new()
         }
     );
-    assert_eq!(Text::lines(&scratch.read("tmp/c.diff")), ["+a line"]);
     assert_eq!(
         *fake.calls.borrow(),
-        [
-            Invocation::new(
-                "git",
-                ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"]
-            ),
-            Invocation::new("git", ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"]),
-            Invocation::new(
-                "cargo",
-                [
-                    "mutants",
-                    "--in-diff",
-                    scratch.file("tmp/c.diff").as_str(),
-                    "--shard",
-                    "15/16",
-                    "--sharding",
-                    "round-robin",
-                    "--jobs",
-                    "2",
-                    "--colors",
-                    "never",
-                    "--output",
-                    scratch.file("out").as_str(),
-                ]
-            ),
-        ]
+        [Invocation::new(
+            "cargo",
+            [
+                "mutants",
+                "--in-diff",
+                scratch.file("tmp/c.diff").as_str(),
+                "--shard",
+                "15/16",
+                "--sharding",
+                "round-robin",
+                "--jobs",
+                "2",
+                "--colors",
+                "never",
+                "--output",
+                scratch.file("out").as_str(),
+            ]
+        ),]
     );
     Ok(())
 }
 
 #[test]
-fn a_crate_whose_tests_changed_has_its_whole_source_mutated_beside_the_changed_lines() -> Result<(), Box<dyn Error>> {
+fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_tests_consume()
+-> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let named = Invocation::new(
         "git",
         ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"],
+    );
+    let consumed = Invocation::new(
+        "lint",
+        [
+            "query",
+            "--in",
+            ".",
+            "--consumed-by",
+            "crates/d/tests/behaviour/main.rs",
+            "--consumed-by",
+            "crates/d/tests/u.rs",
+        ],
     );
     let kept = Invocation::new(
         "git",
@@ -1534,22 +1539,87 @@ fn a_crate_whose_tests_changed_has_its_whole_source_mutated_beside_the_changed_l
             ":(glob)crates/e/src/**/*.rs",
         ],
     );
+    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
     let fake = Script {
         exact: vec![
             ExactReply {
                 asked: named.clone(),
-                text: "crates/d/tests/behaviour/main.rs\ncrates/e/tests/t.rs\ncrates/d/tests/u.rs\n".to_owned(),
+                text: "crates/d/tests/behaviour/main.rs\ncrates/d/tests/u.rs\n".to_owned(),
             },
+            ExactReply { asked: consumed.clone(), text: "crates/e/src/lib.rs\ncrates/d/tests/u.rs\n".to_owned() },
             ExactReply { asked: kept.clone(), text: "+changed\n".to_owned() },
             ExactReply { asked: whole.clone(), text: "+whole\n".to_owned() },
+            ExactReply { asked: listed.clone(), text: "m\n".repeat(61) },
         ],
         ..Script::new()
     };
-    let answer =
-        scratch.answer(&fake, &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
-    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    let answer = scratch.answer(
+        &fake,
+        &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "--test-package=d"],
+    );
+    assert_eq!(
+        answer.lines().shown(),
+        Printed { exit: ExitCode::SUCCESS, out: vec!["mutants: 61 to test in 2 shards"], err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&scratch.read("c.diff")), ["+changed", "+whole"]);
-    assert_eq!(fake.calls.borrow().get(..3), Some(&[named, kept, whole][..]));
+    assert_eq!(Text::lines(&scratch.read("plan.txt")), ["shards=[0,1]"]);
+    assert_eq!(*fake.calls.borrow(), [named, consumed, kept, whole, listed]);
+    Ok(())
+}
+
+#[test]
+fn a_plan_with_no_changed_tests_asks_no_graph_and_keeps_the_changed_lines() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let named = Invocation::new(
+        "git",
+        ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"],
+    );
+    let fake = Script {
+        changed: "+a line\n".to_owned(),
+        exact: vec![ExactReply { asked: named, text: String::new() }],
+        ..Script::new()
+    };
+    let answer =
+        scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "-p"]);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&scratch.read("c.diff")), ["+a line"]);
+    let programs: Vec<String> =
+        fake.calls.borrow().iter().map(|call| call.program().to_string_lossy().into_owned()).collect();
+    assert_eq!(programs, ["git", "git", "cargo"]);
+    Ok(())
+}
+
+struct Plans;
+
+impl Plans {
+    fn shards(mutants: usize) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
+        let fake = Script { exact: vec![ExactReply { asked: listed, text: "m\n".repeat(mutants) }], ..Script::new() };
+        scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "-p"]);
+        Text::lines(&scratch.read("plan.txt"))
+    }
+}
+
+laws::table!(
+    shards_grow_with_the_mutants_up_to_a_ceiling,
+    |mutants: &usize| Plans::shards(*mutants),
+    [
+        0 => ["shards=[0]"],
+        60 => ["shards=[0]"],
+        61 => ["shards=[0,1]"],
+        100_000 => ["shards=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]"],
+    ]
+);
+
+#[test]
+fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let fake = Script::new();
+    let answer = scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt")]);
+    assert_eq!(Text::lines(&answer.out), ["mutants: 0 to test in 1 shards"]);
+    assert_eq!(Text::lines(&scratch.read("plan.txt")), ["shards=[0]"]);
+    assert!(fake.calls.borrow().is_empty());
     Ok(())
 }
 
@@ -1648,11 +1718,14 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
 fn a_failed_start_while_testing_changed_lines_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
-    assert_eq!(Text::lines(&scratch.answer(&Script::refusing("git"), &arguments).err), ["cannot run git: boom"]);
+    let planning = ["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "-p"];
+    assert_eq!(Text::lines(&scratch.answer(&Script::refusing("git"), &planning).err), ["cannot run git: boom"]);
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("cargo"), &arguments).err), ["cannot run cargo: boom"]);
     scratch.write("blocker", "")?;
-    let blocked =
-        scratch.answer(&Script::new(), &["mutants-changed", &scratch.file("blocker/c.diff"), "out", "0/8", "-p"]);
+    let blocked = scratch.answer(
+        &Script::new(),
+        &["mutants-plan", &scratch.file("blocker/c.diff"), "lint", &scratch.file("plan.txt"), "-p"],
+    );
     assert!(blocked.err.contains("blocker/c.diff"));
     Ok(())
 }

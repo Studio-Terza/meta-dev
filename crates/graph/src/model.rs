@@ -3,6 +3,8 @@ mod declarations;
 mod file_model;
 mod filed;
 
+use std::collections::BTreeSet;
+use std::path::Path;
 use std::sync::OnceLock;
 
 use crate::boundary::ItemId;
@@ -20,7 +22,7 @@ use crate::law::Law;
 use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::quoted::Quoted;
-use crate::references::{Consumers, References};
+use crate::references::{Consumed, Consumers, References};
 use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
 pub use building::Building;
@@ -212,6 +214,19 @@ impl Model {
             .chain(self.functions().map(Consumers::from))
             .chain(self.mentions().map(Consumers::from))
             .collect()
+    }
+
+    #[must_use]
+    pub fn consumed_by(&self, files: &BTreeSet<&Path>) -> BTreeSet<&Path> {
+        let consumed: Consumed = [
+            Consumed::within(files, self.holdings()),
+            Consumed::within(files, self.implementations()),
+            Consumed::within(files, self.functions()),
+            Consumed::within(files, self.mentions()),
+        ]
+        .into_iter()
+        .collect();
+        consumed.roots(self.items())
     }
 
     #[must_use]

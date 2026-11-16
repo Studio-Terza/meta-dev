@@ -352,3 +352,32 @@ fn crate_sizes_count_files_and_lines_and_place_each_crate_on_the_compile_chain()
     );
     Ok(())
 }
+
+const FACADE: [Source; 4] = [
+    Source::new(Located::new("crates/inner/src/lib.rs"), Text::new("pub struct Cents;\npub struct Unused;\n")),
+    Source::new(Located::new("crates/other/src/lib.rs"), Text::new("pub struct Ledger;\n")),
+    Source::new(Located::new("crates/facade/src/lib.rs"), Text::new("pub use inner::Cents;\n")),
+    Source::new(
+        Located::new("crates/facade/tests/behaviour.rs"),
+        Text::new("use facade::Cents;\n\n#[test]\nfn priced() {\n    let _cents: Cents = Cents;\n}\n"),
+    ),
+];
+
+#[test]
+fn a_test_file_consumes_the_crate_that_declares_what_it_names_through_a_re_export() {
+    let files = Sources::parsed(&FACADE);
+    let query = Asked::query(&["--consumed-by", "crates/facade/tests/behaviour.rs"])
+        .unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+    let answered = query.answered(&files, &[]).to_string();
+    let roots: Vec<String> = answered.parse::<Lines>().into_iter().flatten().collect();
+    assert_eq!(roots, ["crates/inner/src/lib.rs"]);
+}
+
+laws::table!(
+    a_consumer_flag_needs_a_file,
+    |words: &&[&str]| Asked::query(words).err(),
+    [
+        &["--consumed-by"][..] => Some(QueryFailure::Unfinished),
+        &["--consumed-by", "a.rs"][..] => None,
+    ]
+);

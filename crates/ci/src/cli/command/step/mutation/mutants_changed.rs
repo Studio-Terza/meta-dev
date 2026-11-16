@@ -1,5 +1,4 @@
 mod pass;
-mod tested;
 mod verdict;
 
 use std::ffi::{OsStr, OsString};
@@ -14,7 +13,6 @@ use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports};
 use pass::{Pass, Survivors};
-use tested::Tested;
 use verdict::Verdict;
 
 #[derive(Debug)]
@@ -41,8 +39,6 @@ impl MutantsChanged {
     }
 
     fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        let changed = Tested::asked(ports)?.diff(ports)?;
-        self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
         let shard = self.shard.arguments();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]

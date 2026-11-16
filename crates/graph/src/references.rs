@@ -6,6 +6,7 @@ use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::Item;
+use crate::item_declaration::ItemDeclaration;
 use crate::member::Member;
 use crate::model::Model;
 use crate::path_use::PathUse;
@@ -180,5 +181,37 @@ impl<'model> FromIterator<Consumers<'model>> for Consumers<'model> {
                 consumers
             },
         ))
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Consumed(BTreeSet<ItemId>);
+
+impl Consumed {
+    pub(crate) fn within<'model, Entity>(
+        files: &BTreeSet<&Path>,
+        placed: impl Iterator<Item = Placed<'model, Entity>>,
+    ) -> Consumed
+    where
+        Entity: Copy,
+        Owned: From<Entity>,
+    {
+        placed
+            .filter(|found| files.contains(found.site().path()))
+            .map(|found| Consumed(Owned::from(found.entity()).reached.0))
+            .collect()
+    }
+
+    pub(crate) fn roots<'model>(
+        &self,
+        items: impl Iterator<Item = Placed<'model, &'model ItemDeclaration>>,
+    ) -> BTreeSet<&'model Path> {
+        items.filter(|placed| self.0.contains(&placed.entity().declared())).map(Placed::root).collect()
+    }
+}
+
+impl FromIterator<Consumed> for Consumed {
+    fn from_iter<Parts: IntoIterator<Item = Consumed>>(parts: Parts) -> Consumed {
+        Consumed(parts.into_iter().flat_map(|part| part.0).collect())
     }
 }
