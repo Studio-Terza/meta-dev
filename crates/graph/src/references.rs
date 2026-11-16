@@ -45,12 +45,18 @@ pub(crate) struct Owned {
     owner: Option<ItemId>,
     reached: Reached,
     shipped: Option<Reach>,
+    traited: Option<ItemId>,
 }
 
 impl Owned {
     fn shipped(region: &impl AsRef<Region>, owner: Option<ItemId>, reached: Reached) -> Owned {
         let shipped = Some(region.as_ref().reach()).filter(|reach| *reach == Reach::Shipped);
-        Owned { owner: shipped.and(owner), reached, shipped }
+        Owned { owner: shipped.and(owner), reached, shipped, traited: None }
+    }
+
+    fn traited(self, implemented: Option<&Resolved>) -> Owned {
+        let traited = self.shipped.and(implemented).and_then(Resolved::crate_item);
+        Owned { traited, ..self }
     }
 }
 
@@ -65,19 +71,22 @@ impl From<&Implementation> for Owned {
         let subject = implementation.subject_type().named().map(AsRef::<Resolved>::as_ref);
         let reached = implementation.implemented().map_or_default(Reached::from);
         Owned::shipped(implementation, subject.and_then(Resolved::crate_item), reached)
+            .traited(implementation.implemented())
     }
 }
 
 impl From<&Function> for Owned {
     fn from(function: &Function) -> Owned {
-        let owner = AsRef::<Seat>::as_ref(function).owner();
-        Owned::shipped(function, owner, function.signature().written().collect())
+        let seat: &Seat = function.as_ref();
+        Owned::shipped(function, seat.owner(), function.signature().written().collect())
+            .traited(seat.implemented_trait())
     }
 }
 
 impl From<&PathUse> for Owned {
     fn from(used: &PathUse) -> Owned {
-        Owned::shipped(used, AsRef::<Seat>::as_ref(used).owner(), Reached::from(used.resolved()))
+        let seat: &Seat = used.as_ref();
+        Owned::shipped(used, seat.owner(), Reached::from(used.resolved())).traited(seat.implemented_trait())
     }
 }
 
@@ -105,11 +114,15 @@ impl References {
         Entity: Copy,
         Owned: From<Entity>,
     {
-        let Owned { owner, reached, .. } = Owned::from(placed.entity());
-        let home = owner
-            .filter(|found| model.declared(*found).and_then(Item::krate).is_none_or(|krate| krate == placed.krate()));
-        home.map_or_default(|found| References {
-            targets: BTreeMap::from([(found, reached.0)]),
+        let Owned { owner, reached, traited, .. } = Owned::from(placed.entity());
+        let at_home =
+            |item: &ItemId| model.declared(*item).and_then(Item::krate).is_none_or(|krate| krate == placed.krate());
+        let home = owner.filter(at_home);
+        let foreign = home.map_or(owner, |_| None);
+        let link = home.or_else(|| traited.filter(at_home));
+        let targets: BTreeSet<ItemId> = reached.0.into_iter().chain(foreign).collect();
+        link.map_or_default(|found| References {
+            targets: BTreeMap::from([(found, targets.into_iter().filter(|target| *target != found).collect())]),
             roots: BTreeMap::from([(found, placed.root().to_path_buf())]),
         })
     }
