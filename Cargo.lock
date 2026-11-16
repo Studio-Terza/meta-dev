@@ -1853,6 +1853,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
+ "newtype",
  "syntax",
  "syntax-lexer",
  "text-lines",
@@ -3182,6 +3183,7 @@ version = "0.1.0"
 dependencies = [
  "grammar-banner",
  "laws",
+ "newtype",
  "serde",
  "text-lines",
 ]

@@ -39,6 +39,12 @@ pub struct Shaped<'model> {
 }
 
 #[derive(Clone, Copy, Debug)]
+struct Spotted<'shape> {
+    spot: &'shape Spot,
+    written: &'shape Input,
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Subject<'model> {
     resolved: &'model Resolved,
 }
@@ -136,12 +142,12 @@ impl Subject<'_> {
     }
 }
 
-impl Spot {
-    fn spelled(&self, written: &Input) -> String {
-        match self {
-            Spot::Receiver(receiver) => receiver.to_string(),
-            Spot::Inner => String::from("Inner"),
-            Spot::Typed(_) => written.typed().map(TypeRef::brief).map(|name| name.to_string()).unwrap_or_default(),
+impl fmt::Display for Spotted<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.spot {
+            Spot::Receiver(receiver) => write!(formatter, "{receiver}"),
+            Spot::Inner => formatter.write_str("Inner"),
+            Spot::Typed(_) => self.written.typed().map_or(Ok(()), |ty| write!(formatter, "{}", ty.brief())),
         }
     }
 }
@@ -155,8 +161,13 @@ impl<'model> AsRef<Site<'model>> for Shaped<'model> {
 impl fmt::Display for Shaped<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let signature = self.function.signature();
-        let inputs: Vec<String> =
-            self.key.inputs.iter().zip(signature.inputs()).map(|(spot, written)| spot.spelled(written)).collect();
+        let inputs: Vec<String> = self
+            .key
+            .inputs
+            .iter()
+            .zip(signature.inputs())
+            .map(|(spot, written)| Spotted { spot, written }.to_string())
+            .collect();
         let spelled = signature.output().written().map(TypeRef::brief);
         let output = self.returns_itself().map_or(spelled, |()| Some(Name::from("Self")));
         let returned = output.map(|name| format!(" -> {name}")).unwrap_or_default();

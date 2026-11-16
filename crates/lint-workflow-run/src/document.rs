@@ -60,9 +60,11 @@ impl Document {
 
     fn command(key: Node<'_, '_>, value: Node<'_, '_>, setting: Key, actions: Actions<'_>) -> Vec<Found> {
         match value.text() {
-            Some(text) => {
-                Command::new(text).finding(setting).map(|finding| Found::new(key.line(), finding)).into_iter().collect()
-            }
+            Some(text) => Command::from(text)
+                .finding(setting)
+                .map(|finding| Found::new(key.line(), finding))
+                .into_iter()
+                .collect(),
             None => Self::judged(value, actions),
         }
     }

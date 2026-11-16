@@ -1,17 +1,14 @@
 use lint_layout::LineNumber;
+use newtype::Newtype;
 use saphyr::{MarkedYaml, Scalar, YamlData};
 
 use crate::document::key::Key;
 use crate::document::text::Text;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Newtype, Clone, Copy, Debug)]
 pub(crate) struct Node<'node, 'input>(&'node MarkedYaml<'input>);
 
 impl<'node, 'input> Node<'node, 'input> {
-    pub(crate) fn new(node: &'node MarkedYaml<'input>) -> Node<'node, 'input> {
-        Node(node)
-    }
-
     pub(crate) fn structure(self) -> &'node YamlData<'input, MarkedYaml<'input>> {
         &self.0.data
     }

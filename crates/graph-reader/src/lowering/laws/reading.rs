@@ -6,12 +6,13 @@ use syntax::{Expr, ExprCall, GenericArgument, Macro, Past, Path, PathArguments, 
 
 use graph::{LawKind, Side};
 use lint_layout::Name;
+use newtype::Newtype;
 
 use super::{LoweredOperation, LoweredOwner, LoweredRoute};
 use crate::lowering::signature::InScope;
 use closure::Closure;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Newtype, Clone, Copy, Debug)]
 pub(super) struct Reading<'scope> {
     scope: &'scope InScope,
 }
@@ -35,10 +36,6 @@ struct Generator<'scope> {
 impl<'scope> Reading<'scope> {
     const GENERATOR: usize = 1;
     const CHECKED_FROM: usize = 2;
-
-    pub(super) fn new(scope: &'scope InScope) -> Reading<'scope> {
-        Reading { scope }
-    }
 
     pub(super) fn routes(self, invocation: &Macro, kind: LawKind) -> Vec<LoweredRoute> {
         let arguments = invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).unwrap_or_default();
