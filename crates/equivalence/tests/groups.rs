@@ -1,4 +1,7 @@
+use std::path::Path;
+
 use equivalence::{Groups, Holes, Keyed, Nested};
+use graph::Site;
 
 #[derive(Clone, Copy, Debug)]
 struct Item(u8);
@@ -15,6 +18,13 @@ impl Keyed for Item {
 struct Span {
     length: u8,
     from: u8,
+    site: Site<'static>,
+}
+
+impl AsRef<Site<'static>> for Span {
+    fn as_ref(&self) -> &Site<'static> {
+        &self.site
+    }
 }
 
 impl Keyed for Span {
@@ -36,12 +46,17 @@ impl Nested for Span {
 struct Grouping;
 
 impl Grouping {
+    const FILES: [&str; 2] = ["a.rs", "b.rs"];
+
     fn sizes(keys: &[u8]) -> Vec<usize> {
         Groups::grouped(keys.iter().copied().map(Item)).listed().iter().map(|group| group.members().len()).collect()
     }
 
     fn outermost(spans: &[u8]) -> Vec<u8> {
-        let found = spans.as_chunks::<2>().0.iter().map(|[length, from]| Span { length: *length, from: *from });
+        let found = spans.as_chunks::<3>().0.iter().filter_map(|[length, from, file]| {
+            let path = Path::new(Self::FILES.get(usize::from(*file))?);
+            Some(Span { length: *length, from: *from, site: Site::of_file(path) })
+        });
         Groups::grouped(found).outermost(|length| *length).listed().iter().map(|group| *group.key()).collect()
     }
 
@@ -75,7 +90,8 @@ laws::table!(
     a_group_inside_a_larger_group_is_dropped_whatever_order_the_keys_come_in,
     Grouping::outermost,
     [
-        [3, 1, 3, 21, 10, 0, 10, 20] => vec![10],
-        [3, 1, 3, 21, 10, 40, 10, 60] => vec![10, 3],
+        [3, 1, 0, 3, 21, 0, 10, 0, 0, 10, 20, 0] => vec![10],
+        [3, 1, 0, 3, 21, 0, 10, 40, 0, 10, 60, 0] => vec![10, 3],
+        [3, 1, 0, 3, 21, 0, 10, 0, 1, 10, 20, 1] => vec![10, 3],
     ]
 );
