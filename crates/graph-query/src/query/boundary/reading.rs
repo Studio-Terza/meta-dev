@@ -5,7 +5,7 @@ use lint_layout::Name;
 use lint_transition_graph::Ask;
 
 use crate::boundary::QueryFailure;
-use crate::query::Query;
+use crate::query::{Consumer, Query};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Item {
@@ -28,6 +28,7 @@ enum Expecting {
     From,
     To(Name),
     Crates,
+    Consumer,
 }
 
 #[derive(Debug)]
@@ -47,7 +48,7 @@ impl Query {
 }
 
 impl Expecting {
-    const FLAGS: [(&'static str, Expecting); 12] = [
+    const FLAGS: [(&'static str, Expecting); 13] = [
         ("--in", Expecting::Root),
         ("--role", Expecting::Role),
         ("--top", Expecting::Top),
@@ -60,6 +61,7 @@ impl Expecting {
         ("--path", Expecting::From),
         ("--cycles", Expecting::Item(Item::Cycles)),
         ("--crates", Expecting::Crates),
+        ("--consumed-by", Expecting::Consumer),
     ];
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -88,6 +90,10 @@ impl Reading {
             Expecting::Root => {
                 Ok(Reading { query: self.query.with_root(PathBuf::from(word)), expecting: Expecting::Word })
             }
+            Expecting::Consumer => Ok(Reading {
+                query: self.query.with_consumer(Consumer::new(PathBuf::from(word))),
+                expecting: Expecting::Word,
+            }),
             Expecting::Role => Ok(Reading { query: self.query.with_role(word.parse()?), expecting: Expecting::Word }),
             Expecting::Top => Ok(Reading { query: self.query.with_top(word.parse()?), expecting: Expecting::Word }),
             Expecting::Item(item) => {
@@ -118,7 +124,8 @@ impl Reading {
             | Expecting::Item(_)
             | Expecting::From
             | Expecting::To(_)
-            | Expecting::Crates => Err(QueryFailure::Unfinished),
+            | Expecting::Crates
+            | Expecting::Consumer => Err(QueryFailure::Unfinished),
         }
     }
 

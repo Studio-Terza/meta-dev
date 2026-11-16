@@ -1,6 +1,7 @@
 mod boundary;
 mod candidate;
 mod catalog;
+mod consumer;
 mod kind;
 mod matches;
 mod reply;
@@ -8,10 +9,10 @@ mod term;
 mod top;
 
 use std::borrow::Borrow;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
-use graph::ItemKind;
+use graph::{ItemKind, Model};
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -23,6 +24,7 @@ use crate::boundary::CrateSizes;
 use crate::role::Role;
 use candidate::Candidate;
 use catalog::{Catalog, Stocked};
+pub(crate) use consumer::Consumer;
 use kind::Kind;
 use matches::Matches;
 use reply::Reply;
@@ -37,6 +39,7 @@ pub struct Query {
     top: Option<Top>,
     roots: Vec<PathBuf>,
     crates: Option<()>,
+    consumers: Vec<Consumer>,
 }
 
 impl Query {
@@ -60,6 +63,11 @@ impl Query {
         self
     }
 
+    pub(crate) fn with_consumer(mut self, file: Consumer) -> Query {
+        self.consumers.push(file);
+        self
+    }
+
     pub(crate) fn with_crates(mut self) -> Query {
         self.crates = Some(());
         self
@@ -80,6 +88,7 @@ impl Query {
             .map(|_| self)
             .or_else(|| self.searches().map(|()| self))
             .or_else(|| self.crates.map(|()| self))
+            .or_else(|| self.consumers.first().map(|_| self))
     }
 
     #[must_use]
@@ -98,6 +107,11 @@ impl Query {
         workspaces: &'files [Metadata],
     ) -> Option<CrateSizes<'files>> {
         self.crates.map(|()| CrateSizes::measured(files, workspaces))
+    }
+
+    pub(crate) fn consumed<'model>(&self, model: &'model Model) -> BTreeSet<&'model Path> {
+        let files: BTreeSet<&Path> = self.consumers.iter().map(AsRef::as_ref).collect();
+        files.first().map_or_default(|_| model.consumed_by(&files))
     }
 
     #[must_use]

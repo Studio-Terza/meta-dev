@@ -1,0 +1,88 @@
+name: mutation sweep
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: mutation-sweep
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_DEV_OPT_LEVEL: "1"
+  SQLITE3_LIB_DIR: ${{ github.workspace }}/target/sqlite
+  SQLITE3_STATIC: "1"
+  SQLITE3_NO_PKG_CONFIG: "1"
+  TOOLS: ${{ github.workspace }}/target/ci/tools
+  METADATA: ${{ github.workspace }}/target/ci/metadata.json
+
+permissions:
+  contents: read
+
+jobs:
+  mutants-sweep-plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/tools
+      - name: reach of the merged change
+        run: '"$TOOLS/ci" reach "$METADATA" pull_request main "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
+      - uses: taiki-e/install-action@v2
+        if: env.MUTANTS_SCOPE != ''
+        with:
+          tool: cargo-mutants@27.1.0
+      - name: plan
+        id: plan
+        run: '"$TOOLS/ci" mutants-plan "$RUNNER_TEMP/changed.diff" "$GITHUB_OUTPUT" consumed-by "$TOOLS/lint" $MUTANTS_SCOPE'
+      - uses: actions/upload-artifact@v4
+        if: env.MUTANTS_SCOPE != ''
+        with:
+          name: swept-diff
+          path: ${{ runner.temp }}/changed.diff
+
+  mutants-sweep:
+    needs: mutants-sweep-plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        index: ${{ fromJSON(needs.mutants-sweep-plan.outputs.shards) }}
+    env:
+      CARGO_PROFILE_DEV_OPT_LEVEL: "0"
+      SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/tools
+      - name: reach of the merged change
+        run: '"$TOOLS/ci" reach "$METADATA" pull_request main "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
+      - uses: ./.github/actions/sqlite
+      - uses: taiki-e/install-action@v2
+        if: env.MUTANTS_SCOPE != ''
+        with:
+          tool: cargo-mutants@27.1.0
+      - uses: actions/download-artifact@v4
+        if: env.MUTANTS_SCOPE != ''
+        with:
+          name: swept-diff
+          path: ${{ runner.temp }}
+      - name: mutants the merged change's tests consume
+        env:
+          DIFF: ${{ runner.temp }}/changed.diff
+        run: '"$TOOLS/ci" mutants-changed "$DIFF" "$RUNNER_TEMP" "$SHARD" $MUTANTS_SCOPE'
+      - name: survivors in the summary
+        if: failure()
+        env:
+          MISSED: ${{ runner.temp }}/scoped/mutants.out/missed.txt
+        run: '"$TOOLS/ci" summarize "$MISSED" "$GITHUB_STEP_SUMMARY"'
