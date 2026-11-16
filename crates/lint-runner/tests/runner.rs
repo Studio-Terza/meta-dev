@@ -334,7 +334,7 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
     let untimed = Trees::timed(&root.files, &root.root, &[])?;
     let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(MOST_READERS);
     let rows = [
-        "lint timings in milliseconds:\n",
+        "lint timings in milliseconds, took then started:\n",
         "  phase total\n",
         "  phase stage: list the trees and their packages\n",
         "  phase locate: describe the workspaces through cargo metadata\n",
