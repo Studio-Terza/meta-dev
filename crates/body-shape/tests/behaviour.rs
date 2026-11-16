@@ -1,4 +1,4 @@
-use body_shape::{Reading, Shape};
+use body_shape::{Bounds, Reading, Shape, Shaper};
 use equivalence::{Equivalence, Erased};
 
 struct Shapes;
@@ -7,6 +7,7 @@ impl Shapes {
     const BODIES: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals]);
     const NAMES: Equivalence = Equivalence::erasing(&[Erased::Names, Erased::Literals]);
     const SPELLED: Equivalence = Equivalence::erasing(&[Erased::Locals]);
+    const PREFIX: usize = 6;
 
     fn of(text: &str) -> Shape {
         Self::read(text, Self::BODIES).shape()
@@ -42,6 +43,22 @@ impl Shapes {
 
     fn size(text: &&str) -> String {
         Self::of(text).size().to_string()
+    }
+
+    fn prefix(text: &str) -> Option<Reading> {
+        let table = syntax::Lexed::parsed(text).ok()?.tokens_taken();
+        let lexemes = table.lexemes();
+        let bounds = Bounds::new(lexemes.first()?.place(), lexemes.get(Self::PREFIX)?.place());
+        Some(Shaper::reading(&table, Self::BODIES).read(bounds))
+    }
+
+    fn prefix_size(text: &&str) -> String {
+        Self::prefix(text).map_or_else(String::new, |reading| reading.shape().size().to_string())
+    }
+
+    fn prefixes_alike(pair: &[&str]) -> bool {
+        let [left, right] = [pair.first(), pair.last()].map(|text| text.and_then(|found| Self::prefix(found)));
+        left.zip(right).filter(|_| pair.len() == 2).is_some_and(|(first, second)| first.shape() == second.shape())
     }
 }
 
@@ -122,5 +139,24 @@ laws::table!(
         "{ a - 2 }" => "-2",
         "{ f(true, 2) }" => "true 2",
         "{ g(false) }" => "false",
+    ]
+);
+
+laws::table!(
+    a_range_reads_only_its_own_tokens_even_when_the_next_one_touches_it,
+    Shapes::prefix_size,
+    [
+        "fn f() { a(b) }" => "6",
+        "fn f() { a }" => "6",
+    ]
+);
+
+laws::table!(
+    a_local_at_the_end_of_a_range_is_not_named_by_a_call_after_the_range,
+    Shapes::prefixes_alike,
+    [
+        ["fn f() { a(b) }", "fn f() { c(d) }"] => true,
+        ["fn f() { a(b) }", "fn f() { c }"] => true,
+        ["fn f() { a(b) }", "fn g() { a(b) }"] => false,
     ]
 );

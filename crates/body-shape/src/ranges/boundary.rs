@@ -33,11 +33,11 @@ impl Token {
         }
     }
 
-    fn coded(self, distance: Option<usize>) -> Option<Code> {
+    fn coded(self, slot: Option<usize>) -> Option<Code> {
         match self {
             Token::Dropped => None,
             Token::Shaped(code) => Some(code),
-            Token::Slotted(_) => Some(distance.map_or(Code::New, Code::Distance)),
+            Token::Slotted(_) => slot.map(Code::Slot),
         }
     }
 }
@@ -116,9 +116,9 @@ struct Direct {
 
 impl Direct {
     fn stepped(mut self, token: Token) -> Direct {
-        let shaped = self.labels.count();
-        let earlier = token.slotted().and_then(|symbol| self.seen.insert(symbol, shaped));
-        let code = token.coded(earlier.map(|before| shaped - before));
+        let next = self.seen.len();
+        let slot = token.slotted().map(|symbol| *self.seen.entry(symbol).or_insert(next));
+        let code = token.coded(slot);
         Direct { labels: code.into_iter().fold(self.labels, Labels::pushed), ..self }
     }
 

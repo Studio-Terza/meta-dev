@@ -6,8 +6,7 @@ pub(crate) enum Code {
     Word(Arc<str>),
     Literal(Arc<str>),
     Erased,
-    New,
-    Distance(usize),
+    Slot(usize),
 }
 
 impl Code {
@@ -18,7 +17,7 @@ impl Code {
     pub(crate) fn literal(&self) -> Code {
         match self {
             Code::Word(text) | Code::Literal(text) => Code::Literal(Arc::clone(text)),
-            Code::Mark(_) | Code::Erased | Code::New | Code::Distance(_) => self.clone(),
+            Code::Mark(_) | Code::Erased | Code::Slot(_) => self.clone(),
         }
     }
 }

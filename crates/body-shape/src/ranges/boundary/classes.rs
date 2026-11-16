@@ -166,7 +166,7 @@ impl Lexemes for Classifying<'_> {
     }
 
     fn literal(&self, quoted: Quoted) -> Token {
-        let code = self.classes.facts.fact(*quoted.as_ref()).map_or(Code::New, |fact| fact.word.literal());
+        let code = self.classes.facts.fact(*quoted.as_ref()).map_or(Code::Erased, |fact| fact.word.literal());
         self.classes.literals_erased().map_or(Token::Shaped(code), |_| Token::Shaped(Code::Erased))
     }
 
