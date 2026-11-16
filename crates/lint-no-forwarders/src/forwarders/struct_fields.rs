@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use syntax::{Field, GenericArgument, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
+use syntax::{Field, GenericArgument, Index, ItemStruct, Member, PathArguments, PathSegment, Type, TypeSpine};
 
 use lint_core::Syntax;
 use lint_layout::Name;
@@ -48,11 +48,8 @@ impl StructFields {
     }
 
     pub fn type_name(ty: &Type) -> Option<Name> {
-        match ty {
-            Type::Reference(reference) => Self::type_name(&reference.elem),
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
+        let root = TypeSpine::from(ty).past(|node| matches!(node, Type::Reference(_)))?.node();
+        Syntax::type_path(root).and_then(|path| path.path.segments.last()).map(|segment| Name::from(&segment.ident))
     }
 
     pub fn type_arguments(segment: &PathSegment) -> Vec<Name> {

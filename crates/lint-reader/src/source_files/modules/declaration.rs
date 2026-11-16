@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use syntax::{Item, ItemMod};
+use syntax::{Item, ItemMod, Nested};
 
 use lint_core::Walk;
 
@@ -48,28 +48,19 @@ impl<'items> Declaration<'items> {
 
     #[must_use]
     pub fn within(items: &'items [Item], directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
-        items.iter().flat_map(|item| Self::of_item(item, directory, wanted)).collect()
-    }
-
-    fn of_item(item: &'items Item, directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
-        match item {
-            Item::Mod(module) => Self::of_module(module, directory, wanted),
-            _ => Vec::new(),
-        }
-    }
-
-    fn of_module(module: &'items ItemMod, directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
-        let walk = Walk::outside_tests(&module.attrs);
-        let inline = module
-            .content
-            .iter()
-            .filter(|_| walk == Walk::Entered)
-            .flat_map(|(_, inner)| Self::within(inner, &directory.join(Name::from(&module.ident)), wanted));
-        let declared = Some(module)
-            .filter(|candidate| candidate.content.is_none())
-            .filter(|_| walk == wanted)
-            .map(|outlined| Declaration::new(outlined, directory.to_path_buf()));
-        inline.chain(declared).collect()
+        Nested::modules(items)
+            .into_iter()
+            .filter(|nested| nested.ancestors().iter().all(|outer| Walk::outside_tests(&outer.attrs) == Walk::Entered))
+            .filter(|nested| nested.module().content.is_none())
+            .filter(|nested| Walk::outside_tests(&nested.module().attrs) == wanted)
+            .map(|nested| {
+                let joined = nested
+                    .ancestors()
+                    .iter()
+                    .fold(directory.to_path_buf(), |path, outer| path.join(Name::from(&outer.ident)));
+                Declaration::new(nested.module(), joined)
+            })
+            .collect()
     }
 
     #[must_use]

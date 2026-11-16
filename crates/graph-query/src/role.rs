@@ -2,8 +2,9 @@ use std::str::FromStr;
 
 use graph::{MethodShape, Receiver, Returned, Taken};
 use graph_reader::ReceiverSyntax;
+use lint_core::Syntax;
 use lint_layout::Name;
-use syntax::{FnArg, ReturnType, Signature, Type, TypeParamBound};
+use syntax::{FnArg, Past, ReturnType, Signature, Type, TypeParamBound, TypeSpine};
 
 use crate::boundary::QueryFailure;
 use crate::score::Score;
@@ -32,30 +33,33 @@ impl Role {
 }
 
 impl Spelled {
-    fn last(ty: &Type) -> Option<Name> {
-        match ty {
-            Type::Reference(reference) => Self::last(&reference.elem),
-            Type::Paren(paren) => Self::last(&paren.elem),
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
-    }
-
     fn taken(ty: &Type) -> Taken {
-        Self::last(ty)
+        let peeled = TypeSpine::from(ty).past(|node| matches!(node, Type::Reference(_) | Type::Paren(_)));
+        peeled
+            .and_then(|found| Syntax::type_path(found.node()))
+            .and_then(|path| path.path.segments.last())
+            .map(|segment| Name::from(&segment.ident))
             .and_then(|name| Returned::named(&name))
             .filter(|returned| *returned == Returned::Itself)
             .map_or(Taken::Other, |_| Taken::Itself)
     }
 
     fn returned(ty: &Type) -> Returned {
-        match ty {
-            Type::Reference(reference) => Self::returned(&reference.elem),
-            Type::Paren(paren) => Self::returned(&paren.elem),
+        let peeled = TypeSpine::from(ty).past(|node| matches!(node, Type::Reference(_) | Type::Paren(_)));
+        peeled.map_or(Returned::Value, Self::shaped)
+    }
+
+    fn shaped(peeled: Past<'_, Type>) -> Returned {
+        match peeled.node() {
             Type::Tuple(tuple) => tuple.elems.first().map_or(Returned::Nothing, |_| Returned::Value),
             Type::Slice(_) | Type::Array(_) => Returned::Many,
             Type::ImplTrait(bounds) => bounds.bounds.iter().find_map(Self::bounded).unwrap_or(Returned::Value),
-            Type::Path(_) => Self::last(ty).and_then(|name| Returned::named(&name)).unwrap_or(Returned::Value),
+            Type::Path(path) => path
+                .path
+                .segments
+                .last()
+                .and_then(|segment| Returned::named(&Name::from(&segment.ident)))
+                .unwrap_or(Returned::Value),
             _ => Returned::Value,
         }
     }

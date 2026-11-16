@@ -6,10 +6,10 @@ mod table_rows;
 
 use std::path::Path;
 
-use lint_core::{Address, Macros, SourceFile};
+use lint_core::{Macros, SourceFile};
 
 use syntax::Punctuated;
-use syntax::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, Token};
+use syntax::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, MacroTree, Token};
 
 use lint_core::{MacroAliases, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
@@ -32,7 +32,6 @@ pub struct Assertions<'file> {
 #[derive(Debug)]
 struct Met {
     invocation: Macro,
-    at: Address,
     body: Option<BodyId>,
 }
 
@@ -51,37 +50,33 @@ impl<'file> Assertions<'file> {
         }
     }
 
-    fn judged(
+    fn judged(&self, invocation: &Macro, constants: &Bindings<'_>, locals: &Bindings<'_>) -> Vec<Violation<'file>> {
+        let nested = |inner: &Macro| Macros::nested(self.file, inner).to_vec();
+        let stops = |found: &Macro| self.assertion(found).compared(found).map(|_| ());
+        let asserted = MacroTree::frontier(invocation, &nested, &stops);
+        asserted.iter().filter_map(|found| self.violation(found, constants, locals)).collect()
+    }
+
+    fn assertion(&self, invocation: &Macro) -> Assertion {
+        Assertion::named(&invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident)), &self.tables)
+    }
+
+    fn violation(
         &self,
         invocation: &Macro,
-        at: Address,
         constants: &Bindings<'_>,
         locals: &Bindings<'_>,
-    ) -> Vec<Violation<'file>> {
-        let compared = Assertion::named(
-            &invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident)),
-            &self.tables,
-        )
-        .compared(invocation);
-        compared.map_or_else(
-            || {
-                let nested = Macros::nested_at(self.file, at, invocation);
-                nested.iter().flat_map(|inner| self.judged(inner, Address::from(inner), constants, locals)).collect()
-            },
-            |sides| {
-                let line = invocation
-                    .path
-                    .segments
-                    .first()
-                    .map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
-                let judge = Compared::new(constants, locals);
-                let pinned = sides.iter().find_map(|side| judge.pinning(side));
-                pinned
-                    .map(|pinning| Violation::new(Site::new(self.file.head().path(), line), Finding::from(pinning)))
-                    .into_iter()
-                    .collect()
-            },
-        )
+    ) -> Option<Violation<'file>> {
+        self.assertion(invocation).compared(invocation).and_then(|sides| {
+            let line = invocation
+                .path
+                .segments
+                .first()
+                .map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
+            let judge = Compared::new(constants, locals);
+            let pinned = sides.iter().find_map(|side| judge.pinning(side));
+            pinned.map(|pinning| Violation::new(Site::new(self.file.head().path(), line), Finding::from(pinning)))
+        })
     }
 }
 
@@ -120,8 +115,8 @@ impl<'ast> Watch<'ast> for Assertions<'_> {
         self.tables.on_item_use(item, facts)
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
-        self.met.push(Met { invocation: invocation.clone(), at: facts.address(), body: self.scopes.current() });
+    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
+        self.met.push(Met { invocation: invocation.clone(), body: self.scopes.current() });
         Descend::Over
     }
 }
@@ -131,7 +126,7 @@ impl<'file> Finds<'file> for Assertions<'file> {
         let constants = self.scopes.constants();
         self.met
             .iter()
-            .flat_map(|met| self.judged(&met.invocation, met.at, &constants, &self.scopes.locals(met.body)))
+            .flat_map(|met| self.judged(&met.invocation, &constants, &self.scopes.locals(met.body)))
             .collect()
     }
 }

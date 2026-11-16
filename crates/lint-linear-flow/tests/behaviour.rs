@@ -35,7 +35,7 @@ const GUARD: &str =
 const LITERAL: &str = "fn f(count: u8) -> u8 {\n    match count {\n        0 => g(),\n        1..=3 => h(),\n        _ => k(),\n    }\n}\n";
 const BOOLEAN: &str = "fn f(on: bool) -> u8 {\n    match on {\n        true => 1,\n        false => 0,\n    }\n}\n";
 const TUPLE: &str = "fn f(a: Switch, b: Switch) -> u8 {\n    match (a, b) {\n        (Switch::On, _) => 1,\n        _ => 0,\n    }\n}\n";
-const NESTED_PATTERNS: &str = "fn f(found: Option<Pair>) -> u8 {\n    match found {\n        Some(Pair { left: 0, .. }) => 1,\n        Some(Pair { left: (a, b), .. }) => g(a, b),\n        Some(ref inner @ Pair::Wide(_)) | Some(inner) => h(inner),\n        None => 0,\n    }\n}\n";
+const NESTED_PATTERNS: &str = "fn f(found: Option<Pair>) -> u8 {\n    match found {\n        Some(Pair { left: 0, .. }) => 1,\n        Some(Pair { left: (1, _), .. }) => 2,\n        Some(Pair { right: [2, ..], .. }) => 3,\n        Some(Pair { left: (a, b), .. }) => g(a, b),\n        Some(ref inner @ Pair::Wide(_)) | Some(inner) => h(inner),\n        None => 0,\n    }\n}\n";
 const ARMS: &str = "fn f(on: Switch) -> u8 {\n    match on {\n        Switch::On => {\n            let x = g();\n            h(x)\n        }\n        Switch::Off => a + b,\n        Switch::Dim => { g() }\n        Switch::Half => { g(); }\n        Switch::Lit => {}\n        Switch::Low => (k()?),\n        Switch::Out => { println!(\"x\") }\n    }\n}\n";
 const ELSE_IF: &str =
     "fn f(found: Option<u8>) -> u8 {\n    if let Some(value) = found { value } else if p { 1 } else { 0 }\n}\n";
@@ -138,7 +138,7 @@ const ROUTERS: [Case; 12] = [
     Case::new(
         Title::new("nested patterns"),
         &[Source::new(Located::new("a.rs"), Text::new(NESTED_PATTERNS))],
-        Flagged::new(&["a.rs:3"]),
+        Flagged::new(&["a.rs:3", "a.rs:4", "a.rs:5"]),
     ),
     Case::new(
         Title::new("arm shapes"),

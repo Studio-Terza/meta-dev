@@ -35,14 +35,6 @@ impl Journal {
         files.read_text(&self.0).map_err(|failure| Failure::unusable(self, failure))
     }
 
-    pub(crate) fn read_or(&self, files: &impl Files, absent: Text) -> Result<Text, Failure<'_>> {
-        self.existing(files).map_or_else(|| Ok(absent), |journal| journal.read(files))
-    }
-
-    pub(crate) fn existing(&self, files: &impl Files) -> Option<&Journal> {
-        (files.kind(&self.0) == Kind::File).then_some(self)
-    }
-
     pub(crate) fn read_present<'path, Held>(
         files: &impl Files,
         journals: Vec<Held>,

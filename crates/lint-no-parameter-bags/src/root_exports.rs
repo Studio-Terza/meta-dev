@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{UseTree, Visibility};
+use syntax::{UseLeaf, UseTree, Visibility};
 
 use lint_core::{Parsed, SourceFile, Syntax};
 use lint_layout::Name;
@@ -27,13 +27,7 @@ impl RootExports {
     }
 
     fn leaves(tree: &UseTree) -> Vec<Name> {
-        match tree {
-            UseTree::Path(path) => Self::leaves(&path.tree),
-            UseTree::Group(group) => group.items.iter().flat_map(Self::leaves).collect(),
-            UseTree::Name(name) => vec![Name::from(&name.ident)],
-            UseTree::Rename(rename) => vec![Name::from(&rename.rename)],
-            UseTree::Glob(_) => Vec::new(),
-        }
+        UseLeaf::of_tree(tree).iter().filter_map(|leaf| leaf.end().bound()).map(Name::from).collect()
     }
 }
 

@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::Spanned;
 use syntax::{
-    Block, Expr, ExprClosure, ExprField, ExprForLoop, ExprLoop, ExprMethodCall, ExprPath, ExprWhile, FnArg, Item, Pat,
-    Signature,
+    Block, Expr, ExprClosure, ExprField, ExprForLoop, ExprLoop, ExprMethodCall, ExprPath, ExprWhile, FnArg, Item, Past,
+    Pat, PatSpine, Signature, Spine,
 };
 
 use graph::{Looping, ParamIndex, Reached, Repeating, Repetition};
@@ -239,11 +239,8 @@ impl Bound {
     }
 
     fn pattern(pattern: &Pat) -> Option<Name> {
-        match pattern {
-            Pat::Ident(binding) => Some(Name::from(&binding.ident)),
-            Pat::Type(typed) => Self::pattern(&typed.pat),
-            _ => None,
-        }
+        let peeled = PatSpine::from(pattern).past(|node| matches!(node, Pat::Type(_)))?.node();
+        Syntax::pat_ident(peeled).map(|binding| Name::from(&binding.ident))
     }
 }
 
@@ -339,19 +336,24 @@ impl PerElement {
     }
 
     fn iterated(receiver: &Expr) -> Option<&Expr> {
-        match receiver {
-            Expr::Range(_) => Some(receiver),
-            Expr::Paren(inner) => Self::iterated(&inner.expr),
-            Expr::MethodCall(call) => Self::chained(call).map(|_| receiver),
+        let end = Spine::from(receiver).past(|node| Self::passed(node).is_some())?;
+        Self::sourced(end).map(|()| receiver)
+    }
+
+    fn passed(node: &Expr) -> Option<()> {
+        match node {
+            Expr::Paren(_) => Some(()),
+            Expr::MethodCall(call) => Name::from(&call.method).matches::<Whole>(&Self::SHARED).map(|_| ()),
             _ => None,
         }
     }
 
-    fn chained(call: &ExprMethodCall) -> Option<&ExprMethodCall> {
-        let method = Name::from(&call.method);
-        let shared =
-            || method.matches::<Whole>(&Self::SHARED).and_then(|_| Self::iterated(&call.receiver)).map(|_| call);
-        method.matches::<Whole>(&Self::SOURCES).map(|_| call).or_else(shared)
+    fn sourced(end: Past<'_, Expr>) -> Option<()> {
+        match end.node() {
+            Expr::Range(_) => Some(()),
+            Expr::MethodCall(call) => Name::from(&call.method).matches::<Whole>(&Self::SOURCES).map(|_| ()),
+            _ => None,
+        }
     }
 }
 

@@ -2,7 +2,7 @@ mod crate_reach;
 
 use std::collections::BTreeMap;
 
-use syntax::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
+use syntax::{Ident, ItemUse, Macro, Path, UseLeaf, UseTree};
 
 use super::export::Export;
 use lint_core::SourceFile;
@@ -104,31 +104,19 @@ impl ForeignReferences {
         self.crates.get(crate_name).and_then(|reach| reach.unnamed(export.name())).map(|_| export)
     }
 
-    fn walk(&mut self, first: Option<&Ident>, tree: &UseTree) {
-        match tree {
-            UseTree::Path(path) => self.walk_path(first, path),
-            UseTree::Group(group) => group.items.iter().for_each(|item| self.walk(first, item)),
-            UseTree::Name(name) => self.record(first, Leaf::Named(&name.ident)),
-            UseTree::Rename(rename) => self.record(first, Leaf::Named(&rename.ident)),
-            UseTree::Glob(_) => self.record(first, Leaf::Glob),
-        }
+    fn used(&mut self, tree: &UseTree) {
+        let leaves = UseLeaf::of_tree(tree);
+        let reached = leaves.iter().flat_map(|leaf| {
+            let first = leaf.path().first().copied();
+            let module = leaf.path().get(1).copied().map(Leaf::Named);
+            [Some(Self::reach(leaf)), module].into_iter().flatten().map(move |reach| (first, reach))
+        });
+        reached.for_each(|(first, reach)| self.record(first, reach));
     }
 
-    fn record_modules(&mut self, first: &Ident, tree: &UseTree) {
-        match tree {
-            UseTree::Path(path) => self.record(Some(first), Leaf::Named(&path.ident)),
-            UseTree::Group(group) => group.items.iter().for_each(|item| self.record_modules(first, item)),
-            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => {}
-        }
-    }
-
-    fn walk_path(&mut self, first: Option<&Ident>, path: &UsePath) {
-        first
-            .is_none()
-            .then_some(&path.ident)
-            .into_iter()
-            .for_each(|crate_ident| self.record_modules(crate_ident, &path.tree));
-        self.walk(Some(first.unwrap_or(&path.ident)), &path.tree);
+    fn reach<'tree>(leaf: &UseLeaf<'tree>) -> Leaf<'tree> {
+        let named = leaf.end().named().map(|named| &named.ident);
+        named.or_else(|| leaf.end().renamed().map(|renamed| &renamed.ident)).map_or(Leaf::Glob, Leaf::Named)
     }
 
     fn record(&mut self, first: Option<&Ident>, leaf: Leaf<'_>) {
@@ -149,7 +137,7 @@ impl<'ast> Watch<'ast> for Reading {
     }
 
     fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
-        self.references.walk(None, &item.tree);
+        self.references.used(&item.tree);
         Descend::Over
     }
 

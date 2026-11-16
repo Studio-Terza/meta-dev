@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use syntax::{ItemUse, UseRename, UseTree};
+use syntax::{ItemUse, UseLeaf, UseTree};
 
 use crate::watch::{Descend, Facts, Kind, Watch};
 
@@ -25,20 +25,8 @@ impl MacroAliases {
     }
 
     fn renamed(&self, tree: &UseTree) -> Vec<Name> {
-        match tree {
-            UseTree::Path(path) => self.renamed(&path.tree),
-            UseTree::Rename(rename) => self.alias(rename),
-            UseTree::Group(group) => group.items.iter().flat_map(|item| self.renamed(item)).collect(),
-            UseTree::Name(_) | UseTree::Glob(_) => Vec::new(),
-        }
-    }
-
-    fn alias(&self, rename: &UseRename) -> Vec<Name> {
-        Some(rename)
-            .filter(|candidate| candidate.ident == self.original)
-            .map(|matched| Name::from(&matched.rename))
-            .into_iter()
-            .collect()
+        let renames = UseLeaf::of_tree(tree).into_iter().filter_map(|leaf| leaf.end().renamed());
+        renames.filter(|renamed| renamed.ident == self.original).map(|renamed| Name::from(&renamed.rename)).collect()
     }
 }
 

@@ -1405,9 +1405,16 @@ impl Exits {
 
     fn changed(code: &Code) -> ExitCode {
         let scratch = Scratch::fresh();
+        let seeded = scratch
+            .directory("out/mutants.out")
+            .and_then(|()| scratch.write("out/mutants.out/missed.txt", "src/a.rs:1: replace f -> bool with true\n"))
+            .and_then(|()| scratch.directory("out/scoped/mutants.out"))
+            .and_then(|()| {
+                scratch.write("out/scoped/mutants.out/caught.txt", "src/a.rs:1: replace f -> bool with true\n")
+            });
         let arguments =
             ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "3/8", "--test-package=leaf"];
-        scratch.answer(&Script::exiting(code.0), &arguments).exit
+        seeded.map_or(ExitCode::from(u8::MAX), |()| scratch.answer(&Script::exiting(code.0), &arguments).exit)
     }
 }
 
@@ -1450,7 +1457,7 @@ fn a_shard_runs_cargo_mutants_for_its_slice() {
 }
 
 #[test]
-fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Error>> {
+fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let fake = Script { changed: "+a line\n".to_owned(), ..Script::new() };
     let answer = scratch.answer(
@@ -1466,7 +1473,11 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
     );
     assert_eq!(
         answer.lines().shown(),
-        Printed { exit: ExitCode::SUCCESS, out: vec!["mutants: none missed"], err: Vec::<&str>::new() }
+        Printed {
+            exit: ExitCode::SUCCESS,
+            out: vec!["mutants: 0 timed out on their own crate's tests", "mutants: none missed"],
+            err: Vec::<&str>::new()
+        }
     );
     assert_eq!(Text::lines(&scratch.read("tmp/c.diff")), ["+a line"]);
     assert_eq!(
@@ -1483,8 +1494,6 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
                     "15/16",
                     "--sharding",
                     "round-robin",
-                    "--test-package=a",
-                    "--test-package=b",
                     "--jobs",
                     "2",
                     "--colors",
@@ -1499,14 +1508,61 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn missed_mutants_fail_the_step_and_are_listed() -> Result<(), Box<dyn Error>> {
+fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_still_missed()
+-> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.directory("out/mutants.out")?;
-    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1: replace f -> bool with true\n")?;
-    let answer = scratch
-        .answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
+    scratch.directory("out/scoped/mutants.out")?;
+    let own = "src/a.rs:1:5: replace f -> bool with true\nsrc/b.rs:2:9: delete match arm A::B(_) | C in D<'a>::e\n";
+    scratch.write("out/mutants.out/missed.txt", own)?;
+    scratch.write("out/mutants.out/timeout.txt", "src/c.rs:3:1: replace g with ()\n")?;
+    scratch.write("out/scoped/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    scratch.write("out/scoped/mutants.out/caught.txt", "src/b.rs:2:9: delete match arm A::B(_) | C in D<'a>::e\n")?;
+    let fake = Script::new();
+    let answer = scratch.answer(
+        &fake,
+        &[
+            "mutants-changed",
+            &scratch.file("c.diff"),
+            &scratch.file("out"),
+            "0/8",
+            "--test-package=a",
+            "--test-package=b",
+        ],
+    );
     assert_eq!(answer.exit, ExitCode::from(2));
-    assert_eq!(Text::lines(&answer.out), ["mutants missed:", "src/a.rs:1: replace f -> bool with true"]);
+    assert_eq!(
+        Text::lines(&answer.out),
+        [
+            "mutants: 1 timed out on their own crate's tests",
+            "mutants missed:",
+            "src/a.rs:1:5: replace f -> bool with true"
+        ]
+    );
+    let rerun = fake.calls.borrow().last().cloned();
+    assert_eq!(
+        rerun,
+        Some(Invocation::new(
+            "cargo",
+            [
+                "mutants",
+                "--in-diff",
+                scratch.file("c.diff").as_str(),
+                "--re",
+                r"^src/a\.rs:1:5: replace f \-> bool with true$",
+                "--re",
+                r"^src/b\.rs:2:9: delete match arm A::B\(_\) \| C in D<'a>::e$",
+                "--test-package=a",
+                "--test-package=b",
+                "--jobs",
+                "2",
+                "--colors",
+                "never",
+                "--output",
+                scratch.file("out/scoped").as_str(),
+            ]
+        ))
+    );
     Ok(())
 }
 
@@ -1517,7 +1573,13 @@ fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
     scratch.write("out/mutants.out/missed.txt", "")?;
     let answer = scratch
         .answer(&Script::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
-    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec!["mutants: none missed".to_owned()]));
+    assert_eq!(
+        (answer.exit, Text::lines(&answer.out)),
+        (
+            ExitCode::SUCCESS,
+            vec!["mutants: 0 timed out on their own crate's tests".to_owned(), "mutants: none missed".to_owned()]
+        )
+    );
     Ok(())
 }
 
@@ -2475,5 +2537,23 @@ fn a_build_script_waits_for_the_host_build_of_its_build_dependencies() -> Result
         "graph-work 0.30 seconds, the sum of the same units",
     ];
     assert_eq!(Text::lines(&answer.out), expected);
+    Ok(())
+}
+
+#[test]
+fn a_scoped_rerun_that_tests_fewer_mutants_than_were_missed_fails() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.directory("out/mutants.out")?;
+    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
+    let answer = scratch.answer(&Script::new(), &arguments);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert_eq!(
+        Text::lines(&answer.err),
+        [
+            "the scoped rerun did not test these mutants its own crate missed; their names selected nothing:",
+            "src/a.rs:1:5: replace f -> bool with true"
+        ]
+    );
     Ok(())
 }

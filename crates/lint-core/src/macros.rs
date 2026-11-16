@@ -50,11 +50,6 @@ impl Macros {
     }
 
     #[must_use]
-    pub fn nested_at(file: &SourceFile, at: Address, copy: &Macro) -> Rc<[Macro]> {
-        file.expansions().calls(at, copy)
-    }
-
-    #[must_use]
     pub fn items_in_file(file: &SourceFile, invocation: &Macro) -> Rc<[Item]> {
         file.expansions().items(invocation)
     }

@@ -1,5 +1,5 @@
-use syntax::Macro;
 use syntax::Spanned;
+use syntax::{Macro, MacroTree};
 
 use graph::{Building, Domain, Quote, Quoted};
 use lint_core::{Macros, SourceFile};
@@ -32,16 +32,16 @@ impl Built for QuoteRow {
 
 impl QuoteRow {
     pub(super) fn found(source: &SourceFile, invoked: &Macro, here: &Seat) -> Vec<QuoteRow> {
-        let row = Quotation::first(invoked).map(|literal| QuoteRow {
+        let nested = |inner: &Macro| Macros::nested(source, inner).to_vec();
+        MacroTree::preorder(invoked, &nested).iter().filter_map(|found| QuoteRow::row(found, here)).collect()
+    }
+
+    fn row(invoked: &Macro, here: &Seat) -> Option<QuoteRow> {
+        Quotation::first(invoked).map(|literal| QuoteRow {
             located: here.located(Position::from(invoked.path.span())),
             written: UsePath::from(&invoked.path),
             line: LineNumber::from(literal.span()),
             quote: Quotation::quote(&literal),
-        });
-        let nested = Macros::nested(source, invoked)
-            .iter()
-            .flat_map(|inner| QuoteRow::found(source, inner, here))
-            .collect::<Vec<_>>();
-        row.into_iter().chain(nested).collect()
+        })
     }
 }

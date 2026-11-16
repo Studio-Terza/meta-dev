@@ -7,6 +7,7 @@ use std::path::Path;
 use syntax::Punctuated;
 use syntax::Span;
 use syntax::Spanned;
+use syntax::Spine;
 
 use syntax::{
     Attribute, BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, Ident,
@@ -19,6 +20,7 @@ use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
@@ -41,13 +43,8 @@ impl ExpressionFlow {
     }
 
     fn assigned_local(place: &Expr) -> Option<&Ident> {
-        match place {
-            Expr::Path(path) => path.path.get_ident().filter(|ident| *ident != "self"),
-            Expr::Field(field) => Self::assigned_local(&field.base),
-            Expr::Index(index) => Self::assigned_local(&index.expr),
-            Expr::Paren(paren) => Self::assigned_local(&paren.expr),
-            _ => None,
-        }
+        let root = Spine::from(place).past(|node| matches!(node, Expr::Field(_) | Expr::Index(_) | Expr::Paren(_)))?;
+        Syntax::expr_path(root.node()).and_then(|path| path.path.get_ident()).filter(|ident| *ident != "self")
     }
 
     fn compound(op: BinOp) -> Option<BinOp> {

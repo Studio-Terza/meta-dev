@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
+use lint_core::Syntax;
 use syntax::Punctuated;
-use syntax::{Expr, ExprClosure, ExprMethodCall, ExprPath, Pat, PatType, Stmt, Token};
+use syntax::{Expr, ExprClosure, ExprMethodCall, ExprPath, Past, Pat, PatType, Spine, Token};
 
 use lint_layout::Name;
 
@@ -31,23 +32,14 @@ impl<'scope, 'owner> Closure<'scope, 'owner> {
     }
 
     fn body(&self, body: &Expr) -> Option<LoweredOperation> {
-        match body {
-            Expr::Block(block) => self.statements(&block.block.stmts),
-            Expr::Paren(inner) => self.body(&inner.expr),
+        let peeled = Spine::from(body).past(|node| matches!(node, Expr::Paren(_) | Expr::Block(_)))?;
+        self.operation(peeled)
+    }
+
+    fn operation(&self, peeled: Past<'_, Expr>) -> Option<LoweredOperation> {
+        match peeled.node() {
             Expr::MethodCall(call) => self.method(call),
             Expr::Call(call) => self.checking.called(&call.func),
-            _ => None,
-        }
-    }
-
-    fn statements(&self, statements: &[Stmt]) -> Option<LoweredOperation> {
-        let (last, rest) = statements.split_last()?;
-        rest.first().map_or_else(|| self.statement(last), |_| None)
-    }
-
-    fn statement(&self, statement: &Stmt) -> Option<LoweredOperation> {
-        match statement {
-            Stmt::Expr(inner, None) => self.body(inner),
             _ => None,
         }
     }
@@ -90,13 +82,10 @@ impl Parameters {
     }
 
     fn typed(&self, receiver: &Expr, fallback: Option<&LoweredOwner>) -> Option<LoweredOwner> {
-        match receiver {
-            Expr::Path(found) => self.named(found, fallback),
-            Expr::Paren(inner) => self.typed(&inner.expr, fallback),
-            Expr::Reference(reference) => self.typed(&reference.expr, fallback),
-            Expr::Unary(unary) => self.typed(&unary.expr, fallback),
-            _ => None,
-        }
+        let peeled = Spine::from(receiver)
+            .past(|node| matches!(node, Expr::Paren(_) | Expr::Reference(_) | Expr::Unary(_)))?
+            .node();
+        Syntax::expr_path(peeled).and_then(|found| self.named(found, fallback))
     }
 
     fn named(&self, found: &ExprPath, fallback: Option<&LoweredOwner>) -> Option<LoweredOwner> {
