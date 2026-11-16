@@ -92,7 +92,7 @@ impl Crew<'_> {
     pub(crate) fn gated(
         self,
         readout: &Measured<Readout>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer>,
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
@@ -235,16 +235,20 @@ impl Lints {
         unlocated.map_or_else(|| Outcome::from_rendered(rendered, readout.failures()), Outcome::Unlocated)
     }
 
-    fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+    fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
         Worked::timed(sources.located().timing())
     }
 
-    fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
+    fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>, worker: Worker) -> Worked {
         let readout = ManuallyDrop::new(sources.read(worker));
         [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 
-    fn worked(readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
+    fn worked(
+        readout: &Readout,
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        worker: Worker,
+    ) -> Worked {
         let mut lowered = sources.gathered(readout, worker, Filer::started);
         let mut work: Vec<FileWork<'_>> = lowered.filed();
         let filed: Worked = work.iter_mut().map(FileWork::worked).collect();
@@ -253,11 +257,13 @@ impl Lints {
         jobs.sort_by_key(Job::rank);
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
         let queued: Worked = claimed.collect();
-        let judging = Stopwatch::started(sources.wired().timer());
+        let waiting = Stopwatch::started(sources.wired().timer());
         let settled = Settled::from(sources.gathering());
+        let waited = waiting.stopped(Step::Judged(worker).waited());
+        let judging = Stopwatch::started(sources.wired().timer());
         let judged: Worked = work.into_iter().map(|file| file.judged(settled)).collect();
         let judged_timing = judging.stopped(Step::Judged(worker));
-        let timings = lowered.timings().iter().copied().chain([judged_timing]);
+        let timings = lowered.timings().iter().copied().chain([waited, judged_timing]);
         timings.map(Worked::timed).chain([filed, queued, judged]).collect()
     }
 }
@@ -373,59 +379,37 @@ impl<'file> FileWork<'file> {
 }
 
 impl Work {
-    fn awaited<'run>(self, sources: &'run Sources<impl Files, impl Cargo, impl Timer>) -> Option<&'run Model> {
+    fn awaited<'run>(self, sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Ready<'run> {
         match self {
-            Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => sources.gathering().model(),
-            Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => None,
+            Work::Modelled(_) | Work::Extracted(_) => Ready::Modelled(sources.gathering().model()),
+            Work::Described(_) => Ready::Grounded(Ground::awaited(sources)),
+            Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Ready::Bare,
         }
     }
 
-    fn reported<'run>(self, readout: &'run Readout, model: Option<&'run Model>) -> Vec<Report<'run>> {
+    fn reported<'run>(self, readout: &'run Readout, ready: Ready<'run>) -> Vec<Report<'run>> {
         match self {
             Work::Checked(check) => check(readout),
-            Work::Modelled(query) => model.map(query).into_iter().collect(),
+            Work::Modelled(query) => ready.model().map(query).into_iter().collect(),
             Work::Described(_) | Work::Extracted(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Vec::new(),
         }
     }
 
-    fn worked<'run>(
-        self,
-        slot: Slot,
-        readout: &'run Readout,
-        model: Option<&'run Model>,
-        sources: &'run Sources<impl Files, impl Cargo, impl Timer>,
-    ) -> Worked {
+    fn worked<'run>(self, slot: Slot, readout: &'run Readout, ready: Ready<'run>) -> Worked {
         match self {
-            Work::Extracted(_) | Work::Described(_) => self.grounded(slot, model, sources),
+            Work::Extracted(_) | Work::Described(_) => self.grounded(slot, ready),
             Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
-                Worked::rendering(slot, self.reported(readout, model))
+                Worked::rendering(slot, self.reported(readout, ready))
             }
         }
     }
 
-    fn grounded(
-        self,
-        slot: Slot,
-        model: Option<&Model>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer>,
-    ) -> Worked {
+    fn grounded(self, slot: Slot, ready: Ready<'_>) -> Worked {
         match self {
-            Work::Extracted(extracted) => Worked::rendering(slot, model.map_or_default(extracted)),
-            Work::Described(described) => Worked::rendering(
-                slot,
-                sources
-                    .located()
-                    .done()
-                    .as_ref()
-                    .ok()
-                    .zip(model)
-                    .map(|(located, merged)| {
-                        let facts = Settled::from(sources.gathering()).roles();
-                        described(sources.gathering().heads(), Described::workspaces(located), facts, merged)
-                    })
-                    .into_iter()
-                    .collect(),
-            ),
+            Work::Extracted(extracted) => Worked::rendering(slot, ready.model().map_or_default(extracted)),
+            Work::Described(described) => {
+                Worked::rendering(slot, ready.ground().map(|ground| ground.reported(described)).into_iter().collect())
+            }
             Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
                 Worked::default()
             }
@@ -456,11 +440,13 @@ impl Job {
         }
     }
 
-    fn done(self, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
-        let model = self.work.awaited(sources);
+    fn done(self, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
+        let waiting = Stopwatch::started(sources.wired().timer());
+        let ready = self.work.awaited(sources);
+        let waited = waiting.stopped(self.step.waited());
         let stopwatch = Stopwatch::started(sources.wired().timer());
-        let worked = self.work.worked(self.slot, readout, model, sources);
-        [worked, Worked::timed(stopwatch.stopped(self.step))].into_iter().collect()
+        let worked = self.work.worked(self.slot, readout, ready);
+        [worked, Worked::timed(waited), Worked::timed(stopwatch.stopped(self.step))].into_iter().collect()
     }
 }
 
@@ -719,5 +705,50 @@ where
 {
     fn pending(file: &SourceFile) -> Box<dyn Awaits<'_> + '_> {
         Box::new(Waiting::<Lint> { file, watched: Lint::watched(file) })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Ground<'run> {
+    heads: &'run [FileHead],
+    described: &'run Described,
+    roles: &'run RoleFacts<'run>,
+    model: &'run Model,
+}
+
+impl<'run> Ground<'run> {
+    fn awaited(sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Option<Ground<'run>> {
+        let described = sources.located().done().as_ref().ok()?;
+        let roles = Settled::from(sources.gathering()).roles();
+        let model = sources.gathering().model()?;
+        Some(Ground { heads: sources.gathering().heads(), described, roles, model })
+    }
+
+    fn reported(self, described: Workspaced) -> Report<'run> {
+        described(self.heads, Described::workspaces(self.described), self.roles, self.model)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Ready<'run> {
+    Bare,
+    Modelled(Option<&'run Model>),
+    Grounded(Option<Ground<'run>>),
+}
+
+impl<'run> Ready<'run> {
+    fn model(self) -> Option<&'run Model> {
+        match self {
+            Ready::Modelled(model) => model,
+            Ready::Grounded(ground) => ground.map(|found| found.model),
+            Ready::Bare => None,
+        }
+    }
+
+    fn ground(self) -> Option<Ground<'run>> {
+        match self {
+            Ready::Grounded(ground) => ground,
+            Ready::Modelled(_) | Ready::Bare => None,
+        }
     }
 }

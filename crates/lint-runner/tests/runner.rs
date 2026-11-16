@@ -348,11 +348,16 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
         "  phase stage: list the trees and their packages\n",
         "  phase locate: describe the workspaces through cargo metadata\n",
         "  phase model: merge the lowered files into the code model\n",
+        "  phase contexts: join every file's context-lint parts\n",
+        "  wait model: until cargo metadata has described the workspaces\n",
         "  lint lint_hand_impls::HandImpls\n",
         "  lint lint_port_dependencies::OwnedDependencies\n",
+        "  wait lint lint_port_dependencies::OwnedDependencies: until the model, the contexts and the workspaces it reads are ready\n",
         "  lint lint_rust_only::RustOnly\n",
     ];
-    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 8], "{timed}");
+    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 11], "{timed}");
+    let waited = "  wait judged lints on worker ";
+    assert_eq!(timed.matches(waited).count(), workers, "{timed}");
     assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");
     let lowered = "  phase lower: lower and file-lint its share of files on worker ";
     assert_eq!(timed.matches(lowered).count(), workers, "{timed}");

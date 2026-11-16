@@ -2,6 +2,7 @@ mod contexts;
 mod gathering;
 
 pub(crate) use contexts::{Holding, Priming, Settled};
+use gathering::Merging;
 pub(crate) use gathering::{Claimed, Gathering};
 
 use std::sync::OnceLock;
@@ -104,22 +105,37 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         readout: &'read Readout,
         worker: Worker,
         starting: impl Fn(Claimed<'read>) -> Filed,
-    ) -> Lowering<Part> {
+    ) -> Lowering<Part>
+    where
+        T: Sync,
+    {
         let stopwatch = Stopwatch::started(self.wired.timer);
         let mut share = self.gathering.gathered(readout, self.shared.heads(), starting);
         let filed = share.filed();
         let lowered = stopwatch.stopped(Step::Lower(worker));
-        let merged = share.into_merging().map(|complete| {
-            let merging = Stopwatch::started(self.wired.timer);
-            self.gathering.settled(complete, |facts| self.merged(facts));
-            merging.stopped(Step::Model)
-        });
+        let merged = share.into_merging().map_or_default(|complete| self.settled(complete));
         Lowering { timings: [lowered].into_iter().chain(merged).collect(), filed }
     }
 
-    fn merged(&self, facts: Vec<FileFacts>) -> Option<Model> {
+    fn settled(&self, complete: Merging<'run>) -> Vec<Timing>
+    where
+        T: Sync,
+    {
+        let timer = self.wired.timer;
+        let waiting = Stopwatch::started(timer);
+        let described = self.located().done().as_ref().ok();
+        let waited = waiting.stopped(Step::Model.waited());
+        let settled = complete.settled(
+            &self.gathering,
+            |facts| Stopwatch::measured(timer, Step::Model, || Self::merged(facts, described)),
+            |parts| Stopwatch::measured(timer, Step::Contexts, || parts.into_iter().collect()),
+        );
+        [waited].into_iter().chain(settled).collect()
+    }
+
+    fn merged(facts: Vec<FileFacts>, described: Option<&Described>) -> Option<Model> {
         let model = FileFacts::merged(facts);
-        self.located().done().as_ref().ok().map(|described| Reader::rooted(model, described.crates()))
+        described.map(|found| Reader::rooted(model, found.crates()))
     }
 
     pub(crate) fn gathering(&self) -> &Gathering<'run> {
