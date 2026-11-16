@@ -1,7 +1,8 @@
+use lint_placement::Level;
 use std::fmt;
 
 use lint_layout::{Name, UsePath, Whole, Word, words};
-use lint_placement::CrateRoot;
+use lint_placement::Krate;
 
 use super::{ModuleIndex, ModulePath};
 
@@ -29,7 +30,7 @@ impl Start {
 
 #[derive(Debug)]
 pub struct Target<'path> {
-    crate_root: &'path CrateRoot,
+    crate_root: Krate<'path>,
     segments: Vec<&'path Name>,
 }
 
@@ -44,14 +45,15 @@ impl<'path> Target<'path> {
         let first = AsRef::<[Name]>::as_ref(path).first()?;
         let start = Self::start(Start::spelled(first), file)?;
         let anchor = first.matches::<Whole>(&Self::ANCHORS);
-        let child: Vec<&Name> = file.segments.iter().chain([first]).collect();
-        anchor.map(|_| ()).or_else(|| modules.same_as(file.crate_root, &child).map(|_| ()))?;
+        let crate_root = file.nest.krate()?;
+        let child: Vec<&Name> = file.segments().iter().chain([first]).collect();
+        anchor.map(|_| ()).or_else(|| modules.same_as(crate_root, &child).map(|_| ()))?;
         let skip = anchor.into_iter().count();
         let segments = AsRef::<[Name]>::as_ref(path)
             .iter()
             .skip(skip)
             .try_fold(start.iter().collect(), |segments, segment| Start::spelled(segment).advance(segments, segment))?;
-        Some(Target { crate_root: file.crate_root, segments })
+        Some(Target { crate_root, segments })
     }
 
     pub fn deepest_in<'file>(&self, modules: &ModuleIndex<'file>) -> Option<ModulePath<'file>> {
@@ -72,16 +74,16 @@ impl<'path> Target<'path> {
     }
 
     fn enclosing<'user>(&self, boundary: &[&Name], user: &'user ModulePath<'_>) -> Option<&'user ModulePath<'user>> {
-        Some(user).filter(|candidate| self.crate_root == candidate.crate_root).filter(|in_crate| {
-            in_crate.segments.get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
+        Some(user).filter(|candidate| candidate.nest.krate() == Some(self.crate_root)).filter(|in_crate| {
+            in_crate.segments().get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
         })
     }
 
     fn start<'file>(start: Start, file: &ModulePath<'file>) -> Option<&'file [Name]> {
         match start {
             Start::Crate => Some(&[]),
-            Start::Super => file.parent().map(|parent| parent.segments),
-            Start::Relative => Some(file.segments),
+            Start::Super => file.nest.parent().filter(|parent| parent.level() != Level::Workspace).map(<&[Name]>::from),
+            Start::Relative => Some(file.segments()),
         }
     }
 }

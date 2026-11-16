@@ -65,7 +65,7 @@ impl Built for UseRow {
         let direct = resolving.path(scope, &self.written, self.domain());
         let head = direct
             .unresolved()
-            .and_then(|_| Some(resolving.path(scope, &self.written.parent()?, Domain::Types)))
+            .and_then(|_| Some(resolving.path(scope, &self.written.qualifier()?, Domain::Types)))
             .zip(self.written.tail().last());
         let aliased = head.as_ref().and_then(|(parent, last)| building.aliased(parent)?.joined(last));
         let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);

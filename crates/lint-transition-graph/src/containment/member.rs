@@ -1,3 +1,4 @@
+use lint_placement::Krate;
 use std::fmt;
 
 use lint_layout::Name;
@@ -12,7 +13,7 @@ pub(crate) struct Member<'found> {
 
 impl<'found> Member<'found> {
     pub(crate) fn declared(krate: &'found Name, name: &'found Name) -> Member<'found> {
-        Member { name, cluster: Cluster::module(krate, &[]) }
+        Member { name, cluster: Cluster::module(Krate::Named(krate), &[]) }
     }
 
     pub(crate) fn within(self, segments: &'found [Name]) -> Option<Member<'found>> {

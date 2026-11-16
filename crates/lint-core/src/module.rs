@@ -25,12 +25,6 @@ impl<'file> Module<'file> {
     pub fn within(&self, name: Name) -> Module<'file> {
         Module { crate_file: self.crate_file, path: self.path.iter().cloned().chain(Some(name)).collect() }
     }
-
-    #[must_use]
-    pub fn parent(&self) -> Option<Module<'file>> {
-        let outer = self.path.len().checked_sub(1)?;
-        Some(Module { crate_file: self.crate_file, path: self.path.iter().take(outer).cloned().collect() })
-    }
 }
 
 impl<'file> From<&Module<'file>> for &'file CrateFile {

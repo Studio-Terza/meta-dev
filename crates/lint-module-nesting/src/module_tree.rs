@@ -9,12 +9,12 @@ use std::path::Path;
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
+use module_path::{InsideSibling, ModuleIndex, ModulePath, Target};
 
 use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
-use lint_placement::CrateRoot;
+use lint_placement::{CrateRoot, Level, Nest};
 use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 use reexport_count::ReexportCount;
 use syntax::ItemUse;
@@ -151,18 +151,17 @@ impl<'file> ModuleTree<'file> {
         let crowded = self
             .reexports
             .iter()
-            .filter(|(module, _)| module.parent().is_some())
+            .filter(|(module, _)| AsRef::<Nest<'_>>::as_ref(*module).level() == Level::Module)
             .filter_map(move |(module, count)| count.beyond(most).map(|crowded| (module, crowded)))
             .map(move |(module, count)| {
-                Violation::new(Site::of_file(<&Path>::from(*module)), Finding::CrowdedReexports { count, most })
+                Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
             });
         self.modules
             .modules()
             .iter()
             .filter_map(|module| {
-                self.home_of(module).map(|home| {
-                    Violation::new(Site::of_file(<&Path>::from(*module)), Finding::UsedFromOneSibling { home })
-                })
+                self.home_of(module)
+                    .map(|home| Violation::new(Site::of_file(module.file()), Finding::UsedFromOneSibling { home }))
             })
             .chain(deep_uses)
             .chain(crowded)
@@ -182,13 +181,17 @@ impl<'file> ModuleTree<'file> {
         self.users.record(used, module);
         let crossed = target.as_ref().and_then(|found| found.crossed_directory(&module, &self.modules));
         self.deep_uses.extend(crossed.map(|crossing| {
-            Violation::new(Site::of_file(<&Path>::from(module)), Finding::ReachesPastModRs { target: crossing })
+            Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: crossing })
         }));
     }
 
     fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
-        let outsiders: Vec<&ModulePath<'file>> =
-            self.users.callers_of(module)?.iter().filter(|user| Ancestor::holds(module, user).is_none()).collect();
+        let outsiders: Vec<&ModulePath<'file>> = self
+            .users
+            .callers_of(module)?
+            .iter()
+            .filter(|user| AsRef::<Nest<'_>>::as_ref(module).holding(*AsRef::<Nest<'_>>::as_ref(*user)).is_none())
+            .collect();
         outsiders
             .iter()
             .all(|user| InsideSibling::holds(user, module).is_some())
