@@ -19,7 +19,9 @@ const FIRST_USER: Source = Source::new(
 );
 const BODY_USER: Source = Source::new(
     Located::new("crates/a/src/first.rs"),
-    Text::new("pub struct Runner;\nimpl Runner {\n    pub fn run() -> u8 {\n        let options: Option<crate::bag::Options> = None;\n        let built = crate::bag::Options { depth: 1 };\n        built.depth\n    }\n}\n"),
+    Text::new(
+        "pub struct Runner;\nimpl Runner {\n    pub fn run() -> u8 {\n        let options: Option<crate::bag::Options> = None;\n        let built = crate::bag::Options { depth: 1 };\n        built.depth\n    }\n}\n",
+    ),
 );
 const OTHER_CRATE_USER: Source = Source::new(
     Located::new("crates/b/src/lib.rs"),
