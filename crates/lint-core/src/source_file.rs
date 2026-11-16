@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use crate::macros::Expansions;
 use boundary::Nesting;
-pub use boundary::Walks;
 use file_ports::Absent;
 pub use head::FileHead;
 use lint_layout::Failure;
@@ -23,7 +22,6 @@ pub struct SourceFile {
     syntax: syntax::File,
     test_modules: Vec<SourceFile>,
     expansions: Expansions,
-    walks: Walks,
 }
 
 impl SourceFile {
@@ -48,7 +46,6 @@ impl SourceFile {
                 syntax,
                 test_modules: Vec::new(),
                 expansions: Expansions::default(),
-                walks: Walks::default(),
             }),
             Err(source) => Err(Failure::Parse { path, line: LineNumber::from(source.span()), source }),
         }
@@ -93,11 +90,6 @@ impl SourceFile {
     #[must_use]
     pub(crate) fn expansions(&self) -> &Expansions {
         &self.expansions
-    }
-
-    #[must_use]
-    pub fn walks(&self) -> &Walks {
-        &self.walks
     }
 }
 

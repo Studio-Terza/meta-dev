@@ -4,7 +4,7 @@ use std::fmt;
 
 use syntax::{Around, Macro, Node, Walk};
 
-use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Unwalked, Violation, Walks, Watch, Watching};
+use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Unwalked, Violation, Watch, Watching};
 use lint_layout::Name;
 
 pub use boundary::Member;
@@ -71,7 +71,6 @@ impl Sweep {
         file: Option<&'file SourceFile>,
         watchers: Vec<&'run mut Watching<'run>>,
     ) -> Sweeping<'file, 'run> {
-        file.map(SourceFile::walks).into_iter().for_each(Walks::walked);
         let kinds: Vec<&[Kind]> = watchers.iter().map(|watcher| watcher.kinds()).collect();
         let listening = ByKind::filled(|kind| Index::listening(&kinds, kind));
         let muting = Muting::new(watchers.len());

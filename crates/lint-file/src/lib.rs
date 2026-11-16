@@ -1,7 +1,6 @@
 mod concluded;
 mod file_facts;
 mod lead;
-mod one_walk;
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -12,7 +11,6 @@ use lint_sweep::{Finds, Gathers, Member, Sweep, Watching};
 pub use concluded::{Concluded, Listed};
 pub use file_facts::FileFacts;
 pub use lead::{Lead, Leader, SortStart, Start};
-pub use one_walk::OneWalk;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {

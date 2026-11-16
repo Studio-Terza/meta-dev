@@ -15,8 +15,8 @@ use lint_hand_impls::HandImpls;
 use file_ports::Files;
 use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{
-    FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, OneWalk, Primed, PrimedLint, Reads, Ruled, RuledLint,
-    SortStart, Start, Swept, SweptLint, WatchingLint,
+    FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, Primed, PrimedLint, Reads, Ruled, RuledLint, SortStart, Start,
+    Swept, SweptLint, WatchingLint,
 };
 use lint_port_dependencies::{RoleFacts, RoleReading};
 use lint_reader::{Described, Unlocated};
@@ -149,7 +149,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 57] = [
+    const LINTS: [Entry; 56] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -199,7 +199,6 @@ impl Lints {
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
         Entry::spelled::<RepeatedReads>(Work::Modelled(<RepeatedReads as ModelLint>::report)),
         Entry::spelled::<NodeRecursion>(Work::Modelled(<NodeRecursion as ModelLint>::report)),
-        <Late<OneWalk> as Registered>::ENTRY,
         <Swept<NoEarlyExits> as Registered>::ENTRY,
         <Kin<LinearBodies> as Registered>::ENTRY,
         <Kin<PureRouters> as Registered>::ENTRY,
@@ -649,13 +648,6 @@ where
     };
 }
 
-impl<Lint: FileLint + fmt::Debug + 'static> Registered for Late<Lint> {
-    const ENTRY: Entry = Entry {
-        name: Named::spelled::<Lint>(),
-        work: Work::Ruled(Rules { headline: Lint::HEADLINE, reads: Lint::READS, conclude: Self::concluding }),
-    };
-}
-
 trait Concluded {
     fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_>;
 }
@@ -665,9 +657,6 @@ pub(crate) trait Concludes<'file>: fmt::Debug {
 }
 
 #[derive(Debug)]
-struct Late<Lint>(PhantomData<Lint>);
-
-#[derive(Debug)]
 struct RuledConclusion<'file, Lint> {
     file: &'file SourceFile,
     lint: PhantomData<Lint>,
@@ -675,12 +664,6 @@ struct RuledConclusion<'file, Lint> {
 
 #[derive(Debug)]
 struct PrimedConclusion<'file, Lint> {
-    file: &'file SourceFile,
-    lint: PhantomData<Lint>,
-}
-
-#[derive(Debug)]
-struct LateConclusion<'file, Lint> {
     file: &'file SourceFile,
     lint: PhantomData<Lint>,
 }
@@ -703,12 +686,6 @@ where
     }
 }
 
-impl<'file, Lint: FileLint + fmt::Debug> Concludes<'file> for LateConclusion<'file, Lint> {
-    fn concluded<'run: 'file>(self: Box<Self>, _: Settled<'_, 'run>) -> Vec<Violation<'file>> {
-        Lint::violations(self.file)
-    }
-}
-
 impl<Lint: RuledLint + fmt::Debug + 'static> Concluded for Ruled<Lint>
 where
     for<'file> RuledConclusion<'file, Lint>: Concludes<'file>,
@@ -724,12 +701,6 @@ where
 {
     fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_> {
         Box::new(PrimedConclusion::<Lint> { file, lint: PhantomData })
-    }
-}
-
-impl<Lint: FileLint + fmt::Debug + 'static> Concluded for Late<Lint> {
-    fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_> {
-        Box::new(LateConclusion::<Lint> { file, lint: PhantomData })
     }
 }
 

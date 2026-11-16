@@ -10,12 +10,8 @@ test = false
 doctest = false
 
 [dependencies]
-lint-layout = { path = "../lint-layout" }
 lint-core = { path = "../lint-core" }
 lint-sweep = { path = "../lint-sweep" }
-
-[dev-dependencies]
-lint-layout = { path = "../lint-layout" }
 
 [lints]
 workspace = true
