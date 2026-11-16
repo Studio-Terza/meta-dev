@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use syntax::{Attribute, Item, Macro, Stmt};
+use syntax::{Attribute, Item, Macro, MacroTree, Stmt};
 
 use super::Macros;
 use crate::watch::Address;
@@ -51,7 +51,7 @@ impl Expansions {
     }
 
     pub fn items(&self, invocation: &Macro) -> Rc<[Item]> {
-        self.items.read(self.held(Address::from(invocation)), || Rc::from(Macros::items(invocation)))
+        self.items.read(self.held(Address::from(invocation)), || Rc::from(MacroTree::items(invocation)))
     }
 
     pub fn attributes(&self, invocation: &Macro) -> Rc<[Attribute]> {

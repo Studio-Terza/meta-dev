@@ -22,11 +22,6 @@ impl Macros {
     const ARROW_END: char = '>';
 
     #[must_use]
-    pub fn items(invocation: &Macro) -> Vec<Item> {
-        syntax::parse::parse2::<syntax::File>(invocation.tokens.clone()).map_or_else(|_| Vec::new(), |file| file.items)
-    }
-
-    #[must_use]
     pub fn statements(invocation: &Macro) -> Vec<Stmt> {
         let bodies = invocation
             .path
