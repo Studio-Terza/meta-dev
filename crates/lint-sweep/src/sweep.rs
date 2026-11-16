@@ -4,7 +4,7 @@ use std::fmt;
 
 use syntax::{Around, Macro, Node, Walk};
 
-use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Violation, Walks, Watch, Watching};
+use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Unwalked, Violation, Walks, Watch, Watching};
 use lint_layout::Name;
 
 pub use boundary::Member;
@@ -56,6 +56,10 @@ impl Sweep {
     }
 
     pub fn watching<'run>(file: &SourceFile, watchers: Vec<&'run mut Watching<'run>>) {
+        Walk::file(&mut Sweep::sweeping(Some(file), watchers), file.syntax());
+    }
+
+    pub fn once<'run>(_: Unwalked, file: &SourceFile, watchers: Vec<&'run mut Watching<'run>>) {
         Walk::file(&mut Sweep::sweeping(Some(file), watchers), file.syntax());
     }
 

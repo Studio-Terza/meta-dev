@@ -1,10 +1,17 @@
+use std::mem;
+use std::sync::{Mutex, PoisonError};
+
 use crate::repo_file::RepoFile;
 use crate::source_file::SourceFile;
 use lint_layout::Failure;
 
+#[derive(Debug)]
+pub struct Unwalked(());
+
 #[derive(Debug, Default)]
 pub struct Readout {
     files: Vec<SourceFile>,
+    unwalked: Mutex<Vec<Unwalked>>,
     repo_files: Vec<RepoFile>,
     failures: Vec<Failure>,
 }
@@ -26,10 +33,15 @@ impl Readout {
     }
 
     #[must_use]
-    pub fn with_file(self, file: SourceFile) -> Readout {
-        let mut files = self.files;
-        files.push(file);
-        Readout { files, ..self }
+    pub fn unwalked(&self) -> Vec<Unwalked> {
+        mem::take(&mut *self.unwalked.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    #[must_use]
+    pub fn with_file(mut self, file: SourceFile) -> Readout {
+        self.files.push(file);
+        self.unwalked.get_mut().unwrap_or_else(PoisonError::into_inner).push(Unwalked(()));
+        self
     }
 
     #[must_use]

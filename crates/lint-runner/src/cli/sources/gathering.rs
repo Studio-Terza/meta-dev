@@ -4,7 +4,7 @@ use std::thread;
 
 use graph::Model;
 use graph_reader::{FileFacts, GroupLowering, ListedGroup, Listing};
-use lint_core::{FileHead, Parsed, Readout, SourceFile};
+use lint_core::{FileHead, Parsed, Readout, SourceFile, Unwalked};
 use lint_sweep::Gathers;
 
 use super::contexts::{Contexts, Contributed};
@@ -17,16 +17,17 @@ struct Claim<'listing, 'read, 'run> {
     group: &'listing ListedGroup<'read>,
     file: &'read SourceFile,
     head: &'run FileHead,
+    unwalked: Unwalked,
 }
 
 impl<'read, 'run> Claim<'_, 'read, 'run> {
-    fn gathered<Part, Filed: Gathers<Part>>(&self, starting: &impl Fn(Claimed<'read>) -> Filed) -> Joined<'run, Part> {
+    fn gathered<Part, Filed: Gathers<Part>>(self, starting: &impl Fn(Claimed<'read>) -> Filed) -> Joined<'run, Part> {
         let parsed = Parsed::new(self.file, self.head);
         let mut lowering: GroupLowering<'_> = self.group.lowering();
         let claimed = Claimed { order: self.order, file: self.file };
         let mut filing = starting(claimed);
         let joining = lowering.watching().into_iter().chain(filing.watching()).collect();
-        let contexts = Contributed::joined(parsed, joining);
+        let contexts = Contributed::joined(parsed, self.unwalked, joining);
         let gathered = Gathered { head: self.head, facts: lowering.gathered(), contexts };
         Joined { gathered, filed: filing.gathered() }
     }
@@ -111,12 +112,13 @@ impl<'run> Gathering<'run> {
             .groups()
             .iter()
             .zip(readout.files())
-            .filter_map(|(group, file)| {
+            .zip(readout.unwalked())
+            .filter_map(|((group, file), unwalked)| {
                 let index = heads.binary_search_by(|head| head.path().cmp(file.head().path())).ok()?;
-                Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)? })
+                Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)?, unwalked })
             })
             .collect();
-        let joined: Vec<Joined<'run, Part>> = claims.iter().map(|claim| claim.gathered(&starting)).collect();
+        let joined: Vec<Joined<'run, Part>> = claims.into_iter().map(|claim| claim.gathered(&starting)).collect();
         let (gathered, filed): (Vec<Gathered<'run>>, Vec<Part>) =
             joined.into_iter().map(|found| (found.gathered, found.filed)).unzip();
         Share { merging: self.deposited(gathered, heads), filed }

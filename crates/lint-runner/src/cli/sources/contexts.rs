@@ -1,6 +1,6 @@
 use super::gathering::Gathering;
 use lint_clones::Clones;
-use lint_core::Parsed;
+use lint_core::{Parsed, Unwalked};
 use lint_enum_predicates::EnumPredicates;
 use lint_file::{ContextLint, FileFacts, Gleaning, OneWalk, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
@@ -86,7 +86,7 @@ macro_rules! contexts {
         }
 
         impl<'run> Contributed<'run> {
-            pub(crate) fn joined(parsed: Parsed<'_, 'run>, joining: Vec<&mut Watching<'_>>) -> Contributed<'run> {
+            pub(crate) fn joined(parsed: Parsed<'_, 'run>, unwalked: Unwalked, joining: Vec<&mut Watching<'_>>) -> Contributed<'run> {
                 let mut gatherings = Gatherings {
                     $($field: <$lint as ContextLint>::gathering(parsed),)*
                     $($primed: <$prime as PrimedFacts>::priming(parsed),)*
@@ -101,7 +101,7 @@ macro_rules! contexts {
                 $(watching.extend(gatherings.$primed.watching());)*
                 $(watching.extend(recordings.$primed.watching());)*
                 $(watching.extend(gatherings.$gleaned.watching());)*
-                Sweep::watching(parsed.file(), watching);
+                Sweep::once(unwalked, parsed.file(), watching);
                 Contributed {
                     $($field: <$lint as ContextLint>::completed(gatherings.$field.gathered(), &facts),)*
                     $($primed: <$prime as PrimedFacts>::primer_completed(gatherings.$primed.gathered(), &facts),)*
