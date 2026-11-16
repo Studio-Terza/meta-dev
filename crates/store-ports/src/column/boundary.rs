@@ -3,9 +3,7 @@ use std::fmt::Display;
 use std::num::TryFromIntError;
 use std::str::FromStr;
 
-use newtype::{Enumerated, Guarded, Inner, Listed, Newtype, Optional, Spelled, Validated};
-
-use super::Column;
+use newtype::{Enumerated, Guarded, Inner, Listed, Newtype, Optional, Spelled, Stored, Validated};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ColumnFailure {
@@ -192,5 +190,31 @@ impl Primitive for u32 {
 
     fn check(column: &str) -> Option<String> {
         Some(format!("{column} BETWEEN 0 AND {}", u32::MAX))
+    }
+}
+
+pub trait Column: Sized {
+    type Raw;
+
+    fn raw(&self) -> Self::Raw;
+
+    fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
+
+    fn check(column: &str) -> Option<String>;
+}
+
+impl<Value: Stored<Kind: Encoding<Value>>> Column for Value {
+    type Raw = <Value::Kind as Encoding<Value>>::Raw;
+
+    fn raw(&self) -> Self::Raw {
+        Value::Kind::raw(self)
+    }
+
+    fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
+        Value::Kind::from_raw(raw)
+    }
+
+    fn check(column: &str) -> Option<String> {
+        Value::Kind::check(column)
     }
 }

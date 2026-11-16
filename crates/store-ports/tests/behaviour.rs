@@ -642,7 +642,7 @@ impl Remarked {
 INSERT INTO
   nodes (id, project, facet, stage, provenance)
 VALUES
-  (1, 'p', 'problem', 'vague', 'init')
+  (1, 'p', 'feature', 'vague', 'init')
 "#
         ))?;
         let edge = statements.written(store_ports::query!(
