@@ -422,9 +422,9 @@ impl Work {
                     .as_ref()
                     .ok()
                     .zip(model)
-                    .map(|(located, model)| {
+                    .map(|(located, merged)| {
                         let facts = Settled::from(sources.gathering()).roles();
-                        described(sources.gathering().heads(), Described::workspaces(located), facts, model)
+                        described(sources.gathering().heads(), Described::workspaces(located), facts, merged)
                     })
                     .into_iter()
                     .collect(),
