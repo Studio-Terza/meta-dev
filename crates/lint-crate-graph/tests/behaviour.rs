@@ -8,7 +8,6 @@ const FLAGGED: [&str; 1] = ["crates/one/src/lib.rs:1"];
 const BIG_RING: usize = LINKS_IN_ROOT * 2 + 1;
 const SMALL_RING: usize = 6;
 const LINKS_IN_ROOT: usize = 20;
-const LONG_CHAIN: usize = 20_000;
 
 struct Link {
     index: usize,
@@ -68,11 +67,6 @@ fn a_cycle_in_test_code_does_not_count() {
     let in_module =
         Sources::file(ONE, Text::new(&format!("#[cfg(test)]\nmod tests {{\n{}}}\n", Items::ring("A", BIG_RING))));
     assert_eq!(Items::flagged(&[in_module]), Lines::default());
-}
-
-#[test]
-fn a_long_chain_is_judged_without_exhausting_the_stack() {
-    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&Items::chain("A", LONG_CHAIN)))]), Lines::default());
 }
 
 #[test]

@@ -132,3 +132,31 @@ preserves!(
 laws::law!(a_given_value_is_built_once_and_shared_by_every_case, given table = Sample::sorted(&[3, 1, 2]), any::<u8>(), probe, {
     proptest::prop_assert_eq!(table.binary_search(&probe).is_ok(), [1, 2, 3].contains(&probe));
 });
+
+table!(every_value_of_a_finite_domain_is_checked_once, [1u8, 2, 3], number, {
+    assert_eq!(Sample::reversed(&Sample::reversed(&[number])), [number]);
+});
+
+table!(
+    #[should_panic(expected = "the value 3 is checked")]
+    a_failing_value_of_a_finite_domain_fails,
+    [1u8, 2, 3],
+    number,
+    {
+        assert!(number < 3, "the value {number} is checked");
+    }
+);
+
+table!(a_row_may_fail_with_an_error, ["a", "b"], text, {
+    Sample::text(&Sample::bytes(text))?;
+});
+
+table!(
+    #[should_panic(expected = "the table row is broken: invalid utf-8")]
+    a_row_failing_with_an_error_fails,
+    [vec![0xff_u8]],
+    bytes,
+    {
+        Sample::text(&bytes)?;
+    }
+);

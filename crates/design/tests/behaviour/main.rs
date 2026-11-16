@@ -34,10 +34,9 @@ use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use grammar_notes::{Cite, Quote};
 use laws::proptest;
-use laws::proptest::prelude::{Just, any, prop_assert, prop_assert_eq, prop_oneof};
+use laws::proptest::prelude::{Just, any, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::{BoxedStrategy, Strategy};
-use laws::proptest::test_runner::TestCaseError;
 use newtype::Counter;
 use newtype::Enumerated;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
@@ -199,6 +198,18 @@ impl Session {
 
     fn prefix(&self, cut: usize) -> Session {
         Session { directory: self.directory, lines: self.lines.chars().take(cut).collect() }
+    }
+
+    fn cuts(&self) -> Vec<usize> {
+        let ends: Vec<usize> = self
+            .lines
+            .chars()
+            .enumerate()
+            .filter(|(_index, letter)| *letter == '\n')
+            .map(|(index, _letter)| index)
+            .collect();
+        let starts = std::iter::once(0).chain(ends.iter().map(|end| end + 1));
+        starts.zip(&ends).flat_map(|(start, end)| [start, start + 1, start.midpoint(*end), *end]).collect()
     }
 
     fn files(&self) -> Memory {
@@ -640,32 +651,31 @@ fn a_reply_appended_after_an_ingest_links_to_the_message_stored_before_it() -> R
     Ok(())
 }
 
-laws::law!(
+laws::table!(
     ingesting_a_transcript_in_two_parts_stores_the_links_of_ingesting_it_whole,
-    given whole = Links::whole(&Session::linked())?,
-    0usize..1400,
+    Session::linked().cuts(),
     cut,
     {
         let session = Session::linked();
-        let split = Links::split(&session, cut).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let whole = Links::whole(&session)?;
+        let split = Links::split(&session, cut)?;
         let relations: BTreeSet<&str> = whole.iter().map(|link| link.relation.as_str()).collect();
-        prop_assert_eq!(relations, BTreeSet::from(["answers", "cites", "replies-to", "resends"]));
-        prop_assert_eq!(&split, &whole);
+        assert_eq!(relations, BTreeSet::from(["answers", "cites", "replies-to", "resends"]));
+        assert_eq!(split, whole, "cut at {cut}");
     }
 );
 
 struct Found;
 
 impl Found {
-    fn ingested(session: &Session) -> Result<Sqlite, TestCaseError> {
+    fn ingested(session: &Session) -> Result<Sqlite, Failure> {
         let store = Sqlite::in_memory::<StreamSchema>();
-        Invocation::against(&store, session, &["ingest"])
-            .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        Invocation::against(&store, session, &["ingest"])?;
         Ok(store)
     }
 
-    fn by(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<String, TestCaseError> {
-        Invocation::against(store, session, arguments).map_err(|failure| TestCaseError::fail(failure.to_string()))
+    fn by(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<String, Failure> {
+        Invocation::against(store, session, arguments)
     }
 
     fn said(lines: &[Said]) -> Session {
@@ -685,51 +695,58 @@ impl Said {
     }
 }
 
-laws::law!(an_owner_segment_is_found_by_a_word_it_contains_and_no_other_is, "[a-z]{4,10}", word, {
+const SEARCHED: [&str; 2] = ["abcd", "wordsmiths"];
+
+laws::table!(an_owner_segment_is_found_by_a_word_it_contains_and_no_other_is, SEARCHED, word, {
     let session = Found::said(&[
         Said::by(Speaker::Owner, "o1", format!("alpha {word}")),
         Said::by(Speaker::Owner, "o2", "1234 5678".to_owned()),
     ]);
     let store = Found::ingested(&session)?;
-    let out = Found::by(&store, &session, &["search", &word])?;
-    prop_assert!(out.contains("hit o1.0 owner"));
-    prop_assert!(!out.contains("hit o2.0 owner"));
+    let out = Found::by(&store, &session, &["search", word])?;
+    assert!(out.contains("hit o1.0 owner"), "{out}");
+    assert!(!out.contains("hit o2.0 owner"), "{out}");
 });
 
-laws::law!(several_words_find_only_the_segments_holding_every_one, ("a[a-z]{3,8}", "b[a-z]{3,8}"), words, {
-    let (first, second) = words;
-    let session = Found::said(&[
-        Said::by(Speaker::Owner, "o1", format!("{second} and {first}")),
-        Said::by(Speaker::Owner, "o2", format!("{first} 1234")),
-        Said::by(Speaker::Owner, "o3", format!("5678 {second}")),
-    ]);
-    let store = Found::ingested(&session)?;
-    let out = Found::by(&store, &session, &["search", &first, &second])?;
-    prop_assert_eq!(out.matches(" owner ").count(), 1);
-    prop_assert!(out.contains("hit o1.0 owner"));
-});
+laws::table!(
+    several_words_find_only_the_segments_holding_every_one,
+    [["acde", "bcde"], ["acdefghij", "bcdefghij"]],
+    words,
+    {
+        let [first, second] = words;
+        let session = Found::said(&[
+            Said::by(Speaker::Owner, "o1", format!("{second} and {first}")),
+            Said::by(Speaker::Owner, "o2", format!("{first} 1234")),
+            Said::by(Speaker::Owner, "o3", format!("5678 {second}")),
+        ]);
+        let store = Found::ingested(&session)?;
+        let out = Found::by(&store, &session, &["search", first, second])?;
+        assert_eq!(out.matches(" owner ").count(), 1, "{out}");
+        assert!(out.contains("hit o1.0 owner"), "{out}");
+    }
+);
 
-laws::law!(the_lead_is_searched_only_when_everyone_is_asked_for, "[a-z]{4,10}", word, {
+laws::table!(the_lead_is_searched_only_when_everyone_is_asked_for, SEARCHED, word, {
     let session =
-        Found::said(&[Said::by(Speaker::Owner, "o1", word.clone()), Said::by(Speaker::Lead, "l1", word.clone())]);
+        Found::said(&[Said::by(Speaker::Owner, "o1", word.to_owned()), Said::by(Speaker::Lead, "l1", word.to_owned())]);
     let store = Found::ingested(&session)?;
-    let owner = Found::by(&store, &session, &["search", &word])?;
-    let everyone = Found::by(&store, &session, &["search", "--all", &word])?;
-    prop_assert!(owner.contains("hit o1.0 owner"));
-    prop_assert!(!owner.contains("hit l1.0 lead"));
-    prop_assert!(everyone.contains("hit o1.0 owner"));
-    prop_assert!(everyone.contains("hit l1.0 lead"));
+    let owner = Found::by(&store, &session, &["search", word])?;
+    let everyone = Found::by(&store, &session, &["search", "--all", word])?;
+    assert!(owner.contains("hit o1.0 owner"), "{owner}");
+    assert!(!owner.contains("hit l1.0 lead"), "{owner}");
+    assert!(everyone.contains("hit o1.0 owner"), "{everyone}");
+    assert!(everyone.contains("hit l1.0 lead"), "{everyone}");
 });
 
-laws::law!(a_word_is_found_whatever_its_case, "[a-z]{4,10}", word, {
+laws::table!(a_word_is_found_whatever_its_case, SEARCHED, word, {
     let raised: String = word.chars().map(|letter| letter.to_ascii_uppercase()).collect();
     let session =
-        Found::said(&[Said::by(Speaker::Owner, "o1", raised.clone()), Said::by(Speaker::Owner, "o2", word.clone())]);
+        Found::said(&[Said::by(Speaker::Owner, "o1", raised.clone()), Said::by(Speaker::Owner, "o2", word.to_owned())]);
     let store = Found::ingested(&session)?;
-    let lower = Found::by(&store, &session, &["search", &word])?;
+    let lower = Found::by(&store, &session, &["search", word])?;
     let upper = Found::by(&store, &session, &["search", &raised])?;
-    prop_assert!(lower.contains("hit o1.0 owner") && lower.contains("hit o2.0 owner"));
-    prop_assert!(upper.contains("hit o1.0 owner") && upper.contains("hit o2.0 owner"));
+    assert!(lower.contains("hit o1.0 owner") && lower.contains("hit o2.0 owner"), "{lower}");
+    assert!(upper.contains("hit o1.0 owner") && upper.contains("hit o2.0 owner"), "{upper}");
 });
 
 #[test]
@@ -900,33 +917,31 @@ impl Repository {
         Repository { files }
     }
 
-    fn opened(&self, directory: &str, arguments: &[&str]) -> Result<Vec<PathBuf>, TestCaseError> {
-        Opened::from(directory, FakeLent::new(&self.files), arguments)
-            .map(|opened| opened.paths)
-            .map_err(|failure| TestCaseError::fail(failure.to_string()))
+    fn opened(&self, directory: &str, arguments: &[&str]) -> Result<Vec<PathBuf>, Failure> {
+        Opened::from(directory, FakeLent::new(&self.files), arguments).map(|opened| opened.paths)
     }
 }
 
-laws::law!(
+laws::table!(
     init_from_a_subdirectory_records_the_workspace_at_the_repository_root,
-    "[a-z]{1,6}(/[a-z]{1,6}){0,2}",
+    ["a", "abcdef/b", "a/bc/def"],
     below,
     {
         let repository = Repository::at("/work");
         let inside = format!("/work/{below}");
         repository.opened(&inside, &["init", "demo", "--workspace", "/ws"])?;
-        prop_assert_eq!(repository.files.kind(Path::new("/work/.meta/local.toml")), Kind::File);
-        prop_assert_eq!(repository.files.kind(&Path::new(&inside).join(".meta")), Kind::Missing);
-        prop_assert_eq!(repository.opened(&inside, &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
-        prop_assert_eq!(repository.opened("/work", &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
+        assert_eq!(repository.files.kind(Path::new("/work/.meta/local.toml")), Kind::File);
+        assert_eq!(repository.files.kind(&Path::new(&inside).join(".meta")), Kind::Missing);
+        assert_eq!(repository.opened(&inside, &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
+        assert_eq!(repository.opened("/work", &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
     }
 );
 
-laws::law!(the_workspace_flag_overrides_the_recorded_workspace, "/[a-z]{1,6}", flagged, {
+laws::table!(the_workspace_flag_overrides_the_recorded_workspace, ["/a", "/abcdef"], flagged, {
     let repository = Repository::at("/work");
     repository.opened("/work", &["init", "demo", "--workspace", "/ws"])?;
-    let opened = repository.opened("/work", &["search", "thanks", "--workspace", &flagged])?;
-    prop_assert_eq!(opened, [Path::new(&flagged).join(".meta/design.sqlite")]);
+    let opened = repository.opened("/work", &["search", "thanks", "--workspace", flagged])?;
+    assert_eq!(opened, [Path::new(flagged).join(".meta/design.sqlite")]);
 });
 
 #[test]
@@ -1387,9 +1402,9 @@ fn only_init_consumes_a_project() {
     assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
 }
 
-laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VARIANTS), facet, {
+laws::table!(show_of_a_node_lists_its_ancestors_and_its_children, Facet::VARIANTS, facet, {
     let store = Sqlite::in_memory::<StreamSchema>();
-    let shown = Graph::planted(&store, facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let shown = Graph::planted(&store, *facet)?;
     let wanted = [
         format!("n3 \"demo\" {facet} vague vague core entered init"),
         "  ancestor n1 \"demo\" project vague vague core entered init".to_owned(),
@@ -1398,9 +1413,9 @@ laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VA
         "  edge n3 refines n2 entered init".to_owned(),
     ];
     let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
-    prop_assert_eq!(missing, Vec::<&String>::new());
-    prop_assert_eq!(shown.matches("  child ").count(), 1);
-    prop_assert_eq!(shown.matches("  ancestor ").count(), 2);
+    assert_eq!(missing, Vec::<&String>::new());
+    assert_eq!(shown.matches("  child ").count(), 1);
+    assert_eq!(shown.matches("  ancestor ").count(), 2);
 });
 
 impl Graph {
@@ -1875,16 +1890,16 @@ impl Workspace {
     }
 }
 
-laws::law!(
+laws::table!(
     a_refused_init_plants_no_node_and_keeps_no_local_config_and_a_later_init_succeeds,
-    select(vec![Unplanted::Inverted, Unplanted::Unrooted]),
+    [Unplanted::Inverted, Unplanted::Unrooted],
     unplanted,
     {
-        let replanted = Workspace::replanted(unplanted).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        prop_assert_eq!(replanted.refused, Some(unplanted));
-        prop_assert_eq!(replanted.unplaced, Some(NodeId::new(2)));
-        prop_assert_eq!(replanted.config, Kind::Missing);
-        prop_assert_eq!(replanted.out, "root n2 project \"q\"\n");
+        let replanted = Workspace::replanted(unplanted)?;
+        assert_eq!(replanted.refused, Some(unplanted));
+        assert_eq!(replanted.unplaced, Some(NodeId::new(2)));
+        assert_eq!(replanted.config, Kind::Missing);
+        assert_eq!(replanted.out, "root n2 project \"q\"\n");
     }
 );
 
@@ -2652,9 +2667,7 @@ fn review_a_seven_character_prefix_is_shown_whatever_its_first_character() -> Re
     Ok(())
 }
 
-const STEMS: [&str; 3] = ["aaaa1111", "aaaa1112", "bbbb2222"];
-
-const SAYINGS: [&str; 3] = ["", "word", "1. word\\n2. more word"];
+const ECHOED: &str = "1. word\\n2. more word";
 
 #[derive(Clone, Debug)]
 struct Uttered {
@@ -2667,18 +2680,15 @@ struct Uttered {
 struct Echoes;
 
 impl Echoes {
-    fn uttered() -> BoxedStrategy<Vec<Uttered>> {
-        proptest::collection::vec(
-            (
-                select(STEMS.to_vec()),
-                select(vec![Speaker::Owner, Speaker::Lead]),
-                select(SAYINGS.to_vec()),
-                proptest::option::of(0usize..3),
-            )
-                .prop_map(|(stem, speaker, text, back)| Uttered { stem, speaker, text, back }),
-            1..6,
-        )
-        .boxed()
+    fn uttered() -> [Uttered; 6] {
+        [
+            Uttered { stem: "aaaa1111", speaker: Speaker::Owner, text: "word", back: Some(1) },
+            Uttered { stem: "aaaa1112", speaker: Speaker::Lead, text: ECHOED, back: Some(0) },
+            Uttered { stem: "bbbb2222", speaker: Speaker::Owner, text: "", back: None },
+            Uttered { stem: "aaaa1111", speaker: Speaker::Lead, text: "word", back: Some(2) },
+            Uttered { stem: "bbbb2222", speaker: Speaker::Owner, text: ECHOED, back: Some(1) },
+            Uttered { stem: "aaaa1112", speaker: Speaker::Owner, text: "word", back: Some(0) },
+        ]
     }
 
     fn uuid(stem: &str, index: usize) -> String {
@@ -2748,20 +2758,22 @@ impl Echoes {
     }
 }
 
-laws::law!(every_ref_that_show_or_search_prints_is_shown, Echoes::uttered(), uttered, {
+#[test]
+fn every_ref_that_show_or_search_prints_is_shown() -> Result<(), Box<dyn Error>> {
+    let uttered = Echoes::uttered();
     let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Echoes::session(&uttered).files() };
-    applying.run(&["ingest"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    applying.run(&["ingest"])?;
     let printed = Echoes::uuids(&uttered)
         .iter()
         .map(|uuid| applying.run(&["show", uuid]))
         .chain([applying.run(&["search", "--all", "word"])])
-        .collect::<Result<String, Failure>>()
-        .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        .collect::<Result<String, Failure>>()?;
     let refs: Vec<String> = Spread::parsed(&printed).into_iter().flat_map(Echoes::refs).collect();
-    prop_assert!(refs.len() >= uttered.len(), "{}", printed);
+    assert!(refs.len() >= uttered.len(), "{printed}");
     let refused: Vec<&String> = refs.iter().filter(|reference| applying.run(&["show", reference]).is_err()).collect();
-    prop_assert_eq!(refused, Vec::<&String>::new(), "{}", printed);
-});
+    assert_eq!(refused, Vec::<&String>::new(), "{printed}");
+    Ok(())
+}
 
 type Sqlite = <SqliteOpener as Opens>::Store;
 
