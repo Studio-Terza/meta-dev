@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use workspace_metadata::CrateName;
 
 use lint_core::SourceFile;
 use workspace_metadata::{Chained, Graph, Metadata};
@@ -46,12 +47,22 @@ impl fmt::Display for CrateSizes<'_> {
         let mut rows: Vec<(Size, &Chained<'_>)> = self
             .chained
             .iter()
-            .map(|chained| (self.sizes.get(&chained.name().to_string()).copied().unwrap_or_default(), chained))
+            .map(|chained| {
+                (self.sizes.get(&AsRef::<CrateName>::as_ref(chained).to_string()).copied().unwrap_or_default(), chained)
+            })
             .collect();
-        rows.sort_by_key(|(size, chained)| (std::cmp::Reverse(size.lines), chained.name().to_string()));
+        rows.sort_by_key(|(size, chained)| {
+            (std::cmp::Reverse(size.lines), AsRef::<CrateName>::as_ref(chained).to_string())
+        });
         writeln!(formatter, "crates by size and place on the compile chain:")?;
         rows.iter().try_for_each(|(size, chained)| {
-            writeln!(formatter, "  {}: {} files, {} lines; {chained}", chained.name(), size.files, size.lines)
+            writeln!(
+                formatter,
+                "  {}: {} files, {} lines; {chained}",
+                AsRef::<CrateName>::as_ref(chained),
+                size.files,
+                size.lines
+            )
         })
     }
 }

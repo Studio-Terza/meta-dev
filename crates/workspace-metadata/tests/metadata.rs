@@ -1,4 +1,5 @@
 use std::error::Error;
+use workspace_metadata::CrateName;
 
 use workspace_metadata::{Graph, Library, Metadata};
 
@@ -10,7 +11,8 @@ fn real_cargo_metadata_lists_each_dependency_library_with_its_root_form_and_rena
         .libraries()
         .iter()
         .flat_map(|library: &Library<'_>| {
-            let named = format!("{} {:?} {}", library.name(), library.form(), library.root().display());
+            let named =
+                format!("{} {:?} {}", AsRef::<CrateName>::as_ref(library), library.form(), library.root().display());
             let dependencies = library.dependencies().iter().map(|(krate, package)| format!("  {krate} is {package}"));
             std::iter::once(named).chain(dependencies)
         })
@@ -91,7 +93,8 @@ fn each_member_knows_its_depth_and_the_workspace_crates_below_and_above_it_on_th
 -> Result<(), Box<dyn Error>> {
     let metadata: Metadata = serde_json::from_str(CHAINED)?;
     let graph: Graph<'_> = std::iter::once(&metadata).collect();
-    let placed: Vec<String> = graph.chained().iter().map(|chained| format!("{}: {chained}", chained.name())).collect();
+    let placed: Vec<String> =
+        graph.chained().iter().map(|chained| format!("{}: {chained}", AsRef::<CrateName>::as_ref(chained))).collect();
     assert_eq!(
         placed,
         [

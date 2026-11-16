@@ -17,15 +17,17 @@ pub struct Dependency {
 }
 
 impl Dependency {
-    pub fn name(&self) -> &CrateName {
-        &self.name
-    }
-
     pub fn shipped(&self) -> Option<&CrateName> {
         self.kind.filter(|edge| *edge == Edge::Dev).map_or(Some(&self.name), |_| None)
     }
 
     pub fn key_of(&self, required: &CrateName) -> Option<&CrateName> {
         Some(&self.name).filter(|name| *name == required).map(|name| self.rename.as_ref().unwrap_or(name))
+    }
+}
+
+impl AsRef<CrateName> for Dependency {
+    fn as_ref(&self) -> &CrateName {
+        &self.name
     }
 }

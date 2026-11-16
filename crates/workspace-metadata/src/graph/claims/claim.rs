@@ -1,3 +1,4 @@
+use crate::crate_name::CrateName;
 use crate::metadata::Package;
 use crate::package_id::PackageId;
 
@@ -21,7 +22,7 @@ impl<'unit, 'meta> Claim<'unit, 'meta> {
 
     pub(super) fn reached(package: &'meta PackageId, named: &Package, unit: &'unit Unit<'meta>) -> Claim<'unit, 'meta> {
         let owner = unit.port();
-        Claim { package, open: unit.shares(named.name()).map_or(Some(owner), |_| None), unit }
+        Claim { package, open: unit.shares(AsRef::<CrateName>::as_ref(named)).map_or(Some(owner), |_| None), unit }
     }
 
     pub(super) fn package(&self) -> &'meta PackageId {
