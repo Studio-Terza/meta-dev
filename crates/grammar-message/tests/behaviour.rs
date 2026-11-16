@@ -49,3 +49,29 @@ laws::table!(
         "\u{200b}kept" => "\u{200b}kept".to_owned(),
     ]
 );
+
+struct Inked;
+
+impl Inked {
+    fn expected(mark: Mark) -> Option<bool> {
+        match mark {
+            Mark::Break => Some(false),
+            Mark::Stop | Mark::Numbered(..) | Mark::Bulleted | Mark::Quoted | Mark::Uuid => Some(true),
+            Mark::Plain => None,
+        }
+    }
+}
+
+laws::law!(
+    only_breaks_lack_ink_among_marks,
+    "(\n- |\n> |\n1\\. |\n  2\\) |\n\\*\\*3\\.\\*\\* |[.?!] |85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b|[ a-z]|\n){0,24}",
+    text,
+    {
+        let unexpected: Vec<Mark> = Lexemes::scanned(&text)
+            .into_iter()
+            .filter(|lexeme| Inked::expected(lexeme.mark()).is_some_and(|inked| inked != lexeme.ink().is_some()))
+            .map(|lexeme| lexeme.mark())
+            .collect();
+        prop_assert_eq!(unexpected, Vec::<Mark>::new());
+    }
+);
