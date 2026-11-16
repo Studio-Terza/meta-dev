@@ -171,8 +171,7 @@ impl Lowering<'_> {
 
     pub(super) fn pattern_used(&mut self, pat: &Pat) {
         let reached = PatTree::reached(pat, &|_, _| true);
-        let paths: Vec<&syntax::Path> = reached.iter().filter_map(|found| Matched::path(found.pat())).collect();
-        paths.into_iter().fold(self, |lowering, path| {
+        reached.iter().filter_map(|found| Matched::path(found.pat())).fold(self, |lowering, path| {
             lowering.used(UsePath::from(path), Position::from(path.span()), Mention::Matched);
             lowering
         });

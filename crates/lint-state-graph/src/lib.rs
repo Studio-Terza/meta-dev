@@ -42,11 +42,11 @@ impl PrimedFacts for StateGraph {
     type Raw<'head> = StateRaw<'head>;
     type Recording<'run, 'head: 'run> = StateRecording<'run, 'head>;
 
-    fn priming<'head>(parsed: Parsed<'_, 'head>) -> DeclarationGathering {
+    fn priming(parsed: Parsed<'_, '_>) -> DeclarationGathering {
         DeclarationGathering::from(parsed)
     }
 
-    fn primer_completed<'head>(part: Option<Declarations>, _: &FileFacts<'head>) -> Option<Declarations> {
+    fn primer_completed(part: Option<Declarations>, _: &FileFacts<'_>) -> Option<Declarations> {
         part
     }
 

@@ -3,7 +3,5 @@ pub mod edges;
 pub mod duplicate;
 pub mod crowded;
 pub mod exposed;
-pub mod shape;
-pub mod area;
 pub mod sound;
 pub mod broken;

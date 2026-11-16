@@ -35,7 +35,7 @@ impl From<Parsed<'_, '_>> for DeclarationGathering {
 impl Gathers<Option<Declarations>> for DeclarationGathering {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let all: Vec<&mut Watching<'_>> = vec![&mut self.reading];
-        self.shipped.map_or_default(|_| all)
+        self.shipped.map_or_default(|()| all)
     }
 
     fn gathered(self) -> Option<Declarations> {
@@ -58,7 +58,7 @@ impl Gathered {
     }
 }
 
-impl<'head> FromIterator<Option<Declarations>> for Declarations {
+impl FromIterator<Option<Declarations>> for Declarations {
     fn from_iter<Parts: IntoIterator<Item = Option<Declarations>>>(parts: Parts) -> Declarations {
         let gathered = parts.into_iter().flatten().fold(Gathered::default(), Gathered::including);
         let merged = Declarations { vertices: gathered.vertices, aliases: gathered.aliases };

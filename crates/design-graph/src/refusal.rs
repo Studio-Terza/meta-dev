@@ -54,6 +54,7 @@ pub trait Refused: From<Cycle> + From<Inversion> + From<Misstaged> + From<Unpaid
 }
 
 impl Refusal {
+    #[must_use]
     pub fn refused<R: Refused>(self) -> R {
         match self {
             Refusal::Cyclic(cycle) => R::from(cycle),

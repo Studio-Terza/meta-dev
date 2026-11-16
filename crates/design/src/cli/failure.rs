@@ -184,7 +184,6 @@ impl From<Inversion> for Failure {
     }
 }
 
-
 impl From<Unpaid> for Failure {
     fn from(unpaid: Unpaid) -> Failure {
         Failure::Uncovered(Uncovered::new(

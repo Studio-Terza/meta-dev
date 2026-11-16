@@ -1,5 +1,3 @@
-free functions are not allowed; make them associated functions or methods:
-src/area.rs:1: fn area; make it an associated function or a method
 function names say what the function does:
 src/crowded.rs:2: fn a names nothing; say what it does
 src/crowded.rs:3: fn b names nothing; say what it does
@@ -9,12 +7,9 @@ src/crowded.rs:6: fn e names nothing; say what it does
 src/crowded.rs:7: fn f names nothing; say what it does
 src/crowded.rs:8: fn g names nothing; say what it does
 primitives appear in signatures and fields only inside a boundary:
-src/area.rs:1: bare u8 in area; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/exposed.rs:2: bare u8 in depth; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/exposed.rs:3: bare u8 in hidden; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/shape.rs:2: bare u8 in Circle; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 state graph violated:
-src/area.rs:3: match on Shape outside its file; dispatch through a trait
 src/broken.rs:4: state Ajar cannot be reached from a start state; add an edge to it from a reachable state, or remove it
 src/broken.rs:5: terminal state Shut has outgoing edges; remove its edges, or declare it with state instead of terminal
 src/broken.rs:11: state Ajar cannot reach a terminal state; add an edge from it toward a terminal state
