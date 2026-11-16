@@ -3,7 +3,6 @@ use std::fmt;
 use syntax::Path;
 
 use crate::name::Name;
-use crate::word::Word;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UsePath(Vec<Name>);
@@ -12,20 +11,8 @@ impl UsePath {
     const SEPARATOR: &'static str = "::";
 
     #[must_use]
-    pub fn joined(&self, rest: &[Name]) -> UsePath {
-        UsePath(self.0.iter().chain(rest).cloned().collect())
-    }
-
-    #[must_use]
     pub fn rerooted(&self, root: &UsePath) -> UsePath {
         UsePath(root.0.iter().chain(self.0.iter().skip(1)).cloned().collect())
-    }
-
-    #[must_use]
-    pub fn spells(&self, segments: &[Word<'_>]) -> Option<&UsePath> {
-        (self.0.len() == segments.len())
-            .then_some(self)
-            .filter(|path| path.0.iter().zip(segments).all(|(segment, spelled)| *segment == Name::from(*spelled)))
     }
 
     #[must_use]
