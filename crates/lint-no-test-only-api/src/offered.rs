@@ -12,6 +12,7 @@ use crate::finding::Finding;
 pub(crate) struct Offer<'model> {
     member: Member,
     site: Site<'model>,
+    krate: &'model Name,
 }
 
 impl<'model> Offer<'model> {
@@ -21,6 +22,10 @@ impl<'model> Offer<'model> {
             model.implementations().filter_map(|placed| Self::derived(placed.entity())?.subject_item()).collect();
         let variants = model.holdings().filter_map(|placed| Self::variant(model, &derived, placed));
         constructors.chain(variants).collect()
+    }
+
+    pub(crate) fn shipped(self, support: &BTreeSet<Name>) -> Option<Offer<'model>> {
+        support.get(self.krate).map_or(Some(self), |_| None)
     }
 
     pub(crate) fn tested_only(self, used: &Used) -> Option<Violation<'model>> {
@@ -41,7 +46,7 @@ impl<'model> Offer<'model> {
         Offering::admits(*AsRef::<Exposure>::as_ref(function), *AsRef::<Region>::as_ref(function))?;
         Making::made_by(function, owner)?;
         let name: &Name = function.as_ref();
-        Some(Offer { member: Member::new(owner, name.clone()), site: placed.site() })
+        Some(Offer { member: Member::new(owner, name.clone()), site: placed.site(), krate: placed.krate() })
     }
 
     fn variant(
@@ -54,7 +59,7 @@ impl<'model> Offer<'model> {
         derived.get(&owner).map_or(Some(()), |_| None)?;
         Offering::admits(model.declared(owner)?.exposure(), *AsRef::<Region>::as_ref(holding))?;
         let name: &Name = holding.as_ref();
-        Some(Offer { member: Member::new(owner, name.clone()), site: placed.site() })
+        Some(Offer { member: Member::new(owner, name.clone()), site: placed.site(), krate: placed.krate() })
     }
 }
 

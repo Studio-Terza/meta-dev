@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+workspace-metadata = { path = "../workspace-metadata" }
 graph = { path = "../graph" }
 lint-sweep = { path = "../lint-sweep" }
 lint-core = { path = "../lint-core" }

@@ -76,6 +76,14 @@ impl Package {
         self.dependencies.iter().filter_map(|dependency| dependency.key_of(required))
     }
 
+    pub fn binary(&self) -> Option<&Target> {
+        self.targets.iter().find_map(Target::binary)
+    }
+
+    pub fn shipped_dependencies(&self) -> impl Iterator<Item = &CrateName> {
+        self.dependencies.iter().filter_map(Dependency::shipped)
+    }
+
     pub fn dependencies_among<'package>(
         &'package self,
         members: &BTreeMap<&CrateName, &Path>,

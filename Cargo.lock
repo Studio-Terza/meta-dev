@@ -1763,6 +1763,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "syntax",
+ "workspace-metadata",
 ]
 
 [[package]]

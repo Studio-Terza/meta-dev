@@ -6,7 +6,7 @@ mod offered;
 mod test_features;
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use feature_word::FeatureWord;
@@ -16,7 +16,9 @@ use graph::Model;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::{Headline, ModelLint, Parsed, Report};
+use lint_core::{FileHead, Headline, Parsed, Report, WorkspaceLint};
+use lint_layout::Name;
+use workspace_metadata::Metadata;
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_placement::PackageRoot;
 use lint_sweep::{Gathers, Watchers, Watching};
@@ -139,10 +141,21 @@ impl<'file> Gathers<Offered<'file>> for Offered<'file> {
     }
 }
 
-impl ModelLint for NoTestOnlyApi {
-    fn report(model: &Model) -> Report<'_> {
+impl WorkspaceLint for NoTestOnlyApi {
+    type Facts<'head> = ();
+
+    fn gathered<'head>(_: &[Parsed<'_, 'head>]) {}
+
+    fn report<'file, 'head: 'file>(
+        _: &'file [FileHead],
+        workspaces: &'file [Metadata],
+        (): &'file (),
+        model: &'file Model,
+    ) -> Report<'file> {
+        let support: BTreeSet<Name> =
+            workspaces.iter().flat_map(Metadata::test_support).map(|name| Name::from(name.as_ref())).collect();
         let used = Used::from(model);
-        let offered = Offer::every(model).into_iter().filter_map(|offer| offer.tested_only(&used)).collect();
-        Report::new(Self::HEADLINE, offered)
+        let offers = Offer::every(model).into_iter().filter_map(|offer| offer.shipped(&support));
+        Report::new(Self::HEADLINE, offers.filter_map(|offer| offer.tested_only(&used)).collect())
     }
 }
