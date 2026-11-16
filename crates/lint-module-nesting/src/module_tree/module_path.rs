@@ -1,9 +1,7 @@
-mod ancestor;
 mod index;
 mod inside_sibling;
 mod target;
 
-pub use ancestor::Ancestor;
 pub use index::ModuleIndex;
 pub use inside_sibling::InsideSibling;
 pub use target::Target;
@@ -12,41 +10,43 @@ use std::fmt;
 use std::path::Path;
 
 use lint_layout::Name;
-use lint_placement::CrateRoot;
+use lint_placement::{CrateRoot, Krate, Nest};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModulePath<'file> {
-    crate_root: &'file CrateRoot,
-    segments: &'file [Name],
+    nest: Nest<'file>,
     file: &'file Path,
 }
 
 impl<'file> ModulePath<'file> {
     pub fn new(crate_root: &'file CrateRoot, segments: &'file [Name], file: &'file Path) -> ModulePath<'file> {
-        ModulePath { crate_root, segments, file }
+        ModulePath { nest: Nest::module(Krate::Rooted(crate_root), segments), file }
     }
 
     pub fn file(&self) -> &'file Path {
         self.file
     }
 
-    pub fn parent(&self) -> Option<ModulePath<'file>> {
-        let (_, parents) = self.segments.split_last()?;
-        Some(self.with_segments(parents))
-    }
-
     pub fn truncated_like(&self, other: &ModulePath<'file>) -> ModulePath<'file> {
-        self.with_segments(self.segments.get(..other.segments.len()).unwrap_or(self.segments))
+        let segments = self.segments();
+        let kept = segments.get(..other.segments().len()).unwrap_or(segments);
+        ModulePath { nest: self.nest.krate().map_or(self.nest, |root| Nest::module(root, kept)), file: Path::new("") }
     }
 
-    fn with_segments(&self, segments: &'file [Name]) -> ModulePath<'file> {
-        ModulePath { crate_root: self.crate_root, segments, file: Path::new("") }
+    fn segments(&self) -> &'file [Name] {
+        <&[Name]>::from(self.nest)
+    }
+}
+
+impl<'file> AsRef<Nest<'file>> for ModulePath<'file> {
+    fn as_ref(&self) -> &Nest<'file> {
+        &self.nest
     }
 }
 
 impl fmt::Display for ModulePath<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "crate")?;
-        self.segments.iter().try_for_each(|segment| write!(formatter, "::{segment}"))
+        self.segments().iter().try_for_each(|segment| write!(formatter, "::{segment}"))
     }
 }

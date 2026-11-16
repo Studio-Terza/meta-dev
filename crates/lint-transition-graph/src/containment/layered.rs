@@ -1,3 +1,4 @@
+use lint_placement::Krate;
 use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::fmt;
@@ -90,7 +91,13 @@ impl<'view, 'found, 'file> CrateCycles<'view, 'found, 'file> {
     fn found(&self, toward: Toward) -> Vec<Cycle<'found>> {
         self.view
             .slices()
-            .filter(|slice| slice.cluster().krate().is_some_and(|krate| Borrow::<Name>::borrow(krate) == self.krate))
+            .filter(|slice| {
+                slice
+                    .cluster()
+                    .krate()
+                    .and_then(Krate::name)
+                    .is_some_and(|krate| Borrow::<Name>::borrow(krate) == self.krate)
+            })
             .flat_map(|slice| Cycle::all(self.view, slice, toward))
             .filter(|cycle| cycle.members.first().is_some())
             .collect()

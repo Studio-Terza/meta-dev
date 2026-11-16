@@ -1,5 +1,6 @@
+use lint_placement::Level;
+
 use super::ModulePath;
-use super::ancestor::Ancestor;
 
 pub struct InsideSibling;
 
@@ -8,10 +9,12 @@ impl InsideSibling {
         this: &ModulePath<'_>,
         module: &'module ModulePath<'file>,
     ) -> Option<&'module ModulePath<'file>> {
-        let length = module.segments.len();
+        let length = module.segments().len();
         module
+            .nest
             .parent()
-            .and_then(|parent| Ancestor::holds(&parent, this).map(|_| module))
-            .filter(|_| this.segments.len() >= length)
+            .filter(|parent| parent.level() != Level::Workspace)
+            .and_then(|parent| parent.holding(this.nest).map(|_| module))
+            .filter(|_| this.segments().len() >= length)
     }
 }
