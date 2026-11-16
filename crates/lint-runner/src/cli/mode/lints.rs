@@ -248,11 +248,8 @@ impl Lints {
         let mut lowered = sources.gathered(readout, worker, Filer::started);
         let mut work: Vec<FileWork<'_>> = lowered.filed();
         let filed: Worked = work.iter_mut().map(FileWork::worked).collect();
-        let mut jobs: Vec<Job> = Self::LINTS
-            .into_iter()
-            .enumerate()
-            .filter_map(|(index, entry)| entry.queued(Slot::from(index)))
-            .collect();
+        let mut jobs: Vec<Job> =
+            Self::LINTS.into_iter().enumerate().filter_map(|(index, entry)| entry.queued(Slot::from(index))).collect();
         jobs.sort_by_key(Job::rank);
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
         let queued: Worked = claimed.collect();
@@ -304,8 +301,7 @@ impl Entry {
             | Work::Extracted(_)
             | Work::Described(_)
             | Work::Judged(_)
-            | Work::Ruled(_)
-            => None,
+            | Work::Ruled(_) => None,
         }
     }
 
@@ -317,8 +313,7 @@ impl Entry {
             | Work::Extracted(_)
             | Work::Described(_)
             | Work::Filed(_)
-            | Work::Ruled(_)
-            => None,
+            | Work::Ruled(_) => None,
         }
     }
 
@@ -330,8 +325,7 @@ impl Entry {
             | Work::Extracted(_)
             | Work::Described(_)
             | Work::Filed(_)
-            | Work::Judged(_)
-            => None,
+            | Work::Judged(_) => None,
         }
     }
 
@@ -390,9 +384,7 @@ impl Work {
         match self {
             Work::Checked(check) => check(readout),
             Work::Modelled(query) => model.map(query).into_iter().collect(),
-            Work::Described(_) | Work::Extracted(_) | Work::Filed(_)
-            | Work::Judged(_)
-            | Work::Ruled(_) => Vec::new(),
+            Work::Described(_) | Work::Extracted(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Vec::new(),
         }
     }
 
@@ -411,7 +403,12 @@ impl Work {
         }
     }
 
-    fn grounded(self, slot: Slot, model: Option<&Model>, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+    fn grounded(
+        self,
+        slot: Slot,
+        model: Option<&Model>,
+        sources: &Sources<impl Files, impl Cargo, impl Timer>,
+    ) -> Worked {
         match self {
             Work::Extracted(extracted) => Worked::rendering(slot, model.map_or_default(extracted)),
             Work::Described(described) => Worked::rendering(

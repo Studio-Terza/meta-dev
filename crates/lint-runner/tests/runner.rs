@@ -256,18 +256,19 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
     let clean = root.verdict(&[]);
     root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
     let mut err = Vec::new();
-    let unwritten = [&["--timings"][..], &["--report"], &["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]]
-        .map(|flags| {
-            Cli::from_args(flags.iter().map(OsString::from).chain([OsString::from(&root.root)])).verdict(
-                Ports::new(
-                    &root.files,
-                    [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
-                    Monotonic::default(),
-                ),
-                &mut <&mut [u8]>::default(),
-                &mut err,
-            )
-        });
+    let unwritten =
+        [&["--timings"][..], &["--report"], &["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]]
+            .map(|flags| {
+                Cli::from_args(flags.iter().map(OsString::from).chain([OsString::from(&root.root)])).verdict(
+                    Ports::new(
+                        &root.files,
+                        [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                        Monotonic::default(),
+                    ),
+                    &mut <&mut [u8]>::default(),
+                    &mut err,
+                )
+            });
     let unreadable = Trees::verdict(&Memory::default(), Path::new("/no/such/root"), &[]);
     assert_eq!(
         [clean, root.verdict(&[]), root.verdict(&["query", "--role", "nonsense", "--in"]), unreadable],

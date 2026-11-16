@@ -171,11 +171,11 @@ jobs:
       - uses: ./.github/actions/judge
         with:
           stages: lint
-      - name: elegance reports
-        if: github.ref == 'refs/heads/main'
+      - name: reports, elegance and test budget
+        if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
         run: '"$TOOLS/ci" logged "$ELEGANCE" "$TOOLS/lint" --report .'
-      - name: elegance summary
-        if: github.ref == 'refs/heads/main' && always()
+      - name: reports summary
+        if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         run: '"$TOOLS/ci" summarize "$ELEGANCE" "$GITHUB_STEP_SUMMARY"'
       - name: history restore
         if: github.ref == 'refs/heads/main'

@@ -34,7 +34,8 @@ impl ItemPath {
         let words = tail.into_inner();
         let start = self.segments.len().checked_sub(words.len())?;
         let ending = self.segments.get(start..)?;
-        let mismatch = ending.iter().zip(words).find(|(segment, word)| AsRef::<str>::as_ref(*segment) != word.into_inner());
+        let mismatch =
+            ending.iter().zip(words).find(|(segment, word)| AsRef::<str>::as_ref(*segment) != word.into_inner());
         mismatch.map_or(Some(self), |_| None)
     }
 }

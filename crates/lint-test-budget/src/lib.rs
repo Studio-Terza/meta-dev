@@ -57,4 +57,3 @@ impl FromIterator<TestBudget> for TestBudget {
         }))
     }
 }
-

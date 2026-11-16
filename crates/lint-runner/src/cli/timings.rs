@@ -167,9 +167,9 @@ struct Rows<'table>(&'table [&'table Timing]);
 impl fmt::Display for Rows<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "lint timings in milliseconds, took then started:")?;
-        self.0.iter().try_for_each(|timing| {
-            writeln!(formatter, "{:>7} {:>7}  {}", timing.took, timing.began, timing.step)
-        })
+        self.0
+            .iter()
+            .try_for_each(|timing| writeln!(formatter, "{:>7} {:>7}  {}", timing.took, timing.began, timing.step))
     }
 }
 

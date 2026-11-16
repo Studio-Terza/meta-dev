@@ -47,7 +47,6 @@ impl<'model> Door<'model> {
         let named = written.and_then(ItemPath::last).and_then(|word| word.matches::<Whole>(&Lexicon::DOOR_WORDS));
         open.and(named).and(subject).map(|opened| Door { path: placed.site().path(), subject: opened })
     }
-
 }
 
 #[derive(Debug)]
