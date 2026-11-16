@@ -3,8 +3,7 @@ mod sqlx_name;
 
 use std::borrow::Borrow;
 
-use syntax::ToTokens;
-use syntax::{TokenStream, TokenTree};
+use syntax::TokenTable;
 
 use lint_core::{Finding, Site, SourceFile, Violation};
 use lint_file::{Lead, Leader};
@@ -38,20 +37,19 @@ impl ReservedNames {
     fn sorted(file: &SourceFile) -> Vec<Vec<Violation<'_>>> {
         let text = file.text();
         let mentioned = text.mentioning(CountedName::NAMES).or_else(|| text.mentioning(SqlxName::NAMES));
-        let spelled = mentioned.map_or_default(|_| Self::idents(file.syntax().to_token_stream()));
+        let spelled = mentioned.map_or_default(|_| Self::idents(file.tokens()));
         vec![Self::kept::<CountedName>(file, &spelled), Self::kept::<SqlxName>(file, &spelled)]
     }
 
-    fn idents(tokens: TokenStream) -> Vec<Spelled> {
-        tokens.into_iter().flat_map(Self::tree_idents).collect()
-    }
-
-    fn tree_idents(tree: TokenTree) -> Vec<Spelled> {
-        match tree {
-            TokenTree::Group(group) => Self::idents(group.stream()),
-            TokenTree::Ident(ident) => vec![Spelled { name: Name::from(&ident), line: LineNumber::from(ident.span()) }],
-            TokenTree::Punct(_) | TokenTree::Literal(_) => Vec::new(),
-        }
+    fn idents(table: &TokenTable) -> Vec<Spelled> {
+        let words = table.lexemes().iter().filter_map(|lexeme| {
+            let named = lexeme.kind().named()?;
+            Some(Spelled {
+                name: Name::from(table.spelled(*named.as_ref())),
+                line: LineNumber::from(lexeme.place().line()),
+            })
+        });
+        words.collect()
     }
 
     fn kept<'file, Reserving: Reserved>(file: &'file SourceFile, spelled: &[Spelled]) -> Vec<Violation<'file>> {
