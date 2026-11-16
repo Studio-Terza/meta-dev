@@ -1,8 +1,13 @@
+mod boundary;
+
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 
+use graph::Site;
+
 use crate::group::Group;
 use crate::member::{Keyed, Nested};
+use boundary::Kept;
 
 #[derive(Debug)]
 pub struct Groups<Member: Keyed>(Vec<Group<Member>>);
@@ -30,17 +35,11 @@ impl<Member: Keyed> Groups<Member> {
 
 impl<Member: Keyed + Nested> Groups<Member> {
     #[must_use]
-    pub fn outermost<Rank: Ord>(mut self, rank: impl Fn(&Member::Key) -> Rank) -> Groups<Member> {
+    pub fn outermost<'file, Rank: Ord>(mut self, rank: impl Fn(&Member::Key) -> Rank) -> Groups<Member>
+    where
+        Member: AsRef<Site<'file>>,
+    {
         self.0.sort_by_key(|group| Reverse(rank(group.key())));
-        Groups(self.0.into_iter().fold(Vec::new(), Self::admitted))
-    }
-
-    fn admitted(mut kept: Vec<Group<Member>>, group: Group<Member>) -> Vec<Group<Member>> {
-        kept.extend(group.members().iter().any(|member| Self::cover(&kept, member).is_none()).then_some(group));
-        kept
-    }
-
-    fn cover<'kept>(kept: &'kept [Group<Member>], member: &Member) -> Option<&'kept Member> {
-        kept.iter().flat_map(Group::members).find_map(|outer| member.lies_within(outer))
+        Groups(self.0.into_iter().collect::<Kept<'file, Member>>().into_groups())
     }
 }
