@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  nodes (id, project, facet, stage, provenance)\nVALUES\n  (1, 'p', 'feature', 'vague', 'init')\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "00a4b6764d0f0228dc5398a5c9b49c8bf4734a20dc10e3977a8f6d1e8d4b900d"
+}

@@ -410,6 +410,7 @@ version = "0.1.0"
 dependencies = [
  "design-closure",
  "design-graph",
+ "design-jobs",
  "design-messages",
  "design-model",
  "design-runs",
