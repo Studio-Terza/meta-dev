@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::{Ids, Spelled};
+pub use boundary::{Ids, Spelled, Unnumbered};

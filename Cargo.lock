@@ -901,6 +901,7 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
+ "thiserror",
 ]
 
 [[package]]

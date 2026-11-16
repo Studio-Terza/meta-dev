@@ -48,3 +48,20 @@ impl Unpaid {
         &self.rest
     }
 }
+
+pub trait Refused: From<Cycle> + From<Inversion> + From<Misstaged> + From<Unpaid> + From<StoreFailure> {
+    fn ancestral(old: NodeId, by: NodeId) -> Self;
+}
+
+impl Refusal {
+    pub fn refused<R: Refused>(self) -> R {
+        match self {
+            Refusal::Cyclic(cycle) => R::from(cycle),
+            Refusal::Ancestral { old, by } => R::ancestral(old, by),
+            Refusal::Inverted(inversion) => R::from(inversion),
+            Refusal::Misstaged(misstaged) => R::from(misstaged),
+            Refusal::Unpaid(unpaid) => R::from(unpaid),
+            Refusal::Store(failure) => R::from(failure),
+        }
+    }
+}

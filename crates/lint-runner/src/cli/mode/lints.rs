@@ -148,7 +148,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 57] = [
+    const LINTS: [Entry; 58] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,

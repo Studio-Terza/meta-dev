@@ -16,7 +16,7 @@ mod segment_ref;
 mod uncovered;
 mod verb;
 
-pub use attempt::{Attempt, Reading};
+pub use attempt::{Attempt, Reading, Readings};
 pub use briefing::{Briefing, Outlined};
 pub use directive::{Directive, Visit};
 pub use directives::Directives;

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use graph::{Argument, Function, Model, ParamIndex, Read, Reader, Resolved};
+use graph::{Argument, Function, Model, Nominal, ParamIndex, Read, Reader, Resolved};
 use lint_layout::Name;
 
 use super::dispatched::Dispatched;
@@ -9,7 +9,7 @@ use super::dispatched::Dispatched;
 pub struct ReadKey<'model> {
     implemented: &'model Resolved,
     method: &'model Name,
-    taken: &'model Resolved,
+    taken: Nominal<'model>,
     reader: &'model Reader,
     parameter: ParamIndex,
     fields: &'model [Name],
@@ -37,10 +37,10 @@ impl<'model> ReadKey<'model> {
         let ty = read.parameter().entry(function.signature().inputs())?.typed()?.dereferenced();
         let taken: &Resolved = ty.named()?.as_ref();
         let arguments = read.comparable()?;
-        Self::concrete(taken).map(|concrete| ReadKey {
+        taken.nominal().map(|nominal| ReadKey {
             implemented,
             method: function.as_ref(),
-            taken: concrete,
+            taken: nominal,
             reader: read.reader(),
             parameter: read.parameter(),
             fields: read.fields(),
@@ -54,18 +54,6 @@ impl<'model> ReadKey<'model> {
 
     pub fn spelled(self, model: &'model Model) -> SpelledKey<'model> {
         SpelledKey { model, key: self }
-    }
-
-    fn concrete(resolved: &Resolved) -> Option<&Resolved> {
-        match resolved {
-            Resolved::Param(_) | Resolved::Primitive(_) => None,
-            Resolved::Std(_)
-            | Resolved::StdTrait(_)
-            | Resolved::Crate(_)
-            | Resolved::Member(_)
-            | Resolved::External(_)
-            | Resolved::Unknown(..) => Some(resolved),
-        }
     }
 }
 

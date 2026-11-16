@@ -9,10 +9,11 @@ use design_runs::{
 use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
     AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
+    Watching,
 };
 use port_core::Held;
 use store_ports::{Store, StoreFailure};
-use structurer::{Attempt, Lapse, Reading, Said, SegmentRef};
+use structurer::{Attempt, Directives, Lapse, Readings, Said, SegmentRef};
 use transcript_ports::{Body, SessionId};
 
 use super::Printed;
@@ -89,6 +90,28 @@ struct Worked {
 enum Step {
     Ended(Ending),
     Again(Attempt),
+}
+
+#[derive(Debug)]
+struct Stepping<'attempts, 'structure, 'ports, S: Store, D: Dispatch, C: Clock> {
+    attempts: &'attempts Attempts<'structure, 'ports, S, D, C>,
+    run: RunId,
+    attempt: Attempt,
+}
+
+#[derive(Debug)]
+struct Applying<'attempts, 'structure, 'ports, S: Store, D: Dispatch, C: Clock> {
+    attempts: &'attempts Attempts<'structure, 'ports, S, D, C>,
+    run: RunId,
+    finished: &'attempts Finished,
+}
+
+#[derive(Debug)]
+struct Unapplied;
+
+#[derive(Debug)]
+struct RunEnding {
+    run: RunId,
 }
 
 #[derive(Debug)]
@@ -216,7 +239,7 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
                 |held| record.ended(held, deadline),
             )?;
         let retried = attempt.lapse().cloned();
-        let step = self.stepped(run, attempt, watched)?;
+        let step = watched.visited(Stepping { attempts: self, run, attempt })?;
         self.continued(run, retried, step)
     }
 
@@ -226,23 +249,66 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
             Step::Again(again) => self.attempted(again),
         }
     }
+}
 
-    fn stepped(&self, run: RunId, attempt: Attempt, watched: Watched) -> Result<Step, Failure> {
-        match watched {
-            Watched::Stalled(stall) => Ok(Step::Ended(Ending::Halted(Halt::Stalled(stall)))),
-            Watched::Finished(finished) => self.read(run, attempt.read(finished.reply()), &finished),
-        }
+impl<S: Store, D: Dispatch, C: Clock> Watching for Stepping<'_, '_, '_, S, D, C> {
+    type Output = Result<Step, Failure>;
+
+    fn finished(self, finished: &Finished) -> Result<Step, Failure> {
+        self.attempt.read(finished.reply()).visited(Applying { attempts: self.attempts, run: self.run, finished })
     }
 
-    fn read(&self, run: RunId, reading: Reading, finished: &Finished) -> Result<Step, Failure> {
-        match reading {
-            Reading::Parsed { directives, attempt } => Step::settled(
-                attempt,
-                Parsed::new(self.structure.store, directives, Provenance::Agent(run), self.remit.clone())
-                    .replied(finished.reply()),
-            ),
-            unfinished @ (Reading::Again(_) | Reading::Flailed(_)) => Ok(Step::from(unfinished)),
-        }
+    fn stalled(self, stall: &Stall) -> Result<Step, Failure> {
+        Ok(Step::Ended(Ending::Halted(Halt::Stalled(stall.clone()))))
+    }
+}
+
+impl<S: Store, D: Dispatch, C: Clock> Readings for Applying<'_, '_, '_, S, D, C> {
+    type Output = Result<Step, Failure>;
+
+    fn parsed(self, directives: Directives, attempt: Attempt) -> Result<Step, Failure> {
+        let Attempts { structure, remit, .. } = self.attempts;
+        Step::settled(
+            attempt,
+            Parsed::new(structure.store, directives, Provenance::Agent(self.run), (*remit).clone())
+                .replied(self.finished.reply()),
+        )
+    }
+
+    fn again(self, attempt: Attempt) -> Result<Step, Failure> {
+        Ok(Unapplied.again(attempt))
+    }
+
+    fn flailed(self, lapse: Lapse) -> Result<Step, Failure> {
+        Ok(Unapplied.flailed(lapse))
+    }
+}
+
+impl Readings for Unapplied {
+    type Output = Step;
+
+    fn parsed(self, _directives: Directives, attempt: Attempt) -> Step {
+        Step::Again(attempt)
+    }
+
+    fn again(self, attempt: Attempt) -> Step {
+        Step::Again(attempt)
+    }
+
+    fn flailed(self, lapse: Lapse) -> Step {
+        Step::Ended(Ending::Halted(Halt::Flailed(lapse)))
+    }
+}
+
+impl Watching for RunEnding {
+    type Output = RunEnded;
+
+    fn finished(self, finished: &Finished) -> RunEnded {
+        RunEnded::finished(self.run, finished)
+    }
+
+    fn stalled(self, stall: &Stall) -> RunEnded {
+        RunEnded::new(self.run, RunState::from(stall), stall.usage())
     }
 }
 
@@ -255,7 +321,7 @@ impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
         let watched = looked
             .and_then(|_started| Watch::over(crew.dispatch, crew.clock).watched(held))
             .unwrap_or_else(|failure| Watched::Stalled(Stall::Failed(Fault::from(failure))));
-        store.write(Ending::ended(self.run, &watched))?;
+        store.write(watched.visited(RunEnding { run: self.run }))?;
         Ok(watched)
     }
 }
@@ -270,13 +336,6 @@ impl Reaped {
 }
 
 impl Ending {
-    fn ended(run: RunId, watched: &Watched) -> RunEnded {
-        match watched {
-            Watched::Finished(finished) => RunEnded::finished(run, finished),
-            Watched::Stalled(stall) => RunEnded::new(run, RunState::from(stall), stall.usage()),
-        }
-    }
-
     fn lines(&self, job: JobId, store: &impl Store) -> Result<Vec<Line>, Failure> {
         match self {
             Ending::Applied(application) => application.lines(store),
@@ -337,16 +396,7 @@ impl Step {
     fn settled(attempt: Attempt, applied: Result<Application, Failure>) -> Result<Step, Failure> {
         applied
             .map(|application| Step::Ended(Ending::Applied(application)))
-            .or_else(|failure| failure.refusal().map(|lapse| Step::from(attempt.lapsed(lapse))))
-    }
-}
-
-impl From<Reading> for Step {
-    fn from(reading: Reading) -> Step {
-        match reading {
-            Reading::Parsed { attempt, .. } | Reading::Again(attempt) => Step::Again(attempt),
-            Reading::Flailed(lapse) => Step::Ended(Ending::Halted(Halt::Flailed(lapse))),
-        }
+            .or_else(|failure| failure.refusal().map(|lapse| attempt.lapsed(lapse).visited(Unapplied)))
     }
 }
 
