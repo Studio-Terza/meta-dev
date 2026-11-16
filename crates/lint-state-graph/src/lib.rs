@@ -95,10 +95,10 @@ struct RecordedState<'head> {
 }
 
 impl<'head> Gathers<StateRaw<'head>> for StateRecording<'_, 'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         self.watchers.as_mut().map_or_default(|watchers| {
             let own: Vec<&mut Watching<'_>> = vec![&mut watchers.fields, &mut watchers.graphs];
-            watchers.edges.watching().into_iter().chain(watchers.matches.watching()).chain(own).collect()
+            watchers.edges.watching().into_iter().chain(watchers.matches.watching()).chain(own).collect::<Vec<_>>()
         })
     }
 

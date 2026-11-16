@@ -573,10 +573,10 @@ impl<'file> Filer<'file> {
 }
 
 impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let found = self.finds.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });
         let sorted = found.chain(self.sorts.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }));
-        sorted.chain(self.rulings.iter_mut().flat_map(|ruling| ruling.pending.watching())).collect()
+        sorted.chain(self.rulings.iter_mut().flat_map(|ruling| ruling.pending.watching()))
     }
 
     fn gathered(self) -> FileWork<'file> {
@@ -699,7 +699,7 @@ where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        self.watched.watching()
+        self.watched.watching().into_iter().collect()
     }
 
     fn judged<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>> {

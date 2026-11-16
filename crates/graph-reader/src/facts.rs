@@ -42,7 +42,7 @@ struct FileLowering<'read> {
 }
 
 impl Gathers<FileFacts> for FileLowering<'_> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(&mut self.lowering)
     }
 
@@ -62,8 +62,8 @@ pub struct GroupLowering<'read> {
 }
 
 impl Gathers<Vec<FileFacts>> for GroupLowering<'_> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        self.head.as_mut().map_or_default(Gathers::watching)
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        self.head.as_mut().map(Gathers::watching).into_iter().flatten()
     }
 
     fn gathered(self) -> Vec<FileFacts> {

@@ -74,7 +74,7 @@ impl<'file> From<&'file SourceFile> for BudgetGathering<'file> {
 }
 
 impl Gathers<CrateBudget> for BudgetGathering<'_> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(&mut self.scan)
     }
 
@@ -91,7 +91,7 @@ impl Gathers<CrateBudget> for BudgetGathering<'_> {
 }
 
 impl Gathers<CrateBudget> for TestScan<'_> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

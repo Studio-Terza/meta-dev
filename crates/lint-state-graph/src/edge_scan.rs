@@ -40,8 +40,8 @@ pub struct Written<'file> {
 }
 
 impl<'file> Gathers<Written<'file>> for EdgeScan<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        vec![self]
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        std::iter::once::<&mut Watching<'_>>(self)
     }
 
     fn gathered(self) -> Written<'file> {

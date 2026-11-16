@@ -53,7 +53,7 @@ impl<'head> From<&PairedOwners<'head>> for Report<'head> {
 pub struct PairedGleaner<'head>(PairedMethods<'head>);
 
 impl<'head> Gathers<PairedOwners<'head>> for PairedGleaner<'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         self.0.watching()
     }
 

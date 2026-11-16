@@ -43,7 +43,7 @@ impl<'head> From<Parsed<'_, 'head>> for DeclarationGathering<'head> {
 }
 
 impl<'head> Gathers<Option<Declarations<'head>>> for DeclarationGathering<'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let all: Vec<&mut Watching<'_>> = vec![&mut self.reading];
         self.shipped.map_or_default(|_| all)
     }

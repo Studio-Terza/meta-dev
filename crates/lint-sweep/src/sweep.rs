@@ -11,7 +11,7 @@ pub use boundary::Member;
 use boundary::{Index, Muting};
 
 pub trait Gathers<Part> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>>;
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>>;
 
     fn gathered(self) -> Part;
 }
@@ -47,7 +47,7 @@ impl Sweep {
     }
 
     pub fn gathered<Part>(file: &SourceFile, mut gathering: impl Gathers<Part>) -> Part {
-        Walk::file(&mut Sweep::sweeping(Some(file), gathering.watching()), file.syntax());
+        Walk::file(&mut Sweep::sweeping(Some(file), gathering.watching().into_iter().collect()), file.syntax());
         gathering.gathered()
     }
 
@@ -191,8 +191,8 @@ impl<'file> Watchers<'file> {
 }
 
 impl<'file> Gathers<Vec<Violation<'file>>> for Watchers<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        self.0.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }).collect()
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        self.0.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }).collect::<Vec<_>>()
     }
 
     fn gathered(self) -> Vec<Violation<'file>> {

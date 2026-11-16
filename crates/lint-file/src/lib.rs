@@ -188,9 +188,9 @@ struct Walking<'head, Gathering, Watched> {
 impl<'head, Part, Found, Gathering: Gathers<Part>, Watched: Gathers<Found>> Gathers<Walked<'head, Part, Found>>
     for Walking<'head, Gathering, Watched>
 {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        let watched = self.watched.as_mut().map_or_default(Gathers::watching);
-        self.gathering.watching().into_iter().chain(self.facts.watching()).chain(watched).collect()
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        let watched = self.watched.as_mut().map(Gathers::watching).into_iter().flatten();
+        self.gathering.watching().into_iter().chain(self.facts.watching()).chain(watched)
     }
 
     fn gathered(self) -> Walked<'head, Part, Found> {
@@ -274,8 +274,8 @@ struct Two<First, Second> {
 impl<FirstPart, SecondPart, First: Gathers<FirstPart>, Second: Gathers<SecondPart>> Gathers<Two<FirstPart, SecondPart>>
     for Two<First, Second>
 {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        self.first.watching().into_iter().chain(self.second.watching()).collect()
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        self.first.watching().into_iter().chain(self.second.watching())
     }
 
     fn gathered(self) -> Two<FirstPart, SecondPart> {

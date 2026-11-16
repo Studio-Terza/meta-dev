@@ -66,10 +66,10 @@ pub enum Watched<'file> {
 }
 
 impl<'file> Gathers<Tested<'file>> for Watched<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         match self {
-            Watched::Shipped(code) => vec![code],
-            Watched::Beside(reach) => vec![reach],
+            Watched::Shipped(code) => std::iter::once::<&mut Watching<'_>>(code),
+            Watched::Beside(reach) => std::iter::once::<&mut Watching<'_>>(reach),
         }
     }
 

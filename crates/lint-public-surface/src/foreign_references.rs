@@ -81,7 +81,7 @@ impl From<&SourceFile> for Reading {
 }
 
 impl Gathers<ForeignReferences> for Reading {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

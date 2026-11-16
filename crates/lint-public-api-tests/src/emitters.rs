@@ -17,7 +17,7 @@ impl Emitters {
 }
 
 impl Gathers<Emitters> for Emitters {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

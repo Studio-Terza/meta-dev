@@ -77,7 +77,7 @@ impl<'ast> Watch<'ast> for PairedMethods<'_> {
 }
 
 impl<'file> Gathers<BTreeMap<Owner<'file>, Vec<Declared<'file>>>> for PairedMethods<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

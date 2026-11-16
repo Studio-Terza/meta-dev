@@ -139,7 +139,7 @@ impl<'ast> Watch<'ast> for Guards<'_> {
 }
 
 impl<'file> Gathers<Modules<'file>> for Guards<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

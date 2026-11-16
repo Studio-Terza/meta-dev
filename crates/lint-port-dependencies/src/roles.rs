@@ -97,7 +97,7 @@ impl<'ast> Watch<'ast> for RootReading<'_> {
 }
 
 impl<'head> Gathers<RoleFile<'head>> for RootReading<'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let rooted = self.place.as_ref().map(|_| ());
         rooted.map_or_default(|()| Sweep::alone(self))
     }

@@ -144,7 +144,7 @@ impl<'ast> Watch<'ast> for Scan<'_> {
 }
 
 impl<'file> Gathers<Occurrences<'file>> for Scan<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 
