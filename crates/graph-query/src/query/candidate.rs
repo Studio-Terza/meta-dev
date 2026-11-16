@@ -59,7 +59,7 @@ impl<'model> Candidate<'model> {
             label: Label::Named(stocked.name()),
             site: placed.site(),
             names: vec![stocked.name()],
-            methods: Catalog::OWNERS.iter().flat_map(|owner| catalog.owned_by(id, *owner)).map(Offered::from).collect(),
+            methods: catalog.owned_by(id).map(Offered::from).collect(),
             related: implementers
                 .into_iter()
                 .chain(catalog.implemented_by(id).filter_map(Implementation::interface_name))

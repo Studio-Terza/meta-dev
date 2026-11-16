@@ -89,7 +89,6 @@ impl<'head> From<Parsed<'_, 'head>> for TypeHomes<'head> {
 
 impl<'head> FromIterator<TypeHomes<'head>> for TypeHomes<'head> {
     fn from_iter<Parts: IntoIterator<Item = TypeHomes<'head>>>(parts: Parts) -> TypeHomes<'head> {
-        let merged = parts.into_iter().fold(TypeHomes::empty(), TypeHomes::absorbed);
-        TypeHomes { reading: Home::NOWHERE, ..merged }
+        parts.into_iter().fold(TypeHomes::empty(), TypeHomes::absorbed)
     }
 }

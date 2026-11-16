@@ -1,18 +1,14 @@
 mod operators;
 
-use std::fmt;
-
 use crate::transitions::{Ground, Wrapping};
 use body_lifts::Body;
 use graph::Mutation;
 use lint_layout::Name;
-use newtype::Counter;
 
 use crate::algebra::Totality;
 use crate::count::Count;
 use crate::edge::Edge;
 use crate::end::{End, Node};
-use crate::listed::Listed;
 use operators::Operators;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -64,14 +60,6 @@ impl<'found> Acting<'found> {
     #[must_use]
     pub fn subject(&self) -> &Node<'found> {
         &self.subject
-    }
-}
-
-impl fmt::Display for Acting<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let held = std::iter::repeat_n(End::domain(self.subject), self.held.count());
-        let taken = Listed::<_, ','>::joined(held.chain(self.parameters.iter().copied()));
-        write!(formatter, "({taken})")
     }
 }
 

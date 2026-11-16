@@ -81,10 +81,6 @@ impl PlaceRows {
             .collect();
         Places(places)
     }
-
-    fn subject_of(&self, place: Option<PlaceId>) -> Option<SubjectId> {
-        place.and_then(|id| self.places.get(id.0)).and_then(|row| row.subject)
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -132,11 +128,10 @@ impl Lowering<'_> {
     }
 
     pub(super) fn owning(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> PlaceId {
-        let subject = self.lowered.rows.places.subject_of(self.context.place());
         let line = Position::from(ident.span()).line();
         let region = self.context.within_item(attributes).region();
         let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain, line, region };
-        self.placed(PlaceRow { subject, owner: Some(owner) })
+        self.placed(PlaceRow { subject: None, owner: Some(owner) })
     }
 
     pub(super) fn owned_by(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> Descend {
