@@ -25,10 +25,13 @@ const TABLE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait
 const VALUE_OUTSIDE_TABLE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nfn pick() -> fn(&Ctx) -> u8 { <A as Lint>::run }\n";
 const BOUNDED_CONST: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { const NAMES: &'static [&'static str]; fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { const NAMES: &'static [&'static str] = &[]; fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { const NAMES: &'static [&'static str] = &[]; fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nstruct Table<P>(P);\nimpl<P: Lint> Table<P> { const NAMES: &'static [&'static str] = P::NAMES; }\n";
 const BOUNDED_METHOD: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nstruct Table<P>(P);\nimpl<P: Lint> Table<P> { const RUN: fn(&Ctx) -> u8 = P::run; }\n";
+const WHERE_BOUNDED_METHOD: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nstruct Table<P>(P);\nimpl<P> Table<P> where P: Lint { const RUN: fn(&Ctx) -> u8 = P::run; }\n";
+const BOUNDED_CALL: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nstruct Table<P>(P);\nimpl<P: Lint> Table<P> { const RUN: u8 = P::run(&Ctx { a: 1 }); }\n";
+const VALUE_AFTER_TABLES: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(c: &Ctx) -> u8 { fact(c) + 2 } }\nconst LIMIT: u8 = 1;\nstatic HELD: u8 = 1;\nimpl A { const TOP: u8 = 1; }\nfn pick() -> fn(&Ctx) -> u8 { <A as Lint>::run }\n";
 const SINKS: &str = "struct Out { a: u8 }\nfn write(o: &mut Out) { o.a = 1; }\ntrait Lint { fn run(&self, o: &mut Out, p: Out) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 1 } }\nimpl Lint for B { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const METHOD_CALLS: &str = "struct Ctx { a: u8 }\nimpl Ctx { fn fact(&self) -> u8 { self.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { c.fact() + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.fact() + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 
-const CASES: [Case; 26] = [
+const CASES: [Case; 29] = [
     Case::new(
         Title::new("the same literal is one fact"),
         &[Source::new(Located::new("a.rs"), Text::new(SAME_LITERAL))],
@@ -153,6 +156,21 @@ const CASES: [Case; 26] = [
         Title::new("a method reached through a bounded parameter in a table"),
         &[Source::new(Located::new("a.rs"), Text::new(BOUNDED_METHOD))],
         Flagged::new(&["a.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a method reached through a where-bounded parameter in a table"),
+        &[Source::new(Located::new("a.rs"), Text::new(WHERE_BOUNDED_METHOD))],
+        Flagged::new(&["a.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a method called inside a const is a call, not a table entry"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUNDED_CALL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a method value after const and static items is outside their tables"),
+        &[Source::new(Located::new("a.rs"), Text::new(VALUE_AFTER_TABLES))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("a mutable parameter passed on is written, not read"),

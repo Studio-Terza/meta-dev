@@ -381,3 +381,27 @@ laws::table!(
         &["--consumed-by", "a.rs"][..] => None,
     ]
 );
+
+const CART: [Source; 1] = [Source::new(
+    Located::new("crates/shop/src/lib.rs"),
+    Text::new(
+        "mod store {\n    pub struct Cart;\n    impl Cart {\n        pub fn merged(&self, other: Cart) -> Cart {}\n    }\n}\n",
+    ),
+)];
+
+#[test]
+fn a_method_naming_its_own_type_is_shaped_as_taking_and_giving_itself() {
+    let files = Sources::parsed(&CART);
+    let model = Reader::read_files(&files);
+    let transitions = Transitions::from(&model);
+    let query = Asked::query(&["--role", "fn combine(&self, other: Self) -> Self"])
+        .unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
+    let found: Vec<String> = query.matches(&transitions).to_string().parse::<Lines>().into_iter().flatten().collect();
+    assert_eq!(
+        found,
+        [
+            "score 2: store Cart in shop at crates/shop/src/lib.rs:2",
+            "    merged fn(&self, Self) -> Self fits fn(&self, Self) -> Self",
+        ]
+    );
+}
