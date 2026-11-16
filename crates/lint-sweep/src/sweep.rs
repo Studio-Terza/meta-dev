@@ -72,7 +72,8 @@ impl Sweep {
         watchers: Vec<&'run mut Watching<'run>>,
     ) -> Sweeping<'file, 'run> {
         let kinds: Vec<&[Kind]> = watchers.iter().map(|watcher| watcher.kinds()).collect();
-        let listening = ByKind::filled(|kind| Index::listening(&kinds, kind));
+        let mut heard = Index::listening(&kinds);
+        let listening = ByKind::filled(|kind| heard.remove(&kind).unwrap_or_default());
         let muting = Muting::new(watchers.len());
         Sweeping { file, watchers, listening, muting }
     }

@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use syntax::parse::Speculative;
 use syntax::parse::{Parse, ParseBuffer, ParseStream};
-use syntax::{Delimiter, Group, Ident, Literal, Punct, Span, TokenStream, TokenTree};
+use syntax::{Group, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use syntax::{LitStr, Macro, Path};
 
 use lint_layout::Position;
@@ -74,27 +74,24 @@ impl FromStr for Holes {
 struct Interpolated;
 
 impl Interpolated {
-    fn read(token: TokenTree) -> TokenStream {
+    fn read(token: TokenTree) -> Vec<TokenStream> {
         match token {
             TokenTree::Group(group) => Self::stream(group.stream()),
             TokenTree::Literal(literal) => Self::holes(&literal),
-            TokenTree::Ident(_) | TokenTree::Punct(_) => TokenStream::new(),
+            TokenTree::Ident(_) | TokenTree::Punct(_) => Vec::new(),
         }
     }
 
-    fn stream(tokens: TokenStream) -> TokenStream {
-        tokens.into_iter().map(Self::read).collect()
+    fn stream(tokens: TokenStream) -> Vec<TokenStream> {
+        tokens.into_iter().flat_map(Self::read).collect()
     }
 
-    fn holes(literal: &Literal) -> TokenStream {
+    fn holes(literal: &Literal) -> Vec<TokenStream> {
         let text = syntax::parse::parse2::<LitStr>(TokenTree::Literal(literal.clone()).into())
             .map_or_default(|found| found.value());
         let Ok(Holes(holes)) = text.parse::<Holes>();
         let spanned = Respanned(literal.span());
-        holes
-            .into_iter()
-            .map(|hole| TokenTree::Group(Group::new(Delimiter::Parenthesis, spanned.spanned(hole))))
-            .collect()
+        holes.into_iter().map(|hole| spanned.spanned(hole)).collect()
     }
 }
 
@@ -105,7 +102,7 @@ impl TokenPaths {
     const ACCESS: char = '.';
 
     pub(super) fn interpolated(invoked: &Macro) -> Vec<Spelled> {
-        Self::within(Interpolated::stream(invoked.tokens.clone()))
+        Interpolated::stream(invoked.tokens.clone()).into_iter().flat_map(Self::within).collect()
     }
 
     pub(super) fn within(tokens: TokenStream) -> Vec<Spelled> {
