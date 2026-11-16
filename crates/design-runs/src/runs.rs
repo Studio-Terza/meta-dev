@@ -1,5 +1,7 @@
 mod boundary;
 
+pub use boundary::{Release, ReleaseNew, Succession, SuccessionNew};
+
 use std::fmt;
 
 use design_jobs::JobState;
@@ -51,6 +53,8 @@ pub enum Delivery {
     Unreported,
     #[name("reported")]
     Reported,
+    #[name("withdrawn")]
+    Withdrawn,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -60,8 +64,11 @@ pub struct Spawned {
     deadline: Deadline,
 }
 
-#[derive(Clone, Copy, Debug, Op)]
-pub struct JobOpened(JobId);
+#[derive(Clone, Debug, Op)]
+pub struct JobOpened {
+    job: JobId,
+    covering: Vec<Segment>,
+}
 
 #[derive(Clone, Debug, Op)]
 pub struct JobHalted {
@@ -215,8 +222,11 @@ impl Lifecycle for RunState {
 }
 
 impl Lifecycle for Delivery {
-    const EDGES: &'static [Edge<Delivery>] =
-        &[Edge::new(Delivery::Unreported, Delivery::Reported), Edge::new(Delivery::Reported, Delivery::Unreported)];
+    const EDGES: &'static [Edge<Delivery>] = &[
+        Edge::new(Delivery::Unreported, Delivery::Reported),
+        Edge::new(Delivery::Reported, Delivery::Unreported),
+        Edge::new(Delivery::Unreported, Delivery::Withdrawn),
+    ];
 }
 
 impl From<&Stall> for RunState {
@@ -232,7 +242,14 @@ impl From<&Stall> for RunState {
 
 impl From<JobId> for JobOpened {
     fn from(job: JobId) -> JobOpened {
-        JobOpened(job)
+        JobOpened { job, covering: Vec::new() }
+    }
+}
+
+impl JobOpened {
+    #[must_use]
+    pub fn covering(self, covering: Vec<Segment>) -> JobOpened {
+        JobOpened { covering, ..self }
     }
 }
 

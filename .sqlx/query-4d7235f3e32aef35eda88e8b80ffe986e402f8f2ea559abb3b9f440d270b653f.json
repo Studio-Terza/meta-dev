@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\nSELECT\n  flailed.message,\n  flailed.ordinal,\n  flailed.job,\n  flailed.run\nFROM\n  flailed\n  JOIN messages ON messages.uuid = flailed.message\nORDER BY\n  messages.at,\n  flailed.message,\n  flailed.ordinal\n",
+  "query": "\nSELECT\n  held.message,\n  held.ordinal,\n  held.job,\n  held.run\nFROM\n  held\n  JOIN messages ON messages.uuid = held.message\nWHERE\n  held.job = ?1\nORDER BY\n  messages.at,\n  held.message,\n  held.ordinal\n",
   "describe": {
     "columns": [
       {
@@ -49,7 +49,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "309afd609054b97614decd09545dbfa9b26a3dd09138ae83b1b0d3fb75ed8470"
+  "hash": "4d7235f3e32aef35eda88e8b80ffe986e402f8f2ea559abb3b9f440d270b653f"
 }

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT job AS \"job!\", released_at AS \"released_at!\" FROM releases",
+  "describe": {
+    "columns": [
+      {
+        "name": "job!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "job"
+          }
+        }
+      },
+      {
+        "name": "released_at!",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "releases",
+            "name": "released_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "80c0f39fd22456fe6e89ae778dc138228f723eb57395d24f2b8d9438733ad9cf"
+}

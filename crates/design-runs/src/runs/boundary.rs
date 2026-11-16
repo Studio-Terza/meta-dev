@@ -1,8 +1,9 @@
 use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Wrapping};
+use store_ports::Record as _;
 use store_ports::{Batch, Columns, Edge, Moved, Prepared, Query, Staged, Statements, StoreFailure, Written};
-use transcript_ports::{Body, SessionId, Uuid};
+use transcript_ports::{Body, Instant, SessionId, Uuid};
 
 use design_jobs::JobState;
 
@@ -25,13 +26,30 @@ struct NextJobRow {
     next: JobId,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
+#[record(table = "releases")]
+pub struct Release {
+    #[record(key)]
+    job: JobId,
+    #[record(generated)]
+    released_at: Instant,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
+#[record(table = "successions")]
+pub struct Succession {
+    #[record(key)]
+    released: JobId,
+    successor: JobId,
+}
+
 #[derive(Debug, Columns)]
 struct OpenJobRow {
     id: JobId,
 }
 
 #[derive(Debug, Columns)]
-struct ReportedRow {
+struct DeliveredRow {
     job: JobId,
 }
 
@@ -135,9 +153,9 @@ impl Batch for JobOpened {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let job = self.0;
+        let JobOpened { job, covering } = self;
         let open = JobState::Open;
-        statements.written(store_ports::query!(
+        let opened = statements.written(store_ports::query!(
             r#"
 INSERT INTO
   jobs (id, state)
@@ -146,7 +164,41 @@ VALUES
 "#,
             job: JobId,
             open: JobState
-        ))
+        ))?;
+        let succeeded = covering
+            .iter()
+            .map(|segment| {
+                let message = AsRef::<Uuid>::as_ref(segment).clone();
+                let ordinal = Ordinal::from(segment);
+                statements.written(store_ports::query!(
+                    r#"
+INSERT INTO
+  successions (released, successor)
+SELECT DISTINCT
+  flailed.job,
+  ?1
+FROM
+  flailed
+  JOIN releases ON releases.job = flailed.job
+WHERE
+  flailed.message = ?2
+  AND flailed.ordinal = ?3
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      successions
+    WHERE
+      successions.released = flailed.job
+  )
+"#,
+                    job: JobId,
+                    message: Uuid,
+                    ordinal: Ordinal
+                ))
+            })
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total([opened].into_iter().chain(succeeded)))
     }
 }
 
@@ -183,21 +235,6 @@ impl Batch for Retold {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let Retold { job, account } = self;
-        let reported = Delivery::Reported;
-        let delivered = statements.rows(store_ports::query!(
-            ReportedRow,
-            r#"
-SELECT
-  job
-FROM
-  failures
-WHERE
-  job = ?1
-  AND delivery = ?2
-"#,
-            job: JobId,
-            reported: Delivery
-        ))?;
         let recorded = statements.written(store_ports::query!(
             r#"
 UPDATE
@@ -210,13 +247,8 @@ WHERE
             job: JobId,
             account: Account
         ))?;
-        let moved = delivered
-            .into_iter()
-            .map(|row| {
-                Moved::<Delivery>::new(row.job, Edge::new(Delivery::Reported, Delivery::Unreported)).written(statements)
-            })
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total([recorded].into_iter().chain(moved)))
+        let moved = Delivery::Reported.shifted(Delivery::Unreported, job, statements)?;
+        Ok(Written::total([recorded, moved].into_iter()))
     }
 }
 
@@ -402,25 +434,9 @@ impl Batch for JobRetried {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let job = self.0;
-        let released = statements.written(store_ports::query!(
-            r#"
-DELETE FROM
-  flailed
-WHERE
-  job = ?1
-"#,
-            job: JobId
-        ))?;
-        let withdrawn = statements.written(store_ports::query!(
-            r#"
-DELETE FROM
-  failures
-WHERE
-  job = ?1
-"#,
-            job: JobId
-        ))?;
-        Ok(Written::total([released, withdrawn].into_iter()))
+        let released = statements.one(Release::created(&ReleaseNew { job }))?;
+        let withdrawn = Delivery::Unreported.shifted(Delivery::Withdrawn, *released.key(), statements)?;
+        Ok(Written::total([Written::new(1), withdrawn].into_iter()))
     }
 }
 
@@ -432,17 +448,17 @@ impl Query for FlailedSegments {
             FlailedRow,
             r#"
 SELECT
-  flailed.message,
-  flailed.ordinal,
-  flailed.job,
-  flailed.run
+  held.message,
+  held.ordinal,
+  held.job,
+  held.run
 FROM
-  flailed
-  JOIN messages ON messages.uuid = flailed.message
+  held
+  JOIN messages ON messages.uuid = held.message
 ORDER BY
   messages.at,
-  flailed.message,
-  flailed.ordinal
+  held.message,
+  held.ordinal
 "#
         ))?;
         Ok(rows.into_iter().map(Flailed::from).collect())
@@ -458,19 +474,19 @@ impl Query for HeldBy {
             FlailedRow,
             r#"
 SELECT
-  flailed.message,
-  flailed.ordinal,
-  flailed.job,
-  flailed.run
+  held.message,
+  held.ordinal,
+  held.job,
+  held.run
 FROM
-  flailed
-  JOIN messages ON messages.uuid = flailed.message
+  held
+  JOIN messages ON messages.uuid = held.message
 WHERE
-  flailed.job = ?1
+  held.job = ?1
 ORDER BY
   messages.at,
-  flailed.message,
-  flailed.ordinal
+  held.message,
+  held.ordinal
 "#,
             job: JobId
         ))?;
@@ -589,14 +605,14 @@ SELECT
   segments.ordinal,
   segments.body,
   messages.session,
-  flailed.run AS "run?: i64"
+  held.run AS "run?: i64"
 FROM
   unplaced
   JOIN segments ON segments.message = unplaced.message
   AND segments.ordinal = unplaced.ordinal
   JOIN messages ON messages.uuid = unplaced.message
-  LEFT JOIN flailed ON flailed.message = unplaced.message
-  AND flailed.ordinal = unplaced.ordinal
+  LEFT JOIN held ON held.message = unplaced.message
+  AND held.ordinal = unplaced.ordinal
 ORDER BY
   messages.at,
   segments.message,
@@ -650,5 +666,30 @@ WHERE
             from: Delivery,
             to: Delivery
         )
+    }
+}
+
+impl Delivery {
+    fn shifted(self, to: Delivery, job: JobId, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let from = self;
+        let delivered = statements.rows(store_ports::query!(
+            DeliveredRow,
+            r#"
+SELECT
+  job
+FROM
+  failures
+WHERE
+  job = ?1
+  AND delivery = ?2
+"#,
+            job: JobId,
+            from: Delivery
+        ))?;
+        let moved = delivered
+            .into_iter()
+            .map(|row| Moved::<Delivery>::new(row.job, Edge::new(from, to)).written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(moved.into_iter()))
     }
 }

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO successions (released, successor) VALUES (?1, ?2) RETURNING released AS \"released!\", successor AS \"successor!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "released!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "successions",
+            "name": "released"
+          }
+        }
+      },
+      {
+        "name": "successor!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "successions",
+            "name": "successor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "e58ec6dde555cfb25aa79739f0eb8ee4f3327f90d74a77a70a98dbb22857b040"
+}

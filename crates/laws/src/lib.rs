@@ -173,7 +173,7 @@ macro_rules! preserves {
 
 #[macro_export]
 macro_rules! crud {
-    ($(#[$meta:meta])* $name:ident, $record:ty, $fresh:expr, $opened:expr $(,)?) => {
+    ($(#[$meta:meta])* $name:ident, $record:ty, $fresh:expr, $opened:expr $(, given $placed:expr)? $(,)?) => {
         $crate::law!(
             $(#[$meta])* $name,
             (
@@ -193,6 +193,10 @@ macro_rules! crud {
             let (first, second, column, argument) = drawn;
             let run = ::port_core::Run::root();
             let store = run.port($opened);
+            $(
+                ($placed)(&store, &first).map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+                ($placed)(&store, &second).map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+            )?
             let made: $record = store
                 .create(Created::<$record>::new(first.clone()))
                 .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
@@ -244,16 +248,20 @@ macro_rules! lifecycle {
             let run = ::port_core::Run::root();
             let store = run.port($opened);
             let states = <$state as Lifecycle>::states();
-            states.iter().flat_map(|from| states.iter().map(move |to| [*from, *to])).try_for_each(
-                |[from, to]| -> Result<(), Box<dyn ::std::error::Error>> {
+            let moved = states
+                .iter()
+                .flat_map(|from| states.iter().map(move |to| [*from, *to]))
+                .map(|[from, to]| -> Result<usize, Box<dyn ::std::error::Error>> {
                     let key = ($placed)(&store, from)?;
                     let edge = ::store_ports::Edge::new(from, to);
                     let moved = store.write(::store_ports::Moved::<$state>::new(key, edge));
                     let listed = <$state as Lifecycle>::EDGES.contains(&edge);
                     assert_eq!(moved.is_ok(), listed, "{from:?} -> {to:?} moves only along a lifecycle edge: {moved:?}");
-                    Ok(())
-                },
-            )
+                    Ok(usize::from(listed))
+                })
+                .sum::<Result<usize, Box<dyn ::std::error::Error>>>()?;
+            assert_eq!(moved, <$state as Lifecycle>::EDGES.len(), "every lifecycle edge is a move");
+            Ok(())
         }
     };
 }

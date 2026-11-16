@@ -162,7 +162,7 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let job = structurer::Job::new(Structure::<S, D, C>::said(chunk), Structure::<S, D, C>::said(&asked), context);
         let segments = chunk.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone());
         let remit = Remit::job(id, segments.clone());
-        self.store.write(JobOpened::from(id))?;
+        self.store.write(JobOpened::from(id).covering(segments.clone().collect()))?;
         let ended = Attempts { structure: self, id, job: &job, remit: &remit }.attempted(Attempt::First)?;
         let halt = ended.ending.halt().cloned();
         let held = halt.as_ref().and_then(Halt::flailed).map(|_lapse| JobFlailed::new(ended.run, segments.collect()));
