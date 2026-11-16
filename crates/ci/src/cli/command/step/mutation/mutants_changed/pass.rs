@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::num::NonZeroU8;
 use std::path::PathBuf;
@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use file_ports::Files;
 use text_lines::Lines;
 
+use super::super::boundary::Exact;
 use super::verdict::Verdict;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::journal::Journal;
@@ -23,8 +24,16 @@ pub(super) struct Pass {
 pub(super) struct Survivors(Vec<Text>);
 
 impl Survivors {
-    pub(super) fn names(&self) -> &[Text] {
-        &self.0
+    const EXAMINE: &'static str = "--re";
+
+    pub(super) fn examined(&self) -> Vec<OsString> {
+        self.0.iter().flat_map(|name| [OsString::from(Self::EXAMINE), OsString::from(Exact::from(name))]).collect()
+    }
+
+    fn selected(&self, tested: &BTreeSet<Text>) -> Result<(), Failure<'static>> {
+        let untested: Vec<&str> =
+            self.0.iter().filter(|name| tested.contains(*name).then_some(()).is_none()).map(AsRef::as_ref).collect();
+        untested.first().map_or(Ok(()), |_| Err(Failure::Unselected(Text::new(untested.join("\n")))))
     }
 }
 
@@ -66,13 +75,7 @@ impl Pass {
         let read: Vec<Option<Text>> =
             Journal::read_present(files, journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
         let tested: BTreeSet<Text> = read.iter().flatten().flat_map(Self::names).collect();
-        let untested: Vec<&str> = expected
-            .names()
-            .iter()
-            .filter(|name| tested.contains(*name).then_some(()).is_none())
-            .map(AsRef::as_ref)
-            .collect();
-        untested.first().map_or(Ok(()), |_| Err(Failure::Unselected(Text::new(untested.join("\n")))))?;
+        expected.selected(&tested)?;
         let missed: Vec<String> =
             self.listed(files, Outcome::Missed)?.iter().map(|name| [name.as_ref(), "\n"].concat()).collect();
         Verdict::from(&Text::new(missed.concat())).reported(out)

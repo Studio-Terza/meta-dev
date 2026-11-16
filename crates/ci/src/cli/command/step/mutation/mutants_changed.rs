@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use super::super::journal::Journal;
 use super::Step;
-use super::boundary::{Exact, Shard};
+use super::boundary::Shard;
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
@@ -28,7 +28,6 @@ impl MutantsChanged {
     const IN_DIFF: &'static str = "--in-diff";
     const DIFF: [&'static str; 6] = ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"];
     const SCOPED: &'static str = "scoped";
-    const EXAMINE: &'static str = "--re";
 
     fn new(diff: PathBuf, output: PathBuf, shard: Shard, scope: Vec<OsString>) -> MutantsChanged {
         MutantsChanged {
@@ -60,11 +59,7 @@ impl MutantsChanged {
 
     fn rerun(&self, ports: &impl Ports, out: &mut impl Write, missed: &Survivors) -> Result<Exit, Failure<'_>> {
         let diff: &Path = self.diff.as_ref();
-        let named: Vec<OsString> = missed
-            .names()
-            .iter()
-            .flat_map(|name| [OsString::from(Self::EXAMINE), OsString::from(Exact::from(name))])
-            .collect();
+        let named = missed.examined();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
             .into_iter()
             .chain(named.iter().map(OsString::as_os_str))

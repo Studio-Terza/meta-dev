@@ -6,6 +6,16 @@ use lint_sweep::Descend;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BodyId(usize);
 
+impl BodyId {
+    pub fn locals(self, scopes: &Scopes) -> Bindings<'_> {
+        scopes
+            .closed
+            .get(&self)
+            .and_then(|found| scopes.locals.get(found.start..found.end))
+            .map_or_default(|bound| bound.iter().collect())
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Body {
     id: BodyId,
@@ -49,11 +59,5 @@ impl Scopes {
 
     pub fn constants(&self) -> Bindings<'_> {
         self.constants.iter().collect()
-    }
-
-    pub fn locals(&self, body: Option<BodyId>) -> Bindings<'_> {
-        body.and_then(|id| self.closed.get(&id))
-            .and_then(|found| self.locals.get(found.start..found.end))
-            .map_or_default(|bound| bound.iter().collect())
     }
 }

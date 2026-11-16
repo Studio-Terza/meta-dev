@@ -3,8 +3,12 @@ use std::fmt;
 use std::iter;
 
 use grammar::logos::Logos;
+use newtype::{Arbitrary, Display, Newtype};
 
-use super::{Cite, Date, Ending, Layout, Quote, Unclosed};
+use super::{Cite, Date, Ending, Quote, Unclosed};
+
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Layout(String);
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
