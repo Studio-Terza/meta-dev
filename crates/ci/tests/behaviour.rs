@@ -1483,6 +1483,10 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
     assert_eq!(
         *fake.calls.borrow(),
         [
+            Invocation::new(
+                "git",
+                ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"]
+            ),
             Invocation::new("git", ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"]),
             Invocation::new(
                 "cargo",
@@ -1504,6 +1508,48 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
             ),
         ]
     );
+    Ok(())
+}
+
+#[test]
+fn a_crate_whose_tests_changed_has_its_whole_source_mutated_beside_the_changed_lines() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let named = Invocation::new(
+        "git",
+        ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"],
+    );
+    let kept = Invocation::new(
+        "git",
+        ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs", ":(exclude)crates/d/src", ":(exclude)crates/e/src"],
+    );
+    let whole = Invocation::new(
+        "git",
+        [
+            "diff",
+            "--no-renames",
+            "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+            "HEAD",
+            "--",
+            ":(glob)crates/d/src/**/*.rs",
+            ":(glob)crates/e/src/**/*.rs",
+        ],
+    );
+    let fake = Script {
+        exact: vec![
+            ExactReply {
+                asked: named.clone(),
+                text: "crates/d/tests/behaviour/main.rs\ncrates/e/tests/t.rs\ncrates/d/tests/u.rs\n".to_owned(),
+            },
+            ExactReply { asked: kept.clone(), text: "+changed\n".to_owned() },
+            ExactReply { asked: whole.clone(), text: "+whole\n".to_owned() },
+        ],
+        ..Script::new()
+    };
+    let answer =
+        scratch.answer(&fake, &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"]);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&scratch.read("c.diff")), ["+changed", "+whole"]);
+    assert_eq!(fake.calls.borrow().get(..3), Some(&[named, kept, whole][..]));
     Ok(())
 }
 

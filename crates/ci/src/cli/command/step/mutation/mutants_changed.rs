@@ -1,4 +1,5 @@
 mod pass;
+mod tested;
 mod verdict;
 
 use std::ffi::{OsStr, OsString};
@@ -11,8 +12,9 @@ use super::boundary::Shard;
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
-use crate::cli::ports::{Exit, Invocation, Ports};
+use crate::cli::ports::{Exit, Ports};
 use pass::{Pass, Survivors};
+use tested::Tested;
 use verdict::Verdict;
 
 #[derive(Debug)]
@@ -26,7 +28,6 @@ pub struct MutantsChanged {
 
 impl MutantsChanged {
     const IN_DIFF: &'static str = "--in-diff";
-    const DIFF: [&'static str; 6] = ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"];
     const SCOPED: &'static str = "scoped";
 
     fn new(diff: PathBuf, output: PathBuf, shard: Shard, scope: Vec<OsString>) -> MutantsChanged {
@@ -40,8 +41,7 @@ impl MutantsChanged {
     }
 
     fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        let invocation = Invocation::new("git", Self::DIFF);
-        let changed = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
+        let changed = Tested::asked(ports)?.diff(ports)?;
         self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
         let shard = self.shard.arguments();
