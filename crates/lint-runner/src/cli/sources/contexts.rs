@@ -10,7 +10,6 @@ use lint_no_test_only_api::NoTestOnlyApi;
 use lint_port_dependencies::RoleReading;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
-use lint_repeated_methods::RepeatedMethods;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_state_graph::StateGraph;
 use lint_sweep::{Gathers, Sweep, Watching};
@@ -169,7 +168,6 @@ contexts! {
         guard_must_use: GuardMustUse,
         enum_predicates: EnumPredicates,
         module_nesting: ModuleNesting,
-        repeated_methods: RepeatedMethods,
         public_api_tests: PublicApiTests,
         no_test_only_api: NoTestOnlyApi,
         repeated_shapes: RepeatedShapes,

@@ -1,36 +1,30 @@
-mod shape_index;
+mod repeated;
+mod shaped;
 
-use lint_core::{Bound, Headline, Parsed, SourceFile, Violation};
-use lint_file::{Concluded, ContextLint, FileFacts, Reads, RuledLint};
+use graph::Model;
+use lint_core::{Bound, Headline, Report, Violation};
+use lint_file::ModelLint;
 
-use shape_index::{ImplGathering, ShippedImpls};
+use repeated::Repeated;
+use shaped::{Inners, Shaped};
 
 #[derive(Debug)]
 pub struct RepeatedMethods;
 
-impl ContextLint for RepeatedMethods {
-    const HEADLINE: Headline = Headline::new(
-        "one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive",
-    );
-    const READS: Reads = Reads::Shipped;
-
-    type Part<'head> = ShippedImpls<'head>;
-    type Context<'head> = Concluded<'head>;
-
-    type Gathering<'head> = ImplGathering<'head>;
-
-    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> ImplGathering<'head> {
-        ImplGathering::from(parsed)
-    }
-
-    fn completed<'head>(part: ShippedImpls<'head>, facts: &FileFacts<'head>) -> ShippedImpls<'head> {
-        part.homed(facts.as_ref())
-    }
-}
-
-impl RuledLint for RepeatedMethods {
-    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
-        concluded.found_in(file)
+impl ModelLint for RepeatedMethods {
+    fn report(model: &Model) -> Report<'_> {
+        let inners = Inners::read(model);
+        let methods = model.functions().filter_map(|placed| Shaped::placed(placed, &inners));
+        let found: Vec<Violation<'_>> = Shaped::grouped(methods)
+            .into_iter()
+            .filter_map(|members| Repeated::flagged(model, members, Self::TYPES_PER_SHAPE))
+            .collect();
+        Report::new(
+            Headline::new(
+                "one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive",
+            ),
+            found,
+        )
     }
 }
 

@@ -1955,13 +1955,11 @@ dependencies = [
 name = "lint-repeated-methods"
 version = "0.1.0"
 dependencies = [
+ "graph",
  "lint-core",
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-sweep",
- "newtype",
- "syntax",
 ]
 
 [[package]]

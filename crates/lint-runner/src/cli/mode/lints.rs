@@ -171,7 +171,7 @@ impl Lints {
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
         <Ruled<PublicSurface> as Registered>::ENTRY,
-        <Ruled<RepeatedMethods> as Registered>::ENTRY,
+        Entry::spelled::<RepeatedMethods>(Work::Modelled(<RepeatedMethods as ModelLint>::report)),
         <Primed<StateGraph> as Registered>::ENTRY,
         <Ruled<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
