@@ -1,25 +1,25 @@
+mod pass;
 mod verdict;
 
 use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use file_ports::Files;
-
 use super::super::journal::Journal;
 use super::Step;
-use super::boundary::Shard;
+use super::boundary::{Exact, Shard};
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
-use crate::cli::ports::{Exit, Invocation, Ports, Text};
+use crate::cli::ports::{Exit, Invocation, Ports};
+use pass::{Pass, Survivors};
 use verdict::Verdict;
 
 #[derive(Debug)]
 pub struct MutantsChanged {
     diff: Journal,
-    missed: Journal,
-    output: PathBuf,
+    own: Pass,
+    scoped: Pass,
     shard: Shard,
     scope: Vec<OsString>,
 }
@@ -27,43 +27,51 @@ pub struct MutantsChanged {
 impl MutantsChanged {
     const IN_DIFF: &'static str = "--in-diff";
     const DIFF: [&'static str; 6] = ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"];
-    const MISSED_LIST: [&'static str; 2] = ["mutants.out", "missed.txt"];
-
-    fn changed_lines(ports: &impl Ports) -> Result<Text, Failure<'static>> {
-        let invocation = Invocation::new("git", Self::DIFF);
-        ports.output(&invocation).map_err(Failure::starting(&invocation))
-    }
+    const SCOPED: &'static str = "scoped";
+    const EXAMINE: &'static str = "--re";
 
     fn new(diff: PathBuf, output: PathBuf, shard: Shard, scope: Vec<OsString>) -> MutantsChanged {
         MutantsChanged {
-            missed: Journal::from(
-                [output.as_path()].into_iter().chain(Self::MISSED_LIST.map(Path::new)).collect::<PathBuf>(),
-            ),
             diff: Journal::from(diff),
-            output,
+            scoped: Pass::within(output.join(Self::SCOPED)),
+            own: Pass::within(output),
             shard,
             scope,
         }
     }
 
-    fn judged(&self, files: &impl Files, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        let missed = self.missed.read_or(files, Text::default())?;
-        Verdict::from(&missed).reported(out)
-    }
-
     fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        let changed = Self::changed_lines(ports)?;
+        let invocation = Invocation::new("git", Self::DIFF);
+        let changed = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
         self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
         let shard = self.shard.arguments();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
             .into_iter()
             .chain(shard.iter().map(OsString::as_os_str))
+            .collect();
+        let own = self.own.ran(ports, &selection, &[CargoMutants::MISSED, CargoMutants::TIMEOUT])?;
+        own.followed_by(|| {
+            let survivors = self.own.survivors(ports.files(), out)?;
+            let rerun = survivors.map(|found| self.rerun(ports, out, &found));
+            rerun.unwrap_or_else(|| Verdict::NoneMissed.reported(out))
+        })
+    }
+
+    fn rerun(&self, ports: &impl Ports, out: &mut impl Write, missed: &Survivors) -> Result<Exit, Failure<'_>> {
+        let diff: &Path = self.diff.as_ref();
+        let named: Vec<OsString> = missed
+            .names()
+            .iter()
+            .flat_map(|name| [OsString::from(Self::EXAMINE), OsString::from(Exact::from(name))])
+            .collect();
+        let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
+            .into_iter()
+            .chain(named.iter().map(OsString::as_os_str))
             .chain(self.scope.iter().map(OsString::as_os_str))
             .collect();
-        let invocation = CargoMutants::invocation(&self.output, &selection, &[]);
-        let run = ports.run(&invocation).map_err(Failure::starting(&invocation))?;
-        run.exit().excusing(&[CargoMutants::TIMEOUT]).followed_by(|| self.judged(ports.files(), out))
+        let scoped = self.scoped.ran(ports, &selection, &[CargoMutants::TIMEOUT])?;
+        scoped.followed_by(|| self.scoped.judged(ports.files(), out, missed))
     }
 }
 
