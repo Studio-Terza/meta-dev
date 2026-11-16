@@ -1,10 +1,11 @@
 use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use newtype::{Counter, Wrapping};
-use store_ports::{Batch, Columns, Query, Statements, StoreFailure, Written};
-use transcript_ports::{Body, SessionId, Uuid};
+use store_ports::Record as _;
+use store_ports::{Batch, Columns, Edge, Moved, Prepared, Query, Staged, Statements, StoreFailure, Written};
+use transcript_ports::{Body, Instant, SessionId, Uuid};
 
-use design_jobs::{JobClosed, JobState};
+use design_jobs::JobState;
 
 use super::{
     Delivery, FailuresReported, Flailed, FlailedSegments, Halted, HeldBy, Hold, JobFlailed, JobHalted, JobOpened,
@@ -25,9 +26,31 @@ struct NextJobRow {
     next: JobId,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
+#[record(table = "releases")]
+pub struct Release {
+    #[record(key)]
+    job: JobId,
+    #[record(generated)]
+    released_at: Instant,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
+#[record(table = "successions")]
+pub struct Succession {
+    #[record(key)]
+    released: JobId,
+    successor: JobId,
+}
+
 #[derive(Debug, Columns)]
 struct OpenJobRow {
     id: JobId,
+}
+
+#[derive(Debug, Columns)]
+struct DeliveredRow {
+    job: JobId,
 }
 
 #[derive(Debug, Columns)]
@@ -130,9 +153,9 @@ impl Batch for JobOpened {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let job = self.0;
+        let JobOpened { job, covering } = self;
         let open = JobState::Open;
-        statements.written(store_ports::query!(
+        let opened = statements.written(store_ports::query!(
             r#"
 INSERT INTO
   jobs (id, state)
@@ -141,7 +164,41 @@ VALUES
 "#,
             job: JobId,
             open: JobState
-        ))
+        ))?;
+        let succeeded = covering
+            .iter()
+            .map(|segment| {
+                let message = AsRef::<Uuid>::as_ref(segment).clone();
+                let ordinal = Ordinal::from(segment);
+                statements.written(store_ports::query!(
+                    r#"
+INSERT INTO
+  successions (released, successor)
+SELECT DISTINCT
+  flailed.job,
+  ?1
+FROM
+  flailed
+  JOIN releases ON releases.job = flailed.job
+WHERE
+  flailed.message = ?2
+  AND flailed.ordinal = ?3
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      successions
+    WHERE
+      successions.released = flailed.job
+  )
+"#,
+                    job: JobId,
+                    message: Uuid,
+                    ordinal: Ordinal
+                ))
+            })
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total([opened].into_iter().chain(succeeded)))
     }
 }
 
@@ -150,7 +207,7 @@ impl Batch for JobHalted {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let JobHalted { job, halted, account, held, retold } = self;
-        let closed = JobClosed::new(job, JobState::from(halted)).written(statements)?;
+        let closed = JobState::from(halted).closing(job).written(statements)?;
         let unreported = Delivery::Unreported;
         let recorded = statements.written(store_ports::query!(
             r#"
@@ -178,21 +235,20 @@ impl Batch for Retold {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let Retold { job, account } = self;
-        let unreported = Delivery::Unreported;
-        statements.written(store_ports::query!(
+        let recorded = statements.written(store_ports::query!(
             r#"
 UPDATE
   failures
 SET
-  account = ?2,
-  delivery = ?3
+  account = ?2
 WHERE
   job = ?1
 "#,
             job: JobId,
-            account: Account,
-            unreported: Delivery
-        ))
+            account: Account
+        ))?;
+        let moved = Delivery::Reported.shifted(Delivery::Unreported, job, statements)?;
+        Ok(Written::total([recorded, moved].into_iter()))
     }
 }
 
@@ -224,23 +280,11 @@ impl Batch for FailuresReported {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let reported = Delivery::Reported;
         let written = self
             .0
             .into_iter()
             .map(|job| {
-                statements.written(store_ports::query!(
-                    r#"
-UPDATE
-  failures
-SET
-  delivery = ?2
-WHERE
-  job = ?1
-"#,
-                    job: JobId,
-                    reported: Delivery
-                ))
+                Moved::<Delivery>::new(job, Edge::new(Delivery::Unreported, Delivery::Reported)).written(statements)
             })
             .collect::<Result<Vec<Written>, StoreFailure>>()?;
         Ok(Written::total(written.into_iter()))
@@ -251,20 +295,12 @@ impl Batch for JobsInterrupted {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let open = JobState::Open;
-        let interrupted = JobState::Interrupted;
-        statements.written(store_ports::query!(
-            r#"
-UPDATE
-  jobs
-SET
-  state = ?2
-WHERE
-  state = ?1
-"#,
-            open: JobState,
-            interrupted: JobState
-        ))
+        let moved = OpenJobs
+            .rows(statements)?
+            .into_iter()
+            .map(|job| JobState::Interrupted.closing(job).written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(moved.into_iter()))
     }
 }
 
@@ -323,28 +359,28 @@ impl Batch for RunEnded {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let RunEnded { run, state, usage, reply } = self;
         let Spent { input, output, cache_written, cache_read } = Spent::from(usage);
-        statements.written(store_ports::query!(
+        let moved = Moved::<RunState>::new(run, Edge::new(RunState::Running, state)).written(statements)?;
+        let recorded = statements.written(store_ports::query!(
             r#"
 UPDATE
   runs
 SET
-  state = ?2,
-  input_tokens = ?3,
-  output_tokens = ?4,
-  cache_written_tokens = ?5,
-  cache_read_tokens = ?6,
-  reply = ?7
+  input_tokens = ?2,
+  output_tokens = ?3,
+  cache_written_tokens = ?4,
+  cache_read_tokens = ?5,
+  reply = ?6
 WHERE
   id = ?1
 "#,
             run: RunId,
-            state: RunState,
             input: Option<Tokens>,
             output: Option<Tokens>,
             cache_written: Option<Tokens>,
             cache_read: Option<Tokens>,
             reply: Option<Excerpt>
-        ))
+        ))?;
+        Ok(Written::total([moved, recorded].into_iter()))
     }
 }
 
@@ -398,25 +434,9 @@ impl Batch for JobRetried {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let job = self.0;
-        let released = statements.written(store_ports::query!(
-            r#"
-DELETE FROM
-  flailed
-WHERE
-  job = ?1
-"#,
-            job: JobId
-        ))?;
-        let withdrawn = statements.written(store_ports::query!(
-            r#"
-DELETE FROM
-  failures
-WHERE
-  job = ?1
-"#,
-            job: JobId
-        ))?;
-        Ok(Written::total([released, withdrawn].into_iter()))
+        let released = statements.one(Release::created(&ReleaseNew { job }))?;
+        let withdrawn = Delivery::Unreported.shifted(Delivery::Withdrawn, *released.key(), statements)?;
+        Ok(Written::total([Written::new(1), withdrawn].into_iter()))
     }
 }
 
@@ -428,17 +448,17 @@ impl Query for FlailedSegments {
             FlailedRow,
             r#"
 SELECT
-  flailed.message,
-  flailed.ordinal,
-  flailed.job,
-  flailed.run
+  held.message,
+  held.ordinal,
+  held.job,
+  held.run
 FROM
-  flailed
-  JOIN messages ON messages.uuid = flailed.message
+  held
+  JOIN messages ON messages.uuid = held.message
 ORDER BY
   messages.at,
-  flailed.message,
-  flailed.ordinal
+  held.message,
+  held.ordinal
 "#
         ))?;
         Ok(rows.into_iter().map(Flailed::from).collect())
@@ -454,19 +474,19 @@ impl Query for HeldBy {
             FlailedRow,
             r#"
 SELECT
-  flailed.message,
-  flailed.ordinal,
-  flailed.job,
-  flailed.run
+  held.message,
+  held.ordinal,
+  held.job,
+  held.run
 FROM
-  flailed
-  JOIN messages ON messages.uuid = flailed.message
+  held
+  JOIN messages ON messages.uuid = held.message
 WHERE
-  flailed.job = ?1
+  held.job = ?1
 ORDER BY
   messages.at,
-  flailed.message,
-  flailed.ordinal
+  held.message,
+  held.ordinal
 "#,
             job: JobId
         ))?;
@@ -585,14 +605,14 @@ SELECT
   segments.ordinal,
   segments.body,
   messages.session,
-  flailed.run AS "run?: i64"
+  held.run AS "run?: i64"
 FROM
   unplaced
   JOIN segments ON segments.message = unplaced.message
   AND segments.ordinal = unplaced.ordinal
   JOIN messages ON messages.uuid = unplaced.message
-  LEFT JOIN flailed ON flailed.message = unplaced.message
-  AND flailed.ordinal = unplaced.ordinal
+  LEFT JOIN held ON held.message = unplaced.message
+  AND held.ordinal = unplaced.ordinal
 ORDER BY
   messages.at,
   segments.message,
@@ -600,5 +620,76 @@ ORDER BY
 "#
         ))?;
         Ok(rows.into_iter().map(Unplaced::from).collect())
+    }
+}
+
+impl Staged for RunState {
+    type Key = RunId;
+
+    type State = RunState;
+
+    fn moved(key: &RunId, from: RunState, to: RunState) -> Prepared<()> {
+        store_ports::query!(
+            r#"
+UPDATE
+  runs
+SET
+  state = ?3
+WHERE
+  id = ?1
+  AND state = ?2
+"#,
+            key: RunId,
+            from: RunState,
+            to: RunState
+        )
+    }
+}
+
+impl Staged for Delivery {
+    type Key = JobId;
+
+    type State = Delivery;
+
+    fn moved(key: &JobId, from: Delivery, to: Delivery) -> Prepared<()> {
+        store_ports::query!(
+            r#"
+UPDATE
+  failures
+SET
+  delivery = ?3
+WHERE
+  job = ?1
+  AND delivery = ?2
+"#,
+            key: JobId,
+            from: Delivery,
+            to: Delivery
+        )
+    }
+}
+
+impl Delivery {
+    fn shifted(self, to: Delivery, job: JobId, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let from = self;
+        let delivered = statements.rows(store_ports::query!(
+            DeliveredRow,
+            r#"
+SELECT
+  job
+FROM
+  failures
+WHERE
+  job = ?1
+  AND delivery = ?2
+"#,
+            job: JobId,
+            from: Delivery
+        ))?;
+        let moved = delivered
+            .into_iter()
+            .map(|row| Moved::<Delivery>::new(row.job, Edge::new(from, to)).written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(moved.into_iter()))
     }
 }

@@ -148,7 +148,7 @@ impl Scratch {
 
 impl Scratch {
     const RECORDS: &'static str = "SELECT t.name FROM pragma_table_list AS t WHERE t.schema = 'main' AND t.type = 'table' AND t.name != ?1 AND (SELECT count(*) FROM pragma_table_info(t.name) WHERE pk > 0) = 1 AND NOT EXISTS (SELECT 1 FROM pragma_table_info(t.name) WHERE pk = 0 AND \"notnull\" = 0) ORDER BY t.name";
-    const COLUMNS: &'static str = "SELECT name, CASE WHEN pk > 0 AND upper(type) = 'INTEGER' THEN 'generated_key' WHEN pk > 0 THEN 'key' WHEN dflt_value IS NOT NULL THEN 'generated' ELSE 'given' END FROM pragma_table_info(?1) ORDER BY cid";
+    const COLUMNS: &'static str = "SELECT name, CASE WHEN pk > 0 AND upper(type) = 'INTEGER' AND NOT EXISTS (SELECT 1 FROM pragma_foreign_key_list(?1) AS f WHERE f.\"from\" = name) THEN 'generated_key' WHEN pk > 0 THEN 'key' WHEN dflt_value IS NOT NULL THEN 'generated' ELSE 'given' END FROM pragma_table_info(?1) ORDER BY cid";
 
     fn tables(&mut self) -> Result<Vec<Table>, Uncached> {
         let names: Vec<String> = self

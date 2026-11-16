@@ -23,6 +23,16 @@ pub enum StoreFailure {
     Missing,
     #[error("the store's rewrite refuses to open it: {0}")]
     Refused(#[source] Box<dyn Error + Send + Sync>),
+    #[error("a lifecycle move was refused: {0}")]
+    Unmoved(#[from] Unmoved),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Unmoved {
+    #[error("the move is not an edge of its lifecycle")]
+    Unlisted,
+    #[error("the row is not in the state the move starts from")]
+    Elsewhere,
 }
 
 impl StoreFailure {
@@ -36,7 +46,8 @@ impl StoreFailure {
             | StoreFailure::Statement(_)
             | StoreFailure::Column(_)
             | StoreFailure::Missing
-            | StoreFailure::Refused(_)) => Err(failed),
+            | StoreFailure::Refused(_)
+            | StoreFailure::Unmoved(_)) => Err(failed),
         }
     }
 }

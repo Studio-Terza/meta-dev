@@ -13,7 +13,8 @@ use design_model::{
 };
 use design_runs::{
     Account, FailuresReported, FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRetried, NextJob,
-    OpenJobs, Retold, RunSpawned, Spawned, UnplacedSegments, UnreportedFailures, Unstructured,
+    OpenJobs, Retold, RunSpawned, Spawned, Succession, SuccessionNew, UnplacedSegments, UnreportedFailures,
+    Unstructured,
 };
 use design_store::{
     AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Holding, JobRepeated, Linked, NextNode,
@@ -33,6 +34,7 @@ use newtype::Enumerated;
 use newtype::{Checked, Counter, Display, Newtype, Wrapping};
 use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
+use store_ports::Record as _;
 use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
 use stream::{Message, Stream};
 use transcript_ports::{
@@ -1636,6 +1638,11 @@ fn a_retried_hold_withdraws_its_account_and_queues_its_segments_again() -> Resul
     assert_eq!((queued, told, holding), (Vec::new(), 1, segments.clone()));
     assert_eq!(Unstructuring::listed(&store)?, segments);
     assert_eq!((store.read(HeldBy::from(job))?, store.read(UnreportedFailures)?), (None, Vec::new()));
+    let successor = store.read(NextJob)?;
+    store.write(JobOpened::from(successor).covering(segments))?;
+    let succeeded: Vec<SuccessionNew> =
+        store.read(Succession::fetched(&job))?.iter().map(SuccessionNew::from).collect();
+    assert_eq!(succeeded, vec![SuccessionNew { released: job, successor }]);
     Ok(())
 }
 

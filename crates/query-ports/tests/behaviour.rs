@@ -20,7 +20,7 @@ fn kept() {
 const FIXTURE: &str = r#"fn fixture() { store_ports::query!("SELECT 3 AS three"); }"#;
 const NOTES: &str = r#"store_ports::query!("SELECT 4 AS four")"#;
 const STALE: &str = "query-stale.json";
-const RECORDS: &str = "CREATE TABLE r (id INTEGER PRIMARY KEY, name TEXT NOT NULL, at TEXT NOT NULL DEFAULT 'now');\nCREATE TABLE n (k TEXT PRIMARY KEY, v TEXT);\nCREATE TABLE p (a TEXT NOT NULL, b TEXT NOT NULL, PRIMARY KEY (a, b));\n";
+const RECORDS: &str = "CREATE TABLE r (id INTEGER PRIMARY KEY, name TEXT NOT NULL, at TEXT NOT NULL DEFAULT 'now');\nCREATE TABLE n (k TEXT PRIMARY KEY, v TEXT);\nCREATE TABLE p (a TEXT NOT NULL, b TEXT NOT NULL, PRIMARY KEY (a, b));\nCREATE TABLE k (id INTEGER PRIMARY KEY NOT NULL REFERENCES r (id), v TEXT NOT NULL);\n";
 const WORKSPACE: &str = "[workspace]\nresolver = \"3\"\nmembers = [\"crates/*\"]\n";
 const MANIFEST: &str = "[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nstore-ports = { path = \"../store-ports\" }\n";
 const PORT_MANIFEST: &str = "[package]\nname = \"store-ports\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nstore-ports-macros = { path = \"../store-ports-macros\" }\n";
@@ -106,8 +106,13 @@ fn a_table_with_one_key_and_no_nullable_columns_gets_its_record_statements() -> 
         .column("id", Origin::GeneratedKey)
         .column("name", Origin::Given)
         .column("at", Origin::Generated);
-    let expected =
-        record.statements().iter().map(|sql| Workspace::named(sql)).chain([Workspace::named(KEPT)]).collect();
+    let referencing = Table::named("k").column("id", Origin::Key).column("v", Origin::Given);
+    let expected = [record, referencing]
+        .iter()
+        .flat_map(Table::statements)
+        .map(|sql| Workspace::named(&sql))
+        .chain([Workspace::named(KEPT)])
+        .collect();
     assert_eq!(workspace.cached()?, expected);
     Ok(())
 }

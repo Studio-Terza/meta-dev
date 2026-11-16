@@ -15,7 +15,6 @@ doctest = false
 design-model = { path = "../design-model" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
-port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }
 thiserror.workspace = true
 

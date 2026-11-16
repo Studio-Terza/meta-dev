@@ -1,6 +1,7 @@
 mod batch;
 mod busy;
 mod column;
+mod lifecycle;
 mod migrator;
 mod opens;
 mod prepared;
@@ -19,6 +20,7 @@ mod written;
 pub use batch::Batch;
 pub use busy::Busy;
 pub use column::{Column, ColumnFailure, Columns};
+pub use lifecycle::{Edge, Lifecycle, Moved, Staged};
 pub use migrator::{Migration, Migrator};
 pub use opens::Opens;
 pub use prepared::{Execute, Prepared, Values};

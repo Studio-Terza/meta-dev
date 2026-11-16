@@ -1,5 +1,7 @@
 mod boundary;
 
+pub use boundary::{Release, ReleaseNew, Succession, SuccessionNew};
+
 use std::fmt;
 
 use design_jobs::JobState;
@@ -8,6 +10,7 @@ use dispatch_ports::{Deadline, Finished, Pid, Reply, Stall, Started, Usage};
 use named_derive::Named;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use port_core::Op;
+use store_ports::{Edge, Lifecycle};
 use transcript_ports::{Body, SessionId};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
@@ -45,11 +48,13 @@ pub enum Halted {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Delivery {
+pub enum Delivery {
     #[name("unreported")]
     Unreported,
     #[name("reported")]
     Reported,
+    #[name("withdrawn")]
+    Withdrawn,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,8 +64,11 @@ pub struct Spawned {
     deadline: Deadline,
 }
 
-#[derive(Clone, Copy, Debug, Op)]
-pub struct JobOpened(JobId);
+#[derive(Clone, Debug, Op)]
+pub struct JobOpened {
+    job: JobId,
+    covering: Vec<Segment>,
+}
 
 #[derive(Clone, Debug, Op)]
 pub struct JobHalted {
@@ -201,6 +209,26 @@ impl AsRef<Deadline> for Spawned {
     }
 }
 
+impl Lifecycle for RunState {
+    const EDGES: &'static [Edge<RunState>] = &[
+        Edge::new(RunState::Running, RunState::Replied),
+        Edge::new(RunState::Running, RunState::Unreadable),
+        Edge::new(RunState::Running, RunState::Errored),
+        Edge::new(RunState::Running, RunState::Overdue),
+        Edge::new(RunState::Running, RunState::Killed),
+        Edge::new(RunState::Running, RunState::Gone),
+        Edge::new(RunState::Running, RunState::Failed),
+    ];
+}
+
+impl Lifecycle for Delivery {
+    const EDGES: &'static [Edge<Delivery>] = &[
+        Edge::new(Delivery::Unreported, Delivery::Reported),
+        Edge::new(Delivery::Reported, Delivery::Unreported),
+        Edge::new(Delivery::Unreported, Delivery::Withdrawn),
+    ];
+}
+
 impl From<&Stall> for RunState {
     fn from(stall: &Stall) -> RunState {
         match stall {
@@ -214,7 +242,14 @@ impl From<&Stall> for RunState {
 
 impl From<JobId> for JobOpened {
     fn from(job: JobId) -> JobOpened {
-        JobOpened(job)
+        JobOpened { job, covering: Vec::new() }
+    }
+}
+
+impl JobOpened {
+    #[must_use]
+    pub fn covering(self, covering: Vec<Segment>) -> JobOpened {
+        JobOpened { covering, ..self }
     }
 }
 

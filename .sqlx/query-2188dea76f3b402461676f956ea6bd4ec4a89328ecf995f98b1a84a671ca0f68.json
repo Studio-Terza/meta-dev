@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE releases SET released_at = ?1 WHERE job = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2188dea76f3b402461676f956ea6bd4ec4a89328ecf995f98b1a84a671ca0f68"
+}

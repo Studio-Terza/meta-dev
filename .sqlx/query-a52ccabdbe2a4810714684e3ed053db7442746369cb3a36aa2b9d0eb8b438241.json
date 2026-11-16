@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO failures (halted, account, delivery) VALUES (?1, ?2, ?3) RETURNING job AS \"job!\", halted AS \"halted!\", account AS \"account!\", delivery AS \"delivery!\"",
+  "query": "INSERT INTO failures (job, halted, account, delivery) VALUES (?1, ?2, ?3, ?4) RETURNING job AS \"job!\", halted AS \"halted!\", account AS \"account!\", delivery AS \"delivery!\"",
   "describe": {
     "columns": [
       {
@@ -49,7 +49,7 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       null,
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "ebd54681d735ef0a9a9da6e639d9a7de44eec69210a091a62e94cf0070d43115"
+  "hash": "a52ccabdbe2a4810714684e3ed053db7442746369cb3a36aa2b9d0eb8b438241"
 }

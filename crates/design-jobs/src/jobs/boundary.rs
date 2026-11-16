@@ -1,24 +1,27 @@
 use design_model::JobId;
-use store_ports::{Batch, Statements, StoreFailure, Written};
+use store_ports::{Prepared, Staged};
 
-use super::{JobClosed, JobState};
+use super::JobState;
 
-impl Batch for JobClosed {
-    type Failure = StoreFailure;
+impl Staged for JobState {
+    type Key = JobId;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let JobClosed { job, state } = self;
-        statements.written(store_ports::query!(
+    type State = JobState;
+
+    fn moved(key: &JobId, from: JobState, to: JobState) -> Prepared<()> {
+        store_ports::query!(
             r#"
 UPDATE
   jobs
 SET
-  state = ?2
+  state = ?3
 WHERE
   id = ?1
+  AND state = ?2
 "#,
-            job: JobId,
-            state: JobState
-        ))
+            key: JobId,
+            from: JobState,
+            to: JobState
+        )
     }
 }
