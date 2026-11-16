@@ -1,5 +1,5 @@
 use quote::ToTokens;
-use syn::{Block, Expr, Lit, Pat, Stmt, Type};
+use syn::{Block, Expr, Lit, Member, Pat, Stmt, Type};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Past<'tree, Node>(&'tree Node);
@@ -216,5 +216,18 @@ impl LitText {
     #[must_use]
     pub fn written(lit: &Lit) -> String {
         lit.to_token_stream().to_string()
+    }
+}
+
+#[derive(Debug)]
+pub struct MemberText;
+
+impl MemberText {
+    #[must_use]
+    pub fn written(member: &Member) -> String {
+        match member {
+            Member::Named(named) => named.to_string(),
+            Member::Unnamed(index) => index.index.to_string(),
+        }
     }
 }

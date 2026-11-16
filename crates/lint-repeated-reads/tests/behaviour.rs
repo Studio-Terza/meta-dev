@@ -15,6 +15,7 @@ const OBJECTS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntra
 const UNDISPATCHED: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c) + 2 } }\n";
 const ONE_TYPE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.a } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const FIELDS: &str = "struct Inner { b: u8 }\nstruct Ctx { a: Inner }\nfn fact(i: &Inner) -> u8 { i.b }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(&c.a) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(&(c.a)) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
+const INDEXED: &str = "struct Inner { b: u8 }\nstruct Ctx(Inner);\nfn fact(i: &Inner) -> u8 { i.b }\ntrait Lint { fn run(&self, p: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, p: &Ctx) -> u8 { fact(&p.0) + 1 } }\nimpl Lint for B { fn run(&self, p: &Ctx) -> u8 { fact(&p.0) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const CONSTRUCTORS: &str = "struct Ctx { a: u8 }\nstruct Held<'c>(&'c Ctx);\nenum Kept<'c> { One(&'c Ctx) }\ntrait Lint { fn run(&self, c: &Ctx) -> usize; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> usize { [Some(c)].len() + [Held(c)].len() + [Kept::One(c)].len() } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> usize { [Some(c)].len() + [Held(c)].len() + [Kept::One(c)].len() } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const ASSOCIATED: &str = "struct Ctx { a: u8 }\nstruct Facts;\nimpl Facts { fn of(c: &Ctx) -> u8 { c.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { Facts::of(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { Facts::of(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const GENERIC_OWNER: &str = "struct Ctx { a: u8 }\ntrait Fact { fn of(c: &Ctx) -> u8; }\ntrait Lint { fn run<F: Fact>(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run<F: Fact>(&self, c: &Ctx) -> u8 { F::of(c) + 1 } }\nimpl Lint for B { fn run<F: Fact>(&self, c: &Ctx) -> u8 { F::of(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
@@ -27,7 +28,7 @@ const BOUNDED_METHOD: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a
 const SINKS: &str = "struct Out { a: u8 }\nfn write(o: &mut Out) { o.a = 1; }\ntrait Lint { fn run(&self, o: &mut Out, p: Out) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 1 } }\nimpl Lint for B { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const METHOD_CALLS: &str = "struct Ctx { a: u8 }\nimpl Ctx { fn fact(&self) -> u8 { self.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { c.fact() + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.fact() + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 
-const CASES: [Case; 25] = [
+const CASES: [Case; 26] = [
     Case::new(
         Title::new("the same literal is one fact"),
         &[Source::new(Located::new("a.rs"), Text::new(SAME_LITERAL))],
@@ -92,6 +93,11 @@ const CASES: [Case; 25] = [
         Title::new("one implementation reads the fact"),
         &[Source::new(Located::new("a.rs"), Text::new(ONE_TYPE))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("the same indexed field of a newtype parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(INDEXED))],
+        Flagged::new(&["a.rs:7"]),
     ),
     Case::new(
         Title::new("the same field of the parameter, through a reference and parentheses"),
