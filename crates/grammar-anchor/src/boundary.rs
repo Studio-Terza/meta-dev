@@ -13,13 +13,13 @@ enum Spelling<'text> {
 #[logos(crate = grammar::logos)]
 enum Index {
     #[regex("0|[1-9][0-9]*", |lexer| lexer.slice().parse().ok())]
-    Ordinal(usize),
+    Ordinal(u32),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Anchoring {
     message: String,
-    ordinal: Option<usize>,
+    ordinal: Option<u32>,
 }
 
 impl Anchoring {
@@ -39,7 +39,7 @@ impl Anchoring {
     }
 
     #[must_use]
-    pub fn ordinal(&self) -> Option<usize> {
+    pub fn ordinal(&self) -> Option<u32> {
         self.ordinal
     }
 }
@@ -54,12 +54,12 @@ impl<'text> Spelling<'text> {
 }
 
 impl Index {
-    fn hashed([hash, digits]: &[Spelling<'_>; 2]) -> Option<usize> {
+    fn hashed([hash, digits]: &[Spelling<'_>; 2]) -> Option<u32> {
         Some(hash).filter(|spelling| **spelling == Spelling::Hash)?;
         Index::read(digits.message()?)
     }
 
-    fn read(digits: &str) -> Option<usize> {
+    fn read(digits: &str) -> Option<u32> {
         let spelled: Vec<Result<Index, ()>> = Index::lexer(digits).collect();
         <[Result<Index, ()>; 1]>::try_from(spelled)
             .ok()

@@ -13,7 +13,7 @@ struct Read6 {
     quoted: Term,
     bare: Term,
     integer: u64,
-    ordinal: usize,
+    ordinal: u32,
     message: Term,
 }
 

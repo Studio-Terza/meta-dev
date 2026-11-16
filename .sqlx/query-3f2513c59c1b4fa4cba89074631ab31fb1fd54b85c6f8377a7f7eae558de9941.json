@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE notes_endings SET ending = ?1 WHERE node = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3f2513c59c1b4fa4cba89074631ab31fb1fd54b85c6f8377a7f7eae558de9941"
+}

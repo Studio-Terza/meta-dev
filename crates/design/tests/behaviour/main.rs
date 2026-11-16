@@ -449,7 +449,7 @@ impl Unheld {
         Session::working([Unheld::asked(), Session::line(Speaker::Owner, "o1", "\"l1\"", "1. yes\\n2. no")].concat())
     }
 
-    fn end(segment: &str, ordinal: usize) -> Anchored {
+    fn end(segment: &str, ordinal: u32) -> Anchored {
         Anchored::Segment(SegmentRef::new(Prefix::new(segment.to_owned()), Ordinal::new(ordinal)))
     }
 
@@ -2154,7 +2154,7 @@ impl Generated {
     }
 
     fn segment() -> BoxedStrategy<SegmentRef> {
-        (Generated::message(), 0usize..100_000)
+        (Generated::message(), 0u32..100_000)
             .prop_map(|(prefix, ordinal)| SegmentRef::new(Prefix::new(prefix), Ordinal::new(ordinal)))
             .boxed()
     }
@@ -2259,8 +2259,8 @@ impl Generated {
 
     fn counted() -> BoxedStrategy<Line> {
         prop_oneof![
-            (any::<SessionId>(), any::<u64>())
-                .prop_map(|(session, cursor)| Line::Read { session, cursor: Cursor::new(Offset::new(cursor)) }),
+            (any::<SessionId>(), any::<Offset>())
+                .prop_map(|(session, cursor)| Line::Read { session, cursor: Cursor::new(cursor) }),
             (Generated::author(), Generated::count()).prop_map(|(author, count)| Line::Authored { author, count }),
             (any::<transcript_ports::Kind>(), Generated::count())
                 .prop_map(|(kind, count)| Line::Unrecognised { kind, count }),
@@ -2496,11 +2496,11 @@ impl Spread {
             .collect()
     }
 
-    fn reference(prefix: &str, ordinal: usize) -> SegmentRef {
+    fn reference(prefix: &str, ordinal: u32) -> SegmentRef {
         SegmentRef::new(Prefix::new(prefix.to_owned()), Ordinal::new(ordinal))
     }
 
-    fn segment(prefix: &str, ordinal: usize, body: &str) -> Result<Line, Box<dyn Error>> {
+    fn segment(prefix: &str, ordinal: u32, body: &str) -> Result<Line, Box<dyn Error>> {
         Ok(Line::Segment {
             segment: Spread::reference(prefix, ordinal),
             shape: ShapeName::new("sentence".to_owned()),
@@ -2537,7 +2537,7 @@ fn show_and_search_print_the_shortest_unique_ref_and_every_one_printed_applies()
     ];
     assert_eq!(shown, wanted);
     let found = Spread::parsed(&applying.run(&["search", "thought"])?);
-    let hit = |prefix: &str, ordinal: usize, body: &str| -> Result<Line, Box<dyn Error>> {
+    let hit = |prefix: &str, ordinal: u32, body: &str| -> Result<Line, Box<dyn Error>> {
         Ok(Line::Hit {
             segment: Spread::reference(prefix, ordinal),
             author: Authorship::Owner,

@@ -170,3 +170,40 @@ macro_rules! preserves {
         });
     };
 }
+
+#[macro_export]
+macro_rules! crud {
+    ($(#[$meta:meta])* $name:ident, $record:ty, $fresh:expr, $opened:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, ($fresh, $fresh), pair, {
+            use ::store_ports::{Created, Record, Store};
+            let (first, second) = pair;
+            let run = ::port_core::Run::root();
+            let store = run.port($opened);
+            let made: $record = store
+                .create(Created::<$record>::new(first.clone()))
+                .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+            let read = |store: &::port_core::Port<'_, _>| {
+                store
+                    .read(<$record>::fetched(made.key()))
+                    .map(|rows| rows.into_iter().next())
+                    .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))
+            };
+            $crate::proptest::prop_assert_eq!(read(&store)?, Some(made.clone()), "create then read returns what was created");
+            let again = store.create(Created::<$record>::new(first));
+            $crate::proptest::prop_assert_eq!(
+                again.map_or_else(|_refused| read(&store), |_twice| Ok(Some(made.clone())))?,
+                Some(made.clone()),
+                "a refused create leaves the store as it was"
+            );
+            let revised = made.revised(&second);
+            store
+                .write(revised.updated())
+                .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+            $crate::proptest::prop_assert_eq!(read(&store)?, Some(revised), "update then read returns the update");
+            store
+                .write(<$record>::deleted(made.key()))
+                .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+            $crate::proptest::prop_assert_eq!(read(&store)?, None, "delete then read finds nothing");
+        });
+    };
+}

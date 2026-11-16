@@ -1,27 +1,31 @@
+mod boundary;
+
 use grammar_message::Span;
 use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 
 #[derive(Debug, thiserror::Error)]
-#[error("message text holds a NUL character")]
-pub struct Nul;
+pub enum Malformed {
+    #[error("message text holds a NUL character")]
+    Nul,
+    #[error("message text is longer than u32::MAX bytes")]
+    Oversized,
+}
 
 #[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[newtype(checked)]
 pub struct Body(String);
 
 impl Checked for Body {
-    type Error = Nul;
+    type Error = Malformed;
 
-    fn checked(text: &String) -> Result<&String, Nul> {
-        match text.chars().find(|letter| *letter == '\0') {
-            Some(_) => Err(Nul),
-            None => Ok(text),
-        }
+    fn checked(text: &String) -> Result<&String, Malformed> {
+        u32::try_from(text.len()).map_err(|_oversized| Malformed::Oversized)?;
+        text.chars().find(|letter| *letter == '\0').map_or(Ok(text), |_nul| Err(Malformed::Nul))
     }
 }
 
 impl Body {
-    pub fn sliced(&self, span: Span) -> Result<Body, Nul> {
+    pub fn sliced(&self, span: Span) -> Result<Body, Malformed> {
         Body::try_new(span.slice(&self.0).to_owned())
     }
 
@@ -30,7 +34,7 @@ impl Body {
         self.0.chars().next().map(|_| self)
     }
 
-    pub fn joined(&self, after: &Body) -> Result<Body, Nul> {
+    pub fn joined(&self, after: &Body) -> Result<Body, Malformed> {
         Body::try_new(format!("{self} {after}"))
     }
 }

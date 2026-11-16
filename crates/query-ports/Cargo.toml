@@ -22,6 +22,7 @@ graph-reader = { path = "../graph-reader" }
 lint-layout = { path = "../lint-layout" }
 lint-reader = { path = "../lint-reader" }
 lint-store-queries = { path = "../lint-store-queries" }
+query-cache = { path = "../query-cache" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

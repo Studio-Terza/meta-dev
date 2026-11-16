@@ -13,7 +13,9 @@ use port_core::Pass;
 use migrations::Migrations;
 use opened::Opened;
 use place::Place;
-use store_ports::{Batch, Busy, Claim, Opens, Query, Schema, StoreFailure, StoreFiller, StoreLock, Written, store_ops};
+use store_ports::{
+    Batch, Busy, Claim, Created, Opens, Query, Record, Schema, StoreFailure, StoreFiller, StoreLock, Written, store_ops,
+};
 
 #[derive(Clone, Debug)]
 pub struct Sqlite {
@@ -68,6 +70,10 @@ impl StoreFiller for Sqlite {
 
     fn write<Q: Batch>(&self, _pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
         self.shared.opened(|path: &Path| fs::create_dir_all(path), |opened| opened.transacted(batch))
+    }
+
+    fn create<R: Record>(&self, _pass: Pass<'_, Created<R>>, created: Created<R>) -> Result<R, StoreFailure> {
+        self.shared.opened(|path: &Path| fs::create_dir_all(path), |opened| opened.created(created))
     }
 
     fn lock(&self, _pass: Pass<'_, store_ops::Lock>) -> Result<StoreLock, Busy> {

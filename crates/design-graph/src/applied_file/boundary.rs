@@ -1,9 +1,21 @@
 use design_model::Provenance;
 use file_ports::Bytes;
+use store_ports::Record as _;
 use store_ports::{Columns, Query, Statements, StoreFailure, Written};
 use transcript_ports::Instant;
 
 use super::{AppliedFile, AppliedId, Earlier, Seen, Unseen};
+
+#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
+#[record(table = "applied_files")]
+pub struct AppliedFileRow {
+    #[record(generated_key)]
+    id: AppliedId,
+    content: Bytes,
+    #[record(generated)]
+    applied_at: Instant,
+    provenance: Provenance,
+}
 
 #[derive(Debug, Columns)]
 struct EarlierRow {
@@ -45,16 +57,7 @@ impl Unseen {
         provenance: Provenance,
         statements: &mut Statements<'_>,
     ) -> Result<Written, StoreFailure> {
-        let content = &self.0;
-        statements.written(store_ports::query!(
-            r#"
-INSERT INTO
-  applied_files (content, provenance)
-VALUES
-  (?1, ?2)
-"#,
-            content: Bytes,
-            provenance: Provenance
-        ))
+        let fresh = AppliedFileRowNew { content: self.0.clone(), provenance };
+        statements.one(AppliedFileRow::created(&fresh)).map(|_stored| Written::new(1))
     }
 }

@@ -6,6 +6,7 @@ pub enum Value {
     Integer(i64),
     Real(f64),
     Text(String),
+    Blob(Vec<u8>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -74,7 +75,7 @@ impl FromValue for i64 {
         match value {
             Value::Integer(integer) => Ok(integer),
             Value::Null => Err(ColumnFailure::Absent),
-            Value::Real(_) | Value::Text(_) => Err(ColumnFailure::Mistyped),
+            Value::Real(_) | Value::Text(_) | Value::Blob(_) => Err(ColumnFailure::Mistyped),
         }
     }
 }
@@ -84,7 +85,7 @@ impl FromValue for f64 {
         match value {
             Value::Real(real) => Ok(real),
             Value::Null => Err(ColumnFailure::Absent),
-            Value::Integer(_) | Value::Text(_) => Err(ColumnFailure::Mistyped),
+            Value::Integer(_) | Value::Text(_) | Value::Blob(_) => Err(ColumnFailure::Mistyped),
         }
     }
 }
@@ -94,7 +95,17 @@ impl FromValue for String {
         match value {
             Value::Text(text) => Ok(text),
             Value::Null => Err(ColumnFailure::Absent),
-            Value::Integer(_) | Value::Real(_) => Err(ColumnFailure::Mistyped),
+            Value::Integer(_) | Value::Real(_) | Value::Blob(_) => Err(ColumnFailure::Mistyped),
+        }
+    }
+}
+
+impl FromValue for Vec<u8> {
+    fn from_value(value: Value) -> Result<Vec<u8>, ColumnFailure> {
+        match value {
+            Value::Blob(blob) => Ok(blob),
+            Value::Null => Err(ColumnFailure::Absent),
+            Value::Integer(_) | Value::Real(_) | Value::Text(_) => Err(ColumnFailure::Mistyped),
         }
     }
 }
@@ -103,7 +114,7 @@ impl<Inner: FromValue> FromValue for Option<Inner> {
     fn from_value(value: Value) -> Result<Option<Inner>, ColumnFailure> {
         match value {
             Value::Null => Ok(None),
-            Value::Integer(_) | Value::Real(_) | Value::Text(_) => Inner::from_value(value).map(Some),
+            Value::Integer(_) | Value::Real(_) | Value::Text(_) | Value::Blob(_) => Inner::from_value(value).map(Some),
         }
     }
 }

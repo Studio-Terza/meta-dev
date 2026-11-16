@@ -12,7 +12,7 @@ enum Spelling<'text> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Cited {
     prefix: String,
-    ordinal: usize,
+    ordinal: u32,
 }
 
 impl<'text> Spelling<'text> {
@@ -40,7 +40,7 @@ impl Cited {
     }
 
     #[must_use]
-    pub fn ordinal(&self) -> usize {
+    pub fn ordinal(&self) -> u32 {
         self.ordinal
     }
 }

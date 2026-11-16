@@ -2,8 +2,6 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use newtype::Wrapping;
-
 use crate::{Bytes, FileFailure, Files, Kind, Offset, Size, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -20,7 +18,7 @@ impl Files for Disk {
 
     fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
         let mut file = File::open(path)?;
-        file.seek(SeekFrom::Start(offset.into_inner()))?;
+        file.seek(SeekFrom::Start(offset.position()))?;
         let mut bytes = Vec::new();
         io::copy(&mut file, &mut bytes)?;
         Ok(Bytes::new(bytes))

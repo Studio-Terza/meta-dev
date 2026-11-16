@@ -39,8 +39,13 @@ const PRIVATE_TEXT_PAIR: &str = "struct A;\nimpl std::fmt::Display for A {}\nimp
 const CRATE_ENCODING: &str = "pub(crate) struct A;\nimpl A {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const PRIVATE_TYPE_PUBLIC_IMPL: &str = "struct A;\nimpl A {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
+const RECORD: &str = "#[derive(Columns, store_ports::Record)]\npub struct A;\n";
+const WRITTEN_RECORD: &str = "pub struct A;\nimpl store_ports::Record for A {}\n";
+const CRUD: &str = "laws::crud!(stored, A, any::<A>(), store());\n";
+const OTHER_CRUD: &str = "laws::crud!(stored, B, any::<B>(), store());\n";
+const RECORD_ROUNDTRIP: &str = "laws::roundtrip!(a, any::<A>(), A::encode, A::decode);\n";
 
-const CASES: [Case; 33] = [
+const CASES: [Case; 38] = [
     Case::new(
         Title::new("display and from_str"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_PAIR))],
@@ -258,6 +263,40 @@ const CASES: [Case; 33] = [
         ],
         Flagged::new(&["src/lib.rs:1"]),
     ),
+    Case::new(
+        Title::new("a derived record without crud laws"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(RECORD))],
+        Flagged::new(&["src/lib.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a written record without crud laws"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(WRITTEN_RECORD))],
+        Flagged::new(&["src/lib.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a record with crud laws"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(RECORD)),
+            Source::new(Located::new("tests/a.rs"), Text::new(CRUD)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("crud laws for another record"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(RECORD)),
+            Source::new(Located::new("tests/a.rs"), Text::new(OTHER_CRUD)),
+        ],
+        Flagged::new(&["src/lib.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a roundtrip does not stand in for crud laws"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(RECORD)),
+            Source::new(Located::new("tests/a.rs"), Text::new(RECORD_ROUNDTRIP)),
+        ],
+        Flagged::new(&["src/lib.rs:2"]),
+    ),
 ];
 
 const LAW_FOR_PAIR: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
@@ -284,4 +323,19 @@ fn the_message_names_the_fix() {
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
     assert!(pair.dirty().is_some());
+}
+
+#[test]
+fn a_record_without_crud_laws_names_the_crud_fix() {
+    let record = [Sources::file("src/lib.rs", Text::new(RECORD))];
+    let model = Reader::read_files(&record);
+    let unstored = MandatoryLaws::report(&model);
+    let messages: Vec<String> = unstored.violations().iter().map(ToString::to_string).collect();
+    assert_eq!(messages.len(), 1);
+    assert!(
+        messages
+            .iter()
+            .all(|message| message.contains("`A` is a stored record without create, read, update and delete laws"))
+    );
+    assert!(messages.iter().all(|message| message.contains("laws::crud!")));
 }

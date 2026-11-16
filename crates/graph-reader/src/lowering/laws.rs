@@ -49,6 +49,7 @@ struct Mentions;
 
 impl Kinds {
     const ROUNDTRIP: [Word<'static>; 1] = words!["roundtrip"];
+    const CRUD: [Word<'static>; 1] = words!["crud"];
     const PROPTEST: [Word<'static>; 1] = words!["proptest"];
     const PROPERTIES: [Word<'static>; 8] = words![
         "associative",
@@ -76,9 +77,10 @@ impl Kinds {
         let law = TestMarks::law(invocation);
         let roundtrip =
             last.as_ref().and_then(|name| name.matches::<Whole>(&Self::ROUNDTRIP)).and(law).map(|_| LawKind::Roundtrip);
+        let crud = last.as_ref().and_then(|name| name.matches::<Whole>(&Self::CRUD)).and(law).map(|_| LawKind::Crud);
         let proptest = last.as_ref().and_then(|name| name.matches::<Whole>(&Self::PROPTEST)).map(|_| LawKind::Proptest);
         let property = law.and(last.as_ref()).and_then(Self::property).map(LawKind::Property);
-        roundtrip.or(proptest).or(property).or(law.map(|_| LawKind::Law))
+        roundtrip.or(crud).or(proptest).or(property).or(law.map(|_| LawKind::Law))
     }
 
     fn property(name: &Name) -> Option<Property> {

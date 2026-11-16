@@ -4,7 +4,7 @@ mod connected;
 use std::path::Path;
 
 use rusqlite::Connection;
-use store_ports::{Batch, Query, StoreFailure, Written};
+use store_ports::{Batch, Created, Query, Record, StoreFailure, Written};
 
 use super::failed::{Unexecuted, Unopened};
 use super::migrations::Migrations;
@@ -49,6 +49,10 @@ impl Opened {
         self.settled(|connected| batch.written(connected))
     }
 
+    pub(super) fn created<R: Record>(&self, created: Created<R>) -> Result<R, StoreFailure> {
+        self.settled(|connected| created.stored(connected))
+    }
+
     fn configured(connection: Connection) -> Result<Opened, StoreFailure> {
         connection.execute_batch(Self::SETTINGS).map_err(Unopened::from)?;
         connection.busy_timeout(Self::BUSY).map_err(Unopened::from)?;
@@ -64,10 +68,10 @@ impl Opened {
         Ok(self)
     }
 
-    fn settled<Failure: From<StoreFailure>>(
+    fn settled<Done, Failure: From<StoreFailure>>(
         &self,
-        writing: impl FnOnce(&mut Connected<'_>) -> Result<Written, Failure>,
-    ) -> Result<Written, Failure> {
+        writing: impl FnOnce(&mut Connected<'_>) -> Result<Done, Failure>,
+    ) -> Result<Done, Failure> {
         let transaction =
             self.connection.unchecked_transaction().map_err(Unexecuted::from).map_err(StoreFailure::from)?;
         let written = writing(&mut Connected::over(&transaction))?;

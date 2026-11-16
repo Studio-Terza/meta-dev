@@ -1,5 +1,5 @@
 use grammar_message::Span;
-use transcript_ports::{Body, Nul};
+use transcript_ports::{Body, Malformed};
 
 use crate::Message;
 use crate::form::Form;
@@ -27,7 +27,7 @@ impl Segment {
         self.form
     }
 
-    pub fn text(&self, message: &Message) -> Result<Body, Nul> {
+    pub fn text(&self, message: &Message) -> Result<Body, Malformed> {
         message.record().text().sliced(self.range)
     }
 }

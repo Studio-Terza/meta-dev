@@ -29,3 +29,7 @@ exit = { path = "../exit" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+sqlite-ports = { path = "../sqlite-ports" }

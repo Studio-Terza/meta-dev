@@ -1,7 +1,9 @@
 use std::fmt::Debug;
 use std::vec;
 
-use crate::{Argument, ColumnFailure, Columns, Released, StoreFailure, Value, Written};
+use port_core::Op;
+
+use crate::{Argument, Batch, ColumnFailure, Columns, Query, Released, Statements, StoreFailure, Value, Written};
 
 pub trait Execute: Debug {
     fn fetched(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Vec<Vec<Value>>, StoreFailure>;
@@ -9,7 +11,7 @@ pub trait Execute: Debug {
     fn executed(&mut self, sql: &'static str, arguments: Vec<Argument>) -> Result<Written, StoreFailure>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Op)]
 pub struct Prepared<Row> {
     sql: &'static str,
     arguments: Vec<Argument>,
@@ -34,6 +36,22 @@ impl<Row: Columns> Prepared<Row> {
         decode: fn(&mut Values) -> Result<Row, ColumnFailure>,
     ) -> Prepared<Row> {
         Prepared { sql, arguments, decode }
+    }
+}
+
+impl<Row: Columns> Query for Prepared<Row> {
+    type Rows = Vec<Row>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Row>, StoreFailure> {
+        statements.rows(self)
+    }
+}
+
+impl Batch for Prepared<()> {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(self)
     }
 }
 

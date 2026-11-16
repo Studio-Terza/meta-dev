@@ -35,7 +35,9 @@ use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
 use stream::{Message, Stream};
-use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, Nul, SessionId, Skipped, Transcripts, Uuid};
+use transcript_ports::{
+    Authorship, Body, ClaudeCodeDir, Cursor, Instant, Malformed, SessionId, Skipped, Transcripts, Uuid,
+};
 
 const DIRECTORY: &str = "/projects/work";
 
@@ -381,7 +383,7 @@ VALUES
         Ok(message.segments().iter().map(|segment| segment.text(&message)).collect::<Result<Vec<Body>, _>>()?)
     }
 
-    fn kept(self) -> Result<Body, Nul> {
+    fn kept(self) -> Result<Body, Malformed> {
         Body::try_new(format!("{}w{}", self.0, self.0))
     }
 }
@@ -823,7 +825,7 @@ impl Proposals {
         }
     }
 
-    fn segment(message: &str, ordinal: usize) -> Result<Segment, Box<dyn Error>> {
+    fn segment(message: &str, ordinal: u32) -> Result<Segment, Box<dyn Error>> {
         Ok(Segment::new(Uuid::try_new(message.to_owned())?, Ordinal::new(ordinal)))
     }
 }
@@ -1077,8 +1079,8 @@ impl Ends {
                 Provenance::from(Entered::Apply),
                 file,
                 vec![Directed::Related {
-                    source: Proposals::segment("o1", edge.child)?,
-                    target: Proposals::segment("o1", edge.parent)?,
+                    source: Proposals::segment("o1", u32::try_from(edge.child)?)?,
+                    target: Proposals::segment("o1", u32::try_from(edge.parent)?)?,
                     relation,
                 }],
                 Remit::Unbounded,
@@ -1092,9 +1094,9 @@ impl Ends {
                 Ok(Cycle::Nodes { source: Dag::id(edge.child), relation, target: Dag::id(edge.parent) })
             }
             Ends::Segments(relation) => Ok(Cycle::Segments {
-                source: Proposals::segment("o1", edge.child)?,
+                source: Proposals::segment("o1", u32::try_from(edge.child)?)?,
                 relation,
-                target: Proposals::segment("o1", edge.parent)?,
+                target: Proposals::segment("o1", u32::try_from(edge.parent)?)?,
             }),
         }
     }

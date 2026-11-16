@@ -1,4 +1,3 @@
-use newtype::{Arbitrary, Display, Newtype};
+mod boundary;
 
-#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Offset(u64);
+pub use boundary::Offset;

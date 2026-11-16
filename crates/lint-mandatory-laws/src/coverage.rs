@@ -17,12 +17,12 @@ impl<'model> From<&'model Model> for Coverage<'model> {
 }
 
 impl<'model> Coverage<'model> {
-    pub(crate) fn roundtrips_naming(&self, subject: &Subject<'_>) -> Vec<&'model BTreeSet<Name>> {
+    pub(crate) fn naming(&self, subject: &Subject<'_>, kind: LawKind) -> Vec<&'model BTreeSet<Name>> {
         self.model
             .laws()
             .filter(|placed| placed.krate() == subject.krate())
             .map(graph::Placed::entity)
-            .filter(|law| law.kind() == LawKind::Roundtrip)
+            .filter(|law| law.kind() == kind)
             .map(graph::Law::mentions)
             .filter(|mentions| mentions.contains(AsRef::<Name>::as_ref(subject)))
             .collect()

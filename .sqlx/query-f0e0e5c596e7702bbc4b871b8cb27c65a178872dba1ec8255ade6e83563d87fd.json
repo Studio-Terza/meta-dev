@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO notes_endings (ending) VALUES (?1) RETURNING node AS \"node!\", ending AS \"ending!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "node!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "notes_endings",
+            "name": "node"
+          }
+        }
+      },
+      {
+        "name": "ending!",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notes_endings",
+            "name": "ending"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "f0e0e5c596e7702bbc4b871b8cb27c65a178872dba1ec8255ade6e83563d87fd"
+}

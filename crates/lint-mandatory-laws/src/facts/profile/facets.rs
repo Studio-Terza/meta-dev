@@ -1,15 +1,18 @@
 mod obligation;
 mod pair;
+mod unstored;
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::super::exposure::Exposure;
 use crate::coverage::Coverage;
 use crate::subject::Subject;
+use graph::LawKind;
 use lint_core::{Site, Violation};
 use lint_layout::{Name, Word, words};
 use obligation::Obligation;
 use pair::Pair;
+use unstored::Unstored;
 
 #[derive(Debug)]
 pub(crate) struct Facets<'file> {
@@ -23,6 +26,7 @@ impl<'file> Facets<'file> {
     const METHOD_PAIR: [Word<'static>; 2] = words!["encode", "decode"];
     const TO: Word<'static> = Word::new("to");
     const FROM: Word<'static> = Word::new("from");
+    const RECORD: Word<'static> = Word::new("Record");
 
     pub(crate) fn new(site: Site<'file>, exposure: Exposure, facts: Vec<Name>) -> Facets<'file> {
         Facets { site, exposure, facts: facts.into_iter().collect() }
@@ -50,7 +54,7 @@ impl<'file> Facets<'file> {
         subject: &'facts Subject<'file>,
         coverage: &Coverage<'_>,
     ) -> Vec<Violation<'file>> {
-        let roundtrips = coverage.roundtrips_naming(subject);
+        let roundtrips = coverage.naming(subject, LawKind::Roundtrip);
         let methods = self.method_pairs();
         let spare = roundtrips
             .iter()
@@ -62,10 +66,15 @@ impl<'file> Facets<'file> {
             .iter()
             .filter_map(|[left, right]| Some(Pair::new(self.known(*left)?, self.known(*right)?)))
             .skip(spare);
+        let unstored = self
+            .known(Self::RECORD)
+            .filter(|_| coverage.naming(subject, LawKind::Crud).is_empty())
+            .map(|_| Violation::new(self.site, Unstored::from(subject)));
         unwitnessed
             .copied()
             .chain(unspared)
             .map(|pair| Violation::new(self.site, Obligation::new(subject, pair)))
+            .chain(unstored)
             .collect()
     }
 

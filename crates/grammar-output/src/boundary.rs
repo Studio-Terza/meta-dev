@@ -116,9 +116,9 @@ impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
     }
 }
 
-impl<T: Guarded<Inner = String>> Unwrapping<T> for Validated {
+impl<T: Guarded<Inner: FromStr>> Unwrapping<T> for Validated {
     fn unwrapped(text: String) -> Option<T> {
-        T::try_new(text).ok()
+        text.parse().ok().and_then(|inner| T::try_new(inner).ok())
     }
 }
 
