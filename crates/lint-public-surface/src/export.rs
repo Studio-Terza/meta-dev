@@ -1,4 +1,4 @@
-use syntax::{ItemMod, ItemUse, UseTree, Visibility};
+use syntax::{ItemMod, ItemUse, UseLeaf, UseTree, Visibility};
 
 use lint_core::{SourceFile, Syntax};
 use lint_layout::LineNumber;
@@ -46,16 +46,7 @@ impl Export {
     }
 
     fn leaves(tree: &UseTree) -> Vec<Export> {
-        match tree {
-            UseTree::Path(path) => Self::leaves(&path.tree),
-            UseTree::Group(group) => group.items.iter().flat_map(Self::leaves).collect(),
-            UseTree::Name(name) => {
-                vec![Export { name: Name::from(&name.ident), line: LineNumber::from(name.ident.span()) }]
-            }
-            UseTree::Rename(rename) => {
-                vec![Export { name: Name::from(&rename.rename), line: LineNumber::from(rename.rename.span()) }]
-            }
-            UseTree::Glob(_) => Vec::new(),
-        }
+        let bound = UseLeaf::of_tree(tree).into_iter().filter_map(|leaf| leaf.end().bound());
+        bound.map(|ident| Export { name: Name::from(ident), line: LineNumber::from(ident.span()) }).collect()
     }
 }

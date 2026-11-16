@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, Signature, Type};
+use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, Signature, Spine, Type};
 
 use graph::{ParamIndex, Read, Reader, Resolved};
 use lint_core::Syntax;
@@ -25,22 +25,31 @@ struct Rooted {
 
 impl Rooted {
     fn from_argument(expr: &Expr) -> Option<Rooted> {
-        match expr {
-            Expr::Reference(reference) => {
-                reference.mutability.map_or_else(|| Rooted::from_argument(&reference.expr), |_| None)
-            }
-            Expr::Paren(inner) => Rooted::from_argument(&inner.expr),
-            Expr::Field(field) => Rooted::from_argument(&field.base).and_then(|rooted| rooted.through(&field.member)),
-            Expr::Path(path) => {
-                path.path.get_ident().map(|ident| Rooted { root: Name::from(ident), fields: Vec::new() })
-            }
+        let passed: Vec<&Expr> = Spine::from(expr).take_while(|node| Self::passes(node).is_some()).collect();
+        let root = Spine::from(expr).past(|node| Self::passes(node).is_some())?.node();
+        let ident = Syntax::expr_path(root)?.path.get_ident()?;
+        let fields: Option<Vec<Name>> = passed
+            .iter()
+            .rev()
+            .filter_map(|node| Self::field(node))
+            .map(|field| Syntax::named_member(&field.member).map(Name::from))
+            .collect();
+        Some(Rooted { root: Name::from(ident), fields: fields? })
+    }
+
+    fn passes(node: &Expr) -> Option<()> {
+        match node {
+            Expr::Reference(reference) => reference.mutability.map_or(Some(()), |_| None),
+            Expr::Paren(_) | Expr::Field(_) => Some(()),
             _ => None,
         }
     }
 
-    fn through(self, member: &syntax::Member) -> Option<Rooted> {
-        Syntax::named_member(member)
-            .map(|named| Rooted { fields: self.fields.into_iter().chain([Name::from(named)]).collect(), ..self })
+    fn field(node: &Expr) -> Option<&ExprField> {
+        match node {
+            Expr::Field(field) => Some(field),
+            _ => None,
+        }
     }
 
     fn whole(&self) -> Option<&Rooted> {

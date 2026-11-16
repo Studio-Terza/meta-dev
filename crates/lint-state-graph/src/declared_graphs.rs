@@ -2,9 +2,9 @@ mod graph;
 
 use std::path::Path;
 
-use syntax::{ItemMod, ItemUse, Macro};
+use syntax::{ItemMod, ItemUse, Macro, MacroTree};
 
-use lint_core::{Address, MacroAliases, Macros, SourceFile, Violation, Walk};
+use lint_core::{MacroAliases, Macros, SourceFile, Violation, Walk};
 use lint_layout::{Name, Word};
 use lint_sweep::{Descend, Facts, Kind, Watch};
 
@@ -16,13 +16,7 @@ pub struct DeclaredGraphs<'run, 'scan> {
     path: &'scan Path,
     names: MacroAliases,
     gates: Vec<Walk>,
-    invocations: Vec<Invoked>,
-}
-
-#[derive(Debug)]
-struct Invoked {
-    invocation: Macro,
-    at: Address,
+    invocations: Vec<Macro>,
 }
 
 impl<'run, 'scan> DeclaredGraphs<'run, 'scan> {
@@ -38,14 +32,13 @@ impl<'run, 'scan> DeclaredGraphs<'run, 'scan> {
         }
     }
 
-    fn found_in(&self, invocation: &Macro, at: Address) -> Vec<Violation<'scan>> {
-        match invocation.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))) {
-            Some(_) => Graph::checked(invocation, self.path),
-            None => Macros::nested_at(self.file, at, invocation)
-                .iter()
-                .flat_map(|inner| self.found_in(inner, Address::from(inner)))
-                .collect(),
-        }
+    fn found_in(&self, invocation: &Macro) -> Vec<Violation<'scan>> {
+        let nested = |inner: &Macro| Macros::nested(self.file, inner).to_vec();
+        let stops = |found: &Macro| {
+            found.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))).map(|_| ())
+        };
+        let graphs = MacroTree::frontier(invocation, &nested, &stops);
+        graphs.iter().flat_map(|found| Graph::checked(found, self.path)).collect()
     }
 }
 
@@ -67,12 +60,8 @@ impl<'ast> Watch<'ast> for DeclaredGraphs<'_, '_> {
         self.names.on_item_use(item, facts)
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
-        let outside = self
-            .gates
-            .iter()
-            .all(|gate| *gate == Walk::Entered)
-            .then(|| Invoked { invocation: invocation.clone(), at: facts.address() });
+    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
+        let outside = self.gates.iter().all(|gate| *gate == Walk::Entered).then(|| invocation.clone());
         self.invocations.extend(outside);
         Descend::Over
     }
@@ -80,6 +69,6 @@ impl<'ast> Watch<'ast> for DeclaredGraphs<'_, '_> {
 
 impl<'file> From<DeclaredGraphs<'_, 'file>> for Vec<Violation<'file>> {
     fn from(scan: DeclaredGraphs<'_, 'file>) -> Vec<Violation<'file>> {
-        scan.invocations.iter().flat_map(|invoked| scan.found_in(&invoked.invocation, invoked.at)).collect()
+        scan.invocations.iter().flat_map(|invoked| scan.found_in(invoked)).collect()
     }
 }

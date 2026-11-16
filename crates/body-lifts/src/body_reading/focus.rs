@@ -1,4 +1,4 @@
-use syntax::{Expr, ExprField, UnOp};
+use syntax::{Expr, Past, Spine, UnOp};
 
 use lint_layout::{Name, Whole, Word, words};
 
@@ -12,25 +12,24 @@ impl Focus {
     ];
 
     pub(super) fn reached(found: &Expr) -> Option<&Expr> {
-        match found {
-            Expr::Reference(reference) => Self::reached(&reference.expr),
-            Expr::Paren(paren) => Self::reached(&paren.expr),
-            Expr::Unary(unary) => Some(unary)
-                .filter(|candidate| matches!(candidate.op, UnOp::Deref(_)))
-                .and_then(|deref| Self::reached(&deref.expr)),
-            Expr::MethodCall(call) => Some(call)
-                .filter(|candidate| candidate.args.is_empty())
-                .filter(|bare| Name::from(&bare.method).matches::<Whole>(&Self::VIEWS).is_some())
-                .and_then(|view| Self::reached(&view.receiver)),
-            Expr::Field(field) => Self::rooted(field),
-            _ => None,
-        }
+        let end = Spine::from(found).past(|node| Self::viewed(node).is_some())?.node();
+        let field = Some(end).filter(|node| matches!(node, Expr::Field(_)))?;
+        Self::rooted(Spine::from(field).past(|node| matches!(node, Expr::Field(_)))?)
     }
 
-    fn rooted(field: &ExprField) -> Option<&Expr> {
-        match field.base.as_ref() {
-            Expr::Field(inner) => Self::rooted(inner),
-            Expr::Path(path) => path.path.get_ident().map(|_| field.base.as_ref()),
+    fn rooted(root: Past<'_, Expr>) -> Option<&Expr> {
+        let node = root.node();
+        Some(node).filter(|found| matches!(found, Expr::Path(path) if path.path.get_ident().is_some()))
+    }
+
+    fn viewed(node: &Expr) -> Option<()> {
+        match node {
+            Expr::Reference(_) | Expr::Paren(_) => Some(()),
+            Expr::Unary(unary) => matches!(unary.op, UnOp::Deref(_)).then_some(()),
+            Expr::MethodCall(call) => Some(call)
+                .filter(|candidate| candidate.args.is_empty())
+                .and_then(|bare| Name::from(&bare.method).matches::<Whole>(&Self::VIEWS))
+                .map(|_| ()),
             _ => None,
         }
     }

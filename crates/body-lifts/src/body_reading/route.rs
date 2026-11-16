@@ -1,4 +1,4 @@
-use syntax::{Arm, Expr, ExprMatch, Pat};
+use syntax::{Arm, Expr, ExprMatch, Pat, PatEdge, PatReached, PatTree};
 
 use super::BodyReading;
 use super::applied::Applied;
@@ -31,15 +31,12 @@ impl Route {
     }
 
     fn binding(pattern: &Pat) -> Option<&Pat> {
-        match pattern {
-            Pat::Ident(_) => Some(pattern),
-            Pat::TupleStruct(found) => found.elems.iter().find_map(Self::binding),
-            Pat::Tuple(found) => found.elems.iter().find_map(Self::binding),
-            Pat::Struct(found) => found.fields.iter().find_map(|field| Self::binding(&field.pat)),
-            Pat::Reference(found) => Self::binding(&found.pat),
-            Pat::Paren(found) => Self::binding(&found.pat),
-            Pat::Or(found) => found.cases.iter().find_map(Self::binding),
-            _ => None,
-        }
+        let opens = |pat: &Pat, _: PatEdge| {
+            matches!(
+                pat,
+                Pat::TupleStruct(_) | Pat::Tuple(_) | Pat::Struct(_) | Pat::Reference(_) | Pat::Paren(_) | Pat::Or(_)
+            )
+        };
+        PatTree::reached(pattern, &opens).into_iter().map(PatReached::pat).find(|pat| matches!(pat, Pat::Ident(_)))
     }
 }

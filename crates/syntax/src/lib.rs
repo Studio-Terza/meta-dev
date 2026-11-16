@@ -1,7 +1,16 @@
+mod readers;
 mod walk;
 
 pub use proc_macro2::{Delimiter, Group, Ident, LineColumn, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 pub use quote::{ToTokens, format_ident, quote, quote_spanned};
+pub use readers::applied::Applied;
+pub use readers::boundary::{
+    ExprEdge, ExprReached, ExprTree, Past, PatEdge, PatReached, PatSpine, PatTree, Spine, TypeSpine,
+};
+pub use readers::macro_tree::MacroTree;
+pub use readers::nested::Nested;
+pub use readers::type_fold::{TypeFold, TypeTree};
+pub use readers::use_leaf::UseLeaf;
 pub use syn::ext::IdentExt;
 pub use syn::punctuated::Punctuated;
 pub use syn::spanned::Spanned;
@@ -16,8 +25,8 @@ pub use syn::{
     Member, Meta, MetaList, ParenthesizedGenericArguments, Pat, PatIdent, PatStruct, PatTupleStruct, PatType, Path,
     PathArguments, PathSegment, PredicateType, QSelf, Receiver, Result, ReturnType, Signature, Stmt, StmtMacro, Token,
     TraitBound, TraitBoundModifier, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, Type, TypeArray, TypeParam,
-    TypeParamBound, TypePath, TypeReference, TypeTuple, UnOp, UsePath, UseRename, UseTree, Variant, VisRestricted,
-    Visibility, WherePredicate, braced, custom_keyword, token,
+    TypeParamBound, TypePath, TypeReference, TypeTuple, UnOp, UseTree, Variant, VisRestricted, Visibility,
+    WherePredicate, braced, custom_keyword, token,
 };
 pub use walk::{Around, Node, Walk};
 

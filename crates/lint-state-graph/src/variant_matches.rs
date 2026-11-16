@@ -5,7 +5,7 @@ use variant_paths::VariantPaths;
 use std::path::Path;
 use syntax::Spanned;
 
-use syntax::{Arm, Expr, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
+use syntax::{Arm, Expr, ExprEdge, ExprLet, ExprMatch, ExprTree, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
 
 use super::declarations::Declarations;
 use super::finding::Finding;
@@ -51,14 +51,16 @@ impl<'scan, 'file> VariantMatches<'scan, 'file> {
     }
 
     fn table(expr: &Expr) -> Option<&Expr> {
-        match expr {
-            Expr::Lit(_) | Expr::Path(_) => Some(expr),
-            Expr::Unary(unary) => Self::table(&unary.expr).map(|_| expr),
-            Expr::Paren(paren) => Self::table(&paren.expr).map(|_| expr),
-            Expr::Tuple(tuple) => tuple.elems.iter().map(Self::table).collect::<Option<Vec<_>>>().map(|_| expr),
-            Expr::Array(array) => array.elems.iter().map(Self::table).collect::<Option<Vec<_>>>().map(|_| expr),
-            _ => None,
-        }
+        let reached = ExprTree::reached(expr, &|_, edge| matches!(edge, ExprEdge::Inner | ExprEdge::Element));
+        reached
+            .iter()
+            .all(|node| {
+                matches!(
+                    node.expr(),
+                    Expr::Lit(_) | Expr::Path(_) | Expr::Unary(_) | Expr::Paren(_) | Expr::Tuple(_) | Expr::Array(_)
+                )
+            })
+            .then_some(expr)
     }
 }
 

@@ -1,4 +1,4 @@
-use syntax::{Expr, ExprMethodCall};
+use syntax::{Expr, ExprMethodCall, Spine};
 
 use lint_layout::{Name, Whole, Word, words};
 
@@ -16,9 +16,16 @@ impl<'body> Chain<'body> {
     const MAP: [Word<'static>; 1] = words!["map"];
 
     pub(super) fn unwound(found: &'body Expr) -> Chain<'body> {
-        match found {
-            Expr::MethodCall(call) => Self::unwound(&call.receiver).pushed(call),
-            _ => Chain { calls: Vec::new(), root: found },
+        let mut calls: Vec<&ExprMethodCall> = Spine::from(found).map_while(Self::called).collect();
+        calls.reverse();
+        let root = Spine::from(found).find(|node| Self::called(node).is_none()).unwrap_or(found);
+        Chain { calls, root }
+    }
+
+    fn called(node: &'body Expr) -> Option<&'body ExprMethodCall> {
+        match node {
+            Expr::MethodCall(call) => Some(call),
+            _ => None,
         }
     }
 
@@ -39,11 +46,6 @@ impl<'body> Chain<'body> {
             })
             .and(mapped)
             .and_then(|_| Applied::traced(self.root))
-    }
-
-    fn pushed(mut self, call: &'body ExprMethodCall) -> Chain<'body> {
-        self.calls.push(call);
-        self
     }
 
     fn mapping(argument: &'body Expr) -> Option<&'body Expr> {
