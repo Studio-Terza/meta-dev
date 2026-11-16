@@ -6,6 +6,7 @@ mod target;
 
 use admission::Admission;
 use directory::Directory;
+pub use directory::{Below, Listing, Surveyed};
 use packages::Packages;
 pub use regrouped::Regrouped;
 
@@ -23,16 +24,16 @@ use lint_layout::Manifest;
 pub struct Roots;
 
 impl Roots {
-    pub fn files(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Vec<PathBuf>, Failure>> {
-        Directory::files(files, &Self::canonical(trees))
+    pub fn surveyed(files: &impl Files, trees: &[&Tree<'_>]) -> Surveyed {
+        Directory::shared(files, &Self::canonical(trees))
     }
 
-    pub fn under(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Vec<Target>, Failure>> {
-        let below = Directory::trees(files, &Self::canonical(trees));
+    pub fn under(files: &impl Files, trees: &[&Tree<'_>], below: Below) -> Vec<Result<Vec<Target>, Failure>> {
+        let walked = below.trees();
         let directories: Vec<Vec<PathBuf>> =
-            trees.iter().zip(&below).map(|(tree, found)| Self::searched(tree, found)).collect();
+            trees.iter().zip(&walked).map(|(tree, found)| Self::searched(tree, found)).collect();
         let read = Regrouped::like(&directories, Manifest::read_many(files, &directories.concat()));
-        let manifests = below
+        let manifests = walked
             .into_iter()
             .zip(read)
             .map(|(searched, outcomes)| {

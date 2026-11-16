@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::collections::BTreeMap;
 use std::iter;
 use std::ops::Deref;
@@ -5,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Kind};
 use lint_layout::Failure;
+
+use boundary::Spot;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Fact {
@@ -16,9 +20,9 @@ pub enum Fact {
 
 #[derive(Debug, Default)]
 pub struct Survey {
-    kinds: BTreeMap<PathBuf, Kind>,
-    canonical: BTreeMap<PathBuf, PathBuf>,
-    listed: BTreeMap<PathBuf, Vec<PathBuf>>,
+    kinds: BTreeMap<Spot, Kind>,
+    canonical: BTreeMap<Spot, PathBuf>,
+    listed: BTreeMap<Spot, Vec<PathBuf>>,
     failed: Vec<Failure>,
 }
 
@@ -60,12 +64,12 @@ impl Survey {
 
     #[must_use]
     pub fn kind(&self, path: &Path) -> Kind {
-        self.kinds.get(path).copied().unwrap_or(Kind::Missing)
+        self.kinds.get(Spot::bytes(path)).copied().unwrap_or(Kind::Missing)
     }
 
     #[must_use]
     pub fn canonical(&self, path: &Path) -> Option<&Path> {
-        self.canonical.get(path).map(PathBuf::as_path)
+        self.canonical.get(Spot::bytes(path)).map(PathBuf::as_path)
     }
 
     #[must_use]
@@ -75,7 +79,7 @@ impl Survey {
 
     #[must_use]
     pub fn entries(&self, directory: &Path) -> &[PathBuf] {
-        self.listed.get(directory).map_or(&[], Vec::as_slice)
+        self.listed.get(Spot::bytes(directory)).map_or(&[], Vec::as_slice)
     }
 
     pub fn settled(&mut self, order: &[impl AsRef<Path>]) -> Result<Settled<'_>, Failure> {
@@ -87,11 +91,12 @@ impl Survey {
     }
 
     fn extended<Value>(
-        mut found: BTreeMap<PathBuf, Value>,
+        mut found: BTreeMap<Spot, Value>,
         paths: &[PathBuf],
         values: Vec<Option<Value>>,
-    ) -> BTreeMap<PathBuf, Value> {
-        found.extend(paths.iter().cloned().zip(values).filter_map(|(path, value)| Some((path, value?))));
+    ) -> BTreeMap<Spot, Value> {
+        found
+            .extend(paths.iter().cloned().map(Spot::from).zip(values).filter_map(|(path, value)| Some((path, value?))));
         found
     }
 
@@ -115,12 +120,12 @@ impl Survey {
     }
 
     fn sorted_into(
-        mut listed: BTreeMap<PathBuf, Vec<PathBuf>>,
+        mut listed: BTreeMap<Spot, Vec<PathBuf>>,
         directory: PathBuf,
         mut entries: Vec<PathBuf>,
-    ) -> BTreeMap<PathBuf, Vec<PathBuf>> {
+    ) -> BTreeMap<Spot, Vec<PathBuf>> {
         entries.sort();
-        listed.insert(directory, entries);
+        listed.insert(Spot::from(directory), entries);
         listed
     }
 }
