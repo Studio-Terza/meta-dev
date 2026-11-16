@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nUPDATE\n  runs\nSET\n  state = ?3\nWHERE\n  id = ?1\n  AND state = ?2\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "a0f97931eb45e5af435e99ad408bb4604b2fc5bc7aed59d56d743a43c05ba500"
+}

@@ -5,7 +5,7 @@ use port_core::Op;
 use store_ports::{Batch, Query, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
-use design_jobs::{JobClosed, JobState};
+use design_jobs::JobState;
 
 use crate::{Covered, Refusal, Unpaid};
 
@@ -70,7 +70,7 @@ impl Paid {
     pub(crate) fn closed(self, state: JobState, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         match self {
             Paid::Unbounded => Ok(Written::default()),
-            Paid::Job(job) => JobClosed::new(job, state).written(statements),
+            Paid::Job(job) => state.closing(job).written(statements),
         }
     }
 }

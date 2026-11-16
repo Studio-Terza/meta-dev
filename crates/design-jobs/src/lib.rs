@@ -1,3 +1,3 @@
 mod jobs;
 
-pub use jobs::{JobClosed, JobState};
+pub use jobs::JobState;

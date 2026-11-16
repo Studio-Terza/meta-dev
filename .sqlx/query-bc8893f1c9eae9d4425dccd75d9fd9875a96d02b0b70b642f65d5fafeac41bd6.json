@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\nSELECT\n  job\nFROM\n  failures\nWHERE\n  job = ?1\n  AND delivery = ?2\n",
+  "describe": {
+    "columns": [
+      {
+        "name": "job",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "job"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bc8893f1c9eae9d4425dccd75d9fd9875a96d02b0b70b642f65d5fafeac41bd6"
+}

@@ -233,3 +233,27 @@ macro_rules! crud {
         );
     };
 }
+
+#[macro_export]
+macro_rules! lifecycle {
+    ($(#[$meta:meta])* $name:ident, $state:ty, $opened:expr, $placed:expr $(,)?) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+            use ::store_ports::{Lifecycle, Store};
+            let run = ::port_core::Run::root();
+            let store = run.port($opened);
+            let states = <$state as Lifecycle>::states();
+            states.iter().flat_map(|from| states.iter().map(move |to| [*from, *to])).try_for_each(
+                |[from, to]| -> Result<(), Box<dyn ::std::error::Error>> {
+                    let key = ($placed)(&store, from)?;
+                    let edge = ::store_ports::Edge::new(from, to);
+                    let moved = store.write(::store_ports::Moved::<$state>::new(key, edge));
+                    let listed = <$state as Lifecycle>::EDGES.contains(&edge);
+                    assert_eq!(moved.is_ok(), listed, "{from:?} -> {to:?} moves only along a lifecycle edge: {moved:?}");
+                    Ok(())
+                },
+            )
+        }
+    };
+}

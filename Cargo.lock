@@ -342,7 +342,6 @@ dependencies = [
  "design-model",
  "named-derive",
  "newtype",
- "port-core",
  "store-ports",
  "thiserror",
 ]
