@@ -1,10 +1,13 @@
 use std::convert::Infallible;
+use std::iter;
 use std::str::FromStr;
 
-use syntax::{Delimiter, Group, Ident, Literal, Span, TokenStream, TokenTree};
-use syntax::{LitStr, Macro};
+use syntax::parse::Speculative;
+use syntax::parse::{Parse, ParseBuffer, ParseStream};
+use syntax::{Delimiter, Group, Ident, Literal, Punct, Span, TokenStream, TokenTree};
+use syntax::{LitStr, Macro, Path};
 
-use lint_layout::{Position, TokenPaths as Parsed};
+use lint_layout::Position;
 
 use crate::namespace::UsePath;
 
@@ -96,19 +99,54 @@ impl Interpolated {
 }
 
 #[derive(Debug)]
-pub(super) struct TokenPaths;
+pub(super) struct TokenPaths(Vec<Spelled>);
 
 impl TokenPaths {
+    const ACCESS: char = '.';
+
     pub(super) fn interpolated(invoked: &Macro) -> Vec<Spelled> {
         Self::within(Interpolated::stream(invoked.tokens.clone()))
     }
 
     pub(super) fn within(tokens: TokenStream) -> Vec<Spelled> {
-        let parsed = Parsed::within(tokens);
-        let spelled = parsed.iter().filter_map(|path| {
-            let first = path.segments.first()?;
-            Some(Spelled { path: UsePath::from(path), started_at: Position::from(first.ident.span()) })
-        });
-        spelled.collect()
+        syntax::parse::parse2::<TokenPaths>(tokens).map_or_default(|paths| paths.0)
+    }
+
+    fn attempted(input: ParseStream, attempt: &ParseBuffer) -> syntax::Result<Vec<Spelled>> {
+        match attempt.call(Path::parse_mod_style) {
+            Ok(path) => Ok(Self::advanced(input, attempt, &path)),
+            Err(_) => Self::skipped(input.parse()?, input),
+        }
+    }
+
+    fn advanced(input: ParseStream, attempt: &ParseBuffer, path: &Path) -> Vec<Spelled> {
+        input.advance_to(attempt);
+        let first = path.segments.first();
+        let spelled = first
+            .map(|segment| Spelled { path: UsePath::from(path), started_at: Position::from(segment.ident.span()) });
+        spelled.into_iter().collect()
+    }
+
+    fn skipped(tree: TokenTree, input: ParseStream) -> syntax::Result<Vec<Spelled>> {
+        match tree {
+            TokenTree::Group(group) => Ok(Self::within(group.stream())),
+            TokenTree::Punct(punct) => Self::punctuated(&punct, input),
+            _ => Ok(Vec::new()),
+        }
+    }
+
+    fn punctuated(punct: &Punct, input: ParseStream) -> syntax::Result<Vec<Spelled>> {
+        Some(punct.as_char())
+            .filter(|spelled| *spelled == Self::ACCESS)
+            .map_or_else(|| Ok(Vec::new()), |_| input.parse::<Option<Ident>>().map(|_| Vec::new()))
+    }
+}
+
+impl Parse for TokenPaths {
+    fn parse(input: ParseStream) -> syntax::Result<TokenPaths> {
+        let steps = iter::from_fn(|| input.cursor().token_tree().map(|_| Self::attempted(input, &input.fork())));
+        steps
+            .collect::<syntax::Result<Vec<Vec<Spelled>>>>()
+            .map(|parsed| TokenPaths(parsed.into_iter().flatten().collect()))
     }
 }
