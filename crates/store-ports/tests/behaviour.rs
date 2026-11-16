@@ -1148,3 +1148,28 @@ laws::law!(a_negative_count_is_refused_as_unfit, i64::MIN..0, number, {
 });
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
+
+struct Checked;
+
+impl Checked {
+    fn clause<Checking: Column>(column: &str) -> Option<String> {
+        Checking::check(column).map(|clause| clause.to_string())
+    }
+}
+
+#[test]
+fn each_generated_clause_spells_its_whole_predicate() {
+    assert_eq!(
+        Checked::clause::<design_model::Stage>("stage").as_deref(),
+        Some("stage IN ('vague', 'refining', 'terminal', 'dropped')")
+    );
+    assert_eq!(Checked::clause::<Ordinal>("ordinal").as_deref(), Some("ordinal BETWEEN 0 AND 4294967295"));
+    assert_eq!(
+        Checked::clause::<Option<Ordinal>>("ordinal").as_deref(),
+        Some("ordinal IS NULL OR (ordinal BETWEEN 0 AND 4294967295)")
+    );
+    assert_eq!(
+        Checked::clause::<Option<Option<design_model::Stage>>>("stage").as_deref(),
+        Some("stage IS NULL OR (stage IS NULL OR (stage IN ('vague', 'refining', 'terminal', 'dropped')))")
+    );
+}
