@@ -1,26 +1,18 @@
 use std::fmt;
-use std::io::Write;
 
-use newtype::{Arbitrary, Newtype};
-
-use crate::cli::failure::Failure;
 use crate::cli::output::Line;
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Printed(usize);
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Lines<'lines>(&'lines [Line]);
 
-impl Printed {
-    pub(crate) fn lines(out: &mut impl Write, lines: &[Line]) -> Result<Printed, Failure> {
-        let mut rendered = Vec::new();
-        lines.iter().try_for_each(|line| writeln!(rendered, "{line}"))?;
-        out.write_all(&rendered)?;
-        Ok(Printed::new(rendered.len()))
+impl<'lines, Listed: AsRef<[Line]>> From<&'lines Listed> for Lines<'lines> {
+    fn from(listed: &'lines Listed) -> Lines<'lines> {
+        Lines(listed.as_ref())
     }
+}
 
-    pub(crate) fn rendered(out: &mut impl Write, rendered: &impl fmt::Display) -> Result<Printed, Failure> {
-        let mut bytes = Vec::new();
-        write!(bytes, "{rendered}")?;
-        out.write_all(&bytes)?;
-        Ok(Printed::new(bytes.len()))
+impl fmt::Display for Lines<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|line| writeln!(formatter, "{line}"))
     }
 }

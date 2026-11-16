@@ -1,5 +1,6 @@
+use crate::Uttered;
+use crate::cli::request::command::printed::Lines;
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Write;
 use std::path::Path;
 
 use design_model::{
@@ -17,12 +18,12 @@ use store_ports::{Store, Written};
 use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
 use transcript_ports::{Authorship, Uuid};
 
-use super::Printed;
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::output::{Count, Line};
 use crate::cli::request::Ground;
 use crate::cli::request::command::rendering::Refs;
+use console_ports::Shown;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Unresolved {
@@ -155,9 +156,9 @@ impl Application {
         Ok(application)
     }
 
-    pub(crate) fn reported(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
+    pub(crate) fn reported(self, store: &impl Store) -> Result<Uttered, Failure> {
         let lines = self.lines(store)?;
-        Printed::lines(out, &lines).map(|_printed| Outcome::from(self))
+        Ok(Uttered::new(Shown::said(Lines::from(&lines)), Ok(Outcome::from(self))))
     }
 
     pub(crate) fn lines(&self, store: &impl Store) -> Result<Vec<Line>, Failure> {

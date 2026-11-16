@@ -13,7 +13,7 @@ use std::sync::Mutex;
 
 use std::str::FromStr;
 
-use console_ports::{Heard, Variables};
+use console_ports::{Heard, Shown, Variables};
 
 use design::{
     Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Miss, Noted, Outcome, Reconciliation, Reference,
@@ -295,13 +295,9 @@ impl Invocation {
 
     fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(&Self::environment(), files, Opening(|_path| store.clone()), Staff::idle()).report(
-            &run,
-            arguments.iter().map(OsString::from),
-            &mut out,
-        )?;
-        Ok(String::from_utf8(out).unwrap_or_default())
+        let uttered = Cli::new(&Self::environment(), files, Opening(|_path| store.clone()), Staff::idle())
+            .report(&run, arguments.iter().map(OsString::from));
+        Answered::told(uttered)
     }
 
     fn shown(session: &Session, uuid: &str) -> Result<String, Failure> {
@@ -387,15 +383,25 @@ struct Answered {
     out: String,
 }
 
+impl Answered {
+    fn said(uttered: &design::Uttered) -> String {
+        AsRef::<str>::as_ref(AsRef::<Shown>::as_ref(uttered)).to_owned()
+    }
+
+    fn told(uttered: design::Uttered) -> Result<String, Failure> {
+        let text = Answered::said(&uttered);
+        uttered.ended().map(|_outcome| text)
+    }
+}
+
 struct Rooted;
 
 impl Rooted {
     fn outcome(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
-        let mut out = Vec::new();
-        let outcome =
+        let uttered =
             Cli::new(&Invocation::environment(), session.files(), Opening(|_path| store.clone()), Staff::idle())
-                .rooted(arguments.iter().map(OsString::from), &mut out)?;
-        Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
+                .rooted(arguments.iter().map(OsString::from));
+        Ok(Answered { out: Answered::said(&uttered), outcome: uttered.ended()? })
     }
 }
 
@@ -564,8 +570,7 @@ impl Opened {
     fn from(directory: &str, files: impl Files, arguments: &[&str]) -> Result<Opened, Failure> {
         let opened = Mutex::new(Vec::new());
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(
+        let uttered = Cli::new(
             &Invocation::at(directory),
             files,
             Opening(|path: PathBuf| {
@@ -574,8 +579,9 @@ impl Opened {
             }),
             Staff::idle(),
         )
-        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
-        Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out: String::from_utf8(out).unwrap_or_default() })
+        .report(&run, arguments.iter().map(OsString::from));
+        let out = Answered::told(uttered)?;
+        Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out })
     }
 }
 
@@ -1302,7 +1308,8 @@ fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Re
         Opening(|_path| applying.store.clone()),
         Staff::idle(),
     )
-    .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
+    .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from))
+    .ended()?;
     assert_eq!(lent, Outcome::Applied);
     Ok(())
 }
@@ -1311,15 +1318,14 @@ impl Applying {
     fn rooted(&self, directives: Bytes) -> Result<Answered, Failure> {
         self.files.create_directories(Path::new("/work/notes")).ok();
         self.files.write(Path::new("/work/notes/directives"), directives).ok();
-        let mut out = Vec::new();
-        let outcome = Cli::new(
+        let uttered = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&self.files),
             Opening(|_path| self.store.clone()),
             Staff::idle(),
         )
-        .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
-        Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
+        .rooted(["apply", "notes/directives"].iter().map(OsString::from));
+        Ok(Answered { out: Answered::said(&uttered), outcome: uttered.ended()? })
     }
 
     fn graph(&self) -> Result<[String; 2], Failure> {
@@ -1540,7 +1546,8 @@ impl Applying {
             Opening(|_path| self.store.clone()),
             Staff::idle(),
         )
-        .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
+        .rooted(arguments.iter().map(OsString::from))
+        .ended()
     }
 }
 
@@ -1860,15 +1867,14 @@ impl Workspace {
 
     fn run(&self, directory: &str, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(
+        let uttered = Cli::new(
             &Invocation::at(directory),
             FakeLent::new(&self.files),
             Opening(|_path| self.store.clone()),
             Staff::idle(),
         )
-        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
-        Ok(String::from_utf8(out).unwrap_or_default())
+        .report(&run, arguments.iter().map(OsString::from));
+        Answered::told(uttered)
     }
 
     fn replanted(unplanted: Unplanted) -> Result<Replanted, Failure> {
@@ -2784,10 +2790,14 @@ impl Recalling {
         let heard = Heard::new(format!("{{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"{prompt}\"}}"));
         let environment = Invocation::at("/work").hearing(heard);
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(&environment, FakeLent::new(&applying.files), Opening(|_path| applying.store.clone()), Staff::idle())
-            .report(&run, ["hook", "user-prompt-submit"].iter().map(OsString::from), &mut out)?;
-        Ok(String::from_utf8(out).unwrap_or_default())
+        let uttered = Cli::new(
+            &environment,
+            FakeLent::new(&applying.files),
+            Opening(|_path| applying.store.clone()),
+            Staff::idle(),
+        )
+        .report(&run, ["hook", "user-prompt-submit"].iter().map(OsString::from));
+        Answered::told(uttered)
     }
 }
 

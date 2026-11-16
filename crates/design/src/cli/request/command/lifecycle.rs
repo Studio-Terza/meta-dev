@@ -1,15 +1,16 @@
-use std::io::Write;
+use crate::Uttered;
+use crate::cli::request::command::printed::Lines;
 
 use design_model::{Casting, Entered, NodeId, Provenance, Role, Transition};
 use design_store::{Cast, Restaged};
 use store_ports::Store;
 
-use super::Printed;
 use super::subject::Found;
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::request::command::rendering::Refs;
 use crate::cli::request::{Shaped, Token, Valued};
+use console_ports::Shown;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Moving {
@@ -60,14 +61,14 @@ impl Move {
         Ok(Move { node: node.parse()?, transition: moving.transition(shaped)? })
     }
 
-    pub fn written(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
+    pub fn written(self, store: &impl Store) -> Result<Uttered, Failure> {
         let lock = store.lock()?;
         let node = Found::resolved(store, self.node)?;
         store.write(Restaged::new(node, self.transition))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
-        Printed::lines(out, &Refs::placed(store, shown.placed())?)?;
-        Ok(Outcome::Moved(shown.placed().node().stage().stage()))
+        let said = Shown::said(Lines::from(&Refs::placed(store, shown.placed())?));
+        Ok(Uttered::new(said, Ok(Outcome::Moved(shown.placed().node().stage().stage()))))
     }
 }
 
@@ -77,13 +78,13 @@ impl Recast {
         Ok(Recast { node: node.parse()?, role: role.parse().map_err(|_unknown| Failure::Usage)? })
     }
 
-    pub fn written(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
+    pub fn written(self, store: &impl Store) -> Result<Uttered, Failure> {
         let lock = store.lock()?;
         let node = Found::resolved(store, self.node)?;
         store.write(Cast::new(node, Casting::new(self.role, Provenance::from(Entered::Role))))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
-        Printed::lines(out, &Refs::placed(store, shown.placed())?)?;
-        Ok(Outcome::Recast(shown.placed().node().casting().role()))
+        let said = Shown::said(Lines::from(&Refs::placed(store, shown.placed())?));
+        Ok(Uttered::new(said, Ok(Outcome::Recast(shown.placed().node().casting().role()))))
     }
 }

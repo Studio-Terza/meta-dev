@@ -293,7 +293,6 @@ dependencies = [
  "design-model",
  "dispatch-ports",
  "e2e",
- "exit",
  "file-ports",
  "grammar-slug",
  "laws",
@@ -560,10 +559,6 @@ dependencies = [
  "parking",
  "pin-project-lite",
 ]
-
-[[package]]
-name = "exit"
-version = "0.1.0"
 
 [[package]]
 name = "fallible-iterator"

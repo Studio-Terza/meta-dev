@@ -12,7 +12,6 @@ mod structure;
 mod subject;
 mod view;
 
-use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -26,15 +25,16 @@ use store_ports::{Opens, Store};
 
 use super::persistence::Persistence;
 use super::{Flag, Ground, Token, Valued};
-use crate::Outcome;
 use crate::cli::failure::Failure;
+use crate::{Outcome, Uttered};
 pub use apply::{Application, Unresolved};
+use console_ports::Shown;
 pub use hook::Hook;
 use import::Import;
 use ingest::Ingest;
 use init::Init;
 use lifecycle::{Move, Moving, Recast};
-use printed::Printed;
+use printed::Lines;
 use retry::Retry;
 use search::Search;
 pub use structure::Crew;
@@ -188,38 +188,33 @@ impl Command {
         environment: &impl Environment,
         ground: Ground<'_, F, S>,
         crew: &Crew<'_, D, C>,
-        out: &mut impl Write,
-    ) -> Result<Outcome, Failure> {
+    ) -> Result<Uttered, Failure> {
         match self {
             Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())
-                .and_then(|tally| Printed::lines(out, &tally.lines()))
-                .map(|_printed| Outcome::Ingested),
-            Command::Show(subject) => subject.shown(ground.store(), out).map(|_printed| Outcome::Shown),
+                .map(|tally| Uttered::new(Shown::said(Lines::from(&tally.lines())), Ok(Outcome::Ingested))),
+            Command::Show(subject) => {
+                subject.shown(ground.store()).map(|shown| Uttered::new(shown, Ok(Outcome::Shown)))
+            }
             Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
-                .and_then(|lines| Printed::lines(out, &lines))
-                .map(|_printed| Outcome::Searched),
-            Command::Recall(terms) => ground
-                .store()
-                .read(Recall::telling(&terms))
-                .map_err(Failure::from)
-                .and_then(|recalled| Printed::rendered(out, &Recollection::from(recalled.as_slice())))
-                .map(|_printed| Outcome::Recalled),
-            Command::Init(init) => init
-                .planted(&ground)
-                .and_then(|initialised| Printed::lines(out, &initialised.lines()))
-                .map(|_printed| Outcome::Initialised),
+                .map(|lines| Uttered::new(Shown::said(Lines::from(&lines)), Ok(Outcome::Searched))),
+            Command::Recall(terms) => {
+                ground.store().read(Recall::telling(&terms)).map_err(Failure::from).map(|recalled| {
+                    Uttered::new(Shown::said(Recollection::from(recalled.as_slice())), Ok(Outcome::Recalled))
+                })
+            }
+            Command::Init(init) => init.planted(&ground).map(|initialised| {
+                Uttered::new(Shown::said(Lines::from(&initialised.lines())), Ok(Outcome::Initialised))
+            }),
             Command::Apply(path) => {
-                Application::read(&ground, &path).and_then(|application| application.reported(ground.store(), out))
+                Application::read(&ground, &path).and_then(|application| application.reported(ground.store()))
             }
-            Command::Move(moving) => moving.written(ground.store(), out),
-            Command::Recast(recast) => recast.written(ground.store(), out),
-            Command::Structure => {
-                Structure::new(ground.store(), crew).worked().and_then(|structured| structured.reported(out))
-            }
-            Command::Hook(hook) => hook.answered(environment, ground, crew, out),
-            Command::View(view) => view.written(&ground, out),
-            Command::Import(path) => Import::written(&ground, &path, out),
-            Command::Retry(retry) => retry.released(ground.store(), out),
+            Command::Move(moving) => moving.written(ground.store()),
+            Command::Recast(recast) => recast.written(ground.store()),
+            Command::Structure => Structure::new(ground.store(), crew).worked().map(structure::Structured::reported),
+            Command::Hook(hook) => hook.answered(environment, ground, crew),
+            Command::View(view) => view.written(&ground),
+            Command::Import(path) => Import::written(&ground, &path),
+            Command::Retry(retry) => retry.released(ground.store()),
         }
     }
 }
