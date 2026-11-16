@@ -1,8 +1,9 @@
 use std::marker::PhantomData;
 
-use lint_core::Report;
+use graph::Model;
+use lint_core::{ModelLint, Report};
 
-use crate::containment::ClusterLint;
+use crate::containment::{ClusterLint, Containment};
 use crate::system::TypeSystem;
 
 pub trait GraphLint {
@@ -19,5 +20,11 @@ pub struct Clustered<Check>(PhantomData<Check>);
 impl<Check: ClusterLint> GraphLint for Clustered<Check> {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         system.containment().report::<Check>()
+    }
+}
+
+impl<Check: ClusterLint> ModelLint for Clustered<Check> {
+    fn report(model: &Model) -> Report<'_> {
+        Containment::clustered(model).report::<Check>()
     }
 }
