@@ -379,34 +379,41 @@ impl<'file> FileWork<'file> {
 }
 
 impl Work {
-    fn reported<'run>(
-        self,
-        readout: &'run Readout,
-        sources: &'run Sources<impl Files, impl Cargo, impl Timer>,
-    ) -> Vec<Report<'run>> {
+    fn awaited<'run>(self, sources: &'run Sources<impl Files, impl Cargo, impl Timer>) -> Option<&'run Model> {
+        match self {
+            Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => sources.gathering().model(),
+            Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => None,
+        }
+    }
+
+    fn reported<'run>(self, readout: &'run Readout, model: Option<&'run Model>) -> Vec<Report<'run>> {
         match self {
             Work::Checked(check) => check(readout),
-            Work::Modelled(query) => sources.gathering().model().map(query).into_iter().collect(),
+            Work::Modelled(query) => model.map(query).into_iter().collect(),
             Work::Described(_) | Work::Extracted(_) | Work::Filed(_)
             | Work::Judged(_)
             | Work::Ruled(_) => Vec::new(),
         }
     }
 
-    fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+    fn worked<'run>(
+        self,
+        slot: Slot,
+        readout: &'run Readout,
+        model: Option<&'run Model>,
+        sources: &'run Sources<impl Files, impl Cargo, impl Timer>,
+    ) -> Worked {
         match self {
-            Work::Extracted(_) | Work::Described(_) => self.grounded(slot, sources),
+            Work::Extracted(_) | Work::Described(_) => self.grounded(slot, model, sources),
             Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
-                Worked::rendering(slot, self.reported(readout, sources))
+                Worked::rendering(slot, self.reported(readout, model))
             }
         }
     }
 
-    fn grounded(self, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+    fn grounded(self, slot: Slot, model: Option<&Model>, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Extracted(extracted) => {
-                Worked::rendering(slot, sources.gathering().model().map_or_default(extracted))
-            }
+            Work::Extracted(extracted) => Worked::rendering(slot, model.map_or_default(extracted)),
             Work::Described(described) => Worked::rendering(
                 slot,
                 sources
@@ -414,7 +421,7 @@ impl Work {
                     .done()
                     .as_ref()
                     .ok()
-                    .zip(sources.gathering().model())
+                    .zip(model)
                     .map(|(located, model)| {
                         let facts = Settled::from(sources.gathering()).roles();
                         described(sources.gathering().heads(), Described::workspaces(located), facts, model)
@@ -451,8 +458,9 @@ impl Job {
     }
 
     fn done(self, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+        let model = self.work.awaited(sources);
         let stopwatch = Stopwatch::started(sources.wired().timer());
-        let worked = self.work.worked(self.slot, readout, sources);
+        let worked = self.work.worked(self.slot, readout, model, sources);
         [worked, Worked::timed(stopwatch.stopped(self.step))].into_iter().collect()
     }
 }
