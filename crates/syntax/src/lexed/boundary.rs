@@ -133,11 +133,6 @@ impl TokenTable {
     pub fn spelled(&self, symbol: Symbol) -> &str {
         self.symbols.get(usize::from(symbol)).map_or("", String::as_str)
     }
-
-    #[must_use]
-    pub fn first_at(&self, place: Place) -> usize {
-        self.lexemes.partition_point(|lexeme| lexeme.place < place)
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

@@ -11,7 +11,7 @@ use crate::shape::{Code, Labels, Literals, Reading, Shape, ShapeKey};
 use crate::token_count::TokenCount;
 use classes::{Classes, Window};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Token {
     Dropped,
     Shaped(Code),
@@ -19,16 +19,16 @@ enum Token {
 }
 
 impl Token {
-    fn counted(self) -> usize {
+    fn counted(&self) -> usize {
         match self {
             Token::Dropped => 0,
             Token::Shaped(_) | Token::Slotted(_) => 1,
         }
     }
 
-    fn slotted(self) -> Option<Symbol> {
+    fn slotted(&self) -> Option<Symbol> {
         match self {
-            Token::Slotted(symbol) => Some(symbol),
+            Token::Slotted(symbol) => Some(*symbol),
             Token::Dropped | Token::Shaped(_) => None,
         }
     }
@@ -37,7 +37,7 @@ impl Token {
         match self {
             Token::Dropped => None,
             Token::Shaped(code) => Some(code),
-            Token::Slotted(_) => Some(distance.map_or(Code::NEW, Code::distance)),
+            Token::Slotted(_) => Some(distance.map_or(Code::New, Code::Distance)),
         }
     }
 }
@@ -96,7 +96,7 @@ impl Shaper {
         let high = end.saturating_sub(Self::EDGE).max(start)..end;
         let moved = low
             .chain(high)
-            .find(|index| self.tokens.get(*index).copied() != Some(self.classes.token(&self.lexemes, *index, window)));
+            .find(|index| self.tokens.get(*index).cloned() != Some(self.classes.token(&self.lexemes, *index, window)));
         moved.map_or(Some(()), |_| None)
     }
 

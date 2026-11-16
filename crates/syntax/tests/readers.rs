@@ -224,3 +224,14 @@ fn lexing_once_parses_and_places_every_opening_as_parse_file_does() {
     assert_eq!(lines(&once), lines(&direct));
     assert_eq!(once.iter().flatten().count(), OPENINGS.len());
 }
+
+#[test]
+fn every_literal_form_is_a_quoted_lexeme_and_words_and_marks_are_not() {
+    let lexed = syntax::Lexed::parsed("const A: X = f(\"s\", 'c', b'x', b\"y\", r\"z\", 1.5, 7u8, -2);\n");
+    let kinds: Vec<syntax::LexemeKind> = lexed.map_or_else(
+        |_| Vec::new(),
+        |mut found| found.tokens_taken().lexemes().iter().map(|lexeme| lexeme.kind()).collect(),
+    );
+    let quoted = kinds.iter().filter(|kind| kind.quoted().is_some()).count();
+    assert_eq!([quoted, kinds.len()], [8, 25]);
+}

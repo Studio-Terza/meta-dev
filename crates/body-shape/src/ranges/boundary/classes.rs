@@ -136,7 +136,7 @@ struct Classifying<'classes> {
 }
 
 impl Classifying<'_> {
-    fn renamed(&self, named: Named, sort: Sort, word: Code) -> Token {
+    fn renamed(&self, named: Named, sort: Sort, word: &Code) -> Token {
         let every = self.classes.equivalence.erases(Erased::Names);
         let local = self
             .classes
@@ -144,16 +144,16 @@ impl Classifying<'_> {
             .erases(Erased::Locals)
             .filter(|_| sort == Sort::Lower)
             .filter(|_| self.spot != Spot::Named);
-        every.or(local).map_or(Token::Shaped(word), |_| Token::Slotted(*named.as_ref()))
+        every.or(local).map_or_else(|| Token::Shaped(word.clone()), |_| Token::Slotted(*named.as_ref()))
     }
 
     fn sorted(&self, named: Named, fact: &Fact) -> Token {
         match fact.sort {
             Sort::LiteralWord => {
-                self.classes.literals_erased().map_or(Token::Shaped(fact.word), |_| Token::Shaped(Code::ERASED))
+                self.classes.literals_erased().map_or(Token::Shaped(fact.word.clone()), |_| Token::Shaped(Code::Erased))
             }
-            Sort::Keyword => Token::Shaped(fact.word),
-            Sort::Lower | Sort::Other => self.renamed(named, fact.sort, fact.word),
+            Sort::Keyword => Token::Shaped(fact.word.clone()),
+            Sort::Lower | Sort::Other => self.renamed(named, fact.sort, &fact.word),
         }
     }
 }
@@ -166,8 +166,8 @@ impl Lexemes for Classifying<'_> {
     }
 
     fn literal(&self, quoted: Quoted) -> Token {
-        let code = self.classes.facts.fact(*quoted.as_ref()).map_or(Code::NEW, |fact| fact.word.literal());
-        self.classes.literals_erased().map_or(Token::Shaped(code), |_| Token::Shaped(Code::ERASED))
+        let code = self.classes.facts.fact(*quoted.as_ref()).map_or(Code::New, |fact| fact.word.literal());
+        self.classes.literals_erased().map_or(Token::Shaped(code), |_| Token::Shaped(Code::Erased))
     }
 
     fn mark(&self, mark: char) -> Token {
@@ -175,7 +175,7 @@ impl Lexemes for Classifying<'_> {
             .filter(|found| *found == '-')
             .filter(|_| self.spot == Spot::BeforeLiteral)
             .and(self.classes.literals_erased());
-        dropped.map_or(Token::Shaped(Code::mark(mark)), |_| Token::Dropped)
+        dropped.map_or(Token::Shaped(Code::Mark(mark)), |_| Token::Dropped)
     }
 }
 
