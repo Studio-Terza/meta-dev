@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use graph::Site;
@@ -9,7 +9,7 @@ use crate::member::{Keyed, Nested};
 #[derive(Debug)]
 pub(super) struct Kept<'file, Member: Keyed> {
     groups: Vec<Group<Member>>,
-    homes: BTreeMap<&'file Path, Vec<usize>>,
+    homes: BTreeMap<&'file Path, BTreeSet<usize>>,
 }
 
 impl<'file, Member: Keyed + Nested + AsRef<Site<'file>>> Kept<'file, Member> {
@@ -20,8 +20,7 @@ impl<'file, Member: Keyed + Nested + AsRef<Site<'file>>> Kept<'file, Member> {
     fn keeping(self, group: Group<Member>) -> Kept<'file, Member> {
         let at = self.groups.len();
         let homes = group.members().iter().map(|member| member.as_ref().path()).fold(self.homes, |mut homes, path| {
-            let placed = homes.entry(path).or_default();
-            placed.extend(placed.last().filter(|last| **last == at).map_or(Some(at), |_| None));
+            homes.entry(path).or_default().insert(at);
             homes
         });
         let mut groups = self.groups;
