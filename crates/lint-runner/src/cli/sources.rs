@@ -138,11 +138,6 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         described.map(|found| Reader::rooted(model, found.crates()))
     }
 
-    pub(crate) fn described(&self) -> Option<&Model> {
-        let contexts = Some(self.gathering.contexts());
-        self.located().done().as_ref().ok().and(contexts).and(self.gathering.model())
-    }
-
     pub(crate) fn gathering(&self) -> &Gathering<'run> {
         &self.gathering
     }
