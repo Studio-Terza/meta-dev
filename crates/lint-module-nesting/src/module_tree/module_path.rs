@@ -1,9 +1,7 @@
-mod ancestor;
 mod index;
 mod inside_sibling;
 mod target;
 
-pub use ancestor::Ancestor;
 pub use index::ModuleIndex;
 pub use inside_sibling::InsideSibling;
 pub use target::Target;

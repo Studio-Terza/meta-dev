@@ -8,7 +8,7 @@ use std::path::Path;
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
+use module_path::{InsideSibling, ModuleIndex, ModulePath, Target};
 
 use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
@@ -185,8 +185,12 @@ impl<'file> ModuleTree<'file> {
     }
 
     fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
-        let outsiders: Vec<&ModulePath<'file>> =
-            self.users.callers_of(module)?.iter().filter(|user| Ancestor::holds(module, user).is_none()).collect();
+        let outsiders: Vec<&ModulePath<'file>> = self
+            .users
+            .callers_of(module)?
+            .iter()
+            .filter(|user| AsRef::<Nest<'_>>::as_ref(module).holding(*AsRef::<Nest<'_>>::as_ref(*user)).is_none())
+            .collect();
         outsiders
             .iter()
             .all(|user| InsideSibling::holds(user, module).is_some())
