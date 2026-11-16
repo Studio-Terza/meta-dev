@@ -109,16 +109,21 @@ const SEEDED: [&str; 6] = [
     "INSERT INTO senses (id, message, ordinal, kind, specificity, confidence, explicitness, provenance, supersedes) VALUES (2, 'm1', 0, 'opinion', 'exact', 'firm', 'explicit', 'init', 1)",
 ];
 
-const REASONS: [&str; 2] =
-    ["runs records a usage whole or not at all", "a sense supersedes only a sense of its own segment"];
+const REASONS: [&str; 3] = [
+    "runs records a usage whole or not at all",
+    "a sense supersedes only a sense of its own segment",
+    "UNIQUE constraint failed",
+];
 
-const REFUSED: [&str; 2] = [
+const REFUSED: [&str; 3] = [
     "INSERT INTO runs (id, job, pid, deadline, state, input_tokens) VALUES (1, 1, 7, 0, 'running', 5)",
     "INSERT INTO senses (id, message, ordinal, kind, specificity, confidence, explicitness, provenance, supersedes) VALUES (3, 'm1', 1, 'opinion', 'exact', 'firm', 'explicit', 'init', 2)",
+    "INSERT INTO senses (id, message, ordinal, kind, specificity, confidence, explicitness, provenance) VALUES (4, 'm1', 0, 'opinion', 'exact', 'leaning', 'implicit', 'init')",
 ];
 
 #[test]
-fn a_partial_usage_and_a_sense_superseding_another_segment_are_refused() -> Result<(), Box<dyn Error>> {
+fn a_partial_usage_a_sense_superseding_another_segment_and_a_second_root_sense_are_refused()
+-> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     SEEDED
