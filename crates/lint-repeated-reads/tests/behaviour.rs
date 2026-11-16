@@ -3,7 +3,9 @@ use lint_repeated_reads::RepeatedReads;
 
 const SAME_LITERAL: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, deep: bool) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, true) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c, true) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const OTHER_LITERALS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, deep: bool) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, true) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c, false) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
-const SAME_EXPRESSION: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, n: u8) -> u8 { c.a + n }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, c.a + 1) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, ctx: &Ctx) -> u8 { fact(ctx, ctx.a + 1) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
+const SAME_EXPRESSION: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, n: u8) -> u8 { c.a + n }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, (c.a + 1) * 2) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, ctx: &Ctx) -> u8 { fact(ctx, (ctx.a + 1) * 2) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
+const OTHER_GROUPS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, n: u8) -> u8 { c.a + n }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, (c.a + 1) * 2) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, ctx: &Ctx) -> u8 { fact(ctx, (ctx.a - 1) * 2) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
+const TUPLE_AND_ARRAY: &str = "struct Ctx { a: u8 }\nfn fact<T>(c: &Ctx, t: T) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, (c.a, c.a)) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, ctx: &Ctx) -> u8 { fact(ctx, [ctx.a, ctx.a]) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const LOCAL_ARGUMENT: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, n: u8) -> u8 { c.a + n }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { let n = 1; fact(c, n) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { let n = 1; fact(c, n) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const OWN_CONSTANTS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, probe: u8) -> u8 { c.a + probe }\ntrait Lint { const PROBE: u8; fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { const PROBE: u8 = 1; fn run(&self, c: &Ctx) -> u8 { fact(c, Self::PROBE) + 1 } }\nimpl Lint for B { const PROBE: u8 = 2; fn run(&self, c: &Ctx) -> u8 { fact(c, Self::PROBE) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const SHARED_CONSTANT: &str = "struct Ctx { a: u8 }\nstruct Limits;\nimpl Limits { const MOST: u8 = 1; }\nfn fact(c: &Ctx, probe: u8) -> u8 { c.a + probe }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, Limits::MOST) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c, Limits::MOST) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
@@ -23,7 +25,7 @@ const BOUNDED_METHOD: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a
 const SINKS: &str = "struct Out { a: u8 }\nfn write(o: &mut Out) { o.a = 1; }\ntrait Lint { fn run(&self, o: &mut Out, p: Out) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 1 } }\nimpl Lint for B { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const METHOD_CALLS: &str = "struct Ctx { a: u8 }\nimpl Ctx { fn fact(&self) -> u8 { self.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { c.fact() + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.fact() + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 
-const CASES: [Case; 21] = [
+const CASES: [Case; 23] = [
     Case::new(
         Title::new("the same literal is one fact"),
         &[Source::new(Located::new("a.rs"), Text::new(SAME_LITERAL))],
@@ -38,6 +40,16 @@ const CASES: [Case; 21] = [
         Title::new("the same expression over the parameter is one fact"),
         &[Source::new(Located::new("a.rs"), Text::new(SAME_EXPRESSION))],
         Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("expressions that differ inside a group are two facts"),
+        &[Source::new(Located::new("a.rs"), Text::new(OTHER_GROUPS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a tuple and an array of the same values are two facts"),
+        &[Source::new(Located::new("a.rs"), Text::new(TUPLE_AND_ARRAY))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("a local argument cannot be compared"),
