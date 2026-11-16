@@ -54,7 +54,9 @@ impl Built for UseRow {
             .and_then(|_| Some(resolving.path(scope, &self.written.parent()?, Domain::Types)))
             .zip(self.written.tail().last());
         let aliased = head.as_ref().and_then(|(parent, last)| building.aliased(parent)?.joined(last));
-        let member = head.as_ref().and_then(|(parent, _)| Some(Resolved::Member(Member::from(parent.crate_item()?))));
+        let member = head
+            .as_ref()
+            .and_then(|(parent, last)| Some(Resolved::Member(Member::new(parent.crate_item()?, (*last).clone()))));
         let valued = || {
             direct.unresolved().and(Some(self.domain())).filter(|domain| *domain == Domain::Types)?;
             Some(resolving.path(scope, &self.written, Domain::Values)).filter(|resolved| resolved.known().is_some())

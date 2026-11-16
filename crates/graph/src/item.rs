@@ -24,6 +24,7 @@ pub enum ItemKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Exposure {
     Public,
+    Restricted,
     Hidden,
 }
 

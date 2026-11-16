@@ -5,6 +5,7 @@ use std::fmt;
 
 use lint_layout::Name;
 
+use crate::item::Exposure;
 use crate::region::{Region, Seat};
 use crate::type_ref::TypeRef;
 
@@ -176,17 +177,36 @@ pub struct Function {
     signature: Signature,
     seat: Seat,
     definition: Option<Definition>,
+    exposure: Exposure,
 }
 
 impl Function {
     #[must_use]
     pub fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Function {
-        Function { name, owner, entry, signature, seat: Seat::new(Region::SHIPPED, None), definition: None }
+        Function {
+            name,
+            owner,
+            entry,
+            signature,
+            seat: Seat::new(Region::SHIPPED, None),
+            definition: None,
+            exposure: Exposure::Hidden,
+        }
     }
 
     #[must_use]
     pub fn seated(self, seat: Seat) -> Function {
         Function { seat, ..self }
+    }
+
+    #[must_use]
+    pub fn exposed(self, exposure: Exposure) -> Function {
+        Function { exposure, ..self }
+    }
+
+    #[must_use]
+    pub fn exposure(&self) -> Exposure {
+        self.exposure
     }
 
     #[must_use]

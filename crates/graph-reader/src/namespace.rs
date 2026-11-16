@@ -21,7 +21,7 @@ use lint_layout::{Dependencies, Name};
 use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::ScopeId;
-pub(crate) use entries::{Declared, DeclaredKind, Entries, Visibility};
+pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
 pub(crate) use graph::Domain;
 pub(crate) use items::ItemIds;
 pub(crate) use port_macro::PortMacro;
