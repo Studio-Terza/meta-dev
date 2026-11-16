@@ -10,7 +10,7 @@ use syntax::Spanned;
 use syntax::{ItemImpl, ItemMod, Macro};
 
 use lint_core::{Headline, Parsed, Site, SourceFile, Syntax, Violation};
-use lint_file::{ContextLint, Reads};
+use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
 use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Watch, Watching};
@@ -38,7 +38,9 @@ impl ContextLint for EnumPredicates {
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Declarations<'head> {
         Declarations::in_file(parsed)
     }
+}
 
+impl WatchingLint for EnumPredicates {
     type Found<'file> = Candidates<'file>;
     type Watched<'file> = Predicates<'file>;
 

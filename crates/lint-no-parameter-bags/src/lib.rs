@@ -4,7 +4,7 @@ mod root_exports;
 
 use bag_candidates::BagCandidates;
 use lint_core::{Headline, Parsed, SourceFile, Violation};
-use lint_file::{ContextLint, Reads};
+use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_sweep::{Gathers, Sweep, Watching};
@@ -67,7 +67,9 @@ impl ContextLint for NoParameterBags {
         let shipped = parsed.file().shipped().map(|_| parsed);
         BagUses { uses: shipped.map(NameUses::from), exports: shipped.map_or_default(RootExports::from) }
     }
+}
 
+impl WatchingLint for NoParameterBags {
     type Found<'file> = BagCandidates<'file>;
     type Watched<'file> = BagCandidates<'file>;
 

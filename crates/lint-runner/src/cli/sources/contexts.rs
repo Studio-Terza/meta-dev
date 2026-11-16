@@ -2,7 +2,7 @@ use super::gathering::Gathering;
 use lint_clones::Clones;
 use lint_core::{Parsed, Unwalked};
 use lint_enum_predicates::EnumPredicates;
-use lint_file::{ContextLint, FileFacts, Gleaning, OneWalk, PrimedFacts};
+use lint_file::{ContextLint, FileFacts, Gleaning, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
 use lint_module_nesting::ModuleNesting;
 use lint_named_numbers::NamedNumbers;
@@ -182,7 +182,6 @@ contexts! {
         public_api_tests: PublicApiTests,
         no_test_only_api: NoTestOnlyApi,
         repeated_shapes: RepeatedShapes,
-        one_walk: OneWalk,
     }
     primed: {
         state_graph: StateGraph,

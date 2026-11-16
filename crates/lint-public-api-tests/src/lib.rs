@@ -8,7 +8,7 @@ use lint_core::Message;
 use lint_core::Problem;
 use lint_core::{Headline, Parsed};
 use lint_core::{SourceFile, Violation};
-use lint_file::{ContextLint, Reads};
+use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_sweep::{Gathers, Watching};
 use path_reach::PathReach;
 use test_code::{TestCode, Tested};
@@ -39,7 +39,9 @@ impl ContextLint for PublicApiTests {
     fn gathering(_: Parsed<'_, '_>) -> Emitters {
         Emitters::default()
     }
+}
 
+impl WatchingLint for PublicApiTests {
     type Found<'file> = Tested<'file>;
     type Watched<'file> = Watched<'file>;
 

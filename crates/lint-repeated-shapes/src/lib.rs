@@ -8,8 +8,7 @@ use std::path::Path;
 
 use equivalence::{Equivalence, Erased, Groups};
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
-use lint_file::{ContextLint, Listed, Reads};
-use lint_sweep::Unwatched;
+use lint_file::{ContextLint, Listed, Reads, RuledLint};
 
 use finding::Finding;
 use occurrence::Occurrence;
@@ -68,19 +67,10 @@ impl ContextLint for RepeatedShapes {
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Scan<'head> {
         Scan::scanning(parsed, Self::EQUIVALENCE)
     }
+}
 
-    type Found<'file> = Unwatched;
-    type Watched<'file> = Unwatched;
-
-    fn watched(_: &SourceFile) -> Unwatched {
-        Unwatched
-    }
-
-    fn judged<'file, 'head: 'file>(
-        file: &'file SourceFile,
-        _: Unwatched,
-        listed: &Listed<'head>,
-    ) -> Vec<Violation<'file>> {
+impl RuledLint for RepeatedShapes {
+    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, listed: &Listed<'head>) -> Vec<Violation<'file>> {
         listed.found_in(file)
     }
 }

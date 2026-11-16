@@ -2,7 +2,7 @@ mod boundary;
 
 use boundary::Numeral;
 use lint_core::{Headline, Parsed};
-use lint_file::{ContextLint, Reads};
+use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_sweep::{Descend, Facts, Finds, Kind, Watch, Watchers};
 use lint_sweep::{Gathers, Sweep, Watching};
 use std::collections::BTreeSet;
@@ -62,7 +62,9 @@ impl ContextLint for NamedNumbers {
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> SupportGathering<'head> {
         SupportGathering { file: parsed.head().path(), modules: SupportModules::default() }
     }
+}
 
+impl WatchingLint for NamedNumbers {
     type Found<'file> = Vec<Violation<'file>>;
     type Watched<'file> = Watchers<'file>;
 

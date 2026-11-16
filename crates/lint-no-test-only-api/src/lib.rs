@@ -17,7 +17,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::{Headline, Parsed};
-use lint_file::{ContextLint, Reads};
+use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_layout::Name;
 use lint_placement::PackageRoot;
 use lint_sweep::{Gathers, Sweep, Watchers, Watching};
@@ -116,7 +116,9 @@ impl ContextLint for NoTestOnlyApi {
             mentions: Mentions::of_file(parsed.file()),
         }
     }
+}
 
+impl WatchingLint for NoTestOnlyApi {
     type Found<'file> = Offered<'file>;
     type Watched<'file> = Offered<'file>;
 

@@ -3,7 +3,7 @@ mod workspace_types;
 
 use forwarders::{Forwarded, Forwarders};
 use lint_core::{Headline, Parsed};
-use lint_file::{ContextLint, Reads};
+use lint_file::{ContextLint, Reads, WatchingLint};
 use workspace_types::{TypeGathering, WorkspaceTypes};
 
 use lint_core::{SourceFile, Violation};
@@ -23,7 +23,9 @@ impl ContextLint for NoForwarders {
     fn gathering(parsed: Parsed<'_, '_>) -> TypeGathering {
         TypeGathering::from(parsed.file())
     }
+}
 
+impl WatchingLint for NoForwarders {
     type Found<'file> = Forwarded<'file>;
     type Watched<'file> = Forwarders<'file>;
 

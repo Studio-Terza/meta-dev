@@ -2,7 +2,7 @@ mod consumers;
 mod declared;
 
 use lint_core::{Headline, Parsed, SourceFile, Violation};
-use lint_file::{ContextLint, Reads};
+use lint_file::{ContextLint, Reads, WatchingLint};
 
 use consumers::{Consumers, Consuming};
 use declared::{Declarations, Declared};
@@ -24,7 +24,9 @@ impl ContextLint for UnconsumedTraits {
     fn gathering(parsed: Parsed<'_, '_>) -> Consuming {
         Consuming::from(parsed.file())
     }
+}
 
+impl WatchingLint for UnconsumedTraits {
     type Found<'file> = Declarations<'file>;
     type Watched<'file> = Declared<'file>;
 

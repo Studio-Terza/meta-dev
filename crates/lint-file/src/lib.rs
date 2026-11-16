@@ -66,7 +66,9 @@ pub trait ContextLint {
     fn completed<'head>(part: Self::Part<'head>, _: &FileFacts<'head>) -> Self::Part<'head> {
         part
     }
+}
 
+pub trait WatchingLint: ContextLint {
     type Found<'file>;
     type Watched<'file>: Gathers<Self::Found<'file>> + Debug;
 
@@ -77,6 +79,10 @@ pub trait ContextLint {
         found: Self::Found<'file>,
         context: &Self::Context<'head>,
     ) -> Vec<Violation<'file>>;
+}
+
+pub trait RuledLint: ContextLint {
+    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, context: &Self::Context<'head>) -> Vec<Violation<'file>>;
 }
 
 #[derive(Debug)]
@@ -90,6 +96,9 @@ pub struct Kin<Checked>(PhantomData<Checked>);
 
 #[derive(Debug)]
 pub struct Judged<Checked>(PhantomData<Checked>);
+
+#[derive(Debug)]
+pub struct Ruled<Checked>(PhantomData<Checked>);
 
 impl<Checked: FileLint + 'static> Leader for Filed<Checked> {
     const LEAD: Lead = Lead::Filed(Checked::violations);
@@ -121,7 +130,21 @@ impl<Checked: KinLint> Lint for Kin<Checked> {
     }
 }
 
-impl<Checked: ContextLint> Lint for Judged<Checked> {
+impl<Checked: RuledLint> Lint for Ruled<Checked> {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        let context: Checked::Context<'_> = files
+            .iter()
+            .map(|file| {
+                let parsed = Parsed::from(file);
+                FileFacts::completed(file, parsed, Checked::gathering(parsed), Checked::completed)
+            })
+            .collect();
+        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
+        Report::new(Checked::HEADLINE, read.flat_map(|file| Checked::ruled(file, &context)).collect())
+    }
+}
+
+impl<Checked: WatchingLint> Lint for Judged<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let walked: Vec<Done<Checked::Part<'_>, Checked::Found<'_>>> = files
             .iter()
@@ -202,14 +225,8 @@ pub trait PrimedLint: PrimedFacts {
     const HEADLINE: Headline;
     const READS: Reads;
 
-    type Found<'file>;
-    type Watched<'file>: Gathers<Self::Found<'file>> + Debug;
-
-    fn watched(file: &SourceFile) -> Self::Watched<'_>;
-
     fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
-        found: Self::Found<'file>,
         primer: &Self::Primer<'head>,
         context: &Self::Context<'head>,
     ) -> Vec<Violation<'file>>;
@@ -227,9 +244,8 @@ impl<Checked: PrimedLint> Lint for Primed<Checked> {
             .filter_map(|walk| walk.raw.take())
             .map(|raw| Checked::contribution(raw, &primer))
             .collect();
-        let judged = files.iter().zip(walked).flat_map(|(file, walk)| {
-            walk.found.map(|seen| Checked::judged(file, seen, &primer, &context)).into_iter().flatten()
-        });
+        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
+        let judged = read.flat_map(|file| Checked::judged(file, &primer, &context));
         Report::new(Checked::HEADLINE, judged.collect())
     }
 }
@@ -237,17 +253,17 @@ impl<Checked: PrimedLint> Lint for Primed<Checked> {
 struct PrimedWalk<'file, Checked: PrimedLint> {
     primer: Option<Checked::PrimerPart<'file>>,
     raw: Option<Checked::Raw<'file>>,
-    found: Option<Checked::Found<'file>>,
 }
 
 impl<'file, Checked: PrimedLint> PrimedWalk<'file, Checked> {
     fn walked(file: &'file SourceFile) -> PrimedWalk<'file, Checked> {
         let parsed = Parsed::from(file);
         let gathering = Two { first: Checked::priming(parsed), second: Checked::recording(parsed) };
-        let watched = Checked::READS.admits(file).map(Checked::watched);
-        let walk = Sweep::gathered(file, Walking { gathering, facts: FileFacts::from(parsed), watched });
-        let Two { first, second } = walk.part;
-        PrimedWalk { primer: Some(Checked::primer_completed(first, &walk.facts)), raw: Some(second), found: walk.found }
+        let walked = FileFacts::completed(file, parsed, gathering, |Two { first, second }, facts| Two {
+            first: Checked::primer_completed(first, facts),
+            second,
+        });
+        PrimedWalk { primer: Some(walked.first), raw: Some(walked.second) }
     }
 }
 

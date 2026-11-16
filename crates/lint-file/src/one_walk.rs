@@ -1,8 +1,7 @@
-use lint_core::{Fix, Headline, Message, Parsed, Problem, Site, SourceFile, Violation};
+use lint_core::{Fix, Headline, Message, Problem, Site, SourceFile, Violation};
 use lint_layout::LineNumber;
-use lint_sweep::Unwatched;
 
-use crate::{ContextLint, Reads};
+use crate::{FileLint, Reads};
 
 #[derive(Debug)]
 pub struct OneWalk;
@@ -14,28 +13,12 @@ impl OneWalk {
     );
 }
 
-impl ContextLint for OneWalk {
+impl FileLint for OneWalk {
     const HEADLINE: Headline =
         Headline::new("syntax is walked once: every lint, the lowering and the facts ride one sweep of each file");
     const READS: Reads = Reads::Every;
 
-    type Part<'head> = Unwatched;
-    type Context<'head> = Unwatched;
-
-    type Gathering<'head> = Unwatched;
-
-    fn gathering(_: Parsed<'_, '_>) -> Unwatched {
-        Unwatched
-    }
-
-    type Found<'file> = Unwatched;
-    type Watched<'file> = Unwatched;
-
-    fn watched(_: &SourceFile) -> Unwatched {
-        Unwatched
-    }
-
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, _: Unwatched, _: &Unwatched) -> Vec<Violation<'file>> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let again = file
             .walks()
             .repeated()

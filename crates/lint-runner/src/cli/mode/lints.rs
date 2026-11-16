@@ -3,6 +3,7 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Write;
+use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::thread::Scope;
 
@@ -14,8 +15,8 @@ use lint_hand_impls::HandImpls;
 use file_ports::Files;
 use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
 use lint_file::{
-    ContextLint, FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, OneWalk, Primed, PrimedLint, Reads, SortStart,
-    Start, Swept, SweptLint,
+    FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, OneWalk, Primed, PrimedLint, Reads, Ruled, RuledLint,
+    SortStart, Start, Swept, SweptLint, WatchingLint,
 };
 use lint_port_dependencies::{RoleFacts, RoleReading};
 use lint_reader::{Described, Unlocated};
@@ -117,6 +118,15 @@ struct Judging {
     pend: Pend,
 }
 
+type Conclude = for<'file> fn(&'file SourceFile) -> Box<dyn Concludes<'file> + 'file>;
+
+#[derive(Clone, Copy, Debug)]
+struct Rules {
+    headline: Headline,
+    reads: Reads,
+    conclude: Conclude,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Filing {
     headline: Headline,
@@ -152,7 +162,7 @@ impl Lints {
         <Swept<FnShape> as Registered>::ENTRY,
         <Swept<LiteralNames> as Registered>::ENTRY,
         <Swept<ManualIteration> as Registered>::ENTRY,
-        <Judged<ModuleNesting> as Registered>::ENTRY,
+        <Ruled<ModuleNesting> as Registered>::ENTRY,
         <Judged<NamedNumbers> as Registered>::ENTRY,
         <Judged<NoForwarders> as Registered>::ENTRY,
         <Swept<NoNumbersInBinaries> as Registered>::ENTRY,
@@ -161,10 +171,10 @@ impl Lints {
         <Swept<PrivateFns> as Registered>::ENTRY,
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
-        <Judged<PublicSurface> as Registered>::ENTRY,
-        <Judged<RepeatedMethods> as Registered>::ENTRY,
+        <Ruled<PublicSurface> as Registered>::ENTRY,
+        <Ruled<RepeatedMethods> as Registered>::ENTRY,
         <Primed<StateGraph> as Registered>::ENTRY,
-        <Judged<GuardMustUse> as Registered>::ENTRY,
+        <Ruled<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
         <Swept<NoIgnoredTests> as Registered>::ENTRY,
@@ -182,14 +192,14 @@ impl Lints {
         <Kin<HiddenSqlx> as Registered>::ENTRY,
         Entry::spelled::<StoreQueries>(Work::Modelled(<StoreQueries as ModelLint>::report)),
         <Swept<LongExactStrings> as Registered>::ENTRY,
-        <Judged<RepeatedShapes> as Registered>::ENTRY,
+        <Ruled<RepeatedShapes> as Registered>::ENTRY,
         Entry::spelled::<MandatoryLaws>(Work::Modelled(<MandatoryLaws as ModelLint>::report)),
         <Swept<ArbitraryNewtypes> as Registered>::ENTRY,
         <Swept<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
         Entry::spelled::<RepeatedReads>(Work::Modelled(<RepeatedReads as ModelLint>::report)),
         Entry::spelled::<NodeRecursion>(Work::Modelled(<NodeRecursion as ModelLint>::report)),
-        <Judged<OneWalk> as Registered>::ENTRY,
+        <Late<OneWalk> as Registered>::ENTRY,
         <Swept<NoEarlyExits> as Registered>::ENTRY,
         <Kin<LinearBodies> as Registered>::ENTRY,
         <Kin<PureRouters> as Registered>::ENTRY,
@@ -272,6 +282,7 @@ enum Work {
     Extracted(Extracting),
     Filed(Filing),
     Judged(Judging),
+    Ruled(Rules),
     Described(Workspaced),
     Survey,
 }
@@ -283,7 +294,7 @@ impl Entry {
 
     fn queued(self, slot: Slot) -> Option<Job> {
         match self.work {
-            Work::Filed(_) | Work::Judged(_) => None,
+            Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => None,
             Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) | Work::Survey => {
                 Some(Job { slot, step: Step::Lint(self.name), work: self.work })
             }
@@ -298,6 +309,7 @@ impl Entry {
             | Work::Extracted(_)
             | Work::Described(_)
             | Work::Judged(_)
+            | Work::Ruled(_)
             | Work::Survey => None,
         }
     }
@@ -310,12 +322,29 @@ impl Entry {
             | Work::Extracted(_)
             | Work::Described(_)
             | Work::Filed(_)
+            | Work::Ruled(_)
             | Work::Survey => None,
         }
     }
 
-    fn headline(&self) -> Option<Headline> {
-        self.filing().map(|filing| filing.headline).or_else(|| self.judging().map(|judging| judging.headline))
+    fn ruling(self) -> Option<Rules> {
+        match self.work {
+            Work::Ruled(rules) => Some(rules),
+            Work::Checked(_)
+            | Work::Modelled(_)
+            | Work::Extracted(_)
+            | Work::Described(_)
+            | Work::Filed(_)
+            | Work::Judged(_)
+            | Work::Survey => None,
+        }
+    }
+
+    pub(crate) fn headline(&self) -> Option<Headline> {
+        let filed = self.filing().map(|filing| filing.headline);
+        filed
+            .or_else(|| self.judging().map(|judging| judging.headline))
+            .or_else(|| self.ruling().map(|rules| rules.headline))
     }
 }
 
@@ -326,10 +355,17 @@ struct Ruling<'file> {
 }
 
 #[derive(Debug)]
+struct Concluding<'file> {
+    slot: Slot,
+    pending: Box<dyn Concludes<'file> + 'file>,
+}
+
+#[derive(Debug)]
 pub(crate) struct FileWork<'file> {
     order: FileOrder,
     worked: Worked,
     rulings: Vec<Ruling<'file>>,
+    concluding: Vec<Concluding<'file>>,
 }
 
 impl<'file> FileWork<'file> {
@@ -339,7 +375,10 @@ impl<'file> FileWork<'file> {
 
     fn judged<'run: 'file>(self, settled: Settled<'_, 'run>) -> Worked {
         let order = self.order;
-        let judged = self.rulings.into_iter().map(|ruling| (ruling.slot, ruling.pending.judged(settled)));
+        let watched = self.rulings.into_iter().map(|ruling| (ruling.slot, ruling.pending.judged(settled)));
+        let ruled =
+            self.concluding.into_iter().map(|concluding| (concluding.slot, concluding.pending.concluded(settled)));
+        let judged = watched.chain(ruled);
         judged.map(|(slot, violations)| Worked::filing(slot, order, &violations)).collect()
     }
 }
@@ -353,14 +392,19 @@ impl Work {
         match self {
             Work::Checked(check) => check(readout),
             Work::Modelled(query) => sources.gathering().model().map(query).into_iter().collect(),
-            Work::Described(_) | Work::Extracted(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) => Vec::new(),
+            Work::Described(_)
+            | Work::Extracted(_)
+            | Work::Survey
+            | Work::Filed(_)
+            | Work::Judged(_)
+            | Work::Ruled(_) => Vec::new(),
         }
     }
 
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
             Work::Survey | Work::Extracted(_) | Work::Described(_) => self.settled(slot, sources),
-            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) => {
+            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
         }
@@ -372,7 +416,9 @@ impl Work {
                 Worked::surveying(&Survey::settled(&Settled::from(sources.gathering()), sources.gathering().model()))
             }
             Work::Extracted(_) | Work::Described(_) => self.grounded(slot, sources, Settled::from(sources.gathering())),
-            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) => Worked::default(),
+            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
+                Worked::default()
+            }
         }
     }
 
@@ -401,7 +447,9 @@ impl Work {
                     .into_iter()
                     .collect(),
             ),
-            Work::Checked(_) | Work::Modelled(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) => Worked::default(),
+            Work::Checked(_) | Work::Modelled(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
+                Worked::default()
+            }
         }
     }
 }
@@ -426,7 +474,7 @@ impl Job {
     fn rank(&self) -> Rank {
         match self.work {
             Work::Survey => Rank::Survey,
-            Work::Checked(_) | Work::Filed(_) | Work::Judged(_) => Rank::Early(Reverse(self.slot)),
+            Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Rank::Early(Reverse(self.slot)),
             Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => Rank::Late(self.slot),
         }
     }
@@ -497,6 +545,7 @@ struct Admitted {
 pub(crate) struct Filer<'file> {
     claimed: Claimed<'file>,
     rulings: Vec<Ruling<'file>>,
+    concluding: Vec<Concluding<'file>>,
     admitted: Vec<Admitted>,
     leads: BTreeMap<TypeId, Lead>,
     starts: Vec<TypeId>,
@@ -532,7 +581,13 @@ impl<'file> Filer<'file> {
             .filter_map(|(index, entry)| Some((Slot::from(index), entry.judging()?)))
             .filter_map(|(slot, judging)| Some(Ruling { slot, pending: (judging.pend)(judging.reads.admits(file)?) }))
             .collect();
-        Filer { claimed, rulings, admitted, leads, starts, sorting, finds, sorts }
+        let concluding = Lints::LINTS
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| Some((Slot::from(index), entry.ruling()?)))
+            .filter_map(|(slot, rules)| Some(Concluding { slot, pending: (rules.conclude)(rules.reads.admits(file)?) }))
+            .collect();
+        Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts }
     }
 
     fn taken<'found>(
@@ -552,7 +607,7 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
     }
 
     fn gathered(self) -> FileWork<'file> {
-        let Filer { claimed, rulings, admitted, leads, starts, sorting, finds, sorts } = self;
+        let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
         let file = claimed.file();
         let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found()]));
         let watched = listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, watcher.sorted())));
@@ -560,11 +615,11 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
         let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
         let found = admitted.into_iter().map(|found| (found.slot, Self::taken(&mut sorted, found.source)));
         let worked = found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations)).collect();
-        FileWork { order: claimed.order(), worked, rulings }
+        FileWork { order: claimed.order(), worked, rulings, concluding }
     }
 }
 
-impl<Lint: ContextLint + 'static> Registered for Judged<Lint>
+impl<Lint: WatchingLint + 'static> Registered for Judged<Lint>
 where
     Judged<Lint>: Judges,
 {
@@ -576,12 +631,106 @@ where
 
 impl<Lint: PrimedLint + 'static> Registered for Primed<Lint>
 where
-    Primed<Lint>: Judges,
+    Primed<Lint>: Concluded,
 {
     const ENTRY: Entry = Entry {
         name: Named::spelled::<Lint>(),
-        work: Work::Judged(Judging { headline: Lint::HEADLINE, reads: Lint::READS, pend: Self::pending }),
+        work: Work::Ruled(Rules { headline: Lint::HEADLINE, reads: Lint::READS, conclude: Self::concluding }),
     };
+}
+
+impl<Lint: RuledLint + 'static> Registered for Ruled<Lint>
+where
+    Ruled<Lint>: Concluded,
+{
+    const ENTRY: Entry = Entry {
+        name: Named::spelled::<Lint>(),
+        work: Work::Ruled(Rules { headline: Lint::HEADLINE, reads: Lint::READS, conclude: Self::concluding }),
+    };
+}
+
+impl<Lint: FileLint + fmt::Debug + 'static> Registered for Late<Lint> {
+    const ENTRY: Entry = Entry {
+        name: Named::spelled::<Lint>(),
+        work: Work::Ruled(Rules { headline: Lint::HEADLINE, reads: Lint::READS, conclude: Self::concluding }),
+    };
+}
+
+trait Concluded {
+    fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_>;
+}
+
+pub(crate) trait Concludes<'file>: fmt::Debug {
+    fn concluded<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>>;
+}
+
+#[derive(Debug)]
+struct Late<Lint>(PhantomData<Lint>);
+
+#[derive(Debug)]
+struct RuledConclusion<'file, Lint> {
+    file: &'file SourceFile,
+    lint: PhantomData<Lint>,
+}
+
+#[derive(Debug)]
+struct PrimedConclusion<'file, Lint> {
+    file: &'file SourceFile,
+    lint: PhantomData<Lint>,
+}
+
+#[derive(Debug)]
+struct LateConclusion<'file, Lint> {
+    file: &'file SourceFile,
+    lint: PhantomData<Lint>,
+}
+
+impl<'file, Lint: RuledLint + fmt::Debug> Concludes<'file> for RuledConclusion<'file, Lint>
+where
+    for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
+{
+    fn concluded<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>> {
+        Lint::ruled(self.file, settled.held())
+    }
+}
+
+impl<'file, Lint: PrimedLint + fmt::Debug> Concludes<'file> for PrimedConclusion<'file, Lint>
+where
+    for<'settled, 'run> Settled<'settled, 'run>: Priming<'run, Lint>,
+{
+    fn concluded<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>> {
+        Lint::judged(self.file, settled.primer(), settled.primed())
+    }
+}
+
+impl<'file, Lint: FileLint + fmt::Debug> Concludes<'file> for LateConclusion<'file, Lint> {
+    fn concluded<'run: 'file>(self: Box<Self>, _: Settled<'_, 'run>) -> Vec<Violation<'file>> {
+        Lint::violations(self.file)
+    }
+}
+
+impl<Lint: RuledLint + fmt::Debug + 'static> Concluded for Ruled<Lint>
+where
+    for<'file> RuledConclusion<'file, Lint>: Concludes<'file>,
+{
+    fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_> {
+        Box::new(RuledConclusion::<Lint> { file, lint: PhantomData })
+    }
+}
+
+impl<Lint: PrimedLint + fmt::Debug + 'static> Concluded for Primed<Lint>
+where
+    for<'file> PrimedConclusion<'file, Lint>: Concludes<'file>,
+{
+    fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_> {
+        Box::new(PrimedConclusion::<Lint> { file, lint: PhantomData })
+    }
+}
+
+impl<Lint: FileLint + fmt::Debug + 'static> Concluded for Late<Lint> {
+    fn concluding(file: &SourceFile) -> Box<dyn Concludes<'_> + '_> {
+        Box::new(LateConclusion::<Lint> { file, lint: PhantomData })
+    }
 }
 
 trait Judges {
@@ -595,18 +744,12 @@ pub(crate) trait Awaits<'file>: fmt::Debug {
 }
 
 #[derive(Debug)]
-struct Waiting<'file, Lint: ContextLint> {
+struct Waiting<'file, Lint: WatchingLint> {
     file: &'file SourceFile,
     watched: Lint::Watched<'file>,
 }
 
-#[derive(Debug)]
-struct PrimedWaiting<'file, Lint: PrimedLint> {
-    file: &'file SourceFile,
-    watched: Lint::Watched<'file>,
-}
-
-impl<'file, Lint: ContextLint + fmt::Debug> Awaits<'file> for Waiting<'file, Lint>
+impl<'file, Lint: WatchingLint + fmt::Debug> Awaits<'file> for Waiting<'file, Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
@@ -620,34 +763,11 @@ where
     }
 }
 
-impl<'file, Lint: PrimedLint + fmt::Debug> Awaits<'file> for PrimedWaiting<'file, Lint>
-where
-    for<'settled, 'run> Settled<'settled, 'run>: Priming<'run, Lint>,
-{
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        self.watched.watching()
-    }
-
-    fn judged<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>> {
-        let PrimedWaiting { file, watched } = *self;
-        Lint::judged(file, watched.gathered(), settled.primer(), settled.primed())
-    }
-}
-
-impl<Lint: ContextLint + fmt::Debug + 'static> Judges for Judged<Lint>
+impl<Lint: WatchingLint + fmt::Debug + 'static> Judges for Judged<Lint>
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
     fn pending(file: &SourceFile) -> Box<dyn Awaits<'_> + '_> {
         Box::new(Waiting::<Lint> { file, watched: Lint::watched(file) })
-    }
-}
-
-impl<Lint: PrimedLint + fmt::Debug + 'static> Judges for Primed<Lint>
-where
-    for<'settled, 'run> Settled<'settled, 'run>: Priming<'run, Lint>,
-{
-    fn pending(file: &SourceFile) -> Box<dyn Awaits<'_> + '_> {
-        Box::new(PrimedWaiting::<Lint> { file, watched: Lint::watched(file) })
     }
 }

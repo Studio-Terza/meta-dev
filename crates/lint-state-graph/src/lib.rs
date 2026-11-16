@@ -16,7 +16,7 @@ use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges, Written};
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Home, Parsed, SourceFile, Violation};
 use lint_file::{Concluded, FileFacts, PrimedFacts, PrimedLint, Reads};
-use lint_sweep::{Gathers, Unwatched, Watching};
+use lint_sweep::{Gathers, Watching};
 use variant_matches::{MatchCandidates, VariantMatches};
 
 #[derive(Debug)]
@@ -116,16 +116,8 @@ impl PrimedLint for StateGraph {
     const HEADLINE: Headline = Headline::new("state graph violated");
     const READS: Reads = Reads::Shipped;
 
-    type Found<'file> = Unwatched;
-    type Watched<'file> = Unwatched;
-
-    fn watched(_: &SourceFile) -> Unwatched {
-        Unwatched
-    }
-
     fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
-        _: Unwatched,
         _: &Declarations<'head>,
         concluded: &Concluded<'head>,
     ) -> Vec<Violation<'file>> {

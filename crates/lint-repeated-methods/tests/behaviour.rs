@@ -1,5 +1,5 @@
 use lint_core::Lint;
-use lint_file::Judged;
+use lint_file::Ruled;
 use lint_repeated_methods::RepeatedMethods;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -148,12 +148,12 @@ const CASES: [Case; 19] = [
 
 #[test]
 fn one_method_shape_on_many_types_is_flagged() {
-    assert_eq!(Sources::mismatches::<Judged<RepeatedMethods>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Ruled<RepeatedMethods>>(&CASES), Lines::default());
 }
 
 #[test]
 fn a_report_names_the_method_and_the_types_that_repeat_it() {
-    let constructors = Judged::<RepeatedMethods>::report(&Sources::parsed(&[Source::new(
+    let constructors = Ruled::<RepeatedMethods>::report(&Sources::parsed(&[Source::new(
         Located::new("a.rs"),
         Text::new(CONSTRUCTORS),
     )]))

@@ -6,8 +6,7 @@ use export::Export;
 use finding::Finding;
 use foreign_references::{ForeignReferences, Reading};
 use lint_core::{Headline, Parsed};
-use lint_file::{ContextLint, Reads};
-use lint_sweep::Unwatched;
+use lint_file::{ContextLint, Reads, RuledLint};
 use lint_sweep::{Gathers, Watching};
 
 use lint_core::Site;
@@ -52,19 +51,10 @@ impl ContextLint for PublicSurface {
     fn gathering(parsed: Parsed<'_, '_>) -> ReferenceGathering {
         ReferenceGathering(Reading::from(parsed.file()))
     }
+}
 
-    type Found<'file> = Unwatched;
-    type Watched<'file> = Unwatched;
-
-    fn watched(_: &SourceFile) -> Unwatched {
-        Unwatched
-    }
-
-    fn judged<'file, 'head: 'file>(
-        file: &'file SourceFile,
-        _: Unwatched,
-        references: &References,
-    ) -> Vec<Violation<'file>> {
+impl RuledLint for PublicSurface {
+    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, references: &References) -> Vec<Violation<'file>> {
         Self::unused_exports(file, references)
     }
 }

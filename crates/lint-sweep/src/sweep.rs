@@ -172,19 +172,6 @@ impl Around for Sweeping<'_, '_> {
     lint_core::sweep_nodes!();
 }
 
-#[derive(Debug, Default)]
-pub struct Unwatched;
-
-impl Gathers<Unwatched> for Unwatched {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        Vec::new()
-    }
-
-    fn gathered(self) -> Unwatched {
-        self
-    }
-}
-
 #[derive(Debug)]
 pub struct Watchers<'file>(Vec<Box<dyn Finds<'file> + 'file>>);
 
@@ -208,11 +195,5 @@ impl<'file> Gathers<Vec<Violation<'file>>> for Watchers<'file> {
 
     fn gathered(self) -> Vec<Violation<'file>> {
         self.0.into_iter().flat_map(Finds::found).collect()
-    }
-}
-
-impl FromIterator<Unwatched> for Unwatched {
-    fn from_iter<Parts: IntoIterator<Item = Unwatched>>(_: Parts) -> Unwatched {
-        Unwatched
     }
 }
