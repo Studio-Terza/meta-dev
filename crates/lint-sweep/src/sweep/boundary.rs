@@ -1,12 +1,20 @@
+use std::collections::BTreeMap;
+
 use lint_core::Kind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Index(usize);
 
 impl Index {
-    pub(super) fn listening(kinds: &[&[Kind]], kind: Kind) -> Vec<Index> {
-        let heard = kinds.iter().enumerate().filter(|(_, wanted)| wanted.contains(&kind));
-        heard.map(|(index, _)| Index(index)).collect()
+    pub(super) fn listening(kinds: &[&[Kind]]) -> BTreeMap<Kind, Vec<Index>> {
+        let heard =
+            kinds.iter().enumerate().flat_map(|(index, wanted)| wanted.iter().map(move |kind| (*kind, Index(index))));
+        let mut listening = heard.fold(BTreeMap::new(), |mut by: BTreeMap<Kind, Vec<Index>>, (kind, index)| {
+            by.entry(kind).or_default().push(index);
+            by
+        });
+        listening.values_mut().for_each(Vec::dedup);
+        listening
     }
 
     pub(super) fn entry_mut<Value>(self, values: &mut [Value]) -> Option<&mut Value> {
