@@ -1,3 +1,7 @@
+mod clause;
+
+pub use clause::Clause;
+
 use std::error::Error;
 use std::fmt::Display;
 use std::num::TryFromIntError;
@@ -26,7 +30,7 @@ pub trait Encoding<Value> {
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure>;
 
-    fn check(column: &str) -> Option<String>;
+    fn check(column: &str) -> Option<Clause>;
 }
 
 pub trait Primitive: Sized {
@@ -36,7 +40,7 @@ pub trait Primitive: Sized {
 
     fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
 
-    fn check(_column: &str) -> Option<String> {
+    fn check(_column: &str) -> Option<Clause> {
         None
     }
 }
@@ -52,7 +56,7 @@ impl<Value: Newtype<Inner: Primitive> + Clone> Encoding<Value> for Inner {
         Value::Inner::from_raw(raw).map(Value::new)
     }
 
-    fn check(column: &str) -> Option<String> {
+    fn check(column: &str) -> Option<Clause> {
         Value::Inner::check(column)
     }
 }
@@ -72,7 +76,7 @@ where
             .and_then(|inner| Value::try_new(inner).map_err(|refused| ColumnFailure::Refused(Box::new(refused))))
     }
 
-    fn check(_column: &str) -> Option<String> {
+    fn check(_column: &str) -> Option<Clause> {
         None
     }
 }
@@ -88,7 +92,7 @@ impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Valu
         raw.parse().map_err(|unknown| ColumnFailure::Misspelled(Box::new(unknown)))
     }
 
-    fn check(_column: &str) -> Option<String> {
+    fn check(_column: &str) -> Option<Clause> {
         None
     }
 }
@@ -107,9 +111,8 @@ where
         <Spelled as Encoding<Value>>::from_raw(raw)
     }
 
-    fn check(column: &str) -> Option<String> {
-        let names: Vec<String> = Value::VARIANTS.iter().map(|variant| format!("'{variant}'")).collect();
-        Some(format!("{column} IN ({})", names.join(", ")))
+    fn check(column: &str) -> Option<Clause> {
+        Some(Clause::within(column, Value::VARIANTS.iter().map(ToString::to_string)))
     }
 }
 
@@ -124,8 +127,8 @@ impl<Value: Column> Encoding<Option<Value>> for Optional {
         raw.map(Value::from_raw).transpose()
     }
 
-    fn check(column: &str) -> Option<String> {
-        Value::check(column).map(|checked| format!("{column} IS NULL OR ({checked})"))
+    fn check(column: &str) -> Option<Clause> {
+        Value::check(column).map(Clause::nullable)
     }
 }
 
@@ -188,8 +191,8 @@ impl Primitive for u32 {
         u32::try_from(raw).map_err(ColumnFailure::Unfit)
     }
 
-    fn check(column: &str) -> Option<String> {
-        Some(format!("{column} BETWEEN 0 AND {}", u32::MAX))
+    fn check(column: &str) -> Option<Clause> {
+        Some(Clause::at_most(column, u32::MAX))
     }
 }
 
@@ -200,7 +203,7 @@ pub trait Column: Sized {
 
     fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
 
-    fn check(column: &str) -> Option<String>;
+    fn check(column: &str) -> Option<Clause>;
 }
 
 impl<Value: Stored<Kind: Encoding<Value>>> Column for Value {
@@ -214,7 +217,7 @@ impl<Value: Stored<Kind: Encoding<Value>>> Column for Value {
         Value::Kind::from_raw(raw)
     }
 
-    fn check(column: &str) -> Option<String> {
+    fn check(column: &str) -> Option<Clause> {
         Value::Kind::check(column)
     }
 }

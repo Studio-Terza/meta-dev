@@ -17,6 +17,14 @@ type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
 
 type Checked = fn(&str) -> Option<String>;
 
+struct Spelled;
+
+impl Spelled {
+    fn clause<Checking: Column>(column: &str) -> Option<String> {
+        Checking::check(column).map(|clause| clause.to_string())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Op)]
 struct Declared(&'static str);
 
@@ -36,32 +44,32 @@ impl Query for Declared {
 }
 
 const COLUMNS: [(&str, &str, Checked); 26] = [
-    ("nodes", "facet", <Facet as Column>::check),
-    ("nodes", "stage", <Stage as Column>::check),
-    ("nodes", "role", <Role as Column>::check),
-    ("node_edges", "relation", <NodeRelation as Column>::check),
-    ("span_edges", "relation", <SpanRelation as Column>::check),
-    ("span_edges", "ordinal", <Ordinal as Column>::check),
-    ("segment_links", "relation", <SegmentRelation as Column>::check),
-    ("segment_links", "source_ordinal", <Ordinal as Column>::check),
-    ("segment_links", "target_ordinal", <Ordinal as Column>::check),
-    ("senses", "kind", <SenseKind as Column>::check),
-    ("senses", "specificity", <Specificity as Column>::check),
-    ("senses", "confidence", <Confidence as Column>::check),
-    ("senses", "explicitness", <Explicitness as Column>::check),
-    ("senses", "ordinal", <Ordinal as Column>::check),
-    ("segments", "ordinal", <Ordinal as Column>::check),
-    ("conversational", "ordinal", <Ordinal as Column>::check),
-    ("flailed", "ordinal", <Ordinal as Column>::check),
-    ("jobs", "state", <JobState as Column>::check),
-    ("runs", "state", <RunState as Column>::check),
-    ("runs", "pid", <Pid as Column>::check),
-    ("runs", "input_tokens", <Option<Tokens> as Column>::check),
-    ("runs", "output_tokens", <Option<Tokens> as Column>::check),
-    ("runs", "cache_written_tokens", <Option<Tokens> as Column>::check),
-    ("runs", "cache_read_tokens", <Option<Tokens> as Column>::check),
-    ("failures", "halted", <Halted as Column>::check),
-    ("failures", "delivery", <Delivery as Column>::check),
+    ("nodes", "facet", Spelled::clause::<Facet>),
+    ("nodes", "stage", Spelled::clause::<Stage>),
+    ("nodes", "role", Spelled::clause::<Role>),
+    ("node_edges", "relation", Spelled::clause::<NodeRelation>),
+    ("span_edges", "relation", Spelled::clause::<SpanRelation>),
+    ("span_edges", "ordinal", Spelled::clause::<Ordinal>),
+    ("segment_links", "relation", Spelled::clause::<SegmentRelation>),
+    ("segment_links", "source_ordinal", Spelled::clause::<Ordinal>),
+    ("segment_links", "target_ordinal", Spelled::clause::<Ordinal>),
+    ("senses", "kind", Spelled::clause::<SenseKind>),
+    ("senses", "specificity", Spelled::clause::<Specificity>),
+    ("senses", "confidence", Spelled::clause::<Confidence>),
+    ("senses", "explicitness", Spelled::clause::<Explicitness>),
+    ("senses", "ordinal", Spelled::clause::<Ordinal>),
+    ("segments", "ordinal", Spelled::clause::<Ordinal>),
+    ("conversational", "ordinal", Spelled::clause::<Ordinal>),
+    ("flailed", "ordinal", Spelled::clause::<Ordinal>),
+    ("jobs", "state", Spelled::clause::<JobState>),
+    ("runs", "state", Spelled::clause::<RunState>),
+    ("runs", "pid", Spelled::clause::<Pid>),
+    ("runs", "input_tokens", Spelled::clause::<Option<Tokens>>),
+    ("runs", "output_tokens", Spelled::clause::<Option<Tokens>>),
+    ("runs", "cache_written_tokens", Spelled::clause::<Option<Tokens>>),
+    ("runs", "cache_read_tokens", Spelled::clause::<Option<Tokens>>),
+    ("failures", "halted", Spelled::clause::<Halted>),
+    ("failures", "delivery", Spelled::clause::<Delivery>),
 ];
 
 #[test]
@@ -77,4 +85,14 @@ fn every_listed_and_counted_column_refuses_what_its_type_refuses() -> Result<(),
         );
         Ok(())
     })
+}
+
+#[test]
+fn a_column_whose_type_has_no_generated_check_yields_no_clause() {
+    assert_eq!(Spelled::clause::<transcript_ports::SessionId>("session"), None);
+    assert_eq!(Spelled::clause::<transcript_ports::Authorship>("author"), None);
+    assert_eq!(Spelled::clause::<design_model::Provenance>("provenance"), None);
+    assert_eq!(Spelled::clause::<Option<transcript_ports::SessionId>>("session"), None);
+    assert_eq!(Spelled::clause::<file_ports::Offset>("read_to"), None);
+    assert_eq!(Spelled::clause::<design_model::RunId>("run"), None);
 }
