@@ -2,7 +2,8 @@ mod candidate;
 
 use candidate::{Bag, Carriers};
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report};
+use lint_core::{Headline, Report};
+use lint_file::ModelLint;
 
 #[derive(Debug)]
 pub struct NoParameterBags;

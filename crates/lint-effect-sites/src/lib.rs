@@ -3,7 +3,8 @@ mod crate_effects;
 use std::collections::BTreeMap;
 
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report};
+use lint_core::{Headline, Report};
+use lint_file::ModelLint;
 use lint_placement::CrateName;
 
 use crate_effects::CrateEffects;

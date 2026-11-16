@@ -5,7 +5,8 @@ mod signatures;
 mod texts;
 
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report, Violation};
+use lint_core::{Headline, Report, Violation};
+use lint_file::ModelLint;
 
 use lexicon::Lexicon;
 use scope::Scope;

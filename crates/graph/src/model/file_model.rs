@@ -4,7 +4,7 @@ use lint_layout::LineNumber;
 
 use crate::placed::FileHome;
 use crate::placed::Placed;
-use crate::site::Site;
+use lint_layout::Site;
 
 #[derive(Debug)]
 pub(crate) struct FileModel {

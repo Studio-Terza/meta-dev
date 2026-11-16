@@ -1,7 +1,8 @@
 use std::marker::PhantomData;
 
 use graph::Model;
-use lint_core::{ModelLint, Report};
+use lint_core::Report;
+use lint_file::ModelLint;
 
 use crate::containment::{ClusterLint, Containment};
 use crate::system::TypeSystem;

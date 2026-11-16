@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use file_ports::{Bytes, Memory};
 use graph_reader::Reader;
-use lint_core::{ModelLint, Readout, SourceFile};
+use lint_core::{Readout, SourceFile};
+use lint_file::ModelLint;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_layout::{CrateSource, Crates, Dependencies, Failure, LibraryForm, Name, PackageName, SourceText};
 use lint_no_plaintext::NoPlaintext;

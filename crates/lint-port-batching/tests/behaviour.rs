@@ -1,5 +1,5 @@
 use graph_reader::Reader;
-use lint_core::ModelLint;
+use lint_file::ModelLint;
 use lint_port_batching::PortBatching;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};

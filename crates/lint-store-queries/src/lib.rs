@@ -4,7 +4,8 @@ mod statement;
 use std::collections::BTreeSet;
 
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report, Site, Violation};
+use lint_core::{Headline, Report, Site, Violation};
+use lint_file::ModelLint;
 
 use queries::{Queries, Unformatted};
 pub use statement::Statement;

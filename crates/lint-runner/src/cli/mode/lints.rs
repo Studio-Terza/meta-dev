@@ -13,11 +13,12 @@ use graph::Model;
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
-use lint_core::{FileHead, Headline, Lint, ModelLint, Readout, Report, SourceFile, Violation, WorkspaceLint};
+use lint_core::{FileHead, Headline, Lint, Readout, Report, SourceFile, Violation};
 use lint_file::{
     FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, Primed, PrimedLint, Reads, Ruled, RuledLint, SortStart, Start,
     Swept, SweptLint, WatchingLint,
 };
+use lint_file::{ModelLint, WorkspaceLint};
 use lint_port_dependencies::RoleFacts;
 use lint_reader::{Described, Unlocated};
 use lint_sweep::{Finds, Gathers, Member, Sorts, Watching};

@@ -71,7 +71,7 @@ impl<'file> Owners<'file> {
 
     fn sites(file: &FileHead, bypass: &Bypass<'_>) -> BTreeSet<LineNumber> {
         let dependencies = file.placement().package().dependency_sites();
-        Some(dependencies.sites(bypass.keys()))
+        Some(dependencies.sites(bypass.keys().as_ref()))
             .filter(|found| found.first().is_some())
             .unwrap_or_else(|| BTreeSet::from([dependencies.header()]))
     }
