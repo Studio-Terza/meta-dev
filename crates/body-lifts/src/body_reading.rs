@@ -23,11 +23,19 @@ impl BodyReading {
             .map(|_| Body::Focused)
             .or_else(|| Route::routed(found).map(|_| Body::Routed))
             .or_else(|| Chain::unwound(found).lifted().map(|_| Body::Mapped))
+            .or_else(|| Self::built(found))
             .unwrap_or(Body::Written)
     }
 
     fn only(block: &Block) -> Option<&Expr> {
         block.stmts.first().filter(|_| block.stmts.len() == 1).and_then(Self::expression)
+    }
+
+    fn built(found: &Expr) -> Option<Body> {
+        match found {
+            Expr::Struct(_) => Some(Body::Built),
+            _ => None,
+        }
     }
 
     fn expression(statement: &Stmt) -> Option<&Expr> {

@@ -6,7 +6,6 @@ use lint_guard_must_use::GuardMustUse;
 use lint_module_nesting::ModuleNesting;
 use lint_named_numbers::NamedNumbers;
 use lint_no_forwarders::NoForwarders;
-use lint_no_parameter_bags::NoParameterBags;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_port_dependencies::RoleReading;
 use lint_public_api_tests::PublicApiTests;
@@ -170,7 +169,6 @@ contexts! {
         guard_must_use: GuardMustUse,
         enum_predicates: EnumPredicates,
         module_nesting: ModuleNesting,
-        no_parameter_bags: NoParameterBags,
         repeated_methods: RepeatedMethods,
         public_api_tests: PublicApiTests,
         no_test_only_api: NoTestOnlyApi,

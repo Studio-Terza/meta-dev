@@ -1716,13 +1716,11 @@ dependencies = [
 name = "lint-no-parameter-bags"
 version = "0.1.0"
 dependencies = [
+ "body-lifts",
+ "graph",
  "lint-core",
- "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-placement",
- "lint-sweep",
- "syntax",
 ]
 
 [[package]]

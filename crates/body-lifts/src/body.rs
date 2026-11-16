@@ -4,4 +4,5 @@ pub enum Body {
     Mapped,
     Focused,
     Routed,
+    Built,
 }
