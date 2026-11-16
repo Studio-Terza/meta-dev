@@ -1,3 +1,4 @@
+use lint_placement::Krate;
 use std::fmt;
 
 use lint_layout::Name;
@@ -12,7 +13,7 @@ pub(crate) struct Member<'found> {
 
 impl<'found> Member<'found> {
     pub(crate) fn declared(krate: &'found Name, name: &'found Name) -> Member<'found> {
-        Member { name, cluster: Cluster::module(krate, &[]) }
+        Member { name, cluster: Cluster::module(Krate::Named(krate), &[]) }
     }
 
     pub(crate) fn within(self, segments: &'found [Name]) -> Option<Member<'found>> {
@@ -31,6 +32,6 @@ impl<'found> Member<'found> {
 impl fmt::Display for Member<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.cluster.krate().into_iter().try_for_each(|krate| write!(formatter, "{krate}"))?;
-        self.cluster.segments().iter().chain([self.name]).try_for_each(|segment| write!(formatter, "::{segment}"))
+        <&[Name]>::from(self.cluster).iter().chain([self.name]).try_for_each(|segment| write!(formatter, "::{segment}"))
     }
 }

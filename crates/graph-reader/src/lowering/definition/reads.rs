@@ -241,7 +241,7 @@ impl Spelled {
     const SUBJECT: Word<'static> = Word::new("Self");
 
     fn under(path: UsePath, scope: &InScope) -> Spelled {
-        let single = path.parent().map(|parent| parent.written()).filter(|parent| parent.as_ref().len() == 1);
+        let single = path.qualifier().map(|parent| parent.written()).filter(|parent| parent.as_ref().len() == 1);
         let head = single.as_ref().and_then(|parent| parent.last().cloned());
         let owner = head.as_ref().and_then(|parent| scope.generic(parent).cloned());
         let last = path.written().last().cloned();
@@ -274,7 +274,7 @@ impl Spelled {
 
     fn path_reader(path: &UsePath, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Reader {
         let name = path.written().last().cloned().unwrap_or_default();
-        path.parent().map_or_else(
+        path.qualifier().map_or_else(
             || {
                 let valued = resolving.path(scope, path, Domain::Values);
                 valued.known().map_or_else(

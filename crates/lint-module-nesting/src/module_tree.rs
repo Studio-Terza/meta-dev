@@ -8,12 +8,12 @@ use std::path::Path;
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
+use module_path::{InsideSibling, ModuleIndex, ModulePath, Target};
 
 use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
-use lint_placement::CrateRoot;
+use lint_placement::{CrateRoot, Level, Nest};
 use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 use reexport_count::ReexportCount;
 use syntax::ItemUse;
@@ -150,7 +150,7 @@ impl<'file> ModuleTree<'file> {
         let crowded = self
             .reexports
             .iter()
-            .filter(|(module, _)| module.parent().is_some())
+            .filter(|(module, _)| AsRef::<Nest<'_>>::as_ref(*module).level() == Level::Module)
             .filter_map(move |(module, count)| count.beyond(most).map(|crowded| (module, crowded)))
             .map(move |(module, count)| {
                 Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
@@ -185,8 +185,12 @@ impl<'file> ModuleTree<'file> {
     }
 
     fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
-        let outsiders: Vec<&ModulePath<'file>> =
-            self.users.callers_of(module)?.iter().filter(|user| Ancestor::holds(module, user).is_none()).collect();
+        let outsiders: Vec<&ModulePath<'file>> = self
+            .users
+            .callers_of(module)?
+            .iter()
+            .filter(|user| AsRef::<Nest<'_>>::as_ref(module).holding(*AsRef::<Nest<'_>>::as_ref(*user)).is_none())
+            .collect();
         outsiders
             .iter()
             .all(|user| InsideSibling::holds(user, module).is_some())
