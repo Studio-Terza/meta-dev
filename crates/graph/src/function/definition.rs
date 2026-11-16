@@ -1,3 +1,4 @@
+mod operator;
 mod read;
 
 use std::fmt;
@@ -7,6 +8,7 @@ use lint_layout::{Casing, LineNumber, Name, Whole, Word};
 
 use crate::boundary::{CallOrder, ParamIndex};
 use crate::type_ref::{Named, TypeRef};
+pub use operator::{Infix, Operator, Prefix};
 pub use read::{Argument, Read, Reader};
 
 #[derive(Clone, Debug, PartialEq, Eq)]

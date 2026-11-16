@@ -5,7 +5,7 @@ use syntax::{
     ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, TraitBoundModifier,
     Type, TypeParam, TypeParamBound, TypePath, WherePredicate,
 };
-use syntax::{Spanned, TypeFold, TypeTree};
+use syntax::{Fold, Spanned, TypeTree};
 
 use graph::{
     AliasParameter, Arrayed, Callable, Input, Named, Parameter, Projection, Receiver, Resolved, Sited, Spelling,
@@ -217,8 +217,8 @@ impl InScope {
         Lowering { scope: self, fold: &fold }.child(ty)
     }
 
-    fn fold<'syn>(&self, tree: TypeTree<'syn>) -> TypeFold<'syn, TypeRef<Written>> {
-        TypeFold::over(tree, |fold, ty| Lowering { scope: self, fold }.lowered(ty).unwrap_or(TypeRef::Opaque))
+    fn fold<'syn>(&self, tree: TypeTree<'syn>) -> Fold<'syn, Type, TypeRef<Written>> {
+        Fold::over(tree, |fold, ty| Lowering { scope: self, fold }.lowered(ty).unwrap_or(TypeRef::Opaque))
     }
 
     fn with_parameters(self, scope: &InScope) -> InScope {
@@ -242,7 +242,7 @@ impl InScope {
 #[derive(Clone, Copy, Debug)]
 struct Lowering<'low> {
     scope: &'low InScope,
-    fold: &'low TypeFold<'low, TypeRef<Written>>,
+    fold: &'low Fold<'low, Type, TypeRef<Written>>,
 }
 
 impl Lowering<'_> {

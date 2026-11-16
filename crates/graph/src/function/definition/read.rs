@@ -1,6 +1,7 @@
 use lint_layout::{LineNumber, Name};
 
-use crate::boundary::{ParamIndex, ShapeText};
+use super::operator::Operator;
+use crate::boundary::{LiteralValue, ParamIndex};
 use crate::resolved::Resolved;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -40,8 +41,17 @@ impl Reader {
 pub enum Argument {
     Parameter { parameter: ParamIndex, fields: Vec<Name> },
     Named(Reader),
-    Shape { text: ShapeText, parameters: Vec<ParamIndex> },
+    Literal(LiteralValue),
+    Applied { operator: Operator, operands: Vec<Argument> },
     Opaque,
+}
+
+impl Argument {
+    #[must_use]
+    pub fn applied(operator: Operator, operands: Vec<Argument>) -> Argument {
+        let opaque = operands.iter().find(|operand| matches!(operand, Argument::Opaque)).map(|_| ());
+        opaque.map_or(Argument::Applied { operator, operands }, |()| Argument::Opaque)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

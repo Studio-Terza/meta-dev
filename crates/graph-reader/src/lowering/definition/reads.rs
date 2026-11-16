@@ -1,8 +1,10 @@
+mod shaped;
+
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, ExprShape, Item, Signature, Spine, Type};
+use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, Signature, Spine, Type};
 
-use graph::{Argument, ParamIndex, Read, Reader, Resolved, ShapeText, TypeRef};
+use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name, Whole, Word};
 use lint_sweep::{Address, Descend, Facts, Kind, Watch};
@@ -10,6 +12,7 @@ use lint_sweep::{Address, Descend, Facts, Kind, Watch};
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
 use super::super::signature::{InScope, Written};
+use shaped::Shaped;
 
 #[derive(Clone, Debug)]
 enum Spelled {
@@ -62,64 +65,63 @@ impl Rooted {
 enum Passed {
     Rooted(Rooted),
     Named(UsePath),
-    Shape(ExprShape),
 }
 
 impl Passed {
-    fn from_argument(expr: &Expr) -> Passed {
+    fn leaf(expr: &Expr) -> Option<Passed> {
         let rooted = Rooted::from_argument(expr).map(Passed::Rooted);
-        let named = rooted.or_else(|| Syntax::expr_path(expr).map(|found| Passed::Named(UsePath::from(&found.path))));
-        named.unwrap_or_else(|| Passed::Shape(ExprShape::from(expr)))
+        rooted.or_else(|| Syntax::expr_path(expr).map(|found| Passed::Named(UsePath::from(&found.path))))
     }
 
-    fn rooted(&self) -> Option<Rooted> {
+    fn rooted(self) -> Option<Rooted> {
         match self {
-            Passed::Rooted(rooted) => Some(rooted.clone()),
-            Passed::Named(_) | Passed::Shape(_) => None,
+            Passed::Rooted(rooted) => Some(rooted),
+            Passed::Named(_) => None,
         }
     }
 
-    fn lowered(self, parameters: &BTreeMap<Name, ParamIndex>, scope: &InScope) -> LoweredArgument {
+    fn all_lowered(
+        passed: Vec<Shaped<Passed>>,
+        parameters: &BTreeMap<Name, ParamIndex>,
+        scope: &InScope,
+    ) -> Vec<Shaped<Lowered>> {
+        passed.into_iter().map(|shaped| shaped.mapped(&|leaf: Passed| leaf.lowered(parameters, scope))).collect()
+    }
+
+    fn lowered(self, parameters: &BTreeMap<Name, ParamIndex>, scope: &InScope) -> Shaped<Lowered> {
         match self {
-            Passed::Rooted(rooted) => LoweredArgument::rooted(rooted, parameters),
-            Passed::Named(path) => LoweredArgument::Named(Spelled::under(path, scope)),
-            Passed::Shape(shape) => LoweredArgument::shaped(&shape, parameters),
+            Passed::Rooted(rooted) => Lowered::rooted(rooted, parameters),
+            Passed::Named(path) => Shaped::Leaf(Lowered::Named(Spelled::under(path, scope))),
         }
     }
 }
 
-#[derive(Debug)]
-enum LoweredArgument {
+#[derive(Clone, Debug)]
+enum Lowered {
     Parameter { parameter: ParamIndex, fields: Vec<Name> },
     Named(Spelled),
-    Shape { text: ShapeText, parameters: Vec<ParamIndex> },
-    Opaque,
 }
 
-impl LoweredArgument {
-    fn rooted(rooted: Rooted, parameters: &BTreeMap<Name, ParamIndex>) -> LoweredArgument {
+impl Lowered {
+    fn rooted(rooted: Rooted, parameters: &BTreeMap<Name, ParamIndex>) -> Shaped<Lowered> {
         let parameter = parameters.get(&rooted.root).copied();
-        parameter.map_or(LoweredArgument::Opaque, |found| LoweredArgument::Parameter {
-            parameter: found,
-            fields: rooted.fields,
+        parameter.map_or(Shaped::Opaque, |found| {
+            Shaped::Leaf(Lowered::Parameter { parameter: found, fields: rooted.fields })
         })
     }
 
-    fn shaped(shape: &ExprShape, parameters: &BTreeMap<Name, ParamIndex>) -> LoweredArgument {
-        let indices: Option<Vec<ParamIndex>> =
-            shape.leaves().iter().map(|leaf| parameters.get(&Name::from(leaf)).copied()).collect();
-        indices.map_or(LoweredArgument::Opaque, |found| LoweredArgument::Shape {
-            text: ShapeText::from(shape.text()),
-            parameters: found,
-        })
+    fn all_resolved(
+        arguments: Vec<Shaped<Lowered>>,
+        resolving: &Resolving<'_, '_, '_>,
+        scope: ScopeId,
+    ) -> Vec<Argument> {
+        arguments.into_iter().map(|shaped| shaped.argument(&|leaf: Lowered| leaf.resolved(resolving, scope))).collect()
     }
 
     fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Argument {
         match self {
-            LoweredArgument::Parameter { parameter, fields } => Argument::Parameter { parameter, fields },
-            LoweredArgument::Named(spelled) => Argument::Named(spelled.reader(resolving, scope)),
-            LoweredArgument::Shape { text, parameters } => Argument::Shape { text, parameters },
-            LoweredArgument::Opaque => Argument::Opaque,
+            Lowered::Parameter { parameter, fields } => Argument::Parameter { parameter, fields },
+            Lowered::Named(spelled) => Argument::Named(spelled.reader(resolving, scope)),
         }
     }
 }
@@ -152,7 +154,7 @@ impl Calls {
 struct LoweredRead {
     path: UsePath,
     rooted: Rooted,
-    passed: Vec<Passed>,
+    passed: Vec<Shaped<Passed>>,
     line: LineNumber,
 }
 
@@ -179,7 +181,7 @@ struct LoweredReadAt {
     spelled: Spelled,
     parameter: ParamIndex,
     fields: Vec<Name>,
-    arguments: Vec<LoweredArgument>,
+    arguments: Vec<Shaped<Lowered>>,
     line: LineNumber,
 }
 
@@ -205,8 +207,7 @@ impl Reads {
         let kept = self.found.into_iter().filter(|read| forwarding.and(read.rooted.whole()).is_none());
         let settled = kept.filter_map(|read| {
             let parameter = *parameters.get(&read.rooted.root)?;
-            let arguments: Vec<LoweredArgument> =
-                read.passed.into_iter().map(|passed| passed.lowered(&parameters, scope)).collect();
+            let arguments = Passed::all_lowered(read.passed, &parameters, scope);
             let spelled = Spelled::under(read.path, scope);
             Some(LoweredReadAt { spelled, parameter, fields: read.rooted.fields, arguments, line: read.line })
         });
@@ -226,8 +227,9 @@ impl Reads {
     }
 
     fn recorded(&mut self, path: impl Fn() -> UsePath, arguments: &[&Expr], line: LineNumber) -> Descend {
-        let passed: Vec<Passed> = arguments.iter().copied().map(Passed::from_argument).collect();
-        let roots = passed.iter().filter_map(Passed::rooted);
+        let passed: Vec<Shaped<Passed>> =
+            arguments.iter().map(|argument| Shaped::folded(argument, &Passed::leaf)).collect();
+        let roots = passed.iter().filter_map(Shaped::leaf).filter_map(|leaf| leaf.clone().rooted());
         let found: Vec<LoweredRead> =
             roots.map(|rooted| LoweredRead { path: path(), rooted, passed: passed.clone(), line }).collect();
         self.found.extend(found);
@@ -290,8 +292,7 @@ impl ReadsLowered {
         self.0
             .into_iter()
             .map(|read| {
-                let arguments =
-                    read.arguments.into_iter().map(|argument| argument.resolved(resolving, scope)).collect();
+                let arguments = Lowered::all_resolved(read.arguments, resolving, scope);
                 Read::new(read.spelled.reader(resolving, scope), read.parameter, read.fields, read.line)
                     .passing(arguments)
             })

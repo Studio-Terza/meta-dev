@@ -104,10 +104,10 @@ impl AsRef<str> for Quote {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ShapeText(String);
+pub struct LiteralValue(String);
 
-impl From<&str> for ShapeText {
-    fn from(text: &str) -> ShapeText {
-        ShapeText(text.to_owned())
+impl From<&str> for LiteralValue {
+    fn from(text: &str) -> LiteralValue {
+        LiteralValue(text.to_owned())
     }
 }

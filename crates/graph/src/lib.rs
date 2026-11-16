@@ -28,7 +28,7 @@ mod traversal;
 mod type_ref;
 mod unresolved;
 
-pub use boundary::{CallOrder, FileId, ItemId, ParamIndex, Quote, ShapeText};
+pub use boundary::{CallOrder, FileId, ItemId, LiteralValue, ParamIndex, Quote};
 pub use call::{Call, Callee, MacroCall};
 pub use crate_root::{CrateExports, CrateRoots, Reexport, Root};
 pub use dispatch::Dispatch;
@@ -37,7 +37,8 @@ pub use external::External;
 
 pub use found::Found;
 pub use function::definition::{
-    Argument, CallOwner, Definition, Invocation, Looping, Reached, Read, Reader, Receiving, Repeating, Repetition,
+    Argument, CallOwner, Definition, Infix, Invocation, Looping, Operator, Prefix, Reached, Read, Reader, Receiving,
+    Repeating, Repetition,
 };
 pub use function::{
     Entry, Function, Input, MethodShape, Mutation, Output, Owner, Parameter, Receiver, Returned, Signature, Taken,
