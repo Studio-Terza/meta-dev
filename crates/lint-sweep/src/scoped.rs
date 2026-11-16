@@ -1,5 +1,4 @@
 use std::fmt;
-use std::mem;
 
 use lint_core::{Address, Descend, Kind, Violation, Watch};
 
@@ -167,11 +166,8 @@ impl<Parent, Group> Scoped<Parent, Group> {
 
 impl<Parent: for<'any> Watch<'any> + Attaches<Group>, Group: Gathers<Group>> Scoped<Parent, Group> {
     fn opened(&mut self, at: Address) {
-        let waiting = mem::take(&mut self.pending).into_iter().chain(self.parent.attaching());
-        let (reached, later): (Vec<Attachment<Group>>, Vec<Attachment<Group>>) =
-            waiting.partition(|attachment| attachment.root == at);
-        self.pending = later;
-        self.open.extend(reached.into_iter().map(Open::from));
+        self.pending.extend(self.parent.attaching());
+        self.open.extend(self.pending.extract_if(.., |attachment| attachment.root == at).map(Open::from));
     }
 
     fn entered<'ast>(
@@ -193,9 +189,7 @@ impl<Parent: for<'any> Watch<'any> + Attaches<Group>, Group: Gathers<Group>> Sco
     fn left<'ast>(&mut self, kind: Kind, at: Address, call: &mut dyn FnMut(&mut dyn Watch<'ast>)) {
         self.listener.left(&mut self.parent, kind, at, call);
         self.open.iter_mut().for_each(|open| open.left(kind, at, call));
-        let (closed, kept): (Vec<Open<Group>>, Vec<Open<Group>>) =
-            mem::take(&mut self.open).into_iter().partition(|open| open.root == at);
-        self.open = kept;
+        let closed: Vec<Open<Group>> = self.open.extract_if(.., |open| open.root == at).collect();
         closed.into_iter().fold(&mut self.parent, |parent, open| {
             parent.detached(open.group);
             parent
