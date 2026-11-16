@@ -26,10 +26,7 @@ use design_model::{
     Title, Vague,
 };
 use design_runs::{Excerpt, RunState};
-use design_store::{
-    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShapeName, ShownMessage, ShownNode, Stored,
-    StreamSchema,
-};
+use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use grammar_notes::{Cite, Quote};
@@ -365,7 +362,7 @@ impl Links {
             .flat_map(Stored::links)
             .map(|link| {
                 let [source, target] = link.anchors();
-                let relation: &RelationName = link.as_ref();
+                let relation: &Relation = link.as_ref();
                 Link { source: source.to_string(), relation: relation.to_string(), target: target.to_string() }
             })
             .collect())
@@ -473,7 +470,7 @@ impl Unheld {
             .iter()
             .map(|link| {
                 let [source, target] = link.anchors();
-                let relation: &RelationName = link.as_ref();
+                let relation: &Relation = link.as_ref();
                 format!("{source} {relation} {target}")
             })
             .collect())
@@ -488,11 +485,7 @@ fn an_answer_to_an_item_the_store_does_not_hold_is_refused_and_the_rest_of_the_s
     let run = Run::root();
     run.port(store.clone()).write(Unstored { message: Uuid::try_new("l1".to_owned())?, ordinal: Ordinal::new(1) })?;
     let out = Invocation::against(&store, &Unheld::answered(), &["ingest"])?;
-    let refused = Line::Refused(RefusedLink::new(
-        Unheld::end("o1", 1),
-        RelationName::new("answers".to_owned()),
-        Unheld::end("l1", 1),
-    ));
+    let refused = Line::Refused(RefusedLink::new(Unheld::end("o1", 1), Relation::Answers, Unheld::end("l1", 1)));
     assert_eq!(Unheld::refused(&out), [refused]);
     assert_eq!(Unheld::stored(&store)?, ["o1 replies-to l1", "o1#0 answers l1#0"]);
     let again = Invocation::against(&store, &Unheld::answered(), &["ingest"])?;
@@ -2116,20 +2109,12 @@ impl Generated {
         any::<String>().boxed()
     }
 
-    fn word() -> BoxedStrategy<String> {
-        "[A-Za-z0-9_][A-Za-z0-9_-]{0,15}".boxed()
+    fn shape() -> BoxedStrategy<Shape> {
+        select(Shape::VARIANTS).boxed()
     }
 
-    fn shape() -> BoxedStrategy<ShapeName> {
-        prop_oneof![Generated::word(), select(Shape::VARIANTS).prop_map(|shape| shape.to_string())]
-            .prop_map(ShapeName::new)
-            .boxed()
-    }
-
-    fn relation() -> BoxedStrategy<RelationName> {
-        prop_oneof![Generated::word(), select(Relation::VARIANTS).prop_map(|relation| relation.to_string())]
-            .prop_map(RelationName::new)
-            .boxed()
+    fn relation() -> BoxedStrategy<Relation> {
+        select(Relation::VARIANTS).boxed()
     }
 
     fn node() -> BoxedStrategy<NodeId> {
@@ -2503,7 +2488,7 @@ impl Spread {
     fn segment(prefix: &str, ordinal: u32, body: &str) -> Result<Line, Box<dyn Error>> {
         Ok(Line::Segment {
             segment: Spread::reference(prefix, ordinal),
-            shape: ShapeName::new("sentence".to_owned()),
+            shape: Shape::Sentence,
             body: Body::try_new(body.to_owned())?,
         })
     }

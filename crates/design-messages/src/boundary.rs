@@ -6,20 +6,14 @@ use std::iter::Sum;
 use design_model::{Ordinal, Segment};
 use file_ports::Offset;
 use grammar_search::Term;
-use newtype::{Arbitrary, Display, Newtype, Wrapping};
+use newtype::{Arbitrary, Newtype, Wrapping};
 use store_ports::Record as _;
 use store_ports::{Columns, Released, Statements, StoreFailure, Written};
-use stream::{Anchor, Anchors, MechanicalLink, Message, SegmentId, Shape};
+use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
 use design_closure::Keyed;
-
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub struct ShapeName(String);
-
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub struct RelationName(String);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rank(f64);
@@ -42,14 +36,14 @@ pub struct MessageRow {
 pub struct SegmentRow {
     message: Uuid,
     ordinal: Ordinal,
-    shape: ShapeName,
+    shape: Shape,
     body: Body,
 }
 
 #[derive(Clone, Debug, Columns)]
 pub struct LinkRow {
     source: Anchor,
-    relation: RelationName,
+    relation: Relation,
     target: Anchor,
     source_message: Uuid,
     target_message: Uuid,
@@ -130,7 +124,7 @@ impl From<&MechanicalLink> for LinkRow {
         let [source, target] = link.anchors();
         LinkRow {
             source: source.clone(),
-            relation: RelationName::new(link.relation().to_string()),
+            relation: link.relation(),
             target: target.clone(),
             source_message: source.message().clone(),
             target_message: target.message().clone(),
@@ -212,7 +206,7 @@ impl SegmentRow {
                 segment.text(message).ok().map(|body| SegmentRow {
                     message: uuid.clone(),
                     ordinal: Ordinal::new(segment.identity().ordinal().into_inner()),
-                    shape: ShapeName::new(Shape::from(segment.form()).to_string()),
+                    shape: Shape::from(segment.form()),
                     body,
                 })
             })
@@ -541,7 +535,7 @@ VALUES
 "#,
             message: Uuid,
             ordinal: Ordinal,
-            shape: ShapeName,
+            shape: Shape,
             body: Body
         ))
     }
@@ -564,7 +558,7 @@ VALUES
   (?1, ?2, ?3, ?4, ?5)
 "#,
             source: Anchor,
-            relation: RelationName,
+            relation: Relation,
             target: Anchor,
             source_message: Uuid,
             target_message: Uuid
@@ -626,14 +620,14 @@ impl AsRef<Authorship> for MessageRow {
     }
 }
 
-impl AsRef<ShapeName> for SegmentRow {
-    fn as_ref(&self) -> &ShapeName {
+impl AsRef<Shape> for SegmentRow {
+    fn as_ref(&self) -> &Shape {
         &self.shape
     }
 }
 
-impl AsRef<RelationName> for LinkRow {
-    fn as_ref(&self) -> &RelationName {
+impl AsRef<Relation> for LinkRow {
+    fn as_ref(&self) -> &Relation {
         &self.relation
     }
 }

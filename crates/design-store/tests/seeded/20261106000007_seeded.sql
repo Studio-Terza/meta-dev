@@ -14,7 +14,7 @@ INSERT INTO messages (uuid, session, parent, at, author, body)
 VALUES ('o3', 's', NULL, '2026-01-01T00:00:03Z', 'owner', 'First point. Second point.');
 
 INSERT INTO segments (message, ordinal, shape, body)
-VALUES ('o3', 0, 'question', 'First point. Second point.');
+VALUES ('o3', 0, 'sentence', 'First point. Second point.');
 
 INSERT INTO messages (uuid, session, parent, at, author, body)
 VALUES ('o4', 's', NULL, '2026-01-01T00:00:04Z', 'owner', 'Only one.');

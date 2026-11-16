@@ -12,6 +12,7 @@ use port_core::Op;
 use port_core::Run;
 use sqlite_ports::SqliteOpener;
 use store_ports::{Argument, Column, FromValue, Query, Statements, Store, StoreFailure};
+use stream::{Relation, Shape};
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;
 
@@ -43,7 +44,9 @@ impl Query for Declared {
     }
 }
 
-const COLUMNS: [(&str, &str, Checked); 26] = [
+const COLUMNS: [(&str, &str, Checked); 28] = [
+    ("segments", "shape", Spelled::clause::<Shape>),
+    ("mechanical_links", "relation", Spelled::clause::<Relation>),
     ("nodes", "facet", Spelled::clause::<Facet>),
     ("nodes", "stage", Spelled::clause::<Stage>),
     ("nodes", "role", Spelled::clause::<Role>),

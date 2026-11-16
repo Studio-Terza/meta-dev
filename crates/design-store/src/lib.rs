@@ -8,7 +8,7 @@ pub use design_graph::{
 };
 pub use design_messages::{
     Asked, AskedEarlier, Cursors, EarlierLines, Hit, Holding, ImportedEnding, ImportedNotes, LinkRow, Noted, Prefixes,
-    Quoted, QuotedSegments, RelationName, Scope, SearchSegments, SessionCursors, SessionRecords, ShapeName, Shortest,
-    ShownMessage, Stored, StreamSchema,
+    Quoted, QuotedSegments, Scope, SearchSegments, SessionCursors, SessionRecords, Shortest, ShownMessage, Stored,
+    StreamSchema,
 };
 pub use recall::{Recall, Recalled, Recollection};
