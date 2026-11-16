@@ -11,6 +11,8 @@ pub trait Column: Sized {
     fn raw(&self) -> Self::Raw;
 
     fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
+
+    fn check(column: &str) -> Option<String>;
 }
 
 pub trait Columns: Sized {
@@ -28,5 +30,9 @@ impl<Value: Stored<Kind: Encoding<Value>>> Column for Value {
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
         Value::Kind::from_raw(raw)
+    }
+
+    fn check(column: &str) -> Option<String> {
+        Value::Kind::check(column)
     }
 }

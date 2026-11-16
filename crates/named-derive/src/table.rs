@@ -49,7 +49,7 @@ impl Table {
             }
 
             impl ::newtype::Stored for #ident {
-                type Kind = ::newtype::Spelled;
+                type Kind = ::newtype::Listed;
             }
 
             impl ::newtype::Enumerated for #ident {

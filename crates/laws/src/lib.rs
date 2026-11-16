@@ -265,3 +265,27 @@ macro_rules! lifecycle {
         }
     };
 }
+
+#[macro_export]
+macro_rules! checked {
+    ($(#[$meta:meta])* $name:ident, $opened:expr, [$($table:literal . $column:literal : $kind:ty),+ $(,)?] $(,)?) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+            use ::store_ports::{Column, Declared, Store};
+            let run = ::port_core::Run::root();
+            let store = run.port($opened);
+            $(
+                let clause = <$kind as Column>::check($column).ok_or(concat!($table, ".", $column, " has no generated check"))?;
+                let declared = store.read(Declared::of($table))?;
+                assert!(
+                    declared.contains(&clause),
+                    "{}.{} enforces what its type refuses: add `{clause}` to the table's checks",
+                    $table,
+                    $column
+                );
+            )+
+            Ok(())
+        }
+    };
+}
