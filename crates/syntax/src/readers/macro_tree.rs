@@ -21,11 +21,13 @@ impl MacroTree {
     }
 
     #[must_use]
+    pub fn items(invocation: &Macro) -> Vec<Item> {
+        syn::parse2::<File>(invocation.tokens.clone()).map_or_else(|_| Vec::new(), |file| file.items)
+    }
+
+    #[must_use]
     pub fn expanded_items(items: &[Item]) -> Vec<Item> {
-        let invoked = items.iter().filter_map(Self::item_macro);
-        let expanded = invoked.flat_map(|invocation| {
-            syn::parse2::<File>(invocation.tokens.clone()).map_or_else(|_| Vec::new(), |file| file.items)
-        });
+        let expanded = items.iter().filter_map(Self::item_macro).flat_map(Self::items);
         expanded.flat_map(|item| [item.clone()].into_iter().chain(Self::expanded_items(&[item]))).collect()
     }
 
