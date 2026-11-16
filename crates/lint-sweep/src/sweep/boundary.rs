@@ -34,19 +34,20 @@ impl Muting {
         self.depth += 1;
     }
 
-    pub(super) fn listening(&self, index: Index) -> Option<Index> {
-        self.muted.get(index.0).copied().flatten().map_or(Some(index), |_| None)
-    }
-
     pub(super) fn silence(&mut self, index: Index) {
         let depth = self.depth;
         let silenced = self.muted.get_mut(index.0).map(|muted| muted.replace(depth));
         self.awake -= silenced.map_or(0, |_| 1);
     }
 
-    pub(super) fn leaving(&mut self, called: &[Index]) {
+    pub(super) fn heard(&self, index: Index) -> Option<Index> {
+        let muted = self.muted.get(index.0).copied().flatten();
+        muted.is_none_or(|depth| depth == self.depth).then_some(index)
+    }
+
+    pub(super) fn leaving(&mut self, listening: &[Index]) {
         let depth = self.depth;
-        let woken = called.iter().filter_map(|index| self.muted.get_mut(index.0)?.take_if(|muted| *muted == depth));
+        let woken = listening.iter().filter_map(|index| self.muted.get_mut(index.0)?.take_if(|muted| *muted == depth));
         self.awake += woken.count();
         self.depth -= 1;
     }

@@ -19,6 +19,10 @@ const TEST_FN_AGAIN: &str = "#[test]\nfn b() {\n    let rows = [3, 4];\n    let 
 const CONST_A: &str = "const fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    let mut at = 0;\n    while at < items.len() {\n        if items[at] > 3 {\n            total += items[at] * 2;\n        } else {\n            total += 1;\n        }\n        at += 1;\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const CONST_B: &str = "const fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    let mut at = 0;\n    while at < rows.len() {\n        if rows[at] > 3 {\n            sum += rows[at] * 2;\n        } else {\n            sum += 1;\n        }\n        at += 1;\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 
+const SWAPPED: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            row += sum * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
+const OUTER_A: &str = "fn a(items: &[u32]) -> u32 {\n    let first = items.len();\n    let found = {\n        let mut total = 0;\n        for item in items {\n            if *item > 3 {\n                total += item * 2;\n            } else {\n                total += 1;\n            }\n        }\n        if total > 100 {\n            return 100;\n        }\n        total\n    };\n    found + first\n}\n";
+const OUTER_B: &str = "fn b(rows: &[u32]) -> u32 {\n    let size = rows.len();\n    let got = {\n        let mut sum = 0;\n        for row in rows {\n            if *row > 3 {\n                sum += row * 2;\n            } else {\n                sum += 1;\n            }\n        }\n        if sum > 100 {\n            return 100;\n        }\n        sum\n    };\n    got + size\n}\n";
+const INNER_ELSEWHERE: &str = "fn c(cells: &[u32]) -> u32 {\n    other(cells);\n    let kept = {\n        let mut acc = 0;\n        for cell in cells {\n            if *cell > 3 {\n                acc += cell * 2;\n            } else {\n                acc += 1;\n            }\n        }\n        if acc > 100 {\n            return 100;\n        }\n        acc\n    };\n    kept\n}\n";
 const THREE: &str = "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\nfn b(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 4 {\n            total += item * 3;\n        } else {\n            total += 2;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\nfn c(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 5 {\n            total += item * 4;\n        } else {\n            total += 3;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const NESTED_A: &str = "fn a(x: u8) -> String {\n    let label = match x {\n        0 => format!(\"zero {}\", x),\n        1 => format!(\"one {}\", x),\n        2 => format!(\"two {}\", x),\n        _ => format!(\"many {}\", x),\n    };\n    label\n}\n";
 const NESTED_B: &str = "fn b(y: u8) -> String {\n    let text = match y {\n        0 => format!(\"zero {}\", y),\n        1 => format!(\"one {}\", y),\n        2 => format!(\"two {}\", y),\n        _ => format!(\"many {}\", y),\n    };\n    text\n}\n";
@@ -37,7 +41,7 @@ const SMALL: &str = "fn s1(items: &[u32]) -> u32 {\n    let mut total = 0; for i
 const SMALL_AGAIN: &str = "fn s2(rows: &[u32]) -> u32 {\n    let mut sum = 0; for row in rows { if *row > 4 { sum += row * 3; } else { sum += 2; } } if sum > 200 { return 200; } sum }\n";
 const SAME_FILE: &str = "fn p1(items: &[u32]) -> u32 {\n    let mut total = 0;\n    let mut at = 0;\n    while at < items.len() {\n        if items[at] > 3 { total += 2; } else { total += 1; }\n        at += 1;\n    }\n    total\n}\nfn p2(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    let mut to = 0;\n    while to < rows.len() {\n        if rows[to] > 4 { sum += 3; } else { sum += 2; }\n        to += 1;\n    }\n    sum\n}\nfn s1(items: &[u32]) -> u32 {\n    let mut total = 0; for item in items { if *item > 3 { total += item * 2; } else { total += 1; } } if total > 100 { return 100; } total }\nfn s2(rows: &[u32]) -> u32 {\n    let mut sum = 0; for row in rows { if *row > 4 { sum += row * 3; } else { sum += 2; } } if sum > 200 { return 200; } sum }\n";
 
-const CASES: [Case; 18] = [
+const CASES: [Case; 20] = [
     Case::new(
         Title::new("renamed with other literals"),
         &[Source::new(Located::new("a.rs"), Text::new(BODY)), Source::new(Located::new("b.rs"), Text::new(RENAMED))],
@@ -47,6 +51,20 @@ const CASES: [Case; 18] = [
         Title::new("within one file"),
         &[Source::new(Located::new("a.rs"), Text::new(THREE))],
         Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("locals that swap roles are a different shape"),
+        &[Source::new(Located::new("a.rs"), Text::new(BODY)), Source::new(Located::new("b.rs"), Text::new(SWAPPED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an inner block repeated outside its outer copies"),
+        &[
+            Source::new(Located::new("a.rs"), Text::new(OUTER_A)),
+            Source::new(Located::new("b.rs"), Text::new(OUTER_B)),
+            Source::new(Located::new("c.rs"), Text::new(INNER_ELSEWHERE)),
+        ],
+        Flagged::new(&["a.rs:1", "a.rs:3"]),
     ),
     Case::new(
         Title::new("other callee"),

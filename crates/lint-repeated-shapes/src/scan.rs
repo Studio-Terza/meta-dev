@@ -1,18 +1,16 @@
-mod spread;
-
 use std::mem;
 
-use syntax::ToTokens;
-use syntax::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
+use syntax::{
+    Attribute, Block, Expr, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Span, Spanned, TraitItemFn,
+};
 
-use body_shape::Reading;
+use body_shape::{Bounds, Shaper};
 use equivalence::Equivalence;
 use std::path::Path;
 
 use lint_core::{Bound, Parsed, Site, Walk};
-use lint_layout::{Length, LineNumber, TestMarks};
+use lint_layout::{LineNumber, TestMarks};
 use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Sweep, Watch, Watching};
-use spread::Spread;
 
 use crate::Occurrences;
 use crate::extent::Extent;
@@ -24,7 +22,7 @@ pub struct Scan<'file> {
     path: &'file Path,
     kind: Kind,
     outer: Vec<Kind>,
-    equivalence: Equivalence,
+    shaper: Shaper,
     occurrences: Vec<Occurrence<'file>>,
     tested: Vec<Occurrence<'file>>,
 }
@@ -49,19 +47,16 @@ impl<'file> Scan<'file> {
         tested: Vec<Occurrence<'file>>,
         equivalence: Equivalence,
     ) -> Scan<'file> {
-        Scan { path: parsed.head().path(), kind, outer: Vec::new(), equivalence, occurrences: Vec::new(), tested }
+        let shaper = Shaper::reading(parsed.file().tokens(), equivalence);
+        Scan { path: parsed.head().path(), kind, outer: Vec::new(), shaper, occurrences: Vec::new(), tested }
     }
 
-    fn considered(&mut self, node: &impl ToTokens) -> Option<Bound> {
-        let tokens = node.to_token_stream();
-        let span = Spread::joined(&tokens);
-        let wide = Self::FLOOR.allows(Length::new(span.byte_range().len())).map(|_| tokens);
-        let reading = wide.map(|printed| Reading::erasing(printed, self.equivalence));
-        let large = reading.as_ref().and_then(|read| Self::FLOOR.allows(read.shape().size())).map(|_| Self::FLOOR);
-        let site = Site::new(self.path, LineNumber::from(span));
-        let kind = self.kind;
-        let occurrence =
-            reading.filter(|_| large.is_some()).map(|read| Occurrence::new(read, site, Extent::from(span), kind));
+    fn considered(&mut self, edges: Edges) -> Option<Bound> {
+        let extent = Extent::spanning(edges.first, edges.last);
+        let reading = self.shaper.read(Bounds::from(extent));
+        let large = Self::FLOOR.allows(reading.shape().size()).map(|_| Self::FLOOR);
+        let site = Site::new(self.path, LineNumber::from(edges.first));
+        let occurrence = large.map(|_| Occurrence::new(reading, site, extent, self.kind));
         self.occurrences.extend(occurrence);
         large
     }
@@ -136,15 +131,15 @@ impl<'ast> Watch<'ast> for Scan<'_> {
     }
 
     fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
-        self.considered(block).map_or(Descend::Over, |_| Descend::Into)
+        self.considered(Edges::of_block(block)).map_or(Descend::Over, |_| Descend::Into)
     }
 
     fn on_expr_match(&mut self, found: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {
-        self.considered(found).map_or(Descend::Over, |_| Descend::Into)
+        self.considered(Edges::of_match(found)).map_or(Descend::Over, |_| Descend::Into)
     }
 
     fn on_expr_closure(&mut self, found: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) -> Descend {
-        self.considered(found).map_or(Descend::Over, |_| Descend::Into)
+        self.considered(Edges::of_closure(found)).map_or(Descend::Over, |_| Descend::Into)
     }
 }
 
@@ -155,5 +150,43 @@ impl<'file> Gathers<Occurrences<'file>> for Scan<'file> {
 
     fn gathered(self) -> Occurrences<'file> {
         Occurrences { path: self.path, found: self.occurrences.into_iter().chain(self.tested).collect() }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Edges {
+    first: Span,
+    last: Span,
+}
+
+impl Edges {
+    fn of_block(block: &Block) -> Edges {
+        Edges { first: block.brace_token.span.open(), last: block.brace_token.span.close() }
+    }
+
+    fn of_match(found: &ExprMatch) -> Edges {
+        let attributed = found.attrs.first().map(|attribute| attribute.pound_token.span);
+        Edges { first: attributed.unwrap_or(found.match_token.span), last: found.brace_token.span.close() }
+    }
+
+    fn of_closure(found: &ExprClosure) -> Edges {
+        let opened = found
+            .attrs
+            .first()
+            .map(|attribute| attribute.pound_token.span)
+            .or_else(|| found.lifetimes.as_ref().map(|bound| bound.for_token.span))
+            .or_else(|| found.constness.map(|token| token.span))
+            .or_else(|| found.movability.map(|token| token.span))
+            .or_else(|| found.asyncness.map(|token| token.span))
+            .or_else(|| found.capture.map(|token| token.span))
+            .unwrap_or(found.or1_token.spans[0]);
+        Edges { first: opened, last: Self::ending(&found.body) }
+    }
+
+    fn ending(body: &Expr) -> Span {
+        match body {
+            Expr::Block(block) => block.block.brace_token.span.close(),
+            _ => body.span(),
+        }
     }
 }

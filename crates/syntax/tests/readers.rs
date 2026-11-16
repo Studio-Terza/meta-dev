@@ -198,3 +198,29 @@ fn outermost_types_are_the_types_an_expression_names_without_their_parts() -> Re
     assert_eq!(named, ["Vec < u8 >", "usize"]);
     Ok(())
 }
+
+const OPENINGS: [&str; 5] = [
+    "#![allow(dead_code)]\n//! Inner docs.\nfn f() {}\n",
+    "\u{feff}fn f() {}\n",
+    "#!/usr/bin/env run\nfn f() {\n    g();\n}\n",
+    "\u{feff}#!/usr/bin/env run\n#![allow(dead_code)]\nstruct A;\n",
+    "#! [allow(dead_code)]\nfn f() {}\n",
+];
+
+#[test]
+fn lexing_once_parses_and_places_every_opening_as_parse_file_does() {
+    let once: Vec<Option<syntax::File>> =
+        OPENINGS.iter().map(|content| syntax::Lexed::parsed(content).map(syntax::Lexed::into_file).ok()).collect();
+    let direct: Vec<Option<syntax::File>> =
+        OPENINGS.iter().map(|content| syntax::parse::parse_file(content).ok()).collect();
+    let lines = |files: &[Option<syntax::File>]| -> Vec<Vec<usize>> {
+        files
+            .iter()
+            .flatten()
+            .map(|file| file.items.iter().map(|item| syntax::Spanned::span(item).start().line).collect())
+            .collect()
+    };
+    assert_eq!(once, direct);
+    assert_eq!(lines(&once), lines(&direct));
+    assert_eq!(once.iter().flatten().count(), OPENINGS.len());
+}

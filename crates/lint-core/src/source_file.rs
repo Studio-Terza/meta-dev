@@ -20,6 +20,7 @@ pub struct SourceFile {
     head: FileHead,
     text: SourceText,
     syntax: syntax::File,
+    tokens: syntax::TokenTable,
     test_modules: Vec<SourceFile>,
     expansions: Expansions,
 }
@@ -38,12 +39,13 @@ impl SourceFile {
     fn parsed(path: PathBuf, located: Located, placement: Placement, text: SourceText) -> Result<Self, Failure> {
         match Nesting::within_limit(&text)
             .ok_or_else(|| syntax::Error::new(syntax::Span::call_site(), Nesting))
-            .and_then(|bounded| syntax::parse::parse_file(bounded.as_ref()))
+            .and_then(|bounded| syntax::Lexed::parsed(bounded.as_ref()))
         {
-            Ok(syntax) => Ok(Self {
+            Ok(mut lexed) => Ok(Self {
                 head: FileHead::new(path, located, placement),
                 text,
-                syntax,
+                tokens: lexed.tokens_taken(),
+                syntax: lexed.into_file(),
                 test_modules: Vec::new(),
                 expansions: Expansions::default(),
             }),
@@ -85,6 +87,11 @@ impl SourceFile {
     #[must_use]
     pub fn syntax(&self) -> &syntax::File {
         &self.syntax
+    }
+
+    #[must_use]
+    pub fn tokens(&self) -> &syntax::TokenTable {
+        &self.tokens
     }
 
     #[must_use]
