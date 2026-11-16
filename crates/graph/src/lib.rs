@@ -56,7 +56,7 @@ pub use path_use::{Mention, PathUse};
 pub use placed::{FileHome, Harness, Placed};
 pub use primitive::Primitive;
 pub use quoted::Quoted;
-pub use references::References;
+pub use references::{Consumers, References};
 pub use region::{Ground, Reach, Region, Seat, Within, Zone};
 pub use resolved::Resolved;
 pub use site::Site;

@@ -157,3 +157,22 @@ fn a_cycle_closed_through_a_self_import_in_another_module_is_flagged() {
     let closed = Sources::file("crates/one/src/b.rs", Text::new(&closing));
     assert_eq!(Items::flagged(&[root, opened, closed]), Lines::from(FLAGGED));
 }
+
+#[test]
+fn a_cycle_closed_by_a_type_written_in_a_body_is_flagged() {
+    let open = Items::chain("A", BIG_RING);
+    let closing =
+        format!("impl A{} {{\n    pub fn f() {{\n        let first: Option<A0> = None;\n    }}\n}}\n", BIG_RING - 1);
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&format!("{open}{closing}")))]), Lines::from(FLAGGED));
+}
+
+#[test]
+fn an_impl_in_another_crate_adds_no_link_to_its_subject() {
+    let one = Sources::file(ONE, Text::new(&Items::chain("A", BIG_RING)));
+    let closing = format!(
+        "pub struct B(one::A0);\npub trait Local {{\n    fn f(&self);\n}}\nimpl Local for one::A{} {{\n    fn f(&self) {{\n        let back: Option<B> = None;\n    }}\n}}\n",
+        BIG_RING - 1
+    );
+    let two = Sources::file(TWO, Text::new(&closing));
+    assert_eq!(Items::flagged(&[one, two]), Lines::default());
+}

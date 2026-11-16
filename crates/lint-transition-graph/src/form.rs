@@ -101,7 +101,7 @@ impl<'found> Form<'found> {
     fn lifted(body: Body) -> Option<Form<'found>> {
         match body {
             Body::Mapped | Body::Focused | Body::Routed => Some(Form::Lift),
-            Body::Written => None,
+            Body::Written | Body::Built => None,
         }
     }
 

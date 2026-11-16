@@ -2,7 +2,7 @@ mod shaped;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, Signature, Spine, Type};
+use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, MemberText, Signature, Spine, Type};
 
 use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
 use lint_core::Syntax;
@@ -32,13 +32,13 @@ impl Rooted {
         let passed: Vec<&Expr> = Spine::from(expr).take_while(|node| Self::passes(node).is_some()).collect();
         let root = Spine::from(expr).past(|node| Self::passes(node).is_some())?.node();
         let ident = Syntax::expr_path(root)?.path.get_ident()?;
-        let fields: Option<Vec<Name>> = passed
+        let fields: Vec<Name> = passed
             .iter()
             .rev()
             .filter_map(|node| Self::field(node))
-            .map(|field| Syntax::named_member(&field.member).map(Name::from))
+            .map(|field| Name::from(MemberText::written(&field.member).as_str()))
             .collect();
-        Some(Rooted { root: Name::from(ident), fields: fields? })
+        Some(Rooted { root: Name::from(ident), fields })
     }
 
     fn passes(node: &Expr) -> Option<()> {

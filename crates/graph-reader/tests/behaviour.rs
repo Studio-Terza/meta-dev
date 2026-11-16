@@ -395,6 +395,18 @@ impl Read {
             .collect()
     }
 
+    fn links(fixtures: &[Fixture]) -> Vec<String> {
+        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+        let model = Reader::read_files(&files);
+        let named = |item: &graph::ItemId| model.declared(*item).map(|found| AsRef::<Name>::as_ref(found).to_string());
+        let edges = model
+            .references()
+            .targets()
+            .iter()
+            .flat_map(|(owner, targets)| targets.iter().map(move |target| (owner, target)));
+        edges.filter_map(|(owner, target)| Some(format!("{} -> {}", named(owner)?, named(target)?))).collect()
+    }
+
     fn implemented(files: &[SourceFile]) -> Vec<Seen> {
         let model = Reader::read_files(files);
         model
@@ -993,4 +1005,17 @@ fn functions_written_inside_macro_bodies_are_read() {
             Expect::function("made", Owner::Free, Entry::Called, Some(Expect::primitive(Primitive::Char))),
         ]
     );
+}
+
+const FOREIGN_SUBJECT: [Fixture; 2] = [
+    Fixture::new("crates/a/src/lib.rs", "pub struct Record;\n"),
+    Fixture::new(
+        "crates/b/src/lib.rs",
+        "pub trait Shown {\n    fn shown(&self);\n}\nimpl Shown for a::Record {\n    fn shown(&self) {\n        let again: Option<a::Record> = None;\n    }\n}\n",
+    ),
+];
+
+#[test]
+fn an_impl_of_a_local_trait_for_a_foreign_type_links_the_trait_to_the_type() {
+    assert_eq!(Read::links(&FOREIGN_SUBJECT), ["Shown -> Record"]);
 }

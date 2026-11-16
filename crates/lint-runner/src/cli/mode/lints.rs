@@ -164,7 +164,7 @@ impl Lints {
         <Judged<NamedNumbers> as Registered>::ENTRY,
         <Judged<NoForwarders> as Registered>::ENTRY,
         <Swept<NoNumbersInBinaries> as Registered>::ENTRY,
-        <Judged<NoParameterBags> as Registered>::ENTRY,
+        Entry::spelled::<NoParameterBags>(Work::Modelled(<NoParameterBags as ModelLint>::report)),
         Entry::spelled::<PrimitiveBoundary>(Work::Modelled(<PrimitiveBoundary as ModelLint>::report)),
         <Swept<PrivateFns> as Registered>::ENTRY,
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),

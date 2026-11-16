@@ -20,7 +20,7 @@ use crate::law::Law;
 use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::quoted::Quoted;
-use crate::references::References;
+use crate::references::{Consumers, References};
 use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
 pub use building::Building;
@@ -37,6 +37,7 @@ pub struct Model {
     calls: Vec<Filed<Call>>,
     uses: Vec<Filed<PathUse>>,
     interpolated: Vec<Filed<PathUse>>,
+    typed: Vec<Filed<PathUse>>,
     dispatched: Vec<Dispatch>,
     quoted: Vec<Filed<Quoted>>,
     placed: Vec<Filed<ItemDeclaration>>,
@@ -195,12 +196,22 @@ impl Model {
     pub fn references(&self) -> &References {
         self.references.get_or_init(|| {
             self.holdings()
-                .map(References::from)
-                .chain(self.implementations().map(References::from))
-                .chain(self.functions().map(References::from))
-                .chain(self.mentions().map(References::from))
+                .map(|placed| References::homed(self, placed))
+                .chain(self.implementations().map(|placed| References::homed(self, placed)))
+                .chain(self.functions().map(|placed| References::homed(self, placed)))
+                .chain(self.mentions().map(|placed| References::homed(self, placed)))
                 .collect()
         })
+    }
+
+    #[must_use]
+    pub fn consumers(&self) -> Consumers<'_> {
+        self.holdings()
+            .map(Consumers::from)
+            .chain(self.implementations().map(Consumers::from))
+            .chain(self.functions().map(Consumers::from))
+            .chain(self.mentions().map(Consumers::from))
+            .collect()
     }
 
     #[must_use]
@@ -209,7 +220,9 @@ impl Model {
     }
 
     pub fn mentions(&self) -> impl Iterator<Item = Placed<'_, &PathUse>> {
-        self.uses().chain(PathUses { files: &self.files, rows: self.interpolated.iter() })
+        self.uses()
+            .chain(PathUses { files: &self.files, rows: self.interpolated.iter() })
+            .chain(PathUses { files: &self.files, rows: self.typed.iter() })
     }
 
     #[must_use]

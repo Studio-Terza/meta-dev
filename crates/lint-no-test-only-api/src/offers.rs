@@ -24,11 +24,7 @@ pub struct Offers<'file> {
 
 impl<'file> Offers<'file> {
     pub(crate) fn tested_only(self, names: &BTreeSet<Name>) -> Vec<Violation<'file>> {
-        self.found
-            .into_iter()
-            .filter(|candidate| names.contains(candidate.called()))
-            .map(Candidate::violation)
-            .collect()
+        self.found.into_iter().filter_map(|candidate| candidate.tested_only(names)).collect()
     }
 
     fn offered(&mut self, ident: &Ident, visibility: &Visibility) {

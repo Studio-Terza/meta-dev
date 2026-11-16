@@ -126,7 +126,9 @@ impl<'file> Finds<'file> for Assertions<'file> {
         let constants = self.scopes.constants();
         self.met
             .iter()
-            .flat_map(|met| self.judged(&met.invocation, &constants, &self.scopes.locals(met.body)))
+            .flat_map(|met| {
+                self.judged(&met.invocation, &constants, &met.body.map_or_default(|id| id.locals(&self.scopes)))
+            })
             .collect()
     }
 }

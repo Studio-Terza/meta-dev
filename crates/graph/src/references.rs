@@ -5,7 +5,9 @@ use crate::boundary::ItemId;
 use crate::function::Function;
 use crate::holding::Holding;
 use crate::implementation::Implementation;
+use crate::item::Item;
 use crate::member::Member;
+use crate::model::Model;
 use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::region::{Reach, Region, Seat};
@@ -39,15 +41,22 @@ impl<'ty> FromIterator<&'ty TypeRef> for Reached {
 }
 
 #[derive(Debug)]
-struct Owned {
+pub(crate) struct Owned {
     owner: Option<ItemId>,
     reached: Reached,
+    shipped: Option<Reach>,
+    traited: Option<ItemId>,
 }
 
 impl Owned {
     fn shipped(region: &impl AsRef<Region>, owner: Option<ItemId>, reached: Reached) -> Owned {
         let shipped = Some(region.as_ref().reach()).filter(|reach| *reach == Reach::Shipped);
-        Owned { owner: shipped.and(owner), reached }
+        Owned { owner: shipped.and(owner), reached, shipped, traited: None }
+    }
+
+    fn traited(self, implemented: Option<&Resolved>) -> Owned {
+        let traited = self.shipped.and(implemented).and_then(Resolved::crate_item);
+        Owned { traited, ..self }
     }
 }
 
@@ -62,19 +71,22 @@ impl From<&Implementation> for Owned {
         let subject = implementation.subject_type().named().map(AsRef::<Resolved>::as_ref);
         let reached = implementation.implemented().map_or_default(Reached::from);
         Owned::shipped(implementation, subject.and_then(Resolved::crate_item), reached)
+            .traited(implementation.implemented())
     }
 }
 
 impl From<&Function> for Owned {
     fn from(function: &Function) -> Owned {
-        let owner = AsRef::<Seat>::as_ref(function).owner();
-        Owned::shipped(function, owner, function.signature().written().collect())
+        let seat: &Seat = function.as_ref();
+        Owned::shipped(function, seat.owner(), function.signature().written().collect())
+            .traited(seat.implemented_trait())
     }
 }
 
 impl From<&PathUse> for Owned {
     fn from(used: &PathUse) -> Owned {
-        Owned::shipped(used, AsRef::<Seat>::as_ref(used).owner(), Reached::from(used.resolved()))
+        let seat: &Seat = used.as_ref();
+        Owned::shipped(used, seat.owner(), Reached::from(used.resolved())).traited(seat.implemented_trait())
     }
 }
 
@@ -96,15 +108,21 @@ impl References {
     }
 }
 
-impl<Entity> From<Placed<'_, Entity>> for References
-where
-    Entity: Copy,
-    Owned: From<Entity>,
-{
-    fn from(placed: Placed<'_, Entity>) -> References {
-        let Owned { owner, reached } = Owned::from(placed.entity());
-        owner.map_or_default(|found| References {
-            targets: BTreeMap::from([(found, reached.0)]),
+impl References {
+    pub(crate) fn homed<Entity>(model: &Model, placed: Placed<'_, Entity>) -> References
+    where
+        Entity: Copy,
+        Owned: From<Entity>,
+    {
+        let Owned { owner, reached, traited, .. } = Owned::from(placed.entity());
+        let at_home =
+            |item: &ItemId| model.declared(*item).and_then(Item::krate).is_none_or(|krate| krate == placed.krate());
+        let home = owner.filter(at_home);
+        let foreign = home.map_or(owner, |_| None);
+        let link = home.or_else(|| traited.filter(at_home));
+        let targets: BTreeSet<ItemId> = reached.0.into_iter().chain(foreign).collect();
+        link.map_or_default(|found| References {
+            targets: BTreeMap::from([(found, targets.into_iter().filter(|target| *target != found).collect())]),
             roots: BTreeMap::from([(found, placed.root().to_path_buf())]),
         })
     }
@@ -119,5 +137,48 @@ impl FromIterator<References> for References {
             references.roots.extend(part.roots);
             references
         })
+    }
+}
+
+type CrateFiles<'model> = BTreeMap<&'model Path, BTreeSet<&'model Path>>;
+
+#[derive(Debug, Default)]
+pub struct Consumers<'model>(BTreeMap<ItemId, CrateFiles<'model>>);
+
+impl<'model> Consumers<'model> {
+    #[must_use]
+    pub fn files(&self, item: ItemId, root: &Path) -> Option<&BTreeSet<&'model Path>> {
+        self.0.get(&item).and_then(|crates| crates.get(root))
+    }
+}
+
+impl<'model, Entity> From<Placed<'model, Entity>> for Consumers<'model>
+where
+    Entity: Copy,
+    Owned: From<Entity>,
+{
+    fn from(placed: Placed<'model, Entity>) -> Consumers<'model> {
+        let Owned { reached, shipped, .. } = Owned::from(placed.entity());
+        let file = placed.site().path();
+        let root = placed.root();
+        Consumers(shipped.map_or_default(|_| {
+            reached.0.into_iter().map(|target| (target, BTreeMap::from([(root, BTreeSet::from([file]))]))).collect()
+        }))
+    }
+}
+
+impl<'model> FromIterator<Consumers<'model>> for Consumers<'model> {
+    fn from_iter<Parts: IntoIterator<Item = Consumers<'model>>>(parts: Parts) -> Consumers<'model> {
+        let found = parts
+            .into_iter()
+            .flat_map(|part| part.0)
+            .flat_map(|(target, crates)| crates.into_iter().map(move |(root, files)| (target, root, files)));
+        Consumers(found.fold(
+            BTreeMap::new(),
+            |mut consumers: BTreeMap<ItemId, CrateFiles<'model>>, (target, root, files)| {
+                consumers.entry(target).or_default().entry(root).or_default().extend(files);
+                consumers
+            },
+        ))
     }
 }

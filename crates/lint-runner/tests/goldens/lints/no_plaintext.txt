@@ -1,6 +1,3 @@
-a struct with no logic of its own that one other file consumes is a parameter bag:
-src/checked.rs:19: Entry only carries values into one other file; give it the logic that consumes it
-src/free.rs:4: Entry only carries values into one other file; give it the logic that consumes it
 primitives appear in signatures and fields only inside a boundary:
 src/free.rs:5: bare String in title; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/globbed.rs:7: bare String in note; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary

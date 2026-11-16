@@ -29,6 +29,7 @@ macro_rules! node_kinds {
             ExprPath on_expr_path off_expr_path visit_expr_path ExprPath;
             ExprRepeat on_expr_repeat off_expr_repeat visit_expr_repeat ExprRepeat;
             ExprReturn on_expr_return off_expr_return visit_expr_return ExprReturn;
+            ExprStruct on_expr_struct off_expr_struct visit_expr_struct ExprStruct;
             ExprTry on_expr_try off_expr_try visit_expr_try ExprTry;
             ExprUnary on_expr_unary off_expr_unary visit_expr_unary ExprUnary;
             ExprWhile on_expr_while off_expr_while visit_expr_while ExprWhile;

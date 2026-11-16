@@ -507,6 +507,7 @@ pub(crate) struct Lowering<'read> {
 impl Lowering<'_> {
     fn entered(&mut self, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Seat {
         let scope = self.lowered.openings.opened(self.here.scope(), kind, entries);
+        self.context = self.context.entered(kind);
         let inner = Seat::new(scope, children);
         std::mem::replace(&mut self.here, inner)
     }
@@ -588,6 +589,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
             Kind::ExprCall,
             Kind::ExprMacro,
             Kind::ExprPath,
+            Kind::ExprStruct,
             Kind::ItemMacro,
             Kind::Macro,
         ]
@@ -602,7 +604,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
     }
 
     fn on_type(&mut self, ty: &'ast syntax::Type, _: &Facts<'_, syntax::Type>) -> Descend {
-        self.objects_used(ty);
+        self.types_used(ty);
         Descend::Into
     }
 
@@ -748,6 +750,11 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
 
     fn on_expr_macro(&mut self, expr: &'ast ExprMacro, _: &Facts<'_, ExprMacro>) -> Descend {
         self.macro_called(expr);
+        Descend::Into
+    }
+
+    fn on_expr_struct(&mut self, literal: &'ast syntax::ExprStruct, _: &Facts<'_, syntax::ExprStruct>) -> Descend {
+        self.struct_used(literal);
         Descend::Into
     }
 

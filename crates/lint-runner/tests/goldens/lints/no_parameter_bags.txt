@@ -1,8 +1,11 @@
 free functions are not allowed; make them associated functions or methods:
-src/first.rs:1: fn run; make it an associated function or a method
-src/logic_user.rs:1: fn run; make it an associated function or a method
-src/second.rs:1: fn walk; make it an associated function or a method
-src/user.rs:1: fn run; make it an associated function or a method
+src/first.rs:2: fn run; make it an associated function or a method
+src/logic_user.rs:2: fn run; make it an associated function or a method
+src/second.rs:2: fn walk; make it an associated function or a method
+src/user.rs:2: fn run; make it an associated function or a method
+modules nest by use: a file used only inside one sibling belongs inside it:
+src/bag.rs:1: used only from crate::user; move it inside that module
+src/logic.rs:1: used only from crate::logic_user; move it inside that module
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/bag.rs:1: Options only carries values into one other file; give it the logic that consumes it
 primitives appear in signatures and fields only inside a boundary:

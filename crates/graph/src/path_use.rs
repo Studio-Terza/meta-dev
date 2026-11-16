@@ -12,6 +12,7 @@ pub enum Mention {
     InMacro,
     Interpolated,
     Dispatched,
+    Typed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

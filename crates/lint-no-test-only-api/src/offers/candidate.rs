@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use lint_core::Violation;
 use lint_layout::Name;
 
@@ -12,11 +14,7 @@ impl<'file> Candidate<'file> {
         Candidate { called, violation }
     }
 
-    pub(crate) fn called(&self) -> &Name {
-        &self.called
-    }
-
-    pub(crate) fn violation(self) -> Violation<'file> {
-        self.violation
+    pub(crate) fn tested_only(self, names: &BTreeSet<Name>) -> Option<Violation<'file>> {
+        names.get(&self.called).map(|_| self.violation)
     }
 }

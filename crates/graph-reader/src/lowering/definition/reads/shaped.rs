@@ -1,7 +1,6 @@
-use syntax::{BinOp, Expr, ExprReference, ExprTree, Fold, LitText, Member, UnOp};
+use syntax::{BinOp, Expr, ExprReference, ExprTree, Fold, LitText, Member, MemberText, UnOp};
 
 use graph::{Argument, Infix, LiteralValue, Operator, Prefix};
-use lint_core::Syntax;
 use lint_layout::Name;
 
 #[derive(Clone, Debug)]
@@ -83,7 +82,7 @@ impl<Leaf, Reads: Fn(&Expr) -> Option<Leaf>> Shaping<'_, '_, Leaf, Reads> {
                 Some(Operator::Method(Name::from(&call.method))),
                 [&*call.receiver].into_iter().chain(&call.args),
             ),
-            Expr::Field(field) => self.operated(Operators::field(&field.member), [&*field.base]),
+            Expr::Field(field) => self.operated(Some(Operators::field(&field.member)), [&*field.base]),
             _ => None,
         }
     }
@@ -140,7 +139,7 @@ impl Operators {
         reference.mutability.map_or(Some(Operator::Borrow), |_| None)
     }
 
-    fn field(member: &Member) -> Option<Operator> {
-        Syntax::named_member(member).map(|named| Operator::Field(Name::from(named)))
+    fn field(member: &Member) -> Operator {
+        Operator::Field(Name::from(MemberText::written(member).as_str()))
     }
 }
