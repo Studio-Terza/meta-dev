@@ -1,6 +1,6 @@
 use port_core::Op;
 
-use crate::{Columns, Prepared, Statements, StoreFailure};
+use crate::{Argument, Columns, Prepared, Statements, StoreFailure};
 
 pub trait Record: Columns + Sized {
     type Key;
@@ -19,6 +19,10 @@ pub trait Record: Columns + Sized {
     fn updated(&self) -> Prepared<()>;
 
     fn deleted(key: &Self::Key) -> Prepared<()>;
+
+    fn listed() -> Prepared<Self>;
+
+    fn overwrites(argument: &Argument) -> Vec<Prepared<()>>;
 }
 
 #[derive(Debug, Op)]

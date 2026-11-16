@@ -174,9 +174,23 @@ macro_rules! preserves {
 #[macro_export]
 macro_rules! crud {
     ($(#[$meta:meta])* $name:ident, $record:ty, $fresh:expr, $opened:expr $(,)?) => {
-        $crate::law!($(#[$meta])* $name, ($fresh, $fresh), pair, {
+        $crate::law!(
+            $(#[$meta])* $name,
+            (
+                $fresh,
+                $fresh,
+                $crate::proptest::prelude::any::<$crate::proptest::sample::Index>(),
+                $crate::proptest::prop_oneof![
+                    $crate::proptest::strategy::Just(::store_ports::Argument::Null),
+                    $crate::proptest::strategy::Strategy::prop_map($crate::proptest::prelude::any::<i64>(), ::store_ports::Argument::Integer),
+                    $crate::proptest::strategy::Strategy::prop_map($crate::proptest::prelude::any::<String>(), ::store_ports::Argument::Text),
+                    $crate::proptest::strategy::Strategy::prop_map($crate::proptest::prelude::any::<Vec<u8>>(), ::store_ports::Argument::Blob),
+                ],
+            ),
+            drawn,
+            {
             use ::store_ports::{Created, Record, Store};
-            let (first, second) = pair;
+            let (first, second, column, argument) = drawn;
             let run = ::port_core::Run::root();
             let store = run.port($opened);
             let made: $record = store
@@ -189,7 +203,7 @@ macro_rules! crud {
                     .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))
             };
             $crate::proptest::prop_assert_eq!(read(&store)?, Some(made.clone()), "create then read returns what was created");
-            let again = store.create(Created::<$record>::new(first));
+            let again = store.create(Created::<$record>::new(first.clone()));
             $crate::proptest::prop_assert_eq!(
                 again.map_or_else(|_refused| read(&store), |_twice| Ok(Some(made.clone())))?,
                 Some(made.clone()),
@@ -204,6 +218,18 @@ macro_rules! crud {
                 .write(<$record>::deleted(made.key()))
                 .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
             $crate::proptest::prop_assert_eq!(read(&store)?, None, "delete then read finds nothing");
-        });
+            store
+                .create(Created::<$record>::new(first))
+                .map_err(|failure| $crate::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+            let overwrites = <$record>::overwrites(&argument);
+            let at = column.index(overwrites.len());
+            let overwritten = overwrites.into_iter().nth(at).map(|overwrite| store.write(overwrite));
+            let listed = store.read(<$record>::listed());
+            $crate::proptest::prop_assert!(
+                listed.is_ok(),
+                "the schema refuses what the type refuses: column {at} took {argument:?} ({overwritten:?}) and reads back as {listed:?}"
+            );
+            }
+        );
     };
 }

@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", content AS \"content!\", applied_at AS \"applied_at!\", provenance AS \"provenance!\" FROM applied_files",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "applied_files",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "content!",
+        "ordinal": 1,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "applied_files",
+            "name": "content"
+          }
+        }
+      },
+      {
+        "name": "applied_at!",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "applied_files",
+            "name": "applied_at"
+          }
+        }
+      },
+      {
+        "name": "provenance!",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "applied_files",
+            "name": "provenance"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fbe5a44b4b50074b9605e7b55d64053561ac0f4f4381419642194588455352e2"
+}
