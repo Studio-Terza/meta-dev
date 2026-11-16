@@ -3,7 +3,6 @@ mod number;
 mod title;
 
 use std::fmt;
-use std::io::Write;
 
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Invocation, Ports, Run, Text};
@@ -32,34 +31,18 @@ impl<'title> Issue<'title> {
         Ok(runs.iter().map(Run::exit).find(|exit| *exit != Exit::Success).unwrap_or(Exit::Success))
     }
 
-    pub(super) fn filing(
-        &self,
-        body: &impl fmt::Display,
-        out: &mut impl Write,
-    ) -> Result<Invocation, Failure<'static>> {
+    pub(super) fn filing(&self, body: &impl fmt::Display) -> Invocation {
         match self.number {
-            Some(number) => self.updating(number, body, out),
-            None => Self::opening(self.title, body, out),
+            Some(number) => Invocation::new("gh", ["issue", "edit", &number.to_string(), "--body", &body.to_string()]),
+            None => Invocation::new(
+                "gh",
+                ["issue", "create", "--title", self.title.into_inner(), "--body", &body.to_string()],
+            ),
         }
     }
 
-    fn updating(
-        &self,
-        number: Number,
-        body: &impl fmt::Display,
-        out: &mut impl Write,
-    ) -> Result<Invocation, Failure<'static>> {
-        writeln!(out, "updating issue {number}: {}", self.title)?;
-        Ok(Invocation::new("gh", ["issue", "edit", &number.to_string(), "--body", &body.to_string()]))
-    }
-
-    fn opening(
-        title: Title<'_>,
-        body: &impl fmt::Display,
-        out: &mut impl Write,
-    ) -> Result<Invocation, Failure<'static>> {
-        writeln!(out, "opening an issue: {title}")?;
-        Ok(Invocation::new("gh", ["issue", "create", "--title", title.into_inner(), "--body", &body.to_string()]))
+    pub(super) fn announcement(&self) -> Announcement<'_, 'title> {
+        Announcement(self)
     }
 
     fn search(title: Title<'title>) -> Invocation {
@@ -79,5 +62,17 @@ impl<'title> Issue<'title> {
 impl fmt::Display for Issue<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "\"{}\" in:title", self.title)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Announcement<'issue, 'title>(&'issue Issue<'title>);
+
+impl fmt::Display for Announcement<'_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0.number {
+            Some(number) => writeln!(formatter, "updating issue {number}: {}", self.0.title),
+            None => writeln!(formatter, "opening an issue: {}", self.0.title),
+        }
     }
 }

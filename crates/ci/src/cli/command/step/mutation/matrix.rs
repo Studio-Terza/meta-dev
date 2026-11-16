@@ -1,5 +1,6 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -56,10 +57,9 @@ impl Step for Matrix {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let markdown = self.written(ports.files())?.read(ports.files())?;
-        write!(out, "{markdown}")?;
-        self.summary.append(ports.files(), &markdown)?;
-        Ok(Exit::Success)
+        let said = vec![Shown::said(format_args!("{markdown}"))];
+        Ok(Telling::reported(said, self.summary.append(ports.files(), &markdown).map(|()| Exit::Success)))
     }
 }

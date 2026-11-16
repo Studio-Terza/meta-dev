@@ -1,7 +1,7 @@
+use crate::cli::command::Telling;
 mod boundary;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use boundary::Finished;
@@ -37,7 +37,7 @@ impl Step for LibtestSeconds {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let text = self.output.read(ports.files())?;
         let results: Vec<Finished> = text
             .as_ref()
@@ -47,11 +47,13 @@ impl Step for LibtestSeconds {
             .filter_map(|line| Finished::read(self.output.as_ref(), &line))
             .collect::<Result<_, _>>()?;
         let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
-        results
-            .first()
-            .map(|_| total)
-            .ok_or_else(|| Failure::NoTestResult { path: self.output.as_ref() })
-            .and_then(|summed| self.measured.append(ports.files(), &self.stage, summed))
-            .map(|()| Exit::Success)
+        Ok(Telling::ended(
+            results
+                .first()
+                .map(|_| total)
+                .ok_or_else(|| Failure::NoTestResult { path: self.output.as_ref() })
+                .and_then(|summed| self.measured.append(ports.files(), &self.stage, summed))
+                .map(|()| Exit::Success),
+        ))
     }
 }

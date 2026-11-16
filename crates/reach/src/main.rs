@@ -5,5 +5,5 @@ use file_ports::Disk;
 use reach::Cli;
 
 fn main() -> ExitCode {
-    Process::answer(|arguments| Cli::answer(arguments.into_iter(), &Disk))
+    Process::tell(|arguments| Cli::answer(arguments.into_iter(), &Disk))
 }

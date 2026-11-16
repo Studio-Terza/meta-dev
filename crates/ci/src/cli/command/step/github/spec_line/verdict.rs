@@ -1,10 +1,9 @@
-use std::io::Write;
+use std::fmt;
 use std::num::NonZeroU8;
 
 use grammar_spec_line::{Attachment, Line, Spec};
 use text_lines::Lines;
 
-use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Text};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -30,33 +29,45 @@ impl Verdict {
             .unwrap_or_else(|| specs.first().map(|_| ()).map_or(Verdict::Missing, |()| Verdict::Malformed(specs)))
     }
 
-    pub(crate) fn reported(&self, out: &mut impl Write) -> Result<(), Failure<'static>> {
-        match self {
-            Verdict::Repair => Ok(writeln!(
-                out,
-                "repairing main: the body has the line {}, so the spec line is not checked",
-                Line::Repair
-            )?),
-            Verdict::Attached(attachment) => Ok(writeln!(out, "spec line well formed: spec: {attachment}")?),
-            Verdict::Malformed(specs) => Self::malformed(specs, out),
-            Verdict::Missing => Self::missing(out),
-        }
-    }
-
-    fn malformed(specs: &[Line], out: &mut impl Write) -> Result<(), Failure<'static>> {
-        specs.iter().try_for_each(|line| writeln!(out, "spec line malformed: {line}"))?;
-        Ok(writeln!(out, "::error::no spec line of the body is well formed; {}", Self::FORMS)?)
-    }
-
-    fn missing(out: &mut impl Write) -> Result<(), Failure<'static>> {
-        writeln!(out, "spec line missing")?;
-        Ok(writeln!(out, "::error::the body has no line starting \"spec: \"; {}", Self::FORMS)?)
-    }
-
     pub(crate) fn exit(&self) -> Exit {
         match self {
             Verdict::Repair | Verdict::Attached(_) => Exit::Success,
             Verdict::Malformed(_) | Verdict::Missing => Exit::Failure(NonZeroU8::MIN),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Malformed<'specs>(&'specs [Line]);
+
+#[derive(Clone, Copy, Debug)]
+struct Missing;
+
+impl fmt::Display for Verdict {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Verdict::Repair => writeln!(
+                formatter,
+                "repairing main: the body has the line {}, so the spec line is not checked",
+                Line::Repair
+            ),
+            Verdict::Attached(attachment) => writeln!(formatter, "spec line well formed: spec: {attachment}"),
+            Verdict::Malformed(specs) => write!(formatter, "{}", Malformed(specs)),
+            Verdict::Missing => write!(formatter, "{Missing}"),
+        }
+    }
+}
+
+impl fmt::Display for Malformed<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|line| writeln!(formatter, "spec line malformed: {line}"))?;
+        writeln!(formatter, "::error::no spec line of the body is well formed; {}", Verdict::FORMS)
+    }
+}
+
+impl fmt::Display for Missing {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(formatter, "spec line missing")?;
+        writeln!(formatter, "::error::the body has no line starting \"spec: \"; {}", Verdict::FORMS)
     }
 }

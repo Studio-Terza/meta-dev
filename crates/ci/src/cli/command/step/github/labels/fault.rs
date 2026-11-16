@@ -1,9 +1,7 @@
 use std::fmt;
-use std::io::Write;
 
 use super::change::Change;
 use super::check::Check;
-use crate::cli::command::failure::Failure;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fault {
@@ -24,11 +22,6 @@ impl<'change> Owed<'change> {
 
     pub(crate) fn outstanding(&self) -> Option<&Owed<'change>> {
         self.failing.first().map(|_| self)
-    }
-
-    pub(crate) fn complained(&self, out: &mut impl Write) -> Result<(), Failure<'static>> {
-        self.failing.iter().try_for_each(|change| writeln!(out, "{}", change.now_at().display()))?;
-        Ok(writeln!(out, "::error::{}", self.fault)?)
     }
 }
 
@@ -51,5 +44,12 @@ impl fmt::Display for Fault {
                 Check::GOLDENS
             ),
         }
+    }
+}
+
+impl fmt::Display for Owed<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.failing.iter().try_for_each(|change| writeln!(formatter, "{}", change.now_at().display()))?;
+        writeln!(formatter, "::error::{}", self.fault)
     }
 }

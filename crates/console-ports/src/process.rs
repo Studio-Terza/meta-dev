@@ -3,7 +3,7 @@ use std::ffi::{OsStr, OsString};
 use std::io::{self, Stderr, Stdout, Write};
 use std::process::ExitCode;
 
-use crate::{Answer, Complaint, Environment, Heard, Shown};
+use crate::{Answer, Complaint, Environment, Heard, Shown, Tale, Teller};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Process;
@@ -13,8 +13,14 @@ impl Process {
         respond(env::args_os().skip(1).collect(), &mut io::stdout(), &mut io::stderr())
     }
 
-    pub fn answer(respond: impl FnOnce(Vec<OsString>) -> Answer) -> ExitCode {
-        let answer = respond(env::args_os().skip(1).collect());
+    pub fn tell<Told: Teller>(parse: impl FnOnce(Vec<OsString>) -> Told) -> ExitCode {
+        let teller = parse(env::args_os().skip(1).collect());
+        let mut tale = teller.told();
+        let printed = tale.by_ref().try_for_each(|line| io::stdout().write_all(AsRef::<str>::as_ref(&line).as_bytes()));
+        printed.map_or(ExitCode::FAILURE, |()| Process::written(&tale.ended()))
+    }
+
+    fn written(answer: &Answer) -> ExitCode {
         let shown: &Shown = answer.as_ref();
         let complaint: &Complaint = answer.as_ref();
         let written = io::stdout()

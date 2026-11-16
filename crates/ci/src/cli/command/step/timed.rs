@@ -1,5 +1,5 @@
+use crate::cli::command::Telling;
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use super::Step;
@@ -31,8 +31,8 @@ impl Step for Timed {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        Timed::measure(&self.measured, &self.stage, &self.invocation, ports)
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
+        Ok(Telling::ended(Timed::measure(&self.measured, &self.stage, &self.invocation, ports)))
     }
 }
 
