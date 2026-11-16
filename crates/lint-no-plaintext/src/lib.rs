@@ -1,3 +1,4 @@
+use std::path::Path;
 mod finding;
 mod kinds;
 mod texts;
@@ -69,7 +70,7 @@ impl NoPlaintext {
         let ty: &TypeRef = holding.as_ref();
         let content = texts.content(&model.expanded(ty))?;
         let site = placed.site();
-        let spotted = Spots::first(ty).map_or(site, |position| Site::new(site.path(), position.line()));
+        let spotted = Spots::first(ty).map_or(site, |position| Site::new(<&Path>::from(site), position.line()));
         Some(Texted { owner, name: holding.as_ref(), site: spotted, content })
     }
 

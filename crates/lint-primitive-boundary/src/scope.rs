@@ -22,7 +22,7 @@ impl<'model> AliasTarget<'model> {
         let alias = [holding.held()].into_iter().find(|held| *held == Held::Alias);
         alias.and(holding.declares()).map(|item| AliasTarget {
             item,
-            path: placed.site().path(),
+            path: <&Path>::from(placed.site()),
             target: holding.as_ref(),
         })
     }
@@ -45,7 +45,7 @@ impl<'model> Door<'model> {
         let subject = implementation.subject_type().named().map(AsRef::<Resolved>::as_ref);
         let written = implementation.interface().and_then(|interface| AsRef::<Spelling>::as_ref(interface).written());
         let named = written.and_then(ItemPath::last).and_then(|word| word.matches::<Whole>(&Lexicon::DOOR_WORDS));
-        open.and(named).and(subject).map(|opened| Door { path: placed.site().path(), subject: opened })
+        open.and(named).and(subject).map(|opened| Door { path: <&Path>::from(placed.site()), subject: opened })
     }
 }
 

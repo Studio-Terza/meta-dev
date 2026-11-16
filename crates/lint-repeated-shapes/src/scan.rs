@@ -49,7 +49,14 @@ impl<'file> Scan<'file> {
         equivalence: Equivalence,
     ) -> Scan<'file> {
         let shaper = Shaper::reading(<&SourceFile>::from(parsed).tokens(), equivalence);
-        Scan { path: parsed.head().path(), kind, outer: Vec::new(), shaper, occurrences: Vec::new(), tested }
+        Scan {
+            path: AsRef::<Path>::as_ref(parsed.head()),
+            kind,
+            outer: Vec::new(),
+            shaper,
+            occurrences: Vec::new(),
+            tested,
+        }
     }
 
     fn considered(&mut self, edges: Edges) -> Option<Bound> {

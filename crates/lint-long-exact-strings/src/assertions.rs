@@ -75,7 +75,9 @@ impl<'file> Assertions<'file> {
                 .map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
             let judge = Compared::new(constants, locals);
             let pinned = sides.iter().find_map(|side| judge.pinning(side));
-            pinned.map(|pinning| Violation::new(Site::new(self.file.head().path(), line), Finding::from(pinning)))
+            pinned.map(|pinning| {
+                Violation::new(Site::new(AsRef::<Path>::as_ref(self.file.head()), line), Finding::from(pinning))
+            })
         })
     }
 }

@@ -1,3 +1,4 @@
+use std::path::Path;
 mod finding;
 
 use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
@@ -22,7 +23,7 @@ impl<'file> Returns<'file> {
             .filter(|path| path.path.is_ident("bool"))
             .map(|_| {
                 Violation::new(
-                    Site::new(self.file.head().path(), LineNumber::from(signature.ident.span())),
+                    Site::new(AsRef::<Path>::as_ref(self.file.head()), LineNumber::from(signature.ident.span())),
                     Finding::from(&signature.ident),
                 )
             })

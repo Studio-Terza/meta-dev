@@ -40,7 +40,7 @@ struct Body<'run, 'model> {
 impl<'run, 'model> Reader<'run, 'model> {
     pub(crate) fn new(model: &'model Model, ports: &'run Ports<'model>) -> Reader<'run, 'model> {
         let impls = model.implementations().fold(BTreeMap::new(), |mut impls: BTreeMap<_, Vec<_>>, placed| {
-            impls.entry(placed.site().path()).or_default().push(placed.entity());
+            impls.entry(<&Path>::from(placed.site())).or_default().push(placed.entity());
             impls
         });
         Reader { model, ports, impls }
@@ -64,7 +64,7 @@ impl<'run, 'model> Reader<'run, 'model> {
         let function = placed.entity();
         let seat: &Seat = function.as_ref();
         let implemented = seat.subject().and_then(|subject| {
-            self.impls.get(placed.site().path())?.iter().find(|found| found.subject_type() == subject).copied()
+            self.impls.get(<&Path>::from(placed.site()))?.iter().find(|found| found.subject_type() == subject).copied()
         });
         let generics: Vec<&Parameter> = implemented
             .map_or(&[][..], |found| AsRef::<[Parameter]>::as_ref(found))
@@ -73,7 +73,7 @@ impl<'run, 'model> Reader<'run, 'model> {
             .collect();
         let body = Body {
             function,
-            path: placed.site().path(),
+            path: <&Path>::from(placed.site()),
             typing: self.ports.typing(&generics),
             held: seat.owner().and_then(|owner| self.ports.fields(owner)),
         };

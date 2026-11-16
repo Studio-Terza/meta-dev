@@ -40,7 +40,7 @@ impl SweptLint for LiteralNames {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(VagueNames { path: file.head().path(), found: Vec::new() })
+        Box::new(VagueNames { path: AsRef::<Path>::as_ref(file.head()), found: Vec::new() })
     }
 }
 

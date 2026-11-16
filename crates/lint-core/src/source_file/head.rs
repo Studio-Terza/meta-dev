@@ -47,11 +47,6 @@ impl FileHead {
     }
 
     #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    #[must_use]
     pub fn located(&self) -> &Located {
         &self.located
     }
@@ -90,5 +85,11 @@ impl FileHead {
             let depth = inside.map_or(0, |relative| relative.components().count());
             ManifestFile::from(self.path.ancestors().nth(depth).unwrap_or(&self.path).join(Self::MANIFEST))
         })
+    }
+}
+
+impl AsRef<Path> for FileHead {
+    fn as_ref(&self) -> &Path {
+        &self.path
     }
 }

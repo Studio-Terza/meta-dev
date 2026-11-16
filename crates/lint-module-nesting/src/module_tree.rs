@@ -71,7 +71,7 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
                 uses: Sweep::gathered(test, UsePaths::default()),
             });
             ModuleUses {
-                file: head.path(),
+                file: AsRef::<Path>::as_ref(head),
                 crate_root: head.placement().crate_root(),
                 segments: head.placement().module().segments(),
                 reexports: ReexportCount::of_file(file.syntax()),
@@ -101,7 +101,7 @@ impl<'head> FromIterator<ShippedModule<'head>> for Concluded<'head> {
         let heads: BTreeMap<&Path, &'head Path> = modules.iter().map(|module| (module.file, module.file)).collect();
         let tree = ModuleTree::from(modules.as_slice());
         tree.violations()
-            .filter_map(|violation| heads.get(violation.site().path()).map(|head| violation.moved(head)))
+            .filter_map(|violation| heads.get(<&Path>::from(*violation.site())).map(|head| violation.moved(head)))
             .collect()
     }
 }

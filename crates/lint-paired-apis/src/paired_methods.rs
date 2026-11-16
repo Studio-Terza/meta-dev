@@ -1,5 +1,6 @@
 use lint_core::SourceFile;
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use syntax::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
 
@@ -43,7 +44,7 @@ impl<'file> PairedMethods<'file> {
     }
 
     fn owned_by(&mut self, owner: Option<Name>, methods: &[&Ident]) {
-        let path = self.head.path();
+        let path = AsRef::<Path>::as_ref(self.head);
         let declared = methods
             .iter()
             .map(|method| Declared::new(Name::from(*method), Site::new(path, LineNumber::from(method.span()))));

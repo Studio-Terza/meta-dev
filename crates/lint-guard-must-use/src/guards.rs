@@ -42,7 +42,7 @@ impl<'file> Guards<'file> {
         let head = parsed.head();
         let kinds = <&SourceFile>::from(parsed).shipped().map_or(&[][..], |_| Self::KINDS);
         Guards {
-            path: head.path(),
+            path: AsRef::<Path>::as_ref(head),
             module: Module::of_head(head),
             members: Members::default(),
             modules: Modules::default(),

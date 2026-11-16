@@ -49,7 +49,7 @@ impl<'file> TestCode<'file> {
     const DEFINITION: &'static str = "macro_rules";
 
     pub(crate) fn tested(self) -> Tested<'file> {
-        let path = self.file.head().path();
+        let path = AsRef::<Path>::as_ref(self.file.head());
         let found = self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::IN_SOURCE));
         Tested { path, found: found.collect(), invoked: self.invoked }
     }

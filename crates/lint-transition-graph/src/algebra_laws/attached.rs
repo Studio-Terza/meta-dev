@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 use graph::Property;
 use lint_core::Site;
@@ -23,7 +24,11 @@ impl Attached {
                 let site = *AsRef::<Site<'file>>::as_ref(operation);
                 let properties: BTreeSet<Property> = declarations
                     .laws()
-                    .routing(site.path(), AsRef::<Name>::as_ref(operation.acting().subject()), operation.function())
+                    .routing(
+                        <&Path>::from(site),
+                        AsRef::<Name>::as_ref(operation.acting().subject()),
+                        operation.function(),
+                    )
                     .into_iter()
                     .filter_map(|law| law.kind().property())
                     .filter(|property| *property != Property::Preserves)

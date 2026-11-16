@@ -1,3 +1,4 @@
+use std::path::Path;
 mod declaration;
 mod finding;
 
@@ -93,6 +94,6 @@ impl<'file> Gathers<Declarations<'file>> for Declared<'file> {
 
 impl<'file> From<&'file SourceFile> for Declared<'file> {
     fn from(file: &'file SourceFile) -> Declared<'file> {
-        Declared { path: file.head().path(), found: Vec::new() }
+        Declared { path: AsRef::<Path>::as_ref(file.head()), found: Vec::new() }
     }
 }

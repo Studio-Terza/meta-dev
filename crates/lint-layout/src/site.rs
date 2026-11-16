@@ -21,11 +21,6 @@ impl<'file> Site<'file> {
     }
 
     #[must_use]
-    pub fn path(&self) -> &'file Path {
-        self.path
-    }
-
-    #[must_use]
     pub fn moved(self, path: &Path) -> Site<'_> {
         Site { path, line: self.line }
     }
@@ -34,5 +29,11 @@ impl<'file> Site<'file> {
 impl fmt::Display for Site<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}:{}", self.path.display(), self.line)
+    }
+}
+
+impl<'file> From<Site<'file>> for &'file Path {
+    fn from(site: Site<'file>) -> &'file Path {
+        site.path
     }
 }

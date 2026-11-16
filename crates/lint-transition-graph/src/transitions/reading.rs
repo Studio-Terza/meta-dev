@@ -53,7 +53,7 @@ impl<'file> From<&'file Model> for Reading<'file> {
             model,
             crates: model.items().map(|placed| (placed.entity().declared(), placed.krate())).collect(),
             seated: defined.iter().fold(BTreeMap::new(), |mut seated: BTreeMap<_, Vec<_>>, placed| {
-                seated.entry(placed.site().path()).or_default().push(*placed);
+                seated.entry(<&Path>::from(placed.site())).or_default().push(*placed);
                 seated
             }),
             provided: defined
@@ -128,7 +128,7 @@ impl<'file> Reading<'file> {
         let filler = implementation.interface_name().cloned().map_or(Filler::Inherent, Filler::Implemented);
         let seated = self
             .seated
-            .get(placed.site().path())
+            .get(<&Path>::from(placed.site()))
             .into_iter()
             .flatten()
             .filter(|function| function.entity().entry() != Entry::Test)

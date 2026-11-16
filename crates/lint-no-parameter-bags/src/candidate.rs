@@ -79,7 +79,13 @@ impl<'model> Bag<'model> {
         let path: ItemPath = declared.krate().into_iter().chain([name]).cloned().collect();
         let exported = model.exported(Domain::Types, &path).and_then(Resolved::crate_item).filter(|id| *id == item);
         let hidden = exported.map_or(Some(()), |_| None);
-        shipped.and(hidden).map(|()| Bag { item, name, file: placed.site().path(), root: placed.root(), placed })
+        shipped.and(hidden).map(|()| Bag {
+            item,
+            name,
+            file: <&Path>::from(placed.site()),
+            root: placed.root(),
+            placed,
+        })
     }
 
     pub fn bagged(self, carriers: &Carriers, consumers: &Consumers<'model>) -> Option<Violation<'model>> {

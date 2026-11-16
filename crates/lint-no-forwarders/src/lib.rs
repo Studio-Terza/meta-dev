@@ -1,3 +1,4 @@
+use std::path::Path;
 mod forwarders;
 mod workspace_types;
 
@@ -30,7 +31,7 @@ impl WatchingLint for NoForwarders {
     type Watched<'file> = Forwarders<'file>;
 
     fn watched(file: &SourceFile) -> Forwarders<'_> {
-        Forwarders::from(file.head().path())
+        Forwarders::from(AsRef::<Path>::as_ref(file.head()))
     }
 
     fn judged<'file, 'head: 'file>(

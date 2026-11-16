@@ -12,7 +12,7 @@ impl<'head> Concluded<'head> {
     where
         'head: 'file,
     {
-        let paths = std::iter::once(file).chain(file.test_modules()).map(|found| found.head().path());
+        let paths = std::iter::once(file).chain(file.test_modules()).map(|found| AsRef::<Path>::as_ref(found.head()));
         paths.filter_map(|path| self.0.get(path)).flatten().cloned().collect()
     }
 }
@@ -22,7 +22,7 @@ impl<'head> FromIterator<Violation<'head>> for Concluded<'head> {
         Concluded(found.into_iter().fold(
             BTreeMap::new(),
             |mut filed: BTreeMap<&'head Path, Vec<Violation<'head>>>, violation| {
-                filed.entry(violation.site().path()).or_default().push(violation);
+                filed.entry(<&Path>::from(*violation.site())).or_default().push(violation);
                 filed
             },
         ))
@@ -46,6 +46,6 @@ impl<'head> Listed<'head> {
     where
         'head: 'file,
     {
-        self.at.filter(|at| *at == file.head().path()).map_or_default(|_| self.violations.clone())
+        self.at.filter(|at| *at == AsRef::<Path>::as_ref(file.head())).map_or_default(|_| self.violations.clone())
     }
 }

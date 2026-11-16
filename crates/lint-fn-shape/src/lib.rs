@@ -93,7 +93,7 @@ impl SweptLint for FnShape {
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
         Box::new(Shapes {
-            path: file.head().path(),
+            path: AsRef::<Path>::as_ref(file.head()),
             depth: NestingDepth::default(),
             nests: Vec::new(),
             violations: Vec::new(),

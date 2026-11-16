@@ -60,7 +60,7 @@ impl ContextLint for NamedNumbers {
     type Gathering<'head> = SupportGathering<'head>;
 
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> SupportGathering<'head> {
-        SupportGathering { file: parsed.head().path(), modules: SupportModules::default() }
+        SupportGathering { file: AsRef::<Path>::as_ref(parsed.head()), modules: SupportModules::default() }
     }
 }
 
@@ -70,7 +70,7 @@ impl WatchingLint for NamedNumbers {
 
     fn watched(file: &SourceFile) -> Watchers<'_> {
         let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
-        let numbers = counted.map(|found| Numbers { path: found.head().path(), lines: Vec::new() });
+        let numbers = counted.map(|found| Numbers { path: AsRef::<Path>::as_ref(found.head()), lines: Vec::new() });
         numbers.into_iter().fold(Watchers::none(), |watchers, watched| watchers.and(Box::new(watched)))
     }
 
@@ -79,7 +79,7 @@ impl WatchingLint for NamedNumbers {
         found: Vec<Violation<'file>>,
         support: &SupportPaths,
     ) -> Vec<Violation<'file>> {
-        support.0.get(file.head().path()).map_or(found, |_| Vec::new())
+        support.0.get(AsRef::<Path>::as_ref(file.head())).map_or(found, |_| Vec::new())
     }
 }
 

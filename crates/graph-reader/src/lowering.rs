@@ -333,7 +333,7 @@ struct FileShape {
 
 impl From<&SourceFile> for FileShape {
     fn from(source: &SourceFile) -> FileShape {
-        let path = source.head().path();
+        let path = AsRef::<Path>::as_ref(source.head());
         let parent = path.parent().unwrap_or_else(|| Path::new(""));
         let rooted = Some(path).filter(|candidate| *candidate == AsRef::<Path>::as_ref(source.head().crate_file()));
         let enclosure = rooted

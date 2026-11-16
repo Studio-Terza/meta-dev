@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::Path;
 
 use crate::laws::Law;
 use crate::laws::LawPath;
@@ -117,7 +118,7 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
     ) -> Option<Morphism<'edge, 'found, 'file>> {
         let verdicts: Vec<Vec<Shortfall<'edge, 'found, 'file>>> = declarations
             .laws()
-            .of_package(self.edge.site().path())
+            .of_package(<&Path>::from(self.edge.site()))
             .into_iter()
             .filter(|law| law.kind().property() == Some(Property::Preserves))
             .filter(|law| self.reached_by(law).is_some())

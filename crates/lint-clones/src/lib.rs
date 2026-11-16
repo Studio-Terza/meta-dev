@@ -1,3 +1,4 @@
+use std::path::Path;
 mod clone_sites;
 
 use clone_sites::CloneSites;
@@ -43,7 +44,7 @@ impl Gleaning for Clones {
 
     fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> CloneSites<'head> {
         let core = <&SourceFile>::from(parsed).shipped().filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
-        CloneSites::new(parsed.head().path(), core.map(|_| ()))
+        CloneSites::new(AsRef::<Path>::as_ref(parsed.head()), core.map(|_| ()))
     }
 }
 

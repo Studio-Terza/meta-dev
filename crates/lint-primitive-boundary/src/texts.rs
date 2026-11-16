@@ -1,6 +1,7 @@
 use graph::{Call, Callee, ItemPath, Model, Placed};
 use lint_core::Violation;
 use lint_layout::{Name, Whole, Word, words};
+use std::path::Path;
 
 use crate::finding::Finding;
 use crate::lexicon::Lone;
@@ -38,7 +39,7 @@ impl<'read, 'model> Texts<'read, 'model> {
 
     fn sighted(&self, placed: Placed<'model, &'model Call>) -> Option<Violation<'model>> {
         let handler = self.handler(placed.entity().callee());
-        let call = handler.as_ref().and_then(|_| self.scope.call(placed.entity(), placed.site().path()));
+        let call = handler.as_ref().and_then(|_| self.scope.call(placed.entity(), <&Path>::from(placed.site())));
         call.and(handler).map(|called| Violation::new(placed.site(), Finding::TextOutsideDoor { handler: called }))
     }
 

@@ -29,7 +29,7 @@ impl ModelLint for ForeignMatches {
             .filter_map(|placed| {
                 let id = sums.get(&placed.entity().declared()).copied()?;
                 let item = model.declared(id)?;
-                Some((id, Declared { path: placed.site().path(), name: item.as_ref() }))
+                Some((id, Declared { path: <&Path>::from(placed.site()), name: item.as_ref() }))
             })
             .collect();
         let foreign = model
@@ -39,7 +39,7 @@ impl ModelLint for ForeignMatches {
             .filter_map(|used| {
                 let declared = enums.get(&used.entity().resolved().member()?.owner())?;
                 Some(used.site())
-                    .filter(|site| site.path() != declared.path)
+                    .filter(|site| <&Path>::from(*site) != declared.path)
                     .map(|site| Violation::new(site, Finding::ForeignMatch { enum_name: declared.name }))
             })
             .collect();

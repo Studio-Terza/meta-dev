@@ -1,3 +1,4 @@
+use std::path::Path;
 mod declarations;
 mod declared_graphs;
 mod edge;
@@ -47,7 +48,7 @@ impl PrimedFacts for StateGraph {
     }
 
     fn recording<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> StateRecording<'run, 'head> {
-        let path = parsed.head().path();
+        let path = AsRef::<Path>::as_ref(parsed.head());
         let watchers = <&SourceFile>::from(parsed).shipped().map(|_| StateWatchers {
             edges: EdgeScan::from(path),
             fields: FieldVisibility::new(path),

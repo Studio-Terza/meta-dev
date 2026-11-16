@@ -24,8 +24,8 @@ impl<'file> PathReach<'file> {
     pub(crate) fn beside(file: &'file SourceFile) -> PathReach<'file> {
         let package = AsRef::<Path>::as_ref(file.head().manifest_file()).parent().map_or_default(Path::to_path_buf);
         PathReach {
-            path: file.head().path(),
-            directory: file.head().path().parent().map_or_default(Path::to_path_buf),
+            path: AsRef::<Path>::as_ref(file.head()),
+            directory: AsRef::<Path>::as_ref(file.head()).parent().map_or_default(Path::to_path_buf),
             source: Self::lexical(&package.join(Self::SOURCE_DIRECTORY)),
             lines: Vec::new(),
         }

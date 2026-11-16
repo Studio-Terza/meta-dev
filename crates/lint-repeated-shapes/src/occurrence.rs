@@ -1,6 +1,7 @@
 use body_shape::{Labels, Literals, Reading, Shape, TokenCount};
 use equivalence::{Keyed, Nested};
 use lint_core::Site;
+use std::path::Path;
 
 use crate::extent::Extent;
 use crate::kind::Kind;
@@ -59,7 +60,7 @@ impl Keyed for Occurrence<'_> {
 impl<'file> Nested for Occurrence<'file> {
     fn lies_within<'outer>(&self, outer: &'outer Occurrence<'file>) -> Option<&'outer Occurrence<'file>> {
         Some(outer)
-            .filter(|candidate| self.site.path() == candidate.site.path())
+            .filter(|candidate| <&Path>::from(self.site) == <&Path>::from(candidate.site))
             .and_then(|same_file| same_file.extent.holds(&self.extent).map(|_| same_file))
     }
 }

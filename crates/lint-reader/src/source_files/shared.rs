@@ -84,7 +84,7 @@ impl<'tree> SharedRead<'tree> {
         held.extend(heads);
         let complete = expected.met(&held).map(|_| mem::take(&mut *held));
         let sorted = complete.map(|mut table| {
-            table.sort_by(|earlier, later| earlier.path().cmp(later.path()));
+            table.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier).cmp(AsRef::<Path>::as_ref(later)));
             table
         });
         sorted.map(|table| self.table.get_or_init(|| table));

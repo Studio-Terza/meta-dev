@@ -1,3 +1,4 @@
+use std::path::Path;
 mod case;
 mod flagged;
 mod lines;
@@ -44,14 +45,19 @@ impl Sources {
     pub fn placed(manifests: &[Source], sources: &[Source]) -> Vec<SourceFile> {
         let files: Memory = manifests
             .iter()
-            .map(|manifest| (manifest.path().to_path_buf(), Bytes::from(manifest.text().into_inner())))
+            .map(|manifest| (AsRef::<Path>::as_ref(manifest).to_path_buf(), Bytes::from(manifest.text().into_inner())))
             .collect();
         sources
             .iter()
             .map(|source| {
-                let placement = Placement::locate(&files, source.path());
+                let placement = Placement::locate(&files, AsRef::<Path>::as_ref(source));
                 let text = SourceText::new(source.text().into_inner().to_owned());
-                Self::kept(SourceFile::parse_at(source.path().into(), source.path().into(), placement, text))
+                Self::kept(SourceFile::parse_at(
+                    AsRef::<Path>::as_ref(source).into(),
+                    AsRef::<Path>::as_ref(source).into(),
+                    placement,
+                    text,
+                ))
             })
             .collect()
     }
@@ -78,7 +84,7 @@ impl Sources {
 
     #[must_use]
     pub fn parsed(sources: &[Source]) -> Vec<SourceFile> {
-        sources.iter().map(|source| Self::file(source.path(), source.text())).collect()
+        sources.iter().map(|source| Self::file(AsRef::<Path>::as_ref(source), source.text())).collect()
     }
 
     #[must_use]
@@ -104,6 +110,6 @@ impl Sources {
 
 impl fmt::Display for Sources {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.iter().try_for_each(|source| write!(formatter, "{} ", source.path().display()))
+        self.0.iter().try_for_each(|source| write!(formatter, "{} ", AsRef::<Path>::as_ref(source).display()))
     }
 }
