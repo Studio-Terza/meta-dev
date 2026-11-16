@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use equivalence::Equivalence;
-use syntax::{Lexeme, Symbol, TokenTable};
+use syntax_lexer::{Lexeme, Symbol, TokenTable};
 
 use super::Bounds;
 use crate::shape::{Code, Labels, Literals, Reading};
