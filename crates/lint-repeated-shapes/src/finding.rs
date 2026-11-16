@@ -26,7 +26,12 @@ impl Finding<'_> {
         sites.first().map(|site| {
             Violation::new(
                 **site,
-                Finding { size: group.key().size(), kind, template, others: sites.get(1..).unwrap_or_default() },
+                Finding {
+                    size: TokenCount::from(group.key()),
+                    kind,
+                    template,
+                    others: sites.get(1..).unwrap_or_default(),
+                },
             )
         })
     }

@@ -7,7 +7,7 @@ use std::ops::Range;
 use syntax::{Lexeme, LexemeKind, Lexemes, Named, Quoted, Symbol, TokenTable};
 
 use super::Token;
-use super::arithmetic::Code;
+use crate::shape::Code;
 use crate::shape::{Sign, Spelled, Spelling, Spoken};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -79,6 +79,10 @@ impl Window {
 
     pub(super) fn indices(self) -> Range<usize> {
         self.low..self.high
+    }
+
+    pub(super) fn ends(self) -> [usize; 2] {
+        [self.low, self.high]
     }
 
     fn inside(self, lexemes: &[Lexeme], index: Option<usize>) -> Option<LexemeKind> {

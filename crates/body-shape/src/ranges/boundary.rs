@@ -1,15 +1,14 @@
-mod arithmetic;
 mod classes;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use equivalence::Equivalence;
 use syntax::{Lexeme, Symbol, TokenTable};
 
 use super::Bounds;
-use crate::shape::{Literals, Reading, Shape, ShapeKey};
+use crate::shape::{Code, Labels, Literals, Reading, Shape, ShapeKey};
 use crate::token_count::TokenCount;
-use arithmetic::{Code, Hashed, Polynomial};
 use classes::{Classes, Window};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,21 +42,12 @@ impl Token {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Stretch {
-    start: usize,
-    end: usize,
-}
-
 #[derive(Debug)]
 pub struct Shaper {
     classes: Classes,
     lexemes: Vec<Lexeme>,
     tokens: Vec<Token>,
     counted: Vec<usize>,
-    codes: Vec<Code>,
-    prefix: Polynomial,
-    links: Links,
 }
 
 impl Shaper {
@@ -73,121 +63,72 @@ impl Shaper {
             counts.push(counts.last().copied().unwrap_or_default() + token.counted());
             counts
         });
-        let links = Links::linked(&tokens);
-        let codes: Vec<Code> = tokens
-            .iter()
-            .enumerate()
-            .map(|(index, token)| token.coded(links.distance(&counted, index)).unwrap_or(Code::NEW))
-            .collect();
-        let shaped: Vec<Code> =
-            codes.iter().zip(&tokens).filter(|(_, token)| token.counted() == 1).map(|(code, _)| *code).collect();
-        Shaper { classes, lexemes, prefix: Polynomial::prefix(&shaped), tokens, counted, codes, links }
+        Shaper { classes, lexemes, tokens, counted }
     }
 
-    pub fn read(&mut self, bounds: Bounds) -> Reading {
-        let stretch = Stretch {
-            start: self.lexemes.partition_point(|lexeme| lexeme.place() < bounds.start),
-            end: self.lexemes.partition_point(|lexeme| lexeme.place() < bounds.end),
-        };
-        self.links.advanced(stretch.start);
-        let window = Window::new(stretch.start, stretch.end);
-        let shape = self.stable(stretch).map_or_else(|| self.direct(window), |()| self.fast(stretch));
-        Reading::new(shape, self.literals(stretch))
+    #[must_use]
+    pub fn sized(&self, bounds: Bounds) -> TokenCount {
+        let window = self.window(bounds);
+        let counted = |index: usize| self.counted.get(index).copied().unwrap_or_default();
+        let [from, to] = window.ends().map(counted);
+        self.stable(window).map_or_else(|| self.direct(window).size(), |()| TokenCount::new(to.saturating_sub(from)))
     }
 
-    fn stable(&self, stretch: Stretch) -> Option<()> {
-        let window = Window::new(stretch.start, stretch.end);
-        let low = stretch.start..(stretch.start + Self::EDGE).min(stretch.end);
-        let high = stretch.end.saturating_sub(Self::EDGE).max(stretch.start)..stretch.end;
+    #[must_use]
+    pub fn read(&self, bounds: Bounds) -> Reading {
+        let window = self.window(bounds);
+        let literals: Literals =
+            window.indices().filter_map(|index| self.classes.spelled(&self.lexemes, index, window)).collect();
+        let direct = self.direct(window);
+        Reading::new(direct.shape(), literals, direct.labels)
+    }
+
+    fn window(&self, bounds: Bounds) -> Window {
+        Window::new(
+            self.lexemes.partition_point(|lexeme| lexeme.place() < bounds.start),
+            self.lexemes.partition_point(|lexeme| lexeme.place() < bounds.end),
+        )
+    }
+
+    fn stable(&self, window: Window) -> Option<()> {
+        let [start, end] = window.ends();
+        let low = start..(start + Self::EDGE).min(end);
+        let high = end.saturating_sub(Self::EDGE).max(start)..end;
         let moved = low
             .chain(high)
             .find(|index| self.tokens.get(*index).copied() != Some(self.classes.token(&self.lexemes, *index, window)));
         moved.map_or(Some(()), |_| None)
     }
 
-    fn fast(&self, stretch: Stretch) -> Shape {
-        let [from, to] = [stretch.start, stretch.end].map(|index| self.counted.get(index).copied().unwrap_or_default());
-        let hash =
-            self.links.firsts.range(stretch.start..stretch.end).fold(self.prefix.range(from, to), |hash, index| {
-                let was = self.codes.get(*index).copied().unwrap_or(Code::NEW);
-                let shaped = self.counted.get(*index).copied().unwrap_or_default();
-                self.prefix.corrected(hash, was, to.saturating_sub(shaped + 1))
-            });
-        Shape::ranged(TokenCount::new(to.saturating_sub(from)), ShapeKey::new(hash.folded()))
-    }
-
-    fn direct(&self, window: Window) -> Shape {
-        let tokens = window.indices().map(|index| self.classes.token(&self.lexemes, index, window));
-        let walked = tokens.fold(Direct::default(), Direct::stepped);
-        Shape::ranged(TokenCount::new(walked.shaped), ShapeKey::new(walked.hash.folded()))
-    }
-
-    fn literals(&self, stretch: Stretch) -> Literals {
-        let window = Window::new(stretch.start, stretch.end);
-        (stretch.start..stretch.end).filter_map(|index| self.classes.spelled(&self.lexemes, index, window)).collect()
-    }
-}
-
-#[derive(Debug)]
-struct Links {
-    previous: Vec<Option<usize>>,
-    next: Vec<Option<usize>>,
-    firsts: BTreeSet<usize>,
-    cursor: usize,
-}
-
-impl Links {
-    fn linked(tokens: &[Token]) -> Links {
-        let mut last = HashMap::new();
-        let previous: Vec<Option<usize>> = tokens
-            .iter()
-            .enumerate()
-            .map(|(index, token)| token.slotted().and_then(|symbol| last.insert(symbol, index)))
-            .collect();
-        let mut following = HashMap::new();
-        let mut next: Vec<Option<usize>> = tokens
-            .iter()
-            .enumerate()
-            .rev()
-            .map(|(index, token)| token.slotted().and_then(|symbol| following.insert(symbol, index)))
-            .collect();
-        next.reverse();
-        let firsts = previous
-            .iter()
-            .zip(tokens)
-            .enumerate()
-            .filter_map(|(index, (before, token))| token.slotted().filter(|_| before.is_none()).map(|_| index))
-            .collect();
-        Links { previous, next, firsts, cursor: 0 }
-    }
-
-    fn distance(&self, counted: &[usize], index: usize) -> Option<usize> {
-        let before = self.previous.get(index).copied().flatten()?;
-        Some(counted.get(index).copied().unwrap_or_default() - counted.get(before).copied().unwrap_or_default())
-    }
-
-    fn advanced(&mut self, start: usize) {
-        let passed = self.cursor..start.max(self.cursor);
-        let entering: Vec<usize> =
-            passed.filter_map(|index| self.next.get(index).copied().flatten()).filter(|next| *next >= start).collect();
-        self.firsts = self.firsts.split_off(&start);
-        self.firsts.extend(entering);
-        self.cursor = start.max(self.cursor);
+    fn direct(&self, window: Window) -> Direct {
+        window
+            .indices()
+            .map(|index| self.classes.token(&self.lexemes, index, window))
+            .fold(Direct::default(), Direct::stepped)
     }
 }
 
 #[derive(Debug, Default)]
 struct Direct {
-    shaped: usize,
     seen: HashMap<Symbol, usize>,
-    hash: Hashed,
+    labels: Labels,
 }
 
 impl Direct {
     fn stepped(mut self, token: Token) -> Direct {
-        let earlier = token.slotted().and_then(|symbol| self.seen.insert(symbol, self.shaped));
-        let code = token.coded(earlier.map(|before| self.shaped - before));
-        let hash = code.map_or(self.hash, |found| self.hash.appended(found));
-        Direct { shaped: self.shaped + token.counted(), hash, ..self }
+        let shaped = self.labels.count();
+        let earlier = token.slotted().and_then(|symbol| self.seen.insert(symbol, shaped));
+        let code = token.coded(earlier.map(|before| shaped - before));
+        Direct { labels: code.into_iter().fold(self.labels, Labels::pushed), ..self }
+    }
+
+    fn size(&self) -> TokenCount {
+        TokenCount::new(self.labels.count())
+    }
+
+    fn shape(&self) -> Shape {
+        let mut hasher = DefaultHasher::new();
+        self.labels.hash(&mut hasher);
+        Shape::ranged(self.size(), ShapeKey::new(hasher.finish()))
     }
 }

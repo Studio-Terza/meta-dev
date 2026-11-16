@@ -53,10 +53,10 @@ impl<'file> Scan<'file> {
 
     fn considered(&mut self, edges: Edges) -> Option<Bound> {
         let extent = Extent::spanning(edges.first, edges.last);
-        let reading = self.shaper.read(Bounds::from(extent));
-        let large = Self::FLOOR.allows(reading.shape().size()).map(|_| Self::FLOOR);
+        let bounds = Bounds::from(extent);
+        let large = Self::FLOOR.allows(self.shaper.sized(bounds)).map(|_| Self::FLOOR);
         let site = Site::new(self.path, LineNumber::from(edges.first));
-        let occurrence = large.map(|_| Occurrence::new(reading, site, extent, self.kind));
+        let occurrence = large.map(|_| Occurrence::new(self.shaper.read(bounds), site, extent, self.kind));
         self.occurrences.extend(occurrence);
         large
     }

@@ -6,6 +6,7 @@ mod scan;
 
 use std::path::Path;
 
+use body_shape::TokenCount;
 use equivalence::{Equivalence, Erased, Groups};
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
 use lint_file::{ContextLint, Listed, Reads, RuledLint};
@@ -25,7 +26,7 @@ impl RepeatedShapes {
         equivalence: Equivalence,
     ) -> Vec<Violation<'file>> {
         Groups::grouped(occurrences)
-            .outermost(|shape| shape.size())
+            .outermost(|exact| TokenCount::from(exact))
             .listed()
             .iter()
             .filter_map(|group| Finding::violation(group, equivalence))
