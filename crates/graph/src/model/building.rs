@@ -35,6 +35,7 @@ impl Model {
     fn filed(&mut self, file: FileId, line: LineNumber, used: PathUse) {
         match used.mention() {
             Mention::Interpolated => self.interpolated.push(Filed::new(file, Found::new(line, used))),
+            Mention::Typed => self.typed.push(Filed::new(file, Found::new(line, used))),
             Mention::Dispatched => self.dispatched.push(Dispatch::from(&used)),
             Mention::Expression | Mention::Invoked | Mention::InMacro => {
                 self.uses.push(Filed::new(file, Found::new(line, used)));
@@ -59,6 +60,7 @@ impl Building {
         model.calls.extend(found.calls);
         model.uses.extend(found.uses);
         model.interpolated.extend(found.interpolated);
+        model.typed.extend(found.typed);
         model.dispatched.extend(found.dispatched);
         model.placed.extend(found.placed);
         model.laws.extend(found.laws);
@@ -141,6 +143,7 @@ impl Building {
             laws: Filed::sorted(model.laws),
             uses: Filed::sorted(model.uses),
             interpolated: Filed::sorted(model.interpolated),
+            typed: Filed::sorted(model.typed),
             dispatched: model.dispatched,
             quoted: Filed::sorted(model.quoted),
             declarations: Declarations::new(self.items, self.aliases, self.exports),

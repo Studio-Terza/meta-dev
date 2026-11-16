@@ -1,7 +1,7 @@
 mod tokens;
 
 use syntax::Spanned;
-use syntax::{ExprPath, Macro, QSelf, Type, TypeParamBound};
+use syntax::{ExprPath, ExprStruct, Macro, QSelf, Type, TypeParamBound};
 
 use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved};
 use lint_layout::Position;
@@ -28,14 +28,16 @@ impl UseRow {
     fn domain(&self) -> Domain {
         match self.mention {
             Mention::Invoked => Domain::Macros,
-            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Dispatched => Domain::Types,
+            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Dispatched | Mention::Typed => {
+                Domain::Types
+            }
         }
     }
 
     fn kept<'resolved>(&self, resolved: &'resolved Resolved) -> Option<&'resolved Resolved> {
         match self.mention {
             Mention::Invoked | Mention::Dispatched => Some(resolved),
-            Mention::Expression | Mention::InMacro | Mention::Interpolated => {
+            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Typed => {
                 self.written.tail().first().map(|_| resolved).or_else(|| resolved.known())
             }
         }
@@ -98,6 +100,18 @@ impl Dispatch {
 }
 
 #[derive(Debug)]
+struct Typed;
+
+impl Typed {
+    fn path(ty: &Type) -> Option<&syntax::Path> {
+        match ty {
+            Type::Path(inner) => inner.qself.as_ref().map_or(Some(&inner.path), |_| None),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Qualified;
 
 impl Qualified {
@@ -139,11 +153,22 @@ impl Lowering<'_> {
         });
     }
 
-    pub(super) fn objects_used(&mut self, ty: &Type) {
+    pub(super) fn struct_used(&mut self, literal: &ExprStruct) {
+        let position = literal.path.segments.first().map(|first| Position::from(first.ident.span()));
+        let written = literal.qself.as_ref().map_or(Some(&literal.path), |_| None).zip(position);
+        written.into_iter().fold(self, |lowering, (path, at)| {
+            lowering.used(UsePath::from(path), at, Mention::Expression);
+            lowering
+        });
+    }
+
+    pub(super) fn types_used(&mut self, ty: &Type) {
         let position = Position::from(ty.span());
-        let traits = Dispatch::objects(ty);
-        traits.into_iter().fold(self, |lowering, path| {
-            lowering.used(path, position, Mention::Dispatched);
+        let typed =
+            self.context.in_body().and_then(|_| Typed::path(ty)).map(|path| (UsePath::from(path), Mention::Typed));
+        let traits = Dispatch::objects(ty).into_iter().map(|path| (path, Mention::Dispatched));
+        traits.chain(typed).fold(self, |lowering, (path, mention)| {
+            lowering.used(path, position, mention);
             lowering
         });
     }

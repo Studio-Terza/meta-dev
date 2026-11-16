@@ -4,6 +4,7 @@ use graph::{Ground, Reach, Region, Within, Zone};
 use lint_core::{Gate, SourceFile, Walk};
 
 use super::places::PlaceId;
+use crate::namespace::ScopeKind;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Regions;
@@ -38,35 +39,59 @@ impl Regions {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Spot {
+    Declared,
+    Body,
+}
+
+impl From<ScopeKind> for Spot {
+    fn from(kind: ScopeKind) -> Spot {
+        match kind {
+            ScopeKind::Module => Spot::Declared,
+            ScopeKind::Block => Spot::Body,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Context {
     region: Region,
     place: Option<PlaceId>,
+    spot: Spot,
 }
 
 impl Context {
     pub(super) fn outermost(region: Region) -> Context {
-        Context { region, place: None }
+        Context { region, place: None, spot: Spot::Declared }
     }
 
     pub(super) fn within_item(&self, attributes: &[Attribute]) -> Context {
-        Context { region: Regions::tested(self.region, attributes), place: self.place }
+        Context { region: Regions::tested(self.region, attributes), ..*self }
     }
 
     pub(super) fn within_module(&self, item: &ItemMod) -> Context {
-        Context { region: Regions::of_module(self.region, item), place: self.place }
+        Context { region: Regions::of_module(self.region, item), ..*self }
     }
 
     pub(super) fn of_impl(&self, block: &ItemImpl, place: PlaceId) -> Context {
-        Context { region: self.region.inside(Self::within(block)), place: Some(place) }
+        Context { region: self.region.inside(Self::within(block)), place: Some(place), ..*self }
     }
 
     pub(super) fn transcribed(&self) -> Context {
-        Context { region: self.region.reached(Reach::Transcribed), place: self.place }
+        Context { region: self.region.reached(Reach::Transcribed), ..*self }
     }
 
     pub(super) fn owned(&self, place: PlaceId) -> Context {
-        Context { region: self.region, place: Some(place) }
+        Context { place: Some(place), ..*self }
+    }
+
+    pub(super) fn entered(&self, kind: ScopeKind) -> Context {
+        Context { spot: Spot::from(kind), ..*self }
+    }
+
+    pub(super) fn in_body(&self) -> Option<Context> {
+        Some(*self).filter(|context| context.spot == Spot::Body)
     }
 
     pub(super) fn region(&self) -> Region {
