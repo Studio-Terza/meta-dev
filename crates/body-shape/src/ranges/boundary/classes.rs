@@ -8,7 +8,7 @@ use syntax::{Lexeme, LexemeKind, Lexemes, Named, Quoted, Symbol, TokenTable};
 
 use super::Token;
 use crate::shape::Code;
-use crate::shape::{Sign, Spelled, Spelling, Spoken};
+use crate::shape::{Sign, Spelled};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Spot {
@@ -29,7 +29,6 @@ enum Sort {
 struct Fact {
     sort: Sort,
     word: Code,
-    spelled: String,
 }
 
 #[derive(Debug, Default)]
@@ -52,11 +51,7 @@ impl Facts {
         let literal = name.matches::<Whole>(&Self::LITERAL_WORDS).map(|_| Sort::LiteralWord);
         let keyword = name.matches::<Whole>(&Self::KEYWORDS).map(|_| Sort::Keyword);
         let lower = Some(name.casing()).filter(|casing| *casing == Casing::Lower).map(|_| Sort::Lower);
-        Fact {
-            sort: literal.or(keyword).or(lower).unwrap_or(Sort::Other),
-            word: Code::word(spelled),
-            spelled: spelled.to_owned(),
-        }
+        Fact { sort: literal.or(keyword).or(lower).unwrap_or(Sort::Other), word: Code::word(spelled) }
     }
 
     fn fact(&self, symbol: Symbol) -> Option<&Fact> {
@@ -190,12 +185,12 @@ impl Lexemes for Speaking<'_> {
 
     fn word(&self, named: Named) -> Option<Spelled> {
         let fact = self.facts.fact(*named.as_ref()).filter(|found| found.sort == Sort::LiteralWord)?;
-        Some(Spelled::new(self.sign, Spoken::Word(Name::from(fact.spelled.as_str()))))
+        Some(Spelled::new(self.sign, fact.word.clone()))
     }
 
     fn literal(&self, quoted: Quoted) -> Option<Spelled> {
         let fact = self.facts.fact(*quoted.as_ref())?;
-        Some(Spelled::new(self.sign, Spoken::Literal(Spelling::new(fact.spelled.clone()))))
+        Some(Spelled::new(self.sign, fact.word.clone()))
     }
 
     fn mark(&self, _: char) -> Option<Spelled> {

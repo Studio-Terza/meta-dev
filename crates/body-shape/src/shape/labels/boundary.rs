@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -22,6 +23,16 @@ impl Code {
     }
 }
 
+impl fmt::Display for Code {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Code::Mark(mark) => write!(formatter, "{mark}"),
+            Code::Word(text) | Code::Literal(text) => formatter.write_str(text),
+            Code::Erased => formatter.write_str("_"),
+            Code::Slot(slot) => write!(formatter, "${slot}"),
+        }
+    }
+}
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Labels(Vec<Code>);
 
