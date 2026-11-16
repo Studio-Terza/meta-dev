@@ -165,7 +165,7 @@ jobs:
         run: cargo fetch --locked
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" --timings .'
-      - name: budget
+      - name: lint timings
         if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         run: '"$TOOLS/ci" show "$BUDGET"'
       - uses: ./.github/actions/judge
