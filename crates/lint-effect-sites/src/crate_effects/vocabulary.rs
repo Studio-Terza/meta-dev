@@ -90,9 +90,12 @@ impl Vocabulary {
     fn effected(used: &PathUse) -> Option<Effected> {
         match used.mention() {
             Mention::Invoked => Self::printed(used.written()),
-            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Dispatched | Mention::Typed => {
-                Self::LONG.iter().chain(&Self::SHORT).find_map(|tail| tail.effected(used))
-            }
+            Mention::Expression
+            | Mention::InMacro
+            | Mention::Interpolated
+            | Mention::Dispatched
+            | Mention::Typed
+            | Mention::Matched => Self::LONG.iter().chain(&Self::SHORT).find_map(|tail| tail.effected(used)),
         }
     }
 

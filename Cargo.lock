@@ -2092,6 +2092,7 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "graph",
  "laws",
  "lint-core",
  "lint-file",

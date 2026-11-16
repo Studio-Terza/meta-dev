@@ -600,6 +600,9 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
             Kind::ExprMacro,
             Kind::ExprPath,
             Kind::ExprStruct,
+            Kind::ExprMatch,
+            Kind::ExprLet,
+            Kind::Local,
             Kind::ItemMacro,
             Kind::Macro,
         ]
@@ -771,6 +774,29 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
 
     fn on_expr_path(&mut self, expression: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
         self.path_used(expression);
+        Descend::Into
+    }
+
+    fn on_expr_match(&mut self, expr: &'ast syntax::ExprMatch, _: &Facts<'_, syntax::ExprMatch>) -> Descend {
+        expr.arms
+            .iter()
+            .filter(|arm| syntax::Constant::composed(&arm.body).is_none())
+            .for_each(|arm| self.pattern_used(&arm.pat));
+        Descend::Into
+    }
+
+    fn on_expr_let(&mut self, expr: &'ast syntax::ExprLet, _: &Facts<'_, syntax::ExprLet>) -> Descend {
+        self.pattern_used(&expr.pat);
+        Descend::Into
+    }
+
+    fn on_local(&mut self, local: &'ast syntax::Local, _: &Facts<'_, syntax::Local>) -> Descend {
+        local
+            .init
+            .as_ref()
+            .filter(|init| init.diverge.is_some())
+            .into_iter()
+            .for_each(|_| self.pattern_used(&local.pat));
         Descend::Into
     }
 

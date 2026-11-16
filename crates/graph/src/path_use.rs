@@ -13,6 +13,7 @@ pub enum Mention {
     Interpolated,
     Dispatched,
     Typed,
+    Matched,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

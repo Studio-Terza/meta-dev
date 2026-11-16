@@ -34,7 +34,7 @@ impl WrittenImpl {
 }
 
 impl<'found> ImplContext<'found> {
-    pub fn resolved(item: &WrittenImpl, declarations: &'found Declarations<'_>) -> ImplContext<'found> {
+    pub fn resolved(item: &WrittenImpl, declarations: &'found Declarations) -> ImplContext<'found> {
         let self_type = declarations.resolved(&item.self_type).clone();
         let vertex = declarations.vertex_named(&self_type).map(Vertex::name);
         let kind = item.trait_name.clone().map_or_else(

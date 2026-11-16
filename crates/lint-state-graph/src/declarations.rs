@@ -1,107 +1,72 @@
 mod vertex;
 
 use std::collections::{BTreeMap, BTreeSet};
-use syntax::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
+use syntax::{ItemImpl, ItemMod, ItemType};
 
-use lint_core::Home;
 use lint_core::Parsed;
-use lint_core::TypeHomes;
 use lint_core::TypeName;
-use lint_layout::Name;
 use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
 pub use vertex::Vertex;
 
 #[derive(Debug)]
-pub struct Declarations<'file> {
+pub struct Declarations {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
-    homes: TypeHomes<'file>,
-    sum_types: BTreeMap<Home<'file>, BTreeSet<Name>>,
-    reading: BTreeSet<Name>,
 }
 
 #[derive(Debug, Default)]
 pub struct DeclarationReading {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
-    reading: BTreeSet<Name>,
 }
 
 #[derive(Debug)]
-pub struct DeclarationGathering<'head> {
+pub struct DeclarationGathering {
     reading: DeclarationReading,
-    shipped: Option<Home<'head>>,
+    shipped: Option<()>,
 }
 
-impl<'head> From<Parsed<'_, 'head>> for DeclarationGathering<'head> {
-    fn from(parsed: Parsed<'_, 'head>) -> DeclarationGathering<'head> {
-        DeclarationGathering {
-            reading: DeclarationReading::default(),
-            shipped: parsed.file().shipped().map(|_| Home::from(parsed.head())),
-        }
+impl From<Parsed<'_, '_>> for DeclarationGathering {
+    fn from(parsed: Parsed<'_, '_>) -> DeclarationGathering {
+        DeclarationGathering { reading: DeclarationReading::default(), shipped: parsed.file().shipped().map(|_| ()) }
     }
 }
 
-impl<'head> Gathers<Option<Declarations<'head>>> for DeclarationGathering<'head> {
+impl Gathers<Option<Declarations>> for DeclarationGathering {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let all: Vec<&mut Watching<'_>> = vec![&mut self.reading];
         self.shipped.map_or_default(|_| all)
     }
 
-    fn gathered(self) -> Option<Declarations<'head>> {
+    fn gathered(self) -> Option<Declarations> {
         let reading = self.reading;
-        self.shipped.map(|home| {
-            Declarations {
-                vertices: reading.vertices,
-                aliases: reading.aliases,
-                homes: TypeHomes::empty(),
-                sum_types: BTreeMap::new(),
-                reading: reading.reading,
-            }
-            .filed(home)
-        })
-    }
-}
-
-impl<'file> Declarations<'file> {
-    pub fn homed(self, homes: &TypeHomes<'file>) -> Declarations<'file> {
-        Declarations { homes: homes.clone(), ..self }
+        self.shipped.map(|()| Declarations { vertices: reading.vertices, aliases: reading.aliases })
     }
 }
 
 #[derive(Default)]
-struct Gathered<'head> {
+struct Gathered {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
-    homes: Vec<TypeHomes<'head>>,
-    sum_types: BTreeMap<Home<'head>, BTreeSet<Name>>,
 }
 
-impl<'head> Gathered<'head> {
-    fn including(mut self, part: Declarations<'head>) -> Gathered<'head> {
+impl Gathered {
+    fn including(mut self, part: Declarations) -> Gathered {
         self.vertices.extend(part.vertices);
         self.aliases.extend(part.aliases);
-        self.homes.push(part.homes);
-        part.sum_types.into_iter().for_each(|(home, names)| self.sum_types.entry(home).or_default().extend(names));
         self
     }
 }
 
-impl<'head> FromIterator<Option<Declarations<'head>>> for Declarations<'head> {
-    fn from_iter<Parts: IntoIterator<Item = Option<Declarations<'head>>>>(parts: Parts) -> Declarations<'head> {
+impl<'head> FromIterator<Option<Declarations>> for Declarations {
+    fn from_iter<Parts: IntoIterator<Item = Option<Declarations>>>(parts: Parts) -> Declarations {
         let gathered = parts.into_iter().flatten().fold(Gathered::default(), Gathered::including);
-        let merged = Declarations {
-            vertices: gathered.vertices,
-            aliases: gathered.aliases,
-            homes: gathered.homes.into_iter().collect(),
-            sum_types: gathered.sum_types,
-            reading: BTreeSet::new(),
-        };
+        let merged = Declarations { vertices: gathered.vertices, aliases: gathered.aliases };
         merged.with_resolved_vertices()
     }
 }
 
-impl<'file> Declarations<'file> {
+impl Declarations {
     pub fn resolved<'name>(&'name self, name: &'name TypeName) -> &'name TypeName {
         self.aliases.get(name).unwrap_or(name)
     }
@@ -110,18 +75,7 @@ impl<'file> Declarations<'file> {
         self.vertices.get(name).map(Vertex::new)
     }
 
-    pub fn foreign_sum_type(&self, enum_name: &Name, from: &Home<'file>) -> Option<&Name> {
-        let home = self.homes.home_of(enum_name, *from);
-        self.sum_types.get(&home).and_then(|names| names.get(enum_name)).filter(|_| home != *from)
-    }
-
-    fn filed(mut self, home: Home<'file>) -> Declarations<'file> {
-        let enums = std::mem::take(&mut self.reading);
-        self.sum_types.entry(home).or_default().extend(enums);
-        self
-    }
-
-    fn with_resolved_vertices(mut self) -> Declarations<'file> {
+    fn with_resolved_vertices(mut self) -> Declarations {
         let vertices = std::mem::take(&mut self.vertices);
         self.vertices =
             vertices.into_iter().map(|vertex| self.aliases.get(&vertex).cloned().unwrap_or(vertex)).collect();
@@ -135,18 +89,11 @@ impl<'file> Declarations<'file> {
             .filter(|segment| segment.ident == "State")
             .map(|_| TypeName::from_type(&item.self_ty))
     }
-
-    fn sum_type(item: &ItemEnum) -> Option<&ItemEnum> {
-        item.variants
-            .iter()
-            .find(|variant| matches!(variant.fields, Fields::Named(_) | Fields::Unnamed(_)))
-            .map(|_| item)
-    }
 }
 
 impl<'ast> Watch<'ast> for DeclarationReading {
     fn kinds(&self) -> &'static [Kind] {
-        &[Kind::ItemImpl, Kind::ItemType, Kind::ItemEnum, Kind::ItemMod]
+        &[Kind::ItemImpl, Kind::ItemType, Kind::ItemMod]
     }
 
     fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
@@ -157,12 +104,6 @@ impl<'ast> Watch<'ast> for DeclarationReading {
 
     fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
         self.aliases.insert(TypeName::named(&item.ident), TypeName::from_type(&item.ty));
-        Descend::Over
-    }
-
-    fn on_item_enum(&mut self, item: &'ast ItemEnum, facts: &Facts<'_, ItemEnum>) -> Descend {
-        let entered = Descend::from(facts.gate()).entered();
-        self.reading.extend(entered.and_then(|_| Declarations::sum_type(item)).map(|found| Name::from(&found.ident)));
         Descend::Over
     }
 

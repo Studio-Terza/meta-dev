@@ -50,7 +50,7 @@ impl<'file> Gathers<Written<'file>> for EdgeScan<'file> {
 }
 
 impl<'file> Written<'file> {
-    pub fn resolved<'scan>(&'scan self, declarations: &'scan Declarations<'scan>) -> ScannedEdges<'file> {
+    pub fn resolved<'scan>(&'scan self, declarations: &'scan Declarations) -> ScannedEdges<'file> {
         let resolution =
             EdgeResolution { declarations, path: self.path, edges: BTreeMap::new(), violations: Vec::new() };
         self.impls.iter().fold(resolution, EdgeResolution::scanned).into_edges()
@@ -59,7 +59,7 @@ impl<'file> Written<'file> {
 
 #[derive(Debug)]
 pub struct EdgeResolution<'scan, 'file> {
-    declarations: &'scan Declarations<'scan>,
+    declarations: &'scan Declarations,
     path: &'file Path,
     edges: BTreeMap<Edge<'scan>, BTreeMap<Name, Site<'file>>>,
     violations: Vec<Violation<'file>>,
