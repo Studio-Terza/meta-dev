@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::iter;
 use std::ops::ControlFlow;
 
@@ -57,19 +56,18 @@ impl Reach {
     }
 }
 
-pub(super) trait Lattice: Ord + Clone {
+pub(super) trait Lattice: Eq + Sized {
     fn joined(&self, computed: Self) -> Self;
 
     fn settled(self, advanced: impl Fn(&Self) -> Self) -> Self {
-        let mut reached = BTreeSet::from([self.clone()]);
         Self::reached(iter::repeat(()).try_fold(self, |state, ()| {
             let next = state.joined(advanced(&state));
-            Self::stepped(&mut reached, next)
+            Self::stepped(&state, next)
         }))
     }
 
-    fn stepped(reached: &mut BTreeSet<Self>, next: Self) -> ControlFlow<Self, Self> {
-        match reached.insert(next.clone()).then_some(()) {
+    fn stepped(state: &Self, next: Self) -> ControlFlow<Self, Self> {
+        match (next != *state).then_some(()) {
             Some(()) => ControlFlow::Continue(next),
             None => ControlFlow::Break(next),
         }

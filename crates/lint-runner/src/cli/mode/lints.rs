@@ -436,6 +436,7 @@ impl Work {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Rank {
     Early(Reverse<Slot>),
+    Whole(Slot),
     Late(Slot),
 }
 
@@ -450,7 +451,8 @@ impl Job {
     fn rank(&self) -> Rank {
         match self.work {
             Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Rank::Early(Reverse(self.slot)),
-            Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => Rank::Late(self.slot),
+            Work::Extracted(_) => Rank::Whole(self.slot),
+            Work::Modelled(_) | Work::Described(_) => Rank::Late(self.slot),
         }
     }
 
