@@ -1,7 +1,3 @@
-test budget, report only:
-corpus: 0 tests in 4 files, 0 of 18 lines, 0 process starts
-report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
-report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 guard types are #[must_use]:
 src/unmarked.rs:1: Lock implements Drop; mark it #[must_use]
 a hand impl of a derivable trait is prone to subtle bugs; derive it:

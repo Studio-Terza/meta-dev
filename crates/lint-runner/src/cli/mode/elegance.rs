@@ -1,9 +1,11 @@
 use graph::Model;
+use lint_clones::Clones;
 use lint_complexity::Complexity;
 use lint_core::{Lint, ModelLint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
 use lint_narrowed_returns::NarrowedReturns;
+use lint_paired_apis::PairedApis;
 use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
     AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction, GraphLint,
@@ -36,6 +38,8 @@ impl Elegance {
             FlowShapes::report(files),
             NormalisedShapes::report(files),
             <NarrowedReturns as ModelLint>::report(model),
+            PairedApis::report(files),
+            Clones::report(files),
         ]
     }
 }

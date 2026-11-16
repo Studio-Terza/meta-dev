@@ -177,6 +177,9 @@ jobs:
       - name: elegance summary
         if: github.ref == 'refs/heads/main' && always()
         run: '"$TOOLS/ci" summarize "$ELEGANCE" "$GITHUB_STEP_SUMMARY"'
+      - name: test budget and elegance reports on pull requests
+        if: github.base_ref == 'main'
+        run: '"$TOOLS/lint" --report .'
       - name: history restore
         if: github.ref == 'refs/heads/main'
         uses: actions/cache/restore@v4

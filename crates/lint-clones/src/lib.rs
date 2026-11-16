@@ -16,9 +16,7 @@ impl Clones {
 
 impl Lint for Clones {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let findings: CloneFindings<'_> =
-            files.iter().map(|file| Sweep::gathered(file, Clones::gleaner(Parsed::from(file)))).collect();
-        Report::from(&findings)
+        Report::from(&Clones::swept(files))
     }
 }
 

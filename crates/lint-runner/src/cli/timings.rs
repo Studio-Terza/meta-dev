@@ -51,7 +51,6 @@ pub(crate) enum Step {
     Judged(Worker),
     Model,
     Lint(Named),
-    Survey,
 }
 
 impl fmt::Display for Step {
@@ -69,7 +68,6 @@ impl fmt::Display for Step {
             }
             Step::Model => formatter.write_str("phase model: merge the lowered files into the code model"),
             Step::Lint(name) => write!(formatter, "lint {name}"),
-            Step::Survey => formatter.write_str("phase survey: test budget, paired apis and clones"),
         }
     }
 }
@@ -77,12 +75,13 @@ impl fmt::Display for Step {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Timing {
     step: Step,
+    began: Moment,
     took: Elapsed,
 }
 
 impl Timing {
     fn joined(self, later: Timing) -> Timing {
-        Timing { step: self.step, took: self.took + later.took }
+        Timing { step: self.step, began: self.began.min(later.began), took: self.took + later.took }
     }
 }
 
@@ -121,7 +120,7 @@ impl<'timer, T: Timer> Stopwatch<'timer, T> {
     }
 
     pub(crate) fn stopped(&self, step: Step) -> Timing {
-        Timing { step, took: self.timer.now().since(self.started) }
+        Timing { step, began: self.started, took: self.timer.now().since(self.started) }
     }
 
     pub(crate) fn measured<Done>(timer: &'timer T, step: Step, work: impl FnOnce() -> Done) -> Measured<Done> {
@@ -167,8 +166,10 @@ struct Rows<'table>(&'table [&'table Timing]);
 
 impl fmt::Display for Rows<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "lint timings in milliseconds:")?;
-        self.0.iter().try_for_each(|timing| writeln!(formatter, "{:>7}  {}", timing.took, timing.step))
+        writeln!(formatter, "lint timings in milliseconds, took then started:")?;
+        self.0
+            .iter()
+            .try_for_each(|timing| writeln!(formatter, "{:>7} {:>7}  {}", timing.took, timing.began, timing.step))
     }
 }
 

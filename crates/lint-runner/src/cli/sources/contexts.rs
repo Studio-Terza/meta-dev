@@ -1,5 +1,4 @@
 use super::gathering::Gathering;
-use lint_clones::Clones;
 use lint_core::{Parsed, Unwalked};
 use lint_enum_predicates::EnumPredicates;
 use lint_file::{ContextLint, FileFacts, Gleaning, PrimedFacts};
@@ -9,7 +8,6 @@ use lint_named_numbers::NamedNumbers;
 use lint_no_forwarders::NoForwarders;
 use lint_no_parameter_bags::NoParameterBags;
 use lint_no_test_only_api::NoTestOnlyApi;
-use lint_paired_apis::PairedApis;
 use lint_port_dependencies::RoleReading;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
@@ -17,15 +15,10 @@ use lint_repeated_methods::RepeatedMethods;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_state_graph::StateGraph;
 use lint_sweep::{Gathers, Sweep, Watching};
-use lint_test_budget::TestBudget;
 use lint_unconsumed_traits::UnconsumedTraits;
 
 pub(crate) trait Holding<'run, Lint: ContextLint> {
     fn held(&self) -> &Lint::Context<'run>;
-}
-
-pub(crate) trait Gleans<'run, Glean: Gleaning> {
-    fn gleaned(&self) -> &Glean::Gleaned<'run>;
 }
 
 pub(crate) trait Priming<'run, Lint: PrimedFacts> {
@@ -141,13 +134,13 @@ macro_rules! contexts {
             }
         )*
 
-        $(
-            impl<'run> Gleans<'run, $glean> for Settled<'_, 'run> {
-                fn gleaned(&self) -> &<$glean as Gleaning>::Gleaned<'run> {
+        impl<'settled, 'run> Settled<'settled, 'run> {
+            $(
+                pub(crate) fn $gleaned(self) -> &'settled <$glean as Gleaning>::Gleaned<'run> {
                     &self.contexts.$gleaned
                 }
-            }
-        )*
+            )*
+        }
 
         #[derive(Debug)]
         pub(crate) struct Primings<'run> {
@@ -187,9 +180,6 @@ contexts! {
         state_graph: StateGraph,
     }
     gleaned: {
-        test_budget: TestBudget,
-        paired_apis: PairedApis,
-        clones: Clones,
         roles: RoleReading,
     }
 }

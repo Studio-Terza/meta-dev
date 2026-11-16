@@ -18,8 +18,6 @@ use super::timings::Timing;
 pub(crate) struct Slot(usize);
 
 impl Slot {
-    pub(crate) const NONE: Slot = Slot(usize::MAX);
-
     pub(crate) fn picked<Item>(self, items: &[Item]) -> Option<&Item> {
         items.get(self.0)
     }
@@ -76,11 +74,7 @@ pub(crate) struct Worked {
     rendered: Vec<Rendered>,
     filed: Vec<FileLines>,
     timings: Vec<Timing>,
-    surveyed: Vec<String>,
 }
-
-#[derive(Debug)]
-pub(crate) struct Surveyed(Vec<String>);
 
 impl Worked {
     const LINE_END: char = '\n';
@@ -98,10 +92,6 @@ impl Worked {
         });
         let filed = violations.first().map(|_| FileLines { slot, order, text });
         Worked { filed: filed.into_iter().collect(), ..Worked::default() }
-    }
-
-    pub(crate) fn surveying(survey: &impl fmt::Display) -> Worked {
-        Worked { surveyed: vec![survey.to_string()], ..Worked::default() }
     }
 
     pub(crate) fn timed(timing: Timing) -> Worked {
@@ -132,21 +122,8 @@ impl FromIterator<Worked> for Worked {
             whole.rendered.extend(part.rendered);
             whole.filed.extend(part.filed);
             whole.timings.extend(part.timings);
-            whole.surveyed.extend(part.surveyed);
             whole
         })
-    }
-}
-
-impl From<&Worked> for Surveyed {
-    fn from(worked: &Worked) -> Surveyed {
-        Surveyed(worked.surveyed.clone())
-    }
-}
-
-impl fmt::Display for Surveyed {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.iter().try_for_each(|survey| formatter.write_str(survey))
     }
 }
 

@@ -1,3 +1,4 @@
+use std::fmt;
 use std::time::Duration;
 
 use crate::Elapsed;
@@ -15,5 +16,11 @@ impl Moment {
 impl From<Duration> for Moment {
     fn from(since_start: Duration) -> Moment {
         Moment(since_start)
+    }
+}
+
+impl fmt::Display for Moment {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Elapsed::from(self.0).fmt(formatter)
     }
 }
