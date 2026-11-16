@@ -9,12 +9,12 @@ use crate::planting::{Placing, Planting};
 use lint_sweep::{Gathers, Scoped, Sweep, Watching};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Index(usize);
+struct ModuleIndex(usize);
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Order {
     file: PathBuf,
-    module: Index,
+    module: ModuleIndex,
 }
 
 #[derive(Clone, Debug)]
@@ -104,7 +104,7 @@ impl<'read> Listing<'read> {
                             .map(|(module, (listed, reached))| ListedFile {
                                 source: listed,
                                 reach: reached,
-                                order: Order { file: source.head().path().to_path_buf(), module: Index(module) },
+                                order: Order { file: source.head().path().to_path_buf(), module: ModuleIndex(module) },
                             })
                             .collect(),
                     )

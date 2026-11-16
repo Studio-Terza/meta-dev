@@ -102,3 +102,12 @@ impl AsRef<str> for Quote {
         &self.0
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LiteralValue(String);
+
+impl From<&str> for LiteralValue {
+    fn from(text: &str) -> LiteralValue {
+        LiteralValue(text.to_owned())
+    }
+}

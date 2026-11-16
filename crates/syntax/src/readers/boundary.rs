@@ -1,4 +1,5 @@
-use syn::{Block, Expr, Pat, Stmt, Type};
+use quote::ToTokens;
+use syn::{Block, Expr, Lit, Pat, Stmt, Type};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Past<'tree, Node>(&'tree Node);
@@ -205,5 +206,15 @@ impl PatTree {
             Pat::Slice(slice) => slice.elems.iter().map(|elem| PatReached::along(elem, PatEdge::Element)).collect(),
             _ => Vec::new(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct LitText;
+
+impl LitText {
+    #[must_use]
+    pub fn written(lit: &Lit) -> String {
+        lit.to_token_stream().to_string()
     }
 }

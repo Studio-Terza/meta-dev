@@ -1,6 +1,6 @@
 use std::fmt;
 
-use graph::{Function, Model, ParamIndex, Read, Reader, Resolved};
+use graph::{Argument, Function, Model, ParamIndex, Read, Reader, Resolved};
 use lint_layout::Name;
 
 use super::dispatched::Dispatched;
@@ -13,6 +13,7 @@ pub struct ReadKey<'model> {
     reader: &'model Reader,
     parameter: ParamIndex,
     fields: &'model [Name],
+    arguments: &'model [Argument],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -35,6 +36,7 @@ impl<'model> ReadKey<'model> {
     ) -> Option<ReadKey<'model>> {
         let ty = read.parameter().entry(function.signature().inputs())?.typed()?.dereferenced();
         let taken: &Resolved = ty.named()?.as_ref();
+        let arguments = read.comparable()?;
         Self::concrete(taken).map(|concrete| ReadKey {
             implemented,
             method: function.as_ref(),
@@ -42,6 +44,7 @@ impl<'model> ReadKey<'model> {
             reader: read.reader(),
             parameter: read.parameter(),
             fields: read.fields(),
+            arguments,
         })
     }
 
