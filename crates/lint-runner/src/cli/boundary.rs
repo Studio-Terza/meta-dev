@@ -62,11 +62,7 @@ impl From<usize> for FileOrder {
     }
 }
 
-impl FileOrder {
-    pub(crate) fn picked_from<Held>(self, held: &[Held]) -> Option<&Held> {
-        held.get(self.0)
-    }
-}
+impl FileOrder {}
 
 #[derive(Debug)]
 struct FileLines {

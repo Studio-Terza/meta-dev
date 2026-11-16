@@ -20,8 +20,7 @@ use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads};
 use lint_layout::Name;
 use lint_placement::PackageRoot;
-use lint_sweep::Judgement;
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::{Gathers, Sweep, Watchers, Watching};
 use mentions::Mentions;
 use offers::Offers;
 use test_features::TestFeatures;
@@ -118,21 +117,47 @@ impl ContextLint for NoTestOnlyApi {
         }
     }
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        test_only: &'run TestOnly<'head>,
-    ) -> Judgement<'file, 'run> {
+    type Found<'file> = Offered<'file>;
+    type Watched<'file> = Offered<'file>;
+
+    fn watched(file: &SourceFile) -> Offered<'_> {
         let path = file.head().path();
         let shipped = file.shipped().map(|_| ());
+        let gated =
+            shipped.into_iter().fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(GatedItems::new(path))));
+        let watchers = gated.and(Box::new(TestFeatures::new(path)));
+        Offered { watchers, found: Vec::new(), offers: shipped.map(|()| Offers::from(file)) }
+    }
+
+    fn judged<'file, 'head: 'file>(
+        file: &'file SourceFile,
+        found: Offered<'file>,
+        test_only: &TestOnly<'head>,
+    ) -> Vec<Violation<'file>> {
+        let path = file.head().path();
         let package = file.head().placement().package();
         let manifest =
             test_only.manifests.get(package).filter(|last| **last == path).map(|_| Self::in_manifest(package, file));
-        let gated = shipped
-            .into_iter()
-            .fold(Judgement::found(Vec::new()), |judged, ()| judged.and(Box::new(GatedItems::new(path))));
-        let featured = gated.and(Box::new(TestFeatures::new(path)));
-        let names = &test_only.names;
-        let offered = shipped.into_iter().fold(featured, |judged, ()| judged.and(Box::new(Offers::new(file, names))));
-        offered.then(manifest.into_iter().flatten())
+        let offered = found.offers.map_or_default(|offers| offers.tested_only(&test_only.names));
+        found.found.into_iter().chain(offered).chain(manifest.into_iter().flatten()).collect()
+    }
+}
+
+#[derive(Debug)]
+pub struct Offered<'file> {
+    watchers: Watchers<'file>,
+    found: Vec<Violation<'file>>,
+    offers: Option<Offers<'file>>,
+}
+
+impl<'file> Gathers<Offered<'file>> for Offered<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        let offers = self.offers.iter_mut().map(|offers| -> &mut Watching<'_> { offers });
+        self.watchers.watching().into_iter().chain(offers).collect()
+    }
+
+    fn gathered(self) -> Offered<'file> {
+        let found = self.watchers.gathered();
+        Offered { watchers: Watchers::none(), found, offers: self.offers }
     }
 }

@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
@@ -23,11 +23,10 @@ use lint_layout::LineNumber;
 pub struct TypeShape;
 
 impl TypeShape {
-    fn findings(ty: &Type) -> Vec<Message> {
-        let mut findings = TypeFindings::default();
-        Sweep::through_type(ty, &mut findings);
-        findings.0
-    }
+    const TUPLE: Message = Message::new(
+        Problem::new("tuple in a signature or field"),
+        Fix::new("values that travel together are a struct"),
+    );
 
     fn string_error(path: &TypePath) -> Option<Message> {
         path.path
@@ -55,7 +54,7 @@ impl SweptLint for TypeShape {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(TypeShapes { path: file.head().path(), violations: Vec::new() })
+        Box::new(TypeShapes { path: file.head().path(), violations: Vec::new(), roots: Vec::new(), open: Vec::new() })
     }
 }
 
@@ -63,6 +62,27 @@ impl SweptLint for TypeShape {
 struct TypeShapes<'scan> {
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
+    roots: Vec<Root<'scan>>,
+    open: Vec<Open>,
+}
+
+#[derive(Debug)]
+struct Root<'scan> {
+    at: Address,
+    span: Span,
+    first: Option<Violation<'scan>>,
+}
+
+impl<'scan> Root<'scan> {
+    fn new(ty: &Type, first: Option<Violation<'scan>>) -> Root<'scan> {
+        Root { at: Address::from(ty), span: ty.span(), first }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Open {
+    at: Address,
+    span: Span,
 }
 
 impl<'scan> TypeShapes<'scan> {
@@ -70,17 +90,17 @@ impl<'scan> TypeShapes<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
-    fn check_type(&mut self, ty: &Type) {
-        let violations: Vec<Violation<'scan>> =
-            TypeShape::findings(ty).into_iter().map(|finding| self.violation(ty.span(), finding)).collect();
-        self.violations.extend(violations);
-    }
-
     fn check_fields(&mut self, fields: &Fields) {
         fields.iter().for_each(|field| {
-            self.violations.extend(self.bool_field(field));
-            self.check_type(&field.ty);
+            let first = self.bool_field(field);
+            self.roots.push(Root::new(&field.ty, first));
         });
+    }
+
+    fn found(&mut self, message: Option<Message>) {
+        let at = self.open.last().map(|open| open.span);
+        let found = at.zip(message).map(|(span, finding)| self.violation(span, finding));
+        self.violations.extend(found);
     }
 
     fn bool_field(&self, field: &Field) -> Option<Violation<'scan>> {
@@ -102,7 +122,18 @@ impl<'scan> TypeShapes<'scan> {
 
 impl<'ast> Watch<'ast> for TypeShapes<'_> {
     fn kinds(&self) -> &'static [Kind] {
-        &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemStruct, Kind::ItemEnum, Kind::ItemType, Kind::Macro, Kind::Signature]
+        &[
+            Kind::ItemMod,
+            Kind::ItemImpl,
+            Kind::ItemStruct,
+            Kind::ItemEnum,
+            Kind::ItemType,
+            Kind::Macro,
+            Kind::Signature,
+            Kind::Type,
+            Kind::TypeTuple,
+            Kind::TypePath,
+        ]
     }
 
     fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
@@ -115,17 +146,17 @@ impl<'ast> Watch<'ast> for TypeShapes<'_> {
 
     fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
         self.check_fields(&item.fields);
-        Descend::Over
+        Descend::Into
     }
 
     fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
         item.variants.iter().for_each(|variant| self.check_fields(&variant.fields));
-        Descend::Over
+        Descend::Into
     }
 
     fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
-        self.check_type(&item.ty);
-        Descend::Over
+        self.roots.push(Root::new(&item.ty, None));
+        Descend::Into
     }
 
     fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
@@ -139,37 +170,38 @@ impl<'ast> Watch<'ast> for TypeShapes<'_> {
             .filter_map(Syntax::typed)
             .map(|typed| &*typed.ty)
             .chain(Syntax::returned(&signature.output))
-            .for_each(|ty| self.check_type(ty));
-        Descend::Over
+            .for_each(|ty| self.roots.push(Root::new(ty, None)));
+        Descend::Into
+    }
+
+    fn on_type(&mut self, ty: &'ast Type, _: &Facts<'_, Type>) -> Descend {
+        let at = Address::from(ty);
+        let (mut reached, waiting): (Vec<Root<'_>>, Vec<Root<'_>>) =
+            std::mem::take(&mut self.roots).into_iter().partition(|root| root.at == at);
+        self.roots = waiting;
+        self.violations.extend(reached.iter_mut().filter_map(|root| root.first.take()));
+        self.open.extend(reached.iter().map(|root| Open { at: root.at, span: root.span }));
+        Descend::Into
+    }
+
+    fn off_type(&mut self, ty: &'ast Type, _: &Facts<'_, Type>) {
+        let at = Address::from(ty);
+        self.open.pop_if(|open| open.at == at);
+    }
+
+    fn on_type_tuple(&mut self, tuple: &'ast TypeTuple, _: &Facts<'_, TypeTuple>) -> Descend {
+        self.found(tuple.elems.first().map(|_| TypeShape::TUPLE));
+        Descend::Into
+    }
+
+    fn on_type_path(&mut self, path: &'ast TypePath, _: &Facts<'_, TypePath>) -> Descend {
+        self.found(TypeShape::string_error(path));
+        Descend::Into
     }
 }
 
 impl<'file> Finds<'file> for TypeShapes<'file> {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
         self.violations
-    }
-}
-
-#[derive(Default)]
-struct TypeFindings(Vec<Message>);
-
-impl<'ast> Watch<'ast> for TypeFindings {
-    fn kinds(&self) -> &'static [Kind] {
-        &[Kind::TypeTuple, Kind::TypePath]
-    }
-
-    fn on_type_tuple(&mut self, tuple: &'ast TypeTuple, _: &Facts<'_, TypeTuple>) -> Descend {
-        self.0.extend(tuple.elems.first().map(|_| {
-            Message::new(
-                Problem::new("tuple in a signature or field"),
-                Fix::new("values that travel together are a struct"),
-            )
-        }));
-        Descend::Into
-    }
-
-    fn on_type_path(&mut self, path: &'ast TypePath, _: &Facts<'_, TypePath>) -> Descend {
-        self.0.extend(TypeShape::string_error(path));
-        Descend::Into
     }
 }

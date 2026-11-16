@@ -6,12 +6,12 @@ use emitters::Emitters;
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
-use lint_core::SourceFile;
 use lint_core::{Headline, Parsed};
+use lint_core::{SourceFile, Violation};
 use lint_file::{ContextLint, Reads};
-use lint_sweep::Judgement;
+use lint_sweep::{Gathers, Watching};
 use path_reach::PathReach;
-use test_code::TestCode;
+use test_code::{TestCode, Tested};
 
 #[derive(Debug)]
 pub struct PublicApiTests;
@@ -40,13 +40,41 @@ impl ContextLint for PublicApiTests {
         Emitters::default()
     }
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        emitters: &'run Emitters,
-    ) -> Judgement<'file, 'run> {
-        file.shipped().map_or_else(
-            || Judgement::watching(Box::new(PathReach::beside(file))),
-            |_| Judgement::watching(Box::new(TestCode::new(file, emitters.as_ref()))),
-        )
+    type Found<'file> = Tested<'file>;
+    type Watched<'file> = Watched<'file>;
+
+    fn watched(file: &SourceFile) -> Watched<'_> {
+        file.shipped()
+            .map_or_else(|| Watched::Beside(PathReach::beside(file)), |_| Watched::Shipped(TestCode::from(file)))
+    }
+
+    fn judged<'file, 'head: 'file>(
+        _: &'file SourceFile,
+        found: Tested<'file>,
+        emitters: &Emitters,
+    ) -> Vec<Violation<'file>> {
+        found.emitted(emitters.as_ref())
+    }
+}
+
+#[derive(Debug)]
+pub enum Watched<'file> {
+    Shipped(TestCode<'file>),
+    Beside(PathReach<'file>),
+}
+
+impl<'file> Gathers<Tested<'file>> for Watched<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        match self {
+            Watched::Shipped(code) => vec![code],
+            Watched::Beside(reach) => vec![reach],
+        }
+    }
+
+    fn gathered(self) -> Tested<'file> {
+        match self {
+            Watched::Shipped(code) => code.tested(),
+            Watched::Beside(reach) => reach.tested(),
+        }
     }
 }

@@ -94,6 +94,15 @@ pub(super) struct Reads {
     calls: Calls,
 }
 
+#[derive(Debug)]
+pub(super) struct SharedParameters(BTreeMap<Name, ParamIndex>);
+
+impl SharedParameters {
+    fn unbound(self, rebound: &BTreeSet<Name>) -> BTreeMap<Name, ParamIndex> {
+        self.0.into_iter().filter(|(name, _)| rebound.get(name).is_none()).collect()
+    }
+}
+
 #[derive(Debug, Default)]
 pub(super) struct ReadsLowered(Vec<LoweredReadAt>);
 
@@ -106,25 +115,24 @@ struct LoweredReadAt {
 }
 
 impl Reads {
+    pub(super) fn shared_parameters(signature: &Signature) -> SharedParameters {
+        let shared = signature.inputs.iter().enumerate().filter_map(|(index, input)| {
+            let typed = Syntax::typed(input)?;
+            Self::shared(&typed.ty)?;
+            Some((Name::from(&Syntax::pat_ident(&typed.pat)?.ident), ParamIndex::from(index)))
+        });
+        SharedParameters(shared.collect())
+    }
+
     pub(super) fn settled(
         self,
         scope: &InScope,
-        signature: &Signature,
-        body: &Block,
+        shared: SharedParameters,
+        tail: Option<Address>,
         rebound: &BTreeSet<Name>,
     ) -> ReadsLowered {
-        let parameters: BTreeMap<Name, ParamIndex> = signature
-            .inputs
-            .iter()
-            .enumerate()
-            .filter_map(|(index, input)| {
-                let typed = Syntax::typed(input)?;
-                Self::shared(&typed.ty)?;
-                Some((Name::from(&Syntax::pat_ident(&typed.pat)?.ident), ParamIndex::from(index)))
-            })
-            .filter(|(name, _)| rebound.get(name).is_none())
-            .collect();
-        let forwarding = self.calls.only().filter(|only| Self::tail_call(body) == Some(*only));
+        let parameters = shared.unbound(rebound);
+        let forwarding = self.calls.only().filter(|only| tail == Some(*only));
         let kept = self.found.into_iter().filter(|read| forwarding.and(read.rooted.whole()).is_none());
         let settled = kept.filter_map(|read| {
             let parameter = *parameters.get(&read.rooted.root)?;
@@ -141,7 +149,7 @@ impl Reads {
         }
     }
 
-    fn tail_call(body: &Block) -> Option<Address> {
+    pub(super) fn tail_call(body: &Block) -> Option<Address> {
         let only = body.stmts.first().filter(|_| body.stmts.len() == 1);
         only.and_then(Syntax::tail).and_then(Syntax::expr_call).map(Address::from)
     }

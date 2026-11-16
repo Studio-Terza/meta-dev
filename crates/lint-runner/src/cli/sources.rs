@@ -12,6 +12,7 @@ use graph::Model;
 use graph_reader::{FileFacts, Reader};
 use lint_core::{FileHead, Readout};
 use lint_reader::{CrateSources, Described, Partition, SharedRead, Stage, Unlocated};
+use lint_sweep::Gathers;
 
 use timer_ports::Timer;
 
@@ -98,17 +99,22 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         })
     }
 
-    pub(crate) fn gathered<'read>(&self, readout: &'read Readout, worker: Worker) -> Lowering<'read> {
+    pub(crate) fn gathered<'read, Part, Filed: Gathers<Part>>(
+        &self,
+        readout: &'read Readout,
+        worker: Worker,
+        starting: impl Fn(Claimed<'read>) -> Filed,
+    ) -> Lowering<Part> {
         let stopwatch = Stopwatch::started(self.wired.timer);
-        let share = self.gathering.gathered(readout, self.shared.heads());
+        let mut share = self.gathering.gathered(readout, self.shared.heads(), starting);
+        let filed = share.filed();
         let lowered = stopwatch.stopped(Step::Lower(worker));
-        let claimed = share.claimed().to_vec();
         let merged = share.into_merging().map(|complete| {
             let merging = Stopwatch::started(self.wired.timer);
             self.gathering.settled(complete, |facts| self.merged(facts));
             merging.stopped(Step::Model)
         });
-        Lowering { timings: [lowered].into_iter().chain(merged).collect(), claimed }
+        Lowering { timings: [lowered].into_iter().chain(merged).collect(), filed }
     }
 
     fn merged(&self, facts: Vec<FileFacts>) -> Option<Model> {
@@ -122,17 +128,17 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Lowering<'read> {
+pub(crate) struct Lowering<Part> {
     timings: Vec<Timing>,
-    claimed: Vec<Claimed<'read>>,
+    filed: Vec<Part>,
 }
 
-impl<'read> Lowering<'read> {
+impl<Part> Lowering<Part> {
     pub(crate) fn timings(&self) -> &[Timing] {
         &self.timings
     }
 
-    pub(crate) fn claimed(&self) -> &[Claimed<'read>] {
-        &self.claimed
+    pub(crate) fn filed(&mut self) -> Vec<Part> {
+        std::mem::take(&mut self.filed)
     }
 }

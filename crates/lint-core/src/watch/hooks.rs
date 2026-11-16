@@ -40,7 +40,7 @@ macro_rules! hooks {
         }
 
         pub trait Watch<'ast> {
-            fn kinds(&self) -> &'static [Kind];
+            fn kinds(&self) -> &[Kind];
 
             fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
                 Descend::Into
@@ -61,6 +61,73 @@ macro_rules! hooks {
 
                 fn $off(&mut self, _: &'ast syntax::$node, _: &Facts<'_, syntax::$node>) {}
             )*
+        }
+
+        impl<'ast, Inner: Watch<'ast> + ?Sized> Watch<'ast> for &mut Inner {
+            fn kinds(&self) -> &[Kind] {
+                (**self).kinds()
+            }
+
+            fn on_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
+                (**self).on_macro(node, facts)
+            }
+
+            fn off_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) {
+                (**self).off_macro(node, facts);
+            }
+
+            fn on_ident(&mut self, node: &'ast Ident, name: &Name) -> Descend {
+                (**self).on_ident(node, name)
+            }
+
+            fn off_ident(&mut self, node: &'ast Ident) {
+                (**self).off_ident(node);
+            }
+
+            $(
+                fn $on(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) -> Descend {
+                    (**self).$on(node, facts)
+                }
+
+                fn $off(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) {
+                    (**self).$off(node, facts);
+                }
+            )*
+        }
+
+        #[macro_export]
+        macro_rules! scope_nodes {
+            () => {
+                fn kinds(&self) -> &[$crate::Kind] {
+                    &self.kinds
+                }
+
+                fn on_macro(&mut self, node: &'ast syntax::Macro, facts: &$crate::Facts<'_, syntax::Macro>) -> $crate::Descend {
+                    self.entered($crate::Kind::Macro, $crate::Address::from(node), &mut |watcher| watcher.on_macro(node, facts))
+                }
+
+                fn off_macro(&mut self, node: &'ast syntax::Macro, facts: &$crate::Facts<'_, syntax::Macro>) {
+                    self.left($crate::Kind::Macro, $crate::Address::from(node), &mut |watcher| watcher.off_macro(node, facts));
+                }
+
+                fn on_ident(&mut self, node: &'ast syntax::Ident, name: &lint_layout::Name) -> $crate::Descend {
+                    self.entered($crate::Kind::Ident, $crate::Address::from(node), &mut |watcher| watcher.on_ident(node, name))
+                }
+
+                fn off_ident(&mut self, node: &'ast syntax::Ident) {
+                    self.left($crate::Kind::Ident, $crate::Address::from(node), &mut |watcher| watcher.off_ident(node));
+                }
+
+                $(
+                    fn $on(&mut self, node: &'ast syntax::$node, facts: &$crate::Facts<'_, syntax::$node>) -> $crate::Descend {
+                        self.entered($crate::Kind::$kind, $crate::Address::from(node), &mut |watcher| watcher.$on(node, facts))
+                    }
+
+                    fn $off(&mut self, node: &'ast syntax::$node, facts: &$crate::Facts<'_, syntax::$node>) {
+                        self.left($crate::Kind::$kind, $crate::Address::from(node), &mut |watcher| watcher.$off(node, facts));
+                    }
+                )*
+            };
         }
 
         #[macro_export]

@@ -4,7 +4,7 @@ mod finding;
 use syntax::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
 
 use crate::Consumers;
 use finding::Finding;
@@ -13,18 +13,26 @@ use lint_layout::{LineNumber, Name};
 use declaration::Declaration;
 
 #[derive(Debug)]
-pub(crate) struct Declared<'file, 'run> {
+pub struct Declared<'file> {
     path: &'file std::path::Path,
-    consumers: &'run Consumers,
     found: Vec<Declaration<'file>>,
 }
 
-impl<'file, 'run> Declared<'file, 'run> {
-    const DISPATCHING: &'static str = "enum_dispatch";
+#[derive(Debug)]
+pub struct Declarations<'file>(Vec<Declaration<'file>>);
 
-    pub(crate) fn new(file: &'file SourceFile, consumers: &'run Consumers) -> Declared<'file, 'run> {
-        Declared { path: file.head().path(), consumers, found: Vec::new() }
+impl<'file> Declarations<'file> {
+    pub(crate) fn unconsumed(self, consumers: &Consumers) -> Vec<Violation<'file>> {
+        self.0
+            .into_iter()
+            .filter_map(|declaration| declaration.unconsumed(consumers))
+            .map(|declaration| Violation::new(*AsRef::<Site>::as_ref(&declaration), Finding::from(&declaration)))
+            .collect()
     }
+}
+
+impl Declared<'_> {
+    const DISPATCHING: &'static str = "enum_dispatch";
 
     fn methods(block: &ItemTrait) -> impl Iterator<Item = &TraitItemFn> {
         block.items.iter().filter_map(Self::method)
@@ -52,7 +60,7 @@ impl<'file, 'run> Declared<'file, 'run> {
     }
 }
 
-impl<'ast> Watch<'ast> for Declared<'_, '_> {
+impl<'ast> Watch<'ast> for Declared<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemTrait]
     }
@@ -73,13 +81,18 @@ impl<'ast> Watch<'ast> for Declared<'_, '_> {
     }
 }
 
-impl<'file> Finds<'file> for Declared<'file, '_> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let consumers = self.consumers;
-        self.found
-            .into_iter()
-            .filter_map(|declaration| declaration.unconsumed(consumers))
-            .map(|declaration| Violation::new(*AsRef::<Site>::as_ref(&declaration), Finding::from(&declaration)))
-            .collect()
+impl<'file> Gathers<Declarations<'file>> for Declared<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![self]
+    }
+
+    fn gathered(self) -> Declarations<'file> {
+        Declarations(self.found)
+    }
+}
+
+impl<'file> From<&'file SourceFile> for Declared<'file> {
+    fn from(file: &'file SourceFile) -> Declared<'file> {
+        Declared { path: file.head().path(), found: Vec::new() }
     }
 }

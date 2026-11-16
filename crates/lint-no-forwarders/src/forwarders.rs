@@ -14,36 +14,37 @@ use syntax::{Expr, ImplItemFn, ItemImpl, ItemMod, ItemStruct, PathSegment, Stmt}
 
 use super::workspace_types::WorkspaceTypes;
 use callee::Callee;
-use forwarder::Forwarder;
+use forwarder::{Forwarder, Owned};
 use lint_core::Syntax;
 use lint_core::Violation;
 use lint_layout::{Casing, Name};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
 
 #[derive(Debug)]
-pub struct Forwarders<'run, 'file> {
+pub struct Forwarders<'file> {
     path: &'file Path,
-    types: &'run WorkspaceTypes,
     structs: BTreeMap<Name, StructFields>,
     self_type: Name,
     self_ident: Option<Name>,
     concrete: Vec<Name>,
-    found: Vec<Violation<'file>>,
+    found: Vec<Forwarder>,
 }
 
-impl<'run, 'file> Forwarders<'run, 'file> {
-    pub fn new(path: &'file Path, types: &'run WorkspaceTypes) -> Forwarders<'run, 'file> {
-        Forwarders {
-            path,
-            types,
-            structs: BTreeMap::new(),
-            self_type: Name::default(),
-            self_ident: None,
-            concrete: Vec::new(),
-            found: Vec::new(),
-        }
-    }
+#[derive(Debug)]
+pub struct Forwarded<'file> {
+    path: &'file Path,
+    found: Vec<Forwarder>,
+}
 
+impl<'file> Forwarded<'file> {
+    pub fn declared(self, types: &WorkspaceTypes) -> Vec<Violation<'file>> {
+        let path = self.path;
+        let declared = self.found.into_iter().filter(|forwarder| types.declares(forwarder.owner()).is_some());
+        declared.map(|forwarder| forwarder.violation(path)).collect()
+    }
+}
+
+impl Forwarders<'_> {
     fn classify(&self, function: &ImplItemFn) -> Option<Forwarder> {
         let params: Vec<Parameter> = function.sig.inputs.iter().filter_map(Parameter::describe).collect();
         Some(function.block.stmts.as_slice())
@@ -51,15 +52,14 @@ impl<'run, 'file> Forwarders<'run, 'file> {
             .and_then(<[Stmt]>::first)
             .and_then(Syntax::tail)
             .and_then(|tail| self.callee(tail, &params))
-            .map(|callee| Forwarder::new(&function.sig.ident, callee))
+            .map(|owned| owned.forwarder(&function.sig.ident))
     }
 
-    fn callee(&self, tail: &Expr, params: &[Parameter]) -> Option<Callee> {
+    fn callee(&self, tail: &Expr, params: &[Parameter]) -> Option<Owned> {
         match tail {
             Expr::MethodCall(call) => Parameter::forwarding(&call.args, params)
                 .and_then(|()| self.receiver_type(&call.receiver, params))
-                .filter(|name| self.types.declares(name).is_some())
-                .map(|_| Callee::method(Name::from(&call.method))),
+                .map(|owner| Owned::new(Callee::method(Name::from(&call.method)), owner)),
             Expr::Call(call) => {
                 Parameter::forwarding(&call.args, params).and_then(|()| self.workspace_callee(&call.func))
             }
@@ -82,7 +82,7 @@ impl<'run, 'file> Forwarders<'run, 'file> {
         }
     }
 
-    fn workspace_callee(&self, func: &Expr) -> Option<Callee> {
+    fn workspace_callee(&self, func: &Expr) -> Option<Owned> {
         let segments: Vec<Name> =
             Syntax::expr_path(func)?.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect();
         let (method, leading) = segments.split_last()?;
@@ -90,14 +90,13 @@ impl<'run, 'file> Forwarders<'run, 'file> {
             .last()
             .filter(|owner| AsRef::<str>::as_ref(*owner) != "Self")
             .or_else(|| leading.last().and(self.self_ident.as_ref()))?;
-        self.types
-            .declares(owner)
-            .filter(|_| method.casing() == Casing::Lower)
-            .map(|_| Callee::associated(owner.clone(), method.clone()))
+        (method.casing() == Casing::Lower)
+            .then_some(owner)
+            .map(|named| Owned::new(Callee::associated(named.clone(), method.clone()), named))
     }
 }
 
-impl Forwarders<'_, '_> {
+impl Forwarders<'_> {
     pub fn targeted(&mut self, segment: &PathSegment) -> Descend {
         self.self_type = Name::from(&segment.ident);
         self.self_ident = Some(Name::from(&segment.ident));
@@ -106,7 +105,7 @@ impl Forwarders<'_, '_> {
     }
 }
 
-impl<'ast> Watch<'ast> for Forwarders<'_, '_> {
+impl<'ast> Watch<'ast> for Forwarders<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemImpl, Kind::ImplItemFn]
     }
@@ -125,14 +124,30 @@ impl<'ast> Watch<'ast> for Forwarders<'_, '_> {
     }
 
     fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        let path = self.path;
-        self.found.extend(self.classify(function).map(|forwarder| forwarder.violation(path)));
+        self.found.extend(self.classify(function));
         Descend::Into
     }
 }
 
-impl<'file> Finds<'file> for Forwarders<'_, 'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.found
+impl<'file> Gathers<Forwarded<'file>> for Forwarders<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![self]
+    }
+
+    fn gathered(self) -> Forwarded<'file> {
+        Forwarded { path: self.path, found: self.found }
+    }
+}
+
+impl<'file> From<&'file Path> for Forwarders<'file> {
+    fn from(path: &'file Path) -> Forwarders<'file> {
+        Forwarders {
+            path,
+            structs: BTreeMap::new(),
+            self_type: Name::default(),
+            self_ident: None,
+            concrete: Vec::new(),
+            found: Vec::new(),
+        }
     }
 }

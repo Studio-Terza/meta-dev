@@ -1,5 +1,5 @@
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, File, Ident, Item, Macro, Pat, Stmt, Type};
+use syn::{File, Ident, Item, Macro, Stmt};
 
 #[macro_export]
 macro_rules! node_kinds {
@@ -54,8 +54,6 @@ macro_rules! node_kinds {
             LitInt on_lit_int off_lit_int visit_lit_int LitInt;
             Local on_local off_local visit_local Local;
             PatIdent on_pat_ident off_pat_ident visit_pat_ident PatIdent;
-            PatStruct on_pat_struct off_pat_struct visit_pat_struct PatStruct;
-            PatTupleStruct on_pat_tuple_struct off_pat_tuple_struct visit_pat_tuple_struct PatTupleStruct;
             Path on_path off_path visit_path Path;
             Signature on_signature off_signature visit_signature Signature;
             Stmt on_stmt off_stmt visit_stmt Stmt;
@@ -114,24 +112,8 @@ impl<'walk, Visitor: Around + ?Sized> Walk<'walk, Visitor> {
         Walk(visitor).visit_file(file);
     }
 
-    pub fn block(visitor: &'walk mut Visitor, block: &Block) {
-        Walk(visitor).visit_block(block);
-    }
-
     pub fn stmt(visitor: &'walk mut Visitor, stmt: &Stmt) {
         Walk(visitor).visit_stmt(stmt);
-    }
-
-    pub fn expr(visitor: &'walk mut Visitor, expr: &Expr) {
-        Walk(visitor).visit_expr(expr);
-    }
-
-    pub fn type_node(visitor: &'walk mut Visitor, ty: &Type) {
-        Walk(visitor).visit_type(ty);
-    }
-
-    pub fn pat(visitor: &'walk mut Visitor, pat: &Pat) {
-        Walk(visitor).visit_pat(pat);
     }
 
     pub fn item_node(visitor: &'walk mut Visitor, item: &Item) {

@@ -14,11 +14,33 @@ pub struct Forwarder {
     name: Name,
     line: LineNumber,
     callee: Callee,
+    owner: Name,
+}
+
+#[derive(Debug)]
+pub struct Owned {
+    callee: Callee,
+    owner: Name,
+}
+
+impl Owned {
+    pub fn new(callee: Callee, owner: &Name) -> Owned {
+        Owned { callee, owner: owner.clone() }
+    }
+
+    pub fn forwarder(self, name: &Ident) -> Forwarder {
+        Forwarder {
+            name: Name::from(name),
+            line: LineNumber::from(name.span()),
+            callee: self.callee,
+            owner: self.owner,
+        }
+    }
 }
 
 impl Forwarder {
-    pub fn new(name: &Ident, callee: Callee) -> Forwarder {
-        Forwarder { name: Name::from(name), line: LineNumber::from(name.span()), callee }
+    pub fn owner(&self) -> &Name {
+        &self.owner
     }
 
     pub fn violation(self, path: &Path) -> Violation<'_> {

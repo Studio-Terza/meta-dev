@@ -7,7 +7,7 @@ use graph_reader::{FileFacts, GroupLowering, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile};
 use lint_sweep::Gathers;
 
-use super::contexts::{Contexts, Contributed, PrimedParts, Primings};
+use super::contexts::{Contexts, Contributed};
 
 use super::super::boundary::FileOrder;
 
@@ -19,13 +19,23 @@ struct Claim<'listing, 'read, 'run> {
     head: &'run FileHead,
 }
 
-impl<'run> Claim<'_, '_, 'run> {
-    fn gathered(&self) -> Gathered<'run> {
+impl<'read, 'run> Claim<'_, 'read, 'run> {
+    fn gathered<Part, Filed: Gathers<Part>>(&self, starting: &impl Fn(Claimed<'read>) -> Filed) -> Joined<'run, Part> {
         let parsed = Parsed::new(self.file, self.head);
         let mut lowering: GroupLowering<'_> = self.group.lowering();
-        let contexts = Contributed::joined(parsed, lowering.watching());
-        Gathered { head: self.head, facts: lowering.gathered(), contexts }
+        let claimed = Claimed { order: self.order, file: self.file };
+        let mut filing = starting(claimed);
+        let joining = lowering.watching().into_iter().chain(filing.watching()).collect();
+        let contexts = Contributed::joined(parsed, joining);
+        let gathered = Gathered { head: self.head, facts: lowering.gathered(), contexts };
+        Joined { gathered, filed: filing.gathered() }
     }
+}
+
+#[derive(Debug)]
+struct Joined<'run, Part> {
+    gathered: Gathered<'run>,
+    filed: Part,
 }
 
 #[derive(Debug)]
@@ -52,14 +62,14 @@ impl<'read> Claimed<'read> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Share<'read, 'run> {
-    claimed: Vec<Claimed<'read>>,
+pub(crate) struct Share<'run, Part> {
     merging: Option<Merging<'run>>,
+    filed: Vec<Part>,
 }
 
-impl<'read, 'run> Share<'read, 'run> {
-    pub(crate) fn claimed(&self) -> &[Claimed<'read>] {
-        &self.claimed
+impl<'run, Part> Share<'run, Part> {
+    pub(crate) fn filed(&mut self) -> Vec<Part> {
+        mem::take(&mut self.filed)
     }
 
     pub(crate) fn into_merging(self) -> Option<Merging<'run>> {
@@ -77,34 +87,24 @@ struct Splitting<'run> {
 pub(crate) struct Merging<'run>(Vec<Gathered<'run>>);
 
 #[derive(Debug)]
-struct PrimedFile<'run> {
-    head: &'run FileHead,
-    parts: PrimedParts<'run>,
-}
-
-#[derive(Debug)]
 pub(crate) struct Gathering<'run> {
     heads: &'run OnceLock<Vec<FileHead>>,
     deposited: Mutex<Vec<Gathered<'run>>>,
-    primed: Mutex<Vec<PrimedFile<'run>>>,
-    primings: OnceLock<Primings<'run>>,
     model: OnceLock<Option<Model>>,
     contexts: OnceLock<Contexts<'run>>,
 }
 
 impl<'run> Gathering<'run> {
     pub(crate) fn new(heads: &'run OnceLock<Vec<FileHead>>) -> Gathering<'run> {
-        Gathering {
-            heads,
-            deposited: Mutex::default(),
-            primed: Mutex::default(),
-            primings: OnceLock::new(),
-            model: OnceLock::new(),
-            contexts: OnceLock::new(),
-        }
+        Gathering { heads, deposited: Mutex::default(), model: OnceLock::new(), contexts: OnceLock::new() }
     }
 
-    pub(crate) fn gathered<'read>(&self, readout: &'read Readout, table: &[FileHead]) -> Share<'read, 'run> {
+    pub(crate) fn gathered<'read, Part, Filed: Gathers<Part>>(
+        &self,
+        readout: &'read Readout,
+        table: &[FileHead],
+        starting: impl Fn(Claimed<'read>) -> Filed,
+    ) -> Share<'run, Part> {
         let heads = self.heads.get_or_init(|| table.to_vec());
         let listing = Listing::of_files(readout.files());
         let claims: Vec<Claim<'_, 'read, 'run>> = listing
@@ -116,9 +116,10 @@ impl<'run> Gathering<'run> {
                 Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)? })
             })
             .collect();
-        let (claimed, parts): (Vec<Claimed<'read>>, Vec<Gathered<'run>>) =
-            claims.iter().map(|claim| (Claimed { order: claim.order, file: claim.file }, claim.gathered())).unzip();
-        Share { claimed, merging: self.deposited(parts, heads) }
+        let joined: Vec<Joined<'run, Part>> = claims.iter().map(|claim| claim.gathered(&starting)).collect();
+        let (gathered, filed): (Vec<Gathered<'run>>, Vec<Part>) =
+            joined.into_iter().map(|found| (found.gathered, found.filed)).unzip();
+        Share { merging: self.deposited(gathered, heads), filed }
     }
 
     pub(crate) fn settled(&self, merging: Merging<'run>, model: impl FnOnce(Vec<FileFacts>) -> Option<Model>) {
@@ -144,34 +145,6 @@ impl<'run> Gathering<'run> {
 
     pub(crate) fn contexts(&self) -> &Contexts<'run> {
         self.contexts.wait()
-    }
-
-    pub(crate) fn primed(&self, claimed: &[Claimed<'_>]) -> Option<&Primings<'run>> {
-        let contexts = self.contexts.wait();
-        let heads = self.heads.get().map_or(&[][..], Vec::as_slice);
-        let parts: Vec<PrimedFile<'run>> = claimed
-            .iter()
-            .filter_map(|found| {
-                found
-                    .order
-                    .picked_from(heads)
-                    .map(|head| PrimedFile { head, parts: contexts.priming(Parsed::new(found.file, head)) })
-            })
-            .collect();
-        let mut held = self.primed.lock().unwrap_or_else(PoisonError::into_inner);
-        held.extend(parts);
-        let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
-        complete.map(Self::primings_of).map(|merged| self.primings.get_or_init(|| merged))
-    }
-
-    fn primings_of(files: Vec<PrimedFile<'run>>) -> Primings<'run> {
-        let mut sorted = files;
-        sorted.sort_by(|earlier, later| earlier.head.path().cmp(later.head.path()));
-        sorted.into_iter().map(|file| file.parts).collect()
-    }
-
-    pub(crate) fn primings(&self) -> &Primings<'run> {
-        self.primings.wait()
     }
 
     fn deposited(&self, parts: Vec<Gathered<'run>>, heads: &[FileHead]) -> Option<Merging<'run>> {

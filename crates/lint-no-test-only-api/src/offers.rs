@@ -9,7 +9,7 @@ use constructor::Constructor;
 use lint_core::{Site, Violation};
 use lint_core::{SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 
 use std::collections::BTreeSet;
 
@@ -17,15 +17,18 @@ use crate::finding::Finding;
 use candidate::Candidate;
 
 #[derive(Debug)]
-pub(crate) struct Offers<'file, 'run> {
+pub struct Offers<'file> {
     path: &'file Path,
-    names: &'run BTreeSet<Name>,
     found: Vec<Candidate<'file>>,
 }
 
-impl<'file, 'run> Offers<'file, 'run> {
-    pub(crate) fn new(file: &'file SourceFile, names: &'run BTreeSet<Name>) -> Offers<'file, 'run> {
-        Offers { path: file.head().path(), names, found: Vec::new() }
+impl<'file> Offers<'file> {
+    pub(crate) fn tested_only(self, names: &BTreeSet<Name>) -> Vec<Violation<'file>> {
+        self.found
+            .into_iter()
+            .filter(|candidate| names.contains(candidate.called()))
+            .map(Candidate::violation)
+            .collect()
     }
 
     fn offered(&mut self, ident: &Ident, visibility: &Visibility) {
@@ -60,7 +63,7 @@ impl<'file, 'run> Offers<'file, 'run> {
     }
 }
 
-impl<'ast> Watch<'ast> for Offers<'_, '_> {
+impl<'ast> Watch<'ast> for Offers<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemEnum]
     }
@@ -84,13 +87,8 @@ impl<'ast> Watch<'ast> for Offers<'_, '_> {
     }
 }
 
-impl<'file> Finds<'file> for Offers<'file, '_> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let names = self.names;
-        self.found
-            .into_iter()
-            .filter(|candidate| names.contains(candidate.called()))
-            .map(Candidate::violation)
-            .collect()
+impl<'file> From<&'file SourceFile> for Offers<'file> {
+    fn from(file: &'file SourceFile) -> Offers<'file> {
+        Offers { path: file.head().path(), found: Vec::new() }
     }
 }

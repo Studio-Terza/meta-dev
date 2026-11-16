@@ -1,16 +1,18 @@
 mod concluded;
 mod file_facts;
 mod lead;
+mod one_walk;
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
-use lint_sweep::{Finds, Gathers, Judgement, Member, Sweep};
+use lint_sweep::{Finds, Gathers, Member, Sweep, Watching};
 
 pub use concluded::{Concluded, Listed};
 pub use file_facts::FileFacts;
 pub use lead::{Lead, Leader, SortStart, Start};
+pub use one_walk::OneWalk;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reads {
@@ -65,10 +67,16 @@ pub trait ContextLint {
         part
     }
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
+    type Found<'file>;
+    type Watched<'file>: Gathers<Self::Found<'file>> + Debug;
+
+    fn watched(file: &SourceFile) -> Self::Watched<'_>;
+
+    fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
-        context: &'run Self::Context<'head>,
-    ) -> Judgement<'file, 'run>;
+        found: Self::Found<'file>,
+        context: &Self::Context<'head>,
+    ) -> Vec<Violation<'file>>;
 }
 
 #[derive(Debug)]
@@ -115,18 +123,57 @@ impl<Checked: KinLint> Lint for Kin<Checked> {
 
 impl<Checked: ContextLint> Lint for Judged<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let context: Checked::Context<'_> = files
+        let walked: Vec<Done<Checked::Part<'_>, Checked::Found<'_>>> = files
             .iter()
             .map(|file| {
                 let parsed = Parsed::from(file);
-                FileFacts::completed(file, parsed, Checked::gathering(parsed), Checked::completed)
+                let watched = Checked::READS.admits(file).map(Checked::watched);
+                let walking =
+                    Walking { gathering: Checked::gathering(parsed), facts: FileFacts::from(parsed), watched };
+                let walked = Sweep::gathered(file, walking);
+                Done { part: Checked::completed(walked.part, &walked.facts), found: walked.found }
             })
             .collect();
-        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
-        Report::new(
-            Checked::HEADLINE,
-            read.flat_map(|file| Checked::judgement(file, &context).violations(file)).collect(),
-        )
+        let (parts, found): (Vec<Checked::Part<'_>>, Vec<Option<Checked::Found<'_>>>) =
+            walked.into_iter().map(|walk| (walk.part, walk.found)).unzip();
+        let context: Checked::Context<'_> = parts.into_iter().collect();
+        let judged = files.iter().zip(found).flat_map(|(file, watched)| {
+            watched.map(|seen| Checked::judged(file, seen, &context)).into_iter().flatten()
+        });
+        Report::new(Checked::HEADLINE, judged.collect())
+    }
+}
+
+#[derive(Debug)]
+struct Done<Part, Found> {
+    part: Part,
+    found: Option<Found>,
+}
+
+#[derive(Debug)]
+struct Walked<'head, Part, Found> {
+    part: Part,
+    facts: FileFacts<'head>,
+    found: Option<Found>,
+}
+
+#[derive(Debug)]
+struct Walking<'head, Gathering, Watched> {
+    gathering: Gathering,
+    facts: FileFacts<'head>,
+    watched: Option<Watched>,
+}
+
+impl<'head, Part, Found, Gathering: Gathers<Part>, Watched: Gathers<Found>> Gathers<Walked<'head, Part, Found>>
+    for Walking<'head, Gathering, Watched>
+{
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        let watched = self.watched.as_mut().map_or_default(Gathers::watching);
+        self.gathering.watching().into_iter().chain(self.facts.watching()).chain(watched).collect()
+    }
+
+    fn gathered(self) -> Walked<'head, Part, Found> {
+        Walked { part: self.gathering.gathered(), facts: self.facts, found: self.watched.map(Gathers::gathered) }
     }
 }
 
@@ -137,7 +184,8 @@ pub trait PrimedFacts {
     type Context<'head>: FromIterator<Self::Part<'head>> + Send + Sync + Debug;
 
     type Priming<'head>: Gathers<Self::PrimerPart<'head>>;
-    type Contribution<'run, 'head: 'run>: Gathers<Self::Part<'head>>;
+    type Raw<'head>: Send + Debug;
+    type Recording<'run, 'head: 'run>: Gathers<Self::Raw<'head>>;
 
     fn priming<'head>(parsed: Parsed<'_, 'head>) -> Self::Priming<'head>;
 
@@ -145,21 +193,26 @@ pub trait PrimedFacts {
         part
     }
 
-    fn contribution<'run, 'head: 'run>(
-        parsed: Parsed<'run, 'head>,
-        primer: &'run Self::Primer<'head>,
-    ) -> Self::Contribution<'run, 'head>;
+    fn recording<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Self::Recording<'run, 'head>;
+
+    fn contribution<'head>(raw: Self::Raw<'head>, primer: &Self::Primer<'head>) -> Self::Part<'head>;
 }
 
 pub trait PrimedLint: PrimedFacts {
     const HEADLINE: Headline;
     const READS: Reads;
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
+    type Found<'file>;
+    type Watched<'file>: Gathers<Self::Found<'file>> + Debug;
+
+    fn watched(file: &SourceFile) -> Self::Watched<'_>;
+
+    fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
-        primer: &'run Self::Primer<'head>,
-        context: &'run Self::Context<'head>,
-    ) -> Judgement<'file, 'run>;
+        found: Self::Found<'file>,
+        primer: &Self::Primer<'head>,
+        context: &Self::Context<'head>,
+    ) -> Vec<Violation<'file>>;
 }
 
 #[derive(Debug)]
@@ -167,22 +220,52 @@ pub struct Primed<Checked>(PhantomData<Checked>);
 
 impl<Checked: PrimedLint> Lint for Primed<Checked> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let primer: Checked::Primer<'_> = files
-            .iter()
-            .map(|file| {
-                let parsed = Parsed::from(file);
-                FileFacts::completed(file, parsed, Checked::priming(parsed), Checked::primer_completed)
-            })
+        let mut walked: Vec<PrimedWalk<'_, Checked>> = files.iter().map(PrimedWalk::walked).collect();
+        let primer: Checked::Primer<'_> = walked.iter_mut().filter_map(|walk| walk.primer.take()).collect();
+        let context: Checked::Context<'_> = walked
+            .iter_mut()
+            .filter_map(|walk| walk.raw.take())
+            .map(|raw| Checked::contribution(raw, &primer))
             .collect();
-        let context: Checked::Context<'_> = files
-            .iter()
-            .map(|file| Sweep::gathered(file, Checked::contribution(Parsed::from(file), &primer)))
-            .collect();
-        let read = files.iter().filter_map(|file| Checked::READS.admits(file));
-        Report::new(
-            Checked::HEADLINE,
-            read.flat_map(|file| Checked::judgement(file, &primer, &context).violations(file)).collect(),
-        )
+        let judged = files.iter().zip(walked).flat_map(|(file, walk)| {
+            walk.found.map(|seen| Checked::judged(file, seen, &primer, &context)).into_iter().flatten()
+        });
+        Report::new(Checked::HEADLINE, judged.collect())
+    }
+}
+
+struct PrimedWalk<'file, Checked: PrimedLint> {
+    primer: Option<Checked::PrimerPart<'file>>,
+    raw: Option<Checked::Raw<'file>>,
+    found: Option<Checked::Found<'file>>,
+}
+
+impl<'file, Checked: PrimedLint> PrimedWalk<'file, Checked> {
+    fn walked(file: &'file SourceFile) -> PrimedWalk<'file, Checked> {
+        let parsed = Parsed::from(file);
+        let gathering = Two { first: Checked::priming(parsed), second: Checked::recording(parsed) };
+        let watched = Checked::READS.admits(file).map(Checked::watched);
+        let walk = Sweep::gathered(file, Walking { gathering, facts: FileFacts::from(parsed), watched });
+        let Two { first, second } = walk.part;
+        PrimedWalk { primer: Some(Checked::primer_completed(first, &walk.facts)), raw: Some(second), found: walk.found }
+    }
+}
+
+#[derive(Debug)]
+struct Two<First, Second> {
+    first: First,
+    second: Second,
+}
+
+impl<FirstPart, SecondPart, First: Gathers<FirstPart>, Second: Gathers<SecondPart>> Gathers<Two<FirstPart, SecondPart>>
+    for Two<First, Second>
+{
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        self.first.watching().into_iter().chain(self.second.watching()).collect()
+    }
+
+    fn gathered(self) -> Two<FirstPart, SecondPart> {
+        Two { first: self.first.gathered(), second: self.second.gathered() }
     }
 }
 

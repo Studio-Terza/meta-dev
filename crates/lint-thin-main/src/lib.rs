@@ -1,13 +1,10 @@
-mod body_items;
 mod finding;
-
-use body_items::BodyItems;
 
 use finding::Finding;
 use lint_file::{FileLint, Reads};
 use syntax::Span;
 use syntax::Spanned;
-use syntax::{Item, ItemFn};
+use syntax::{BlockItems, Item, ItemFn};
 
 use lint_core::{Headline, Site, SourceFile, Violation};
 use lint_layout::LineNumber;
@@ -24,7 +21,10 @@ impl FileLint for ThinMain {
         let binary = Some(file).filter(|found| found.head().placement().role() == Role::BinaryRoot);
         binary.map_or_default(|root| {
             let items = &root.syntax().items;
-            let inside_main = Self::mains(items).flat_map(|main| BodyItems::declared_in(root, main));
+            let inside_main = Self::mains(items)
+                .flat_map(|main| BlockItems::declared(&main.block))
+                .filter(|item| matches!(item, Item::Use(_)).then_some(()).is_none())
+                .map(Self::keyword);
             let outside = items.iter().filter(|item| Self::thin(item).is_none()).map(Self::keyword);
             let logic = outside.chain(inside_main);
             logic

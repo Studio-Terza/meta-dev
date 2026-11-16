@@ -1,7 +1,7 @@
-use syntax::{BinOp, Block, ExprBinary, ExprForLoop, ExprIf, ExprMatch, ExprTry, ExprWhile, Item};
+use syntax::{BinOp, ExprBinary, ExprForLoop, ExprIf, ExprMatch, ExprTry, ExprWhile, Item};
 
 use body_lifts::Branching;
-use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 use newtype::Counter;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,13 +20,6 @@ impl Branches {
     #[must_use]
     pub fn new(propagation: Propagation) -> Branches {
         Branches { score: Branching::new(1), propagation }
-    }
-
-    #[must_use]
-    pub fn scored(body: &Block, propagation: Propagation) -> Branching {
-        let mut scan = Branches::new(propagation);
-        Sweep::over_block(body, vec![&mut scan]);
-        scan.score
     }
 
     #[must_use]

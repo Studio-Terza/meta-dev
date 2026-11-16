@@ -2,7 +2,7 @@ use super::gathering::Gathering;
 use lint_clones::Clones;
 use lint_core::Parsed;
 use lint_enum_predicates::EnumPredicates;
-use lint_file::{ContextLint, FileFacts, Gleaning, PrimedFacts};
+use lint_file::{ContextLint, FileFacts, Gleaning, OneWalk, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
 use lint_module_nesting::ModuleNesting;
 use lint_named_numbers::NamedNumbers;
@@ -37,7 +37,6 @@ pub(crate) trait Priming<'run, Lint: PrimedFacts> {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Settled<'settled, 'run> {
     contexts: &'settled Contexts<'run>,
-    primings: &'settled Primings<'run>,
 }
 
 macro_rules! contexts {
@@ -47,6 +46,7 @@ macro_rules! contexts {
             $($field: <$lint as ContextLint>::Context<'run>,)*
             $($primed: <$prime as PrimedFacts>::Primer<'run>,)*
             $($gleaned: <$glean as Gleaning>::Gleaned<'run>,)*
+            primings: Primings<'run>,
         }
 
         #[derive(Debug)]
@@ -54,6 +54,7 @@ macro_rules! contexts {
             $($field: <$lint as ContextLint>::Part<'run>,)*
             $($primed: <$prime as PrimedFacts>::PrimerPart<'run>,)*
             $($gleaned: <$glean as Gleaning>::Part<'run>,)*
+            recorded: Recorded<'run>,
         }
 
         #[derive(Debug, Default)]
@@ -61,6 +62,21 @@ macro_rules! contexts {
             $($field: Vec<<$lint as ContextLint>::Part<'run>>,)*
             $($primed: Vec<<$prime as PrimedFacts>::PrimerPart<'run>>,)*
             $($gleaned: Vec<<$glean as Gleaning>::Part<'run>>,)*
+            raws: Raws<'run>,
+        }
+
+        #[derive(Debug)]
+        pub(crate) struct Recorded<'run> {
+            $($primed: <$prime as PrimedFacts>::Raw<'run>,)*
+        }
+
+        #[derive(Debug, Default)]
+        struct Raws<'run> {
+            $($primed: Vec<<$prime as PrimedFacts>::Raw<'run>>,)*
+        }
+
+        struct Recordings<'file, 'run: 'file> {
+            $($primed: <$prime as PrimedFacts>::Recording<'file, 'run>,)*
         }
 
         struct Gatherings<'file, 'run: 'file> {
@@ -76,18 +92,21 @@ macro_rules! contexts {
                     $($primed: <$prime as PrimedFacts>::priming(parsed),)*
                     $($gleaned: <$glean as Gleaning>::gleaner(parsed),)*
                 };
+                let mut recordings = Recordings { $($primed: <$prime as PrimedFacts>::recording(parsed),)* };
                 let mut facts = FileFacts::from(parsed);
                 let mut watching: Vec<&mut Watching<'_>> =
                     joining.into_iter().map(|joined| -> &mut Watching<'_> { joined }).collect();
                 watching.extend(facts.watching());
                 $(watching.extend(gatherings.$field.watching());)*
                 $(watching.extend(gatherings.$primed.watching());)*
+                $(watching.extend(recordings.$primed.watching());)*
                 $(watching.extend(gatherings.$gleaned.watching());)*
                 Sweep::watching(parsed.file(), watching);
                 Contributed {
                     $($field: <$lint as ContextLint>::completed(gatherings.$field.gathered(), &facts),)*
                     $($primed: <$prime as PrimedFacts>::primer_completed(gatherings.$primed.gathered(), &facts),)*
                     $($gleaned: gatherings.$gleaned.gathered(),)*
+                    recorded: Recorded { $($primed: recordings.$primed.gathered(),)* },
                 }
             }
         }
@@ -98,12 +117,18 @@ macro_rules! contexts {
                     $(split.$field.push(part.$field);)*
                     $(split.$primed.push(part.$primed);)*
                     $(split.$gleaned.push(part.$gleaned);)*
+                    $(split.raws.$primed.push(part.recorded.$primed);)*
                     split
                 });
+                $(let $primed: <$prime as PrimedFacts>::Primer<'run> = split.$primed.into_iter().collect();)*
+                let primings = Primings {
+                    $($primed: split.raws.$primed.into_iter().map(|raw| <$prime as PrimedFacts>::contribution(raw, &$primed)).collect(),)*
+                };
                 Contexts {
                     $($field: split.$field.into_iter().collect(),)*
-                    $($primed: split.$primed.into_iter().collect(),)*
+                    $($primed,)*
                     $($gleaned: split.$gleaned.into_iter().collect(),)*
+                    primings,
                 }
             }
         }
@@ -129,42 +154,6 @@ macro_rules! contexts {
             $($primed: <$prime as PrimedFacts>::Context<'run>,)*
         }
 
-        #[derive(Debug)]
-        pub(crate) struct PrimedParts<'run> {
-            $($primed: <$prime as PrimedFacts>::Part<'run>,)*
-        }
-
-        struct Contributions<'settled, 'run: 'settled> {
-            $($primed: <$prime as PrimedFacts>::Contribution<'settled, 'run>,)*
-        }
-
-        #[derive(Debug, Default)]
-        struct Primeds<'run> {
-            $($primed: Vec<<$prime as PrimedFacts>::Part<'run>>,)*
-        }
-
-        impl<'run> Contexts<'run> {
-            pub(crate) fn priming(&self, parsed: Parsed<'_, 'run>) -> PrimedParts<'run> {
-                let mut contributions = Contributions {
-                    $($primed: <$prime as PrimedFacts>::contribution(parsed, &self.$primed),)*
-                };
-                let mut watching: Vec<&mut Watching<'_>> = Vec::new();
-                $(watching.extend(contributions.$primed.watching());)*
-                Sweep::watching(parsed.file(), watching);
-                PrimedParts { $($primed: contributions.$primed.gathered(),)* }
-            }
-        }
-
-        impl<'run> FromIterator<PrimedParts<'run>> for Primings<'run> {
-            fn from_iter<Found: IntoIterator<Item = PrimedParts<'run>>>(found: Found) -> Primings<'run> {
-                let split = found.into_iter().fold(Primeds::default(), |mut split, part| {
-                    $(split.$primed.push(part.$primed);)*
-                    split
-                });
-                Primings { $($primed: split.$primed.into_iter().collect(),)* }
-            }
-        }
-
         $(
             impl<'run> Priming<'run, $prime> for Settled<'_, 'run> {
                 fn primer(&self) -> &<$prime as PrimedFacts>::Primer<'run> {
@@ -172,7 +161,7 @@ macro_rules! contexts {
                 }
 
                 fn primed(&self) -> &<$prime as PrimedFacts>::Context<'run> {
-                    &self.primings.$primed
+                    &self.contexts.primings.$primed
                 }
             }
         )*
@@ -193,6 +182,7 @@ contexts! {
         public_api_tests: PublicApiTests,
         no_test_only_api: NoTestOnlyApi,
         repeated_shapes: RepeatedShapes,
+        one_walk: OneWalk,
     }
     primed: {
         state_graph: StateGraph,
@@ -207,6 +197,6 @@ contexts! {
 
 impl<'settled, 'run> From<&'settled Gathering<'run>> for Settled<'settled, 'run> {
     fn from(gathering: &'settled Gathering<'run>) -> Settled<'settled, 'run> {
-        Settled { contexts: gathering.contexts(), primings: gathering.primings() }
+        Settled { contexts: gathering.contexts() }
     }
 }

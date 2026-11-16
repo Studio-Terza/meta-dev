@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Attaches, Attachment, Descend, Facts, Finds, Gathers, Kind, Scoped, Watch, Watching};
 use std::collections::{BTreeMap, BTreeSet};
 
 use std::path::Path;
@@ -72,15 +72,21 @@ impl SweptLint for ExpressionFlow {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Flows { file, path: file.head().path(), violations: Vec::new() })
+        Box::new(Scoped::new(Flows {
+            path: file.head().path(),
+            violations: Vec::new(),
+            opening: Vec::new(),
+            held: Vec::new(),
+        }))
     }
 }
 
 #[derive(Debug)]
 struct Flows<'scan> {
-    file: &'scan SourceFile,
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
+    opening: Vec<Attachment<MutableLocals>>,
+    held: Vec<Vec<Violation<'scan>>>,
 }
 
 impl Flows<'_> {
@@ -103,15 +109,8 @@ impl Flows<'_> {
     }
 
     fn body(&mut self, body: &Block) -> Descend {
-        let mut locals = MutableLocals { declared: BTreeMap::new(), touched: Vec::new() };
-        Sweep::through_block(self.file, body, &mut locals);
-        self.report(
-            locals.only_reassigned(),
-            Message::new(
-                Problem::new("mutable local that is only reassigned"),
-                Fix::new("a mutable binding is borrowed as &mut or has methods called on it"),
-            ),
-        );
+        self.opening.push(Attachment::reaching(body, MutableLocals { declared: BTreeMap::new(), touched: Vec::new() }));
+        self.held.push(std::mem::take(&mut self.violations));
         Descend::Into
     }
 }
@@ -247,6 +246,7 @@ impl<'ast> Watch<'ast> for Flows<'_> {
     }
 }
 
+#[derive(Debug)]
 struct MutableLocals {
     declared: BTreeMap<Name, Span>,
     touched: Vec<Name>,
@@ -306,6 +306,37 @@ impl<'ast> Watch<'ast> for MutableLocals {
     fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         self.touched.extend(Self::written_to(invocation));
         Descend::Expand
+    }
+}
+
+impl Attaches<MutableLocals> for Flows<'_> {
+    const ATTACHED: &'static [Kind] = &[Kind::Block, Kind::Local, Kind::Expr, Kind::Macro];
+
+    fn attaching(&mut self) -> Vec<Attachment<MutableLocals>> {
+        std::mem::take(&mut self.opening)
+    }
+
+    fn detached(&mut self, locals: MutableLocals) {
+        let inside = std::mem::take(&mut self.violations);
+        self.violations = self.held.pop().unwrap_or_default();
+        self.report(
+            locals.only_reassigned(),
+            Message::new(
+                Problem::new("mutable local that is only reassigned"),
+                Fix::new("a mutable binding is borrowed as &mut or has methods called on it"),
+            ),
+        );
+        self.violations.extend(inside);
+    }
+}
+
+impl Gathers<MutableLocals> for MutableLocals {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![self]
+    }
+
+    fn gathered(self) -> MutableLocals {
+        self
     }
 }
 

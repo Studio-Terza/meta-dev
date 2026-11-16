@@ -1458,6 +1458,7 @@ name = "lint-file"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-layout",
  "lint-sweep",
 ]
 

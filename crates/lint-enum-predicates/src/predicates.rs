@@ -13,13 +13,13 @@ use lint_core::{Headline, Parsed, Site, SourceFile, Syntax, Violation};
 use lint_file::{ContextLint, Reads};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
-use lint_sweep::{Descend, Facts, Finds, Judgement, Kind as Node, Watch};
+use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Watch, Watching};
 
 pub use declaration::Declaration;
 use declarations::Declarations;
 use finding::Finding;
 use kind::Kind;
-pub use known::Known;
+pub use known::{Known, Target};
 
 #[derive(Debug)]
 pub struct EnumPredicates;
@@ -39,34 +39,41 @@ impl ContextLint for EnumPredicates {
         Declarations::in_file(parsed)
     }
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
+    type Found<'file> = Candidates<'file>;
+    type Watched<'file> = Predicates<'file>;
+
+    fn watched(file: &SourceFile) -> Predicates<'_> {
+        Predicates::from(file)
+    }
+
+    fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
-        known: &'run Known<'head>,
-    ) -> Judgement<'file, 'run> {
-        Judgement::watching(Box::new(Predicates::new(known, file)))
+        found: Candidates<'file>,
+        known: &Known<'head>,
+    ) -> Vec<Violation<'file>> {
+        let enums = found.0.into_iter().filter(|candidate| known.kind(file, &candidate.target) == Kind::Enum);
+        enums.flat_map(|candidate| candidate.violations).collect()
     }
 }
 
 #[derive(Debug)]
-pub struct Predicates<'scan, 'file> {
-    known: &'scan Known<'scan>,
-    outer: Vec<Cow<'file, ModulePath>>,
-    file: &'file SourceFile,
-    module: Cow<'file, ModulePath>,
+pub struct Candidate<'file> {
+    target: Target,
     violations: Vec<Violation<'file>>,
 }
 
-impl<'scan, 'file> Predicates<'scan, 'file> {
-    pub fn new(known: &'scan Known<'scan>, file: &'file SourceFile) -> Predicates<'scan, 'file> {
-        Predicates {
-            known,
-            outer: Vec::new(),
-            file,
-            module: Cow::Borrowed(file.head().placement().module()),
-            violations: Vec::new(),
-        }
-    }
+#[derive(Debug)]
+pub struct Candidates<'file>(Vec<Candidate<'file>>);
 
+#[derive(Debug)]
+pub struct Predicates<'file> {
+    candidates: Vec<Candidate<'file>>,
+    outer: Vec<Cow<'file, ModulePath>>,
+    file: &'file SourceFile,
+    module: Cow<'file, ModulePath>,
+}
+
+impl<'file> Predicates<'file> {
     fn predicates(&self, block: &ItemImpl) -> Vec<Violation<'file>> {
         block
             .items
@@ -88,7 +95,7 @@ impl<'scan, 'file> Predicates<'scan, 'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for Predicates<'_, '_> {
+impl<'ast> Watch<'ast> for Predicates<'_> {
     fn kinds(&self) -> &'static [Node] {
         &[Node::ItemMod, Node::ItemImpl, Node::Macro]
     }
@@ -105,11 +112,14 @@ impl<'ast> Watch<'ast> for Predicates<'_, '_> {
     }
 
     fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        let found = facts
-            .inherent()
-            .filter(|candidate| self.known.kind(self.file, &self.module, &candidate.self_ty) == Kind::Enum)
-            .map_or_default(|enum_impl| self.predicates(enum_impl));
-        self.violations.extend(found);
+        let found = facts.inherent().and_then(|block| {
+            let target = Target::implemented(&self.module, &block.self_ty)?;
+            let violations = self.predicates(block);
+            Some(violations)
+                .filter(|found| found.is_empty().then_some(()).is_none())
+                .map(|found| Candidate { target, violations: found })
+        });
+        self.candidates.extend(found);
         Descend::Into
     }
 
@@ -118,8 +128,23 @@ impl<'ast> Watch<'ast> for Predicates<'_, '_> {
     }
 }
 
-impl<'file> Finds<'file> for Predicates<'_, 'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+impl<'file> Gathers<Candidates<'file>> for Predicates<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![self]
+    }
+
+    fn gathered(self) -> Candidates<'file> {
+        Candidates(self.candidates)
+    }
+}
+
+impl<'file> From<&'file SourceFile> for Predicates<'file> {
+    fn from(file: &'file SourceFile) -> Predicates<'file> {
+        Predicates {
+            candidates: Vec::new(),
+            outer: Vec::new(),
+            file,
+            module: Cow::Borrowed(file.head().placement().module()),
+        }
     }
 }

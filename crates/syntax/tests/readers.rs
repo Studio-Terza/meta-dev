@@ -1,8 +1,8 @@
 use syntax::parse::{Parser, parse_str, parse2};
 use syntax::{
-    Application, Applied, Constant, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro, File, Group, Ident,
-    Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens, TokenStream, TokenTree, Type,
-    TypeFold, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
+    Application, Applied, Block, BlockItems, Constant, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro,
+    File, Group, Ident, Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens, TokenStream,
+    TokenTree, Type, TypeFold, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
 };
 
 #[test]
@@ -179,5 +179,22 @@ fn spines_peel_invisible_groups_and_typed_patterns() -> Result<(), Error> {
     let typed: Vec<&Pat> = closure.inputs.iter().collect();
     assert_eq!(typed.iter().map(|input| PatSpine::from(*input).count()).collect::<Vec<_>>(), [2]);
     assert_eq!(typed.iter().map(|input| PatTree::reached(input, &|_, _| true).len()).collect::<Vec<_>>(), [2]);
+    Ok(())
+}
+
+#[test]
+fn block_items_are_the_items_a_block_declares_at_any_depth_but_not_inside_items() -> Result<(), Error> {
+    let block: Block = parse_str("{ use a::b; fn f() { fn g() {} } if x { struct S; } }")?;
+    let declared: Vec<String> =
+        BlockItems::declared(&block).iter().map(|item| item.to_token_stream().to_string()).collect();
+    assert_eq!(declared, ["use a :: b ;", "fn f () { fn g () { } }", "struct S ;"]);
+    Ok(())
+}
+
+#[test]
+fn outermost_types_are_the_types_an_expression_names_without_their_parts() -> Result<(), Error> {
+    let length: Expr = parse_str("size_of::<Vec<u8>>() + N as usize")?;
+    let named: Vec<String> = TypeTree::outermost(&length).iter().map(|ty| ty.to_token_stream().to_string()).collect();
+    assert_eq!(named, ["Vec < u8 >", "usize"]);
     Ok(())
 }
