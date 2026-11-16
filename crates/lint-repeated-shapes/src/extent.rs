@@ -1,5 +1,6 @@
 use body_shape::Bounds;
-use syntax::{Place, Span};
+use syntax::Span;
+use syntax_lexer::Place;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Extent {

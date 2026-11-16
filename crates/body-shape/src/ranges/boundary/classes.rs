@@ -4,7 +4,7 @@ use equivalence::{Equivalence, Erased};
 use lint_layout::{Casing, Name, Whole, Word, words};
 use std::ops::Range;
 
-use syntax::{Lexeme, LexemeKind, Lexemes, Named, Quoted, Symbol, TokenTable};
+use syntax_lexer::{Lexeme, LexemeKind, Lexemes, Named, Quoted, Symbol, TokenTable};
 
 use super::Token;
 use crate::shape::Code;

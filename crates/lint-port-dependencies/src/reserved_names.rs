@@ -3,7 +3,7 @@ mod sqlx_name;
 
 use std::borrow::Borrow;
 
-use syntax::TokenTable;
+use syntax_lexer::TokenTable;
 
 use lint_core::{Finding, Site, SourceFile, Violation};
 use lint_file::{Lead, Leader};

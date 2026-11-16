@@ -86,6 +86,7 @@ dependencies = [
  "lint-layout",
  "newtype",
  "syntax",
+ "syntax-lexer",
 ]
 
 [[package]]
@@ -1390,6 +1391,7 @@ dependencies = [
  "lint-placement",
  "newtype",
  "syntax",
+ "syntax-lexer",
  "workspace-metadata",
 ]
 
@@ -1836,6 +1838,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "syntax",
+ "syntax-lexer",
  "text-lines",
  "workspace-metadata",
 ]
@@ -1966,6 +1969,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "syntax",
+ "syntax-lexer",
 ]
 
 [[package]]
@@ -3118,6 +3122,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "syntax-lexer"
+version = "0.1.0"
+dependencies = [
+ "syntax",
 ]
 
 [[package]]
