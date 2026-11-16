@@ -3,9 +3,7 @@ use std::fmt;
 use syntax::Path;
 
 use crate::name::Name;
-use crate::path_tail::PathTail;
 use crate::word::Word;
-use newtype::Wrapping;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UsePath(Vec<Name>);
@@ -21,19 +19,6 @@ impl UsePath {
     #[must_use]
     pub fn rerooted(&self, root: &UsePath) -> UsePath {
         UsePath(root.0.iter().chain(self.0.iter().skip(1)).cloned().collect())
-    }
-
-    #[must_use]
-    pub fn rest(&self) -> UsePath {
-        UsePath(self.0.iter().skip(1).cloned().collect())
-    }
-
-    #[must_use]
-    pub fn ends_with(&self, tail: PathTail<'_>) -> Option<&UsePath> {
-        let words = tail.into_inner();
-        (self.0.len() >= words.len()).then_some(self).filter(|path| {
-            path.0.iter().rev().zip(words.iter().rev()).all(|(segment, spelled)| *segment == Name::from(*spelled))
-        })
     }
 
     #[must_use]

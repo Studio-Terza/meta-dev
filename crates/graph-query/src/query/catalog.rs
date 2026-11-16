@@ -69,11 +69,11 @@ impl<'model> Catalog<'model> {
             .filter_map(|placed| AsRef::<[Parameter]>::as_ref(placed.entity()).first().map(|_| placed))
     }
 
-    pub(crate) fn owned_by(&self, id: ItemId, owner: Owner) -> impl Iterator<Item = &'model Function> + '_ {
+    pub(crate) fn owned_by(&self, id: ItemId) -> impl Iterator<Item = &'model Function> + '_ {
         self.functions
             .iter()
             .map(|placed| placed.entity())
-            .filter(move |function| function.owner() == owner)
+            .filter(|function| Self::OWNERS.contains(&function.owner()))
             .filter(move |function| AsRef::<Seat>::as_ref(*function).owner() == Some(id))
     }
 

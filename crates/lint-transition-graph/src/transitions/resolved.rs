@@ -27,9 +27,9 @@ impl Resolved {
         }
     }
 
-    pub(crate) fn nature(&self, selfish: Nature) -> Nature {
+    pub(crate) fn nature(&self) -> Nature {
         match self {
-            Resolved::Itself => selfish,
+            Resolved::Itself => Nature::Interface,
             Resolved::Found(found) => found.nature(),
         }
     }
