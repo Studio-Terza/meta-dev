@@ -1,7 +1,8 @@
-use syntax::parse::{Parser, parse_str};
+use syntax::parse::{Parser, parse_str, parse2};
 use syntax::{
-    Application, Applied, Constant, Constructed, Error, Expr, ExprMacro, File, Ident, Macro, MacroTree, Meta, Nested,
-    Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens, Type, TypeFold, TypeSpine, TypeTree, UseLeaf, UseTree,
+    Application, Applied, Constant, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro, File, Group, Ident,
+    Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens, TokenStream, TokenTree, Type,
+    TypeFold, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
 };
 
 #[test]
@@ -150,4 +151,33 @@ impl Rendered {
         let shown: Vec<String> = parts.map(|part| done.take(part).unwrap_or_default()).collect();
         format!("({})", shown.join(", "))
     }
+}
+
+#[test]
+fn spines_peel_every_wrapper_they_name() -> Result<(), Error> {
+    let expr: Expr = parse_str("{ (-&*(a as B)[0].c).d().await? }")?;
+    let spine: Vec<&Expr> = Spine::from(&expr).collect();
+    assert_eq!((spine.len(), spine.last().map(|last| last.to_token_stream().to_string())), (13, Some("a".to_owned())));
+    let ty: Type = parse_str("&(*const [[u8; 2]])")?;
+    let types: Vec<&Type> = TypeSpine::from(&ty).collect();
+    assert_eq!((types.len(), types.last().map(|last| last.to_token_stream().to_string())), (6, Some("u8".to_owned())));
+    let pat: Pat = Pat::parse_single.parse_str("&(x @ Some(_))")?;
+    assert_eq!(PatSpine::from(&pat).count(), 4);
+    let alternatives: Pat = Pat::parse_multi.parse_str("Some(&(a @ [b, ..])) | S { f: (c, d) }")?;
+    assert_eq!(PatTree::reached(&alternatives, &|_, _| true).len(), 12);
+    Ok(())
+}
+
+#[test]
+fn spines_peel_invisible_groups_and_typed_patterns() -> Result<(), Error> {
+    let grouped = TokenStream::from(TokenTree::Group(Group::new(Delimiter::None, quote!(x))));
+    let expr: Expr = parse2(grouped.clone())?;
+    assert_eq!(Spine::from(&expr).count(), 2);
+    let ty: Type = parse2(grouped)?;
+    assert_eq!(TypeSpine::from(&ty).count(), 2);
+    let closure: ExprClosure = parse_str("|x: u8| x")?;
+    let typed: Vec<&Pat> = closure.inputs.iter().collect();
+    assert_eq!(typed.iter().map(|input| PatSpine::from(*input).count()).collect::<Vec<_>>(), [2]);
+    assert_eq!(typed.iter().map(|input| PatTree::reached(input, &|_, _| true).len()).collect::<Vec<_>>(), [2]);
+    Ok(())
 }
