@@ -1,11 +1,10 @@
-use std::collections::VecDeque;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::slice;
-use std::sync::{LazyLock, Mutex, PoisonError};
+use std::sync::LazyLock;
 
 use crate::Opening;
 use design::{
@@ -16,14 +15,13 @@ use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, 
 use design_runs::{JobOpened, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use design_store::Planting;
 use dispatch_ports::{
-    Agent, AgentRun, Bell, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Fault, Finished,
-    HeadlessClaude, Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, SystemClock, Tokens, Usage, Wall,
-    clock_ops, dispatch_ops,
+    Agent, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Fault, Finished, HeadlessClaude, Output, Pause, Pid,
+    Reply, Scripted, Stall, Started, Stepped, SystemClock, Tokens, Usage, Wall, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
 use newtype::Wrapping;
+use port_core::Run;
 use port_core::{Calls, Snapshot};
-use port_core::{Pass, Run};
 use serde_json::Value;
 use store_ports::{Store, Written};
 use structurer::{Briefing, Directives, Lapse, SegmentRef, Uncovered};
@@ -32,91 +30,18 @@ use transcript_ports::transcripts_ops::ReadFrom;
 
 use super::{Applying, FakeLent, Invocation, Session, Speaker};
 
-#[derive(Debug, Default)]
-pub struct Script {
-    replies: Mutex<VecDeque<Option<Output>>>,
-    current: Mutex<Option<Output>>,
-    prompts: Mutex<Vec<Prompt>>,
-    living: Vec<Living>,
-    kills: Mutex<Vec<Pid>>,
-    spawned: Mutex<u32>,
-}
-
-#[derive(Clone, Debug)]
-struct Living {
-    pid: Pid,
-    started: Started,
-}
-
 #[derive(Debug)]
-pub struct FakeDispatch<'script>(&'script Script);
-
-#[derive(Debug)]
-pub struct FakeClock {
-    now: Mutex<Wall>,
-    sleep: Pause,
-}
+pub struct Script;
 
 pub struct Staff;
 
-static IDLE: LazyLock<Script> = LazyLock::new(Script::default);
+static IDLE: LazyLock<Scripted> = LazyLock::new(Scripted::default);
 
 impl Staff {
     const START: Wall = Wall::new(1_800_000_000);
 
-    pub fn idle() -> Agents<impl FnOnce(PathBuf) -> FakeDispatch<'static>, FakeClock> {
-        Agents::new(|_scratch| FakeDispatch(&IDLE), FakeClock::asleep_for(Pause::new(0)))
-    }
-}
-
-impl FakeClock {
-    fn asleep_for(sleep: Pause) -> FakeClock {
-        FakeClock { now: Mutex::new(Staff::START), sleep }
-    }
-}
-
-impl ClockFiller for FakeClock {
-    fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
-        *self.now.lock().unwrap_or_else(PoisonError::into_inner)
-    }
-
-    fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
-        let mut now = self.now.lock().unwrap_or_else(PoisonError::into_inner);
-        *now = now.after(pause).after(self.sleep);
-        *now
-    }
-}
-
-impl DispatchFiller for FakeDispatch<'_> {
-    fn dispatch(
-        &self,
-        _pass: Pass<'_, dispatch_ops::Dispatch>,
-        job: &Job,
-        prompt: &Prompt,
-    ) -> Result<AgentRun, DispatchFailure> {
-        let mut spawned = self.0.spawned.lock().unwrap_or_else(PoisonError::into_inner);
-        *spawned = spawned.saturating_add(1);
-        let reply = self.0.replies.lock().unwrap_or_else(PoisonError::into_inner).pop_front().flatten();
-        *self.0.current.lock().unwrap_or_else(PoisonError::into_inner) = reply;
-        self.0.prompts.lock().unwrap_or_else(PoisonError::into_inner).push(prompt.clone());
-        Ok(AgentRun::new(Pid::new(spawned.saturating_add(100)), *job.as_ref()))
-    }
-
-    fn output(
-        &self,
-        _pass: Pass<'_, dispatch_ops::Output>,
-        _run: &mut AgentRun,
-    ) -> Result<Option<Output>, DispatchFailure> {
-        Ok(self.0.current.lock().unwrap_or_else(PoisonError::into_inner).take())
-    }
-
-    fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, pid: Pid) -> Result<Option<Started>, DispatchFailure> {
-        Ok(self.0.living.iter().find(|living| living.pid == pid).map(|living| living.started.clone()))
-    }
-
-    fn kill(&self, _pass: Pass<'_, dispatch_ops::Kill>, pid: Pid) -> Result<Ended, DispatchFailure> {
-        self.0.kills.lock().unwrap_or_else(PoisonError::into_inner).push(pid);
-        Ok(self.0.living.iter().find(|living| living.pid == pid).map_or(Ended::Absent, |_living| Ended::Killed))
+    pub fn idle() -> Agents<impl FnOnce(PathBuf) -> &'static Scripted, Stepped> {
+        Agents::new(|_scratch| &*IDLE, Stepped::starting(Staff::START, Pause::new(0)))
     }
 }
 
@@ -130,18 +55,15 @@ impl Script {
     const NINE: &str = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i";
     const SEVENTEEN: &str = "1. a\\n2. b\\n3. c\\n4. d\\n5. e\\n6. f\\n7. g\\n8. h\\n9. i\\n10. j\\n11. k\\n12. l\\n13. m\\n14. n\\n15. o\\n16. p\\n17. q";
 
-    fn replying(replies: &[Option<&str>]) -> Script {
-        Script {
-            replies: Mutex::new(
-                replies.iter().map(|reply| reply.map(|text| Output::Finished(Script::finished(text)))).collect(),
-            ),
-            ..Script::default()
-        }
+    fn replying(replies: &[Option<&str>]) -> Scripted {
+        Scripted::replying(replies.iter().map(|reply| reply.map(|text| Output::Finished(Script::finished(text)))))
     }
 
-    fn living(self, pid: u32, started: &str) -> Script {
-        let parsed = started.parse::<Started>().ok();
-        Script { living: parsed.map(|at| Living { pid: Pid::new(pid), started: at }).into_iter().collect(), ..self }
+    fn alive(scripted: Scripted, pid: u32, started: &str) -> Scripted {
+        match started.parse::<Started>() {
+            Ok(at) => scripted.living(Pid::new(pid), at),
+            Err(_) => scripted,
+        }
     }
 
     fn finished(reply: &str) -> Finished {
@@ -152,19 +74,14 @@ impl Script {
         Usage::new(Tokens::new(10), Tokens::new(20), Tokens::new(3), Tokens::new(4))
     }
 
-    fn prompts(&self) -> Vec<Option<Briefing>> {
-        let prompts = self.prompts.lock().unwrap_or_else(PoisonError::into_inner);
-        prompts.iter().map(|prompt| prompt.clone().into_inner().parse::<Briefing>().ok()).collect()
-    }
-
-    fn kills(&self) -> Vec<Pid> {
-        self.kills.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    fn briefs(scripted: &Scripted) -> Vec<Option<Briefing>> {
+        scripted.prompts().into_iter().map(|prompt| prompt.into_inner().parse::<Briefing>().ok()).collect()
     }
 }
 
 struct Structuring {
     applying: Applying,
-    script: Script,
+    script: Scripted,
     sleep: Pause,
 }
 
@@ -177,15 +94,12 @@ struct Structured {
 }
 
 impl Structuring {
-    fn over(script: Script, sleep: Pause) -> Result<Structuring, Failure> {
+    fn over(script: Scripted, sleep: Pause) -> Result<Structuring, Failure> {
         Ok(Structuring { applying: Applying::ready()?, script, sleep })
     }
 
     fn structured(&self, arguments: &[&str]) -> Structured {
-        self.structured_by(
-            Agents::new(|_scratch| FakeDispatch(&self.script), FakeClock::asleep_for(self.sleep)),
-            arguments,
-        )
+        self.structured_by(Agents::new(|_scratch| &self.script, Stepped::starting(Staff::START, self.sleep)), arguments)
     }
 
     fn structured_by<D: DispatchFiller>(
@@ -282,7 +196,7 @@ fn a_job_is_shown_the_questions_still_open_earlier_in_its_session_and_may_link_a
     let outside = SegmentRef::new(Prefix::new(Session::ASKED.to_owned()), Ordinal::new(0));
     let retried = Line::Retried(Lapsed::new(JobId::new(1), Lapse::refused(&Unresolved::Outside(outside))));
     let shown = format!("asked {asked} \"what of aaaaaaaa-0000-4000-8000-000000000004\"\n");
-    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let briefs = Script::briefs(&structuring.script).iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
     assert_eq!(open.parse::<Lines>().into_iter().flatten().count(), 1);
     assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1, 1]);
     assert_eq!(structured.has(&[retried]), []);
@@ -303,7 +217,7 @@ fn a_brief_with_asked_lines_states_that_they_are_link_targets_only_and_a_reply_l
         .applying
         .applied(&format!("place({asked}, n1, questions)\nsense({asked}, question, specific, firm, explicit)"))?;
     let structured = structuring.structured(&["structure"]);
-    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let briefs = Script::briefs(&structuring.script).iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
     let stated = "An asked line shows a question still open from earlier in the session; it is a link target only";
     assert_eq!(briefs.iter().map(|brief| brief.matches(stated).count()).collect::<Vec<usize>>(), [1]);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
@@ -329,7 +243,7 @@ fn a_reply_linking_to_a_job_segment_without_a_directive_for_it_is_refused_as_unp
     let refused = Line::Retried(Lapsed::new(JobId::new(1), Lapse::from(Uncovered::new(target, Vec::new()))));
     assert_eq!(structured.has(&[refused]), []);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
-    assert_eq!(structuring.script.prompts().len(), 2);
+    assert_eq!(Script::briefs(&structuring.script).len(), 2);
     Ok(())
 }
 
@@ -345,7 +259,7 @@ fn a_job_starting_partway_through_a_message_is_shown_the_question_open_earlier_i
     let covering = format!("link({message}.1, {message}.0, answers)");
     let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
     let structured = structuring.structured(&["structure"]);
-    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let briefs = Script::briefs(&structuring.script).iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
     let shown = format!("asked {message}.0 \"1. which crate\"\n");
     assert_eq!(briefs.iter().map(|brief| brief.matches(&shown).count()).collect::<Vec<usize>>(), [1]);
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
@@ -372,7 +286,7 @@ fn same_timestamp_messages_are_ordered_by_transcript_order_not_uuid() -> Result<
     let covering = format!("link({middle}.1, {middle}.0, answers)");
     let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
     let structured = structuring.structured(&["structure"]);
-    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let briefs = Script::briefs(&structuring.script).iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
     let shown = [(before, "which crate"), (middle, "1. which store"), (after, "which port")]
         .map(|(asked, body)| format!("asked {asked}.0 \"{body}\"\n"));
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
@@ -401,7 +315,7 @@ fn a_job_spanning_two_sessions_is_shown_each_session_s_earlier_open_questions() 
     let covering = [first_answer, second_answer].map(|said| format!("conversational({said}.0)")).join("\n");
     let structuring = Structuring { applying, script: Script::replying(&[Some(&covering)]), sleep: Pause::new(0) };
     let structured = structuring.structured(&["structure"]);
-    let briefs = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
+    let briefs = Script::briefs(&structuring.script).iter().flatten().map(ToString::to_string).collect::<Vec<String>>();
     let shown =
         [(first, "which crate"), (second, "which store")].map(|(asked, body)| format!("asked {asked}.0 \"{body}\"\n"));
     assert_eq!(structured.outcome?, Outcome::Structured { jobs: Count::new(1) });
@@ -430,7 +344,7 @@ fn a_flailed_job_holds_its_segments_and_the_run_goes_on_and_the_next_run_does_no
     let told = first.outcome.as_ref().err().map_or_default(ToString::to_string);
     assert!(matches!(first.outcome, Err(Failure::Flailed { sequel: Sequel::WentOn, .. })));
     let second = structuring.structured(&["structure"]);
-    assert_eq!(structuring.script.prompts().len(), 3, "the second run re-sent the flailed job's segments");
+    assert_eq!(Script::briefs(&structuring.script).len(), 3, "the second run re-sent the flailed job's segments");
     let shown = structuring.applying.run(&["show", "job", "1"])?;
     assert!(
         matches!(structuring.applying.run(&["show", "job", "3"]), Err(Failure::Unrun(job)) if job == JobId::new(3))
@@ -461,7 +375,7 @@ fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_before_its_next_job_an
         sleep: Pause::new(3600),
     };
     let stalled = structuring.structured(&["structure"]);
-    let owed = (structuring.unstructured()?, structuring.script.prompts().len());
+    let owed = (structuring.unstructured()?, Script::briefs(&structuring.script).len());
     let again = structuring.structured(&["structure"]);
     let overdue = Line::Ran(Attempted::new(RunId::new(1), JobId::new(1), RunState::Overdue, None));
     let replied = [(2, 2), (3, 3)].map(|(run, job)| {
@@ -469,7 +383,7 @@ fn a_deadline_passed_during_a_sleep_stalls_the_run_loudly_before_its_next_job_an
     });
     assert_eq!([stalled.has(&[overdue]), again.has(&replied)], [[], []]);
     assert!(matches!(stalled.outcome, Err(Failure::Stalled { stall: Stall::Overdue, .. })));
-    assert_eq!((owed, structuring.script.prompts().len()), ((9, 1), 3));
+    assert_eq!((owed, Script::briefs(&structuring.script).len()), ((9, 1), 3));
     assert_eq!(again.outcome?, Outcome::Structured { jobs: Count::new(2) });
     Ok(())
 }
@@ -507,7 +421,7 @@ fn a_flail_then_a_stall_halts_the_stop_before_its_third_job_and_the_stop_tells_t
         .collect::<Vec<String>>();
     assert_eq!(told, [flailed.to_string(), stalled.to_string()]);
     assert_eq!(stopped.outcome?, Outcome::Blocked);
-    assert_eq!((structuring.unstructured()?, structuring.script.prompts().len()), (9, 3));
+    assert_eq!((structuring.unstructured()?, Script::briefs(&structuring.script).len()), (9, 3));
     let overdue = Line::Ran(Attempted::new(RunId::new(3), JobId::new(2), RunState::Overdue, None));
     assert_eq!(Structured::parsed(&structuring.applying.run(&["show", "job", "2"])?), [overdue]);
     assert!(
@@ -548,7 +462,7 @@ fn a_retried_flail_owes_its_segments_again_and_the_next_run_sends_and_applies_th
         []
     );
     assert_eq!(applied.outcome?, Outcome::Structured { jobs: Count::new(1) });
-    assert_eq!(structuring.script.prompts().len(), 3);
+    assert_eq!(Script::briefs(&structuring.script).len(), 3);
     assert!(matches!(again.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(1)));
     assert!(matches!(unflailed.outcome, Err(Failure::Unflailed(job)) if job == JobId::new(2)));
     assert!(matches!(unrun.outcome, Err(Failure::Unrun(job)) if job == JobId::new(99)));
@@ -562,7 +476,7 @@ fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() 
         Structuring::over(Script::replying(&[Some(Script::MISREAD), Some(Script::MISREAD)]), Pause::new(0))?;
     let structured = structuring.structured(&["structure"]);
     let lapse = Script::MISREAD.parse::<Directives>().err().map(Lapse::from);
-    let prompts = structuring.script.prompts();
+    let prompts = Script::briefs(&structuring.script);
     let retried = prompts.first().cloned().flatten().zip(lapse.clone()).map(|(first, lapsed)| first.retried(&lapsed));
     assert_eq!(prompts.get(1).cloned().flatten(), retried);
     assert_eq!(prompts.len(), 2);
@@ -578,7 +492,7 @@ fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() 
 fn a_restarted_structure_kills_a_stored_run_past_its_deadline_whose_pid_and_start_time_match() -> Result<(), Failure> {
     let started = "Sat Nov  7 10:00:00 2026";
     let structuring =
-        Structuring::over(Script::replying(&[Some(Script::COVERING)]).living(41, started), Pause::new(0))?;
+        Structuring::over(Script::alive(Script::replying(&[Some(Script::COVERING)]), 41, started), Pause::new(0))?;
     structuring.stored_run(41, started)?;
     let structured = structuring.structured(&["structure"]);
     let again = structuring.structured(&["structure"]);
@@ -592,7 +506,7 @@ fn a_restarted_structure_kills_a_stored_run_past_its_deadline_whose_pid_and_star
 #[test]
 fn a_reused_pid_with_another_start_time_is_not_killed() -> Result<(), Failure> {
     let structuring = Structuring::over(
-        Script::replying(&[Some(Script::COVERING)]).living(41, "Sun Nov  8 09:00:00 2026"),
+        Script::alive(Script::replying(&[Some(Script::COVERING)]), 41, "Sun Nov  8 09:00:00 2026"),
         Pause::new(0),
     )?;
     structuring.stored_run(41, "Sat Nov  7 10:00:00 2026")?;
@@ -622,7 +536,7 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
     structuring.applying.run(&["refine", "n5"])?;
     structuring.applying.run(&["specify", "n5", "--artifact", "behaviour:h", "--condition", "h holds"])?;
     golden::golden!("structure.txt", &format!("design structure\n{}", structuring.structured(&["structure"]).text));
-    let briefs: String = structuring.script.prompts().iter().flatten().map(ToString::to_string).collect();
+    let briefs: String = Script::briefs(&structuring.script).iter().flatten().map(ToString::to_string).collect();
     golden::golden!("structure-briefs.txt", &briefs);
     assert!(matches!(structuring.applying.run(&["show", "n6"]), Err(Failure::Unplaced(_))));
     Ok(())
@@ -631,7 +545,7 @@ fn a_reply_leaving_job_segments_uncovered_writes_nothing_and_is_retried_with_the
 #[test]
 fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the_run_and_leaves_its_segments_owed()
 -> Result<(), Box<dyn Error>> {
-    let structuring = Structuring::over(Script::default(), Pause::new(0))?;
+    let structuring = Structuring::over(Scripted::default(), Pause::new(0))?;
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let errs = Agent::new(
         "sh",
@@ -667,7 +581,7 @@ fn an_agent_that_errs_writes_no_result_cannot_start_or_cannot_be_read_stalls_the
 
 #[test]
 fn a_stop_whose_agent_cannot_be_started_blocks_loudly_and_closes_its_job_stalled() -> Result<(), Box<dyn Error>> {
-    let structuring = Structuring::over(Script::default(), Pause::new(0))?;
+    let structuring = Structuring::over(Scripted::default(), Pause::new(0))?;
     let scratch = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let stopped = [(); 2].map(|()| {
         let missing = Agent::new("/nonexistent/claude", &[]);
@@ -716,7 +630,7 @@ fn a_stop_ingests_what_was_said_since_and_structures_it_and_a_stop_after_it_read
 
 #[test]
 fn a_prompt_ingests_silently_and_leaves_what_it_ingested_to_the_stop() -> Result<(), Box<dyn Error>> {
-    let structuring = Structuring::over(Script::default(), Pause::new(0))?;
+    let structuring = Structuring::over(Scripted::default(), Pause::new(0))?;
     let before = structuring.unstructured()?;
     let linked = Session::linked();
     let said = [linked.lines, Session::line(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000006", "null", "more")];
