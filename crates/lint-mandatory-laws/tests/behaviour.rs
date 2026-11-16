@@ -324,3 +324,18 @@ fn the_message_names_the_fix() {
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
     assert!(pair.dirty().is_some());
 }
+
+#[test]
+fn a_record_without_crud_laws_names_the_crud_fix() {
+    let record = [Sources::file("src/lib.rs", Text::new(RECORD))];
+    let model = Reader::read_files(&record);
+    let unstored = MandatoryLaws::report(&model);
+    let messages: Vec<String> = unstored.violations().iter().map(ToString::to_string).collect();
+    assert_eq!(messages.len(), 1);
+    assert!(
+        messages
+            .iter()
+            .all(|message| message.contains("`A` is a stored record without create, read, update and delete laws"))
+    );
+    assert!(messages.iter().all(|message| message.contains("laws::crud!")));
+}
