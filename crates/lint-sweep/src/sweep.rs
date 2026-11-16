@@ -95,27 +95,21 @@ struct Sweeping<'file, 'run> {
 
 impl<'run> Sweeping<'_, 'run> {
     fn entered(&mut self, kind: Kind, enter: impl Fn(&mut Watching<'run>) -> Descend) -> Entered {
-        self.muting.entering();
-        let called: Vec<Index> =
-            self.listening.get(kind).iter().filter_map(|index| self.muting.listening(*index)).collect();
-        let chosen: Vec<(Index, Descend)> = called
-            .iter()
-            .filter_map(|index| Some((*index, enter(&mut **index.entry_mut(&mut self.watchers)?))))
-            .filter(|(_, descend)| *descend != Descend::Into)
-            .collect();
-        chosen
-            .iter()
-            .filter(|(_, descend)| *descend != Descend::Unfold)
-            .for_each(|(index, _)| self.muting.silence(*index));
-        let expanding = chosen.iter().filter(|(_, descend)| *descend != Descend::Over).map(|(index, _)| *index);
-        Entered { expanding: expanding.collect(), called }
+        let Sweeping { listening, watchers, muting, .. } = self;
+        muting.entering();
+        listening.get(kind).iter().fold(Entered::default(), |entered, index| {
+            let watcher = muting.heard(*index).and_then(|heard| heard.entry_mut(watchers));
+            entered.chosen(muting, *index, watcher.map(|found| enter(&mut **found)))
+        })
     }
 
-    fn left(&mut self, entered: &Entered, leave: impl Fn(&mut Watching<'run>)) {
-        entered.called.iter().for_each(|index| {
-            index.entry_mut(&mut self.watchers).into_iter().for_each(|watcher| leave(&mut **watcher));
+    fn left(&mut self, kind: Kind, leave: impl Fn(&mut Watching<'run>)) {
+        let Sweeping { listening, watchers, muting, .. } = self;
+        let heard = listening.get(kind);
+        heard.iter().filter_map(|index| muting.heard(*index)).for_each(|index| {
+            index.entry_mut(watchers).into_iter().for_each(|watcher| leave(&mut **watcher));
         });
-        self.muting.leaving(&entered.called);
+        muting.leaving(heard);
     }
 
     fn around_kind(
@@ -125,9 +119,9 @@ impl<'run> Sweeping<'_, 'run> {
         descend: &mut dyn FnMut(&mut Self),
         leave: impl Fn(&mut Watching<'run>),
     ) {
-        let entered = self.entered(kind, enter);
+        self.entered(kind, enter);
         self.muting.awake().into_iter().for_each(|_| descend(self));
-        self.left(&entered, leave);
+        self.left(kind, leave);
     }
 
     fn expanded(&mut self, entered: &Entered, invocation: &Macro) {
@@ -138,10 +132,18 @@ impl<'run> Sweeping<'_, 'run> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Entered {
     expanding: Vec<Index>,
-    called: Vec<Index>,
+}
+
+impl Entered {
+    fn chosen(mut self, muting: &mut Muting, index: Index, descend: Option<Descend>) -> Entered {
+        let kept = descend.filter(|chosen| *chosen != Descend::Into);
+        kept.filter(|chosen| *chosen != Descend::Unfold).into_iter().for_each(|_| muting.silence(index));
+        self.expanding.extend(kept.filter(|chosen| *chosen != Descend::Over).map(|_| index));
+        self
+    }
 }
 
 impl Sweeping<'_, '_> {
@@ -151,7 +153,7 @@ impl Sweeping<'_, '_> {
         let entered = self.entered(Kind::Macro, |watcher| watcher.on_macro(node, &facts));
         self.muting.awake().into_iter().for_each(|_| descend(self));
         entered.expanding.first().into_iter().for_each(|_| self.expanded(&entered, node));
-        self.left(&entered, |watcher| watcher.off_macro(node, &facts));
+        self.left(Kind::Macro, |watcher| watcher.off_macro(node, &facts));
     }
 
     fn ident_around(&mut self, node: &syntax::Ident) {

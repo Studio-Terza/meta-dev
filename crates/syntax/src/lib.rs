@@ -1,7 +1,11 @@
+mod lexed;
+mod lexeme;
 mod readers;
 mod walk;
 
-pub use proc_macro2::{Delimiter, Group, Ident, LineColumn, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
+pub use lexed::{Lexed, Lexeme, Place, TokenTable};
+pub use lexeme::{LexemeKind, Lexemes, Named, Quoted, Symbol};
+pub use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 pub use quote::{ToTokens, format_ident, quote, quote_spanned};
 pub use readers::applied::Applied;
 pub use readers::block_items::BlockItems;

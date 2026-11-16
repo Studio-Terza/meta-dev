@@ -1,13 +1,26 @@
-use body_shape::{Literals, Reading, Shape};
+use body_shape::{Labels, Literals, Reading, Shape, TokenCount};
 use equivalence::{Keyed, Nested};
 use lint_core::Site;
 
 use crate::extent::Extent;
 use crate::kind::Kind;
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Exact {
+    shape: Shape,
+    labels: Labels,
+}
+
+impl From<&Exact> for TokenCount {
+    fn from(exact: &Exact) -> TokenCount {
+        exact.shape.size()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Occurrence<'file> {
     shape: Shape,
+    labels: Labels,
     literals: Literals,
     site: Site<'file>,
     extent: Extent,
@@ -16,7 +29,14 @@ pub(crate) struct Occurrence<'file> {
 
 impl<'file> Occurrence<'file> {
     pub(crate) fn new(reading: Reading, site: Site<'file>, extent: Extent, kind: Kind) -> Occurrence<'file> {
-        Occurrence { shape: reading.shape(), literals: reading.into_literals(), site, extent, kind }
+        Occurrence {
+            shape: reading.shape(),
+            labels: reading.labels().clone(),
+            literals: reading.into_literals(),
+            site,
+            extent,
+            kind,
+        }
     }
 
     pub(crate) fn literals(&self) -> &Literals {
@@ -29,10 +49,10 @@ impl<'file> Occurrence<'file> {
 }
 
 impl Keyed for Occurrence<'_> {
-    type Key = Shape;
+    type Key = Exact;
 
-    fn key(&self) -> Shape {
-        self.shape
+    fn key(&self) -> Exact {
+        Exact { shape: self.shape, labels: self.labels.clone() }
     }
 }
 

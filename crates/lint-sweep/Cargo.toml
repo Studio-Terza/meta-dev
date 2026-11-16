@@ -18,6 +18,7 @@ syntax = { path = "../syntax" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-fixtures = { path = "../lint-fixtures" }
+syntax = { path = "../syntax" }
 
 [lints]
 workspace = true

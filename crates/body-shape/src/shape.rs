@@ -1,3 +1,4 @@
+mod labels;
 mod literals;
 mod mark;
 mod neighbours;
@@ -15,12 +16,14 @@ use syntax::TokenStream;
 use crate::token_count::TokenCount;
 use neighbours::Neighbours;
 use raw_token::RawToken;
-use shape_key::ShapeKey;
+pub(crate) use shape_key::ShapeKey;
 use slots::Slots;
-use spelling::Sign;
 
+pub(crate) use labels::Code;
+pub use labels::Labels;
 pub use literals::Literals;
 pub(crate) use shape_token::ShapeToken;
+pub(crate) use spelling::{Sign, Spelled, Spelling, Spoken};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Shape {
@@ -32,6 +35,10 @@ impl Shape {
     #[must_use]
     pub fn size(self) -> TokenCount {
         self.size
+    }
+
+    pub(crate) fn ranged(size: TokenCount, key: ShapeKey) -> Shape {
+        Shape { size, key }
     }
 
     fn read(raw: &[RawToken], equivalence: Equivalence) -> Shape {
@@ -49,6 +56,7 @@ impl Shape {
 pub struct Reading {
     shape: Shape,
     literals: Literals,
+    labels: Labels,
 }
 
 impl Reading {
@@ -58,7 +66,16 @@ impl Reading {
         let shape = Shape::read(&raw, equivalence);
         let signs: Vec<Sign> = Neighbours::all(&raw).map(Neighbours::sign).collect();
         let literals = raw.into_iter().zip(signs).filter_map(|(token, sign)| token.spelled(sign)).collect();
-        Reading { shape, literals }
+        Reading { shape, literals, labels: Labels::default() }
+    }
+
+    pub(crate) fn new(shape: Shape, literals: Literals, labels: Labels) -> Reading {
+        Reading { shape, literals, labels }
+    }
+
+    #[must_use]
+    pub fn labels(&self) -> &Labels {
+        &self.labels
     }
 
     #[must_use]
