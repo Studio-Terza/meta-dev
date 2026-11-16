@@ -138,8 +138,10 @@ impl BodyGroup {
 }
 
 impl Gathers<BodyGroup> for BodyGroup {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        vec![&mut self.rebound, &mut self.invocations, &mut self.branches, &mut self.repetitions, &mut self.reads]
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        let members: [&mut Watching<'_>; _] =
+            [&mut self.rebound, &mut self.invocations, &mut self.branches, &mut self.repetitions, &mut self.reads];
+        members
     }
 
     fn gathered(self) -> BodyGroup {

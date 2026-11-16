@@ -33,7 +33,7 @@ pub struct SupportGathering<'head> {
 }
 
 impl Gathers<SupportPaths> for SupportGathering<'_> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(&mut self.modules)
     }
 

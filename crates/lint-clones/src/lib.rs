@@ -48,7 +48,7 @@ impl Gleaning for Clones {
 }
 
 impl<'head> Gathers<CloneFindings<'head>> for CloneSites<'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

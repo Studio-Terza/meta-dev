@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lint_core::{Address, Descend, Kind, Violation, Watch};
+use lint_core::{Address, Descend, Kind, Violation, Watch, Watching};
 
 use crate::{Finds, Gathers};
 
@@ -104,7 +104,7 @@ struct Open<Group> {
 impl<Group: Gathers<Group>> From<Attachment<Group>> for Open<Group> {
     fn from(attachment: Attachment<Group>) -> Open<Group> {
         let mut group = attachment.group;
-        let watching = group.watching();
+        let watching: Vec<&mut Watching<'_>> = group.watching().into_iter().collect();
         let listeners = watching.iter().map(|_| Listener::default()).collect();
         let mut heard: Vec<Kind> = watching.iter().flat_map(|member| member.kinds().iter().copied()).collect();
         heard.sort();
@@ -115,9 +115,8 @@ impl<Group: Gathers<Group>> From<Attachment<Group>> for Open<Group> {
 
 impl<Group: Gathers<Group>> Open<Group> {
     fn heard<'ast>(&mut self, kind: Kind, call: &mut dyn FnMut(&mut dyn Watch<'ast>) -> Descend) {
-        let watching = self.group.watching();
-        self.listeners.resize_with(watching.len(), Listener::default);
-        watching
+        self.group
+            .watching()
             .into_iter()
             .zip(self.listeners.iter_mut())
             .for_each(|(member, listener)| listener.heard(member, kind, call));
@@ -132,9 +131,11 @@ impl<Group: Gathers<Group>> Open<Group> {
     }
 
     fn left<'ast>(&mut self, kind: Kind, at: Address, call: &mut dyn FnMut(&mut dyn Watch<'ast>)) {
-        let watching = Some(()).filter(|()| self.heard.contains(&kind)).map_or_default(|()| self.group.watching());
-        watching
+        Some(())
+            .filter(|()| self.heard.contains(&kind))
+            .map(|()| self.group.watching())
             .into_iter()
+            .flatten()
             .zip(self.listeners.iter_mut())
             .for_each(|(member, listener)| listener.left(member, kind, at, call));
     }

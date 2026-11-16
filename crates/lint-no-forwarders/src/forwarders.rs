@@ -130,8 +130,8 @@ impl<'ast> Watch<'ast> for Forwarders<'_> {
 }
 
 impl<'file> Gathers<Forwarded<'file>> for Forwarders<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        vec![self]
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        std::iter::once::<&mut Watching<'_>>(self)
     }
 
     fn gathered(self) -> Forwarded<'file> {

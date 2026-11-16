@@ -68,7 +68,7 @@ impl<'head> From<Parsed<'_, 'head>> for ImplGathering<'head> {
 }
 
 impl<'head> Gathers<ShippedImpls<'head>> for ImplGathering<'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let all: Vec<&mut Watching<'_>> = vec![&mut self.reading, &mut self.inners];
         self.shipped.map_or_default(|_| all)
     }

@@ -83,7 +83,7 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
 }
 
 impl<'head> Gathers<ShippedModule<'head>> for ModuleGathering<'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let module = self.module.as_ref();
         module.map_or_default(|_| Sweep::alone(&mut self.uses))
     }
@@ -120,7 +120,7 @@ impl<'ast> Watch<'ast> for UsePaths {
 }
 
 impl Gathers<Vec<UsePath>> for UsePaths {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

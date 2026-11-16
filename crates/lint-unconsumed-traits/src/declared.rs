@@ -82,8 +82,8 @@ impl<'ast> Watch<'ast> for Declared<'_> {
 }
 
 impl<'file> Gathers<Declarations<'file>> for Declared<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        vec![self]
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        std::iter::once::<&mut Watching<'_>>(self)
     }
 
     fn gathered(self) -> Declarations<'file> {

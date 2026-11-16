@@ -28,7 +28,7 @@ impl From<&SourceFile> for Consuming {
 }
 
 impl Gathers<Consumers> for Consuming {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 

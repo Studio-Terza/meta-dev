@@ -23,8 +23,8 @@ pub(crate) struct Scoring<'file> {
 }
 
 impl<'file> Gathers<Scoring<'file>> for Scoring<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        vec![&mut self.branches]
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        std::iter::once::<&mut Watching<'_>>(&mut self.branches)
     }
 
     fn gathered(self) -> Scoring<'file> {
@@ -62,8 +62,8 @@ impl<'file> Functions<'file> {
 struct Scanning<'file>(Scoped<Functions<'file>, Scoring<'file>>);
 
 impl<'file> Gathers<Functions<'file>> for Scanning<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        vec![&mut self.0]
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        std::iter::once::<&mut Watching<'_>>(&mut self.0)
     }
 
     fn gathered(self) -> Functions<'file> {

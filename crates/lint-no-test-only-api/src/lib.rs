@@ -56,7 +56,7 @@ pub struct TestOnly<'head> {
 }
 
 impl<'head> Gathers<FileManifest<'head>> for FileManifest<'head> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Vec::new()
     }
 
@@ -130,7 +130,7 @@ pub struct Offered<'file> {
 }
 
 impl<'file> Gathers<Offered<'file>> for Offered<'file> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         self.watchers.watching()
     }
 

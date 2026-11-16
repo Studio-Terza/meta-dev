@@ -24,7 +24,7 @@ pub struct References(ForeignReferences);
 pub struct ReferenceGathering(Reading);
 
 impl Gathers<References> for ReferenceGathering {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         self.0.watching()
     }
 
