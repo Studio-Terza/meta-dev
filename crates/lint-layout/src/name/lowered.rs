@@ -11,6 +11,6 @@ impl FromIterator<char> for Lowered {
 
 impl From<Lowered> for Name {
     fn from(lowered: Lowered) -> Name {
-        Name(lowered.0)
+        Name(std::sync::Arc::from(lowered.0))
     }
 }

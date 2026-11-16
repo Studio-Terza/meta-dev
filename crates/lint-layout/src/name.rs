@@ -1,3 +1,4 @@
+mod boundary;
 mod camel_word;
 mod casing;
 mod length;
@@ -5,13 +6,15 @@ mod lowered;
 mod prefix;
 
 use std::ffi::OsStr;
-use std::fmt;
+use std::fmt::{self, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 use syntax::{Ident, ItemImpl, Type};
 
 use crate::matching::Matching;
 use crate::word::Word;
+use boundary::Spelling;
 pub use camel_word::CamelWord;
 pub use casing::Casing;
 pub use length::Length;
@@ -22,7 +25,7 @@ use newtype::proptest::strategy::{BoxedStrategy, Strategy};
 pub use prefix::Prefix;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Name(String);
+pub struct Name(Arc<str>);
 
 impl Name {
     #[must_use]
@@ -64,12 +67,12 @@ impl Name {
             .get(..spelled.len())
             .filter(|head| *head == spelled)
             .and_then(|_| self.0.get(spelled.len()..))
-            .map(|rest| Name([closing.into_inner(), rest].concat()))
+            .map(|rest| Name(Spelling::joined(&[closing.into_inner(), rest])))
     }
 
     #[must_use]
     pub fn suffixed(&self, ending: Word<'_>) -> Name {
-        Name([self.0.as_str(), ending.into_inner()].concat())
+        Name(Spelling::joined(&[&self.0, ending.into_inner()]))
     }
 
     #[must_use]
@@ -78,7 +81,7 @@ impl Name {
         letters
             .chunk_by(|left, right| left.is_alphanumeric() == right.is_alphanumeric())
             .filter(|chunk| chunk.iter().all(|letter| letter.is_alphanumeric()))
-            .map(|chunk| Name(chunk.iter().collect()))
+            .map(|chunk| Name(Spelling::written(|written| written.extend(chunk))))
             .collect()
     }
 
@@ -104,13 +107,13 @@ impl Name {
 
 impl From<&str> for Name {
     fn from(text: &str) -> Name {
-        Name(text.to_owned())
+        Name(Arc::from(text))
     }
 }
 
 impl AsRef<Path> for Name {
     fn as_ref(&self) -> &Path {
-        Path::new(&self.0)
+        Path::new(&*self.0)
     }
 }
 
@@ -122,19 +125,19 @@ impl AsRef<str> for Name {
 
 impl From<Word<'_>> for Name {
     fn from(word: Word<'_>) -> Name {
-        Name(word.into_inner().to_owned())
+        Name(Arc::from(word.into_inner()))
     }
 }
 
 impl From<&Ident> for Name {
     fn from(ident: &Ident) -> Name {
-        Name(ident.to_string())
+        Name(Spelling::written(|written| write!(written, "{ident}").unwrap_or_default()))
     }
 }
 
 impl From<&OsStr> for Name {
     fn from(segment: &OsStr) -> Name {
-        Name(segment.to_string_lossy().into_owned())
+        Name(Arc::from(segment.to_string_lossy()))
     }
 }
 
@@ -149,7 +152,7 @@ impl Arbitrary for Name {
     type Strategy = BoxedStrategy<Name>;
 
     fn arbitrary_with((): ()) -> BoxedStrategy<Name> {
-        any::<String>().prop_map(Name).boxed()
+        any::<String>().prop_map(|text| Name(Arc::from(text))).boxed()
     }
 }
 
