@@ -6,7 +6,7 @@ pub use quote::{ToTokens, format_ident, quote, quote_spanned};
 pub use readers::applied::Applied;
 pub use readers::block_items::BlockItems;
 pub use readers::boundary::{LitText, MemberText, Past, PatEdge, PatReached, PatSpine, PatTree, Spine, TypeSpine};
-pub use readers::expr_shapes::{Application, Constant, Constructed};
+pub use readers::expr_shapes::{Application, Constructed};
 pub use readers::macro_tree::MacroTree;
 pub use readers::nested::Nested;
 pub use readers::type_fold::{ExprTree, Fold, TypeTree};
