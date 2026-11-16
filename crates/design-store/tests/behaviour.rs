@@ -19,7 +19,7 @@ use design_runs::{
 use design_store::{
     AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Holding, JobRepeated, Linked, NextNode,
     Placed, Planting, Prefixed, Prefixes, ProjectRoot, Refusal, Remit, Resolved, Resolving, Restaged, Scope,
-    SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, StreamSchema, Unseen,
+    SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema, Unseen,
 };
 use dispatch_ports::{Deadline, Pid, Wall};
 use file_ports::{Bytes, Files, Memory};
@@ -35,7 +35,7 @@ use port_core::{Op, Port, Run};
 use sqlite_ports::SqliteOpener;
 use store_ports::Record as _;
 use store_ports::{Batch, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version, Written};
-use stream::{Message, Relation, Stream};
+use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{
     Authorship, Body, ClaudeCodeDir, Cursor, Instant, Malformed, SessionId, Skipped, Transcripts, Uuid,
 };
@@ -94,7 +94,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
     let segments: Vec<String> = shown
         .segments()
         .iter()
-        .map(|segment| format!("{} {}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment)))
+        .map(|segment| format!("{} {}", segment.ordinal(), AsRef::<Shape>::as_ref(segment)))
         .collect();
     assert_eq!(segments, ["0 item", "1 item"]);
     let first = shown.segments().first().map(Body::from).ok_or("no segment")?;
@@ -398,7 +398,7 @@ impl Listed {
             .segments()
             .iter()
             .map(|segment| {
-                format!("{} {} {:?}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment), Body::from(segment))
+                format!("{} {} {:?}", segment.ordinal(), AsRef::<Shape>::as_ref(segment), Body::from(segment))
             })
             .collect())
     }

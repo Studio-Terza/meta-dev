@@ -9,7 +9,7 @@ use design_model::{
     Standing, Title,
 };
 use design_runs::RunState;
-use design_store::{SessionCursors, ShapeName, ShownMessage, StreamSchema};
+use design_store::{SessionCursors, ShownMessage, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar_search::Term;
@@ -25,7 +25,7 @@ use store_ports::{
     Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version,
     Written,
 };
-use stream::Relation;
+use stream::{Relation, Shape};
 use strum::VariantArray;
 use tempfile::TempDir;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
@@ -170,9 +170,7 @@ impl Place {
         Ok(shown
             .segments()
             .iter()
-            .map(|segment| {
-                format!("{} {} {}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment), Body::from(segment))
-            })
+            .map(|segment| format!("{} {} {}", segment.ordinal(), AsRef::<Shape>::as_ref(segment), Body::from(segment)))
             .collect())
     }
 
@@ -188,7 +186,7 @@ impl Place {
     }
 
     fn refused(remark: Remark) -> Refusal {
-        let stored = vec!["0 question First point. Second point.".to_owned()];
+        let stored = vec!["0 sentence First point. Second point.".to_owned()];
         Refusal { remark, refused: Some(Place::REFERENCED.to_owned()), applied: Older::versions(), stored }
     }
 
@@ -479,7 +477,7 @@ VALUES
   (
     'o1',
     0,
-    'question',
+    'sentence',
     'First point. Second point.'
   )
 "#
@@ -757,7 +755,7 @@ VALUES
   (
     '00000000-0000-4000-8000-000000000002',
     0,
-    'question',
+    'sentence',
     'First point. See 00000000-0000-4000-8000-000000000001.'
   )
 "#
@@ -946,7 +944,7 @@ fn a_rederivation_that_would_renumber_a_cited_segment_refuses_and_leaves_the_lin
         )
     );
     assert_eq!(place.applied()?, Older::versions());
-    assert_eq!(place.shown(Cited::CITING)?, [format!("0 question First point. See {}.", Cited::CITED)]);
+    assert_eq!(place.shown(Cited::CITING)?, [format!("0 sentence First point. See {}.", Cited::CITED)]);
     assert_eq!(place.linked(Cited::CITING)?, [format!("{}#0 cites {}", Cited::CITING, Cited::CITED)]);
     Ok(())
 }
@@ -961,7 +959,7 @@ fn a_rederivation_refuses_to_change_a_segment_that_a_table_added_later_refers_to
     assert!(matches!(&refused, StoreFailure::Refused(_)));
     assert_eq!(refused.to_string(), Place::REFERENCED);
     assert_eq!(place.applied()?, Older::versions());
-    assert_eq!(place.shown("o1")?, ["0 question First point. Second point."]);
+    assert_eq!(place.shown("o1")?, ["0 sentence First point. Second point."]);
     Ok(())
 }
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  segments (message, ordinal, shape, body)\nVALUES\n  (\n    '00000000-0000-4000-8000-000000000001',\n    0,\n    'sentence',\n    'Only one.'\n  ),\n  (\n    '00000000-0000-4000-8000-000000000002',\n    0,\n    'sentence',\n    'First point. See 00000000-0000-4000-8000-000000000001.'\n  )\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "3fb55f3b24ca56868467f62a3051f218d63c0a63507651715e63c38754a4a58a"
+}

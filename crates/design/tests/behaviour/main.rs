@@ -26,9 +26,7 @@ use design_model::{
     Title, Vague,
 };
 use design_runs::{Excerpt, RunState};
-use design_store::{
-    AppliedId, Linked, Planting, Resolved, Resolving, ShapeName, ShownMessage, ShownNode, Stored, StreamSchema,
-};
+use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 use grammar_notes::{Cite, Quote};
@@ -2111,14 +2109,8 @@ impl Generated {
         any::<String>().boxed()
     }
 
-    fn word() -> BoxedStrategy<String> {
-        "[A-Za-z0-9_][A-Za-z0-9_-]{0,15}".boxed()
-    }
-
-    fn shape() -> BoxedStrategy<ShapeName> {
-        prop_oneof![Generated::word(), select(Shape::VARIANTS).prop_map(|shape| shape.to_string())]
-            .prop_map(ShapeName::new)
-            .boxed()
+    fn shape() -> BoxedStrategy<Shape> {
+        select(Shape::VARIANTS).boxed()
     }
 
     fn relation() -> BoxedStrategy<Relation> {
@@ -2496,7 +2488,7 @@ impl Spread {
     fn segment(prefix: &str, ordinal: u32, body: &str) -> Result<Line, Box<dyn Error>> {
         Ok(Line::Segment {
             segment: Spread::reference(prefix, ordinal),
-            shape: ShapeName::new("sentence".to_owned()),
+            shape: Shape::Sentence,
             body: Body::try_new(body.to_owned())?,
         })
     }

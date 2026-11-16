@@ -16,7 +16,7 @@ mod stored;
 mod stream_schema;
 
 pub use asked_earlier::{Asked, AskedEarlier};
-pub use boundary::{CursorRow, CursorRowNew, Hit, LinkRow, ShapeName};
+pub use boundary::{CursorRow, CursorRowNew, Hit, LinkRow};
 pub use cursors::Cursors;
 pub use earlier_lines::EarlierLines;
 pub use imported_notes::{ImportedEnding, ImportedNotes, Noted};

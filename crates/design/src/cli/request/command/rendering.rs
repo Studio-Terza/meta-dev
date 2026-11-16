@@ -2,12 +2,10 @@ use design_model::{
     Dropped, NodeId, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Staging, Terminal,
 };
 use design_runs::Unplaced;
-use design_store::{
-    Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, Remarking, ShapeName, Shortest, Stored,
-};
+use design_store::{Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, Remarking, Shortest, Stored};
 use newtype::Wrapping;
 use store_ports::{Store, StoreFailure};
-use stream::{Anchors, Relation, SegmentId};
+use stream::{Anchors, Relation, SegmentId, Shape};
 use structurer::SegmentRef;
 use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
 
@@ -102,10 +100,10 @@ impl Refs {
         [Line::Message { uuid: uuid.clone(), author: *author, session: session.clone(), stamp: stamp.clone() }]
             .into_iter()
             .chain(stored.segments().iter().map(|segment| {
-                let shape: &ShapeName = segment.as_ref();
+                let shape: &Shape = segment.as_ref();
                 Line::Segment {
                     segment: self.reference(&Segment::new(uuid.clone(), segment.ordinal())),
-                    shape: shape.clone(),
+                    shape: *shape,
                     body: Body::from(segment),
                 }
             }))

@@ -6,7 +6,7 @@ use design_model::{
     Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
 };
 use design_runs::{Excerpt, RunState};
-use design_store::{AppliedId, ShapeName};
+use design_store::AppliedId;
 use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
 use grammar_cited::Cited;
@@ -118,7 +118,7 @@ pub enum Line {
     },
     Segment {
         segment: SegmentRef,
-        shape: ShapeName,
+        shape: Shape,
         body: Body,
     },
     Link {
