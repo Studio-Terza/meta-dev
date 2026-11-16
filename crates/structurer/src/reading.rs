@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use design_model::Title;
-use grammar_directive::{Lexed, Line, Location, Piece};
+use grammar_directive::{Classes, Lexed, Line, Location, Piece};
 
 use crate::misread::Wanted;
 use crate::verb::{By, New, Verb};
@@ -72,7 +72,7 @@ impl<'line> Call<'line> {
 
     pub(crate) fn opened(reader: &mut Reader<'line>, name: &'line Lexed) -> Result<Call<'line>, Misread> {
         let open = reader.next();
-        let opened = Some(open).filter(|candidate| Shape::shaped(candidate.piece()) == Shape::Open);
+        let opened = Some(open).filter(|candidate| candidate.piece().classed::<Shape>() == Shape::Open);
         opened.ok_or_else(|| Misread::expected(open, Wanted::Open))?;
         Term::arguments(reader, Vec::new()).map(|arguments| Call { name, arguments })
     }
@@ -98,12 +98,12 @@ impl<'line> Term<'line> {
     pub(crate) fn arguments(reader: &mut Reader<'line>, read: Vec<Term<'line>>) -> Result<Vec<Term<'line>>, Misread> {
         let arguments: Vec<Term<'line>> = read.into_iter().chain([Term::read(reader)?]).collect();
         let separator = reader.next();
-        Shape::shaped(separator.piece()).separated(separator, reader, arguments)
+        separator.piece().classed::<Shape>().separated(separator, reader, arguments)
     }
 
     pub(crate) fn read(reader: &mut Reader<'line>) -> Result<Term<'line>, Misread> {
         let first = reader.next();
-        Shape::shaped(first.piece()).term(first, reader)
+        first.piece().classed::<Shape>().term(first, reader)
     }
 
     pub(crate) fn atom(&self) -> Option<&'line Lexed> {
@@ -193,17 +193,6 @@ impl<'line> Term<'line> {
 }
 
 impl Shape {
-    pub(crate) fn shaped(piece: &Piece) -> Shape {
-        match piece {
-            Piece::Open => Shape::Open,
-            Piece::Close => Shape::Close,
-            Piece::Comma => Shape::Comma,
-            Piece::Word(_) => Shape::Word,
-            Piece::Fresh(_) | Piece::Segment(_) | Piece::Quoted(_) => Shape::Atom,
-            Piece::Break | Piece::End | Piece::Stray(_) => Shape::Other,
-        }
-    }
-
     pub(crate) fn separated<'line>(
         self,
         separator: &'line Lexed,
@@ -221,7 +210,7 @@ impl Shape {
 
     pub(crate) fn term<'line>(self, first: &'line Lexed, reader: &mut Reader<'line>) -> Result<Term<'line>, Misread> {
         match self {
-            Shape::Word => Following::peeked(reader.peek()).term(first, reader),
+            Shape::Word => reader.peek().classed::<Following>().term(first, reader),
             Shape::Atom => Ok(Term::Atom(first)),
             Shape::Open | Shape::Close | Shape::Comma | Shape::Other => Err(Misread::expected(first, Wanted::Argument)),
         }
@@ -229,25 +218,36 @@ impl Shape {
 }
 
 impl Following {
-    pub(crate) fn peeked(piece: &Piece) -> Following {
-        match piece {
-            Piece::Open => Following::Open,
-            Piece::Close
-            | Piece::Comma
-            | Piece::Break
-            | Piece::End
-            | Piece::Word(_)
-            | Piece::Fresh(_)
-            | Piece::Segment(_)
-            | Piece::Quoted(_)
-            | Piece::Stray(_) => Following::Other,
-        }
-    }
-
     pub(crate) fn term<'line>(self, first: &'line Lexed, reader: &mut Reader<'line>) -> Result<Term<'line>, Misread> {
         match self {
             Following::Open => Call::opened(reader, first).map(Term::Call),
             Following::Other => Ok(Term::Atom(first)),
         }
     }
+}
+
+impl Classes for Shape {
+    const OPEN: Shape = Shape::Open;
+    const CLOSE: Shape = Shape::Close;
+    const COMMA: Shape = Shape::Comma;
+    const BREAK: Shape = Shape::Other;
+    const END: Shape = Shape::Other;
+    const WORD: Shape = Shape::Word;
+    const FRESH: Shape = Shape::Atom;
+    const SEGMENT: Shape = Shape::Atom;
+    const QUOTED: Shape = Shape::Atom;
+    const STRAY: Shape = Shape::Other;
+}
+
+impl Classes for Following {
+    const OPEN: Following = Following::Open;
+    const CLOSE: Following = Following::Other;
+    const COMMA: Following = Following::Other;
+    const BREAK: Following = Following::Other;
+    const END: Following = Following::Other;
+    const WORD: Following = Following::Other;
+    const FRESH: Following = Following::Other;
+    const SEGMENT: Following = Following::Other;
+    const QUOTED: Following = Following::Other;
+    const STRAY: Following = Following::Other;
 }

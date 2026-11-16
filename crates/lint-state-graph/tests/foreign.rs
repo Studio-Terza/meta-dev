@@ -131,19 +131,28 @@ const CASES: [Case; 20] = [
     Case::new(
         Title::new("an enum in an inline module"),
         &[LIB_X, INLINE_SHAPE_X, INLINE_AREA_X],
-        Flagged::new(&["crates/x/src/area.rs:5"]),
+        Flagged::new(&["crates/x/src/area.rs:5", "crates/x/src/area.rs:6"]),
     ),
     Case::new(Title::new("a unit enum elsewhere"), &[LIB_X, COLOR_X, PAINT_X], Flagged::new(&[])),
-    Case::new(Title::new("arms that only tabulate"), &[LIB_X, WIDE_SHAPE_X, TABLES_X], Flagged::new(&[])),
+    Case::new(
+        Title::new("arms that only tabulate are dispatch on the enum too"),
+        &[LIB_X, WIDE_SHAPE_X, TABLES_X],
+        Flagged::new(&[
+            "crates/x/src/area.rs:5",
+            "crates/x/src/area.rs:6",
+            "crates/x/src/area.rs:7",
+            "crates/x/src/area.rs:8",
+        ]),
+    ),
     Case::new(
         Title::new("a match in a method"),
         &[LIB_X, SUM_SHAPE_X, METHOD_X],
-        Flagged::new(&["crates/x/src/area.rs:6"]),
+        Flagged::new(&["crates/x/src/area.rs:6", "crates/x/src/area.rs:7"]),
     ),
     Case::new(
         Title::new("a match in an inline module"),
         &[LIB_X, SUM_SHAPE_X, MODULE_X],
-        Flagged::new(&["crates/x/src/area.rs:6"]),
+        Flagged::new(&["crates/x/src/area.rs:6", "crates/x/src/area.rs:7"]),
     ),
     Case::new(Title::new("if let"), &[LIB_X, SUM_SHAPE_X, IF_LET_X], Flagged::new(&["crates/x/src/area.rs:4"])),
     Case::new(Title::new("let else"), &[LIB_X, SUM_SHAPE_X, LET_ELSE_X], Flagged::new(&["crates/x/src/area.rs:4"])),

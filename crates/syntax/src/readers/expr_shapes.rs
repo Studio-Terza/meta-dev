@@ -1,27 +1,6 @@
 use syn::{Expr, ExprCall, ExprMethodCall, Ident};
 
 #[derive(Debug)]
-pub struct Constant;
-
-impl Constant {
-    #[must_use]
-    pub fn composed(expr: &Expr) -> Option<&Expr> {
-        Self::parts(expr).map(|()| expr)
-    }
-
-    fn parts(expr: &Expr) -> Option<()> {
-        match expr {
-            Expr::Lit(_) | Expr::Path(_) => Some(()),
-            Expr::Paren(inner) => Self::parts(&inner.expr),
-            Expr::Unary(inner) => Self::parts(&inner.expr),
-            Expr::Tuple(tuple) => tuple.elems.iter().try_for_each(Self::parts),
-            Expr::Array(array) => array.elems.iter().try_for_each(Self::parts),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct Application;
 
 impl Application {

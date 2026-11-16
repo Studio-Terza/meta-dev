@@ -8,9 +8,9 @@ use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
 use dispatch_ports::{
-    AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Due, Ended, Errored, Finished,
-    Job, Output, Pause, Pid, Prompt, Reply, Stall, Started, Stderr, Timeout, Tokens, Told, Unreadable, Usage, Wall,
-    Watch, Watched, Woke, clock_ops, dispatch_ops,
+    AgentRun, Bell, ClockFiller, Deadline, Dispatch, DispatchFailure, DispatchFiller, Due, Ended, Errored, Fault,
+    Finished, Job, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told,
+    Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::sample::select;
@@ -325,3 +325,35 @@ laws::table!(
         0 => Duration::ZERO,
     ]
 );
+
+#[derive(Debug, PartialEq, Eq)]
+enum Cause {
+    Errored,
+    Unreadable,
+    Overdue,
+    Unspawned,
+    Failed,
+}
+
+impl Stalled for Cause {
+    const ERRORED: Cause = Cause::Errored;
+    const UNREADABLE: Cause = Cause::Unreadable;
+    const OVERDUE: Cause = Cause::Overdue;
+    const UNSPAWNED: Cause = Cause::Unspawned;
+    const FAILED: Cause = Cause::Failed;
+}
+
+#[test]
+fn each_stall_names_its_own_cause() -> Result<(), Box<dyn Error>> {
+    let fault = || Fault::from(DispatchFailure::Spawn(std::io::Error::from_raw_os_error(2)));
+    let stalls = [
+        Stall::Errored(Errored::new(Told::try_new("refused".to_owned())?, Usage::default())),
+        Stall::Unreadable(Unreadable::Unsuccessful { stderr: Stderr::Silent }),
+        Stall::Overdue,
+        Stall::Unspawned(fault()),
+        Stall::Failed(fault()),
+    ];
+    let causes: Vec<Cause> = stalls.iter().map(Stall::stalled).collect();
+    assert_eq!(causes, [Cause::Errored, Cause::Unreadable, Cause::Overdue, Cause::Unspawned, Cause::Failed]);
+    Ok(())
+}

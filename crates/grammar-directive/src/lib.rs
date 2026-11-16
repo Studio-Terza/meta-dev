@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::{Lexed, Line, Location, Piece, Pieces, Quote};
+pub use boundary::{Classes, Lexed, Line, Location, Piece, Pieces, Quote};

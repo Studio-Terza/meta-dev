@@ -1,6 +1,6 @@
 use named_derive::Named;
 
-use crate::form::Form;
+use crate::form::{Form, Forms};
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shape {
@@ -16,11 +16,13 @@ pub enum Shape {
 
 impl From<Form> for Shape {
     fn from(form: Form) -> Shape {
-        match form {
-            Form::Sentence => Shape::Sentence,
-            Form::Item(..) => Shape::Item,
-            Form::Bullet => Shape::Bullet,
-            Form::Quote => Shape::Quote,
-        }
+        form.formed()
     }
+}
+
+impl Forms for Shape {
+    const SENTENCE: Shape = Shape::Sentence;
+    const ITEM: Shape = Shape::Item;
+    const BULLET: Shape = Shape::Bullet;
+    const QUOTE: Shape = Shape::Quote;
 }

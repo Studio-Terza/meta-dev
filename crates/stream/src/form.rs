@@ -18,6 +18,24 @@ impl Opened for Form {
     }
 }
 
+pub(crate) trait Forms {
+    const SENTENCE: Self;
+    const ITEM: Self;
+    const BULLET: Self;
+    const QUOTE: Self;
+}
+
+impl Form {
+    pub(crate) fn formed<F: Forms>(self) -> F {
+        match self {
+            Form::Sentence => F::SENTENCE,
+            Form::Item(..) => F::ITEM,
+            Form::Bullet => F::BULLET,
+            Form::Quote => F::QUOTE,
+        }
+    }
+}
+
 impl Form {
     pub(crate) fn top_level_number(self) -> Option<Number> {
         match self {

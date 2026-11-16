@@ -781,10 +781,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
     }
 
     fn on_expr_match(&mut self, expr: &'ast syntax::ExprMatch, _: &Facts<'_, syntax::ExprMatch>) -> Descend {
-        expr.arms
-            .iter()
-            .filter(|arm| syntax::Constant::composed(&arm.body).is_none())
-            .for_each(|arm| self.pattern_used(&arm.pat));
+        expr.arms.iter().for_each(|arm| self.pattern_used(&arm.pat));
         Descend::Into
     }
 
