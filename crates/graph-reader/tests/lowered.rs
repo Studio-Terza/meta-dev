@@ -357,3 +357,43 @@ fn a_name_after_a_dot_in_macro_tokens_is_a_field_or_method_not_a_path() {
     written.sort();
     assert_eq!(written, ["a::b", "c"]);
 }
+
+#[test]
+fn a_member_named_through_a_type_alias_belongs_to_the_aliased_type() {
+    let model = Read::model(
+        "pub struct InFile;\nimpl InFile {\n    pub fn new() -> InFile {\n        InFile\n    }\n}\npub type Site = InFile;\nfn f() {\n    Site::new();\n}\n",
+    );
+    let owners: Vec<String> = model
+        .uses()
+        .filter_map(|placed| placed.entity().resolved().member().map(graph::Member::owner))
+        .filter_map(|owner| model.declared(owner))
+        .map(|item| AsRef::<lint_layout::Name>::as_ref(item).to_string())
+        .collect();
+    assert_eq!(owners, ["InFile"]);
+}
+
+#[test]
+fn a_shared_adaptor_chained_on_another_still_repeats_per_element() {
+    let model = Read::model(
+        "fn f(step: u8, ids: Vec<u8>) -> Vec<u8> {\n    ids.iter().filter(|id| **id > 0).map(|id| step.wrapping_add(*id)).collect()\n}\n",
+    );
+    let mut methods: Vec<String> = model
+        .functions()
+        .filter_map(|placed| placed.entity().definition())
+        .flat_map(|definition| definition.repetitions().iter().filter_map(|repetition| repetition.method()))
+        .map(ToString::to_string)
+        .collect();
+    methods.sort();
+    assert_eq!(methods, ["wrapping_add"]);
+}
+
+#[test]
+fn a_struct_literal_uses_its_type_path() {
+    let model = Read::model("struct Point {\n    x: u8,\n}\nfn f() -> Point {\n    Point { x: 1 }\n}\n");
+    let literals: Vec<String> = model
+        .uses()
+        .filter(|placed| placed.entity().mention() == Mention::Expression)
+        .map(|placed| format!("{} {}", placed.entity().written(), placed.site()))
+        .collect();
+    assert_eq!(literals, ["Point a.rs:5"]);
+}

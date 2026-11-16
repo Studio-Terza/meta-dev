@@ -62,12 +62,13 @@ fn a_place_is_named_by_its_last_segment_or_its_crate() {
 }
 
 #[test]
-fn a_rooted_crate_is_named_by_its_package_and_never_equals_a_named_one() {
+fn a_rooted_crate_has_no_name_and_never_equals_a_named_one() {
     let tree = Tree::new();
     let root = CrateRoot::new(PathBuf::from("crates/graph"));
     let rooted = Nest::module(Krate::Rooted(&root), &[]);
     assert_eq!(rooted.named(&Name::from("graph")), None);
     assert_ne!(rooted, tree.at(0));
-    assert_eq!(rooted.to_string(), "crate crates/graph");
+    assert_eq!(rooted.to_string(), "crate");
+    assert_eq!(Nest::module(Krate::Rooted(&root), &tree.segments).to_string(), "crate::model::building");
     assert_eq!(Krate::Named(&tree.krate).name(), Some(&tree.krate));
 }
