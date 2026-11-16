@@ -28,6 +28,8 @@ pub enum Failure<'path> {
     Program { program: std::ffi::OsString, source: io::Error },
     #[error("cannot write the report: {0}")]
     Write(#[from] io::Error),
+    #[error("the scoped rerun did not test these mutants its own crate missed; their names selected nothing:\n{0}")]
+    Unselected(file_ports::Text),
     #[error("reach failed: {0}")]
     Reach(Refusal),
     #[error("the limits cannot be judged: {0}")]

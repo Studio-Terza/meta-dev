@@ -1,6 +1,6 @@
 mod count;
 mod mutant;
-mod outcome;
+pub(super) mod outcome;
 mod report;
 mod tally;
 
