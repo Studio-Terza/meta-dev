@@ -1,6 +1,6 @@
 use grammar_message::{Boundary, Lexeme, Span};
 
-use crate::form::Form;
+use crate::form::{Form, Forms};
 use transcript_ports::{Body, Uuid};
 
 use crate::ordinal::Ordinal;
@@ -69,13 +69,11 @@ impl Fill {
     }
 }
 
-impl Form {
-    fn stopping(self) -> Ending {
-        match self {
-            Form::Sentence => Ending::Close,
-            Form::Item(..) | Form::Bullet | Form::Quote => Ending::Continue,
-        }
-    }
+impl Forms for Ending {
+    const SENTENCE: Ending = Ending::Close;
+    const ITEM: Ending = Ending::Continue;
+    const BULLET: Ending = Ending::Continue;
+    const QUOTE: Ending = Ending::Continue;
 }
 
 impl Open {
@@ -100,7 +98,7 @@ impl Open {
     fn bounded(self, boundary: Boundary) -> Ending {
         match boundary {
             Boundary::Line => self.fill.breaking(),
-            Boundary::Sentence => self.part.form.stopping(),
+            Boundary::Sentence => self.part.form.formed(),
         }
     }
 

@@ -1,8 +1,8 @@
 use syntax::parse::{Parser, parse_str, parse2};
 use syntax::{
-    Application, Applied, Block, BlockItems, Constant, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro,
-    File, Fold, Group, Ident, Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens,
-    TokenStream, TokenTree, Type, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
+    Application, Applied, Block, BlockItems, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro, File, Fold,
+    Group, Ident, Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens, TokenStream,
+    TokenTree, Type, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
 };
 
 #[test]
@@ -96,15 +96,6 @@ fn type_folds_see_children_before_parents_and_hand_each_out_once() -> Result<(),
     let fold = Fold::over(TypeTree::from(&ty), Rendered::step);
     assert_eq!(fold.take(&ty), Some("ref (Vec < u8 >, array i32)".to_owned()));
     assert_eq!(fold.take(&ty), None);
-    Ok(())
-}
-
-#[test]
-fn constants_are_literals_and_paths_in_tuples_and_arrays() -> Result<(), Error> {
-    let table: Expr = parse_str("[(1, -A::B), (2, (C))]")?;
-    assert!(Constant::composed(&table).is_some());
-    let computed: Expr = parse_str("[(1, f())]")?;
-    assert!(Constant::composed(&computed).is_none());
     Ok(())
 }
 

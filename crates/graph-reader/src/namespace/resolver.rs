@@ -74,8 +74,8 @@ pub(crate) enum Resolution {
 impl Resolution {
     pub(super) fn present(&self) -> Option<&Resolution> {
         match self {
-            Resolution::Bound(Binding::Absent) => None,
-            Resolution::Waiting | Resolution::Bound(_) => Some(self),
+            Resolution::Waiting => Some(self),
+            Resolution::Bound(binding) => binding.present().map(|_| self),
         }
     }
 

@@ -74,6 +74,37 @@ pub enum Piece {
     Stray(String),
 }
 
+pub trait Classes {
+    const OPEN: Self;
+    const CLOSE: Self;
+    const COMMA: Self;
+    const BREAK: Self;
+    const END: Self;
+    const WORD: Self;
+    const FRESH: Self;
+    const SEGMENT: Self;
+    const QUOTED: Self;
+    const STRAY: Self;
+}
+
+impl Piece {
+    #[must_use]
+    pub fn classed<C: Classes>(&self) -> C {
+        match self {
+            Piece::Open => C::OPEN,
+            Piece::Close => C::CLOSE,
+            Piece::Comma => C::COMMA,
+            Piece::Break => C::BREAK,
+            Piece::End => C::END,
+            Piece::Word(_) => C::WORD,
+            Piece::Fresh(_) => C::FRESH,
+            Piece::Segment(_) => C::SEGMENT,
+            Piece::Quoted(_) => C::QUOTED,
+            Piece::Stray(_) => C::STRAY,
+        }
+    }
+}
+
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LineNumber(usize);
 

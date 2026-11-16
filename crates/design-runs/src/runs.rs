@@ -6,7 +6,7 @@ use std::fmt;
 
 use design_jobs::JobState;
 use design_model::{JobId, RunId, Segment};
-use dispatch_ports::{Deadline, Finished, Pid, Reply, Stall, Started, Usage};
+use dispatch_ports::{Deadline, Finished, Pid, Reply, Stall, Stalled, Started, Usage};
 use named_derive::Named;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use port_core::Op;
@@ -231,13 +231,16 @@ impl Lifecycle for Delivery {
 
 impl From<&Stall> for RunState {
     fn from(stall: &Stall) -> RunState {
-        match stall {
-            Stall::Errored(_) => RunState::Errored,
-            Stall::Unreadable(_) => RunState::Unreadable,
-            Stall::Overdue => RunState::Overdue,
-            Stall::Unspawned(_) | Stall::Failed(_) => RunState::Failed,
-        }
+        stall.stalled()
     }
+}
+
+impl Stalled for RunState {
+    const ERRORED: RunState = RunState::Errored;
+    const UNREADABLE: RunState = RunState::Unreadable;
+    const OVERDUE: RunState = RunState::Overdue;
+    const UNSPAWNED: RunState = RunState::Failed;
+    const FAILED: RunState = RunState::Failed;
 }
 
 impl From<JobId> for JobOpened {
