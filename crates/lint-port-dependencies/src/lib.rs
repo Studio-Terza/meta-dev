@@ -4,8 +4,9 @@ mod reserved_names;
 mod roles;
 
 use graph::Model;
-use lint_core::{FileHead, Headline, ModelLint, Parsed, Report, Violation, WorkspaceLint};
+use lint_core::{FileHead, Headline, Parsed, Report, Violation};
 use lint_file::{Gleaning, KinLint, Reads};
+use lint_file::{ModelLint, WorkspaceLint};
 use lint_sweep::{Member, Sweep};
 use workspace_metadata::{Graph, Metadata, Role};
 

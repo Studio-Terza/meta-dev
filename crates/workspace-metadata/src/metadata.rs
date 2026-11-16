@@ -12,7 +12,6 @@ use crate::crate_name::CrateName;
 use crate::outside::Outside;
 use crate::package_id::PackageId;
 use crate::readers::Readers;
-use crate::unreadable::Unreadable;
 pub use library::Library;
 pub use package::{Expanders, Form, MacroName};
 pub(crate) use package::{Package, PortTable};
@@ -131,9 +130,9 @@ impl Metadata {
 }
 
 impl FromStr for Metadata {
-    type Err = Unreadable;
+    type Err = serde_json::Error;
 
-    fn from_str(text: &str) -> Result<Metadata, Unreadable> {
-        Ok(serde_json::from_str(text)?)
+    fn from_str(text: &str) -> Result<Metadata, serde_json::Error> {
+        serde_json::from_str(text)
     }
 }

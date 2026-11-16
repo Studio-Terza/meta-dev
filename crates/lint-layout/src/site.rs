@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::Path;
 
-use lint_layout::LineNumber;
+use crate::line_number::LineNumber;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Site<'file> {

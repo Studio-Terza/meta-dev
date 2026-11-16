@@ -1,7 +1,8 @@
 mod finding;
 
 use graph::{Domain, External, Implementation, ItemPath, Model, Placed, Resolved};
-use lint_core::{Headline, ModelLint, Report, Violation};
+use lint_core::{Headline, Report, Violation};
+use lint_file::ModelLint;
 use lint_layout::{Whole, Word, words};
 
 use finding::Finding;

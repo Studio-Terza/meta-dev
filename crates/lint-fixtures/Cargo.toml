@@ -13,13 +13,13 @@ doctest = false
 graph-reader = { path = "../graph-reader" }
 file-ports = { path = "../file-ports" }
 lint-core = { path = "../lint-core" }
+lint-file = { path = "../lint-file" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
 workspace-metadata = { path = "../workspace-metadata" }
 
 [dev-dependencies]
 laws = { path = "../laws" }
-text-lines = { path = "../text-lines" }
 
 [lints]
 workspace = true

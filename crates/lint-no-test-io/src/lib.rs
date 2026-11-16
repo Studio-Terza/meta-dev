@@ -4,7 +4,8 @@ mod finding;
 use effect_paths::EffectPaths;
 use finding::Finding;
 use graph::{Harness, Model};
-use lint_core::{Gate, Headline, ModelLint, Report, Violation};
+use lint_core::{Gate, Headline, Report, Violation};
+use lint_file::ModelLint;
 
 #[derive(Debug)]
 pub struct NoTestIo;

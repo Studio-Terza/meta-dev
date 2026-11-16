@@ -5,7 +5,8 @@ mod texts;
 use std::collections::BTreeSet;
 
 use graph::{Held, Holding, ItemId, Model, Placed, Site, TypeRef};
-use lint_core::{Headline, ModelLint, Report, Violation};
+use lint_core::{Headline, Report, Violation};
+use lint_file::ModelLint;
 use lint_layout::Name;
 
 use finding::Finding;

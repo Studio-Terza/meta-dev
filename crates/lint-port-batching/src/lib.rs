@@ -2,7 +2,8 @@ mod ports;
 mod reader;
 
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report};
+use lint_core::{Headline, Report};
+use lint_file::ModelLint;
 
 use ports::Ports;
 use reader::Reader;

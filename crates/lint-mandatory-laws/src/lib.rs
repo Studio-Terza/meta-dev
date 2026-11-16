@@ -5,7 +5,8 @@ mod subject;
 use coverage::Coverage;
 use facts::Facts;
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report};
+use lint_core::{Headline, Report};
+use lint_file::ModelLint;
 
 #[derive(Debug)]
 pub struct MandatoryLaws;

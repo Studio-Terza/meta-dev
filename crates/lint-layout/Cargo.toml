@@ -12,8 +12,6 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
-text-lines = { path = "../text-lines" }
-workspace-metadata = { path = "../workspace-metadata" }
 syntax = { path = "../syntax" }
 thiserror.workspace = true
 toml.workspace = true

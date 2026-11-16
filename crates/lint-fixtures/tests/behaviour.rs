@@ -1,7 +1,5 @@
 use lint_core::{Fix, Headline, Lint, Message, Problem, Report, Site, SourceFile, Violation};
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
-use text_lines::OneLine;
-use workspace_metadata::{CrateName, DependencyKeys};
 
 const SOURCES: &[Source] = &[Source::new(Located::new("a.rs"), Text::new("struct A;\n"))];
 
@@ -17,10 +15,8 @@ struct EveryDependency;
 
 impl Lint for EveryDependency {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let named = OneLine::try_new(String::from("logos")).map(CrateName::new);
-        let logos: DependencyKeys<'_> = named.iter().collect();
         let flagged = files.iter().flat_map(|file| {
-            file.head().placement().package().dependency_sites().sites(&logos).into_iter().map(|line| {
+            file.head().placement().package().dependency_sites().sites(["logos"]).into_iter().map(|line| {
                 Violation::new(
                     Site::new(file.head().manifest_file().as_ref(), line),
                     Message::new(Problem::new("depends"), Fix::new("drop it")),
