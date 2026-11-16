@@ -51,6 +51,7 @@ use lint_no_parameter_bags::NoParameterBags;
 use lint_no_plaintext::NoPlaintext;
 use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
+use lint_node_recursion::NodeRecursion;
 use lint_port_batching::PortBatching;
 use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, KeyDependencyRoles, OwnedDependencies};
 use lint_primitive_boundary::PrimitiveBoundary;
@@ -60,6 +61,7 @@ use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_raw_resources::RawResources;
 use lint_repeated_methods::RepeatedMethods;
+use lint_repeated_reads::RepeatedReads;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
@@ -137,7 +139,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 54] = [
+    const LINTS: [Entry; 56] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -185,6 +187,8 @@ impl Lints {
         <Swept<ArbitraryNewtypes> as Registered>::ENTRY,
         <Swept<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),
+        Entry::spelled::<RepeatedReads>(Work::Modelled(<RepeatedReads as ModelLint>::report)),
+        Entry::spelled::<NodeRecursion>(Work::Modelled(<NodeRecursion as ModelLint>::report)),
         <Swept<NoEarlyExits> as Registered>::ENTRY,
         <Kin<LinearBodies> as Registered>::ENTRY,
         <Kin<PureRouters> as Registered>::ENTRY,

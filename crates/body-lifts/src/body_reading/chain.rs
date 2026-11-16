@@ -1,8 +1,6 @@
-use syntax::{Expr, ExprMethodCall, Spine};
+use syntax::{Application, Expr, ExprMethodCall, Spine};
 
 use lint_layout::{Name, Whole, Word, words};
-
-use super::applied::Applied;
 
 #[derive(Debug)]
 pub(super) struct Chain<'body> {
@@ -45,13 +43,13 @@ impl<'body> Chain<'body> {
                 mapping_calls.iter().flat_map(|call| call.args.iter()).all(|argument| Self::mapping(argument).is_some())
             })
             .and(mapped)
-            .and_then(|_| Applied::traced(self.root))
+            .and_then(|_| Application::root(self.root))
     }
 
     fn mapping(argument: &'body Expr) -> Option<&'body Expr> {
         match argument {
             Expr::Path(_) => Some(argument),
-            Expr::Closure(closure) => Applied::traced(&closure.body).map(|_| argument),
+            Expr::Closure(closure) => Application::root(&closure.body).map(|_| argument),
             _ => None,
         }
     }

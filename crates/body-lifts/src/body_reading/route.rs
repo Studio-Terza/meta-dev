@@ -1,7 +1,6 @@
-use syntax::{Arm, Expr, ExprMatch, Pat, PatEdge, PatReached, PatTree};
+use syntax::{Application, Arm, Expr, ExprMatch, Pat, PatEdge, PatReached, PatTree};
 
 use super::BodyReading;
-use super::applied::Applied;
 
 #[derive(Debug)]
 pub(super) struct Route;
@@ -9,7 +8,7 @@ pub(super) struct Route;
 impl Route {
     pub(super) fn taken(arm: &Arm) -> Option<&Expr> {
         Self::binding(&arm.pat).filter(|_| arm.guard.is_none())?;
-        Self::body(&arm.body).and_then(Applied::traced)
+        Self::body(&arm.body).and_then(Application::root)
     }
 
     pub(super) fn routed(found: &Expr) -> Option<&ExprMatch> {

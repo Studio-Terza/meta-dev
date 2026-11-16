@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 use syntax::Punctuated;
-use syntax::{Expr, ExprEdge, ExprTree, Macro, Token};
+use syntax::{Constructed, Expr, Ident, Macro, Token};
 
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word, words};
@@ -27,19 +27,12 @@ impl Step<'_> {
     const FORMATS: [Word<'static>; 2] = words!["format", "format_args"];
     const LISTS: [Word<'static>; 2] = words!["concat", "vec"];
 
-    fn opens(parent: &Expr, edge: ExprEdge) -> Option<()> {
-        match parent {
-            Expr::Reference(_) | Expr::Paren(_) | Expr::Array(_) | Expr::Tuple(_) | Expr::Struct(_) => Some(()),
-            Expr::MethodCall(call) => Name::from(&call.method)
-                .matches::<Whole>(&Self::PEELED)
-                .filter(|_| edge == ExprEdge::Receiver)
-                .map(|_| ()),
-            Expr::Call(call) => Literal::called(&call.func)
-                .and_then(|last| last.matches::<Whole>(&Self::WRAPPERS))
-                .filter(|_| edge != ExprEdge::Function)
-                .map(|_| ()),
-            _ => None,
-        }
+    fn wraps(function: &Expr) -> Option<()> {
+        Literal::called(function).and_then(|last| last.matches::<Whole>(&Self::WRAPPERS)).map(|_| ())
+    }
+
+    fn converts(method: &Ident) -> Option<()> {
+        Name::from(method).matches::<Whole>(&Self::PEELED).map(|_| ())
     }
 
     fn leaf<'any>(node: &Expr) -> Vec<Step<'any>> {
@@ -80,8 +73,8 @@ impl<'side> Opened<'side> {
     }
 
     fn tree(tree: &Expr) -> Opened<'side> {
-        let reached = ExprTree::reached(tree, &|parent, edge| Step::opens(parent, edge).is_some());
-        Opened { found: None, steps: reached.iter().flat_map(|node| Step::leaf(node.expr())).collect() }
+        let parts = Constructed::new(&Step::wraps, &Step::converts).parts(tree);
+        Opened { found: None, steps: parts.into_iter().flat_map(Step::leaf).collect() }
     }
 }
 

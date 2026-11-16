@@ -5,7 +5,7 @@ use variant_paths::VariantPaths;
 use std::path::Path;
 use syntax::Spanned;
 
-use syntax::{Arm, Expr, ExprEdge, ExprLet, ExprMatch, ExprTree, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
+use syntax::{Arm, Constant, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
 
 use super::declarations::Declarations;
 use super::finding::Finding;
@@ -44,23 +44,10 @@ impl<'scan, 'file> VariantMatches<'scan, 'file> {
     }
 
     fn foreign_match(&self, arm: &Arm) -> Option<Violation<'file>> {
-        match Self::table(&arm.body) {
+        match Constant::composed(&arm.body) {
             Some(_) => None,
             None => self.foreign_variant(&arm.pat).map(|enum_name| self.violation(&arm.pat, &enum_name)),
         }
-    }
-
-    fn table(expr: &Expr) -> Option<&Expr> {
-        let reached = ExprTree::reached(expr, &|_, edge| matches!(edge, ExprEdge::Inner | ExprEdge::Element));
-        reached
-            .iter()
-            .all(|node| {
-                matches!(
-                    node.expr(),
-                    Expr::Lit(_) | Expr::Path(_) | Expr::Unary(_) | Expr::Paren(_) | Expr::Tuple(_) | Expr::Array(_)
-                )
-            })
-            .then_some(expr)
     }
 }
 
