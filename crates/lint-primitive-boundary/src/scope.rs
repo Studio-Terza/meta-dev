@@ -94,17 +94,6 @@ pub struct Scope<'model> {
 impl<'model> Scope<'model> {
     const CHECKED: [Held; 4] = [Held::StructField, Held::EnumField, Held::UnionField, Held::StructParameter];
 
-    pub fn read(model: &'model Model) -> Scope<'model> {
-        Scope {
-            newtypes: Newtypes::read(model),
-            aliases: model.holdings().filter_map(AliasTarget::declared).map(|alias| (alias.item, alias)).collect(),
-            doors: model.implementations().filter_map(Door::opened).fold(BTreeMap::new(), |mut doors, door| {
-                doors.entry(door.path).or_insert_with(BTreeSet::new).insert(door.subject);
-                doors
-            }),
-        }
-    }
-
     pub fn function<'function>(&self, function: &'function Function) -> Option<&'function Function> {
         let own = Scope::own(*AsRef::<Region>::as_ref(function));
         own.and_then(|_| Scope::unexempted(self.newtypes.edge(function).as_ref(), function))
@@ -141,6 +130,19 @@ impl<'model> Scope<'model> {
         match exemption {
             Some(_) => None,
             None => Some(kept),
+        }
+    }
+}
+
+impl<'model> From<&'model Model> for Scope<'model> {
+    fn from(model: &'model Model) -> Scope<'model> {
+        Scope {
+            newtypes: Newtypes::read(model),
+            aliases: model.holdings().filter_map(AliasTarget::declared).map(|alias| (alias.item, alias)).collect(),
+            doors: model.implementations().filter_map(Door::opened).fold(BTreeMap::new(), |mut doors, door| {
+                doors.entry(door.path).or_insert_with(BTreeSet::new).insert(door.subject);
+                doors
+            }),
         }
     }
 }

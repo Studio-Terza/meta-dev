@@ -51,7 +51,7 @@ impl PrimedFacts for StateGraph {
         let path = AsRef::<Path>::as_ref(parsed.head());
         let watchers = <&SourceFile>::from(parsed).shipped().map(|_| StateWatchers {
             edges: EdgeScan::from(path),
-            fields: FieldVisibility::new(path),
+            fields: FieldVisibility::from(path),
             graphs: DeclaredGraphs::new(<&SourceFile>::from(parsed), path),
         });
         StateRecording { watchers }

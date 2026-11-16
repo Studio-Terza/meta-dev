@@ -13,7 +13,7 @@ pub struct RepeatedMethods;
 
 impl ModelLint for RepeatedMethods {
     fn report(model: &Model) -> Report<'_> {
-        let inners = Inners::read(model);
+        let inners = Inners::from(model);
         let methods = model.functions().filter_map(|placed| Shaped::placed(placed, &inners));
         let found: Vec<Violation<'_>> = Shaped::grouped(methods)
             .into_iter()

@@ -53,18 +53,6 @@ struct Subject<'model> {
 pub struct Inners<'model>(BTreeMap<ItemId, Vec<&'model TypeRef>>);
 
 impl<'model> Inners<'model> {
-    pub fn read(model: &'model Model) -> Inners<'model> {
-        let fields = model
-            .holdings()
-            .map(Placed::entity)
-            .filter(|holding| matches!(holding.held(), Held::NewtypeField | Held::StructField))
-            .filter_map(|holding| holding.declares().map(|owner| (owner, AsRef::<TypeRef>::as_ref(holding))));
-        Inners(fields.fold(BTreeMap::new(), |mut inners: BTreeMap<ItemId, Vec<&'model TypeRef>>, (owner, ty)| {
-            inners.entry(owner).or_default().push(ty);
-            inners
-        }))
-    }
-
     fn only(&self, owner: ItemId) -> Option<&'model TypeRef> {
         self.0.get(&owner).filter(|fields| fields.len() == 1).and_then(|fields| fields.first().copied())
     }
@@ -172,5 +160,19 @@ impl fmt::Display for Shaped<'_> {
         let output = self.returns_itself().map_or(spelled, |()| Some(Name::from("Self")));
         let returned = output.map(|name| format!(" -> {name}")).unwrap_or_default();
         write!(formatter, "fn {}({}){returned}", self.key.name, inputs.join(", "))
+    }
+}
+
+impl<'model> From<&'model Model> for Inners<'model> {
+    fn from(model: &'model Model) -> Inners<'model> {
+        let fields = model
+            .holdings()
+            .map(Placed::entity)
+            .filter(|holding| matches!(holding.held(), Held::NewtypeField | Held::StructField))
+            .filter_map(|holding| holding.declares().map(|owner| (owner, AsRef::<TypeRef>::as_ref(holding))));
+        Inners(fields.fold(BTreeMap::new(), |mut inners: BTreeMap<ItemId, Vec<&'model TypeRef>>, (owner, ty)| {
+            inners.entry(owner).or_default().push(ty);
+            inners
+        }))
     }
 }

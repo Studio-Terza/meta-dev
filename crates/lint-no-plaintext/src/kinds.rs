@@ -57,22 +57,6 @@ pub(crate) struct Kinds<'model> {
 }
 
 impl<'model> Kinds<'model> {
-    pub(crate) fn read(model: &'model Model) -> Kinds<'model> {
-        let identities = Identities::read(model);
-        let played: BTreeMap<Role, Vec<Derive<'model>>> = model
-            .implementations()
-            .filter_map(|placed| Played::recognised(model, &identities, placed))
-            .fold(BTreeMap::new(), |mut played, play| {
-                played.entry(play.role).or_default().push(play.derive);
-                played
-            });
-        let derives = |role: Role| played.get(&role).cloned().unwrap_or_default();
-        let subjects = |role: Role| -> BTreeSet<ItemId> { derives(role).iter().map(|derive| derive.subject).collect() };
-        let validated = subjects(Role::DeserializesChecked);
-        let plain = subjects(Role::Deserializes).difference(&validated).copied().collect();
-        Kinds { validated, plain, unresolved: derives(Role::Unresolved) }
-    }
-
     pub(crate) fn unvalidated(&self, item: ItemId) -> Option<ItemId> {
         match self.validated.get(&item) {
             Some(_) => None,
@@ -86,5 +70,23 @@ impl<'model> Kinds<'model> {
 
     pub(crate) fn unresolved(&self) -> &[Derive<'model>] {
         &self.unresolved
+    }
+}
+
+impl<'model> From<&'model Model> for Kinds<'model> {
+    fn from(model: &'model Model) -> Kinds<'model> {
+        let identities = Identities::from(model);
+        let played: BTreeMap<Role, Vec<Derive<'model>>> = model
+            .implementations()
+            .filter_map(|placed| Played::recognised(model, &identities, placed))
+            .fold(BTreeMap::new(), |mut played, play| {
+                played.entry(play.role).or_default().push(play.derive);
+                played
+            });
+        let derives = |role: Role| played.get(&role).cloned().unwrap_or_default();
+        let subjects = |role: Role| -> BTreeSet<ItemId> { derives(role).iter().map(|derive| derive.subject).collect() };
+        let validated = subjects(Role::DeserializesChecked);
+        let plain = subjects(Role::Deserializes).difference(&validated).copied().collect();
+        Kinds { validated, plain, unresolved: derives(Role::Unresolved) }
     }
 }

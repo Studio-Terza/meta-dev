@@ -29,10 +29,6 @@ impl<'file> TestFeatures<'file> {
     const FEATURE: &str = "feature";
     const VALUE_INDEX: usize = 2;
 
-    pub(crate) fn new(path: &'file Path) -> TestFeatures<'file> {
-        TestFeatures { path, found: Vec::new() }
-    }
-
     fn condition(path: &syntax::Path) -> Option<&syntax::Path> {
         Self::CONDITIONS.iter().find(|condition| path.is_ident(condition)).map(|_| path)
     }
@@ -90,5 +86,11 @@ impl<'file> Finds<'file> for TestFeatures<'file> {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
         let path = self.path;
         self.found.into_iter().map(|flagged| flagged.in_file(path)).collect()
+    }
+}
+
+impl<'file> From<&'file Path> for TestFeatures<'file> {
+    fn from(path: &'file Path) -> TestFeatures<'file> {
+        TestFeatures { path, found: Vec::new() }
     }
 }

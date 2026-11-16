@@ -41,7 +41,7 @@ impl<'model> Texted<'model> {
 
 impl ModelLint for NoPlaintext {
     fn report(model: &Model) -> Report<'_> {
-        let kinds = Kinds::read(model);
+        let kinds = Kinds::from(model);
         let texts = Texts::settled(model, &kinds);
         let texted: Vec<Texted<'_>> =
             model.holdings().filter_map(|placed| Self::texted(model, &texts, placed)).collect();
