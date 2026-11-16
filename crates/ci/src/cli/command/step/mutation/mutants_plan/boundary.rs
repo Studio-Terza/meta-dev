@@ -11,7 +11,9 @@ pub(super) struct Indices(usize);
 
 impl Shards {
     const MUTANTS_EACH: usize = 60;
-    const MOST: usize = 32;
+    const FREE_PLAN_CONCURRENT_JOBS: usize = 20;
+    const OTHER_JOBS_OF_A_RUN: usize = 6;
+    const MOST: usize = Self::FREE_PLAN_CONCURRENT_JOBS - Self::OTHER_JOBS_OF_A_RUN;
 
     pub(super) fn for_mutants(mutants: usize) -> Shards {
         Shards { mutants, count: mutants.div_ceil(Self::MUTANTS_EACH).clamp(1, Self::MOST) }
