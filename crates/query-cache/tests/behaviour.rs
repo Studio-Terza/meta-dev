@@ -32,12 +32,23 @@ laws::table!(
             String::from(r#"SELECT id AS "id!", body AS "body!", at AS "at!" FROM r WHERE id = ?1"#),
             String::from("UPDATE r SET body = ?1, at = ?2 WHERE id = ?3"),
             String::from("DELETE FROM r WHERE id = ?1"),
+            String::from(r#"SELECT id AS "id!", body AS "body!", at AS "at!" FROM r"#),
         ],
         Table::named("s").column("id", Origin::GeneratedKey) => [
             String::from(r#"INSERT INTO s DEFAULT VALUES RETURNING id AS "id!""#),
             String::from(r#"SELECT id AS "id!" FROM s WHERE id = ?1"#),
             String::from("UPDATE s SET id = id WHERE id = ?1"),
             String::from("DELETE FROM s WHERE id = ?1"),
+            String::from(r#"SELECT id AS "id!" FROM s"#),
         ],
+    ]
+);
+
+laws::table!(
+    a_record_table_overwrites_one_column,
+    |column: &&str| Table::named("r").overwrite(column),
+    [
+        "id" => String::from("UPDATE r SET id = ?1"),
+        "body" => String::from("UPDATE r SET body = ?1"),
     ]
 );

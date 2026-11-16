@@ -61,7 +61,7 @@ impl Table {
     }
 
     #[must_use]
-    pub fn statements(&self) -> [String; 4] {
+    pub fn statements(&self) -> [String; 5] {
         let Table { name, fields } = self;
         let named = |wanted: &[Origin]| -> Vec<&str> {
             fields.iter().filter(|field| wanted.contains(&field.origin)).map(|field| field.name.as_str()).collect()
@@ -92,6 +92,12 @@ impl Table {
                 unkeyed.len() + 1
             ),
             format!("DELETE FROM {name} WHERE {key} = ?1"),
+            format!("SELECT {returned} FROM {name}"),
         ]
+    }
+
+    #[must_use]
+    pub fn overwrite(&self, column: &str) -> String {
+        format!("UPDATE {} SET {column} = ?1", self.name)
     }
 }

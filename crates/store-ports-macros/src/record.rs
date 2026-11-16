@@ -34,7 +34,8 @@ impl Expanding for Record {
             .iter()
             .find(|field| Origin::KEYS.contains(&field.origin))
             .ok_or_else(|| Error::new(table.span(), Record::KEYLESS))?;
-        let [create, fetch, update, delete] = Record::statements(&table, &fields);
+        let [create, fetch, update, delete, list] = Record::statements(&table, &fields);
+        let overwrites = fields.iter().map(|field| field.overwrite(&table));
         let names: Vec<&Ident> = fields.iter().map(|field| &field.name).collect();
         let fresh = format_ident!("{}New", row);
         let given: Vec<&Placed> = fields.iter().filter(|field| Origin::INSERTED.contains(&field.origin)).collect();
@@ -100,6 +101,14 @@ impl Expanding for Record {
                 fn deleted(key: &#key_type) -> #prepared<()> {
                     let #key_name = key;
                     #query(#delete, #keyed)
+                }
+
+                fn listed() -> #prepared<Self> {
+                    #query(#row, #list)
+                }
+
+                fn overwrites(argument: &::store_ports::Argument) -> ::std::vec::Vec<#prepared<()>> {
+                    ::std::vec![#(#prepared::written(#overwrites, ::std::vec![::core::clone::Clone::clone(argument)]),)*]
                 }
             }
         })

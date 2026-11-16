@@ -41,7 +41,7 @@ impl Record {
     const UNNAMED: &'static str = "a record is a struct with named fields";
     const ATTRIBUTE: &'static str = "record";
 
-    pub(super) fn statements(table: &LitStr, fields: &[Placed]) -> [LitStr; 4] {
+    pub(super) fn statements(table: &LitStr, fields: &[Placed]) -> [LitStr; 5] {
         let described = fields.iter().fold(Table::named(&table.value()), |described, field| {
             described.column(&field.name.to_string(), field.origin)
         });
@@ -63,6 +63,10 @@ impl Record {
 }
 
 impl Placed {
+    pub(super) fn overwrite(&self, table: &LitStr) -> LitStr {
+        LitStr::new(&Table::named(&table.value()).overwrite(&self.name.to_string()), table.span())
+    }
+
     fn from_field(field: &Field) -> syntax::Result<Placed> {
         let name = field.ident.clone().ok_or_else(|| Error::new_spanned(field, Record::UNNAMED))?;
         let marked = Record::marking(&field.attrs).map(Attribute::parse_args::<Marked>).transpose()?;
