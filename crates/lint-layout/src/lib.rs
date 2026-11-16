@@ -33,7 +33,7 @@ pub use package_name::PackageName;
 pub use path_dependencies::PathDependencies;
 pub use path_tail::PathTail;
 pub use position::Position;
-pub use site::Site;
+pub use site::{InFile, Site};
 pub use source_text::SourceText;
 pub use test_marks::{TestMarks, Whole};
 pub use untested::Untested;
