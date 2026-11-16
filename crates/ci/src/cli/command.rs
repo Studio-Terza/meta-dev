@@ -8,7 +8,7 @@ use step::clippy_targets::ClippyTargets;
 use step::cold_size::ColdSize;
 use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
 use step::graph_path::GraphPath;
-use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
+use step::mutation::{Matrix, MutantsChanged, MutantsPlan, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::sqlite::BuildSqlite;
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
@@ -32,6 +32,7 @@ pub enum Command {
     ToolsKey(ToolsKey),
     MutantsShard(MutantsShard),
     MutantsChanged(MutantsChanged),
+    MutantsPlan(MutantsPlan),
     WallTimes(WallTimes),
     Show(Show),
     Summarize(Summarize),
@@ -60,6 +61,7 @@ impl Command {
     const TOOLS_KEY: &'static str = "tools-key";
     const MUTANTS_SHARD: &'static str = "mutants-shard";
     const MUTANTS_CHANGED: &'static str = "mutants-changed";
+    const MUTANTS_PLAN: &'static str = "mutants-plan";
     const WALL_TIMES: &'static str = "wall-times";
     const SHOW: &'static str = "show";
     const SUMMARIZE: &'static str = "summarize";
@@ -88,6 +90,7 @@ impl Command {
             Some(Self::TOOLS_KEY) => Self::parsed(arguments.collect(), Command::ToolsKey),
             Some(Self::MUTANTS_SHARD) => Self::parsed(arguments.collect(), Command::MutantsShard),
             Some(Self::MUTANTS_CHANGED) => Self::parsed(arguments.collect(), Command::MutantsChanged),
+            Some(Self::MUTANTS_PLAN) => Self::parsed(arguments.collect(), Command::MutantsPlan),
             Some(Self::WALL_TIMES) => Self::parsed(arguments.collect(), Command::WallTimes),
             Some(Self::SHOW) => Self::parsed(arguments.collect(), Command::Show),
             Some(Self::SUMMARIZE) => Self::parsed(arguments.collect(), Command::Summarize),
@@ -123,6 +126,7 @@ impl Command {
             Command::ToolsKey(step) => step.carry_out(ports, out),
             Command::MutantsShard(step) => step.carry_out(ports, out),
             Command::MutantsChanged(step) => step.carry_out(ports, out),
+            Command::MutantsPlan(step) => step.carry_out(ports, out),
             Command::WallTimes(step) => step.carry_out(ports, out),
             Command::Show(step) => step.carry_out(ports, out),
             Command::Summarize(step) => step.carry_out(ports, out),

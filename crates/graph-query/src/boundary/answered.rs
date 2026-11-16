@@ -18,7 +18,9 @@ impl Query {
         let transitions = Transitions::from(&model);
         let system = TypeSystem::built_from(&extraction, &transitions);
         let sized = self.sized(files, workspaces).map_or_default(|sizes| sizes.to_string());
-        Answered(format!("{}{sized}", self.reply(&system)))
+        let consumed =
+            self.consumed(&model).iter().map(|root| format!("{}\n", root.display())).collect::<Vec<String>>().concat();
+        Answered(format!("{}{sized}{consumed}", self.reply(&system)))
     }
 }
 
