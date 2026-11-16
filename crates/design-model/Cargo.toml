@@ -20,7 +20,7 @@ named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 serde.workspace = true
 thiserror.workspace = true
-transcript-ports = { path = "../transcript-ports" }
+message-id = { path = "../message-id" }
 
 [dev-dependencies]
 laws = { path = "../laws" }

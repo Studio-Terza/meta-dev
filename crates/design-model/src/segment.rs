@@ -1,5 +1,5 @@
+use message_id::Uuid;
 use newtype::{Arbitrary, Display, Newtype};
-use transcript_ports::Uuid;
 
 use crate::Prefix;
 

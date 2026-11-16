@@ -2,8 +2,8 @@ use design_model::{
     Confidence, Explicitness, NodeId, Ordinal, Provenance, Segment, SegmentRelation, Sense, SenseKind, SpanRelation,
     Specificity, Standing,
 };
+use message_id::Uuid;
 use store_ports::{Columns as Row, Statements, StoreFailure};
-use transcript_ports::Uuid;
 
 use super::{Annotation, Remark};
 
