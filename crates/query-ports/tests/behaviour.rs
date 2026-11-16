@@ -73,14 +73,13 @@ impl Workspace {
 fn every_store_query_in_the_crates_gets_an_entry_and_entries_no_query_uses_are_removed() -> Result<(), Box<dyn Error>> {
     let workspace = Workspace::laid()?;
     let arguments = vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];
-    let mut out = Vec::new();
-    QueryCache::try_from(arguments)?.prepared(&mut out)?;
+    let changes = QueryCache::try_from(arguments)?.prepared()?;
     let kept = Workspace::named(KEPT);
     assert_eq!(workspace.cached()?, BTreeSet::from([kept.clone()]));
     let entry = fs::read_to_string(workspace.path().join(".sqlx").join(&kept))?;
     assert!(entry.contains(r#""query": "SELECT 1 AS one""#));
     assert!(entry.contains(r#""name": "one""#));
-    let printed = String::from_utf8(out)?;
+    let printed = changes.to_string();
     golden!("prepared.txt", &printed);
     Ok(())
 }
@@ -89,10 +88,8 @@ fn every_store_query_in_the_crates_gets_an_entry_and_entries_no_query_uses_are_r
 fn a_second_run_over_a_cache_that_matches_its_queries_changes_nothing() -> Result<(), Box<dyn Error>> {
     let workspace = Workspace::laid()?;
     let arguments = || vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];
-    QueryCache::try_from(arguments())?.prepared(&mut Vec::new())?;
-    let mut out = Vec::new();
-    QueryCache::try_from(arguments())?.prepared(&mut out)?;
-    assert_eq!(out, Vec::<u8>::new());
+    QueryCache::try_from(arguments())?.prepared()?;
+    assert_eq!(QueryCache::try_from(arguments())?.prepared()?.to_string(), "");
     Ok(())
 }
 
@@ -101,7 +98,7 @@ fn a_table_with_one_key_and_no_nullable_columns_gets_its_record_statements() -> 
     let workspace = Workspace::laid()?;
     fs::write(workspace.path().join("migrations/20260102000000_records.sql"), RECORDS)?;
     let arguments = vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];
-    QueryCache::try_from(arguments)?.prepared(&mut Vec::new())?;
+    QueryCache::try_from(arguments)?.prepared()?;
     let record = Table::named("r")
         .column("id", Origin::GeneratedKey)
         .column("name", Origin::Given)

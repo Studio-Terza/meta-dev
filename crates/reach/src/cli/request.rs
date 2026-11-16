@@ -1,7 +1,10 @@
 mod workspace;
 
 use std::ffi::OsString;
-use std::io::{self, Write};
+use std::io;
+use std::process::ExitCode;
+
+use console_ports::Answer;
 use std::path::{Path, PathBuf};
 
 use file_ports::Files;
@@ -35,23 +38,22 @@ impl Request {
         }
     }
 
-    pub fn written(self, files: &impl Files, metadata: &Path, out: &mut impl Write) -> Result<(), Failure> {
+    pub fn written(self, files: &impl Files, metadata: &Path) -> Result<Answer, Failure> {
         match self {
-            Request::Affected(changed) => {
-                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).reached(&changed))?)
+            Request::Affected(changed) => Ok(Answer::new(ExitCode::SUCCESS)
+                .showing(Workspace::from(&Self::metadata(files, metadata)?).reached(&changed))),
+            Request::Widened(changed) => Ok(Answer::new(ExitCode::SUCCESS)
+                .showing(Workspace::from(&Self::metadata(files, metadata)?).reached(&changed).widened())),
+            Request::History(changed) => Ok(Answer::new(ExitCode::SUCCESS)
+                .showing(Workspace::from(&Self::metadata(files, metadata)?).history(&changed))),
+            Request::Sources(roots) => Ok(Answer::new(ExitCode::SUCCESS)
+                .showing(Workspace::from(&Self::metadata(files, metadata)?).sources(&roots))),
+            Request::Beyond { produced, changed } => {
+                Ok(Workspace::from(&Self::metadata(files, metadata)?).beyond(&produced, &changed).map_or_else(
+                    || Answer::new(ExitCode::SUCCESS),
+                    |path| Answer::new(ExitCode::SUCCESS).showing(path.display()).showing('\n'),
+                ))
             }
-            Request::Widened(changed) => {
-                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).reached(&changed).widened())?)
-            }
-            Request::History(changed) => {
-                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).history(&changed))?)
-            }
-            Request::Sources(roots) => {
-                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).sources(&roots))?)
-            }
-            Request::Beyond { produced, changed } => Ok(Workspace::from(&Self::metadata(files, metadata)?)
-                .beyond(&produced, &changed)
-                .map_or(Ok(()), |path| writeln!(out, "{}", path.display()))?),
         }
     }
 

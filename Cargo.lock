@@ -354,7 +354,6 @@ dependencies = [
  "console-ports",
  "design-closure",
  "design-model",
- "exit",
  "file-ports",
  "grammar-notes",
  "grammar-search",
@@ -2532,7 +2531,6 @@ name = "query-ports"
 version = "0.1.0"
 dependencies = [
  "console-ports",
- "exit",
  "file-ports",
  "golden",
  "graph-reader",

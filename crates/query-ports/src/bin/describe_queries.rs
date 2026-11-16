@@ -1,10 +1,12 @@
-use console_ports::Process;
-use exit::Exit;
+use std::process::ExitCode;
+
+use console_ports::{Answer, Process};
 use query_ports::QueryCache;
 
-fn main() -> Exit {
-    Process::answer(|arguments, out, err| {
-        let prepared = QueryCache::try_from(arguments).and_then(|cache| cache.prepared(out));
-        Exit::reported(prepared, err)
+fn main() -> ExitCode {
+    Process::answer(|arguments| {
+        let prepared = QueryCache::try_from(arguments).and_then(|cache| cache.prepared());
+        let shown = prepared.as_ref().map_or_default(ToString::to_string);
+        Answer::reported(prepared).showing(shown)
     })
 }

@@ -2,6 +2,7 @@ mod source;
 
 use std::collections::BTreeSet;
 use std::ffi::OsString;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -20,6 +21,21 @@ use source::Sources;
 pub struct QueryCache {
     root: PathBuf,
     migrations: PathBuf,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Change {
+    verb: &'static str,
+    path: PathBuf,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Changes(Vec<Change>);
+
+#[derive(Debug)]
+struct Kept {
+    path: PathBuf,
+    change: Option<Change>,
 }
 
 #[derive(Serialize)]
@@ -57,7 +73,7 @@ impl QueryCache {
     const DATABASE: &'static str = "SQLite";
     const MEMORY: &'static str = "sqlite::memory:";
 
-    pub fn prepared(&self, out: &mut impl io::Write) -> Result<(), Uncached> {
+    pub fn prepared(&self) -> Result<Changes, Uncached> {
         let queries = Sources::queries(&self.root)?;
         let mut scratch = Scratch::migrated(&self.migrations)?;
         let tables = scratch.tables()?;
@@ -66,44 +82,48 @@ impl QueryCache {
             .iter()
             .map(AsRef::as_ref)
             .chain(recorded.iter().map(String::as_str))
-            .map(|query| self.kept(&mut scratch, query, out))
-            .collect::<Result<BTreeSet<PathBuf>, Uncached>>()?;
-        self.pruned(&kept, out)
+            .map(|query| self.kept(&mut scratch, query))
+            .collect::<Result<Vec<Kept>, Uncached>>()?;
+        let paths: BTreeSet<PathBuf> = kept.iter().map(|entry| entry.path.clone()).collect();
+        let removed = self.pruned(&paths)?;
+        Ok(Changes(kept.into_iter().filter_map(|entry| entry.change).chain(removed).collect()))
     }
 
-    fn kept(&self, scratch: &mut Scratch, query: &str, out: &mut impl io::Write) -> Result<PathBuf, Uncached> {
+    fn kept(&self, scratch: &mut Scratch, query: &str) -> Result<Kept, Uncached> {
         let hash = hex::encode(Sha256::digest(query.as_bytes()));
         let path = self.root.join(Self::DIRECTORY).join(format!("query-{hash}.json"));
         let text = scratch.described(query, hash)?;
         let current = fs::read(&path).ok();
-        Some(text)
+        let change = Some(text)
             .filter(|fresh| current.as_ref() != Some(fresh))
-            .map_or_else(|| Ok(path.clone()), |fresh| self.rewritten(path.clone(), &fresh, out))
+            .map(|fresh| self.rewritten(&path, &fresh))
+            .transpose()?;
+        Ok(Kept { path, change })
     }
 
-    fn rewritten(&self, path: PathBuf, text: &[u8], out: &mut impl io::Write) -> Result<PathBuf, Uncached> {
-        fs::write(&path, text).map_err(|failed| Uncached::Io { path: path.clone(), source: failed })?;
-        self.announced("wrote", path, out)
+    fn rewritten(&self, path: &Path, text: &[u8]) -> Result<Change, Uncached> {
+        fs::write(path, text).map_err(|failed| Uncached::Io { path: path.to_path_buf(), source: failed })?;
+        Ok(self.change(Change::WROTE, path))
     }
 
-    fn announced(&self, change: &str, path: PathBuf, out: &mut impl io::Write) -> Result<PathBuf, Uncached> {
-        let shown = path.strip_prefix(&self.root).unwrap_or(&path);
-        writeln!(out, "{change} {}", shown.display())
-            .map_err(|failed| Uncached::Io { path: path.clone(), source: failed })?;
-        Ok(path)
+    fn change(&self, verb: &'static str, path: &Path) -> Change {
+        Change { verb, path: path.strip_prefix(&self.root).unwrap_or(path).to_path_buf() }
     }
 
-    fn pruned(&self, kept: &BTreeSet<PathBuf>, out: &mut impl io::Write) -> Result<(), Uncached> {
+    fn pruned(&self, kept: &BTreeSet<PathBuf>) -> Result<Vec<Change>, Uncached> {
         let directory = self.root.join(Self::DIRECTORY);
         let unlisted = |failed| Uncached::Io { path: directory.clone(), source: failed };
         let listed = fs::read_dir(&directory)
             .map_err(unlisted)?
             .map(|entry| entry.map(|found| found.path()).map_err(unlisted))
             .collect::<Result<BTreeSet<PathBuf>, Uncached>>()?;
-        listed.difference(kept).try_for_each(|stale| {
-            fs::remove_file(stale).map_err(|failed| Uncached::Io { path: stale.clone(), source: failed })?;
-            self.announced("removed", stale.clone(), out).map(|_removed| ())
-        })
+        listed
+            .difference(kept)
+            .map(|stale| {
+                fs::remove_file(stale).map_err(|failed| Uncached::Io { path: stale.clone(), source: failed })?;
+                Ok(self.change(Change::REMOVED, stale))
+            })
+            .collect()
     }
 }
 
@@ -166,5 +186,22 @@ impl Scratch {
         columns.iter().try_fold(Table::named(name), |table, (column, origin)| {
             Ok(table.column(column, origin.parse().map_err(Uncached::Origin)?))
         })
+    }
+}
+
+impl Change {
+    const WROTE: &'static str = "wrote";
+    const REMOVED: &'static str = "removed";
+}
+
+impl fmt::Display for Change {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {}", self.verb, self.path.display())
+    }
+}
+
+impl fmt::Display for Changes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|change| writeln!(formatter, "{change}"))
     }
 }

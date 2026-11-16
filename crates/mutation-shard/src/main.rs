@@ -5,5 +5,5 @@ use file_ports::Disk;
 use mutation_shard::Cli;
 
 fn main() -> ExitCode {
-    Process::answer(|arguments, _, err| Cli::answer(arguments.into_iter(), &Disk, err))
+    Process::answer(|arguments| Cli::answer(arguments.into_iter(), &Disk))
 }

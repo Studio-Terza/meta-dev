@@ -8,7 +8,7 @@ use file_ports::Disk;
 use sqlite_ports::SqliteOpener;
 
 fn main() -> Exit {
-    Process::answer(|arguments, out, err| {
+    Process::stream(|arguments, out, err| {
         let answered = Cli::new(
             &Process,
             Disk,
