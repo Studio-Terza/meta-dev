@@ -22,9 +22,12 @@ impl<'file> Crates<'file> {
             crates
         }))
     }
+}
 
-    pub(crate) fn violations(&self) -> Vec<Violation<'file>> {
-        self.0
+impl<'file> From<&Crates<'file>> for Vec<Violation<'file>> {
+    fn from(crates: &Crates<'file>) -> Vec<Violation<'file>> {
+        crates
+            .0
             .iter()
             .filter_map(|(name, functions)| Distribution::listing(name, functions))
             .map(|found| found.violation())

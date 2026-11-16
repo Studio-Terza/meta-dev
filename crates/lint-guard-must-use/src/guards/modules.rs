@@ -23,7 +23,7 @@ impl<'file> FromIterator<Modules<'file>> for Modules<'file> {
 
 impl<'file> Modules<'file> {
     pub fn file(&mut self, module: Module<'file>, members: Members<'file>) {
-        let filed = self.0.remove(&module).unwrap_or_default().merged(members);
+        let filed: Members<'_> = [self.0.remove(&module).unwrap_or_default(), members].into_iter().collect();
         self.0.insert(module, filed);
     }
 
