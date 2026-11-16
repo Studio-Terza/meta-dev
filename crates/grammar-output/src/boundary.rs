@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::vec::IntoIter;
 
 use grammar::logos::{Lexer, Logos};
-use newtype::{Guarded, Inner, Newtype, Stored, Validated};
+use newtype::{Guarded, Inner, Listed, Newtype, Stored, Validated};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -113,6 +113,12 @@ pub trait Unwrapping<T> {
 impl<T: Newtype<Inner = String>> Unwrapping<T> for Inner {
     fn unwrapped(text: String) -> Option<T> {
         Some(T::new(text))
+    }
+}
+
+impl<T: FromStr> Unwrapping<T> for Listed {
+    fn unwrapped(text: String) -> Option<T> {
+        text.parse().ok()
     }
 }
 

@@ -3,12 +3,11 @@ use design_model::{
 };
 use design_runs::Unplaced;
 use design_store::{
-    Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, RelationName, Remarking, ShapeName, Shortest,
-    Stored,
+    Annotation, Citation, Earlier, Hit, Placed, Placement, Prefixes, Remarking, ShapeName, Shortest, Stored,
 };
 use newtype::Wrapping;
 use store_ports::{Store, StoreFailure};
-use stream::{Anchors, SegmentId};
+use stream::{Anchors, Relation, SegmentId};
 use structurer::SegmentRef;
 use transcript_ports::{Authorship, Body, Instant, SessionId, Uuid};
 
@@ -112,10 +111,10 @@ impl Refs {
             }))
             .chain(stored.links().iter().map(|link| {
                 let [source, target] = link.anchors();
-                let relation: &RelationName = link.as_ref();
+                let relation: &Relation = link.as_ref();
                 Line::Link {
                     source: source.visited(Ends(self)),
-                    relation: relation.clone(),
+                    relation: *relation,
                     target: target.visited(Ends(self)),
                 }
             }))

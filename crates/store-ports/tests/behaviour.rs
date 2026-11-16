@@ -9,7 +9,7 @@ use design_model::{
     Standing, Title,
 };
 use design_runs::RunState;
-use design_store::{RelationName, SessionCursors, ShapeName, ShownMessage, StreamSchema};
+use design_store::{SessionCursors, ShapeName, ShownMessage, StreamSchema};
 use dispatch_ports::{Pid, Started, Tokens, Wall};
 use file_ports::{Bytes, Offset};
 use grammar_search::Term;
@@ -25,6 +25,7 @@ use store_ports::{
     Batch, Busy, Column, ColumnFailure, Columns, Migrator, Query, Schema, Statements, Store, StoreFailure, Version,
     Written,
 };
+use stream::Relation;
 use strum::VariantArray;
 use tempfile::TempDir;
 use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
@@ -201,7 +202,7 @@ impl Place {
             .iter()
             .map(|link| {
                 let [source, target] = link.anchors();
-                format!("{source} {} {target}", AsRef::<RelationName>::as_ref(link))
+                format!("{source} {} {target}", AsRef::<Relation>::as_ref(link))
             })
             .collect())
     }

@@ -1,7 +1,7 @@
 mod count;
 
 use design_model::{Ordinal, Prefix};
-use design_store::{Cursors, EarlierLines, Holding, LinkRow, RelationName, SessionCursors, SessionRecords};
+use design_store::{Cursors, EarlierLines, Holding, LinkRow, SessionCursors, SessionRecords};
 use newtype::{Counter, Wrapping};
 use store_ports::{Store, Written};
 use stream::{Anchors, Message, Relation, SegmentId, Shape, Stream};
@@ -119,8 +119,8 @@ impl Tally {
 impl Tally {
     fn refusal(link: &LinkRow) -> output::Line {
         let [source, target] = link.anchors();
-        let relation: &RelationName = link.as_ref();
-        output::Line::Refused(RefusedLink::new(source.visited(Whole), relation.clone(), target.visited(Whole)))
+        let relation: &Relation = link.as_ref();
+        output::Line::Refused(RefusedLink::new(source.visited(Whole), *relation, target.visited(Whole)))
     }
 }
 

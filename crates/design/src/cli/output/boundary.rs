@@ -6,7 +6,7 @@ use design_model::{
     Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
 };
 use design_runs::{Excerpt, RunState};
-use design_store::{AppliedId, RelationName, ShapeName};
+use design_store::{AppliedId, ShapeName};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
 use grammar_cited::Cited;
@@ -123,7 +123,7 @@ pub enum Line {
     },
     Link {
         source: Anchored,
-        relation: RelationName,
+        relation: Relation,
         target: Anchored,
     },
     Refused(RefusedLink),
@@ -159,7 +159,7 @@ pub enum Line {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RefusedLink {
     source: Anchored,
-    relation: RelationName,
+    relation: Relation,
     target: Anchored,
 }
 
@@ -560,7 +560,7 @@ impl fmt::Display for Anchored {
 
 impl RefusedLink {
     #[must_use]
-    pub fn new(source: Anchored, relation: RelationName, target: Anchored) -> RefusedLink {
+    pub fn new(source: Anchored, relation: Relation, target: Anchored) -> RefusedLink {
         RefusedLink { source, relation, target }
     }
 

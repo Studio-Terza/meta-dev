@@ -28,6 +28,7 @@ dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar-search = { path = "../grammar-search" }
 laws = { path = "../laws" }
+stream = { path = "../stream" }
 strum.workspace = true
 tempfile.workspace = true
 transcript-ports = { path = "../transcript-ports" }

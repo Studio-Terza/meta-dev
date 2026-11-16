@@ -9,7 +9,7 @@ use grammar_search::Term;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use store_ports::Record as _;
 use store_ports::{Columns, Released, Statements, StoreFailure, Written};
-use stream::{Anchor, Anchors, MechanicalLink, Message, SegmentId, Shape};
+use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
@@ -17,9 +17,6 @@ use design_closure::Keyed;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct ShapeName(String);
-
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub struct RelationName(String);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rank(f64);
@@ -49,7 +46,7 @@ pub struct SegmentRow {
 #[derive(Clone, Debug, Columns)]
 pub struct LinkRow {
     source: Anchor,
-    relation: RelationName,
+    relation: Relation,
     target: Anchor,
     source_message: Uuid,
     target_message: Uuid,
@@ -130,7 +127,7 @@ impl From<&MechanicalLink> for LinkRow {
         let [source, target] = link.anchors();
         LinkRow {
             source: source.clone(),
-            relation: RelationName::new(link.relation().to_string()),
+            relation: link.relation(),
             target: target.clone(),
             source_message: source.message().clone(),
             target_message: target.message().clone(),
@@ -564,7 +561,7 @@ VALUES
   (?1, ?2, ?3, ?4, ?5)
 "#,
             source: Anchor,
-            relation: RelationName,
+            relation: Relation,
             target: Anchor,
             source_message: Uuid,
             target_message: Uuid
@@ -632,8 +629,8 @@ impl AsRef<ShapeName> for SegmentRow {
     }
 }
 
-impl AsRef<RelationName> for LinkRow {
-    fn as_ref(&self) -> &RelationName {
+impl AsRef<Relation> for LinkRow {
+    fn as_ref(&self) -> &Relation {
         &self.relation
     }
 }
