@@ -13,6 +13,7 @@ test = false
 doctest = false
 
 [dependencies]
+thiserror.workspace = true
 grammar = { path = "../grammar" }
 
 [dev-dependencies]

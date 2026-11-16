@@ -68,7 +68,7 @@ pub struct Unstarted(String);
 
 impl Started {
     fn read(text: &str) -> Option<Started> {
-        let stamp = Stamp::read(text)?;
+        let stamp = Stamp::try_from(text).ok()?;
         let [weekday, month] = stamp.words();
         let [day, hour, minute, second, year] = stamp.numbers();
         Some(Started {

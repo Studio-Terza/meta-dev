@@ -774,6 +774,7 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
+ "thiserror",
 ]
 
 [[package]]
@@ -826,6 +827,8 @@ name = "grammar-cited"
 version = "0.1.0"
 dependencies = [
  "grammar",
+ "laws",
+ "thiserror",
 ]
 
 [[package]]
@@ -875,6 +878,7 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
+ "thiserror",
 ]
 
 [[package]]
