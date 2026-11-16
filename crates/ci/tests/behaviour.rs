@@ -1206,6 +1206,8 @@ laws::table!(
         ["mutants-changed", "diff", "out", "8/8", "-p"] => true,
         ["mutants-changed", "diff", "out", "-1/8", "-p"] => true,
         ["mutants-changed", "diff", "out", "--test-package=leaf"] => true,
+        ["mutants-plan", "diff", "out", "nowhere", "-p"] => true,
+        ["mutants-plan", "diff", "out", "consumed-by"] => true,
         ["wall-times"] => true,
         ["wall-times", "repo", "1"] => true,
         ["wall-times", "repo", "1", "job", "extra"] => true,
@@ -1555,7 +1557,14 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_t
     };
     let answer = scratch.answer(
         &fake,
-        &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "--test-package=d"],
+        &[
+            "mutants-plan",
+            &scratch.file("c.diff"),
+            &scratch.file("plan.txt"),
+            "consumed-by",
+            "lint",
+            "--test-package=d",
+        ],
     );
     assert_eq!(
         answer.lines().shown(),
@@ -1579,8 +1588,10 @@ fn a_plan_with_no_changed_tests_asks_no_graph_and_keeps_the_changed_lines() -> R
         exact: vec![ExactReply { asked: named, text: String::new() }],
         ..Script::new()
     };
-    let answer =
-        scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "-p"]);
+    let answer = scratch.answer(
+        &fake,
+        &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint", "-p"],
+    );
     assert_eq!(answer.exit, ExitCode::SUCCESS);
     assert_eq!(Text::lines(&scratch.read("c.diff")), ["+a line"]);
     let programs: Vec<String> =
@@ -1596,7 +1607,10 @@ impl Plans {
         let scratch = Scratch::fresh();
         let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
         let fake = Script { exact: vec![ExactReply { asked: listed, text: "m\n".repeat(mutants) }], ..Script::new() };
-        scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "-p"]);
+        scratch.answer(
+            &fake,
+            &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint", "-p"],
+        );
         Text::lines(&scratch.read("plan.txt"))
     }
 }
@@ -1616,7 +1630,8 @@ laws::table!(
 fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let fake = Script::new();
-    let answer = scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt")]);
+    let answer = scratch
+        .answer(&fake, &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint"]);
     assert_eq!(Text::lines(&answer.out), ["mutants: 0 to test in 1 shards"]);
     assert_eq!(Text::lines(&scratch.read("plan.txt")), ["shards=[0]"]);
     assert!(fake.calls.borrow().is_empty());
@@ -1718,13 +1733,13 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
 fn a_failed_start_while_testing_changed_lines_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
-    let planning = ["mutants-plan", &scratch.file("c.diff"), "lint", &scratch.file("plan.txt"), "-p"];
+    let planning = ["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint", "-p"];
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("git"), &planning).err), ["cannot run git: boom"]);
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("cargo"), &arguments).err), ["cannot run cargo: boom"]);
     scratch.write("blocker", "")?;
     let blocked = scratch.answer(
         &Script::new(),
-        &["mutants-plan", &scratch.file("blocker/c.diff"), "lint", &scratch.file("plan.txt"), "-p"],
+        &["mutants-plan", &scratch.file("blocker/c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint", "-p"],
     );
     assert!(blocked.err.contains("blocker/c.diff"));
     Ok(())
@@ -2674,5 +2689,43 @@ fn a_scoped_rerun_that_tests_fewer_mutants_than_were_missed_fails() -> Result<()
             "src/a.rs:1:5: replace f -> bool with true"
         ]
     );
+    Ok(())
+}
+
+#[test]
+fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let named = Invocation::new(
+        "git",
+        ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"],
+    );
+    let kept =
+        Invocation::new("git", ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs", ":(exclude)crates/d/src"]);
+    let whole = Invocation::new(
+        "git",
+        [
+            "diff",
+            "--no-renames",
+            "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+            "HEAD",
+            "--",
+            ":(glob)crates/d/src/**/*.rs",
+        ],
+    );
+    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
+    let fake = Script {
+        exact: vec![
+            ExactReply { asked: named.clone(), text: "crates/d/tests/behaviour.rs\n".to_owned() },
+            ExactReply { asked: kept.clone(), text: "+changed\n".to_owned() },
+            ExactReply { asked: whole.clone(), text: "+whole\n".to_owned() },
+            ExactReply { asked: listed.clone(), text: "m\n".repeat(3) },
+        ],
+        ..Script::new()
+    };
+    let answer =
+        scratch.answer(&fake, &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "changed", "-p"]);
+    assert_eq!(Text::lines(&answer.out), ["mutants: 3 to test in 1 shards"]);
+    assert_eq!(Text::lines(&scratch.read("c.diff")), ["+changed", "+whole"]);
+    assert_eq!(*fake.calls.borrow(), [named, kept, whole, listed]);
     Ok(())
 }

@@ -13,12 +13,12 @@ use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 use boundary::Shards;
-use tested::Tested;
+use tested::{Reach, Reaching, Tested};
 
 #[derive(Debug)]
 pub struct MutantsPlan {
     diff: Journal,
-    lint: PathBuf,
+    reach: Reach,
     output: Journal,
     scope: Vec<OsString>,
 }
@@ -27,7 +27,7 @@ impl MutantsPlan {
     const LISTED: [&'static str; 3] = ["mutants", "--list", "--in-diff"];
 
     fn planned(&self, ports: &impl Ports) -> Result<Shards, Failure<'_>> {
-        let changed = Tested::asked(ports, &self.lint)?.diff(ports)?;
+        let changed = Tested::asked(ports, &self.reach)?.diff(ports)?;
         self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
         let invocation =
@@ -41,12 +41,18 @@ impl Step for MutantsPlan {
     fn from_arguments(given: Vec<OsString>) -> Result<MutantsPlan, Failure<'static>> {
         let mut arguments = Arguments::from(given);
         let diff = &arguments.taken()?;
-        let lint = &arguments.taken()?;
         let output = &arguments.taken()?;
+        let reaching = arguments
+            .taken()?
+            .to_str()
+            .ok_or(Failure::Usage)?
+            .parse::<Reaching>()
+            .map_err(|_unreached| Failure::Usage)?;
+        let reach = Reach::taken(reaching, &mut arguments)?;
         let scope = arguments.rest();
         Ok(MutantsPlan {
             diff: Journal::from(PathBuf::from(diff)),
-            lint: PathBuf::from(lint),
+            reach,
             output: Journal::file(Path::new(output)),
             scope,
         })

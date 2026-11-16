@@ -220,7 +220,7 @@ jobs:
           tool: cargo-mutants@27.1.0
       - name: plan
         id: plan
-        run: '"$TOOLS/ci" mutants-plan "$RUNNER_TEMP/changed.diff" "$TOOLS/lint" "$GITHUB_OUTPUT" $MUTANTS_SCOPE'
+        run: '"$TOOLS/ci" mutants-plan "$RUNNER_TEMP/changed.diff" "$GITHUB_OUTPUT" changed $MUTANTS_SCOPE'
       - uses: actions/upload-artifact@v4
         if: env.MUTANTS_SCOPE != ''
         with:
