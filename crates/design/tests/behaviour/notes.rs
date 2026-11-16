@@ -8,10 +8,6 @@ use design_model::{NodeId, NotesLine};
 use design_store::StreamSchema;
 use file_ports::{Bytes, Files};
 use grammar_notes::{Cite, Quote};
-use laws::proptest::collection::vec;
-use laws::proptest::prelude::{prop_assert, prop_assert_eq};
-use laws::proptest::sample::select;
-use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
 
 use super::view::Viewing;
@@ -181,56 +177,53 @@ fn import_notes_makes_a_node_of_every_content_line_anchors_each_ruling_and_view_
     Ok(())
 }
 
-laws::law!(
-    importing_notes_and_viewing_them_gives_the_content_back_with_as_many_nodes_as_content_lines,
+const KINDS: [(&str, &str); 14] = [
+    ("", ""),
+    ("# Notes (2026-11-05)", "# Notes (2026-11-05)"),
+    ("## Later", "## Later"),
+    ("Owner: \"rows turn into a map.\" and more", "Owner: \"rows turn into a map.\" and more"),
     (
-        vec(
-            select(vec![
-                ("", ""),
-                ("# Notes (2026-11-05)", "# Notes (2026-11-05)"),
-                ("## Later", "## Later"),
-                ("Owner: \"rows turn into a map.\" and more", "Owner: \"rows turn into a map.\" and more"),
-                (
-                    "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\"",
-                    "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\""
-                ),
-                (
-                    "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that",
-                    "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that"
-                ),
-                (
-                    "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)",
-                    "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)"
-                ),
-                ("(Owner moved on: not a ruling)", "(Owner moved on: not a ruling)"),
-                ("  indented: prose with Rust's 'quotes' in it", "  indented: prose with Rust's 'quotes' in it"),
-                ("  ", ""),
-                ("\r", ""),
-                ("  \r", ""),
-                ("\t", ""),
-                (" \t ", ""),
-            ]),
-            0..8
-        ),
-        select(vec!["\n", ""]),
+        "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\"",
+        "RULING (owner, explicit, 2026-11-05): \"yes the new trellis is approved.\"",
     ),
+    (
+        "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that",
+        "- 2026-11-06 RULING (owner, d4d4d4d4): 'agreed' to that",
+    ),
+    (
+        "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)",
+        "Lead: as b2b2b2b2 said, \"water again later\" (78c6b13)",
+    ),
+    ("(Owner moved on: not a ruling)", "(Owner moved on: not a ruling)"),
+    ("  indented: prose with Rust's 'quotes' in it", "  indented: prose with Rust's 'quotes' in it"),
+    ("  ", ""),
+    ("\r", ""),
+    ("  \r", ""),
+    ("\t", ""),
+    (" \t ", ""),
+];
+
+laws::table!(
+    importing_notes_and_viewing_them_gives_the_content_back_with_as_many_nodes_as_content_lines,
+    [Vec::new(), KINDS.to_vec(), KINDS.into_iter().rev().collect()]
+        .into_iter()
+        .flat_map(|lines: Vec<(&str, &str)>| ["\n", ""].map(|ending| (lines.clone(), ending))),
     file,
     {
         let (lines, ending) = file;
         let body: String = lines.iter().flat_map(|(line, _viewed)| [*line, "\n"]).collect();
         let notes = format!("{body}last line{ending}");
-        let applying = Noting::ready().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        let imported =
-            Noting::imported(&applying, &notes).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        let viewed = applying.run(&["view", "notes"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let applying = Noting::ready()?;
+        let imported = Noting::imported(&applying, &notes)?;
+        let viewed = applying.run(&["view", "notes"])?;
         let laid: String = lines.iter().flat_map(|(_line, text)| [*text, "\n"]).collect();
         let inked = lines.iter().filter(|(_line, text)| !text.is_empty()).count() + 1;
         let nodes =
             Spread::parsed(&imported).iter().filter(|line| matches!(line, Line::Noted(Noted::Imported { .. }))).count();
-        prop_assert_eq!(viewed, format!("{laid}last line{ending}"));
-        prop_assert_eq!(nodes, inked);
+        assert_eq!(viewed, format!("{laid}last line{ending}"));
+        assert_eq!(nodes, inked);
         let reconciled = format!("reconciled lines {inked} nodes {inked} ");
-        prop_assert!(imported.contains(&reconciled));
+        assert!(imported.contains(&reconciled), "{imported}");
     }
 );
 

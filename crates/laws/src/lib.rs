@@ -75,6 +75,18 @@ macro_rules! table {
             )+
         }
     };
+    ($(#[$meta:meta])* $name:ident, $domain:expr, $row:ident, $body:block $(,)?) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() {
+            ::core::iter::IntoIterator::into_iter($domain)
+                .try_for_each(|$row| -> Result<(), Box<dyn ::std::error::Error>> {
+                    let _: () = $body;
+                    Ok(())
+                })
+                .unwrap_or_else(|failure| panic!("the table row is broken: {failure}"));
+        }
+    };
 }
 
 #[macro_export]

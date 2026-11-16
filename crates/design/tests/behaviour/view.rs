@@ -5,9 +5,6 @@ use design::{Failure, Line, Unresolved, Viewed};
 use design_model::{Ending, NodeId, Segment};
 use design_runs::Unstructured;
 use design_store::StreamSchema;
-use laws::proptest::prelude::prop_assert_eq;
-use laws::proptest::sample::select;
-use laws::proptest::test_runner::TestCaseError;
 use newtype::Wrapping;
 use port_core::Run;
 use store_ports::Store;
@@ -548,32 +545,29 @@ impl Own {
     }
 }
 
-laws::law!(
+laws::table!(
     the_unplaced_view_lists_exactly_the_owner_segments_without_a_directive_of_their_own,
-    (select(Own::ALL.to_vec()), select(Own::ALL.to_vec()), select(Own::ALL.to_vec()), select(Own::ALL.to_vec())),
-    owns,
+    0..Own::ALL.len(),
+    turn,
     {
         let segments = [format!("{}.0", Session::ASKED), Applying::answer(0), Applying::answer(1), LATER.to_owned()];
-        let owned = segments.iter().zip([owns.0, owns.1, owns.2, owns.3]);
-        let directives: Vec<String> = owned.clone().filter_map(|(segment, own)| own.directive(segment)).collect();
-        let applying = Applying::ready().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let owned: Vec<(&String, Own)> = segments.iter().zip(Own::ALL.into_iter().cycle().skip(turn)).collect();
+        let directives: Vec<String> = owned.iter().filter_map(|(segment, own)| own.directive(segment)).collect();
+        let applying = Applying::ready()?;
         applying
-            .applied(&["propose(new, refines(n1), feature, \"cover\")".to_owned(), directives.join("\n")].join("\n"))
-            .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        let viewed = applying.run(&["view", "unplaced"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+            .applied(&["propose(new, refines(n1), feature, \"cover\")".to_owned(), directives.join("\n")].join("\n"))?;
+        let viewed = applying.run(&["view", "unplaced"])?;
         let listed: Vec<String> = Spread::parsed(&viewed).into_iter().filter_map(Viewing::unplaced).collect();
         let wanted: Vec<String> = owned
+            .iter()
             .filter(|(_segment, own)| matches!(own.owed(), Owed::Unplaced))
-            .map(|(segment, _own)| segment.clone())
+            .map(|(segment, _own)| (*segment).clone())
             .collect();
-        let owed = Run::root()
-            .port(applying.store)
-            .read(Unstructured)
-            .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        let owed = Run::root().port(applying.store).read(Unstructured)?;
         let unstructured: Vec<String> =
             owed.iter().map(|unplaced| SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)).to_string()).collect();
-        prop_assert_eq!(&listed, &wanted);
-        prop_assert_eq!(unstructured, wanted);
+        assert_eq!(&listed, &wanted);
+        assert_eq!(unstructured, wanted);
     }
 );
 

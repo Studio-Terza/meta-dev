@@ -17,13 +17,14 @@ use design_runs::{
 };
 use design_store::{
     AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Holding, JobRepeated, Linked, NextNode,
-    Placed, Planting, Prefixed, ProjectRoot, Refusal, RelationName, Remit, Resolved, Resolving, Restaged, Scope,
-    SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, StreamSchema, Unseen,
+    Placed, Planting, Prefixed, Prefixes, ProjectRoot, Refusal, RelationName, Remit, Resolved, Resolving, Restaged,
+    Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShapeName, ShownMessage, ShownNode, StreamSchema,
+    Unseen,
 };
 use dispatch_ports::{Deadline, Pid, Wall};
 use file_ports::{Bytes, Files, Memory};
 use grammar_search::Terms;
-use laws::proptest::collection::vec;
+use laws::proptest::collection::{btree_set, vec};
 use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
@@ -720,13 +721,12 @@ impl Projects {
     }
 }
 
-laws::law!(
+laws::table!(
     a_project_root_is_found_by_its_project_alone,
-    select(Facet::VARIANTS).prop_filter("a facet other than a project root", |facet| *facet != Facet::Project),
+    Facet::VARIANTS.iter().filter(|facet| **facet != Facet::Project),
     facet,
     {
-        let found = Projects::alone(facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        prop_assert_eq!(found, [Some(NodeId::new(3)), None]);
+        assert_eq!(Projects::alone(*facet)?, [Some(NodeId::new(3)), None], "{facet}");
     }
 );
 
@@ -956,6 +956,47 @@ fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dy
     assert_eq!(heard("1")?, []);
     Ok(())
 }
+
+struct Shortened;
+
+impl Shortened {
+    fn session(uuids: &BTreeSet<String>) -> String {
+        uuids
+            .iter()
+            .map(|uuid| {
+                format!(
+                    "{{\"type\":\"user\",\"uuid\":\"{uuid}\",\"parentUuid\":null,\"sessionId\":\"s\",\
+                     \"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{{\"kind\":\"human\"}},\
+                     \"message\":{{\"content\":\"1. go\\n2. now\"}}}}\n"
+                )
+            })
+            .collect::<Vec<String>>()
+            .concat()
+    }
+
+    fn strays(uuids: &BTreeSet<String>) -> Result<Vec<String>, Box<dyn Error>> {
+        let Recorded { records, .. } = Recorded::of(&Shortened::session(uuids))?;
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        store.write(store.read(Holding::from(records))?)?;
+        let messages =
+            uuids.iter().map(|uuid| Ok(Uuid::try_new(uuid.clone())?)).collect::<Result<Vec<Uuid>, Box<dyn Error>>>()?;
+        let shortest = store.read(messages.iter().cloned().collect::<Prefixes>())?;
+        messages.iter().try_fold(Vec::new(), |mut strays, message| {
+            let prefix = shortest.prefix(message);
+            let heard = store.read(Prefixed::from(prefix.clone()))?;
+            let others = heard.iter().filter(|said| AsRef::<Uuid>::as_ref(said.segment()) != message);
+            strays.extend(others.map(|said| format!("{prefix} heard {:?}", said.segment())));
+            strays.extend(heard.is_empty().then(|| format!("{prefix} heard nothing")));
+            Ok(strays)
+        })
+    }
+}
+
+laws::law!(a_shortest_prefix_hears_only_its_own_message, btree_set("[ab]{12}", 1..8), uuids, {
+    let strays = Shortened::strays(&uuids).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(strays, Vec::<String>::new());
+});
 
 #[test]
 fn a_segment_is_covered_by_its_own_directive_not_by_a_link_to_it() -> Result<(), Box<dyn Error>> {
