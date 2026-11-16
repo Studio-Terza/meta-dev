@@ -1,3 +1,4 @@
+use lint_layout::Name;
 use std::fmt;
 use std::num::NonZeroUsize;
 
@@ -104,7 +105,7 @@ impl fmt::Display for Placed<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.spelled {
             Spelled::Path => write!(formatter, "{}{}", self.member, self.found_at()),
-            Spelled::Name => write!(formatter, "{}{}", self.member.name(), self.found_at()),
+            Spelled::Name => write!(formatter, "{}{}", <&Name>::from(self.member), self.found_at()),
         }
     }
 }
@@ -125,7 +126,8 @@ impl fmt::Display for Listing<'_, '_, '_> {
 
 impl fmt::Display for Names<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let shown: Vec<String> = self.0.iter().take(Self::SHOWN).map(|member| member.name().to_string()).collect();
+        let shown: Vec<String> =
+            self.0.iter().take(Self::SHOWN).map(|member| <&Name>::from(*member).to_string()).collect();
         formatter.write_str(shown.first().map_or("nothing", |_| ""))?;
         formatter.write_str(&shown.join(", "))?;
         NonZeroUsize::new(self.0.len().saturating_sub(Self::SHOWN))

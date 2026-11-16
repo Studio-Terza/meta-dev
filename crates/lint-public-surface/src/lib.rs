@@ -1,3 +1,4 @@
+use lint_layout::Name;
 mod export;
 mod finding;
 mod foreign_references;
@@ -68,7 +69,7 @@ impl PublicSurface {
             .map(|export| {
                 Violation::new(
                     Site::new(file.head().path(), export.line()),
-                    Finding::UnnamedExport { name: export.name() },
+                    Finding::UnnamedExport { name: AsRef::<Name>::as_ref(&export) },
                 )
             })
             .collect()
