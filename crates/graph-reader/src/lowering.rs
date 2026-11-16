@@ -706,6 +706,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.parameters(&Holder::named(&item.ident, Held::Bound), &item.generics, &link);
         item.variants.iter().fold(&mut *self, |lowering, variant| {
+            lowering.hold(Holder::named(&variant.ident, Held::Variant), link.clone(), TypeRef::Tuple(Vec::new()));
             let holder = Holder::named(&variant.ident, Held::EnumField);
             lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
             lowering

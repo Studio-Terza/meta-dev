@@ -14,6 +14,7 @@ pub enum Held {
     Alias,
     Value,
     Bound,
+    Variant,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

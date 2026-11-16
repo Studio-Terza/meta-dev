@@ -205,11 +205,6 @@ impl Function {
     }
 
     #[must_use]
-    pub fn exposure(&self) -> Exposure {
-        self.exposure
-    }
-
-    #[must_use]
     pub fn defined(self, definition: Option<Definition>) -> Function {
         Function { definition, ..self }
     }
@@ -272,5 +267,11 @@ impl AsRef<Name> for Function {
 impl AsRef<[Parameter]> for Signature {
     fn as_ref(&self) -> &[Parameter] {
         &self.parameters
+    }
+}
+
+impl AsRef<Exposure> for Function {
+    fn as_ref(&self) -> &Exposure {
+        &self.exposure
     }
 }

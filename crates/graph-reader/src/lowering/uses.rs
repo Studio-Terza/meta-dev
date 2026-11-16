@@ -3,8 +3,8 @@ mod tokens;
 use syntax::Spanned;
 use syntax::{ExprPath, ExprStruct, Macro, QSelf, Type, TypeParamBound};
 
-use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved};
-use lint_layout::Position;
+use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved, Seat};
+use lint_layout::{Name, Position, Whole, Word, words};
 
 use crate::namespace::UsePath;
 
@@ -34,6 +34,17 @@ impl UseRow {
         }
     }
 
+    const SELF: [Word<'static>; 1] = words!["Self"];
+    const OWNED_LENGTH: usize = 2;
+
+    fn owned(&self, seat: &Seat) -> Option<Resolved> {
+        let written = self.written.written();
+        let segments: &[Name] = written.as_ref();
+        let last = segments.get(1).filter(|_| segments.len() == Self::OWNED_LENGTH)?;
+        segments.first()?.matches::<Whole>(&Self::SELF)?;
+        Some(Resolved::Member(Member::new(seat.owner()?, last.clone())))
+    }
+
     fn kept<'resolved>(&self, resolved: &'resolved Resolved) -> Option<&'resolved Resolved> {
         match self.mention {
             Mention::Invoked | Mention::Dispatched => Some(resolved),
@@ -54,6 +65,7 @@ impl Built for UseRow {
             .and_then(|_| Some(resolving.path(scope, &self.written.parent()?, Domain::Types)))
             .zip(self.written.tail().last());
         let aliased = head.as_ref().and_then(|(parent, last)| building.aliased(parent)?.joined(last));
+        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);
         let member = head
             .as_ref()
             .and_then(|(parent, last)| Some(Resolved::Member(Member::new(parent.crate_item()?, (*last).clone()))));
@@ -61,10 +73,9 @@ impl Built for UseRow {
             direct.unresolved().and(Some(self.domain())).filter(|domain| *domain == Domain::Types)?;
             Some(resolving.path(scope, &self.written, Domain::Values)).filter(|resolved| resolved.known().is_some())
         };
-        let resolved = aliased.or(member).or_else(valued).unwrap_or(direct);
+        let resolved = self.owned(&seat).or(aliased).or(member).or_else(valued).unwrap_or(direct);
         let written = self.written.written();
         let named = self.kept(&resolved).map(|_| ()).map(|()| resolved);
-        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);
         let line = self.located.position().line();
         let used = named.map(|kept| PathUse::new(written, kept, self.mention, seat));
         used.into_iter().fold(building, |mut built, found| {

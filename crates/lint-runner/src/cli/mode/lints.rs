@@ -147,7 +147,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 56] = [
+    const LINTS: [Entry; 57] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -175,6 +175,7 @@ impl Lints {
         <Ruled<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
         <Judged<NoTestOnlyApi> as Registered>::ENTRY,
+        Entry::spelled::<NoTestOnlyApi>(Work::Modelled(<NoTestOnlyApi as ModelLint>::report)),
         <Swept<NoIgnoredTests> as Registered>::ENTRY,
         Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
         Entry::spelled::<FakesAtPorts>(Work::Modelled(<FakesAtPorts as ModelLint>::report)),

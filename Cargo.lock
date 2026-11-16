@@ -1754,6 +1754,8 @@ dependencies = [
 name = "lint-no-test-only-api"
 version = "0.1.0"
 dependencies = [
+ "graph",
+ "graph-reader",
  "lint-core",
  "lint-file",
  "lint-fixtures",
