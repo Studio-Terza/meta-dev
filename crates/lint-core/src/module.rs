@@ -26,14 +26,6 @@ impl<'file> Module<'file> {
         Module { crate_file: self.crate_file, path: self.path.iter().cloned().chain(Some(name)).collect() }
     }
 
-    pub fn enter(&mut self, name: Name) {
-        self.path.push(name);
-    }
-
-    pub fn leave(&mut self) {
-        self.path.pop();
-    }
-
     #[must_use]
     pub fn parent(&self) -> Option<Module<'file>> {
         let outer = self.path.len().checked_sub(1)?;
