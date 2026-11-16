@@ -264,7 +264,7 @@ impl UsePath {
         self.segments.iter().cloned().collect()
     }
 
-    pub(crate) fn parent(&self) -> Option<UsePath> {
+    pub(crate) fn qualifier(&self) -> Option<UsePath> {
         let (_, kept) = self.segments.split_last()?;
         kept.first().map(|_| UsePath { segments: kept.to_vec(), ..self.clone() })
     }

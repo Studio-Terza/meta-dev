@@ -14,18 +14,19 @@ pub struct ModuleIndex<'file> {
 
 impl<'file> From<Vec<ModulePath<'file>>> for ModuleIndex<'file> {
     fn from(modules: Vec<ModulePath<'file>>) -> ModuleIndex<'file> {
-        let latest = modules.iter().fold(
+        let latest = modules.iter().filter_map(|module| module.nest.krate().map(|root| (root, module))).fold(
             HashMap::new(),
-            |mut found: HashMap<&'file CrateRoot, HashMap<Vec<&'file Name>, ModulePath<'file>>>, module| {
-                found.entry(module.crate_root).or_default().insert(module.segments.iter().collect(), *module);
+            |mut found: HashMap<&'file CrateRoot, HashMap<Vec<&'file Name>, ModulePath<'file>>>, (root, module)| {
+                found.entry(root).or_default().insert(module.segments().iter().collect(), *module);
                 found
             },
         );
         let directories = modules
             .iter()
             .filter(|module| module.file.file_name().is_some_and(|name| name == Self::MODULE_FILE))
-            .fold(HashMap::new(), |mut found: HashMap<&'file CrateRoot, HashSet<Vec<&'file Name>>>, module| {
-                found.entry(module.crate_root).or_default().insert(module.segments.iter().collect());
+            .filter_map(|module| module.nest.krate().map(|root| (root, module)))
+            .fold(HashMap::new(), |mut found: HashMap<&'file CrateRoot, HashSet<Vec<&'file Name>>>, (root, module)| {
+                found.entry(root).or_default().insert(module.segments().iter().collect());
                 found
             });
         ModuleIndex { modules, latest, directories }
