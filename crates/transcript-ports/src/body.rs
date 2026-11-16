@@ -30,7 +30,7 @@ impl Body {
     }
 
     #[must_use]
-    pub fn written(&self) -> Option<&Body> {
+    pub fn nonempty(&self) -> Option<&Body> {
         self.0.chars().next().map(|_| self)
     }
 
