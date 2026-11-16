@@ -12,17 +12,17 @@ use std::fmt;
 use std::path::Path;
 
 use lint_layout::Name;
-use lint_placement::{CrateRoot, Nest};
+use lint_placement::{CrateRoot, Krate, Nest};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModulePath<'file> {
-    nest: Nest<'file, &'file CrateRoot>,
+    nest: Nest<'file>,
     file: &'file Path,
 }
 
 impl<'file> ModulePath<'file> {
     pub fn new(crate_root: &'file CrateRoot, segments: &'file [Name], file: &'file Path) -> ModulePath<'file> {
-        ModulePath { nest: Nest::module(crate_root, segments), file }
+        ModulePath { nest: Nest::module(Krate::Rooted(crate_root), segments), file }
     }
 
     pub fn file(&self) -> &'file Path {
@@ -40,8 +40,8 @@ impl<'file> ModulePath<'file> {
     }
 }
 
-impl<'file> AsRef<Nest<'file, &'file CrateRoot>> for ModulePath<'file> {
-    fn as_ref(&self) -> &Nest<'file, &'file CrateRoot> {
+impl<'file> AsRef<Nest<'file>> for ModulePath<'file> {
+    fn as_ref(&self) -> &Nest<'file> {
         &self.nest
     }
 }

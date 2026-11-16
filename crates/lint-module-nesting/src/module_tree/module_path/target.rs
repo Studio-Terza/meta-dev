@@ -2,7 +2,7 @@ use lint_placement::Level;
 use std::fmt;
 
 use lint_layout::{Name, UsePath, Whole, Word, words};
-use lint_placement::CrateRoot;
+use lint_placement::Krate;
 
 use super::{ModuleIndex, ModulePath};
 
@@ -30,7 +30,7 @@ impl Start {
 
 #[derive(Debug)]
 pub struct Target<'path> {
-    crate_root: &'path CrateRoot,
+    crate_root: Krate<'path>,
     segments: Vec<&'path Name>,
 }
 

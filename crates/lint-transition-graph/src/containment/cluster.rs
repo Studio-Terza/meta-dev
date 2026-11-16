@@ -1,10 +1,9 @@
 use std::fmt;
 
-use lint_layout::Name;
 pub(crate) use lint_placement::Level;
 use lint_placement::Nest;
 
-pub(crate) type Cluster<'found> = Nest<'found, &'found Name>;
+pub(crate) type Cluster<'found> = Nest<'found>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Part<'found> {

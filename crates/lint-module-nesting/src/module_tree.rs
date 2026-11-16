@@ -150,7 +150,7 @@ impl<'file> ModuleTree<'file> {
         let crowded = self
             .reexports
             .iter()
-            .filter(|(module, _)| AsRef::<Nest<'_, &CrateRoot>>::as_ref(*module).level() == Level::Module)
+            .filter(|(module, _)| AsRef::<Nest<'_>>::as_ref(*module).level() == Level::Module)
             .filter_map(move |(module, count)| count.beyond(most).map(|crowded| (module, crowded)))
             .map(move |(module, count)| {
                 Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
