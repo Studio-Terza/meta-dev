@@ -2,9 +2,8 @@ mod module_tree;
 
 use module_tree::{ModuleGathering, ShippedModule};
 
-use lint_core::{Bound, Headline, Parsed, SourceFile};
-use lint_file::{Concluded, ContextLint, Reads};
-use lint_sweep::Judgement;
+use lint_core::{Bound, Headline, Parsed, SourceFile, Violation};
+use lint_file::{Concluded, ContextLint, Reads, RuledLint};
 
 #[derive(Debug)]
 pub struct ModuleNesting;
@@ -22,12 +21,11 @@ impl ContextLint for ModuleNesting {
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> ModuleGathering<'head> {
         ModuleGathering::from(parsed)
     }
+}
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        concluded: &'run Concluded<'head>,
-    ) -> Judgement<'file, 'run> {
-        Judgement::found(concluded.found_in(file))
+impl RuledLint for ModuleNesting {
+    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
+        concluded.found_in(file)
     }
 }
 

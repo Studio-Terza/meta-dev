@@ -33,7 +33,7 @@ pub use macro_aliases::MacroAliases;
 pub use macros::Macros;
 pub use model_lint::ModelLint;
 pub use module::Module;
-pub use readout::Readout;
+pub use readout::{Readout, Unwalked};
 pub use repo_file::RepoFile;
 pub use report::Report;
 pub use source_file::{FileHead, Parsed, SourceFile};

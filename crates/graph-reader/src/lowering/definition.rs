@@ -1,3 +1,4 @@
+mod boundary;
 mod reads;
 mod repetitions;
 
@@ -9,13 +10,14 @@ use body_lifts::{Body, BodyReading, Branching};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
-use lint_sweep::{Address, Descend, Facts, Kind, Sweep, Watch};
+use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watch, Watching};
 
 use crate::branches::{Branches, Propagation};
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
-use reads::{Reads, ReadsLowered};
+pub(super) use boundary::RowIndex;
+use reads::{Reads, ReadsLowered, SharedParameters};
 use repetitions::Repetitions;
 
 #[derive(Debug)]
@@ -57,15 +59,42 @@ struct Invocations {
 #[derive(Debug, Default)]
 struct Rebound(BTreeSet<Name>);
 
-impl LoweredDefinition {
-    pub(super) fn of_body(scope: &InScope, signature: &Signature, body: &Block) -> LoweredDefinition {
-        let mut rebound = Rebound::default();
-        let mut invocations = Invocations::default();
-        let mut branches = Branches::new(Propagation::Ambient);
-        let mut repetitions = Repetitions::of_signature(signature);
-        let mut reads = Reads::default();
-        Sweep::over_block(body, vec![&mut rebound, &mut invocations, &mut branches, &mut repetitions, &mut reads]);
-        let read = reads.settled(scope, signature, body, &rebound.0);
+#[derive(Debug)]
+pub(crate) struct BodyGroup {
+    row: RowIndex,
+    scope: InScope,
+    shape: Body,
+    parameters: BTreeMap<Name, TypeRef<Written>>,
+    shared: SharedParameters,
+    tail: Option<Address>,
+    rebound: Rebound,
+    invocations: Invocations,
+    branches: Branches,
+    repetitions: Repetitions,
+    reads: Reads,
+}
+
+impl BodyGroup {
+    pub(super) const KINDS: &'static [Kind] = &[
+        Kind::Block,
+        Kind::Item,
+        Kind::PatIdent,
+        Kind::Expr,
+        Kind::ExprCall,
+        Kind::ExprMethodCall,
+        Kind::ExprClosure,
+        Kind::ExprForLoop,
+        Kind::ExprWhile,
+        Kind::ExprLoop,
+        Kind::ExprPath,
+        Kind::ExprField,
+        Kind::ExprIf,
+        Kind::ExprTry,
+        Kind::ExprMatch,
+        Kind::ExprBinary,
+    ];
+
+    pub(super) fn opened(row: RowIndex, scope: &InScope, signature: &Signature, body: &Block) -> BodyGroup {
         let parameters: BTreeMap<Name, TypeRef<Written>> = signature
             .inputs
             .iter()
@@ -73,19 +102,52 @@ impl LoweredDefinition {
             .filter_map(|typed| Some((Name::from(&Syntax::pat_ident(&typed.pat)?.ident), &typed.ty)))
             .map(|(name, ty)| (name, scope.lowered(ty).dereferenced().clone()))
             .collect();
-        let bound = rebound.0.iter().fold(parameters, |mut kept: BTreeMap<Name, TypeRef<Written>>, name| {
+        BodyGroup {
+            row,
+            scope: scope.clone(),
+            shape: BodyReading::classified(body),
+            parameters,
+            shared: Reads::shared_parameters(signature),
+            tail: Reads::tail_call(body),
+            rebound: Rebound::default(),
+            invocations: Invocations::default(),
+            branches: Branches::new(Propagation::Ambient),
+            repetitions: Repetitions::of_signature(signature),
+            reads: Reads::default(),
+        }
+    }
+
+    pub(super) fn row(&self) -> RowIndex {
+        self.row
+    }
+
+    pub(super) fn lowered(self) -> LoweredDefinition {
+        let read = self.reads.settled(&self.scope, self.shared, self.tail, &self.rebound.0);
+        let bound = self.rebound.0.iter().fold(self.parameters, |mut kept: BTreeMap<Name, TypeRef<Written>>, name| {
             kept.remove(name);
             kept
         });
         LoweredDefinition {
-            shape: BodyReading::classified(body),
-            branching: branches.score(),
-            invocations: invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
-            repetitions: repetitions.found(),
+            shape: self.shape,
+            branching: self.branches.score(),
+            invocations: self.invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
+            repetitions: self.repetitions.found(),
             reads: read,
         }
     }
+}
 
+impl Gathers<BodyGroup> for BodyGroup {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![&mut self.rebound, &mut self.invocations, &mut self.branches, &mut self.repetitions, &mut self.reads]
+    }
+
+    fn gathered(self) -> BodyGroup {
+        self
+    }
+}
+
+impl LoweredDefinition {
     pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Definition {
         let invocations =
             self.invocations.into_iter().map(|invocation| invocation.resolved(resolving, scope)).collect();

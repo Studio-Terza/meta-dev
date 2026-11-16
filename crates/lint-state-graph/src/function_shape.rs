@@ -1,19 +1,15 @@
 mod body;
 mod returns;
+mod written;
 
 pub use body::Body;
-pub use returns::Returns;
+pub use returns::{Returns, WrittenReturns};
+pub use written::WrittenFn;
 
-use crate::declarations::Vertex;
-use std::path::Path;
+use syntax::{ImplItem, ImplItemFn};
 
-use syntax::{FnArg, ImplItem, ImplItemFn, PatType, Type};
-
-use super::declarations::Declarations;
-use super::impl_context::ImplContext;
 use lint_core::Site;
 use lint_core::TypeName;
-use lint_layout::LineNumber;
 
 pub struct FunctionShape<'found, 'file> {
     site: Site<'file>,
@@ -23,41 +19,10 @@ pub struct FunctionShape<'found, 'file> {
 }
 
 impl<'found, 'file> FunctionShape<'found, 'file> {
-    pub fn describe(
-        path: &'file Path,
-        function: &ImplItemFn,
-        context: &ImplContext<'_>,
-        declarations: &'found Declarations<'_>,
-    ) -> FunctionShape<'found, 'file> {
-        let vertex = |ty: &Type| {
-            let written = TypeName::from_type(ty);
-            declarations.vertex_named(declarations.resolved(written.or_self(context.self_type()))).map(Vertex::name)
-        };
-        FunctionShape {
-            site: Site::new(path, LineNumber::from(function.sig.ident.span())),
-            returns: Returns::classify(&function.sig.output, vertex),
-            vertex_parameters: function
-                .sig
-                .inputs
-                .iter()
-                .filter_map(Self::typed)
-                .filter_map(|typed| vertex(&typed.ty))
-                .collect(),
-            body: Body::classify(&function.block),
-        }
-    }
-
     pub fn function(item: &ImplItem) -> Option<&ImplItemFn> {
         match item {
             ImplItem::Fn(function) => Some(function),
             _ => None,
-        }
-    }
-
-    fn typed(argument: &FnArg) -> Option<&PatType> {
-        match argument {
-            FnArg::Typed(typed) => Some(typed),
-            FnArg::Receiver(_) => None,
         }
     }
 

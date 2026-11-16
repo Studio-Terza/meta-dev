@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::ptr;
 
 use syn::visit::{self, Visit};
-use syn::{Generics, Type, TypeParamBound};
+use syn::{Expr, Generics, Type, TypeParamBound};
 
 #[derive(Debug, Default)]
 pub struct TypeTree<'syn> {
@@ -16,6 +16,24 @@ impl<'syn> TypeTree<'syn> {
             tree.visit_type_param_bound(bound);
             tree
         })
+    }
+}
+
+#[derive(Debug, Default)]
+struct Outermost<'syn>(Vec<&'syn Type>);
+
+impl<'syn> Visit<'syn> for Outermost<'syn> {
+    fn visit_type(&mut self, ty: &'syn Type) {
+        self.0.push(ty);
+    }
+}
+
+impl<'syn> TypeTree<'syn> {
+    #[must_use]
+    pub fn outermost(expr: &'syn Expr) -> Vec<&'syn Type> {
+        let mut found = Outermost::default();
+        found.visit_expr(expr);
+        found.0
     }
 }
 

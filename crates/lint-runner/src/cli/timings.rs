@@ -48,9 +48,7 @@ pub(crate) enum Step {
     Locate,
     Read(Worker),
     Lower(Worker),
-    Filed(Worker),
     Judged(Worker),
-    Primed(Worker),
     Model,
     Lint(Named),
     Survey,
@@ -63,15 +61,11 @@ impl fmt::Display for Step {
             Step::Stage => formatter.write_str("phase stage: list the trees and their packages"),
             Step::Locate => formatter.write_str("phase locate: describe the workspaces through cargo metadata"),
             Step::Read(Worker(index)) => write!(formatter, "phase read: read and parse the sources on worker {index}"),
-            Step::Lower(Worker(index)) => write!(formatter, "phase lower: lower its share of files on worker {index}"),
-            Step::Filed(Worker(index)) => {
-                write!(formatter, "phase file lints: lint its share of files on worker {index}")
+            Step::Lower(Worker(index)) => {
+                write!(formatter, "phase lower: lower and file-lint its share of files on worker {index}")
             }
             Step::Judged(Worker(index)) => {
                 write!(formatter, "phase judged lints: judge its share of files on worker {index}")
-            }
-            Step::Primed(Worker(index)) => {
-                write!(formatter, "phase primed: read primed parts of its share of files on worker {index}")
             }
             Step::Model => formatter.write_str("phase model: merge the lowered files into the code model"),
             Step::Lint(name) => write!(formatter, "lint {name}"),

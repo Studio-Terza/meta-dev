@@ -2,8 +2,8 @@ mod boundary;
 
 use boundary::Numeral;
 use lint_core::{Headline, Parsed};
-use lint_file::{ContextLint, Reads};
-use lint_sweep::{Descend, Facts, Finds, Judgement, Kind, Watch};
+use lint_file::{ContextLint, Reads, WatchingLint};
+use lint_sweep::{Descend, Facts, Finds, Kind, Watch, Watchers};
 use lint_sweep::{Gathers, Sweep, Watching};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -62,16 +62,24 @@ impl ContextLint for NamedNumbers {
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> SupportGathering<'head> {
         SupportGathering { file: parsed.head().path(), modules: SupportModules::default() }
     }
+}
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        support: &'run SupportPaths,
-    ) -> Judgement<'file, 'run> {
-        let counted = Some(file)
-            .filter(|found| Gate::BOUNDARY.admits(found.head()).is_none())
-            .and_then(|found| support.0.get(found.head().path()).map_or(Some(found), |_| None));
+impl WatchingLint for NamedNumbers {
+    type Found<'file> = Vec<Violation<'file>>;
+    type Watched<'file> = Watchers<'file>;
+
+    fn watched(file: &SourceFile) -> Watchers<'_> {
+        let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
         let numbers = counted.map(|found| Numbers { path: found.head().path(), lines: Vec::new() });
-        numbers.map_or_else(|| Judgement::found(Vec::new()), |watched| Judgement::watching(Box::new(watched)))
+        numbers.into_iter().fold(Watchers::none(), |watchers, watched| watchers.and(Box::new(watched)))
+    }
+
+    fn judged<'file, 'head: 'file>(
+        file: &'file SourceFile,
+        found: Vec<Violation<'file>>,
+        support: &SupportPaths,
+    ) -> Vec<Violation<'file>> {
+        support.0.get(file.head().path()).map_or(found, |_| Vec::new())
     }
 }
 

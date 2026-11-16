@@ -346,8 +346,8 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
     ];
     assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 9], "{timed}");
     assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");
-    assert_eq!(timed.matches("  phase lower: lower its share of files on worker ").count(), workers, "{timed}");
-    assert_eq!(timed.matches("  phase file lints: lint its share of files on worker ").count(), workers, "{timed}");
+    let lowered = "  phase lower: lower and file-lint its share of files on worker ";
+    assert_eq!(timed.matches(lowered).count(), workers, "{timed}");
     assert_eq!(untimed.matches("lint timings").count(), 0, "{untimed}");
     Ok(())
 }

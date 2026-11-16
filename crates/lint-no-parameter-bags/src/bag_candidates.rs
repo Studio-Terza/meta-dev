@@ -9,7 +9,7 @@ use method_shape::MethodShape;
 use syntax::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
 
 use lint_core::{SourceFile, Violation};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
 
 use crate::Bags;
 use lint_core::Syntax;
@@ -17,18 +17,13 @@ use lint_layout::LineNumber;
 use lint_layout::Name;
 
 #[derive(Debug)]
-pub struct BagCandidates<'file, 'run> {
+pub struct BagCandidates<'file> {
     file: &'file SourceFile,
-    bags: &'run Bags<'run>,
     structs: BTreeMap<Name, LineNumber>,
     disqualified: BTreeSet<Name>,
 }
 
-impl<'file, 'run> BagCandidates<'file, 'run> {
-    pub fn new(file: &'file SourceFile, bags: &'run Bags<'run>) -> BagCandidates<'file, 'run> {
-        BagCandidates { file, bags, structs: BTreeMap::new(), disqualified: BTreeSet::new() }
-    }
-
+impl BagCandidates<'_> {
     pub fn candidates(&self) -> impl Iterator<Item = Candidate<'_>> {
         self.structs
             .iter()
@@ -48,7 +43,7 @@ impl<'file, 'run> BagCandidates<'file, 'run> {
     }
 }
 
-impl<'ast> Watch<'ast> for BagCandidates<'_, '_> {
+impl<'ast> Watch<'ast> for BagCandidates<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemImpl]
     }
@@ -68,14 +63,29 @@ impl<'ast> Watch<'ast> for BagCandidates<'_, '_> {
     }
 }
 
-impl<'file> Finds<'file> for BagCandidates<'file, '_> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+impl<'file> Gathers<BagCandidates<'file>> for BagCandidates<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![self]
+    }
+
+    fn gathered(self) -> BagCandidates<'file> {
+        self
+    }
+}
+
+impl<'file> BagCandidates<'file> {
+    pub fn bagged(self, bags: &Bags<'_>) -> Vec<Violation<'file>> {
         let file = self.file;
-        let bags = self.bags;
         self.candidates()
             .filter(|candidate| bags.exports.exported(file, candidate.name()).is_none())
             .filter(|candidate| bags.one_consumer(file, candidate.name()).is_some())
             .map(|candidate| candidate.violation(file.head().path()))
             .collect()
+    }
+}
+
+impl<'file> From<&'file SourceFile> for BagCandidates<'file> {
+    fn from(file: &'file SourceFile) -> BagCandidates<'file> {
+        BagCandidates { file, structs: BTreeMap::new(), disqualified: BTreeSet::new() }
     }
 }

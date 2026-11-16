@@ -4,6 +4,7 @@ mod walk;
 pub use proc_macro2::{Delimiter, Group, Ident, LineColumn, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 pub use quote::{ToTokens, format_ident, quote, quote_spanned};
 pub use readers::applied::Applied;
+pub use readers::block_items::BlockItems;
 pub use readers::boundary::{Past, PatEdge, PatReached, PatSpine, PatTree, Spine, TypeSpine};
 pub use readers::expr_shapes::{Application, Constant, Constructed};
 pub use readers::macro_tree::MacroTree;
@@ -21,9 +22,9 @@ pub use syn::{
     ForeignItemFn, GenericArgument, GenericParam, Generics, ImplItem, ImplItemConst, ImplItemFn, ImplItemType, Index,
     Item, ItemConst, ItemEnum, ItemExternCrate, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct,
     ItemTrait, ItemType, ItemUnion, ItemUse, Lifetime, LifetimeParam, Lit, LitFloat, LitInt, LitStr, Local, Macro,
-    Member, Meta, MetaList, ParenthesizedGenericArguments, Pat, PatIdent, PatStruct, PatTupleStruct, PatType, Path,
-    PathArguments, PathSegment, PredicateType, QSelf, Receiver, Result, ReturnType, Signature, Stmt, StmtMacro, Token,
-    TraitBound, TraitBoundModifier, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, Type, TypeArray, TypeParam,
+    Member, Meta, MetaList, ParenthesizedGenericArguments, Pat, PatIdent, PatType, Path, PathArguments, PathSegment,
+    PredicateType, QSelf, Receiver, Result, ReturnType, Signature, Stmt, StmtMacro, Token, TraitBound,
+    TraitBoundModifier, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, Type, TypeArray, TypeParam,
     TypeParamBound, TypePath, TypeReference, TypeTuple, UnOp, UseTree, Variant, VisRestricted, Visibility,
     WherePredicate, braced, custom_keyword, token,
 };

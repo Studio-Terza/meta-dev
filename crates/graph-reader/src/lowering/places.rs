@@ -8,7 +8,7 @@ use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};
 
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
-use lint_sweep::{Descend, Sweep};
+use lint_sweep::{Descend, Scoped, Sweep};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct PlaceId(usize);
@@ -155,10 +155,11 @@ impl Lowering<'_> {
     fn transcribed(&mut self, statements: &[Stmt]) -> &mut Self {
         let outer = self.context;
         self.context = self.context.transcribed();
-        statements.iter().filter_map(Syntax::stmt_item).fold(&mut *self, |inner, declared| {
-            Sweep::through_item(declared, inner);
-            inner
-        });
+        let mut scoped = Scoped::new(&mut *self);
+        statements
+            .iter()
+            .filter_map(Syntax::stmt_item)
+            .for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
         self.context = outer;
         self
     }
@@ -166,10 +167,9 @@ impl Lowering<'_> {
     fn expanded(&mut self, invocation: &Macro) -> &mut Self {
         let items = Macros::items_in_file(self.source, invocation);
         self.lowered.openings.absorb(self.here.scope(), Entries::of_items(&items));
-        items.iter().fold(self, |lowering, declared| {
-            Sweep::through_item(declared, lowering);
-            lowering
-        })
+        let mut scoped = Scoped::new(&mut *self);
+        items.iter().for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
+        self
     }
 
     pub(super) fn trait_owning(&mut self, ident: &Ident, attributes: &[Attribute]) -> PlaceId {

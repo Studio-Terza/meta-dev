@@ -1,6 +1,5 @@
 mod bounds;
 
-use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 use syntax::{
     AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics, Ident,
     ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, TraitBoundModifier,
@@ -284,27 +283,11 @@ impl Lowering<'_> {
 }
 
 #[derive(Debug)]
-struct Measured<'low> {
-    lowering: Lowering<'low>,
-    found: Vec<TypeRef<Written>>,
-}
+struct Measured;
 
-impl Measured<'_> {
+impl Measured {
     fn types(lowering: Lowering<'_>, length: &Expr) -> Vec<TypeRef<Written>> {
-        let mut measured = Measured { lowering, found: Vec::new() };
-        Sweep::through_expr(length, &mut measured);
-        measured.found
-    }
-}
-
-impl<'ast> Watch<'ast> for Measured<'_> {
-    fn kinds(&self) -> &'static [Kind] {
-        &[Kind::Type]
-    }
-
-    fn on_type(&mut self, ty: &'ast Type, _: &Facts<'_, Type>) -> Descend {
-        self.found.push(self.lowering.child(ty));
-        Descend::Over
+        TypeTree::outermost(length).into_iter().map(|ty| lowering.child(ty)).collect()
     }
 }
 

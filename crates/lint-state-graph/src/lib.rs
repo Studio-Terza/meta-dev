@@ -7,16 +7,17 @@ mod field_visibility;
 mod finding;
 mod function_shape;
 mod impl_context;
+mod receiving;
 mod variant_matches;
 
 use declarations::{DeclarationGathering, Declarations};
 use declared_graphs::DeclaredGraphs;
-use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges};
+use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges, Written};
 use field_visibility::FieldVisibility;
-use lint_core::{Headline, Home, Parsed, SourceFile};
+use lint_core::{Headline, Home, Parsed, SourceFile, Violation};
 use lint_file::{Concluded, FileFacts, PrimedFacts, PrimedLint, Reads};
-use lint_sweep::{Gathers, Judgement, Watching};
-use variant_matches::VariantMatches;
+use lint_sweep::{Gathers, Watching};
+use variant_matches::{MatchCandidates, VariantMatches};
 
 #[derive(Debug)]
 pub struct StateGraph;
@@ -37,7 +38,8 @@ impl PrimedFacts for StateGraph {
     type Context<'head> = Concluded<'head>;
 
     type Priming<'head> = DeclarationGathering<'head>;
-    type Contribution<'run, 'head: 'run> = StateContribution<'run, 'head>;
+    type Raw<'head> = StateRaw<'head>;
+    type Recording<'run, 'head: 'run> = StateRecording<'run, 'head>;
 
     fn priming<'head>(parsed: Parsed<'_, 'head>) -> DeclarationGathering<'head> {
         DeclarationGathering::from(parsed)
@@ -50,52 +52,62 @@ impl PrimedFacts for StateGraph {
         part.map(|declarations| declarations.homed(facts.as_ref()))
     }
 
-    fn contribution<'run, 'head: 'run>(
-        parsed: Parsed<'run, 'head>,
-        declarations: &'run Declarations<'head>,
-    ) -> StateContribution<'run, 'head> {
+    fn recording<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> StateRecording<'run, 'head> {
         let path = parsed.head().path();
         let watchers = parsed.file().shipped().map(|_| StateWatchers {
-            edges: EdgeScan::new(path, declarations),
+            edges: EdgeScan::from(path),
             fields: FieldVisibility::new(path),
-            matches: VariantMatches::new(path, Home::from(parsed.head()), declarations),
+            matches: VariantMatches::new(path, Home::from(parsed.head())),
             graphs: DeclaredGraphs::new(parsed.file(), path),
         });
-        StateContribution { watchers }
+        StateRecording { watchers }
+    }
+
+    fn contribution<'head>(raw: Self::Raw<'head>, declarations: &Self::Primer<'head>) -> Self::Part<'head> {
+        StateFile(raw.0.map_or_default(|recorded| {
+            let own = recorded.own.into_iter().chain(recorded.matches.foreign(declarations));
+            recorded.edges.resolved(declarations).including(own.collect())
+        }))
     }
 }
 
 #[derive(Debug)]
-pub struct StateContribution<'run, 'head> {
+pub struct StateRecording<'run, 'head> {
     watchers: Option<StateWatchers<'run, 'head>>,
 }
 
 #[derive(Debug)]
 struct StateWatchers<'run, 'head> {
-    edges: EdgeScan<'run, 'head>,
+    edges: EdgeScan<'head>,
     fields: FieldVisibility<'head>,
-    matches: VariantMatches<'run, 'head>,
+    matches: VariantMatches<'head>,
     graphs: DeclaredGraphs<'run, 'head>,
 }
 
-impl<'head> Gathers<StateFile<'head>> for StateContribution<'_, 'head> {
+#[derive(Debug)]
+pub struct StateRaw<'head>(Option<RecordedState<'head>>);
+
+#[derive(Debug)]
+struct RecordedState<'head> {
+    edges: Written<'head>,
+    matches: MatchCandidates<'head>,
+    own: Vec<Violation<'head>>,
+}
+
+impl<'head> Gathers<StateRaw<'head>> for StateRecording<'_, 'head> {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
         self.watchers.as_mut().map_or_default(|watchers| {
-            let all: Vec<&mut Watching<'_>> =
-                vec![&mut watchers.edges, &mut watchers.fields, &mut watchers.matches, &mut watchers.graphs];
-            all
+            let own: Vec<&mut Watching<'_>> = vec![&mut watchers.fields, &mut watchers.graphs];
+            watchers.edges.watching().into_iter().chain(watchers.matches.watching()).chain(own).collect()
         })
     }
 
-    fn gathered(self) -> StateFile<'head> {
-        let scanned = self.watchers.map(|watchers| {
-            let own = Vec::from(watchers.fields)
-                .into_iter()
-                .chain(watchers.matches.violations())
-                .chain(Vec::from(watchers.graphs));
-            watchers.edges.into_edges().including(own.collect())
-        });
-        StateFile(scanned.unwrap_or_default())
+    fn gathered(self) -> StateRaw<'head> {
+        StateRaw(self.watchers.map(|watchers| RecordedState {
+            edges: watchers.edges.gathered(),
+            matches: watchers.matches.gathered(),
+            own: Vec::from(watchers.fields).into_iter().chain(Vec::from(watchers.graphs)).collect(),
+        }))
     }
 }
 
@@ -103,11 +115,11 @@ impl PrimedLint for StateGraph {
     const HEADLINE: Headline = Headline::new("state graph violated");
     const READS: Reads = Reads::Shipped;
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
+    fn judged<'file, 'head: 'file>(
         file: &'file SourceFile,
-        _: &'run Declarations<'head>,
-        concluded: &'run Concluded<'head>,
-    ) -> Judgement<'file, 'run> {
-        Judgement::found(concluded.found_in(file))
+        _: &Declarations<'head>,
+        concluded: &Concluded<'head>,
+    ) -> Vec<Violation<'file>> {
+        concluded.found_in(file)
     }
 }

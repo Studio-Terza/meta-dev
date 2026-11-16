@@ -1,6 +1,32 @@
-use syntax::{ReturnType, Type, TypeTuple};
+use syntax::{ReturnType, Type};
 
 use lint_core::TypeName;
+
+#[derive(Debug)]
+pub enum WrittenReturns {
+    Other,
+    Single(TypeName),
+    Tuple(Vec<TypeName>),
+}
+
+impl From<&ReturnType> for WrittenReturns {
+    fn from(output: &ReturnType) -> WrittenReturns {
+        match output {
+            ReturnType::Default => WrittenReturns::Other,
+            ReturnType::Type(_, ty) => WrittenReturns::from(ty.as_ref()),
+        }
+    }
+}
+
+impl From<&Type> for WrittenReturns {
+    fn from(ty: &Type) -> WrittenReturns {
+        match ty {
+            Type::Reference(_) => WrittenReturns::Other,
+            Type::Tuple(tuple) => WrittenReturns::Tuple(tuple.elems.iter().map(TypeName::from_type).collect()),
+            other => WrittenReturns::Single(TypeName::from_type(other)),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Returns<'found> {
@@ -10,18 +36,16 @@ pub enum Returns<'found> {
 }
 
 impl<'found> Returns<'found> {
-    pub fn classify(output: &ReturnType, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
-        match output {
-            ReturnType::Default => Returns::Other,
-            ReturnType::Type(_, ty) => Self::of_type(ty, vertex),
-        }
-    }
-
-    fn of_type(ty: &Type, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
-        match ty {
-            Type::Reference(_) => Returns::Other,
-            Type::Tuple(tuple) => Self::of_tuple(tuple, vertex),
-            other => vertex(other).map_or(Returns::Other, Returns::Vertex),
+    pub fn resolved(
+        written: &WrittenReturns,
+        vertex: impl Fn(&TypeName) -> Option<&'found TypeName>,
+    ) -> Returns<'found> {
+        match written {
+            WrittenReturns::Other => Returns::Other,
+            WrittenReturns::Single(name) => vertex(name).map_or(Returns::Other, Returns::Vertex),
+            WrittenReturns::Tuple(names) => {
+                names.iter().find_map(vertex).map_or(Returns::Other, |_| Returns::TupleHoldingVertex)
+            }
         }
     }
 
@@ -30,9 +54,5 @@ impl<'found> Returns<'found> {
             Returns::Vertex(name) => Some(name),
             Returns::TupleHoldingVertex | Returns::Other => None,
         }
-    }
-
-    fn of_tuple(tuple: &TypeTuple, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
-        tuple.elems.iter().find_map(vertex).map_or(Returns::Other, |_| Returns::TupleHoldingVertex)
     }
 }

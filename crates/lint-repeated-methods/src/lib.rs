@@ -1,8 +1,7 @@
 mod shape_index;
 
-use lint_core::{Bound, Headline, Parsed, SourceFile};
-use lint_file::{Concluded, ContextLint, FileFacts, Reads};
-use lint_sweep::Judgement;
+use lint_core::{Bound, Headline, Parsed, SourceFile, Violation};
+use lint_file::{Concluded, ContextLint, FileFacts, Reads, RuledLint};
 
 use shape_index::{ImplGathering, ShippedImpls};
 
@@ -27,12 +26,11 @@ impl ContextLint for RepeatedMethods {
     fn completed<'head>(part: ShippedImpls<'head>, facts: &FileFacts<'head>) -> ShippedImpls<'head> {
         part.homed(facts.as_ref())
     }
+}
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        concluded: &'run Concluded<'head>,
-    ) -> Judgement<'file, 'run> {
-        Judgement::found(concluded.found_in(file))
+impl RuledLint for RepeatedMethods {
+    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
+        concluded.found_in(file)
     }
 }
 

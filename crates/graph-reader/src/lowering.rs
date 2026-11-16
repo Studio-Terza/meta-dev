@@ -40,11 +40,12 @@ use crate::planting::Files;
 use attributes::Attributes;
 use boundary::SelfType;
 use calls::CallRow;
-use definition::{LoweredDefinition, Mutations};
+pub(crate) use definition::BodyGroup;
+use definition::{LoweredDefinition, Mutations, RowIndex};
 use frames::{Enclosure, Frame};
 use held::{Holder, HoldingRow, Link};
 use laws::LawRow;
-use lint_sweep::{Address, Descend, Facts, Kind, Watch};
+use lint_sweep::{Address, Attaches, Attachment, Descend, Facts, Kind, Watch};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
@@ -156,6 +157,10 @@ struct FnRow {
 }
 
 impl FnRow {
+    fn defined(&mut self, definition: LoweredDefinition) {
+        self.definition = Some(definition);
+    }
+
     fn resolved(resolving: &Resolving<'_, '_, '_>, scope: ScopeId, output: Option<TypeRef<Written>>) -> Output {
         match output {
             Some(ty) => Output::Written(Written::typed(&ty, resolving, scope)),
@@ -349,6 +354,7 @@ impl<'read> Lowering<'read> {
         };
         Lowering {
             source,
+            opening: Vec::new(),
             lowered,
             here: Seat::new(ScopeId::FIRST, shape.children),
             enclosure: shape.enclosure,
@@ -362,6 +368,23 @@ impl<'read> Lowering<'read> {
 
     pub(crate) fn lowered(self) -> Lowered {
         self.lowered
+    }
+}
+
+impl Attaches<BodyGroup> for Lowering<'_> {
+    const ATTACHED: &'static [Kind] = BodyGroup::KINDS;
+
+    fn attaching(&mut self) -> Vec<Attachment<BodyGroup>> {
+        std::mem::take(&mut self.opening)
+    }
+
+    fn detached(&mut self, group: BodyGroup) {
+        let row = group.row();
+        let definition = group.lowered();
+        row.slot_in(&mut self.lowered.rows.functions)
+            .into_iter()
+            .zip([definition])
+            .for_each(|(function, lowered)| function.defined(lowered));
     }
 }
 
@@ -470,6 +493,7 @@ impl<'read> Plot<'read> {
 #[derive(Debug)]
 pub(crate) struct Lowering<'read> {
     source: &'read SourceFile,
+    opening: Vec<Attachment<BodyGroup>>,
     lowered: Lowered,
     here: Seat,
     enclosure: Enclosure,
@@ -501,6 +525,9 @@ impl Lowering<'_> {
     fn function(&mut self, attributes: &[Attribute], signature: &SynSignature, body: Option<&Block>) -> InScope {
         let generics = self.generics.extended(&signature.generics);
         let name = Name::from(&signature.ident);
+        let row = RowIndex::from(self.lowered.rows.functions.as_slice());
+        self.opening
+            .extend(body.map(|block| Attachment::reaching(block, BodyGroup::opened(row, &generics, signature, block))));
         self.lowered.rows.functions.push(FnRow {
             located: self.here.located(Position::from(signature.ident.span())),
             owner: self.enclosure.owner(),
@@ -510,7 +537,7 @@ impl Lowering<'_> {
             constraints: generics.constraints(&signature.generics),
             parameters: LoweredParameter::declared(&generics, &signature.generics),
             mutation: Mutations::signed(signature),
-            definition: body.map(|block| LoweredDefinition::of_body(&generics, signature, block)),
+            definition: None,
             region: self.context.region(),
             place: self.context.place(),
             name,
@@ -743,5 +770,17 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
     fn on_macro(&mut self, invoked: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
         self.macro_used(invoked);
         Descend::Into
+    }
+}
+
+impl Attaches<BodyGroup> for &mut Lowering<'_> {
+    const ATTACHED: &'static [Kind] = BodyGroup::KINDS;
+
+    fn attaching(&mut self) -> Vec<Attachment<BodyGroup>> {
+        (**self).attaching()
+    }
+
+    fn detached(&mut self, group: BodyGroup) {
+        (**self).detached(group);
     }
 }

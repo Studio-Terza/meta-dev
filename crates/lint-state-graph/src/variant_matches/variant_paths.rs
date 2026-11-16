@@ -1,38 +1,26 @@
-use syntax::{ExprPath, Pat, PatStruct, PatTupleStruct, Path};
+use syntax::{Pat, PatTree, Path};
 
 use lint_layout::Name;
-use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
 
-#[derive(Debug, Default)]
-pub struct VariantPaths(Vec<Name>);
+#[derive(Debug)]
+pub struct VariantPaths;
 
 impl VariantPaths {
     pub fn in_pat(pat: &Pat) -> Vec<Name> {
-        let mut paths = VariantPaths::default();
-        Sweep::through_pat(pat, &mut paths);
-        paths.0
+        let reached = PatTree::reached(pat, &|_, _| true);
+        reached.into_iter().filter_map(|found| Self::path(found.pat())).filter_map(Self::parent).collect()
     }
 
-    fn record(&mut self, path: &Path, descend: Descend) -> Descend {
-        self.0.extend(path.segments.iter().nth_back(1).map(|parent| Name::from(&parent.ident)));
-        descend
-    }
-}
-
-impl<'ast> Watch<'ast> for VariantPaths {
-    fn kinds(&self) -> &'static [Kind] {
-        &[Kind::ExprPath, Kind::PatTupleStruct, Kind::PatStruct]
+    fn path(pat: &Pat) -> Option<&Path> {
+        match pat {
+            Pat::Path(path) => Some(&path.path),
+            Pat::TupleStruct(variant) => Some(&variant.path),
+            Pat::Struct(variant) => Some(&variant.path),
+            _ => None,
+        }
     }
 
-    fn on_expr_path(&mut self, pat: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
-        self.record(&pat.path, Descend::Over)
-    }
-
-    fn on_pat_tuple_struct(&mut self, pat: &'ast PatTupleStruct, _: &Facts<'_, PatTupleStruct>) -> Descend {
-        self.record(&pat.path, Descend::Into)
-    }
-
-    fn on_pat_struct(&mut self, pat: &'ast PatStruct, _: &Facts<'_, PatStruct>) -> Descend {
-        self.record(&pat.path, Descend::Into)
+    fn parent(path: &Path) -> Option<Name> {
+        path.segments.iter().nth_back(1).map(|parent| Name::from(&parent.ident))
     }
 }

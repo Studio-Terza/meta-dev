@@ -3,11 +3,10 @@ mod name_uses;
 mod root_exports;
 
 use bag_candidates::BagCandidates;
-use lint_core::{Headline, Parsed, SourceFile};
-use lint_file::{ContextLint, Reads};
+use lint_core::{Headline, Parsed, SourceFile, Violation};
+use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::Judgement;
 use lint_sweep::{Gathers, Sweep, Watching};
 use name_uses::NameUses;
 use root_exports::RootExports;
@@ -68,11 +67,21 @@ impl ContextLint for NoParameterBags {
         let shipped = parsed.file().shipped().map(|_| parsed);
         BagUses { uses: shipped.map(NameUses::from), exports: shipped.map_or_default(RootExports::from) }
     }
+}
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        bags: &'run Bags<'head>,
-    ) -> Judgement<'file, 'run> {
-        Judgement::watching(Box::new(BagCandidates::new(file, bags)))
+impl WatchingLint for NoParameterBags {
+    type Found<'file> = BagCandidates<'file>;
+    type Watched<'file> = BagCandidates<'file>;
+
+    fn watched(file: &SourceFile) -> BagCandidates<'_> {
+        BagCandidates::from(file)
+    }
+
+    fn judged<'file, 'head: 'file>(
+        _: &'file SourceFile,
+        found: BagCandidates<'file>,
+        bags: &Bags<'head>,
+    ) -> Vec<Violation<'file>> {
+        found.bagged(bags)
     }
 }

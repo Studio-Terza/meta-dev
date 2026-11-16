@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Attaches, Attachment, Descend, Facts, Finds, Gathers, Kind, Scoped, Watch, Watching};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
@@ -71,7 +71,12 @@ impl SweptLint for ManualIteration {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Iterations { path: file.head().path(), violations: Vec::new() })
+        Box::new(Scoped::new(Iterations {
+            path: file.head().path(),
+            violations: Vec::new(),
+            opening: Vec::new(),
+            held: Vec::new(),
+        }))
     }
 }
 
@@ -79,6 +84,8 @@ impl SweptLint for ManualIteration {
 struct Iterations<'scan> {
     path: &'scan Path,
     violations: Vec<Violation<'scan>>,
+    opening: Vec<Attachment<IteratorCalls>>,
+    held: Vec<Vec<Violation<'scan>>>,
 }
 
 impl<'scan> Iterations<'scan> {
@@ -126,24 +133,13 @@ impl<'ast> Watch<'ast> for Iterations<'_> {
     }
 
     fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
-        let finding = Some(local)
+        let init = Some(local)
             .filter(|candidate| matches!(&candidate.pat, Pat::Ident(binding) if binding.mutability.is_some()))
-            .and_then(|mutable| mutable.init.as_ref())
-            .filter(|init| {
-                let mut calls = IteratorCalls::default();
-                Sweep::through_expr(&init.expr, &mut calls);
-                calls.0 > 0
-            })
-            .map(|_| {
-                self.violation(
-                    local.span(),
-                    Message::new(
-                        Problem::new("mutable iterator local"),
-                        Fix::new("drive it with combinators such as format, collect, or fold"),
-                    ),
-                )
-            });
-        self.violations.extend(finding);
+            .and_then(|mutable| mutable.init.as_ref());
+        let opened =
+            init.map(|found| Attachment::reaching(&*found.expr, IteratorCalls { found: None, local: local.span() }));
+        self.held.extend(opened.iter().map(|_| std::mem::take(&mut self.violations)));
+        self.opening.extend(opened);
         Descend::Into
     }
 
@@ -162,14 +158,51 @@ impl<'ast> Watch<'ast> for Iterations<'_> {
     }
 }
 
+impl Attaches<IteratorCalls> for Iterations<'_> {
+    const ATTACHED: &'static [Kind] = &[Kind::Expr, Kind::ExprMethodCall];
+
+    fn attaching(&mut self) -> Vec<Attachment<IteratorCalls>> {
+        std::mem::take(&mut self.opening)
+    }
+
+    fn detached(&mut self, calls: IteratorCalls) {
+        let inside = std::mem::take(&mut self.violations);
+        self.violations = self.held.pop().unwrap_or_default();
+        let finding = calls.found.map(|()| {
+            self.violation(
+                calls.local,
+                Message::new(
+                    Problem::new("mutable iterator local"),
+                    Fix::new("drive it with combinators such as format, collect, or fold"),
+                ),
+            )
+        });
+        self.violations.extend(finding);
+        self.violations.extend(inside);
+    }
+}
+
 impl<'file> Finds<'file> for Iterations<'file> {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
         self.violations
     }
 }
 
-#[derive(Default)]
-struct IteratorCalls(usize);
+#[derive(Debug)]
+struct IteratorCalls {
+    found: Option<()>,
+    local: Span,
+}
+
+impl Gathers<IteratorCalls> for IteratorCalls {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![self]
+    }
+
+    fn gathered(self) -> IteratorCalls {
+        self
+    }
+}
 
 impl<'ast> Watch<'ast> for IteratorCalls {
     fn kinds(&self) -> &'static [Kind] {
@@ -177,11 +210,8 @@ impl<'ast> Watch<'ast> for IteratorCalls {
     }
 
     fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.0 += facts
-            .name()
-            .and_then(|name| name.matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS))
-            .into_iter()
-            .count();
+        let constructed = facts.name().and_then(|name| name.matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS));
+        self.found = self.found.or(constructed.map(|_| ()));
         Descend::Into
     }
 }

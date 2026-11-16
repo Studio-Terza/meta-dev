@@ -1,6 +1,7 @@
 use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use super::PublicApiTests;
 use lint_core::Macros;
@@ -9,20 +10,48 @@ use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 use lint_layout::Name;
 use lint_layout::TestMarks;
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
 
 #[derive(Debug)]
-pub(crate) struct TestCode<'run, 'file> {
+pub struct TestCode<'file> {
     file: &'file SourceFile,
-    emitters: &'run BTreeSet<Name>,
     lines: Vec<LineNumber>,
+    invoked: Vec<Invoked>,
 }
 
-impl<'run, 'file> TestCode<'run, 'file> {
+#[derive(Debug)]
+struct Invoked {
+    name: Name,
+    line: LineNumber,
+}
+
+#[derive(Debug)]
+pub struct Tested<'file> {
+    path: &'file Path,
+    found: Vec<Violation<'file>>,
+    invoked: Vec<Invoked>,
+}
+
+impl<'file> Tested<'file> {
+    pub(crate) fn reached(found: Vec<Violation<'file>>, path: &'file Path) -> Tested<'file> {
+        Tested { path, found, invoked: Vec::new() }
+    }
+
+    pub(crate) fn emitted(self, emitters: &BTreeSet<Name>) -> Vec<Violation<'file>> {
+        let path = self.path;
+        let emitting = self.invoked.into_iter().filter(|invoked| emitters.contains(&invoked.name));
+        let lines = emitting.map(|invoked| Violation::new(Site::new(path, invoked.line), PublicApiTests::IN_SOURCE));
+        self.found.into_iter().chain(lines).collect()
+    }
+}
+
+impl<'file> TestCode<'file> {
     const DEFINITION: &'static str = "macro_rules";
 
-    pub(crate) fn new(file: &'file SourceFile, emitters: &'run BTreeSet<Name>) -> TestCode<'run, 'file> {
-        TestCode { file, emitters, lines: Vec::new() }
+    pub(crate) fn tested(self) -> Tested<'file> {
+        let path = self.file.head().path();
+        let found = self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::IN_SOURCE));
+        Tested { path, found: found.collect(), invoked: self.invoked }
     }
 
     fn gated(&mut self, attributes: &[Attribute], line: LineNumber) -> Descend {
@@ -32,7 +61,7 @@ impl<'run, 'file> TestCode<'run, 'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for TestCode<'_, '_> {
+impl<'ast> Watch<'ast> for TestCode<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemFn, Kind::Macro]
     }
@@ -66,16 +95,16 @@ impl<'ast> Watch<'ast> for TestCode<'_, '_> {
         let marked = called.and_then(|call| {
             Macros::attributes_in_file(self.file, call).iter().find_map(TestMarks::test).map(|_| line)
         });
-        let emitted =
-            invocation.path.get_ident().filter(|name| self.emitters.contains(&Name::from(*name))).map(|_| line);
-        self.lines.extend(law.or(marked).or(emitted));
+        let settled = law.or(marked);
+        self.lines.extend(settled);
+        let named = invocation.path.get_ident().map(|name| Invoked { name: Name::from(name), line });
+        self.invoked.extend(settled.map_or(named, |_| None));
         Descend::Over
     }
 }
 
-impl<'file> Finds<'file> for TestCode<'_, 'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.file.head().path();
-        self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::IN_SOURCE)).collect()
+impl<'file> From<&'file SourceFile> for TestCode<'file> {
+    fn from(file: &'file SourceFile) -> TestCode<'file> {
+        TestCode { file, lines: Vec::new(), invoked: Vec::new() }
     }
 }

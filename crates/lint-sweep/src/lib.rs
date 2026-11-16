@@ -1,4 +1,6 @@
+mod scoped;
 mod sweep;
 
 pub use lint_core::{Address, Descend, Facts, Kind, Watch, Watching};
-pub use sweep::{Finds, Gathers, Judgement, Member, Sorts, Sweep};
+pub use scoped::{Attaches, Attachment, Scoped};
+pub use sweep::{Finds, Gathers, Member, Sorts, Sweep, Watchers};

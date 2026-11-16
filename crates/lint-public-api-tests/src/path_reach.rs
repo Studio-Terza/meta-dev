@@ -5,10 +5,12 @@ use syntax::ItemMod;
 use super::PublicApiTests;
 use lint_core::{Site, SourceFile, Syntax, Violation};
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Kind, Watch};
+
+use super::test_code::Tested;
 
 #[derive(Debug)]
-pub(crate) struct PathReach<'file> {
+pub struct PathReach<'file> {
     path: &'file Path,
     directory: PathBuf,
     source: PathBuf,
@@ -75,9 +77,10 @@ impl<'ast> Watch<'ast> for PathReach<'_> {
     }
 }
 
-impl<'file> Finds<'file> for PathReach<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+impl<'file> PathReach<'file> {
+    pub(crate) fn tested(self) -> Tested<'file> {
         let path = self.path;
-        self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::REACH)).collect()
+        let found = self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::REACH));
+        Tested::reached(found.collect(), path)
     }
 }

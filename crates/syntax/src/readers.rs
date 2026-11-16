@@ -1,4 +1,5 @@
 pub(crate) mod applied;
+pub(crate) mod block_items;
 pub(crate) mod boundary;
 pub(crate) mod expr_shapes;
 pub(crate) mod macro_tree;

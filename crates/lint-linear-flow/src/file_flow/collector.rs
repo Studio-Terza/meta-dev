@@ -29,7 +29,7 @@ pub struct Collector<'file> {
 impl<'file> Collector<'file> {
     pub fn collected(file: &'file SourceFile) -> Vec<FunctionFlow<'file>> {
         let mut collector = Collector { file, frames: Vec::new(), closed: Vec::new() };
-        Sweep::through_file(file, &mut collector);
+        Sweep::watching(file, vec![&mut collector]);
         collector.functions()
     }
 

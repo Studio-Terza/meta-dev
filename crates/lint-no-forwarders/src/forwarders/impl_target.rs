@@ -17,7 +17,7 @@ impl<'ast> ImplTarget<'ast> {
             .map_or(ImplTarget::Skipped, ImplTarget::Inherent)
     }
 
-    pub fn walked_by(self, forwarders: &mut Forwarders<'_, '_>) -> Descend {
+    pub fn walked_by(self, forwarders: &mut Forwarders<'_>) -> Descend {
         match self {
             ImplTarget::Inherent(segment) => forwarders.targeted(segment),
             ImplTarget::Skipped => Descend::Over,

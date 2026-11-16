@@ -2,9 +2,8 @@ mod guards;
 
 use guards::Guards;
 use guards::Modules;
-use lint_core::{Headline, Parsed, SourceFile};
-use lint_file::{Concluded, ContextLint, Reads};
-use lint_sweep::Judgement;
+use lint_core::{Headline, Parsed, SourceFile, Violation};
+use lint_file::{Concluded, ContextLint, Reads, RuledLint};
 
 #[derive(Debug)]
 pub struct GuardMustUse;
@@ -21,11 +20,10 @@ impl ContextLint for GuardMustUse {
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Guards<'head> {
         Guards::scanning(parsed)
     }
+}
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        concluded: &'run Concluded<'head>,
-    ) -> Judgement<'file, 'run> {
-        Judgement::found(concluded.found_in(file))
+impl RuledLint for GuardMustUse {
+    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, concluded: &Concluded<'head>) -> Vec<Violation<'file>> {
+        concluded.found_in(file)
     }
 }

@@ -6,8 +6,7 @@ use export::Export;
 use finding::Finding;
 use foreign_references::{ForeignReferences, Reading};
 use lint_core::{Headline, Parsed};
-use lint_file::{ContextLint, Reads};
-use lint_sweep::Judgement;
+use lint_file::{ContextLint, Reads, RuledLint};
 use lint_sweep::{Gathers, Watching};
 
 use lint_core::Site;
@@ -52,17 +51,16 @@ impl ContextLint for PublicSurface {
     fn gathering(parsed: Parsed<'_, '_>) -> ReferenceGathering {
         ReferenceGathering(Reading::from(parsed.file()))
     }
+}
 
-    fn judgement<'run, 'file: 'run, 'head: 'file>(
-        file: &'file SourceFile,
-        references: &'run References,
-    ) -> Judgement<'file, 'run> {
-        Judgement::found(Self::judged(file, references))
+impl RuledLint for PublicSurface {
+    fn ruled<'file, 'head: 'file>(file: &'file SourceFile, references: &References) -> Vec<Violation<'file>> {
+        Self::unused_exports(file, references)
     }
 }
 
 impl PublicSurface {
-    fn judged<'file, 'head: 'file>(file: &'file SourceFile, references: &References) -> Vec<Violation<'file>> {
+    fn unused_exports<'file>(file: &'file SourceFile, references: &References) -> Vec<Violation<'file>> {
         let crate_name = CrateName::from(file.head().placement().crate_root());
         Export::in_root(file)
             .into_iter()

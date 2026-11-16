@@ -21,6 +21,29 @@ struct Placed<'head> {
     module: ModulePath,
 }
 
+#[derive(Debug)]
+pub struct Target {
+    name: Name,
+    local: Option<ModulePath>,
+}
+
+impl Target {
+    pub fn implemented(module: &ModulePath, implemented: &Type) -> Option<Target> {
+        match implemented {
+            Type::Path(path) => Self::pathed(module, path),
+            _ => None,
+        }
+    }
+
+    fn pathed(module: &ModulePath, path: &TypePath) -> Option<Target> {
+        let name = path.path.segments.last().map(|last| Name::from(&last.ident))?;
+        let single = Some(path)
+            .filter(|candidate| candidate.qself.is_none())
+            .filter(|unqualified| unqualified.path.segments.len() == 1);
+        Some(Target { name, local: single.map(|_| module.clone()) })
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Known<'head> {
     named: BTreeMap<Named<'head>, Vec<Kind>>,
@@ -41,21 +64,12 @@ impl<'head> Known<'head> {
         self
     }
 
-    pub fn kind(&self, file: &SourceFile, module: &ModulePath, implemented: &Type) -> Kind {
-        match implemented {
-            Type::Path(path) => path.path.segments.last().map_or(Kind::Other, |last| {
-                self.kind_named(file.head().placement().crate_root(), module, path, Name::from(&last.ident))
-            }),
-            _ => Kind::Other,
-        }
-    }
-
-    fn kind_named(&self, crate_root: &CrateRoot, module: &ModulePath, path: &TypePath, name: Name) -> Kind {
-        let named = Named { crate_root, name };
-        let local = Some(path)
-            .filter(|candidate| candidate.qself.is_none())
-            .filter(|unqualified| unqualified.path.segments.len() == 1)
-            .and_then(|_| self.placed.get(&Placed { named: named.clone(), module: module.clone() }).copied());
+    pub fn kind(&self, file: &SourceFile, target: &Target) -> Kind {
+        let named = Named { crate_root: file.head().placement().crate_root(), name: target.name.clone() };
+        let local = target
+            .local
+            .as_ref()
+            .and_then(|module| self.placed.get(&Placed { named: named.clone(), module: module.clone() }).copied());
         let candidates = self.named.get(&named).map_or(&[][..], Vec::as_slice);
         let enums =
             candidates.first().filter(|_| candidates.iter().all(|kind| *kind == Kind::Enum)).map(|_| Kind::Enum);

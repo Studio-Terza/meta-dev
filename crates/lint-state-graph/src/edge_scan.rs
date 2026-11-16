@@ -2,35 +2,70 @@ mod role;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use syntax::{ImplItemFn, ItemImpl, ItemMod, Receiver};
+use syntax::{ItemImpl, ItemMod};
 
 use super::declarations::Declarations;
 use super::edge::{Edge, EdgeKey};
 use super::edge_count::EdgeCount;
 use super::finding::Finding;
+use super::function_shape::WrittenFn;
 use super::function_shape::{Body, FunctionShape, Returns};
+use super::impl_context::WrittenImpl;
 use super::impl_context::{ImplContext, ImplKind};
+use crate::receiving::Receiving;
 use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::{Bound, Site};
 use lint_file::Concluded;
 use lint_layout::{Length, Name};
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
 use role::Role;
 
 #[derive(Debug)]
-pub struct EdgeScan<'scan, 'file> {
+pub struct EdgeScan<'file> {
+    path: &'file Path,
+    impls: Vec<WrittenImpl>,
+}
+
+impl<'file> From<&'file Path> for EdgeScan<'file> {
+    fn from(path: &'file Path) -> EdgeScan<'file> {
+        EdgeScan { path, impls: Vec::new() }
+    }
+}
+
+#[derive(Debug)]
+pub struct Written<'file> {
+    path: &'file Path,
+    impls: Vec<WrittenImpl>,
+}
+
+impl<'file> Gathers<Written<'file>> for EdgeScan<'file> {
+    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
+        vec![self]
+    }
+
+    fn gathered(self) -> Written<'file> {
+        Written { path: self.path, impls: self.impls }
+    }
+}
+
+impl<'file> Written<'file> {
+    pub fn resolved<'scan>(&'scan self, declarations: &'scan Declarations<'scan>) -> ScannedEdges<'file> {
+        let resolution =
+            EdgeResolution { declarations, path: self.path, edges: BTreeMap::new(), violations: Vec::new() };
+        self.impls.iter().fold(resolution, EdgeResolution::scanned).into_edges()
+    }
+}
+
+#[derive(Debug)]
+pub struct EdgeResolution<'scan, 'file> {
     declarations: &'scan Declarations<'scan>,
     path: &'file Path,
     edges: BTreeMap<Edge<'scan>, BTreeMap<Name, Site<'file>>>,
     violations: Vec<Violation<'file>>,
 }
 
-impl<'scan, 'file> EdgeScan<'scan, 'file> {
-    pub fn new(path: &'file Path, declarations: &'scan Declarations<'scan>) -> Self {
-        EdgeScan { declarations, path, edges: BTreeMap::new(), violations: Vec::new() }
-    }
-
+impl<'scan, 'file> EdgeResolution<'scan, 'file> {
     pub fn into_edges(self) -> ScannedEdges<'file> {
         let edges = self.edges.into_iter().flat_map(|(edge, names)| {
             names.into_iter().map(move |(name, site)| EdgeRecord { key: EdgeKey::from(edge), name, site })
@@ -38,19 +73,19 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
         ScannedEdges { violations: self.violations, edges: edges.collect() }
     }
 
-    fn check_function(&mut self, context: &ImplContext<'scan>, function: &ImplItemFn) {
-        let shape = FunctionShape::describe(self.path, function, context, self.declarations);
+    fn check_function(&mut self, context: &ImplContext<'scan>, function: &WrittenFn) {
+        let shape = FunctionShape::resolved(self.path, function, context, self.declarations);
         self.violations.extend(
             matches!(shape.returns(), Returns::TupleHoldingVertex)
                 .then(|| Violation::new(shape.site(), Finding::TupleHoldsVertex)),
         );
-        Role::classified(function.sig.receiver(), context, &shape).checked(self, context, function, &shape);
+        Role::classified(function.receiver(), context, &shape).checked(self, context, function, &shape);
     }
 
     fn record_edge(
         &mut self,
         context: &ImplContext<'scan>,
-        function: &ImplItemFn,
+        function: &WrittenFn,
         shape: &FunctionShape<'scan, 'file>,
         edge: Edge<'scan>,
     ) {
@@ -64,10 +99,10 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
 
     fn view_fault(
         context: &ImplContext<'scan>,
-        receiver: &Receiver,
+        receiver: Receiving,
         shape: &FunctionShape<'scan, 'file>,
     ) -> Option<Violation<'file>> {
-        receiver.mutability.map_or_else(
+        (receiver == Receiving::Mutable).then_some(()).map_or_else(
             || {
                 shape
                     .returns()
@@ -75,7 +110,7 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
                     .filter(|_| shape.body() != Body::FieldProjection)
                     .map(|target| Violation::new(shape.site(), Finding::ViewReturnsVertex { target }))
             },
-            |_| {
+            |()| {
                 matches!(context.kind(), ImplKind::InherentOnVertex(_))
                     .then(|| Violation::new(shape.site(), Finding::MutatesVertex { vertex: context.self_type() }))
             },
@@ -83,7 +118,7 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for EdgeScan<'_, '_> {
+impl<'ast> Watch<'ast> for EdgeScan<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
@@ -93,18 +128,22 @@ impl<'ast> Watch<'ast> for EdgeScan<'_, '_> {
     }
 
     fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate()).then(|| self.scanned(item))
+        Descend::from(facts.gate()).then(|| self.written(item))
     }
 }
 
-impl EdgeScan<'_, '_> {
-    fn scanned(&mut self, item: &ItemImpl) -> Descend {
-        let context = ImplContext::describe(item, self.declarations);
-        item.items
-            .iter()
-            .filter_map(FunctionShape::function)
-            .for_each(|function| self.check_function(&context, function));
+impl EdgeScan<'_> {
+    fn written(&mut self, item: &ItemImpl) -> Descend {
+        self.impls.push(WrittenImpl::from(item));
         Descend::Into
+    }
+}
+
+impl<'scan, 'file> EdgeResolution<'scan, 'file> {
+    fn scanned(mut self, item: &WrittenImpl) -> EdgeResolution<'scan, 'file> {
+        let context = ImplContext::resolved(item, self.declarations);
+        item.functions().iter().for_each(|function| self.check_function(&context, function));
+        self
     }
 }
 
