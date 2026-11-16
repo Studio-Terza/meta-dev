@@ -37,7 +37,7 @@ impl Model {
             Mention::Interpolated => self.interpolated.push(Filed::new(file, Found::new(line, used))),
             Mention::Typed => self.typed.push(Filed::new(file, Found::new(line, used))),
             Mention::Dispatched => self.dispatched.push(Dispatch::from(&used)),
-            Mention::Expression | Mention::Invoked | Mention::InMacro => {
+            Mention::Expression | Mention::Invoked | Mention::InMacro | Mention::Matched => {
                 self.uses.push(Filed::new(file, Found::new(line, used)));
             }
         }

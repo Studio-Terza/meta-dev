@@ -1,3 +1,4 @@
 mod boundary;
 
-pub use boundary::{NodeId, Unnumbered};
+pub use boundary::NodeId;
+pub use grammar_node::Unnumbered;

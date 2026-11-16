@@ -1,7 +1,7 @@
 mod tokens;
 
 use syntax::Spanned;
-use syntax::{ExprPath, ExprStruct, Macro, QSelf, Type, TypeParamBound};
+use syntax::{ExprPath, ExprStruct, Macro, Pat, PatTree, QSelf, Type, TypeParamBound};
 
 use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved, Seat};
 use lint_layout::{Name, Position, Whole, Word, words};
@@ -28,9 +28,12 @@ impl UseRow {
     fn domain(&self) -> Domain {
         match self.mention {
             Mention::Invoked => Domain::Macros,
-            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Dispatched | Mention::Typed => {
-                Domain::Types
-            }
+            Mention::Expression
+            | Mention::InMacro
+            | Mention::Interpolated
+            | Mention::Dispatched
+            | Mention::Typed
+            | Mention::Matched => Domain::Types,
         }
     }
 
@@ -48,7 +51,7 @@ impl UseRow {
     fn kept<'resolved>(&self, resolved: &'resolved Resolved) -> Option<&'resolved Resolved> {
         match self.mention {
             Mention::Invoked | Mention::Dispatched => Some(resolved),
-            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Typed => {
+            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Typed | Mention::Matched => {
                 self.written.tail().first().map(|_| resolved).or_else(|| resolved.known())
             }
         }
@@ -166,6 +169,14 @@ impl Lowering<'_> {
         });
     }
 
+    pub(super) fn pattern_used(&mut self, pat: &Pat) {
+        let reached = PatTree::reached(pat, &|_, _| true);
+        reached.iter().filter_map(|found| Matched::path(found.pat())).fold(self, |lowering, path| {
+            lowering.used(UsePath::from(path), Position::from(path.span()), Mention::Matched);
+            lowering
+        });
+    }
+
     pub(super) fn struct_used(&mut self, literal: &ExprStruct) {
         let position = literal.path.segments.first().map(|first| Position::from(first.ident.span()));
         let written = literal.qself.as_ref().map_or(Some(&literal.path), |_| None).zip(position);
@@ -227,5 +238,19 @@ impl Lowering<'_> {
             place: self.context.place(),
         };
         self.lowered.rows.uses.push(row);
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Matched;
+
+impl Matched {
+    fn path(pat: &Pat) -> Option<&syntax::Path> {
+        match pat {
+            Pat::Path(path) => Some(&path.path),
+            Pat::TupleStruct(variant) => Some(&variant.path),
+            Pat::Struct(variant) => Some(&variant.path),
+            _ => None,
+        }
     }
 }

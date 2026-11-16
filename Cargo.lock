@@ -901,6 +901,7 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
+ "thiserror",
 ]
 
 [[package]]
@@ -2092,6 +2093,7 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "graph",
  "laws",
  "lint-core",
  "lint-file",

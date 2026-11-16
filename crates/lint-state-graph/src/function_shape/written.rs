@@ -60,7 +60,7 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
         path: &'file Path,
         function: &WrittenFn,
         context: &ImplContext<'_>,
-        declarations: &'found Declarations<'_>,
+        declarations: &'found Declarations,
     ) -> FunctionShape<'found, 'file> {
         let vertex = |written: &TypeName| {
             declarations.vertex_named(declarations.resolved(written.or_self(context.self_type()))).map(Vertex::name)

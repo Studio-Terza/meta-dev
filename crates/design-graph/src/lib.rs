@@ -27,7 +27,7 @@ pub use placed::Placed;
 pub use placement::{CurrentSpans, Placement};
 pub use prefixed::{Cited, NextNode, Prefixed, Spoken, Started};
 pub use project_root::ProjectRoot;
-pub use refusal::{Refusal, Unpaid};
+pub use refusal::{Refusal, Refused, Unpaid};
 use relative::Relative;
 pub use remit::{JobRepeated, Remit};
 pub use shown_node::ShownNode;

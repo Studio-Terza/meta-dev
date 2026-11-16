@@ -6,21 +6,6 @@ use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title}
 const OPEN_AND_CLOSED: &str = "struct Open;\nstruct Closed;\nimpl State for Open {}\nimpl State for Closed {}\n";
 const EDGE: &str = "impl Open {\n    pub fn close(self) -> Closed {\n        Closed\n    }\n}\n";
 const MUTATES: &str = "impl Open {\n    pub fn tweak(&mut self) {}\n}\n";
-const SHAPE: Source =
-    Source::new(Located::new("shape.rs"), Text::new("pub enum Shape {\n    Circle(u8),\n    Square,\n}\n"));
-
-const TEST_AREA: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "#[cfg(test)]\nmod tests {\n    fn area(shape: Shape) -> u8 {\n        match shape {\n            Shape::Circle(radius) => grow(radius),\n            Shape::Square => 1,\n        }\n    }\n}\n",
-    ),
-);
-const UNIT_SHAPE: Source = Source::new(
-    Located::new("unit.rs"),
-    Text::new(
-        "enum Shape {\n    Circle,\n    Square,\n}\nfn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle => grow(1),\n        Shape::Square => grow(2),\n    }\n}\n",
-    ),
-);
 
 const NESTED: &str = "fn f() {\n    mod inner {\n        states::states! {\n            #[derive()]\n            mod door {\n                start Open { shut -> Shut, }\n                terminal Shut {}\n                state Lost {}\n            }\n        }\n    }\n}\n";
 const UNREACHABLE: &str = "states! {\n    mod door {\n        start Open { shut -> Shut }\n        state Ajar { shut -> Shut }\n        terminal Shut {}\n    }\n}\n";
@@ -49,103 +34,14 @@ const TRAIT_TRANSITION: &str =
     "impl From<Open> for Closed {\n    fn from(open: Open) -> Closed {\n        make()\n    }\n}\n";
 const TWO_TRAITS: &str = "impl Wrap for Open {\n    fn wrap(self) -> Closed {\n        make()\n    }\n}\nimpl Seal for Open {\n    fn seal(self) -> Closed {\n        make()\n    }\n}\n";
 
-const INLINE_SHAPE: Source = Source::new(
-    Located::new("shape.rs"),
-    Text::new("mod inner {\n    pub enum Shape {\n        Circle(u8),\n        Square,\n    }\n}\n"),
-);
-const FOREIGN_MATCH: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle(radius) => grow(radius),\n        Shape::Square => 1,\n    }\n}\n",
-    ),
-);
-const COLOR: Source = Source::new(Located::new("color.rs"), Text::new("pub enum Color {\n    Red,\n    Blue,\n}\n"));
-const PAINT: Source = Source::new(
-    Located::new("paint.rs"),
-    Text::new(
-        "fn paint(color: Color) -> u8 {\n    match color {\n        Color::Red => grow(1),\n        Color::Blue => grow(2),\n    }\n}\n",
-    ),
-);
-const SUM_SHAPE_X: Source = Source::new(
-    Located::new("crates/x/src/shape.rs"),
-    Text::new("pub enum Shape {\n    Circle(u8),\n    Square,\n}\n"),
-);
-const UNIT_SHAPE_X: Source =
-    Source::new(Located::new("crates/x/src/shape.rs"), Text::new("pub enum Shape {\n    Circle,\n    Square,\n}\n"));
-const SUM_SHAPE_Y: Source = Source::new(
-    Located::new("crates/y/src/shape.rs"),
-    Text::new("pub enum Shape {\n    Circle(u8),\n    Square,\n}\n"),
-);
-const UNIT_SHAPE_Y: Source =
-    Source::new(Located::new("crates/y/src/shape.rs"), Text::new("pub enum Shape {\n    Circle,\n    Square,\n}\n"));
-const AREA_X: Source = Source::new(
-    Located::new("crates/x/src/area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle(radius) => grow(radius),\n        Shape::Square => grow(1),\n    }\n}\n",
-    ),
-);
-const UNIT_AREA_X: Source = Source::new(
-    Located::new("crates/x/src/area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle => grow(1),\n        Shape::Square => grow(2),\n    }\n}\n",
-    ),
-);
 const BOXED_VIEW: &str = "impl Open {\n    pub fn next(&self) -> Box<Closed> {\n        make()\n    }\n}\n";
-const UNIT_ARM: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Square => grow(1),\n        _ => 2,\n    }\n}\n",
-    ),
-);
-const ROUND: Source =
-    Source::new(Located::new("shape.rs"), Text::new("pub enum Shape {\n    Round { radius: u8 },\n}\n"));
-const STRUCT_ARM: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Round { radius } => grow(radius),\n    }\n}\n",
-    ),
-);
-const WIDE_SHAPE: Source = Source::new(
-    Located::new("shape.rs"),
-    Text::new("pub enum Shape {\n    Circle(u8),\n    Square,\n    Oval(u8),\n    Star(u8),\n}\n"),
-);
-const TABLES: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> Row {\n    match shape {\n        Shape::Circle(_) => -1,\n        Shape::Square => (2),\n        Shape::Oval(_) => (1, 2),\n        Shape::Star(_) => [1, 2],\n    }\n}\n",
-    ),
-);
-const IN_METHOD: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "impl Area {\n    fn area(shape: Shape) -> u8 {\n        match shape {\n            Shape::Circle(radius) => grow(radius),\n            Shape::Square => 1,\n        }\n    }\n}\n",
-    ),
-);
-const IN_MODULE: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "mod inner {\n    fn area(shape: Shape) -> u8 {\n        match shape {\n            Shape::Circle(radius) => grow(radius),\n            Shape::Square => 1,\n        }\n    }\n}\n",
-    ),
-);
-const IF_LET: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> u8 {\n    if let Shape::Circle(radius) = shape { grow(radius) } else { 1 }\n}\n",
-    ),
-);
-const LET_ELSE: Source = Source::new(
-    Located::new("area.rs"),
-    Text::new(
-        "fn area(shape: Shape) -> u8 {\n    let Shape::Circle(radius) = shape else { panic() };\n    grow(radius)\n}\n",
-    ),
-);
 
 const ALIASED: &str = "use states::states as lifecycle;\nlifecycle! {\n    mod door {\n        start Open { shut -> Shut }\n        state Lost {}\n        terminal Shut {}\n    }\n}\n";
 const GROUPED_ALIAS: &str = "use states::{states as lifecycle, other};\nfn f() {\n    lifecycle! {\n        mod door {\n            start Open { shut -> Shut }\n            state Lost {}\n            terminal Shut {}\n        }\n    }\n}\n";
 const BEHIND_CFG_IF: &str = "cfg_if::cfg_if! {\n    if #[cfg(unix)] {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    }\n}\n";
 const BEHIND_MACRO_RULES: &str = "macro_rules! door {\n    () => {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    };\n}\ndoor!();\n";
 
-const CASES: [Case; 28] = [
+const CASES: [Case; 13] = [
     Case::new(
         Title::new("public edge"),
         &[
@@ -154,8 +50,6 @@ const CASES: [Case; 28] = [
         ],
         Flagged::new(&[]),
     ),
-    Case::new(Title::new("test module match"), &[SHAPE, TEST_AREA], Flagged::new(&[])),
-    Case::new(Title::new("own unit enum of that name"), &[SHAPE, UNIT_SHAPE], Flagged::new(&[])),
     Case::new(
         Title::new("a value's view"),
         &[
@@ -238,13 +132,6 @@ const CASES: [Case; 28] = [
         ],
         Flagged::new(&["b.rs:2"]),
     ),
-    Case::new(Title::new("an enum in an inline module"), &[INLINE_SHAPE, FOREIGN_MATCH], Flagged::new(&["area.rs:3"])),
-    Case::new(Title::new("a unit enum elsewhere"), &[COLOR, PAINT], Flagged::new(&[])),
-    Case::new(Title::new("arms that only tabulate"), &[WIDE_SHAPE, TABLES], Flagged::new(&[])),
-    Case::new(Title::new("a match in a method"), &[SHAPE, IN_METHOD], Flagged::new(&["area.rs:4"])),
-    Case::new(Title::new("a match in an inline module"), &[SHAPE, IN_MODULE], Flagged::new(&["area.rs:4"])),
-    Case::new(Title::new("if let"), &[SHAPE, IF_LET], Flagged::new(&["area.rs:2"])),
-    Case::new(Title::new("let else"), &[SHAPE, LET_ELSE], Flagged::new(&["area.rs:2"])),
     Case::new(
         Title::new("a view returning another wrapper"),
         &[
@@ -252,36 +139,6 @@ const CASES: [Case; 28] = [
             Source::new(Located::new("b.rs"), Text::new(BOXED_VIEW)),
         ],
         Flagged::new(&[]),
-    ),
-    Case::new(Title::new("a unit variant arm"), &[SHAPE, UNIT_ARM], Flagged::new(&["area.rs:3"])),
-    Case::new(Title::new("a struct variant arm"), &[ROUND, STRUCT_ARM], Flagged::new(&["area.rs:3"])),
-    Case::new(
-        Title::new("a unit enum of the crate's own beside a sum type of that name in another crate"),
-        &[SUM_SHAPE_Y, UNIT_SHAPE_X, UNIT_AREA_X],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a sum type of the crate's own beside a unit enum of that name in another crate"),
-        &[UNIT_SHAPE_Y, SUM_SHAPE_X, AREA_X],
-        Flagged::new(&["crates/x/src/area.rs:3", "crates/x/src/area.rs:4"]),
-    ),
-    Case::new(
-        Title::new("a sum type of the file's own beside one of that name in another crate"),
-        &[
-            SUM_SHAPE_Y,
-            Source::new(
-                Located::new("crates/x/src/area.rs"),
-                Text::new(
-                    "enum Shape {\n    Circle(u8),\n}\nfn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle(radius) => grow(radius),\n    }\n}\n",
-                ),
-            ),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a sum type of another file of the crate"),
-        &[SUM_SHAPE_X, AREA_X],
-        Flagged::new(&["crates/x/src/area.rs:3", "crates/x/src/area.rs:4"]),
     ),
 ];
 

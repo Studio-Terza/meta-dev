@@ -4,9 +4,10 @@ use std::io;
 use std::path::PathBuf;
 
 use design_model::{
-    Ending, JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated,
+    Ending, Inversion, JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified,
+    Unstated,
 };
-use design_store::{Refusal, Unpaid};
+use design_store::{Cycle, Refusal, Refused, Unpaid};
 use dispatch_ports::{DispatchFailure, Stall};
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
@@ -161,14 +162,25 @@ impl fmt::Display for Flails {
 
 impl From<Refusal> for Failure {
     fn from(refusal: Refusal) -> Failure {
-        match refusal {
-            Refusal::Cyclic(cycle) => Failure::Unresolved(Unresolved::from(cycle)),
-            Refusal::Ancestral { old, by } => Failure::Unresolved(Unresolved::Ancestral { old, by }),
-            Refusal::Inverted(inversion) => Failure::Inverted { edge: inversion.edge() },
-            Refusal::Misstaged(misstaged) => Failure::from(misstaged),
-            Refusal::Unpaid(unpaid) => Failure::from(unpaid),
-            Refusal::Store(failure) => Failure::Store(failure),
-        }
+        refusal.refused()
+    }
+}
+
+impl Refused for Failure {
+    fn ancestral(old: NodeId, by: NodeId) -> Failure {
+        Failure::Unresolved(Unresolved::Ancestral { old, by })
+    }
+}
+
+impl From<Cycle> for Failure {
+    fn from(cycle: Cycle) -> Failure {
+        Failure::Unresolved(Unresolved::from(cycle))
+    }
+}
+
+impl From<Inversion> for Failure {
+    fn from(inversion: Inversion) -> Failure {
+        Failure::Inverted { edge: inversion.edge() }
     }
 }
 

@@ -67,7 +67,7 @@ use lint_repeated_methods::RepeatedMethods;
 use lint_repeated_reads::RepeatedReads;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
-use lint_state_graph::StateGraph;
+use lint_state_graph::{ForeignMatches, StateGraph};
 use lint_store_queries::StoreQueries;
 use lint_thin_main::ThinMain;
 use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, Transitions, TypeSystem};
@@ -148,7 +148,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 57] = [
+    const LINTS: [Entry; 58] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -193,6 +193,7 @@ impl Lints {
         <Swept<LongExactStrings> as Registered>::ENTRY,
         <Ruled<RepeatedShapes> as Registered>::ENTRY,
         Entry::spelled::<MandatoryLaws>(Work::Modelled(<MandatoryLaws as ModelLint>::report)),
+        Entry::spelled::<ForeignMatches>(Work::Modelled(<ForeignMatches as ModelLint>::report)),
         <Swept<ArbitraryNewtypes> as Registered>::ENTRY,
         <Swept<BoolMethods> as Registered>::ENTRY,
         Entry::spelled::<EffectsInPorts>(Work::Modelled(<EffectsInPorts as ModelLint>::report)),

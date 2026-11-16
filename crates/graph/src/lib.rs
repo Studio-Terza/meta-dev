@@ -58,7 +58,7 @@ pub use primitive::Primitive;
 pub use quoted::Quoted;
 pub use references::{Consumers, References};
 pub use region::{Ground, Reach, Region, Seat, Within, Zone};
-pub use resolved::Resolved;
+pub use resolved::{Nominal, Resolved};
 pub use sited::{Sited, Spelling};
 pub use traversal::Traversal;
 pub use type_ref::{Arrayed, Bounds, Callable, Element, Grouped, Named, Outline, Projection, TypeRef, TypeUses};

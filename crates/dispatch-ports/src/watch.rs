@@ -32,6 +32,23 @@ pub enum Stall {
     Failed(Fault),
 }
 
+pub trait Watching {
+    type Output;
+
+    fn finished(self, finished: &Finished) -> Self::Output;
+
+    fn stalled(self, stall: &Stall) -> Self::Output;
+}
+
+impl Watched {
+    pub fn visited<W: Watching>(&self, watching: W) -> W::Output {
+        match self {
+            Watched::Finished(finished) => watching.finished(finished),
+            Watched::Stalled(stall) => watching.stalled(stall),
+        }
+    }
+}
+
 impl Stall {
     #[must_use]
     pub fn usage(&self) -> Option<Usage> {

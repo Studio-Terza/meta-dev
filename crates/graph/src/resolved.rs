@@ -131,6 +131,19 @@ impl Resolved {
     }
 
     #[must_use]
+    pub fn nominal(&self) -> Option<Nominal<'_>> {
+        match self {
+            Resolved::Param(_) | Resolved::Primitive(_) => None,
+            Resolved::Std(_)
+            | Resolved::StdTrait(_)
+            | Resolved::Crate(_)
+            | Resolved::Member(_)
+            | Resolved::External(_)
+            | Resolved::Unknown(..) => Some(Nominal(self)),
+        }
+    }
+
+    #[must_use]
     pub fn unresolved(&self) -> Option<Unresolved> {
         match self {
             Resolved::Unknown(_, cause) => Some(*cause),
@@ -167,3 +180,6 @@ impl AsRef<ItemPath> for StdTrait<'_> {
         self.0
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Nominal<'resolved>(&'resolved Resolved);

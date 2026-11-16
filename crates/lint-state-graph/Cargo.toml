@@ -14,11 +14,13 @@ lint-sweep = { path = "../lint-sweep" }
 newtype = { path = "../newtype" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
+graph = { path = "../graph" }
 lint-layout = { path = "../lint-layout" }
 syntax = { path = "../syntax" }
 
 [dev-dependencies]
 lint-file = { path = "../lint-file" }
+graph = { path = "../graph" }
 lint-fixtures = { path = "../lint-fixtures" }
 laws = { path = "../laws" }
 

@@ -16,6 +16,26 @@ pub enum Reading {
     Flailed(Lapse),
 }
 
+pub trait Readings {
+    type Output;
+
+    fn parsed(self, directives: Directives, attempt: Attempt) -> Self::Output;
+
+    fn again(self, attempt: Attempt) -> Self::Output;
+
+    fn flailed(self, lapse: Lapse) -> Self::Output;
+}
+
+impl Reading {
+    pub fn visited<R: Readings>(self, readings: R) -> R::Output {
+        match self {
+            Reading::Parsed { directives, attempt } => readings.parsed(directives, attempt),
+            Reading::Again(attempt) => readings.again(attempt),
+            Reading::Flailed(lapse) => readings.flailed(lapse),
+        }
+    }
+}
+
 impl Attempt {
     #[must_use]
     pub fn lapsed(self, lapse: Lapse) -> Reading {

@@ -1,4 +1,4 @@
-use grammar_message::{Lexeme, Mark, Span};
+use grammar_message::{Boundary, Lexeme, Span};
 
 use crate::form::Form;
 use transcript_ports::{Body, Uuid};
@@ -51,11 +51,7 @@ impl Part {
 
 impl Fill {
     fn marked(lexeme: Lexeme) -> Fill {
-        match lexeme.mark() {
-            Mark::Break => Fill::Blank,
-            Mark::Plain => lexeme.ink().map_or(Fill::Blank, |_| Fill::Written),
-            Mark::Stop | Mark::Numbered(..) | Mark::Bulleted | Mark::Quoted | Mark::Uuid => Fill::Written,
-        }
+        lexeme.ink().map_or(Fill::Blank, |_| Fill::Written)
     }
 
     fn after(self, lexeme: Lexeme) -> Fill {
@@ -86,7 +82,7 @@ impl Open {
     fn starting(lexeme: Lexeme) -> Open {
         Open {
             part: Part {
-                form: Form::opened_by(lexeme.mark()).unwrap_or(Form::Sentence),
+                form: lexeme.mark().opened().unwrap_or(Form::Sentence),
                 span: lexeme.span(),
                 ink: lexeme.ink(),
             },
@@ -101,11 +97,10 @@ impl Open {
         }
     }
 
-    fn ending_at(self, mark: Mark) -> Ending {
-        match mark {
-            Mark::Break => self.fill.breaking(),
-            Mark::Stop => self.part.form.stopping(),
-            Mark::Numbered(..) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Ending::Continue,
+    fn bounded(self, boundary: Boundary) -> Ending {
+        match boundary {
+            Boundary::Line => self.fill.breaking(),
+            Boundary::Sentence => self.part.form.stopping(),
         }
     }
 
@@ -127,11 +122,12 @@ impl Segmenter {
 
     fn pushed(mut self, lexeme: Lexeme) -> Segmenter {
         let previous = self.open.take();
-        let opening = Form::opened_by(lexeme.mark());
+        let opening: Option<Form> = lexeme.mark().opened();
         let segmenter = opening.and(previous).into_iter().fold(self, Segmenter::record);
         let continuing = opening.map_or(previous, |_| None);
         let open = continuing.map_or_else(|| Open::starting(lexeme), |open| open.extended(lexeme));
-        Segmenter { open: Some(open), ..segmenter }.ended(open.ending_at(lexeme.mark()))
+        Segmenter { open: Some(open), ..segmenter }
+            .ended(lexeme.mark().boundary().map_or(Ending::Continue, |boundary| open.bounded(boundary)))
     }
 
     fn ended(self, ending: Ending) -> Segmenter {
