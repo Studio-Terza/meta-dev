@@ -11,23 +11,34 @@ use crate::cli::ports::{Invocation, Ports, Text};
 pub(in super::super) struct Tested(BTreeSet<PathBuf>);
 
 impl Tested {
-    const TESTS: &'static str = "tests";
+    const MARKS: [&'static str; 2] = ["src", "tests"];
+    const QUERY: [&'static str; 3] = ["query", "--in", "."];
+    const CONSUMED_BY: &'static str = "--consumed-by";
     const EMPTY_TREE: &'static str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
     const CHANGED: [&'static str; 6] = ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"];
     const NAMED: [&'static str; 7] =
         ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"];
 
-    pub(in super::super) fn asked(ports: &impl Ports) -> Result<Tested, Failure<'static>> {
+    pub(in super::super) fn asked(ports: &impl Ports, lint: &Path) -> Result<Tested, Failure<'static>> {
         let invocation = Invocation::new("git", Self::NAMED);
         let named = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
-        let tested = named.as_ref().parse::<Lines>().into_iter().flatten().filter_map(|name| {
-            Path::new(&name)
-                .ancestors()
-                .find(|directory| directory.file_name() == Some(OsStr::new(Self::TESTS)))
-                .and_then(Path::parent)
-                .map(Path::to_path_buf)
-        });
-        Ok(Tested(tested.collect()))
+        let files: Vec<String> = named.as_ref().parse::<Lines>().into_iter().flatten().collect();
+        let consumed = files.first().map_or(Ok(Vec::new()), |_| Self::consumed(ports, lint, &files))?;
+        Ok(Tested(files.iter().chain(&consumed).filter_map(|path| Self::home(Path::new(path))).collect()))
+    }
+
+    fn consumed(ports: &impl Ports, lint: &Path, files: &[String]) -> Result<Vec<String>, Failure<'static>> {
+        let asked = files.iter().flat_map(|file| [OsString::from(Self::CONSUMED_BY), OsString::from(file)]);
+        let invocation = Invocation::new(lint, Self::QUERY.map(OsString::from).into_iter().chain(asked));
+        let answer = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
+        Ok(answer.as_ref().parse::<Lines>().into_iter().flatten().collect())
+    }
+
+    fn home(path: &Path) -> Option<PathBuf> {
+        path.ancestors()
+            .find(|directory| Self::MARKS.iter().any(|mark| directory.file_name() == Some(OsStr::new(mark))))
+            .and_then(Path::parent)
+            .map(Path::to_path_buf)
     }
 
     pub(in super::super) fn diff(&self, ports: &impl Ports) -> Result<Text, Failure<'static>> {
