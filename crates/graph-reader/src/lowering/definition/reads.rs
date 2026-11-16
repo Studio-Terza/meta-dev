@@ -1,23 +1,27 @@
+mod shaped;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, Signature, Spine, Type};
 
-use graph::{ParamIndex, Read, Reader, Resolved};
+use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
 use lint_core::Syntax;
-use lint_layout::{LineNumber, Name};
+use lint_layout::{LineNumber, Name, Whole, Word};
 use lint_sweep::{Address, Descend, Facts, Kind, Watch};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
-use super::super::signature::InScope;
+use super::super::signature::{InScope, Written};
+use shaped::Shaped;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Spelled {
     Path(UsePath),
     Generic { owner: Name, name: Name },
+    Subject { subject: TypeRef<Written>, name: Name },
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Rooted {
     root: Name,
     fields: Vec<Name>,
@@ -57,6 +61,71 @@ impl Rooted {
     }
 }
 
+#[derive(Clone, Debug)]
+enum Passed {
+    Rooted(Rooted),
+    Named(UsePath),
+}
+
+impl Passed {
+    fn leaf(expr: &Expr) -> Option<Passed> {
+        let rooted = Rooted::from_argument(expr).map(Passed::Rooted);
+        rooted.or_else(|| Syntax::expr_path(expr).map(|found| Passed::Named(UsePath::from(&found.path))))
+    }
+
+    fn rooted(self) -> Option<Rooted> {
+        match self {
+            Passed::Rooted(rooted) => Some(rooted),
+            Passed::Named(_) => None,
+        }
+    }
+
+    fn all_lowered(
+        passed: Vec<Shaped<Passed>>,
+        parameters: &BTreeMap<Name, ParamIndex>,
+        scope: &InScope,
+    ) -> Vec<Shaped<Lowered>> {
+        passed.into_iter().map(|shaped| shaped.mapped(&|leaf: Passed| leaf.lowered(parameters, scope))).collect()
+    }
+
+    fn lowered(self, parameters: &BTreeMap<Name, ParamIndex>, scope: &InScope) -> Shaped<Lowered> {
+        match self {
+            Passed::Rooted(rooted) => Lowered::rooted(rooted, parameters),
+            Passed::Named(path) => Shaped::Leaf(Lowered::Named(Spelled::under(path, scope))),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum Lowered {
+    Parameter { parameter: ParamIndex, fields: Vec<Name> },
+    Named(Spelled),
+}
+
+impl Lowered {
+    fn rooted(rooted: Rooted, parameters: &BTreeMap<Name, ParamIndex>) -> Shaped<Lowered> {
+        let parameter = parameters.get(&rooted.root).copied();
+        parameter.map_or(Shaped::Opaque, |found| {
+            Shaped::Leaf(Lowered::Parameter { parameter: found, fields: rooted.fields })
+        })
+    }
+
+    fn all_resolved(
+        arguments: Vec<Shaped<Lowered>>,
+        resolving: &Resolving<'_, '_, '_>,
+        scope: ScopeId,
+    ) -> Vec<Argument> {
+        arguments.into_iter().map(|shaped| shaped.argument(&|leaf: Lowered| leaf.resolved(resolving, scope))).collect()
+    }
+
+    fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Argument {
+        match self {
+            Lowered::Parameter { parameter, fields } => Argument::Parameter { parameter, fields },
+            Lowered::Named(spelled) => Argument::Named(spelled.reader(resolving, scope)),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 enum Calls {
     #[default]
@@ -85,6 +154,7 @@ impl Calls {
 struct LoweredRead {
     path: UsePath,
     rooted: Rooted,
+    passed: Vec<Shaped<Passed>>,
     line: LineNumber,
 }
 
@@ -111,6 +181,7 @@ struct LoweredReadAt {
     spelled: Spelled,
     parameter: ParamIndex,
     fields: Vec<Name>,
+    arguments: Vec<Shaped<Lowered>>,
     line: LineNumber,
 }
 
@@ -136,8 +207,9 @@ impl Reads {
         let kept = self.found.into_iter().filter(|read| forwarding.and(read.rooted.whole()).is_none());
         let settled = kept.filter_map(|read| {
             let parameter = *parameters.get(&read.rooted.root)?;
+            let arguments = Passed::all_lowered(read.passed, &parameters, scope);
             let spelled = Spelled::under(read.path, scope);
-            Some(LoweredReadAt { spelled, parameter, fields: read.rooted.fields, line: read.line })
+            Some(LoweredReadAt { spelled, parameter, fields: read.rooted.fields, arguments, line: read.line })
         });
         ReadsLowered(settled.collect())
     }
@@ -154,26 +226,50 @@ impl Reads {
         only.and_then(Syntax::tail).and_then(Syntax::expr_call).map(Address::from)
     }
 
-    fn recorded(&mut self, path: impl Fn() -> UsePath, arguments: Vec<&Expr>, line: LineNumber) -> Descend {
-        let roots = arguments.into_iter().filter_map(Rooted::from_argument);
-        self.found.extend(roots.map(|rooted| LoweredRead { path: path(), rooted, line }));
+    fn recorded(&mut self, path: impl Fn() -> UsePath, arguments: &[&Expr], line: LineNumber) -> Descend {
+        let passed: Vec<Shaped<Passed>> =
+            arguments.iter().map(|argument| Shaped::folded(argument, &Passed::leaf)).collect();
+        let roots = passed.iter().filter_map(Shaped::leaf).filter_map(|leaf| leaf.clone().rooted());
+        let found: Vec<LoweredRead> =
+            roots.map(|rooted| LoweredRead { path: path(), rooted, passed: passed.clone(), line }).collect();
+        self.found.extend(found);
         Descend::Into
     }
 }
 
 impl Spelled {
+    const SUBJECT: Word<'static> = Word::new("Self");
+
     fn under(path: UsePath, scope: &InScope) -> Spelled {
         let single = path.parent().map(|parent| parent.written()).filter(|parent| parent.as_ref().len() == 1);
-        let owner = single.and_then(|parent| scope.generic(parent.last()?).cloned());
+        let head = single.as_ref().and_then(|parent| parent.last().cloned());
+        let owner = head.as_ref().and_then(|parent| scope.generic(parent).cloned());
         let last = path.written().last().cloned();
-        owner.zip(last).map_or(Spelled::Path(path), |(generic, name)| Spelled::Generic { owner: generic, name })
+        let subject = head
+            .filter(|parent| parent.matches::<Whole>(&[Self::SUBJECT]).is_some())
+            .map(|_| scope.current_subject().clone());
+        let generic = owner.zip(last.clone()).map(|(generic, name)| Spelled::Generic { owner: generic, name });
+        let own = subject.zip(last).map(|(implementer, name)| Spelled::Subject { subject: implementer, name });
+        generic.or(own).unwrap_or(Spelled::Path(path))
     }
 
     fn reader(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Reader {
         match self {
             Spelled::Path(path) => Self::path_reader(&path, resolving, scope),
             Spelled::Generic { owner, name } => Reader::Associated { owner: Resolved::Param(owner), name },
+            Spelled::Subject { subject, name } => Self::subject_reader(&subject, name, resolving, scope),
         }
+    }
+
+    fn subject_reader(
+        subject: &TypeRef<Written>,
+        name: Name,
+        resolving: &Resolving<'_, '_, '_>,
+        scope: ScopeId,
+    ) -> Reader {
+        let typed = Written::typed(subject, resolving, scope);
+        let owner = typed.named().map(|named| AsRef::<Resolved>::as_ref(named).clone());
+        Reader::Associated { owner: owner.unwrap_or(Resolved::Param(Name::from(Self::SUBJECT))), name }
     }
 
     fn path_reader(path: &UsePath, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Reader {
@@ -195,7 +291,11 @@ impl ReadsLowered {
     pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Vec<Read> {
         self.0
             .into_iter()
-            .map(|read| Read::new(read.spelled.reader(resolving, scope), read.parameter, read.fields, read.line))
+            .map(|read| {
+                let arguments = Lowered::all_resolved(read.arguments, resolving, scope);
+                Read::new(read.spelled.reader(resolving, scope), read.parameter, read.fields, read.line)
+                    .passing(arguments)
+            })
             .collect()
     }
 }
@@ -218,7 +318,8 @@ impl<'ast> Watch<'ast> for Reads {
         self.calls = self.calls.counted(facts.address());
         Syntax::expr_path(&call.func).map_or(Descend::Into, |found| {
             let line = found.path.segments.last().map_or(LineNumber::FIRST, |last| LineNumber::from(last.ident.span()));
-            self.recorded(|| UsePath::from(&found.path), call.args.iter().collect(), line)
+            let arguments: Vec<&Expr> = call.args.iter().collect();
+            self.recorded(|| UsePath::from(&found.path), &arguments, line)
         })
     }
 }

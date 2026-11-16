@@ -1,8 +1,8 @@
 use syntax::parse::{Parser, parse_str, parse2};
 use syntax::{
     Application, Applied, Block, BlockItems, Constant, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro,
-    File, Group, Ident, Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens, TokenStream,
-    TokenTree, Type, TypeFold, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
+    File, Fold, Group, Ident, Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens,
+    TokenStream, TokenTree, Type, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
 };
 
 #[test]
@@ -93,7 +93,7 @@ fn macro_trees_expand_items_and_walk_nested_invocations() -> Result<(), Error> {
 #[test]
 fn type_folds_see_children_before_parents_and_hand_each_out_once() -> Result<(), Error> {
     let ty: Type = parse_str("&(Vec<u8>, [i32; 2])")?;
-    let fold = TypeFold::over(TypeTree::from(&ty), Rendered::step);
+    let fold = Fold::over(TypeTree::from(&ty), Rendered::step);
     assert_eq!(fold.take(&ty), Some("ref (Vec < u8 >, array i32)".to_owned()));
     assert_eq!(fold.take(&ty), None);
     Ok(())
@@ -138,7 +138,7 @@ fn constructed_values_open_only_the_named_wrappers_and_conversions() -> Result<(
 struct Rendered;
 
 impl Rendered {
-    fn step(done: &TypeFold<'_, String>, node: &Type) -> String {
+    fn step(done: &Fold<'_, Type, String>, node: &Type) -> String {
         match node {
             Type::Reference(reference) => format!("ref {}", done.take(&reference.elem).unwrap_or_default()),
             Type::Tuple(tuple) => Rendered::tuple(done, tuple.elems.iter()),
@@ -147,7 +147,7 @@ impl Rendered {
         }
     }
 
-    fn tuple<'ty>(done: &TypeFold<'_, String>, parts: impl Iterator<Item = &'ty Type>) -> String {
+    fn tuple<'ty>(done: &Fold<'_, Type, String>, parts: impl Iterator<Item = &'ty Type>) -> String {
         let shown: Vec<String> = parts.map(|part| done.take(part).unwrap_or_default()).collect();
         format!("({})", shown.join(", "))
     }

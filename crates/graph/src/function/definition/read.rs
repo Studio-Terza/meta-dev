@@ -1,6 +1,7 @@
 use lint_layout::{LineNumber, Name};
 
-use crate::boundary::ParamIndex;
+use super::operator::Operator;
+use crate::boundary::{LiteralValue, ParamIndex};
 use crate::resolved::Resolved;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,17 +38,46 @@ impl Reader {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Argument {
+    Parameter { parameter: ParamIndex, fields: Vec<Name> },
+    Named(Reader),
+    Literal(LiteralValue),
+    Applied { operator: Operator, operands: Vec<Argument> },
+    Opaque,
+}
+
+impl Argument {
+    #[must_use]
+    pub fn applied(operator: Operator, operands: Vec<Argument>) -> Argument {
+        let opaque = operands.iter().find(|operand| matches!(operand, Argument::Opaque)).map(|_| ());
+        opaque.map_or(Argument::Applied { operator, operands }, |()| Argument::Opaque)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Read {
     reader: Reader,
     parameter: ParamIndex,
     fields: Vec<Name>,
+    arguments: Vec<Argument>,
     line: LineNumber,
 }
 
 impl Read {
     #[must_use]
     pub fn new(reader: Reader, parameter: ParamIndex, fields: Vec<Name>, line: LineNumber) -> Read {
-        Read { reader, parameter, fields, line }
+        Read { reader, parameter, fields, arguments: Vec::new(), line }
+    }
+
+    #[must_use]
+    pub fn passing(self, arguments: Vec<Argument>) -> Read {
+        Read { arguments, ..self }
+    }
+
+    #[must_use]
+    pub fn comparable(&self) -> Option<&[Argument]> {
+        let opaque = self.arguments.iter().find(|argument| matches!(argument, Argument::Opaque));
+        opaque.map_or(Some(self.arguments.as_slice()), |_| None)
     }
 
     #[must_use]
