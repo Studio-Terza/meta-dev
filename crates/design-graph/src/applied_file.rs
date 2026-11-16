@@ -1,5 +1,7 @@
 mod boundary;
 
+pub use boundary::{AppliedFileRow, AppliedFileRowNew};
+
 use file_ports::Bytes;
 use newtype::{Arbitrary, Newtype};
 use port_core::Op;

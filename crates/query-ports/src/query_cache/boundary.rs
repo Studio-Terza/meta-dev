@@ -6,6 +6,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use query_cache::Table;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::migrate::{MigrateError, Migrator};
@@ -47,6 +48,8 @@ pub enum Uncached {
     Undescribed { query: String, source: sqlx::Error },
     #[error("cannot write a cache entry: {0}")]
     Unwritten(serde_json::Error),
+    #[error("cannot place a column: {0}")]
+    Origin(query_cache::Unplaced),
 }
 
 impl QueryCache {
@@ -57,9 +60,13 @@ impl QueryCache {
     pub fn prepared(&self, out: &mut impl io::Write) -> Result<(), Uncached> {
         let queries = Sources::queries(&self.root)?;
         let mut scratch = Scratch::migrated(&self.migrations)?;
+        let tables = scratch.tables()?;
+        let recorded: Vec<String> = tables.iter().flat_map(Table::statements).collect();
         let kept = queries
             .iter()
-            .map(|query| self.kept(&mut scratch, query.as_ref(), out))
+            .map(AsRef::as_ref)
+            .chain(recorded.iter().map(String::as_str))
+            .map(|query| self.kept(&mut scratch, query, out))
             .collect::<Result<BTreeSet<PathBuf>, Uncached>>()?;
         self.pruned(&kept, out)
     }
@@ -104,6 +111,7 @@ impl QueryCache {
 struct Scratch {
     runtime: Runtime,
     connection: SqliteConnection,
+    ledger: String,
 }
 
 impl TryFrom<Vec<OsString>> for QueryCache {
@@ -122,7 +130,7 @@ impl Scratch {
             runtime.block_on(SqliteConnection::connect(QueryCache::MEMORY)).map_err(Uncached::Database)?;
         let migrator = runtime.block_on(Migrator::new(migrations)).map_err(Uncached::Migrate)?;
         runtime.block_on(migrator.run(&mut connection)).map_err(Uncached::Migrate)?;
-        Ok(Scratch { runtime, connection })
+        Ok(Scratch { runtime, connection, ledger: migrator.table_name.to_string() })
     }
 
     fn described(&mut self, query: &str, hash: String) -> Result<Vec<u8>, Uncached> {
@@ -135,5 +143,28 @@ impl Scratch {
         let mut text = serde_json::to_vec_pretty(&entry).map_err(Uncached::Unwritten)?;
         text.push(b'\n');
         Ok(text)
+    }
+}
+
+impl Scratch {
+    const RECORDS: &'static str = "SELECT t.name FROM pragma_table_list AS t WHERE t.schema = 'main' AND t.type = 'table' AND t.name != ?1 AND (SELECT count(*) FROM pragma_table_info(t.name) WHERE pk > 0) = 1 AND NOT EXISTS (SELECT 1 FROM pragma_table_info(t.name) WHERE pk = 0 AND \"notnull\" = 0) ORDER BY t.name";
+    const COLUMNS: &'static str = "SELECT name, CASE WHEN pk > 0 AND upper(type) = 'INTEGER' THEN 'generated_key' WHEN pk > 0 THEN 'key' WHEN dflt_value IS NOT NULL THEN 'generated' ELSE 'given' END FROM pragma_table_info(?1) ORDER BY cid";
+
+    fn tables(&mut self) -> Result<Vec<Table>, Uncached> {
+        let names: Vec<String> = self
+            .runtime
+            .block_on(sqlx::query_scalar(Self::RECORDS).bind(&self.ledger).fetch_all(&mut self.connection))
+            .map_err(Uncached::Database)?;
+        names.iter().map(|name| self.table(name)).collect()
+    }
+
+    fn table(&mut self, name: &str) -> Result<Table, Uncached> {
+        let columns: Vec<(String, String)> = self
+            .runtime
+            .block_on(sqlx::query_as(Self::COLUMNS).bind(name).fetch_all(&mut self.connection))
+            .map_err(Uncached::Database)?;
+        columns.iter().try_fold(Table::named(name), |table, (column, origin)| {
+            Ok(table.column(column, origin.parse().map_err(Uncached::Origin)?))
+        })
     }
 }

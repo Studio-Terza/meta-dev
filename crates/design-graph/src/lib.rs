@@ -16,7 +16,7 @@ mod relative;
 mod remit;
 mod shown_node;
 
-pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
+pub use applied_file::{AppliedFile, AppliedFileRow, AppliedFileRowNew, AppliedId, Earlier, Seen, Sees, Unseen};
 pub use citation::Citation;
 pub use covered::Covered;
 pub use directions::{Directed, Directions};

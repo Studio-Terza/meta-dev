@@ -21,6 +21,7 @@ pub enum Storage {
     Real,
     Float,
     Text,
+    Blob,
     #[serde(other)]
     Unmapped,
 }
@@ -72,6 +73,7 @@ impl Storage {
             Storage::Integer | Storage::Int4 | Storage::Int64 => Some("i64"),
             Storage::Real | Storage::Float => Some("f64"),
             Storage::Text => Some("::std::string::String"),
+            Storage::Blob => Some("::std::vec::Vec<u8>"),
             Storage::Unmapped => None,
         }
     }

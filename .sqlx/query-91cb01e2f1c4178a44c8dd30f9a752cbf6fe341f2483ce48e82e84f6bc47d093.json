@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT job AS \"job!\", halted AS \"halted!\", account AS \"account!\", delivery AS \"delivery!\" FROM failures WHERE job = ?1",
+  "describe": {
+    "columns": [
+      {
+        "name": "job!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "job"
+          }
+        }
+      },
+      {
+        "name": "halted!",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "halted"
+          }
+        }
+      },
+      {
+        "name": "account!",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "account"
+          }
+        }
+      },
+      {
+        "name": "delivery!",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "delivery"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "91cb01e2f1c4178a44c8dd30f9a752cbf6fe341f2483ce48e82e84f6bc47d093"
+}

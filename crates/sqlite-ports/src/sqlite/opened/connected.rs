@@ -44,7 +44,7 @@ impl Bound {
             ValueRef::Text(text) => String::from_utf8(text.to_vec())
                 .map(Value::Text)
                 .map_err(|_unreadable| StoreFailure::from(ColumnFailure::Mistyped)),
-            ValueRef::Blob(_) => Err(StoreFailure::from(ColumnFailure::Mistyped)),
+            ValueRef::Blob(blob) => Ok(Value::Blob(blob.to_vec())),
         }
     }
 }

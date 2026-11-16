@@ -25,3 +25,8 @@ transcript-ports = { path = "../transcript-ports" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+sqlite-ports = { path = "../sqlite-ports" }
+design-messages = { path = "../design-messages" }

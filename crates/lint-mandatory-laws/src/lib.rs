@@ -13,6 +13,9 @@ pub struct MandatoryLaws;
 
 impl ModelLint for MandatoryLaws {
     fn report(model: &Model) -> Report<'_> {
-        Report::new(Headline::new("conversions have roundtrip laws"), Facts::from(model).unmet(&Coverage::from(model)))
+        Report::new(
+            Headline::new("conversions and stored records have laws"),
+            Facts::from(model).unmet(&Coverage::from(model)),
+        )
     }
 }

@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use golden::golden;
+use query_cache::{Origin, Table};
 use query_ports::QueryCache;
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
@@ -19,6 +20,7 @@ fn kept() {
 const FIXTURE: &str = r#"fn fixture() { store_ports::query!("SELECT 3 AS three"); }"#;
 const NOTES: &str = r#"store_ports::query!("SELECT 4 AS four")"#;
 const STALE: &str = "query-stale.json";
+const RECORDS: &str = "CREATE TABLE r (id INTEGER PRIMARY KEY, name TEXT NOT NULL, at TEXT NOT NULL DEFAULT 'now');\nCREATE TABLE n (k TEXT PRIMARY KEY, v TEXT);\nCREATE TABLE p (a TEXT NOT NULL, b TEXT NOT NULL, PRIMARY KEY (a, b));\n";
 const WORKSPACE: &str = "[workspace]\nresolver = \"3\"\nmembers = [\"crates/*\"]\n";
 const MANIFEST: &str = "[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nstore-ports = { path = \"../store-ports\" }\n";
 const PORT_MANIFEST: &str = "[package]\nname = \"store-ports\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nstore-ports-macros = { path = \"../store-ports-macros\" }\n";
@@ -91,5 +93,21 @@ fn a_second_run_over_a_cache_that_matches_its_queries_changes_nothing() -> Resul
     let mut out = Vec::new();
     QueryCache::try_from(arguments())?.prepared(&mut out)?;
     assert_eq!(out, Vec::<u8>::new());
+    Ok(())
+}
+
+#[test]
+fn a_table_with_one_key_and_no_nullable_columns_gets_its_record_statements() -> Result<(), Box<dyn Error>> {
+    let workspace = Workspace::laid()?;
+    fs::write(workspace.path().join("migrations/20260102000000_records.sql"), RECORDS)?;
+    let arguments = vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];
+    QueryCache::try_from(arguments)?.prepared(&mut Vec::new())?;
+    let record = Table::named("r")
+        .column("id", Origin::GeneratedKey)
+        .column("name", Origin::Given)
+        .column("at", Origin::Generated);
+    let expected =
+        record.statements().iter().map(|sql| Workspace::named(sql)).chain([Workspace::named(KEPT)]).collect();
+    assert_eq!(workspace.cached()?, expected);
     Ok(())
 }

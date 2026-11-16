@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO failures (halted, account, delivery) VALUES (?1, ?2, ?3) RETURNING job AS \"job!\", halted AS \"halted!\", account AS \"account!\", delivery AS \"delivery!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "job!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "job"
+          }
+        }
+      },
+      {
+        "name": "halted!",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "halted"
+          }
+        }
+      },
+      {
+        "name": "account!",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "account"
+          }
+        }
+      },
+      {
+        "name": "delivery!",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "failures",
+            "name": "delivery"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ebd54681d735ef0a9a9da6e639d9a7de44eec69210a091a62e94cf0070d43115"
+}

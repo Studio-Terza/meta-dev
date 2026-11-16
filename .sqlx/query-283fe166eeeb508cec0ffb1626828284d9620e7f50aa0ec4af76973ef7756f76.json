@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT node AS \"node!\", ending AS \"ending!\" FROM notes_endings WHERE node = ?1",
+  "describe": {
+    "columns": [
+      {
+        "name": "node!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "notes_endings",
+            "name": "node"
+          }
+        }
+      },
+      {
+        "name": "ending!",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "notes_endings",
+            "name": "ending"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "283fe166eeeb508cec0ffb1626828284d9620e7f50aa0ec4af76973ef7756f76"
+}

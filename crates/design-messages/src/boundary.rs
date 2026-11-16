@@ -7,6 +7,7 @@ use design_model::{Ordinal, Segment};
 use file_ports::Offset;
 use grammar_search::Term;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
+use store_ports::Record as _;
 use store_ports::{Columns, Released, Statements, StoreFailure, Written};
 use stream::{Anchor, Anchors, MechanicalLink, Message, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
@@ -78,8 +79,10 @@ pub(crate) struct EdgeRow {
     parent: Option<Uuid>,
 }
 
-#[derive(Debug, Columns)]
-pub(crate) struct CursorRow {
+#[derive(Clone, Debug, PartialEq, Eq, Columns, store_ports::Record)]
+#[record(table = "cursors")]
+pub struct CursorRow {
+    #[record(key)]
     session: SessionId,
     read_to: Offset,
 }
@@ -491,6 +494,19 @@ FROM
     pub(crate) fn session(&self) -> &SessionId {
         &self.session
     }
+
+    fn reconciled(&self, stored: Option<&CursorRow>, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        match stored {
+            None => statements.one(CursorRow::created(&CursorRowNew::from(self))).map(|_created| Written::new(1)),
+            Some(found) => self.revising(found, statements),
+        }
+    }
+
+    fn revising(&self, found: &CursorRow, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        Some(found)
+            .filter(|stored| *stored != self)
+            .map_or_else(|| Ok(Written::default()), |_changed| statements.written(self.updated()))
+    }
 }
 
 impl Row for MessageRow {
@@ -575,23 +591,8 @@ VALUES
 
 impl Row for CursorRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let CursorRow { session, read_to } = self;
-        statements.written(store_ports::query!(
-            r#"
-INSERT INTO
-  cursors (session, read_to)
-VALUES
-  (?1, ?2)
-ON CONFLICT
-  (session)
-DO UPDATE SET
-  read_to = excluded.read_to
-WHERE
-  read_to <> excluded.read_to
-"#,
-            session: SessionId,
-            read_to: Offset
-        ))
+        let stored = statements.rows(CursorRow::fetched(&self.session))?;
+        self.reconciled(stored.first(), statements)
     }
 }
 

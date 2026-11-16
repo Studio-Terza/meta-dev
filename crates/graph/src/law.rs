@@ -20,6 +20,7 @@ pub enum Property {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LawKind {
     Roundtrip,
+    Crud,
     Law,
     Proptest,
     Property(Property),
@@ -64,14 +65,14 @@ impl LawKind {
     pub fn property(self) -> Option<Property> {
         match self {
             LawKind::Property(property) => Some(property),
-            LawKind::Roundtrip | LawKind::Law | LawKind::Proptest => None,
+            LawKind::Roundtrip | LawKind::Crud | LawKind::Law | LawKind::Proptest => None,
         }
     }
 
     #[must_use]
     pub fn titled(self) -> Option<LawKind> {
         match self {
-            LawKind::Roundtrip | LawKind::Law | LawKind::Property(_) => Some(self),
+            LawKind::Roundtrip | LawKind::Crud | LawKind::Law | LawKind::Property(_) => Some(self),
             LawKind::Proptest => None,
         }
     }

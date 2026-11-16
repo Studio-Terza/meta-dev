@@ -40,8 +40,8 @@ impl<'model> From<&'model Model> for Reading<'model> {
 
 impl<'model> Reading<'model> {
     const TYPES: [ItemKind; 2] = [ItemKind::Struct, ItemKind::Enum];
-    const TRAITS: [Word<'static>; 4] = words!["Display", "FromStr", "Serialize", "Deserialize"];
-    const SERDE: [Word<'static>; 2] = words!["Serialize", "Deserialize"];
+    const TRAITS: [Word<'static>; 5] = words!["Display", "FromStr", "Serialize", "Deserialize", "Record"];
+    const DERIVED: [Word<'static>; 3] = words!["Serialize", "Deserialize", "Record"];
     const METHODS: [Word<'static>; 2] = words!["encode", "decode"];
     const LEADS: [Word<'static>; 2] = words!["to", "from"];
     const OWNERS: [Owner; 2] = [Owner::Inherent, Owner::TraitImpl];
@@ -68,7 +68,7 @@ impl<'model> Reading<'model> {
     fn implemented(&self, implementation: &Implementation) -> Option<Profile<'model>> {
         let resolved: &Resolved = implementation.subject_type().named()?.as_ref();
         let typed = self.types.get(&resolved.crate_item()?)?;
-        let listed = implementation.written().map_or(&Self::SERDE[..], |_| &Self::TRAITS[..]);
+        let listed = implementation.written().map_or(&Self::DERIVED[..], |_| &Self::TRAITS[..]);
         let name = implementation.interface_name().filter(|found| found.matches::<Whole>(listed).is_some())?;
         Some(Profile::declared(Self::subject(*typed), typed.site, Exposure::Private, vec![name.clone()]))
     }
