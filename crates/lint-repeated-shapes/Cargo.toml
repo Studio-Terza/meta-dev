@@ -18,6 +18,7 @@ lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 syntax = { path = "../syntax" }
+syntax-lexer = { path = "../syntax-lexer" }
 
 [dev-dependencies]
 lint-file = { path = "../lint-file" }

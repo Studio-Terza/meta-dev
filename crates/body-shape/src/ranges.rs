@@ -1,6 +1,8 @@
 mod boundary;
 
-use syntax::{Block, Place};
+use syntax::Block;
+
+use syntax_lexer::Place;
 
 pub use boundary::{Erasure, Shaper};
 

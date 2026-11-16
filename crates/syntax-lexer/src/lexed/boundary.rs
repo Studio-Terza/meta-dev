@@ -1,25 +1,25 @@
 use std::collections::HashMap;
 
 use crate::lexeme::{Kinded, LexemeKind, Symbol};
-use proc_macro2::{Delimiter, Group, Ident, Span, TokenStream, TokenTree};
+use syntax::{Delimiter, Group, Ident, Span, TokenStream, TokenTree};
 
 #[derive(Debug)]
 pub struct Lexed {
-    file: syn::File,
+    file: syntax::File,
     tokens: TokenTable,
 }
 
 impl Lexed {
-    pub fn parsed(content: &str) -> syn::Result<Lexed> {
+    pub fn parsed(content: &str) -> syntax::Result<Lexed> {
         let opened = Opening::read(content);
         let stream: TokenStream = opened.rest().parse()?;
-        let parsed: syn::File = syn::parse2(stream.clone())?;
-        let file = syn::File { shebang: opened.shebang(), ..parsed };
+        let parsed: syntax::File = syntax::parse::parse2(stream.clone())?;
+        let file = syntax::File { shebang: opened.shebang(), ..parsed };
         Ok(Lexed { file, tokens: TokenTable::flattened(stream) })
     }
 
     #[must_use]
-    pub fn into_file(self) -> syn::File {
+    pub fn into_file(self) -> syntax::File {
         self.file
     }
 
@@ -77,8 +77,8 @@ impl From<Span> for Place {
     }
 }
 
-impl From<proc_macro2::LineColumn> for Place {
-    fn from(at: proc_macro2::LineColumn) -> Place {
+impl From<syntax::LineColumn> for Place {
+    fn from(at: syntax::LineColumn) -> Place {
         Place { line: Offset::counted(at.line), column: Offset::counted(at.column) }
     }
 }

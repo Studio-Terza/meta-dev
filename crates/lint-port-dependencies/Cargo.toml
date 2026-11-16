@@ -20,6 +20,7 @@ lint-placement = { path = "../lint-placement" }
 text-lines = { path = "../text-lines" }
 workspace-metadata = { path = "../workspace-metadata" }
 syntax = { path = "../syntax" }
+syntax-lexer = { path = "../syntax-lexer" }
 
 [dev-dependencies]
 lint-file = { path = "../lint-file" }

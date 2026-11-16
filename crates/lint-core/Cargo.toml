@@ -15,6 +15,7 @@ newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 lint-placement = { path = "../lint-placement" }
 syntax = { path = "../syntax" }
+syntax-lexer = { path = "../syntax-lexer" }
 lint-layout = { path = "../lint-layout" }
 workspace-metadata = { path = "../workspace-metadata" }
 
