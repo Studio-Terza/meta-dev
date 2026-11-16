@@ -1,4 +1,3 @@
-use lint_core::Sourced;
 use lint_core::{Parsed, SourceFile, TypeHomes};
 use lint_sweep::{Gathers, Sweep, Watching};
 
@@ -10,7 +9,7 @@ pub struct FileFacts<'head> {
 
 impl<'head> From<Parsed<'_, 'head>> for FileFacts<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> FileFacts<'head> {
-        FileFacts { homes: TypeHomes::from(parsed), shipped: parsed.file().shipped().map(|_| ()) }
+        FileFacts { homes: TypeHomes::from(parsed), shipped: <&SourceFile>::from(parsed).shipped().map(|_| ()) }
     }
 }
 

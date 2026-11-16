@@ -1,4 +1,3 @@
-use lint_core::Sourced;
 use std::mem;
 use std::panic;
 use std::sync::{Mutex, OnceLock, PoisonError};
@@ -170,8 +169,8 @@ impl<'run> Gathering<'run> {
     }
 }
 
-impl<'read> Sourced<'read> for Claimed<'read> {
-    fn file(self) -> &'read SourceFile {
-        self.file
+impl<'read> From<Claimed<'read>> for &'read SourceFile {
+    fn from(claimed: Claimed<'read>) -> &'read SourceFile {
+        claimed.file
     }
 }

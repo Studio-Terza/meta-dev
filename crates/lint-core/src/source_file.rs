@@ -129,8 +129,8 @@ impl<'file> From<&'file SourceFile> for Parsed<'file, 'file> {
     }
 }
 
-impl<'syntax> crate::Sourced<'syntax> for Parsed<'syntax, '_> {
-    fn file(self) -> &'syntax SourceFile {
-        self.file
+impl<'syntax> From<Parsed<'syntax, '_>> for &'syntax SourceFile {
+    fn from(parsed: Parsed<'syntax, '_>) -> &'syntax SourceFile {
+        parsed.file
     }
 }

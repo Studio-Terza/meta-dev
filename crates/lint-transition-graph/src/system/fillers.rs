@@ -1,4 +1,4 @@
-use lint_core::Sourced;
+use lint_core::SourceFile;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
@@ -26,11 +26,11 @@ pub(crate) struct Fillers<'file> {
 
 impl<'file> Fillers<'file> {
     pub(crate) fn read(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Fillers<'file> {
-        let shipped = parsed.file().shipped().map(|_| parsed);
+        let shipped = <&SourceFile>::from(parsed).shipped().map(|_| parsed);
         shipped.map_or_default(|found| {
             let krate = found.head().placement().package().crate_name();
-            let erasure = Erasure::reading(found.file().tokens(), equivalence);
-            Sweep::gathered(found.file(), Scan { krate, erasure, fillers: Fillers::default() })
+            let erasure = Erasure::reading(<&SourceFile>::from(found).tokens(), equivalence);
+            Sweep::gathered(<&SourceFile>::from(found), Scan { krate, erasure, fillers: Fillers::default() })
         })
     }
 

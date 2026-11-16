@@ -1,4 +1,5 @@
 use std::mem;
+use std::path::Path;
 
 use lint_layout::Failure;
 use lint_roots::Survey;
@@ -24,7 +25,7 @@ pub(super) type Explored = Result<Declared, Failure>;
 
 impl Declared {
     pub(super) fn read(survey: &Survey, node: &Node<'_>, items: &[syntax::Item]) -> Declared {
-        let mut declared = Modules::declared_in(survey, node.located().file(), node.children(), items);
+        let mut declared = Modules::declared_in(survey, AsRef::<Path>::as_ref(node.located()), node.children(), items);
         let tests = declared.tests().to_vec();
         let failures = declared.take_failures();
         Declared { children: declared.take_children(survey), tests, failures }

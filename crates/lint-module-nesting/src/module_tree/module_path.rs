@@ -26,10 +26,6 @@ impl<'file> ModulePath<'file> {
         ModulePath { crate_root, segments, file }
     }
 
-    pub fn file(&self) -> &'file Path {
-        self.file
-    }
-
     pub fn parent(&self) -> Option<ModulePath<'file>> {
         let (_, parents) = self.segments.split_last()?;
         Some(self.with_segments(parents))
@@ -48,5 +44,11 @@ impl fmt::Display for ModulePath<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "crate")?;
         self.segments.iter().try_for_each(|segment| write!(formatter, "::{segment}"))
+    }
+}
+
+impl<'file> From<ModulePath<'file>> for &'file Path {
+    fn from(module: ModulePath<'file>) -> &'file Path {
+        module.file
     }
 }

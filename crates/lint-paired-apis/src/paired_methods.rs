@@ -1,4 +1,4 @@
-use lint_core::Sourced;
+use lint_core::SourceFile;
 use std::collections::BTreeMap;
 
 use syntax::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
@@ -22,7 +22,9 @@ pub struct PairedMethods<'file> {
 impl<'file> PairedMethods<'file> {
     pub fn of_file(parsed: Parsed<'_, 'file>) -> PairedMethods<'file> {
         let head = parsed.head();
-        let kinds = parsed.file().shipped().map_or(&[][..], |_| &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemTrait][..]);
+        let kinds = <&SourceFile>::from(parsed)
+            .shipped()
+            .map_or(&[][..], |_| &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemTrait][..]);
         PairedMethods { head, module: Module::of_head(head), found: BTreeMap::new(), kinds }
     }
 

@@ -1,5 +1,5 @@
 use super::gathering::Gathering;
-use lint_core::Sourced;
+use lint_core::SourceFile;
 use lint_core::{Parsed, Unwalked};
 use lint_enum_predicates::EnumPredicates;
 use lint_file::{ContextLint, FileFacts, Gleaning, PrimedFacts};
@@ -93,7 +93,7 @@ macro_rules! contexts {
                 $(watching.extend(gatherings.$primed.watching());)*
                 $(watching.extend(recordings.$primed.watching());)*
                 $(watching.extend(gatherings.$gleaned.watching());)*
-                Sweep::once(unwalked, parsed.file(), watching);
+                Sweep::once(unwalked, <&SourceFile>::from(parsed), watching);
                 Contributed {
                     $($field: <$lint as ContextLint>::completed(gatherings.$field.gathered(), &facts),)*
                     $($primed: <$prime as PrimedFacts>::primer_completed(gatherings.$primed.gathered(), &facts),)*

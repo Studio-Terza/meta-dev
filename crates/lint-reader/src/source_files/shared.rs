@@ -1,3 +1,4 @@
+use std::path::Path;
 mod assembly;
 mod boundary;
 mod declared;
@@ -116,7 +117,8 @@ impl<'tree, Port: Files> Explorer<'_, 'tree, Port> {
 
     fn kept(mut self, queued: &Queued<'tree>, file: SourceFile) -> Self {
         let node = queued.node();
-        let candidates = Modules::candidates(node.located().file(), node.children(), &file.syntax().items);
+        let candidates =
+            Modules::candidates(AsRef::<Path>::as_ref(node.located()), node.children(), &file.syntax().items);
         let mut state = self.shared.locked();
         let declared = Declared::read(state.learned(self.files, &candidates), node, &file.syntax().items);
         state.settled(queued, Ok(declared), self.share);

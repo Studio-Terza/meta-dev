@@ -1,4 +1,3 @@
-use lint_core::Sourced;
 use std::any::TypeId;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
@@ -532,7 +531,7 @@ pub(crate) struct Filer<'file> {
 
 impl<'file> Filer<'file> {
     pub(crate) fn started(claimed: Claimed<'file>) -> Filer<'file> {
-        let file = claimed.file();
+        let file = <&SourceFile>::from(claimed);
         let admitted: Vec<Admitted> = Lints::LINTS
             .iter()
             .enumerate()
@@ -584,7 +583,7 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
 
     fn gathered(self) -> FileWork<'file> {
         let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
-        let file = claimed.file();
+        let file = <&SourceFile>::from(claimed);
         let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found()]));
         let watched = listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, watcher.sorted())));
         let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));

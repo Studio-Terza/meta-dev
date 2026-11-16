@@ -1,4 +1,4 @@
-use lint_core::Sourced;
+use lint_core::SourceFile;
 mod members;
 mod modules;
 mod type_key;
@@ -40,7 +40,7 @@ impl<'file> Guards<'file> {
 
     pub fn scanning(parsed: Parsed<'_, 'file>) -> Guards<'file> {
         let head = parsed.head();
-        let kinds = parsed.file().shipped().map_or(&[][..], |_| Self::KINDS);
+        let kinds = <&SourceFile>::from(parsed).shipped().map_or(&[][..], |_| Self::KINDS);
         Guards {
             path: head.path(),
             module: Module::of_head(head),

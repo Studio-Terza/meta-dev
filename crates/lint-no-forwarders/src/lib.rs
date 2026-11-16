@@ -1,4 +1,3 @@
-use lint_core::Sourced;
 mod forwarders;
 mod workspace_types;
 
@@ -22,7 +21,7 @@ impl ContextLint for NoForwarders {
     type Gathering<'head> = TypeGathering;
 
     fn gathering(parsed: Parsed<'_, '_>) -> TypeGathering {
-        TypeGathering::from(parsed.file())
+        TypeGathering::from(<&SourceFile>::from(parsed))
     }
 }
 

@@ -1,4 +1,3 @@
-use lint_core::Sourced;
 mod export;
 mod finding;
 mod foreign_references;
@@ -50,7 +49,7 @@ impl ContextLint for PublicSurface {
     type Gathering<'head> = ReferenceGathering;
 
     fn gathering(parsed: Parsed<'_, '_>) -> ReferenceGathering {
-        ReferenceGathering(Reading::from(parsed.file()))
+        ReferenceGathering(Reading::from(<&SourceFile>::from(parsed)))
     }
 }
 

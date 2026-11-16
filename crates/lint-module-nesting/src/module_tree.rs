@@ -1,4 +1,4 @@
-use lint_core::Sourced;
+use lint_core::SourceFile;
 mod finding;
 mod module_path;
 mod reexport_count;
@@ -64,7 +64,7 @@ pub struct ModuleGathering<'head> {
 impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> ModuleGathering<'head> {
         let head = parsed.head();
-        let file = parsed.file();
+        let file = <&SourceFile>::from(parsed);
         let module = file.shipped().map(|_| {
             let tests = file.test_modules().iter().map(|test| TestUses {
                 segments: test.head().placement().module().segments().to_vec(),
@@ -154,14 +154,15 @@ impl<'file> ModuleTree<'file> {
             .filter(|(module, _)| module.parent().is_some())
             .filter_map(move |(module, count)| count.beyond(most).map(|crowded| (module, crowded)))
             .map(move |(module, count)| {
-                Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
+                Violation::new(Site::of_file(<&Path>::from(*module)), Finding::CrowdedReexports { count, most })
             });
         self.modules
             .modules()
             .iter()
             .filter_map(|module| {
-                self.home_of(module)
-                    .map(|home| Violation::new(Site::of_file(module.file()), Finding::UsedFromOneSibling { home }))
+                self.home_of(module).map(|home| {
+                    Violation::new(Site::of_file(<&Path>::from(*module)), Finding::UsedFromOneSibling { home })
+                })
             })
             .chain(deep_uses)
             .chain(crowded)
@@ -181,7 +182,7 @@ impl<'file> ModuleTree<'file> {
         self.users.record(used, module);
         let crossed = target.as_ref().and_then(|found| found.crossed_directory(&module, &self.modules));
         self.deep_uses.extend(crossed.map(|crossing| {
-            Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: crossing })
+            Violation::new(Site::of_file(<&Path>::from(module)), Finding::ReachesPastModRs { target: crossing })
         }));
     }
 

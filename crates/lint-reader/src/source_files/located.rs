@@ -43,11 +43,6 @@ impl<'tree> Located<'tree> {
     }
 
     #[must_use]
-    pub fn file(&self) -> &Path {
-        &self.file
-    }
-
-    #[must_use]
     pub fn node(self, children: &Path) -> Node<'tree> {
         Node { located: self, children: children.to_path_buf() }
     }
@@ -85,5 +80,11 @@ impl<'tree> Node<'tree> {
     #[must_use]
     pub fn child(&self, file: &Path, children: &Path) -> Node<'tree> {
         Located::new(self.located.tree, &self.located.package, file).node(children)
+    }
+}
+
+impl AsRef<Path> for Located<'_> {
+    fn as_ref(&self) -> &Path {
+        &self.file
     }
 }

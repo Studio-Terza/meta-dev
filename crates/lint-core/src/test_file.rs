@@ -19,8 +19,8 @@ impl<'file> TestFile<'file> {
     }
 }
 
-impl<'file> crate::Sourced<'file> for TestFile<'file> {
-    fn file(self) -> &'file SourceFile {
-        self.0
+impl<'file> From<TestFile<'file>> for &'file SourceFile {
+    fn from(test: TestFile<'file>) -> &'file SourceFile {
+        test.0
     }
 }

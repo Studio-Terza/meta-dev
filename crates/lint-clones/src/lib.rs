@@ -1,4 +1,3 @@
-use lint_core::Sourced;
 mod clone_sites;
 
 use clone_sites::CloneSites;
@@ -43,7 +42,7 @@ impl Gleaning for Clones {
     type Gleaner<'run, 'head: 'run> = CloneSites<'head>;
 
     fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> CloneSites<'head> {
-        let core = parsed.file().shipped().filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
+        let core = <&SourceFile>::from(parsed).shipped().filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
         CloneSites::new(parsed.head().path(), core.map(|_| ()))
     }
 }

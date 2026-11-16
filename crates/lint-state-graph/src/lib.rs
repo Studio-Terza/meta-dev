@@ -1,4 +1,3 @@
-use lint_core::Sourced;
 mod declarations;
 mod declared_graphs;
 mod edge;
@@ -53,10 +52,10 @@ impl PrimedFacts for StateGraph {
 
     fn recording<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> StateRecording<'run, 'head> {
         let path = parsed.head().path();
-        let watchers = parsed.file().shipped().map(|_| StateWatchers {
+        let watchers = <&SourceFile>::from(parsed).shipped().map(|_| StateWatchers {
             edges: EdgeScan::from(path),
             fields: FieldVisibility::new(path),
-            graphs: DeclaredGraphs::new(parsed.file(), path),
+            graphs: DeclaredGraphs::new(<&SourceFile>::from(parsed), path),
         });
         StateRecording { watchers }
     }
