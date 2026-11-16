@@ -147,7 +147,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 56] = [
+    const LINTS: [Entry; 57] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -205,10 +205,10 @@ impl Lints {
             let extraction = Extraction::default();
             let transitions = Transitions::from(model);
             let system = TypeSystem::built_from(&extraction, &transitions);
-            [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
-                .into_iter()
-                .flatten()
-                .collect()
+            [OneEdge::dirty(&system), DistinctSignatures::dirty(&system)].into_iter().flatten().collect()
+        })),
+        Entry::spelled::<Clustered<AcyclicQuotients>>(Work::Extracted(|model| {
+            <Clustered<AcyclicQuotients> as ModelLint>::report(model).dirty().into_iter().collect()
         })),
         <Judged<UnconsumedTraits> as Registered>::ENTRY,
         Entry::spelled::<RustOnly>(Work::Checked(|readout| vec![RustOnly::report(readout.repo_files())])),
