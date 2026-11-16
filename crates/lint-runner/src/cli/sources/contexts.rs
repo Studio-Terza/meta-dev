@@ -2,7 +2,7 @@ use super::gathering::Gathering;
 use lint_core::SourceFile;
 use lint_core::{Parsed, Unwalked};
 use lint_enum_predicates::EnumPredicates;
-use lint_file::{ContextLint, FileFacts, Gleaning, PrimedFacts};
+use lint_file::{ContextLint, Gleaning, PrimedFacts};
 use lint_guard_must_use::GuardMustUse;
 use lint_module_nesting::ModuleNesting;
 use lint_named_numbers::NamedNumbers;
@@ -85,18 +85,16 @@ macro_rules! contexts {
                     $($gleaned: <$glean as Gleaning>::gleaner(parsed),)*
                 };
                 let mut recordings = Recordings { $($primed: <$prime as PrimedFacts>::recording(parsed),)* };
-                let mut facts = FileFacts::from(parsed);
                 let mut watching: Vec<&mut Watching<'_>> =
                     joining.into_iter().map(|joined| -> &mut Watching<'_> { joined }).collect();
-                watching.extend(facts.watching());
                 $(watching.extend(gatherings.$field.watching());)*
                 $(watching.extend(gatherings.$primed.watching());)*
                 $(watching.extend(recordings.$primed.watching());)*
                 $(watching.extend(gatherings.$gleaned.watching());)*
                 Sweep::once(unwalked, <&SourceFile>::from(parsed), watching);
                 Contributed {
-                    $($field: <$lint as ContextLint>::completed(gatherings.$field.gathered(), &facts),)*
-                    $($primed: <$prime as PrimedFacts>::primer_completed(gatherings.$primed.gathered(), &facts),)*
+                    $($field: gatherings.$field.gathered(),)*
+                    $($primed: gatherings.$primed.gathered(),)*
                     $($gleaned: gatherings.$gleaned.gathered(),)*
                     recorded: Recorded { $($primed: recordings.$primed.gathered(),)* },
                 }

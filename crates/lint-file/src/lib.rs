@@ -1,5 +1,4 @@
 mod concluded;
-mod file_facts;
 mod lead;
 mod model_lint;
 mod workspace_lint;
@@ -11,7 +10,6 @@ use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
 use lint_sweep::{Finds, Gathers, Member, Sweep, Watching};
 
 pub use concluded::{Concluded, Listed};
-pub use file_facts::FileFacts;
 pub use lead::{Lead, Leader, SortStart, Start};
 pub use model_lint::ModelLint;
 pub use workspace_lint::WorkspaceLint;
@@ -64,10 +62,6 @@ pub trait ContextLint {
     type Gathering<'head>: Gathers<Self::Part<'head>>;
 
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Self::Gathering<'head>;
-
-    fn completed<'head>(part: Self::Part<'head>, _: &FileFacts<'head>) -> Self::Part<'head> {
-        part
-    }
 }
 
 pub trait WatchingLint: ContextLint {
@@ -138,7 +132,7 @@ impl<Checked: RuledLint> Lint for Ruled<Checked> {
             .iter()
             .map(|file| {
                 let parsed = Parsed::from(file);
-                FileFacts::completed(file, parsed, Checked::gathering(parsed), Checked::completed)
+                Sweep::gathered(file, Checked::gathering(parsed))
             })
             .collect();
         let read = files.iter().filter_map(|file| Checked::READS.admits(file));
@@ -153,10 +147,9 @@ impl<Checked: WatchingLint> Lint for Judged<Checked> {
             .map(|file| {
                 let parsed = Parsed::from(file);
                 let watched = Checked::READS.admits(file).map(Checked::watched);
-                let walking =
-                    Walking { gathering: Checked::gathering(parsed), facts: FileFacts::from(parsed), watched };
+                let walking = Walking { gathering: Checked::gathering(parsed), watched };
                 let walked = Sweep::gathered(file, walking);
-                Done { part: Checked::completed(walked.part, &walked.facts), found: walked.found }
+                Done { part: walked.part, found: walked.found }
             })
             .collect();
         let (parts, found): (Vec<Checked::Part<'_>>, Vec<Option<Checked::Found<'_>>>) =
@@ -176,29 +169,27 @@ struct Done<Part, Found> {
 }
 
 #[derive(Debug)]
-struct Walked<'head, Part, Found> {
+struct Walked<Part, Found> {
     part: Part,
-    facts: FileFacts<'head>,
     found: Option<Found>,
 }
 
 #[derive(Debug)]
-struct Walking<'head, Gathering, Watched> {
+struct Walking<Gathering, Watched> {
     gathering: Gathering,
-    facts: FileFacts<'head>,
     watched: Option<Watched>,
 }
 
-impl<'head, Part, Found, Gathering: Gathers<Part>, Watched: Gathers<Found>> Gathers<Walked<'head, Part, Found>>
-    for Walking<'head, Gathering, Watched>
+impl<Part, Found, Gathering: Gathers<Part>, Watched: Gathers<Found>> Gathers<Walked<Part, Found>>
+    for Walking<Gathering, Watched>
 {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let watched = self.watched.as_mut().map(Gathers::watching).into_iter().flatten();
-        self.gathering.watching().into_iter().chain(self.facts.watching()).chain(watched)
+        self.gathering.watching().into_iter().chain(watched)
     }
 
-    fn gathered(self) -> Walked<'head, Part, Found> {
-        Walked { part: self.gathering.gathered(), facts: self.facts, found: self.watched.map(Gathers::gathered) }
+    fn gathered(self) -> Walked<Part, Found> {
+        Walked { part: self.gathering.gathered(), found: self.watched.map(Gathers::gathered) }
     }
 }
 
@@ -213,10 +204,6 @@ pub trait PrimedFacts {
     type Recording<'run, 'head: 'run>: Gathers<Self::Raw<'head>>;
 
     fn priming<'head>(parsed: Parsed<'_, 'head>) -> Self::Priming<'head>;
-
-    fn primer_completed<'head>(part: Self::PrimerPart<'head>, _: &FileFacts<'head>) -> Self::PrimerPart<'head> {
-        part
-    }
 
     fn recording<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Self::Recording<'run, 'head>;
 
@@ -261,10 +248,7 @@ impl<'file, Checked: PrimedLint> PrimedWalk<'file, Checked> {
     fn walked(file: &'file SourceFile) -> PrimedWalk<'file, Checked> {
         let parsed = Parsed::from(file);
         let gathering = Two { first: Checked::priming(parsed), second: Checked::recording(parsed) };
-        let walked = FileFacts::completed(file, parsed, gathering, |Two { first, second }, facts| Two {
-            first: Checked::primer_completed(first, facts),
-            second,
-        });
+        let walked = Sweep::gathered(file, gathering);
         PrimedWalk { primer: Some(walked.first), raw: Some(walked.second) }
     }
 }
