@@ -1,5 +1,6 @@
-use body_shape::{Bounds, Reading, Shape, Shaper};
+use body_shape::{Bounds, Erasure, Literals, Reading, Shape};
 use equivalence::{Equivalence, Erased};
+use syntax::Item;
 
 struct Shapes;
 
@@ -9,47 +10,60 @@ impl Shapes {
     const SPELLED: Equivalence = Equivalence::erasing(&[Erased::Locals]);
     const PREFIX: usize = 6;
 
-    fn of(text: &str) -> Shape {
-        Self::read(text, Self::BODIES).shape()
+    fn of(text: &str) -> Option<Shape> {
+        Self::read(text, Self::BODIES).map(|reading| reading.shape())
     }
 
-    fn read(text: &str, equivalence: Equivalence) -> Reading {
-        Reading::erasing(text.parse::<syntax::TokenStream>().unwrap_or_default(), equivalence)
+    fn read(text: &str, equivalence: Equivalence) -> Option<Reading> {
+        let mut lexed = syntax::Lexed::parsed(&format!("fn f() {text}")).ok()?;
+        let table = lexed.tokens_taken();
+        let bounds = lexed.into_file().items.iter().find_map(Self::body)?;
+        Some(Erasure::reading(&table, equivalence).read(bounds))
+    }
+
+    fn body(item: &Item) -> Option<Bounds> {
+        match item {
+            Item::Fn(function) => Some(Bounds::from(function.block.as_ref())),
+            _ => None,
+        }
     }
 
     fn alike_with_names_erased(pair: &[&str]) -> bool {
         pair.first().zip(pair.last()).filter(|_| pair.len() == 2).is_some_and(|(left, right)| {
-            Self::read(left, Self::NAMES).shape() == Self::read(right, Self::NAMES).shape()
+            Self::read(left, Self::NAMES)
+                .zip(Self::read(right, Self::NAMES))
+                .is_some_and(|(ours, theirs)| ours.shape() == theirs.shape())
         })
     }
 
     fn alike_with_literals_kept(pair: &[&str]) -> bool {
         pair.first().zip(pair.last()).filter(|_| pair.len() == 2).is_some_and(|(left, right)| {
-            Self::read(left, Self::SPELLED).shape() == Self::read(right, Self::SPELLED).shape()
+            Self::read(left, Self::SPELLED)
+                .zip(Self::read(right, Self::SPELLED))
+                .is_some_and(|(ours, theirs)| ours.shape() == theirs.shape())
         })
     }
 
     fn literals(text: &&str) -> String {
-        let literals = Self::read(text, Self::BODIES).into_literals();
+        let literals = Self::read(text, Self::BODIES).map_or_else(Literals::default, Reading::into_literals);
         literals.as_ref().iter().map(ToString::to_string).collect::<Vec<String>>().join(" ")
     }
 
     fn alike(pair: &[&str]) -> bool {
-        pair.first()
-            .zip(pair.last())
-            .filter(|_| pair.len() == 2)
-            .is_some_and(|(left, right)| Self::of(left) == Self::of(right))
+        pair.first().zip(pair.last()).filter(|_| pair.len() == 2).is_some_and(|(left, right)| {
+            Self::of(left).zip(Self::of(right)).is_some_and(|(ours, theirs)| ours == theirs)
+        })
     }
 
     fn size(text: &&str) -> String {
-        Self::of(text).size().to_string()
+        Self::of(text).map_or_else(String::new, |shape| shape.size().to_string())
     }
 
     fn prefix(text: &str) -> Option<Reading> {
         let table = syntax::Lexed::parsed(text).ok()?.tokens_taken();
         let lexemes = table.lexemes();
         let bounds = Bounds::new(lexemes.first()?.place(), lexemes.get(Self::PREFIX)?.place());
-        Some(Shaper::reading(&table, Self::BODIES).read(bounds))
+        Some(Erasure::reading(&table, Self::BODIES).read(bounds))
     }
 
     fn prefix_size(text: &&str) -> String {

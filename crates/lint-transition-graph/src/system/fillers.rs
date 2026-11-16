@@ -1,13 +1,12 @@
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
-use body_shape::{Reading, Shape};
+use body_shape::{Bounds, Erasure, Labels};
 use equivalence::Equivalence;
 use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
-use syntax::ToTokens;
 use syntax::{ItemImpl, ItemMod};
 
 use crate::end::Node;
@@ -21,7 +20,7 @@ struct Filled<'file> {
 
 #[derive(Debug, Default)]
 pub(crate) struct Fillers<'file> {
-    bodies: BTreeMap<Filled<'file>, BTreeMap<Name, Shape>>,
+    bodies: BTreeMap<Filled<'file>, BTreeMap<Name, Labels>>,
 }
 
 impl<'file> Fillers<'file> {
@@ -29,7 +28,8 @@ impl<'file> Fillers<'file> {
         let shipped = parsed.file().shipped().map(|_| parsed);
         shipped.map_or_default(|found| {
             let krate = found.head().placement().package().crate_name();
-            Sweep::gathered(found.file(), Scan { krate, equivalence, fillers: Fillers::default() })
+            let erasure = Erasure::reading(found.file().tokens(), equivalence);
+            Sweep::gathered(found.file(), Scan { krate, erasure, fillers: Fillers::default() })
         })
     }
 
@@ -41,7 +41,7 @@ impl<'file> Fillers<'file> {
             .map_or(Some(other), |_| None)
     }
 
-    fn filled(&self, node: &Node<'_>) -> BTreeMap<&Name, &BTreeMap<Name, Shape>> {
+    fn filled(&self, node: &Node<'_>) -> BTreeMap<&Name, &BTreeMap<Name, Labels>> {
         self.bodies
             .iter()
             .filter(|(filled, _)| Borrow::<Name>::borrow(filled.krate) == node.krate())
@@ -52,13 +52,13 @@ impl<'file> Fillers<'file> {
 }
 
 #[derive(Debug)]
-struct Scan<'file> {
+struct Scan<'syntax, 'file> {
     krate: &'file CrateName,
-    equivalence: Equivalence,
+    erasure: Erasure<'syntax>,
     fillers: Fillers<'file>,
 }
 
-impl<'file> Gathers<Fillers<'file>> for Scan<'file> {
+impl<'file> Gathers<Fillers<'file>> for Scan<'_, 'file> {
     fn watching(&mut self) -> Vec<&mut Watching<'_>> {
         Sweep::alone(self)
     }
@@ -68,7 +68,7 @@ impl<'file> Gathers<Fillers<'file>> for Scan<'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for Scan<'_> {
+impl<'ast> Watch<'ast> for Scan<'_, '_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
@@ -90,10 +90,7 @@ impl<'ast> Watch<'ast> for Scan<'_> {
             .iter()
             .filter_map(Syntax::impl_fn)
             .map(|method| {
-                (
-                    Name::from(&method.sig.ident),
-                    Reading::erasing(method.block.to_token_stream(), self.equivalence).shape(),
-                )
+                (Name::from(&method.sig.ident), self.erasure.read(Bounds::from(&method.block)).labels().clone())
             })
             .collect();
         self.fillers.bodies.extend(filled.filter(|_| facts.gate() == Walk::Entered).map(|kept| (kept, methods)));

@@ -56,7 +56,7 @@ impl<'file> Scan<'file> {
         let bounds = Bounds::from(extent);
         let large = Self::FLOOR.allows(self.shaper.sized(bounds)).map(|_| Self::FLOOR);
         let site = Site::new(self.path, LineNumber::from(edges.first));
-        let occurrence = large.map(|_| Occurrence::new(self.shaper.read(bounds), site, extent, self.kind));
+        let occurrence = large.map(|_| Occurrence::new(self.shaper.erasure().read(bounds), site, extent, self.kind));
         self.occurrences.extend(occurrence);
         large
     }

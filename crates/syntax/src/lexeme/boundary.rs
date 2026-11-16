@@ -57,6 +57,14 @@ impl LexemeKind {
         }
     }
 
+    #[must_use]
+    pub fn named(self) -> Option<Named> {
+        match self {
+            LexemeKind::Word(named) => Some(named),
+            LexemeKind::Literal(_) | LexemeKind::Mark(_) => None,
+        }
+    }
+
     pub fn read<Reader: Lexemes>(self, reader: &Reader) -> Reader::Read {
         match self {
             LexemeKind::Word(named) => reader.word(named),
