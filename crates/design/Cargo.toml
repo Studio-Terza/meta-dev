@@ -35,6 +35,7 @@ thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
+dispatch-fakes = { path = "../dispatch-fakes" }
 e2e = { path = "../../e2e" }
 golden = { path = "../golden" }
 laws = { path = "../laws" }

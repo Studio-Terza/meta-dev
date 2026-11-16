@@ -1,4 +1,4 @@
-use crate::Pid;
+use dispatch_ports::Pid;
 
 #[derive(Debug)]
 pub(super) struct Spawns;

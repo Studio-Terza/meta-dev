@@ -14,9 +14,10 @@ use design::{
 use design_model::{Entered, Entry, Facet, JobId, Node, NodeId, Ordinal, Prefix, Provenance, RunId};
 use design_runs::{JobOpened, Ran, RunSpawned, RunState, RunsOf, Spawned, Unstructured};
 use design_store::Planting;
+use dispatch_fakes::{Scripted, Stepped};
 use dispatch_ports::{
     Agent, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Fault, Finished, HeadlessClaude, Output, Pause, Pid,
-    Reply, Scripted, Stall, Started, Stepped, SystemClock, Tokens, Usage, Wall, dispatch_ops,
+    Reply, Stall, Started, SystemClock, Tokens, Usage, Wall, dispatch_ops,
 };
 use file_ports::{Bytes, Files};
 use newtype::Wrapping;

@@ -255,6 +255,7 @@ dependencies = [
  "design-model",
  "design-runs",
  "design-store",
+ "dispatch-fakes",
  "dispatch-ports",
  "e2e",
  "file-ports",
@@ -437,6 +438,14 @@ dependencies = [
  "block-buffer 0.12.1",
  "crypto-common 0.2.2",
  "ctutils",
+]
+
+[[package]]
+name = "dispatch-fakes"
+version = "0.1.0"
+dependencies = [
+ "dispatch-ports",
+ "port-core",
 ]
 
 [[package]]

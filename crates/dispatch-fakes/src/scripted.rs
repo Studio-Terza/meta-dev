@@ -5,11 +5,11 @@ use std::sync::{Mutex, PoisonError};
 
 use port_core::Pass;
 
-use crate::{
+use boundary::Spawns;
+use dispatch_ports::{
     AgentRun, Bell, ClockFiller, DispatchFailure, DispatchFiller, Ended, Job, Output, Pause, Pid, Prompt, Started,
     Wall, clock_ops, dispatch_ops,
 };
-use boundary::Spawns;
 
 #[derive(Clone, Debug)]
 struct Living {
