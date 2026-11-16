@@ -13,7 +13,7 @@ pub(super) struct Endpoints<'scope, 'look, 'file> {
     scope: &'scope Scope<'look, 'file>,
 }
 
-impl<'scope, 'look, 'file> Endpoints<'scope, 'look, 'file> {
+impl Endpoints<'_, '_, '_> {
     const WRAPPERS: [Word<'static>; 14] = words![
         "Option", "Result", "Vec", "Box", "Rc", "Arc", "Cow", "VecDeque", "BTreeSet", "HashSet", "RefCell", "Cell",
         "Mutex", "Reverse"

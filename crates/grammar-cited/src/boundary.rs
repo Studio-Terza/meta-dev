@@ -40,10 +40,11 @@ impl FromStr for Cited {
     fn from_str(cited: &str) -> Result<Cited, Uncited> {
         let spelled: Vec<Spelling<'_>> = Spelling::lexer(cited).collect::<Result<_, ()>>().unwrap_or_default();
         let unshaped = || Uncited::Unshaped(cited.to_owned());
-        let [prefix, dot, digits] = <[Spelling<'_>; 3]>::try_from(spelled).map_err(|_| unshaped())?;
+        let [prefix, dot, digits] = <[Spelling<'_>; 3]>::try_from(spelled).map_err(|_miscounted| unshaped())?;
         Some(dot).filter(|spelling| *spelling == Spelling::Dot).ok_or_else(unshaped)?;
         let word = prefix.word().ok_or_else(unshaped)?;
-        let ordinal = digits.word().ok_or_else(unshaped)?.parse().map_err(|_| Uncited::Unnumbered(cited.to_owned()))?;
+        let ordinal =
+            digits.word().ok_or_else(unshaped)?.parse().map_err(|_unparsed| Uncited::Unnumbered(cited.to_owned()))?;
         Ok(Cited { prefix: word.to_owned(), ordinal })
     }
 }

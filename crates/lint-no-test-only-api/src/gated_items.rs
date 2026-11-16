@@ -16,8 +16,6 @@ pub(crate) struct GatedItems<'file> {
     found: Vec<Flagged>,
 }
 
-impl<'file> GatedItems<'file> {}
-
 impl<'ast> Watch<'ast> for GatedItems<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Item, Kind::ItemMod, Kind::ItemImpl, Kind::Field]

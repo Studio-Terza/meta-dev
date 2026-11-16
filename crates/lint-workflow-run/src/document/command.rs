@@ -21,7 +21,7 @@ impl<'text> From<Text<'text>> for Command<'text> {
     }
 }
 
-impl<'text> Command<'text> {
+impl Command<'_> {
     const LIMIT: Characters = Characters::new(120);
     const SEPARATORS: [Word; 5] = [Word::new("|"), Word::new("&"), Word::new(";"), Word::new(">"), Word::new("<")];
     const SUBSTITUTIONS: [Word; 2] = [Word::new("`"), Word::new("$(")];

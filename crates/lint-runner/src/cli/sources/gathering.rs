@@ -55,7 +55,7 @@ pub(crate) struct Claimed<'read> {
     file: &'read SourceFile,
 }
 
-impl<'read> Claimed<'read> {
+impl Claimed<'_> {
     pub(crate) fn order(self) -> FileOrder {
         self.order
     }

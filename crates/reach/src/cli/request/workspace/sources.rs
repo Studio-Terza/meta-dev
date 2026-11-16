@@ -8,7 +8,7 @@ pub struct Sources<'meta> {
     directories: BTreeSet<&'meta Path>,
 }
 
-impl<'meta> Sources<'meta> {
+impl Sources<'_> {
     const MANIFEST: &'static str = "Cargo.toml";
     const SOURCE_TREE: &'static str = "src/**";
 }

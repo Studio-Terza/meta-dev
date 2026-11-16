@@ -1,6 +1,7 @@
 mod finding;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, btree_map};
+use std::iter;
 use std::path::Path;
 
 use graph::{Function, Implementation, Model, Parameter, Placed, Reached, Repetition, Seat};
@@ -17,7 +18,7 @@ pub(crate) struct Reader<'run, 'model> {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Spot<'model> {
+pub(crate) struct Spot<'model> {
     site: Site<'model>,
     port: Port,
 }
@@ -110,11 +111,10 @@ impl<'model> FromIterator<Flagged<'model>> for Found<'model> {
 
 impl<'model> IntoIterator for Found<'model> {
     type Item = Violation<'model>;
-    type IntoIter = std::vec::IntoIter<Violation<'model>>;
+    type IntoIter =
+        iter::Map<btree_map::IntoIter<Spot<'model>, Finding>, fn((Spot<'model>, Finding)) -> Violation<'model>>;
 
-    fn into_iter(self) -> std::vec::IntoIter<Violation<'model>> {
-        let violations: Vec<Violation<'model>> =
-            self.0.into_iter().map(|(spot, finding)| Violation::new(spot.site, finding)).collect();
-        violations.into_iter()
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter().map(|(spot, finding)| Violation::new(spot.site, finding))
     }
 }

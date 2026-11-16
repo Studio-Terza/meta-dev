@@ -57,7 +57,7 @@ impl<'text> TryFrom<&'text str> for Stamp<'text> {
         let pieces: Vec<Piece<'text>> =
             Piece::lexer(text).collect::<Result<Vec<Piece<'text>>, ()>>().map_err(|()| unshaped())?;
         let [weekday, month, day, hour, before, minute, after, second, year] =
-            <[Piece<'text>; 9]>::try_from(pieces).map_err(|_| unshaped())?;
+            <[Piece<'text>; 9]>::try_from(pieces).map_err(|_miscounted| unshaped())?;
         before.colon().zip(after.colon()).ok_or_else(unshaped)?;
         let misplaced = || Unstamped::Misplaced(text.to_owned());
         Ok(Stamp {

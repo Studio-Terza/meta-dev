@@ -13,7 +13,7 @@ pub(super) struct Peeling<'scope, 'look, 'file> {
     scope: &'scope Scope<'look, 'file>,
 }
 
-impl<'scope, 'look, 'file> Peeling<'scope, 'look, 'file> {
+impl Peeling<'_, '_, '_> {
     const TRANSPARENT: [Word<'static>; 8] = words!["Box", "Rc", "Arc", "Cow", "RefCell", "Cell", "Mutex", "Reverse"];
     const COLLECTIONS: [Word<'static>; 4] = words!["Vec", "VecDeque", "BTreeSet", "HashSet"];
     const OPTION: [Word<'static>; 1] = words!["Option"];

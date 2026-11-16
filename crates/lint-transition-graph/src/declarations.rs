@@ -42,7 +42,7 @@ impl<'file> Declarations<'file> {
         sites: impl Iterator<Item = Site<'site>>,
         checked: Checked,
     ) -> Vec<Violation<'file>> {
-        let paths: BTreeSet<&Path> = sites.map(|site| <&Path>::from(site)).collect();
+        let paths: BTreeSet<&Path> = sites.map(<&Path>::from).collect();
         let listed: Vec<&Path> = paths.into_iter().collect();
         self.laws
             .of_crates(&listed)

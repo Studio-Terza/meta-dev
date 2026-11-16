@@ -16,7 +16,7 @@ pub struct FieldVisibility<'scan> {
     violations: Vec<Violation<'scan>>,
 }
 
-impl<'scan> FieldVisibility<'scan> {
+impl FieldVisibility<'_> {
     fn exposed(&mut self, item: &ItemStruct) -> Descend {
         let exposed = item
             .fields

@@ -33,7 +33,7 @@ struct Generator<'scope> {
     scope: &'scope InScope,
 }
 
-impl<'scope> Reading<'scope> {
+impl Reading<'_> {
     const GENERATOR: usize = 1;
     const CHECKED_FROM: usize = 2;
 

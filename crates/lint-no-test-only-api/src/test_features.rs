@@ -24,7 +24,7 @@ pub(crate) struct TestFeatures<'file> {
     found: Vec<Flagged>,
 }
 
-impl<'file> TestFeatures<'file> {
+impl TestFeatures<'_> {
     const CONDITIONS: [&str; 2] = ["cfg", "cfg_attr"];
     const FEATURE: &str = "feature";
     const VALUE_INDEX: usize = 2;

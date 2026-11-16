@@ -158,7 +158,7 @@ impl fmt::Display for Shaped<'_> {
             .collect();
         let spelled = signature.output().written().map(TypeRef::brief);
         let output = self.returns_itself().map_or(spelled, |()| Some(Name::from("Self")));
-        let returned = output.map(|name| format!(" -> {name}")).unwrap_or_default();
+        let returned = output.map_or_default(|name| format!(" -> {name}"));
         write!(formatter, "fn {}({}){returned}", self.key.name, inputs.join(", "))
     }
 }
