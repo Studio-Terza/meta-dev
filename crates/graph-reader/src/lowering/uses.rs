@@ -69,9 +69,10 @@ impl Built for UseRow {
             .zip(self.written.tail().last());
         let aliased = head.as_ref().and_then(|(parent, last)| building.aliased(parent)?.joined(last));
         let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);
-        let member = head
-            .as_ref()
-            .and_then(|(parent, last)| Some(Resolved::Member(Member::new(parent.crate_item()?, (*last).clone()))));
+        let member = head.as_ref().and_then(|(parent, last)| {
+            let owner = building.aliased(parent).and_then(Resolved::crate_item).or_else(|| parent.crate_item())?;
+            Some(Resolved::Member(Member::new(owner, (*last).clone())))
+        });
         let valued = || {
             direct.unresolved().and(Some(self.domain())).filter(|domain| *domain == Domain::Types)?;
             Some(resolving.path(scope, &self.written, Domain::Values)).filter(|resolved| resolved.known().is_some())

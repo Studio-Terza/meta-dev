@@ -32,7 +32,7 @@ impl<'found> Krate<'found> {
     pub fn name(self) -> Option<&'found Name> {
         match self {
             Krate::Named(name) => Some(name),
-            Krate::Rooted(root) => root.package(),
+            Krate::Rooted(_) => None,
         }
     }
 }
@@ -95,8 +95,15 @@ impl fmt::Display for Krate<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Krate::Named(name) => write!(formatter, "{name}"),
-            Krate::Rooted(root) => write!(formatter, "{}", root.directory().display()),
+            Krate::Rooted(_) => write!(formatter, "crate"),
         }
+    }
+}
+
+impl Nest<'_> {
+    fn crate_shown(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "crate")?;
+        self.krate.and_then(Krate::name).map_or(Ok(()), |name| write!(formatter, " {name}"))
     }
 }
 
@@ -104,7 +111,7 @@ impl fmt::Display for Nest<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.level() {
             Level::Workspace => write!(formatter, "the workspace"),
-            Level::Crate => self.krate.map_or(Ok(()), |krate| write!(formatter, "crate {krate}")),
+            Level::Crate => self.crate_shown(formatter),
             Level::Module => {
                 self.krate.map_or(Ok(()), |krate| write!(formatter, "{krate}::{}", Segments(self.segments)))
             }

@@ -357,3 +357,17 @@ fn a_name_after_a_dot_in_macro_tokens_is_a_field_or_method_not_a_path() {
     written.sort();
     assert_eq!(written, ["a::b", "c"]);
 }
+
+#[test]
+fn a_member_named_through_a_type_alias_belongs_to_the_aliased_type() {
+    let model = Read::model(
+        "pub struct InFile;\nimpl InFile {\n    pub fn new() -> InFile {\n        InFile\n    }\n}\npub type Site = InFile;\nfn f() {\n    Site::new();\n}\n",
+    );
+    let owners: Vec<String> = model
+        .uses()
+        .filter_map(|placed| placed.entity().resolved().member().map(graph::Member::owner))
+        .filter_map(|owner| model.declared(owner))
+        .map(|item| AsRef::<lint_layout::Name>::as_ref(item).to_string())
+        .collect();
+    assert_eq!(owners, ["InFile"]);
+}
