@@ -137,30 +137,6 @@ impl Primitive for Vec<u8> {
     }
 }
 
-impl Primitive for usize {
-    type Raw = i64;
-
-    fn into_raw(self) -> i64 {
-        i64::try_from(self).unwrap_or(i64::MAX)
-    }
-
-    fn from_raw(raw: i64) -> Result<usize, ColumnFailure> {
-        usize::try_from(raw).map_err(ColumnFailure::Unfit)
-    }
-}
-
-impl Primitive for u64 {
-    type Raw = i64;
-
-    fn into_raw(self) -> i64 {
-        i64::try_from(self).unwrap_or(i64::MAX)
-    }
-
-    fn from_raw(raw: i64) -> Result<u64, ColumnFailure> {
-        u64::try_from(raw).map_err(ColumnFailure::Unfit)
-    }
-}
-
 impl Primitive for u32 {
     type Raw = i64;
 

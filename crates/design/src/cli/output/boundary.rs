@@ -435,7 +435,7 @@ impl Key {
         match self {
             Key::Session => Ok(Line::Read {
                 session: fields.field::<Quoted<_>>()?,
-                cursor: Cursor::new(Offset::new(fields.past(&[Key::Read, Key::To])?.field::<Integer<_>>()?)),
+                cursor: Cursor::new(fields.past(&[Key::Read, Key::To])?.field::<Bare<Offset>>()?),
             }),
             Key::Authorship => Ok(Line::Authored {
                 author: fields.field::<Word<_>>()?,

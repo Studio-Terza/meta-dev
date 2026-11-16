@@ -23,6 +23,6 @@ impl Message {
 
     #[must_use]
     pub fn segments(&self) -> Vec<Segment> {
-        Segmenter::segments(Lexemes::scanned(self.0.text()), self.0.uuid())
+        Segmenter::segments(Lexemes::scanned(self.0.text()), self.0.uuid(), self.0.text())
     }
 }

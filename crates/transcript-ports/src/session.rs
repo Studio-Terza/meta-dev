@@ -29,6 +29,6 @@ impl Session {
 
     #[must_use]
     pub fn unread(&self, cursor: Cursor) -> Option<Cursor> {
-        (self.size.into_inner() > cursor.into_inner().into_inner()).then_some(cursor)
+        (self.size.into_inner() > cursor.into_inner().position()).then_some(cursor)
     }
 }

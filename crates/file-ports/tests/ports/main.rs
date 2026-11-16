@@ -295,22 +295,27 @@ impl Tails {
     }
 }
 
-laws::law!(read_from_agrees_between_disk_and_memory, 0u64..16, at, {
-    let scratch =
-        tempfile::tempdir().map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
-    let memory = Memory::default();
-    memory
-        .create_directories(Path::new("/scratch"))
-        .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
-    let on_disk = Tails::of(&Disk, scratch.path(), Offset::new(at));
-    let in_memory = Tails::of(&memory, Path::new("/scratch"), Offset::new(at));
-    laws::proptest::prop_assert_eq!(on_disk.ok(), in_memory.ok());
-});
+laws::law!(
+    read_from_agrees_between_disk_and_memory,
+    laws::proptest::strategy::Strategy::prop_filter_map(0i64..16, "an offset", |at| Offset::try_new(at).ok()),
+    at,
+    {
+        let scratch = tempfile::tempdir()
+            .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+        let memory = Memory::default();
+        memory
+            .create_directories(Path::new("/scratch"))
+            .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
+        let on_disk = Tails::of(&Disk, scratch.path(), at);
+        let in_memory = Tails::of(&memory, Path::new("/scratch"), at);
+        laws::proptest::prop_assert_eq!(on_disk.ok(), in_memory.ok());
+    }
+);
 
 #[test]
-fn read_from_returns_the_bytes_after_the_offset() -> Result<(), FileFailure> {
+fn read_from_returns_the_bytes_after_the_offset() -> Result<(), Box<dyn std::error::Error>> {
     let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
-    assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::new(7))?, Bytes::from("789"));
+    assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::try_new(7)?)?, Bytes::from("789"));
     Ok(())
 }

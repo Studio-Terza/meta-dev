@@ -7,7 +7,7 @@ struct Inks;
 #[derive(Debug, PartialEq, Eq)]
 struct Anchored {
     message: String,
-    ordinal: Option<usize>,
+    ordinal: Option<u32>,
 }
 
 impl Inks {

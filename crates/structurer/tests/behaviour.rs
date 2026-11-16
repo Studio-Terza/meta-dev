@@ -25,7 +25,7 @@ struct Generated;
 
 impl Generated {
     fn segment() -> impl Strategy<Value = structurer::SegmentRef> {
-        ("[0-9a-f][0-9a-f-]{7,40}", 0usize..100_000)
+        ("[0-9a-f][0-9a-f-]{7,40}", 0u32..100_000)
             .prop_map(|(prefix, ordinal)| structurer::SegmentRef::new(Prefix::new(prefix), Ordinal::new(ordinal)))
     }
 

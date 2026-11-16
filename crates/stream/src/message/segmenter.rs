@@ -1,7 +1,7 @@
 use grammar_message::{Lexeme, Mark, Span};
 
 use crate::form::Form;
-use transcript_ports::Uuid;
+use transcript_ports::{Body, Uuid};
 
 use crate::ordinal::Ordinal;
 use crate::segment::Segment;
@@ -118,18 +118,11 @@ impl Open {
 }
 
 impl Segmenter {
-    pub fn segments(lexemes: Vec<Lexeme>, message: &Uuid) -> Vec<Segment> {
-        lexemes
-            .into_iter()
-            .fold(Segmenter::default(), Segmenter::pushed)
-            .closed()
-            .done
-            .into_iter()
-            .enumerate()
-            .map(|(position, part)| {
-                Segment::new(SegmentId::new(message.clone(), Ordinal::new(position)), part.inked(), part.form)
-            })
-            .collect()
+    pub fn segments(lexemes: Vec<Lexeme>, message: &Uuid, body: &Body) -> Vec<Segment> {
+        let parts = lexemes.into_iter().fold(Segmenter::default(), Segmenter::pushed).closed().done;
+        body.numbered(parts, |place, part| {
+            Segment::new(SegmentId::new(message.clone(), Ordinal::new(place)), part.inked(), part.form)
+        })
     }
 
     fn pushed(mut self, lexeme: Lexeme) -> Segmenter {

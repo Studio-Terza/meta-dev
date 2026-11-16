@@ -51,6 +51,6 @@ impl<F: Files> TranscriptsFiller for ClaudeCodeDir<F> {
         cursor: Cursor,
     ) -> Result<Read, ReadFailure> {
         let bytes = self.files.read_from(file.file(), cursor.into_inner())?;
-        Ok(Read::complete(bytes.as_ref(), cursor))
+        Read::complete(bytes.as_ref(), cursor)
     }
 }

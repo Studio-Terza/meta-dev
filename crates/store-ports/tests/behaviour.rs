@@ -805,7 +805,7 @@ fn reopening_a_store_keeps_its_rows_and_runs_no_migration_or_rewrite_again() -> 
     first.write(Stale)?;
     let reopened = run.port(place.opened());
     let cursors = reopened.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), Cursor::new(Offset::new(7)));
+    assert_eq!(cursors.resuming(&SessionId::try_new("s".to_owned())?), Cursor::new(Offset::try_new(7)?));
     assert_eq!(reopened.read(Applied)?.len(), StreamSchema::migrator().iter().count());
     let shown = reopened.read(ShownMessage::named(Uuid::try_new("o1".to_owned())?))?.ok_or("o1 was not stored")?;
     let bodies: Vec<String> = shown.segments().iter().map(|segment| Body::from(segment).to_string()).collect();
@@ -970,7 +970,7 @@ fn a_rewrite_due_with_the_first_migration_runs_on_the_schema_its_queries_are_che
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<Early>());
     let cursors = store.read(SessionCursors)?;
-    assert_eq!(cursors.resuming(&SessionId::try_new("staged".to_owned())?), Cursor::new(Offset::new(7)));
+    assert_eq!(cursors.resuming(&SessionId::try_new("staged".to_owned())?), Cursor::new(Offset::try_new(7)?));
     Ok(())
 }
 
@@ -1019,13 +1019,7 @@ laws::roundtrip!(a_title_column_reads_back, any::<Title>(), Column::raw, Stored:
 
 laws::roundtrip!(a_prefix_column_reads_back, any::<Prefix>(), Column::raw, Stored::back::<Prefix>, Some);
 
-laws::roundtrip!(
-    an_ordinal_column_reads_back,
-    (0..=i64::MAX.cast_unsigned()).prop_filter_map("a count", |count| usize::try_from(count).ok().map(Ordinal::new)),
-    Column::raw,
-    Stored::back::<Ordinal>,
-    Some
-);
+laws::roundtrip!(an_ordinal_column_reads_back, any::<Ordinal>(), Column::raw, Stored::back::<Ordinal>, Some);
 
 laws::roundtrip!(a_uuid_column_reads_back, any::<Uuid>(), Column::raw, Stored::back::<Uuid>, Some);
 
@@ -1037,13 +1031,7 @@ laws::roundtrip!(a_body_column_reads_back, any::<Body>(), Column::raw, Stored::b
 
 laws::roundtrip!(a_bytes_column_reads_back, any::<Bytes>(), Column::raw, Stored::back::<Bytes>, Some);
 
-laws::roundtrip!(
-    an_offset_column_reads_back,
-    (0..=i64::MAX.cast_unsigned()).prop_map(Offset::new),
-    Column::raw,
-    Stored::back::<Offset>,
-    Some
-);
+laws::roundtrip!(an_offset_column_reads_back, any::<Offset>(), Column::raw, Stored::back::<Offset>, Some);
 
 laws::roundtrip!(a_term_column_reads_back, any::<Term>(), Column::raw, Stored::back::<Term>, Some);
 
@@ -1156,7 +1144,7 @@ laws::law!(an_unknown_spelling_is_refused_as_misspelled, "[a-z]{0,3}[A-Z ]{1,3}"
 
 laws::law!(a_negative_count_is_refused_as_unfit, i64::MIN..0, number, {
     prop_assert!(matches!(Ordinal::from_raw(number), Err(ColumnFailure::Unfit(_))));
-    prop_assert!(matches!(Offset::from_raw(number), Err(ColumnFailure::Unfit(_))));
+    prop_assert!(matches!(Offset::from_raw(number), Err(ColumnFailure::Refused(_))));
 });
 
 type Sqlite = <SqliteOpener as store_ports::Opens>::Store;

@@ -4,7 +4,7 @@ use newtype::{Arbitrary, Display, Newtype};
 use crate::Prefix;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Ordinal(usize);
+pub struct Ordinal(u32);
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Segment {

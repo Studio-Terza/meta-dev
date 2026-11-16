@@ -12,7 +12,7 @@ use crate::segment_id::SegmentId;
 pub struct Unanchored(String);
 
 impl Anchor {
-    fn anchored(message: Uuid, ordinal: Option<usize>) -> Anchor {
+    fn anchored(message: Uuid, ordinal: Option<u32>) -> Anchor {
         match ordinal {
             None => Anchor::Message(message),
             Some(counted) => Anchor::Segment(SegmentId::new(message, Ordinal::new(counted))),
