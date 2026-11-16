@@ -144,6 +144,7 @@ dependencies = [
  "grammar-unit-label",
  "laws",
  "mutation-report",
+ "named-derive",
  "newtype",
  "reach",
  "serde",
