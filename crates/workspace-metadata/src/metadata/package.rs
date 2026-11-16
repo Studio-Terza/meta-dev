@@ -2,7 +2,7 @@ mod declared;
 mod dependency;
 mod target;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -74,6 +74,15 @@ impl Package {
         required: &'package CrateName,
     ) -> impl Iterator<Item = &'package CrateName> + use<'package> {
         self.dependencies.iter().filter_map(|dependency| dependency.key_of(required))
+    }
+
+    pub fn test_support(&self, shipped: &BTreeSet<&CrateName>) -> Option<&Package> {
+        self.targets.iter().find_map(Target::binary).map_or(Some(()), |_| None)?;
+        shipped.get(&self.name).map_or(Some(self), |_| None)
+    }
+
+    pub fn shipped_dependencies(&self) -> impl Iterator<Item = &CrateName> {
+        self.dependencies.iter().filter_map(Dependency::shipped)
     }
 
     pub fn dependencies_among<'package>(

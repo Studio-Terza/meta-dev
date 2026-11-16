@@ -1,19 +1,27 @@
+use lint_layout::Name;
+
 use crate::boundary::ItemId;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Member {
     owner: ItemId,
-}
-
-impl From<ItemId> for Member {
-    fn from(owner: ItemId) -> Member {
-        Member { owner }
-    }
+    name: Name,
 }
 
 impl Member {
     #[must_use]
+    pub fn new(owner: ItemId, name: Name) -> Member {
+        Member { owner, name }
+    }
+
+    #[must_use]
     pub fn owner(&self) -> ItemId {
         self.owner
+    }
+}
+
+impl AsRef<Name> for Member {
+    fn as_ref(&self) -> &Name {
+        &self.name
     }
 }

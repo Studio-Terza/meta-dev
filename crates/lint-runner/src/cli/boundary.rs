@@ -60,7 +60,9 @@ impl From<usize> for FileOrder {
     }
 }
 
-impl FileOrder {}
+impl FileOrder {
+    pub(crate) const LAST: FileOrder = FileOrder(usize::MAX);
+}
 
 #[derive(Debug)]
 struct FileLines {

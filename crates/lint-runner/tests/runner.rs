@@ -83,6 +83,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         "ModelLint>::report",
         "WorkspaceLint>::report",
         "as Registered>::ENTRY",
+        "<Grounded<",
     ]
     .iter()
     .map(|call| runner.matches(call).count())

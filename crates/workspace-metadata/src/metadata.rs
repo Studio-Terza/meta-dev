@@ -105,6 +105,18 @@ impl Metadata {
             })
     }
 
+    #[must_use]
+    pub fn test_support(&self) -> BTreeSet<&CrateName> {
+        let shipped: BTreeSet<&CrateName> = self.packages.iter().flat_map(Package::shipped_dependencies).collect();
+        let members: BTreeSet<&PackageId> = self.workspace_members.iter().collect();
+        self.packages
+            .iter()
+            .filter(|package| package.package_id().and_then(|id| members.get(id)).is_some())
+            .filter_map(|package| package.test_support(&shipped))
+            .map(Package::name)
+            .collect()
+    }
+
     pub(crate) fn packages(&self) -> &[Package] {
         &self.packages
     }

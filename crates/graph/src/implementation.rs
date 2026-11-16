@@ -1,5 +1,6 @@
 use lint_layout::Name;
 
+use crate::boundary::ItemId;
 use crate::function::Parameter;
 use crate::region::Region;
 use crate::resolved::Resolved;
@@ -112,6 +113,12 @@ impl Implementation {
     #[must_use]
     pub fn subject_type(&self) -> &TypeRef {
         &self.subject.ty
+    }
+
+    #[must_use]
+    pub fn subject_item(&self) -> Option<ItemId> {
+        let named = self.subject.ty.named()?;
+        AsRef::<Resolved>::as_ref(named).crate_item()
     }
 }
 

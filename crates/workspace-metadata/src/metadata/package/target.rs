@@ -15,6 +15,7 @@ enum TargetKind {
     Rlib,
     Dylib,
     ProcMacro,
+    Bin,
     #[serde(other)]
     Other,
 }
@@ -24,7 +25,7 @@ impl TargetKind {
         match self {
             TargetKind::Lib | TargetKind::Rlib | TargetKind::Dylib => Some(Form::Library),
             TargetKind::ProcMacro => Some(Form::ProcMacro),
-            TargetKind::Other => None,
+            TargetKind::Bin | TargetKind::Other => None,
         }
     }
 }
@@ -38,6 +39,10 @@ pub struct Target {
 impl Target {
     pub fn form(&self) -> Option<Form> {
         self.kind.iter().find_map(|kind| kind.form())
+    }
+
+    pub fn binary(&self) -> Option<&Target> {
+        self.kind.iter().find(|kind| **kind == TargetKind::Bin).map(|_| self)
     }
 
     pub fn root(&self) -> &Path {

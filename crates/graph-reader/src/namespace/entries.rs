@@ -182,13 +182,14 @@ impl Declared {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Exposing;
+pub(crate) struct Exposing;
 
 impl Exposing {
-    fn declared_by(visibility: &syntax::Visibility) -> Exposure {
+    pub(crate) fn declared_by(visibility: &syntax::Visibility) -> Exposure {
         match visibility {
             syntax::Visibility::Public(_) => Exposure::Public,
-            syntax::Visibility::Restricted(_) | syntax::Visibility::Inherited => Exposure::Hidden,
+            syntax::Visibility::Restricted(_) => Exposure::Restricted,
+            syntax::Visibility::Inherited => Exposure::Hidden,
         }
     }
 }

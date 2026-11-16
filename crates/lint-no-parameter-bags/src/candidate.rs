@@ -18,16 +18,15 @@ pub struct Carriers(BTreeSet<ItemId>);
 
 impl From<&Model> for Carriers {
     fn from(model: &Model) -> Carriers {
-        let traited = model.implementations().filter_map(|placed| Carriers::traited(placed.entity()));
+        let traited = model.implementations().filter_map(|placed| Carriers::traited(placed.entity())?.subject_item());
         Carriers(traited.chain(model.functions().filter_map(|placed| Method::carried(placed.entity()))).collect())
     }
 }
 
 impl Carriers {
-    fn traited(implementation: &Implementation) -> Option<ItemId> {
-        let written = Some(implementation.origin()).filter(|origin| *origin == Origin::Written);
-        let subject = implementation.subject_type().named().map(AsRef::<Resolved>::as_ref);
-        written.and(implementation.interface()).and(subject).and_then(Resolved::crate_item)
+    fn traited(implementation: &Implementation) -> Option<&Implementation> {
+        Some(implementation.origin()).filter(|origin| *origin == Origin::Written)?;
+        implementation.interface().map(|_| implementation)
     }
 
     fn carries(&self, item: ItemId) -> Option<ItemId> {

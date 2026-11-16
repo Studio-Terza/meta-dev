@@ -21,19 +21,19 @@ use syntax::Spanned;
 use syntax::{
     Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemConst, ImplItemFn,
     ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion,
-    Macro, Signature as SynSignature, TraitItemFn,
+    Macro, Signature as SynSignature, TraitItemFn, Visibility as SynVisibility,
 };
 
 use graph::{
-    Alias, Assigned, Building, Entry, FileId, Function, Held, Implementation, Model, Mutation, Named, Origin, Output,
-    Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Assigned, Building, Entry, Exposure, FileId, Function, Held, Implementation, Model, Mutation, Named, Origin,
+    Output, Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
-    Declared, DeclaredKind, Domain, Entries, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind, Seeds,
-    StdNames, Top, UsePath, Visibility,
+    Declared, DeclaredKind, Domain, Entries, Exposing, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind,
+    Seeds, StdNames, Top, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
 use crate::planting::Files;
@@ -144,6 +144,7 @@ impl Built for ImplRow {
 struct FnRow {
     located: Located,
     name: Name,
+    exposure: Exposure,
     owner: Owner,
     entry: Entry,
     inputs: Vec<LoweredInput>,
@@ -179,6 +180,7 @@ impl Built for FnRow {
         let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints)
             .generic(parameters, self.mutation);
         let function = Function::new(self.name, self.owner, self.entry, signature)
+            .exposed(self.exposure)
             .seated(footing.places().seat(self.region.joined(footing.outer()), self.place))
             .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, building, function)
@@ -523,7 +525,13 @@ impl Lowering<'_> {
         Descend::Into
     }
 
-    fn function(&mut self, attributes: &[Attribute], signature: &SynSignature, body: Option<&Block>) -> InScope {
+    fn function(
+        &mut self,
+        attributes: &[Attribute],
+        visibility: &SynVisibility,
+        signature: &SynSignature,
+        body: Option<&Block>,
+    ) -> InScope {
         let generics = self.generics.extended(&signature.generics);
         let name = Name::from(&signature.ident);
         let row = RowIndex::from(self.lowered.rows.functions.as_slice());
@@ -531,6 +539,7 @@ impl Lowering<'_> {
             .extend(body.map(|block| Attachment::reaching(block, BodyGroup::opened(row, &generics, signature, block))));
         self.lowered.rows.functions.push(FnRow {
             located: self.here.located(Position::from(signature.ident.span())),
+            exposure: Exposing::declared_by(visibility),
             owner: self.enclosure.owner(),
             entry: self.enclosure.entry(attributes, &name),
             inputs: generics.inputs(signature),
@@ -549,12 +558,13 @@ impl Lowering<'_> {
     pub(super) fn method_entered(
         &mut self,
         attributes: &[Attribute],
+        visibility: &SynVisibility,
         signature: &SynSignature,
         body: Option<&Block>,
     ) -> Descend {
         self.saved();
         self.context = self.context.within_item(attributes);
-        let generics = self.function(attributes, signature, body);
+        let generics = self.function(attributes, visibility, signature, body);
         self.enclosed(Enclosure::Body, generics)
     }
 
@@ -642,12 +652,12 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
     fn on_item_fn(&mut self, item: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
         let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
         self.context = self.context.within_item(&item.attrs).owned(place);
-        let generics = self.function(&item.attrs, &item.sig, Some(&item.block));
+        let generics = self.function(&item.attrs, &item.vis, &item.sig, Some(&item.block));
         self.enclosed(Enclosure::Body, generics)
     }
 
     fn on_impl_item_fn(&mut self, item: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.method_entered(&item.attrs, &item.sig, Some(&item.block))
+        self.method_entered(&item.attrs, &item.vis, &item.sig, Some(&item.block))
     }
 
     fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
@@ -655,7 +665,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
     }
 
     fn on_trait_item_fn(&mut self, item: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.method_entered(&item.attrs, &item.sig, item.default.as_ref())
+        self.method_entered(&item.attrs, &SynVisibility::Inherited, &item.sig, item.default.as_ref())
     }
 
     fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
@@ -664,7 +674,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
 
     fn on_foreign_item_fn(&mut self, item: &'ast ForeignItemFn, _: &Facts<'_, ForeignItemFn>) -> Descend {
         self.enclosure = Enclosure::Foreign;
-        self.function(&item.attrs, &item.sig, None);
+        self.function(&item.attrs, &item.vis, &item.sig, None);
         Descend::Into
     }
 
@@ -696,6 +706,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
         self.parameters(&Holder::named(&item.ident, Held::Bound), &item.generics, &link);
         item.variants.iter().fold(&mut *self, |lowering, variant| {
+            lowering.hold(Holder::named(&variant.ident, Held::Variant), link.clone(), TypeRef::Tuple(Vec::new()));
             let holder = Holder::named(&variant.ident, Held::EnumField);
             lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
             lowering

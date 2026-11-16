@@ -76,11 +76,11 @@ impl From<bool> for Verdict {
 impl Envelope {
     fn output(self) -> Option<Output> {
         match self.verdict.0 {
-            Some(Erred) => self.result.map(|told| Output::Errored(Errored { told, usage: self.usage })),
+            Some(Erred) => self.result.map(|told| Output::Errored(Errored::new(told, self.usage))),
             None => Some(self.subtype)
                 .filter(|subtype| *subtype == Subtype::Success)
                 .and(self.result)
-                .map(|told| Output::Finished(Finished { reply: Reply::from(told), usage: self.usage })),
+                .map(|told| Output::Finished(Finished::new(Reply::from(told), self.usage))),
         }
     }
 }
