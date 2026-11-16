@@ -21,6 +21,7 @@ const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
 const NARROWED: &str = "pub fn f() -> Result<(), u8> { Ok(()) }\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
+const CLONED: &str = "pub fn kept(text: &String) -> String {\n    text.clone()\n}\n";
 const REPEATED: &str = "pub struct A;\nimpl A {\n    pub fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n}\n";
 const REPEATED_AGAIN: &str = "pub struct B;\nimpl B {\n    pub fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n}\n";
 const INDEX: &str = "pub trait Index {\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\n";
@@ -118,12 +119,19 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
 }
 
 #[test]
-fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
+fn the_report_flag_lists_report_only_findings_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
-    root.write("src/lib.rs", "pub struct A;\n")?;
     root.write("src/paired.rs", PAIRED)?;
-    assert_eq!(root.reported(), Reported::clean());
-    assert_eq!(root.reported().exit, ExitCode::SUCCESS);
+    root.write("src/lib.rs", "pub struct A;\nmod paired;\nmod cloned;\n")?;
+    root.write("src/cloned.rs", CLONED)?;
+    let surveyed = root.flagged(&["--report"]);
+    let found = [
+        "test budget, report only:\n",
+        "/src/paired.rs:3: fn open pairs with fn close",
+        "/src/cloned.rs:2: clones a value",
+    ];
+    assert_eq!(found.map(|line| surveyed.out.matches(line).count()), [1; 3], "{}", surveyed.out);
+    assert_eq!(surveyed.exit, ExitCode::SUCCESS);
     Ok(())
 }
 
@@ -248,7 +256,7 @@ fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
     let clean = root.verdict(&[]);
     root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
     let mut err = Vec::new();
-    let unwritten = [&[][..], &["--report"], &["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]]
+    let unwritten = [&["--timings"][..], &["--report"], &["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]]
         .map(|flags| {
             Cli::from_args(flags.iter().map(OsString::from).chain([OsString::from(&root.root)])).verdict(
                 Ports::new(
@@ -339,12 +347,11 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
         "  phase stage: list the trees and their packages\n",
         "  phase locate: describe the workspaces through cargo metadata\n",
         "  phase model: merge the lowered files into the code model\n",
-        "  phase survey: test budget, paired apis and clones\n",
         "  lint lint_hand_impls::HandImpls\n",
         "  lint lint_port_dependencies::OwnedDependencies\n",
         "  lint lint_rust_only::RustOnly\n",
     ];
-    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 9], "{timed}");
+    assert_eq!(rows.map(|row| timed.matches(row).count()), [1; 8], "{timed}");
     assert_eq!(timed.matches("  phase read: read and parse the sources on worker ").count(), workers, "{timed}");
     let lowered = "  phase lower: lower and file-lint its share of files on worker ";
     assert_eq!(timed.matches(lowered).count(), workers, "{timed}");

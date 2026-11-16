@@ -18,7 +18,7 @@ use lint_file::{
     FileLint, Filed, Judged, Kin, KinLint, Lead, Leader, Primed, PrimedLint, Reads, Ruled, RuledLint, SortStart, Start,
     Swept, SweptLint, WatchingLint,
 };
-use lint_port_dependencies::{RoleFacts, RoleReading};
+use lint_port_dependencies::RoleFacts;
 use lint_reader::{Described, Unlocated};
 use lint_sweep::{Finds, Gathers, Member, Sorts, Watching};
 use timer_ports::Timer;
@@ -75,9 +75,8 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use super::Survey;
-use crate::cli::boundary::{FileOrder, Helper, Helpers, Rendered, Slot, Surveyed, Worked, Workers};
-use crate::cli::sources::{Claimed, Gleans, Holding, Priming, Settled};
+use crate::cli::boundary::{FileOrder, Helper, Helpers, Rendered, Slot, Worked, Workers};
+use crate::cli::sources::{Claimed, Holding, Priming, Settled};
 use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
 use crate::cli::{Outcome, Sources, Verdict};
 
@@ -101,9 +100,8 @@ impl Crew<'_> {
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
         let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()));
-        let surveyed = Surveyed::from(&worked);
         let outcome = Lints::gathered(readout.done(), sources.located().done().as_ref().err(), worked);
-        outcome.surveyed(&[format_args!("{surveyed}{table}")], out, err)
+        outcome.surveyed(&[table], out, err)
     }
 }
 
@@ -254,7 +252,6 @@ impl Lints {
             .into_iter()
             .enumerate()
             .filter_map(|(index, entry)| entry.queued(Slot::from(index)))
-            .chain([Job::SURVEY])
             .collect();
         jobs.sort_by_key(Job::rank);
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
@@ -283,7 +280,6 @@ enum Work {
     Judged(Judging),
     Ruled(Rules),
     Described(Workspaced),
-    Survey,
 }
 
 impl Entry {
@@ -294,7 +290,7 @@ impl Entry {
     fn queued(self, slot: Slot) -> Option<Job> {
         match self.work {
             Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => None,
-            Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) | Work::Survey => {
+            Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => {
                 Some(Job { slot, step: Step::Lint(self.name), work: self.work })
             }
         }
@@ -309,7 +305,7 @@ impl Entry {
             | Work::Described(_)
             | Work::Judged(_)
             | Work::Ruled(_)
-            | Work::Survey => None,
+            => None,
         }
     }
 
@@ -322,7 +318,7 @@ impl Entry {
             | Work::Described(_)
             | Work::Filed(_)
             | Work::Ruled(_)
-            | Work::Survey => None,
+            => None,
         }
     }
 
@@ -335,7 +331,7 @@ impl Entry {
             | Work::Described(_)
             | Work::Filed(_)
             | Work::Judged(_)
-            | Work::Survey => None,
+            => None,
         }
     }
 
@@ -391,10 +387,7 @@ impl Work {
         match self {
             Work::Checked(check) => check(readout),
             Work::Modelled(query) => sources.gathering().model().map(query).into_iter().collect(),
-            Work::Described(_)
-            | Work::Extracted(_)
-            | Work::Survey
-            | Work::Filed(_)
+            Work::Described(_) | Work::Extracted(_) | Work::Filed(_)
             | Work::Judged(_)
             | Work::Ruled(_) => Vec::new(),
         }
@@ -402,31 +395,14 @@ impl Work {
 
     fn worked(self, slot: Slot, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
-            Work::Survey | Work::Extracted(_) | Work::Described(_) => self.settled(slot, sources),
+            Work::Extracted(_) | Work::Described(_) => self.grounded(slot, sources),
             Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
                 Worked::rendering(slot, self.reported(readout, sources))
             }
         }
     }
 
-    fn settled(self, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
-        match self {
-            Work::Survey => {
-                Worked::surveying(&Survey::settled(&Settled::from(sources.gathering()), sources.gathering().model()))
-            }
-            Work::Extracted(_) | Work::Described(_) => self.grounded(slot, sources, Settled::from(sources.gathering())),
-            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
-                Worked::default()
-            }
-        }
-    }
-
-    fn grounded(
-        self,
-        slot: Slot,
-        sources: &Sources<impl Files, impl Cargo, impl Timer>,
-        settled: Settled<'_, '_>,
-    ) -> Worked {
+    fn grounded(self, slot: Slot, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
         match self {
             Work::Extracted(extracted) => {
                 Worked::rendering(slot, sources.gathering().model().map_or_default(extracted))
@@ -440,13 +416,13 @@ impl Work {
                     .ok()
                     .zip(sources.gathering().model())
                     .map(|(located, model)| {
-                        let facts = Gleans::<RoleReading>::gleaned(&settled);
+                        let facts = Settled::from(sources.gathering()).roles();
                         described(sources.gathering().heads(), Described::workspaces(located), facts, model)
                     })
                     .into_iter()
                     .collect(),
             ),
-            Work::Checked(_) | Work::Modelled(_) | Work::Survey | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
+            Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
                 Worked::default()
             }
         }
@@ -455,7 +431,6 @@ impl Work {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Rank {
-    Survey,
     Early(Reverse<Slot>),
     Late(Slot),
 }
@@ -468,11 +443,8 @@ struct Job {
 }
 
 impl Job {
-    const SURVEY: Job = Job { slot: Slot::NONE, step: Step::Survey, work: Work::Survey };
-
     fn rank(&self) -> Rank {
         match self.work {
-            Work::Survey => Rank::Survey,
             Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Rank::Early(Reverse(self.slot)),
             Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => Rank::Late(self.slot),
         }

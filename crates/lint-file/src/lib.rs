@@ -290,4 +290,8 @@ pub trait Gleaning {
     type Gleaner<'run, 'head: 'run>: Gathers<Self::Part<'head>>;
 
     fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Self::Gleaner<'run, 'head>;
+
+    fn swept(files: &[SourceFile]) -> Self::Gleaned<'_> {
+        files.iter().map(|file| Sweep::gathered(file, Self::gleaner(Parsed::from(file)))).collect()
+    }
 }

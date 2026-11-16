@@ -12,13 +12,10 @@ use file_ports::Files;
 use graph::Model;
 use graph_query::{Answered, Query, QueryFailure};
 use graph_reader::Reader;
-use lint_clones::Clones;
 use lint_core::{Readout, Report, SourceFile};
-use lint_paired_apis::PairedApis;
 use lint_reader::Described;
 use lint_test_budget::TestBudget;
 
-use crate::cli::sources::Gleans;
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -110,7 +107,7 @@ impl Run<'_, '_> {
 
     fn reported(files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {
         let model = Reader::read_files(files);
-        Outcome::Clean.surveyed(&Elegance::reports(files, &model), out, err)
+        Outcome::Clean.surveyed(&[Survey::measured(files, &model)], out, err)
     }
 
     fn queried(answered: Option<&Answered>, out: &mut impl Write, err: &mut impl Write) -> Verdict {
@@ -123,27 +120,20 @@ impl Run<'_, '_> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Survey<'files> {
+struct Survey<'files> {
     budget: TestBudget,
-    paired: Report<'files>,
-    clones: Report<'files>,
+    reports: Vec<Report<'files>>,
 }
 
 impl<'files> Survey<'files> {
-    pub(crate) fn settled<'run: 'files, Held>(settled: &'files Held, model: Option<&Model>) -> Survey<'files>
-    where
-        Held: Gleans<'run, TestBudget> + Gleans<'run, PairedApis> + Gleans<'run, Clones>,
-    {
-        Survey {
-            budget: Gleans::<TestBudget>::gleaned(settled).started(model),
-            paired: Report::from(Gleans::<PairedApis>::gleaned(settled)),
-            clones: Report::from(Gleans::<Clones>::gleaned(settled)),
-        }
+    fn measured(files: &'files [SourceFile], model: &'files Model) -> Survey<'files> {
+        Survey { budget: TestBudget::measured(files).started(model), reports: Elegance::reports(files, model) }
     }
 }
 
 impl fmt::Display for Survey<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}{}{}", self.budget, self.paired, self.clones)
+        write!(formatter, "{}", self.budget)?;
+        self.reports.iter().try_for_each(|report| write!(formatter, "{report}"))
     }
 }

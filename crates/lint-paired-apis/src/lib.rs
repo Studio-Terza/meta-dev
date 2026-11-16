@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use declared::Declared;
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile};
 use lint_file::Gleaning;
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::{Gathers, Watching};
 use owner::Owner;
 use paired_methods::PairedMethods;
 use pairs::Pairs;
@@ -24,9 +24,7 @@ impl PairedApis {
 
 impl Lint for PairedApis {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let declared: PairedOwners<'_> =
-            files.iter().map(|file| Sweep::gathered(file, PairedApis::gleaner(Parsed::from(file)))).collect();
-        Report::from(&declared)
+        Report::from(&PairedApis::swept(files))
     }
 }
 

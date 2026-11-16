@@ -5,13 +5,12 @@ use std::fmt;
 use std::iter;
 
 use graph::Model;
-use lint_core::{Parsed, SourceFile};
-use lint_file::Gleaning;
+use lint_core::SourceFile;
 use lint_placement::CrateName;
 use lint_process_starters::{CommandPaths, Scope};
 
 use crate_budget::{BudgetGathering, CrateBudget};
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::Sweep;
 
 #[derive(Clone, Debug, Default)]
 pub struct TestBudget(BTreeMap<CrateName, CrateBudget>);
@@ -28,8 +27,8 @@ impl TestBudget {
     }
 
     #[must_use]
-    pub fn started(&self, model: Option<&Model>) -> TestBudget {
-        let starts = model.map_or_default(|found| CommandPaths::queried(found, Scope::Everywhere));
+    pub fn started(&self, model: &Model) -> TestBudget {
+        let starts = CommandPaths::queried(model, Scope::Everywhere);
         let parts = starts
             .iter()
             .map(|placed| TestBudget(BTreeMap::from([(CrateName::from(placed.krate()), CrateBudget::start())])));
@@ -59,30 +58,3 @@ impl FromIterator<TestBudget> for TestBudget {
     }
 }
 
-impl Gleaning for TestBudget {
-    type Part<'head> = TestBudget;
-    type Gleaned<'head> = TestBudget;
-
-    type Gleaner<'run, 'head: 'run> = Gleaner<'run>;
-
-    fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Gleaner<'run> {
-        let file = parsed.file();
-        Gleaner { name: CrateName::from(file.head().placement().package().root()), budget: BudgetGathering::from(file) }
-    }
-}
-
-#[derive(Debug)]
-pub struct Gleaner<'file> {
-    name: CrateName,
-    budget: BudgetGathering<'file>,
-}
-
-impl Gathers<TestBudget> for Gleaner<'_> {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        self.budget.watching()
-    }
-
-    fn gathered(self) -> TestBudget {
-        TestBudget(BTreeMap::from([(self.name, self.budget.gathered())]))
-    }
-}

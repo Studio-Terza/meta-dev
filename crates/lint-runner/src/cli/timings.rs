@@ -51,7 +51,6 @@ pub(crate) enum Step {
     Judged(Worker),
     Model,
     Lint(Named),
-    Survey,
 }
 
 impl fmt::Display for Step {
@@ -69,7 +68,6 @@ impl fmt::Display for Step {
             }
             Step::Model => formatter.write_str("phase model: merge the lowered files into the code model"),
             Step::Lint(name) => write!(formatter, "lint {name}"),
-            Step::Survey => formatter.write_str("phase survey: test budget, paired apis and clones"),
         }
     }
 }
