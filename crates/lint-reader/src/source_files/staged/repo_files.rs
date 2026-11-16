@@ -4,15 +4,14 @@ use file_ports::{Bytes, FileFailure, Files};
 use lint_core::{Contents, RepoFile};
 use lint_layout::Failure;
 use lint_roots::Regrouped;
-use lint_roots::Roots;
-use lint_roots::Tree;
+use lint_roots::{Listing, Tree};
 
 #[derive(Debug)]
 pub struct RepoFiles;
 
 impl RepoFiles {
-    pub fn under(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Vec<RepoFile>, Failure>> {
-        let listed = Roots::files(files, trees);
+    pub fn under(files: &impl Files, trees: &[&Tree<'_>], listing: Listing) -> Vec<Result<Vec<RepoFile>, Failure>> {
+        let listed = listing.files();
         let paths: Vec<Vec<PathBuf>> =
             listed.iter().map(|found| found.as_ref().map_or_else(|_| Vec::new(), Clone::clone)).collect();
         let contents = Regrouped::like(&paths, files.read_many(&paths.concat()));
@@ -20,7 +19,7 @@ impl RepoFiles {
             .iter()
             .zip(listed)
             .zip(contents)
-            .map(|((tree, listing), read)| listing.map(|entries| Self::found(tree, &entries, read)))
+            .map(|((tree, outcome), read)| outcome.map(|entries| Self::found(tree, &entries, read)))
             .collect()
     }
 

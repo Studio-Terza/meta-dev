@@ -3,12 +3,13 @@ mod repo_files;
 use std::io;
 use std::panic;
 use std::path::Path;
+use std::sync::{Mutex, PoisonError};
 use std::thread::{self, ScopedJoinHandle};
 
 use file_ports::Files;
 use lint_core::RepoFile;
 use lint_layout::Failure;
-use lint_roots::{Roots, Target, Tree};
+use lint_roots::{Below, Listing, Roots, Target, Tree};
 
 use super::located::{Located, Node};
 use repo_files::RepoFiles;
@@ -23,9 +24,19 @@ pub struct Staged {
 
 impl Staged {
     pub fn under(files: &(impl Files + Sync), trees: &[&Tree<'_>]) -> Vec<Result<Staged, Failure>> {
+        Roots::surveyed(files, trees)
+            .parted(|below, listing| Self::gathered(files, trees, below, &Mutex::new(Some(listing))))
+    }
+
+    fn gathered(
+        files: &(impl Files + Sync),
+        trees: &[&Tree<'_>],
+        below: Below,
+        parked: &Mutex<Option<Listing>>,
+    ) -> Vec<Result<Staged, Failure>> {
         let (targets, repo_files) = thread::scope(|scope| {
-            let listing = thread::Builder::new().spawn_scoped(scope, || RepoFiles::under(files, trees));
-            (Roots::under(files, trees), Self::listed(listing, files, trees))
+            let reading = thread::Builder::new().spawn_scoped(scope, || Self::read(files, trees, parked));
+            (Roots::under(files, trees, below), Self::listed(reading, files, trees, parked))
         });
         trees
             .iter()
@@ -39,11 +50,21 @@ impl Staged {
             .collect()
     }
 
-    fn listed(listing: io::Result<ScopedJoinHandle<'_, Listed>>, files: &impl Files, trees: &[&Tree<'_>]) -> Listed {
-        match listing {
+    fn listed(
+        reading: io::Result<ScopedJoinHandle<'_, Listed>>,
+        files: &impl Files,
+        trees: &[&Tree<'_>],
+        parked: &Mutex<Option<Listing>>,
+    ) -> Listed {
+        match reading {
             Ok(handle) => handle.join().unwrap_or_else(|payload| panic::resume_unwind(payload)),
-            Err(_) => RepoFiles::under(files, trees),
+            Err(_) => Self::read(files, trees, parked),
         }
+    }
+
+    fn read(files: &impl Files, trees: &[&Tree<'_>], parked: &Mutex<Option<Listing>>) -> Listed {
+        let taken = parked.lock().unwrap_or_else(PoisonError::into_inner).take();
+        taken.map_or_default(|listing| RepoFiles::under(files, trees, listing))
     }
 
     #[must_use]
