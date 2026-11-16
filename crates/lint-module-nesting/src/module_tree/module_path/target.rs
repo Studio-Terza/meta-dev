@@ -1,4 +1,5 @@
 use lint_placement::Level;
+use lint_placement::Nest;
 use std::fmt;
 
 use lint_layout::{Name, UsePath, Whole, Word, words};
@@ -45,8 +46,8 @@ impl<'path> Target<'path> {
         let first = AsRef::<[Name]>::as_ref(path).first()?;
         let start = Self::start(Start::spelled(first), file)?;
         let anchor = first.matches::<Whole>(&Self::ANCHORS);
-        let crate_root = file.nest.krate()?;
-        let child: Vec<&Name> = file.segments().iter().chain([first]).collect();
+        let crate_root = AsRef::<Nest<'_>>::as_ref(file).krate()?;
+        let child: Vec<&Name> = <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(file)).iter().chain([first]).collect();
         anchor.map(|_| ()).or_else(|| modules.same_as(crate_root, &child).map(|_| ()))?;
         let skip = anchor.into_iter().count();
         let segments = AsRef::<[Name]>::as_ref(path)
@@ -74,16 +75,23 @@ impl<'path> Target<'path> {
     }
 
     fn enclosing<'user>(&self, boundary: &[&Name], user: &'user ModulePath<'_>) -> Option<&'user ModulePath<'user>> {
-        Some(user).filter(|candidate| candidate.nest.krate() == Some(self.crate_root)).filter(|in_crate| {
-            in_crate.segments().get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
-        })
+        Some(user).filter(|candidate| AsRef::<Nest<'_>>::as_ref(candidate).krate() == Some(self.crate_root)).filter(
+            |in_crate| {
+                <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(in_crate))
+                    .get(..boundary.len())
+                    .is_some_and(|head| head.iter().eq(boundary.iter().copied()))
+            },
+        )
     }
 
     fn start<'file>(start: Start, file: &ModulePath<'file>) -> Option<&'file [Name]> {
         match start {
             Start::Crate => Some(&[]),
-            Start::Super => file.nest.parent().filter(|parent| parent.level() != Level::Workspace).map(<&[Name]>::from),
-            Start::Relative => Some(file.segments()),
+            Start::Super => AsRef::<Nest<'_>>::as_ref(file)
+                .parent()
+                .filter(|parent| parent.level() != Level::Workspace)
+                .map(<&[Name]>::from),
+            Start::Relative => Some(<&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(file))),
         }
     }
 }

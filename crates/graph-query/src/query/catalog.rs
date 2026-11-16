@@ -3,7 +3,6 @@ use graph::{
     Resolved, Seat,
 };
 use lint_layout::Name;
-use std::path::Path;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Stocked<'model> {
@@ -86,7 +85,7 @@ impl<'model> Catalog<'model> {
         let implemented = implementation.interface_name();
         self.functions
             .iter()
-            .filter(move |placed| <&Path>::from(placed.site()) == <&Path>::from(block.site()))
+            .filter(move |placed| placed.site().path() == block.site().path())
             .map(|placed| placed.entity())
             .filter(move |function| AsRef::<Seat>::as_ref(*function).subject() == Some(implementation.subject_type()))
             .filter(move |function| AsRef::<Seat>::as_ref(*function).implemented() == implemented)

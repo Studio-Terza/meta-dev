@@ -1,4 +1,3 @@
-use std::path::Path;
 mod owner;
 mod taken;
 
@@ -47,7 +46,7 @@ impl<'system, 'found, 'file> Method<'system, 'found, 'file> {
         let krate: &'found CrateName = AsRef::<CrateName>::as_ref(transition.context());
         types.owner(transition).map(|end| Method {
             edge,
-            owner: Owner::of_end(end, krate, <&Path>::from(edge.site())),
+            owner: Owner::of_end(end, krate, edge.site().path()),
             equivalence,
         })
     }

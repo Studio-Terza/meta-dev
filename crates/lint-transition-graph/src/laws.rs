@@ -60,7 +60,7 @@ impl<'file> From<&'file Model> for Laws<'file> {
                     routes: placed.entity().routes().iter().map(|route| owners.route(route)).collect(),
                 })
                 .collect(),
-            krates: model.functions().map(|placed| (<&Path>::from(placed.site()), placed.krate())).collect(),
+            krates: model.functions().map(|placed| (placed.site().path(), placed.krate())).collect(),
         }
     }
 }

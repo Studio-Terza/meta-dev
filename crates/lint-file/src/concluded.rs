@@ -22,7 +22,7 @@ impl<'head> FromIterator<Violation<'head>> for Concluded<'head> {
         Concluded(found.into_iter().fold(
             BTreeMap::new(),
             |mut filed: BTreeMap<&'head Path, Vec<Violation<'head>>>, violation| {
-                filed.entry(<&Path>::from(*violation.site())).or_default().push(violation);
+                filed.entry(violation.site().path()).or_default().push(violation);
                 filed
             },
         ))

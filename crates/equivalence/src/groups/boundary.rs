@@ -19,18 +19,17 @@ impl<'file, Member: Keyed + Nested + AsRef<Site<'file>>> Kept<'file, Member> {
 
     fn keeping(self, group: Group<Member>) -> Kept<'file, Member> {
         let at = self.groups.len();
-        let homes =
-            group.members().iter().map(|member| <&Path>::from(*member.as_ref())).fold(self.homes, |mut homes, path| {
-                homes.entry(path).or_default().insert(at);
-                homes
-            });
+        let homes = group.members().iter().map(|member| member.as_ref().path()).fold(self.homes, |mut homes, path| {
+            homes.entry(path).or_default().insert(at);
+            homes
+        });
         let mut groups = self.groups;
         groups.push(group);
         Kept { groups, homes }
     }
 
     fn cover(&self, member: &Member) -> Option<&Member> {
-        let near = self.homes.get(<&Path>::from(*member.as_ref())).into_iter().flatten();
+        let near = self.homes.get(member.as_ref().path()).into_iter().flatten();
         near.filter_map(|at| self.groups.get(*at)).flat_map(Group::members).find_map(|outer| member.lies_within(outer))
     }
 }

@@ -14,7 +14,7 @@ use module_path::{InsideSibling, ModuleIndex, ModulePath, Target};
 use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
-use lint_placement::{CrateRoot, Level, Nest};
+use lint_placement::{CrateRoot, Krate, Level, Nest};
 use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 use reexport_count::ReexportCount;
 use syntax::ItemUse;
@@ -101,7 +101,7 @@ impl<'head> FromIterator<ShippedModule<'head>> for Concluded<'head> {
         let heads: BTreeMap<&Path, &'head Path> = modules.iter().map(|module| (module.file, module.file)).collect();
         let tree = ModuleTree::from(modules.as_slice());
         tree.violations()
-            .filter_map(|violation| heads.get(<&Path>::from(*violation.site())).map(|head| violation.moved(head)))
+            .filter_map(|violation| heads.get(violation.site().path()).map(|head| violation.moved(head)))
             .collect()
     }
 }
@@ -134,7 +134,10 @@ impl<'file> From<&'file [ModuleUses<'file>]> for ModuleTree<'file> {
     fn from(files: &'file [ModuleUses<'file>]) -> ModuleTree<'file> {
         let empty = ModuleTree {
             modules: ModuleIndex::from(
-                files.iter().map(|file| ModulePath::new(file.crate_root, file.segments, file.file)).collect::<Vec<_>>(),
+                files
+                    .iter()
+                    .map(|file| ModulePath::new(file.file, Nest::module(Krate::Rooted(file.crate_root), file.segments)))
+                    .collect::<Vec<_>>(),
             ),
             users: Users::default(),
             deep_uses: Vec::new(),
@@ -154,21 +157,25 @@ impl<'file> ModuleTree<'file> {
             .filter(|(module, _)| AsRef::<Nest<'_>>::as_ref(*module).level() == Level::Module)
             .filter_map(move |(module, count)| count.beyond(most).map(|crowded| (module, crowded)))
             .map(move |(module, count)| {
-                Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
+                Violation::new(Site::of_file(module.path()), Finding::CrowdedReexports { count, most })
             });
         self.modules
             .modules()
             .iter()
             .filter_map(|module| {
-                self.home_of(module)
-                    .map(|home| Violation::new(Site::of_file(module.file()), Finding::UsedFromOneSibling { home }))
+                self.home_of(module).map(|home| {
+                    Violation::new(
+                        Site::of_file(module.path()),
+                        Finding::UsedFromOneSibling { home: *AsRef::<Nest<'_>>::as_ref(&home) },
+                    )
+                })
             })
             .chain(deep_uses)
             .chain(crowded)
     }
 
     fn absorbed(mut self, file: &'file ModuleUses<'file>) -> ModuleTree<'file> {
-        let module = ModulePath::new(file.crate_root, file.segments, file.file);
+        let module = ModulePath::new(file.file, Nest::module(Krate::Rooted(file.crate_root), file.segments));
         self.reexports.insert(module, file.reexports);
         file.tests.iter().for_each(|test| test.recorded(&mut self.users, &self.modules, file.crate_root));
         file.uses.iter().for_each(|path| self.absorb(module, path));
@@ -181,7 +188,7 @@ impl<'file> ModuleTree<'file> {
         self.users.record(used, module);
         let crossed = target.as_ref().and_then(|found| found.crossed_directory(&module, &self.modules));
         self.deep_uses.extend(crossed.map(|crossing| {
-            Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: crossing })
+            Violation::new(Site::of_file(module.path()), Finding::ReachesPastModRs { target: crossing })
         }));
     }
 
@@ -197,7 +204,7 @@ impl<'file> ModuleTree<'file> {
             .all(|user| InsideSibling::holds(user, module).is_some())
             .then(|| {
                 let homes: BTreeSet<ModulePath<'file>> =
-                    outsiders.iter().map(|user| user.truncated_like(module)).collect();
+                    outsiders.iter().map(|user| InsideSibling::home(user, module)).collect();
                 (homes.len() == 1).then(|| homes.into_iter().next()).flatten()
             })
             .flatten()
@@ -211,7 +218,7 @@ impl TestUses {
         modules: &ModuleIndex<'file>,
         crate_root: &'file CrateRoot,
     ) {
-        let caller = ModulePath::new(crate_root, &self.segments, Path::new(""));
+        let caller = ModulePath::new(Path::new(""), Nest::module(Krate::Rooted(crate_root), &self.segments));
         self.uses.iter().for_each(|path| {
             let home = Target::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules));
             users.record(home, caller);

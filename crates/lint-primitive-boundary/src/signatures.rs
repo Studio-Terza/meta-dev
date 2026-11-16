@@ -93,15 +93,14 @@ impl<'read, 'model> Signatures<'read, 'model> {
         context: &Name,
         types: impl Iterator<Item = &'ty TypeRef>,
     ) -> Vec<Ranked<'model>> {
-        let mut walk =
-            TypeWalk { lexicon: self.lexicon, scope: self.scope, file: <&Path>::from(site), found: Vec::new() };
+        let mut walk = TypeWalk { lexicon: self.lexicon, scope: self.scope, file: site.path(), found: Vec::new() };
         types.for_each(|ty| ty.each_use(&mut walk));
         walk.found
             .into_iter()
             .map(|found| Ranked {
-                spot: Spot { path: <&Path>::from(site), position: found.position },
+                spot: Spot { path: site.path(), position: found.position },
                 violation: Violation::new(
-                    Site::new(<&Path>::from(site), found.position.line()),
+                    Site::new(site.path(), found.position.line()),
                     found.identity.finding(context.clone()),
                 ),
             })

@@ -1,12 +1,14 @@
 use std::fmt;
 
-use super::module_path::{ModulePath, Target};
+use lint_placement::Nest;
+
+use super::module_path::Target;
 use super::reexport_count::ReexportCount;
 use lint_core::Bound;
 use lint_core::Fix;
 
 pub enum Finding<'file, 'path> {
-    UsedFromOneSibling { home: ModulePath<'file> },
+    UsedFromOneSibling { home: Nest<'file> },
     ReachesPastModRs { target: &'path Target<'path> },
     CrowdedReexports { count: ReexportCount, most: Bound },
 }

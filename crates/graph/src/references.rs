@@ -160,7 +160,7 @@ where
 {
     fn from(placed: Placed<'model, Entity>) -> Consumers<'model> {
         let Owned { reached, shipped, .. } = Owned::from(placed.entity());
-        let file = <&Path>::from(placed.site());
+        let file = placed.site().path();
         let root = placed.root();
         Consumers(shipped.map_or_default(|_| {
             reached.0.into_iter().map(|target| (target, BTreeMap::from([(root, BTreeSet::from([file]))]))).collect()
@@ -197,7 +197,7 @@ impl Consumed {
         Owned: From<Entity>,
     {
         placed
-            .filter(|found| files.contains(<&Path>::from(found.site())))
+            .filter(|found| files.contains(found.site().path()))
             .map(|found| Consumed(Owned::from(found.entity()).reached.0))
             .collect()
     }
