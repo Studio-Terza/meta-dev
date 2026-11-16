@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 use std::mem;
 
 use syntax::{

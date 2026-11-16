@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod declarations;
 mod declared_graphs;
 mod edge;

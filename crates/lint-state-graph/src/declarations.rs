@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod vertex;
 
 use std::collections::{BTreeMap, BTreeSet};

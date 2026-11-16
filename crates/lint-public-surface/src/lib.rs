@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod export;
 mod finding;
 mod foreign_references;

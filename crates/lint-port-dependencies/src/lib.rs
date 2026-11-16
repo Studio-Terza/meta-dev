@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod owners;
 mod ports;
 mod reserved_names;

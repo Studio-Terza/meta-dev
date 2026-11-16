@@ -1,4 +1,5 @@
 use super::gathering::Gathering;
+use lint_core::Sourced;
 use lint_core::{Parsed, Unwalked};
 use lint_enum_predicates::EnumPredicates;
 use lint_file::{ContextLint, FileFacts, Gleaning, PrimedFacts};

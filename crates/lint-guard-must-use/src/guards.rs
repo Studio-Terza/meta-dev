@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod members;
 mod modules;
 mod type_key;

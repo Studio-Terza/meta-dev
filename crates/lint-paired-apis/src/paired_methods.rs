@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 use std::collections::BTreeMap;
 
 use syntax::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};

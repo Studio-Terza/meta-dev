@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod clone_sites;
 
 use clone_sites::CloneSites;

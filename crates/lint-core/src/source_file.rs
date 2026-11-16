@@ -113,11 +113,6 @@ impl<'syntax, 'head> Parsed<'syntax, 'head> {
     }
 
     #[must_use]
-    pub fn file(self) -> &'syntax SourceFile {
-        self.file
-    }
-
-    #[must_use]
     pub fn head(self) -> &'head FileHead {
         self.head
     }
@@ -131,5 +126,11 @@ impl<'syntax, 'head> Parsed<'syntax, 'head> {
 impl<'file> From<&'file SourceFile> for Parsed<'file, 'file> {
     fn from(file: &'file SourceFile) -> Parsed<'file, 'file> {
         Parsed { file, head: &file.head }
+    }
+}
+
+impl<'syntax> crate::Sourced<'syntax> for Parsed<'syntax, '_> {
+    fn file(self) -> &'syntax SourceFile {
+        self.file
     }
 }

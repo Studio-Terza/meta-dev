@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 use std::mem;
 use std::panic;
 use std::sync::{Mutex, OnceLock, PoisonError};
@@ -57,10 +58,6 @@ pub(crate) struct Claimed<'read> {
 impl<'read> Claimed<'read> {
     pub(crate) fn order(self) -> FileOrder {
         self.order
-    }
-
-    pub(crate) fn file(self) -> &'read SourceFile {
-        self.file
     }
 }
 
@@ -170,5 +167,11 @@ impl<'run> Gathering<'run> {
         held.extend(parts);
         let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
         complete.map(Merging)
+    }
+}
+
+impl<'read> Sourced<'read> for Claimed<'read> {
+    fn file(self) -> &'read SourceFile {
+        self.file
     }
 }

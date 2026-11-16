@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 use std::any::TypeId;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;

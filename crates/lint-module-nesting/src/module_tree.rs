@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod finding;
 mod module_path;
 mod reexport_count;

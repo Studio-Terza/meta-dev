@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 mod consumers;
 mod declared;
 

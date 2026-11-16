@@ -1,3 +1,4 @@
+use lint_core::Sourced;
 use lint_core::{Parsed, SourceFile, TypeHomes};
 use lint_sweep::{Gathers, Sweep, Watching};
 
