@@ -99,3 +99,37 @@ fn a_column_whose_type_has_no_generated_check_yields_no_clause() {
     assert_eq!(Spelled::clause::<file_ports::Offset>("read_to"), None);
     assert_eq!(Spelled::clause::<design_model::RunId>("run"), None);
 }
+
+const SEEDED: [&str; 6] = [
+    "INSERT INTO jobs (id, state) VALUES (1, 'open')",
+    "INSERT INTO messages (uuid, session, parent, at, author, body) VALUES ('m1', 's', NULL, 't', 'owner', 'One. Two.')",
+    "INSERT INTO segments (message, ordinal, shape, body) VALUES ('m1', 0, 'sentence', 'One.')",
+    "INSERT INTO segments (message, ordinal, shape, body) VALUES ('m1', 1, 'sentence', 'Two.')",
+    "INSERT INTO senses (id, message, ordinal, kind, specificity, confidence, explicitness, provenance) VALUES (1, 'm1', 0, 'opinion', 'general', 'firm', 'explicit', 'init')",
+    "INSERT INTO senses (id, message, ordinal, kind, specificity, confidence, explicitness, provenance, supersedes) VALUES (2, 'm1', 0, 'opinion', 'exact', 'firm', 'explicit', 'init', 1)",
+];
+
+const REASONS: [&str; 2] =
+    ["runs records a usage whole or not at all", "a sense supersedes only a sense of its own segment"];
+
+const REFUSED: [&str; 2] = [
+    "INSERT INTO runs (id, job, pid, deadline, state, input_tokens) VALUES (1, 1, 7, 0, 'running', 5)",
+    "INSERT INTO senses (id, message, ordinal, kind, specificity, confidence, explicitness, provenance, supersedes) VALUES (3, 'm1', 1, 'opinion', 'exact', 'firm', 'explicit', 'init', 2)",
+];
+
+#[test]
+fn a_partial_usage_and_a_sense_superseding_another_segment_are_refused() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    SEEDED
+        .iter()
+        .try_for_each(|sql| store.write(store_ports::Prepared::written(sql, Vec::new())).map(|_written| ()))?;
+    let refused: Vec<String> = REFUSED
+        .iter()
+        .filter_map(|sql| store.write(store_ports::Prepared::written(sql, Vec::new())).err())
+        .map(|failure| failure.to_string())
+        .collect();
+    let explained = REASONS.iter().zip(&refused).filter(|(reason, failure)| failure.contains(**reason)).count();
+    assert_eq!(explained, REASONS.len(), "{refused:?}");
+    Ok(())
+}
