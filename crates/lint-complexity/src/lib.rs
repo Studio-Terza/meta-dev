@@ -1,4 +1,3 @@
-use lint_core::Violation;
 mod crates;
 
 use lint_core::{Headline, Lint, Report, SourceFile};
@@ -14,7 +13,7 @@ impl Lint for Complexity {
             Headline::new(
                 "report only, cyclomatic complexity per function, as a distribution per crate; a branchy function is a candidate for a standard trait, a generic over an existing trait, or a derive",
             ),
-            Vec::<Violation<'_>>::from(&Crates::grouped(files)),
+            Crates::grouped(files).violations(),
         )
     }
 }

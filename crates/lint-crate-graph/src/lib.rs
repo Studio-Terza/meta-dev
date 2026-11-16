@@ -1,4 +1,3 @@
-use lint_core::Violation;
 mod links;
 
 use graph::Model;
@@ -12,9 +11,6 @@ pub struct CrateGraph;
 
 impl ModelLint for CrateGraph {
     fn report(model: &Model) -> Report<'_> {
-        Report::new(
-            Headline::new("a crate whose items form one big cycle is split"),
-            Vec::<Violation<'_>>::from(&Links::from(model)),
-        )
+        Report::new(Headline::new("a crate whose items form one big cycle is split"), Links::from(model).violations())
     }
 }

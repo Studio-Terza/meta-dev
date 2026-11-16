@@ -46,6 +46,20 @@ impl<'run, 'model> Reader<'run, 'model> {
         Reader { model, ports, impls }
     }
 
+    pub(crate) fn violations(&self) -> Vec<Violation<'model>> {
+        let found: BTreeMap<Spot<'model>, Finding> = self
+            .model
+            .functions()
+            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() != Reach::Test)
+            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).ground() != Ground::Ports)
+            .flat_map(|placed| self.found(placed))
+            .fold(BTreeMap::new(), |mut found, flagged| {
+                found.entry(flagged.spot).or_insert(flagged.finding);
+                found
+            });
+        found.into_iter().map(|(spot, finding)| Violation::new(spot.site, finding)).collect()
+    }
+
     fn found(&self, placed: Placed<'model, &'model Function>) -> Vec<Flagged<'model>> {
         let function = placed.entity();
         let seat: &Seat = function.as_ref();
@@ -94,21 +108,5 @@ impl<'model> Body<'_, 'model> {
     fn field(self, reached: &Reached) -> Option<Port> {
         let name: &Name = reached.as_ref();
         self.held.filter(|fields| fields.contains(name)).map(|_| Port::Field(name.clone()))
-    }
-}
-
-impl<'model> From<&Reader<'_, 'model>> for Vec<Violation<'model>> {
-    fn from(reader: &Reader<'_, 'model>) -> Vec<Violation<'model>> {
-        let found: BTreeMap<Spot<'model>, Finding> = reader
-            .model
-            .functions()
-            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() != Reach::Test)
-            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).ground() != Ground::Ports)
-            .flat_map(|placed| reader.found(placed))
-            .fold(BTreeMap::new(), |mut found, flagged| {
-                found.entry(flagged.spot).or_insert(flagged.finding);
-                found
-            });
-        found.into_iter().map(|(spot, finding)| Violation::new(spot.site, finding)).collect()
     }
 }

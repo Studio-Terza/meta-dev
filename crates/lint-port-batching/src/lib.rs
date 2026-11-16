@@ -1,4 +1,3 @@
-use lint_core::Violation;
 mod ports;
 mod reader;
 
@@ -17,7 +16,7 @@ impl ModelLint for PortBatching {
         let ports = Ports::from(model);
         Report::new(
             Headline::new("ports are called once per batch, not once per element"),
-            Vec::<Violation<'_>>::from(&Reader::new(model, &ports)),
+            Reader::new(model, &ports).violations(),
         )
     }
 }
