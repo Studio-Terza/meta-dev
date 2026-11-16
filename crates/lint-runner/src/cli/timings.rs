@@ -148,10 +148,6 @@ impl Table {
         Table { shown, timings: summed.into_values().collect() }
     }
 
-    fn origin(&self) -> Moment {
-        self.timings.iter().map(|timing| timing.began).min().unwrap_or_default()
-    }
-
     fn rows(&self) -> Vec<&Timing> {
         let mut rows: Vec<&Timing> = self.timings.iter().collect();
         rows.sort_by_key(|timing| Reverse(timing.took));
@@ -162,22 +158,19 @@ impl Table {
 impl fmt::Display for Table {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.shown {
-            Timings::Shown => Rows { rows: &self.rows(), origin: self.origin() }.fmt(formatter),
+            Timings::Shown => Rows(&self.rows()).fmt(formatter),
             Timings::Hidden => Ok(()),
         }
     }
 }
 
-struct Rows<'table> {
-    rows: &'table [&'table Timing],
-    origin: Moment,
-}
+struct Rows<'table>(&'table [&'table Timing]);
 
 impl fmt::Display for Rows<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "lint timings in milliseconds, took then started:")?;
-        self.rows.iter().try_for_each(|timing| {
-            writeln!(formatter, "{:>7} {:>7}  {}", timing.took, timing.began.since(self.origin), timing.step)
+        self.0.iter().try_for_each(|timing| {
+            writeln!(formatter, "{:>7} {:>7}  {}", timing.took, timing.began, timing.step)
         })
     }
 }

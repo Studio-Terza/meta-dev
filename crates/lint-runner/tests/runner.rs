@@ -349,6 +349,7 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
     let lowered = "  phase lower: lower and file-lint its share of files on worker ";
     assert_eq!(timed.matches(lowered).count(), workers, "{timed}");
     assert_eq!(untimed.matches("lint timings").count(), 0, "{untimed}");
+    assert_eq!(timed.matches("      0  phase total\n").count(), 1, "{timed}");
     Ok(())
 }
 
