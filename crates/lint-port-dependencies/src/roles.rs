@@ -86,12 +86,12 @@ impl<'ast> Watch<'ast> for RootReading<'_> {
         &[Kind::Attribute, Kind::Item]
     }
 
-    fn on_attribute(&mut self, attribute: &'ast syn::Attribute, _: &Facts<'_, syn::Attribute>) -> Descend {
+    fn on_attribute(&mut self, attribute: &'ast syntax::Attribute, _: &Facts<'_, syntax::Attribute>) -> Descend {
         self.denied.extend(Undenied::denied_by(attribute));
         Descend::Over
     }
 
-    fn on_item(&mut self, _: &'ast syn::Item, _: &Facts<'_, syn::Item>) -> Descend {
+    fn on_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) -> Descend {
         Descend::Over
     }
 }

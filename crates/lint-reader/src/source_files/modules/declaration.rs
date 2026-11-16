@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use syn::{Item, ItemMod};
+use syntax::{Item, ItemMod};
 
 use lint_core::Walk;
 

@@ -1,6 +1,6 @@
 use std::iter::Sum;
 
-use syn::{UseTree, Visibility};
+use syntax::{UseTree, Visibility};
 
 use lint_core::Bound;
 use lint_core::Syntax;
@@ -11,7 +11,7 @@ use newtype::Display;
 pub struct ReexportCount(usize);
 
 impl ReexportCount {
-    pub fn of_file(file: &syn::File) -> ReexportCount {
+    pub fn of_file(file: &syntax::File) -> ReexportCount {
         file.items
             .iter()
             .filter_map(Syntax::item_use)

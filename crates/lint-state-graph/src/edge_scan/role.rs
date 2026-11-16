@@ -1,4 +1,4 @@
-use syn::{ImplItemFn, Receiver};
+use syntax::{ImplItemFn, Receiver};
 
 use super::EdgeScan;
 use crate::edge::Edge;

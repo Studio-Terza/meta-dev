@@ -1,8 +1,8 @@
 mod row;
 
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, quote_spanned};
-use syn::{Data, DataEnum, DeriveInput, Ident, LitStr, Variant, Visibility};
+use syntax::TokenStream;
+use syntax::{Data, DataEnum, DeriveInput, Ident, LitStr, Variant, Visibility};
+use syntax::{format_ident, quote, quote_spanned};
 
 use row::Row;
 
@@ -14,13 +14,13 @@ pub struct Table {
 
 impl Table {
     pub fn expanded(tokens: TokenStream) -> TokenStream {
-        syn::parse2(tokens)
+        syntax::parse::parse2(tokens)
             .and_then(Self::read)
             .map_or_else(|error| error.to_compile_error(), |table| table.generated())
     }
 
-    fn read(DeriveInput { vis, ident, data, .. }: DeriveInput) -> syn::Result<Table> {
-        let rows = Self::variants(data).iter().map(Row::declared).collect::<syn::Result<Vec<Vec<Row>>>>()?;
+    fn read(DeriveInput { vis, ident, data, .. }: DeriveInput) -> syntax::Result<Table> {
+        let rows = Self::variants(data).iter().map(Row::declared).collect::<syntax::Result<Vec<Vec<Row>>>>()?;
         Ok(Table { visibility: vis, ident, rows: rows.into_iter().flatten().collect() })
     }
 

@@ -6,8 +6,8 @@ mod known;
 
 use std::borrow::Cow;
 
-use syn::spanned::Spanned;
-use syn::{ItemImpl, ItemMod, Macro};
+use syntax::Spanned;
+use syntax::{ItemImpl, ItemMod, Macro};
 
 use lint_core::{Headline, Parsed, Site, SourceFile, Syntax, Violation};
 use lint_file::{ContextLint, Reads};

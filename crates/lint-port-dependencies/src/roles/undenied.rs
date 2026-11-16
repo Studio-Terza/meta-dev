@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use syn::punctuated::Punctuated;
-use syn::{Path, Token};
+use syntax::Punctuated;
+use syntax::{Path, Token};
 
 use lint_core::{Finding, Fix};
 use lint_layout::{Name, UsePath, Word, words};
@@ -22,7 +22,7 @@ impl Undenied {
         Self::missing(role, &BTreeSet::new())
     }
 
-    pub(super) fn denied_by(attribute: &syn::Attribute) -> Vec<UsePath> {
+    pub(super) fn denied_by(attribute: &syntax::Attribute) -> Vec<UsePath> {
         Some(attribute)
             .filter(|leveled| Self::LEVELS.iter().any(|level| leveled.path().is_ident(level)))
             .and_then(|kept| kept.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())

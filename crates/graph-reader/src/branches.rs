@@ -1,4 +1,4 @@
-use syn::{BinOp, Block, ExprBinary, ExprForLoop, ExprIf, ExprMatch, ExprTry, ExprWhile, Item};
+use syntax::{BinOp, Block, ExprBinary, ExprForLoop, ExprIf, ExprMatch, ExprTry, ExprWhile, Item};
 
 use body_lifts::Branching;
 use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};

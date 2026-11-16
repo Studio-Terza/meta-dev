@@ -1,4 +1,4 @@
-use syn::{Expr, Lit};
+use syntax::{Expr, Lit};
 
 use lint_layout::Name;
 

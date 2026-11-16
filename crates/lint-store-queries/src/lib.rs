@@ -1,4 +1,5 @@
 mod queries;
+mod statement;
 
 use std::collections::BTreeSet;
 
@@ -6,9 +7,18 @@ use graph::Model;
 use lint_core::{Headline, ModelLint, Report, Site, Violation};
 
 use queries::{Queries, Unformatted};
+pub use statement::Statement;
 
 #[derive(Debug)]
 pub struct StoreQueries;
+
+impl StoreQueries {
+    #[must_use]
+    pub fn sql(model: &Model) -> Vec<Statement> {
+        let queries = Queries::new(model);
+        model.quotations().filter_map(|placed| queries.sql(placed)).collect()
+    }
+}
 
 impl ModelLint for StoreQueries {
     fn report(model: &Model) -> Report<'_> {

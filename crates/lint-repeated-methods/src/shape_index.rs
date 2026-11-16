@@ -5,7 +5,7 @@ mod repeated_shape;
 
 use std::collections::BTreeMap;
 
-use syn::{ItemImpl, ItemMod, Visibility};
+use syntax::{ItemImpl, ItemMod, Visibility};
 
 use lint_core::{Bound, DeclaredType, FileHead, Home, Parsed, Site, Syntax, TypeHomes, Violation, Walk};
 use lint_file::Concluded;

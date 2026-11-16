@@ -1,4 +1,4 @@
-use syn::{ItemMod, ItemUse, UseTree, Visibility};
+use syntax::{ItemMod, ItemUse, UseTree, Visibility};
 
 use lint_core::{SourceFile, Syntax};
 use lint_layout::LineNumber;

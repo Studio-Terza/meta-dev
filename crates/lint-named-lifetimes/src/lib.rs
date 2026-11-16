@@ -7,7 +7,7 @@ use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 
 use std::path::Path;
 
-use syn::{LifetimeParam, Macro};
+use syntax::{LifetimeParam, Macro};
 
 use lint_core::Site;
 use lint_core::SourceFile;

@@ -5,11 +5,11 @@ use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
-use proc_macro2::Span;
 use std::path::Path;
-use syn::spanned::Spanned;
+use syntax::Span;
+use syntax::Spanned;
 
-use syn::{
+use syntax::{
     Arm, BinOp, Block, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn,
     ItemFn, ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, UnOp,
 };

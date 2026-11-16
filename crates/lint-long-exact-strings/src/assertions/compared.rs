@@ -3,8 +3,8 @@ mod literal;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
-use syn::punctuated::Punctuated;
-use syn::{Expr, Macro, Token};
+use syntax::Punctuated;
+use syntax::{Expr, Macro, Token};
 
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word, words};

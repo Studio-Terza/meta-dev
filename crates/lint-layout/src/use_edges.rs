@@ -1,4 +1,4 @@
-use syn::UseTree;
+use syntax::UseTree;
 
 use crate::name::Name;
 use crate::use_path::UsePath;
@@ -17,7 +17,7 @@ impl UseEdges {
         edges.found
     }
 
-    fn walk_path(&mut self, path: &syn::UsePath) {
+    fn walk_path(&mut self, path: &syntax::UsePath) {
         self.prefix.push(Name::from(&path.ident));
         self.walk(&path.tree);
         self.prefix.pop();

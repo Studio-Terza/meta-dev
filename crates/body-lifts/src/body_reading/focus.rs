@@ -1,4 +1,4 @@
-use syn::{Expr, ExprField, UnOp};
+use syntax::{Expr, ExprField, UnOp};
 
 use lint_layout::{Name, Whole, Word, words};
 

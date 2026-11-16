@@ -16,7 +16,7 @@ use lint_layout::{Name, UseEdges, UsePath};
 use lint_placement::CrateRoot;
 use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
 use reexport_count::ReexportCount;
-use syn::ItemUse;
+use syntax::ItemUse;
 use users::Users;
 
 pub struct ModuleTree<'file> {

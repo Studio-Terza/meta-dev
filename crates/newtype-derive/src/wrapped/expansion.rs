@@ -1,6 +1,7 @@
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::{GenericParam, LifetimeParam, WherePredicate, parse_quote};
+use syntax::TokenStream;
+use syntax::parse::parse_quote;
+use syntax::quote;
+use syntax::{GenericParam, LifetimeParam, WherePredicate};
 
 use super::Wrapped;
 use super::settings::Checking;

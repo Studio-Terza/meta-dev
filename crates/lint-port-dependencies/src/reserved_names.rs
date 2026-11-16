@@ -3,8 +3,8 @@ mod sqlx_name;
 
 use std::borrow::Borrow;
 
-use proc_macro2::{TokenStream, TokenTree};
-use quote::ToTokens;
+use syntax::ToTokens;
+use syntax::{TokenStream, TokenTree};
 
 use lint_core::{Finding, Site, SourceFile, Violation};
 use lint_file::{Lead, Leader};

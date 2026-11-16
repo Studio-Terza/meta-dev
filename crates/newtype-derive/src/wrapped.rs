@@ -2,8 +2,8 @@ mod expansion;
 mod only_field;
 mod settings;
 
-use proc_macro2::TokenStream;
-use syn::{DeriveInput, Generics, Ident};
+use syntax::TokenStream;
+use syntax::{DeriveInput, Generics, Ident};
 
 pub use expansion::{CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy};
 use only_field::OnlyField;
@@ -18,10 +18,10 @@ pub struct Wrapped {
 
 impl Wrapped {
     pub fn expanded<Derived: Expansion>(tokens: TokenStream) -> TokenStream {
-        syn::parse2(tokens).and_then(Self::split).map_or_else(|error| error.to_compile_error(), Derived::of)
+        syntax::parse::parse2(tokens).and_then(Self::split).map_or_else(|error| error.to_compile_error(), Derived::of)
     }
 
-    fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syn::Result<Wrapped> {
+    fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syntax::Result<Wrapped> {
         match OnlyField::taken(data) {
             Ok(field) => Settings::declared(&attrs).map(|settings| Wrapped { ident, generics, field, settings }),
             Err(refused) => Settings::declared(&attrs)

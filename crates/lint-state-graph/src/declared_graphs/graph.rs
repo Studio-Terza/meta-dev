@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use std::iter;
 use std::path::Path;
 
-use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, Ident, Macro, Token, Visibility, braced};
+use syntax::parse::{Parse, ParseStream};
+use syntax::{Attribute, Ident, Macro, Token, Visibility, braced};
 
 use lint_core::{Site, TypeName, Violation};
 use lint_layout::LineNumber;
@@ -53,13 +53,15 @@ impl Graph {
 }
 
 impl Parse for Graph {
-    fn parse(input: ParseStream) -> syn::Result<Graph> {
+    fn parse(input: ParseStream) -> syntax::Result<Graph> {
         Attribute::parse_outer(input)?;
         input.parse::<Visibility>()?;
         input.parse::<Token![mod]>()?;
         input.parse::<Ident>()?;
         let content;
         braced!(content in input);
-        iter::from_fn(|| content.cursor().token_tree().map(|_| content.parse())).collect::<syn::Result<_>>().map(Graph)
+        iter::from_fn(|| content.cursor().token_tree().map(|_| content.parse()))
+            .collect::<syntax::Result<_>>()
+            .map(Graph)
     }
 }

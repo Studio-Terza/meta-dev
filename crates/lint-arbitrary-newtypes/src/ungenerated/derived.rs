@@ -1,5 +1,5 @@
-use syn::punctuated::Punctuated;
-use syn::{Attribute, Path, Token};
+use syntax::Punctuated;
+use syntax::{Attribute, Path, Token};
 
 use lint_layout::{Name, Whole, Word, words};
 

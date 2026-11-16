@@ -2,7 +2,7 @@ use std::error::Error;
 use std::rc::Rc;
 
 use lint_core::{Macros, Parsed, SourceFile, SourceText};
-use syn::{Expr, Item, Macro, Stmt};
+use syntax::{Expr, Item, Macro, Stmt};
 
 const NESTED: &str = "fn f() {\n    outer!(inner!(a + b); c * d);\n}\n";
 
@@ -63,8 +63,10 @@ fn a_macro_outside_the_file_is_expanded_afresh_each_time() -> Result<(), Box<dyn
     let file = SourceFile::parse("crates/x/src/lib.rs", SourceText::new(NESTED.to_owned()))?;
     let lengths = ["m!(a)", "m!(a; b)", "m!(a; b; c)"]
         .iter()
-        .map(|text| syn::parse_str::<Macro>(text).map(|invocation| Macros::expanded(&file, &invocation).len()))
-        .collect::<Result<Vec<usize>, syn::Error>>()?;
+        .map(|text| {
+            syntax::parse::parse_str::<Macro>(text).map(|invocation| Macros::expanded(&file, &invocation).len())
+        })
+        .collect::<Result<Vec<usize>, syntax::Error>>()?;
     assert_eq!(lengths, [1, 2, 3]);
     Ok(())
 }

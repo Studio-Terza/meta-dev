@@ -1,6 +1,6 @@
-use proc_macro2::{Ident, TokenTree};
-use syn::spanned::Spanned;
-use syn::{Attribute, Field, ImplItem, Item, MetaList, Visibility};
+use syntax::Spanned;
+use syntax::{Attribute, Field, ImplItem, Item, MetaList, Visibility};
+use syntax::{Ident, TokenTree};
 
 use lint_core::Walk;
 use lint_layout::LineNumber;

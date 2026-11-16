@@ -7,8 +7,8 @@ use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
-use quote::ToTokens;
-use syn::{ItemImpl, ItemMod};
+use syntax::ToTokens;
+use syntax::{ItemImpl, ItemMod};
 
 use crate::end::Node;
 

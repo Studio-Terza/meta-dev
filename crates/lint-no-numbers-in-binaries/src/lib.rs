@@ -3,7 +3,7 @@ use std::path::Path;
 use lint_core::{Headline, Violation};
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
-use syn::{ItemMod, LitFloat, LitInt};
+use syntax::{ItemMod, LitFloat, LitInt};
 
 use lint_core::Fix;
 use lint_core::Message;

@@ -1,7 +1,7 @@
 mod declaration;
 mod finding;
 
-use syn::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
+use syntax::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
 use lint_sweep::{Descend, Facts, Finds, Kind, Watch};

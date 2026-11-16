@@ -2,7 +2,7 @@ mod graph;
 
 use std::path::Path;
 
-use syn::{ItemMod, ItemUse, Macro};
+use syntax::{ItemMod, ItemUse, Macro};
 
 use lint_core::{Address, MacroAliases, Macros, SourceFile, Violation, Walk};
 use lint_layout::{Name, Word};

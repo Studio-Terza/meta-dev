@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::spanned::Spanned;
-use syn::{
+use syntax::Spanned;
+use syntax::{
     Block, Expr, ExprClosure, ExprField, ExprForLoop, ExprLoop, ExprMethodCall, ExprPath, ExprWhile, FnArg, Item, Pat,
     Signature,
 };

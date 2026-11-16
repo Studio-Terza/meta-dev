@@ -3,7 +3,7 @@ mod chain;
 mod focus;
 mod route;
 
-use syn::{Block, Expr, Stmt};
+use syntax::{Block, Expr, Stmt};
 
 use crate::body::Body;
 use chain::Chain;

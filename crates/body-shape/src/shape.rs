@@ -10,7 +10,7 @@ mod slots;
 mod spelling;
 
 use equivalence::Equivalence;
-use proc_macro2::TokenStream;
+use syntax::TokenStream;
 
 use crate::token_count::TokenCount;
 use neighbours::Neighbours;

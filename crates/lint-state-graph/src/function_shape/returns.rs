@@ -1,4 +1,4 @@
-use syn::{ReturnType, Type, TypeTuple};
+use syntax::{ReturnType, Type, TypeTuple};
 
 use lint_core::TypeName;
 

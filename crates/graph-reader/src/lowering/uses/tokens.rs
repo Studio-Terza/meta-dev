@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 use std::str::FromStr;
 
-use proc_macro2::{Delimiter, Group, Ident, Literal, Span, TokenStream, TokenTree};
-use syn::{LitStr, Macro};
+use syntax::{Delimiter, Group, Ident, Literal, Span, TokenStream, TokenTree};
+use syntax::{LitStr, Macro};
 
 use lint_layout::{Position, TokenPaths as Parsed};
 
@@ -84,8 +84,8 @@ impl Interpolated {
     }
 
     fn holes(literal: &Literal) -> TokenStream {
-        let text =
-            syn::parse2::<LitStr>(TokenTree::Literal(literal.clone()).into()).map_or_default(|found| found.value());
+        let text = syntax::parse::parse2::<LitStr>(TokenTree::Literal(literal.clone()).into())
+            .map_or_default(|found| found.value());
         let Ok(Holes(holes)) = text.parse::<Holes>();
         let spanned = Respanned(literal.span());
         holes

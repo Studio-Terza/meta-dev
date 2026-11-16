@@ -1,4 +1,4 @@
-use syn::Expr;
+use syntax::Expr;
 
 #[derive(Debug)]
 pub(super) struct Applied;

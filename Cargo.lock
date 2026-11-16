@@ -74,7 +74,7 @@ version = "0.1.0"
 dependencies = [
  "lint-layout",
  "newtype",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -85,7 +85,7 @@ dependencies = [
  "laws",
  "lint-layout",
  "newtype",
- "proc-macro2",
+ "syntax",
 ]
 
 [[package]]
@@ -1037,7 +1037,7 @@ dependencies = [
  "lint-transition-graph",
  "newtype",
  "serde_json",
- "syn 2.0.119",
+ "syntax",
  "text-lines",
  "thiserror",
  "workspace-metadata",
@@ -1055,9 +1055,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1319,7 +1317,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1331,7 +1329,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1343,7 +1341,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1358,7 +1356,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1370,8 +1368,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1383,9 +1380,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "newtype",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
  "workspace-metadata",
 ]
 
@@ -1433,7 +1428,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1445,8 +1440,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1491,8 +1485,7 @@ dependencies = [
  "lint-layout",
  "lint-sweep",
  "newtype",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1506,7 +1499,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1527,9 +1520,8 @@ dependencies = [
  "file-ports",
  "laws",
  "newtype",
- "proc-macro2",
  "serde_core",
- "syn 2.0.119",
+ "syntax",
  "text-lines",
  "thiserror",
  "toml",
@@ -1547,8 +1539,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1560,7 +1551,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1573,8 +1564,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1598,8 +1588,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1613,7 +1602,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1625,7 +1614,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1637,8 +1626,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1659,7 +1647,7 @@ dependencies = [
  "lint-file",
  "lint-layout",
  "ra-ap-rustc_lexer",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1671,8 +1659,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1684,7 +1671,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1696,7 +1683,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1710,8 +1697,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1723,7 +1709,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1736,7 +1722,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1776,9 +1762,17 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
+]
+
+[[package]]
+name = "lint-node-recursion"
+version = "0.1.0"
+dependencies = [
+ "graph",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
 ]
 
 [[package]]
@@ -1792,7 +1786,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1803,7 +1797,7 @@ dependencies = [
  "laws",
  "lint-layout",
  "lint-mandatory-laws",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1830,9 +1824,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
  "text-lines",
  "workspace-metadata",
 ]
@@ -1856,7 +1848,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1882,7 +1874,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1895,7 +1887,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1921,7 +1913,7 @@ dependencies = [
  "lint-roots",
  "newtype",
  "serde_json",
- "syn 2.0.119",
+ "syntax",
  "thiserror",
  "workspace-metadata",
 ]
@@ -1936,9 +1928,7 @@ dependencies = [
  "lint-layout",
  "lint-sweep",
  "newtype",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -1964,9 +1954,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2025,6 +2013,7 @@ dependencies = [
  "lint-no-plaintext",
  "lint-no-test-io",
  "lint-no-test-only-api",
+ "lint-node-recursion",
  "lint-paired-apis",
  "lint-port-batching",
  "lint-port-dependencies",
@@ -2076,8 +2065,7 @@ dependencies = [
  "lint-layout",
  "lint-sweep",
  "newtype",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2091,7 +2079,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "sqlformat",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2101,7 +2089,7 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2119,8 +2107,7 @@ dependencies = [
  "lint-process-starters",
  "lint-sweep",
  "newtype",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2133,8 +2120,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2154,9 +2140,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2168,8 +2152,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "proc-macro2",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2181,7 +2164,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2193,7 +2176,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2341,9 +2324,7 @@ dependencies = [
 name = "named-derive"
 version = "0.1.0"
 dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2362,9 +2343,7 @@ dependencies = [
 name = "newtype-derive"
 version = "0.1.0"
 dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2453,9 +2432,7 @@ name = "port-derive"
 version = "0.1.0"
 dependencies = [
  "grammar-ident",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "syntax",
 ]
 
 [[package]]
@@ -2498,12 +2475,9 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "laws",
- "proc-macro2",
- "quote",
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "syn 2.0.119",
  "thiserror",
 ]
 
@@ -2513,17 +2487,20 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "exit",
+ "file-ports",
  "golden",
+ "graph-reader",
  "hex",
  "libsqlite3-sys",
- "proc-macro2",
+ "lint-layout",
+ "lint-reader",
+ "lint-store-queries",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "sqlx",
  "sqlx-core",
  "sqlx-sqlite",
- "syn 2.0.119",
  "tempfile",
  "thiserror",
  "tokio",
@@ -3019,13 +2996,11 @@ version = "0.1.0"
 dependencies = [
  "grammar-migration",
  "hex",
- "proc-macro2",
  "query-cache",
- "quote",
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "syn 2.0.119",
+ "syntax",
  "thiserror",
 ]
 
@@ -3124,6 +3099,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "syntax"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]

@@ -2,7 +2,7 @@ mod boundary;
 
 use std::collections::BTreeMap;
 
-use syn::{Expr, ItemConst, Local};
+use syntax::{Expr, ItemConst, Local};
 
 use lint_core::Syntax;
 use lint_layout::Name;

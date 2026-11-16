@@ -1,10 +1,10 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
-use proc_macro2::Span;
 use std::path::Path;
+use syntax::Span;
 
-use syn::{
+use syntax::{
     Expr, ExprCast, ExprConst, ExprForLoop, ExprLoop, ExprRepeat, ExprWhile, ImplItemConst, ImplItemFn, ItemConst,
     ItemFn, ItemMod, ItemStatic, Macro, TraitItemConst, TraitItemFn, TypeArray, Variant,
 };
@@ -47,7 +47,7 @@ impl SweptLint for ConstShape {
 }
 
 impl Context {
-    fn of_fn(constness: Option<&syn::token::Const>) -> Context {
+    fn of_fn(constness: Option<&syntax::token::Const>) -> Context {
         constness.map_or(Context::Surface, |_| Context::Const)
     }
 }

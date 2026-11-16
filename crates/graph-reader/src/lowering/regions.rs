@@ -1,4 +1,4 @@
-use syn::{Attribute, ItemImpl, ItemMod};
+use syntax::{Attribute, ItemImpl, ItemMod};
 
 use graph::{Ground, Reach, Region, Within, Zone};
 use lint_core::{Gate, SourceFile, Walk};

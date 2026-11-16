@@ -1,8 +1,8 @@
 mod bounds;
 
 use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
-use syn::spanned::Spanned;
-use syn::{
+use syntax::Spanned;
+use syntax::{
     AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics, Ident,
     ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, TraitBoundModifier,
     Type, TypeParam, TypeParamBound, TypePath, WherePredicate,
@@ -97,10 +97,10 @@ impl TypeParameter {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct ReceiverSyntax<'syn>(&'syn syn::Receiver);
+pub struct ReceiverSyntax<'syn>(&'syn syntax::Receiver);
 
-impl<'syn> From<&'syn syn::Receiver> for ReceiverSyntax<'syn> {
-    fn from(written: &'syn syn::Receiver) -> ReceiverSyntax<'syn> {
+impl<'syn> From<&'syn syntax::Receiver> for ReceiverSyntax<'syn> {
+    fn from(written: &'syn syntax::Receiver) -> ReceiverSyntax<'syn> {
         ReceiverSyntax(written)
     }
 }
@@ -227,7 +227,7 @@ impl InScope {
         }
     }
 
-    fn path_lowered(&self, path: &syn::Path, position: Position) -> TypeRef<Written> {
+    fn path_lowered(&self, path: &syntax::Path, position: Position) -> TypeRef<Written> {
         match self.held(path, position) {
             Some(held) => Projecting { scope: self }.held(held, path),
             None => Bracketed { scope: self }.named(path, position),
@@ -245,7 +245,7 @@ impl InScope {
         }
     }
 
-    fn held(&self, path: &syn::Path, position: Position) -> Option<TypeRef<Written>> {
+    fn held(&self, path: &syntax::Path, position: Position) -> Option<TypeRef<Written>> {
         let first = path.segments.first().map(|first| Name::from(&first.ident));
         let declared = first.as_ref().and_then(|head| self.generic(head));
         let parameter = declared.map(|name| {
@@ -335,12 +335,12 @@ struct Bracketed<'scope> {
 }
 
 impl Bracketed<'_> {
-    fn named(self, path: &syn::Path, position: Position) -> TypeRef<Written> {
+    fn named(self, path: &syntax::Path, position: Position) -> TypeRef<Written> {
         let listed = self.last_listed(path);
         TypeRef::Named(Named::bound(Written::path(UsePath::from(path), position), listed.arguments, listed.bindings))
     }
 
-    fn last_listed(self, path: &syn::Path) -> Arguments {
+    fn last_listed(self, path: &syntax::Path) -> Arguments {
         path.segments.last().map_or_default(|last| self.listed(&last.arguments))
     }
 
@@ -359,22 +359,22 @@ struct Projecting<'scope> {
 }
 
 impl Projecting<'_> {
-    fn held(self, held: TypeRef<Written>, path: &syn::Path) -> TypeRef<Written> {
+    fn held(self, held: TypeRef<Written>, path: &syntax::Path) -> TypeRef<Written> {
         match path.segments.get(1) {
             Some(_) => TypeRef::Projected(Projection::new(held, self.carried(path), Self::associated(path))),
             None => held,
         }
     }
 
-    fn qualified(self, qself: &QSelf, path: &syn::Path) -> TypeRef<Written> {
+    fn qualified(self, qself: &QSelf, path: &syntax::Path) -> TypeRef<Written> {
         TypeRef::Projected(Projection::new(self.scope.lowered(&qself.ty), self.carried(path), Self::associated(path)))
     }
 
-    fn associated(path: &syn::Path) -> Option<Name> {
+    fn associated(path: &syntax::Path) -> Option<Name> {
         path.segments.last().map(|last| Name::from(&last.ident))
     }
 
-    fn carried(self, path: &syn::Path) -> Vec<TypeRef<Written>> {
+    fn carried(self, path: &syntax::Path) -> Vec<TypeRef<Written>> {
         let bracketed = Bracketed { scope: self.scope };
         path.segments.iter().flat_map(|segment| bracketed.listed(&segment.arguments).types()).collect()
     }

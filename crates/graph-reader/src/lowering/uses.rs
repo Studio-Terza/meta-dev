@@ -1,7 +1,7 @@
 mod tokens;
 
-use syn::spanned::Spanned;
-use syn::{ExprPath, Macro, QSelf, Type, TypeParamBound};
+use syntax::Spanned;
+use syntax::{ExprPath, Macro, QSelf, Type, TypeParamBound};
 
 use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved};
 use lint_layout::Position;
@@ -89,11 +89,11 @@ impl Dispatch {
         }
     }
 
-    fn qualified(qself: &QSelf, path: &syn::Path) -> Option<UsePath> {
-        let segments: syn::punctuated::Punctuated<syn::PathSegment, syn::Token![::]> =
+    fn qualified(qself: &QSelf, path: &syntax::Path) -> Option<UsePath> {
+        let segments: syntax::Punctuated<syntax::PathSegment, syntax::Token![::]> =
             path.segments.iter().take(qself.position).cloned().collect();
         let present = segments.first().map(|_| ());
-        present.map(|()| UsePath::from(&syn::Path { leading_colon: path.leading_colon, segments }))
+        present.map(|()| UsePath::from(&syntax::Path { leading_colon: path.leading_colon, segments }))
     }
 }
 
@@ -108,13 +108,13 @@ impl Qualified {
             .map_or_else(|| Some(UsePath::from(&expression.path)), |qself| Self::under_type(qself, &expression.path))
     }
 
-    fn under_type(qself: &QSelf, path: &syn::Path) -> Option<UsePath> {
+    fn under_type(qself: &QSelf, path: &syntax::Path) -> Option<UsePath> {
         let trait_named = qself.position.checked_sub(1);
         let own = trait_named.map_or(Some(&*qself.ty), |_| None);
         own.and_then(Self::type_path).map(|inner| UsePath::from(inner).extended(&UsePath::from(path)))
     }
 
-    fn type_path(ty: &Type) -> Option<&syn::Path> {
+    fn type_path(ty: &Type) -> Option<&syntax::Path> {
         match ty {
             Type::Path(inner) => Some(&inner.path),
             _ => None,

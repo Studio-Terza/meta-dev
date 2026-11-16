@@ -11,9 +11,7 @@ doctest = false
 
 [dependencies]
 grammar-ident = { path = "../grammar-ident" }
-proc-macro2.workspace = true
-quote.workspace = true
-syn = { workspace = true, features = ["visit-mut"] }
+syntax = { path = "../syntax" }
 
 [lints]
 workspace = true

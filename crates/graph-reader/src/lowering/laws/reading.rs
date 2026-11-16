@@ -1,7 +1,7 @@
 mod closure;
 
-use syn::punctuated::Punctuated;
-use syn::{Expr, ExprCall, GenericArgument, Macro, Path, PathArguments, QSelf, Token, Type, TypePath};
+use syntax::Punctuated;
+use syntax::{Expr, ExprCall, GenericArgument, Macro, Path, PathArguments, QSelf, Token, Type, TypePath};
 
 use graph::{LawKind, Side};
 use lint_layout::Name;

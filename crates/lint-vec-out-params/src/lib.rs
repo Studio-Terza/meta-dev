@@ -5,8 +5,8 @@ use std::path::Path;
 use finding::Finding;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
-use syn::spanned::Spanned;
-use syn::{ItemImpl, ItemMod, Macro, PathSegment, Signature, Type, TypePath, TypeReference};
+use syntax::Spanned;
+use syntax::{ItemImpl, ItemMod, Macro, PathSegment, Signature, Type, TypePath, TypeReference};
 
 use lint_core::{Headline, Site, SourceFile, Syntax, Violation};
 use lint_layout::{LineNumber, Name, Word};

@@ -2,7 +2,7 @@ mod boundary;
 
 use std::cell::OnceCell;
 
-use syn::{Attribute, ItemImpl, Macro};
+use syntax::{Attribute, ItemImpl, Macro};
 
 use lint_layout::{LineNumber, Name, TestMarks, Word};
 

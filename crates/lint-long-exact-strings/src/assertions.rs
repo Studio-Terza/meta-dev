@@ -8,8 +8,8 @@ use std::path::Path;
 
 use lint_core::{Address, Macros, SourceFile};
 
-use syn::punctuated::Punctuated;
-use syn::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, Token};
+use syntax::Punctuated;
+use syntax::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, Token};
 
 use lint_core::{MacroAliases, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};

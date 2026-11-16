@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use syn::ItemStruct;
+use syntax::ItemStruct;
 
 use lint_core::Home;
 use lint_layout::Name;

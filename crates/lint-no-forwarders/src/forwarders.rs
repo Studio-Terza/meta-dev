@@ -10,7 +10,7 @@ use std::path::Path;
 use impl_target::ImplTarget;
 use parameter::Parameter;
 use struct_fields::StructFields;
-use syn::{Expr, ImplItemFn, ItemImpl, ItemMod, ItemStruct, PathSegment, Stmt};
+use syntax::{Expr, ImplItemFn, ItemImpl, ItemMod, ItemStruct, PathSegment, Stmt};
 
 use super::workspace_types::WorkspaceTypes;
 use callee::Callee;

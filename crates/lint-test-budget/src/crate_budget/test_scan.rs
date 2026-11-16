@@ -1,6 +1,6 @@
-use proc_macro2::Span;
-use syn::spanned::Spanned;
-use syn::{ItemFn, ItemMod, Macro, PathSegment};
+use syntax::Span;
+use syntax::Spanned;
+use syntax::{ItemFn, ItemMod, Macro, PathSegment};
 
 use lint_core::Walk;
 use lint_core::{Macros, SourceFile};

@@ -1,4 +1,4 @@
-use syn::Pat;
+use syntax::Pat;
 
 use crate::finding::Finding;
 

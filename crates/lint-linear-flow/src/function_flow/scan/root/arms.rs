@@ -3,9 +3,9 @@ mod dispatch;
 
 use std::path::Path;
 
-use proc_macro2::Span;
-use syn::spanned::Spanned;
-use syn::{Arm, Expr, ExprIf, ExprMatch};
+use syntax::Span;
+use syntax::Spanned;
+use syntax::{Arm, Expr, ExprIf, ExprMatch};
 
 use lint_core::Site;
 use lint_layout::LineNumber;

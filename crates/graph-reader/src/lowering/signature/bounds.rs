@@ -1,4 +1,4 @@
-use syn::{GenericParam, Generics, Type, TypeParamBound, WherePredicate};
+use syntax::{GenericParam, Generics, Type, TypeParamBound, WherePredicate};
 
 use lint_layout::Name;
 

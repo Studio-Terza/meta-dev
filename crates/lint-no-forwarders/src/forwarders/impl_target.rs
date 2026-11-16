@@ -1,4 +1,4 @@
-use syn::{ItemImpl, PathSegment};
+use syntax::{ItemImpl, PathSegment};
 
 use super::Forwarders;
 use lint_core::Syntax;

@@ -14,7 +14,7 @@ lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 rustc_lexer.workspace = true
-syn.workspace = true
+syntax = { path = "../syntax" }
 
 [lints]
 workspace = true

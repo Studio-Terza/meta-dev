@@ -8,7 +8,7 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::path::Path;
 
-use syn::{Ident, ItemImpl, Type};
+use syntax::{Ident, ItemImpl, Type};
 
 use crate::matching::Matching;
 use crate::word::Word;

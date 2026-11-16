@@ -1,6 +1,6 @@
-use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
-use syn::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, FieldsUnnamed, Index, Member, Type};
+use syntax::Punctuated;
+use syntax::Spanned;
+use syntax::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, FieldsUnnamed, Index, Member, Type};
 
 pub struct OnlyField {
     member: Member,

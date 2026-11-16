@@ -10,7 +10,7 @@ pub enum Failure {
     #[error("cannot read {path}: {source}", path = path.display())]
     Io { path: PathBuf, source: io::Error },
     #[error("cannot parse {path}:{line}: {source}", path = path.display())]
-    Parse { path: PathBuf, line: LineNumber, source: syn::Error },
+    Parse { path: PathBuf, line: LineNumber, source: syntax::Error },
     #[error("cannot parse {path}: {source}", path = path.display())]
     Manifest { path: PathBuf, source: toml::de::Error },
     #[error("no Rust sources found under {path}", path = path.display())]

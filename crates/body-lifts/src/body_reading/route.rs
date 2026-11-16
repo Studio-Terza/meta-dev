@@ -1,4 +1,4 @@
-use syn::{Arm, Expr, ExprMatch, Pat};
+use syntax::{Arm, Expr, ExprMatch, Pat};
 
 use super::BodyReading;
 use super::applied::Applied;

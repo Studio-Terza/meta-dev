@@ -2,7 +2,7 @@ mod crate_reach;
 
 use std::collections::BTreeMap;
 
-use syn::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
+use syntax::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
 
 use super::export::Export;
 use lint_core::SourceFile;

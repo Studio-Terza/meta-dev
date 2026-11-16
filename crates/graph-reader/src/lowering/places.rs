@@ -1,4 +1,4 @@
-use syn::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
+use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
 
 use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
 use lint_core::{Macros, Syntax};

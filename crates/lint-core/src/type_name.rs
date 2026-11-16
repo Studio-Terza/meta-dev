@@ -1,7 +1,7 @@
 use std::fmt;
 
-use quote::ToTokens;
-use syn::{Ident, Type};
+use syntax::ToTokens;
+use syntax::{Ident, Type};
 
 use crate::syntax::Syntax;
 

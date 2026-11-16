@@ -1,9 +1,9 @@
 use std::iter;
 
-use proc_macro2::{Ident, Punct, TokenStream, TokenTree};
-use syn::Path;
-use syn::parse::discouraged::Speculative;
-use syn::parse::{Parse, ParseBuffer, ParseStream};
+use syntax::Path;
+use syntax::parse::Speculative;
+use syntax::parse::{Parse, ParseBuffer, ParseStream};
+use syntax::{Ident, Punct, TokenStream, TokenTree};
 
 #[derive(Debug)]
 pub struct TokenPaths(Vec<Path>);
@@ -13,10 +13,10 @@ impl TokenPaths {
 
     #[must_use]
     pub fn within(tokens: TokenStream) -> Vec<Path> {
-        syn::parse2::<TokenPaths>(tokens).map_or_default(|paths| paths.0)
+        syntax::parse::parse2::<TokenPaths>(tokens).map_or_default(|paths| paths.0)
     }
 
-    fn attempted(input: ParseStream, attempt: &ParseBuffer) -> syn::Result<Vec<Path>> {
+    fn attempted(input: ParseStream, attempt: &ParseBuffer) -> syntax::Result<Vec<Path>> {
         match attempt.call(Path::parse_mod_style) {
             Ok(path) => Ok(Self::advanced(input, attempt, path)),
             Err(_) => Self::skipped(input.parse()?, input),
@@ -28,7 +28,7 @@ impl TokenPaths {
         path.segments.first().map(|_| ()).map(|()| path).into_iter().collect()
     }
 
-    fn skipped(tree: TokenTree, input: ParseStream) -> syn::Result<Vec<Path>> {
+    fn skipped(tree: TokenTree, input: ParseStream) -> syntax::Result<Vec<Path>> {
         match tree {
             TokenTree::Group(group) => Ok(Self::within(group.stream())),
             TokenTree::Punct(punct) => Self::punctuated(&punct, input),
@@ -36,7 +36,7 @@ impl TokenPaths {
         }
     }
 
-    fn punctuated(punct: &Punct, input: ParseStream) -> syn::Result<Vec<Path>> {
+    fn punctuated(punct: &Punct, input: ParseStream) -> syntax::Result<Vec<Path>> {
         Some(punct.as_char())
             .filter(|spelled| *spelled == Self::ACCESS)
             .map_or_else(|| Ok(Vec::new()), |_| input.parse::<Option<Ident>>().map(|_| Vec::new()))
@@ -44,8 +44,10 @@ impl TokenPaths {
 }
 
 impl Parse for TokenPaths {
-    fn parse(input: ParseStream) -> syn::Result<TokenPaths> {
+    fn parse(input: ParseStream) -> syntax::Result<TokenPaths> {
         let steps = iter::from_fn(|| input.cursor().token_tree().map(|_| Self::attempted(input, &input.fork())));
-        steps.collect::<syn::Result<Vec<Vec<Path>>>>().map(|parsed| TokenPaths(parsed.into_iter().flatten().collect()))
+        steps
+            .collect::<syntax::Result<Vec<Vec<Path>>>>()
+            .map(|parsed| TokenPaths(parsed.into_iter().flatten().collect()))
     }
 }

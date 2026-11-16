@@ -3,7 +3,7 @@ mod constructor;
 
 use std::path::Path;
 
-use syn::{Ident, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Type, Visibility};
+use syntax::{Ident, ImplItem, ImplItemFn, ItemEnum, ItemImpl, ItemMod, Type, Visibility};
 
 use constructor::Constructor;
 use lint_core::{Site, Violation};

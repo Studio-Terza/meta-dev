@@ -2,7 +2,7 @@ mod finding;
 
 use std::path::Path;
 
-use syn::{ExprMethodCall, ItemMod};
+use syntax::{ExprMethodCall, ItemMod};
 
 use lint_core::{Gate, Site, Violation};
 use lint_layout::LineNumber;

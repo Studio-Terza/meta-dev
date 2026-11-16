@@ -16,7 +16,7 @@ graph-reader = { path = "../graph-reader" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
-syn.workspace = true
+syntax = { path = "../syntax" }
 
 [dev-dependencies]
 lint-core = { path = "../lint-core" }

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::{UseTree, Visibility};
+use syntax::{UseTree, Visibility};
 
 use lint_core::{Parsed, SourceFile, Syntax};
 use lint_layout::Name;

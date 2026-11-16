@@ -3,9 +3,9 @@ mod transition;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-use syn::{Ident, Token, braced};
+use syntax::Punctuated;
+use syntax::parse::{Parse, ParseStream};
+use syntax::{Ident, Token, braced};
 
 use lint_core::{Site, TypeName, Violation};
 use lint_layout::LineNumber;
@@ -51,7 +51,7 @@ impl Block {
 }
 
 impl Parse for Block {
-    fn parse(input: ParseStream) -> syn::Result<Block> {
+    fn parse(input: ParseStream) -> syntax::Result<Block> {
         let kind = input.parse()?;
         let state: Ident = input.parse()?;
         let content;

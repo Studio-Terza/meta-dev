@@ -2,8 +2,8 @@ use std::slice;
 
 mod gate;
 
-use proc_macro2::{Ident, TokenTree};
-use syn::{Attribute, ItemFn, ItemMod, Macro, MetaList};
+use syntax::{Attribute, ItemFn, ItemMod, Macro, MetaList};
+use syntax::{Ident, TokenTree};
 
 use gate::Gate;
 use lint_core::{Macros, Walk};

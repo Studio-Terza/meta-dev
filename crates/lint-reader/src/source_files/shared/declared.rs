@@ -23,7 +23,7 @@ pub(super) struct Declared {
 pub(super) type Explored = Result<Declared, Failure>;
 
 impl Declared {
-    pub(super) fn read(survey: &Survey, node: &Node<'_>, items: &[syn::Item]) -> Declared {
+    pub(super) fn read(survey: &Survey, node: &Node<'_>, items: &[syntax::Item]) -> Declared {
         let mut declared = Modules::declared_in(survey, node.located().file(), node.children(), items);
         let tests = declared.tests().to_vec();
         let failures = declared.take_failures();

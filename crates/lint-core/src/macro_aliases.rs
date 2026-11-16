@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use syn::{ItemUse, UseRename, UseTree};
+use syntax::{ItemUse, UseRename, UseTree};
 
 use crate::watch::{Descend, Facts, Kind, Watch};
 

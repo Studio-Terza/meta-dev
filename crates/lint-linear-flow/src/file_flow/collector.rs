@@ -1,4 +1,4 @@
-use syn::{
+use syntax::{
     Block, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, ImplItemFn, Item, ItemFn, Local,
     Macro, Signature, TraitItemFn,
 };

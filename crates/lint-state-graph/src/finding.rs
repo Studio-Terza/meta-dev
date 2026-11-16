@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use quote::ToTokens;
-use syn::{Field, Index};
+use syntax::ToTokens;
+use syntax::{Field, Index};
 
 use super::edge::Edge;
 use super::edge_count::EdgeCount;

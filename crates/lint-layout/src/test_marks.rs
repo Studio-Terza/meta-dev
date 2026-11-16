@@ -1,7 +1,7 @@
 mod whole;
 
-use syn::punctuated::Punctuated;
-use syn::{Attribute, Macro, PathSegment, Token};
+use syntax::Punctuated;
+use syntax::{Attribute, Macro, PathSegment, Token};
 
 use crate::name::Name;
 use crate::word::Word;

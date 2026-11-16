@@ -1,5 +1,5 @@
-use proc_macro2::Span;
-use syn::{LitFloat, LitInt};
+use syntax::Span;
+use syntax::{LitFloat, LitInt};
 
 pub trait Numeral {
     fn digits(&self) -> &str;

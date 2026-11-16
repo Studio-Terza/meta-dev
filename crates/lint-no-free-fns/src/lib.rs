@@ -6,7 +6,7 @@ use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use std::path::Path as StdPath;
 
-use syn::{Ident, ItemFn, Path};
+use syntax::{Ident, ItemFn, Path};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -64,7 +64,7 @@ impl<'ast> Watch<'ast> for FreeFns<'_> {
         Descend::Into
     }
 
-    fn on_macro(&mut self, _: &'ast syn::Macro, _: &Facts<'_, syn::Macro>) -> Descend {
+    fn on_macro(&mut self, _: &'ast syntax::Macro, _: &Facts<'_, syntax::Macro>) -> Descend {
         Descend::Expand
     }
 }

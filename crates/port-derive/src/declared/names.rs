@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
-use proc_macro2::TokenStream;
-use quote::ToTokens;
-use syn::Ident;
+use syntax::Ident;
+use syntax::ToTokens;
+use syntax::TokenStream;
 
 use super::boundary::{Derivation, Spelling};
 

@@ -1,7 +1,7 @@
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
-use syn::parse::{Parse, ParseStream};
-use syn::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed};
+use syntax::TokenStream;
+use syntax::parse::{Parse, ParseStream};
+use syntax::{Data, DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed};
+use syntax::{format_ident, quote};
 
 use crate::expanded::Expanding;
 
@@ -25,7 +25,7 @@ impl Columns {
 }
 
 impl Parse for Columns {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Columns> {
+    fn parse(input: ParseStream<'_>) -> syntax::Result<Columns> {
         let row: DeriveInput = input.parse()?;
         let fields = Columns::fields(&row.data).ok_or_else(|| Error::new_spanned(&row, Columns::UNNAMED))?;
         Ok(Columns { row, fields })
@@ -33,7 +33,7 @@ impl Parse for Columns {
 }
 
 impl Expanding for Columns {
-    fn expansion(self) -> syn::Result<TokenStream> {
+    fn expansion(self) -> syntax::Result<TokenStream> {
         let Columns { row: DeriveInput { vis, ident, .. }, fields } = self;
         let raw = format_ident!("{}Raw", ident);
         let visible = fields.iter().map(|field| &field.vis);

@@ -1,6 +1,6 @@
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::Ident;
+use syntax::Ident;
+use syntax::TokenStream;
+use syntax::quote;
 
 use super::boundary::Spelling;
 use super::method::Method;

@@ -13,7 +13,7 @@ impl Shapes {
     }
 
     fn read(text: &str, equivalence: Equivalence) -> Reading {
-        Reading::erasing(text.parse::<proc_macro2::TokenStream>().unwrap_or_default(), equivalence)
+        Reading::erasing(text.parse::<syntax::TokenStream>().unwrap_or_default(), equivalence)
     }
 
     fn alike_with_names_erased(pair: &[&str]) -> bool {

@@ -3,7 +3,7 @@ mod impl_kind;
 pub use impl_kind::ImplKind;
 
 use crate::declarations::Vertex;
-use syn::{ImplItemFn, ItemImpl, Visibility};
+use syntax::{ImplItemFn, ItemImpl, Visibility};
 
 use super::declarations::Declarations;
 use super::function_shape::FunctionShape;

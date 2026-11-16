@@ -6,7 +6,7 @@ use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
 use std::collections::BTreeMap;
 
 use finding::Finding;
-use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro, Visibility};
+use syntax::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro, Visibility};
 
 use lint_core::Bound;
 use lint_core::Site;

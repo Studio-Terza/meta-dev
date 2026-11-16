@@ -5,6 +5,8 @@ use graph::{ItemKind, ItemPath, Model, Placed, Quoted, Resolved};
 use lint_core::Site;
 use lint_layout::{Word, words};
 
+use crate::statement::Statement;
+
 use boundary::Sql;
 pub(crate) use unformatted::Unformatted;
 
@@ -24,6 +26,11 @@ impl<'model> Queries<'model> {
     pub(crate) fn unformatted(&self, placed: Placed<'model, &'model Quoted>) -> Option<Site<'model>> {
         let quoted = placed.entity();
         self.query(quoted.invoked()).and_then(|_| Sql::from(quoted.as_ref()).unformatted()).map(|_| placed.site())
+    }
+
+    pub(crate) fn sql(&self, placed: Placed<'model, &'model Quoted>) -> Option<Statement> {
+        let quoted = placed.entity();
+        self.query(quoted.invoked()).and_then(|_| Sql::from(quoted.as_ref()).unquoted()).map(Statement::from)
     }
 
     fn query(&self, invoked: &Resolved) -> Option<&ItemPath> {

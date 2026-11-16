@@ -2,8 +2,8 @@ mod spread;
 
 use std::mem;
 
-use quote::ToTokens;
-use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
+use syntax::ToTokens;
+use syntax::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
 
 use body_shape::Reading;
 use equivalence::Equivalence;

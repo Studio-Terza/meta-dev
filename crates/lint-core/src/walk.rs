@@ -1,7 +1,7 @@
-use syn::punctuated::Punctuated;
+use syntax::Punctuated;
 
 use crate::syntax::Syntax;
-use syn::{Attribute, ItemImpl, Meta, MetaList, Token};
+use syntax::{Attribute, ItemImpl, Meta, MetaList, Token};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Walk {

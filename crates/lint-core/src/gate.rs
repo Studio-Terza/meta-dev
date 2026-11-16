@@ -1,6 +1,6 @@
 mod suffix;
 
-use syn::ItemMod;
+use syntax::ItemMod;
 
 use lint_layout::{Name, Word};
 use lint_placement::Placement;

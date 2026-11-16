@@ -1,6 +1,6 @@
-use proc_macro2::{TokenStream, TokenTree};
-use quote::ToTokens;
-use syn::{Ident, Signature};
+use syntax::ToTokens;
+use syntax::{Ident, Signature};
+use syntax::{TokenStream, TokenTree};
 
 #[derive(Debug)]
 pub(super) struct Constructor;

@@ -1,5 +1,5 @@
 use newtype::Display;
-use proc_macro2::Span;
+use syntax::Span;
 
 #[derive(Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LineNumber(usize);

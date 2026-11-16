@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use syntax::{Span, TokenStream};
 
 #[derive(Debug)]
 pub struct Spread;

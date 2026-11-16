@@ -12,7 +12,7 @@ doctest = false
 [dependencies]
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
-syn.workspace = true
+syntax = { path = "../syntax" }
 
 [dev-dependencies]
 lint-core = { path = "../lint-core" }

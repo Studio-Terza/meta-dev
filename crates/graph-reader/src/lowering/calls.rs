@@ -1,5 +1,5 @@
-use syn::spanned::Spanned;
-use syn::{ExprCall, ExprMacro, ExprMethodCall};
+use syntax::Spanned;
+use syntax::{ExprCall, ExprMacro, ExprMethodCall};
 
 use graph::{Building, Call, Callee, ItemPath, MacroCall, Region};
 use lint_core::Syntax;
@@ -27,7 +27,7 @@ impl Built for CallRow {
 
 #[derive(Clone, Copy, Debug)]
 struct CallPath<'path> {
-    path: &'path syn::Path,
+    path: &'path syntax::Path,
 }
 
 impl CallPath<'_> {

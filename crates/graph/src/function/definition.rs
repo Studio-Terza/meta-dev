@@ -111,6 +111,22 @@ impl Receiving {
 }
 
 impl<'name> CallOwner<'name> {
+    #[must_use]
+    pub fn known(self) -> Option<CallOwner<'name>> {
+        match self {
+            CallOwner::Type(_) | CallOwner::Free => Some(self),
+            CallOwner::Unknown => None,
+        }
+    }
+
+    #[must_use]
+    pub fn type_name(self) -> Option<&'name Name> {
+        match self {
+            CallOwner::Type(owner) => Some(owner),
+            CallOwner::Free | CallOwner::Unknown => None,
+        }
+    }
+
     const OWN_TYPE: Word<'static> = Word::new("Self");
 
     fn of_caller(caller: Option<&'name Name>) -> CallOwner<'name> {

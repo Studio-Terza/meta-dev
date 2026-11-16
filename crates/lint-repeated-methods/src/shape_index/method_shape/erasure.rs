@@ -1,6 +1,6 @@
-use proc_macro2::{Group, Ident, TokenStream, TokenTree};
-use quote::ToTokens;
-use syn::FnArg;
+use syntax::FnArg;
+use syntax::ToTokens;
+use syntax::{Group, Ident, TokenStream, TokenTree};
 
 use lint_layout::Name;
 

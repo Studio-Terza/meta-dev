@@ -1,5 +1,5 @@
 use sqlformat::{FormatOptions, QueryParams};
-use syn::LitStr;
+use syntax::LitStr;
 
 use graph::Quote;
 
@@ -15,10 +15,13 @@ impl<'model> From<&'model Quote> for Sql<'model> {
 }
 
 impl Sql<'_> {
+    pub(super) fn unquoted(&self) -> Option<String> {
+        syntax::parse::parse_str::<LitStr>(self.0.as_ref()).ok().map(|literal| literal.value())
+    }
+
     pub(super) fn unformatted(&self) -> Option<Unformatted> {
         let written: &str = self.0.as_ref();
-        let literal = syn::parse_str::<LitStr>(written).ok()?;
-        let formatted = sqlformat::format(&literal.value(), &QueryParams::None, &FormatOptions::default());
+        let formatted = sqlformat::format(&self.unquoted()?, &QueryParams::None, &FormatOptions::default());
         (written != format!("r#\"\n{formatted}\n\"#")).then_some(Unformatted)
     }
 }

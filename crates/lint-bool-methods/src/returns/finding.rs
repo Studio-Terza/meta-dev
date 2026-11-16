@@ -1,6 +1,6 @@
 use std::fmt;
 
-use syn::Ident;
+use syntax::Ident;
 
 use lint_core::Fix;
 use lint_layout::Name;

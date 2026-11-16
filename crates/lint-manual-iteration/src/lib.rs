@@ -1,11 +1,11 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
-use proc_macro2::Span;
 use std::path::Path;
-use syn::spanned::Spanned;
+use syntax::Span;
+use syntax::Spanned;
 
-use syn::{
+use syntax::{
     Block, Expr, ExprForLoop, ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Stmt,
 };
 

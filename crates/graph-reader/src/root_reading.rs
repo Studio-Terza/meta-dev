@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use syn::{File, Item, ItemMod};
+use syntax::{File, Item, ItemMod};
 
 use graph::{CrateExports, CrateRoots, Implementation, Model, Origin, Root};
 use lint_layout::{CrateSource, Crates, Dependencies, Name, PackageName};
@@ -58,7 +58,7 @@ impl RootFile {
     }
 
     fn parsed(source: &CrateSource) -> Option<Root> {
-        let exports = Self::exports(&syn::parse_file(source.root().as_ref()).ok()?, source.dependencies());
+        let exports = Self::exports(&syntax::parse::parse_file(source.root().as_ref()).ok()?, source.dependencies());
         Some(Root::formed(source.form(), exports))
     }
 

@@ -1,6 +1,6 @@
-use proc_macro2::TokenStream;
-use quote::ToTokens;
-use syn::Type;
+use syntax::ToTokens;
+use syntax::TokenStream;
+use syntax::Type;
 
 use newtype::{Arbitrary, Display, Newtype};
 

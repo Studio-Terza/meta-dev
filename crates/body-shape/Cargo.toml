@@ -13,7 +13,7 @@ doctest = false
 equivalence = { path = "../equivalence" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
-proc-macro2.workspace = true
+syntax = { path = "../syntax" }
 
 [dev-dependencies]
 laws = { path = "../laws" }
