@@ -60,16 +60,6 @@ pub(super) enum Layer {
     Extern,
 }
 
-impl Layer {
-    const ORDER: [Layer; 3] = [Layer::Declared, Layer::Imported, Layer::Extern];
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Placed<'name> {
-    key: Key<'name>,
-    layer: Layer,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Row<'rows> {
     layer: Layer,
@@ -88,14 +78,18 @@ impl<'rows> Row<'rows> {
 }
 
 #[derive(Debug, Default)]
-pub(super) struct Explicit<'rows>(BTreeMap<Placed<'rows>, Vec<Row<'rows>>>);
+pub(super) struct Explicit<'rows>(BTreeMap<Key<'rows>, Vec<Row<'rows>>>);
 
 impl<'rows> FromIterator<Keyed<'rows, Row<'rows>>> for Explicit<'rows> {
     fn from_iter<Rows: IntoIterator<Item = Keyed<'rows, Row<'rows>>>>(rows: Rows) -> Explicit<'rows> {
-        Explicit(rows.into_iter().fold(BTreeMap::new(), |mut placed: BTreeMap<Placed<'rows>, Vec<Row<'rows>>>, row| {
-            placed.entry(Placed { key: row.key, layer: row.value.layer }).or_default().push(row.value);
-            placed
-        }))
+        let mut placed: Vec<Keyed<'rows, Row<'rows>>> = rows.into_iter().collect();
+        placed.sort_by(|left, right| left.key.cmp(&right.key).then(left.value.layer.cmp(&right.value.layer)));
+        let grouped = placed.chunk_by(|left, right| left.key == right.key).filter_map(|same| {
+            let first = same.first()?;
+            let layer = same.iter().take_while(|row| row.value.layer == first.value.layer).map(|row| row.value);
+            Some((first.key, layer.collect()))
+        });
+        Explicit(grouped.collect())
     }
 }
 
@@ -108,7 +102,7 @@ impl<'rows> Explicit<'rows> {
     }
 
     fn named(&self, key: Key<'_>, sight: Sight) -> Option<View<'rows>> {
-        let rows = Layer::ORDER.iter().find_map(|layer| self.0.get(&Placed { key, layer: *layer }))?;
+        let rows = self.0.get(&key)?;
         Some(rows.iter().fold(View::ABSENT, |found, row| found.union(row.seen(sight))))
     }
 }
@@ -240,7 +234,7 @@ struct Level<'tables, 'rows> {
 
 impl<'tables, 'rows> Level<'tables, 'rows> {
     fn exposure(self, sight: Sight) -> Exposed<'rows> {
-        let explicit = self.explicit.0.keys().map(|placed| placed.key);
+        let explicit = self.explicit.0.keys().copied();
         let globbed = self.globs(None).flat_map(|glob| glob.exposed.names.keys().copied());
         let keys: BTreeSet<Key<'rows>> = explicit.chain(globbed).collect();
         let lookup = Lookup::new(sight, None, Reading::Written);
