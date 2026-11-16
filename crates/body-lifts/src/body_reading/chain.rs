@@ -1,8 +1,6 @@
-use syntax::{Expr, ExprMethodCall};
+use syntax::{Application, Expr, ExprMethodCall, Spine};
 
 use lint_layout::{Name, Whole, Word, words};
-
-use super::applied::Applied;
 
 #[derive(Debug)]
 pub(super) struct Chain<'body> {
@@ -16,9 +14,16 @@ impl<'body> Chain<'body> {
     const MAP: [Word<'static>; 1] = words!["map"];
 
     pub(super) fn unwound(found: &'body Expr) -> Chain<'body> {
-        match found {
-            Expr::MethodCall(call) => Self::unwound(&call.receiver).pushed(call),
-            _ => Chain { calls: Vec::new(), root: found },
+        let mut calls: Vec<&ExprMethodCall> = Spine::from(found).map_while(Self::called).collect();
+        calls.reverse();
+        let root = Spine::from(found).find(|node| Self::called(node).is_none()).unwrap_or(found);
+        Chain { calls, root }
+    }
+
+    fn called(node: &'body Expr) -> Option<&'body ExprMethodCall> {
+        match node {
+            Expr::MethodCall(call) => Some(call),
+            _ => None,
         }
     }
 
@@ -38,18 +43,13 @@ impl<'body> Chain<'body> {
                 mapping_calls.iter().flat_map(|call| call.args.iter()).all(|argument| Self::mapping(argument).is_some())
             })
             .and(mapped)
-            .and_then(|_| Applied::traced(self.root))
-    }
-
-    fn pushed(mut self, call: &'body ExprMethodCall) -> Chain<'body> {
-        self.calls.push(call);
-        self
+            .and_then(|_| Application::root(self.root))
     }
 
     fn mapping(argument: &'body Expr) -> Option<&'body Expr> {
         match argument {
             Expr::Path(_) => Some(argument),
-            Expr::Closure(closure) => Applied::traced(&closure.body).map(|_| argument),
+            Expr::Closure(closure) => Application::root(&closure.body).map(|_| argument),
             _ => None,
         }
     }

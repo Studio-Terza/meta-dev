@@ -8,6 +8,7 @@ use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
+use syntax::{Past, Spine};
 
 use syntax::{
     Arm, BinOp, Block, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn,
@@ -27,6 +28,17 @@ use nesting_depth::NestingDepth;
 #[derive(Debug)]
 pub struct FnShape;
 
+#[derive(Debug)]
+struct BooleanMethod;
+
+impl BooleanMethod {
+    fn named(name: &Name) -> Option<()> {
+        name.matches::<Prefix>(&FnShape::BOOLEAN_PREFIXES)
+            .or_else(|| name.matches::<Whole>(FnShape::BOOLEAN_METHODS))
+            .map(|_| ())
+    }
+}
+
 impl FnShape {
     const BOOLEAN_METHODS: &[Word<'static>] = &words!["contains", "all", "any", "starts_with", "ends_with", "eq", "ne"];
     const BOOLEAN_PREFIXES: [Word<'static>; 2] = words!["is_", "has_"];
@@ -35,7 +47,12 @@ impl FnShape {
     const FOLDS: [&'static str; 2] = ["fold", "try_fold"];
 
     fn boolean(expr: &Expr) -> Option<&Expr> {
-        match expr {
+        let inner = Spine::from(expr).past(|node| matches!(node, Expr::Paren(_)))?;
+        Self::bare_boolean(inner).map(|()| expr)
+    }
+
+    fn bare_boolean(peeled: Past<'_, Expr>) -> Option<()> {
+        match peeled.node() {
             Expr::Binary(binary) => matches!(
                 binary.op,
                 BinOp::Eq(_)
@@ -47,17 +64,12 @@ impl FnShape {
                     | BinOp::And(_)
                     | BinOp::Or(_)
             )
-            .then_some(expr),
-            Expr::Unary(unary) => matches!(unary.op, UnOp::Not(_)).then_some(expr),
-            Expr::Lit(literal) => matches!(literal.lit, Lit::Bool(_)).then_some(expr),
-            Expr::Paren(paren) => Self::boolean(&paren.expr).map(|_| expr),
-            Expr::MethodCall(call) => Self::boolean_method(&Name::from(&call.method)).map(|_| expr),
+            .then_some(()),
+            Expr::Unary(unary) => matches!(unary.op, UnOp::Not(_)).then_some(()),
+            Expr::Lit(literal) => matches!(literal.lit, Lit::Bool(_)).then_some(()),
+            Expr::MethodCall(call) => BooleanMethod::named(&Name::from(&call.method)),
             _ => None,
         }
-    }
-
-    fn boolean_method(name: &Name) -> Option<Word<'static>> {
-        name.matches::<Prefix>(&Self::BOOLEAN_PREFIXES).or_else(|| name.matches::<Whole>(Self::BOOLEAN_METHODS))
     }
 
     fn binds_bool(local: &Local) -> Option<&Local> {

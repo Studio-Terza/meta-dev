@@ -1,4 +1,4 @@
-use syntax::Pat;
+use syntax::{Pat, PatEdge, PatReached, PatTree};
 
 use crate::finding::Finding;
 
@@ -10,18 +10,8 @@ pub enum Dispatch {
 
 impl From<&Pat> for Dispatch {
     fn from(pattern: &Pat) -> Dispatch {
-        match pattern {
-            Pat::Lit(_) | Pat::Range(_) | Pat::Tuple(_) | Pat::Slice(_) | Pat::Const(_) => Dispatch::Value,
-            Pat::Or(alternatives) => Self::worst(alternatives.cases.iter().map(Dispatch::from)),
-            Pat::Reference(reference) => Dispatch::from(&*reference.pat),
-            Pat::Paren(inner) => Dispatch::from(&*inner.pat),
-            Pat::Ident(binding) => {
-                binding.subpat.as_ref().map_or(Dispatch::Variant, |(_, inner)| Dispatch::from(&**inner))
-            }
-            Pat::TupleStruct(variant) => Self::worst(variant.elems.iter().map(Self::inside)),
-            Pat::Struct(variant) => Self::worst(variant.fields.iter().map(|field| Self::inside(&field.pat))),
-            _ => Dispatch::Variant,
-        }
+        let reached = PatTree::reached(pattern, &|pat, edge| Dispatch::opens(pat, edge).is_some());
+        reached.into_iter().find_map(Dispatch::valued).map_or(Dispatch::Variant, |()| Dispatch::Value)
     }
 }
 
@@ -33,15 +23,28 @@ impl Dispatch {
         }
     }
 
-    fn inside(pattern: &Pat) -> Dispatch {
-        match pattern {
-            Pat::Tuple(tuple) => Self::worst(tuple.elems.iter().map(Self::inside)),
-            Pat::Slice(slice) => Self::worst(slice.elems.iter().map(Self::inside)),
-            other => Dispatch::from(other),
+    fn opens(pat: &Pat, edge: PatEdge) -> Option<()> {
+        match pat {
+            Pat::Tuple(_) | Pat::Slice(_) => Self::nested(edge),
+            Pat::Or(_) | Pat::Reference(_) | Pat::Paren(_) | Pat::Ident(_) | Pat::TupleStruct(_) | Pat::Struct(_) => {
+                Some(())
+            }
+            _ => None,
         }
     }
 
-    fn worst(dispatches: impl Iterator<Item = Dispatch>) -> Dispatch {
-        dispatches.max().unwrap_or(Dispatch::Variant)
+    fn valued(reached: PatReached<'_>) -> Option<()> {
+        match reached.pat() {
+            Pat::Lit(_) | Pat::Range(_) | Pat::Const(_) => Some(()),
+            Pat::Tuple(_) | Pat::Slice(_) => Self::nested(reached.edge()).map_or(Some(()), |()| None),
+            _ => None,
+        }
+    }
+
+    fn nested(edge: PatEdge) -> Option<()> {
+        match edge {
+            PatEdge::Field | PatEdge::Element => Some(()),
+            PatEdge::Root | PatEdge::Alternative | PatEdge::Inner => None,
+        }
     }
 }

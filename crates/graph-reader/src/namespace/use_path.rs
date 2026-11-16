@@ -1,4 +1,4 @@
-use syntax::{Ident, ItemUse, Path, Token, UseTree};
+use syntax::{Ident, ItemUse, Path, Token, UseLeaf, UseTree};
 
 use std::collections::BTreeSet;
 
@@ -242,7 +242,7 @@ impl UsePath {
 
     pub(super) fn imported(used: &ItemUse) -> Vec<Imported> {
         UsePath { leading: Leading::from(&used.leading_colon), reading: Reading::Imported, segments: Vec::new() }
-            .under(&used.tree)
+            .leaves(&used.tree)
     }
 
     pub(super) fn head(&self) -> Head<'_> {
@@ -297,14 +297,18 @@ impl UsePath {
         }
     }
 
-    fn under(&self, tree: &UseTree) -> Vec<Imported> {
-        match tree {
-            UseTree::Path(path) => self.joined(Name::from(&path.ident)).under(&path.tree),
-            UseTree::Name(named) => self.named(Name::from(&named.ident), Name::from(&named.ident)),
-            UseTree::Rename(renamed) => self.named(Name::from(&renamed.ident), Name::from(&renamed.rename)),
-            UseTree::Group(group) => group.items.iter().flat_map(|member| self.under(member)).collect(),
-            UseTree::Glob(_) => vec![Imported::Glob(self.clone())],
-        }
+    fn leaves(&self, tree: &UseTree) -> Vec<Imported> {
+        UseLeaf::of_tree(tree).iter().flat_map(|leaf| self.leaf(leaf)).collect()
+    }
+
+    fn leaf(&self, leaf: &UseLeaf<'_>) -> Vec<Imported> {
+        let base = leaf.path().iter().fold(self.clone(), |path, segment| path.joined(Name::from(*segment)));
+        let named = leaf.end().named().map(|named| &named.ident);
+        let written = named.or_else(|| leaf.end().renamed().map(|renamed| &renamed.ident)).map(Name::from);
+        let bound = leaf.end().bound().map(Name::from);
+        written
+            .zip(bound)
+            .map_or_else(|| Vec::from([Imported::Glob(base.clone())]), |(ident, binds)| base.named(ident, binds))
     }
 
     fn named(&self, ident: Name, binds: Name) -> Vec<Imported> {

@@ -1,7 +1,8 @@
 mod closure;
 
+use lint_core::Syntax;
 use syntax::Punctuated;
-use syntax::{Expr, ExprCall, GenericArgument, Macro, Path, PathArguments, QSelf, Token, Type, TypePath};
+use syntax::{Expr, ExprCall, GenericArgument, Macro, Past, Path, PathArguments, QSelf, Spine, Token, Type, TypePath};
 
 use graph::{LawKind, Side};
 use lint_layout::Name;
@@ -87,12 +88,15 @@ impl<'scope, 'owner> Checking<'scope, 'owner> {
     }
 
     fn checked(self, argument: &Expr) -> Option<Routed> {
-        match argument {
+        let peeled = Spine::from(argument).past(|node| matches!(node, Expr::Reference(_) | Expr::Paren(_)))?;
+        self.routed(peeled)
+    }
+
+    fn routed(self, peeled: Past<'_, Expr>) -> Option<Routed> {
+        match peeled.node() {
             Expr::Path(found) => self.path(found.qself.as_ref(), &found.path).map(Routed::found),
             Expr::Call(call) => self.called(&call.func).map(Routed::found),
             Expr::Closure(closure) => Some(Routed { operation: Closure::resolved(self, closure) }),
-            Expr::Reference(reference) => self.checked(&reference.expr),
-            Expr::Paren(inner) => self.checked(&inner.expr),
             _ => None,
         }
     }
@@ -123,12 +127,8 @@ impl Routed {
 
 impl Generator<'_> {
     fn operand(self, generator: &Expr) -> Option<LoweredOwner> {
-        match generator {
-            Expr::Call(call) => self.call(call),
-            Expr::MethodCall(call) => self.operand(&call.receiver),
-            Expr::Paren(inner) => self.operand(&inner.expr),
-            _ => None,
-        }
+        let peeled = Spine::from(generator).past(|node| matches!(node, Expr::MethodCall(_) | Expr::Paren(_)))?;
+        Syntax::expr_call(peeled.node()).and_then(|call| self.call(call))
     }
 
     fn call(self, call: &ExprCall) -> Option<LoweredOwner> {

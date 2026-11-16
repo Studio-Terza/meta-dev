@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use syntax::MacroTree;
 use syntax::Punctuated;
 use syntax::{
     Attribute, File, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, StmtMacro,
@@ -9,7 +10,6 @@ use syntax::{
 use graph::{
     Building, CrateExports, Domain, Exposure, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved,
 };
-use lint_core::{Macros, Syntax};
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
@@ -489,12 +489,7 @@ impl Entries {
     }
 
     pub(crate) fn of_root(file: &File) -> Entries {
-        let inside = file
-            .items
-            .iter()
-            .filter_map(Syntax::item_macro)
-            .map(|mac| Entries::of_root(&File { shebang: None, attrs: Vec::new(), items: Macros::items(mac) }));
-        inside.fold(Entries::of_items(&file.items), Entries::merged)
+        Entries::of_items(&file.items).merged(Entries::of_items(&MacroTree::expanded_items(&file.items)))
     }
 
     pub(crate) fn of_block(statements: &[Stmt]) -> Entries {

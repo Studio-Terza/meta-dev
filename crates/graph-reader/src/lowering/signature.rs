@@ -1,12 +1,12 @@
 mod bounds;
 
 use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
-use syntax::Spanned;
 use syntax::{
     AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics, Ident,
     ParenthesizedGenericArguments, PathArguments, PredicateType, QSelf, ReturnType, Signature, TraitBoundModifier,
     Type, TypeParam, TypeParamBound, TypePath, WherePredicate,
 };
+use syntax::{Spanned, TypeFold, TypeTree};
 
 use graph::{
     AliasParameter, Arrayed, Callable, Input, Named, Parameter, Projection, Receiver, Resolved, Sited, Spelling,
@@ -196,53 +196,30 @@ impl InScope {
     }
 
     pub(super) fn bounded<'bound>(&self, bounds: impl Iterator<Item = &'bound TypeParamBound>) -> TypeRef<Written> {
-        Bounding { scope: self }.lowered(bounds)
+        let listed: Vec<&TypeParamBound> = bounds.collect();
+        let fold = self.fold(TypeTree::bounds(&listed));
+        Bounding { lowering: Lowering { scope: self, fold: &fold } }.lowered(listed.into_iter())
     }
 
     pub(super) fn constraints(&self, generics: &Generics) -> Vec<TypeRef<Written>> {
-        let constraints = Constraints { scope: self };
+        let fold = self.fold(TypeTree::from(generics));
+        let constraints = Constraints { lowering: Lowering { scope: self, fold: &fold } };
         let parameters = generics.params.iter().flat_map(|parameter| constraints.of_parameter(parameter));
         let predicates = generics.where_clause.iter().flat_map(|clause| clause.predicates.iter());
         parameters.chain(predicates.flat_map(|predicate| constraints.of_predicate(predicate))).collect()
     }
 
     pub(super) fn lowered(&self, ty: &Type) -> TypeRef<Written> {
-        match ty {
-            Type::Path(path) => self.type_path_lowered(path),
-            Type::Tuple(tuple) => TypeRef::Tuple(tuple.elems.iter().map(|element| self.lowered(element)).collect()),
-            Type::Paren(inner) => self.lowered(&inner.elem),
-            Type::Reference(reference) => TypeRef::Reference(Box::new(self.lowered(&reference.elem))),
-            Type::Ptr(pointer) => TypeRef::Pointer(Box::new(self.lowered(&pointer.elem))),
-            Type::Slice(slice) => TypeRef::Slice(Box::new(self.lowered(&slice.elem))),
-            Type::Array(array) => {
-                TypeRef::Array(Arrayed::new(self.lowered(&array.elem), Measured::types(self, &array.len)))
-            }
-            Type::ImplTrait(bounded) => Bounding { scope: self }.lowered(bounded.bounds.iter()),
-            Type::TraitObject(bounded) => Bounding { scope: self }.lowered(bounded.bounds.iter()),
-            Type::BareFn(function) => TypeRef::Function(Callable::new(
-                function.inputs.iter().map(|input| self.lowered(&input.ty)).collect(),
-                self.output(&function.output).unwrap_or_else(|| TypeRef::Tuple(Vec::new())),
-            )),
-            _ => TypeRef::Opaque,
-        }
+        let fold = self.fold(TypeTree::from(ty));
+        Lowering { scope: self, fold: &fold }.child(ty)
     }
 
-    fn path_lowered(&self, path: &syntax::Path, position: Position) -> TypeRef<Written> {
-        match self.held(path, position) {
-            Some(held) => Projecting { scope: self }.held(held, path),
-            None => Bracketed { scope: self }.named(path, position),
-        }
+    fn fold<'syn>(&self, tree: TypeTree<'syn>) -> TypeFold<'syn, TypeRef<Written>> {
+        TypeFold::over(tree, |fold, ty| Lowering { scope: self, fold }.lowered(ty).unwrap_or(TypeRef::Opaque))
     }
 
     fn with_parameters(self, scope: &InScope) -> InScope {
         InScope { parameters: scope.parameters.clone(), subject: self.subject, bounds: scope.bounds.clone() }
-    }
-
-    fn type_path_lowered(&self, path: &TypePath) -> TypeRef<Written> {
-        match &path.qself {
-            Some(qself) => Projecting { scope: self }.qualified(qself, &path.path),
-            None => self.path_lowered(&path.path, Position::from(path.span())),
-        }
     }
 
     fn held(&self, path: &syntax::Path, position: Position) -> Option<TypeRef<Written>> {
@@ -259,15 +236,62 @@ impl InScope {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Lowering<'low> {
+    scope: &'low InScope,
+    fold: &'low TypeFold<'low, TypeRef<Written>>,
+}
+
+impl Lowering<'_> {
+    fn child(self, ty: &Type) -> TypeRef<Written> {
+        self.fold.take(ty).unwrap_or(TypeRef::Opaque)
+    }
+
+    fn output(self, output: &ReturnType) -> Option<TypeRef<Written>> {
+        match output {
+            ReturnType::Default => None,
+            ReturnType::Type(_, ty) => Some(self.child(ty)),
+        }
+    }
+
+    fn lowered(self, ty: &Type) -> Option<TypeRef<Written>> {
+        match ty {
+            Type::Path(path) => Some(self.type_path_lowered(path)),
+            Type::Tuple(tuple) => Some(TypeRef::Tuple(tuple.elems.iter().map(|element| self.child(element)).collect())),
+            Type::Paren(inner) => Some(self.child(&inner.elem)),
+            Type::Reference(reference) => Some(TypeRef::Reference(Box::new(self.child(&reference.elem)))),
+            Type::Ptr(pointer) => Some(TypeRef::Pointer(Box::new(self.child(&pointer.elem)))),
+            Type::Slice(slice) => Some(TypeRef::Slice(Box::new(self.child(&slice.elem)))),
+            Type::Array(array) => {
+                Some(TypeRef::Array(Arrayed::new(self.child(&array.elem), Measured::types(self, &array.len))))
+            }
+            Type::ImplTrait(bounded) => Some(Bounding { lowering: self }.lowered(bounded.bounds.iter())),
+            Type::TraitObject(bounded) => Some(Bounding { lowering: self }.lowered(bounded.bounds.iter())),
+            Type::BareFn(function) => Some(TypeRef::Function(Callable::new(
+                function.inputs.iter().map(|input| self.child(&input.ty)).collect(),
+                self.output(&function.output).unwrap_or_else(|| TypeRef::Tuple(Vec::new())),
+            ))),
+            _ => None,
+        }
+    }
+
+    fn type_path_lowered(self, path: &TypePath) -> TypeRef<Written> {
+        match &path.qself {
+            Some(qself) => Projecting { lowering: self }.qualified(qself, &path.path),
+            None => Bracketed { lowering: self }.unqualified(path),
+        }
+    }
+}
+
 #[derive(Debug)]
-struct Measured<'scope> {
-    scope: &'scope InScope,
+struct Measured<'low> {
+    lowering: Lowering<'low>,
     found: Vec<TypeRef<Written>>,
 }
 
 impl Measured<'_> {
-    fn types(scope: &InScope, length: &Expr) -> Vec<TypeRef<Written>> {
-        let mut measured = Measured { scope, found: Vec::new() };
+    fn types(lowering: Lowering<'_>, length: &Expr) -> Vec<TypeRef<Written>> {
+        let mut measured = Measured { lowering, found: Vec::new() };
         Sweep::through_expr(length, &mut measured);
         measured.found
     }
@@ -279,28 +303,29 @@ impl<'ast> Watch<'ast> for Measured<'_> {
     }
 
     fn on_type(&mut self, ty: &'ast Type, _: &Facts<'_, Type>) -> Descend {
-        self.found.push(self.scope.lowered(ty));
+        self.found.push(self.lowering.child(ty));
         Descend::Over
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Constraints<'scope> {
-    scope: &'scope InScope,
+struct Constraints<'low> {
+    lowering: Lowering<'low>,
 }
 
 impl Constraints<'_> {
     fn of_parameter(self, parameter: &GenericParam) -> Vec<TypeRef<Written>> {
         match parameter {
             GenericParam::Type(declared) => self.of_type_parameter(declared),
-            GenericParam::Const(declared) => vec![self.scope.lowered(&declared.ty)],
+            GenericParam::Const(declared) => vec![self.lowering.child(&declared.ty)],
             GenericParam::Lifetime(_) => Vec::new(),
         }
     }
 
     fn of_type_parameter(self, declared: &TypeParam) -> Vec<TypeRef<Written>> {
-        let bounded = declared.bounds.first().map(|_| Bounding { scope: self.scope }.lowered(declared.bounds.iter()));
-        let defaults = declared.default.iter().map(|ty| self.scope.lowered(ty));
+        let bounded =
+            declared.bounds.first().map(|_| Bounding { lowering: self.lowering }.lowered(declared.bounds.iter()));
+        let defaults = declared.default.iter().map(|ty| self.lowering.child(ty));
         bounded.into_iter().chain(defaults).collect()
     }
 
@@ -308,8 +333,8 @@ impl Constraints<'_> {
         match predicate {
             WherePredicate::Type(bounded) => {
                 vec![
-                    self.scope.lowered(&bounded.bounded_ty),
-                    Bounding { scope: self.scope }.lowered(bounded.bounds.iter()),
+                    self.lowering.child(&bounded.bounded_ty),
+                    Bounding { lowering: self.lowering }.lowered(bounded.bounds.iter()),
                 ]
             }
             _ => Vec::new(),
@@ -330,11 +355,20 @@ impl Arguments {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Bracketed<'scope> {
-    scope: &'scope InScope,
+struct Bracketed<'low> {
+    lowering: Lowering<'low>,
 }
 
 impl Bracketed<'_> {
+    fn unqualified(self, path: &TypePath) -> TypeRef<Written> {
+        let position = Position::from(path.span());
+        let held = self.lowering.scope.held(&path.path, position);
+        held.map_or_else(
+            || self.named(&path.path, position),
+            |found| Projecting { lowering: self.lowering }.held(found, &path.path),
+        )
+    }
+
     fn named(self, path: &syntax::Path, position: Position) -> TypeRef<Written> {
         let listed = self.last_listed(path);
         TypeRef::Named(Named::bound(Written::path(UsePath::from(path), position), listed.arguments, listed.bindings))
@@ -346,16 +380,16 @@ impl Bracketed<'_> {
 
     fn listed(self, arguments: &PathArguments) -> Arguments {
         match arguments {
-            PathArguments::AngleBracketed(bracketed) => Angled { scope: self.scope }.listed(bracketed),
-            PathArguments::Parenthesized(sugared) => Angled { scope: self.scope }.sugared(sugared),
+            PathArguments::AngleBracketed(bracketed) => Angled { lowering: self.lowering }.listed(bracketed),
+            PathArguments::Parenthesized(sugared) => Angled { lowering: self.lowering }.sugared(sugared),
             PathArguments::None => Arguments::default(),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Projecting<'scope> {
-    scope: &'scope InScope,
+struct Projecting<'low> {
+    lowering: Lowering<'low>,
 }
 
 impl Projecting<'_> {
@@ -367,7 +401,7 @@ impl Projecting<'_> {
     }
 
     fn qualified(self, qself: &QSelf, path: &syntax::Path) -> TypeRef<Written> {
-        TypeRef::Projected(Projection::new(self.scope.lowered(&qself.ty), self.carried(path), Self::associated(path)))
+        TypeRef::Projected(Projection::new(self.lowering.child(&qself.ty), self.carried(path), Self::associated(path)))
     }
 
     fn associated(path: &syntax::Path) -> Option<Name> {
@@ -375,14 +409,14 @@ impl Projecting<'_> {
     }
 
     fn carried(self, path: &syntax::Path) -> Vec<TypeRef<Written>> {
-        let bracketed = Bracketed { scope: self.scope };
+        let bracketed = Bracketed { lowering: self.lowering };
         path.segments.iter().flat_map(|segment| bracketed.listed(&segment.arguments).types()).collect()
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Bounding<'scope> {
-    scope: &'scope InScope,
+struct Bounding<'low> {
+    lowering: Lowering<'low>,
 }
 
 impl Bounding<'_> {
@@ -392,17 +426,17 @@ impl Bounding<'_> {
 
     fn bound(self, bound: &TypeParamBound) -> Option<TypeRef<Written>> {
         match bound {
-            TypeParamBound::Trait(trait_bound) => {
-                Some(Bracketed { scope: self.scope }.named(&trait_bound.path, Position::from(trait_bound.path.span())))
-            }
+            TypeParamBound::Trait(trait_bound) => Some(
+                Bracketed { lowering: self.lowering }.named(&trait_bound.path, Position::from(trait_bound.path.span())),
+            ),
             _ => None,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Angled<'scope> {
-    scope: &'scope InScope,
+struct Angled<'low> {
+    lowering: Lowering<'low>,
 }
 
 impl Angled<'_> {
@@ -412,39 +446,39 @@ impl Angled<'_> {
             bindings: bracketed
                 .args
                 .iter()
-                .flat_map(|argument| Associated { scope: self.scope }.bound(argument))
+                .flat_map(|argument| Associated { lowering: self.lowering }.bound(argument))
                 .collect(),
         }
     }
 
     fn sugared(self, sugared: &ParenthesizedGenericArguments) -> Arguments {
         Arguments {
-            arguments: sugared.inputs.iter().map(|input| self.scope.lowered(input)).collect(),
-            bindings: self.scope.output(&sugared.output).into_iter().collect(),
+            arguments: sugared.inputs.iter().map(|input| self.lowering.child(input)).collect(),
+            bindings: self.lowering.output(&sugared.output).into_iter().collect(),
         }
     }
 
     fn argument(self, argument: &GenericArgument) -> Option<TypeRef<Written>> {
         match argument {
-            GenericArgument::Type(ty) => Some(self.scope.lowered(ty)),
+            GenericArgument::Type(ty) => Some(self.lowering.child(ty)),
             _ => None,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Associated<'scope> {
-    scope: &'scope InScope,
+struct Associated<'low> {
+    lowering: Lowering<'low>,
 }
 
 impl Associated<'_> {
     fn bound(self, argument: &GenericArgument) -> Vec<TypeRef<Written>> {
         match argument {
-            GenericArgument::AssocType(bound) => vec![self.scope.lowered(&bound.ty)],
+            GenericArgument::AssocType(bound) => vec![self.lowering.child(&bound.ty)],
             GenericArgument::Constraint(constraint) => {
-                vec![Bounding { scope: self.scope }.lowered(constraint.bounds.iter())]
+                vec![Bounding { lowering: self.lowering }.lowered(constraint.bounds.iter())]
             }
-            GenericArgument::Const(expression) => Measured::types(self.scope, expression),
+            GenericArgument::Const(expression) => Measured::types(self.lowering, expression),
             _ => Vec::new(),
         }
     }
@@ -458,6 +492,7 @@ pub(super) struct LoweredParameter {
 
 impl LoweredParameter {
     pub(super) fn declared(scope: &InScope, generics: &Generics) -> Vec<LoweredParameter> {
+        let fold = scope.fold(TypeTree::from(generics));
         let predicates: Vec<&PredicateType> = generics
             .where_clause
             .iter()
@@ -471,7 +506,7 @@ impl LoweredParameter {
                     .iter()
                     .filter_map(|typed| Requirement::bounding(typed, &declared.ident))
                     .flat_map(|typed| typed.bounds.iter());
-                let bounding = Bounding { scope };
+                let bounding = Bounding { lowering: Lowering { scope, fold: &fold } };
                 LoweredParameter {
                     name: Name::from(&declared.ident),
                     bounds: declared

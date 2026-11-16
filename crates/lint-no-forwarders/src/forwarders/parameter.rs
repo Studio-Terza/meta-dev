@@ -1,5 +1,5 @@
 use syntax::Punctuated;
-use syntax::{Expr, FnArg, Ident, Path, Token};
+use syntax::{Expr, FnArg, Ident, Path, Spine, Token};
 
 use lint_core::Syntax;
 
@@ -30,12 +30,8 @@ impl Parameter {
     }
 
     pub fn forwarded<'expr>(expr: &'expr Expr, params: &[Parameter]) -> Option<&'expr Expr> {
-        match expr {
-            Expr::Path(path) => Parameter::named_by(params, &path.path).map(|_| expr),
-            Expr::Field(field) => Self::forwarded(&field.base, params),
-            Expr::Reference(reference) => Self::forwarded(&reference.expr, params),
-            _ => None,
-        }
+        let root = Spine::from(expr).past(|node| matches!(node, Expr::Field(_) | Expr::Reference(_)))?.node();
+        Syntax::expr_path(root).and_then(|path| Parameter::named_by(params, &path.path)).map(|_| root)
     }
 
     pub fn forwarding(args: &Punctuated<Expr, Token![,]>, params: &[Parameter]) -> Option<()> {

@@ -1,5 +1,5 @@
 use syntax::Punctuated;
-use syntax::{Attribute, Meta, Path, Token};
+use syntax::{Applied, Attribute, Meta, Path, Token};
 
 use lint_layout::{Name, Whole, Word, words};
 
@@ -26,23 +26,15 @@ pub(super) struct Attributes {
 
 impl From<&[Attribute]> for Attributes {
     fn from(attributes: &[Attribute]) -> Attributes {
-        Attributes { metas: attributes.iter().flat_map(|attribute| Self::applied(&attribute.meta)).collect() }
+        Attributes { metas: attributes.iter().flat_map(|attribute| Applied::metas(&attribute.meta)).collect() }
     }
 }
 
 impl Attributes {
-    const CONDITIONAL: [Word<'static>; 1] = words!["cfg_attr"];
     const DERIVE: [Word<'static>; 1] = words!["derive"];
 
     pub(super) fn derived(&self) -> Vec<Path> {
         self.metas.iter().flat_map(|meta| Self::nested(meta, &Self::DERIVE)).filter_map(Element::path).collect()
-    }
-
-    fn applied(meta: &Meta) -> Vec<Meta> {
-        Self::nested(meta, &Self::CONDITIONAL).split_first().map_or_else(
-            || vec![meta.clone()],
-            |(_, applied)| applied.iter().flat_map(|element| Self::applied(&element.0)).collect(),
-        )
     }
 
     fn nested(meta: &Meta, name: &[Word<'static>]) -> Vec<Element> {

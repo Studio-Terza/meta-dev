@@ -1,6 +1,6 @@
 use std::iter::Sum;
 
-use syntax::{UseTree, Visibility};
+use syntax::{UseLeaf, UseTree, Visibility};
 
 use lint_core::Bound;
 use lint_core::Syntax;
@@ -28,11 +28,7 @@ impl ReexportCount {
     }
 
     fn leaves(tree: &UseTree) -> ReexportCount {
-        match tree {
-            UseTree::Path(path) => Self::leaves(&path.tree),
-            UseTree::Group(group) => group.items.iter().map(Self::leaves).sum(),
-            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => ReexportCount(1),
-        }
+        ReexportCount(UseLeaf::of_tree(tree).len())
     }
 }
 
