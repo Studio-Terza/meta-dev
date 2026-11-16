@@ -92,7 +92,7 @@ impl Crew<'_> {
     pub(crate) fn gated(
         self,
         readout: &Measured<Readout>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer>,
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
@@ -235,16 +235,20 @@ impl Lints {
         unlocated.map_or_else(|| Outcome::from_rendered(rendered, readout.failures()), Outcome::Unlocated)
     }
 
-    fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+    fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
         Worked::timed(sources.located().timing())
     }
 
-    fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
+    fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>, worker: Worker) -> Worked {
         let readout = ManuallyDrop::new(sources.read(worker));
         [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 
-    fn worked(readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>, worker: Worker) -> Worked {
+    fn worked(
+        readout: &Readout,
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        worker: Worker,
+    ) -> Worked {
         let mut lowered = sources.gathered(readout, worker, Filer::started);
         let mut work: Vec<FileWork<'_>> = lowered.filed();
         let filed: Worked = work.iter_mut().map(FileWork::worked).collect();
@@ -253,11 +257,13 @@ impl Lints {
         jobs.sort_by_key(Job::rank);
         let claimed = sources.queue().claimed(&jobs).map(|job| job.done(readout, sources));
         let queued: Worked = claimed.collect();
-        let judging = Stopwatch::started(sources.wired().timer());
+        let waiting = Stopwatch::started(sources.wired().timer());
         let settled = Settled::from(sources.gathering());
+        let waited = waiting.stopped(Step::Judged(worker).waited());
+        let judging = Stopwatch::started(sources.wired().timer());
         let judged: Worked = work.into_iter().map(|file| file.judged(settled)).collect();
         let judged_timing = judging.stopped(Step::Judged(worker));
-        let timings = lowered.timings().iter().copied().chain([judged_timing]);
+        let timings = lowered.timings().iter().copied().chain([waited, judged_timing]);
         timings.map(Worked::timed).chain([filed, queued, judged]).collect()
     }
 }
@@ -373,9 +379,10 @@ impl<'file> FileWork<'file> {
 }
 
 impl Work {
-    fn awaited<'run>(self, sources: &'run Sources<impl Files, impl Cargo, impl Timer>) -> Option<&'run Model> {
+    fn awaited<'run>(self, sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Option<&'run Model> {
         match self {
-            Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => sources.gathering().model(),
+            Work::Modelled(_) | Work::Extracted(_) => sources.gathering().model(),
+            Work::Described(_) => sources.described(),
             Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => None,
         }
     }
@@ -393,7 +400,7 @@ impl Work {
         slot: Slot,
         readout: &'run Readout,
         model: Option<&'run Model>,
-        sources: &'run Sources<impl Files, impl Cargo, impl Timer>,
+        sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>,
     ) -> Worked {
         match self {
             Work::Extracted(_) | Work::Described(_) => self.grounded(slot, model, sources),
@@ -407,7 +414,7 @@ impl Work {
         self,
         slot: Slot,
         model: Option<&Model>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer>,
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
     ) -> Worked {
         match self {
             Work::Extracted(extracted) => Worked::rendering(slot, model.map_or_default(extracted)),
@@ -456,11 +463,13 @@ impl Job {
         }
     }
 
-    fn done(self, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer>) -> Worked {
+    fn done(self, readout: &Readout, sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
+        let waiting = Stopwatch::started(sources.wired().timer());
         let model = self.work.awaited(sources);
+        let waited = waiting.stopped(self.step.waited());
         let stopwatch = Stopwatch::started(sources.wired().timer());
         let worked = self.work.worked(self.slot, readout, model, sources);
-        [worked, Worked::timed(stopwatch.stopped(self.step))].into_iter().collect()
+        [worked, Worked::timed(waited), Worked::timed(stopwatch.stopped(self.step))].into_iter().collect()
     }
 }
 

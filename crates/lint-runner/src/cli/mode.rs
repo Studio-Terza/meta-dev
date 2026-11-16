@@ -90,7 +90,7 @@ impl Run<'_, '_> {
     pub(crate) fn verdict_of(
         self,
         readout: &Measured<Readout>,
-        sources: &Sources<impl Files, impl Cargo, impl Timer>,
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {

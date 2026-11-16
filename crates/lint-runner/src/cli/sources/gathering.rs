@@ -1,4 +1,5 @@
 use std::mem;
+use std::panic;
 use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
 
@@ -7,6 +8,7 @@ use graph_reader::{FileFacts, GroupLowering, ListedGroup, Listing};
 use lint_core::{FileHead, Parsed, Readout, SourceFile, Unwalked};
 use lint_sweep::Gathers;
 
+use super::super::timings::{Measured, Timing};
 use super::contexts::{Contexts, Contributed};
 
 use super::super::boundary::FileOrder;
@@ -87,6 +89,33 @@ struct Splitting<'run> {
 #[derive(Debug)]
 pub(crate) struct Merging<'run>(Vec<Gathered<'run>>);
 
+impl<'run> Merging<'run> {
+    pub(crate) fn settled(
+        self,
+        gathering: &Gathering<'run>,
+        model: impl FnOnce(Vec<FileFacts>) -> Measured<Option<Model>>,
+        contexts: impl FnOnce(Vec<Contributed<'run>>) -> Measured<Contexts<'run>> + Send,
+    ) -> Vec<Timing> {
+        let split = self.split();
+        let parts = split.contexts;
+        thread::scope(|scope| {
+            let joined = scope.spawn(|| contexts(parts).kept(&gathering.contexts));
+            let modelled = model(split.facts).kept(&gathering.model);
+            vec![modelled, joined.join().unwrap_or_else(|failure| panic::resume_unwind(failure))]
+        })
+    }
+
+    fn split(self) -> Splitting<'run> {
+        let mut sorted = self.0;
+        sorted.sort_by(|earlier, later| earlier.head.path().cmp(later.head.path()));
+        sorted.into_iter().fold(Splitting::default(), |mut split, part| {
+            split.facts.extend(part.facts);
+            split.contexts.push(part.contexts);
+            split
+        })
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Gathering<'run> {
     heads: &'run OnceLock<Vec<FileHead>>,
@@ -124,19 +153,6 @@ impl<'run> Gathering<'run> {
         Share { merging: self.deposited(gathered, heads), filed }
     }
 
-    pub(crate) fn settled(&self, merging: Merging<'run>, model: impl FnOnce(Vec<FileFacts>) -> Option<Model>) {
-        let split = Self::split(merging);
-        let contexts = split.contexts;
-        thread::scope(|scope| {
-            scope.spawn(|| self.parts_settled(contexts));
-            self.model.get_or_init(|| model(split.facts));
-        });
-    }
-
-    fn parts_settled(&self, contexts: Vec<Contributed<'run>>) {
-        self.contexts.get_or_init(|| contexts.into_iter().collect());
-    }
-
     pub(crate) fn model(&self) -> Option<&Model> {
         self.model.wait().as_ref()
     }
@@ -154,15 +170,5 @@ impl<'run> Gathering<'run> {
         held.extend(parts);
         let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
         complete.map(Merging)
-    }
-
-    fn split(merging: Merging<'run>) -> Splitting<'run> {
-        let mut sorted = merging.0;
-        sorted.sort_by(|earlier, later| earlier.head.path().cmp(later.head.path()));
-        sorted.into_iter().fold(Splitting::default(), |mut split, part| {
-            split.facts.extend(part.facts);
-            split.contexts.push(part.contexts);
-            split
-        })
     }
 }
