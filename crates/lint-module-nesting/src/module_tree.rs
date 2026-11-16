@@ -67,13 +67,13 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
         let file = <&SourceFile>::from(parsed);
         let module = file.shipped().map(|_| {
             let tests = file.test_modules().iter().map(|test| TestUses {
-                segments: test.head().placement().module().segments().to_vec(),
+                segments: AsRef::<[Name]>::as_ref(test.head().placement().module()).to_vec(),
                 uses: Sweep::gathered(test, UsePaths::default()),
             });
             ModuleUses {
                 file: AsRef::<Path>::as_ref(head),
                 crate_root: head.placement().crate_root(),
-                segments: head.placement().module().segments(),
+                segments: AsRef::<[Name]>::as_ref(head.placement().module()),
                 reexports: ReexportCount::of_file(file.syntax()),
                 uses: Vec::new(),
                 tests: tests.collect(),

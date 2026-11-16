@@ -16,11 +16,6 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn segments(&self) -> &[Name] {
-        &self.0
-    }
-
-    #[must_use]
     pub fn naming<'path>(&'path self, typed: impl Fn(&'path Name) -> Option<&'path Name>) -> UsePath {
         let named = self.0.iter().position(|segment| typed(segment).is_some()).map_or(self.0.len(), |at| at + 1);
         UsePath(self.0.iter().take(named).cloned().collect())
@@ -43,5 +38,11 @@ impl fmt::Display for UsePath {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let spelled: Vec<String> = self.0.iter().map(Name::to_string).collect();
         formatter.write_str(&spelled.join(Self::SEPARATOR))
+    }
+}
+
+impl AsRef<[Name]> for UsePath {
+    fn as_ref(&self) -> &[Name] {
+        &self.0
     }
 }

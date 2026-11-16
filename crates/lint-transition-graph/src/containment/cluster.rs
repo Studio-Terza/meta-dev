@@ -56,10 +56,6 @@ impl<'found> Cluster<'found> {
     pub(crate) fn krate(&self) -> Option<&'found Name> {
         self.krate
     }
-
-    pub(crate) fn segments(&self) -> &'found [Name] {
-        self.segments
-    }
 }
 
 #[derive(Debug)]
@@ -127,5 +123,11 @@ impl fmt::Display for Segments<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let segments: Vec<String> = self.0.iter().map(ToString::to_string).collect();
         write!(formatter, "{}", segments.join("::"))
+    }
+}
+
+impl<'found> From<Cluster<'found>> for &'found [Name] {
+    fn from(cluster: Cluster<'found>) -> &'found [Name] {
+        cluster.segments
     }
 }

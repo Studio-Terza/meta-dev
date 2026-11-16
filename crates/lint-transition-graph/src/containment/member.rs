@@ -27,7 +27,7 @@ impl<'found> Member<'found> {
 impl fmt::Display for Member<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.cluster.krate().into_iter().try_for_each(|krate| write!(formatter, "{krate}"))?;
-        self.cluster.segments().iter().chain([self.name]).try_for_each(|segment| write!(formatter, "::{segment}"))
+        <&[Name]>::from(self.cluster).iter().chain([self.name]).try_for_each(|segment| write!(formatter, "::{segment}"))
     }
 }
 
