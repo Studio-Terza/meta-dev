@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use graph::{
@@ -47,15 +48,10 @@ impl<'model> Door<'model> {
         open.and(named).and(subject).map(|opened| Door { path: placed.site().path(), subject: opened })
     }
 
-    fn opening(&self, path: &Path, subject: &Resolved) -> Option<&Door<'model>> {
-        let place = [self.path].into_iter().find(|door| *door == path);
-        let owner = [self.subject].into_iter().find(|door| *door == subject);
-        place.and(owner).map(|_| self)
-    }
 }
 
 #[derive(Debug)]
-struct Newtypes(Vec<ItemId>);
+struct Newtypes(BTreeSet<ItemId>);
 
 impl Newtypes {
     const EDGES: [Word<'static>; 3] = words!["new", "try_new", "into_inner"];
@@ -70,7 +66,7 @@ impl Newtypes {
     }
 
     fn newtype(&self, item: Option<ItemId>) -> Option<ItemId> {
-        item.and_then(|id| self.0.iter().find(|newtype| **newtype == id).copied())
+        item.filter(|id| self.0.contains(id))
     }
 
     fn edge(&self, function: &Function) -> Option<ItemId> {
@@ -92,8 +88,8 @@ impl Newtypes {
 #[derive(Debug)]
 pub struct Scope<'model> {
     newtypes: Newtypes,
-    aliases: Vec<AliasTarget<'model>>,
-    doors: Vec<Door<'model>>,
+    aliases: BTreeMap<ItemId, AliasTarget<'model>>,
+    doors: BTreeMap<&'model Path, BTreeSet<&'model Resolved>>,
 }
 
 impl<'model> Scope<'model> {
@@ -102,8 +98,11 @@ impl<'model> Scope<'model> {
     pub fn read(model: &'model Model) -> Scope<'model> {
         Scope {
             newtypes: Newtypes::read(model),
-            aliases: model.holdings().filter_map(AliasTarget::declared).collect(),
-            doors: model.implementations().filter_map(Door::opened).collect(),
+            aliases: model.holdings().filter_map(AliasTarget::declared).map(|alias| (alias.item, alias)).collect(),
+            doors: model.implementations().filter_map(Door::opened).fold(BTreeMap::new(), |mut doors, door| {
+                doors.entry(door.path).or_insert_with(BTreeSet::new).insert(door.subject);
+                doors
+            }),
         }
     }
 
@@ -122,12 +121,12 @@ impl<'model> Scope<'model> {
         let open = Scope::open(*AsRef::<Region>::as_ref(call));
         let seat: &Seat = call.as_ref();
         let subject = seat.subject().and_then(TypeRef::named).map(AsRef::<Resolved>::as_ref);
-        let door = subject.and_then(|named| self.doors.iter().find_map(|door| door.opening(path, named)));
+        let door = subject.and_then(|named| self.doors.get(path).and_then(|subjects| subjects.get(named)));
         open.and_then(|_| Scope::unexempted(door.as_ref(), call))
     }
 
     pub fn local_alias(&self, resolved: &Resolved, file: &Path) -> Option<&'model TypeRef> {
-        let alias = resolved.crate_item().and_then(|item| self.aliases.iter().find(|alias| alias.item == item));
+        let alias = resolved.crate_item().and_then(|item| self.aliases.get(&item));
         alias.and_then(|found| found.local(file))
     }
 
