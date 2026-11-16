@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use lint_layout::Name;
 
-use crate::site::Site;
+use lint_layout::Site;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Harness {

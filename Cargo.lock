@@ -1386,13 +1386,11 @@ name = "lint-core"
 version = "0.1.0"
 dependencies = [
  "file-ports",
- "graph",
  "lint-layout",
  "lint-placement",
  "newtype",
  "syntax",
  "syntax-lexer",
- "workspace-metadata",
 ]
 
 [[package]]
@@ -1401,6 +1399,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "newtype",
@@ -1423,6 +1422,7 @@ dependencies = [
  "graph-reader",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1460,6 +1460,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1468,8 +1469,10 @@ dependencies = [
 name = "lint-file"
 version = "0.1.0"
 dependencies = [
+ "graph",
  "lint-core",
  "lint-sweep",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1480,9 +1483,9 @@ dependencies = [
  "graph-reader",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-placement",
  "newtype",
- "text-lines",
  "workspace-metadata",
 ]
 
@@ -1520,6 +1523,7 @@ dependencies = [
  "graph",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1533,10 +1537,8 @@ dependencies = [
  "newtype",
  "serde_core",
  "syntax",
- "text-lines",
  "thiserror",
  "toml",
- "workspace-metadata",
 ]
 
 [[package]]
@@ -1586,6 +1588,7 @@ dependencies = [
  "graph-reader",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1646,6 +1649,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1730,6 +1734,7 @@ dependencies = [
  "body-lifts",
  "graph",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1742,6 +1747,7 @@ dependencies = [
  "graph",
  "graph-reader",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1755,6 +1761,7 @@ dependencies = [
  "graph",
  "graph-reader",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1784,6 +1791,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1820,6 +1828,7 @@ dependencies = [
  "graph",
  "graph-reader",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1849,6 +1858,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1873,6 +1883,7 @@ dependencies = [
  "graph",
  "graph-reader",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
@@ -1911,6 +1922,7 @@ dependencies = [
  "graph",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -1951,6 +1963,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
 ]
@@ -2091,6 +2104,7 @@ dependencies = [
  "graph-reader",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "sqlformat",
@@ -2149,6 +2163,7 @@ dependencies = [
  "laws",
  "lint-core",
  "lint-distinct-signatures",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",

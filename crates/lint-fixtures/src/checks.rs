@@ -1,7 +1,8 @@
 use std::marker::PhantomData;
 
 use graph_reader::Reader;
-use lint_core::{Lint, ModelLint, Report, SourceFile};
+use lint_core::{Lint, Report, SourceFile};
+use lint_file::ModelLint;
 
 use crate::sources::{Lines, Sources};
 

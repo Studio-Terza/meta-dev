@@ -15,6 +15,7 @@ body-lifts = { path = "../body-lifts" }
 body-shape = { path = "../body-shape" }
 equivalence = { path = "../equivalence" }
 lint-core = { path = "../lint-core" }
+lint-file = { path = "../lint-file" }
 graph = { path = "../graph" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }

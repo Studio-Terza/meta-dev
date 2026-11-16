@@ -3,7 +3,8 @@ mod finding;
 mod narrowed;
 
 use graph::{Function, Model, Placed};
-use lint_core::{Headline, ModelLint, Report, Violation};
+use lint_core::{Headline, Report, Violation};
+use lint_file::ModelLint;
 
 use error_types::ErrorTypes;
 use finding::Finding;

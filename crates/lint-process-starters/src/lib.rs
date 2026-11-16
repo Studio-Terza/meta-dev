@@ -2,7 +2,8 @@ mod command_paths;
 
 pub use command_paths::{CommandPaths, Scope};
 use graph::Model;
-use lint_core::{Fix, Headline, Message, ModelLint, Problem, Report, Violation};
+use lint_core::{Fix, Headline, Message, Problem, Report, Violation};
+use lint_file::ModelLint;
 
 #[derive(Debug)]
 pub struct ProcessStarters;

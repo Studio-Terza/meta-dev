@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use graph_reader::Reader;
-use lint_core::{FileHead, Parsed, Report, SourceFile, WorkspaceLint};
+use lint_core::{FileHead, Parsed, Report, SourceFile};
+use lint_file::WorkspaceLint;
 use newtype::Wrapping;
 use workspace_metadata::Metadata;
 

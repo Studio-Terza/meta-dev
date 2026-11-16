@@ -1,6 +1,6 @@
 use graph::Model;
 
-use crate::report::Report;
+use lint_core::Report;
 
 pub trait ModelLint {
     fn report(model: &Model) -> Report<'_>;

@@ -1,8 +1,9 @@
 use graph::Model;
 use lint_clones::Clones;
 use lint_complexity::Complexity;
-use lint_core::{Lint, ModelLint, Report, SourceFile};
+use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
+use lint_file::ModelLint;
 use lint_linear_flow::FlowShapes;
 use lint_narrowed_returns::NarrowedReturns;
 use lint_paired_apis::PairedApis;

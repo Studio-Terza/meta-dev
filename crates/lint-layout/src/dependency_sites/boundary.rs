@@ -1,19 +1,23 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
-use text_lines::OneLine;
 use toml::Spanned;
 use toml::de::{DeTable, DeValue};
-use workspace_metadata::CrateName;
 
 use super::DependencySites;
 use crate::line_number::LineNumber;
+use crate::name::Name;
 use crate::source_text::SourceText;
 
 impl DependencySites {
     const LISTS: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
     const PLATFORMS: &'static str = "target";
     const HEADER: &'static str = "dependencies";
+
+    #[must_use]
+    pub fn sites<Key: AsRef<str>>(&self, keys: impl IntoIterator<Item = Key>) -> BTreeSet<LineNumber> {
+        keys.into_iter().filter_map(|key| self.keys.get(&Name::from(key.as_ref()))).flatten().copied().collect()
+    }
 
     pub(crate) fn listed(text: &SourceText, top: &DeTable<'_>) -> DependencySites {
         let platforms = Self::entries(top, Self::PLATFORMS)
@@ -24,10 +28,8 @@ impl DependencySites {
             .chain(platforms)
             .flat_map(Self::lists)
             .flat_map(|listed| listed.keys())
-            .filter_map(|key| {
-                Some((CrateName::new(OneLine::try_new(key.get_ref().clone().into_owned()).ok()?), text.line_of(key)))
-            })
-            .fold(BTreeMap::new(), |mut keys: BTreeMap<CrateName, BTreeSet<LineNumber>>, (key, line)| {
+            .map(|key| (Name::from(key.get_ref().as_ref()), text.line_of(key)))
+            .fold(BTreeMap::new(), |mut keys: BTreeMap<Name, BTreeSet<LineNumber>>, (key, line)| {
                 keys.entry(key).or_default().insert(line);
                 keys
             });

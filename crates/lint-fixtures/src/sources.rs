@@ -10,7 +10,8 @@ use std::str::FromStr;
 
 use file_ports::{Bytes, Memory};
 use graph_reader::Reader;
-use lint_core::{FileHead, Parsed, Report, SourceFile, SourceText, WorkspaceLint};
+use lint_core::{FileHead, Parsed, Report, SourceFile, SourceText};
+use lint_file::WorkspaceLint;
 use lint_placement::Placement;
 use newtype::Wrapping;
 use workspace_metadata::Metadata;

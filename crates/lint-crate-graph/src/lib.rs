@@ -1,7 +1,8 @@
 mod links;
 
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report};
+use lint_core::{Headline, Report};
+use lint_file::ModelLint;
 
 use links::Links;
 

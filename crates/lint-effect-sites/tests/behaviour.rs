@@ -1,6 +1,6 @@
 use graph_reader::Reader;
-use lint_core::ModelLint;
 use lint_effect_sites::{EffectSites, EffectsInPorts};
+use lint_file::ModelLint;
 use lint_fixtures::{Located, Source, Sources, Text};
 
 use lint_fixtures::Shown;

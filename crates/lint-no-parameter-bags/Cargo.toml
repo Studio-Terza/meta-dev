@@ -13,6 +13,7 @@ doctest = false
 body-lifts = { path = "../body-lifts" }
 graph = { path = "../graph" }
 lint-core = { path = "../lint-core" }
+lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 
 [dev-dependencies]

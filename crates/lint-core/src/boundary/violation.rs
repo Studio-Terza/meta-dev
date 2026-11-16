@@ -2,7 +2,7 @@ use std::fmt;
 use std::path::Path;
 
 use super::{Finding, Fix};
-use graph::Site;
+use lint_layout::Site;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Violation<'file> {

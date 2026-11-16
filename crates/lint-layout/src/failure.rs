@@ -1,8 +1,6 @@
 use std::io;
 use std::path::PathBuf;
 
-use workspace_metadata::Unreadable;
-
 use crate::line_number::LineNumber;
 
 #[derive(Debug, thiserror::Error)]
@@ -17,6 +15,4 @@ pub enum Failure {
     NoSources { path: PathBuf },
     #[error("cannot run cargo metadata in {path}: {source}", path = path.display())]
     Cargo { path: PathBuf, source: io::Error },
-    #[error("cannot read cargo metadata of {path}: {source}", path = path.display())]
-    Metadata { path: PathBuf, source: Unreadable },
 }

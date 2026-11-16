@@ -1,7 +1,8 @@
 mod groups;
 
 use graph::Model;
-use lint_core::{Headline, ModelLint, Report};
+use lint_core::{Headline, Report};
+use lint_file::ModelLint;
 
 use groups::Groups;
 
