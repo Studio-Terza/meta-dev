@@ -5,9 +5,9 @@ pub struct Agent {
 }
 
 impl Agent {
-    pub const CLAUDE: Agent = Agent {
-        program: "claude",
-        arguments: &[
+    pub const CLAUDE: Agent = Agent::new(
+        "claude",
+        &[
             "-p",
             "--model",
             "haiku",
@@ -19,7 +19,7 @@ impl Agent {
             "--tools",
             "",
         ],
-    };
+    );
 
     #[must_use]
     pub const fn new(program: &'static str, arguments: &'static [&'static str]) -> Agent {

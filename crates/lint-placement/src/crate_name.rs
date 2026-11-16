@@ -27,8 +27,14 @@ impl From<&CrateRoot> for CrateName {
             || root.directory_name().unwrap_or_default().to_string_lossy().into_owned(),
             ToString::to_string,
         );
+        CrateName::from(spelled.as_str())
+    }
+}
+
+impl From<&str> for CrateName {
+    fn from(package: &str) -> CrateName {
         let underscored: String =
-            spelled.chars().map(|letter| Some(letter).filter(|candidate| *candidate != '-').unwrap_or('_')).collect();
+            package.chars().map(|letter| Some(letter).filter(|candidate| *candidate != '-').unwrap_or('_')).collect();
         CrateName(Name::from(underscored.as_str()))
     }
 }

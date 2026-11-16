@@ -22,7 +22,7 @@ impl Dependency {
     }
 
     pub fn shipped(&self) -> Option<&CrateName> {
-        self.kind.map_or(Some(&self.name), |edge| Some(&self.name).filter(|_| edge == Edge::Build))
+        self.kind.filter(|edge| *edge == Edge::Dev).map_or(Some(&self.name), |_| None)
     }
 
     pub fn key_of(&self, required: &CrateName) -> Option<&CrateName> {

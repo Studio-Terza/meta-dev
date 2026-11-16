@@ -17,13 +17,12 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::{FileHead, Headline, Parsed, Report, WorkspaceLint};
-use lint_layout::Name;
-use workspace_metadata::Metadata;
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_placement::PackageRoot;
+use lint_placement::{CrateName, PackageRoot};
 use lint_sweep::{Gathers, Watchers, Watching};
 use offered::{Offer, Used};
 use test_features::TestFeatures;
+use workspace_metadata::Metadata;
 
 #[derive(Debug)]
 pub struct NoTestOnlyApi;
@@ -144,7 +143,7 @@ impl<'file> Gathers<Offered<'file>> for Offered<'file> {
 impl WorkspaceLint for NoTestOnlyApi {
     type Facts<'head> = ();
 
-    fn gathered<'head>(_: &[Parsed<'_, 'head>]) {}
+    fn gathered(_: &[Parsed<'_, '_>]) {}
 
     fn report<'file, 'head: 'file>(
         _: &'file [FileHead],
@@ -152,8 +151,8 @@ impl WorkspaceLint for NoTestOnlyApi {
         (): &'file (),
         model: &'file Model,
     ) -> Report<'file> {
-        let support: BTreeSet<Name> =
-            workspaces.iter().flat_map(Metadata::test_support).map(|name| Name::from(name.as_ref())).collect();
+        let support: BTreeSet<CrateName> =
+            workspaces.iter().flat_map(Metadata::test_support).map(|name| CrateName::from(name.as_ref())).collect();
         let used = Used::from(model);
         let offers = Offer::every(model).into_iter().filter_map(|offer| offer.shipped(&support));
         Report::new(Self::HEADLINE, offers.filter_map(|offer| offer.tested_only(&used)).collect())

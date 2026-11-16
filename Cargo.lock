@@ -1756,6 +1756,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "graph-reader",
+ "laws",
  "lint-core",
  "lint-file",
  "lint-fixtures",

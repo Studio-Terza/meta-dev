@@ -147,7 +147,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 57] = [
+    const LINTS: [Entry; 56] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -174,8 +174,7 @@ impl Lints {
         <Primed<StateGraph> as Registered>::ENTRY,
         <Ruled<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
-        <Judged<NoTestOnlyApi> as Registered>::ENTRY,
-        Entry::spelled::<NoTestOnlyApi>(Work::Modelled(<NoTestOnlyApi as ModelLint>::report)),
+        <Grounded<NoTestOnlyApi> as Registered>::ENTRY,
         <Swept<NoIgnoredTests> as Registered>::ENTRY,
         Entry::spelled::<NoTestIo>(Work::Modelled(<NoTestIo as ModelLint>::report)),
         Entry::spelled::<FakesAtPorts>(Work::Modelled(<FakesAtPorts as ModelLint>::report)),
@@ -284,6 +283,7 @@ enum Work {
     Judged(Judging),
     Ruled(Rules),
     Described(Workspaced),
+    Composite(Judging, Workspaced),
 }
 
 impl Entry {
@@ -294,7 +294,7 @@ impl Entry {
     fn queued(self, slot: Slot) -> Option<Job> {
         match self.work {
             Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => None,
-            Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) => {
+            Work::Checked(_) | Work::Modelled(_) | Work::Extracted(_) | Work::Described(_) | Work::Composite(..) => {
                 Some(Job { slot, step: Step::Lint(self.name), work: self.work })
             }
         }
@@ -307,6 +307,7 @@ impl Entry {
             | Work::Modelled(_)
             | Work::Extracted(_)
             | Work::Described(_)
+            | Work::Composite(..)
             | Work::Judged(_)
             | Work::Ruled(_) => None,
         }
@@ -314,7 +315,7 @@ impl Entry {
 
     fn judging(self) -> Option<Judging> {
         match self.work {
-            Work::Judged(judging) => Some(judging),
+            Work::Judged(judging) | Work::Composite(judging, _) => Some(judging),
             Work::Checked(_)
             | Work::Modelled(_)
             | Work::Extracted(_)
@@ -331,6 +332,7 @@ impl Entry {
             | Work::Modelled(_)
             | Work::Extracted(_)
             | Work::Described(_)
+            | Work::Composite(..)
             | Work::Filed(_)
             | Work::Judged(_) => None,
         }
@@ -383,7 +385,7 @@ impl Work {
     fn awaited<'run>(self, sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Ready<'run> {
         match self {
             Work::Modelled(_) | Work::Extracted(_) => Ready::Modelled(sources.gathering().model()),
-            Work::Described(_) => Ready::Grounded(Ground::awaited(sources)),
+            Work::Described(_) | Work::Composite(..) => Ready::Grounded(Ground::awaited(sources)),
             Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Ready::Bare,
         }
     }
@@ -392,13 +394,18 @@ impl Work {
         match self {
             Work::Checked(check) => check(readout),
             Work::Modelled(query) => ready.model().map(query).into_iter().collect(),
-            Work::Described(_) | Work::Extracted(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Vec::new(),
+            Work::Described(_)
+            | Work::Composite(..)
+            | Work::Extracted(_)
+            | Work::Filed(_)
+            | Work::Judged(_)
+            | Work::Ruled(_) => Vec::new(),
         }
     }
 
     fn worked<'run>(self, slot: Slot, readout: &'run Readout, ready: Ready<'run>) -> Worked {
         match self {
-            Work::Extracted(_) | Work::Described(_) => self.grounded(slot, ready),
+            Work::Extracted(_) | Work::Described(_) | Work::Composite(..) => self.grounded(slot, ready),
             Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
                 Worked::rendering(slot, self.reported(readout, ready))
             }
@@ -411,6 +418,7 @@ impl Work {
             Work::Described(described) => {
                 Worked::rendering(slot, ready.ground().map(|ground| ground.reported(described)).into_iter().collect())
             }
+            Work::Composite(_, described) => ready.filed(slot, described),
             Work::Checked(_) | Work::Modelled(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => {
                 Worked::default()
             }
@@ -437,7 +445,7 @@ impl Job {
         match self.work {
             Work::Checked(_) | Work::Filed(_) | Work::Judged(_) | Work::Ruled(_) => Rank::Early(Reverse(self.slot)),
             Work::Extracted(_) => Rank::Whole(self.slot),
-            Work::Modelled(_) | Work::Described(_) => Rank::Late(self.slot),
+            Work::Modelled(_) | Work::Described(_) | Work::Composite(..) => Rank::Late(self.slot),
         }
     }
 
@@ -746,10 +754,32 @@ impl<'run> Ready<'run> {
         }
     }
 
+    fn filed(self, slot: Slot, described: Workspaced) -> Worked {
+        let report = self.ground().map(|ground| ground.reported(described));
+        report.map_or_default(|found| Worked::filing(slot, FileOrder::LAST, found.violations()))
+    }
+
     fn ground(self) -> Option<Ground<'run>> {
         match self {
             Ready::Grounded(ground) => ground,
             Ready::Modelled(_) | Ready::Bare => None,
         }
     }
+}
+
+#[derive(Debug)]
+struct Grounded<Lint>(PhantomData<Lint>);
+
+impl<Lint> Registered for Grounded<Lint>
+where
+    Lint: WatchingLint + for<'head> WorkspaceLint<Facts<'head> = ()> + 'static,
+    Judged<Lint>: Judges,
+{
+    const ENTRY: Entry = Entry {
+        name: Named::spelled::<Lint>(),
+        work: Work::Composite(
+            Judging { headline: Lint::HEADLINE, reads: Lint::READS, pend: Judged::<Lint>::pending },
+            |heads, workspaces, _, model| Lint::report(heads, workspaces, &(), model),
+        ),
+    };
 }

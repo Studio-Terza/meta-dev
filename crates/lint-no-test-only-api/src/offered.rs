@@ -7,6 +7,7 @@ use lint_core::Violation;
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::finding::Finding;
+use lint_placement::CrateName;
 
 #[derive(Debug)]
 pub(crate) struct Offer<'model> {
@@ -24,8 +25,8 @@ impl<'model> Offer<'model> {
         constructors.chain(variants).collect()
     }
 
-    pub(crate) fn shipped(self, support: &BTreeSet<Name>) -> Option<Offer<'model>> {
-        support.get(self.krate).map_or(Some(self), |_| None)
+    pub(crate) fn shipped(self, support: &BTreeSet<CrateName>) -> Option<Offer<'model>> {
+        support.get(&CrateName::from(self.krate)).map_or(Some(self), |_| None)
     }
 
     pub(crate) fn tested_only(self, used: &Used) -> Option<Violation<'model>> {

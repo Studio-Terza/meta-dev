@@ -1,7 +1,7 @@
 use lint_file::Judged;
 use lint_no_test_only_api::NoTestOnlyApi;
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const GATED_FN: &str = "#[cfg(test)]\npub fn f() {}\n";
 const GATED_CRATE_FN: &str = "#[cfg(test)]\npub(crate) fn f() {}\n";
@@ -61,6 +61,16 @@ const DERIVED_CLOCK: &str = "#[derive(Debug)]\npub enum Clock {\n    Live,\n    
 const MANIFEST: &[Source] = &[Source::new(Located::new("crates/k/Cargo.toml"), Text::new("[package]\nname = \"k\"\n"))];
 const LIB: Source =
     Source::new(Located::new("crates/k/src/lib.rs"), Text::new("pub mod a;\npub mod b;\npub use a::*;\n"));
+
+const LOOSE: &str = r#"{"workspace_root":"/","packages":[{"name":"k","manifest_path":"/crates/k/Cargo.toml","dependencies":[]}],"workspace_members":[]}"#;
+const SUPPORTING: &str = r#"{"workspace_root":"/","packages":[{"id":"k","name":"k","manifest_path":"/crates/k/Cargo.toml","dependencies":[],"targets":[{"kind":["lib"],"src_path":"/crates/k/src/lib.rs"}]},{"id":"u","name":"u","manifest_path":"/crates/u/Cargo.toml","dependencies":[{"name":"k","kind":"dev"}]}],"workspace_members":["k","u"]}"#;
+const SHIPPING: &str = r#"{"workspace_root":"/","packages":[{"id":"k","name":"k","manifest_path":"/crates/k/Cargo.toml","dependencies":[]},{"id":"u","name":"u","manifest_path":"/crates/u/Cargo.toml","dependencies":[{"name":"k","kind":null}]}],"workspace_members":["k","u"]}"#;
+const BINARY: &str = r#"{"workspace_root":"/","packages":[{"id":"k","name":"k","manifest_path":"/crates/k/Cargo.toml","dependencies":[],"targets":[{"kind":["bin"],"src_path":"/crates/k/src/main.rs"}]}],"workspace_members":["k"]}"#;
+const TESTED_ONLY: &[Source] = &[
+    LIB,
+    Source::new(Located::new("crates/k/src/a.rs"), Text::new(STAGED)),
+    Source::new(Located::new("crates/k/tests/t.rs"), Text::new(STAGED_TEST)),
+];
 
 const OFFERED: [Case; 23] = [
     Case::new(
@@ -392,9 +402,20 @@ fn visible_items_only_tests_name_are_flagged_on_the_model() {
     let mismatched: Vec<String> = OFFERED
         .iter()
         .filter_map(|case| {
-            let found = Sources::placed_flagged::<Queried<NoTestOnlyApi>>(MANIFEST, case.sources());
+            let found = Sources::placed_in::<NoTestOnlyApi>(MANIFEST, case.sources(), Text::new(LOOSE));
             (found != Lines::from(case.flagged())).then(|| format!("{} flagged {found}", case.name()))
         })
         .collect();
     assert_eq!(mismatched, Vec::<String>::new());
 }
+
+laws::table!(
+    a_crate_every_dependent_takes_only_for_tests_offers_no_test_only_api,
+    |workspace: &&str| Sources::placed_in::<NoTestOnlyApi>(MANIFEST, TESTED_ONLY, Text::new(workspace)),
+    [
+        LOOSE => Lines::from(["crates/k/src/a.rs:3"]),
+        SUPPORTING => Lines::default(),
+        SHIPPING => Lines::from(["crates/k/src/a.rs:3"]),
+        BINARY => Lines::from(["crates/k/src/a.rs:3"]),
+    ]
+);

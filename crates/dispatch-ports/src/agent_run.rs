@@ -24,7 +24,8 @@ impl AgentRun {
     }
 
     pub(crate) fn spawned(child: Child, exchange: Exchange, bell: Bell, deadline: Deadline) -> AgentRun {
-        AgentRun { pid: Pid::new(child.id()), deadline, bell, process: Some(Process::new(child, exchange)) }
+        let pid = Pid::new(child.id());
+        AgentRun { bell, process: Some(Process::new(child, exchange)), ..AgentRun::new(pid, deadline) }
     }
 
     pub(crate) fn read_out(&mut self) -> Option<Result<Output, DispatchFailure>> {
