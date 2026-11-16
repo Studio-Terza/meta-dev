@@ -80,25 +80,21 @@ impl<'table> Erasure<'table> {
 #[derive(Debug)]
 pub struct Shaper {
     erasure: Erasure<'static>,
-    tokens: Vec<Token>,
     counted: Vec<usize>,
 }
 
 impl Shaper {
-    const EDGE: usize = 2;
-
     #[must_use]
     pub fn reading(table: &TokenTable, equivalence: Equivalence) -> Shaper {
         let erasure =
             Erasure { classes: Classes::read(table, equivalence), lexemes: Cow::Owned(table.lexemes().to_vec()) };
         let whole = Window::new(0, erasure.lexemes.len());
-        let tokens: Vec<Token> =
-            whole.indices().map(|index| erasure.classes.token(&erasure.lexemes, index, whole)).collect();
-        let counted = tokens.iter().fold(vec![0], |mut counts, token| {
+        let tokens = whole.indices().map(|index| erasure.classes.token(&erasure.lexemes, index, whole));
+        let counted = tokens.fold(vec![0], |mut counts, token| {
             counts.push(counts.last().copied().unwrap_or_default() + token.counted());
             counts
         });
-        Shaper { erasure, tokens, counted }
+        Shaper { erasure, counted }
     }
 
     #[must_use]
@@ -111,18 +107,7 @@ impl Shaper {
         let window = self.erasure.window(bounds);
         let counted = |index: usize| self.counted.get(index).copied().unwrap_or_default();
         let [from, to] = window.ends().map(counted);
-        let direct = || TokenCount::new(self.erasure.direct(window).labels.count());
-        self.stable(window).map_or_else(direct, |()| TokenCount::new(to.saturating_sub(from)))
-    }
-
-    fn stable(&self, window: Window) -> Option<()> {
-        let [start, end] = window.ends();
-        let low = start..(start + Self::EDGE).min(end);
-        let high = end.saturating_sub(Self::EDGE).max(start)..end;
-        let moved = low.chain(high).find(|index| {
-            self.tokens.get(*index).cloned() != Some(self.erasure.classes.token(&self.erasure.lexemes, *index, window))
-        });
-        moved.map_or(Some(()), |_| None)
+        TokenCount::new(to.saturating_sub(from))
     }
 }
 
