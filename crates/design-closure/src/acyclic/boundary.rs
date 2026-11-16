@@ -5,7 +5,7 @@ use newtype::{Arbitrary, Counter, Newtype, Wrapping};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 
 use super::{Acyclic, Closed, Refuses};
-use transcript_ports::Uuid;
+use message_id::Uuid;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Keyed(i64);

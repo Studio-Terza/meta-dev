@@ -15,6 +15,7 @@ grammar-lines = { path = "../grammar-lines" }
 text-lines = { path = "../text-lines" }
 grammar-message = { path = "../grammar-message" }
 grammar-output = { path = "../grammar-output" }
+message-id = { path = "../message-id" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true

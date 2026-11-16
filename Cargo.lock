@@ -308,12 +308,12 @@ name = "design-closure"
 version = "0.1.0"
 dependencies = [
  "design-model",
+ "message-id",
  "named-derive",
  "newtype",
  "serde_json",
  "store-ports",
  "thiserror",
- "transcript-ports",
 ]
 
 [[package]]
@@ -373,12 +373,12 @@ dependencies = [
  "grammar-project",
  "grammar-provenance",
  "laws",
+ "message-id",
  "named-derive",
  "newtype",
  "serde",
  "serde_json",
  "thiserror",
- "transcript-ports",
 ]
 
 [[package]]
@@ -2310,6 +2310,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "message-id"
+version = "0.1.0"
+dependencies = [
+ "grammar-output",
+ "newtype",
+ "thiserror",
+]
+
+[[package]]
 name = "mio"
 version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3329,6 +3338,7 @@ dependencies = [
  "grammar-message",
  "grammar-output",
  "laws",
+ "message-id",
  "newtype",
  "port-core",
  "serde",

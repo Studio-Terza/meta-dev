@@ -18,7 +18,7 @@ newtype = { path = "../newtype" }
 serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 thiserror.workspace = true
-transcript-ports = { path = "../transcript-ports" }
+message-id = { path = "../message-id" }
 
 [lints]
 workspace = true
