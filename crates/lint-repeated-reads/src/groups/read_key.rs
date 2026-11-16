@@ -1,6 +1,6 @@
 use std::fmt;
 
-use graph::{Function, Model, ParamIndex, Read, Reader, Resolved};
+use graph::{Argument, Function, Model, ParamIndex, Read, Reader, Resolved};
 use lint_layout::Name;
 
 use super::dispatched::Dispatched;
@@ -13,6 +13,7 @@ pub struct ReadKey<'model> {
     reader: &'model Reader,
     parameter: ParamIndex,
     fields: &'model [Name],
+    arguments: &'model [Argument],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -42,6 +43,7 @@ impl<'model> ReadKey<'model> {
             reader: read.reader(),
             parameter: read.parameter(),
             fields: read.fields(),
+            arguments: read.arguments(),
         })
     }
 

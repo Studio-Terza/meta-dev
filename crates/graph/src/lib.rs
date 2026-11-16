@@ -37,7 +37,7 @@ pub use external::External;
 
 pub use found::Found;
 pub use function::definition::{
-    CallOwner, Definition, Invocation, Looping, Reached, Read, Reader, Receiving, Repeating, Repetition,
+    Argument, CallOwner, Definition, Invocation, Looping, Reached, Read, Reader, Receiving, Repeating, Repetition,
 };
 pub use function::{
     Entry, Function, Input, MethodShape, Mutation, Output, Owner, Parameter, Receiver, Returned, Signature, Taken,

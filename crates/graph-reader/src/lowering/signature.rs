@@ -175,6 +175,10 @@ impl InScope {
         self.bounds.iter().filter(|bound| bound.param() == param).flat_map(ParamBounds::traits).collect()
     }
 
+    pub(super) fn current_subject(&self) -> &TypeRef<Written> {
+        &self.subject
+    }
+
     pub(super) fn subjectless(&self) -> InScope {
         InScope::outside().with_parameters(self)
     }

@@ -1,6 +1,8 @@
 use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Shown, Source, Sources, Text, Title};
 use lint_repeated_reads::RepeatedReads;
 
+const OWN_CONSTANTS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx, probe: u8) -> u8 { c.a + probe }\ntrait Lint { const PROBE: u8; fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { const PROBE: u8 = 1; fn run(&self, c: &Ctx) -> u8 { fact(c, Self::PROBE) + 1 } }\nimpl Lint for B { const PROBE: u8 = 2; fn run(&self, c: &Ctx) -> u8 { fact(c, Self::PROBE) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
+const SHARED_CONSTANT: &str = "struct Ctx { a: u8 }\nstruct Limits;\nimpl Limits { const MOST: u8 = 1; }\nfn fact(c: &Ctx, probe: u8) -> u8 { c.a + probe }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c, Limits::MOST) + 1 } }\nstruct B;\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c, Limits::MOST) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const OBJECTS: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c) + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const UNDISPATCHED: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { fact(c) + 2 } }\n";
 const ONE_TYPE: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { fact(c) + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.a } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
@@ -17,7 +19,17 @@ const BOUNDED_METHOD: &str = "struct Ctx { a: u8 }\nfn fact(c: &Ctx) -> u8 { c.a
 const SINKS: &str = "struct Out { a: u8 }\nfn write(o: &mut Out) { o.a = 1; }\ntrait Lint { fn run(&self, o: &mut Out, p: Out) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 1 } }\nimpl Lint for B { fn run(&self, o: &mut Out, mut p: Out) -> u8 { write(o); write(&mut p); 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 const METHOD_CALLS: &str = "struct Ctx { a: u8 }\nimpl Ctx { fn fact(&self) -> u8 { self.a } }\ntrait Lint { fn run(&self, c: &Ctx) -> u8; }\nstruct A;\nstruct B;\nimpl Lint for A { fn run(&self, c: &Ctx) -> u8 { c.fact() + 1 } }\nimpl Lint for B { fn run(&self, c: &Ctx) -> u8 { c.fact() + 2 } }\nfn all(lints: &[&dyn Lint]) -> usize { lints.len() }\n";
 
-const CASES: [Case; 15] = [
+const CASES: [Case; 17] = [
+    Case::new(
+        Title::new("the same callee with different constants is two facts"),
+        &[Source::new(Located::new("a.rs"), Text::new(OWN_CONSTANTS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("the same callee with the same constant is one fact"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHARED_CONSTANT))],
+        Flagged::new(&["a.rs:7"]),
+    ),
     Case::new(
         Title::new("two implementations of a dyn trait read the same fact"),
         &[Source::new(Located::new("a.rs"), Text::new(OBJECTS))],
