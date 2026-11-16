@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use graph::{
-    Arrayed, Callee, Held, ItemPath, MacroCall, Named, Owner, Primitive, Reach, Region, Resolved, Seat, Sited,
+    Arrayed, Callee, Held, ItemPath, MacroCall, Mention, Named, Owner, Primitive, Reach, Region, Resolved, Seat, Sited,
     Spelling, TypeRef, Within, Zone,
 };
 use graph_reader::Reader;
@@ -340,4 +340,18 @@ fn a_macro_in_statement_position_quotes_its_first_literal_like_one_in_an_express
     let quoted: Vec<String> =
         model.quotations().map(|placed| AsRef::<graph::Quote>::as_ref(placed.entity()).as_ref().to_owned()).collect();
     assert_eq!(quoted, vec!["\"SELECT 1\"".to_owned(), "\"SELECT 2\"".to_owned()]);
+}
+
+const IN_MACRO: &str = "fn field() {}\nfn c() {}\nfn f(x: S) {\n    g!(x.field, a::b, -c);\n}\n";
+
+#[test]
+fn a_name_after_a_dot_in_macro_tokens_is_a_field_or_method_not_a_path() {
+    let model = Read::model(IN_MACRO);
+    let mut written: Vec<String> = model
+        .uses()
+        .filter(|placed| placed.entity().mention() == Mention::InMacro)
+        .map(|placed| placed.entity().written().to_string())
+        .collect();
+    written.sort();
+    assert_eq!(written, ["a::b", "c"]);
 }
