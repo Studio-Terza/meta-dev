@@ -3,7 +3,6 @@ mod members;
 mod modules;
 mod type_key;
 
-use std::mem;
 use std::path::Path;
 
 use syntax::Punctuated;
@@ -11,20 +10,26 @@ use syntax::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType
 
 use lint_core::Module;
 use lint_core::{Parsed, Site, Walk};
+use lint_file::Concluded;
 use lint_layout::{LineNumber, Name, Word};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
-use members::Members;
-pub use modules::Modules;
+use members::{Dropped, Members};
+use modules::Modules;
 
 #[derive(Debug)]
 pub struct Guards<'file> {
     path: &'file Path,
     module: Module<'file>,
+    kinds: &'static [Kind],
+}
+
+#[derive(Debug, Default)]
+pub struct Scanned<'file> {
+    module: Option<Module<'file>>,
     members: Members<'file>,
     modules: Modules<'file>,
     outer: Vec<Frame<'file>>,
-    kinds: &'static [Kind],
 }
 
 #[derive(Debug)]
@@ -41,24 +46,27 @@ impl<'file> Guards<'file> {
     pub fn scanning(parsed: Parsed<'_, 'file>) -> Guards<'file> {
         let head = parsed.head();
         let kinds = <&SourceFile>::from(parsed).shipped().map_or(&[][..], |_| Self::KINDS);
-        Guards {
-            path: AsRef::<Path>::as_ref(head),
-            module: Module::of_head(head),
-            members: Members::default(),
-            modules: Modules::default(),
-            outer: Vec::new(),
-            kinds,
-        }
+        Guards { path: AsRef::<Path>::as_ref(head), module: Module::of_head(head), kinds }
     }
 
-    fn declared(&mut self, attributes: &[Attribute], name: &Ident) -> Descend {
+    fn declared(&self, found: Scanned<'file>, attributes: &[Attribute], name: &Ident) -> Visit<Scanned<'file>> {
         let site = Site::new(self.path, LineNumber::from(name.span()));
-        Descend::from(Walk::outside_tests(attributes))
+        let marked = Descend::from(Walk::outside_tests(attributes))
             .entered()
-            .map(|_| attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None))
-            .into_iter()
-            .for_each(|mark| self.members.declare(Name::from(name), mark));
-        Descend::Over
+            .map(|_| attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None));
+        let members = marked.into_iter().fold(found.members, |members, mark| members.declared(Name::from(name), mark));
+        Visit::new(Scanned { members, ..found }, Descend::Over)
+    }
+
+    fn current(&self, found: &Scanned<'file>) -> Module<'file> {
+        found.module.clone().unwrap_or_else(|| self.module.clone())
+    }
+
+    fn topmost(&self, modules: Modules<'file>, top: Module<'file>, members: Members<'file>) -> Modules<'file> {
+        match self.kinds.first() {
+            Some(_) => modules.filed(top, members),
+            None => modules,
+        }
     }
 }
 
@@ -87,70 +95,86 @@ impl MustUse {
     }
 }
 
-impl<'ast> Watch<'ast> for Guards<'_> {
+impl<'file> Fold for Guards<'file> {
+    type Found = Scanned<'file>;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        let inner = facts.name().map_or_else(|| self.module.clone(), |name| self.module.within(name.clone()));
-        let outer = mem::replace(&mut self.module, inner);
-        let around = mem::take(&mut self.members);
-        self.outer.push(Frame { module: outer, members: around });
-        Descend::from(facts.gate())
+    fn finished(&self, found: Scanned<'file>) -> Scanned<'file> {
+        let top = self.current(&found);
+        let Scanned { members, modules, outer, .. } = found;
+        Scanned { module: None, members: Members::default(), modules: self.topmost(modules, top, members), outer }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        let frame = self.outer.pop().unwrap_or(Frame { module: Module::UNPLACED, members: Members::default() });
-        let visited = mem::replace(&mut self.module, frame.module);
-        let within = mem::replace(&mut self.members, frame.members);
-        self.modules.file(visited, within);
+    fn on_item_mod(&self, found: Scanned<'file>, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Scanned<'file>> {
+        let current = self.current(&found);
+        let inner = facts.name().map_or_else(|| current.clone(), |name| current.within(name.clone()));
+        let Scanned { members, modules, outer, .. } = found;
+        let frame = Frame { module: current, members };
+        let opened = outer.into_iter().chain([frame]).collect();
+        Visit::new(
+            Scanned { module: Some(inner), members: Members::default(), modules, outer: opened },
+            Descend::from(facts.gate()),
+        )
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
-            .entered()
-            .into_iter()
-            .for_each(|_| self.members.drop_implemented(Name::implementing(item, Word::new(Self::DROP))));
-        Descend::Over
+    fn off_item_mod(&self, found: Scanned<'file>, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Scanned<'file> {
+        let visited = self.current(&found);
+        let Scanned { members, modules, mut outer, .. } = found;
+        let frame = outer.pop().unwrap_or(Frame { module: Module::UNPLACED, members: Members::default() });
+        Scanned { module: Some(frame.module), members: frame.members, modules: modules.filed(visited, members), outer }
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
-        self.declared(&item.attrs, &item.ident)
+    fn on_item_impl(
+        &self,
+        found: Scanned<'file>,
+        item: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+    ) -> Visit<Scanned<'file>> {
+        let dropped =
+            Descend::from(facts.gate()).entered().and_then(|_| Name::implementing(item, Word::new(Self::DROP)));
+        Visit::new(Scanned { members: found.members.drop_implemented(Dropped::from(dropped)), ..found }, Descend::Over)
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
-        self.declared(&item.attrs, &item.ident)
+    fn on_item_struct(
+        &self,
+        found: Scanned<'file>,
+        item: &ItemStruct,
+        _: &Facts<'_, ItemStruct>,
+    ) -> Visit<Scanned<'file>> {
+        self.declared(found, &item.attrs, &item.ident)
     }
 
-    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
-        self.declared(&item.attrs, &item.ident)
+    fn on_item_enum(&self, found: Scanned<'file>, item: &ItemEnum, _: &Facts<'_, ItemEnum>) -> Visit<Scanned<'file>> {
+        self.declared(found, &item.attrs, &item.ident)
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType, facts: &Facts<'_, ItemType>) -> Descend {
-        let target = Name::of_type(&item.ty);
-        Descend::from(facts.gate())
-            .entered()
-            .map(|_| target)
-            .into_iter()
-            .zip(facts.name())
-            .for_each(|(aliased, name)| self.members.alias(name.clone(), aliased));
-        Descend::Over
+    fn on_item_union(
+        &self,
+        found: Scanned<'file>,
+        item: &ItemUnion,
+        _: &Facts<'_, ItemUnion>,
+    ) -> Visit<Scanned<'file>> {
+        self.declared(found, &item.attrs, &item.ident)
+    }
+
+    fn on_item_type(
+        &self,
+        found: Scanned<'file>,
+        item: &ItemType,
+        facts: &Facts<'_, ItemType>,
+    ) -> Visit<Scanned<'file>> {
+        let target = Descend::from(facts.gate()).entered().and_then(|_| Name::of_type(&item.ty));
+        let members =
+            facts.name().into_iter().fold(found.members, |members, name| members.aliased(name.clone(), target.clone()));
+        Visit::new(Scanned { members, ..found }, Descend::Over)
     }
 }
 
-impl<'file> Gathers<Modules<'file>> for Guards<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> Modules<'file> {
-        let mut modules = self.modules;
-        self.kinds
-            .first()
-            .map(|_| (self.module, self.members))
-            .into_iter()
-            .for_each(|(module, members)| modules.file(module, members));
-        modules
+impl<'file> FromIterator<Scanned<'file>> for Concluded<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Scanned<'file>>>(parts: Parts) -> Concluded<'file> {
+        parts.into_iter().map(|scanned| scanned.modules).collect::<Modules<'file>>().violations().into_iter().collect()
     }
 }

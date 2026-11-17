@@ -9,6 +9,15 @@ use lint_layout::Name;
 use super::type_key::TypeKey;
 use finding::Finding;
 
+#[derive(Debug)]
+pub struct Dropped(Option<Name>);
+
+impl From<Option<Name>> for Dropped {
+    fn from(name: Option<Name>) -> Dropped {
+        Dropped(name)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Members<'file> {
     declared: BTreeMap<Name, BTreeSet<Site<'file>>>,
@@ -17,16 +26,18 @@ pub struct Members<'file> {
 }
 
 impl<'file> Members<'file> {
-    pub fn declare(&mut self, name: Name, unmarked: Option<Site<'file>>) {
-        self.declared.entry(name).or_default().extend(unmarked);
+    pub fn declared(self, name: Name, unmarked: Option<Site<'file>>) -> Members<'file> {
+        let mut declared = self.declared;
+        declared.entry(name).or_default().extend(unmarked);
+        Members { declared, ..self }
     }
 
-    pub fn alias(&mut self, name: Name, target: Option<Name>) {
-        self.aliases.extend(target.map(|aliased| (name, aliased)));
+    pub fn aliased(self, name: Name, target: Option<Name>) -> Members<'file> {
+        Members { aliases: self.aliases.into_iter().chain(target.map(|aliased| (name, aliased))).collect(), ..self }
     }
 
-    pub fn drop_implemented(&mut self, name: Option<Name>) {
-        self.dropped.extend(name);
+    pub fn drop_implemented(self, dropped: Dropped) -> Members<'file> {
+        Members { dropped: self.dropped.into_iter().chain(dropped.0).collect(), ..self }
     }
 
     fn merged(mut self, other: Members<'file>) -> Members<'file> {

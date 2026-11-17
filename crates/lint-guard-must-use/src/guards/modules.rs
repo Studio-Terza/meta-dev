@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::Module;
 use lint_core::{Site, Violation};
-use lint_file::Concluded;
 use lint_layout::Name;
 use lint_placement::CrateFile;
 
@@ -14,17 +13,19 @@ pub struct Modules<'file>(BTreeMap<Module<'file>, Members<'file>>);
 
 impl<'file> FromIterator<Modules<'file>> for Modules<'file> {
     fn from_iter<Parts: IntoIterator<Item = Modules<'file>>>(parts: Parts) -> Modules<'file> {
-        parts.into_iter().flat_map(|part| part.0).fold(Modules::default(), |mut merged, (module, members)| {
-            merged.file(module, members);
-            merged
-        })
+        parts
+            .into_iter()
+            .flat_map(|part| part.0)
+            .fold(Modules::default(), |merged, (module, members)| merged.filed(module, members))
     }
 }
 
 impl<'file> Modules<'file> {
-    pub fn file(&mut self, module: Module<'file>, members: Members<'file>) {
-        let filed: Members<'_> = [self.0.remove(&module).unwrap_or_default(), members].into_iter().collect();
-        self.0.insert(module, filed);
+    pub fn filed(self, module: Module<'file>, members: Members<'file>) -> Modules<'file> {
+        let mut modules = self.0;
+        let filed: Members<'_> = [modules.remove(&module).unwrap_or_default(), members].into_iter().collect();
+        modules.insert(module, filed);
+        Modules(modules)
     }
 
     pub fn violations(self) -> Vec<Violation<'file>> {
@@ -61,11 +62,5 @@ impl<'file> Modules<'file> {
                 .collect()
         };
         members.declares(name).map_or_else(shared, |_| vec![TypeKey::new(module, name)])
-    }
-}
-
-impl<'file> FromIterator<Modules<'file>> for Concluded<'file> {
-    fn from_iter<Parts: IntoIterator<Item = Modules<'file>>>(parts: Parts) -> Concluded<'file> {
-        parts.into_iter().collect::<Modules<'file>>().violations().into_iter().collect()
     }
 }
