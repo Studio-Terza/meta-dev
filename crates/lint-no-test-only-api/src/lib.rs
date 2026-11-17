@@ -105,8 +105,9 @@ impl WatchingLint for NoTestOnlyApi {
     fn watched(file: &SourceFile) -> Offered<'_> {
         let path = AsRef::<Path>::as_ref(file.head());
         let shipped = file.shipped().map(|_| ());
-        let gated =
-            shipped.into_iter().fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(GatedItems::from(path))));
+        let gated = shipped
+            .into_iter()
+            .fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(Folding::from(GatedItems::from(path)))));
         let watchers = gated.and(Box::new(Folding::from(TestFeatures::from(path))));
         Offered { watchers, found: Vec::new() }
     }
