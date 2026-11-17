@@ -20,7 +20,7 @@ const CODE_EDITED: &str = "diff --git a/crates/a/src/lib.rs b/crates/a/src/lib.r
 const NOTHING_MOVED: &str = "";
 const LINE_ABOVE: &str = "diff --git a/crates/a/src/lib.rs b/crates/a/src/lib.rs\n--- a/crates/a/src/lib.rs\n+++ b/crates/a/src/lib.rs\n@@ -1,0 +2 @@\n+use std::fmt;\n";
 
-const METADATA: &str = r#"{"workspace_root": "/w", "workspace_members": ["a", "fakes", "shared"], "packages": [{"id": "a", "manifest_path": "/w/crates/a/Cargo.toml"}, {"id": "fakes", "manifest_path": "/w/crates/fakes/Cargo.toml"}, {"id": "shared", "manifest_path": "/w/crates/shared/Cargo.toml"}], "resolve": {"nodes": [{"id": "a", "deps": [{"pkg": "fakes", "dep_kinds": [{"kind": "dev"}]}, {"pkg": "shared", "dep_kinds": [{"kind": null}, {"kind": "dev"}]}]}, {"id": "fakes", "deps": []}, {"id": "shared", "deps": []}]}}"#;
+const METADATA: &str = r#"{"workspace_root": "/w", "workspace_members": ["a 0.1.0 (path+file:///w/crates/a)", "fakes 0.1.0 (path+file:///w/crates/fakes)", "shared 0.1.0 (path+file:///w/crates/shared)"], "packages": [{"name": "a", "id": "a 0.1.0 (path+file:///w/crates/a)", "manifest_path": "/w/crates/a/Cargo.toml", "dependencies": [{"name": "fakes", "kind": "dev"}, {"name": "shared", "kind": null}, {"name": "shared", "kind": "dev"}, {"name": "serde", "kind": null}]}, {"name": "fakes", "id": "fakes 0.1.0 (path+file:///w/crates/fakes)", "manifest_path": "/w/crates/fakes/Cargo.toml", "dependencies": []}, {"name": "shared", "id": "shared 0.1.0 (path+file:///w/crates/shared)", "manifest_path": "/w/crates/shared/Cargo.toml", "dependencies": []}], "resolve": null}"#;
 
 struct Prior {
     survivors: &'static [&'static str],
