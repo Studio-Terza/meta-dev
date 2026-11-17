@@ -24,23 +24,20 @@ pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
 
 impl<'file, Folded: Fold + fmt::Debug> Finds<'file> for Folding<Folded>
 where
-    Folded::Found: Into<Vec<Violation<'file>>>,
+    Vec<Violation<'file>>: From<Folded::Found>,
 {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.concluded().into()
+        self.concluded()
     }
 }
 
-impl<Part, Folded: Fold> Gathers<Part> for Folding<Folded>
-where
-    Folded::Found: Into<Part>,
-{
+impl<Part: From<Folded::Found>, Folded: Fold> Gathers<Part> for Folding<Folded> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 
     fn gathered(self) -> Part {
-        self.concluded().into()
+        self.concluded()
     }
 }
 

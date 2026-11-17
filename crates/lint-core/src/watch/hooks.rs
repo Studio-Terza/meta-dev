@@ -102,6 +102,10 @@ macro_rules! hooks {
 
             fn kinds(&self) -> &[Kind];
 
+            fn finished(&self, found: Self::Found) -> Self::Found {
+                found
+            }
+
             fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {
                 Visit::descending(found)
             }
@@ -247,6 +251,13 @@ impl<Found> Visit<Found> {
     }
 }
 
+impl<Item> Visit<Vec<Item>> {
+    #[must_use]
+    pub fn adding(found: Vec<Item>, more: impl IntoIterator<Item = Item>, descend: Descend) -> Visit<Vec<Item>> {
+        Visit::new(found.into_iter().chain(more).collect(), descend)
+    }
+}
+
 impl<Folded: Fold> From<Folded> for Folding<Folded> {
     fn from(fold: Folded) -> Folding<Folded> {
         Folding { fold, found: Folded::Found::default() }
@@ -255,8 +266,8 @@ impl<Folded: Fold> From<Folded> for Folding<Folded> {
 
 impl<Folded: Fold> Folding<Folded> {
     #[must_use]
-    pub fn concluded(self) -> Folded::Found {
-        self.found
+    pub fn concluded<Part: From<Folded::Found>>(self) -> Part {
+        Part::from(self.fold.finished(self.found))
     }
 
     pub(super) fn visited(&mut self, step: impl FnOnce(&Folded, Folded::Found) -> Visit<Folded::Found>) -> Descend {

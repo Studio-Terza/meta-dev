@@ -3,8 +3,7 @@ mod boundary;
 use boundary::Numeral;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch, Watchers};
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::{Descend, Facts, Fold, Folding, Gathers, Kind, Sweep, Visit, Watchers, Watching};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -70,8 +69,8 @@ impl WatchingLint for NamedNumbers {
 
     fn watched(file: &SourceFile) -> Watchers<'_> {
         let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
-        let numbers = counted.map(|found| Numbers { path: AsRef::<Path>::as_ref(found.head()), lines: Vec::new() });
-        numbers.into_iter().fold(Watchers::none(), |watchers, watched| watchers.and(Box::new(watched)))
+        let numbers = counted.map(|found| Numbers { path: AsRef::<Path>::as_ref(found.head()) });
+        numbers.into_iter().fold(Watchers::none(), |watchers, watched| watchers.and(Box::new(Folding::from(watched))))
     }
 
     fn judged<'file, 'head: 'file>(
@@ -101,10 +100,21 @@ impl NamedNumbers {
 #[derive(Debug)]
 struct Numbers<'file> {
     path: &'file Path,
-    lines: Vec<LineNumber>,
 }
 
-impl<'ast> Watch<'ast> for Numbers<'_> {
+impl<'file> Numbers<'file> {
+    fn numbered(&self, found: Vec<Violation<'file>>, unnamed: Option<LineNumber>) -> Visit<Vec<Violation<'file>>> {
+        Visit::adding(
+            found,
+            unnamed.map(|line| Violation::new(Site::new(self.path, line), NamedNumbers::OUTSIDE_CONSTS)),
+            Descend::Into,
+        )
+    }
+}
+
+impl<'file> Fold for Numbers<'file> {
+    type Found = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -119,48 +129,49 @@ impl<'ast> Watch<'ast> for Numbers<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        Gate::BOUNDARY.outside(module)
+    fn on_item_mod(&self, found: Self::Found, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Visit<Self::Found> {
+        Visit::new(found, Gate::BOUNDARY.outside(module))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_impl(&self, found: Self::Found, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
-        Descend::Over
+    fn on_item_const(&self, found: Self::Found, _: &ItemConst, _: &Facts<'_, ItemConst>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
-        Descend::Over
+    fn on_impl_item_const(
+        &self,
+        found: Self::Found,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+    ) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Descend {
-        Descend::Over
+    fn on_trait_item_const(
+        &self,
+        found: Self::Found,
+        _: &TraitItemConst,
+        _: &Facts<'_, TraitItemConst>,
+    ) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) -> Descend {
-        Descend::Over
+    fn on_expr_const(&self, found: Self::Found, _: &ExprConst, _: &Facts<'_, ExprConst>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_lit_int(&mut self, _: &'ast LitInt, facts: &Facts<'_, LitInt>) -> Descend {
-        self.lines.extend(facts.unnamed());
-        Descend::Into
+    fn on_lit_int(&self, found: Self::Found, _: &LitInt, facts: &Facts<'_, LitInt>) -> Visit<Self::Found> {
+        self.numbered(found, facts.unnamed())
     }
 
-    fn on_lit_float(&mut self, _: &'ast LitFloat, facts: &Facts<'_, LitFloat>) -> Descend {
-        self.lines.extend(facts.unnamed());
-        Descend::Into
-    }
-}
-
-impl<'file> Finds<'file> for Numbers<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.path;
-        self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), NamedNumbers::OUTSIDE_CONSTS)).collect()
+    fn on_lit_float(&self, found: Self::Found, _: &LitFloat, facts: &Facts<'_, LitFloat>) -> Visit<Self::Found> {
+        self.numbered(found, facts.unnamed())
     }
 }

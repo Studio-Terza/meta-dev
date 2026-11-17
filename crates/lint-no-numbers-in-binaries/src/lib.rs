@@ -40,12 +40,10 @@ struct Numbers<'file> {
 
 impl<'file> Numbers<'file> {
     fn numbered(&self, found: Vec<Violation<'file>>, unnamed: Option<LineNumber>) -> Visit<Vec<Violation<'file>>> {
-        let path = self.path;
-        Visit::descending(
-            found
-                .into_iter()
-                .chain(unnamed.map(|line| Violation::new(Site::new(path, line), NoNumbersInBinaries::IN_BINARY)))
-                .collect(),
+        Visit::adding(
+            found,
+            unnamed.map(|line| Violation::new(Site::new(self.path, line), NoNumbersInBinaries::IN_BINARY)),
+            Descend::Into,
         )
     }
 }
