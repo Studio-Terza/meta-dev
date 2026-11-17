@@ -2,13 +2,21 @@ use std::fmt;
 
 pub trait Ignore: Copy + fmt::Display {}
 
-pub trait Ignoring<Value>: IntoIterator<Item = Value> + Sized {
+pub trait Ignoring<Value, Failure>: Into<Result<Value, Failure>> {
     fn ignoring(self, _: impl Ignore) -> Option<Value> {
-        self.into_iter().next()
+        match self.into() {
+            Ok(value) => Some(value),
+            Err(failure) => Self::dropped(failure),
+        }
+    }
+
+    fn dropped(failure: Failure) -> Option<Value> {
+        drop(failure);
+        None
     }
 }
 
-impl<Value, Failure> Ignoring<Value> for Result<Value, Failure> {}
+impl<Value, Failure> Ignoring<Value, Failure> for Result<Value, Failure> {}
 
 #[macro_export]
 macro_rules! invariant {
