@@ -271,7 +271,7 @@ fn every_field_bound_constant_and_alias_is_read_with_its_kind_and_item() {
     );
 }
 
-const PLACED: &str = "fn shipped() {}\n#[cfg(test)]\nmod tests {\n    fn tested() {}\n}\nm! {\n    fn expanded() {}\n}\nmod boundary {\n    fn parsed() {}\n}\nunsafe extern \"C\" {\n    fn foreign(a: u8);\n}\nimpl Clone for S {\n    fn clone(&self) -> S {\n        fn helper() {}\n        S\n    }\n}\n";
+const PLACED: &str = "fn shipped() {}\n#[cfg(test)]\nmod tests {\n    fn tested() {}\n}\n#[cfg(test)]\ntrait Probe {\n    fn probed(&self);\n}\nm! {\n    fn expanded() {}\n}\nmod boundary {\n    fn parsed() {}\n}\nunsafe extern \"C\" {\n    fn foreign(a: u8);\n}\nimpl Clone for S {\n    fn clone(&self) -> S {\n        fn helper() {}\n        S\n    }\n}\n";
 
 #[test]
 fn every_function_carries_its_reach_zone_and_enclosure() {
@@ -280,6 +280,7 @@ fn every_function_carries_its_reach_zone_and_enclosure() {
         [
             PlacedRow::new("shipped", Owner::Free, Reach::Shipped),
             PlacedRow::new("tested", Owner::Free, Reach::Test),
+            PlacedRow::new("probed", Owner::TraitDecl, Reach::Test),
             PlacedRow::new("expanded", Owner::Free, Reach::Shipped),
             PlacedRow::new("parsed", Owner::Free, Reach::Shipped).zoned(Zone::Boundary),
             PlacedRow::new("foreign", Owner::Foreign, Reach::Shipped),

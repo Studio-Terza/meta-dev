@@ -1808,14 +1808,12 @@ dependencies = [
 name = "lint-paired-apis"
 version = "0.1.0"
 dependencies = [
+ "graph",
  "laws",
  "lint-core",
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-placement",
- "lint-sweep",
- "syntax",
 ]
 
 [[package]]

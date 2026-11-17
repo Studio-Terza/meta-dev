@@ -1,20 +1,31 @@
 mod declared;
-mod owner;
-mod paired_methods;
 mod pairs;
 
 use std::collections::BTreeMap;
 
+use graph::{Exposure, Function, ItemId, Model, Owner, Placed, Reach, Region, Seat};
+use lint_core::{Headline, Report};
+use lint_file::ModelLint;
+use lint_layout::Name;
+
 use declared::Declared;
-use lint_core::{Headline, Lint, Parsed, Report, SourceFile};
-use lint_file::Gleaning;
-use lint_sweep::{Gathers, Watching};
-use owner::Owner;
-use paired_methods::PairedMethods;
 use pairs::Pairs;
 
 #[derive(Debug)]
 pub struct PairedApis;
+
+#[derive(Debug)]
+struct Owned<'model> {
+    owner: ItemId,
+    declared: Declared<'model>,
+}
+
+impl ModelLint for PairedApis {
+    fn report(model: &Model) -> Report<'_> {
+        let owned = model.functions().filter_map(Owned::placed).fold(BTreeMap::new(), Owned::grouped);
+        Report::new(PairedApis::HEADLINE, Pairs::listed(owned.values()))
+    }
+}
 
 impl PairedApis {
     const HEADLINE: Headline = Headline::new(
@@ -22,53 +33,30 @@ impl PairedApis {
     );
 }
 
-impl Lint for PairedApis {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::from(&PairedApis::swept(files))
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct PairedOwners<'head>(BTreeMap<Owner<'head>, Vec<Declared<'head>>>);
-
-impl<'head> FromIterator<PairedOwners<'head>> for PairedOwners<'head> {
-    fn from_iter<Parts: IntoIterator<Item = PairedOwners<'head>>>(parts: Parts) -> PairedOwners<'head> {
-        PairedOwners(parts.into_iter().flat_map(|part| part.0).fold(
-            BTreeMap::new(),
-            |mut owners, (owner, declared)| {
-                owners.entry(owner).or_insert_with(Vec::new).extend(declared);
-                owners
-            },
-        ))
-    }
-}
-
-impl<'head> From<&PairedOwners<'head>> for Report<'head> {
-    fn from(owners: &PairedOwners<'head>) -> Report<'head> {
-        Report::new(PairedApis::HEADLINE, Pairs::listed(&owners.0))
-    }
-}
-
-#[derive(Debug)]
-pub struct PairedGleaner<'head>(PairedMethods<'head>);
-
-impl<'head> Gathers<PairedOwners<'head>> for PairedGleaner<'head> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        self.0.watching()
+impl<'model> Owned<'model> {
+    fn placed(placed: Placed<'model, &'model Function>) -> Option<Owned<'model>> {
+        let function = placed.entity();
+        let seat: &Seat = function.as_ref();
+        let region: &Region = function.as_ref();
+        let owner = Self::paired(function).filter(|_| region.reach() == Reach::Shipped).and(seat.owner())?;
+        let name: &Name = function.as_ref();
+        Some(Owned { owner, declared: Declared::new(name.clone(), placed.site()) })
     }
 
-    fn gathered(self) -> PairedOwners<'head> {
-        PairedOwners(self.0.gathered())
+    fn paired(function: &Function) -> Option<&Function> {
+        match function.owner() {
+            Owner::Inherent => (*AsRef::<Exposure>::as_ref(function) == Exposure::Public).then_some(function),
+            Owner::TraitDecl => Some(function),
+            Owner::Free | Owner::TraitImpl | Owner::Nested | Owner::Foreign => None,
+        }
     }
-}
 
-impl Gleaning for PairedApis {
-    type Part<'head> = PairedOwners<'head>;
-    type Gleaned<'head> = PairedOwners<'head>;
-
-    type Gleaner<'run, 'head: 'run> = PairedGleaner<'head>;
-
-    fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> PairedGleaner<'head> {
-        PairedGleaner(PairedMethods::of_file(parsed))
+    fn grouped(
+        owners: BTreeMap<ItemId, Vec<Declared<'model>>>,
+        owned: Owned<'model>,
+    ) -> BTreeMap<ItemId, Vec<Declared<'model>>> {
+        let mut grown = owners;
+        grown.entry(owned.owner).or_default().push(owned.declared);
+        grown
     }
 }

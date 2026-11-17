@@ -651,7 +651,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         self.trait_bounds(item, &generics);
         let place = self.trait_owning(&item.ident, &item.attrs);
         self.filler_owning(item);
-        self.context = self.context.owned(place);
+        self.context = self.context.within_item(&item.attrs).owned(place);
         self.enclosed(Enclosure::Trait, generics)
     }
 

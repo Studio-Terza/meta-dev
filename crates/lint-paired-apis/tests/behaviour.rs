@@ -1,5 +1,4 @@
-use lint_core::Lint;
-use lint_fixtures::{Lines, Located, Source, Sources, Text};
+use lint_fixtures::{Checks, Lines, Located, Queried, Source, Sources, Text};
 use lint_paired_apis::PairedApis;
 
 const START_STOP: &str = "pub struct A;\nimpl A {\n    pub fn start(&self) {}\n    pub fn stop(&self) {}\n}\n";
@@ -12,22 +11,24 @@ const BEGIN_END: &str = "pub struct A;\nimpl A {\n    pub fn begin(&self) {}\n  
 const SUFFIXED: &str =
     "pub struct A;\nimpl A {\n    pub fn start_server(&self) {}\n    pub fn stop_server(&self) {}\n}\n";
 const IN_TRAIT: &str = "trait Port {\n    fn open(&self);\n    fn close(&self);\n}\n";
-const IN_MODULE: &str =
-    "mod inner {\n    impl A {\n        pub fn lock(&self) {}\n        pub fn unlock(&self) {}\n    }\n}\n";
+const IN_MODULE: &str = "mod inner {\n    pub struct A;\n    impl A {\n        pub fn lock(&self) {}\n        pub fn unlock(&self) {}\n    }\n}\n";
 const ALONE: &str = "pub struct A;\nimpl A {\n    pub fn start(&self) {}\n    pub fn close(&self) {}\n}\n";
 const OTHER_SUFFIX: &str =
     "pub struct A;\nimpl A {\n    pub fn start_server(&self) {}\n    pub fn stop_client(&self) {}\n}\n";
 const HALF_PRIVATE: &str = "pub struct A;\nimpl A {\n    pub fn start(&self) {}\n    fn stop(&self) {}\n}\n";
-const TWO_BLOCKS: &str = "impl A {\n    pub fn start(&self) {}\n}\nimpl B {\n    pub fn stop(&self) {}\n}\n";
-const SPLIT_BLOCKS: &str = "impl A {\n    pub fn start(&self) {}\n}\nimpl A {\n    pub fn stop(&self) {}\n}\n";
+const TWO_BLOCKS: &str =
+    "pub struct A;\npub struct B;\nimpl A {\n    pub fn start(&self) {}\n}\nimpl B {\n    pub fn stop(&self) {}\n}\n";
+const SPLIT_BLOCKS: &str =
+    "pub struct A;\nimpl A {\n    pub fn start(&self) {}\n}\nimpl A {\n    pub fn stop(&self) {}\n}\n";
 const TRAIT_IMPL: &str = "impl Port for A {\n    fn open(&self) {}\n    fn close(&self) {}\n}\n";
 const TRAIT_CONSTS: &str = "trait Port {\n    const OPEN: u8;\n    fn open(&self);\n}\n";
-const IMPL_CONSTS: &str = "impl A {\n    const CLOSE: u8 = 1;\n    pub fn open(&self) {}\n}\n";
-const TEST_IMPL: &str = "#[cfg(test)]\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
-const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    impl A {\n        pub fn open(&self) {}\n        pub fn close(&self) {}\n    }\n}\n";
+const IMPL_CONSTS: &str = "pub struct A;\nimpl A {\n    const CLOSE: u8 = 1;\n    pub fn open(&self) {}\n}\n";
+const TEST_IMPL: &str =
+    "pub struct A;\n#[cfg(test)]\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
+const TEST_MODULE: &str = "pub struct A;\n#[cfg(test)]\nmod tests {\n    use super::A;\n    impl A {\n        pub fn open(&self) {}\n        pub fn close(&self) {}\n    }\n}\n";
 const TEST_TRAIT: &str = "#[cfg(test)]\ntrait Port {\n    fn open(&self);\n    fn close(&self);\n}\n";
 
-laws::table!(paired_methods_are_listed, Sources::flagged::<PairedApis>, [
+laws::table!(paired_methods_are_listed, Sources::flagged::<Queried<PairedApis>>, [
     [Source::new(Located::new("a.rs"), Text::new(START_STOP))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(LOCK_UNLOCK))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(OPEN_CLOSE))] => Lines::from(["a.rs:4"]),
@@ -36,17 +37,17 @@ laws::table!(paired_methods_are_listed, Sources::flagged::<PairedApis>, [
     [Source::new(Located::new("a.rs"), Text::new(BEGIN_END))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(SUFFIXED))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(IN_TRAIT))] => Lines::from(["a.rs:2"]),
-    [Source::new(Located::new("a.rs"), Text::new(IN_MODULE))] => Lines::from(["a.rs:3"]),
-    [Source::new(Located::new("a.rs"), Text::new(SPLIT_BLOCKS))] => Lines::from(["a.rs:2"]),
-    [Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod a;\nmod b;\n")), Source::new(Located::new("crates/x/src/a.rs"), Text::new("impl A {\n    pub fn open(&self) {}\n}\n")), Source::new(Located::new("crates/x/src/b.rs"), Text::new("impl A {\n    pub fn close(&self) {}\n}\n"))] => Lines::from(["crates/x/src/a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(IN_MODULE))] => Lines::from(["a.rs:4"]),
+    [Source::new(Located::new("a.rs"), Text::new(SPLIT_BLOCKS))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod a;\nmod b;\npub struct A;\n")), Source::new(Located::new("crates/x/src/a.rs"), Text::new("use crate::A;\nimpl A {\n    pub fn open(&self) {}\n}\n")), Source::new(Located::new("crates/x/src/b.rs"), Text::new("use crate::A;\nimpl A {\n    pub fn close(&self) {}\n}\n"))] => Lines::from(["crates/x/src/a.rs:3"]),
 ]);
 
-laws::table!(unpaired_methods_are_not, Sources::flagged::<PairedApis>, [
+laws::table!(unpaired_methods_are_not, Sources::flagged::<Queried<PairedApis>>, [
     [Source::new(Located::new("a.rs"), Text::new(ALONE))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(OTHER_SUFFIX))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(HALF_PRIVATE))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(TWO_BLOCKS))] => Lines::default(),
-    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new("impl A {\n    pub fn open(&self) {}\n}\n")), Source::new(Located::new("crates/two/src/lib.rs"), Text::new("impl A {\n    pub fn close(&self) {}\n}\n"))] => Lines::default(),
+    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new("pub struct A;\nimpl A {\n    pub fn open(&self) {}\n}\n")), Source::new(Located::new("crates/two/src/lib.rs"), Text::new("pub struct A;\nimpl A {\n    pub fn close(&self) {}\n}\n"))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(TRAIT_IMPL))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(TRAIT_CONSTS))] => Lines::default(),
     [Source::new(Located::new("a.rs"), Text::new(IMPL_CONSTS))] => Lines::default(),
@@ -58,7 +59,9 @@ laws::table!(unpaired_methods_are_not, Sources::flagged::<PairedApis>, [
 
 #[test]
 fn the_message_says_to_write_a_guard() {
-    let shown =
-        PairedApis::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(SUFFIXED))])).to_string();
+    let shown = Queried::<PairedApis>::reported(
+        &Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(SUFFIXED))]),
+        |report| report.to_string(),
+    );
     assert!(["guard", "fn start_server pairs with fn stop_server"].iter().all(|word| shown.contains(word)));
 }

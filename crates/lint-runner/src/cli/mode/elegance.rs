@@ -39,7 +39,7 @@ impl Elegance {
             FlowShapes::report(files),
             NormalisedShapes::report(files),
             <NarrowedReturns as ModelLint>::report(model),
-            PairedApis::report(files),
+            <PairedApis as ModelLint>::report(model),
             Clones::report(files),
         ]
     }
