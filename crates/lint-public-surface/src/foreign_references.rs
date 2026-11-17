@@ -15,7 +15,6 @@ use crate_reach::CrateReach;
 
 #[derive(Debug, Default)]
 pub struct ForeignReferences {
-    own_crate: Option<CrateName>,
     crates: BTreeMap<CrateName, CrateReach>,
 }
 
@@ -44,10 +43,7 @@ enum Reader {
 impl Reader {
     fn tested(mut read: ForeignReferences, tested: Option<CrateName>) -> ForeignReferences {
         let kept = tested.and_then(|crate_name| read.crates.remove_entry(&crate_name));
-        ForeignReferences {
-            crates: kept.map(|(name, reach)| (name, reach.names_only())).into_iter().collect(),
-            ..ForeignReferences::default()
-        }
+        ForeignReferences { crates: kept.map(|(name, reach)| (name, reach.names_only())).into_iter().collect() }
     }
 
     fn kept(self, read: ForeignReferences, tested: Option<CrateName>) -> ForeignReferences {
@@ -104,7 +100,7 @@ impl Semigroup for ForeignReferences {
         other.crates.into_iter().for_each(|(crate_name, reach)| {
             self.crates.entry(crate_name).or_default().absorb(reach);
         });
-        ForeignReferences { own_crate: self.own_crate.or(other.own_crate), ..self }
+        self
     }
 }
 
@@ -113,22 +109,8 @@ impl Monoid for ForeignReferences {}
 impl ForeignReferences {
     const TESTS: &'static str = "tests";
 
-    fn owned_by(own_crate: Option<&CrateName>) -> ForeignReferences {
-        ForeignReferences { own_crate: own_crate.cloned(), crates: BTreeMap::new() }
-    }
-
     pub fn unnamed<'export>(&self, crate_name: &CrateName, export: &'export Export) -> Option<&'export Export> {
         self.crates.get(crate_name).and_then(|reach| reach.unnamed(AsRef::<Name>::as_ref(export))).map(|_| export)
-    }
-
-    fn used(&mut self, tree: &UseTree) {
-        let leaves = UseLeaf::of_tree(tree);
-        let reached = leaves.iter().flat_map(|leaf| {
-            let first = leaf.path().first().copied();
-            let module = leaf.path().get(1).copied().map(Leaf::Named);
-            [Some(Self::reach(leaf)), module].into_iter().flatten().map(move |reach| (first, reach))
-        });
-        reached.for_each(|(first, reach)| self.record(first, reach));
     }
 
     fn reach<'tree>(leaf: &UseLeaf<'tree>) -> Leaf<'tree> {
@@ -136,12 +118,29 @@ impl ForeignReferences {
         named.or_else(|| leaf.end().renamed().map(|renamed| &renamed.ident)).map_or(Leaf::Glob, Leaf::Named)
     }
 
-    fn record(&mut self, first: Option<&Ident>, leaf: Leaf<'_>) {
+    fn reaching(crate_name: CrateName, leaf: Leaf<'_>) -> ForeignReferences {
+        let mut reach = CrateReach::default();
+        leaf.reached(&mut reach);
+        ForeignReferences { crates: BTreeMap::from([(crate_name, reach)]) }
+    }
+}
+
+impl ReferenceScan {
+    fn used(&self, tree: &UseTree) -> ForeignReferences {
+        let leaves = UseLeaf::of_tree(tree);
+        let reached = leaves.iter().flat_map(|leaf| {
+            let first = leaf.path().first().copied();
+            let module = leaf.path().get(1).copied().map(Leaf::Named);
+            [Some(ForeignReferences::reach(leaf)), module].into_iter().flatten().map(move |reach| (first, reach))
+        });
+        Monoid::concat(reached.map(|(first, reach)| self.recorded(first, reach)))
+    }
+
+    fn recorded(&self, first: Option<&Ident>, leaf: Leaf<'_>) -> ForeignReferences {
         first
             .map(CrateName::from)
             .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
-            .into_iter()
-            .for_each(|crate_name| leaf.reached(self.crates.entry(crate_name).or_default()));
+            .map_or_else(ForeignReferences::default, |crate_name| ForeignReferences::reaching(crate_name, leaf))
     }
 }
 
@@ -157,9 +156,7 @@ impl Contribute for ReferenceScan {
     }
 
     fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), ForeignReferences> {
-        let mut references = ForeignReferences::owned_by(self.own_crate.as_ref());
-        references.used(&item.tree);
-        Contributed::new((), references, Descend::Over)
+        Contributed::new((), self.used(&item.tree), Descend::Over)
     }
 
     fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), ForeignReferences> {
@@ -168,10 +165,8 @@ impl Contribute for ReferenceScan {
 
     fn on_path(&self, path: &Path, _: &Facts<'_, Path>) -> Contributed<(), ForeignReferences> {
         let pair = path.segments.first().zip(path.segments.iter().nth(1));
-        Contributed::parted(pair.map_or_default(|(first, second)| {
-            let mut references = ForeignReferences::owned_by(self.own_crate.as_ref());
-            references.record(Some(&first.ident), Leaf::Named(&second.ident));
-            references
-        }))
+        Contributed::parted(
+            pair.map_or_default(|(first, second)| self.recorded(Some(&first.ident), Leaf::Named(&second.ident))),
+        )
     }
 }
