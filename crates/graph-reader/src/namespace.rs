@@ -60,30 +60,6 @@ pub(crate) struct Openings {
     nested: Vec<Opening>,
 }
 
-impl Openings {
-    pub(crate) fn new(top: Entries) -> Openings {
-        Openings { top, nested: Vec::new() }
-    }
-
-    pub(crate) fn opened(&mut self, parent: ScopeId, kind: ScopeKind, entries: Entries) -> ScopeId {
-        let scope = ScopeId::after(&self.nested).nested();
-        self.nested.push(Opening { parent, kind, entries });
-        scope
-    }
-
-    pub(crate) fn absorb(&mut self, scope: ScopeId, entries: Entries) {
-        let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
-        let held = nested.map_or(&mut self.top, |opening| &mut opening.entries);
-        *held = [std::mem::take(held), entries].into_iter().collect();
-    }
-
-    pub(crate) fn declare(&mut self, scope: ScopeId, declared: Declared) {
-        let top = &mut self.top;
-        let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
-        nested.map_or(top, |opening| &mut opening.entries).declare(declared);
-    }
-}
-
 #[derive(Debug)]
 pub(crate) enum ScopeOp {
     Opened { key: ScopeKey, parent: ScopeKey, kind: ScopeKind, entries: Entries },
@@ -99,20 +75,29 @@ impl ScopeOp {
         }
     }
 
-    fn replayed(self, scopes: &ScopeMap, mut openings: Openings) -> Openings {
+    fn shaped(&self, scopes: &ScopeMap) -> Option<Opening> {
         match self {
-            ScopeOp::Opened { parent, kind, entries, .. } => {
-                openings.opened(scopes.scope(&parent), kind, entries);
+            ScopeOp::Opened { parent, kind, .. } => {
+                Some(Opening { parent: scopes.scope(parent), kind: *kind, entries: Entries::default() })
             }
-            ScopeOp::Absorbed { key, entries } => openings.absorb(scopes.scope(&key), entries),
-            ScopeOp::Declared { key, name, visibility, module } => {
-                openings.declare(
-                    scopes.scope(&key),
-                    Declared::new(name, visibility, DeclaredKind::Module(scopes.scope(&module))),
-                );
-            }
+            ScopeOp::Absorbed { .. } | ScopeOp::Declared { .. } => None,
         }
-        openings
+    }
+
+    fn chunk(self, scopes: &ScopeMap) -> Chunk {
+        match self {
+            ScopeOp::Opened { key, entries, .. } | ScopeOp::Absorbed { key, entries } => {
+                Chunk { scope: scopes.scope(&key), entries }
+            }
+            ScopeOp::Declared { key, name, visibility, module } => Chunk {
+                scope: scopes.scope(&key),
+                entries: Entries::declaring(Declared::new(
+                    name,
+                    visibility,
+                    DeclaredKind::Module(scopes.scope(&module)),
+                )),
+            },
+        }
     }
 }
 
@@ -130,9 +115,26 @@ impl Replayed {
 impl Openings {
     pub(crate) fn replayed(top: Entries, ops: Vec<ScopeOp>) -> Replayed {
         let scopes = ScopeMap::keyed(ops.iter().filter_map(ScopeOp::opened).cloned());
-        let openings = ops.into_iter().fold(Openings::new(top), |openings, op| op.replayed(&scopes, openings));
-        Replayed { openings, scopes }
+        let shapes: Vec<Opening> = ops.iter().filter_map(|op| op.shaped(&scopes)).collect();
+        let mut chunks = ops.into_iter().map(|op| op.chunk(&scopes)).fold(BTreeMap::new(), |chunked, chunk| {
+            let mut grown: BTreeMap<ScopeId, Vec<Entries>> = chunked;
+            grown.entry(chunk.scope).or_default().push(chunk.entries);
+            grown
+        });
+        let top_entries = [top].into_iter().chain(chunks.remove(&ScopeId::FIRST).into_iter().flatten()).collect();
+        let nested = shapes
+            .into_iter()
+            .zip(ScopeId::FIRST.following())
+            .map(|(shape, id)| Opening { entries: chunks.remove(&id).into_iter().flatten().collect(), ..shape })
+            .collect();
+        Replayed { openings: Openings { top: top_entries, nested }, scopes }
     }
+}
+
+#[derive(Debug)]
+struct Chunk {
+    scope: ScopeId,
+    entries: Entries,
 }
 
 #[derive(Debug)]

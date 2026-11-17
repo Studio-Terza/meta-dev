@@ -27,12 +27,8 @@ impl ScopeId {
         ScopeId(self.0 + base.0)
     }
 
-    pub(super) fn nested(self) -> ScopeId {
-        ScopeId(self.0 + 1)
-    }
-
-    pub(super) fn below_top(self) -> Option<ScopeId> {
-        self.0.checked_sub(1).map(ScopeId)
+    pub(super) fn following(self) -> impl Iterator<Item = ScopeId> {
+        (self.0 + 1..).map(ScopeId)
     }
 }
 
