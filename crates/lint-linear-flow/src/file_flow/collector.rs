@@ -1,92 +1,85 @@
 use std::path::Path;
+
 use syntax::{
     Block, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, ImplItemFn, Item, ItemFn, Local,
     Macro, Signature, TraitItemFn,
 };
 
+use algebra::{Monoid, Semigroup};
 use lint_core::SourceFile;
-use lint_sweep::{Descend, Facts, Kind, Sweep, Watch};
-
-use lint_core::Violation;
-use lint_sweep::Sorts;
+use lint_sweep::{
+    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Ranked, Ranks, Scope, Sweep,
+};
 
 use super::FileFlow;
 use crate::finding::{Finding, Rule};
-use crate::function_flow::{FunctionFlow, Opened};
-
-#[derive(Debug)]
-enum Frame<'file> {
-    Function(Opened<'file>),
-    Item,
-}
+use crate::function_flow::{Candidate, FunctionFlow};
 
 #[derive(Debug)]
 pub struct Collector<'file> {
     file: &'file SourceFile,
-    frames: Vec<Frame<'file>>,
+}
+
+#[derive(Debug, Default)]
+pub struct Flows<'file> {
     closed: Vec<FunctionFlow<'file>>,
+    pending: Vec<Candidate<'file>>,
+}
+
+impl Semigroup for Flows<'_> {
+    fn combine(self, other: Self) -> Self {
+        Flows { closed: self.closed.combine(other.closed), pending: self.pending.combine(other.pending) }
+    }
+}
+
+impl Monoid for Flows<'_> {}
+
+impl<'file> Flows<'file> {
+    fn settled(self) -> Flows<'file> {
+        Flows { closed: self.closed, pending: Vec::new() }
+    }
 }
 
 impl<'file> Collector<'file> {
     pub fn collected(file: &'file SourceFile) -> Vec<FunctionFlow<'file>> {
-        let mut collector = Collector { file, frames: Vec::new(), closed: Vec::new() };
-        Sweep::watching(file, vec![&mut collector]);
-        collector.functions()
+        let mut collecting = Contributing::new(Collector { file });
+        Sweep::watching(file, vec![&mut collecting]);
+        collecting.concluded(|_, (), flows| flows.closed)
     }
 
-    pub fn watching(file: &'file SourceFile) -> Collector<'file> {
-        Collector { file, frames: Vec::new(), closed: Vec::new() }
+    pub fn watching(file: &'file SourceFile) -> Contributing<Collector<'file>> {
+        Contributing::new(Collector { file })
     }
 
-    fn functions(self) -> Vec<FunctionFlow<'file>> {
-        self.closed
-    }
-}
-
-impl<'file> Collector<'file> {
-    fn opened(&mut self, signature: &Signature, body: Option<&Block>) -> Descend {
-        let path = AsRef::<Path>::as_ref(self.file.head());
-        let opened = body
-            .filter(|_| signature.constness.is_none())
-            .map(|block| Frame::Function(Opened::new(path, signature.ident.span(), block)));
-        self.frames.push(opened.unwrap_or(Frame::Item));
-        Descend::Into
+    fn path(&self) -> &'file Path {
+        AsRef::<Path>::as_ref(self.file.head())
     }
 
-    fn shut(&mut self) {
-        let shut = self.frames.pop().and_then(Frame::closed);
-        self.closed.extend(shut);
+    fn closed(
+        &self,
+        signature: &Signature,
+        body: Option<&Block>,
+        inner: Contribution<(), Flows<'file>>,
+    ) -> Flows<'file> {
+        inner.concluded(|(), flows| {
+            let Flows { closed, pending } = flows;
+            let tracked = body.filter(|_| signature.constness.is_none());
+            let flow = tracked.map(|block| FunctionFlow::closed(self.path(), signature.ident.span(), block, pending));
+            Flows { closed: closed.into_iter().chain(flow).collect(), pending: Vec::new() }
+        })
     }
 
-    fn inside(&mut self) -> Option<&mut Opened<'file>> {
-        self.frames.last_mut().and_then(Frame::opened).and_then(Opened::active)
+    fn candidate(found: Option<Candidate<'file>>) -> Contributed<(), Flows<'file>> {
+        Contributed::parted(Flows { closed: Vec::new(), pending: found.into_iter().collect() })
     }
 }
 
-impl<'file> Frame<'file> {
-    fn closed(self) -> Option<FunctionFlow<'file>> {
-        match self {
-            Frame::Function(opened) => Some(opened.closed()),
-            Frame::Item => None,
-        }
-    }
+impl<'file> Contribute for Collector<'file> {
+    type Open = ();
+    type Part = Flows<'file>;
 
-    fn opened(&mut self) -> Option<&mut Opened<'file>> {
-        match self {
-            Frame::Function(opened) => Some(opened),
-            Frame::Item => None,
-        }
-    }
-}
-
-impl<'ast> Watch<'ast> for Collector<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[
-            Kind::Item,
-            Kind::ItemFn,
-            Kind::ImplItemFn,
-            Kind::TraitItemFn,
-            Kind::Block,
             Kind::Macro,
             Kind::ExprIf,
             Kind::ExprMatch,
@@ -99,95 +92,101 @@ impl<'ast> Watch<'ast> for Collector<'_> {
         ]
     }
 
-    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
-        self.frames.push(Frame::Item);
-        Descend::Into
+    fn scopes(&self) -> &'static [Scope] {
+        const {
+            &[
+                Scope::new(Kind::Item),
+                Scope::new(Kind::ItemFn),
+                Scope::new(Kind::ImplItemFn),
+                Scope::new(Kind::TraitItemFn),
+                Scope::new(Kind::Signature),
+            ]
+        }
     }
 
-    fn off_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) {
-        self.frames.pop();
+    fn off_item(&self, _: &Item, _: &Facts<'_, Item>, inner: Contribution<(), Flows<'file>>) -> Flows<'file> {
+        inner.concluded(|(), flows| flows.settled())
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.opened(&function.sig, Some(&function.block))
+    fn off_signature(
+        &self,
+        _: &Signature,
+        _: &Facts<'_, Signature>,
+        inner: Contribution<(), Flows<'file>>,
+    ) -> Flows<'file> {
+        inner.concluded(|(), flows| flows.settled())
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
-        self.shut();
+    fn off_item_fn(
+        &self,
+        function: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+        inner: Contribution<(), Flows<'file>>,
+    ) -> Flows<'file> {
+        self.closed(&function.sig, Some(&function.block), inner)
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.opened(&function.sig, Some(&function.block))
+    fn off_impl_item_fn(
+        &self,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        inner: Contribution<(), Flows<'file>>,
+    ) -> Flows<'file> {
+        self.closed(&function.sig, Some(&function.block), inner)
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.shut();
+    fn off_trait_item_fn(
+        &self,
+        function: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+        inner: Contribution<(), Flows<'file>>,
+    ) -> Flows<'file> {
+        self.closed(&function.sig, function.default.as_ref(), inner)
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.opened(&function.sig, function.default.as_ref())
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Flows<'file>> {
+        Contributed::descending(Descend::Expand)
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
-        self.shut();
+    fn on_expr_if(&self, expr: &ExprIf, _: &Facts<'_, ExprIf>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::branched(self.path(), expr))
     }
 
-    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
-        self.frames.last_mut().and_then(Frame::opened).into_iter().for_each(|opened| opened.entered(block));
-        Descend::Into
+    fn on_expr_match(&self, expr: &ExprMatch, _: &Facts<'_, ExprMatch>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::matched(self.path(), expr))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_expr_while(&self, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::looped(self.path(), expr.while_token.span, Finding::While))
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.branched(expr));
-        Descend::Into
+    fn on_expr_for_loop(&self, expr: &ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::looped(self.path(), expr.for_token.span, Finding::For))
     }
 
-    fn on_expr_match(&mut self, expr: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.matched(expr));
-        Descend::Into
+    fn on_expr_loop(&self, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::looped(self.path(), expr.loop_token.span, Finding::Loop))
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.record(expr.while_token.span, Some(Finding::While)));
-        Descend::Into
+    fn on_local(&self, local: &Local, _: &Facts<'_, Local>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::bound(self.path(), local))
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.record(expr.for_token.span, Some(Finding::For)));
-        Descend::Into
+    fn on_expr_binary(&self, expr: &ExprBinary, _: &Facts<'_, ExprBinary>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::joined(self.path(), expr))
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.record(expr.loop_token.span, Some(Finding::Loop)));
-        Descend::Into
-    }
-
-    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.bound(local));
-        Descend::Into
-    }
-
-    fn on_expr_binary(&mut self, expr: &'ast ExprBinary, _: &Facts<'_, ExprBinary>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.joined(expr));
-        Descend::Into
-    }
-
-    fn on_expr_unary(&mut self, expr: &'ast ExprUnary, _: &Facts<'_, ExprUnary>) -> Descend {
-        self.inside().into_iter().for_each(|opened| opened.negated(expr));
-        Descend::Into
+    fn on_expr_unary(&self, expr: &ExprUnary, _: &Facts<'_, ExprUnary>) -> Contributed<(), Flows<'file>> {
+        Self::candidate(Candidate::negated(self.path(), expr))
     }
 }
 
-impl<'file> Sorts<'file> for Collector<'file> {
-    fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>> {
+impl<'file> Ranks<'file> for Collector<'file> {
+    fn ranked(self, (): (), gathered: Flows<'file>) -> Ranked<'file> {
         let file = self.file;
         let tested = file.test_modules().iter().map(|module| FileFlow::collected(module, Collector::collected(module)));
         let flows: Vec<FileFlow<'file>> =
-            [FileFlow::collected(file, self.functions())].into_iter().chain(tested).collect();
-        Rule::ALL.iter().map(|rule| FileFlow::violations(&flows, *rule)).collect()
+            [FileFlow::collected(file, gathered.closed)].into_iter().chain(tested).collect();
+        Ranked::from(Rule::ALL.iter().map(|rule| FileFlow::violations(&flows, *rule)).collect::<Vec<_>>())
     }
 }

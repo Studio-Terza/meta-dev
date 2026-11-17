@@ -1579,6 +1579,7 @@ dependencies = [
 name = "lint-linear-flow"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",

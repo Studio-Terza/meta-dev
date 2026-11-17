@@ -23,7 +23,7 @@ pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
 }
 
 pub trait Sorts<'file>: for<'ast> Watch<'ast> + fmt::Debug {
-    fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>>;
+    fn sorted(self: Box<Self>) -> Ranked<'file>;
 }
 
 pub trait Concludes<'file>: Contribute + fmt::Debug {
@@ -37,6 +37,35 @@ where
 {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
         self.concluded(Contributor::violations)
+    }
+}
+
+#[derive(Debug)]
+pub struct Ranked<'file>(Vec<Vec<Violation<'file>>>);
+
+impl<'file> From<Vec<Vec<Violation<'file>>>> for Ranked<'file> {
+    fn from(lists: Vec<Vec<Violation<'file>>>) -> Ranked<'file> {
+        Ranked(lists)
+    }
+}
+
+impl<'file> From<Ranked<'file>> for Vec<Vec<Violation<'file>>> {
+    fn from(ranked: Ranked<'file>) -> Vec<Vec<Violation<'file>>> {
+        ranked.0
+    }
+}
+
+pub trait Ranks<'file>: Contribute + fmt::Debug {
+    fn ranked(self, open: Self::Open, part: Self::Part) -> Ranked<'file>;
+}
+
+impl<'file, Contributor: Ranks<'file>> Sorts<'file> for Contributing<Contributor>
+where
+    Contributor::Open: fmt::Debug,
+    Contributor::Part: fmt::Debug,
+{
+    fn sorted(self: Box<Self>) -> Ranked<'file> {
+        self.concluded(Contributor::ranked)
     }
 }
 

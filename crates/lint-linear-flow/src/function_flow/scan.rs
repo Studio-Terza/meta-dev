@@ -13,74 +13,69 @@ use lint_sweep::Address;
 use super::FunctionFlow;
 use crate::finding::Finding;
 use crate::function_flow::found::Found;
-use crate::verdict::Verdict;
 use root::Root;
 
-#[derive(Debug)]
-pub struct Opened<'file> {
-    path: &'file Path,
-    body: Option<Address>,
-    site: Site<'file>,
-    shape: Verdict,
-    root: Option<Address>,
-    found: Vec<Found<'file>>,
-    faults: Vec<Found<'file>>,
+#[derive(Clone, Copy, Debug)]
+pub struct Candidate<'file> {
+    found: Found<'file>,
+    at: Option<Address>,
 }
 
-impl<'file> Opened<'file> {
-    pub fn new(path: &'file Path, name: Span, body: &Block) -> Opened<'file> {
-        let root = Root::from(body);
-        Opened {
-            path,
-            body: Some(Address::from(body)),
-            site: Site::new(path, LineNumber::from(name)),
-            shape: root.verdict(),
-            root: root.address(),
-            found: Vec::new(),
-            faults: root.faults(path),
-        }
+impl<'file> Candidate<'file> {
+    fn recorded(
+        path: &'file Path,
+        span: Span,
+        finding: Option<Finding>,
+        at: Option<Address>,
+    ) -> Option<Candidate<'file>> {
+        finding.map(|flagged| Candidate { found: Found::new(Site::new(path, LineNumber::from(span)), flagged), at })
     }
 
-    pub fn entered(&mut self, block: &Block) {
-        self.body = self.body.filter(|body| *body != Address::from(block));
+    pub fn looped(path: &'file Path, span: Span, finding: Finding) -> Option<Candidate<'file>> {
+        Self::recorded(path, span, Some(finding), None)
     }
 
-    pub fn active(&mut self) -> Option<&mut Opened<'file>> {
-        self.body.map_or(Some(self), |_| None)
+    pub fn branched(path: &'file Path, expr: &ExprIf) -> Option<Candidate<'file>> {
+        Self::recorded(path, expr.if_token.span, Some(Finding::branching(&expr.cond)), Some(Address::from(expr)))
     }
 
-    pub fn closed(self) -> FunctionFlow<'file> {
-        FunctionFlow { site: self.site, shape: self.shape, found: self.found.into_iter().chain(self.faults).collect() }
+    pub fn matched(path: &'file Path, expr: &ExprMatch) -> Option<Candidate<'file>> {
+        Self::recorded(path, expr.match_token.span, Some(Finding::Match), Some(Address::from(expr)))
     }
 
-    pub fn record(&mut self, span: Span, finding: Option<Finding>) {
-        let path = self.path;
-        self.found.extend(finding.map(|flagged| Found::new(Site::new(path, LineNumber::from(span)), flagged)));
-    }
-
-    pub fn branched(&mut self, expr: &ExprIf) {
-        let rooted = self.root.filter(|root| *root == Address::from(expr));
-        self.record(expr.if_token.span, rooted.map_or_else(|| Some(Finding::branching(&expr.cond)), |_| None));
-    }
-
-    pub fn matched(&mut self, expr: &ExprMatch) {
-        let rooted = self.root.filter(|root| *root == Address::from(expr));
-        self.record(expr.match_token.span, rooted.map_or(Some(Finding::Match), |_| None));
-    }
-
-    pub fn bound(&mut self, local: &Local) {
+    pub fn bound(path: &'file Path, local: &Local) -> Option<Candidate<'file>> {
         let otherwise = local.init.as_ref().and_then(|init| init.diverge.as_ref());
-        self.record(
+        Self::recorded(
+            path,
             otherwise.map_or_else(Span::call_site, |(token, _)| token.span),
             otherwise.map(|_| Finding::LetElse),
-        );
+            None,
+        )
     }
 
-    pub fn joined(&mut self, expr: &ExprBinary) {
-        self.record(expr.op.span(), Finding::joining(expr.op));
+    pub fn joined(path: &'file Path, expr: &ExprBinary) -> Option<Candidate<'file>> {
+        Self::recorded(path, expr.op.span(), Finding::joining(expr.op), None)
     }
 
-    pub fn negated(&mut self, expr: &ExprUnary) {
-        self.record(expr.op.span(), Finding::negating(expr.op));
+    pub fn negated(path: &'file Path, expr: &ExprUnary) -> Option<Candidate<'file>> {
+        Self::recorded(path, expr.op.span(), Finding::negating(expr.op), None)
+    }
+}
+
+impl<'file> FunctionFlow<'file> {
+    pub fn closed(
+        path: &'file Path,
+        name: Span,
+        body: &Block,
+        candidates: Vec<Candidate<'file>>,
+    ) -> FunctionFlow<'file> {
+        let root = Root::from(body);
+        let rooted = root.address();
+        let found = candidates.into_iter().filter(|candidate| candidate.at.is_none_or(|at| Some(at) != rooted));
+        FunctionFlow {
+            site: Site::new(path, LineNumber::from(name)),
+            shape: root.verdict(),
+            found: found.map(|candidate| candidate.found).chain(root.faults(path)).collect(),
+        }
     }
 }
