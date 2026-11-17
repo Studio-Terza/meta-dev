@@ -160,3 +160,15 @@ table!(
         Sample::text(&bytes)?;
     }
 );
+
+laws::generates!(
+    a_generator_that_rejects_a_quarter_generates,
+    proptest::strategy::Strategy::prop_filter(any::<u8>(), "a multiple of four", |number| number % 4 != 0)
+);
+
+#[test]
+fn a_generator_that_rejects_most_of_what_it_draws_fails() {
+    let strict =
+        proptest::strategy::Strategy::prop_filter(any::<u8>(), "not a multiple of four", |number| number % 4 == 0);
+    assert!(matches!(laws::Generation::bounded(&strict), Err(proptest::test_runner::TestError::Abort(_))));
+}

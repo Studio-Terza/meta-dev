@@ -1,5 +1,38 @@
 pub use proptest;
 
+use proptest::strategy::Strategy;
+use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
+
+#[derive(Debug)]
+pub struct Generation;
+
+impl Generation {
+    pub const CASES: u32 = 256;
+
+    pub fn bounded<Generating: Strategy>(strategy: &Generating) -> Result<(), TestError<Generating::Value>> {
+        TestRunner::new(Config {
+            cases: Self::CASES,
+            max_local_rejects: Self::CASES,
+            failure_persistence: None,
+            rng_seed: RngSeed::Fixed(0),
+            ..Config::default()
+        })
+        .run(strategy, |_| Ok(()))
+    }
+}
+
+#[macro_export]
+macro_rules! generates {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr $(,)?) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+            $crate::Generation::bounded(&$strategy)?;
+            Ok(())
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! monoid {
     ($(#[$meta:meta])* $name:ident, $type:ty, $strategy:expr $(,)?) => {
