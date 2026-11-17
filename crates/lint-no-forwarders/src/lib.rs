@@ -1,3 +1,4 @@
+use std::path::Path;
 mod forwarders;
 mod workspace_types;
 
@@ -21,7 +22,7 @@ impl ContextLint for NoForwarders {
     type Gathering<'head> = TypeGathering;
 
     fn gathering(parsed: Parsed<'_, '_>) -> TypeGathering {
-        TypeGathering::from(parsed.file())
+        TypeGathering::from(<&SourceFile>::from(parsed))
     }
 }
 
@@ -30,7 +31,7 @@ impl WatchingLint for NoForwarders {
     type Watched<'file> = Forwarders<'file>;
 
     fn watched(file: &SourceFile) -> Forwarders<'_> {
-        Forwarders::from(file.head().path())
+        Forwarders::from(AsRef::<Path>::as_ref(file.head()))
     }
 
     fn judged<'file, 'head: 'file>(

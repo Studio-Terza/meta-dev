@@ -12,7 +12,7 @@ impl<'head> Concluded<'head> {
     where
         'head: 'file,
     {
-        let paths = std::iter::once(file).chain(file.test_modules()).map(|found| found.head().path());
+        let paths = std::iter::once(file).chain(file.test_modules()).map(|found| AsRef::<Path>::as_ref(found.head()));
         paths.filter_map(|path| self.0.get(path)).flatten().cloned().collect()
     }
 }
@@ -46,6 +46,6 @@ impl<'head> Listed<'head> {
     where
         'head: 'file,
     {
-        self.at.filter(|at| *at == file.head().path()).map_or_default(|_| self.violations.clone())
+        self.at.filter(|at| *at == AsRef::<Path>::as_ref(file.head())).map_or_default(|_| self.violations.clone())
     }
 }

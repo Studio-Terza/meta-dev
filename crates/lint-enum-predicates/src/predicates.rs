@@ -1,3 +1,4 @@
+use std::path::Path;
 mod declaration;
 mod declarations;
 mod finding;
@@ -89,7 +90,7 @@ impl<'file> Predicates<'file> {
             })
             .map(|signature| {
                 Violation::new(
-                    Site::new(self.file.head().path(), LineNumber::from(signature.span())),
+                    Site::new(AsRef::<Path>::as_ref(self.file.head()), LineNumber::from(signature.span())),
                     Finding::BoolPredicate { name: Name::from(&signature.ident) },
                 )
             })

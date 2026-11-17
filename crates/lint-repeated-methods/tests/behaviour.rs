@@ -1,8 +1,5 @@
-use lint_core::Lint;
-use lint_file::Ruled;
+use lint_fixtures::{Case, Checks, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 use lint_repeated_methods::RepeatedMethods;
-
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const PRIVATE: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn show(&self) -> u8 { 1 }\n}\nimpl B {\n    fn show(&self) -> u8 { 1 }\n}\nimpl C {\n    fn show(&self) -> u8 { 1 }\n}\n";
 const TRAIT_IMPLS: &str = "struct A;\nstruct B;\nstruct C;\nimpl Tr for A {\n    fn show(&self) -> u8 { 1 }\n}\nimpl Tr for B {\n    fn show(&self) -> u8 { 1 }\n}\nimpl Tr for C {\n    fn show(&self) -> u8 { 1 }\n}\n";
@@ -14,6 +11,7 @@ const CONST_CONSTRUCTORS: &str = "pub struct A(u8);\npub struct B(u8);\npub stru
 const CONST_METHODS: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl A {\n    pub const fn zero() -> Self { A(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\nimpl B {\n    pub const fn zero() -> Self { B(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\nimpl C {\n    pub const fn zero() -> Self { C(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\n";
 
 const OWN_TYPE: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn join(&self, other: A) -> A { other }\n}\nimpl B {\n    pub fn join(&self, other: B) -> B { other }\n}\nimpl C {\n    pub fn join(&self, other: C) -> C { other }\n}\n";
+const SELF_OR_NAMED: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn join(&self, other: Self) -> Self { other }\n}\nimpl B {\n    pub fn join(&self, other: B) -> B { other }\n}\nimpl C {\n    pub fn join(&self, other: C) -> Self { other }\n}\n";
 const DIFFERENT_RETURNS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn show(&self) -> u8 { 1 }\n}\nimpl B {\n    pub fn show(&self) -> u16 { 1 }\n}\nimpl C {\n    pub fn show(&self) -> u32 { 1 }\n}\n";
 const INLINE: &str = "mod inner {\n    struct A;\n    struct B;\n    struct C;\n    impl A {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl B {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl C {\n        pub fn show(&self) -> u8 { 1 }\n    }\n}\n";
 
@@ -32,7 +30,9 @@ const SHOW_ON_B: &str = "struct B;\nimpl B {\n    pub fn show(&self) -> u8 { 1 }
 const WRAPPED_A: Source = Source::new(Located::new("crates/x/src/a.rs"), Text::new("pub struct A(u8);\n"));
 const WRAPPED_B: Source = Source::new(Located::new("crates/x/src/b.rs"), Text::new("pub struct B(u16);\n"));
 const WRAPPED_C: Source = Source::new(Located::new("crates/x/src/c.rs"), Text::new("pub struct C(u32);\n"));
-const CONSTRUCTORS_ELSEWHERE: &str = "impl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner) }\n}\n";
+const LIB_X: Source =
+    Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod a;\nmod b;\nmod c;\nmod impls;\n"));
+const CONSTRUCTORS_ELSEWHERE: &str = "use crate::a::A;\nuse crate::b::B;\nuse crate::c::C;\n\nimpl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner) }\n}\n";
 
 const CASES: [Case; 19] = [
     Case::new(
@@ -73,6 +73,11 @@ const CASES: [Case; 19] = [
     Case::new(
         Title::new("own type erased"),
         &[Source::new(Located::new("a.rs"), Text::new(OWN_TYPE))],
+        Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("Self and the own type's name are one type"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_OR_NAMED))],
         Flagged::new(&["a.rs:5"]),
     ),
     Case::new(
@@ -127,36 +132,26 @@ const CASES: [Case; 19] = [
     Case::new(
         Title::new("constructors in another file of the crate"),
         &[
+            LIB_X,
             WRAPPED_A,
             WRAPPED_B,
             WRAPPED_C,
             Source::new(Located::new("crates/x/src/impls.rs"), Text::new(CONSTRUCTORS_ELSEWHERE)),
         ],
-        Flagged::new(&["crates/x/src/impls.rs:2"]),
-    ),
-    Case::new(
-        Title::new("constructors in another crate"),
-        &[
-            WRAPPED_A,
-            WRAPPED_B,
-            WRAPPED_C,
-            Source::new(Located::new("crates/y/src/lib.rs"), Text::new(CONSTRUCTORS_ELSEWHERE)),
-        ],
-        Flagged::new(&["crates/y/src/lib.rs:2"]),
+        Flagged::new(&["crates/x/src/impls.rs:6"]),
     ),
 ];
 
 #[test]
 fn one_method_shape_on_many_types_is_flagged() {
-    assert_eq!(Sources::mismatches::<Ruled<RepeatedMethods>>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<RepeatedMethods>>(&CASES), Lines::default());
 }
 
 #[test]
 fn a_report_names_the_method_and_the_types_that_repeat_it() {
-    let constructors = Ruled::<RepeatedMethods>::report(&Sources::parsed(&[Source::new(
-        Located::new("a.rs"),
-        Text::new(CONSTRUCTORS),
-    )]))
-    .to_string();
+    let constructors = Queried::<RepeatedMethods>::reported(
+        &Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(CONSTRUCTORS))]),
+        |report| report.to_string(),
+    );
     assert!(constructors.contains("fn new(Inner) -> Self on A, B, C"));
 }

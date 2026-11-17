@@ -23,15 +23,17 @@ impl<'found> Member<'found> {
     pub(crate) fn cluster(&self) -> Cluster<'found> {
         self.cluster
     }
-
-    pub(crate) fn name(&self) -> &'found Name {
-        self.name
-    }
 }
 
 impl fmt::Display for Member<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.cluster.krate().into_iter().try_for_each(|krate| write!(formatter, "{krate}"))?;
         <&[Name]>::from(self.cluster).iter().chain([self.name]).try_for_each(|segment| write!(formatter, "::{segment}"))
+    }
+}
+
+impl<'found> From<Member<'found>> for &'found Name {
+    fn from(member: Member<'found>) -> &'found Name {
+        member.name
     }
 }

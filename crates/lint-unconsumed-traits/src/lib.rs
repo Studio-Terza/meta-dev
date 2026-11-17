@@ -22,7 +22,7 @@ impl ContextLint for UnconsumedTraits {
     type Gathering<'head> = Consuming;
 
     fn gathering(parsed: Parsed<'_, '_>) -> Consuming {
-        Consuming::from(parsed.file())
+        Consuming::from(<&SourceFile>::from(parsed))
     }
 }
 

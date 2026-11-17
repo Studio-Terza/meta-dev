@@ -1,3 +1,4 @@
+use lint_core::SourceFile;
 use std::mem;
 
 use syntax::{
@@ -31,12 +32,12 @@ impl<'file> Scan<'file> {
     const FLOOR: Bound = Bound::Least(40);
 
     pub(crate) fn of_file(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
-        Sweep::gathered(parsed.file(), Self::scanning(parsed, equivalence)).found
+        Sweep::gathered(<&SourceFile>::from(parsed), Self::scanning(parsed, equivalence)).found
     }
 
     pub(crate) fn scanning(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Scan<'file> {
         let tests = parsed.test_modules().into_iter().flat_map(|module| {
-            Sweep::gathered(module.file(), Self::new(module, Kind::Tests, Vec::new(), equivalence)).found
+            Sweep::gathered(<&SourceFile>::from(module), Self::new(module, Kind::Tests, Vec::new(), equivalence)).found
         });
         Self::new(parsed, Kind::of_role(parsed.head().placement().role()), tests.collect(), equivalence)
     }
@@ -47,8 +48,15 @@ impl<'file> Scan<'file> {
         tested: Vec<Occurrence<'file>>,
         equivalence: Equivalence,
     ) -> Scan<'file> {
-        let shaper = Shaper::reading(parsed.file().tokens(), equivalence);
-        Scan { path: parsed.head().path(), kind, outer: Vec::new(), shaper, occurrences: Vec::new(), tested }
+        let shaper = Shaper::reading(<&SourceFile>::from(parsed).tokens(), equivalence);
+        Scan {
+            path: AsRef::<Path>::as_ref(parsed.head()),
+            kind,
+            outer: Vec::new(),
+            shaper,
+            occurrences: Vec::new(),
+            tested,
+        }
     }
 
     fn considered(&mut self, edges: Edges) -> Option<Bound> {

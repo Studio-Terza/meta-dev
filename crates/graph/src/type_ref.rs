@@ -24,7 +24,7 @@ pub(crate) trait Rebuild<From> {
     fn child(&mut self, ty: &TypeRef<From>) -> Result<TypeRef<Self::Into>, Self::Fail>;
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TypeRef<Bound = Sited> {
     Named(Named<Bound>),
     Tuple(Vec<TypeRef<Bound>>),
@@ -38,27 +38,27 @@ pub enum TypeRef<Bound = Sited> {
     Opaque,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Named<Bound> {
     path: Bound,
     arguments: Vec<TypeRef<Bound>>,
     bindings: Vec<TypeRef<Bound>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Arrayed<Bound> {
     element: Box<TypeRef<Bound>>,
     measured: Vec<TypeRef<Bound>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Projection<Bound> {
     subject: Box<TypeRef<Bound>>,
     arguments: Vec<TypeRef<Bound>>,
     associated: Option<Name>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Callable<Bound> {
     inputs: Vec<TypeRef<Bound>>,
     output: Box<TypeRef<Bound>>,

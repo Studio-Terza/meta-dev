@@ -1,5 +1,6 @@
 use std::mem;
 use std::panic;
+use std::path::Path;
 use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
 
@@ -54,13 +55,9 @@ pub(crate) struct Claimed<'read> {
     file: &'read SourceFile,
 }
 
-impl<'read> Claimed<'read> {
+impl Claimed<'_> {
     pub(crate) fn order(self) -> FileOrder {
         self.order
-    }
-
-    pub(crate) fn file(self) -> &'read SourceFile {
-        self.file
     }
 }
 
@@ -107,7 +104,7 @@ impl<'run> Merging<'run> {
 
     fn split(self) -> Splitting<'run> {
         let mut sorted = self.0;
-        sorted.sort_by(|earlier, later| earlier.head.path().cmp(later.head.path()));
+        sorted.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier.head).cmp(AsRef::<Path>::as_ref(later.head)));
         sorted.into_iter().fold(Splitting::default(), |mut split, part| {
             split.facts.extend(part.facts);
             split.contexts.push(part.contexts);
@@ -143,7 +140,9 @@ impl<'run> Gathering<'run> {
             .zip(readout.files())
             .zip(readout.unwalked())
             .filter_map(|((group, file), unwalked)| {
-                let index = heads.binary_search_by(|head| head.path().cmp(file.head().path())).ok()?;
+                let index = heads
+                    .binary_search_by(|head| AsRef::<Path>::as_ref(head).cmp(AsRef::<Path>::as_ref(file.head())))
+                    .ok()?;
                 Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)?, unwalked })
             })
             .collect();
@@ -170,5 +169,11 @@ impl<'run> Gathering<'run> {
         held.extend(parts);
         let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
         complete.map(Merging)
+    }
+}
+
+impl<'read> From<Claimed<'read>> for &'read SourceFile {
+    fn from(claimed: Claimed<'read>) -> &'read SourceFile {
+        claimed.file
     }
 }

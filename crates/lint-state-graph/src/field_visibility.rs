@@ -16,11 +16,7 @@ pub struct FieldVisibility<'scan> {
     violations: Vec<Violation<'scan>>,
 }
 
-impl<'scan> FieldVisibility<'scan> {
-    pub fn new(path: &'scan Path) -> FieldVisibility<'scan> {
-        FieldVisibility { path, violations: Vec::new() }
-    }
-
+impl FieldVisibility<'_> {
     fn exposed(&mut self, item: &ItemStruct) -> Descend {
         let exposed = item
             .fields
@@ -55,5 +51,11 @@ impl<'ast> Watch<'ast> for FieldVisibility<'_> {
 impl<'file> From<FieldVisibility<'file>> for Vec<Violation<'file>> {
     fn from(scan: FieldVisibility<'file>) -> Vec<Violation<'file>> {
         scan.violations
+    }
+}
+
+impl<'scan> From<&'scan Path> for FieldVisibility<'scan> {
+    fn from(path: &'scan Path) -> FieldVisibility<'scan> {
+        FieldVisibility { path, violations: Vec::new() }
     }
 }

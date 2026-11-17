@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::slice;
 
 mod gate;
@@ -125,7 +126,7 @@ impl<'ast> Watch<'ast> for SkipMarks<'_> {
 
 impl<'file> Finds<'file> for SkipMarks<'file> {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.file.head().path();
+        let path = AsRef::<Path>::as_ref(self.file.head());
         let unrun = self
             .unrun
             .unwrap_or_default()

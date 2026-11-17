@@ -23,6 +23,12 @@ pub enum Owner {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Evaluation {
+    Runtime,
+    Constant,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Entry {
     Test,
     Main,
@@ -178,6 +184,7 @@ pub struct Function {
     seat: Seat,
     definition: Option<Definition>,
     exposure: Exposure,
+    evaluation: Evaluation,
 }
 
 impl Function {
@@ -191,6 +198,7 @@ impl Function {
             seat: Seat::new(Region::SHIPPED, None),
             definition: None,
             exposure: Exposure::Hidden,
+            evaluation: Evaluation::Runtime,
         }
     }
 
@@ -202,6 +210,11 @@ impl Function {
     #[must_use]
     pub fn exposed(self, exposure: Exposure) -> Function {
         Function { exposure, ..self }
+    }
+
+    #[must_use]
+    pub fn evaluated(self, evaluation: Evaluation) -> Function {
+        Function { evaluation, ..self }
     }
 
     #[must_use]
@@ -273,5 +286,11 @@ impl AsRef<[Parameter]> for Signature {
 impl AsRef<Exposure> for Function {
     fn as_ref(&self) -> &Exposure {
         &self.exposure
+    }
+}
+
+impl AsRef<Evaluation> for Function {
+    fn as_ref(&self) -> &Evaluation {
+        &self.evaluation
     }
 }

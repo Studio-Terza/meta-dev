@@ -24,7 +24,9 @@ impl FromStr for Anchor {
     type Err = Unanchored;
 
     fn from_str(written: &str) -> Result<Anchor, Unanchored> {
-        Anchoring::read(written)
+        written
+            .parse::<Anchoring>()
+            .ok()
             .and_then(|anchoring| {
                 let message = Uuid::try_new(anchoring.message().to_owned()).ok()?;
                 Some(Anchor::anchored(message, anchoring.ordinal()))

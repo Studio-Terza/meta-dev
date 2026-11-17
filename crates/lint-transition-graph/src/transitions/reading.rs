@@ -79,7 +79,7 @@ impl<'file> Reading<'file> {
             .model
             .implementations()
             .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
-            .filter(|placed| placed.entity().written().is_some())
+            .filter(|placed| placed.entity().hand_written().is_some())
             .map(|placed| self.implemented(placed));
         let traits = self
             .model

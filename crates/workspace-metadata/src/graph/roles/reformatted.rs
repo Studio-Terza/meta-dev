@@ -22,7 +22,7 @@ impl<'meta> Reformatted<'meta> {
             .declaring(Role::Lexer)
             .into_iter()
             .filter_map(|id| graph.package(id))
-            .filter_map(|lexer| Some((lexer.format()?, lexer.name())))
+            .filter_map(|lexer| Some((lexer.format()?, AsRef::<CrateName>::as_ref(lexer))))
             .fold(BTreeMap::new(), |mut formats, (format, name)| {
                 formats.entry(format).or_insert_with(BTreeSet::new).insert(name);
                 formats

@@ -63,7 +63,10 @@ impl Gleaning for RoleReading {
         let head = parsed.head();
         let root = Some(head).filter(|found| found.placement().role() == Placed::LibraryRoot);
         let place = root.and_then(|found| {
-            Some(RootPlace { package: found.placement().package().root().package()?, path: found.path() })
+            Some(RootPlace {
+                package: found.placement().package().root().package()?,
+                path: AsRef::<Path>::as_ref(found),
+            })
         });
         RootReading { place, denied: BTreeSet::new() }
     }

@@ -15,7 +15,13 @@ use unquoted::hidden::Hidden;
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Command<'text>(Text<'text>);
 
-impl<'text> Command<'text> {
+impl<'text> From<Text<'text>> for Command<'text> {
+    fn from(text: Text<'text>) -> Command<'text> {
+        Command(text.trimmed())
+    }
+}
+
+impl Command<'_> {
     const LIMIT: Characters = Characters::new(120);
     const SEPARATORS: [Word; 5] = [Word::new("|"), Word::new("&"), Word::new(";"), Word::new(">"), Word::new("<")];
     const SUBSTITUTIONS: [Word; 2] = [Word::new("`"), Word::new("$(")];
@@ -31,10 +37,6 @@ impl<'text> Command<'text> {
     ];
     const SHELLS: [Word; 5] =
         [Word::new("bash"), Word::new("sh"), Word::new("pwsh"), Word::new("powershell"), Word::new("cmd")];
-
-    pub(crate) fn new(text: Text<'text>) -> Command<'text> {
-        Command(text.trimmed())
-    }
 
     pub(crate) fn finding(self, setting: Key) -> Option<Finding> {
         (self.0.lines() > Lines::ONE)

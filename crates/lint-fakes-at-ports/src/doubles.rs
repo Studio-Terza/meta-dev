@@ -56,7 +56,7 @@ impl<'model> Doubles<'model> {
     pub(crate) fn violations(&self, model: &'model Model) -> Vec<Violation<'model>> {
         let implemented: Vec<Implemented<'model>> = model
             .implementations()
-            .filter(|placed| placed.entity().written().is_some())
+            .filter(|placed| placed.entity().hand_written().is_some())
             .filter_map(|placed| {
                 let implementation = placed.entity();
                 let target: &Resolved = implementation.subject_type().named()?.as_ref();

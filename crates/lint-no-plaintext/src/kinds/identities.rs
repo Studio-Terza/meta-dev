@@ -29,19 +29,6 @@ impl Identities {
     const NEWTYPE_DERIVES: [(Word<'static>, Role); 2] =
         [(Self::DESERIALIZE, Role::Deserializes), (Word::new("CheckedDeserialize"), Role::DeserializesChecked)];
 
-    pub(super) fn read(model: &Model) -> Identities {
-        let serde = Self::SERDE.into_iter().map(|package| ((package, Self::DESERIALIZE), Role::Deserializes));
-        let newtype = Self::NEWTYPE_DERIVES.into_iter().map(|(derive, role)| ((Self::NEWTYPE, derive), role));
-        let packaged = serde.chain(newtype).map(|((package, derive), role)| {
-            (Packaged { package: PackageName::from(package), item: [derive].into_iter().collect() }, role)
-        });
-        let exported = Self::NEWTYPE_DERIVES.into_iter().filter_map(|(derive, role)| {
-            let path: ItemPath = [Self::NEWTYPE, derive].into_iter().collect();
-            model.exported(Domain::Macros, &path).cloned().map(|resolved| (resolved, role))
-        });
-        Identities { exported: exported.collect(), packaged: packaged.collect() }
-    }
-
     pub(super) fn role(&self, model: &Model, implemented: &Resolved) -> Option<Role> {
         self.traced(model, implemented, &BTreeSet::new())
     }
@@ -65,5 +52,20 @@ impl Identities {
         let packaged =
             Packaged { package: external.package()?.clone(), item: external.below_root().iter().cloned().collect() };
         self.packaged.get(&packaged).copied()
+    }
+}
+
+impl From<&Model> for Identities {
+    fn from(model: &Model) -> Identities {
+        let serde = Self::SERDE.into_iter().map(|package| ((package, Self::DESERIALIZE), Role::Deserializes));
+        let newtype = Self::NEWTYPE_DERIVES.into_iter().map(|(derive, role)| ((Self::NEWTYPE, derive), role));
+        let packaged = serde.chain(newtype).map(|((package, derive), role)| {
+            (Packaged { package: PackageName::from(package), item: [derive].into_iter().collect() }, role)
+        });
+        let exported = Self::NEWTYPE_DERIVES.into_iter().filter_map(|(derive, role)| {
+            let path: ItemPath = [Self::NEWTYPE, derive].into_iter().collect();
+            model.exported(Domain::Macros, &path).cloned().map(|resolved| (resolved, role))
+        });
+        Identities { exported: exported.collect(), packaged: packaged.collect() }
     }
 }

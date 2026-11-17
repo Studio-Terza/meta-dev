@@ -1,3 +1,4 @@
+use std::path::Path;
 use syntax::{
     Block, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, ImplItemFn, Item, ItemFn, Local,
     Macro, Signature, TraitItemFn,
@@ -44,7 +45,7 @@ impl<'file> Collector<'file> {
 
 impl<'file> Collector<'file> {
     fn opened(&mut self, signature: &Signature, body: Option<&Block>) -> Descend {
-        let path = self.file.head().path();
+        let path = AsRef::<Path>::as_ref(self.file.head());
         let opened = body
             .filter(|_| signature.constness.is_none())
             .map(|block| Frame::Function(Opened::new(path, signature.ident.span(), block)));

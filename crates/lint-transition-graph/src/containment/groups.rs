@@ -1,3 +1,4 @@
+use lint_layout::Name;
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -40,7 +41,7 @@ impl fmt::Display for Groups<'_> {
             .0
             .iter()
             .map(|group| {
-                let names: Vec<String> = group.iter().map(|member| member.name().to_string()).collect();
+                let names: Vec<String> = group.iter().map(|member| <&Name>::from(*member).to_string()).collect();
                 format!("[{}]", names.join(" "))
             })
             .collect();

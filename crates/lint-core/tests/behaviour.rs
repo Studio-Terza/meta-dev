@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::path::Path;
 use std::rc::Rc;
 
 use lint_core::{Macros, Parsed, SourceFile, SourceText};
@@ -79,7 +80,7 @@ fn a_parsed_file_pairs_each_test_module_with_its_own_head() -> Result<(), Box<dy
     let paths: Vec<String> = Parsed::from(&file)
         .test_modules()
         .into_iter()
-        .map(|parsed| parsed.head().path().display().to_string())
+        .map(|parsed| AsRef::<Path>::as_ref(parsed.head()).display().to_string())
         .collect();
     assert_eq!(paths, ["crates/x/src/tests.rs"]);
     Ok(())

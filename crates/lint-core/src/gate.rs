@@ -29,7 +29,10 @@ impl Gate {
             .and_then(|suffix| placement.crate_root().package()?.matches::<Suffix>(&[suffix]))
             .map(|_| file)
             .or_else(|| {
-                placement.module().segments().iter().find(|segment| **segment == Name::from(self.module)).map(|_| file)
+                AsRef::<[Name]>::as_ref(placement.module())
+                    .iter()
+                    .find(|segment| **segment == Name::from(self.module))
+                    .map(|_| file)
             })
     }
 
