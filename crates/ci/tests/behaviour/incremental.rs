@@ -47,8 +47,11 @@ impl Prior {
         let summarized = |summary: &'static str| {
             move |mutant: &&str| ["{\"scenario\": {\"Mutant\": ", mutant, "}, \"summary\": \"", summary, "\"}"].concat()
         };
-        let missed =
-            survivors.iter().map(summarized("MissedMutant")).chain(timed_out.iter().map(summarized("Timeout")));
+        let missed = survivors
+            .iter()
+            .map(summarized("MissedMutant"))
+            .chain(timed_out.iter().map(summarized("Timeout")))
+            .chain([CAUGHT_BEFORE].iter().map(summarized("CaughtMutant")));
         [
             "{\"outcomes\": [{\"scenario\": \"Baseline\", \"summary\": \"Success\"}",
             &missed.map(|outcome| [", ", &outcome].concat()).collect::<String>(),
