@@ -21,7 +21,7 @@ pub use failure::{Failure, Flail, Flails, Unmatched};
 pub use request::Unresolved;
 use request::{Crew, Ground, Kept, Request};
 pub use sequel::Sequel;
-use uttered::Uttered;
+use uttered::{Settled, Uttered};
 pub use viewed::Viewed;
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl<'environment, E: Environment, F: Files, O, H, C: ClockFiller> Cli<'environm
         Cli { environment, files, opened, agents }
     }
 
-    pub fn rooted<D: DispatchFiller>(self, arguments: impl Iterator<Item = OsString>) -> Uttered
+    pub fn rooted<D: DispatchFiller>(self, arguments: impl Iterator<Item = OsString>) -> Uttered<Settled>
     where
         O: Opens,
         H: FnOnce(PathBuf) -> D,
