@@ -85,3 +85,31 @@ impl<Entry: Lattice> Lattice for Vec<Entry> {
         self.iter().zip(computed).map(|(held, found)| held.joined(found)).collect()
     }
 }
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct ScopeKey {
+    within: std::sync::Arc<[lint_sweep::Address]>,
+    at: Option<lint_sweep::Address>,
+}
+
+impl ScopeKey {
+    pub(crate) fn at(within: &std::sync::Arc<[lint_sweep::Address]>, node: lint_sweep::Address) -> ScopeKey {
+        ScopeKey { within: std::sync::Arc::clone(within), at: Some(node) }
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ScopeMap(std::collections::BTreeMap<ScopeKey, ScopeId>);
+
+impl ScopeMap {
+    pub(crate) fn scope(&self, key: &ScopeKey) -> ScopeId {
+        self.0.get(key).copied().unwrap_or(ScopeId::FIRST)
+    }
+
+    pub(super) fn keyed(keys: impl IntoIterator<Item = ScopeKey>) -> ScopeMap {
+        let top = [(ScopeKey::default(), ScopeId::FIRST)];
+        ScopeMap(
+            top.into_iter().chain(keys.into_iter().enumerate().map(|(index, key)| (key, ScopeId(index + 1)))).collect(),
+        )
+    }
+}

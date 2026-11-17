@@ -20,7 +20,7 @@ use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
 use binding::Binding;
-pub(crate) use boundary::ScopeId;
+pub(crate) use boundary::{ScopeId, ScopeKey, ScopeMap};
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
 pub(crate) use graph::Domain;
 pub(crate) use items::ItemIds;
@@ -81,6 +81,52 @@ impl Openings {
         let top = &mut self.top;
         let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
         nested.map_or(top, |opening| &mut opening.entries).declare(declared);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum ScopeOp {
+    Opened { key: ScopeKey, parent: ScopeKey, kind: ScopeKind, entries: Entries },
+    Absorbed { key: ScopeKey, entries: Entries },
+    Declared { key: ScopeKey, name: Name, visibility: Visibility, module: ScopeKey },
+}
+
+impl ScopeOp {
+    fn opened(&self) -> Option<&ScopeKey> {
+        match self {
+            ScopeOp::Opened { key, .. } => Some(key),
+            ScopeOp::Absorbed { .. } | ScopeOp::Declared { .. } => None,
+        }
+    }
+
+    fn replayed(self, scopes: &ScopeMap, mut openings: Openings) -> Openings {
+        match self {
+            ScopeOp::Opened { parent, kind, entries, .. } => {
+                openings.opened(scopes.scope(&parent), kind, entries);
+            }
+            ScopeOp::Absorbed { key, entries } => openings.absorb(scopes.scope(&key), entries),
+            ScopeOp::Declared { key, name, visibility, module } => {
+                openings.declare(
+                    scopes.scope(&key),
+                    Declared::new(name, visibility, DeclaredKind::Module(scopes.scope(&module))),
+                );
+            }
+        }
+        openings
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Replayed {
+    pub(crate) openings: Openings,
+    pub(crate) scopes: ScopeMap,
+}
+
+impl Openings {
+    pub(crate) fn replayed(top: Entries, ops: Vec<ScopeOp>) -> Replayed {
+        let scopes = ScopeMap::keyed(ops.iter().filter_map(ScopeOp::opened).cloned());
+        let openings = ops.into_iter().fold(Openings::new(top), |openings, op| op.replayed(&scopes, openings));
+        Replayed { openings, scopes }
     }
 }
 
