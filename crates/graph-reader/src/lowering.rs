@@ -38,7 +38,7 @@ use crate::planting::Files;
 use attributes::Attributes;
 use boundary::SelfType;
 use calls::CallRow;
-use definition::LoweredDefinition;
+use definition::{BodyPart, LoweredDefinition};
 use frames::Enclosure;
 use held::HoldingRow;
 use laws::LawRow;
@@ -524,6 +524,7 @@ pub(crate) struct Grains {
     rows: FileRows,
     ops: Vec<ScopeOp>,
     slots: Vec<Slot<ScopeKey>>,
+    body: BodyPart,
 }
 
 impl Semigroup for Grains {
@@ -532,6 +533,7 @@ impl Semigroup for Grains {
             rows: self.rows.combine(other.rows),
             ops: self.ops.combine(other.ops),
             slots: self.slots.combine(other.slots),
+            body: self.body.combine(other.body),
         }
     }
 }
@@ -558,5 +560,17 @@ pub(super) struct Owning {
 impl Owning {
     fn within(&self, context: &Context) -> Context {
         context.owned(self.place.clone())
+    }
+}
+
+impl From<BodyPart> for Grains {
+    fn from(body: BodyPart) -> Grains {
+        Grains { body, ..Grains::default() }
+    }
+}
+
+impl Grains {
+    fn unbodied(self) -> Grains {
+        Grains { body: BodyPart::default(), ..self }
     }
 }

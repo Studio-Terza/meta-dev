@@ -14,7 +14,7 @@ use lint_layout::{Name, Position};
 use lint_sweep::{Address, Around, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope, Sweep};
 
 use super::attributes::Attributes;
-use super::definition::{BodyGroup, Mutations};
+use super::definition::{BodyGroup, BodyPart, Branches, Mutations};
 use super::frames::Enclosure;
 use super::held::{Holder, Link};
 use super::regions::{Context, Regions};
@@ -117,14 +117,15 @@ impl<'read> Frame<'read> {
         body: Option<&Block>,
         inner: Contribution<Framed<'read>, Grains>,
     ) -> Grains {
-        inner.concluded(|framed, grains| {
+        inner.concluded(|framed, grown| {
             let generics = framed.0.map_or_else(|| Arc::clone(&self.generics), |frame| frame.generics);
+            let Grains { rows, ops, slots, body: part } = grown;
             let definition = body.map(|block| {
                 let mut group = BodyGroup::opened(&generics, signature, block);
                 Sweep::block_in(self.source, block, lint_sweep::Gathers::watching(&mut group).into_iter().collect());
-                lint_sweep::Gathers::gathered(group).lowered()
+                lint_sweep::Gathers::gathered(group).lowered(part)
             });
-            Grains { rows: grains.rows.defined(definition), ..grains }
+            Grains { rows: rows.defined(definition), ops, slots, body: BodyPart::default() }
         })
     }
 }
@@ -187,6 +188,12 @@ impl<'read> Contribute for Lowering<'read> {
             Kind::ExprLet,
             Kind::Local,
             Kind::Macro,
+            Kind::ExprIf,
+            Kind::ExprWhile,
+            Kind::ExprForLoop,
+            Kind::ExprTry,
+            Kind::ExprBinary,
+            Kind::PatIdent,
         ]
     }
 
@@ -209,6 +216,9 @@ impl<'read> Contribute for Lowering<'read> {
                 Scope::new(Kind::ImplItemConst),
                 Scope::new(Kind::ItemMacro),
                 Scope::new(Kind::ExprCall),
+                Scope::new(Kind::ExprMethodCall),
+                Scope::new(Kind::Item),
+                Scope::new(Kind::Signature),
             ]
         }
     }
@@ -452,7 +462,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ExprMethodCall>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).method_called(call))
+        Contributed::parted(self.frame(&around).method_called(call).combine(Grains::from(BodyPart::method_entered(call))))
     }
 
     fn on_expr_call(
@@ -463,7 +473,7 @@ impl<'read> Contribute for Lowering<'read> {
     ) -> Grown<'read> {
         let frame = self.frame(&around);
         let calling = Frame { calling: lint_core::Syntax::expr_path(&call.func).map(Address::from), ..frame.clone() };
-        let called = frame.path_called(call);
+        let called = frame.path_called(call).combine(Grains::from(BodyPart::call_entered(call)));
         calling.framed(called, Descend::Into)
     }
 
@@ -501,7 +511,8 @@ impl<'read> Contribute for Lowering<'read> {
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
         let frame = self.frame(&around);
-        Contributed::parted(Monoid::concat(expr.arms.iter().map(|arm| frame.pattern_used(&arm.pat))))
+        let patterns: Grains = Monoid::concat(expr.arms.iter().map(|arm| frame.pattern_used(&arm.pat)));
+        Contributed::parted(patterns.combine(Grains::from(BodyPart::branching(Branches::matched(expr)))))
     }
 
     fn on_expr_let(
@@ -543,10 +554,50 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemMacro>,
         inner: Contribution<Framed<'read>, Grains>,
     ) -> Grains {
-        inner.concluded(|framed, grains| {
+        inner.concluded(|framed, grown| {
             let frame = framed.0.unwrap_or_else(|| self.top.clone());
-            grains.combine(frame.macro_left(item))
+            grown.combine(frame.macro_left(item))
         })
+    }
+
+    fn on_expr_if(&self, _: &syntax::ExprIf, _: &Facts<'_, syntax::ExprIf>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
+    }
+
+    fn on_expr_while(&self, _: &syntax::ExprWhile, _: &Facts<'_, syntax::ExprWhile>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
+    }
+
+    fn on_expr_for_loop(&self, _: &syntax::ExprForLoop, _: &Facts<'_, syntax::ExprForLoop>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
+    }
+
+    fn on_expr_try(&self, _: &syntax::ExprTry, _: &Facts<'_, syntax::ExprTry>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::branching(Branches::propagating())))
+    }
+
+    fn on_expr_binary(&self, found: &syntax::ExprBinary, _: &Facts<'_, syntax::ExprBinary>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::branching(Branches::joined(found))))
+    }
+
+    fn on_pat_ident(&self, found: &syntax::PatIdent, _: &Facts<'_, syntax::PatIdent>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::rebinding(found)))
+    }
+
+    fn off_expr_method_call(&self, call: &ExprMethodCall, _: &Facts<'_, ExprMethodCall>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+        inner.concluded(|_, grown| grown.combine(Grains::from(BodyPart::method_made(call))))
+    }
+
+    fn off_expr_call(&self, call: &ExprCall, _: &Facts<'_, ExprCall>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+        inner.concluded(|_, grown| grown.combine(Grains::from(BodyPart::call_made(call))))
+    }
+
+    fn off_item(&self, _: &syntax::Item, _: &Facts<'_, syntax::Item>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+        inner.concluded(|_, grown| grown.unbodied())
+    }
+
+    fn off_signature(&self, _: &SynSignature, _: &Facts<'_, SynSignature>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+        inner.concluded(|_, grown| grown.unbodied())
     }
 
     fn on_macro(

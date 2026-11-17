@@ -1,3 +1,4 @@
+use algebra::{Monoid, Semigroup};
 mod shaped;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -135,13 +136,6 @@ enum Calls {
 }
 
 impl Calls {
-    fn counted(self, at: Address) -> Calls {
-        match self {
-            Calls::Zero => Calls::One(at),
-            Calls::One(_) | Calls::Many => Calls::Many,
-        }
-    }
-
     fn only(self) -> Option<Address> {
         match self {
             Calls::One(at) => Some(at),
@@ -226,14 +220,21 @@ impl Reads {
         only.and_then(Syntax::tail).and_then(Syntax::expr_call).map(Address::from)
     }
 
-    fn recorded(&mut self, path: impl Fn() -> UsePath, arguments: &[&Expr], line: LineNumber) -> Descend {
-        let passed: Vec<Shaped<Passed>> =
-            arguments.iter().map(|argument| Shaped::folded(argument, &Passed::leaf)).collect();
-        let roots = passed.iter().filter_map(Shaped::leaf).filter_map(|leaf| leaf.clone().rooted());
-        let found: Vec<LoweredRead> =
-            roots.map(|rooted| LoweredRead { path: path(), rooted, passed: passed.clone(), line }).collect();
-        self.found.extend(found);
-        Descend::Into
+    pub(super) fn counted(at: Address) -> Reads {
+        Reads { found: Vec::new(), calls: Calls::One(at) }
+    }
+
+    pub(super) fn called(call: &ExprCall, at: Address) -> Reads {
+        let recorded = Syntax::expr_path(&call.func).map_or_default(|found| {
+            let line = found.path.segments.last().map_or(LineNumber::FIRST, |last| LineNumber::from(last.ident.span()));
+            let passed: Vec<Shaped<Passed>> =
+                call.args.iter().map(|argument| Shaped::folded(argument, &Passed::leaf)).collect();
+            let roots = passed.iter().filter_map(Shaped::leaf).filter_map(|leaf| leaf.clone().rooted());
+            roots
+                .map(|rooted| LoweredRead { path: UsePath::from(&found.path), rooted, passed: passed.clone(), line })
+                .collect()
+        });
+        Reads { found: recorded, calls: Calls::One(at) }
     }
 }
 
@@ -300,26 +301,31 @@ impl ReadsLowered {
     }
 }
 
-impl<'ast> Watch<'ast> for Reads {
-    fn kinds(&self) -> &'static [Kind] {
-        &[Kind::Item, Kind::ExprCall, Kind::ExprMethodCall]
-    }
 
-    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
-        Descend::Over
+impl Semigroup for Reads {
+    fn combine(self, other: Reads) -> Reads {
+        Reads { found: self.found.combine(other.found), calls: self.calls.combine(other.calls) }
     }
+}
 
-    fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.calls = self.calls.counted(facts.address());
-        Descend::Into
+impl Monoid for Reads {}
+
+impl Semigroup for Calls {
+    fn combine(self, other: Calls) -> Calls {
+        match self {
+            Calls::Zero => other,
+            Calls::One(_) | Calls::Many => self.followed(other),
+        }
     }
+}
 
-    fn on_expr_call(&mut self, call: &'ast ExprCall, facts: &Facts<'_, ExprCall>) -> Descend {
-        self.calls = self.calls.counted(facts.address());
-        Syntax::expr_path(&call.func).map_or(Descend::Into, |found| {
-            let line = found.path.segments.last().map_or(LineNumber::FIRST, |last| LineNumber::from(last.ident.span()));
-            let arguments: Vec<&Expr> = call.args.iter().collect();
-            self.recorded(|| UsePath::from(&found.path), &arguments, line)
-        })
+impl Monoid for Calls {}
+
+impl Calls {
+    fn followed(self, other: Calls) -> Calls {
+        match other {
+            Calls::Zero => self,
+            Calls::One(_) | Calls::Many => Calls::Many,
+        }
     }
 }
