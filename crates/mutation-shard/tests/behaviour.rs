@@ -3,6 +3,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use console_ports::Complaint;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use mutation_shard::Cli;
 use serde_json::{Value, json};
@@ -21,9 +22,9 @@ struct Answer {
 
 impl Answer {
     fn to(files: &impl Files, arguments: &[&OsStr]) -> Answer {
-        let mut err = Vec::new();
-        let exit = Cli::answer(arguments.iter().map(OsString::from), files, &mut err);
-        Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
+        let answered = Cli::answer(arguments.iter().map(OsString::from), files);
+        let err: &Complaint = answered.as_ref();
+        Answer { exit: answered.code(), err: AsRef::<str>::as_ref(err).to_owned() }
     }
 
     fn usage() -> Answer {

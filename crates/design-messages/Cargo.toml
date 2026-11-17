@@ -25,7 +25,6 @@ transcript-ports = { path = "../transcript-ports" }
 
 [build-dependencies]
 console-ports = { path = "../console-ports" }
-exit = { path = "../exit" }
 
 [lints]
 workspace = true

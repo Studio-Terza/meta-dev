@@ -1,14 +1,7 @@
-use std::io::Write;
+use std::process::ExitCode;
 
-use console_ports::Process;
-use exit::Exit;
+use console_ports::{Answer, Process};
 
-#[derive(Debug)]
-struct Watched;
-
-fn main() -> Exit {
-    Process::answer(|_arguments, out, err| {
-        let watched = out.write_all(b"cargo::rerun-if-changed=migrations\n").map(|()| Watched);
-        Exit::reported(watched, err)
-    })
+fn main() -> ExitCode {
+    Process::answer(|_arguments| Answer::new(ExitCode::SUCCESS).showing("cargo::rerun-if-changed=migrations\n"))
 }

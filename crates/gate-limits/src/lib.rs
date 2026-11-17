@@ -6,10 +6,11 @@ mod seconds;
 mod stage;
 
 use std::ffi::OsString;
-use std::io::{self, Write};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use console_ports::Answer;
 use contents::Contents;
 pub use failure::Failure;
 use file_ports::{Bytes, Files};
@@ -41,18 +42,15 @@ impl Cli {
         Cli { limits, measured, only, report_only }
     }
 
-    pub fn report_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        self.gate(files).map_or_else(|failure| Self::refused(&failure, err), |gate| self.reported(&gate, out))
+    pub fn report_to(&self, files: &impl Files) -> Answer {
+        self.gate(files).map_or_else(
+            |failure| Answer::complained(ExitCode::FAILURE, format_args!("{failure}\n")),
+            |gate| self.reported(&gate),
+        )
     }
 
-    fn reported(&self, gate: &Gate, out: &mut impl Write) -> ExitCode {
-        write!(out, "{gate}").ok();
-        gate.blocking(&self.report_only).map_or(ExitCode::SUCCESS, |_| ExitCode::FAILURE)
-    }
-
-    fn refused(failure: &Failure<'_>, err: &mut impl Write) -> ExitCode {
-        writeln!(err, "{failure}").ok();
-        ExitCode::FAILURE
+    fn reported(&self, gate: &Gate) -> Answer {
+        Answer::new(gate.blocking(&self.report_only).map_or(ExitCode::SUCCESS, |_| ExitCode::FAILURE)).showing(gate)
     }
 
     pub fn past_warn(&self, files: &impl Files) -> Result<Vec<Finding>, Failure<'_>> {
