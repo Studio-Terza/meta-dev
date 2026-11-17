@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use syntax::{ItemEnum, ItemStruct, ItemTrait};
 
+use lint_core::Extended;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
@@ -35,7 +36,7 @@ impl WorkspaceTypes {
 
 impl WorkspaceTypes {
     fn declared(self, name: &syntax::Ident) -> Visit<WorkspaceTypes> {
-        Visit::new(WorkspaceTypes(self.0.into_iter().chain([Name::from(name)]).collect()), Descend::Over)
+        Visit::new(WorkspaceTypes(self.0.extended([Name::from(name)])), Descend::Over)
     }
 }
 

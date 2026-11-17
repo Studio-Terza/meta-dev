@@ -4,6 +4,7 @@ mod finding;
 
 use syntax::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
+use lint_core::Extended;
 use lint_core::{Site, SourceFile, Violation, Walk};
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
@@ -77,7 +78,7 @@ impl<'file> Fold for Declared<'file> {
         let declared = Self::with_methods(block)
             .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
             .and(declaration);
-        Visit::new(Declarations(found.0.into_iter().chain(declared).collect()), Descend::Over)
+        Visit::new(Declarations(found.0.extended(declared)), Descend::Over)
     }
 }
 

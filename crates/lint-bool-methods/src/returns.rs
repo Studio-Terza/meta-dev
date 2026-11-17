@@ -3,6 +3,7 @@ mod finding;
 
 use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
+use lint_core::Extended;
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
@@ -36,7 +37,7 @@ impl<'file> Returns<'file> {
     ) -> Visit<Vec<Violation<'file>>> {
         let descend = Descend::from(Walk::outside_tests(attributes));
         let flagged = descend.entered().and_then(|_| self.flagged(signature));
-        Visit::new(found.into_iter().chain(flagged).collect(), descend)
+        Visit::new(found.extended(flagged), descend)
     }
 }
 

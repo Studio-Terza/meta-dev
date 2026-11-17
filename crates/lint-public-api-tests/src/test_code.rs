@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::PublicApiTests;
+use lint_core::Extended;
 use lint_core::Macros;
 use lint_core::Walk;
 use lint_core::{Site, SourceFile, Violation};
@@ -45,17 +46,17 @@ impl<'file> Tested<'file> {
         let path = self.path;
         let emitting = self.invoked.into_iter().filter(|invoked| emitters.contains(&invoked.name));
         let lines = emitting.map(|invoked| Violation::new(Site::new(path, invoked.line), PublicApiTests::IN_SOURCE));
-        self.found.into_iter().chain(lines).collect()
+        self.found.extended(lines)
     }
 }
 
 impl Collected {
     fn lined(self, line: Option<LineNumber>) -> Collected {
-        Collected { lines: self.lines.into_iter().chain(line).collect(), ..self }
+        Collected { lines: self.lines.extended(line), ..self }
     }
 
     fn named(self, named: Option<Invoked>) -> Collected {
-        Collected { invoked: self.invoked.into_iter().chain(named).collect(), ..self }
+        Collected { invoked: self.invoked.extended(named), ..self }
     }
 }
 

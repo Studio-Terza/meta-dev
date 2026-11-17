@@ -3,6 +3,7 @@ use syntax::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
 use body_lifts::Branching;
 use graph_reader::{Branches, Propagation};
+use lint_core::Extended;
 use lint_core::{Drawn, Fold, Folding, Site, SourceFile, Visit, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
 use lint_sweep::{Attaching, Attachment, Descend, Facts, Gathers, Grouped, Kind, Scoped, Sweep, Watching};
@@ -60,8 +61,8 @@ impl<'file> Functions<'file> {
         let attached = opened.map(|block| Attachment::reaching(block, Branches::new(Propagation::Branch)));
         let scoring = opened.map(|_| Scoring { name: Name::from(name), line, site });
         Visit::descending(Listed {
-            opening: found.opening.into_iter().chain(attached).collect(),
-            open: found.open.into_iter().chain(scoring).collect(),
+            opening: found.opening.extended(attached),
+            open: found.open.extended(scoring),
             ..found
         })
     }
@@ -99,7 +100,7 @@ impl<'file> Attaching<Branches> for Functions<'file> {
     fn detached(&self, found: Listed<'file>, branched: graph_reader::Branched) -> Listed<'file> {
         let mut open = found.open;
         let scored = open.pop().map(|scoring| Scored { scoring, branching: Branching::from(branched) });
-        Listed { open, found: found.found.into_iter().chain(scored).collect(), ..found }
+        Listed { open, found: found.found.extended(scored), ..found }
     }
 }
 

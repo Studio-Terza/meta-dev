@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_core::{Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
@@ -121,7 +122,7 @@ impl<'scan> ConstContexts<'scan> {
 
 impl<'scan> Consted<'scan> {
     fn flagged(self, more: impl IntoIterator<Item = Violation<'scan>>) -> Consted<'scan> {
-        Consted { violations: self.violations.into_iter().chain(more).collect(), ..self }
+        Consted { violations: self.violations.extended(more), ..self }
     }
 
     fn within(self, context: Context) -> Visit<Consted<'scan>> {
@@ -133,7 +134,7 @@ impl<'scan> Consted<'scan> {
     }
 
     fn awaiting(self, more: impl IntoIterator<Item = Address>) -> Visit<Consted<'scan>> {
-        Visit::descending(Consted { pending: self.pending.into_iter().chain(more).collect(), ..self })
+        Visit::descending(Consted { pending: self.pending.extended(more), ..self })
     }
 }
 
@@ -152,7 +153,7 @@ struct Contexts {
 
 impl Contexts {
     fn within(self, context: Context) -> Contexts {
-        Contexts { current: context, outer: self.outer.into_iter().chain([self.current]).collect() }
+        Contexts { current: context, outer: self.outer.extended([self.current]) }
     }
 
     fn restored(self) -> Contexts {
@@ -203,7 +204,7 @@ impl<'scan> Fold for ConstContexts<'scan> {
         facts: &Facts<'_, ItemMod>,
     ) -> Visit<Consted<'scan>> {
         let zone = found.zone.unwrap_or(self.zone);
-        let zones = found.zones.into_iter().chain([zone]).collect();
+        let zones = found.zones.extended([zone]);
         Visit::new(Consted { zone: Some(zone.entering(module)), zones, ..found }, Descend::from(facts.gate()))
     }
 
@@ -346,12 +347,9 @@ impl<'scan> Fold for ConstContexts<'scan> {
     fn off_expr(&self, found: Consted<'scan>, _: &Expr, facts: &Facts<'_, Expr>) -> Consted<'scan> {
         let at = facts.address();
         let index = found.pending.iter().rposition(|waiting| *waiting == at);
-        let pending = found.pending.into_iter().enumerate().filter(|(kept, _)| Some(*kept) != index);
-        Consted {
-            pending: pending.map(|(_, waiting)| waiting).collect(),
-            context: found.context.marked(index.map_or(Mark::Unmarked, |_| Mark::Left)),
-            ..found
-        }
+        let mut pending = found.pending;
+        let waited = index.map(|waiting| pending.remove(waiting));
+        Consted { pending, context: found.context.marked(waited.map_or(Mark::Unmarked, |_| Mark::Left)), ..found }
     }
 
     fn on_macro(&self, found: Consted<'scan>, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Consted<'scan>> {

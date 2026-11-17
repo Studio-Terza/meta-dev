@@ -4,6 +4,7 @@ use std::path::Path;
 
 use syntax::{ExprMethodCall, ItemMod};
 
+use lint_core::Extended;
 use lint_core::{Gate, Site, Violation};
 use lint_layout::LineNumber;
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
@@ -47,6 +48,6 @@ impl<'file> Fold for CloneSites<'file> {
             Some(call).filter(|candidate| candidate.method == Self::CLONE).filter(|clone| clone.args.is_empty()).map(
                 |bare_clone| Violation::new(Site::new(self.path, LineNumber::from(bare_clone.method.span())), Finding),
             );
-        Visit::descending(CloneFindings(found.0.into_iter().chain(cloned).collect()))
+        Visit::descending(CloneFindings(found.0.extended(cloned)))
     }
 }

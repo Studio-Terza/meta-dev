@@ -1,6 +1,7 @@
 mod boundary;
 mod contents;
 mod drawn;
+mod extended;
 mod gate;
 mod headline;
 mod lint;
@@ -21,6 +22,7 @@ mod watch;
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
 pub use drawn::Drawn;
+pub use extended::Extended;
 pub use gate::Gate;
 pub use headline::Headline;
 pub use lint::Lint;

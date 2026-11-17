@@ -13,6 +13,7 @@ use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
 use graph::Model;
+use lint_core::Extended;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -121,7 +122,7 @@ impl WatchingLint for NoTestOnlyApi {
         let package = file.head().placement().package();
         let manifest =
             test_only.manifests.get(package).filter(|last| **last == path).map(|_| Self::in_manifest(package, file));
-        found.found.into_iter().chain(manifest.into_iter().flatten()).collect()
+        found.found.extended(manifest.into_iter().flatten())
     }
 }
 

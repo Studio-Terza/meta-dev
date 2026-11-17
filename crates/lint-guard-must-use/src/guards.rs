@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::SourceFile;
 mod members;
 mod modules;
@@ -113,7 +114,7 @@ impl<'file> Fold for Guards<'file> {
         let inner = facts.name().map_or_else(|| current.clone(), |name| current.within(name.clone()));
         let Scanned { members, modules, outer, .. } = found;
         let frame = Frame { module: current, members };
-        let opened = outer.into_iter().chain([frame]).collect();
+        let opened = outer.extended([frame]);
         Visit::new(
             Scanned { module: Some(inner), members: Members::default(), modules, outer: opened },
             Descend::from(facts.gate()),

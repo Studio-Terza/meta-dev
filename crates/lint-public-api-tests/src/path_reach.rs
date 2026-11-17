@@ -3,6 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use syntax::ItemMod;
 
 use super::PublicApiTests;
+use lint_core::Extended;
 use lint_core::{Site, SourceFile, Syntax, Violation};
 use lint_layout::LineNumber;
 use lint_sweep::{Facts, Fold, Kind, Visit};
@@ -74,7 +75,7 @@ impl Fold for PathReach<'_> {
             .filter(|target| Self::lexical(&directory.join(target)).starts_with(&self.source))
             .map(|_| LineNumber::from(module.ident.span()));
         let inner = facts.name().into_iter().fold(directory, |outer, name| outer.join(name));
-        Visit::descending(Reached { directory: Some(inner), lines: found.lines.into_iter().chain(reaching).collect() })
+        Visit::descending(Reached { directory: Some(inner), lines: found.lines.extended(reaching) })
     }
 
     fn off_item_mod(&self, found: Reached, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Reached {

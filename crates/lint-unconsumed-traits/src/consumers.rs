@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use syntax::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
 
+use lint_core::Extended;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
@@ -70,10 +71,7 @@ impl Fold for Consuming {
         _: &ExprMethodCall,
         facts: &Facts<'_, ExprMethodCall>,
     ) -> Visit<Consumers> {
-        Visit::descending(Consumers {
-            called: found.called.into_iter().chain(facts.name().cloned()).collect(),
-            ..found
-        })
+        Visit::descending(Consumers { called: found.called.extended(facts.name().cloned()), ..found })
     }
 
     fn on_expr_path(&self, found: Consumers, path: &ExprPath, _: &Facts<'_, ExprPath>) -> Visit<Consumers> {
@@ -84,6 +82,6 @@ impl Fold for Consuming {
             .nth(1)
             .and_then(|_| path.path.segments.last())
             .map(|segment| Name::from(&segment.ident));
-        Visit::descending(Consumers { called: found.called.into_iter().chain(called).collect(), ..found })
+        Visit::descending(Consumers { called: found.called.extended(called), ..found })
     }
 }

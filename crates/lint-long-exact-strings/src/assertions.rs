@@ -6,6 +6,7 @@ mod table_rows;
 
 use std::path::Path;
 
+use lint_core::Extended;
 use lint_core::{Macros, SourceFile};
 
 use syntax::Punctuated;
@@ -159,7 +160,7 @@ impl<'file> Fold for Assertions<'file> {
 
     fn on_macro(&self, found: Asserted<'file>, invocation: &Macro, _: &Facts<'_, Macro>) -> Visit<Asserted<'file>> {
         let met = Met { invocation: invocation.clone(), body: found.scopes.current() };
-        Visit::new(Asserted { met: found.met.into_iter().chain([met]).collect(), ..found }, Descend::Over)
+        Visit::new(Asserted { met: found.met.extended([met]), ..found }, Descend::Over)
     }
 }
 

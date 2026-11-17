@@ -15,6 +15,7 @@ use syntax::{Expr, ImplItemFn, ItemImpl, ItemMod, ItemStruct, PathSegment, Stmt}
 use super::workspace_types::WorkspaceTypes;
 use callee::Callee;
 use forwarder::{Forwarder, Owned};
+use lint_core::Extended;
 use lint_core::Syntax;
 use lint_core::Violation;
 use lint_layout::{Casing, Name};
@@ -136,6 +137,6 @@ impl Fold for Forwarders {
 
     fn on_impl_item_fn(&self, found: Scope, function: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Visit<Scope> {
         let forwarder = found.classify(function);
-        Visit::descending(Scope { found: found.found.into_iter().chain(forwarder).collect(), ..found })
+        Visit::descending(Scope { found: found.found.extended(forwarder), ..found })
     }
 }

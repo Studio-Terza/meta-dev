@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::SourceFile;
 
 use syntax::{
@@ -76,7 +77,7 @@ impl<'file> Scan<'file> {
         let kind = self.kind(&found);
         let occurrence = large.map(|_| Occurrence::new(self.shaper.erasure().read(bounds), site, extent, kind));
         let descend = large.map_or(Descend::Over, |_| Descend::Into);
-        Visit::new(Scanned { occurrences: found.occurrences.into_iter().chain(occurrence).collect(), ..found }, descend)
+        Visit::new(Scanned { occurrences: found.occurrences.extended(occurrence), ..found }, descend)
     }
 
     fn within(&self, found: Scanned<'file>, attributes: &[Attribute]) -> Visit<Scanned<'file>> {
@@ -86,11 +87,7 @@ impl<'file> Scan<'file> {
             .filter(|_| Walk::outside_tests(attributes) == Walk::Entered)
             .filter(|_| TestMarks::mark_test(attributes).is_none())
             .unwrap_or(Kind::Tests);
-        Visit::descending(Scanned {
-            kind: Some(inner),
-            outer: found.outer.into_iter().chain([current]).collect(),
-            ..found
-        })
+        Visit::descending(Scanned { kind: Some(inner), outer: found.outer.extended([current]), ..found })
     }
 }
 
@@ -198,7 +195,7 @@ impl<'file> Gathers<Occurrences<'file>> for Scanning<'file> {
 
     fn gathered(self) -> Occurrences<'file> {
         let scanned: Scanned<'file> = self.folding.concluded();
-        Occurrences { path: self.path, found: scanned.occurrences.into_iter().chain(self.tested).collect() }
+        Occurrences { path: self.path, found: scanned.occurrences.extended(self.tested) }
     }
 }
 

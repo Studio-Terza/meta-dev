@@ -1,6 +1,7 @@
 mod finding;
 
 use finding::Finding;
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Fold, Folding, Kind, Visit};
@@ -53,7 +54,7 @@ impl<'file> Fold for ShortLifetimes<'file> {
         let short = (Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| {
             Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::ShortLifetime { name })
         });
-        Visit::new(found.into_iter().chain(short).collect(), Descend::Over)
+        Visit::new(found.extended(short), Descend::Over)
     }
 
     fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {

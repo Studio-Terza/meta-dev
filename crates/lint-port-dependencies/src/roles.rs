@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use graph::Model;
+use lint_core::Extended;
 use lint_core::{FileHead, Parsed, Site, Violation};
 use lint_file::Gleaning;
 use lint_layout::LineNumber;
@@ -103,7 +104,7 @@ impl Fold for Denials {
         attribute: &syntax::Attribute,
         _: &Facts<'_, syntax::Attribute>,
     ) -> Visit<Denied> {
-        Visit::new(Denied(found.0.into_iter().chain(Undenied::denied_by(attribute)).collect()), Descend::Over)
+        Visit::new(Denied(found.0.extended(Undenied::denied_by(attribute))), Descend::Over)
     }
 
     fn on_item(&self, found: Denied, _: &syntax::Item, _: &Facts<'_, syntax::Item>) -> Visit<Denied> {

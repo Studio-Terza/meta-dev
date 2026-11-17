@@ -2,6 +2,7 @@ mod finding;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use lint_core::Extended;
 use lint_core::Module;
 use lint_core::{Site, Violation};
 use lint_layout::Name;
@@ -33,11 +34,11 @@ impl<'file> Members<'file> {
     }
 
     pub fn aliased(self, name: Name, target: Option<Name>) -> Members<'file> {
-        Members { aliases: self.aliases.into_iter().chain(target.map(|aliased| (name, aliased))).collect(), ..self }
+        Members { aliases: self.aliases.extended(target.map(|aliased| (name, aliased))), ..self }
     }
 
     pub fn drop_implemented(self, dropped: Dropped) -> Members<'file> {
-        Members { dropped: self.dropped.into_iter().chain(dropped.0).collect(), ..self }
+        Members { dropped: self.dropped.extended(dropped.0), ..self }
     }
 
     fn merged(mut self, other: Members<'file>) -> Members<'file> {

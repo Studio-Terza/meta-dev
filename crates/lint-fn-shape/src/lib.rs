@@ -2,6 +2,7 @@ mod finding;
 mod nesting_depth;
 
 use finding::Finding;
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_core::{Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
@@ -141,18 +142,19 @@ impl<'scan> Shapes<'scan> {
 
 impl<'scan> Shaped<'scan> {
     fn flagged(self, more: impl IntoIterator<Item = Violation<'scan>>) -> Shaped<'scan> {
-        Shaped { violations: self.violations.into_iter().chain(more).collect(), ..self }
+        Shaped { violations: self.violations.extended(more), ..self }
     }
 
     fn pushed(self, more: impl IntoIterator<Item = Nest>) -> Visit<Shaped<'scan>> {
-        Visit::descending(Shaped { nests: self.nests.into_iter().chain(more).collect(), ..self })
+        Visit::descending(Shaped { nests: self.nests.extended(more), ..self })
     }
 
     fn unnesting(self, at: Address) -> Shaped<'scan> {
         let index = self.nests.iter().rposition(|nest| nest.at == at);
-        let depth = index.map_or(self.depth, |_| self.depth - NestingDepth::LEVEL);
-        let nests = self.nests.into_iter().enumerate().filter(|(kept, _)| Some(*kept) != index).map(|(_, nest)| nest);
-        Shaped { depth, nests: nests.collect(), ..self }
+        let mut nests = self.nests;
+        let unnested = index.map(|nested| nests.remove(nested));
+        let depth = unnested.map_or(self.depth, |_| self.depth - NestingDepth::LEVEL);
+        Shaped { depth, nests, ..self }
     }
 }
 

@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Address, Descend, Facts, Finds, Fold, Folding, Kind, Visit};
@@ -97,19 +98,19 @@ impl<'scan> From<Shapes<'scan>> for Vec<Violation<'scan>> {
 
 impl<'scan> Shapes<'scan> {
     fn rooted(self, roots: impl IntoIterator<Item = Root<'scan>>) -> Shapes<'scan> {
-        Shapes { roots: self.roots.into_iter().chain(roots).collect(), ..self }
+        Shapes { roots: self.roots.extended(roots), ..self }
     }
 
     fn flagged(self, flagged: Option<Violation<'scan>>) -> Shapes<'scan> {
-        Shapes { violations: self.violations.into_iter().chain(flagged).collect(), ..self }
+        Shapes { violations: self.violations.extended(flagged), ..self }
     }
 
     fn entered(self, at: Address) -> Shapes<'scan> {
         let (reached, roots): (Vec<Root<'scan>>, Vec<Root<'scan>>) =
             self.roots.into_iter().partition(|root| root.at == at);
         let opened: Vec<Open> = reached.iter().map(|root| Open { at: root.at, span: root.span }).collect();
-        let violations = self.violations.into_iter().chain(reached.into_iter().filter_map(|root| root.first)).collect();
-        Shapes { violations, roots, open: self.open.into_iter().chain(opened).collect() }
+        let violations = self.violations.extended(reached.into_iter().filter_map(|root| root.first));
+        Shapes { violations, roots, open: self.open.extended(opened) }
     }
 
     fn left(self, ty: &Type) -> Shapes<'scan> {

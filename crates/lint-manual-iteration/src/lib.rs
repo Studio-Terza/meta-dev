@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_core::{Drawn, Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
@@ -99,8 +100,8 @@ impl<'scan> Iterated<'scan> {
         match opened {
             Some(attachment) => Iterated {
                 violations: Vec::new(),
-                opening: self.opening.into_iter().chain([attachment]).collect(),
-                held: self.held.into_iter().chain([self.violations]).collect(),
+                opening: self.opening.extended([attachment]),
+                held: self.held.extended([self.violations]),
             },
             None => self,
         }
@@ -191,7 +192,7 @@ impl<'scan> Fold for Iterations<'scan> {
                 ),
             )
         });
-        Visit::descending(Iterated { violations: found.violations.into_iter().chain(finding).collect(), ..found })
+        Visit::descending(Iterated { violations: found.violations.extended(finding), ..found })
     }
 }
 

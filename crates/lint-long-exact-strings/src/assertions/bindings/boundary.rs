@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use std::collections::BTreeMap;
 
 use super::{Bindings, Bound};
@@ -62,8 +63,8 @@ impl Scopes {
                 open: self.open.iter().take(self.open.len().saturating_sub(1)).copied().collect(),
                 ..self
             },
-            Step::Constant(bound) => Scopes { constants: self.constants.into_iter().chain([bound]).collect(), ..self },
-            Step::Local(bound) => Scopes { locals: self.locals.into_iter().chain(bound).collect(), ..self },
+            Step::Constant(bound) => Scopes { constants: self.constants.extended([bound]), ..self },
+            Step::Local(bound) => Scopes { locals: self.locals.extended(bound), ..self },
         }
     }
 

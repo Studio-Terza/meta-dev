@@ -7,6 +7,7 @@ use syntax::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 use syntax::{Ident, TokenTree};
 
 use gate::Gate;
+use lint_core::Extended;
 use lint_core::{Macros, Walk};
 use lint_core::{Site, SourceFile, Violation};
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
@@ -120,7 +121,7 @@ impl<'file> Fold for SkipMarks<'file> {
 
     fn on_item_mod(&self, found: Marks<'file>, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Visit<Marks<'file>> {
         let inner: Vec<LineNumber> = self.gates(&found).into_iter().chain(Gate::lines_in(&module.attrs)).collect();
-        let outer = found.outer.into_iter().chain([found.gates]).collect();
+        let outer = found.outer.extended([found.gates]);
         Visit::descending(Marks { gates: Some(inner), outer, ..found })
     }
 
@@ -149,7 +150,7 @@ impl<'file> Fold for SkipMarks<'file> {
             .filter(|candidate| Walk::outside_tests(slice::from_ref(*candidate)) == Walk::Skipped)
             .and(self.unrun)
             .map(|()| LineNumber::from(attribute.pound_token.span));
-        Visit::descending(Marks { unrun: found.unrun.into_iter().chain(gated).collect(), ..found })
+        Visit::descending(Marks { unrun: found.unrun.extended(gated), ..found })
     }
 }
 

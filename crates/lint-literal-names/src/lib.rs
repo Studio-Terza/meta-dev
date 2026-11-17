@@ -1,6 +1,7 @@
 mod finding;
 
 use finding::Finding;
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Fold, Folding, Kind, Visit};
@@ -60,7 +61,7 @@ impl<'file> VagueNames<'file> {
         let site = Site::new(self.path, LineNumber::from(ident.span()));
         let name = Name::from(ident);
         let vague = descend.entered().and_then(|_| LiteralNames::vague(&name));
-        let noted = found.into_iter().chain(vague.map(|finding| Violation::new(site, finding))).collect();
+        let noted = found.extended(vague.map(|finding| Violation::new(site, finding)));
         Visit::new(noted, descend)
     }
 }

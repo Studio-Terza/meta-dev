@@ -4,6 +4,7 @@ mod finding;
 use syntax::Span;
 use syntax::{ExprBreak, ExprContinue, ExprReturn, Macro};
 
+use lint_core::Extended;
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 use lint_sweep::{Descend, Facts, Fold, Folding, Kind, Sweep, Visit};
@@ -18,7 +19,7 @@ pub struct Exits<'file> {
 impl<'file> Exits<'file> {
     fn record(&self, found: Vec<Violation<'file>>, span: Span, finding: Finding) -> Visit<Vec<Violation<'file>>> {
         let exit = Violation::new(Site::new(AsRef::<Path>::as_ref(self.file.head()), LineNumber::from(span)), finding);
-        Visit::descending(found.into_iter().chain([exit]).collect())
+        Visit::descending(found.extended([exit]))
     }
 }
 
@@ -38,7 +39,7 @@ impl<'file> Fold for Exits<'file> {
     fn finished(&self, found: Self::Found) -> Self::Found {
         let modules = self.file.test_modules().iter();
         let tested = modules.flat_map(|module| Sweep::found(module, Box::new(Folding::from(Exits::from(module)))));
-        found.into_iter().chain(tested).collect()
+        found.extended(tested)
     }
 
     fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {

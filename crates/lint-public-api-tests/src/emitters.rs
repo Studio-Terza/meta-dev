@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use syntax::ItemMacro;
 
+use lint_core::Extended;
 use lint_core::Macros;
 use lint_layout::Name;
 use lint_layout::TestMarks;
@@ -45,6 +46,6 @@ impl Fold for Emitting {
             .filter(|_| definition.mac.path.is_ident(Emitters::DEFINITION))
             .filter(|_| Macros::attributes(&definition.mac).iter().find_map(TestMarks::test).is_some())
             .map(Name::from);
-        Visit::descending(Emitters { names: found.names.into_iter().chain(names).collect() })
+        Visit::descending(Emitters { names: found.names.extended(names) })
     }
 }

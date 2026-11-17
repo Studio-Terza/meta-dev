@@ -2,6 +2,7 @@ use syntax::Span;
 use syntax::Spanned;
 use syntax::{ItemFn, ItemMod, Macro, PathSegment};
 
+use lint_core::Extended;
 use lint_core::Walk;
 use lint_core::{Macros, SourceFile};
 use lint_layout::TestMarks;
@@ -73,7 +74,7 @@ impl Fold for TestScan<'_> {
     }
 
     fn on_item_mod(&self, found: Tally, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Visit<Tally> {
-        let before = found.before.into_iter().chain([found.test_lines]).collect();
+        let before = found.before.extended([found.test_lines]);
         Visit::descending(Tally { before, ..found })
     }
 

@@ -4,6 +4,7 @@ use syntax::{
     Macro, Signature, TraitItemFn,
 };
 
+use lint_core::Extended;
 use lint_core::{Fold, Folding, SourceFile, Visit};
 use lint_sweep::{Descend, Facts, Kind, Sweep};
 
@@ -51,19 +52,19 @@ impl<'file> Collector<'file> {
 
 impl<'file> Flowing<'file> {
     fn pushed(self, frame: Frame<'file>) -> Flowing<'file> {
-        Flowing { frames: self.frames.into_iter().chain([frame]).collect(), ..self }
+        Flowing { frames: self.frames.extended([frame]), ..self }
     }
 
     fn shut(self) -> Flowing<'file> {
         let mut frames = self.frames;
         let shut = frames.pop().and_then(Frame::closed);
-        Flowing { frames, closed: self.closed.into_iter().chain(shut).collect(), ..self }
+        Flowing { frames, closed: self.closed.extended(shut), ..self }
     }
 
     fn topped(self, change: impl FnOnce(Opened<'file>) -> Opened<'file>) -> Flowing<'file> {
         let mut frames = self.frames;
         let top = frames.pop().map(|frame| frame.changed(change));
-        Flowing { frames: frames.into_iter().chain(top).collect(), ..self }
+        Flowing { frames: frames.extended(top), ..self }
     }
 
     fn inside(self, change: impl FnOnce(Opened<'file>) -> Opened<'file>) -> Visit<Flowing<'file>> {

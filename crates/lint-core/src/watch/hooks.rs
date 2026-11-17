@@ -6,7 +6,7 @@ use lint_layout::Name;
 
 use super::Descend;
 use super::facts::Facts;
-use crate::Drawn;
+use crate::{Drawn, Extended};
 
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ident;)*) => {
@@ -265,7 +265,7 @@ impl<Found> Visit<Found> {
 impl<Item> Visit<Vec<Item>> {
     #[must_use]
     pub fn adding(found: Vec<Item>, more: impl IntoIterator<Item = Item>, descend: Descend) -> Visit<Vec<Item>> {
-        Visit::new(found.into_iter().chain(more).collect(), descend)
+        Visit::new(found.extended(more), descend)
     }
 }
 

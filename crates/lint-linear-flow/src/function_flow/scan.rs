@@ -6,6 +6,7 @@ use syntax::Span;
 use syntax::Spanned;
 use syntax::{Block, ExprBinary, ExprIf, ExprMatch, ExprUnary, Local};
 
+use lint_core::Extended;
 use lint_core::Site;
 use lint_layout::LineNumber;
 use lint_sweep::Address;
@@ -55,14 +56,14 @@ impl<'file> Opened<'file> {
     }
 
     pub fn closed(self) -> FunctionFlow<'file> {
-        FunctionFlow { site: self.site, shape: self.shape, found: self.found.into_iter().chain(self.faults).collect() }
+        FunctionFlow { site: self.site, shape: self.shape, found: self.found.extended(self.faults) }
     }
 
     #[must_use]
     pub fn record(self, span: Span, finding: Option<Finding>) -> Opened<'file> {
         let path = self.path;
         let flagged = finding.map(|flagged| Found::new(Site::new(path, LineNumber::from(span)), flagged));
-        Opened { found: self.found.into_iter().chain(flagged).collect(), ..self }
+        Opened { found: self.found.extended(flagged), ..self }
     }
 
     #[must_use]

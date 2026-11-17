@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::SourceFile;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
@@ -86,7 +87,7 @@ impl<'file> Fold for Scan<'_, 'file> {
             })
             .collect();
         let kept = filled.filter(|_| facts.gate() == Walk::Entered).map(|kept| (kept, methods));
-        Visit::new(Fillers { bodies: fillers.bodies.into_iter().chain(kept).collect() }, Descend::Over)
+        Visit::new(Fillers { bodies: fillers.bodies.extended(kept) }, Descend::Over)
     }
 }
 

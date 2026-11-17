@@ -7,6 +7,7 @@ use syntax::{ItemStruct, Lifetime, TypeReference};
 
 use derived::Derived;
 use finding::Finding;
+use lint_core::Extended;
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 use lint_sweep::{Facts, Fold, Kind, Visit};
@@ -38,17 +39,17 @@ impl<'file> Structs<'file> {
     fn borrowed(self) -> Visit<Structs<'file>> {
         let mut open = self.open;
         let last = open.pop().map(|top| Open { holding: Holding::Borrowing, ..top });
-        Visit::descending(Structs { open: open.into_iter().chain(last).collect(), ..self })
+        Visit::descending(Structs { open: open.extended(last), ..self })
     }
 
     fn opened(self, flagged: Option<Violation<'file>>) -> Structs<'file> {
-        Structs { open: self.open.into_iter().chain([Open { flagged, holding: Holding::Owning }]).collect(), ..self }
+        Structs { open: self.open.extended([Open { flagged, holding: Holding::Owning }]), ..self }
     }
 
     fn closed(self) -> Structs<'file> {
         let mut open = self.open;
         let owning = open.pop().filter(|last| last.holding == Holding::Owning);
-        Structs { open, found: self.found.into_iter().chain(owning.and_then(|last| last.flagged)).collect() }
+        Structs { open, found: self.found.extended(owning.and_then(|last| last.flagged)) }
     }
 }
 

@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::SourceFile;
 mod vertex;
 
@@ -113,10 +114,7 @@ impl Fold for Reader {
     ) -> Visit<DeclarationReading> {
         let descend = Descend::from(facts.gate());
         let vertex = descend.entered().and_then(|_| Declarations::vertex(item));
-        Visit::new(
-            DeclarationReading { vertices: found.vertices.into_iter().chain(vertex).collect(), ..found },
-            descend,
-        )
+        Visit::new(DeclarationReading { vertices: found.vertices.extended(vertex), ..found }, descend)
     }
 
     fn on_item_type(

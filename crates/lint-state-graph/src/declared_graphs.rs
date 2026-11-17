@@ -4,6 +4,7 @@ use std::path::Path;
 
 use syntax::{ItemMod, ItemUse, Macro, MacroTree};
 
+use lint_core::Extended;
 use lint_core::{MacroAliases, Macros, SourceFile, Violation, Walk};
 use lint_layout::{Name, Word};
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
@@ -57,7 +58,7 @@ impl Fold for DeclaredGraphs<'_, '_> {
     }
 
     fn on_item_mod(&self, found: Seen, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Seen> {
-        Visit::descending(Seen { gates: found.gates.into_iter().chain([facts.gate()]).collect(), ..found })
+        Visit::descending(Seen { gates: found.gates.extended([facts.gate()]), ..found })
     }
 
     fn off_item_mod(&self, found: Seen, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Seen {
@@ -73,6 +74,6 @@ impl Fold for DeclaredGraphs<'_, '_> {
 
     fn on_macro(&self, found: Seen, invocation: &Macro, _: &Facts<'_, Macro>) -> Visit<Seen> {
         let outside = found.gates.iter().all(|gate| *gate == Walk::Entered).then(|| invocation.clone());
-        Visit::new(Seen { invocations: found.invocations.into_iter().chain(outside).collect(), ..found }, Descend::Over)
+        Visit::new(Seen { invocations: found.invocations.extended(outside), ..found }, Descend::Over)
     }
 }

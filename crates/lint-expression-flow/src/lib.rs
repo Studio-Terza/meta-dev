@@ -1,3 +1,4 @@
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_core::{Drawn, Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
@@ -124,15 +125,15 @@ impl<'scan> Flows<'scan> {
 
 impl<'scan> Flowed<'scan> {
     fn flagged(self, more: Vec<Violation<'scan>>) -> Flowed<'scan> {
-        Flowed { violations: self.violations.into_iter().chain(more).collect(), ..self }
+        Flowed { violations: self.violations.extended(more), ..self }
     }
 
     fn opened(self, opened: Option<Attachment<MutableLocals>>) -> Visit<Flowed<'scan>> {
         match opened {
             Some(attachment) => Visit::descending(Flowed {
                 violations: Vec::new(),
-                opening: self.opening.into_iter().chain([attachment]).collect(),
-                held: self.held.into_iter().chain([self.violations]).collect(),
+                opening: self.opening.extended([attachment]),
+                held: self.held.extended([self.violations]),
             }),
             None => Visit::new(self, Descend::Over),
         }
@@ -354,7 +355,7 @@ impl Locals {
     }
 
     fn touching(self, touched: Option<Name>) -> Locals {
-        Locals { touched: self.touched.into_iter().chain(touched).collect(), ..self }
+        Locals { touched: self.touched.extended(touched), ..self }
     }
 }
 
@@ -367,7 +368,7 @@ impl Fold for MutableLocals {
 
     fn on_local(&self, found: Locals, local: &Local, _: &Facts<'_, Local>) -> Visit<Locals> {
         let declared = Self::declared_mutable(local).map(|binding| (Name::from(&binding.ident), local.let_token.span));
-        Visit::descending(Locals { declared: found.declared.into_iter().chain(declared).collect(), ..found })
+        Visit::descending(Locals { declared: found.declared.extended(declared), ..found })
     }
 
     fn on_expr(&self, found: Locals, expr: &Expr, _: &Facts<'_, Expr>) -> Visit<Locals> {

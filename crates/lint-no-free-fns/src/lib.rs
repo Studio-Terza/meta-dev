@@ -1,6 +1,7 @@
 mod finding;
 
 use finding::Finding;
+use lint_core::Extended;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Descend, Facts, Finds, Fold, Folding, Kind, Visit};
@@ -62,7 +63,7 @@ impl<'file> Fold for FreeFns<'file> {
             || Some(Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::FreeFn { name })),
             |_| None,
         );
-        Visit::descending(found.into_iter().chain(free).collect())
+        Visit::descending(found.extended(free))
     }
 
     fn on_macro(&self, found: Self::Found, _: &syntax::Macro, _: &Facts<'_, syntax::Macro>) -> Visit<Self::Found> {
