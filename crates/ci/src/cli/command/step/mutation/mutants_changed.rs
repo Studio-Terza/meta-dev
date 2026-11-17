@@ -77,16 +77,17 @@ impl Step for MutantsChanged {
         let diff = PathBuf::from(arguments.taken()?);
         let output = PathBuf::from(arguments.taken()?);
         let shard = arguments.taken()?.to_str().ok_or(Failure::Usage)?.parse()?;
-        let selected = arguments.flagged(Self::SELECTED)?.map(|path| Journal::from(PathBuf::from(path)));
-        let kept = arguments.flagged(Self::KEPT)?.map(PathBuf::from);
+        let selected = arguments.flagged(Self::SELECTED)?;
+        let kept = selected.path().map(Journal::from);
+        let keeping = selected.following().flagged(Self::KEPT)?;
         Ok(MutantsChanged {
             diff: Journal::from(diff),
             scoped: Pass::within(output.join(Self::SCOPED)),
             own: Pass::within(output),
             shard,
-            selected,
-            keeping: Keeping::from(kept),
-            scope: arguments.rest(),
+            selected: kept,
+            keeping: Keeping::from(keeping.path()),
+            scope: keeping.following().rest(),
         })
     }
 

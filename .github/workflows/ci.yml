@@ -210,7 +210,6 @@ jobs:
       shards: ${{ steps.plan.outputs.shards }}
     env:
       GH_TOKEN: ${{ github.token }}
-      PRIOR: ${{ runner.temp }}/prior
     steps:
       - uses: actions/checkout@v4
         with:
@@ -223,6 +222,8 @@ jobs:
           tool: cargo-mutants@27.1.0
       - name: earlier result
         if: env.MUTANTS_SCOPE != ''
+        env:
+          PRIOR: ${{ runner.temp }}/prior
         run: '"$TOOLS/ci" mutants-prior "$GITHUB_REPOSITORY" "$GITHUB_HEAD_REF" "$PRIOR"'
       - name: plan
         id: plan
@@ -249,7 +250,6 @@ jobs:
     env:
       CARGO_PROFILE_DEV_OPT_LEVEL: "0"
       SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
-      CHOSEN: --selected ${{ runner.temp }}/prior/selected.txt --kept ${{ runner.temp }}/kept
     steps:
       - uses: actions/checkout@v4
         with:
@@ -267,6 +267,8 @@ jobs:
           name: changed-diff
           path: ${{ runner.temp }}
       - name: mutants in changed lines
+        env:
+          CHOSEN: --selected ${{ runner.temp }}/prior/selected.txt --kept ${{ runner.temp }}/kept
         run: '"$TOOLS/ci" mutants-changed "$RUNNER_TEMP/changed.diff" "$RUNNER_TEMP" "$SHARD" $CHOSEN $MUTANTS_SCOPE'
       - uses: actions/upload-artifact@v4
         if: success() || failure()

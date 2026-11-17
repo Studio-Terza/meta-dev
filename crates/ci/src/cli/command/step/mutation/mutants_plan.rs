@@ -68,17 +68,17 @@ impl Step for MutantsPlan {
             .parse::<Reaching>()
             .map_err(|_unreached| Failure::Usage)?;
         let reach = Reach::taken(reaching, &mut arguments)?;
-        let directory = arguments.flagged(Self::PRIOR)?;
-        let prior = directory
-            .map(|found| arguments.taken().map(|metadata| Prior::new(PathBuf::from(found), PathBuf::from(metadata))))
-            .transpose()?;
-        let scope = arguments.rest();
+        let flagged = arguments.flagged(Self::PRIOR)?;
+        let directory = flagged.path();
+        let mut rest = flagged.following();
+        let metadata = directory.as_ref().map(|_| rest.taken()).transpose()?;
+        let prior = directory.zip(metadata).map(|(found, read)| Prior::new(found, PathBuf::from(read)));
         Ok(MutantsPlan {
             diff: Journal::from(PathBuf::from(diff)),
             reach,
             output: Journal::file(Path::new(output)),
             prior,
-            scope,
+            scope: rest.rest(),
         })
     }
 
