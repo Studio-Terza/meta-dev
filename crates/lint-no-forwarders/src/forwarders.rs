@@ -19,7 +19,7 @@ use forwarder::{Forwarder, Owned};
 use lint_core::Syntax;
 use lint_core::Violation;
 use lint_layout::{Casing, Name};
-use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Scope, Watching};
 
 #[derive(Debug)]
 pub struct Forwarders<'file> {
@@ -169,8 +169,8 @@ impl Contribute for Forwarders<'_> {
         &[Kind::ItemMod, Kind::ItemStruct, Kind::ImplItemFn]
     }
 
-    fn scopes(&self) -> &'static [Kind] {
-        &[Kind::ItemImpl]
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Kind::ItemImpl)] }
     }
 
     fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<Unplaced, Gleaned> {

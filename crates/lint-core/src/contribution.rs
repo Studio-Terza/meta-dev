@@ -3,6 +3,9 @@ use algebra::{Monoid, Semigroup};
 use crate::watch::Descend;
 use crate::watch::{Contribute, Kind};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Scope(Kind);
+
 #[derive(Debug)]
 pub struct Contributed<Open, Part> {
     within: Contribution<Open, Part>,
@@ -55,7 +58,8 @@ impl<Open: Monoid, Part: Monoid> Monoid for Contribution<Open, Part> {}
 
 impl<Contributor: Contribute> Contributing<Contributor> {
     pub fn new(contributor: Contributor) -> Contributing<Contributor> {
-        let kinds = contributor.kinds().iter().chain(contributor.scopes()).copied().collect();
+        let kinds =
+            contributor.kinds().iter().copied().chain(contributor.scopes().iter().map(|scope| scope.0)).collect();
         Contributing { contributor, kinds, frames: vec![Contribution::default()] }
     }
 
@@ -74,7 +78,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         contributed: impl FnOnce(&Contributor) -> Contributed<Contributor::Open, Contributor::Part>,
     ) -> Descend {
         let Contributed { within, descend } = contributed(&self.contributor);
-        let opened = self.contributor.scopes().contains(&kind).then(Contribution::default);
+        let opened = self.contributor.scopes().contains(&Scope(kind)).then(Contribution::default);
         let top = opened.unwrap_or_else(|| self.frames.pop().unwrap_or_default());
         self.frames.push(top.combine(within));
         descend
@@ -85,7 +89,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         kind: Kind,
         closed: impl FnOnce(&Contributor, Contribution<Contributor::Open, Contributor::Part>) -> Contributor::Part,
     ) {
-        let scope = self.contributor.scopes().iter().find(|scope| **scope == kind);
+        let scope = self.contributor.scopes().iter().find(|scope| **scope == Scope(kind));
         let inner = scope.and_then(|_| self.frames.pop());
         let closing = inner.map(|within| closed(&self.contributor, within));
         let merged = closing.map(|part| {
@@ -93,5 +97,12 @@ impl<Contributor: Contribute> Contributing<Contributor> {
             top.combine(Contribution { open: Contributor::Open::default(), part })
         });
         self.frames.extend(merged);
+    }
+}
+
+impl Scope {
+    #[must_use]
+    pub const fn new(kind: Kind) -> Scope {
+        Scope(kind)
     }
 }

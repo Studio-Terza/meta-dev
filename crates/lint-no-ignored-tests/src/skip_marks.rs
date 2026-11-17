@@ -6,10 +6,11 @@ mod gate;
 use syntax::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 use syntax::{Ident, TokenTree};
 
+use algebra::{Monoid, Semigroup};
 use gate::Gate;
 use lint_core::{Macros, Walk};
 use lint_core::{Site, SourceFile, Violation};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
 
 use crate::NoIgnoredTests;
 use lint_layout::Name;
@@ -20,18 +21,42 @@ use lint_layout::{LineNumber, Word, words};
 #[derive(Debug)]
 pub(crate) struct SkipMarks<'file> {
     file: &'file SourceFile,
-    lines: Vec<LineNumber>,
     gates: Vec<LineNumber>,
-    outer: Vec<Vec<LineNumber>>,
-    unrun: Option<Vec<LineNumber>>,
+    unrun: Option<()>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Marks {
+    lines: Vec<LineNumber>,
+    unrun: Vec<LineNumber>,
+    tested: Option<()>,
+}
+
+impl Semigroup for Marks {
+    fn combine(self, other: Marks) -> Marks {
+        Marks {
+            lines: self.lines.combine(other.lines),
+            unrun: self.unrun.combine(other.unrun),
+            tested: self.tested.or(other.tested),
+        }
+    }
+}
+
+impl Monoid for Marks {}
+
+impl Marks {
+    fn gated(self, gates: Vec<LineNumber>) -> Marks {
+        let tested = self.tested.map_or_else(Vec::new, |()| gates);
+        Marks { lines: self.lines.combine(tested), ..self }
+    }
 }
 
 impl<'file> SkipMarks<'file> {
     const CONDITIONAL_ATTRIBUTE: &str = "cfg_attr";
     const SKIPPING: [Word<'static>; 2] = words!["ignore", "skip"];
 
-    pub(crate) fn new(file: &'file SourceFile, unrun: Option<Vec<LineNumber>>) -> SkipMarks<'file> {
-        SkipMarks { file, lines: Vec::new(), gates: Gate::lines_in(&file.syntax().attrs), outer: Vec::new(), unrun }
+    pub(crate) fn new(file: &'file SourceFile, unrun: Option<()>) -> SkipMarks<'file> {
+        SkipMarks { file, gates: Gate::lines_in(&file.syntax().attrs), unrun }
     }
 
     fn skip_named(list: &MetaList) -> Option<Word<'static>> {
@@ -63,15 +88,13 @@ impl<'file> SkipMarks<'file> {
         )
     }
 
-    fn record_skips(&mut self, attributes: &[Attribute], marked: Marked) {
-        self.lines.extend(
-            attributes
-                .iter()
-                .filter_map(|attribute| Self::skip(attribute).map(|_| LineNumber::from(attribute.pound_token.span))),
-        );
-        self.lines.extend(
-            Gate::lines_in(attributes).into_iter().chain(self.gates.iter().copied()).filter(|_| marked == Marked::Test),
-        );
+    fn skips(attributes: &[Attribute], marked: Marked) -> Marks {
+        let skipped = attributes
+            .iter()
+            .filter_map(|attribute| Self::skip(attribute).map(|_| LineNumber::from(attribute.pound_token.span)));
+        let gated = Gate::lines_in(attributes).into_iter().filter(|_| marked.test().is_some());
+        let tested = marked.test();
+        Marks { lines: skipped.chain(gated).collect(), unrun: Vec::new(), tested }
     }
 }
 
@@ -82,6 +105,13 @@ enum Marked {
 }
 
 impl Marked {
+    fn test(self) -> Option<()> {
+        match self {
+            Marked::Test => Some(()),
+            Marked::Other => None,
+        }
+    }
+
     fn among(attributes: &[Attribute], law: Option<&Macro>) -> Marked {
         law.map(|_| Marked::Test)
             .or_else(|| TestMarks::mark_test(attributes).map(|_| Marked::Test))
@@ -89,55 +119,56 @@ impl Marked {
     }
 }
 
-impl<'ast> Watch<'ast> for SkipMarks<'_> {
+impl Contribute for SkipMarks<'_> {
+    type Open = Vec<LineNumber>;
+    type Part = Marks;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemFn, Kind::Macro, Kind::Attribute]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        let inner: Vec<LineNumber> = self.gates.iter().copied().chain(Gate::lines_in(&module.attrs)).collect();
-        self.outer.push(std::mem::replace(&mut self.gates, inner));
-        Descend::Into
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Kind::ItemMod)] }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.gates = self.outer.pop().unwrap_or_default();
+    fn on_item_mod(&self, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Contributed<Vec<LineNumber>, Marks> {
+        Contributed::new(Gate::lines_in(&module.attrs), Marks::default(), Descend::Into)
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.record_skips(&function.attrs, Marked::among(&function.attrs, None));
-        Descend::Into
+    fn off_item_mod(&self, _: &ItemMod, _: &Facts<'_, ItemMod>, inner: Contribution<Vec<LineNumber>, Marks>) -> Marks {
+        inner.concluded(|gates, marks| marks.gated(gates))
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
+    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Contributed<Vec<LineNumber>, Marks> {
+        Contributed::parted(Self::skips(&function.attrs, Marked::among(&function.attrs, None)))
+    }
+
+    fn on_macro(&self, invocation: &Macro, facts: &Facts<'_, Macro>) -> Contributed<Vec<LineNumber>, Marks> {
         let attributes = Macros::attributes_in_file(self.file, invocation);
-        self.record_skips(&attributes, Marked::among(&attributes, facts.law()));
-        Descend::Over
+        let marks = Self::skips(&attributes, Marked::among(&attributes, facts.law()));
+        Contributed::new(Vec::new(), marks, Descend::Over)
     }
 
-    fn on_attribute(&mut self, attribute: &'ast Attribute, _: &Facts<'_, Attribute>) -> Descend {
-        let gated = Some(attribute)
+    fn on_attribute(&self, attribute: &Attribute, _: &Facts<'_, Attribute>) -> Contributed<Vec<LineNumber>, Marks> {
+        let unrun = self
+            .unrun
+            .and(Some(attribute))
             .filter(|candidate| Walk::outside_tests(slice::from_ref(*candidate)) == Walk::Skipped)
             .map(|skipped| LineNumber::from(skipped.pound_token.span));
-        self.unrun.iter_mut().for_each(|unrun| unrun.extend(gated));
-        Descend::Into
+        Contributed::parted(Marks { unrun: unrun.into_iter().collect(), ..Marks::default() })
     }
 }
 
-impl<'file> Finds<'file> for SkipMarks<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+impl<'file> Concludes<'file> for SkipMarks<'file> {
+    fn violations(self, _: Vec<LineNumber>, marks: Marks) -> Vec<Violation<'file>> {
         let path = AsRef::<Path>::as_ref(self.file.head());
-        let unrun = self
-            .unrun
-            .unwrap_or_default()
-            .into_iter()
-            .map(|line| Violation::new(Site::new(path, line), NoIgnoredTests::UNRUN));
+        let Marks { mut lines, unrun: never_run, .. } = marks.gated(self.gates);
+        let unrun = never_run.into_iter().map(|line| Violation::new(Site::new(path, line), NoIgnoredTests::UNRUN));
         let target = self
             .file
             .head()
             .switched_off()
             .map(|switched| Violation::new(Site::of_file(switched), NoIgnoredTests::UNTESTED));
-        let mut lines = self.lines;
         lines.sort();
         lines.dedup();
         let skipped = lines.into_iter().map(|line| Violation::new(Site::new(path, line), NoIgnoredTests::SKIPPED));

@@ -6,6 +6,8 @@ use lint_file::Concluded;
 use lint_layout::Name;
 use lint_placement::CrateFile;
 
+use algebra::{Monoid, Semigroup};
+
 use super::members::Members;
 use super::type_key::TypeKey;
 
@@ -14,17 +16,25 @@ pub struct Modules<'file>(BTreeMap<Module<'file>, Members<'file>>);
 
 impl<'file> FromIterator<Modules<'file>> for Modules<'file> {
     fn from_iter<Parts: IntoIterator<Item = Modules<'file>>>(parts: Parts) -> Modules<'file> {
-        parts.into_iter().flat_map(|part| part.0).fold(Modules::default(), |mut merged, (module, members)| {
-            merged.file(module, members);
-            merged
-        })
+        Monoid::concat(parts)
     }
 }
 
+impl Semigroup for Modules<'_> {
+    fn combine(self, other: Self) -> Self {
+        Modules(other.0.into_iter().fold(self.0, |mut merged, (module, members)| {
+            let filed = merged.remove(&module).unwrap_or_default().combine(members);
+            merged.insert(module, filed);
+            merged
+        }))
+    }
+}
+
+impl Monoid for Modules<'_> {}
+
 impl<'file> Modules<'file> {
-    pub fn file(&mut self, module: Module<'file>, members: Members<'file>) {
-        let filed: Members<'_> = [self.0.remove(&module).unwrap_or_default(), members].into_iter().collect();
-        self.0.insert(module, filed);
+    pub fn filed(module: Module<'file>, members: Members<'file>) -> Modules<'file> {
+        Modules(BTreeMap::from([(module, members)]))
     }
 
     pub fn violations(self) -> Vec<Violation<'file>> {
