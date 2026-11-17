@@ -6,7 +6,7 @@ use syntax::{ItemImpl, ItemMod, ItemType};
 
 use lint_core::Parsed;
 use lint_core::TypeName;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Folding, Gathers, Kind, Visit, Watching};
 pub use vertex::Vertex;
 
 #[derive(Debug)]
@@ -23,14 +23,14 @@ pub struct DeclarationReading {
 
 #[derive(Debug)]
 pub struct DeclarationGathering {
-    reading: DeclarationReading,
+    reading: Folding<Reader>,
     shipped: Option<()>,
 }
 
 impl From<Parsed<'_, '_>> for DeclarationGathering {
     fn from(parsed: Parsed<'_, '_>) -> DeclarationGathering {
         DeclarationGathering {
-            reading: DeclarationReading::default(),
+            reading: Folding::from(Reader),
             shipped: <&SourceFile>::from(parsed).shipped().map(|_| ()),
         }
     }
@@ -43,7 +43,7 @@ impl Gathers<Option<Declarations>> for DeclarationGathering {
     }
 
     fn gathered(self) -> Option<Declarations> {
-        let reading = self.reading;
+        let reading: DeclarationReading = self.reading.concluded();
         self.shipped.map(|()| Declarations { vertices: reading.vertices, aliases: reading.aliases })
     }
 }
@@ -95,23 +95,47 @@ impl Declarations {
     }
 }
 
-impl<'ast> Watch<'ast> for DeclarationReading {
+#[derive(Debug)]
+pub struct Reader;
+
+impl Fold for Reader {
+    type Found = DeclarationReading;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemImpl, Kind::ItemType, Kind::ItemMod]
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+    fn on_item_impl(
+        &self,
+        found: DeclarationReading,
+        item: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+    ) -> Visit<DeclarationReading> {
         let descend = Descend::from(facts.gate());
-        self.vertices.extend(descend.entered().and_then(|_| Declarations::vertex(item)));
-        descend
+        let vertex = descend.entered().and_then(|_| Declarations::vertex(item));
+        Visit::new(
+            DeclarationReading { vertices: found.vertices.into_iter().chain(vertex).collect(), ..found },
+            descend,
+        )
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
-        self.aliases.insert(TypeName::named(&item.ident), TypeName::from_type(&item.ty));
-        Descend::Over
+    fn on_item_type(
+        &self,
+        found: DeclarationReading,
+        item: &ItemType,
+        _: &Facts<'_, ItemType>,
+    ) -> Visit<DeclarationReading> {
+        let mut aliases = found.aliases;
+        aliases.insert(TypeName::named(&item.ident), TypeName::from_type(&item.ty));
+        Visit::new(DeclarationReading { aliases, ..found }, Descend::Over)
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(
+        &self,
+        found: DeclarationReading,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+    ) -> Visit<DeclarationReading> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 }
