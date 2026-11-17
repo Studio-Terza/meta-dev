@@ -1,9 +1,10 @@
 use std::path::Path;
 mod finding;
 
+use algebra::{Monoid, Semigroup};
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 use std::collections::BTreeMap;
 
 use finding::Finding;
@@ -26,15 +27,16 @@ impl SweptLint for PrivateFns {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(PrivateFnCounter { file, found: BTreeMap::new() })
+        Box::new(Contributing::new(PrivateFnCounter { file }))
     }
 }
 
 impl PrivateFns {
     const PER_TYPE: Bound = Bound::Most(4);
 
-    fn violations(file: &SourceFile, found: BTreeMap<TypeName, Vec<Name>>) -> Vec<Violation<'_>> {
+    fn violations(file: &SourceFile, found: PrivateNames) -> Vec<Violation<'_>> {
         found
+            .0
             .into_iter()
             .filter(|(_, names)| Self::PER_TYPE.allows(Length::new(names.len())).is_none())
             .map(|(type_name, names)| {
@@ -50,7 +52,22 @@ impl PrivateFns {
 #[derive(Debug)]
 struct PrivateFnCounter<'file> {
     file: &'file SourceFile,
-    found: BTreeMap<TypeName, Vec<Name>>,
+}
+
+#[derive(Debug, Default)]
+struct PrivateNames(BTreeMap<TypeName, Vec<Name>>);
+
+impl Semigroup for PrivateNames {
+    fn combine(mut self, other: PrivateNames) -> PrivateNames {
+        other.0.into_iter().for_each(|(type_name, names)| self.0.entry(type_name).or_default().extend(names));
+        self
+    }
+}
+
+impl Monoid for PrivateNames {
+    fn identity() -> PrivateNames {
+        PrivateNames::default()
+    }
 }
 
 impl PrivateFnCounter<'_> {
@@ -68,36 +85,36 @@ impl PrivateFnCounter<'_> {
             _ => None,
         }
     }
-
-    fn inherent(&mut self, item: &ItemImpl) -> Descend {
-        let counted =
-            Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)));
-        let private = counted.entered().map(|_| Self::private_names(item).collect::<Vec<Name>>());
-        self.found.entry(TypeName::from_type(&item.self_ty)).or_default().extend(private.into_iter().flatten());
-        Descend::Over
-    }
 }
 
-impl<'ast> Watch<'ast> for PrivateFnCounter<'_> {
+impl Contribute for PrivateFnCounter<'_> {
+    type Open = ();
+    type Part = PrivateNames;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), PrivateNames> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), PrivateNames> {
+        Contributed::descending(Descend::Expand)
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        self.inherent(item)
+    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<(), PrivateNames> {
+        let counted =
+            Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)));
+        let private: Vec<Name> =
+            counted.entered().map(|_| Self::private_names(item).collect::<Vec<Name>>()).into_iter().flatten().collect();
+        let names = PrivateNames(BTreeMap::from([(TypeName::from_type(&item.self_ty), private)]));
+        Contributed::new((), names, Descend::Over)
     }
 }
 
-impl<'file> Finds<'file> for PrivateFnCounter<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        PrivateFns::violations(self.file, self.found)
+impl<'file> Concludes<'file> for PrivateFnCounter<'file> {
+    fn violations(self, (): (), found: PrivateNames) -> Vec<Violation<'file>> {
+        PrivateFns::violations(self.file, found)
     }
 }

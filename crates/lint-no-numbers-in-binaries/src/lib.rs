@@ -61,6 +61,9 @@ impl Contribute for Numbers<'_> {
 
 impl<'file> Concludes<'file> for Numbers<'file> {
     fn violations(self, (): (), lines: Vec<LineNumber>) -> Vec<Violation<'file>> {
-        lines.into_iter().map(|line| Violation::new(Site::new(self.path, line), NoNumbersInBinaries::IN_BINARY)).collect()
+        lines
+            .into_iter()
+            .map(|line| Violation::new(Site::new(self.path, line), NoNumbersInBinaries::IN_BINARY))
+            .collect()
     }
 }
