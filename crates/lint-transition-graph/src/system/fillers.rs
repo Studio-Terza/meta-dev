@@ -2,12 +2,13 @@ use lint_core::SourceFile;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
+use algebra::{Monoid, Semigroup};
 use body_shape::{Bounds, Erasure, Labels};
 use equivalence::Equivalence;
 use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
 use syntax::{ItemImpl, ItemMod};
 
 use crate::end::Node;
@@ -30,7 +31,7 @@ impl<'file> Fillers<'file> {
         shipped.map_or_default(|found| {
             let krate = found.head().placement().package().crate_name();
             let erasure = Erasure::reading(<&SourceFile>::from(found).tokens(), equivalence);
-            Sweep::gathered(<&SourceFile>::from(found), Scan { krate, erasure, fillers: Fillers::default() })
+            Sweep::gathered(<&SourceFile>::from(found), Contributing::new(Scan { krate, erasure }))
         })
     }
 
@@ -56,29 +57,31 @@ impl<'file> Fillers<'file> {
 struct Scan<'syntax, 'file> {
     krate: &'file CrateName,
     erasure: Erasure<'syntax>,
-    fillers: Fillers<'file>,
 }
 
-impl<'file> Gathers<Fillers<'file>> for Scan<'_, 'file> {
+impl<'file> Gathers<Fillers<'file>> for Contributing<Scan<'_, 'file>> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 
     fn gathered(self) -> Fillers<'file> {
-        self.fillers
+        self.concluded(|_, (), fillers| fillers)
     }
 }
 
-impl<'ast> Watch<'ast> for Scan<'_, '_> {
+impl<'file> Contribute for Scan<'_, 'file> {
+    type Open = ();
+    type Part = Fillers<'file>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Fillers<'file>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, found: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+    fn on_item_impl(&self, found: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Fillers<'file>> {
         let interface =
             found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
         let filled = interface.zip(facts.name().cloned()).map(|(trait_name, filler)| Filled {
@@ -94,13 +97,22 @@ impl<'ast> Watch<'ast> for Scan<'_, '_> {
                 (Name::from(&method.sig.ident), self.erasure.read(Bounds::from(&method.block)).labels().clone())
             })
             .collect();
-        self.fillers.bodies.extend(filled.filter(|_| facts.gate() == Walk::Entered).map(|kept| (kept, methods)));
-        Descend::Over
+        let bodies = filled.filter(|_| facts.gate() == Walk::Entered).map(|kept| (kept, methods)).into_iter().collect();
+        Contributed::new((), Fillers { bodies }, Descend::Over)
     }
 }
 
 impl<'file> FromIterator<Fillers<'file>> for Fillers<'file> {
     fn from_iter<Found: IntoIterator<Item = Fillers<'file>>>(parts: Found) -> Fillers<'file> {
-        Fillers { bodies: parts.into_iter().flat_map(|part| part.bodies).collect() }
+        Monoid::concat(parts)
     }
 }
+
+impl Semigroup for Fillers<'_> {
+    fn combine(mut self, other: Self) -> Self {
+        self.bodies.extend(other.bodies);
+        self
+    }
+}
+
+impl Monoid for Fillers<'_> {}

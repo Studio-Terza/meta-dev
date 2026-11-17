@@ -2,11 +2,13 @@ use lint_core::SourceFile;
 mod vertex;
 
 use std::collections::{BTreeMap, BTreeSet};
+
+use algebra::{Monoid, Semigroup};
 use syntax::{ItemImpl, ItemMod, ItemType};
 
 use lint_core::Parsed;
 use lint_core::TypeName;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Watching};
 pub use vertex::Vertex;
 
 #[derive(Debug)]
@@ -22,15 +24,18 @@ pub struct DeclarationReading {
 }
 
 #[derive(Debug)]
+pub struct DeclarationScan;
+
+#[derive(Debug)]
 pub struct DeclarationGathering {
-    reading: DeclarationReading,
+    reading: Contributing<DeclarationScan>,
     shipped: Option<()>,
 }
 
 impl From<Parsed<'_, '_>> for DeclarationGathering {
     fn from(parsed: Parsed<'_, '_>) -> DeclarationGathering {
         DeclarationGathering {
-            reading: DeclarationReading::default(),
+            reading: Contributing::new(DeclarationScan),
             shipped: <&SourceFile>::from(parsed).shipped().map(|_| ()),
         }
     }
@@ -43,28 +48,29 @@ impl Gathers<Option<Declarations>> for DeclarationGathering {
     }
 
     fn gathered(self) -> Option<Declarations> {
-        let reading = self.reading;
+        let reading = self.reading.concluded(|_, (), reading| reading);
         self.shipped.map(|()| Declarations { vertices: reading.vertices, aliases: reading.aliases })
     }
 }
 
-#[derive(Default)]
-struct Gathered {
-    vertices: BTreeSet<TypeName>,
-    aliases: BTreeMap<TypeName, TypeName>,
-}
-
-impl Gathered {
-    fn including(mut self, part: Declarations) -> Gathered {
-        self.vertices.extend(part.vertices);
-        self.aliases.extend(part.aliases);
+impl Semigroup for DeclarationReading {
+    fn combine(mut self, other: DeclarationReading) -> DeclarationReading {
+        self.vertices.extend(other.vertices);
+        self.aliases.extend(other.aliases);
         self
     }
 }
 
+impl Monoid for DeclarationReading {}
+
 impl FromIterator<Option<Declarations>> for Declarations {
     fn from_iter<Parts: IntoIterator<Item = Option<Declarations>>>(parts: Parts) -> Declarations {
-        let gathered = parts.into_iter().flatten().fold(Gathered::default(), Gathered::including);
+        let gathered: DeclarationReading = Monoid::concat(
+            parts
+                .into_iter()
+                .flatten()
+                .map(|part| DeclarationReading { vertices: part.vertices, aliases: part.aliases }),
+        );
         let merged = Declarations { vertices: gathered.vertices, aliases: gathered.aliases };
         merged.with_resolved_vertices()
     }
@@ -95,23 +101,26 @@ impl Declarations {
     }
 }
 
-impl<'ast> Watch<'ast> for DeclarationReading {
+impl Contribute for DeclarationScan {
+    type Open = ();
+    type Part = DeclarationReading;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemImpl, Kind::ItemType, Kind::ItemMod]
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+    fn on_item_impl(&self, item: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), DeclarationReading> {
         let descend = Descend::from(facts.gate());
-        self.vertices.extend(descend.entered().and_then(|_| Declarations::vertex(item)));
-        descend
+        let vertices = descend.entered().and_then(|_| Declarations::vertex(item)).into_iter().collect();
+        Contributed::new((), DeclarationReading { vertices, aliases: BTreeMap::new() }, descend)
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
-        self.aliases.insert(TypeName::named(&item.ident), TypeName::from_type(&item.ty));
-        Descend::Over
+    fn on_item_type(&self, item: &ItemType, _: &Facts<'_, ItemType>) -> Contributed<(), DeclarationReading> {
+        let aliases = BTreeMap::from([(TypeName::named(&item.ident), TypeName::from_type(&item.ty))]);
+        Contributed::new((), DeclarationReading { vertices: BTreeSet::new(), aliases }, Descend::Over)
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), DeclarationReading> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 }

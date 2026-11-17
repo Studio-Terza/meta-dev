@@ -47,7 +47,7 @@ macro_rules! monoid {
                 $(#[$meta])* the_identity_changes_nothing,
                 $strategy,
                 <$type as ::algebra::Semigroup>::combine,
-                <$type as ::algebra::Monoid>::identity()
+                <$type as ::core::default::Default>::default()
             );
             $crate::law!($(#[$meta])* concatenating_folds_from_the_identity, ($strategy, $strategy), pair, {
                 let (first, second) = pair;

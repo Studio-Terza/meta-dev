@@ -4,7 +4,9 @@ use std::fmt;
 
 use syntax::{Around, Macro, Node, Walk};
 
-use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Unwalked, Violation, Watch, Watching};
+use lint_core::{
+    ByKind, Contribute, Contributing, Descend, Facts, Kind, Macros, SourceFile, Unwalked, Violation, Watch, Watching,
+};
 use lint_layout::Name;
 
 pub use boundary::Member;
@@ -22,6 +24,20 @@ pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
 
 pub trait Sorts<'file>: for<'ast> Watch<'ast> + fmt::Debug {
     fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>>;
+}
+
+pub trait Concludes<'file>: Contribute + fmt::Debug {
+    fn violations(self, open: Self::Open, part: Self::Part) -> Vec<Violation<'file>>;
+}
+
+impl<'file, Contributor: Concludes<'file>> Finds<'file> for Contributing<Contributor>
+where
+    Contributor::Open: fmt::Debug,
+    Contributor::Part: fmt::Debug,
+{
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.concluded(Contributor::violations)
+    }
 }
 
 #[derive(Debug)]

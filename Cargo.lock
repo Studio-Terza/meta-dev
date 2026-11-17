@@ -1714,6 +1714,7 @@ dependencies = [
 name = "lint-no-forwarders"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1833,6 +1834,7 @@ dependencies = [
 name = "lint-paired-apis"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
@@ -1901,6 +1903,7 @@ dependencies = [
 name = "lint-private-fns"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1927,6 +1930,7 @@ dependencies = [
 name = "lint-public-api-tests"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
@@ -2119,6 +2123,7 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "laws",
  "lint-core",
@@ -2190,6 +2195,7 @@ dependencies = [
 name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-lifts",
  "body-shape",
  "equivalence",
@@ -2223,6 +2229,7 @@ dependencies = [
 name = "lint-unconsumed-traits"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",

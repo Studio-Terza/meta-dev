@@ -30,12 +30,12 @@ impl<Open: Monoid, Part: Monoid> Contributed<Open, Part> {
 
     #[must_use]
     pub fn parted(part: Part) -> Contributed<Open, Part> {
-        Contributed::new(Open::identity(), part, Descend::Into)
+        Contributed::new(Open::default(), part, Descend::Into)
     }
 
     #[must_use]
     pub fn descending(descend: Descend) -> Contributed<Open, Part> {
-        Contributed::new(Open::identity(), Part::identity(), descend)
+        Contributed::new(Open::default(), Part::default(), descend)
     }
 }
 
@@ -51,21 +51,17 @@ impl<Open: Semigroup, Part: Semigroup> Semigroup for Contribution<Open, Part> {
     }
 }
 
-impl<Open: Monoid, Part: Monoid> Monoid for Contribution<Open, Part> {
-    fn identity() -> Contribution<Open, Part> {
-        Contribution { open: Open::identity(), part: Part::identity() }
-    }
-}
+impl<Open: Monoid, Part: Monoid> Monoid for Contribution<Open, Part> {}
 
 impl<Contributor: Contribute> Contributing<Contributor> {
     pub fn new(contributor: Contributor) -> Contributing<Contributor> {
         let kinds = contributor.kinds().iter().chain(contributor.scopes()).copied().collect();
-        Contributing { contributor, kinds, frames: vec![Contribution::identity()] }
+        Contributing { contributor, kinds, frames: vec![Contribution::default()] }
     }
 
-    pub fn concluded<Out>(self, into: impl FnOnce(Contributor::Open, Contributor::Part) -> Out) -> Out {
+    pub fn concluded<Out>(self, into: impl FnOnce(Contributor, Contributor::Open, Contributor::Part) -> Out) -> Out {
         let Contribution { open, part } = Monoid::concat(self.frames);
-        into(open, part)
+        into(self.contributor, open, part)
     }
 
     pub(crate) fn watched(&self) -> &[Kind] {
@@ -78,8 +74,8 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         contributed: impl FnOnce(&Contributor) -> Contributed<Contributor::Open, Contributor::Part>,
     ) -> Descend {
         let Contributed { within, descend } = contributed(&self.contributor);
-        let opened = self.contributor.scopes().contains(&kind).then(Contribution::identity);
-        let top = opened.unwrap_or_else(|| self.frames.pop().unwrap_or_else(Contribution::identity));
+        let opened = self.contributor.scopes().contains(&kind).then(Contribution::default);
+        let top = opened.unwrap_or_else(|| self.frames.pop().unwrap_or_default());
         self.frames.push(top.combine(within));
         descend
     }
@@ -93,8 +89,8 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         let inner = scope.and_then(|_| self.frames.pop());
         let closing = inner.map(|within| closed(&self.contributor, within));
         let merged = closing.map(|part| {
-            let top = self.frames.pop().unwrap_or_else(Contribution::identity);
-            top.combine(Contribution { open: Contributor::Open::identity(), part })
+            let top = self.frames.pop().unwrap_or_default();
+            top.combine(Contribution { open: Contributor::Open::default(), part })
         });
         self.frames.extend(merged);
     }

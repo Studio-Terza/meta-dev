@@ -54,6 +54,6 @@ impl<'head> Gathers<CloneFindings<'head>> for Contributing<CloneSites<'head>> {
     }
 
     fn gathered(self) -> CloneFindings<'head> {
-        CloneFindings(self.concluded(|(), found| found))
+        CloneFindings(self.concluded(|_, (), found| found))
     }
 }

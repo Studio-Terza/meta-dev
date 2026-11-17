@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 use std::path::Path as StdPath;
 
 use syntax::{Ident, ItemFn, Path};
@@ -40,37 +40,39 @@ impl SweptLint for NoFreeFns {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()), found: Vec::new() })
+        Box::new(Contributing::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()) }))
     }
 }
 
 #[derive(Debug)]
 struct FreeFns<'file> {
     path: &'file StdPath,
-    found: Vec<Violation<'file>>,
 }
 
-impl<'ast> Watch<'ast> for FreeFns<'_> {
+impl<'file> Contribute for FreeFns<'file> {
+    type Open = ();
+    type Part = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
+    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Contributed<(), Vec<Violation<'file>>> {
         let name = &function.sig.ident;
-        self.found.extend(NoFreeFns::exemption(function).map_or_else(
+        let free = NoFreeFns::exemption(function).map_or_else(
             || Some(Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::FreeFn { name })),
             |_| None,
-        ));
-        Descend::Into
+        );
+        Contributed::parted(free.into_iter().collect())
     }
 
-    fn on_macro(&mut self, _: &'ast syntax::Macro, _: &Facts<'_, syntax::Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &syntax::Macro, _: &Facts<'_, syntax::Macro>) -> Contributed<(), Vec<Violation<'file>>> {
+        Contributed::descending(Descend::Expand)
     }
 }
 
-impl<'file> Finds<'file> for FreeFns<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.found
+impl<'file> Concludes<'file> for FreeFns<'file> {
+    fn violations(self, (): (), found: Vec<Violation<'file>>) -> Vec<Violation<'file>> {
+        found
     }
 }

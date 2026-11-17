@@ -81,7 +81,7 @@ impl Gathers<CrateBudget> for BudgetGathering<'_> {
     fn gathered(self) -> CrateBudget {
         let share = self.share;
         let unscanned = self.file;
-        let file = self.scan.concluded(|(), tally| tally).counted(|tests, test_lines| CrateBudget {
+        let file = self.scan.concluded(|_, (), tally| tally).counted(|tests, test_lines| CrateBudget {
             test_lines: share.test_lines(test_lines, unscanned.lines),
             tests,
             ..unscanned
@@ -96,7 +96,7 @@ impl Gathers<CrateBudget> for Contributing<TestScan<'_>> {
     }
 
     fn gathered(self) -> CrateBudget {
-        self.concluded(|(), tally| tally).counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
+        self.concluded(|_, (), tally| tally).counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
     }
 }
 

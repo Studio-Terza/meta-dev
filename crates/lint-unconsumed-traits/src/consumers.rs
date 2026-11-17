@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 
+use algebra::{Monoid, Semigroup};
 use syntax::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
 
 #[derive(Debug, Default)]
 pub struct Consumers {
@@ -14,7 +15,6 @@ pub struct Consumers {
 
 #[derive(Debug)]
 pub struct Consuming {
-    consumers: Consumers,
     kinds: &'static [Kind],
 }
 
@@ -23,64 +23,75 @@ impl From<&SourceFile> for Consuming {
         let kinds = file
             .shipped()
             .map_or(&[][..], |_| &[Kind::ItemMod, Kind::TraitBound, Kind::ExprMethodCall, Kind::ExprPath][..]);
-        Consuming { consumers: Consumers::default(), kinds }
+        Consuming { kinds }
     }
 }
 
-impl Gathers<Consumers> for Consuming {
+impl Gathers<Consumers> for Contributing<Consuming> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 
     fn gathered(self) -> Consumers {
-        self.consumers
+        self.concluded(|_, (), consumers| consumers)
     }
 }
 
 impl FromIterator<Consumers> for Consumers {
     fn from_iter<Parts: IntoIterator<Item = Consumers>>(parts: Parts) -> Consumers {
-        parts.into_iter().fold(Consumers::default(), |mut merged, part| {
-            merged.bounds.extend(part.bounds);
-            merged.called.extend(part.called);
-            merged
-        })
+        Monoid::concat(parts)
     }
 }
+
+impl Semigroup for Consumers {
+    fn combine(mut self, other: Consumers) -> Consumers {
+        self.bounds.extend(other.bounds);
+        self.called.extend(other.called);
+        self
+    }
+}
+
+impl Monoid for Consumers {}
 
 impl Consumers {
     pub(crate) fn consuming<'name>(&'name self, name: &'name Name, provided: &'name [Name]) -> Option<&'name Name> {
         self.bounds.get(name).or_else(|| provided.iter().find(|method| self.called.contains(*method)))
     }
+
+    fn called(called: Option<Name>) -> Contributed<(), Consumers> {
+        Contributed::parted(Consumers { bounds: BTreeSet::new(), called: called.into_iter().collect() })
+    }
 }
 
-impl<'ast> Watch<'ast> for Consuming {
+impl Contribute for Consuming {
+    type Open = ();
+    type Part = Consumers;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Consumers> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_trait_bound(&mut self, bound: &'ast TraitBound, _: &Facts<'_, TraitBound>) -> Descend {
-        self.consumers.bounds.extend(bound.path.segments.last().map(|segment| Name::from(&segment.ident)));
-        Descend::Into
+    fn on_trait_bound(&self, bound: &TraitBound, _: &Facts<'_, TraitBound>) -> Contributed<(), Consumers> {
+        let bounds = bound.path.segments.last().map(|segment| Name::from(&segment.ident)).into_iter().collect();
+        Contributed::parted(Consumers { bounds, called: BTreeSet::new() })
     }
 
-    fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.consumers.called.extend(facts.name().cloned());
-        Descend::Into
+    fn on_expr_method_call(&self, _: &ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Contributed<(), Consumers> {
+        Consumers::called(facts.name().cloned())
     }
 
-    fn on_expr_path(&mut self, path: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
-        self.consumers.called.extend(
+    fn on_expr_path(&self, path: &ExprPath, _: &Facts<'_, ExprPath>) -> Contributed<(), Consumers> {
+        Consumers::called(
             path.path
                 .segments
                 .iter()
                 .nth(1)
                 .and_then(|_| path.path.segments.last())
                 .map(|segment| Name::from(&segment.ident)),
-        );
-        Descend::Into
+        )
     }
 }
