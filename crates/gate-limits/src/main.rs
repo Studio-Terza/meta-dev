@@ -5,5 +5,5 @@ use file_ports::Disk;
 use gate_limits::Cli;
 
 fn main() -> ExitCode {
-    Process::answer(|arguments| Cli::from_args(arguments.into_iter()).report_to(&Disk))
+    Process::tell(|arguments| Cli::from_args(arguments.into_iter()).report_to(&Disk))
 }

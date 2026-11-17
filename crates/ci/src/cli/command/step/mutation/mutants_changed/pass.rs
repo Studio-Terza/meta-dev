@@ -1,6 +1,7 @@
+use crate::cli::command::Told;
+use console_ports::Shown;
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
-use std::io::Write;
 use std::num::NonZeroU8;
 use std::path::PathBuf;
 
@@ -55,22 +56,21 @@ impl Pass {
         Ok(run.exit().excusing(excused))
     }
 
-    pub(super) fn survivors(
-        &self,
-        files: &impl Files,
-        out: &mut impl Write,
-    ) -> Result<Option<Survivors>, Failure<'static>> {
-        let [timeouts, missed] = [Outcome::Timeout, Outcome::Missed].map(|outcome| self.listed(files, outcome));
-        writeln!(out, "mutants: {} timed out on their own crate's tests", timeouts?.len())?;
+    pub(super) fn timed_out(&self, files: &impl Files) -> Result<Shown, Failure<'static>> {
+        let timeouts = self.listed(files, Outcome::Timeout)?;
+        Ok(Shown::said(format_args!("mutants: {} timed out on their own crate's tests\n", timeouts.len())))
+    }
+
+    pub(super) fn survivors(&self, files: &impl Files) -> Result<Option<Survivors>, Failure<'static>> {
+        let missed = self.listed(files, Outcome::Missed);
         Ok(Some(missed?).filter(|names| names.is_empty().then_some(()).is_none()).map(Survivors))
     }
 
     pub(super) fn judged(
         &self,
         files: &impl Files,
-        out: &mut impl Write,
         expected: &Survivors,
-    ) -> Result<Exit, Failure<'static>> {
+    ) -> Result<Vec<Told<'static>>, Failure<'static>> {
         let journals: Vec<Journal> = Outcome::ALL.into_iter().map(|outcome| self.journal(outcome)).collect();
         let read: Vec<Option<Text>> =
             Journal::read_present(files, journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
@@ -78,7 +78,7 @@ impl Pass {
         expected.selected(&tested)?;
         let missed: Vec<String> =
             self.listed(files, Outcome::Missed)?.iter().map(|name| [name.as_ref(), "\n"].concat()).collect();
-        Verdict::from(&Text::new(missed.concat())).reported(out)
+        Ok(Verdict::from(&Text::new(missed.concat())).told())
     }
 
     fn listed(&self, files: &impl Files, outcome: Outcome) -> Result<Vec<Text>, Failure<'static>> {

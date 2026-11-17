@@ -1,7 +1,6 @@
 use std::fmt;
-use std::io::Write;
 
-use crate::cli::command::failure::Failure;
+use crate::cli::command::Told;
 use crate::cli::command::step::mutation::cargo_mutants::CargoMutants;
 use crate::cli::ports::{Exit, Text};
 
@@ -19,9 +18,8 @@ impl<'text> From<&'text Text> for Verdict<'text> {
 }
 
 impl Verdict<'_> {
-    pub(super) fn reported(self, out: &mut impl Write) -> Result<Exit, Failure<'static>> {
-        write!(out, "{self}")?;
-        Ok(self.exit())
+    pub(super) fn told<'step>(self) -> Vec<Told<'step>> {
+        vec![Told::said(self), Told::Ended(Ok(self.exit()))]
     }
 
     fn exit(self) -> Exit {

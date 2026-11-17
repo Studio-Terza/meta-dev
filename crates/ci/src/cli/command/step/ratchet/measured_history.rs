@@ -1,5 +1,6 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use super::Step;
@@ -29,9 +30,12 @@ impl Step for MeasuredHistory {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let row = self.measured.row(ports.files())?;
-        writeln!(out, "{}\t{row}", self.revision)?;
-        self.file.append(ports.files(), format_args!("{}\t{row}\n", self.revision)).map(|()| Exit::Success)
+        let said = vec![Shown::said(format_args!("{}\t{row}\n", self.revision))];
+        Ok(Telling::reported(
+            said,
+            self.file.append(ports.files(), format_args!("{}\t{row}\n", self.revision)).map(|()| Exit::Success),
+        ))
     }
 }

@@ -1,3 +1,5 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod branch;
 mod change;
 mod check;
@@ -9,7 +11,6 @@ mod scope;
 
 use std::ffi::OsString;
 use std::fmt;
-use std::io::Write;
 use std::num::NonZeroU8;
 use std::path::Path;
 
@@ -54,17 +55,16 @@ impl Step for Labels {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let changes = Git::with_ports(ports).changes_since_fork(&self.base)?;
         let pull_request = Hub::with_ports(ports).pull_request(&self.pull_request)?;
         Changed::stored_metadata(ports, &self.metadata)?;
-        writeln!(out, "{self}")?;
         let scope = Scope::reached_by(&self.metadata, &changes);
         let checks: Vec<Check> =
             Check::ALL.into_iter().filter(|check| pull_request.carrying(*check).is_none()).collect();
         let judged: Vec<Owed> = scope.judged(ports, &checks, pull_request.refactor(), &changes)?;
         let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();
-        faults.iter().try_for_each(|owed| owed.complained(out))?;
-        Ok(faults.first().map_or(Exit::Success, |_| Exit::Failure(NonZeroU8::MIN)))
+        let said = [Shown::said(format_args!("{self}\n"))].into_iter().chain(faults.iter().map(Shown::said)).collect();
+        Ok(Telling::reported(said, Ok(faults.first().map_or(Exit::Success, |_| Exit::Failure(NonZeroU8::MIN)))))
     }
 }

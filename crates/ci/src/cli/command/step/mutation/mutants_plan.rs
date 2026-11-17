@@ -1,8 +1,9 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod boundary;
 mod tested;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use text_lines::Lines;
@@ -58,10 +59,12 @@ impl Step for MutantsPlan {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let shards = self.scope.first().map_or(Ok(Shards::for_mutants(0)), |_| self.planned(ports))?;
-        writeln!(out, "{shards}")?;
-        self.output.append(ports.files(), format_args!("shards={}\n", shards.indices()))?;
-        Ok(Exit::Success)
+        let said = vec![Shown::said(format_args!("{shards}\n"))];
+        Ok(Telling::reported(
+            said,
+            self.output.append(ports.files(), format_args!("shards={}\n", shards.indices())).map(|()| Exit::Success),
+        ))
     }
 }

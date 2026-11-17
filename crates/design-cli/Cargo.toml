@@ -13,7 +13,6 @@ path = "src/main.rs"
 console-ports = { path = "../console-ports" }
 design = { path = "../design" }
 dispatch-ports = { path = "../dispatch-ports" }
-exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 sqlite-ports = { path = "../sqlite-ports" }
 

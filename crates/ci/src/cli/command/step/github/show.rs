@@ -1,5 +1,7 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 use std::ffi::OsString;
-use std::io::Write;
+use std::fmt;
 use std::iter;
 use std::path::PathBuf;
 
@@ -12,6 +14,15 @@ use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports, Text};
 
 #[derive(Debug)]
+pub(super) struct Shows<'journal>(Vec<Entry<'journal>>);
+
+#[derive(Debug)]
+struct Entry<'journal> {
+    journal: &'journal Journal,
+    text: Text,
+}
+
+#[derive(Debug)]
 pub struct Show {
     journals: Vec<Journal>,
 }
@@ -22,13 +33,16 @@ impl Show {
     pub(super) fn shown<'journal>(
         files: &impl Files,
         journals: &'journal [Journal],
-        out: &mut impl Write,
-    ) -> Result<(), Failure<'journal>> {
-        journals.iter().zip(Journal::read_present(files, journals.iter().collect())).try_for_each(|(journal, read)| {
-            writeln!(out, "{journal}:")?;
-            let text = read.unwrap_or_else(|| Ok(Text::new(Self::ABSENT.to_owned())))?;
-            Ok(write!(out, "{text}")?)
-        })
+    ) -> Result<Shows<'journal>, Failure<'journal>> {
+        let entries = journals
+            .iter()
+            .zip(Journal::read_present(files, journals.iter().collect()))
+            .map(|(journal, read)| {
+                let text = read.unwrap_or_else(|| Ok(Text::new(Self::ABSENT.to_owned())))?;
+                Ok(Entry { journal, text })
+            })
+            .collect::<Result<_, Failure<'journal>>>()?;
+        Ok(Shows(entries))
     }
 }
 
@@ -44,7 +58,14 @@ impl Step for Show {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        Self::shown(ports.files(), &self.journals, out).map(|()| Exit::Success)
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
+        let shows = Self::shown(ports.files(), &self.journals)?;
+        Ok(Telling::reported(vec![Shown::said(shows)], Ok(Exit::Success)))
+    }
+}
+
+impl fmt::Display for Shows<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|entry| write!(formatter, "{}:\n{}", entry.journal, entry.text))
     }
 }

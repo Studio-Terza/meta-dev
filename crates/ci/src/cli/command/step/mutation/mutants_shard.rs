@@ -1,12 +1,12 @@
+use crate::cli::command::Telling;
 use std::ffi::{OsStr, OsString};
-use std::io::Write;
 use std::path::PathBuf;
 
 use super::Step;
 use super::boundary::Shard;
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::Ports;
 
 #[derive(Debug)]
 pub struct MutantsShard {
@@ -30,13 +30,15 @@ impl Step for MutantsShard {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let shard = self.shard.arguments();
         let selection: Vec<&OsStr> = shard.iter().map(OsString::as_os_str).collect();
         let invocation = CargoMutants::invocation(&self.output, &selection, &Self::PASSED_ON.map(OsStr::new));
-        ports
-            .run(&invocation)
-            .map(|run| run.exit().excusing(&[CargoMutants::MISSED, CargoMutants::TIMEOUT]))
-            .map_err(Failure::starting(&invocation))
+        Ok(Telling::ended(
+            ports
+                .run(&invocation)
+                .map(|run| run.exit().excusing(&[CargoMutants::MISSED, CargoMutants::TIMEOUT]))
+                .map_err(Failure::starting(&invocation)),
+        ))
     }
 }

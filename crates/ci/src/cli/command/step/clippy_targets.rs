@@ -1,9 +1,9 @@
+use crate::cli::command::Telling;
 mod name;
 mod scope;
 mod workspace;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use super::Step;
@@ -13,7 +13,7 @@ use super::stage::Stage;
 use super::timed::Timed;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
-use crate::cli::ports::{Exit, Invocation, Ports};
+use crate::cli::ports::{Invocation, Ports};
 use scope::Scope;
 use workspace::Workspace;
 
@@ -40,13 +40,13 @@ impl Step for ClippyTargets {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let workspace = Changed::workspace_metadata(ports)?.as_ref().parse::<Workspace>()?;
         let targets = workspace.targets(&Scope::try_from(self.arguments.as_slice())?)?;
         let invocation = Invocation::new(
             "cargo",
             Self::CLIPPY.iter().map(OsString::from).chain(targets).chain(self.arguments.iter().cloned()),
         );
-        Timed::measure(&self.measured, &self.stage, &invocation, ports)
+        Ok(Telling::ended(Timed::measure(&self.measured, &self.stage, &invocation, ports)))
     }
 }

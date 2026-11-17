@@ -1,5 +1,6 @@
+use crate::Uttered;
+use crate::cli::request::command::printed::Lines;
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Write;
 use std::path::Path;
 
 use design_model::{
@@ -15,12 +16,12 @@ use newtype::{Counter, Wrapping};
 use store_ports::Store;
 use transcript_ports::{Authorship, Uuid};
 
-use super::Printed;
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::noted::{Miss, Noted, Reconciliation, Reference};
 use crate::cli::output::{Count, Line};
 use crate::cli::request::Ground;
+use console_ports::Shown;
 
 #[derive(Debug)]
 pub struct Import;
@@ -167,11 +168,7 @@ enum Landing {
 }
 
 impl Import {
-    pub fn written<F: Files, S: Store>(
-        ground: &Ground<'_, F, S>,
-        path: &Path,
-        out: &mut impl Write,
-    ) -> Result<Outcome, Failure> {
+    pub fn written<F: Files, S: Store>(ground: &Ground<'_, F, S>, path: &Path) -> Result<Uttered, Failure> {
         let bytes = ground.read(path).map_err(Failure::Notes)?;
         let notes = Notes::read(Text::try_from(&bytes).map_err(Failure::Notes)?.as_ref());
         let project = ground.located().project().ok_or(Failure::Unconfigured)?;
@@ -179,9 +176,9 @@ impl Import {
         let lock = sheet.store.lock()?;
         let draft = sheet.heard(&notes)?.drafted(&notes, project);
         let report = draft.landing().landed(&sheet, draft)?;
-        Printed::lines(out, &report.lines)?;
+        let shown = Shown::said(Lines::from(&report.lines));
         lock.end()?;
-        report.settlement.outcome()
+        Ok(Uttered::new(shown, report.settlement.outcome()))
     }
 }
 

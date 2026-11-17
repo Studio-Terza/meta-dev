@@ -15,7 +15,7 @@ use std::sync::Mutex;
 
 use std::str::FromStr;
 
-use console_ports::{Heard, Variables};
+use console_ports::{Heard, Shown, Variables};
 
 use design::{
     Anchored, Attempted, Cli, Count, Failure, Flailing, Lapsed, Line, Miss, Noted, Outcome, Reconciliation, Reference,
@@ -27,7 +27,7 @@ use design_model::{
     Refining, Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal,
     Title, Vague,
 };
-use design_runs::{Excerpt, RunState};
+use design_runs::{Excerpt, FailuresReported, RunState};
 use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
@@ -40,7 +40,10 @@ use newtype::Counter;
 use newtype::Enumerated;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
-use store_ports::{Batch, Busy, Opens, Schema, Statements, Store, StoreFailure, Written};
+use store_ports::{
+    Batch, Busy, Created, Opens, Query, Record, Schema, Statements, Store, StoreFailure, StoreFiller, StoreLock,
+    Written, store_ops,
+};
 use stream::{Relation, Shape};
 use structure::Staff;
 use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
@@ -297,13 +300,9 @@ impl Invocation {
 
     fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(&Self::environment(), files, Opening(|_path| store.clone()), Staff::idle()).report(
-            &run,
-            arguments.iter().map(OsString::from),
-            &mut out,
-        )?;
-        Ok(String::from_utf8(out).unwrap_or_default())
+        let uttered = Cli::new(&Self::environment(), files, Opening(|_path| store.clone()), Staff::idle())
+            .report(&run, arguments.iter().map(OsString::from));
+        Answered::told(uttered)
     }
 
     fn shown(session: &Session, uuid: &str) -> Result<String, Failure> {
@@ -389,15 +388,25 @@ struct Answered {
     out: String,
 }
 
+impl Answered {
+    fn said(uttered: &design::Uttered) -> String {
+        AsRef::<str>::as_ref(AsRef::<Shown>::as_ref(uttered)).to_owned()
+    }
+
+    fn told(uttered: design::Uttered) -> Result<String, Failure> {
+        let text = Answered::said(&uttered);
+        uttered.ended().map(|_outcome| text)
+    }
+}
+
 struct Rooted;
 
 impl Rooted {
     fn outcome(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
-        let mut out = Vec::new();
-        let outcome =
+        let uttered =
             Cli::new(&Invocation::environment(), session.files(), Opening(|_path| store.clone()), Staff::idle())
-                .rooted(arguments.iter().map(OsString::from), &mut out)?;
-        Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
+                .rooted(arguments.iter().map(OsString::from));
+        Ok(Answered { out: Answered::said(&uttered), outcome: uttered.ended()? })
     }
 }
 
@@ -566,8 +575,7 @@ impl Opened {
     fn from(directory: &str, files: impl Files, arguments: &[&str]) -> Result<Opened, Failure> {
         let opened = Mutex::new(Vec::new());
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(
+        let uttered = Cli::new(
             &Invocation::at(directory),
             files,
             Opening(|path: PathBuf| {
@@ -576,8 +584,9 @@ impl Opened {
             }),
             Staff::idle(),
         )
-        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
-        Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out: String::from_utf8(out).unwrap_or_default() })
+        .report(&run, arguments.iter().map(OsString::from));
+        let out = Answered::told(uttered)?;
+        Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out })
     }
 }
 
@@ -1304,7 +1313,8 @@ fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Re
         Opening(|_path| applying.store.clone()),
         Staff::idle(),
     )
-    .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
+    .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from))
+    .ended()?;
     assert_eq!(lent, Outcome::Applied);
     Ok(())
 }
@@ -1313,15 +1323,14 @@ impl Applying {
     fn rooted(&self, directives: Bytes) -> Result<Answered, Failure> {
         self.files.create_directories(Path::new("/work/notes")).ok();
         self.files.write(Path::new("/work/notes/directives"), directives).ok();
-        let mut out = Vec::new();
-        let outcome = Cli::new(
+        let uttered = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&self.files),
             Opening(|_path| self.store.clone()),
             Staff::idle(),
         )
-        .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
-        Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
+        .rooted(["apply", "notes/directives"].iter().map(OsString::from));
+        Ok(Answered { out: Answered::said(&uttered), outcome: uttered.ended()? })
     }
 
     fn graph(&self) -> Result<[String; 2], Failure> {
@@ -1542,7 +1551,8 @@ impl Applying {
             Opening(|_path| self.store.clone()),
             Staff::idle(),
         )
-        .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
+        .rooted(arguments.iter().map(OsString::from))
+        .ended()
     }
 }
 
@@ -1862,15 +1872,14 @@ impl Workspace {
 
     fn run(&self, directory: &str, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(
+        let uttered = Cli::new(
             &Invocation::at(directory),
             FakeLent::new(&self.files),
             Opening(|_path| self.store.clone()),
             Staff::idle(),
         )
-        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
-        Ok(String::from_utf8(out).unwrap_or_default())
+        .report(&run, arguments.iter().map(OsString::from));
+        Answered::told(uttered)
     }
 
     fn replanted(unplanted: Unplanted) -> Result<Replanted, Failure> {
@@ -2786,10 +2795,14 @@ impl Recalling {
         let heard = Heard::new(format!("{{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"{prompt}\"}}"));
         let environment = Invocation::at("/work").hearing(heard);
         let run = Run::root();
-        let mut out = Vec::new();
-        Cli::new(&environment, FakeLent::new(&applying.files), Opening(|_path| applying.store.clone()), Staff::idle())
-            .report(&run, ["hook", "user-prompt-submit"].iter().map(OsString::from), &mut out)?;
-        Ok(String::from_utf8(out).unwrap_or_default())
+        let uttered = Cli::new(
+            &environment,
+            FakeLent::new(&applying.files),
+            Opening(|_path| applying.store.clone()),
+            Staff::idle(),
+        )
+        .report(&run, ["hook", "user-prompt-submit"].iter().map(OsString::from));
+        Answered::told(uttered)
     }
 }
 
@@ -2815,5 +2828,69 @@ fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Res
     let summed = "n2 vague: Herds";
     assert_eq!(both.get(..summed.len()), Some(summed), "{both}");
     assert_eq!(Lines::missing(&recalled, &["n2 vague: Herds"]), Vec::<&&str>::new(), "{recalled}");
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct Unbooked(Sqlite);
+
+impl StoreFiller for Unbooked {
+    fn read<Q: Query>(&self, pass: Pass<'_, Q>, query: Q) -> Result<Q::Rows, StoreFailure> {
+        StoreFiller::read(&self.0, pass, query)
+    }
+
+    fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
+        (Q::NAME == FailuresReported::NAME).then_some(()).map_or_else(
+            || StoreFiller::write(&self.0, pass, batch),
+            |()| Err(Q::Failure::from(StoreFailure::Statement(Box::from("the bookkeeping write was refused")))),
+        )
+    }
+
+    fn create<R: Record>(&self, pass: Pass<'_, Created<R>>, created: Created<R>) -> Result<R, StoreFailure> {
+        StoreFiller::create(&self.0, pass, created)
+    }
+
+    fn lock(&self, pass: Pass<'_, store_ops::Lock>) -> Result<StoreLock, Busy> {
+        StoreFiller::lock(&self.0, pass)
+    }
+}
+
+struct Unbooking(Sqlite);
+
+impl Opens for Unbooking {
+    type Store = Unbooked;
+
+    fn file<S: Schema>(&self, _path: PathBuf) -> Unbooked {
+        Unbooked(self.0.clone())
+    }
+
+    fn in_memory<S: Schema>(&self) -> Unbooked {
+        Unbooked(SqliteOpener.in_memory::<S>())
+    }
+}
+
+#[test]
+fn a_prompt_whose_bookkeeping_write_fails_is_still_told_its_nodes_and_the_hook_fails() -> Result<(), Failure> {
+    let session = Found::said(&[Said::by(
+        Speaker::Owner,
+        "aaaaaaaa-0000-4000-8000-000000000021",
+        "elephants gather near rivers".to_owned(),
+    )]);
+    let applying = Applying::over(&session)?;
+    applying.applied(
+        "propose(new, refines(n1), feature, \"Herds\")\nplace(aaaaaaaa-0000-4000-8000-000000000021.0, n2, mentions)",
+    )?;
+    let heard =
+        Heard::new("{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"where do elephants roam\"}".to_owned());
+    let uttered = Cli::new(
+        &Invocation::at("/work").hearing(heard),
+        FakeLent::new(&applying.files),
+        Unbooking(applying.store.clone()),
+        Staff::idle(),
+    )
+    .report(&Run::root(), ["hook", "user-prompt-submit"].iter().map(OsString::from));
+    let told = Answered::said(&uttered);
+    assert!(told.contains("n2 vague: Herds"), "{told}");
+    assert!(matches!(uttered.ended(), Err(Failure::Store(StoreFailure::Statement(_)))));
     Ok(())
 }

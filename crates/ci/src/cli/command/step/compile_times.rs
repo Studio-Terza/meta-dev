@@ -1,10 +1,11 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod listing;
 mod unit;
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use serde::de::DeserializeOwned;
@@ -62,9 +63,12 @@ impl Step for CompileTimes {
         Ok(CompileTimes { page: Journal::file(Path::new(page)), report: Journal::file(Path::new(report)) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let listing = Listing::totalled(Self::per_crate(&self.page, &self.page.read(ports.files())?)?);
-        write!(out, "{listing}")?;
-        self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Success)
+        let said = vec![Shown::said(format_args!("{listing}"))];
+        Ok(Telling::reported(
+            said,
+            self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Success),
+        ))
     }
 }

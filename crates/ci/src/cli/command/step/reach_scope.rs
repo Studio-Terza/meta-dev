@@ -1,8 +1,9 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod event;
 mod skipped;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use file_ports::Files;
@@ -43,12 +44,11 @@ impl ReachScope {
         }
     }
 
-    fn recorded(&self, files: &impl Files, report: &Text, out: &mut impl Write) -> Result<(), Failure<'_>> {
+    fn recorded(&self, files: &impl Files, report: &Text) -> Result<Vec<Shown>, Failure<'_>> {
         let skipped = Skips::from(report.as_ref());
-        write!(out, "{report}")?;
         self.environment.append(files, report)?;
         self.summary.append(files, format_args!("{report}{skipped}"))?;
-        Ok(write!(out, "{skipped}")?)
+        Ok(vec![Shown::said(report), Shown::said(skipped)])
     }
 }
 
@@ -70,9 +70,10 @@ impl Step for ReachScope {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         Changed::stored_metadata(ports, &self.metadata)?;
         let report = self.report(ports)?;
-        self.recorded(ports.files(), &report, out).map(|()| Exit::Success)
+        let said = self.recorded(ports.files(), &report)?;
+        Ok(Telling::reported(said, Ok(Exit::Success)))
     }
 }

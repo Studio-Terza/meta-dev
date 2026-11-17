@@ -1,5 +1,6 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use super::Step;
@@ -31,9 +32,12 @@ impl Step for History {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let record = Changed::answered(Question::History, &self.metadata, ports)?;
-        write!(out, "{}\t{record}", self.revision)?;
-        self.file.append(ports.files(), format_args!("{}\t{record}", self.revision)).map(|()| Exit::Success)
+        let said = vec![Shown::said(format_args!("{}\t{record}", self.revision))];
+        Ok(Telling::reported(
+            said,
+            self.file.append(ports.files(), format_args!("{}\t{record}", self.revision)).map(|()| Exit::Success),
+        ))
     }
 }

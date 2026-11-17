@@ -2,35 +2,32 @@ mod command;
 pub mod ports;
 
 use std::ffi::OsString;
-use std::io::Write;
-use std::process::ExitCode;
 
-use command::Command;
+use console_ports::Teller;
 
+pub use command::Telling;
+use command::{Command, Failure};
 use ports::Ports;
 
 #[derive(Debug)]
-pub struct Cli;
+pub struct Cli<'ports, P: Ports> {
+    command: Result<Command, Failure<'static>>,
+    ports: &'ports P,
+}
 
-impl Cli {
-    pub fn answer(
-        arguments: impl Iterator<Item = OsString>,
-        ports: &impl Ports,
-        out: &mut impl Write,
-        err: &mut impl Write,
-    ) -> ExitCode {
-        match Command::parse(arguments) {
-            Ok(command) => Self::exited(command.carry_out(ports, out), err),
-            Err(failure) => Self::exited(Err(failure), err),
-        }
+impl<'ports, P: Ports> Cli<'ports, P> {
+    pub fn parsed(arguments: impl Iterator<Item = OsString>, ports: &'ports P) -> Cli<'ports, P> {
+        Cli { command: Command::parse(arguments), ports }
     }
+}
 
-    fn exited(carried_out: Result<ports::Exit, command::Failure<'_>>, err: &mut impl Write) -> ExitCode {
-        carried_out.map_or_else(|failure| Self::refused(&failure, err), ExitCode::from)
-    }
+impl<P: Ports> Teller for Cli<'_, P> {
+    type Told<'teller>
+        = Telling<'teller>
+    where
+        Self: 'teller;
 
-    fn refused(failure: &command::Failure<'_>, err: &mut impl Write) -> ExitCode {
-        writeln!(err, "{failure}").ok();
-        ExitCode::FAILURE
+    fn told(&self) -> Telling<'_> {
+        self.command.as_ref().map_or_else(Telling::refused, |command| command.carry_out(self.ports))
     }
 }
