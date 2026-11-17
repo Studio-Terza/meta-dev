@@ -4,7 +4,9 @@ use std::fmt;
 
 use syntax::{Around, Macro, Node, Walk};
 
-use lint_core::{ByKind, Descend, Facts, Kind, Macros, SourceFile, Unwalked, Violation, Watch, Watching};
+use lint_core::{
+    ByKind, Descend, Facts, Fold, Folding, Kind, Macros, SourceFile, Unwalked, Violation, Watch, Watching,
+};
 use lint_layout::Name;
 
 pub use boundary::Member;
@@ -18,6 +20,12 @@ pub trait Gathers<Part> {
 
 pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
     fn found(self: Box<Self>) -> Vec<Violation<'file>>;
+}
+
+impl<'file, Folded: Fold<Found = Vec<Violation<'file>>> + fmt::Debug> Finds<'file> for Folding<Folded> {
+    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+        self.concluded()
+    }
 }
 
 pub trait Sorts<'file>: for<'ast> Watch<'ast> + fmt::Debug {

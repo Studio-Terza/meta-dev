@@ -35,6 +35,6 @@ pub use syntax::Syntax;
 pub use test_file::TestFile;
 pub use type_name::TypeName;
 pub use walk::Walk;
-pub use watch::{Address, ByKind, Descend, Facts, Kind, Watch, Watching};
+pub use watch::{Address, ByKind, Descend, Facts, Fold, Folding, Kind, Visit, Watch, Watching};
 
 pub use lint_layout::SourceText;

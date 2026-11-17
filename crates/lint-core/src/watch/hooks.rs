@@ -1,3 +1,5 @@
+use std::mem;
+
 use syntax::{Ident, Macro};
 
 use lint_layout::Name;
@@ -95,6 +97,70 @@ macro_rules! hooks {
             )*
         }
 
+        pub trait Fold {
+            type Found: Default + std::fmt::Debug;
+
+            fn kinds(&self) -> &[Kind];
+
+            fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {
+                Visit::descending(found)
+            }
+
+            fn off_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Self::Found {
+                found
+            }
+
+            fn on_ident(&self, found: Self::Found, _: &Ident, _: &Name) -> Visit<Self::Found> {
+                Visit::descending(found)
+            }
+
+            fn off_ident(&self, found: Self::Found, _: &Ident) -> Self::Found {
+                found
+            }
+
+            $(
+                fn $on(&self, found: Self::Found, _: &syntax::$node, _: &Facts<'_, syntax::$node>) -> Visit<Self::Found> {
+                    Visit::descending(found)
+                }
+
+                fn $off(&self, found: Self::Found, _: &syntax::$node, _: &Facts<'_, syntax::$node>) -> Self::Found {
+                    found
+                }
+            )*
+        }
+
+        impl<'ast, Folded: Fold> Watch<'ast> for Folding<Folded> {
+            fn kinds(&self) -> &[Kind] {
+                self.fold.kinds()
+            }
+
+            fn on_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
+                self.visited(|fold, found| fold.on_macro(found, node, facts))
+            }
+
+            fn off_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) {
+                self.left(|fold, found| fold.off_macro(found, node, facts));
+            }
+
+            fn on_ident(&mut self, node: &'ast Ident, name: &Name) -> Descend {
+                self.visited(|fold, found| fold.on_ident(found, node, name))
+            }
+
+            fn off_ident(&mut self, node: &'ast Ident) {
+                self.left(|fold, found| fold.off_ident(found, node));
+            }
+
+            $(
+                fn $on(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) -> Descend {
+                    self.visited(|fold, found| fold.$on(found, node, facts))
+                }
+
+                fn $off(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) {
+                    self.left(|fold, found| fold.$off(found, node, facts));
+                }
+            )*
+        }
+
         #[macro_export]
         macro_rules! scope_nodes {
             () => {
@@ -156,3 +222,50 @@ macro_rules! hooks {
 }
 
 syntax::node_kinds!(hooks);
+
+#[derive(Debug)]
+pub struct Visit<Found> {
+    found: Found,
+    descend: Descend,
+}
+
+#[derive(Debug)]
+pub struct Folding<Folded: Fold> {
+    fold: Folded,
+    found: Folded::Found,
+}
+
+impl<Found> Visit<Found> {
+    #[must_use]
+    pub fn descending(found: Found) -> Visit<Found> {
+        Visit { found, descend: Descend::Into }
+    }
+
+    #[must_use]
+    pub fn new(found: Found, descend: Descend) -> Visit<Found> {
+        Visit { found, descend }
+    }
+}
+
+impl<Folded: Fold> From<Folded> for Folding<Folded> {
+    fn from(fold: Folded) -> Folding<Folded> {
+        Folding { fold, found: Folded::Found::default() }
+    }
+}
+
+impl<Folded: Fold> Folding<Folded> {
+    #[must_use]
+    pub fn concluded(self) -> Folded::Found {
+        self.found
+    }
+
+    pub(super) fn visited(&mut self, step: impl FnOnce(&Folded, Folded::Found) -> Visit<Folded::Found>) -> Descend {
+        let visit = step(&self.fold, mem::take(&mut self.found));
+        self.found = visit.found;
+        visit.descend
+    }
+
+    pub(super) fn left(&mut self, step: impl FnOnce(&Folded, Folded::Found) -> Folded::Found) {
+        self.found = step(&self.fold, mem::take(&mut self.found));
+    }
+}
