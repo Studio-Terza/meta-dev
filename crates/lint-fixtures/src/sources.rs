@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 use file_ports::{Bytes, Memory};
 use graph_reader::Reader;
+use invariants::invariant;
 use lint_core::{FileHead, Parsed, Report, SourceFile, SourceText};
 use lint_file::WorkspaceLint;
 use lint_placement::Placement;
@@ -28,6 +29,18 @@ pub use text::Text;
 #[derive(Debug)]
 pub struct Sources(&'static [Source]);
 
+enum Invariant<'failure> {
+    FixtureParses(&'failure dyn fmt::Display),
+}
+
+impl fmt::Display for Invariant<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Invariant::FixtureParses(failure) => write!(formatter, "fixture source parses: {failure}"),
+        }
+    }
+}
+
 impl Sources {
     #[must_use]
     pub fn file(path: impl Into<PathBuf>, text: Text<'_>) -> SourceFile {
@@ -37,7 +50,7 @@ impl Sources {
     pub(crate) fn kept<Parsed>(parsed: Result<Parsed, impl fmt::Display>) -> Parsed {
         match parsed {
             Ok(file) => file,
-            Err(failure) => unreachable!("fixture source parses: {failure}"),
+            Err(failure) => invariant!(broken Invariant::FixtureParses(&failure)),
         }
     }
 
