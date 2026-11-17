@@ -19,6 +19,10 @@ impl Uttered {
         Uttered::new(Shown::default(), ended)
     }
 
+    pub(crate) fn kept<Kept>(self, bookkept: Result<Kept, Failure>) -> Uttered {
+        Uttered { ended: self.ended.and_then(|outcome| bookkept.map(|_kept| outcome)), ..self }
+    }
+
     pub(crate) fn settled(self, released: Result<Snapshot, ReleaseFailures>) -> Uttered {
         Uttered { ended: Failure::settled(self.ended, released), ..self }
     }

@@ -139,9 +139,9 @@ impl Decision {
             .chain(recalled.iter().map(Recalled::to_string));
         let told: Vec<String> = accounts.chain(nodes).collect();
         told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
-            let outcome = Decision::telling(event, joined).written()?;
-            store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>())?;
-            Ok(outcome)
+            let decided = Decision::telling(event, joined).written()?;
+            let reported = store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>());
+            Ok(decided.kept(reported.map_err(Failure::from)))
         })
     }
 

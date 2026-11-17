@@ -25,7 +25,7 @@ use design_model::{
     Refining, Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal,
     Title, Vague,
 };
-use design_runs::{Excerpt, RunState};
+use design_runs::{Excerpt, FailuresReported, RunState};
 use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
 use dispatch_ports::{Tokens, Usage};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Offset, Size, Text};
@@ -38,7 +38,10 @@ use newtype::Counter;
 use newtype::Enumerated;
 use port_core::{Held, Op, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use sqlite_ports::SqliteOpener;
-use store_ports::{Batch, Busy, Opens, Schema, Statements, Store, StoreFailure, Written};
+use store_ports::{
+    Batch, Busy, Created, Opens, Query, Record, Schema, Statements, Store, StoreFailure, StoreFiller, StoreLock,
+    Written, store_ops,
+};
 use stream::{Relation, Shape};
 use structure::Staff;
 use structurer::{Directive, Directives, Lapse, NodeRef, Proposal, SegmentRef, Uncovered};
@@ -2823,5 +2826,69 @@ fn a_prompt_is_told_the_live_nodes_whose_placed_segments_hold_its_words() -> Res
     let summed = "n2 vague: Herds";
     assert_eq!(both.get(..summed.len()), Some(summed), "{both}");
     assert_eq!(Lines::missing(&recalled, &["n2 vague: Herds"]), Vec::<&&str>::new(), "{recalled}");
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct Unbooked(Sqlite);
+
+impl StoreFiller for Unbooked {
+    fn read<Q: Query>(&self, pass: Pass<'_, Q>, query: Q) -> Result<Q::Rows, StoreFailure> {
+        StoreFiller::read(&self.0, pass, query)
+    }
+
+    fn write<Q: Batch>(&self, pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
+        (Q::NAME == FailuresReported::NAME).then_some(()).map_or_else(
+            || StoreFiller::write(&self.0, pass, batch),
+            |()| Err(Q::Failure::from(StoreFailure::Statement(Box::from("the bookkeeping write was refused")))),
+        )
+    }
+
+    fn create<R: Record>(&self, pass: Pass<'_, Created<R>>, created: Created<R>) -> Result<R, StoreFailure> {
+        StoreFiller::create(&self.0, pass, created)
+    }
+
+    fn lock(&self, pass: Pass<'_, store_ops::Lock>) -> Result<StoreLock, Busy> {
+        StoreFiller::lock(&self.0, pass)
+    }
+}
+
+struct Unbooking(Sqlite);
+
+impl Opens for Unbooking {
+    type Store = Unbooked;
+
+    fn file<S: Schema>(&self, _path: PathBuf) -> Unbooked {
+        Unbooked(self.0.clone())
+    }
+
+    fn in_memory<S: Schema>(&self) -> Unbooked {
+        Unbooked(SqliteOpener.in_memory::<S>())
+    }
+}
+
+#[test]
+fn a_prompt_whose_bookkeeping_write_fails_is_still_told_its_nodes_and_the_hook_fails() -> Result<(), Failure> {
+    let session = Found::said(&[Said::by(
+        Speaker::Owner,
+        "aaaaaaaa-0000-4000-8000-000000000021",
+        "elephants gather near rivers".to_owned(),
+    )]);
+    let applying = Applying::over(&session)?;
+    applying.applied(
+        "propose(new, refines(n1), feature, \"Herds\")\nplace(aaaaaaaa-0000-4000-8000-000000000021.0, n2, mentions)",
+    )?;
+    let heard =
+        Heard::new("{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"where do elephants roam\"}".to_owned());
+    let uttered = Cli::new(
+        &Invocation::at("/work").hearing(heard),
+        FakeLent::new(&applying.files),
+        Unbooking(applying.store.clone()),
+        Staff::idle(),
+    )
+    .report(&Run::root(), ["hook", "user-prompt-submit"].iter().map(OsString::from));
+    let told = Answered::said(&uttered);
+    assert!(told.contains("n2 vague: Herds"), "{told}");
+    assert!(matches!(uttered.ended(), Err(Failure::Store(StoreFailure::Statement(_)))));
     Ok(())
 }
