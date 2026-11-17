@@ -53,16 +53,29 @@ impl Tested {
     const CHANGED: [&'static str; 2] = ["diff", "--no-renames"];
     const CHANGED_PATHS: [&'static str; 3] = ["HEAD", "--", "*.rs"];
     const NAMED: [&'static str; 3] = ["diff", "--name-only", "--no-renames"];
-    const NAMED_PATHS: [&'static str; 3] = ["HEAD", "--", ":(glob)*/**/tests/**/*.rs"];
+    const NAMED_PATHS: [&'static str; 2] = ["--", ":(glob)*/**/tests/**/*.rs"];
+    pub(in super::super) const HEAD: &'static str = "HEAD";
     pub(in super::super) const PULL_BASE: &'static str = "HEAD^1";
 
-    pub(in super::super) fn asked(ports: &impl Ports, reach: &Reach, base: &OsStr) -> Result<Tested, Failure<'static>> {
-        let invocation = Invocation::new("git", Self::around(&Self::NAMED, base, &Self::NAMED_PATHS));
+    pub(in super::super) fn asked(
+        ports: &impl Ports,
+        reach: &Reach,
+        base: &OsStr,
+        head: &OsStr,
+    ) -> Result<Tested, Failure<'static>> {
+        let mut arguments = Self::around(&Self::NAMED, base, &[]);
+        arguments.push(head.to_owned());
+        arguments.extend(Self::NAMED_PATHS.map(OsString::from));
+        let invocation = Invocation::new("git", arguments);
         let named = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
         let files: Vec<String> = named.as_ref().parse::<Lines>().into_iter().flatten().collect();
         let consumed = files.first().map_or(Ok(Vec::new()), |_| reach.consumed(ports, &files))?;
         let homes = files.iter().chain(&consumed).filter_map(|path| Self::home(Path::new(path))).collect();
         Ok(Tested { homes, base: base.to_owned() })
+    }
+
+    pub(in super::super) fn without(self, earlier: &Tested) -> Tested {
+        Tested { homes: self.homes.difference(&earlier.homes).cloned().collect(), ..self }
     }
 
     fn consumed(ports: &impl Ports, lint: &Path, files: &[String]) -> Result<Vec<String>, Failure<'static>> {

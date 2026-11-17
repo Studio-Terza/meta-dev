@@ -26,15 +26,20 @@ struct Prior {
     moved: &'static str,
     listed: Vec<&'static str>,
     since: Vec<&'static str>,
+    earlier_tests: &'static str,
+    since_tests: &'static str,
 }
 
 struct Planned {
     out: Vec<String>,
     selected: Vec<String>,
     shards: Vec<String>,
+    wholes: usize,
 }
 
 impl Prior {
+    const EMPTY_TREE: &'static str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
     fn outcomes(survivors: &[&str]) -> String {
         let missed: Vec<String> = survivors
             .iter()
@@ -87,6 +92,20 @@ impl Prior {
                     asked: Invocation::new("cargo", ["mutants", "--list", "--in-diff", diff.as_str()]),
                     text: "m\n".repeat(self.listed.len()),
                 },
+                ExactReply {
+                    asked: Invocation::new(
+                        "git",
+                        ["diff", "--name-only", "--no-renames", "t0^1", "t0", "--", ":(glob)*/**/tests/**/*.rs"],
+                    ),
+                    text: self.earlier_tests.to_owned(),
+                },
+                ExactReply {
+                    asked: Invocation::new(
+                        "git",
+                        ["diff", "--name-only", "--no-renames", "t0", "HEAD", "--", ":(glob)*/**/tests/**/*.rs"],
+                    ),
+                    text: self.since_tests.to_owned(),
+                },
             ],
             ..Script::new()
         };
@@ -101,6 +120,12 @@ impl Prior {
             out: Text::lines(&answer.out),
             selected: Text::lines(&scratch.read("prior/selected.txt")),
             shards: Text::lines(&scratch.read("plan.txt")),
+            wholes: script
+                .calls
+                .borrow()
+                .iter()
+                .filter(|call| call.arguments().iter().any(|argument| argument == Prior::EMPTY_TREE))
+                .count(),
         })
     }
 }
@@ -113,6 +138,8 @@ fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -
         moved: NOTHING_MOVED,
         listed: vec![SURVIVOR, CAUGHT_BEFORE, UNTOUCHED],
         since: Vec::new(),
+        earlier_tests: "",
+        since_tests: "",
     }
     .planned()?;
     assert_eq!(planned.selected, ["crates/a/src/lib.rs:3:5: replace f -> bool with true"]);
@@ -132,6 +159,8 @@ fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down
         moved: LINE_ABOVE,
         listed: vec![SURVIVOR_MOVED, ADDED, CAUGHT_BEFORE, UNTOUCHED],
         since: vec![ADDED],
+        earlier_tests: "",
+        since_tests: "",
     }
     .planned()?;
     assert_eq!(
@@ -149,6 +178,8 @@ fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() 
         moved: NOTHING_MOVED,
         listed: vec![CAUGHT_BEFORE, UNTOUCHED],
         since: Vec::new(),
+        earlier_tests: "",
+        since_tests: "",
     }
     .planned()?;
     assert_eq!(planned.selected, Vec::<String>::new());
@@ -158,7 +189,7 @@ fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() 
 
 laws::table!(
     test_code_edited_other_than_by_additions_since_the_prior_falls_back_to_every_changed_line,
-    |since: &&'static str| Prior { survivors: &[SURVIVOR], since_head: since, moved: NOTHING_MOVED, listed: vec![SURVIVOR, UNTOUCHED], since: Vec::new() }
+    |since: &&'static str| Prior { survivors: &[SURVIVOR], since_head: since, moved: NOTHING_MOVED, listed: vec![SURVIVOR, UNTOUCHED], since: Vec::new(), earlier_tests: "", since_tests: "" }
         .planned()
         .map_or_default(|planned| (planned.out.first().cloned().unwrap_or_default(), planned.selected.len())),
     [
@@ -402,3 +433,34 @@ fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result
     );
     Ok(())
 }
+
+struct Retested {
+    earlier: &'static str,
+    since: &'static str,
+}
+
+impl Retested {
+    fn wholes(&self) -> usize {
+        Prior {
+            survivors: &[],
+            since_head: TEST_ADDED,
+            moved: NOTHING_MOVED,
+            listed: vec![UNTOUCHED],
+            since: Vec::new(),
+            earlier_tests: self.earlier,
+            since_tests: self.since,
+        }
+        .planned()
+        .map_or_default(|planned| planned.wholes)
+    }
+}
+
+laws::table!(
+    a_crate_s_whole_source_is_mutated_only_when_its_tests_first_change_after_the_earlier_run,
+    Retested::wholes,
+    [
+        Retested { earlier: "", since: "crates/a/tests/behaviour.rs\n" } => 1,
+        Retested { earlier: "crates/a/tests/behaviour.rs\n", since: "crates/a/tests/behaviour.rs\n" } => 0,
+        Retested { earlier: "crates/a/tests/behaviour.rs\n", since: "" } => 0,
+    ]
+);

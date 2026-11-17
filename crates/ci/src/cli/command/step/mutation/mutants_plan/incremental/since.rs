@@ -46,7 +46,11 @@ impl<'run> Since<'run> {
     fn named(&self, ports: &impl Ports, missed: &[Mutant]) -> Result<Option<Vec<Text>>, Failure<'static>> {
         let tree = self.commits.tree().as_ref();
         let since = self.directory.join(Self::SINCE);
-        let changed = Tested::asked(ports, self.reach, OsStr::new(tree))?.diff(ports)?;
+        let parent = [tree, "^1"].concat();
+        let earlier = Tested::asked(ports, self.reach, OsStr::new(&parent), OsStr::new(tree))?;
+        let changed = Tested::asked(ports, self.reach, OsStr::new(tree), OsStr::new(Tested::HEAD))?
+            .without(&earlier)
+            .diff(ports)?;
         let files = ports.files();
         files
             .write(&since, Bytes::from(changed.as_ref()))

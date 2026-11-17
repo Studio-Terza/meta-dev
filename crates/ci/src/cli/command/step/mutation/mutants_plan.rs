@@ -38,7 +38,8 @@ impl MutantsPlan {
     const PRIOR: Flag = Flag::new("--prior");
 
     fn planned(&self, ports: &impl Ports) -> Result<Planned, Failure<'_>> {
-        let changed = Tested::asked(ports, &self.reach, OsStr::new(Tested::PULL_BASE))?.diff(ports)?;
+        let changed =
+            Tested::asked(ports, &self.reach, OsStr::new(Tested::PULL_BASE), OsStr::new(Tested::HEAD))?.diff(ports)?;
         self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
         let choice = self.prior.as_ref().map(|prior| prior.chosen(ports, &self.reach, diff)).transpose()?;
