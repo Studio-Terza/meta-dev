@@ -16,3 +16,7 @@ fn asserts_on_the_parts() {
 }
 
 laws::table!(rendered_rows, corpus::row, [1 => "a\nb"]);
+
+use laws::table as rows;
+
+rows!(renamed_rows, corpus::row, [2 => "c\nd"]);
