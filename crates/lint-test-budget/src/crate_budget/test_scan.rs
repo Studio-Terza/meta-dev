@@ -16,7 +16,7 @@ pub struct TestScan<'file> {
     file: &'file SourceFile,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Tally {
     tests: Count,
     test_lines: Count,
@@ -69,7 +69,7 @@ impl Semigroup for Tally {
 
 impl Monoid for Tally {
     fn identity() -> Tally {
-        Tally::default()
+        Tally { tests: Count::default(), test_lines: Count::default() }
     }
 }
 
