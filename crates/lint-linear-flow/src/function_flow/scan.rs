@@ -19,6 +19,7 @@ use root::Root;
 pub struct Candidate<'file> {
     found: Found<'file>,
     at: Option<Address>,
+    span: Span,
 }
 
 impl<'file> Candidate<'file> {
@@ -28,7 +29,11 @@ impl<'file> Candidate<'file> {
         finding: Option<Finding>,
         at: Option<Address>,
     ) -> Option<Candidate<'file>> {
-        finding.map(|flagged| Candidate { found: Found::new(Site::new(path, LineNumber::from(span)), flagged), at })
+        finding.map(|flagged| Candidate {
+            found: Found::new(Site::new(path, LineNumber::from(span)), flagged),
+            at,
+            span,
+        })
     }
 
     pub fn looped(path: &'file Path, span: Span, finding: Finding) -> Option<Candidate<'file>> {
@@ -71,7 +76,11 @@ impl<'file> FunctionFlow<'file> {
     ) -> FunctionFlow<'file> {
         let root = Root::from(body);
         let rooted = root.address();
-        let found = candidates.into_iter().filter(|candidate| candidate.at.is_none_or(|at| Some(at) != rooted));
+        let inside = body.span().byte_range();
+        let found = candidates
+            .into_iter()
+            .filter(|candidate| inside.contains(&candidate.span.byte_range().start))
+            .filter(|candidate| candidate.at.is_none_or(|at| Some(at) != rooted));
         FunctionFlow {
             site: Site::new(path, LineNumber::from(name)),
             shape: root.verdict(),
