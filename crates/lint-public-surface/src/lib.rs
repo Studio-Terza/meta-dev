@@ -1,3 +1,4 @@
+use algebra::Monoid;
 use lint_layout::Name;
 use std::path::Path;
 mod export;
@@ -37,7 +38,7 @@ impl Gathers<References> for ReferenceGathering {
 
 impl FromIterator<References> for References {
     fn from_iter<Parts: IntoIterator<Item = References>>(parts: Parts) -> References {
-        References(parts.into_iter().map(|part| part.0).fold(ForeignReferences::default(), ForeignReferences::absorb))
+        References(Monoid::concat(parts.into_iter().map(|part| part.0)))
     }
 }
 
