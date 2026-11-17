@@ -96,8 +96,7 @@ impl<'scan> Shapes<'scan> {
     fn within(self, ty: &Type) -> Shapes<'scan> {
         let messages: Vec<Message> =
             self.loose.into_iter().chain(self.located.into_iter().flat_map(|located| located.messages)).collect();
-        let located = Some(Located { at: Address::from(ty), span: ty.span(), messages })
-            .filter(|located| located.messages.first().is_some());
+        let located = messages.first().copied().map(|_| Located { at: Address::from(ty), span: ty.span(), messages });
         Shapes { found: self.found, loose: Vec::new(), located: located.into_iter().collect() }
     }
 
