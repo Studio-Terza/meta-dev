@@ -3,15 +3,34 @@ mod extension;
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
+use std::fmt;
 use std::path::PathBuf;
 
 use file_ports::{FileFailure, Files};
+use invariants::{Ignore, Ignoring};
 use newtype::Wrapping;
 use port_core::Pass;
 
 use crate::transcripts::{TranscriptsFiller, transcripts_ops};
 use crate::{Cursor, Read, ReadFailure, Session, SessionId};
 use extension::Extension;
+
+#[derive(Clone, Copy, Debug)]
+enum Ignored {
+    NotATranscript,
+}
+
+impl fmt::Display for Ignored {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Ignored::NotATranscript => {
+                formatter.write_str("an entry without a transcript extension and a session id stem is not a session")
+            }
+        }
+    }
+}
+
+impl Ignore for Ignored {}
 
 #[derive(Debug)]
 pub struct ClaudeCodeDir<F: Files> {
@@ -27,9 +46,9 @@ impl<F: Files> ClaudeCodeDir<F> {
     fn session_at(&self, path: PathBuf) -> Option<Result<Session, FileFailure>> {
         path.extension()
             .and_then(OsStr::to_str)
-            .and_then(|named| named.parse::<Extension>().ok())
+            .and_then(|named| named.parse::<Extension>().ignoring(Ignored::NotATranscript))
             .and(path.file_stem())
-            .and_then(|stem| SessionId::try_new(stem.to_string_lossy().into_owned()).ok())
+            .and_then(|stem| SessionId::try_new(stem.to_string_lossy().into_owned()).ignoring(Ignored::NotATranscript))
             .map(|id| self.files.size(&path).map(|size| Session::found(id, path, size)))
     }
 }
