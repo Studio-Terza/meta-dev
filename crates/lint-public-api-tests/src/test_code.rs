@@ -18,7 +18,7 @@ pub struct TestCode<'file> {
     file: &'file SourceFile,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct InSource {
     lines: Vec<LineNumber>,
     invoked: Vec<Invoked>,
@@ -30,11 +30,7 @@ impl Semigroup for InSource {
     }
 }
 
-impl Monoid for InSource {
-    fn identity() -> InSource {
-        InSource { lines: Vec::new(), invoked: Vec::new() }
-    }
-}
+impl Monoid for InSource {}
 
 impl InSource {
     fn lines(lines: impl IntoIterator<Item = LineNumber>) -> InSource {

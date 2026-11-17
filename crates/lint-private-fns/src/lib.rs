@@ -54,7 +54,7 @@ struct PrivateFnCounter<'file> {
     file: &'file SourceFile,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct PrivateNames(BTreeMap<TypeName, Vec<Name>>);
 
 impl Semigroup for PrivateNames {
@@ -64,11 +64,7 @@ impl Semigroup for PrivateNames {
     }
 }
 
-impl Monoid for PrivateNames {
-    fn identity() -> PrivateNames {
-        PrivateNames(BTreeMap::new())
-    }
-}
+impl Monoid for PrivateNames {}
 
 impl PrivateFnCounter<'_> {
     fn private_names(item: &ItemImpl) -> impl Iterator<Item = Name> {

@@ -19,7 +19,7 @@ pub struct Declared<'file> {
     path: &'file std::path::Path,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Declarations<'file>(Vec<Declaration<'file>>);
 
 impl Semigroup for Declarations<'_> {
@@ -28,11 +28,7 @@ impl Semigroup for Declarations<'_> {
     }
 }
 
-impl Monoid for Declarations<'_> {
-    fn identity() -> Self {
-        Declarations(Vec::new())
-    }
-}
+impl Monoid for Declarations<'_> {}
 
 impl<'file> Declarations<'file> {
     pub(crate) fn unconsumed(self, consumers: &Consumers) -> Vec<Violation<'file>> {

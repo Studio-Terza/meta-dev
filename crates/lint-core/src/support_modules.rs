@@ -8,7 +8,7 @@ use crate::walk::Walk;
 use crate::watch::{Contribute, Facts, Kind};
 use lint_layout::Name;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SupportModules {
     names: Vec<Name>,
 }
@@ -49,11 +49,7 @@ impl Semigroup for SupportModules {
     }
 }
 
-impl Monoid for SupportModules {
-    fn identity() -> SupportModules {
-        SupportModules { names: Vec::new() }
-    }
-}
+impl Monoid for SupportModules {}
 
 impl Contribute for SupportScan {
     type Open = ();

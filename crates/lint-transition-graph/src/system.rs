@@ -14,7 +14,7 @@ use crate::transitions::Transitions;
 use crate::workspace_types::WorkspaceTypes;
 use fillers::Fillers;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Extraction<'file> {
     fillers: Fillers<'file>,
 }

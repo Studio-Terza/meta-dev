@@ -29,7 +29,7 @@ impl Lint for PairedApis {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PairedOwners<'head>(BTreeMap<Owner<'head>, Vec<Declared<'head>>>);
 
 impl<'head> FromIterator<PairedOwners<'head>> for PairedOwners<'head> {
@@ -45,11 +45,7 @@ impl Semigroup for PairedOwners<'_> {
     }
 }
 
-impl Monoid for PairedOwners<'_> {
-    fn identity() -> Self {
-        PairedOwners(BTreeMap::new())
-    }
-}
+impl Monoid for PairedOwners<'_> {}
 
 impl<'head> PairedOwners<'head> {
     pub(crate) fn new(owners: BTreeMap<Owner<'head>, Vec<Declared<'head>>>) -> PairedOwners<'head> {

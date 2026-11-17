@@ -17,7 +17,7 @@ pub struct Declarations {
     aliases: BTreeMap<TypeName, TypeName>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DeclarationReading {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
@@ -61,11 +61,7 @@ impl Semigroup for DeclarationReading {
     }
 }
 
-impl Monoid for DeclarationReading {
-    fn identity() -> DeclarationReading {
-        DeclarationReading { vertices: BTreeSet::new(), aliases: BTreeMap::new() }
-    }
-}
+impl Monoid for DeclarationReading {}
 
 impl FromIterator<Option<Declarations>> for Declarations {
     fn from_iter<Parts: IntoIterator<Item = Option<Declarations>>>(parts: Parts) -> Declarations {

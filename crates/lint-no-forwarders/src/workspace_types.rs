@@ -7,7 +7,7 @@ use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WorkspaceTypes(BTreeSet<Name>);
 
 #[derive(Debug)]
@@ -35,11 +35,7 @@ impl Semigroup for WorkspaceTypes {
     }
 }
 
-impl Monoid for WorkspaceTypes {
-    fn identity() -> WorkspaceTypes {
-        WorkspaceTypes(BTreeSet::new())
-    }
-}
+impl Monoid for WorkspaceTypes {}
 
 impl WorkspaceTypes {
     pub fn declares(&self, name: &Name) -> Option<&Name> {
