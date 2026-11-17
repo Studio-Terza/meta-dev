@@ -22,9 +22,12 @@ pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
     fn found(self: Box<Self>) -> Vec<Violation<'file>>;
 }
 
-impl<'file, Folded: Fold<Found = Vec<Violation<'file>>> + fmt::Debug> Finds<'file> for Folding<Folded> {
+impl<'file, Folded: Fold + fmt::Debug> Finds<'file> for Folding<Folded>
+where
+    Folded::Found: Into<Vec<Violation<'file>>>,
+{
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.concluded()
+        self.concluded().into()
     }
 }
 

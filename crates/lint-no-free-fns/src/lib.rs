@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Fold, Folding, Kind, Visit};
 use std::path::Path as StdPath;
 
 use syntax::{Ident, ItemFn, Path};
@@ -40,37 +40,32 @@ impl SweptLint for NoFreeFns {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()), found: Vec::new() })
+        Box::new(Folding::from(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()) }))
     }
 }
 
 #[derive(Debug)]
 struct FreeFns<'file> {
     path: &'file StdPath,
-    found: Vec<Violation<'file>>,
 }
 
-impl<'ast> Watch<'ast> for FreeFns<'_> {
+impl<'file> Fold for FreeFns<'file> {
+    type Found = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
+    fn on_item_fn(&self, found: Self::Found, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Visit<Self::Found> {
         let name = &function.sig.ident;
-        self.found.extend(NoFreeFns::exemption(function).map_or_else(
+        let free = NoFreeFns::exemption(function).map_or_else(
             || Some(Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::FreeFn { name })),
             |_| None,
-        ));
-        Descend::Into
+        );
+        Visit::descending(found.into_iter().chain(free).collect())
     }
 
-    fn on_macro(&mut self, _: &'ast syntax::Macro, _: &Facts<'_, syntax::Macro>) -> Descend {
-        Descend::Expand
-    }
-}
-
-impl<'file> Finds<'file> for FreeFns<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.found
+    fn on_macro(&self, found: Self::Found, _: &syntax::Macro, _: &Facts<'_, syntax::Macro>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Expand)
     }
 }

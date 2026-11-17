@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Fold, Folding, Kind, Visit};
 
 use std::path::Path;
 
@@ -27,36 +27,36 @@ impl SweptLint for NamedLifetimes {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(ShortLifetimes { path: AsRef::<Path>::as_ref(file.head()), found: Vec::new() })
+        Box::new(Folding::from(ShortLifetimes { path: AsRef::<Path>::as_ref(file.head()) }))
     }
 }
 
 #[derive(Debug)]
 struct ShortLifetimes<'file> {
     path: &'file Path,
-    found: Vec<Violation<'file>>,
 }
 
-impl<'ast> Watch<'ast> for ShortLifetimes<'_> {
+impl<'file> Fold for ShortLifetimes<'file> {
+    type Found = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::LifetimeParam, Kind::Macro]
     }
 
-    fn on_lifetime_param(&mut self, parameter: &'ast LifetimeParam, _: &Facts<'_, LifetimeParam>) -> Descend {
+    fn on_lifetime_param(
+        &self,
+        found: Self::Found,
+        parameter: &LifetimeParam,
+        _: &Facts<'_, LifetimeParam>,
+    ) -> Visit<Self::Found> {
         let name = &parameter.lifetime.ident;
-        self.found.extend((Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| {
+        let short = (Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| {
             Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::ShortLifetime { name })
-        }));
-        Descend::Over
+        });
+        Visit::new(found.into_iter().chain(short).collect(), Descend::Over)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
-    }
-}
-
-impl<'file> Finds<'file> for ShortLifetimes<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.found
+    fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Expand)
     }
 }
