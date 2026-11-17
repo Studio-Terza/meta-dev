@@ -3,8 +3,10 @@ mod nesting_depth;
 
 use finding::Finding;
 use lint_core::Headline;
+use lint_core::{Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Finds, Kind};
+use std::iter;
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
@@ -92,12 +94,7 @@ impl SweptLint for FnShape {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Shapes {
-            path: AsRef::<Path>::as_ref(file.head()),
-            depth: NestingDepth::default(),
-            nests: Vec::new(),
-            violations: Vec::new(),
-        })
+        Box::new(Folding::from(Shapes { path: AsRef::<Path>::as_ref(file.head()) }))
     }
 }
 
@@ -119,37 +116,55 @@ impl Nest {
 #[derive(Debug)]
 struct Shapes<'scan> {
     path: &'scan Path,
+}
+
+#[derive(Debug, Default)]
+struct Shaped<'scan> {
     depth: NestingDepth,
     nests: Vec<Nest>,
     violations: Vec<Violation<'scan>>,
 }
 
 impl<'scan> Shapes<'scan> {
-    fn found(path: &'scan Path, span: Span, finding: Finding) -> Violation<'scan> {
-        Violation::new(Site::new(path, LineNumber::from(span)), finding)
+    fn found(&self, span: Span, finding: Finding) -> Violation<'scan> {
+        Violation::new(Site::new(self.path, LineNumber::from(span)), finding)
     }
 
-    fn nesting(&mut self, at: Address) -> Descend {
-        self.nests.iter().rev().find(|nest| nest.at == at).copied().into_iter().for_each(|found| {
-            self.depth += NestingDepth::LEVEL;
-            let first_past = NestingDepth::beyond(FnShape::NESTING);
-            let deepest = (self.depth == first_past).then_some(found.span);
-            self.violations.extend(
-                deepest.map(|nested| Self::found(self.path, nested, Finding::DeepNesting { most: FnShape::NESTING })),
-            );
-        });
-        Descend::Into
-    }
-
-    fn unnesting(&mut self, at: Address) {
-        self.nests.iter().rposition(|nest| nest.at == at).into_iter().for_each(|index| {
-            self.nests.remove(index);
-            self.depth -= NestingDepth::LEVEL;
-        });
+    fn nesting(&self, found: Shaped<'scan>, at: Address) -> Visit<Shaped<'scan>> {
+        let nest = found.nests.iter().rev().find(|nest| nest.at == at).copied();
+        let depth = nest.map_or(found.depth, |_| found.depth + NestingDepth::LEVEL);
+        let deepest = nest.and_then(|nested| (depth == NestingDepth::beyond(FnShape::NESTING)).then_some(nested.span));
+        let flagged = deepest.map(|span| self.found(span, Finding::DeepNesting { most: FnShape::NESTING }));
+        Visit::descending(Shaped { depth, ..found }.flagged(flagged))
     }
 }
 
-impl<'ast> Watch<'ast> for Shapes<'_> {
+impl<'scan> Shaped<'scan> {
+    fn flagged(self, more: impl IntoIterator<Item = Violation<'scan>>) -> Shaped<'scan> {
+        Shaped { violations: self.violations.into_iter().chain(more).collect(), ..self }
+    }
+
+    fn pushed(self, more: impl IntoIterator<Item = Nest>) -> Visit<Shaped<'scan>> {
+        Visit::descending(Shaped { nests: self.nests.into_iter().chain(more).collect(), ..self })
+    }
+
+    fn unnesting(self, at: Address) -> Shaped<'scan> {
+        let index = self.nests.iter().rposition(|nest| nest.at == at);
+        let depth = index.map_or(self.depth, |_| self.depth - NestingDepth::LEVEL);
+        let nests = self.nests.into_iter().enumerate().filter(|(kept, _)| Some(*kept) != index).map(|(_, nest)| nest);
+        Shaped { depth, nests: nests.collect(), ..self }
+    }
+}
+
+impl<'scan> From<Shaped<'scan>> for Vec<Violation<'scan>> {
+    fn from(shaped: Shaped<'scan>) -> Vec<Violation<'scan>> {
+        shaped.violations
+    }
+}
+
+impl<'scan> Fold for Shapes<'scan> {
+    type Found = Shaped<'scan>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -172,114 +187,121 @@ impl<'ast> Watch<'ast> for Shapes<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Shaped<'scan>, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Shaped<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_impl(&self, found: Shaped<'scan>, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Visit<Shaped<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_trait(&self, found: Shaped<'scan>, _: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Visit<Shaped<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Shaped<'scan>, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Shaped<'scan>> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_fn(&self, found: Shaped<'scan>, _: &ItemFn, facts: &Facts<'_, ItemFn>) -> Visit<Shaped<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, facts: &Facts<'_, ImplItemFn>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_impl_item_fn(
+        &self,
+        found: Shaped<'scan>,
+        _: &ImplItemFn,
+        facts: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Shaped<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature, _: &Facts<'_, Signature>) -> Descend {
+    fn on_signature(
+        &self,
+        found: Shaped<'scan>,
+        signature: &Signature,
+        _: &Facts<'_, Signature>,
+    ) -> Visit<Shaped<'scan>> {
         let typed = signature.inputs.iter().filter(|argument| matches!(argument, FnArg::Typed(_))).count();
         let wide = FnShape::PARAMETERS.allows(Length::new(typed)).map_or(Some(signature.ident.span()), |_| None);
-        self.violations.extend(
-            wide.map(|span| Self::found(self.path, span, Finding::WideSignature { most: FnShape::PARAMETERS })),
-        );
-        Descend::Into
+        let flagged = wide.map(|span| self.found(span, Finding::WideSignature { most: FnShape::PARAMETERS }));
+        Visit::descending(found.flagged(flagged))
     }
 
-    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
-        self.violations.extend(
-            FnShape::binds_bool(local).map(|binding| Self::found(self.path, binding.span(), Finding::BooleanLocal)),
-        );
-        self.violations.extend(
-            local
-                .init
-                .as_ref()
-                .filter(|init| matches!(*init.expr, Expr::Tuple(_)))
-                .map(|_| Self::found(self.path, local.span(), Finding::TupleLocal)),
-        );
-        Descend::Into
+    fn on_local(&self, found: Shaped<'scan>, local: &Local, _: &Facts<'_, Local>) -> Visit<Shaped<'scan>> {
+        let boolean = FnShape::binds_bool(local).map(|binding| self.found(binding.span(), Finding::BooleanLocal));
+        let tupled = local
+            .init
+            .as_ref()
+            .filter(|init| matches!(*init.expr, Expr::Tuple(_)))
+            .map(|_| self.found(local.span(), Finding::TupleLocal));
+        Visit::descending(found.flagged(boolean.into_iter().chain(tupled)))
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.violations.extend(
-            call.args
-                .first()
-                .filter(|seed| matches!(seed, Expr::Tuple(_)))
-                .filter(|_| FnShape::FOLDS.iter().any(|fold| call.method == fold))
-                .map(|_| Self::found(self.path, call.method.span(), Finding::TupleAccumulator)),
-        );
-        Descend::Into
+    fn on_expr_method_call(
+        &self,
+        found: Shaped<'scan>,
+        call: &ExprMethodCall,
+        _: &Facts<'_, ExprMethodCall>,
+    ) -> Visit<Shaped<'scan>> {
+        let flagged = call
+            .args
+            .first()
+            .filter(|seed| matches!(seed, Expr::Tuple(_)))
+            .filter(|_| FnShape::FOLDS.iter().any(|fold| call.method == fold))
+            .map(|_| self.found(call.method.span(), Finding::TupleAccumulator));
+        Visit::descending(found.flagged(flagged))
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.then_branch), span: expr.if_token.span });
-        self.nests.extend(expr.else_branch.as_ref().and_then(|(_, branch)| Nest::unchained(branch)));
-        Descend::Into
+    fn on_expr_if(&self, found: Shaped<'scan>, expr: &ExprIf, _: &Facts<'_, ExprIf>) -> Visit<Shaped<'scan>> {
+        let then = Nest { at: Address::from(&expr.then_branch), span: expr.if_token.span };
+        let otherwise = expr.else_branch.as_ref().and_then(|(_, branch)| Nest::unchained(branch));
+        found.pushed(iter::once(then).chain(otherwise))
     }
 
-    fn on_arm(&mut self, arm: &'ast Arm, _: &Facts<'_, Arm>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&*arm.body), span: arm.body.span() });
-        Descend::Into
+    fn on_arm(&self, found: Shaped<'scan>, arm: &Arm, _: &Facts<'_, Arm>) -> Visit<Shaped<'scan>> {
+        found.pushed([Nest { at: Address::from(&*arm.body), span: arm.body.span() }])
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.for_token.span });
-        Descend::Into
+    fn on_expr_for_loop(
+        &self,
+        found: Shaped<'scan>,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+    ) -> Visit<Shaped<'scan>> {
+        found.pushed([Nest { at: Address::from(&expr.body), span: expr.for_token.span }])
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.while_token.span });
-        Descend::Into
+    fn on_expr_while(&self, found: Shaped<'scan>, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Visit<Shaped<'scan>> {
+        found.pushed([Nest { at: Address::from(&expr.body), span: expr.while_token.span }])
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.loop_token.span });
-        Descend::Into
+    fn on_expr_loop(&self, found: Shaped<'scan>, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Visit<Shaped<'scan>> {
+        found.pushed([Nest { at: Address::from(&expr.body), span: expr.loop_token.span }])
     }
 
-    fn on_expr_closure(&mut self, closure: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&*closure.body), span: closure.or1_token.span });
-        Descend::Into
+    fn on_expr_closure(
+        &self,
+        found: Shaped<'scan>,
+        closure: &ExprClosure,
+        _: &Facts<'_, ExprClosure>,
+    ) -> Visit<Shaped<'scan>> {
+        found.pushed([Nest { at: Address::from(&*closure.body), span: closure.or1_token.span }])
     }
 
-    fn on_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) -> Descend {
-        self.nesting(facts.address())
+    fn on_block(&self, found: Shaped<'scan>, _: &Block, facts: &Facts<'_, Block>) -> Visit<Shaped<'scan>> {
+        self.nesting(found, facts.address())
     }
 
-    fn off_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) {
-        self.unnesting(facts.address());
+    fn off_block(&self, found: Shaped<'scan>, _: &Block, facts: &Facts<'_, Block>) -> Shaped<'scan> {
+        found.unnesting(facts.address())
     }
 
-    fn on_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) -> Descend {
-        self.nesting(facts.address())
+    fn on_expr(&self, found: Shaped<'scan>, _: &Expr, facts: &Facts<'_, Expr>) -> Visit<Shaped<'scan>> {
+        self.nesting(found, facts.address())
     }
 
-    fn off_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) {
-        self.unnesting(facts.address());
-    }
-}
-
-impl<'file> Finds<'file> for Shapes<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+    fn off_expr(&self, found: Shaped<'scan>, _: &Expr, facts: &Facts<'_, Expr>) -> Shaped<'scan> {
+        found.unnesting(facts.address())
     }
 }

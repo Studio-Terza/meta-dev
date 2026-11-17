@@ -1,6 +1,7 @@
 use lint_core::Headline;
+use lint_core::{Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Finds, Kind};
 use std::path::Path;
 use syntax::Span;
 
@@ -23,8 +24,9 @@ pub struct ConstShape;
 
 impl ConstShape {}
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum Context {
+    #[default]
     Surface,
     Const,
 }
@@ -35,14 +37,7 @@ impl SweptLint for ConstShape {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(ConstContexts {
-            path: AsRef::<Path>::as_ref(file.head()),
-            context: Contexts { current: Context::Surface, outer: Vec::new() },
-            zone: Zone::of_file(file),
-            zones: Vec::new(),
-            pending: Vec::new(),
-            violations: Vec::new(),
-        })
+        Box::new(Folding::from(ConstContexts { path: AsRef::<Path>::as_ref(file.head()), zone: Zone::of_file(file) }))
     }
 }
 
@@ -86,9 +81,14 @@ impl Zone {
 #[derive(Debug)]
 struct ConstContexts<'scan> {
     path: &'scan Path,
-    context: Contexts,
     zone: Zone,
+}
+
+#[derive(Debug, Default)]
+struct Consted<'scan> {
+    zone: Option<Zone>,
     zones: Vec<Zone>,
+    context: Contexts,
     pending: Vec<Address>,
     violations: Vec<Violation<'scan>>,
 }
@@ -98,12 +98,12 @@ impl<'scan> ConstContexts<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
-    fn cast_finding(&self, cast: &ExprCast) -> Option<Violation<'scan>> {
-        Some(self)
+    fn cast_finding(&self, found: &Consted<'scan>, cast: &ExprCast) -> Option<Violation<'scan>> {
+        Some(found)
             .filter(|scan| scan.context.current == Context::Surface)
-            .filter(|scan| scan.zone == Zone::Elsewhere)
-            .map(|scan| {
-                scan.violation(
+            .filter(|scan| scan.zone.unwrap_or(self.zone) == Zone::Elsewhere)
+            .map(|_| {
+                self.violation(
                     cast.as_token.span,
                     Message::new(
                         Problem::new("as cast outside a const fn"),
@@ -113,29 +113,66 @@ impl<'scan> ConstContexts<'scan> {
             })
     }
 
-    fn loop_finding(&self, span: Span, message: Message) -> Option<Violation<'scan>> {
-        (self.context.current == Context::Const).then(|| self.violation(span, message))
+    fn looped(&self, found: Consted<'scan>, span: Span, message: Message) -> Visit<Consted<'scan>> {
+        let flagged = (found.context.current == Context::Const).then(|| self.violation(span, message));
+        Visit::descending(found.flagged(flagged))
     }
 }
 
-#[derive(Debug)]
+impl<'scan> Consted<'scan> {
+    fn flagged(self, more: impl IntoIterator<Item = Violation<'scan>>) -> Consted<'scan> {
+        Consted { violations: self.violations.into_iter().chain(more).collect(), ..self }
+    }
+
+    fn within(self, context: Context) -> Visit<Consted<'scan>> {
+        Visit::descending(Consted { context: self.context.within(context), ..self })
+    }
+
+    fn restored(self) -> Consted<'scan> {
+        Consted { context: self.context.restored(), ..self }
+    }
+
+    fn awaiting(self, more: impl IntoIterator<Item = Address>) -> Visit<Consted<'scan>> {
+        Visit::descending(Consted { pending: self.pending.into_iter().chain(more).collect(), ..self })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Mark {
+    Entered,
+    Left,
+    Unmarked,
+}
+
+#[derive(Debug, Default)]
 struct Contexts {
     current: Context,
     outer: Vec<Context>,
 }
 
 impl Contexts {
-    fn within(&mut self, context: Context) -> Descend {
-        self.outer.push(std::mem::replace(&mut self.current, context));
-        Descend::Into
+    fn within(self, context: Context) -> Contexts {
+        Contexts { current: context, outer: self.outer.into_iter().chain([self.current]).collect() }
     }
 
-    fn restored(&mut self) {
-        self.current = self.outer.pop().unwrap_or(Context::Surface);
+    fn restored(self) -> Contexts {
+        let mut outer = self.outer;
+        let current = outer.pop().unwrap_or(Context::Surface);
+        Contexts { current, outer }
+    }
+
+    fn marked(self, mark: Mark) -> Contexts {
+        match mark {
+            Mark::Entered => self.within(Context::Const),
+            Mark::Left => self.restored(),
+            Mark::Unmarked => self,
+        }
     }
 }
 
-impl<'ast> Watch<'ast> for ConstContexts<'_> {
+impl<'scan> Fold for ConstContexts<'scan> {
+    type Found = Consted<'scan>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -159,160 +196,222 @@ impl<'ast> Watch<'ast> for ConstContexts<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        self.zones.push(self.zone);
-        self.zone = self.zone.entering(module);
-        Descend::from(facts.gate())
+    fn on_item_mod(
+        &self,
+        found: Consted<'scan>,
+        module: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+    ) -> Visit<Consted<'scan>> {
+        let zone = found.zone.unwrap_or(self.zone);
+        let zones = found.zones.into_iter().chain([zone]).collect();
+        Visit::new(Consted { zone: Some(zone.entering(module)), zones, ..found }, Descend::from(facts.gate()))
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.zone = self.zones.pop().unwrap_or(self.zone);
+    fn off_item_mod(&self, found: Consted<'scan>, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Consted<'scan> {
+        let mut zones = found.zones;
+        let zone = zones.pop().or(found.zone);
+        Consted { zone, zones, ..found }
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.context.within(Context::of_fn(function.sig.constness.as_ref()))
+    fn on_item_fn(&self, found: Consted<'scan>, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Visit<Consted<'scan>> {
+        found.within(Context::of_fn(function.sig.constness.as_ref()))
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
-        self.context.restored();
+    fn off_item_fn(&self, found: Consted<'scan>, _: &ItemFn, _: &Facts<'_, ItemFn>) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.context.within(Context::of_fn(function.sig.constness.as_ref()))
+    fn on_impl_item_fn(
+        &self,
+        found: Consted<'scan>,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Consted<'scan>> {
+        found.within(Context::of_fn(function.sig.constness.as_ref()))
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.context.restored();
+    fn off_impl_item_fn(&self, found: Consted<'scan>, _: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.context.within(Context::Surface)
+    fn on_trait_item_fn(
+        &self,
+        found: Consted<'scan>,
+        _: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+    ) -> Visit<Consted<'scan>> {
+        found.within(Context::Surface)
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
-        self.context.restored();
+    fn off_trait_item_fn(&self, found: Consted<'scan>, _: &TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn on_item_const(&self, found: Consted<'scan>, _: &ItemConst, _: &Facts<'_, ItemConst>) -> Visit<Consted<'scan>> {
+        found.within(Context::Const)
     }
 
-    fn off_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) {
-        self.context.restored();
+    fn off_item_const(&self, found: Consted<'scan>, _: &ItemConst, _: &Facts<'_, ItemConst>) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) -> Descend {
-        self.context.within(Context::Const)
+    fn on_item_static(
+        &self,
+        found: Consted<'scan>,
+        _: &ItemStatic,
+        _: &Facts<'_, ItemStatic>,
+    ) -> Visit<Consted<'scan>> {
+        found.within(Context::Const)
     }
 
-    fn off_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) {
-        self.context.restored();
+    fn off_item_static(&self, found: Consted<'scan>, _: &ItemStatic, _: &Facts<'_, ItemStatic>) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn on_impl_item_const(
+        &self,
+        found: Consted<'scan>,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+    ) -> Visit<Consted<'scan>> {
+        found.within(Context::Const)
     }
 
-    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) {
-        self.context.restored();
+    fn off_impl_item_const(
+        &self,
+        found: Consted<'scan>,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+    ) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn on_trait_item_const(
+        &self,
+        found: Consted<'scan>,
+        _: &TraitItemConst,
+        _: &Facts<'_, TraitItemConst>,
+    ) -> Visit<Consted<'scan>> {
+        found.within(Context::Const)
     }
 
-    fn off_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) {
-        self.context.restored();
+    fn off_trait_item_const(
+        &self,
+        found: Consted<'scan>,
+        _: &TraitItemConst,
+        _: &Facts<'_, TraitItemConst>,
+    ) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn on_expr_const(&self, found: Consted<'scan>, _: &ExprConst, _: &Facts<'_, ExprConst>) -> Visit<Consted<'scan>> {
+        found.within(Context::Const)
     }
 
-    fn off_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) {
-        self.context.restored();
+    fn off_expr_const(&self, found: Consted<'scan>, _: &ExprConst, _: &Facts<'_, ExprConst>) -> Consted<'scan> {
+        found.restored()
     }
 
-    fn on_type_array(&mut self, array: &'ast TypeArray, _: &Facts<'_, TypeArray>) -> Descend {
-        self.pending.push(Address::from(&array.len));
-        Descend::Into
+    fn on_type_array(
+        &self,
+        found: Consted<'scan>,
+        array: &TypeArray,
+        _: &Facts<'_, TypeArray>,
+    ) -> Visit<Consted<'scan>> {
+        found.awaiting([Address::from(&array.len)])
     }
 
-    fn on_expr_repeat(&mut self, repeat: &'ast ExprRepeat, _: &Facts<'_, ExprRepeat>) -> Descend {
-        self.pending.push(Address::from(&*repeat.len));
-        Descend::Into
+    fn on_expr_repeat(
+        &self,
+        found: Consted<'scan>,
+        repeat: &ExprRepeat,
+        _: &Facts<'_, ExprRepeat>,
+    ) -> Visit<Consted<'scan>> {
+        found.awaiting([Address::from(&*repeat.len)])
     }
 
-    fn on_variant(&mut self, variant: &'ast Variant, _: &Facts<'_, Variant>) -> Descend {
-        self.pending.extend(variant.discriminant.iter().map(|(_, discriminant)| Address::from(discriminant)));
-        Descend::Into
+    fn on_variant(&self, found: Consted<'scan>, variant: &Variant, _: &Facts<'_, Variant>) -> Visit<Consted<'scan>> {
+        found.awaiting(variant.discriminant.iter().map(|(_, discriminant)| Address::from(discriminant)))
     }
 
-    fn on_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) -> Descend {
+    fn on_expr(&self, found: Consted<'scan>, _: &Expr, facts: &Facts<'_, Expr>) -> Visit<Consted<'scan>> {
         let at = facts.address();
-        let pending = self.pending.iter().rposition(|waiting| *waiting == at);
-        pending.map_or(Descend::Into, |_| self.context.within(Context::Const))
+        let pending = found.pending.iter().rposition(|waiting| *waiting == at);
+        Visit::descending(Consted {
+            context: found.context.marked(pending.map_or(Mark::Unmarked, |_| Mark::Entered)),
+            ..found
+        })
     }
 
-    fn off_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) {
+    fn off_expr(&self, found: Consted<'scan>, _: &Expr, facts: &Facts<'_, Expr>) -> Consted<'scan> {
         let at = facts.address();
-        self.pending.iter().rposition(|waiting| *waiting == at).into_iter().for_each(|index| {
-            self.pending.remove(index);
-            self.context.restored();
-        });
+        let index = found.pending.iter().rposition(|waiting| *waiting == at);
+        let pending = found.pending.into_iter().enumerate().filter(|(kept, _)| Some(*kept) != index);
+        Consted {
+            pending: pending.map(|(_, waiting)| waiting).collect(),
+            context: found.context.marked(index.map_or(Mark::Unmarked, |_| Mark::Left)),
+            ..found
+        }
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Consted<'scan>, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Consted<'scan>> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_expr_cast(&mut self, cast: &'ast ExprCast, _: &Facts<'_, ExprCast>) -> Descend {
-        let finding = self.cast_finding(cast);
-        self.violations.extend(finding);
-        Descend::Into
+    fn on_expr_cast(&self, found: Consted<'scan>, cast: &ExprCast, _: &Facts<'_, ExprCast>) -> Visit<Consted<'scan>> {
+        let finding = self.cast_finding(&found, cast);
+        Visit::descending(found.flagged(finding))
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
-        let finding = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted).map(|_| {
-            self.loop_finding(
+    fn on_expr_while(
+        &self,
+        found: Consted<'scan>,
+        expr: &ExprWhile,
+        _: &Facts<'_, ExprWhile>,
+    ) -> Visit<Consted<'scan>> {
+        match Looping::from(&*expr.cond) {
+            Looping::Counted => self.looped(
+                found,
                 expr.while_token.span,
                 Message::new(
                     Problem::new("counter loop in const context"),
                     Fix::new("walk a slice with while let [head, rest @ ..]"),
                 ),
-            )
-        });
-        self.violations.extend(finding.flatten());
-        Descend::Into
+            ),
+            Looping::Walking => Visit::descending(found),
+        }
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
-        let finding = self.loop_finding(
+    fn on_expr_loop(&self, found: Consted<'scan>, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Visit<Consted<'scan>> {
+        self.looped(
+            found,
             expr.loop_token.span,
             Message::new(
                 Problem::new("open loop in const context"),
                 Fix::new("walk a slice with while let or recurse"),
             ),
-        );
-        self.violations.extend(finding);
-        Descend::Into
+        )
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
-        let finding = self.loop_finding(
+    fn on_expr_for_loop(
+        &self,
+        found: Consted<'scan>,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+    ) -> Visit<Consted<'scan>> {
+        self.looped(
+            found,
             expr.for_token.span,
             Message::new(
                 Problem::new("for loop in const context"),
                 Fix::new("walk a slice with while let [head, rest @ ..]"),
             ),
-        );
-        self.violations.extend(finding);
-        Descend::Into
+        )
     }
 }
 
-impl<'file> Finds<'file> for ConstContexts<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+impl<'scan> From<Consted<'scan>> for Vec<Violation<'scan>> {
+    fn from(consted: Consted<'scan>) -> Vec<Violation<'scan>> {
+        consted.violations
     }
 }

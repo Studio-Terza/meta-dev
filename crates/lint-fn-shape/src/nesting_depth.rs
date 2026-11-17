@@ -1,4 +1,4 @@
-use std::ops::{AddAssign, SubAssign};
+use std::ops::{Add, Sub};
 
 use lint_core::Bound;
 
@@ -14,14 +14,18 @@ impl NestingDepth {
     }
 }
 
-impl AddAssign for NestingDepth {
-    fn add_assign(&mut self, other: NestingDepth) {
-        self.0 += other.0;
+impl Add for NestingDepth {
+    type Output = NestingDepth;
+
+    fn add(self, other: NestingDepth) -> NestingDepth {
+        NestingDepth(self.0 + other.0)
     }
 }
 
-impl SubAssign for NestingDepth {
-    fn sub_assign(&mut self, other: NestingDepth) {
-        self.0 -= other.0;
+impl Sub for NestingDepth {
+    type Output = NestingDepth;
+
+    fn sub(self, other: NestingDepth) -> NestingDepth {
+        NestingDepth(self.0 - other.0)
     }
 }
