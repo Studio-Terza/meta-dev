@@ -241,6 +241,7 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: mutants-plan
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
