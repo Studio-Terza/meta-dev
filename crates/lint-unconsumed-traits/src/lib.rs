@@ -20,10 +20,10 @@ impl ContextLint for UnconsumedTraits {
     type Part<'head> = Consumers;
     type Context<'head> = Consumers;
 
-    type Gathering<'head> = Consuming;
+    type Gathering<'head> = Folding<Consuming>;
 
-    fn gathering(parsed: Parsed<'_, '_>) -> Consuming {
-        Consuming::from(<&SourceFile>::from(parsed))
+    fn gathering(parsed: Parsed<'_, '_>) -> Folding<Consuming> {
+        Folding::from(Consuming::from(<&SourceFile>::from(parsed)))
     }
 }
 

@@ -4,7 +4,7 @@ use syntax::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
 #[derive(Debug, Default)]
 pub struct Consumers {
@@ -14,7 +14,6 @@ pub struct Consumers {
 
 #[derive(Debug)]
 pub struct Consuming {
-    consumers: Consumers,
     kinds: &'static [Kind],
 }
 
@@ -23,17 +22,7 @@ impl From<&SourceFile> for Consuming {
         let kinds = file
             .shipped()
             .map_or(&[][..], |_| &[Kind::ItemMod, Kind::TraitBound, Kind::ExprMethodCall, Kind::ExprPath][..]);
-        Consuming { consumers: Consumers::default(), kinds }
-    }
-}
-
-impl Gathers<Consumers> for Consuming {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> Consumers {
-        self.consumers
+        Consuming { kinds }
     }
 }
 
@@ -53,34 +42,48 @@ impl Consumers {
     }
 }
 
-impl<'ast> Watch<'ast> for Consuming {
+impl Fold for Consuming {
+    type Found = Consumers;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Consumers, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Consumers> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_trait_bound(&mut self, bound: &'ast TraitBound, _: &Facts<'_, TraitBound>) -> Descend {
-        self.consumers.bounds.extend(bound.path.segments.last().map(|segment| Name::from(&segment.ident)));
-        Descend::Into
+    fn on_trait_bound(&self, found: Consumers, bound: &TraitBound, _: &Facts<'_, TraitBound>) -> Visit<Consumers> {
+        Visit::descending(Consumers {
+            bounds: found
+                .bounds
+                .into_iter()
+                .chain(bound.path.segments.last().map(|segment| Name::from(&segment.ident)))
+                .collect(),
+            ..found
+        })
     }
 
-    fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.consumers.called.extend(facts.name().cloned());
-        Descend::Into
+    fn on_expr_method_call(
+        &self,
+        found: Consumers,
+        _: &ExprMethodCall,
+        facts: &Facts<'_, ExprMethodCall>,
+    ) -> Visit<Consumers> {
+        Visit::descending(Consumers {
+            called: found.called.into_iter().chain(facts.name().cloned()).collect(),
+            ..found
+        })
     }
 
-    fn on_expr_path(&mut self, path: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
-        self.consumers.called.extend(
-            path.path
-                .segments
-                .iter()
-                .nth(1)
-                .and_then(|_| path.path.segments.last())
-                .map(|segment| Name::from(&segment.ident)),
-        );
-        Descend::Into
+    fn on_expr_path(&self, found: Consumers, path: &ExprPath, _: &Facts<'_, ExprPath>) -> Visit<Consumers> {
+        let called = path
+            .path
+            .segments
+            .iter()
+            .nth(1)
+            .and_then(|_| path.path.segments.last())
+            .map(|segment| Name::from(&segment.ident));
+        Visit::descending(Consumers { called: found.called.into_iter().chain(called).collect(), ..found })
     }
 }
