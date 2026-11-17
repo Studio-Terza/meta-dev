@@ -63,6 +63,10 @@ const ON_SHARED: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),
     Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nserde_json = \"1\"\n"),
 );
+const ON_DERIVE: Source = Source::new(
+    Located::new("crates/design-store/Cargo.toml"),
+    Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nsqlx-derive = \"1\"\n"),
+);
 const ON_UNOWNED: Source = Source::new(
     Located::new("crates/design-store/Cargo.toml"),
     Text::new("[package]\nname = \"design-store\"\n\n[dependencies]\nlogos = \"0.16\"\n"),
@@ -137,13 +141,15 @@ macro_rules! store {
      {\"id\": \"sqlx-macros-core\", \"name\": \"sqlx-macros-core\", \"manifest_path\": \"/r/sqlx-macros-core/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"libsqlite3-sys\", \"name\": \"libsqlite3-sys\", \"manifest_path\": \"/r/libsqlite3-sys/Cargo.toml\", \"dependencies\": []},\
      {\"id\": \"serde_json\", \"name\": \"serde_json\", \"manifest_path\": \"/r/serde_json/Cargo.toml\", \"dependencies\": []},\
-     {\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []}\
+     {\"id\": \"logos\", \"name\": \"logos\", \"manifest_path\": \"/r/logos/Cargo.toml\", \"dependencies\": []},\
+     {\"id\": \"sqlx-derive\", \"name\": \"sqlx-derive\", \"manifest_path\": \"/r/sqlx-derive/Cargo.toml\", \"dependencies\": [], \"targets\": [{\"kind\": [\"proc-macro\"], \"src_path\": \"/r/sqlx-derive/src/lib.rs\"}]}\
      ], \"resolve\": {\"nodes\": [\
      {\"id\": \"store-ports\", \"dependencies\": [\"sqlx\", \"libsqlite3-sys\", \"store-ports-macros\"]},\
      {\"id\": \"store-ports-macros\", \"dependencies\": [\"sqlx-macros-core\", \"sqlx-core\"]},\
      {\"id\": \"design-store\", \"dependencies\": [", $required, "]},\
      {\"id\": \"sqlx\", \"dependencies\": [\"sqlx-core\", \"libsqlite3-sys\"]},\
      {\"id\": \"sqlx-core\", \"dependencies\": [\"serde_json\"]},\
+     {\"id\": \"sqlx-derive\", \"dependencies\": [\"sqlx\"]},\
      {\"id\": \"sqlx-macros-core\", \"dependencies\": [\"sqlx-core\"]}\
      ]}}"
         ))
@@ -158,6 +164,7 @@ const STORE_ON_LIBSQLITE: Text = store!("{\"name\": \"libsqlite3-sys\"}", "\"lib
 const STORE_ON_SQLX_CORE: Text = store!("{\"name\": \"sqlx-core\"}", "\"sqlx-core\"");
 const STORE_ON_SERDE_JSON: Text = store!("{\"name\": \"serde_json\"}", "\"serde_json\"");
 const STORE_ON_LOGOS: Text = store!("{\"name\": \"logos\"}", "\"logos\"");
+const STORE_ON_DERIVE: Text = store!("{\"name\": \"sqlx-derive\"}", "\"sqlx-derive\"");
 const STORE_WITHOUT_MACROS: Text = Text::new(
     "{\"workspace_root\": \"/w\", \"workspace_members\": [\"store-ports\", \"store-ports-macros\", \"design-store\"], \"packages\": [\
      {\"id\": \"store-ports\", \"name\": \"store-ports\", \"manifest_path\": \"/w/crates/store-ports/Cargo.toml\", \"dependencies\": [], \"metadata\": {\"port\": {\"owns\": [\"sqlx\"]}}, \"targets\": [{\"kind\": [\"lib\"], \"src_path\": \"/w/crates/store-ports/src/lib.rs\"}]},\
@@ -717,6 +724,7 @@ laws::table!(
     [
         Placed::new(&[PORT, MACROS, ON_SHARED], UNIT_CRATES, STORE_ON_SERDE_JSON) => Lines::default(),
         Placed::new(&[PORT, MACROS, ON_UNOWNED], UNIT_CRATES, STORE_ON_LOGOS) => Lines::default(),
+        Placed::new(&[PORT, MACROS, ON_DERIVE], UNIT_CRATES, STORE_ON_DERIVE) => Lines::default(),
     ]
 );
 

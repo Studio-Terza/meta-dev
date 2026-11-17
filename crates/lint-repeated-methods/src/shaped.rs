@@ -5,7 +5,7 @@ use lint_layout::Name;
 
 use graph::{
     Evaluation, Exposure, Function, Held, Input, ItemId, ItemPath, Model, Owner, Parameter, Placed, Reach, Receiver,
-    Region, Resolved, Returned, Seat, Site, Sited, Spelling, TypeRef,
+    Region, Resolved, Seat, Site, Sited, Spelling, TypeRef,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -105,10 +105,8 @@ impl<'model> Shaped<'model> {
 impl Subject<'_> {
     fn erased(self, sited: &Sited) -> Erased {
         let resolved: &Resolved = sited.as_ref();
-        let named_self = resolved.parameter().and_then(Returned::named).filter(|found| *found == Returned::Itself);
         Some(resolved)
             .filter(|candidate| *candidate != self.resolved)
-            .filter(|_| named_self.is_none())
             .map_or(Erased::Subject, |other| Self::named(sited, other))
     }
 

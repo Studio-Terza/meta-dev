@@ -11,6 +11,7 @@ const CONST_CONSTRUCTORS: &str = "pub struct A(u8);\npub struct B(u8);\npub stru
 const CONST_METHODS: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl A {\n    pub const fn zero() -> Self { A(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\nimpl B {\n    pub const fn zero() -> Self { B(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\nimpl C {\n    pub const fn zero() -> Self { C(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\n";
 
 const OWN_TYPE: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn join(&self, other: A) -> A { other }\n}\nimpl B {\n    pub fn join(&self, other: B) -> B { other }\n}\nimpl C {\n    pub fn join(&self, other: C) -> C { other }\n}\n";
+const SELF_OR_NAMED: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn join(&self, other: Self) -> Self { other }\n}\nimpl B {\n    pub fn join(&self, other: B) -> B { other }\n}\nimpl C {\n    pub fn join(&self, other: C) -> Self { other }\n}\n";
 const DIFFERENT_RETURNS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn show(&self) -> u8 { 1 }\n}\nimpl B {\n    pub fn show(&self) -> u16 { 1 }\n}\nimpl C {\n    pub fn show(&self) -> u32 { 1 }\n}\n";
 const INLINE: &str = "mod inner {\n    struct A;\n    struct B;\n    struct C;\n    impl A {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl B {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl C {\n        pub fn show(&self) -> u8 { 1 }\n    }\n}\n";
 
@@ -33,7 +34,7 @@ const LIB_X: Source =
     Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod a;\nmod b;\nmod c;\nmod impls;\n"));
 const CONSTRUCTORS_ELSEWHERE: &str = "use crate::a::A;\nuse crate::b::B;\nuse crate::c::C;\n\nimpl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner) }\n}\n";
 
-const CASES: [Case; 18] = [
+const CASES: [Case; 19] = [
     Case::new(
         Title::new("only the input of the inner type is the inner"),
         &[Source::new(Located::new("a.rs"), Text::new(ONE_INNER_INPUT))],
@@ -72,6 +73,11 @@ const CASES: [Case; 18] = [
     Case::new(
         Title::new("own type erased"),
         &[Source::new(Located::new("a.rs"), Text::new(OWN_TYPE))],
+        Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("Self and the own type's name are one type"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_OR_NAMED))],
         Flagged::new(&["a.rs:5"]),
     ),
     Case::new(
