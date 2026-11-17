@@ -158,9 +158,9 @@ impl<'read> Lowering<'read> {
 
     fn reentered<'item>(self, items: impl Iterator<Item = &'item syntax::Item>) -> Lowering<'read> {
         let origin = self.origin;
-        let mut scoped = Scoped::new(Folding::seeded(origin, Some(self)));
+        let mut scoped = Scoped::new(Folding::seeded(origin, Some(Box::new(self))));
         items.for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
-        origin.opened(scoped.into_parent().concluded())
+        *origin.opened(scoped.into_parent().concluded())
     }
 
     pub(super) fn trait_owning(&mut self, ident: &Ident, attributes: &[Attribute]) -> PlaceId {

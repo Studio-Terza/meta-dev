@@ -386,12 +386,12 @@ impl<'read> Lowerer<'read> {
         Lowerer { source, reach }
     }
 
-    pub(crate) fn lowered(&self, found: Option<Lowering<'read>>) -> Lowered {
+    pub(crate) fn lowered(&self, found: Option<Box<Lowering<'read>>>) -> Lowered {
         self.opened(found).lowered
     }
 
-    fn opened(&self, found: Option<Lowering<'read>>) -> Lowering<'read> {
-        found.unwrap_or_else(|| Lowering::of_file(*self))
+    fn opened(&self, found: Option<Box<Lowering<'read>>>) -> Box<Lowering<'read>> {
+        found.unwrap_or_else(|| Box::new(Lowering::of_file(*self)))
     }
 
     fn macro_left(lowering: Lowering<'read>, item: &ItemMacro) -> Lowering<'read> {
@@ -403,15 +403,19 @@ impl<'read> Lowerer<'read> {
 
     fn stepped(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         step: impl FnOnce(&mut Lowering<'read>) -> Descend,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         let mut lowering = self.opened(found);
         let descend = step(&mut lowering);
         Visit::new(Some(lowering), descend)
     }
 
-    fn settled(&self, found: Option<Lowering<'read>>, step: impl FnOnce(&mut Lowering<'read>)) -> Lowering<'read> {
+    fn settled(
+        &self,
+        found: Option<Box<Lowering<'read>>>,
+        step: impl FnOnce(&mut Lowering<'read>),
+    ) -> Box<Lowering<'read>> {
         let mut lowering = self.opened(found);
         step(&mut lowering);
         lowering
@@ -421,12 +425,15 @@ impl<'read> Lowerer<'read> {
 impl<'read> AttachingGroups<BodyGroup> for Lowerer<'read> {
     const ATTACHED: &'static [Kind] = BodyGroup::KINDS;
 
-    fn attaching(&self, found: Option<Lowering<'read>>) -> Drawn<Option<Lowering<'read>>, Vec<Attachment<BodyGroup>>> {
-        let lowering = self.opened(found);
-        Drawn::new(Some(Lowering { opening: Vec::new(), ..lowering }), lowering.opening)
+    fn attaching(
+        &self,
+        found: Option<Box<Lowering<'read>>>,
+    ) -> Drawn<Option<Box<Lowering<'read>>>, Vec<Attachment<BodyGroup>>> {
+        let lowering = *self.opened(found);
+        Drawn::new(Some(Box::new(Lowering { opening: Vec::new(), ..lowering })), lowering.opening)
     }
 
-    fn detached(&self, found: Option<Lowering<'read>>, group: BodyGroup) -> Option<Lowering<'read>> {
+    fn detached(&self, found: Option<Box<Lowering<'read>>>, group: BodyGroup) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             let row = group.row();
             let definition = group.lowered();
@@ -678,7 +685,7 @@ impl Lowering<'_> {
 }
 
 impl<'read> Fold for Lowerer<'read> {
-    type Found = Option<Lowering<'read>>;
+    type Found = Option<Box<Lowering<'read>>>;
 
     fn kinds(&self) -> &'static [Kind] {
         &[
@@ -714,19 +721,19 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &syntax::Item,
         _: &Facts<'_, syntax::Item>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, Lowering::saved)
     }
 
     fn off_item(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &syntax::Item,
         _: &Facts<'_, syntax::Item>,
-    ) -> Option<Lowering<'read>> {
+    ) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             lowering.restored();
         }))
@@ -734,10 +741,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_type(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         ty: &syntax::Type,
         _: &Facts<'_, syntax::Type>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.types_used(ty);
             Descend::Into
@@ -746,19 +753,19 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item_mod(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemMod,
         _: &Facts<'_, ItemMod>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.item_mod_entered(item))
     }
 
     fn on_block(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         block: &Block,
         _: &Facts<'_, Block>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.saved();
             lowering.entered(ScopeKind::Block, Entries::of_block(&block.stmts), lowering.here.children());
@@ -766,7 +773,12 @@ impl<'read> Fold for Lowerer<'read> {
         })
     }
 
-    fn off_block(&self, found: Option<Lowering<'read>>, _: &Block, _: &Facts<'_, Block>) -> Option<Lowering<'read>> {
+    fn off_block(
+        &self,
+        found: Option<Box<Lowering<'read>>>,
+        _: &Block,
+        _: &Facts<'_, Block>,
+    ) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             lowering.restored();
         }))
@@ -774,46 +786,46 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item_impl(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         block: &ItemImpl,
         _: &Facts<'_, ItemImpl>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.impl_scoped(block))
     }
 
     fn on_item_trait(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemTrait,
         _: &Facts<'_, ItemTrait>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.trait_entered(item))
     }
 
     fn on_item_fn(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemFn,
         _: &Facts<'_, ItemFn>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.fn_entered(item))
     }
 
     fn on_impl_item_fn(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.method_entered(&item.attrs, &item.vis, &item.sig, Some(&item.block)))
     }
 
     fn off_impl_item_fn(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-    ) -> Option<Lowering<'read>> {
+    ) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             lowering.restored();
         }))
@@ -821,10 +833,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_trait_item_fn(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &TraitItemFn,
         _: &Facts<'_, TraitItemFn>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.method_entered(&item.attrs, &SynVisibility::Inherited, &item.sig, item.default.as_ref())
         })
@@ -832,10 +844,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn off_trait_item_fn(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &TraitItemFn,
         _: &Facts<'_, TraitItemFn>,
-    ) -> Option<Lowering<'read>> {
+    ) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             lowering.restored();
         }))
@@ -843,19 +855,19 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_foreign_item_fn(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ForeignItemFn,
         _: &Facts<'_, ForeignItemFn>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.foreign_entered(item))
     }
 
     fn on_item_type(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemType,
         _: &Facts<'_, ItemType>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             let generics = InScope::outside().extended(&item.generics);
             let target = generics.lowered(&item.ty);
@@ -872,10 +884,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item_struct(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemStruct,
         _: &Facts<'_, ItemStruct>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             let scope = lowering.generics.extended(&item.generics);
             let link = Link::declaring(&item.ident);
@@ -888,10 +900,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item_enum(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             let scope = lowering.generics.extended(&item.generics);
             let link = Link::declaring(&item.ident);
@@ -909,10 +921,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item_union(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemUnion,
         _: &Facts<'_, ItemUnion>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             let scope = lowering.generics.extended(&item.generics);
             let link = Link::declaring(&item.ident);
@@ -929,28 +941,28 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item_const(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemConst,
         facts: &Facts<'_, ItemConst>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.tabled(facts.address(), &item.ident, &item.ty, &item.attrs))
     }
 
     fn on_item_static(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemStatic,
         facts: &Facts<'_, ItemStatic>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.tabled(facts.address(), &item.ident, &item.ty, &item.attrs))
     }
 
     fn off_item_const(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &ItemConst,
         _: &Facts<'_, ItemConst>,
-    ) -> Option<Lowering<'read>> {
+    ) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             lowering.tables.pop();
         }))
@@ -958,10 +970,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn off_item_static(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &ItemStatic,
         _: &Facts<'_, ItemStatic>,
-    ) -> Option<Lowering<'read>> {
+    ) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             lowering.tables.pop();
         }))
@@ -969,10 +981,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_impl_item_const(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &ImplItemConst,
         facts: &Facts<'_, ImplItemConst>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.tables.push(facts.address());
             Descend::Into
@@ -981,10 +993,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn off_impl_item_const(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         _: &ImplItemConst,
         _: &Facts<'_, ImplItemConst>,
-    ) -> Option<Lowering<'read>> {
+    ) -> Option<Box<Lowering<'read>>> {
         Some(self.settled(found, |lowering| {
             lowering.tables.pop();
         }))
@@ -992,10 +1004,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_expr_method_call(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         call: &ExprMethodCall,
         _: &Facts<'_, ExprMethodCall>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.method_called(call);
             Descend::Into
@@ -1004,10 +1016,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_expr_call(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         call: &ExprCall,
         _: &Facts<'_, ExprCall>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.path_called(call);
             Descend::Into
@@ -1016,10 +1028,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_expr_macro(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         expr: &ExprMacro,
         _: &Facts<'_, ExprMacro>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.macro_called(expr);
             Descend::Into
@@ -1028,10 +1040,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_expr_struct(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         literal: &syntax::ExprStruct,
         _: &Facts<'_, syntax::ExprStruct>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.struct_used(literal);
             Descend::Into
@@ -1040,10 +1052,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_expr_path(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         expression: &ExprPath,
         _: &Facts<'_, ExprPath>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.path_used(expression);
             Descend::Into
@@ -1052,10 +1064,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_expr_match(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         expr: &syntax::ExprMatch,
         _: &Facts<'_, syntax::ExprMatch>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             expr.arms.iter().for_each(|arm| lowering.pattern_used(&arm.pat));
             Descend::Into
@@ -1064,10 +1076,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_expr_let(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         expr: &syntax::ExprLet,
         _: &Facts<'_, syntax::ExprLet>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.pattern_used(&expr.pat);
             Descend::Into
@@ -1076,10 +1088,10 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_local(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         local: &syntax::Local,
         _: &Facts<'_, syntax::Local>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             local
                 .init
@@ -1093,28 +1105,28 @@ impl<'read> Fold for Lowerer<'read> {
 
     fn on_item_macro(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemMacro,
         _: &Facts<'_, ItemMacro>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| lowering.macro_owned(item))
     }
 
     fn off_item_macro(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         item: &ItemMacro,
         _: &Facts<'_, ItemMacro>,
-    ) -> Option<Lowering<'read>> {
-        Some(Self::macro_left(self.opened(found), item))
+    ) -> Option<Box<Lowering<'read>>> {
+        Some(Box::new(Self::macro_left(*self.opened(found), item)))
     }
 
     fn on_macro(
         &self,
-        found: Option<Lowering<'read>>,
+        found: Option<Box<Lowering<'read>>>,
         invoked: &Macro,
         _: &Facts<'_, Macro>,
-    ) -> Visit<Option<Lowering<'read>>> {
+    ) -> Visit<Option<Box<Lowering<'read>>>> {
         self.stepped(found, |lowering| {
             lowering.macro_used(invoked);
             Descend::Into
