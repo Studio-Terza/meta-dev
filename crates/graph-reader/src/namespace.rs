@@ -116,17 +116,22 @@ impl Openings {
     pub(crate) fn replayed(top: Entries, ops: Vec<ScopeOp>) -> Replayed {
         let scopes = ScopeMap::keyed(ops.iter().filter_map(ScopeOp::opened).cloned());
         let shapes: Vec<Opening> = ops.iter().filter_map(|op| op.shaped(&scopes)).collect();
-        let mut chunks = ops.into_iter().map(|op| op.chunk(&scopes)).fold(BTreeMap::new(), |chunked, chunk| {
-            let mut grown: BTreeMap<ScopeId, Vec<Entries>> = chunked;
-            grown.entry(chunk.scope).or_default().push(chunk.entries);
+        let seeded: Vec<Vec<Entries>> = std::iter::repeat_with(Vec::new).take(shapes.len() + 1).collect();
+        let chunked = ops.into_iter().map(|op| op.chunk(&scopes)).fold(seeded, |chunked, chunk| {
+            let mut grown = chunked;
+            chunk
+                .scope
+                .row_mut(&mut grown)
+                .into_iter()
+                .zip([chunk.entries])
+                .for_each(|(held, entries)| held.push(entries));
             grown
         });
-        let top_entries = [top].into_iter().chain(chunks.remove(&ScopeId::FIRST).into_iter().flatten()).collect();
-        let nested = shapes
-            .into_iter()
-            .zip(ScopeId::FIRST.following())
-            .map(|(shape, id)| Opening { entries: chunks.remove(&id).into_iter().flatten().collect(), ..shape })
-            .collect();
+        let mut merged: Vec<Entries> = chunked.into_iter().map(|chunks| chunks.into_iter().collect()).collect();
+        let nested_entries = merged.split_off(1);
+        let top_entries = [top].into_iter().chain(merged).collect();
+        let nested =
+            shapes.into_iter().zip(nested_entries).map(|(shape, entries)| Opening { entries, ..shape }).collect();
         Replayed { openings: Openings { top: top_entries, nested }, scopes }
     }
 }

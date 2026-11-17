@@ -4,8 +4,9 @@ use std::sync::Arc;
 use graph::{Building, Call, FileId, Found, Function, Holding, Implementation, Law, Region};
 use lint_layout::Position;
 
-use crate::namespace::{Resolving, ScopeId, ScopeKey, ScopeMap};
+use crate::namespace::{Resolving, ScopeKey, ScopeMap};
 
+use super::Grown;
 use super::places::Places;
 
 pub(super) trait Built {
@@ -24,12 +25,10 @@ pub(super) struct Footing<'grown> {
 impl<'grown> Footing<'grown> {
     pub(super) fn new(
         resolving: Resolving<'grown, 'grown, 'grown>,
-        file: FileId,
-        outer: Region,
+        grown: &'grown Grown,
         places: &'grown Places,
-        scopes: &'grown ScopeMap,
     ) -> Footing<'grown> {
-        Footing { resolving, file, outer, places, scopes }
+        Footing { resolving, file: grown.file, outer: grown.outer, places, scopes: &grown.scopes }
     }
 
     pub(super) fn resolving(self) -> Resolving<'grown, 'grown, 'grown> {
@@ -44,8 +43,8 @@ impl<'grown> Footing<'grown> {
         self.outer
     }
 
-    pub(super) fn scope(self, key: &ScopeKey) -> ScopeId {
-        self.scopes.scope(key)
+    pub(super) fn scopes(self) -> &'grown ScopeMap {
+        self.scopes
     }
 
     pub(super) fn file(self) -> FileId {

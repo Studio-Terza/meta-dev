@@ -121,21 +121,22 @@ impl Built for ImplRow {
         let resolving = footing.resolving();
         let implemented = self.implemented.map(|path| {
             let spelling = Spelling::Written(path.written(), located.position());
-            Sited::new(resolving.path(footing.scope(located.scope()), &path, self.domain), spelling)
+            Sited::new(resolving.path(footing.scopes().scope(located.scope()), &path, self.domain), spelling)
         });
-        let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scope(located.scope())));
+        let subject =
+            Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scopes().scope(located.scope())));
         let implementation =
             Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer())).parameterised(
                 self.parameters
                     .into_iter()
-                    .map(|parameter| parameter.resolved(&resolving, footing.scope(located.scope())))
+                    .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
                     .collect(),
                 self.assigned
                     .iter()
                     .map(|assigned| {
                         Assigned::new(
                             assigned.name.clone(),
-                            Written::typed(&assigned.ty, &resolving, footing.scope(located.scope())),
+                            Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
                         )
                     })
                     .collect(),
@@ -173,7 +174,7 @@ impl FnRow {
 
 impl Built for FnRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let scope = footing.scope(self.located.scope());
+        let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
@@ -200,7 +201,7 @@ struct AliasRow {
 impl Built for AliasRow {
     fn built(self, footing: Footing<'_>, mut building: Building) -> Building {
         let resolving = &footing.resolving();
-        let scope = footing.scope(&self.scope);
+        let scope = footing.scopes().scope(&self.scope);
         let declared = resolving.path(scope, &self.name, Domain::Types).crate_item();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
         let alias = Alias::new(parameters, Written::typed(&self.target, resolving, scope));
@@ -315,9 +316,13 @@ impl Monoid for FileRows {}
 
 impl FileRows {
     fn defined(self, definition: Option<LoweredDefinition>) -> FileRows {
-        let mut functions = self.functions.into_iter();
-        let own = functions.next().map(|function| FnRow { definition: definition.or(function.definition), ..function });
-        FileRows { functions: own.into_iter().chain(functions).collect(), ..self }
+        let mut functions = self.functions;
+        let rest = functions.split_off(functions.len().min(1));
+        let own = functions
+            .into_iter()
+            .zip([definition])
+            .map(|(function, defined)| FnRow { definition: defined.or(function.definition), ..function });
+        FileRows { functions: own.chain(rest).collect(), ..self }
     }
 
     fn spread<'footing>(self, footing: Footing<'footing>, columns: Columns<'footing>) -> Columns<'footing> {
@@ -390,6 +395,12 @@ struct Grown {
     scopes: ScopeMap,
 }
 
+impl Grown {
+    fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Places {
+        self.rows.places.settled(&resolving.based(self.base), &self.scopes)
+    }
+}
+
 #[derive(Debug, Default)]
 struct Columns<'footing> {
     aliases: Vec<Footed<'footing, AliasRow>>,
@@ -451,20 +462,20 @@ impl<'read> Plot<'read> {
         let exports = self.space.exports();
         let with_exports =
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
-        let places: Vec<Places> = Parallel::available()
-            .mapped(&self.grown, |grown| grown.rows.places.settled(&resolving.based(grown.base), &grown.scopes));
+        let places: Vec<Places> = Parallel::available().mapped(&self.grown, |grown| grown.settled(&resolving));
         let with_places = self
             .grown
             .iter()
             .zip(&places)
             .fold(with_exports, |built, (grown, seated)| seated.placed(grown.file, built));
-        let mut grown = self.grown;
-        let mut footed: Vec<Footed<'_, FileRows>> = grown
+        let mut planted = self.grown;
+        let mut footed: Vec<Footed<'_, FileRows>> = planted
             .iter_mut()
             .zip(&places)
-            .map(|(file, seated)| Footed {
-                footing: Footing::new(resolving.based(file.base), file.file, file.outer, seated, &file.scopes),
-                row: mem::take(&mut file.rows),
+            .map(|(file, seated)| {
+                let row = mem::take(&mut file.rows);
+                let rooted: &Grown = file;
+                Footed { footing: Footing::new(resolving.based(rooted.base), rooted, seated), row }
             })
             .collect();
         let aliases: Vec<Footed<'_, AliasRow>> = footed
@@ -542,4 +553,10 @@ impl<'read> Framed<'read> {
 pub(super) struct Owning {
     place: PlaceId,
     grains: Grains,
+}
+
+impl Owning {
+    fn within(&self, context: &Context) -> Context {
+        context.owned(self.place.clone())
+    }
 }

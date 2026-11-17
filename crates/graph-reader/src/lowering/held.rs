@@ -72,7 +72,7 @@ pub(super) struct HoldingRow {
 
 impl Built for HoldingRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let scope = footing.scope(self.located.scope());
+        let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let declares = self.link.declares(resolving, scope);
         let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))

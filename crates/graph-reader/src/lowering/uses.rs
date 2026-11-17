@@ -63,7 +63,7 @@ impl UseRow {
 impl Built for UseRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
         let resolving = footing.resolving();
-        let scope = footing.scope(self.located.scope());
+        let scope = footing.scopes().scope(self.located.scope());
         let direct = resolving.path(scope, &self.written, self.domain());
         let head = direct
             .unresolved()

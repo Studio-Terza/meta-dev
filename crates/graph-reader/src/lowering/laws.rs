@@ -125,9 +125,11 @@ impl Mentions {
 impl LoweredOwner {
     fn resolved(self, footing: &Footing<'_>, located: &Located) -> OperationOwner {
         match self {
-            LoweredOwner::Typed(ty) => {
-                OperationOwner::Typed(Written::typed(&ty, &footing.resolving(), footing.scope(located.scope())))
-            }
+            LoweredOwner::Typed(ty) => OperationOwner::Typed(Written::typed(
+                &ty,
+                &footing.resolving(),
+                footing.scopes().scope(located.scope()),
+            )),
             LoweredOwner::Operand => OperationOwner::Operand,
         }
     }

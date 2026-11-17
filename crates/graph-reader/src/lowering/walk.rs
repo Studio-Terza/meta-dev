@@ -32,26 +32,31 @@ pub(crate) struct Lowering<'read> {
 type Grown<'read> = Contributed<Framed<'read>, Grains>;
 
 impl<'read> Frame<'read> {
-    pub(super) fn key(&self, node: Address) -> ScopeKey {
-        ScopeKey::at(&self.within, node)
+    pub(super) fn in_table(&self) -> Frame<'read> {
+        Frame { tabled: Some(()), ..self.clone() }
     }
 
-    fn framed(self, grains: Grains, descend: Descend) -> Grown<'read> {
+    pub(super) fn framed(self, grains: Grains, descend: Descend) -> Grown<'read> {
         Contributed::new(Framed(Some(self)), grains, descend)
     }
 
-    fn with_context(&self, context: Context) -> Frame<'read> {
+    pub(super) fn with_context(&self, context: Context) -> Frame<'read> {
         Frame { context, ..self.clone() }
     }
 
     fn entered(&self, node: Address, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Opened<'read> {
-        let key = self.key(node);
+        let key = ScopeKey::reached(&self.within, node);
         let op = ScopeOp::Opened { key: key.clone(), parent: self.here.scope().clone(), kind, entries };
         let frame = Frame { here: Seat::new(key, children), context: self.context.entered(kind), ..self.clone() };
         Opened { frame, op }
     }
 
-    fn function(&self, attributes: &[Attribute], visibility: &SynVisibility, signature: &SynSignature) -> Functioned {
+    pub(super) fn function(
+        &self,
+        attributes: &[Attribute],
+        visibility: &SynVisibility,
+        signature: &SynSignature,
+    ) -> Functioned {
         let generics = self.generics.extended(&signature.generics);
         let name = Name::from(&signature.ident);
         let row = FnRow {
@@ -73,7 +78,7 @@ impl<'read> Frame<'read> {
         Functioned { row, generics }
     }
 
-    fn method_entered(
+    pub(super) fn method_entered(
         &self,
         attributes: &[Attribute],
         visibility: &SynVisibility,
@@ -85,7 +90,7 @@ impl<'read> Frame<'read> {
         frame.framed(Grains::from(FileRows { functions: vec![row], ..FileRows::default() }), Descend::Into)
     }
 
-    fn module_entered(&self, item: &ItemMod, items: &[syntax::Item]) -> Grown<'read> {
+    pub(super) fn module_entered(&self, item: &ItemMod, items: &[syntax::Item]) -> Grown<'read> {
         let name = Name::from(&item.ident);
         let children = Arc::from(self.here.children().join(&name));
         let Opened { frame: inner, op } =
@@ -101,12 +106,12 @@ impl<'read> Frame<'read> {
         module.framed(Grains { ops: vec![op, declared], ..Grains::default() }, Descend::Into)
     }
 
-    fn slotted(&self, item: &ItemMod) -> Grown<'read> {
+    pub(super) fn slotted(&self, item: &ItemMod) -> Grown<'read> {
         let slot = Slot::new(&self.here, self.context.region(), item);
         Contributed::new(Framed::default(), Grains { slots: vec![slot], ..Grains::default() }, Descend::Over)
     }
 
-    fn defined(
+    pub(super) fn defined(
         &self,
         signature: &SynSignature,
         body: Option<&Block>,
@@ -131,7 +136,7 @@ struct Opened<'read> {
 }
 
 #[derive(Debug)]
-struct Functioned {
+pub(super) struct Functioned {
     row: FnRow,
     generics: InScope,
 }
@@ -259,7 +264,7 @@ impl<'read> Contribute for Lowering<'read> {
         let bounds = frame.trait_bounds(item, &generics);
         let owning = frame.trait_owning(&item.ident, &item.attrs);
         let filler = frame.filler_owning(item);
-        let context = frame.context.owned(owning.place.clone());
+        let context = owning.within(&frame.context);
         let inner = Frame { context, enclosure: Enclosure::Trait, generics: Arc::new(generics), ..frame.clone() };
         inner.framed(bounds.combine(owning.grains).combine(filler), Descend::Into)
     }
@@ -272,7 +277,7 @@ impl<'read> Contribute for Lowering<'read> {
     ) -> Grown<'read> {
         let frame = self.frame(&around);
         let owning = frame.owning(&item.sig.ident, Domain::Values, &item.attrs);
-        let inner = frame.with_context(frame.context.within_item(&item.attrs).owned(owning.place.clone()));
+        let inner = frame.with_context(owning.within(&frame.context.within_item(&item.attrs)));
         let Functioned { row, generics } = inner.function(&item.attrs, &item.vis, &item.sig);
         let body = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
         body.framed(
@@ -417,7 +422,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemConst>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let tabled = Frame { tabled: Some(()), ..self.frame(&around).clone() };
+        let tabled = self.frame(&around).in_table();
         tabled.valued(&item.ident, &item.ty, &item.attrs)
     }
 
@@ -427,7 +432,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemStatic>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let tabled = Frame { tabled: Some(()), ..self.frame(&around).clone() };
+        let tabled = self.frame(&around).in_table();
         tabled.valued(&item.ident, &item.ty, &item.attrs)
     }
 
@@ -437,7 +442,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ImplItemConst>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let tabled = Frame { tabled: Some(()), ..self.frame(&around).clone() };
+        let tabled = self.frame(&around).in_table();
         tabled.framed(Grains::default(), Descend::Into)
     }
 
@@ -526,10 +531,10 @@ impl<'read> Contribute for Lowering<'read> {
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
         let frame = self.frame(&around);
-        match &item.ident {
-            Some(ident) => frame.owned_by(ident, Domain::Macros, &item.attrs, Grains::default()),
-            None => frame.clone().framed(Grains::default(), Descend::Into),
-        }
+        item.ident.as_ref().map_or_else(
+            || frame.clone().framed(Grains::default(), Descend::Into),
+            |ident| frame.owned_by(ident, Domain::Macros, &item.attrs, Grains::default()),
+        )
     }
 
     fn off_item_macro(

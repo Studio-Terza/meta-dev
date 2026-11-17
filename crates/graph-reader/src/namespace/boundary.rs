@@ -26,10 +26,6 @@ impl ScopeId {
     pub(crate) fn above(self, base: ScopeId) -> ScopeId {
         ScopeId(self.0 + base.0)
     }
-
-    pub(super) fn following(self) -> impl Iterator<Item = ScopeId> {
-        (self.0 + 1..).map(ScopeId)
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -89,7 +85,7 @@ pub(crate) struct ScopeKey {
 }
 
 impl ScopeKey {
-    pub(crate) fn at(within: &std::sync::Arc<[lint_sweep::Address]>, node: lint_sweep::Address) -> ScopeKey {
+    pub(crate) fn reached(within: &std::sync::Arc<[lint_sweep::Address]>, node: lint_sweep::Address) -> ScopeKey {
         ScopeKey { within: std::sync::Arc::clone(within), at: Some(node) }
     }
 }

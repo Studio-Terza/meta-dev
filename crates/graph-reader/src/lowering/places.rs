@@ -74,19 +74,25 @@ impl Semigroup for PlaceRows {
 
 impl Monoid for PlaceRows {}
 
+#[derive(Debug)]
+struct Subjected<'rows> {
+    ty: TypeRef,
+    row: &'rows SubjectRow,
+}
+
 impl PlaceRows {
     pub(super) fn settled(&self, resolving: &Resolving<'_, '_, '_>, scopes: &ScopeMap) -> Places {
-        let subjects: BTreeMap<&ScopeKey, (TypeRef, &SubjectRow)> = self
+        let subjects: BTreeMap<&ScopeKey, Subjected<'_>> = self
             .subjects
             .iter()
-            .map(|row| (&row.key, (Written::typed(&row.ty, resolving, scopes.scope(&row.scope)), row)))
+            .map(|row| (&row.key, Subjected { ty: Written::typed(&row.ty, resolving, scopes.scope(&row.scope)), row }))
             .collect();
-        let places: Vec<Place> = self
+        let places: BTreeMap<PlaceId, Place> = self
             .places
             .iter()
             .map(|row| {
                 let subjected = row.subject.as_ref().and_then(|key| subjects.get(key));
-                let subject = subjected.map(|(ty, _)| ty.clone());
+                let subject = subjected.map(|found| found.ty.clone());
                 let declared = row.owner.as_ref().and_then(|owner| {
                     let item = owner.settled(resolving, scopes)?;
                     Some(Declared { line: owner.line, item, region: owner.region })
@@ -94,13 +100,13 @@ impl PlaceRows {
                 let owner = declared
                     .map(|found| found.item)
                     .or_else(|| subject.as_ref()?.named().map(AsRef::<Resolved>::as_ref)?.crate_item());
-                let implemented = subjected.and_then(|(_, found)| found.implemented.clone());
-                let traited = subjected.and_then(|(_, found)| found.implemented_trait(resolving, scopes));
-                Place { subject, owner, declared, implemented, traited }
+                let implemented = subjected.and_then(|found| found.row.implemented.clone());
+                let traited = subjected.and_then(|found| found.row.implemented_trait(resolving, scopes));
+                (row.key.clone(), Place { subject, owner, declared, implemented, traited })
             })
             .collect();
-        let index = self.places.iter().enumerate().map(|(position, row)| (row.key.clone(), position)).collect();
-        Places { order: places, index }
+        let order = self.places.iter().map(|row| row.key.clone()).collect();
+        Places { order, places }
     }
 }
 
@@ -122,20 +128,20 @@ struct Place {
 
 #[derive(Debug)]
 pub(super) struct Places {
-    order: Vec<Place>,
-    index: BTreeMap<PlaceId, usize>,
+    order: Vec<PlaceId>,
+    places: BTreeMap<PlaceId, Place>,
 }
 
 impl Places {
     pub(super) fn placed(&self, file: FileId, building: Building) -> Building {
-        self.order.iter().filter_map(|place| place.declared).fold(building, |mut built, declared| {
+        self.order.iter().filter_map(|id| self.places.get(id)?.declared).fold(building, |mut built, declared| {
             built.placed(file, declared.line, ItemDeclaration::new(declared.item, declared.region));
             built
         })
     }
 
     pub(super) fn seat(&self, region: Region, place: Option<&PlaceId>) -> Seat {
-        let found = place.and_then(|id| self.index.get(id)).and_then(|position| self.order.get(*position));
+        let found = place.and_then(|id| self.places.get(id));
         Seat::new(region, found.and_then(|seated| seated.subject.clone()))
             .owned(found.and_then(|seated| seated.owner))
             .implementing(found.and_then(|seated| seated.implemented.clone()))
@@ -145,7 +151,7 @@ impl Places {
 
 impl<'read> Frame<'read> {
     fn placed(&self, key: Address, seed: PlaceSeed) -> Owning {
-        let place = PlaceId(self.key(key));
+        let place = PlaceId(ScopeKey::reached(&self.within, key));
         let row = PlaceRow { key: place.clone(), subject: seed.subject, owner: seed.owner };
         let rows = FileRows { places: PlaceRows { places: vec![row], subjects: Vec::new() }, ..FileRows::default() };
         Owning { place, grains: Grains::from(rows) }
@@ -177,22 +183,22 @@ impl<'read> Frame<'read> {
         }
     }
 
-    fn expansion(&self, item: &ItemMacro, items: MacroItems) -> Lowering<'read> {
+    pub(super) fn expansion(&self, item: &ItemMacro, items: MacroItems) -> Lowering<'read> {
         let within: Arc<[Address]> = self.within.iter().copied().chain([Address::from(item)]).collect();
         Lowering::below(Frame { context: self.context.within_macro(items), within, ..self.clone() })
     }
 
-    fn swept<'item>(lowering: Lowering<'read>, items: impl Iterator<Item = &'item syntax::Item>) -> Grains {
+    pub(super) fn swept<'item>(lowering: Lowering<'read>, items: impl Iterator<Item = &'item syntax::Item>) -> Grains {
         let mut contributing = Contributing::new(lowering);
         items.for_each(|declared| Sweep::expanded_item(declared, &mut contributing));
         contributing.concluded(|_, _, grains| grains)
     }
 
-    fn transcribed(&self, item: &ItemMacro, statements: &[Stmt]) -> Grains {
+    pub(super) fn transcribed(&self, item: &ItemMacro, statements: &[Stmt]) -> Grains {
         Self::swept(self.expansion(item, MacroItems::Transcribed), statements.iter().filter_map(Syntax::stmt_item))
     }
 
-    fn expanded(&self, item: &ItemMacro, invocation: &Macro) -> Grains {
+    pub(super) fn expanded(&self, item: &ItemMacro, invocation: &Macro) -> Grains {
         let items = Macros::items_in_file(self.source, invocation);
         let absorbed = ScopeOp::Absorbed { key: self.here.scope().clone(), entries: Entries::of_items(&items) };
         let walked = Self::swept(self.expansion(item, MacroItems::Expanded), items.iter());
@@ -232,7 +238,7 @@ impl<'read> Frame<'read> {
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
         let implemented = ImplRow::written(&self.here, self.context.region(), block, &declared);
-        let key = self.key(Address::from(block));
+        let key = ScopeKey::reached(&self.within, Address::from(block));
         let traited = block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path));
         let named =
             block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
