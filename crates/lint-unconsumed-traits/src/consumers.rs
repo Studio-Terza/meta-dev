@@ -7,7 +7,7 @@ use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Consumers {
     bounds: BTreeSet<Name>,
     called: BTreeSet<Name>,
@@ -53,7 +53,7 @@ impl Semigroup for Consumers {
 
 impl Monoid for Consumers {
     fn identity() -> Consumers {
-        Consumers::default()
+        Consumers { bounds: BTreeSet::new(), called: BTreeSet::new() }
     }
 }
 

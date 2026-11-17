@@ -206,7 +206,7 @@ impl Lints {
         <Kin<PureRouters> as Registered>::ENTRY,
         <Kin<PlainConditions> as Registered>::ENTRY,
         Entry::spelled::<TypeSystem>(Work::Extracted(|model| {
-            let extraction = Extraction::default();
+            let extraction: Extraction<'_> = std::iter::empty().collect();
             let transitions = Transitions::from(model);
             let system = TypeSystem::built_from(&extraction, &transitions);
             [OneEdge::dirty(&system), DistinctSignatures::dirty(&system)].into_iter().flatten().collect()

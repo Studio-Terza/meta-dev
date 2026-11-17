@@ -18,7 +18,7 @@ pub struct TestCode<'file> {
     file: &'file SourceFile,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct InSource {
     lines: Vec<LineNumber>,
     invoked: Vec<Invoked>,
@@ -32,7 +32,7 @@ impl Semigroup for InSource {
 
 impl Monoid for InSource {
     fn identity() -> InSource {
-        InSource::default()
+        InSource { lines: Vec::new(), invoked: Vec::new() }
     }
 }
 

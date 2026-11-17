@@ -20,7 +20,7 @@ struct Filled<'file> {
     interface: Name,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Fillers<'file> {
     bodies: BTreeMap<Filled<'file>, BTreeMap<Name, Labels>>,
 }
@@ -28,7 +28,7 @@ pub(crate) struct Fillers<'file> {
 impl<'file> Fillers<'file> {
     pub(crate) fn read(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Fillers<'file> {
         let shipped = <&SourceFile>::from(parsed).shipped().map(|_| parsed);
-        shipped.map_or_default(|found| {
+        shipped.map_or_else(Fillers::identity, |found| {
             let krate = found.head().placement().package().crate_name();
             let erasure = Erasure::reading(<&SourceFile>::from(found).tokens(), equivalence);
             Sweep::gathered(<&SourceFile>::from(found), Contributing::new(Scan { krate, erasure }))
@@ -117,6 +117,6 @@ impl Semigroup for Fillers<'_> {
 
 impl Monoid for Fillers<'_> {
     fn identity() -> Self {
-        Fillers::default()
+        Fillers { bodies: BTreeMap::new() }
     }
 }

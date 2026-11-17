@@ -8,7 +8,7 @@ use lint_layout::Name;
 use lint_layout::TestMarks;
 use lint_sweep::{Contribute, Contributed, Contributing, Facts, Gathers, Kind, Sweep, Watching};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Emitters {
     names: BTreeSet<Name>,
 }
@@ -45,7 +45,7 @@ impl Semigroup for Emitters {
 
 impl Monoid for Emitters {
     fn identity() -> Emitters {
-        Emitters::default()
+        Emitters { names: BTreeSet::new() }
     }
 }
 
