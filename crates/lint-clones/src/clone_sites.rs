@@ -8,6 +8,7 @@ use lint_core::{Gate, Site, Violation};
 use lint_layout::LineNumber;
 use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
+use super::CloneFindings;
 use finding::Finding;
 
 #[derive(Debug)]
@@ -26,7 +27,7 @@ impl<'file> CloneSites<'file> {
 }
 
 impl<'file> Fold for CloneSites<'file> {
-    type Found = Vec<Violation<'file>>;
+    type Found = CloneFindings<'file>;
 
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
@@ -46,6 +47,6 @@ impl<'file> Fold for CloneSites<'file> {
             Some(call).filter(|candidate| candidate.method == Self::CLONE).filter(|clone| clone.args.is_empty()).map(
                 |bare_clone| Violation::new(Site::new(self.path, LineNumber::from(bare_clone.method.span())), Finding),
             );
-        Visit::descending(found.into_iter().chain(cloned).collect())
+        Visit::descending(CloneFindings(found.0.into_iter().chain(cloned).collect()))
     }
 }

@@ -3,7 +3,7 @@ mod finding;
 
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Fold, Folding, Kind, Visit};
 use std::collections::BTreeMap;
 
 use finding::Finding;
@@ -26,7 +26,7 @@ impl SweptLint for PrivateFns {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(PrivateFnCounter { file, found: BTreeMap::new() })
+        Box::new(Folding::from(PrivateFnCounter { file }))
     }
 }
 
@@ -50,7 +50,18 @@ impl PrivateFns {
 #[derive(Debug)]
 struct PrivateFnCounter<'file> {
     file: &'file SourceFile,
-    found: BTreeMap<TypeName, Vec<Name>>,
+}
+
+#[derive(Debug, Default)]
+struct Counted<'file> {
+    file: Option<&'file SourceFile>,
+    by_type: BTreeMap<TypeName, Vec<Name>>,
+}
+
+impl<'file> From<Counted<'file>> for Vec<Violation<'file>> {
+    fn from(counted: Counted<'file>) -> Vec<Violation<'file>> {
+        counted.file.map_or_default(|file| PrivateFns::violations(file, counted.by_type))
+    }
 }
 
 impl PrivateFnCounter<'_> {
@@ -69,35 +80,36 @@ impl PrivateFnCounter<'_> {
         }
     }
 
-    fn inherent(&mut self, item: &ItemImpl) -> Descend {
+    fn inherent<'file>(found: Counted<'file>, item: &ItemImpl) -> Visit<Counted<'file>> {
         let counted =
             Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)));
         let private = counted.entered().map(|_| Self::private_names(item).collect::<Vec<Name>>());
-        self.found.entry(TypeName::from_type(&item.self_ty)).or_default().extend(private.into_iter().flatten());
-        Descend::Over
+        let Counted { file, mut by_type } = found;
+        by_type.entry(TypeName::from_type(&item.self_ty)).or_default().extend(private.into_iter().flatten());
+        Visit::new(Counted { file, by_type }, Descend::Over)
     }
 }
 
-impl<'ast> Watch<'ast> for PrivateFnCounter<'_> {
+impl<'file> Fold for PrivateFnCounter<'file> {
+    type Found = Counted<'file>;
+
+    fn finished(&self, found: Counted<'file>) -> Counted<'file> {
+        Counted { file: Some(self.file), ..found }
+    }
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Self::Found, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        self.inherent(item)
-    }
-}
-
-impl<'file> Finds<'file> for PrivateFnCounter<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        PrivateFns::violations(self.file, self.found)
+    fn on_item_impl(&self, found: Self::Found, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Visit<Self::Found> {
+        Self::inherent(found, item)
     }
 }

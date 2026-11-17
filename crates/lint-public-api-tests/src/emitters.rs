@@ -5,7 +5,7 @@ use syntax::ItemMacro;
 use lint_core::Macros;
 use lint_layout::Name;
 use lint_layout::TestMarks;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Facts, Fold, Kind, Visit};
 
 #[derive(Debug, Default)]
 pub struct Emitters {
@@ -14,16 +14,6 @@ pub struct Emitters {
 
 impl Emitters {
     const DEFINITION: &'static str = "macro_rules";
-}
-
-impl Gathers<Emitters> for Emitters {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> Emitters {
-        self
-    }
 }
 
 impl FromIterator<Emitters> for Emitters {
@@ -38,20 +28,23 @@ impl AsRef<BTreeSet<Name>> for Emitters {
     }
 }
 
-impl<'ast> Watch<'ast> for Emitters {
+#[derive(Debug)]
+pub struct Emitting;
+
+impl Fold for Emitting {
+    type Found = Emitters;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMacro]
     }
 
-    fn on_item_macro(&mut self, definition: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) -> Descend {
-        self.names.extend(
-            definition
-                .ident
-                .iter()
-                .filter(|_| definition.mac.path.is_ident(Self::DEFINITION))
-                .filter(|_| Macros::attributes(&definition.mac).iter().find_map(TestMarks::test).is_some())
-                .map(Name::from),
-        );
-        Descend::Into
+    fn on_item_macro(&self, found: Emitters, definition: &ItemMacro, _: &Facts<'_, ItemMacro>) -> Visit<Emitters> {
+        let names = definition
+            .ident
+            .iter()
+            .filter(|_| definition.mac.path.is_ident(Emitters::DEFINITION))
+            .filter(|_| Macros::attributes(&definition.mac).iter().find_map(TestMarks::test).is_some())
+            .map(Name::from);
+        Visit::descending(Emitters { names: found.names.into_iter().chain(names).collect() })
     }
 }

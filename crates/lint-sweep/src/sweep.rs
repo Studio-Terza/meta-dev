@@ -31,12 +31,12 @@ where
     }
 }
 
-impl<Part: From<Folded::Found>, Folded: Fold> Gathers<Part> for Folding<Folded> {
+impl<Folded: Fold> Gathers<Folded::Found> for Folding<Folded> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 
-    fn gathered(self) -> Part {
+    fn gathered(self) -> Folded::Found {
         self.concluded()
     }
 }

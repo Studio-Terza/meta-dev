@@ -47,9 +47,3 @@ impl Gleaning for Clones {
         Folding::from(CloneSites::new(AsRef::<Path>::as_ref(parsed.head()), core.map(|_| ())))
     }
 }
-
-impl<'head> From<Vec<Violation<'head>>> for CloneFindings<'head> {
-    fn from(found: Vec<Violation<'head>>) -> CloneFindings<'head> {
-        CloneFindings(found)
-    }
-}
