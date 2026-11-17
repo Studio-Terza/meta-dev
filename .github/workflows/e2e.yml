@@ -32,4 +32,4 @@ jobs:
         if: always()
         env:
           E2E_REPORT: ${{ runner.temp }}/e2e.txt
-        run: cargo run --locked -q --bin ci -- summarize "$E2E_REPORT" "$GITHUB_STEP_SUMMARY"
+        run: cargo run --locked --bin ci -- summarize "$E2E_REPORT" "$GITHUB_STEP_SUMMARY"
