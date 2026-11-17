@@ -31,6 +31,19 @@ where
     }
 }
 
+impl<Part, Folded: Fold> Gathers<Part> for Folding<Folded>
+where
+    Folded::Found: Into<Part>,
+{
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        Sweep::alone(self)
+    }
+
+    fn gathered(self) -> Part {
+        self.concluded().into()
+    }
+}
+
 pub trait Sorts<'file>: for<'ast> Watch<'ast> + fmt::Debug {
     fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>>;
 }

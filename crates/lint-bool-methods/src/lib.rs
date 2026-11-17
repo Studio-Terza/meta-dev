@@ -2,7 +2,7 @@ mod returns;
 
 use lint_core::{Headline, SourceFile};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::Finds;
+use lint_sweep::{Finds, Folding};
 use returns::Returns;
 
 #[derive(Debug)]
@@ -14,6 +14,6 @@ impl SweptLint for BoolMethods {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Returns::from(file))
+        Box::new(Folding::from(Returns::from(file)))
     }
 }

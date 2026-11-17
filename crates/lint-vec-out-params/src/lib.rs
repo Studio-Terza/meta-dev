@@ -4,7 +4,7 @@ use std::path::Path;
 
 use finding::Finding;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Finds, Fold, Folding, Kind, Visit};
 use syntax::Spanned;
 use syntax::{ItemImpl, ItemMod, Macro, PathSegment, Signature, Type, TypePath, TypeReference};
 
@@ -21,7 +21,7 @@ impl SweptLint for VecOutParams {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(OutParams { path: AsRef::<Path>::as_ref(file.head()), violations: Vec::new() })
+        Box::new(Folding::from(OutParams { path: AsRef::<Path>::as_ref(file.head()) }))
     }
 }
 
@@ -59,45 +59,51 @@ impl VecOutParams {
 #[derive(Debug)]
 struct OutParams<'file> {
     path: &'file Path,
-    violations: Vec<Violation<'file>>,
 }
 
-impl<'ast> Watch<'ast> for OutParams<'_> {
+impl<'file> Fold for OutParams<'file> {
+    type Found = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::Macro, Kind::Signature]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Self::Found, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        facts.inherent().map_or(Descend::Over, |_| Descend::Into)
+    fn on_item_impl(&self, found: Self::Found, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Visit<Self::Found> {
+        Visit::new(found, facts.inherent().map_or(Descend::Over, |_| Descend::Into))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Self::Found, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature, facts: &Facts<'_, Signature>) -> Descend {
+    fn on_signature(
+        &self,
+        found: Self::Found,
+        signature: &Signature,
+        facts: &Facts<'_, Signature>,
+    ) -> Visit<Self::Found> {
         let path = self.path;
-        self.violations.extend(
-            signature
-                .inputs
-                .iter()
-                .filter_map(Syntax::typed)
-                .filter(|typed| VecOutParams::vec_out(&typed.ty).is_some())
-                .filter_map(|typed| {
-                    let name = facts.name()?.clone();
-                    Some(Violation::new(Site::new(path, LineNumber::from(typed.pat.span())), Finding::VecOut { name }))
-                }),
-        );
-        Descend::Over
-    }
-}
-
-impl<'file> Finds<'file> for OutParams<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+        let noted: Self::Found = found
+            .into_iter()
+            .chain(
+                signature
+                    .inputs
+                    .iter()
+                    .filter_map(Syntax::typed)
+                    .filter(|typed| VecOutParams::vec_out(&typed.ty).is_some())
+                    .filter_map(|typed| {
+                        let name = facts.name()?.clone();
+                        Some(Violation::new(
+                            Site::new(path, LineNumber::from(typed.pat.span())),
+                            Finding::VecOut { name },
+                        ))
+                    }),
+            )
+            .collect();
+        Visit::new(noted, Descend::Over)
     }
 }
