@@ -1,5 +1,5 @@
 use super::Placement;
-use crate::module_path::ModulePath;
+use super::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::role::Role;
 

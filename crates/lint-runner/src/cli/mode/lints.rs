@@ -154,7 +154,7 @@ impl Lints {
         <Filed<ThinMain> as Registered>::ENTRY,
         <Swept<VecOutParams> as Registered>::ENTRY,
         <Swept<NamedLifetimes> as Registered>::ENTRY,
-        <Judged<EnumPredicates> as Registered>::ENTRY,
+        Entry::spelled::<EnumPredicates>(Work::Modelled(<EnumPredicates as ModelLint>::report)),
         <Swept<ConstShape> as Registered>::ENTRY,
         <Swept<TypeShape> as Registered>::ENTRY,
         <Swept<ExpressionFlow> as Registered>::ENTRY,

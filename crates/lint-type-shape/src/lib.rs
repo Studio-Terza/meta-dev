@@ -112,7 +112,8 @@ impl<'scan> Shapes<'scan> {
         Shapes { violations, roots, open: self.open.into_iter().chain(opened).collect() }
     }
 
-    fn left(self, at: Address) -> Shapes<'scan> {
+    fn left(self, ty: &Type) -> Shapes<'scan> {
+        let at = Address::from(ty);
         let mut open = self.open;
         open.pop_if(|last| last.at == at);
         Shapes { open, ..self }
@@ -213,7 +214,7 @@ impl<'scan> Fold for TypeShapes<'scan> {
     }
 
     fn off_type(&self, found: Shapes<'scan>, ty: &Type, _: &Facts<'_, Type>) -> Shapes<'scan> {
-        found.left(Address::from(ty))
+        found.left(ty)
     }
 
     fn on_type_tuple(&self, found: Shapes<'scan>, tuple: &TypeTuple, _: &Facts<'_, TypeTuple>) -> Visit<Shapes<'scan>> {

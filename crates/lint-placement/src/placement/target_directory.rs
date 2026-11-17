@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use super::Placement;
+use super::module_path::ModulePath;
 use crate::crate_root::CrateRoot;
-use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::role::Role;
 

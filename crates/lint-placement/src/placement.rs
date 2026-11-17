@@ -1,4 +1,5 @@
 mod build_script;
+mod module_path;
 mod source_directory;
 mod target_directory;
 
@@ -6,13 +7,13 @@ use std::path::{Path, PathBuf};
 
 use crate::crate_file::CrateFile;
 use crate::crate_root::CrateRoot;
-use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::packages::Packages;
 use crate::role::Role;
 use build_script::BuildScript;
 use file_ports::Files;
 use lint_layout::{Name, Whole, Word};
+use module_path::ModulePath;
 use source_directory::SourceDirectory;
 use target_directory::TargetDirectory;
 
