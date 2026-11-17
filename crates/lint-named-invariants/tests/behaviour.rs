@@ -3,6 +3,7 @@ use lint_file::ModelLint;
 use lint_fixtures::{Lines, Located, Queried, Source, Sources, Text};
 use lint_named_invariants::{NamedInvariants, UnnamedPanics};
 
+const OTHER_CALLS: &str = "fn f(x: Result<u8, E>) -> Option<u8> {\n    x.ok()\n}\n";
 const IGNORED: &str =
     "use invariants::Ignoring;\nfn f(x: Result<u8, E>) -> Option<u8> {\n    x.ignoring(Ignored::Wide)\n}\n";
 
@@ -28,6 +29,7 @@ laws::table!(named_invariants_are_counted_once_per_crate, Sources::flagged::<Que
     [Source::new(Located::new("a.rs"), Text::new(NAMED))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(IGNORED))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(BARE_PANICS))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(OTHER_CALLS))] => Lines::default(),
 ]);
 
 #[test]
