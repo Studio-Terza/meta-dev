@@ -13,12 +13,14 @@ use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
-const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
-const CLIPPY_FIXTURE: &str = include_str!("metadata/clippy_targets.json");
-const TIMINGS_UNITS: &str = include_str!("timings/units.json");
-const TIMINGS_METADATA: &str = include_str!("timings/metadata.json");
-const EVERY_PLATFORM: &str = include_str!("timings/every-platform.json");
-const HOST_PLATFORM: &str = include_str!("timings/host-platform.json");
+mod incremental;
+
+const METADATA: &str = include_str!("../../../reach/tests/metadata/workspace.json");
+const CLIPPY_FIXTURE: &str = include_str!("../metadata/clippy_targets.json");
+const TIMINGS_UNITS: &str = include_str!("../timings/units.json");
+const TIMINGS_METADATA: &str = include_str!("../timings/metadata.json");
+const EVERY_PLATFORM: &str = include_str!("../timings/every-platform.json");
+const HOST_PLATFORM: &str = include_str!("../timings/host-platform.json");
 const HOST: &str = "x86_64-unknown-linux-gnu";
 const GRAPH_PATH: [&str; 6] = [
     "graph-path 2.50 seconds, the longest chain of clippy units, counting only units sccache never caches:",
@@ -76,6 +78,7 @@ struct Script {
     metadata: String,
     answers: Vec<Reply>,
     exact: Vec<ExactReply>,
+    refused: Vec<Invocation>,
     failing: Option<&'static str>,
     logged_text: String,
     calls: RefCell<Vec<Invocation>>,
@@ -91,6 +94,7 @@ impl Script {
             metadata: METADATA.to_owned(),
             answers: Vec::new(),
             exact: Vec::new(),
+            refused: Vec::new(),
             failing: None,
             logged_text: String::new(),
             calls: RefCell::new(Vec::new()),
@@ -161,6 +165,11 @@ impl Ports for Fake<'_> {
 
     fn output(&self, invocation: &Invocation) -> io::Result<ci::ports::Text> {
         self.script.recorded(invocation)?;
+        self.script
+            .refused
+            .iter()
+            .find(|refused| *refused == invocation)
+            .map_or(Ok(()), |_| Err(io::Error::other("refused")))?;
         Ok(ci::ports::Text::new(self.script.answer_to(invocation)))
     }
 

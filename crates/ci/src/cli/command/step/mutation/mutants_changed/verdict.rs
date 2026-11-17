@@ -7,6 +7,7 @@ use crate::cli::ports::{Exit, Text};
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Verdict<'text> {
     Skipped,
+    Unchanged,
     NoneMissed,
     Missed(&'text Text),
 }
@@ -24,7 +25,7 @@ impl Verdict<'_> {
 
     fn exit(self) -> Exit {
         match self {
-            Verdict::Skipped | Verdict::NoneMissed => Exit::Success,
+            Verdict::Skipped | Verdict::Unchanged | Verdict::NoneMissed => Exit::Success,
             Verdict::Missed(_) => Exit::Failure(CargoMutants::MISSED),
         }
     }
@@ -35,6 +36,9 @@ impl fmt::Display for Verdict<'_> {
         match self {
             Verdict::Skipped => {
                 writeln!(formatter, "mutants: skipped, no crate is reached by this change, so nothing was tested")
+            }
+            Verdict::Unchanged => {
+                writeln!(formatter, "mutants: none selected, no changed line since the prior run and no survivor of it")
             }
             Verdict::NoneMissed => writeln!(formatter, "mutants: none missed"),
             Verdict::Missed(missed) => write!(formatter, "mutants missed:\n{missed}"),
