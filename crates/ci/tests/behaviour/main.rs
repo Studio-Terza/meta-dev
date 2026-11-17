@@ -2779,3 +2779,26 @@ fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Box<
     );
     Ok(())
 }
+
+#[test]
+fn a_mutant_its_own_crate_missed_that_times_out_in_the_scope_is_still_a_survivor() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.directory("out/mutants.out")?;
+    scratch.directory("out/scoped/mutants.out")?;
+    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    scratch.write("out/scoped/mutants.out/timeout.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    let answer = scratch.answer(
+        &Script::new(),
+        &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "--test-package=a"],
+    );
+    assert_eq!(answer.exit, ExitCode::from(2));
+    assert_eq!(
+        Text::lines(&answer.out),
+        [
+            "mutants: 0 timed out on their own crate's tests",
+            "mutants missed:",
+            "src/a.rs:1:5: replace f -> bool with true"
+        ]
+    );
+    Ok(())
+}
