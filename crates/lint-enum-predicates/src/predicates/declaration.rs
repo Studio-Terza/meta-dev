@@ -2,14 +2,11 @@ mod declared;
 
 use std::borrow::Cow;
 
-use syntax::Ident;
-
-use lint_layout::Name;
 use lint_placement::{CrateRoot, ModulePath};
 
 use super::Kind;
 use super::known::Known;
-use declared::Declared;
+pub use declared::Declared;
 
 #[derive(Debug)]
 pub struct Declaration<'file> {
@@ -19,20 +16,12 @@ pub struct Declaration<'file> {
 }
 
 impl<'file> Declaration<'file> {
-    pub fn new(crate_root: &'file CrateRoot, module: &'file ModulePath) -> Declaration<'file> {
-        Declaration { crate_root, module: Cow::Borrowed(module), types: Vec::new() }
-    }
-
-    pub fn nested(&self, ident: &Ident) -> Declaration<'file> {
-        Declaration {
-            crate_root: self.crate_root,
-            module: Cow::Owned(self.module.child(Name::from(ident))),
-            types: Vec::new(),
-        }
-    }
-
-    pub fn record(&mut self, ident: &Ident, kind: Kind) {
-        self.types.push(Declared::new(Name::from(ident), kind));
+    pub fn placed(
+        crate_root: &'file CrateRoot,
+        module: Cow<'file, ModulePath>,
+        types: Vec<Declared>,
+    ) -> Declaration<'file> {
+        Declaration { crate_root, module, types }
     }
 
     pub fn filed(self, known: Known<'file>) -> Known<'file> {
