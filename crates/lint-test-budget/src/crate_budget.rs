@@ -5,7 +5,7 @@ use std::fmt;
 use std::ops::Add;
 
 use lint_core::SourceFile;
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::{Contributing, Gathers, Sweep, Watching};
 use newtype::Counter;
 
 use count::Count;
@@ -53,14 +53,14 @@ pub struct BudgetGathering<'file> {
     file: CrateBudget,
     share: TestShare,
     tested: CrateBudget,
-    scan: TestScan<'file>,
+    scan: Contributing<TestScan<'file>>,
 }
 
 impl<'file> From<&'file SourceFile> for BudgetGathering<'file> {
     fn from(file: &'file SourceFile) -> BudgetGathering<'file> {
         let share = file.shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
         let tested = file.test_modules().iter().map(|module| {
-            let scan = Sweep::gathered(module, TestScan::new(module));
+            let scan = Sweep::gathered(module, Contributing::new(TestScan::new(module)));
             CrateBudget::measured(module, TestShare::WholeFile, scan)
         });
         let unscanned = CrateBudget::measured(file, share, CrateBudget::default());
@@ -68,7 +68,7 @@ impl<'file> From<&'file SourceFile> for BudgetGathering<'file> {
             file: unscanned,
             share,
             tested: tested.fold(CrateBudget::default(), Add::add),
-            scan: TestScan::new(file),
+            scan: Contributing::new(TestScan::new(file)),
         }
     }
 }
@@ -81,7 +81,7 @@ impl Gathers<CrateBudget> for BudgetGathering<'_> {
     fn gathered(self) -> CrateBudget {
         let share = self.share;
         let unscanned = self.file;
-        let file = self.scan.counted(|tests, test_lines| CrateBudget {
+        let file = self.scan.concluded(|(), tally| tally).counted(|tests, test_lines| CrateBudget {
             test_lines: share.test_lines(test_lines, unscanned.lines),
             tests,
             ..unscanned
@@ -90,13 +90,13 @@ impl Gathers<CrateBudget> for BudgetGathering<'_> {
     }
 }
 
-impl Gathers<CrateBudget> for TestScan<'_> {
+impl Gathers<CrateBudget> for Contributing<TestScan<'_>> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 
     fn gathered(self) -> CrateBudget {
-        self.counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
+        self.concluded(|(), tally| tally).counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
     }
 }
 

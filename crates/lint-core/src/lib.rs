@@ -1,5 +1,6 @@
 mod boundary;
 mod contents;
+mod contribution;
 mod gate;
 mod headline;
 mod lint;
@@ -19,6 +20,7 @@ mod watch;
 
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
+pub use contribution::{Contributed, Contributing, Contribution};
 pub use gate::Gate;
 pub use headline::Headline;
 pub use lint::Lint;
@@ -35,6 +37,6 @@ pub use syntax::Syntax;
 pub use test_file::TestFile;
 pub use type_name::TypeName;
 pub use walk::Walk;
-pub use watch::{Address, ByKind, Descend, Facts, Kind, Watch, Watching};
+pub use watch::{Address, ByKind, Contribute, Descend, Facts, Kind, Watch, Watching};
 
 pub use lint_layout::SourceText;
