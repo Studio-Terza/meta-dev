@@ -1,6 +1,6 @@
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Finds, Fold, Folding, Kind, Visit};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
@@ -54,18 +54,17 @@ impl SweptLint for TypeShape {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(TypeShapes {
-            path: AsRef::<Path>::as_ref(file.head()),
-            violations: Vec::new(),
-            roots: Vec::new(),
-            open: Vec::new(),
-        })
+        Box::new(Folding::from(TypeShapes { path: AsRef::<Path>::as_ref(file.head()) }))
     }
 }
 
 #[derive(Debug)]
 struct TypeShapes<'scan> {
     path: &'scan Path,
+}
+
+#[derive(Debug, Default)]
+struct Shapes<'scan> {
     violations: Vec<Violation<'scan>>,
     roots: Vec<Root<'scan>>,
     open: Vec<Open>,
@@ -90,22 +89,49 @@ struct Open {
     span: Span,
 }
 
+impl<'scan> From<Shapes<'scan>> for Vec<Violation<'scan>> {
+    fn from(shapes: Shapes<'scan>) -> Vec<Violation<'scan>> {
+        shapes.violations
+    }
+}
+
+impl<'scan> Shapes<'scan> {
+    fn rooted(self, roots: impl IntoIterator<Item = Root<'scan>>) -> Shapes<'scan> {
+        Shapes { roots: self.roots.into_iter().chain(roots).collect(), ..self }
+    }
+
+    fn flagged(self, flagged: Option<Violation<'scan>>) -> Shapes<'scan> {
+        Shapes { violations: self.violations.into_iter().chain(flagged).collect(), ..self }
+    }
+
+    fn entered(self, at: Address) -> Shapes<'scan> {
+        let (reached, roots): (Vec<Root<'scan>>, Vec<Root<'scan>>) =
+            self.roots.into_iter().partition(|root| root.at == at);
+        let opened: Vec<Open> = reached.iter().map(|root| Open { at: root.at, span: root.span }).collect();
+        let violations = self.violations.into_iter().chain(reached.into_iter().filter_map(|root| root.first)).collect();
+        Shapes { violations, roots, open: self.open.into_iter().chain(opened).collect() }
+    }
+
+    fn left(self, at: Address) -> Shapes<'scan> {
+        let mut open = self.open;
+        open.pop_if(|last| last.at == at);
+        Shapes { open, ..self }
+    }
+}
+
 impl<'scan> TypeShapes<'scan> {
     fn violation(&self, span: Span, message: Message) -> Violation<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
-    fn check_fields(&mut self, fields: &Fields) {
-        fields.iter().for_each(|field| {
-            let first = self.bool_field(field);
-            self.roots.push(Root::new(&field.ty, first));
-        });
+    fn roots(&self, fields: &Fields) -> Vec<Root<'scan>> {
+        fields.iter().map(|field| Root::new(&field.ty, self.bool_field(field))).collect()
     }
 
-    fn found(&mut self, message: Option<Message>) {
-        let at = self.open.last().map(|open| open.span);
+    fn found(&self, shapes: Shapes<'scan>, message: Option<Message>) -> Shapes<'scan> {
+        let at = shapes.open.last().map(|open| open.span);
         let found = at.zip(message).map(|(span, finding)| self.violation(span, finding));
-        self.violations.extend(found);
+        shapes.flagged(found)
     }
 
     fn bool_field(&self, field: &Field) -> Option<Violation<'scan>> {
@@ -125,7 +151,9 @@ impl<'scan> TypeShapes<'scan> {
     }
 }
 
-impl<'ast> Watch<'ast> for TypeShapes<'_> {
+impl<'scan> Fold for TypeShapes<'scan> {
+    type Found = Shapes<'scan>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -141,72 +169,58 @@ impl<'ast> Watch<'ast> for TypeShapes<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Shapes<'scan>, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Shapes<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        facts.inherent().map_or(Descend::Over, |_| Descend::Into)
+    fn on_item_impl(&self, found: Shapes<'scan>, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Visit<Shapes<'scan>> {
+        Visit::new(found, facts.inherent().map_or(Descend::Over, |_| Descend::Into))
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
-        self.check_fields(&item.fields);
-        Descend::Into
+    fn on_item_struct(
+        &self,
+        found: Shapes<'scan>,
+        item: &ItemStruct,
+        _: &Facts<'_, ItemStruct>,
+    ) -> Visit<Shapes<'scan>> {
+        Visit::descending(found.rooted(self.roots(&item.fields)))
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
-        item.variants.iter().for_each(|variant| self.check_fields(&variant.fields));
-        Descend::Into
+    fn on_item_enum(&self, found: Shapes<'scan>, item: &ItemEnum, _: &Facts<'_, ItemEnum>) -> Visit<Shapes<'scan>> {
+        Visit::descending(found.rooted(item.variants.iter().flat_map(|variant| self.roots(&variant.fields))))
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
-        self.roots.push(Root::new(&item.ty, None));
-        Descend::Into
+    fn on_item_type(&self, found: Shapes<'scan>, item: &ItemType, _: &Facts<'_, ItemType>) -> Visit<Shapes<'scan>> {
+        Visit::descending(found.rooted([Root::new(&item.ty, None)]))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Shapes<'scan>, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Shapes<'scan>> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature, _: &Facts<'_, Signature>) -> Descend {
-        signature
-            .inputs
-            .iter()
-            .filter_map(Syntax::typed)
-            .map(|typed| &*typed.ty)
-            .chain(Syntax::returned(&signature.output))
-            .for_each(|ty| self.roots.push(Root::new(ty, None)));
-        Descend::Into
+    fn on_signature(
+        &self,
+        found: Shapes<'scan>,
+        signature: &Signature,
+        _: &Facts<'_, Signature>,
+    ) -> Visit<Shapes<'scan>> {
+        let typed = signature.inputs.iter().filter_map(Syntax::typed).map(|typed| &*typed.ty);
+        Visit::descending(found.rooted(typed.chain(Syntax::returned(&signature.output)).map(|ty| Root::new(ty, None))))
     }
 
-    fn on_type(&mut self, ty: &'ast Type, _: &Facts<'_, Type>) -> Descend {
-        let at = Address::from(ty);
-        let (mut reached, waiting): (Vec<Root<'_>>, Vec<Root<'_>>) =
-            std::mem::take(&mut self.roots).into_iter().partition(|root| root.at == at);
-        self.roots = waiting;
-        self.violations.extend(reached.iter_mut().filter_map(|root| root.first.take()));
-        self.open.extend(reached.iter().map(|root| Open { at: root.at, span: root.span }));
-        Descend::Into
+    fn on_type(&self, found: Shapes<'scan>, ty: &Type, _: &Facts<'_, Type>) -> Visit<Shapes<'scan>> {
+        Visit::descending(found.entered(Address::from(ty)))
     }
 
-    fn off_type(&mut self, ty: &'ast Type, _: &Facts<'_, Type>) {
-        let at = Address::from(ty);
-        self.open.pop_if(|open| open.at == at);
+    fn off_type(&self, found: Shapes<'scan>, ty: &Type, _: &Facts<'_, Type>) -> Shapes<'scan> {
+        found.left(Address::from(ty))
     }
 
-    fn on_type_tuple(&mut self, tuple: &'ast TypeTuple, _: &Facts<'_, TypeTuple>) -> Descend {
-        self.found(tuple.elems.first().map(|_| TypeShape::TUPLE));
-        Descend::Into
+    fn on_type_tuple(&self, found: Shapes<'scan>, tuple: &TypeTuple, _: &Facts<'_, TypeTuple>) -> Visit<Shapes<'scan>> {
+        Visit::descending(self.found(found, tuple.elems.first().map(|_| TypeShape::TUPLE)))
     }
 
-    fn on_type_path(&mut self, path: &'ast TypePath, _: &Facts<'_, TypePath>) -> Descend {
-        self.found(TypeShape::string_error(path));
-        Descend::Into
-    }
-}
-
-impl<'file> Finds<'file> for TypeShapes<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+    fn on_type_path(&self, found: Shapes<'scan>, path: &TypePath, _: &Facts<'_, TypePath>) -> Visit<Shapes<'scan>> {
+        Visit::descending(self.found(found, TypeShape::string_error(path)))
     }
 }
