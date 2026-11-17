@@ -1,7 +1,8 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod kilobytes;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::PathBuf;
 
 use file_ports::Files;
@@ -28,13 +29,16 @@ impl Step for ColdSize {
         Ok(ColdSize { directory: PathBuf::from(directory), out: Journal::from(PathBuf::from(out)) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let size = ports
             .files()
             .bytes_below(&self.directory)
             .map_err(|failure| Failure::unusable(self.directory.as_path(), failure))?;
         let kilobytes = Kilobytes::from(size);
-        write!(out, "{kilobytes}")?;
-        self.out.emptied(ports.files())?.append(ports.files(), kilobytes).map(|()| Exit::Success)
+        let said = vec![Shown::said(format_args!("{kilobytes}"))];
+        Ok(Telling::reported(
+            said,
+            self.out.emptied(ports.files())?.append(ports.files(), kilobytes).map(|()| Exit::Success),
+        ))
     }
 }

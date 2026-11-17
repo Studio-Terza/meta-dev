@@ -1,8 +1,8 @@
 mod failure;
 mod step;
+mod telling;
 
 use std::ffi::OsString;
-use std::io::Write;
 
 use step::clippy_targets::ClippyTargets;
 use step::cold_size::ColdSize;
@@ -13,8 +13,10 @@ use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::sqlite::BuildSqlite;
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
-use super::ports::{Exit, Ports};
+use super::ports::Ports;
 pub(crate) use failure::Failure;
+pub use telling::Telling;
+pub(crate) use telling::Told;
 
 #[derive(Debug)]
 pub enum Command {
@@ -110,34 +112,38 @@ impl Command {
         S::from_arguments(arguments).map(variant)
     }
 
-    pub fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    pub fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Telling<'step> {
+        self.told(ports).unwrap_or_else(|failure| Telling::ended(Err(failure)))
+    }
+
+    fn told<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         match self {
-            Command::Timed(step) => step.carry_out(ports, out),
-            Command::ClippyTargets(step) => step.carry_out(ports, out),
-            Command::LibtestSeconds(step) => step.carry_out(ports, out),
-            Command::Reach(step) => step.carry_out(ports, out),
-            Command::History(step) => step.carry_out(ports, out),
-            Command::MeasuredHistory(step) => step.carry_out(ports, out),
-            Command::RatchetLower(step) => step.carry_out(ports, out),
-            Command::CompileTimes(step) => step.carry_out(ports, out),
-            Command::GraphPath(step) => step.carry_out(ports, out),
-            Command::Logged(step) => step.carry_out(ports, out),
-            Command::Tools(step) => step.carry_out(ports, out),
-            Command::ToolsKey(step) => step.carry_out(ports, out),
-            Command::MutantsShard(step) => step.carry_out(ports, out),
-            Command::MutantsChanged(step) => step.carry_out(ports, out),
-            Command::MutantsPlan(step) => step.carry_out(ports, out),
-            Command::WallTimes(step) => step.carry_out(ports, out),
-            Command::Show(step) => step.carry_out(ports, out),
-            Command::Summarize(step) => step.carry_out(ports, out),
-            Command::Labels(step) => step.carry_out(ports, out),
-            Command::SpecLine(step) => step.carry_out(ports, out),
-            Command::StageIssues(step) => step.carry_out(ports, out),
-            Command::CompileTrend(step) => step.carry_out(ports, out),
-            Command::ShardSummary(step) => step.carry_out(ports, out),
-            Command::Matrix(step) => step.carry_out(ports, out),
-            Command::ColdSize(step) => step.carry_out(ports, out),
-            Command::BuildSqlite(step) => step.carry_out(ports, out),
+            Command::Timed(step) => step.carry_out(ports),
+            Command::ClippyTargets(step) => step.carry_out(ports),
+            Command::LibtestSeconds(step) => step.carry_out(ports),
+            Command::Reach(step) => step.carry_out(ports),
+            Command::History(step) => step.carry_out(ports),
+            Command::MeasuredHistory(step) => step.carry_out(ports),
+            Command::RatchetLower(step) => step.carry_out(ports),
+            Command::CompileTimes(step) => step.carry_out(ports),
+            Command::GraphPath(step) => step.carry_out(ports),
+            Command::Logged(step) => step.carry_out(ports),
+            Command::Tools(step) => step.carry_out(ports),
+            Command::ToolsKey(step) => step.carry_out(ports),
+            Command::MutantsShard(step) => step.carry_out(ports),
+            Command::MutantsChanged(step) => step.carry_out(ports),
+            Command::MutantsPlan(step) => step.carry_out(ports),
+            Command::WallTimes(step) => step.carry_out(ports),
+            Command::Show(step) => step.carry_out(ports),
+            Command::Summarize(step) => step.carry_out(ports),
+            Command::Labels(step) => step.carry_out(ports),
+            Command::SpecLine(step) => step.carry_out(ports),
+            Command::StageIssues(step) => step.carry_out(ports),
+            Command::CompileTrend(step) => step.carry_out(ports),
+            Command::ShardSummary(step) => step.carry_out(ports),
+            Command::Matrix(step) => step.carry_out(ports),
+            Command::ColdSize(step) => step.carry_out(ports),
+            Command::BuildSqlite(step) => step.carry_out(ports),
         }
     }
 }

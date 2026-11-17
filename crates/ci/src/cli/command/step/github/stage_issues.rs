@@ -1,11 +1,12 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 use std::ffi::OsString;
-use std::io::Write;
 
 use super::Step;
 use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
-use crate::cli::ports::{Exit, Invocation, Ports};
+use crate::cli::ports::{Invocation, Ports};
 
 #[derive(Debug)]
 pub struct StageIssues {
@@ -20,18 +21,19 @@ impl Step for StageIssues {
         Ok(StageIssues { limits: gate_limits::Cli::from_args([limits, measured].into_iter().chain(arguments.rest())) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let findings = self.limits.past_warn(ports.files())?;
         let titles: Vec<Title<'_>> = findings.iter().map(|finding| Title::new(finding.stage().as_ref())).collect();
         let issues = Issue::titled(&titles, ports)?;
-        let filings = findings
+        let said = findings
             .iter()
             .zip(&issues)
             .map(|(finding, issue)| {
-                writeln!(out, "{} is past its warn level", finding.stage())?;
-                issue.filing(finding, out)
+                Shown::said(format_args!("{} is past its warn level\n{}", finding.stage(), issue.announcement()))
             })
-            .collect::<Result<Vec<Invocation>, Failure<'static>>>()?;
-        Issue::filed(&filings, ports)
+            .collect();
+        let filings: Vec<Invocation> =
+            findings.iter().zip(&issues).map(|(finding, issue)| issue.filing(finding)).collect();
+        Ok(Telling::reported(said, Issue::filed(&filings, ports)))
     }
 }

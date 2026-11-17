@@ -12,7 +12,8 @@ impl CargoMutants {
     pub(crate) const TIMEOUT: NonZeroU8 = Self::MISSED.saturating_add(1);
 
     const SUBCOMMAND: &'static str = "mutants";
-    const FIXED: [&'static str; 6] = ["--jobs", "2", "--colors", "never", "--build-timeout", "600"];
+    const FIXED: [&'static str; 9] =
+        ["--jobs", "2", "--colors", "never", "--no-shuffle", "--caught", "--unviable", "--build-timeout", "600"];
     const OUTPUT: &'static str = "--output";
 
     pub(crate) fn invocation(output: &Path, selection: &[&OsStr], passed_on: &[&OsStr]) -> Invocation {

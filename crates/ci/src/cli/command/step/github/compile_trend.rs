@@ -1,16 +1,17 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod build;
 mod fortnight;
 mod notice;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::PathBuf;
 
 use super::Step;
 use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Invocation, Ports};
 use build::Build;
 use fortnight::Fortnight;
 use notice::{Notice, Report};
@@ -25,24 +26,21 @@ impl CompileTrend {
     const TITLE: Title<'static> =
         Title::new("compile-time trend: the cold build is slower than every run of the previous 14 days");
 
-    fn concluded(notice: &Notice<'_>, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'static>> {
+    fn concluded<'step>(notice: &Notice<'_>, ports: &impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         match notice.slower() {
-            Some(slower) => Self::filed(&slower.reported(&Fortnight::merged(ports)?), ports, out),
-            None => Self::steady(notice, out),
+            Some(slower) => Self::filed(&slower.reported(&Fortnight::merged(ports)?), ports),
+            None => Ok(Telling::reported(vec![Shown::said(format_args!("{notice}\n"))], Ok(Exit::Success))),
         }
     }
 
-    fn filed(report: &Report<'_>, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'static>> {
-        write!(out, "{report}")?;
+    fn filed<'step>(report: &Report<'_>, ports: &impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let issues = Issue::titled(&[Self::TITLE], ports)?;
-        let filings =
-            issues.iter().map(|issue| issue.filing(report, out)).collect::<Result<Vec<_>, Failure<'static>>>()?;
-        Issue::filed(&filings, ports)
-    }
-
-    fn steady(notice: &Notice<'_>, out: &mut impl Write) -> Result<Exit, Failure<'static>> {
-        writeln!(out, "{notice}")?;
-        Ok(Exit::Success)
+        let said = [Shown::said(report)]
+            .into_iter()
+            .chain(issues.iter().map(|issue| Shown::said(issue.announcement())))
+            .collect();
+        let filings: Vec<Invocation> = issues.iter().map(|issue| issue.filing(report)).collect();
+        Ok(Telling::reported(said, Issue::filed(&filings, ports)))
     }
 }
 
@@ -55,9 +53,9 @@ impl Step for CompileTrend {
         Ok(CompileTrend { today: PathBuf::from(today), fortnight: Fortnight::downloading_to(PathBuf::from(downloads)) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let today = Build::measured_in(ports.files(), &self.today)?;
         let earlier = self.fortnight.downloaded(ports)?;
-        Self::concluded(&Notice::new(&today, &earlier, &self.fortnight), ports, out)
+        Self::concluded(&Notice::new(&today, &earlier, &self.fortnight), ports)
     }
 }

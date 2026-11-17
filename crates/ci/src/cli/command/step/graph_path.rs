@@ -1,3 +1,5 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod crates;
 mod host;
 mod manifest;
@@ -11,7 +13,6 @@ mod weighed;
 mod work;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 
 use super::Step;
@@ -40,37 +41,34 @@ pub struct GraphPath {
 impl GraphPath {
     const PATH: &'static str = "graph-path";
 
-    fn recorded(
-        &self,
-        build: Build,
-        ports: &impl Ports,
-        out: &mut impl Write,
-        page: &Text,
-    ) -> Result<Exit, Failure<'_>> {
+    fn recorded(&self, build: Build, ports: &impl Ports, page: &Text) -> Result<Telling<'_>, Failure<'_>> {
         match build {
-            Build::Finished => self.measured(ports, out, page),
-            Build::Failed => self.skipped(ports, out),
+            Build::Finished => self.measured(ports, page),
+            Build::Failed => self.skipped(ports),
         }
     }
 
-    fn skipped(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        write!(out, "{PartialTimings}")?;
-        self.report.emptied(ports.files())?.append(ports.files(), PartialTimings).map(|()| Exit::Success)
+    fn skipped(&self, ports: &impl Ports) -> Result<Telling<'_>, Failure<'_>> {
+        let said = vec![Shown::said(PartialTimings)];
+        let ended = self.report.emptied(ports.files())?.append(ports.files(), PartialTimings).map(|()| Exit::Success);
+        Ok(Telling::reported(said, ended))
     }
 
-    fn measured(&self, ports: &impl Ports, out: &mut impl Write, page: &Text) -> Result<Exit, Failure<'_>> {
+    fn measured(&self, ports: &impl Ports, page: &Text) -> Result<Telling<'_>, Failure<'_>> {
         let units: Vec<TimedUnit> = CompileTimes::units(&self.page, page)?;
         let crates = Host::asked(ports)?.crates(ports)?;
         let dag = UnitDag::weighed(&crates, units);
         let critical = dag.critical();
         let work = Work::from(dag.work());
-        write!(out, "{critical}{work}")?;
+        let said = vec![Shown::said(format_args!("{critical}{work}"))];
         let report = self.report.emptied(ports.files())?;
         report.append(ports.files(), &critical)?;
         report.append(ports.files(), work)?;
-        self.measured
+        let ended = self
+            .measured
             .append(ports.files(), &Stage::new(Self::PATH.to_owned()), *critical.as_ref())
-            .map(|()| Exit::Success)
+            .map(|()| Exit::Success);
+        Ok(Telling::reported(said, ended))
     }
 }
 
@@ -88,7 +86,7 @@ impl Step for GraphPath {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        self.page.read(ports.files()).and_then(|page| self.recorded(Build::recorded(page.as_ref()), ports, out, &page))
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
+        self.page.read(ports.files()).and_then(|page| self.recorded(Build::recorded(page.as_ref()), ports, &page))
     }
 }

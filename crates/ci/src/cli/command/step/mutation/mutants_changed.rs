@@ -1,8 +1,9 @@
+use crate::cli::command::{Telling, Told};
 mod pass;
 mod verdict;
 
 use std::ffi::{OsStr, OsString};
-use std::io::Write;
+use std::iter;
 use std::path::{Path, PathBuf};
 
 use super::super::journal::Journal;
@@ -38,7 +39,7 @@ impl MutantsChanged {
         }
     }
 
-    fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn tested<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let diff: &Path = self.diff.as_ref();
         let shard = self.shard.arguments();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
@@ -46,14 +47,22 @@ impl MutantsChanged {
             .chain(shard.iter().map(OsString::as_os_str))
             .collect();
         let own = self.own.ran(ports, &selection, &[CargoMutants::MISSED, CargoMutants::TIMEOUT])?;
-        own.followed_by(|| {
-            let survivors = self.own.survivors(ports.files(), out)?;
-            let rerun = survivors.map(|found| self.rerun(ports, out, &found));
-            rerun.unwrap_or_else(|| Verdict::NoneMissed.reported(out))
+        Some(own).filter(|exit| *exit == Exit::Success).map_or(Ok(Telling::ended(Ok(own))), |_| {
+            let timed_out = self.own.timed_out(ports.files())?;
+            let survivors = self.own.survivors(ports.files())?;
+            let rest = iter::once_with(move || self.after(ports, survivors.as_ref())).flatten();
+            Ok(Telling::lazy(iter::once(Told::Said(timed_out)).chain(rest)))
         })
     }
 
-    fn rerun(&self, ports: &impl Ports, out: &mut impl Write, missed: &Survivors) -> Result<Exit, Failure<'_>> {
+    fn after<'step>(&'step self, ports: &'step impl Ports, survivors: Option<&Survivors>) -> Vec<Told<'step>> {
+        survivors.map_or_else(
+            || Verdict::NoneMissed.told(),
+            |found| self.rerun(ports, found).unwrap_or_else(|failure| vec![Told::Ended(Err(failure))]),
+        )
+    }
+
+    fn rerun<'step>(&'step self, ports: &impl Ports, missed: &Survivors) -> Result<Vec<Told<'step>>, Failure<'step>> {
         let diff: &Path = self.diff.as_ref();
         let named = missed.examined();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
@@ -62,7 +71,9 @@ impl MutantsChanged {
             .chain(self.scope.iter().map(OsString::as_os_str))
             .collect();
         let scoped = self.scoped.ran(ports, &selection, &[CargoMutants::TIMEOUT])?;
-        scoped.followed_by(|| self.scoped.judged(ports.files(), out, missed))
+        Some(scoped)
+            .filter(|exit| *exit == Exit::Success)
+            .map_or(Ok(vec![Told::Ended(Ok(scoped))]), |_| self.scoped.judged(ports.files(), missed))
     }
 }
 
@@ -76,10 +87,10 @@ impl Step for MutantsChanged {
         Ok(MutantsChanged::new(PathBuf::from(diff), PathBuf::from(output), shard, scope))
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         match self.scope.first() {
-            None => Verdict::Skipped.reported(out),
-            Some(_) => self.tested(ports, out),
+            None => Ok(Telling::lazy(Verdict::Skipped.told().into_iter())),
+            Some(_) => self.tested(ports),
         }
     }
 }

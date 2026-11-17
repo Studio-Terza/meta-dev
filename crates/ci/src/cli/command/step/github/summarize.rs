@@ -1,9 +1,7 @@
+use crate::cli::command::Telling;
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::Path;
 use std::slice;
-
-use text_lines::LossyText;
 
 use super::super::journal::Journal;
 use super::Step;
@@ -27,9 +25,8 @@ impl Step for Summarize {
         Ok(Summarize { report: Journal::file(Path::new(report)), summary: Journal::file(Path::new(summary)) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        let mut shown = Vec::new();
-        Show::shown(ports.files(), slice::from_ref(&self.report), &mut shown)?;
-        self.summary.append(ports.files(), LossyText::from(shown.as_slice())).map(|()| Exit::Success)
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
+        let shown = Show::shown(ports.files(), slice::from_ref(&self.report))?;
+        Ok(Telling::ended(self.summary.append(ports.files(), &shown).map(|()| Exit::Success)))
     }
 }

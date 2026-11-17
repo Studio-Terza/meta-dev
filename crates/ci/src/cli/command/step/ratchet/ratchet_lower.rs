@@ -1,5 +1,6 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 use std::ffi::OsString;
-use std::io::Write;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
@@ -20,9 +21,9 @@ impl Step for RatchetLower {
         Ok(RatchetLower { record: gate_limits::Cli::from_args([record, measured].into_iter()) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let record = self.record.lower(ports.files())?;
-        write!(out, "record lowered to:\n{record}")?;
-        Ok(Exit::Success)
+        let said = vec![Shown::said(format_args!("record lowered to:\n{record}"))];
+        Ok(Telling::reported(said, Ok(Exit::Success)))
     }
 }

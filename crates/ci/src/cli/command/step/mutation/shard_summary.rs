@@ -1,3 +1,5 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod count;
 mod mutant;
 pub(super) mod outcome;
@@ -5,7 +7,6 @@ mod report;
 mod tally;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use file_ports::Files;
@@ -83,10 +84,9 @@ impl Step for ShardSummary {
         Ok(ShardSummary { shards: PathBuf::from(shards), summary: Journal::file(Path::new(summary)) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let report = self.report(ports.files())?;
-        write!(out, "{report}")?;
-        self.summary.append(ports.files(), report)?;
-        Ok(Exit::Success)
+        let said = vec![Shown::said(format_args!("{report}"))];
+        Ok(Telling::reported(said, self.summary.append(ports.files(), report).map(|()| Exit::Success)))
     }
 }

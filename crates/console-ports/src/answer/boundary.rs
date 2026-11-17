@@ -7,7 +7,7 @@ pub struct Shown(String);
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Complaint(String);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Answer {
     shown: Shown,
     complaint: Complaint,
@@ -55,6 +55,13 @@ impl AsRef<Complaint> for Answer {
     }
 }
 
+impl Shown {
+    #[must_use]
+    pub fn said(text: impl Display) -> Shown {
+        Shown(text.to_string())
+    }
+}
+
 impl AsRef<str> for Shown {
     fn as_ref(&self) -> &str {
         &self.0
@@ -64,5 +71,41 @@ impl AsRef<str> for Shown {
 impl AsRef<str> for Complaint {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+pub trait Tale: Iterator<Item = Shown> {
+    fn ended(self) -> Answer;
+}
+
+pub trait Teller {
+    type Told<'teller>: Tale
+    where
+        Self: 'teller;
+
+    fn told(&self) -> Self::Told<'_>;
+}
+
+#[derive(Debug)]
+pub struct Answered(Answer);
+
+impl Iterator for Answered {
+    type Item = Shown;
+
+    fn next(&mut self) -> Option<Shown> {
+        None
+    }
+}
+
+impl Tale for Answered {
+    fn ended(self) -> Answer {
+        self.0
+    }
+}
+
+impl Teller for Answer {
+    type Told<'teller> = Answered;
+
+    fn told(&self) -> Answered {
+        Answered(self.clone())
     }
 }

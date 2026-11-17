@@ -1,7 +1,7 @@
+use crate::cli::command::Telling;
 mod boundary;
 
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use super::Step;
@@ -39,13 +39,13 @@ impl Step for BuildSqlite {
         Ok(BuildSqlite { library })
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let metadata = Changed::asked(ports, &Invocation::new("cargo", Located::METADATA))?;
         let source = metadata.as_ref().parse::<Located>()?.source()?;
         ports
             .files()
             .create_directories(&self.library)
             .map_err(|failed| Failure::unusable(self.library.as_path(), failed))?;
-        self.compiled(ports, &source)
+        Ok(Telling::ended(self.compiled(ports, &source)))
     }
 }

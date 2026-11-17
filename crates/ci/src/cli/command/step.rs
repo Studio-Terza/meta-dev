@@ -22,10 +22,10 @@ mod timed;
 mod tools_key;
 
 use std::ffi::OsString;
-use std::io::Write;
 
+use crate::cli::command::Telling;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::Ports;
 pub(crate) use arguments::Arguments;
 
 pub use compile_times::CompileTimes;
@@ -40,5 +40,5 @@ pub use tools_key::ToolsKey;
 pub trait Step: Sized {
     fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>>;
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>>;
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>>;
 }

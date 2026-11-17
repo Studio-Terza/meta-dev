@@ -1,3 +1,4 @@
+use console_ports::{Tale, Teller};
 use std::cell::RefCell;
 use std::error::Error;
 use std::ffi::OsString;
@@ -192,14 +193,12 @@ impl Answer {
     }
 
     fn to<Argument: AsRef<str>>(fake: &Fake<'_>, arguments: &[Argument]) -> Answer {
-        let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit =
-            Cli::answer(arguments.iter().map(|argument| OsString::from(argument.as_ref())), fake, &mut out, &mut err);
-        Answer {
-            exit,
-            out: String::from_utf8(out).unwrap_or_default(),
-            err: String::from_utf8(err).unwrap_or_default(),
-        }
+        let cli = Cli::parsed(arguments.iter().map(|argument| OsString::from(argument.as_ref())), fake);
+        let mut tale = cli.told();
+        let out: String = tale.by_ref().map(|shown| AsRef::<str>::as_ref(&shown).to_owned()).collect();
+        let ended = tale.ended();
+        let err: &console_ports::Complaint = ended.as_ref();
+        Answer { exit: ended.code(), out, err: AsRef::<str>::as_ref(err).to_owned() }
     }
 
     fn refused(arguments: &[&str]) -> bool {
@@ -1386,6 +1385,9 @@ impl Cargo {
                 "2",
                 "--colors",
                 "never",
+                "--no-shuffle",
+                "--caught",
+                "--unviable",
                 "--build-timeout",
                 "600",
                 "--output",
@@ -1499,6 +1501,9 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
                 "2",
                 "--colors",
                 "never",
+                "--no-shuffle",
+                "--caught",
+                "--unviable",
                 "--build-timeout",
                 "600",
                 "--output",
@@ -1693,6 +1698,9 @@ fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_
                 "2",
                 "--colors",
                 "never",
+                "--no-shuffle",
+                "--caught",
+                "--unviable",
                 "--build-timeout",
                 "600",
                 "--output",
@@ -2733,5 +2741,32 @@ fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Re
     assert_eq!(Text::lines(&answer.out), ["mutants: 3 to test in 1 shards"]);
     assert_eq!(Text::lines(&scratch.read("c.diff")), ["+changed", "+whole"]);
     assert_eq!(*fake.calls.borrow(), [named, kept, whole, listed]);
+    Ok(())
+}
+
+#[test]
+fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.directory("out/mutants.out")?;
+    scratch.directory("out/scoped/mutants.out")?;
+    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    scratch.write("out/scoped/mutants.out/caught.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    let fake = Script::new();
+    let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
+    let ports = Fake { script: &fake, scratch: &scratch };
+    let cli = Cli::parsed(arguments.iter().map(OsString::from), &ports);
+    let mut tale = cli.told();
+    let first = tale.next().map_or_default(|shown| Text::lines(&shown));
+    let runs_when_told = fake.calls.borrow().len();
+    let rest: Vec<String> = tale.by_ref().flat_map(|shown| Text::lines(&shown)).collect();
+    assert_eq!(
+        (first, runs_when_told, rest, fake.calls.borrow().len()),
+        (
+            vec!["mutants: 0 timed out on their own crate's tests".to_owned()],
+            1,
+            vec!["mutants: none missed".to_owned()],
+            2
+        )
+    );
     Ok(())
 }

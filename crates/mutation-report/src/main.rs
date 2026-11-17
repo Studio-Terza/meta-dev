@@ -5,5 +5,5 @@ use file_ports::Disk;
 use mutation_report::Cli;
 
 fn main() -> ExitCode {
-    Process::answer(|arguments| Cli::answer(&arguments, &Disk))
+    Process::tell(|arguments| Cli::answer(&arguments, &Disk))
 }

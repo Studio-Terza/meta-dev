@@ -1,10 +1,11 @@
+use crate::cli::command::Telling;
+use console_ports::Shown;
 mod job;
 mod repository;
 mod run_id;
 
 use std::ffi::OsString;
 use std::fmt;
-use std::io::Write;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
@@ -58,11 +59,10 @@ impl Step for WallTimes {
         })
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let invocation = self.invocation();
         let table = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
-        writeln!(out, "{self}")?;
-        write!(out, "{table}")?;
-        Ok(Exit::Success)
+        let said = vec![Shown::said(format_args!("{self}\n{table}"))];
+        Ok(Telling::reported(said, Ok(Exit::Success)))
     }
 }

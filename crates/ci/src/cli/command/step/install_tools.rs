@@ -1,7 +1,7 @@
+use crate::cli::command::Telling;
 mod tool;
 
 use std::ffi::{OsStr, OsString};
-use std::io::Write;
 use std::path::PathBuf;
 
 use file_ports::Files;
@@ -52,9 +52,9 @@ impl Step for InstallTools {
         Ok(InstallTools { built: PathBuf::from(built), destination: PathBuf::from(destination) })
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+    fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let build = Self::build_invocation();
         let run = ports.run(&build).map_err(Failure::starting(&build))?;
-        run.exit().followed_by(|| self.installed(ports.files()))
+        Ok(Telling::ended(run.exit().followed_by(|| self.installed(ports.files()))))
     }
 }

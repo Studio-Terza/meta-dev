@@ -5,5 +5,5 @@ use ci::ports::System;
 use console_ports::Process;
 
 fn main() -> ExitCode {
-    Process::stream(|arguments, out, err| Cli::answer(arguments.into_iter(), &System, out, err))
+    Process::tell(|arguments| Cli::parsed(arguments.into_iter(), &System))
 }
