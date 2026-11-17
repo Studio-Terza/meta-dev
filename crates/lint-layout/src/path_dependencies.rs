@@ -6,6 +6,7 @@ use newtype::{Arbitrary, Newtype};
 use crate::manifest::Manifest;
 
 #[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[newtype(strategy = crate::untested::Untested::sampled())]
 pub struct PathDependencies(Vec<PathBuf>);
 
 impl PathDependencies {
