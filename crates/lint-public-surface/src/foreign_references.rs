@@ -8,13 +8,12 @@ use super::export::Export;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
 use crate_reach::CrateReach;
 
 #[derive(Debug, Default)]
 pub struct ForeignReferences {
-    own_crate: Option<CrateName>,
     crates: BTreeMap<CrateName, CrateReach>,
 }
 
@@ -43,10 +42,7 @@ enum Reader {
 impl Reader {
     fn tested(mut read: ForeignReferences, tested: Option<CrateName>) -> ForeignReferences {
         let kept = tested.and_then(|crate_name| read.crates.remove_entry(&crate_name));
-        ForeignReferences {
-            crates: kept.map(|(name, reach)| (name, reach.names_only())).into_iter().collect(),
-            ..ForeignReferences::default()
-        }
+        ForeignReferences { crates: kept.map(|(name, reach)| (name, reach.names_only())).into_iter().collect() }
     }
 
     fn kept(self, read: ForeignReferences, tested: Option<CrateName>) -> ForeignReferences {
@@ -60,7 +56,7 @@ impl Reader {
 
 #[derive(Debug)]
 pub struct Reading {
-    references: ForeignReferences,
+    own: Option<CrateName>,
     reader: Reader,
     tested: Option<CrateName>,
 }
@@ -76,17 +72,13 @@ impl From<&SourceFile> for Reading {
         let shipped = file.shipped().map(|_| Reader::Shipped);
         let reader = shipped.or_else(|| own_tests.as_ref().map(|_| Reader::Tests)).unwrap_or(Reader::Neither);
         let own = shipped.and(own_crate);
-        Reading { references: ForeignReferences { own_crate: own, crates: BTreeMap::new() }, reader, tested: own_tests }
+        Reading { own, reader, tested: own_tests }
     }
 }
 
-impl Gathers<ForeignReferences> for Reading {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> ForeignReferences {
-        self.reader.kept(self.references, self.tested)
+impl Reading {
+    pub fn kept(&self, references: ForeignReferences) -> ForeignReferences {
+        self.reader.kept(references, self.tested.clone())
     }
 }
 
@@ -104,14 +96,14 @@ impl ForeignReferences {
         self.crates.get(crate_name).and_then(|reach| reach.unnamed(AsRef::<Name>::as_ref(export))).map(|_| export)
     }
 
-    fn used(&mut self, tree: &UseTree) {
+    fn used(self, tree: &UseTree, own: Option<&CrateName>) -> ForeignReferences {
         let leaves = UseLeaf::of_tree(tree);
         let reached = leaves.iter().flat_map(|leaf| {
             let first = leaf.path().first().copied();
             let module = leaf.path().get(1).copied().map(Leaf::Named);
             [Some(Self::reach(leaf)), module].into_iter().flatten().map(move |reach| (first, reach))
         });
-        reached.for_each(|(first, reach)| self.record(first, reach));
+        reached.fold(self, |references, (first, reach)| references.recorded(first, reach, own))
     }
 
     fn reach<'tree>(leaf: &UseLeaf<'tree>) -> Leaf<'tree> {
@@ -119,16 +111,20 @@ impl ForeignReferences {
         named.or_else(|| leaf.end().renamed().map(|renamed| &renamed.ident)).map_or(Leaf::Glob, Leaf::Named)
     }
 
-    fn record(&mut self, first: Option<&Ident>, leaf: Leaf<'_>) {
+    fn recorded(self, first: Option<&Ident>, leaf: Leaf<'_>, own: Option<&CrateName>) -> ForeignReferences {
+        let mut crates = self.crates;
         first
             .map(CrateName::from)
-            .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
+            .filter(|crate_name| Some(crate_name) != own)
             .into_iter()
-            .for_each(|crate_name| leaf.reached(self.crates.entry(crate_name).or_default()));
+            .for_each(|crate_name| leaf.reached(crates.entry(crate_name).or_default()));
+        ForeignReferences { crates }
     }
 }
 
-impl<'ast> Watch<'ast> for Reading {
+impl Fold for Reading {
+    type Found = ForeignReferences;
+
     fn kinds(&self) -> &'static [Kind] {
         match self.reader {
             Reader::Shipped | Reader::Tests => &[Kind::ItemUse, Kind::Macro, Kind::Path],
@@ -136,19 +132,23 @@ impl<'ast> Watch<'ast> for Reading {
         }
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
-        self.references.used(&item.tree);
-        Descend::Over
+    fn on_item_use(
+        &self,
+        found: ForeignReferences,
+        item: &ItemUse,
+        _: &Facts<'_, ItemUse>,
+    ) -> Visit<ForeignReferences> {
+        Visit::new(found.used(&item.tree, self.own.as_ref()), Descend::Over)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Unfold
+    fn on_macro(&self, found: ForeignReferences, _: &Macro, _: &Facts<'_, Macro>) -> Visit<ForeignReferences> {
+        Visit::new(found, Descend::Unfold)
     }
 
-    fn on_path(&mut self, path: &'ast Path, _: &Facts<'_, Path>) -> Descend {
-        path.segments.first().zip(path.segments.iter().nth(1)).into_iter().for_each(|(first, second)| {
-            self.references.record(Some(&first.ident), Leaf::Named(&second.ident));
-        });
-        Descend::Into
+    fn on_path(&self, found: ForeignReferences, path: &Path, _: &Facts<'_, Path>) -> Visit<ForeignReferences> {
+        let pairs = path.segments.first().zip(path.segments.iter().nth(1));
+        Visit::descending(pairs.into_iter().fold(found, |references, (first, second)| {
+            references.recorded(Some(&first.ident), Leaf::Named(&second.ident), self.own.as_ref())
+        }))
     }
 }

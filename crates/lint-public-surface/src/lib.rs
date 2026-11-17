@@ -9,7 +9,7 @@ use finding::Finding;
 use foreign_references::{ForeignReferences, Reading};
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, RuledLint};
-use lint_sweep::{Gathers, Watching};
+use lint_sweep::{Folding, Gathers, Watching};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -23,7 +23,7 @@ pub struct PublicSurface;
 pub struct References(ForeignReferences);
 
 #[derive(Debug)]
-pub struct ReferenceGathering(Reading);
+pub struct ReferenceGathering(Folding<Reading>);
 
 impl Gathers<References> for ReferenceGathering {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
@@ -31,7 +31,7 @@ impl Gathers<References> for ReferenceGathering {
     }
 
     fn gathered(self) -> References {
-        References(self.0.gathered())
+        References(self.0.concluded_with(Reading::kept))
     }
 }
 
@@ -51,7 +51,7 @@ impl ContextLint for PublicSurface {
     type Gathering<'head> = ReferenceGathering;
 
     fn gathering(parsed: Parsed<'_, '_>) -> ReferenceGathering {
-        ReferenceGathering(Reading::from(<&SourceFile>::from(parsed)))
+        ReferenceGathering(Folding::from(Reading::from(<&SourceFile>::from(parsed))))
     }
 }
 
