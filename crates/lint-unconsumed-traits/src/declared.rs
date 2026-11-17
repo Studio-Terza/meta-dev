@@ -5,7 +5,7 @@ mod finding;
 use syntax::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
 use crate::Consumers;
 use finding::Finding;
@@ -16,10 +16,9 @@ use declaration::Declaration;
 #[derive(Debug)]
 pub struct Declared<'file> {
     path: &'file std::path::Path,
-    found: Vec<Declaration<'file>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Declarations<'file>(Vec<Declaration<'file>>);
 
 impl<'file> Declarations<'file> {
@@ -61,39 +60,29 @@ impl Declared<'_> {
     }
 }
 
-impl<'ast> Watch<'ast> for Declared<'_> {
+impl<'file> Fold for Declared<'file> {
+    type Found = Declarations<'file>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemTrait]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Self::Found, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&mut self, block: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+    fn on_item_trait(&self, found: Self::Found, block: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Visit<Self::Found> {
         let site = Site::new(self.path, LineNumber::from(block.ident.span()));
         let declaration = facts.name().map(|name| Declaration::new(name.clone(), Self::provided(block), site));
-        self.found.extend(
-            Self::with_methods(block)
-                .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
-                .and(declaration),
-        );
-        Descend::Over
-    }
-}
-
-impl<'file> Gathers<Declarations<'file>> for Declared<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
-    }
-
-    fn gathered(self) -> Declarations<'file> {
-        Declarations(self.found)
+        let declared = Self::with_methods(block)
+            .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
+            .and(declaration);
+        Visit::new(Declarations(found.0.into_iter().chain(declared).collect()), Descend::Over)
     }
 }
 
 impl<'file> From<&'file SourceFile> for Declared<'file> {
     fn from(file: &'file SourceFile) -> Declared<'file> {
-        Declared { path: AsRef::<Path>::as_ref(file.head()), found: Vec::new() }
+        Declared { path: AsRef::<Path>::as_ref(file.head()) }
     }
 }

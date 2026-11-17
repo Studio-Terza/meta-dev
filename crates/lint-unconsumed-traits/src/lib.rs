@@ -3,6 +3,7 @@ mod declared;
 
 use lint_core::{Headline, Parsed, SourceFile, Violation};
 use lint_file::{ContextLint, Reads, WatchingLint};
+use lint_sweep::Folding;
 
 use consumers::{Consumers, Consuming};
 use declared::{Declarations, Declared};
@@ -28,10 +29,10 @@ impl ContextLint for UnconsumedTraits {
 
 impl WatchingLint for UnconsumedTraits {
     type Found<'file> = Declarations<'file>;
-    type Watched<'file> = Declared<'file>;
+    type Watched<'file> = Folding<Declared<'file>>;
 
-    fn watched(file: &SourceFile) -> Declared<'_> {
-        Declared::from(file)
+    fn watched(file: &SourceFile) -> Folding<Declared<'_>> {
+        Folding::from(Declared::from(file))
     }
 
     fn judged<'file, 'head: 'file>(
