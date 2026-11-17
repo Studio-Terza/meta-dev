@@ -79,6 +79,10 @@ impl Sweep {
         Walk::file(&mut Sweep::sweeping(Some(file), watchers), file.syntax());
     }
 
+    pub fn block_in<'run>(file: &SourceFile, block: &syntax::Block, watchers: Vec<&'run mut Watching<'run>>) {
+        Walk::block_node(&mut Sweep::sweeping(Some(file), watchers), block);
+    }
+
     pub fn expanded_item(item: &syntax::Item, watcher: &mut Watching<'_>) {
         Walk::item_node(&mut Sweep::sweeping(None, vec![watcher]), item);
     }

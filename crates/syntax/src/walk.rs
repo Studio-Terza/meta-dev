@@ -1,5 +1,5 @@
 use syn::visit::{self, Visit};
-use syn::{File, Ident, Item, Macro, Stmt};
+use syn::{Block, File, Ident, Item, Macro, Stmt};
 
 #[macro_export]
 macro_rules! node_kinds {
@@ -119,5 +119,9 @@ impl<'walk, Visitor: Around + ?Sized> Walk<'walk, Visitor> {
 
     pub fn item_node(visitor: &'walk mut Visitor, item: &Item) {
         Walk(visitor).visit_item(item);
+    }
+
+    pub fn block_node(visitor: &'walk mut Visitor, block: &Block) {
+        Walk(visitor).visit_block(block);
     }
 }
