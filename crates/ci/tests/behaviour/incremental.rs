@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ffi::OsString;
 use std::process::ExitCode;
 
 use ci::ports::Invocation;
@@ -14,11 +15,12 @@ const CAUGHT_BEFORE: &str = r#"{"name": "crates/a/src/lib.rs:12:5: replace k -> 
 const TEST_ADDED: &str = "diff --git a/crates/a/tests/behaviour.rs b/crates/a/tests/behaviour.rs\n--- a/crates/a/tests/behaviour.rs\n+++ b/crates/a/tests/behaviour.rs\n@@ -9,0 +10,3 @@\n+#[test]\n+fn f_is_false() {\n+}\n";
 const TEST_EDITED: &str = "diff --git a/crates/a/tests/behaviour.rs b/crates/a/tests/behaviour.rs\n--- a/crates/a/tests/behaviour.rs\n+++ b/crates/a/tests/behaviour.rs\n@@ -4 +4 @@\n-    assert!(f());\n+    assert!(g());\n";
 const FAKE_EDITED: &str = "diff --git a/crates/fakes/src/lib.rs b/crates/fakes/src/lib.rs\n--- a/crates/fakes/src/lib.rs\n+++ b/crates/fakes/src/lib.rs\n@@ -2 +1,0 @@\n-pub fn faked() {}\n";
+const SHARED_EDITED: &str = "diff --git a/crates/shared/src/lib.rs b/crates/shared/src/lib.rs\n--- a/crates/shared/src/lib.rs\n+++ b/crates/shared/src/lib.rs\n@@ -2 +1,0 @@\n-pub fn shared() {}\n";
 const CODE_EDITED: &str = "diff --git a/crates/a/src/lib.rs b/crates/a/src/lib.rs\n--- a/crates/a/src/lib.rs\n+++ b/crates/a/src/lib.rs\n@@ -8 +8,2 @@\n-    old();\n+    new();\n+    newer();\n";
 const NOTHING_MOVED: &str = "";
 const LINE_ABOVE: &str = "diff --git a/crates/a/src/lib.rs b/crates/a/src/lib.rs\n--- a/crates/a/src/lib.rs\n+++ b/crates/a/src/lib.rs\n@@ -1,0 +2 @@\n+use std::fmt;\n";
 
-const METADATA: &str = r#"{"workspace_root": "/w", "workspace_members": ["a", "fakes"], "packages": [{"id": "a", "manifest_path": "/w/crates/a/Cargo.toml"}, {"id": "fakes", "manifest_path": "/w/crates/fakes/Cargo.toml"}], "resolve": {"nodes": [{"id": "a", "deps": [{"pkg": "fakes", "dep_kinds": [{"kind": "dev"}]}]}, {"id": "fakes", "deps": []}]}}"#;
+const METADATA: &str = r#"{"workspace_root": "/w", "workspace_members": ["a", "fakes", "shared"], "packages": [{"id": "a", "manifest_path": "/w/crates/a/Cargo.toml"}, {"id": "fakes", "manifest_path": "/w/crates/fakes/Cargo.toml"}, {"id": "shared", "manifest_path": "/w/crates/shared/Cargo.toml"}], "resolve": {"nodes": [{"id": "a", "deps": [{"pkg": "fakes", "dep_kinds": [{"kind": "dev"}]}, {"pkg": "shared", "dep_kinds": [{"kind": null}, {"kind": "dev"}]}]}, {"id": "fakes", "deps": []}, {"id": "shared", "deps": []}]}}"#;
 
 struct Prior {
     survivors: &'static [&'static str],
@@ -188,13 +190,14 @@ fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() 
 }
 
 laws::table!(
-    test_code_edited_other_than_by_additions_since_the_prior_falls_back_to_every_changed_line,
+    only_test_code_edited_other_than_by_additions_since_the_prior_falls_back_to_every_changed_line,
     |since: &&'static str| Prior { survivors: &[SURVIVOR], since_head: since, moved: NOTHING_MOVED, listed: vec![SURVIVOR, UNTOUCHED], since: Vec::new(), earlier_tests: "", since_tests: "" }
         .planned()
         .map_or_default(|planned| (planned.out.first().cloned().unwrap_or_default(), planned.selected.len())),
     [
         TEST_EDITED => ("mutants: every changed line, since test code changed other than by additions: crates/a/tests/behaviour.rs".to_owned(), 0),
         FAKE_EDITED => ("mutants: every changed line, since test code changed other than by additions: crates/fakes/src/lib.rs".to_owned(), 0),
+        SHARED_EDITED => ("mutants: 1 selected since h0: its 1 survivors and the lines changed since".to_owned(), 1),
         "not a patch\n" => ("mutants: every changed line, since git printed a patch this cannot read".to_owned(), 0),
     ]
 );
@@ -238,6 +241,7 @@ struct Earlier {
 struct Looked {
     out: Vec<String>,
     marked: Vec<String>,
+    downloads: usize,
 }
 
 impl Ancestry {
@@ -299,7 +303,13 @@ impl Earlier {
         };
         let answer = scratch.answer(&script, &["mutants-prior", "o/r", "topic", &scratch.file("prior")]);
         assert_eq!(answer.exit, ExitCode::SUCCESS);
-        Ok(Looked { out: Text::lines(&answer.out), marked: Text::lines(&scratch.read("prior/tested")) })
+        let downloads = script
+            .calls
+            .borrow()
+            .iter()
+            .filter(|call| call.arguments().get(..2) == Some(&[OsString::from("run"), OsString::from("download")][..]))
+            .count();
+        Ok(Looked { out: Text::lines(&answer.out), marked: Text::lines(&scratch.read("prior/tested")), downloads })
     }
 }
 
@@ -307,10 +317,10 @@ laws::table!(
     only_a_complete_earlier_run_on_an_ancestor_of_the_head_is_reused,
     |earlier: &Earlier| earlier.looked().unwrap_or_default(),
     [
-        Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: reusing run 7, which tested h0".to_owned()], marked: vec!["t0".to_owned(), "h0".to_owned()] },
-        Earlier { ancestry: Ancestry::Diverged, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new() },
-        Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new() },
-        Earlier { ancestry: Ancestry::Ancestor, uploaded: "[]" } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new() },
+        Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: reusing run 7, which tested h0".to_owned()], marked: vec!["t0".to_owned(), "h0".to_owned()], downloads: 2 },
+        Earlier { ancestry: Ancestry::Diverged, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new(), downloads: 0 },
+        Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new(), downloads: 0 },
+        Earlier { ancestry: Ancestry::Ancestor, uploaded: "[]" } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new(), downloads: 0 },
     ]
 );
 
