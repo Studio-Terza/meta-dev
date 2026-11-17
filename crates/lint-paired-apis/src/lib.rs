@@ -5,10 +5,11 @@ mod pairs;
 
 use std::collections::BTreeMap;
 
+use algebra::{Monoid, Semigroup};
 use declared::Declared;
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile};
 use lint_file::Gleaning;
-use lint_sweep::{Gathers, Watching};
+use lint_sweep::{Contributing, Gathers, Sweep, Watching};
 use owner::Owner;
 use paired_methods::PairedMethods;
 use pairs::Pairs;
@@ -33,13 +34,26 @@ pub struct PairedOwners<'head>(BTreeMap<Owner<'head>, Vec<Declared<'head>>>);
 
 impl<'head> FromIterator<PairedOwners<'head>> for PairedOwners<'head> {
     fn from_iter<Parts: IntoIterator<Item = PairedOwners<'head>>>(parts: Parts) -> PairedOwners<'head> {
-        PairedOwners(parts.into_iter().flat_map(|part| part.0).fold(
-            BTreeMap::new(),
-            |mut owners, (owner, declared)| {
-                owners.entry(owner).or_insert_with(Vec::new).extend(declared);
-                owners
-            },
-        ))
+        Monoid::concat(parts)
+    }
+}
+
+impl Semigroup for PairedOwners<'_> {
+    fn combine(mut self, other: Self) -> Self {
+        other.0.into_iter().for_each(|(owner, declared)| self.0.entry(owner).or_default().extend(declared));
+        self
+    }
+}
+
+impl Monoid for PairedOwners<'_> {
+    fn identity() -> Self {
+        PairedOwners::default()
+    }
+}
+
+impl<'head> PairedOwners<'head> {
+    pub(crate) fn new(owners: BTreeMap<Owner<'head>, Vec<Declared<'head>>>) -> PairedOwners<'head> {
+        PairedOwners(owners)
     }
 }
 
@@ -50,15 +64,15 @@ impl<'head> From<&PairedOwners<'head>> for Report<'head> {
 }
 
 #[derive(Debug)]
-pub struct PairedGleaner<'head>(PairedMethods<'head>);
+pub struct PairedGleaner<'head>(Contributing<PairedMethods<'head>>);
 
 impl<'head> Gathers<PairedOwners<'head>> for PairedGleaner<'head> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        self.0.watching()
+        Sweep::alone(&mut self.0)
     }
 
     fn gathered(self) -> PairedOwners<'head> {
-        PairedOwners(self.0.gathered())
+        self.0.concluded(|_, (), owners| owners)
     }
 }
 
@@ -69,6 +83,6 @@ impl Gleaning for PairedApis {
     type Gleaner<'run, 'head: 'run> = PairedGleaner<'head>;
 
     fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> PairedGleaner<'head> {
-        PairedGleaner(PairedMethods::of_file(parsed))
+        PairedGleaner(Contributing::new(PairedMethods::of_file(parsed)))
     }
 }

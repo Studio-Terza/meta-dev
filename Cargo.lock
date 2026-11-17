@@ -1834,6 +1834,7 @@ dependencies = [
 name = "lint-paired-apis"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
