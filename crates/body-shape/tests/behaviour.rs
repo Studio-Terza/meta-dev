@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use body_shape::{Bounds, Erasure, Literals, Reading, Shape, Shaper};
 use equivalence::{Equivalence, Erased};
 use syntax::Item;

@@ -38,7 +38,7 @@ fn each_crate_gets_one_runner_with_a_law_per_nameable_generator() -> Result<(), 
         Text::new("fn f() {}\n"),
     ))));
     let written: Vec<Written> = LawRunners::from(&model).written();
-    let path = PathBuf::from("crates/x/tests/generated_laws.rs");
+    let path = PathBuf::from("crates/x/tests/generated/laws.rs");
     assert_eq!(written.iter().map(Written::path).collect::<Vec<_>>(), [path.as_path()]);
     let disk = Memory::default();
     disk.write_each(written)?;
@@ -49,11 +49,11 @@ fn each_crate_gets_one_runner_with_a_law_per_nameable_generator() -> Result<(), 
 
 laws::table!(a_generated_law_written_outside_the_runner_is_refused, |sources: &Vec<Source>| Sources::flagged::<Queried<HandWrittenLaws>>(sources), [
     Workspace::with(Source::new(Located::new("crates/x/tests/behaviour.rs"), Text::new(HAND_WRITTEN)))
-        => Lines::from(["crates/x/tests/behaviour.rs:1"]),
-    Workspace::with(Source::new(Located::new("crates/x/tests/generated_laws.rs"), Text::new(HAND_WRITTEN)))
+        => Lines::from(["crates/x/tests/behaviour.rs:1", "crates/x/src/lib.rs:1"]),
+    Workspace::with(Source::new(Located::new("crates/x/tests/generated/laws.rs"), Text::new(HAND_WRITTEN)))
         => Lines::default(),
     Workspace::with(Source::new(Located::new("crates/laws/tests/behaviour.rs"), Text::new(HAND_WRITTEN)))
-        => Lines::default(),
+        => Lines::from(["crates/x/src/lib.rs:1"]),
 ]);
 
 #[test]

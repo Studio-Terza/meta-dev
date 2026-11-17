@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use design_graph::{AppliedFileRow, AppliedFileRowNew};
 use design_messages::StreamSchema;
 use design_model::{Entered, Provenance};

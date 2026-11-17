@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use lint_core::{Fix, Headline, Lint, Message, Problem, Report, Site, SourceFile, Violation};
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use std::path::Path;

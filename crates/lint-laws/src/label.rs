@@ -46,8 +46,8 @@ impl<'model> Law<'model> {
     }
 }
 
-impl AsRef<Path> for Law<'_> {
-    fn as_ref(&self) -> &Path {
+impl<'model> Law<'model> {
+    pub fn home(self) -> &'model Path {
         self.root
     }
 }

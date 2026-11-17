@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use std::sync::{Mutex, PoisonError};
 
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};

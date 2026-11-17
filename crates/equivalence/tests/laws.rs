@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use equivalence::Laws;
 
 struct Agreement;

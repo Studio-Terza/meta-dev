@@ -1,3 +1,3 @@
-laws are labels: the law macros lint laws emits appear only in the files it generates, so the graph owns every such law:
+laws are labels: the law macros lint laws emits appear only in the runners it generates, and each runner is declared in one of its crate's test binaries, so the graph owns every such law and every one runs:
 x/tests/behaviour.rs:1: a law the law runner generates, written by hand; label the type instead (derive Arbitrary, implement Monoid) and run lint laws to regenerate
 fails

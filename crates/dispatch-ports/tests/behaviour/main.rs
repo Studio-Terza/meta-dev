@@ -1,5 +1,7 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+#[path = "../generated/laws.rs"]
+mod generated_laws;
 mod ports;
 
 use std::error::Error;

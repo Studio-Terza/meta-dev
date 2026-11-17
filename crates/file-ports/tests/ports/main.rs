@@ -1,3 +1,6 @@
+#[path = "../generated/laws.rs"]
+mod generated_laws;
+
 use std::io;
 use std::path::{Path, PathBuf};
 

@@ -24,7 +24,7 @@ struct Labels<'model> {
     monoids: BTreeSet<ItemId>,
 }
 
-impl LawRunners<'_> {
+impl<'model> LawRunners<'model> {
     #[must_use]
     pub fn written(&self) -> Vec<Written> {
         self.runners.iter().filter_map(|runner| Some(Written::new(runner.file()?, Bytes::from(runner)))).collect()
@@ -33,6 +33,14 @@ impl LawRunners<'_> {
     #[must_use]
     pub fn paths(&self) -> BTreeSet<PathBuf> {
         self.runners.iter().filter_map(Runner::file).collect()
+    }
+
+    pub(crate) fn undeclared(&self, read: &BTreeSet<&Path>) -> Vec<&'model Path> {
+        self.runners
+            .iter()
+            .filter(|runner| runner.file().is_none_or(|file| read.get(file.as_path()).is_none()))
+            .filter_map(Runner::home)
+            .collect()
     }
 }
 
@@ -58,12 +66,7 @@ impl<'model> From<&'model Model> for LawRunners<'model> {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        LawRunners {
-            runners: laws
-                .chunk_by(|left, right| AsRef::<Path>::as_ref(left) == AsRef::<Path>::as_ref(right))
-                .map(Runner::from)
-                .collect(),
-        }
+        LawRunners { runners: laws.chunk_by(|left, right| left.home() == right.home()).map(Runner::from).collect() }
     }
 }
 

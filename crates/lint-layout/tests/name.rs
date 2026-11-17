@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use laws::proptest::prop_assert;
 use lint_layout::{Casing, Lowered, Name};
 

@@ -1,9 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use algebra::{Monoid, Semigroup};
 use newtype::Arbitrary;
 use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::{btree_map, btree_set};
 use newtype::proptest::strategy::Strategy;
 
 use crate::boundary::ItemId;
@@ -104,6 +106,8 @@ pub struct References {
 }
 
 impl References {
+    const SAMPLED: Range<usize> = 0..4;
+
     #[must_use]
     pub fn targets(&self) -> &BTreeMap<ItemId, BTreeSet<ItemId>> {
         &self.targets
@@ -115,13 +119,12 @@ impl References {
     }
 
     fn sampled() -> impl Strategy<Value = References> {
-        Strategy::prop_map(
-            any::<(BTreeMap<ItemId, BTreeSet<ItemId>>, BTreeMap<ItemId, String>)>(),
-            |(targets, roots)| References {
-                targets,
-                roots: roots.into_iter().map(|(item, root)| (item, PathBuf::from(root))).collect(),
-            },
-        )
+        let drawn_targets = btree_map(any::<ItemId>(), btree_set(any::<ItemId>(), Self::SAMPLED), Self::SAMPLED);
+        let drawn_roots = btree_map(any::<ItemId>(), any::<String>(), Self::SAMPLED);
+        Strategy::prop_map((drawn_targets, drawn_roots), |(targets, roots)| References {
+            targets,
+            roots: roots.into_iter().map(|(item, root)| (item, PathBuf::from(root))).collect(),
+        })
     }
 }
 

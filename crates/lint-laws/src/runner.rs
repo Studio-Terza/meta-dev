@@ -8,13 +8,18 @@ pub struct Runner<'model> {
     laws: Vec<Law<'model>>,
 }
 
-impl Runner<'_> {
+impl<'model> Runner<'model> {
     const TESTS: &'static str = "tests";
-    const FILE: &'static str = "generated_laws.rs";
+    const GENERATED: &'static str = "generated";
+    const FILE: &'static str = "laws.rs";
 
     pub fn file(&self) -> Option<PathBuf> {
-        let root: &Path = self.laws.first()?.as_ref();
-        Some(root.parent()?.parent()?.join(Self::TESTS).join(Self::FILE))
+        let root: &Path = self.home()?;
+        Some(root.parent()?.parent()?.join(Self::TESTS).join(Self::GENERATED).join(Self::FILE))
+    }
+
+    pub fn home(&self) -> Option<&'model Path> {
+        self.laws.first().copied().map(Law::home)
     }
 }
 
