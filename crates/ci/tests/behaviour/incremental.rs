@@ -20,10 +20,11 @@ const CODE_EDITED: &str = "diff --git a/crates/a/src/lib.rs b/crates/a/src/lib.r
 const NOTHING_MOVED: &str = "";
 const LINE_ABOVE: &str = "diff --git a/crates/a/src/lib.rs b/crates/a/src/lib.rs\n--- a/crates/a/src/lib.rs\n+++ b/crates/a/src/lib.rs\n@@ -1,0 +2 @@\n+use std::fmt;\n";
 
-const METADATA: &str = r#"{"workspace_root": "/w", "workspace_members": ["a", "fakes", "shared"], "packages": [{"id": "a", "manifest_path": "/w/crates/a/Cargo.toml"}, {"id": "fakes", "manifest_path": "/w/crates/fakes/Cargo.toml"}, {"id": "shared", "manifest_path": "/w/crates/shared/Cargo.toml"}], "resolve": {"nodes": [{"id": "a", "deps": [{"pkg": "fakes", "dep_kinds": [{"kind": "dev"}]}, {"pkg": "shared", "dep_kinds": [{"kind": null}, {"kind": "dev"}]}]}, {"id": "fakes", "deps": []}, {"id": "shared", "deps": []}]}}"#;
+const METADATA: &str = r#"{"workspace_root": "/w", "workspace_members": ["a 0.1.0 (path+file:///w/crates/a)", "fakes 0.1.0 (path+file:///w/crates/fakes)", "shared 0.1.0 (path+file:///w/crates/shared)"], "packages": [{"name": "a", "id": "a 0.1.0 (path+file:///w/crates/a)", "manifest_path": "/w/crates/a/Cargo.toml", "dependencies": [{"name": "fakes", "kind": "dev"}, {"name": "shared", "kind": null}, {"name": "shared", "kind": "dev"}, {"name": "serde", "kind": null}]}, {"name": "fakes", "id": "fakes 0.1.0 (path+file:///w/crates/fakes)", "manifest_path": "/w/crates/fakes/Cargo.toml", "dependencies": []}, {"name": "shared", "id": "shared 0.1.0 (path+file:///w/crates/shared)", "manifest_path": "/w/crates/shared/Cargo.toml", "dependencies": []}], "resolve": null}"#;
 
 struct Prior {
     survivors: &'static [&'static str],
+    timed_out: &'static [&'static str],
     since_head: &'static str,
     moved: &'static str,
     listed: Vec<&'static str>,
@@ -42,14 +43,18 @@ struct Planned {
 impl Prior {
     const EMPTY_TREE: &'static str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
-    fn outcomes(survivors: &[&str]) -> String {
-        let missed: Vec<String> = survivors
+    fn outcomes(survivors: &[&str], timed_out: &[&str]) -> String {
+        let summarized = |summary: &'static str| {
+            move |mutant: &&str| ["{\"scenario\": {\"Mutant\": ", mutant, "}, \"summary\": \"", summary, "\"}"].concat()
+        };
+        let missed = survivors
             .iter()
-            .map(|mutant| ["{\"scenario\": {\"Mutant\": ", mutant, "}, \"summary\": \"MissedMutant\"}"].concat())
-            .collect();
+            .map(summarized("MissedMutant"))
+            .chain(timed_out.iter().map(summarized("Timeout")))
+            .chain([CAUGHT_BEFORE].iter().map(summarized("CaughtMutant")));
         [
             "{\"outcomes\": [{\"scenario\": \"Baseline\", \"summary\": \"Success\"}",
-            &missed.iter().map(|outcome| [", ", outcome].concat()).collect::<String>(),
+            &missed.map(|outcome| [", ", &outcome].concat()).collect::<String>(),
             "]}",
         ]
         .concat()
@@ -63,7 +68,7 @@ impl Prior {
         let scratch = Scratch::new()?;
         scratch.directory("prior/download/0")?;
         scratch.write("prior/tested", "t0\nh0\n")?;
-        scratch.write("prior/download/0/outcomes.json", &Prior::outcomes(self.survivors))?;
+        scratch.write("prior/download/0/outcomes.json", &Prior::outcomes(self.survivors, self.timed_out))?;
         scratch.write("metadata.json", METADATA)?;
         let since_diff = scratch.file("prior/since.diff");
         let diff = scratch.file("c.diff");
@@ -135,6 +140,7 @@ impl Prior {
 #[test]
 fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
+        timed_out: &[],
         survivors: &[SURVIVOR],
         since_head: TEST_ADDED,
         moved: NOTHING_MOVED,
@@ -156,6 +162,7 @@ fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -
 #[test]
 fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
+        timed_out: &[],
         survivors: &[SURVIVOR],
         since_head: CODE_EDITED,
         moved: LINE_ABOVE,
@@ -175,6 +182,7 @@ fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down
 #[test]
 fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() -> Result<(), Box<dyn Error>> {
     let planned = Prior {
+        timed_out: &[],
         survivors: &[],
         since_head: TEST_ADDED,
         moved: NOTHING_MOVED,
@@ -191,7 +199,7 @@ fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() 
 
 laws::table!(
     only_test_code_edited_other_than_by_additions_since_the_prior_falls_back_to_every_changed_line,
-    |since: &&'static str| Prior { survivors: &[SURVIVOR], since_head: since, moved: NOTHING_MOVED, listed: vec![SURVIVOR, UNTOUCHED], since: Vec::new(), earlier_tests: "", since_tests: "" }
+    |since: &&'static str| Prior { timed_out: &[], survivors: &[SURVIVOR], since_head: since, moved: NOTHING_MOVED, listed: vec![SURVIVOR, UNTOUCHED], since: Vec::new(), earlier_tests: "", since_tests: "" }
         .planned()
         .map_or_default(|planned| (planned.out.first().cloned().unwrap_or_default(), planned.selected.len())),
     [
@@ -417,7 +425,7 @@ fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result
     scratch.directory("out/scoped/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true\n")?;
     scratch.write("out/scoped/mutants.out/missed.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true\n")?;
-    let outcomes = Prior::outcomes(&[SURVIVOR]);
+    let outcomes = Prior::outcomes(&[SURVIVOR], &[]);
     scratch.write("out/scoped/mutants.out/outcomes.json", &outcomes)?;
     let script = Script {
         exact: vec![ExactReply {
@@ -452,6 +460,7 @@ struct Retested {
 impl Retested {
     fn wholes(&self) -> usize {
         Prior {
+            timed_out: &[],
             survivors: &[],
             since_head: TEST_ADDED,
             moved: NOTHING_MOVED,
@@ -474,3 +483,20 @@ laws::table!(
         Retested { earlier: "crates/a/tests/behaviour.rs\n", since: "" } => 0,
     ]
 );
+
+#[test]
+fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), Box<dyn Error>> {
+    let planned = Prior {
+        survivors: &[],
+        timed_out: &[SURVIVOR],
+        since_head: TEST_ADDED,
+        moved: NOTHING_MOVED,
+        listed: vec![SURVIVOR, CAUGHT_BEFORE, UNTOUCHED],
+        since: Vec::new(),
+        earlier_tests: "",
+        since_tests: "",
+    }
+    .planned()?;
+    assert_eq!(planned.selected, ["crates/a/src/lib.rs:3:5: replace f -> bool with true"]);
+    Ok(())
+}
