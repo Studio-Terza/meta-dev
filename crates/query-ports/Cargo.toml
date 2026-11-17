@@ -15,7 +15,6 @@ doctest = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }
-exit = { path = "../exit" }
 hex.workspace = true
 file-ports = { path = "../file-ports" }
 graph-reader = { path = "../graph-reader" }

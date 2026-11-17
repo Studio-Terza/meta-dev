@@ -3,6 +3,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use console_ports::{Complaint, Shown};
 use file_ports::{Bytes, Files, Memory};
 use gate_limits::Cli;
 
@@ -30,15 +31,16 @@ impl Run {
         let fixture = Fixture::default();
         let limits = fixture.stored(&format!("{name}-limits.toml"), limits_text)?;
         let measured = fixture.stored(&format!("{name}-measured.toml"), measured_text)?;
-        let (mut out, mut err) = (Vec::new(), Vec::new());
         let named = [limits.as_os_str().to_owned(), measured.as_os_str().to_owned()]
             .into_iter()
             .chain(only.iter().map(OsString::from));
-        let exit = Cli::from_args(named).report_to(&fixture.0, &mut out, &mut err);
+        let answered = Cli::from_args(named).report_to(&fixture.0);
+        let out: &Shown = answered.as_ref();
+        let err: &Complaint = answered.as_ref();
         Ok(Reported {
-            exit,
-            out: String::from_utf8(out).map_err(io::Error::other)?,
-            err: String::from_utf8(err).map_err(io::Error::other)?,
+            exit: answered.code(),
+            out: AsRef::<str>::as_ref(out).to_owned(),
+            err: AsRef::<str>::as_ref(err).to_owned(),
         })
     }
 
@@ -109,16 +111,10 @@ fn a_run_fails_only_above_its_block_level() -> io::Result<()> {
     let fixture = Fixture::default();
     let within_limits = fixture.stored("within-limits.toml", LIMIT)?;
     let within_measured = fixture.stored("within-measured.toml", "test-run = 0.5\n")?;
-    assert_eq!(
-        Run::cli(&within_limits, &within_measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()),
-        ExitCode::SUCCESS
-    );
+    assert_eq!(Run::cli(&within_limits, &within_measured).report_to(&fixture.0).code(), ExitCode::SUCCESS);
     let blocked_limits = fixture.stored("blocked-limits.toml", LIMIT)?;
     let blocked_measured = fixture.stored("blocked-measured.toml", "test-run = 3\n")?;
-    assert_eq!(
-        Run::cli(&blocked_limits, &blocked_measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()),
-        ExitCode::FAILURE
-    );
+    assert_eq!(Run::cli(&blocked_limits, &blocked_measured).report_to(&fixture.0).code(), ExitCode::FAILURE);
     Ok(())
 }
 
@@ -127,7 +123,7 @@ fn an_unreadable_measurement_exits_with_failure() -> io::Result<()> {
     let fixture = Fixture::default();
     let limits = fixture.stored("unreadable-limits.toml", LIMIT)?;
     let missing = PathBuf::from("no-such-measured.toml");
-    assert_eq!(Run::cli(&limits, &missing).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()), ExitCode::FAILURE);
+    assert_eq!(Run::cli(&limits, &missing).report_to(&fixture.0).code(), ExitCode::FAILURE);
     Ok(())
 }
 

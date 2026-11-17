@@ -1,11 +1,22 @@
 use std::ffi::{OsStr, OsString};
 
-use console_ports::{Environment, Process, Variables};
+use std::process::ExitCode;
+
+use console_ports::{Answer, Complaint, Environment, Process, Shown, Variables};
 
 #[test]
-fn the_process_answers_with_its_arguments() {
-    let answered = Process::answer(|arguments, _, _| arguments);
-    assert_eq!(answered, std::env::args_os().skip(1).collect::<Vec<OsString>>());
+fn the_process_answers_with_its_arguments_and_the_answer_s_code() {
+    let expected = std::env::args_os().skip(1).collect::<Vec<OsString>>();
+    let code = Process::answer(|arguments| Answer::new(ExitCode::from(u8::from(arguments != expected))));
+    assert_eq!(code, ExitCode::SUCCESS);
+}
+
+#[test]
+fn an_answer_gathers_what_it_shows_and_keeps_its_complaint() {
+    let answer = Answer::complained(ExitCode::FAILURE, "c").showing("a").showing("b");
+    assert_eq!(AsRef::<str>::as_ref(AsRef::<Shown>::as_ref(&answer)), "ab");
+    assert_eq!(AsRef::<str>::as_ref(AsRef::<Complaint>::as_ref(&answer)), "c");
+    assert_eq!(answer.code(), ExitCode::FAILURE);
 }
 
 #[test]

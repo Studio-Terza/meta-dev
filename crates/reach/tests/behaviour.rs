@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::process::ExitCode;
 
+use console_ports::{Complaint, Shown};
 use file_ports::Memory;
 use reach::Cli;
 
@@ -32,12 +33,13 @@ struct Answer {
 impl Answer {
     fn to(arguments: &[&str]) -> Answer {
         let files: Memory = golden::fixtures!("tests/metadata").unwrap_or_default();
-        let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Cli::answer(arguments.iter().map(OsString::from), &files, &mut out, &mut err);
+        let answered = Cli::answer(arguments.iter().map(OsString::from), &files);
+        let out: &Shown = answered.as_ref();
+        let err: &Complaint = answered.as_ref();
         Answer {
-            exit,
-            out: String::from_utf8(out).unwrap_or_default(),
-            err: String::from_utf8(err).unwrap_or_default(),
+            exit: answered.code(),
+            out: AsRef::<str>::as_ref(out).to_owned(),
+            err: AsRef::<str>::as_ref(err).to_owned(),
         }
     }
 
