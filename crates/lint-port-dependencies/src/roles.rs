@@ -8,13 +8,14 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use algebra::{Monoid, Semigroup};
 use graph::Model;
 use lint_core::{FileHead, Parsed, Site, Violation};
 use lint_file::Gleaning;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_placement::{CrateName as PlacedName, Role as Placed};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
 use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
@@ -68,7 +69,7 @@ impl Gleaning for RoleReading {
                 path: AsRef::<Path>::as_ref(found),
             })
         });
-        RootReading { place, denied: BTreeSet::new() }
+        RootReading { place, scan: Contributing::new(DenialScan) }
     }
 }
 
@@ -81,32 +82,53 @@ struct RootPlace<'head> {
 #[derive(Debug)]
 pub struct RootReading<'head> {
     place: Option<RootPlace<'head>>,
-    denied: BTreeSet<UsePath>,
+    scan: Contributing<DenialScan>,
 }
 
-impl<'ast> Watch<'ast> for RootReading<'_> {
+#[derive(Debug)]
+pub struct DenialScan;
+
+#[derive(Debug, Default)]
+pub struct Denials(BTreeSet<UsePath>);
+
+impl Semigroup for Denials {
+    fn combine(mut self, other: Denials) -> Denials {
+        self.0.extend(other.0);
+        self
+    }
+}
+
+impl Monoid for Denials {}
+
+impl Contribute for DenialScan {
+    type Open = ();
+    type Part = Denials;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Attribute, Kind::Item]
     }
 
-    fn on_attribute(&mut self, attribute: &'ast syntax::Attribute, _: &Facts<'_, syntax::Attribute>) -> Descend {
-        self.denied.extend(Undenied::denied_by(attribute));
-        Descend::Over
+    fn on_attribute(
+        &self,
+        attribute: &syntax::Attribute,
+        _: &Facts<'_, syntax::Attribute>,
+    ) -> Contributed<(), Denials> {
+        Contributed::new((), Denials(Undenied::denied_by(attribute).into_iter().collect()), Descend::Over)
     }
 
-    fn on_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) -> Descend {
-        Descend::Over
+    fn on_item(&self, _: &syntax::Item, _: &Facts<'_, syntax::Item>) -> Contributed<(), Denials> {
+        Contributed::descending(Descend::Over)
     }
 }
 
 impl<'head> Gathers<RoleFile<'head>> for RootReading<'head> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let rooted = self.place.as_ref().map(|_| ());
-        rooted.map_or_default(|()| Sweep::alone(self))
+        rooted.map_or_default(|()| Sweep::alone(&mut self.scan))
     }
 
     fn gathered(self) -> RoleFile<'head> {
-        let denied = self.denied;
+        let denied = self.scan.concluded(|_, (), denials| denials.0);
         RoleFile { root: self.place.map(|place| RootDenial { package: place.package, path: place.path, denied }) }
     }
 }
