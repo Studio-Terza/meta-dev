@@ -432,6 +432,13 @@ draws 256 values and fails if the strategy rejected more than 256 draws along th
 fallible constructor whose check refuses most of what its inner strategy draws fails here, loudly, instead of
 making other laws slow or flaky.
 
+Nobody writes `generates!` or `monoid!` by hand: they are labels read off the graph. `lint laws .` writes one
+`tests/generated_laws.rs` per crate, with a `generates!` law for every type nameable from outside the crate that
+derives `Arbitrary`, and a `monoid!` law when that type also implements `algebra::Monoid`. CI regenerates the runners
+and fails on any difference from the committed files. `hand_written_laws` refuses those macros in any other file,
+except in the `laws` crate's own tests, which exercise the macros themselves. A crate whose types gain laws needs
+`laws` as a dev-dependency; the generated runner does not compile without it.
+
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
 
