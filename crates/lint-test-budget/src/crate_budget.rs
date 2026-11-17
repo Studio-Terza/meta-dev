@@ -5,11 +5,11 @@ use std::fmt;
 use std::ops::Add;
 
 use lint_core::SourceFile;
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::{Folding, Gathers, Sweep, Watching};
 use newtype::Counter;
 
 use count::Count;
-use test_scan::TestScan;
+use test_scan::{Tally, TestScan};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum TestShare {
@@ -53,22 +53,26 @@ pub struct BudgetGathering<'file> {
     file: CrateBudget,
     share: TestShare,
     tested: CrateBudget,
-    scan: TestScan<'file>,
+    scan: Folding<TestScan<'file>>,
 }
 
 impl<'file> From<&'file SourceFile> for BudgetGathering<'file> {
     fn from(file: &'file SourceFile) -> BudgetGathering<'file> {
         let share = file.shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
         let tested = file.test_modules().iter().map(|module| {
-            let scan = Sweep::gathered(module, TestScan::new(module));
-            CrateBudget::measured(module, TestShare::WholeFile, scan)
+            let scan: Tally = Sweep::gathered(module, Folding::from(TestScan::new(module)));
+            CrateBudget::measured(
+                module,
+                TestShare::WholeFile,
+                scan.counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() }),
+            )
         });
         let unscanned = CrateBudget::measured(file, share, CrateBudget::default());
         BudgetGathering {
             file: unscanned,
             share,
             tested: tested.fold(CrateBudget::default(), Add::add),
-            scan: TestScan::new(file),
+            scan: Folding::from(TestScan::new(file)),
         }
     }
 }
@@ -81,22 +85,12 @@ impl Gathers<CrateBudget> for BudgetGathering<'_> {
     fn gathered(self) -> CrateBudget {
         let share = self.share;
         let unscanned = self.file;
-        let file = self.scan.counted(|tests, test_lines| CrateBudget {
+        let file = self.scan.concluded::<Tally>().counted(|tests, test_lines| CrateBudget {
             test_lines: share.test_lines(test_lines, unscanned.lines),
             tests,
             ..unscanned
         });
         file + self.tested
-    }
-}
-
-impl Gathers<CrateBudget> for TestScan<'_> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> CrateBudget {
-        self.counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
     }
 }
 

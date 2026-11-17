@@ -5,7 +5,7 @@ use syntax::{ItemFn, ItemMod, Macro, PathSegment};
 use lint_core::Walk;
 use lint_core::{Macros, SourceFile};
 use lint_layout::TestMarks;
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 use newtype::Counter;
 
 use super::count::Count;
@@ -13,20 +13,30 @@ use super::count::Count;
 #[derive(Debug)]
 pub struct TestScan<'file> {
     file: &'file SourceFile,
+}
+
+#[derive(Debug, Default)]
+pub struct Tally {
     tests: Count,
     test_lines: Count,
     before: Vec<Count>,
+}
+
+impl Tally {
+    pub(super) fn counted<Out>(self, into: impl FnOnce(Count, Count) -> Out) -> Out {
+        into(self.tests, self.test_lines)
+    }
+
+    fn tested(self, more: Count) -> Tally {
+        Tally { tests: self.tests.plus(more), ..self }
+    }
 }
 
 impl<'file> TestScan<'file> {
     const PROPERTY_BLOCK: &str = "proptest";
 
     pub(super) fn new(file: &'file SourceFile) -> TestScan<'file> {
-        TestScan { file, tests: Count::default(), test_lines: Count::default(), before: Vec::new() }
-    }
-
-    pub(super) fn counted<Out>(self, into: impl FnOnce(Count, Count) -> Out) -> Out {
-        into(self.tests, self.test_lines)
+        TestScan { file }
     }
 
     fn line_count(span: Span) -> Count {
@@ -51,30 +61,32 @@ impl<'file> TestScan<'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for TestScan<'_> {
+impl Fold for TestScan<'_> {
+    type Found = Tally;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemFn, Kind::ItemMod, Kind::Macro]
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
-        self.tests = self.tests.plus(Count::new(facts.test_mark().into_iter().count()));
-        Descend::Into
+    fn on_item_fn(&self, found: Tally, _: &ItemFn, facts: &Facts<'_, ItemFn>) -> Visit<Tally> {
+        Visit::descending(found.tested(Count::new(facts.test_mark().into_iter().count())))
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        self.before.push(self.test_lines);
-        Descend::Into
+    fn on_item_mod(&self, found: Tally, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Visit<Tally> {
+        let before = found.before.into_iter().chain([found.test_lines]).collect();
+        Visit::descending(Tally { before, ..found })
     }
 
-    fn off_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) {
-        let before = self.before.pop().unwrap_or_default();
-        self.test_lines = Some(facts.gate())
+    fn off_item_mod(&self, found: Tally, module: &ItemMod, facts: &Facts<'_, ItemMod>) -> Tally {
+        let mut outer = found.before;
+        let before = outer.pop().unwrap_or_default();
+        let test_lines = Some(facts.gate())
             .filter(|walk| *walk == Walk::Skipped)
-            .map_or(self.test_lines, |_| before.plus(Self::line_count(module.span())));
+            .map_or(found.test_lines, |_| before.plus(Self::line_count(module.span())));
+        Tally { test_lines, before: outer, ..found }
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.tests = self.tests.plus(self.tests_in(invocation));
-        Descend::Over
+    fn on_macro(&self, found: Tally, invocation: &Macro, _: &Facts<'_, Macro>) -> Visit<Tally> {
+        Visit::new(found.tested(self.tests_in(invocation)), Descend::Over)
     }
 }
