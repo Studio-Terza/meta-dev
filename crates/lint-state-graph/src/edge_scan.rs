@@ -18,18 +18,21 @@ use lint_core::Violation;
 use lint_core::{Bound, Site};
 use lint_file::Concluded;
 use lint_layout::{Length, Name};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Watching};
 use role::Role;
 
 #[derive(Debug)]
 pub struct EdgeScan<'file> {
     path: &'file Path,
-    impls: Vec<WrittenImpl>,
+    impls: Contributing<ImplScan>,
 }
+
+#[derive(Debug)]
+pub struct ImplScan;
 
 impl<'file> From<&'file Path> for EdgeScan<'file> {
     fn from(path: &'file Path) -> EdgeScan<'file> {
-        EdgeScan { path, impls: Vec::new() }
+        EdgeScan { path, impls: Contributing::new(ImplScan) }
     }
 }
 
@@ -41,11 +44,11 @@ pub struct Written<'file> {
 
 impl<'file> Gathers<Written<'file>> for EdgeScan<'file> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
+        std::iter::once::<&mut Watching<'_>>(&mut self.impls)
     }
 
     fn gathered(self) -> Written<'file> {
-        Written { path: self.path, impls: self.impls }
+        Written { path: self.path, impls: self.impls.concluded(|_, (), impls| impls) }
     }
 }
 
@@ -118,24 +121,21 @@ impl<'scan, 'file> EdgeResolution<'scan, 'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for EdgeScan<'_> {
+impl Contribute for ImplScan {
+    type Open = ();
+    type Part = Vec<WrittenImpl>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Vec<WrittenImpl>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate()).then(|| self.written(item))
-    }
-}
-
-impl EdgeScan<'_> {
-    fn written(&mut self, item: &ItemImpl) -> Descend {
-        self.impls.push(WrittenImpl::from(item));
-        Descend::Into
+    fn on_item_impl(&self, item: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Vec<WrittenImpl>> {
+        let descend = Descend::from(facts.gate());
+        Contributed::new((), descend.entered().map(|_| WrittenImpl::from(item)).into_iter().collect(), descend)
     }
 }
 
