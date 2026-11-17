@@ -2194,6 +2194,7 @@ dependencies = [
 name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-lifts",
  "body-shape",
  "equivalence",
