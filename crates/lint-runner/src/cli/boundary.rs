@@ -172,3 +172,17 @@ impl<'scope> Helper<'scope> {
         self.0.join().unwrap_or_else(|payload| resume_unwind(payload))
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct Dumped<'model>(&'model graph::Model);
+
+impl<'model> From<&'model graph::Model> for Dumped<'model> {
+    fn from(model: &'model graph::Model) -> Dumped<'model> {
+        Dumped(model)
+    }
+}
+impl fmt::Display for Dumped<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&format!("{:#?}\n", self.0))
+    }
+}
