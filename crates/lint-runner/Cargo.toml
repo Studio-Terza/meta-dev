@@ -62,6 +62,7 @@ lint-private-fns = { path = "../lint-private-fns" }
 lint-process-starters = { path = "../lint-process-starters" }
 lint-public-api-tests = { path = "../lint-public-api-tests" }
 lint-public-surface = { path = "../lint-public-surface" }
+lint-named-invariants = { path = "../lint-named-invariants" }
 lint-raw-resources = { path = "../lint-raw-resources" }
 lint-repeated-methods = { path = "../lint-repeated-methods" }
 lint-repeated-shapes = { path = "../lint-repeated-shapes" }

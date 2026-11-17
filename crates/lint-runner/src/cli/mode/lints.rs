@@ -42,6 +42,7 @@ use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
 use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
+use lint_named_invariants::UnnamedPanics;
 use lint_named_lifetimes::NamedLifetimes;
 use lint_named_numbers::NamedNumbers;
 use lint_no_comments::NoComments;
@@ -148,7 +149,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 58] = [
+    const LINTS: [Entry; 59] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -170,6 +171,7 @@ impl Lints {
         <Swept<PrivateFns> as Registered>::ENTRY,
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
+        Entry::spelled::<UnnamedPanics>(Work::Modelled(<UnnamedPanics as ModelLint>::report)),
         <Ruled<PublicSurface> as Registered>::ENTRY,
         Entry::spelled::<RepeatedMethods>(Work::Modelled(<RepeatedMethods as ModelLint>::report)),
         <Primed<StateGraph> as Registered>::ENTRY,

@@ -7,6 +7,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::OnceLock;
 
+use algebra::Monoid;
+
 use crate::boundary::ItemId;
 use crate::call::Call;
 use crate::crate_root::CrateRoots;
@@ -197,12 +199,13 @@ impl Model {
 
     pub fn references(&self) -> &References {
         self.references.get_or_init(|| {
-            self.holdings()
-                .map(|placed| References::homed(self, placed))
-                .chain(self.implementations().map(|placed| References::homed(self, placed)))
-                .chain(self.functions().map(|placed| References::homed(self, placed)))
-                .chain(self.mentions().map(|placed| References::homed(self, placed)))
-                .collect()
+            References::concat(
+                self.holdings()
+                    .map(|placed| References::homed(self, placed))
+                    .chain(self.implementations().map(|placed| References::homed(self, placed)))
+                    .chain(self.functions().map(|placed| References::homed(self, placed)))
+                    .chain(self.mentions().map(|placed| References::homed(self, placed))),
+            )
         })
     }
 

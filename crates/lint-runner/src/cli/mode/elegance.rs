@@ -5,6 +5,7 @@ use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_file::ModelLint;
 use lint_linear_flow::FlowShapes;
+use lint_named_invariants::NamedInvariants;
 use lint_narrowed_returns::NarrowedReturns;
 use lint_paired_apis::PairedApis;
 use lint_repeated_shapes::NormalisedShapes;
@@ -24,7 +25,7 @@ impl Elegance {
         let transitions = Transitions::from(model);
         let system = TypeSystem::built_from(&extraction, &transitions);
         vec![
-            Complexity::report(files),
+            <Complexity as ModelLint>::report(model),
             TransitionGraph::report_graph(&system),
             DuplicateTransitions::report_graph(&system),
             CoreMutation::report_graph(&system),
@@ -39,6 +40,7 @@ impl Elegance {
             FlowShapes::report(files),
             NormalisedShapes::report(files),
             <NarrowedReturns as ModelLint>::report(model),
+            <NamedInvariants as ModelLint>::report(model),
             PairedApis::report(files),
             Clones::report(files),
         ]

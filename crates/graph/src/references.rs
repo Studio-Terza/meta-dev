@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use algebra::{Monoid, Semigroup};
+
 use crate::boundary::ItemId;
 use crate::function::Function;
 use crate::holding::Holding;
@@ -91,7 +93,7 @@ impl From<&PathUse> for Owned {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct References {
     targets: BTreeMap<ItemId, BTreeSet<ItemId>>,
     roots: BTreeMap<ItemId, PathBuf>,
@@ -122,22 +124,24 @@ impl References {
         let foreign = home.map_or(owner, |_| None);
         let link = home.or_else(|| traited.filter(at_home));
         let targets: BTreeSet<ItemId> = reached.0.into_iter().chain(foreign).collect();
-        link.map_or_default(|found| References {
+        link.map_or_else(References::identity, |found| References {
             targets: BTreeMap::from([(found, targets.into_iter().filter(|target| *target != found).collect())]),
             roots: BTreeMap::from([(found, placed.root().to_path_buf())]),
         })
     }
 }
 
-impl FromIterator<References> for References {
-    fn from_iter<Parts: IntoIterator<Item = References>>(parts: Parts) -> References {
-        parts.into_iter().fold(References::default(), |mut references, part| {
-            part.targets
-                .into_iter()
-                .for_each(|(owner, targets)| references.targets.entry(owner).or_default().extend(targets));
-            references.roots.extend(part.roots);
-            references
-        })
+impl Semigroup for References {
+    fn combine(mut self, part: References) -> References {
+        part.targets.into_iter().for_each(|(owner, targets)| self.targets.entry(owner).or_default().extend(targets));
+        self.roots.extend(part.roots);
+        self
+    }
+}
+
+impl Monoid for References {
+    fn identity() -> References {
+        References { targets: BTreeMap::new(), roots: BTreeMap::new() }
     }
 }
 
