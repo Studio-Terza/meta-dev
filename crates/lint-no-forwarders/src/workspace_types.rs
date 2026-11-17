@@ -57,15 +57,30 @@ impl Contribute for TypeGathering {
         self.kinds
     }
 
-    fn on_item_struct(&self, item: &ItemStruct, _: &Facts<'_, ItemStruct>) -> Contributed<(), WorkspaceTypes> {
+    fn on_item_struct(
+        &self,
+        item: &ItemStruct,
+        _: &Facts<'_, ItemStruct>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), WorkspaceTypes> {
         Self::declared(&item.ident)
     }
 
-    fn on_item_enum(&self, item: &ItemEnum, _: &Facts<'_, ItemEnum>) -> Contributed<(), WorkspaceTypes> {
+    fn on_item_enum(
+        &self,
+        item: &ItemEnum,
+        _: &Facts<'_, ItemEnum>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), WorkspaceTypes> {
         Self::declared(&item.ident)
     }
 
-    fn on_item_trait(&self, item: &ItemTrait, _: &Facts<'_, ItemTrait>) -> Contributed<(), WorkspaceTypes> {
+    fn on_item_trait(
+        &self,
+        item: &ItemTrait,
+        _: &Facts<'_, ItemTrait>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), WorkspaceTypes> {
         Self::declared(&item.ident)
     }
 }

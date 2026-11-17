@@ -41,6 +41,16 @@ impl<Open: Monoid, Part: Monoid> Contributed<Open, Part> {
         Contributed::new(Open::default(), Part::default(), descend)
     }
 }
+#[derive(Debug)]
+pub struct Around<'frames, Open, Part> {
+    frames: &'frames [Contribution<Open, Part>],
+}
+
+impl<'frames, Open, Part> Around<'frames, Open, Part> {
+    pub fn nearest(&self) -> impl Iterator<Item = &'frames Open> {
+        self.frames.iter().rev().map(|frame| &frame.open)
+    }
+}
 
 impl<Open, Part> Contribution<Open, Part> {
     pub fn concluded<Out>(self, into: impl FnOnce(Open, Part) -> Out) -> Out {
@@ -75,9 +85,12 @@ impl<Contributor: Contribute> Contributing<Contributor> {
     pub(crate) fn entered(
         &mut self,
         kind: Kind,
-        contributed: impl FnOnce(&Contributor) -> Contributed<Contributor::Open, Contributor::Part>,
+        contributed: impl FnOnce(
+            &Contributor,
+            Around<'_, Contributor::Open, Contributor::Part>,
+        ) -> Contributed<Contributor::Open, Contributor::Part>,
     ) -> Descend {
-        let Contributed { within, descend } = contributed(&self.contributor);
+        let Contributed { within, descend } = contributed(&self.contributor, Around { frames: &self.frames });
         let opened = self.contributor.scopes().contains(&Scope(kind)).then(Contribution::default);
         let top = opened.unwrap_or_else(|| self.frames.pop().unwrap_or_default());
         self.frames.push(top.combine(within));

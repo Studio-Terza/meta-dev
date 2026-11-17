@@ -131,7 +131,12 @@ impl Contribute for SkipMarks<'_> {
         const { &[Scope::new(Kind::ItemMod)] }
     }
 
-    fn on_item_mod(&self, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Contributed<Vec<LineNumber>, Marks> {
+    fn on_item_mod(
+        &self,
+        module: &ItemMod,
+        _: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<LineNumber>, Marks> {
         Contributed::new(Gate::lines_in(&module.attrs), Marks::default(), Descend::Into)
     }
 
@@ -139,17 +144,32 @@ impl Contribute for SkipMarks<'_> {
         inner.concluded(|gates, marks| marks.gated(gates))
     }
 
-    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Contributed<Vec<LineNumber>, Marks> {
+    fn on_item_fn(
+        &self,
+        function: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<LineNumber>, Marks> {
         Contributed::parted(Self::skips(&function.attrs, Marked::among(&function.attrs, None)))
     }
 
-    fn on_macro(&self, invocation: &Macro, facts: &Facts<'_, Macro>) -> Contributed<Vec<LineNumber>, Marks> {
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        facts: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<LineNumber>, Marks> {
         let attributes = Macros::attributes_in_file(self.file, invocation);
         let marks = Self::skips(&attributes, Marked::among(&attributes, facts.law()));
         Contributed::new(Vec::new(), marks, Descend::Over)
     }
 
-    fn on_attribute(&self, attribute: &Attribute, _: &Facts<'_, Attribute>) -> Contributed<Vec<LineNumber>, Marks> {
+    fn on_attribute(
+        &self,
+        attribute: &Attribute,
+        _: &Facts<'_, Attribute>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<LineNumber>, Marks> {
         let unrun = self
             .unrun
             .and(Some(attribute))

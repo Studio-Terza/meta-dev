@@ -59,7 +59,12 @@ impl Contribute for EmitterScan {
         &[Kind::ItemMacro]
     }
 
-    fn on_item_macro(&self, definition: &ItemMacro, _: &Facts<'_, ItemMacro>) -> Contributed<(), Emitters> {
+    fn on_item_macro(
+        &self,
+        definition: &ItemMacro,
+        _: &Facts<'_, ItemMacro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Emitters> {
         let names = definition
             .ident
             .iter()

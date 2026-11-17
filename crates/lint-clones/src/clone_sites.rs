@@ -33,7 +33,12 @@ impl<'file> Contribute for CloneSites<'file> {
         self.kinds
     }
 
-    fn on_item_mod(&self, module: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Vec<Violation<'file>>> {
+    fn on_item_mod(
+        &self,
+        module: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         Contributed::descending(
             Gate::BOUNDARY.names(module).map_or_else(|| Descend::from(facts.gate()), |_| Descend::Over),
         )
@@ -43,6 +48,7 @@ impl<'file> Contribute for CloneSites<'file> {
         &self,
         call: &ExprMethodCall,
         _: &Facts<'_, ExprMethodCall>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         let cloned =
             Some(call).filter(|candidate| candidate.method == Self::CLONE).filter(|clone| clone.args.is_empty()).map(

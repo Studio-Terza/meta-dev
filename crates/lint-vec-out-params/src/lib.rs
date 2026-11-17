@@ -71,19 +71,39 @@ impl<'file> Contribute for OutParams<'file> {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::Macro, Kind::Signature]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Found<'file> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Found<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Found<'file> {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Found<'file> {
         Contributed::descending(facts.inherent().map_or(Descend::Over, |_| Descend::Into))
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Found<'file> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Found<'file> {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_signature(&self, signature: &Signature, facts: &Facts<'_, Signature>) -> Found<'file> {
+    fn on_signature(
+        &self,
+        signature: &Signature,
+        facts: &Facts<'_, Signature>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Found<'file> {
         let path = self.path;
         let found = signature
             .inputs

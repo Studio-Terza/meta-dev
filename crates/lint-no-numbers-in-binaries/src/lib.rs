@@ -46,15 +46,30 @@ impl Contribute for Numbers<'_> {
         self.kinds
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Vec<LineNumber>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<LineNumber>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_lit_int(&self, _: &LitInt, facts: &Facts<'_, LitInt>) -> Contributed<(), Vec<LineNumber>> {
+    fn on_lit_int(
+        &self,
+        _: &LitInt,
+        facts: &Facts<'_, LitInt>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<LineNumber>> {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }
 
-    fn on_lit_float(&self, _: &LitFloat, facts: &Facts<'_, LitFloat>) -> Contributed<(), Vec<LineNumber>> {
+    fn on_lit_float(
+        &self,
+        _: &LitFloat,
+        facts: &Facts<'_, LitFloat>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<LineNumber>> {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }
 }
