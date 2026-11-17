@@ -1,18 +1,19 @@
 mod finding;
 mod nesting_depth;
 
+use algebra::{Monoid, Semigroup};
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
 use syntax::{Past, Spine};
 
 use syntax::{
-    Arm, BinOp, Block, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn,
-    ItemFn, ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, UnOp,
+    Arm, BinOp, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn, ItemFn,
+    ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, UnOp,
 };
 
 use lint_core::Bound;
@@ -92,36 +93,53 @@ impl SweptLint for FnShape {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Shapes {
-            path: AsRef::<Path>::as_ref(file.head()),
-            depth: NestingDepth::default(),
-            nests: Vec::new(),
-            violations: Vec::new(),
-        })
+        Box::new(Contributing::new(Shapes { path: AsRef::<Path>::as_ref(file.head()) }))
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Nest {
-    at: Address,
     span: Span,
+    depth: NestingDepth,
 }
 
 impl Nest {
-    fn unchained(branch: &Expr) -> Option<Nest> {
-        match branch {
-            Expr::If(_) => None,
-            _ => Some(Nest { at: Address::from(branch), span: branch.span() }),
-        }
+    fn within(self, bodies: &[Span]) -> Nest {
+        let start = self.span.byte_range().start;
+        bodies
+            .iter()
+            .find(|body| body.byte_range().contains(&start))
+            .map_or(self, |_| Nest { span: self.span, depth: self.depth.combine(NestingDepth::LEVEL) })
+    }
+}
+
+#[derive(Debug, Default)]
+struct Shaped<'scan> {
+    found: Vec<Violation<'scan>>,
+    nests: Vec<Nest>,
+}
+
+impl Semigroup for Shaped<'_> {
+    fn combine(self, other: Self) -> Self {
+        Shaped { found: self.found.combine(other.found), nests: self.nests.combine(other.nests) }
+    }
+}
+
+impl Monoid for Shaped<'_> {}
+
+impl<'scan> Shaped<'scan> {
+    fn nested(self, bodies: impl IntoIterator<Item = Option<Span>>, own: Span) -> Shaped<'scan> {
+        let ranges: Vec<Span> = bodies.into_iter().flatten().collect();
+        let past = NestingDepth::beyond(FnShape::NESTING);
+        let deeper = self.nests.into_iter().map(|nest| nest.within(&ranges)).filter(|nest| nest.depth <= past);
+        let nests = deeper.chain([Nest { span: own, depth: NestingDepth::LEVEL }]).collect();
+        Shaped { found: self.found, nests }
     }
 }
 
 #[derive(Debug)]
 struct Shapes<'scan> {
     path: &'scan Path,
-    depth: NestingDepth,
-    nests: Vec<Nest>,
-    violations: Vec<Violation<'scan>>,
 }
 
 impl<'scan> Shapes<'scan> {
@@ -129,27 +147,22 @@ impl<'scan> Shapes<'scan> {
         Violation::new(Site::new(path, LineNumber::from(span)), finding)
     }
 
-    fn nesting(&mut self, at: Address) -> Descend {
-        self.nests.iter().rev().find(|nest| nest.at == at).copied().into_iter().for_each(|found| {
-            self.depth += NestingDepth::LEVEL;
-            let first_past = NestingDepth::beyond(FnShape::NESTING);
-            let deepest = (self.depth == first_past).then_some(found.span);
-            self.violations.extend(
-                deepest.map(|nested| Self::found(self.path, nested, Finding::DeepNesting { most: FnShape::NESTING })),
-            );
-        });
-        Descend::Into
+    fn findings(found: impl IntoIterator<Item = Violation<'scan>>) -> Contributed<(), Shaped<'scan>> {
+        Contributed::parted(Shaped { found: found.into_iter().collect(), nests: Vec::new() })
     }
 
-    fn unnesting(&mut self, at: Address) {
-        self.nests.iter().rposition(|nest| nest.at == at).into_iter().for_each(|index| {
-            self.nests.remove(index);
-            self.depth -= NestingDepth::LEVEL;
-        });
+    fn unchained(branch: &Expr) -> Option<Span> {
+        match branch {
+            Expr::If(_) => None,
+            _ => Some(branch.span()),
+        }
     }
 }
 
-impl<'ast> Watch<'ast> for Shapes<'_> {
+impl<'scan> Contribute for Shapes<'scan> {
+    type Open = ();
+    type Part = Shaped<'scan>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -161,125 +174,140 @@ impl<'ast> Watch<'ast> for Shapes<'_> {
             Kind::Signature,
             Kind::Local,
             Kind::ExprMethodCall,
-            Kind::ExprIf,
-            Kind::Arm,
-            Kind::ExprForLoop,
-            Kind::ExprWhile,
-            Kind::ExprLoop,
-            Kind::ExprClosure,
-            Kind::Block,
-            Kind::Expr,
         ]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn scopes(&self) -> &'static [Scope] {
+        const {
+            &[
+                Scope::new(Kind::ExprIf),
+                Scope::new(Kind::Arm),
+                Scope::new(Kind::ExprForLoop),
+                Scope::new(Kind::ExprWhile),
+                Scope::new(Kind::ExprLoop),
+                Scope::new(Kind::ExprClosure),
+            ]
+        }
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Shaped<'scan>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Shaped<'scan>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_item_trait(&self, _: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Contributed<(), Shaped<'scan>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Shaped<'scan>> {
+        Contributed::descending(Descend::Expand)
     }
 
-    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, facts: &Facts<'_, ImplItemFn>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_fn(&self, _: &ItemFn, facts: &Facts<'_, ItemFn>) -> Contributed<(), Shaped<'scan>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_signature(&mut self, signature: &'ast Signature, _: &Facts<'_, Signature>) -> Descend {
+    fn on_impl_item_fn(&self, _: &ImplItemFn, facts: &Facts<'_, ImplItemFn>) -> Contributed<(), Shaped<'scan>> {
+        Contributed::descending(Descend::from(facts.gate()))
+    }
+
+    fn on_signature(&self, signature: &Signature, _: &Facts<'_, Signature>) -> Contributed<(), Shaped<'scan>> {
         let typed = signature.inputs.iter().filter(|argument| matches!(argument, FnArg::Typed(_))).count();
         let wide = FnShape::PARAMETERS.allows(Length::new(typed)).map_or(Some(signature.ident.span()), |_| None);
-        self.violations.extend(
+        Self::findings(
             wide.map(|span| Self::found(self.path, span, Finding::WideSignature { most: FnShape::PARAMETERS })),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
-        self.violations.extend(
-            FnShape::binds_bool(local).map(|binding| Self::found(self.path, binding.span(), Finding::BooleanLocal)),
-        );
-        self.violations.extend(
-            local
-                .init
-                .as_ref()
-                .filter(|init| matches!(*init.expr, Expr::Tuple(_)))
-                .map(|_| Self::found(self.path, local.span(), Finding::TupleLocal)),
-        );
-        Descend::Into
+    fn on_local(&self, local: &Local, _: &Facts<'_, Local>) -> Contributed<(), Shaped<'scan>> {
+        let boolean =
+            FnShape::binds_bool(local).map(|binding| Self::found(self.path, binding.span(), Finding::BooleanLocal));
+        let tuple = local
+            .init
+            .as_ref()
+            .filter(|init| matches!(*init.expr, Expr::Tuple(_)))
+            .map(|_| Self::found(self.path, local.span(), Finding::TupleLocal));
+        Self::findings(boolean.into_iter().chain(tuple))
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.violations.extend(
+    fn on_expr_method_call(
+        &self,
+        call: &ExprMethodCall,
+        _: &Facts<'_, ExprMethodCall>,
+    ) -> Contributed<(), Shaped<'scan>> {
+        Self::findings(
             call.args
                 .first()
                 .filter(|seed| matches!(seed, Expr::Tuple(_)))
                 .filter(|_| FnShape::FOLDS.iter().any(|fold| call.method == fold))
                 .map(|_| Self::found(self.path, call.method.span(), Finding::TupleAccumulator)),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.then_branch), span: expr.if_token.span });
-        self.nests.extend(expr.else_branch.as_ref().and_then(|(_, branch)| Nest::unchained(branch)));
-        Descend::Into
+    fn off_expr_if(
+        &self,
+        expr: &ExprIf,
+        _: &Facts<'_, ExprIf>,
+        inner: Contribution<(), Shaped<'scan>>,
+    ) -> Shaped<'scan> {
+        let otherwise = expr.else_branch.as_ref().and_then(|(_, branch)| Self::unchained(branch));
+        inner.concluded(|(), shaped| shaped.nested([Some(expr.then_branch.span()), otherwise], expr.if_token.span))
     }
 
-    fn on_arm(&mut self, arm: &'ast Arm, _: &Facts<'_, Arm>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&*arm.body), span: arm.body.span() });
-        Descend::Into
+    fn off_arm(&self, arm: &Arm, _: &Facts<'_, Arm>, inner: Contribution<(), Shaped<'scan>>) -> Shaped<'scan> {
+        inner.concluded(|(), shaped| shaped.nested([Some(arm.body.span())], arm.body.span()))
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.for_token.span });
-        Descend::Into
+    fn off_expr_for_loop(
+        &self,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+        inner: Contribution<(), Shaped<'scan>>,
+    ) -> Shaped<'scan> {
+        inner.concluded(|(), shaped| shaped.nested([Some(expr.body.span())], expr.for_token.span))
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.while_token.span });
-        Descend::Into
+    fn off_expr_while(
+        &self,
+        expr: &ExprWhile,
+        _: &Facts<'_, ExprWhile>,
+        inner: Contribution<(), Shaped<'scan>>,
+    ) -> Shaped<'scan> {
+        inner.concluded(|(), shaped| shaped.nested([Some(expr.body.span())], expr.while_token.span))
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&expr.body), span: expr.loop_token.span });
-        Descend::Into
+    fn off_expr_loop(
+        &self,
+        expr: &ExprLoop,
+        _: &Facts<'_, ExprLoop>,
+        inner: Contribution<(), Shaped<'scan>>,
+    ) -> Shaped<'scan> {
+        inner.concluded(|(), shaped| shaped.nested([Some(expr.body.span())], expr.loop_token.span))
     }
 
-    fn on_expr_closure(&mut self, closure: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) -> Descend {
-        self.nests.push(Nest { at: Address::from(&*closure.body), span: closure.or1_token.span });
-        Descend::Into
-    }
-
-    fn on_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) -> Descend {
-        self.nesting(facts.address())
-    }
-
-    fn off_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) {
-        self.unnesting(facts.address());
-    }
-
-    fn on_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) -> Descend {
-        self.nesting(facts.address())
-    }
-
-    fn off_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) {
-        self.unnesting(facts.address());
+    fn off_expr_closure(
+        &self,
+        closure: &ExprClosure,
+        _: &Facts<'_, ExprClosure>,
+        inner: Contribution<(), Shaped<'scan>>,
+    ) -> Shaped<'scan> {
+        inner.concluded(|(), shaped| shaped.nested([Some(closure.body.span())], closure.or1_token.span))
     }
 }
 
-impl<'file> Finds<'file> for Shapes<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+impl<'scan> Concludes<'scan> for Shapes<'scan> {
+    fn violations(self, (): (), shaped: Shaped<'scan>) -> Vec<Violation<'scan>> {
+        let past = NestingDepth::beyond(FnShape::NESTING);
+        let deep = shaped
+            .nests
+            .into_iter()
+            .filter(|nest| nest.depth == past)
+            .map(|nest| Self::found(self.path, nest.span, Finding::DeepNesting { most: FnShape::NESTING }));
+        let mut found: Vec<Violation<'scan>> = shaped.found.into_iter().chain(deep).collect();
+        found.sort_by_key(|violation| *violation.site());
+        found
     }
 }

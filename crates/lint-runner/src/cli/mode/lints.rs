@@ -587,7 +587,8 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
         let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
         let file = <&SourceFile>::from(claimed);
         let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found()]));
-        let watched = listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, watcher.sorted())));
+        let watched =
+            listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, Vec::from(watcher.sorted()))));
         let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));
         let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
         let found = admitted.into_iter().map(|found| (found.slot, Self::taken(&mut sorted, found.source)));
