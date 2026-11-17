@@ -550,6 +550,14 @@ built; trait functions cannot yet be `const`. Every other shared helper comes fr
 not from the derive: a zero count is `Counter::zero`. `#[derive(Display)]` forwards `Display` to
 the inner value.
 
+The same `#[derive(Arbitrary)]` generates types that are not newtypes, so every state type generates through what
+builds it. An enum generates each of its variants, with field values from their own `Arbitrary`. A struct names its
+constructor with `#[newtype(from = Span::ordered)]`; the derive draws one value per field, in field order, and calls
+it. With `#[newtype(checked, from = Ratio::try_new)]` the constructor returns a `Result` and only the values it
+accepts are generated, as a validated newtype's are. When neither fits, `#[newtype(generate = Parity::sampled)]` names
+a function that returns the whole strategy. A constructor that refuses nearly everything aborts generation, so the
+test fails loudly instead of passing on the few values that get through.
+
 `Counter` is a blanket trait over every `Copy` newtype of `usize`: `zero`, `count`, `plus`, `incremented`
 and `total`, saturating at the largest count. The orphan rule forbids a blanket `Add` or `Sum`, so these
 are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and neither does it
