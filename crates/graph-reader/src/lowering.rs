@@ -32,7 +32,8 @@ use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
-    Declared, DeclaredKind, Domain, Entries, Exposing, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind,
+    Declared, DeclaredKind, Domain, Entries, Exposing, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey,
+    ScopeKind, ScopeMap,
     Seeds, StdNames, Top, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
@@ -123,16 +124,16 @@ impl Built for ImplRow {
         let resolving = footing.resolving();
         let implemented = self.implemented.map(|path| {
             let spelling = Spelling::Written(path.written(), located.position());
-            Sited::new(resolving.path(located.scope(), &path, self.domain), spelling)
+            Sited::new(resolving.path(footing.scope(located.scope()), &path, self.domain), spelling)
         });
-        let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, located.scope()));
+        let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scope(located.scope())));
         let implementation =
             Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer())).parameterised(
-                self.parameters.into_iter().map(|parameter| parameter.resolved(&resolving, located.scope())).collect(),
+                self.parameters.into_iter().map(|parameter| parameter.resolved(&resolving, footing.scope(located.scope()))).collect(),
                 self.assigned
                     .iter()
                     .map(|assigned| {
-                        Assigned::new(assigned.name.clone(), Written::typed(&assigned.ty, &resolving, located.scope()))
+                        Assigned::new(assigned.name.clone(), Written::typed(&assigned.ty, &resolving, footing.scope(located.scope())))
                     })
                     .collect(),
             );
@@ -173,7 +174,7 @@ impl FnRow {
 
 impl Built for FnRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let scope = self.located.scope();
+        let scope = footing.scope(self.located.scope());
         let resolving = &footing.resolving();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
@@ -191,7 +192,7 @@ impl Built for FnRow {
 
 #[derive(Debug)]
 struct AliasRow {
-    scope: ScopeId,
+    scope: ScopeKey,
     name: UsePath,
     parameters: Vec<DeclaredParameter>,
     target: TypeRef<Written>,
@@ -200,10 +201,11 @@ struct AliasRow {
 impl Built for AliasRow {
     fn built(self, footing: Footing<'_>, mut building: Building) -> Building {
         let resolving = &footing.resolving();
-        let declared = resolving.path(self.scope, &self.name, Domain::Types).crate_item();
+        let scope = footing.scope(&self.scope);
+        let declared = resolving.path(scope, &self.name, Domain::Types).crate_item();
         let parameters =
-            self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, self.scope)).collect();
-        let alias = Alias::new(parameters, Written::typed(&self.target, resolving, self.scope));
+            self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
+        let alias = Alias::new(parameters, Written::typed(&self.target, resolving, scope));
         declared.into_iter().zip([alias]).for_each(|(item, aliased)| building.alias(item, aliased));
         building
     }
@@ -217,7 +219,7 @@ enum SlotForm {
 
 impl From<&[Attribute]> for SlotForm {
     fn from(attributes: &[Attribute]) -> SlotForm {
-        match attributes.iter().find(|attribute| attribute.path().is_ident(Slot::PATH)) {
+        match attributes.iter().find(|attribute| attribute.path().is_ident(Slot::<ScopeId>::PATH)) {
             Some(_) => SlotForm::Pathed,
             None => SlotForm::Conventional,
         }
@@ -234,8 +236,8 @@ impl SlotForm {
 }
 
 #[derive(Debug)]
-pub(crate) struct Slot {
-    scope: ScopeId,
+pub(crate) struct Slot<Scope = ScopeId> {
+    scope: Scope,
     name: Name,
     children: Arc<Path>,
     form: SlotForm,
@@ -243,7 +245,7 @@ pub(crate) struct Slot {
     region: Region,
 }
 
-impl Slot {
+impl<Scope> Slot<Scope> {
     const PATH: &'static str = "path";
     const EXTENSION: &'static str = "rs";
     const MODULE_FILE: &'static str = "mod.rs";
@@ -257,9 +259,12 @@ impl Slot {
         self.form.chosen(found_flat.xor(found_nested))
     }
 
-    fn new(seat: &Seat, region: Region, item: &ItemMod) -> Slot {
+}
+
+impl Slot<ScopeKey> {
+    fn new(seat: &Seat, region: Region, item: &ItemMod) -> Slot<ScopeKey> {
         Slot {
-            scope: seat.scope(),
+            scope: seat.scope().clone(),
             name: Name::from(&item.ident),
             children: seat.children(),
             form: SlotForm::from(item.attrs.as_slice()),
@@ -268,8 +273,15 @@ impl Slot {
         }
     }
 
-    fn placed(self, base: ScopeId, outer: Region) -> Slot {
-        Slot { scope: self.scope.above(base), region: self.region.joined(outer), ..self }
+    fn placed(self, base: ScopeId, scopes: &ScopeMap, outer: Region) -> Slot {
+        Slot {
+            scope: scopes.scope(&self.scope).above(base),
+            name: self.name,
+            children: self.children,
+            form: self.form,
+            visibility: self.visibility,
+            region: self.region.joined(outer),
+        }
     }
 }
 
@@ -341,7 +353,7 @@ impl From<&SourceFile> for FileShape {
             .map_or_default(|_| Enclosure::BinaryRoot);
         let module = rooted
             .map_or(Some(path), |_| None)
-            .filter(|candidate| candidate.file_name().is_none_or(|name| name != OsStr::new(Slot::MODULE_FILE)));
+            .filter(|candidate| candidate.file_name().is_none_or(|name| name != OsStr::new(Slot::<ScopeId>::MODULE_FILE)));
         let children = module.map_or_else(|| parent.to_path_buf(), |stem| stem.with_extension(""));
         FileShape { enclosure, children: Arc::from(children) }
     }

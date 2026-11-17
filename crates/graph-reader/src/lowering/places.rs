@@ -1,39 +1,40 @@
+use std::collections::BTreeMap;
+
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
 
+use algebra::{Monoid, Semigroup};
 use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
-use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};
+use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeKey, ScopeMap, UsePath};
 
 use super::regions::MacroItems;
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
 use lint_sweep::{Descend, Scoped, Sweep};
 
-#[derive(Clone, Copy, Debug)]
-pub(super) struct PlaceId(usize);
-
-#[derive(Clone, Copy, Debug)]
-struct SubjectId(usize);
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct PlaceId(ScopeKey);
 
 #[derive(Debug)]
 struct SubjectRow {
-    scope: ScopeId,
+    key: ScopeKey,
+    scope: ScopeKey,
     ty: TypeRef<Written>,
     implemented: Option<Name>,
     traited: Option<UsePath>,
 }
 
 impl SubjectRow {
-    fn implemented_trait(&self, resolving: &Resolving<'_, '_, '_>) -> Option<Resolved> {
-        self.traited.as_ref().map(|path| resolving.path(self.scope, path, Domain::Types))
+    fn implemented_trait(&self, resolving: &Resolving<'_, '_, '_>, scopes: &ScopeMap) -> Option<Resolved> {
+        self.traited.as_ref().map(|path| resolving.path(scopes.scope(&self.scope), path, Domain::Types))
     }
 }
 
 #[derive(Debug)]
 struct OwnerRow {
-    scope: ScopeId,
+    scope: ScopeKey,
     name: UsePath,
     domain: Domain,
     line: LineNumber,
@@ -41,14 +42,15 @@ struct OwnerRow {
 }
 
 impl OwnerRow {
-    fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Option<ItemId> {
-        resolving.path(self.scope, &self.name, self.domain).crate_item()
+    fn settled(&self, resolving: &Resolving<'_, '_, '_>, scopes: &ScopeMap) -> Option<ItemId> {
+        resolving.path(scopes.scope(&self.scope), &self.name, self.domain).crate_item()
     }
 }
 
 #[derive(Debug)]
 struct PlaceRow {
-    subject: Option<SubjectId>,
+    key: PlaceId,
+    subject: Option<ScopeKey>,
     owner: Option<OwnerRow>,
 }
 
@@ -58,29 +60,41 @@ pub(super) struct PlaceRows {
     places: Vec<PlaceRow>,
 }
 
+impl Semigroup for PlaceRows {
+    fn combine(self, other: PlaceRows) -> PlaceRows {
+        PlaceRows { subjects: self.subjects.combine(other.subjects), places: self.places.combine(other.places) }
+    }
+}
+
+impl Monoid for PlaceRows {}
+
 impl PlaceRows {
-    pub(super) fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Places {
-        let subjects: Vec<TypeRef> =
-            self.subjects.iter().map(|row| Written::typed(&row.ty, resolving, row.scope)).collect();
-        let places = self
+    pub(super) fn settled(&self, resolving: &Resolving<'_, '_, '_>, scopes: &ScopeMap) -> Places {
+        let subjects: BTreeMap<&ScopeKey, (TypeRef, &SubjectRow)> = self
+            .subjects
+            .iter()
+            .map(|row| (&row.key, (Written::typed(&row.ty, resolving, scopes.scope(&row.scope)), row)))
+            .collect();
+        let places: Vec<Place> = self
             .places
             .iter()
             .map(|row| {
-                let subject = row.subject.and_then(|id| subjects.get(id.0)).cloned();
+                let subjected = row.subject.as_ref().and_then(|key| subjects.get(key));
+                let subject = subjected.map(|(ty, _)| ty.clone());
                 let declared = row.owner.as_ref().and_then(|owner| {
-                    let item = owner.settled(resolving)?;
+                    let item = owner.settled(resolving, scopes)?;
                     Some(Declared { line: owner.line, item, region: owner.region })
                 });
                 let owner = declared
                     .map(|found| found.item)
                     .or_else(|| subject.as_ref()?.named().map(AsRef::<Resolved>::as_ref)?.crate_item());
-                let subjected = row.subject.and_then(|id| self.subjects.get(id.0));
-                let implemented = subjected.and_then(|found| found.implemented.clone());
-                let traited = subjected.and_then(|found| found.implemented_trait(resolving));
+                let implemented = subjected.and_then(|(_, found)| found.implemented.clone());
+                let traited = subjected.and_then(|(_, found)| found.implemented_trait(resolving, scopes));
                 Place { subject, owner, declared, implemented, traited }
             })
             .collect();
-        Places(places)
+        let index = self.places.iter().enumerate().map(|(position, row)| (row.key.clone(), position)).collect();
+        Places { order: places, index }
     }
 }
 
@@ -101,18 +115,21 @@ struct Place {
 }
 
 #[derive(Debug)]
-pub(super) struct Places(Vec<Place>);
+pub(super) struct Places {
+    order: Vec<Place>,
+    index: BTreeMap<PlaceId, usize>,
+}
 
 impl Places {
     pub(super) fn placed(&self, file: FileId, building: Building) -> Building {
-        self.0.iter().filter_map(|place| place.declared).fold(building, |mut built, declared| {
+        self.order.iter().filter_map(|place| place.declared).fold(building, |mut built, declared| {
             built.placed(file, declared.line, ItemDeclaration::new(declared.item, declared.region));
             built
         })
     }
 
-    pub(super) fn seat(&self, region: Region, place: Option<PlaceId>) -> Seat {
-        let found = place.and_then(|id| self.0.get(id.0));
+    pub(super) fn seat(&self, region: Region, place: Option<&PlaceId>) -> Seat {
+        let found = place.and_then(|id| self.index.get(id)).and_then(|position| self.order.get(*position));
         Seat::new(region, found.and_then(|seated| seated.subject.clone()))
             .owned(found.and_then(|seated| seated.owner))
             .implementing(found.and_then(|seated| seated.implemented.clone()))
