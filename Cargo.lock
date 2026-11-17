@@ -12,6 +12,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "algebra"
+version = "0.1.0"
+dependencies = [
+ "laws",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,7 +301,6 @@ dependencies = [
  "design-model",
  "dispatch-ports",
  "e2e",
- "exit",
  "file-ports",
  "grammar-slug",
  "laws",
@@ -561,10 +567,6 @@ dependencies = [
  "parking",
  "pin-project-lite",
 ]
-
-[[package]]
-name = "exit"
-version = "0.1.0"
 
 [[package]]
 name = "fallible-iterator"
@@ -1048,6 +1050,7 @@ dependencies = [
 name = "graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-lifts",
  "lint-layout",
  "newtype",
@@ -1298,6 +1301,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "invariants"
+version = "0.1.0"
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1379,14 +1386,15 @@ name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "graph",
  "graph-reader",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
- "lint-sweep",
- "syntax",
+ "newtype",
 ]
 
 [[package]]
@@ -1405,6 +1413,7 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "lint-layout",
  "lint-placement",
@@ -1501,6 +1510,7 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "graph-reader",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1640,6 +1650,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-named-invariants"
+version = "0.1.0"
+dependencies = [
+ "graph",
+ "graph-reader",
+ "laws",
+ "lint-core",
+ "lint-file",
+ "lint-fixtures",
+ "lint-layout",
+]
+
+[[package]]
 name = "lint-named-lifetimes"
 version = "0.1.0"
 dependencies = [
@@ -1701,6 +1724,7 @@ dependencies = [
 name = "lint-no-forwarders"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1820,6 +1844,7 @@ dependencies = [
 name = "lint-paired-apis"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
@@ -1888,6 +1913,7 @@ dependencies = [
 name = "lint-private-fns"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1914,6 +1940,7 @@ dependencies = [
 name = "lint-public-api-tests"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
@@ -2047,6 +2074,7 @@ dependencies = [
  "lint-mandatory-laws",
  "lint-manual-iteration",
  "lint-module-nesting",
+ "lint-named-invariants",
  "lint-named-lifetimes",
  "lint-named-numbers",
  "lint-narrowed-returns",
@@ -2105,6 +2133,7 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "laws",
  "lint-core",
@@ -2145,6 +2174,7 @@ dependencies = [
 name = "lint-test-budget"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "graph-reader",
  "laws",
@@ -2175,6 +2205,7 @@ dependencies = [
 name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-lifts",
  "body-shape",
  "equivalence",
@@ -2208,6 +2239,7 @@ dependencies = [
 name = "lint-unconsumed-traits"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -3359,6 +3391,7 @@ dependencies = [
  "grammar-lines",
  "grammar-message",
  "grammar-output",
+ "invariants",
  "laws",
  "message-id",
  "newtype",

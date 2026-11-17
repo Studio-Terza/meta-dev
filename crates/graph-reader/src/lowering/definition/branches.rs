@@ -1,30 +1,26 @@
 use syntax::{BinOp, ExprBinary, ExprForLoop, ExprIf, ExprMatch, ExprTry, ExprWhile, Item};
 
-use body_lifts::Branching;
+use body_lifts::{Branching, Propagated};
 use lint_sweep::{Descend, Facts, Kind, Watch};
 use newtype::Counter;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Propagation {
-    Branch,
-    Ambient,
-}
-
 #[derive(Debug)]
-pub struct Branches {
+pub(crate) struct Branches {
     score: Branching,
-    propagation: Propagation,
+    propagated: Propagated,
 }
 
 impl Branches {
-    #[must_use]
-    pub fn new(propagation: Propagation) -> Branches {
-        Branches { score: Branching::new(1), propagation }
+    pub(crate) fn opened() -> Branches {
+        Branches { score: Branching::new(1), propagated: Propagated::default() }
     }
 
-    #[must_use]
-    pub fn score(self) -> Branching {
+    pub(crate) fn score(&self) -> Branching {
         self.score
+    }
+
+    pub(crate) fn propagated(&self) -> Propagated {
+        self.propagated
     }
 
     fn counted(&mut self, extra: Branching) -> Descend {
@@ -63,7 +59,8 @@ impl<'ast> Watch<'ast> for Branches {
     }
 
     fn on_expr_try(&mut self, _: &'ast ExprTry, _: &Facts<'_, ExprTry>) -> Descend {
-        self.counted(Branching::new(usize::from(self.propagation == Propagation::Branch)))
+        self.propagated = self.propagated.plus(Propagated::new(1));
+        Descend::Into
     }
 
     fn on_expr_match(&mut self, found: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {

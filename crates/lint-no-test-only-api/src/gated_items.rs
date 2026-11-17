@@ -6,51 +6,51 @@ use item_head::ItemHead;
 use std::path::Path;
 
 use lint_core::Violation;
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Descend, Facts, Kind};
 
 use crate::flagged::Flagged;
 
 #[derive(Debug)]
 pub(crate) struct GatedItems<'file> {
     path: &'file Path,
-    found: Vec<Flagged>,
 }
 
-impl<'ast> Watch<'ast> for GatedItems<'_> {
+impl Contribute for GatedItems<'_> {
+    type Open = ();
+    type Part = Vec<Flagged>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Item, Kind::ItemMod, Kind::ItemImpl, Kind::Field]
     }
 
-    fn on_item(&mut self, item: &'ast Item, _: &Facts<'_, Item>) -> Descend {
-        self.found.extend(ItemHead::of_item(item).and_then(|head| head.flagged(None)));
-        Descend::Into
+    fn on_item(&self, item: &Item, _: &Facts<'_, Item>) -> Contributed<(), Vec<Flagged>> {
+        Contributed::parted(ItemHead::of_item(item).and_then(|head| head.flagged(None)).into_iter().collect())
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Vec<Flagged>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
+    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<(), Vec<Flagged>> {
         let gated = ItemHead::gate_of(&item.attrs);
-        self.found.extend(item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated)));
-        Descend::Into
+        Contributed::parted(
+            item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated)).collect(),
+        )
     }
 
-    fn on_field(&mut self, field: &'ast Field, _: &Facts<'_, Field>) -> Descend {
-        self.found.extend(ItemHead::of_field(field).flagged(None));
-        Descend::Into
+    fn on_field(&self, field: &Field, _: &Facts<'_, Field>) -> Contributed<(), Vec<Flagged>> {
+        Contributed::parted(ItemHead::of_field(field).flagged(None).into_iter().collect())
     }
 }
 
-impl<'file> Finds<'file> for GatedItems<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.path;
-        self.found.into_iter().map(|flagged| flagged.in_file(path)).collect()
+impl<'file> Concludes<'file> for GatedItems<'file> {
+    fn violations(self, (): (), found: Vec<Flagged>) -> Vec<Violation<'file>> {
+        found.into_iter().map(|flagged| flagged.in_file(self.path)).collect()
     }
 }
 
 impl<'file> From<&'file Path> for GatedItems<'file> {
     fn from(path: &'file Path) -> GatedItems<'file> {
-        GatedItems { path, found: Vec::new() }
+        GatedItems { path }
     }
 }

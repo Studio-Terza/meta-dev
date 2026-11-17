@@ -109,16 +109,16 @@ impl Structuring {
         arguments: &[&str],
     ) -> Structured {
         let run = Run::root();
-        let mut out = Vec::new();
-        let outcome = Cli::new(
+        let uttered = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&self.applying.files),
             Opening(|_path| self.applying.store.clone()),
             agents,
         )
-        .report(&run, arguments.iter().map(OsString::from), &mut out);
+        .report(&run, arguments.iter().map(OsString::from));
         let counted = run.finish().settled().unwrap_or_default();
-        let text = String::from_utf8(out).unwrap_or_default();
+        let text = super::Answered::said(&uttered);
+        let outcome = uttered.ended();
         let lines = Structured::parsed(&text);
         Structured { outcome, lines, text, counted }
     }

@@ -1,3 +1,4 @@
+use algebra::{Monoid, Semigroup};
 use syntax::Span;
 use syntax::Spanned;
 use syntax::{ItemFn, ItemMod, Macro, PathSegment};
@@ -5,7 +6,7 @@ use syntax::{ItemFn, ItemMod, Macro, PathSegment};
 use lint_core::Walk;
 use lint_core::{Macros, SourceFile};
 use lint_layout::TestMarks;
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_sweep::{Contribute, Contributed, Contribution, Descend, Facts, Kind};
 use newtype::Counter;
 
 use super::count::Count;
@@ -13,20 +14,19 @@ use super::count::Count;
 #[derive(Debug)]
 pub struct TestScan<'file> {
     file: &'file SourceFile,
+}
+
+#[derive(Debug, Default)]
+pub struct Tally {
     tests: Count,
     test_lines: Count,
-    before: Vec<Count>,
 }
 
 impl<'file> TestScan<'file> {
     const PROPERTY_BLOCK: &str = "proptest";
 
     pub(super) fn new(file: &'file SourceFile) -> TestScan<'file> {
-        TestScan { file, tests: Count::default(), test_lines: Count::default(), before: Vec::new() }
-    }
-
-    pub(super) fn counted<Out>(self, into: impl FnOnce(Count, Count) -> Out) -> Out {
-        into(self.tests, self.test_lines)
+        TestScan { file }
     }
 
     fn line_count(span: Span) -> Count {
@@ -51,30 +51,51 @@ impl<'file> TestScan<'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for TestScan<'_> {
+impl Tally {
+    pub(super) fn counted<Out>(self, into: impl FnOnce(Count, Count) -> Out) -> Out {
+        into(self.tests, self.test_lines)
+    }
+
+    fn tested(tests: Count) -> Tally {
+        Tally { tests, test_lines: Count::default() }
+    }
+}
+
+impl Semigroup for Tally {
+    fn combine(self, other: Tally) -> Tally {
+        Tally { tests: self.tests.plus(other.tests), test_lines: self.test_lines.plus(other.test_lines) }
+    }
+}
+
+impl Monoid for Tally {}
+
+impl Contribute for TestScan<'_> {
+    type Open = ();
+    type Part = Tally;
+
     fn kinds(&self) -> &'static [Kind] {
-        &[Kind::ItemFn, Kind::ItemMod, Kind::Macro]
+        &[Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
-        self.tests = self.tests.plus(Count::new(facts.test_mark().into_iter().count()));
-        Descend::Into
+    fn scopes(&self) -> &'static [Kind] {
+        &[Kind::ItemMod]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        self.before.push(self.test_lines);
-        Descend::Into
+    fn on_item_fn(&self, _: &ItemFn, facts: &Facts<'_, ItemFn>) -> Contributed<(), Tally> {
+        Contributed::parted(Tally::tested(Count::new(facts.test_mark().into_iter().count())))
     }
 
-    fn off_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) {
-        let before = self.before.pop().unwrap_or_default();
-        self.test_lines = Some(facts.gate())
-            .filter(|walk| *walk == Walk::Skipped)
-            .map_or(self.test_lines, |_| before.plus(Self::line_count(module.span())));
+    fn off_item_mod(&self, module: &ItemMod, facts: &Facts<'_, ItemMod>, inner: Contribution<(), Tally>) -> Tally {
+        let within = inner.concluded(|(), tally| tally);
+        Tally {
+            test_lines: Some(facts.gate())
+                .filter(|walk| *walk == Walk::Skipped)
+                .map_or(within.test_lines, |_| Self::line_count(module.span())),
+            ..within
+        }
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.tests = self.tests.plus(self.tests_in(invocation));
-        Descend::Over
+    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Tally> {
+        Contributed::new((), Tally::tested(self.tests_in(invocation)), Descend::Over)
     }
 }

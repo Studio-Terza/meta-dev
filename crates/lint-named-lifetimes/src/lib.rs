@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 
 use std::path::Path;
 
@@ -27,36 +27,42 @@ impl SweptLint for NamedLifetimes {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(ShortLifetimes { path: AsRef::<Path>::as_ref(file.head()), found: Vec::new() })
+        Box::new(Contributing::new(ShortLifetimes { path: AsRef::<Path>::as_ref(file.head()) }))
     }
 }
 
 #[derive(Debug)]
 struct ShortLifetimes<'file> {
     path: &'file Path,
-    found: Vec<Violation<'file>>,
 }
 
-impl<'ast> Watch<'ast> for ShortLifetimes<'_> {
+impl<'file> Contribute for ShortLifetimes<'file> {
+    type Open = ();
+    type Part = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::LifetimeParam, Kind::Macro]
     }
 
-    fn on_lifetime_param(&mut self, parameter: &'ast LifetimeParam, _: &Facts<'_, LifetimeParam>) -> Descend {
+    fn on_lifetime_param(
+        &self,
+        parameter: &LifetimeParam,
+        _: &Facts<'_, LifetimeParam>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         let name = &parameter.lifetime.ident;
-        self.found.extend((Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| {
+        let short = (Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| {
             Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::ShortLifetime { name })
-        }));
-        Descend::Over
+        });
+        Contributed::new((), short.into_iter().collect(), Descend::Over)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Violation<'file>>> {
+        Contributed::descending(Descend::Expand)
     }
 }
 
-impl<'file> Finds<'file> for ShortLifetimes<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.found
+impl<'file> Concludes<'file> for ShortLifetimes<'file> {
+    fn violations(self, (): (), found: Vec<Violation<'file>>) -> Vec<Violation<'file>> {
+        found
     }
 }

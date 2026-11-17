@@ -1,29 +1,29 @@
 mod distribution;
 mod function;
-mod functions;
 
 use std::collections::BTreeMap;
 
-use lint_core::SourceFile;
+use graph::Model;
+use lint_core::Site;
 use lint_placement::CrateName;
 
 pub(crate) use distribution::Distribution;
 use function::Function;
-use functions::Functions;
 
 #[derive(Debug)]
-pub(crate) struct Crates<'file>(BTreeMap<CrateName, Vec<Function<'file>>>);
+pub(crate) struct Crates<'model>(BTreeMap<CrateName, Vec<Function<'model>>>);
 
-impl<'file> Crates<'file> {
-    pub(crate) fn grouped(files: &'file [SourceFile]) -> Crates<'file> {
-        Crates(files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |mut crates, file| {
-            let name = CrateName::from(file.head().placement().package().root());
-            crates.entry(name).or_default().extend(Functions::of_file(file));
+impl<'model> Crates<'model> {
+    pub(crate) fn grouped(model: &'model Model) -> Crates<'model> {
+        let mut functions: Vec<Function<'model>> = model.functions().filter_map(Function::scored).collect();
+        functions.sort_by_key(|function| *AsRef::<Site<'model>>::as_ref(function));
+        Crates(functions.into_iter().fold(BTreeMap::new(), |mut crates, function| {
+            crates.entry(AsRef::<CrateName>::as_ref(&function).clone()).or_insert_with(Vec::new).push(function);
             crates
         }))
     }
 
-    pub(crate) fn listed(&self) -> impl Iterator<Item = Distribution<'file, '_>> {
+    pub(crate) fn listed(&self) -> impl Iterator<Item = Distribution<'model, '_>> {
         self.0.iter().filter_map(|(name, functions)| Distribution::listing(name, functions))
     }
 }

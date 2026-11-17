@@ -1,6 +1,6 @@
 use syntax::{Attribute, ItemImpl, ItemMod};
 
-use graph::{Ground, Reach, Region, Within, Zone};
+use graph::{Ground, Reach, Region, Within, Writing, Zone};
 use lint_core::{Gate, SourceFile, Walk};
 
 use super::places::PlaceId;
@@ -35,6 +35,21 @@ impl Regions {
         match Gate::BOUNDARY.admits(source.head()) {
             Some(_) => Zone::Boundary,
             None => Zone::Open,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum MacroItems {
+    Transcribed,
+    Expanded,
+}
+
+impl MacroItems {
+    fn region(self, outer: Region) -> Region {
+        match self {
+            MacroItems::Transcribed => outer.reached(Reach::Transcribed),
+            MacroItems::Expanded => outer.written(Writing::Expanded),
         }
     }
 }
@@ -78,8 +93,8 @@ impl Context {
         Context { region: self.region.inside(Self::within(block)), place: Some(place), ..*self }
     }
 
-    pub(super) fn transcribed(&self) -> Context {
-        Context { region: self.region.reached(Reach::Transcribed), ..*self }
+    pub(super) fn within_macro(&self, items: MacroItems) -> Context {
+        Context { region: items.region(self.region), ..*self }
     }
 
     pub(super) fn owned(&self, place: PlaceId) -> Context {

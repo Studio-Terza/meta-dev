@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
-use std::io::Write;
 
-use console_ports::Heard;
+use console_ports::{Heard, Shown};
 use design_runs::{Account, FailuresReported, Unreported, UnreportedFailures};
 use design_store::Recalled;
 use grammar_search::Terms;
@@ -12,7 +11,7 @@ use transcript_ports::Body;
 
 use crate::cli::failure::Failure;
 use crate::cli::output::Count;
-use crate::{HookEvent, Outcome};
+use crate::{HookEvent, Outcome, Uttered};
 
 #[derive(Debug, Serialize)]
 pub struct Settings {
@@ -99,10 +98,9 @@ impl Settings {
         }
     }
 
-    pub fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
-        serde_json::to_writer_pretty(&mut *out, self).map_err(Failure::Render)?;
-        writeln!(out)?;
-        Ok(Outcome::Settings)
+    pub fn written(&self) -> Result<Uttered, Failure> {
+        let json = serde_json::to_string_pretty(self).map_err(Failure::Render)?;
+        Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(Outcome::Settings)))
     }
 }
 
@@ -111,18 +109,13 @@ impl Stopping {
         serde_json::from_str(&heard.into_inner()).map_err(Failure::Unheard)
     }
 
-    pub fn decided(
-        &self,
-        concluded: Result<Count, Failure>,
-        store: &impl Store,
-        out: &mut impl Write,
-    ) -> Result<Outcome, Failure> {
+    pub fn decided(&self, concluded: Result<Count, Failure>, store: &impl Store) -> Result<Uttered, Failure> {
         match self.continuation.0 {
             Some(Continuing) => concluded.map_or_else(
-                |halt| Decision::Notice { system_message: halt.to_string() }.written(out),
-                |_jobs| Ok(Outcome::Hooked(HookEvent::Stop)),
+                |halt| Decision::Notice { system_message: halt.to_string() }.written(),
+                |_jobs| Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))),
             ),
-            None => Decision::told(store, HookEvent::Stop, &[], out),
+            None => Decision::told(store, HookEvent::Stop, &[]),
         }
     }
 }
@@ -136,12 +129,7 @@ impl From<bool> for Continuation {
 impl Decision {
     const RECALLED: &'static str = "Design nodes matching this message (design show <id>):";
 
-    pub fn told(
-        store: &impl Store,
-        event: HookEvent,
-        recalled: &[Recalled],
-        out: &mut impl Write,
-    ) -> Result<Outcome, Failure> {
+    pub fn told(store: &impl Store, event: HookEvent, recalled: &[Recalled]) -> Result<Uttered, Failure> {
         let unreported = store.read(UnreportedFailures)?;
         let accounts = unreported.iter().map(|failure| AsRef::<Account>::as_ref(failure).to_string());
         let nodes = recalled
@@ -150,10 +138,11 @@ impl Decision {
             .into_iter()
             .chain(recalled.iter().map(Recalled::to_string));
         let told: Vec<String> = accounts.chain(nodes).collect();
-        told.first().map(|_first| told.join("\n")).map_or(Ok(Outcome::Hooked(event)), |joined| {
-            let outcome = Decision::telling(event, joined).written(out)?;
-            store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>())?;
-            Ok(outcome)
+        told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
+            let decision = Decision::telling(event, joined);
+            let said = decision.said()?;
+            let reported = store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>());
+            Ok(Uttered::new(said, reported.map(|_reported| decision.outcome()).map_err(Failure::from)))
         })
     }
 
@@ -164,10 +153,13 @@ impl Decision {
         }
     }
 
-    fn written(&self, out: &mut impl Write) -> Result<Outcome, Failure> {
-        serde_json::to_writer(&mut *out, self).map_err(Failure::Render)?;
-        writeln!(out)?;
-        Ok(self.outcome())
+    fn written(&self) -> Result<Uttered, Failure> {
+        Ok(Uttered::new(self.said()?, Ok(self.outcome())))
+    }
+
+    fn said(&self) -> Result<Shown, Failure> {
+        let json = serde_json::to_string(self).map_err(Failure::Render)?;
+        Ok(Shown::said(format_args!("{json}\n")))
     }
 
     fn outcome(&self) -> Outcome {

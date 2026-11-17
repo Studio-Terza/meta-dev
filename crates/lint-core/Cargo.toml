@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+algebra = { path = "../algebra" }
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 lint-placement = { path = "../lint-placement" }

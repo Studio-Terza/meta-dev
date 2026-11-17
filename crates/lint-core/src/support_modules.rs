@@ -1,15 +1,20 @@
 use std::path::{Path, PathBuf};
 
+use algebra::{Monoid, Semigroup};
 use syntax::ItemMod;
 
+use crate::contribution::Contributed;
 use crate::walk::Walk;
-use crate::watch::{Descend, Facts, Kind, Watch};
+use crate::watch::{Contribute, Facts, Kind};
 use lint_layout::Name;
 
 #[derive(Debug, Default)]
 pub struct SupportModules {
     names: Vec<Name>,
 }
+
+#[derive(Debug)]
+pub struct SupportScan;
 
 impl SupportModules {
     const ROOT_FILES: [&'static str; 3] = ["mod.rs", "lib.rs", "main.rs"];
@@ -38,20 +43,31 @@ impl SupportModules {
     }
 }
 
-impl<'ast> Watch<'ast> for SupportModules {
+impl Semigroup for SupportModules {
+    fn combine(self, other: SupportModules) -> SupportModules {
+        SupportModules { names: self.names.combine(other.names) }
+    }
+}
+
+impl Monoid for SupportModules {}
+
+impl Contribute for SupportScan {
+    type Open = ();
+    type Part = SupportModules;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        self.names.extend(
-            module
-                .content
-                .as_ref()
-                .map_or(Some(module), |_| None)
-                .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Skipped)
-                .map(|support| Name::from(&support.ident)),
-        );
-        Descend::Into
+    fn on_item_mod(&self, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Contributed<(), SupportModules> {
+        let names = module
+            .content
+            .as_ref()
+            .map_or(Some(module), |_| None)
+            .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Skipped)
+            .map(|support| Name::from(&support.ident))
+            .into_iter()
+            .collect();
+        Contributed::parted(SupportModules { names })
     }
 }

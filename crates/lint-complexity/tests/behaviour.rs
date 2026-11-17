@@ -1,5 +1,6 @@
+use graph_reader::Reader;
 use lint_complexity::Complexity;
-use lint_core::Lint;
+use lint_file::ModelLint;
 use lint_fixtures::{Located, Source, Sources, Text};
 
 struct Scored;
@@ -7,7 +8,7 @@ struct Scored;
 impl Scored {
     fn of(text: &str) -> String {
         let sources = [Source::new(Located::new("a.rs"), Text::new(Box::leak(text.to_owned().into_boxed_str())))];
-        Complexity::report(&Sources::parsed(&sources)).to_string()
+        Complexity::report(&Reader::read_files(&Sources::parsed(&sources))).to_string()
     }
 
     fn highest_is(pair: &[&str]) -> bool {
@@ -58,6 +59,7 @@ laws::table!(
         [BAND_BODIES, "9 functions by complexity, 1: 1, 2-3: 2, 4-6: 2, 7-10: 2, 11+: 2, highest 12 in g"] => true,
         ["fn a() { fn b(x: u8) { if x > 1 { f(); } } b(1); }", "2 functions by complexity, 1: 1, 2-3: 1, highest 2 in b"] => true,
         ["mod m { fn a(x: u8) { if x > 1 { f(); } } }", "1 functions by complexity, 2-3: 1, highest 2 in a"] => true,
+        ["macro_rules! m { ($($t:tt)*) => { $($t)* }; }\nm! { fn b(x: u8) { if x > 1 { f(); } } }\nfn a() { f(); }", "1 functions by complexity, 1: 1, highest 1 in a"] => true,
         ["trait T { fn q(&self); }", "functions"] => false,
         ["struct S;", "functions"] => false,
     ]
@@ -71,8 +73,8 @@ fn each_crate_gets_its_own_line_and_a_crate_without_functions_none() {
         Source::new(Located::new("crates/z/src/lib.rs"), Text::new("fn b(x: u8) { if x > 1 { f(); } }")),
         Source::new(Located::new("crates/w/tests/t.rs"), Text::new("fn c(x: u8) { if x > 1 { f(); } }")),
     ];
-    let files = Sources::parsed(&sources);
-    let report = Complexity::report(&files);
+    let model = Reader::read_files(&Sources::parsed(&sources));
+    let report = Complexity::report(&model);
     assert_eq!(report.violations().len(), 2);
     let text = report.to_string();
     assert!(text.contains("crate x: 1 functions by complexity, 1: 1, highest 1 in a"), "{text}");

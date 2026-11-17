@@ -1,4 +1,5 @@
-use std::io::Write;
+use crate::Uttered;
+use crate::cli::request::command::printed::Lines;
 use std::str::FromStr;
 
 use design_model::{JobId, Segment};
@@ -8,10 +9,10 @@ use grammar_output::field::Integer;
 use store_ports::Store;
 use structurer::SegmentRef;
 
-use super::Printed;
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use crate::cli::output::{Count, Flailing, Line};
+use console_ports::Shown;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Retry(JobId);
@@ -27,7 +28,7 @@ impl FromStr for Retry {
 }
 
 impl Retry {
-    pub fn released(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
+    pub fn released(self, store: &impl Store) -> Result<Uttered, Failure> {
         let Retry(job) = self;
         let lock = store.lock()?;
         store.read(RunsOf::from(job))?.first().ok_or(Failure::Unrun(job))?;
@@ -40,7 +41,6 @@ impl Retry {
                 Line::Owed(Flailing::new(SegmentRef::from(AsRef::<Segment>::as_ref(flailed)), job, flailed.run()))
             })
             .collect();
-        Printed::lines(out, &owed)?;
-        Ok(Outcome::Retried { segments: Count::new(owed.len()) })
+        Ok(Uttered::new(Shown::said(Lines::from(&owed)), Ok(Outcome::Retried { segments: Count::new(owed.len()) })))
     }
 }

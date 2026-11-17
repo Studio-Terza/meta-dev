@@ -3,7 +3,7 @@ mod exits;
 use exits::Exits;
 use lint_core::{Headline, SourceFile};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::Finds;
+use lint_sweep::{Contributing, Finds};
 
 #[derive(Debug)]
 pub struct NoEarlyExits;
@@ -14,6 +14,6 @@ impl SweptLint for NoEarlyExits {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Exits::from(file))
+        Box::new(Contributing::new(Exits::from(file)))
     }
 }
