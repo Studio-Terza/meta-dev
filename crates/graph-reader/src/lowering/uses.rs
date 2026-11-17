@@ -153,49 +153,46 @@ impl Qualified {
     }
 }
 
-impl Lowering<'_> {
-    pub(super) fn path_used(&mut self, expression: &ExprPath) {
+impl<'read> Lowering<'read> {
+    pub(super) fn path_used(mut self: Box<Self>, expression: &ExprPath) -> Box<Lowering<'read>> {
         let position = expression.path.segments.first().map(|first| Position::from(first.ident.span()));
         let called = self.calling.take().filter(|at| *at == Address::from(expression));
         let tabled = called.map_or(Some(()), |_| None).and(self.tables.last()).map(|_| ());
         let dispatched = tabled.map_or_default(|()| self.dispatched(expression));
-        dispatched.into_iter().zip(position).fold(&mut *self, |lowering, (path, at)| {
-            lowering.used(path, at, Mention::Dispatched);
-            lowering
-        });
         let found = Qualified::written(expression).zip(position);
-        found.into_iter().fold(self, |lowering, (path, at)| {
-            lowering.used(path, at, Mention::Expression);
-            lowering
-        });
+        let mentioned = dispatched
+            .into_iter()
+            .zip(position)
+            .fold(self, |lowering, (path, at)| lowering.used(path, at, Mention::Dispatched));
+        found.into_iter().fold(mentioned, |lowering, (path, at)| lowering.used(path, at, Mention::Expression))
     }
 
-    pub(super) fn pattern_used(&mut self, pat: &Pat) {
+    pub(super) fn pattern_used(self: Box<Self>, pat: &Pat) -> Box<Lowering<'read>> {
         let reached = PatTree::reached(pat, &|_, _| true);
         reached.iter().filter_map(|found| Matched::path(found.pat())).fold(self, |lowering, path| {
-            lowering.used(UsePath::from(path), Position::from(path.span()), Mention::Matched);
-            lowering
-        });
+            lowering.used(UsePath::from(path), Position::from(path.span()), Mention::Matched)
+        })
     }
 
-    pub(super) fn struct_used(&mut self, literal: &ExprStruct) {
+    pub(super) fn diverged(self: Box<Self>, local: &syntax::Local) -> Box<Lowering<'read>> {
+        let diverging = local.init.as_ref().filter(|init| init.diverge.is_some());
+        diverging.into_iter().fold(self, |lowering, _| lowering.pattern_used(&local.pat))
+    }
+
+    pub(super) fn struct_used(self: Box<Self>, literal: &ExprStruct) -> Box<Lowering<'read>> {
         let position = literal.path.segments.first().map(|first| Position::from(first.ident.span()));
         let written = literal.qself.as_ref().map_or(Some(&literal.path), |_| None).zip(position);
-        written.into_iter().fold(self, |lowering, (path, at)| {
-            lowering.used(UsePath::from(path), at, Mention::Expression);
-            lowering
-        });
+        written
+            .into_iter()
+            .fold(self, |lowering, (path, at)| lowering.used(UsePath::from(path), at, Mention::Expression))
     }
 
-    pub(super) fn types_used(&mut self, ty: &Type) {
+    pub(super) fn types_used(self: Box<Self>, ty: &Type) -> Box<Lowering<'read>> {
         let position = Position::from(ty.span());
         let typed =
             self.context.in_body().and_then(|_| Typed::path(ty)).map(|path| (UsePath::from(path), Mention::Typed));
         let traits = Dispatch::objects(ty).into_iter().map(|path| (path, Mention::Dispatched));
-        traits.chain(typed).fold(self, |lowering, (path, mention)| {
-            lowering.used(path, position, mention);
-            lowering
-        });
+        traits.chain(typed).fold(self, |lowering, (path, mention)| lowering.used(path, position, mention))
     }
 
     fn dispatched(&self, expression: &ExprPath) -> Vec<UsePath> {
@@ -210,7 +207,7 @@ impl Lowering<'_> {
         member.map_or_default(|named| traits.map(|traited| traited.extended(&named)).collect())
     }
 
-    pub(super) fn macro_used(&mut self, invoked: &Macro) {
+    pub(super) fn macro_used(mut self: Box<Self>, invoked: &Macro) -> Box<Lowering<'read>> {
         let position = invoked
             .path
             .segments
@@ -220,17 +217,16 @@ impl Lowering<'_> {
         self.lowered.rows.laws.extend(law);
         let quotes = QuoteRow::found(self.source, invoked, &self.here);
         self.lowered.rows.quotes.extend(quotes);
-        self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
         let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
         let interpolated =
             TokenPaths::interpolated(invoked).into_iter().map(|spelled| (spelled, Mention::Interpolated));
-        plain.chain(interpolated).fold(self, |lowering, (spelled, mention)| {
-            spelled.handed(|path, at| lowering.used(path, at, mention));
-            lowering
-        });
+        let invoking = self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
+        plain
+            .chain(interpolated)
+            .fold(invoking, |lowering, (spelled, mention)| spelled.handed(|path, at| lowering.used(path, at, mention)))
     }
 
-    fn used(&mut self, written: UsePath, position: Position, mention: Mention) {
+    fn used(mut self: Box<Self>, written: UsePath, position: Position, mention: Mention) -> Box<Lowering<'read>> {
         let row = UseRow {
             located: self.here.located(position),
             written,
@@ -239,6 +235,7 @@ impl Lowering<'_> {
             place: self.context.place(),
         };
         self.lowered.rows.uses.push(row);
+        self
     }
 }
 

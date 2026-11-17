@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use syntax::{Attribute, ItemImpl, ItemMod};
+use syntax::{Attribute, Block, ItemImpl, ItemMod};
 
-use lint_sweep::Descend;
+use lint_sweep::{Descend, Visit};
+
+use crate::namespace::{Entries, ScopeKind};
 
 use super::regions::Context;
 use super::seat::Seat;
@@ -73,22 +75,48 @@ impl From<&Lowering<'_>> for Frame {
     }
 }
 
-impl Lowering<'_> {
-    pub(super) fn saved(&mut self) -> Descend {
-        self.frames.push(Frame::from(&*self));
-        Descend::Into
+impl Frame {
+    pub(super) fn saved(mut lowering: Box<Lowering<'_>>) -> Box<Lowering<'_>> {
+        let frame = Frame::from(&*lowering);
+        lowering.frames.push(frame);
+        lowering
+    }
+}
+
+impl<'read> Lowering<'read> {
+    pub(super) fn enclosing(mut self: Box<Self>, enclosure: Enclosure) -> Box<Lowering<'read>> {
+        self.enclosure = enclosure;
+        self
     }
 
-    pub(super) fn restored(&mut self) {
+    pub(super) fn contexted(mut self: Box<Self>, change: impl FnOnce(Context) -> Context) -> Box<Lowering<'read>> {
+        self.context = change(self.context);
+        self
+    }
+
+    pub(super) fn enclosed(mut self: Box<Self>, enclosure: Enclosure, generics: InScope) -> Box<Lowering<'read>> {
+        self.enclosure = enclosure;
+        self.generics = Arc::new(generics);
+        self
+    }
+
+    pub(super) fn restored(mut self: Box<Self>) -> Box<Lowering<'read>> {
         let frame = self.frames.pop().unwrap_or_else(|| Frame::from(&*self));
         self.here = frame.here;
         self.enclosure = frame.enclosure;
         self.generics = frame.generics;
         self.context = frame.context;
+        self
     }
 
-    pub(super) fn slotted(&mut self, item: &ItemMod) -> Descend {
-        self.lowered.slots.push(Slot::new(&self.here, self.context.region(), item));
-        Descend::Over
+    pub(super) fn slotted(mut self: Box<Self>, item: &ItemMod) -> Visit<Box<Lowering<'read>>> {
+        let slot = Slot::new(&self.here, self.context.region(), item);
+        self.lowered.slots.push(slot);
+        Visit::new(self, Descend::Over)
+    }
+
+    pub(super) fn block_entered(self: Box<Self>, block: &Block) -> Box<Lowering<'read>> {
+        let children = self.here.children();
+        Frame::saved(self).entered(ScopeKind::Block, Entries::of_block(&block.stmts), children)
     }
 }

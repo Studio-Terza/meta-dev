@@ -43,29 +43,29 @@ impl CallPath<'_> {
     }
 }
 
-impl Lowering<'_> {
-    pub(super) fn method_called(&mut self, call: &ExprMethodCall) {
-        self.called(Position::from(call.method.span()), Callee::Method(Name::from(&call.method)));
+impl<'read> Lowering<'read> {
+    pub(super) fn method_called(self: Box<Self>, call: &ExprMethodCall) -> Box<Lowering<'read>> {
+        self.called(Position::from(call.method.span()), Callee::Method(Name::from(&call.method)))
     }
 
-    pub(super) fn path_called(&mut self, call: &ExprCall) {
+    pub(super) fn path_called(mut self: Box<Self>, call: &ExprCall) -> Box<Lowering<'read>> {
         self.calling = Syntax::expr_path(&call.func).map(Address::from);
         Syntax::expr_path(&call.func).into_iter().fold(self, |lowering, path| {
             let called = CallPath { path: &path.path };
-            lowering.called(called.position(), Callee::Path(called.written()));
-            lowering
-        });
+            lowering.called(called.position(), Callee::Path(called.written()))
+        })
     }
 
-    pub(super) fn macro_called(&mut self, expression: &ExprMacro) {
+    pub(super) fn macro_called(self: Box<Self>, expression: &ExprMacro) -> Box<Lowering<'read>> {
         let invoked = &expression.mac;
         let called = CallPath { path: &invoked.path };
-        self.called(Position::from(invoked.path.span()), Callee::Macro(MacroCall::from(called.written())));
+        self.called(Position::from(invoked.path.span()), Callee::Macro(MacroCall::from(called.written())))
     }
 
-    fn called(&mut self, position: Position, callee: Callee) {
+    fn called(mut self: Box<Self>, position: Position, callee: Callee) -> Box<Lowering<'read>> {
         let located = self.here.located(position);
         let row = CallRow { located, callee, region: self.context.region(), place: self.context.place() };
         self.lowered.rows.calls.push(row);
+        self
     }
 }

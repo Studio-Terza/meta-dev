@@ -248,6 +248,11 @@ impl<Found> Visit<Found> {
     pub fn new(found: Found, descend: Descend) -> Visit<Found> {
         Visit { found, descend }
     }
+
+    #[must_use]
+    pub fn mapped<Other>(self, map: impl FnOnce(Found) -> Other) -> Visit<Other> {
+        Visit { found: map(self.found), descend: self.descend }
+    }
 }
 
 impl<Found> Visit<Found> {

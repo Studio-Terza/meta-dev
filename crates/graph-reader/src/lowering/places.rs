@@ -9,7 +9,7 @@ use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};
 
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
-use lint_sweep::{Descend, Scoped, Sweep};
+use lint_sweep::{Scoped, Sweep};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct PlaceId(usize);
@@ -121,57 +121,51 @@ impl Places {
 }
 
 impl<'read> Lowering<'read> {
-    fn placed(&mut self, row: PlaceRow) -> PlaceId {
-        let places = &mut self.lowered.rows.places.places;
-        let place = PlaceId(places.len());
-        places.push(row);
-        place
+    pub(super) fn next_place(&self) -> PlaceId {
+        PlaceId(self.lowered.rows.places.places.len())
     }
 
-    pub(super) fn owning(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> PlaceId {
+    fn placed(mut self: Box<Self>, row: PlaceRow) -> Box<Lowering<'read>> {
+        self.lowered.rows.places.places.push(row);
+        self
+    }
+
+    pub(super) fn owned_by(
+        self: Box<Self>,
+        ident: &Ident,
+        domain: Domain,
+        attributes: &[Attribute],
+    ) -> Box<Lowering<'read>> {
         let line = Position::from(ident.span()).line();
         let region = self.context.within_item(attributes).region();
         let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain, line, region };
-        self.placed(PlaceRow { subject: None, owner: Some(owner) })
+        let place = self.next_place();
+        self.placed(PlaceRow { subject: None, owner: Some(owner) }).contexted(|context| context.owned(place))
     }
 
-    pub(super) fn owned_by(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> Descend {
-        let place = self.owning(ident, domain, attributes);
-        self.context = self.context.owned(place);
-        Descend::Into
-    }
-
-    pub(super) fn transcribed(self, item: &ItemMacro) -> Lowering<'read> {
+    pub(super) fn transcribed(self: Box<Self>, item: &ItemMacro) -> Box<Lowering<'read>> {
         let statements = Macros::expanded(self.source, &item.mac);
         let outer = self.context;
-        let inner = Lowering { context: self.context.transcribed(), ..self };
-        let back = inner.reentered(statements.iter().filter_map(Syntax::stmt_item));
-        Lowering { context: outer, ..back }
+        self.contexted(|context| context.transcribed())
+            .reentered(statements.iter().filter_map(Syntax::stmt_item))
+            .contexted(|_| outer)
     }
 
-    pub(super) fn expanded(self, invocation: &Macro) -> Lowering<'read> {
+    pub(super) fn expanded(mut self: Box<Self>, invocation: &Macro) -> Box<Lowering<'read>> {
         let items = Macros::items_in_file(self.source, invocation);
-        let mut opened = self;
-        opened.lowered.openings.absorb(opened.here.scope(), Entries::of_items(&items));
-        opened.reentered(items.iter())
+        let scope = self.here.scope();
+        self.lowered.openings.absorb(scope, Entries::of_items(&items));
+        self.reentered(items.iter())
     }
 
-    fn reentered<'item>(self, items: impl Iterator<Item = &'item syntax::Item>) -> Lowering<'read> {
+    fn reentered<'item>(self: Box<Self>, items: impl Iterator<Item = &'item syntax::Item>) -> Box<Lowering<'read>> {
         let origin = self.origin;
-        let mut scoped = Scoped::new(Folding::seeded(origin, Some(Box::new(self))));
+        let mut scoped = Scoped::new(Folding::seeded(origin, Some(self)));
         items.for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
-        *origin.opened(scoped.into_parent().concluded())
+        origin.opened(scoped.into_parent().concluded())
     }
 
-    pub(super) fn trait_owning(&mut self, ident: &Ident, attributes: &[Attribute]) -> PlaceId {
-        let line = Position::from(ident.span()).line();
-        let region = self.context.within_item(attributes).region();
-        let owner =
-            OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain: Domain::Types, line, region };
-        self.placed(PlaceRow { subject: None, owner: Some(owner) })
-    }
-
-    pub(super) fn filler_owning(&mut self, item: &ItemTrait) {
+    pub(super) fn filler_owning(self: Box<Self>, item: &ItemTrait) -> Box<Lowering<'read>> {
         let line = Position::from(item.ident.span()).line();
         let region = self.context.within_item(&item.attrs).region();
         let owner = PortMacro::marked(item).map(|found| OwnerRow {
@@ -181,25 +175,24 @@ impl<'read> Lowering<'read> {
             line,
             region,
         });
-        owner.into_iter().fold(self, |lowering, found| {
-            lowering.placed(PlaceRow { subject: None, owner: Some(found) });
-            lowering
-        });
+        owner.into_iter().fold(self, |lowering, found| lowering.placed(PlaceRow { subject: None, owner: Some(found) }))
     }
 
-    pub(super) fn impl_entered(&mut self, block: &ItemImpl) -> Descend {
+    pub(super) fn impl_entered(mut self: Box<Self>, block: &ItemImpl) -> Box<Lowering<'read>> {
         let declared = self.generics.extended(&block.generics);
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
-        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, &declared));
-        let rows = &mut self.lowered.rows.places.subjects;
-        let subjected = SubjectId(rows.len());
+        let written = ImplRow::written(&self.here, self.context.region(), block, &declared);
+        self.lowered.rows.impls.push(written);
+        let subjected = SubjectId(self.lowered.rows.places.subjects.len());
         let implemented =
             block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
         let traited = block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path));
-        rows.push(SubjectRow { scope: self.here.scope(), ty: subject, implemented, traited });
-        let place = self.placed(PlaceRow { subject: Some(subjected), owner: None });
-        self.context = self.context.of_impl(block, place);
-        self.enclosed(Enclosure::of_impl(block), generics)
+        let row = SubjectRow { scope: self.here.scope(), ty: subject, implemented, traited };
+        self.lowered.rows.places.subjects.push(row);
+        let place = self.next_place();
+        self.placed(PlaceRow { subject: Some(subjected), owner: None })
+            .contexted(|context| context.of_impl(block, place))
+            .enclosed(Enclosure::of_impl(block), generics)
     }
 }
