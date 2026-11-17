@@ -3,11 +3,10 @@ mod extension;
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
-use std::fmt;
 use std::path::PathBuf;
 
 use file_ports::{FileFailure, Files};
-use invariants::{Ignore, Ignoring};
+use invariants::{Ignoring, ignored};
 use newtype::Wrapping;
 use port_core::Pass;
 
@@ -15,22 +14,11 @@ use crate::transcripts::{TranscriptsFiller, transcripts_ops};
 use crate::{Cursor, Read, ReadFailure, Session, SessionId};
 use extension::Extension;
 
-#[derive(Clone, Copy, Debug)]
-enum Ignored {
-    NotATranscript,
-}
-
-impl fmt::Display for Ignored {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Ignored::NotATranscript => {
-                formatter.write_str("an entry without a transcript extension and a session id stem is not a session")
-            }
-        }
+ignored! {
+    enum Ignored {
+        NotATranscript => "an entry without a transcript extension and a session id stem is not a session",
     }
 }
-
-impl Ignore for Ignored {}
 
 #[derive(Debug)]
 pub struct ClaudeCodeDir<F: Files> {
