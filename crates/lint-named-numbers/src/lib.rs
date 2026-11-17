@@ -3,7 +3,7 @@ mod boundary;
 use boundary::Numeral;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch, Watchers};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind, Watchers};
 use lint_sweep::{Gathers, Sweep, Watching};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -70,7 +70,7 @@ impl WatchingLint for NamedNumbers {
 
     fn watched(file: &SourceFile) -> Watchers<'_> {
         let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
-        let numbers = counted.map(|found| Numbers { path: AsRef::<Path>::as_ref(found.head()), lines: Vec::new() });
+        let numbers = counted.map(|found| Contributing::new(Numbers { path: AsRef::<Path>::as_ref(found.head()) }));
         numbers.into_iter().fold(Watchers::none(), |watchers, watched| watchers.and(Box::new(watched)))
     }
 
@@ -101,10 +101,14 @@ impl NamedNumbers {
 #[derive(Debug)]
 struct Numbers<'file> {
     path: &'file Path,
-    lines: Vec<LineNumber>,
 }
 
-impl<'ast> Watch<'ast> for Numbers<'_> {
+type Lines = Contributed<(), Vec<LineNumber>>;
+
+impl Contribute for Numbers<'_> {
+    type Open = ();
+    type Part = Vec<LineNumber>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -119,48 +123,45 @@ impl<'ast> Watch<'ast> for Numbers<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        Gate::BOUNDARY.outside(module)
+    fn on_item_mod(&self, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Lines {
+        Contributed::descending(Gate::BOUNDARY.outside(module))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Lines {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
-        Descend::Over
+    fn on_item_const(&self, _: &ItemConst, _: &Facts<'_, ItemConst>) -> Lines {
+        Contributed::descending(Descend::Over)
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
-        Descend::Over
+    fn on_impl_item_const(&self, _: &ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Lines {
+        Contributed::descending(Descend::Over)
     }
 
-    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Descend {
-        Descend::Over
+    fn on_trait_item_const(&self, _: &TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Lines {
+        Contributed::descending(Descend::Over)
     }
 
-    fn on_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) -> Descend {
-        Descend::Over
+    fn on_expr_const(&self, _: &ExprConst, _: &Facts<'_, ExprConst>) -> Lines {
+        Contributed::descending(Descend::Over)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Lines {
+        Contributed::descending(Descend::Expand)
     }
 
-    fn on_lit_int(&mut self, _: &'ast LitInt, facts: &Facts<'_, LitInt>) -> Descend {
-        self.lines.extend(facts.unnamed());
-        Descend::Into
+    fn on_lit_int(&self, _: &LitInt, facts: &Facts<'_, LitInt>) -> Lines {
+        Contributed::parted(facts.unnamed().into_iter().collect())
     }
 
-    fn on_lit_float(&mut self, _: &'ast LitFloat, facts: &Facts<'_, LitFloat>) -> Descend {
-        self.lines.extend(facts.unnamed());
-        Descend::Into
+    fn on_lit_float(&self, _: &LitFloat, facts: &Facts<'_, LitFloat>) -> Lines {
+        Contributed::parted(facts.unnamed().into_iter().collect())
     }
 }
 
-impl<'file> Finds<'file> for Numbers<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.path;
-        self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), NamedNumbers::OUTSIDE_CONSTS)).collect()
+impl<'file> Concludes<'file> for Numbers<'file> {
+    fn violations(self, (): (), lines: Vec<LineNumber>) -> Vec<Violation<'file>> {
+        lines.into_iter().map(|line| Violation::new(Site::new(self.path, line), NamedNumbers::OUTSIDE_CONSTS)).collect()
     }
 }
