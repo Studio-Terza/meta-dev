@@ -5,6 +5,7 @@ mod workspace_types;
 use forwarders::{Forwarded, Forwarders};
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
+use lint_sweep::Folding;
 use workspace_types::{TypeGathering, WorkspaceTypes};
 
 use lint_core::{SourceFile, Violation};
@@ -19,10 +20,10 @@ impl ContextLint for NoForwarders {
     type Part<'head> = WorkspaceTypes;
     type Context<'head> = WorkspaceTypes;
 
-    type Gathering<'head> = TypeGathering;
+    type Gathering<'head> = Folding<TypeGathering>;
 
-    fn gathering(parsed: Parsed<'_, '_>) -> TypeGathering {
-        TypeGathering::from(<&SourceFile>::from(parsed))
+    fn gathering(parsed: Parsed<'_, '_>) -> Folding<TypeGathering> {
+        Folding::from(TypeGathering::from(<&SourceFile>::from(parsed)))
     }
 }
 
