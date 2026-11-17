@@ -59,8 +59,17 @@ enum Scenario {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 enum Summary {
     MissedMutant,
+    Timeout,
     #[serde(other)]
     Other,
+}
+impl Summary {
+    fn unproven(self) -> Option<()> {
+        match self {
+            Summary::MissedMutant | Summary::Timeout => Some(()),
+            Summary::Other => None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -152,7 +161,7 @@ impl Outcomes {
     pub(in super::super) fn missed(self) -> Vec<Mutant> {
         self.outcomes
             .into_iter()
-            .filter(|outcome| outcome.summary == Summary::MissedMutant)
+            .filter(|outcome| outcome.summary.unproven().is_some())
             .filter_map(|outcome| outcome.scenario.mutant())
             .collect()
     }
