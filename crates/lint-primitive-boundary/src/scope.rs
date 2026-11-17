@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use graph::{
-    Call, Function, Held, Holding, Implementation, ItemId, ItemPath, Model, Owner, Placed, Region, Resolved, Seat,
-    Spelling, TypeRef, Within,
+    Call, Function, Held, Holding, Implementation, ItemId, ItemPath, Model, Owner, Placed, Reach, Region, Resolved,
+    Seat, Spelling, TypeRef, Within, Zone,
 };
 use lint_layout::{Name, Whole, Word, words};
 
@@ -119,7 +119,10 @@ impl<'model> Scope<'model> {
     }
 
     fn own(region: Region) -> Option<Region> {
-        [region.ungrounded()].into_iter().find(|own| *own == Region::SHIPPED)
+        Some(region)
+            .filter(|own| own.reach() == Reach::Shipped)
+            .filter(|own| own.zone() == Zone::Open)
+            .filter(|own| own.within() == Within::Own)
     }
 
     fn open(region: Region) -> Option<Within> {
