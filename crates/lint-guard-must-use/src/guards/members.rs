@@ -29,7 +29,7 @@ impl<'file> Members<'file> {
         self.dropped.extend(name);
     }
 
-    pub fn merged(mut self, other: Members<'file>) -> Members<'file> {
+    fn merged(mut self, other: Members<'file>) -> Members<'file> {
         self.declared = other.declared.into_iter().fold(self.declared, |mut declared, (name, sites)| {
             declared.entry(name).or_default().extend(sites);
             declared
@@ -56,5 +56,11 @@ impl<'file> Members<'file> {
             .iter()
             .filter(move |(name, _)| bound.contains(&TypeKey::new(module, name)))
             .flat_map(|(name, sites)| sites.iter().map(move |site| Violation::new(*site, Finding::from(name))))
+    }
+}
+
+impl<'file> FromIterator<Members<'file>> for Members<'file> {
+    fn from_iter<Parts: IntoIterator<Item = Members<'file>>>(parts: Parts) -> Members<'file> {
+        parts.into_iter().fold(Members::default(), Members::merged)
     }
 }

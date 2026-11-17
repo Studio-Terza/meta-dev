@@ -1,3 +1,4 @@
+use std::path::Path;
 mod finding;
 
 use syntax::Span;
@@ -17,7 +18,8 @@ pub struct Exits<'file> {
 
 impl Exits<'_> {
     fn record(&mut self, span: Span, finding: Finding) -> Descend {
-        self.found.push(Violation::new(Site::new(self.file.head().path(), LineNumber::from(span)), finding));
+        self.found
+            .push(Violation::new(Site::new(AsRef::<Path>::as_ref(self.file.head()), LineNumber::from(span)), finding));
         Descend::Into
     }
 }

@@ -69,7 +69,9 @@ impl<'tree> Shelf<'tree> {
             .get(node.located())
             .and_then(Shelved::parsed)
             .into_iter()
-            .flat_map(|parsed| Modules::candidates(node.located().file(), node.children(), &parsed.syntax().items))
+            .flat_map(|parsed| {
+                Modules::candidates(AsRef::<Path>::as_ref(node.located()), node.children(), &parsed.syntax().items)
+            })
             .collect()
     }
 
@@ -79,7 +81,12 @@ impl<'tree> Shelf<'tree> {
             .and_then(Shelved::parsed)
             .into_iter()
             .flat_map(|parsed| {
-                Modules::nested_in(&self.survey, node.located().file(), node.children(), &parsed.syntax().items)
+                Modules::nested_in(
+                    &self.survey,
+                    AsRef::<Path>::as_ref(node.located()),
+                    node.children(),
+                    &parsed.syntax().items,
+                )
             })
             .collect()
     }

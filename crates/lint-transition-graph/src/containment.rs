@@ -103,7 +103,7 @@ impl<'found, 'file> Containment<'found, 'file> {
     }
 
     pub(crate) fn named<'view>(&'view self, name: &'view Name) -> impl Iterator<Item = Member<'found>> + 'view {
-        self.all().filter(move |member| member.name() == name)
+        self.all().filter(move |member| <&Name>::from(*member) == name)
     }
 
     pub(crate) fn users_within(&self, member: Member<'found>) -> Option<Cluster<'found>> {

@@ -78,7 +78,7 @@ impl Implementation {
     }
 
     #[must_use]
-    pub fn written(&self) -> Option<&Implementation> {
+    pub fn hand_written(&self) -> Option<&Implementation> {
         match self.origin {
             Origin::Written => Some(self),
             Origin::Derived => None,

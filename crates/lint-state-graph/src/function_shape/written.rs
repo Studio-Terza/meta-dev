@@ -42,10 +42,6 @@ impl WrittenFn {
         }
     }
 
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-
     pub fn public(&self) -> Option<()> {
         self.public
     }
@@ -71,5 +67,11 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
             vertex_parameters: function.parameters.iter().filter_map(vertex).collect(),
             body: function.body,
         }
+    }
+}
+
+impl AsRef<Name> for WrittenFn {
+    fn as_ref(&self) -> &Name {
+        &self.name
     }
 }

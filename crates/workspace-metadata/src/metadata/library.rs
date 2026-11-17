@@ -23,11 +23,6 @@ impl<'meta> Library<'meta> {
     }
 
     #[must_use]
-    pub fn name(&self) -> &'meta CrateName {
-        self.name
-    }
-
-    #[must_use]
     pub fn root(&self) -> &'meta Path {
         self.root
     }
@@ -40,5 +35,11 @@ impl<'meta> Library<'meta> {
     #[must_use]
     pub fn dependencies(&self) -> &BTreeMap<&'meta CrateName, &'meta CrateName> {
         &self.dependencies
+    }
+}
+
+impl AsRef<CrateName> for Library<'_> {
+    fn as_ref(&self) -> &CrateName {
+        self.name
     }
 }

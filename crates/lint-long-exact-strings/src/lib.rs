@@ -1,3 +1,4 @@
+use std::path::Path;
 mod assertions;
 
 use assertions::Assertions;
@@ -18,7 +19,7 @@ impl SweptLint for LongExactStrings {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        let asserting = file.text().mentioning(&Self::NAMED).map(|_| file.head().path());
+        let asserting = file.text().mentioning(&Self::NAMED).map(|_| AsRef::<Path>::as_ref(file.head()));
         Box::new(Assertions::new(file, asserting))
     }
 }

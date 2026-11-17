@@ -1,3 +1,4 @@
+use lint_core::SourceFile;
 mod vertex;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,7 +29,10 @@ pub struct DeclarationGathering {
 
 impl From<Parsed<'_, '_>> for DeclarationGathering {
     fn from(parsed: Parsed<'_, '_>) -> DeclarationGathering {
-        DeclarationGathering { reading: DeclarationReading::default(), shipped: parsed.file().shipped().map(|_| ()) }
+        DeclarationGathering {
+            reading: DeclarationReading::default(),
+            shipped: <&SourceFile>::from(parsed).shipped().map(|_| ()),
+        }
     }
 }
 

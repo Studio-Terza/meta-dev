@@ -29,8 +29,13 @@ impl<'meta> Unroled<'meta> {
         let port = graph.package(required)?;
         let role = port.port()?.dependents()?;
         let package = graph.package(dependent)?;
-        let breaching = Breaching::new(package.name(), package.keys(port.name()).collect());
-        package.declares(role).map_or(Some(Unroled { breaching, port: port.name(), role }), |_| None)
+        let breaching = Breaching::new(
+            AsRef::<CrateName>::as_ref(package),
+            package.keys(AsRef::<CrateName>::as_ref(port)).collect(),
+        );
+        package
+            .declares(role)
+            .map_or(Some(Unroled { breaching, port: AsRef::<CrateName>::as_ref(port), role }), |_| None)
     }
 }
 

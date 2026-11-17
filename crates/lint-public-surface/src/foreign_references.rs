@@ -101,7 +101,7 @@ impl ForeignReferences {
     }
 
     pub fn unnamed<'export>(&self, crate_name: &CrateName, export: &'export Export) -> Option<&'export Export> {
-        self.crates.get(crate_name).and_then(|reach| reach.unnamed(export.name())).map(|_| export)
+        self.crates.get(crate_name).and_then(|reach| reach.unnamed(AsRef::<Name>::as_ref(export))).map(|_| export)
     }
 
     fn used(&mut self, tree: &UseTree) {

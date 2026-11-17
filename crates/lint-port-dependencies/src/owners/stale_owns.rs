@@ -1,17 +1,12 @@
+use newtype::Newtype;
 use std::fmt;
 
 use lint_core::{Finding, Fix};
 use workspace_metadata::CrateName;
 
-#[derive(Debug)]
+#[derive(Newtype, Debug)]
 pub(super) struct StaleOwns<'file> {
     owned: &'file CrateName,
-}
-
-impl<'file> StaleOwns<'file> {
-    pub(super) fn new(owned: &'file CrateName) -> StaleOwns<'file> {
-        StaleOwns { owned }
-    }
 }
 
 impl fmt::Display for StaleOwns<'_> {

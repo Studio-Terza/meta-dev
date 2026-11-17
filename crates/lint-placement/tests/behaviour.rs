@@ -1,3 +1,4 @@
+use lint_layout::Name;
 use std::path::{Path, PathBuf};
 
 use file_ports::Absent;
@@ -20,7 +21,11 @@ impl Placed {
 
     fn module(pair: &[&str]) -> Option<String> {
         Self::of(pair).map(|placed| {
-            placed.placement.module().segments().iter().map(ToString::to_string).collect::<Vec<String>>().join("::")
+            AsRef::<[Name]>::as_ref(placed.placement.module())
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>()
+                .join("::")
         })
     }
 

@@ -2,25 +2,22 @@ use graph::{
     Bounds, Callable, Element, Grouped, ItemPath, Named, Outline, Projection, Resolved as Target, Sited, TypeRef,
 };
 use lint_layout::{Name, Whole, Word, words};
+use newtype::Newtype;
 
 use super::Scope;
 use super::endpoints::Endpoints;
 use crate::transitions::wrapping::Wrapping;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Newtype, Clone, Copy, Debug)]
 pub(super) struct Peeling<'scope, 'look, 'file> {
     scope: &'scope Scope<'look, 'file>,
 }
 
-impl<'scope, 'look, 'file> Peeling<'scope, 'look, 'file> {
+impl Peeling<'_, '_, '_> {
     const TRANSPARENT: [Word<'static>; 8] = words!["Box", "Rc", "Arc", "Cow", "RefCell", "Cell", "Mutex", "Reverse"];
     const COLLECTIONS: [Word<'static>; 4] = words!["Vec", "VecDeque", "BTreeSet", "HashSet"];
     const OPTION: [Word<'static>; 1] = words!["Option"];
     const RESULT: [Word<'static>; 1] = words!["Result"];
-
-    pub(super) fn new(scope: &'scope Scope<'look, 'file>) -> Peeling<'scope, 'look, 'file> {
-        Peeling { scope }
-    }
 
     fn inside(self, arguments: &[TypeRef]) -> Wrapping {
         arguments.first().map_or(Wrapping::Plain, |inner| inner.outlined(self))

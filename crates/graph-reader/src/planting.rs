@@ -25,11 +25,11 @@ impl From<&SourceFile> for Placing {
     fn from(source: &SourceFile) -> Placing {
         let placement = source.head().placement();
         Placing {
-            path: source.head().path().to_path_buf(),
+            path: AsRef::<Path>::as_ref(source.head()).to_path_buf(),
             crate_file: AsRef::<Path>::as_ref(source.head().crate_file()).to_path_buf(),
             name: Self::library(placement),
             krate: Borrow::<Name>::borrow(placement.package().crate_name()).clone(),
-            module: placement.module().segments().to_vec(),
+            module: AsRef::<[Name]>::as_ref(placement.module()).to_vec(),
             dependencies: placement.package().dependencies().clone(),
             harness: TestFile::tested(source).map_or(Harness::Elsewhere, |_| Harness::TestTarget),
         }

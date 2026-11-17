@@ -2,17 +2,18 @@ use graph::{
     Bounds, Callable, Element, Grouped, ItemPath, Named, Outline, Projection, Resolved as Target, Sited, TypeRef,
 };
 use lint_layout::{Name, Whole, Word, words};
+use newtype::Newtype;
 
 use super::Scope;
 use crate::transitions::endpoint::{Endpoint, Nature, Unnamed};
 use crate::transitions::resolved::Resolved;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Newtype, Clone, Copy, Debug)]
 pub(super) struct Endpoints<'scope, 'look, 'file> {
     scope: &'scope Scope<'look, 'file>,
 }
 
-impl<'scope, 'look, 'file> Endpoints<'scope, 'look, 'file> {
+impl Endpoints<'_, '_, '_> {
     const WRAPPERS: [Word<'static>; 14] = words![
         "Option", "Result", "Vec", "Box", "Rc", "Arc", "Cow", "VecDeque", "BTreeSet", "HashSet", "RefCell", "Cell",
         "Mutex", "Reverse"
@@ -25,10 +26,6 @@ impl<'scope, 'look, 'file> Endpoints<'scope, 'look, 'file> {
     const SIZED: Word<'static> = Word::new("Sized");
     const FN: Word<'static> = Word::new("Fn");
     const STD: Word<'static> = Word::new("std");
-
-    pub(super) fn new(scope: &'scope Scope<'look, 'file>) -> Endpoints<'scope, 'look, 'file> {
-        Endpoints { scope }
-    }
 
     fn std(self, named: &Named<Sited>, path: &ItemPath) -> Resolved {
         let last = path.last().cloned().unwrap_or_default();

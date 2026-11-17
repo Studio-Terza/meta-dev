@@ -72,7 +72,7 @@ impl SweptLint for ManualIteration {
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
         Box::new(Scoped::new(Iterations {
-            path: file.head().path(),
+            path: AsRef::<Path>::as_ref(file.head()),
             violations: Vec::new(),
             opening: Vec::new(),
             held: Vec::new(),

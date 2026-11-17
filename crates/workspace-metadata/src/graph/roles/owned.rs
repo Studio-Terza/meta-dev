@@ -1,3 +1,4 @@
+use crate::crate_name::CrateName;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::graph::DependencyKeys;
@@ -70,12 +71,12 @@ impl<'meta> Owner<'_, 'meta> {
             .difference(&skipped)
             .copied()
             .filter(|required| graph.normal_reach(required, &avoided).contains(self.package))
-            .filter_map(|required| Some(graph.package(required)?.name()))
+            .filter_map(|required| Some(AsRef::<CrateName>::as_ref(graph.package(required)?)))
             .flat_map(|name| package.keys(name))
             .collect();
-        let held = graph.package(self.package)?.name();
+        let held = AsRef::<CrateName>::as_ref(graph.package(self.package)?);
         Some(keys)
             .filter(|found| found.as_ref().first().is_some())
-            .map(|found| Unported::new(Breaching::new(package.name(), found), held, role))
+            .map(|found| Unported::new(Breaching::new(AsRef::<CrateName>::as_ref(package), found), held, role))
     }
 }

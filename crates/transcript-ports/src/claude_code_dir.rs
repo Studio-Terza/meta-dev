@@ -1,3 +1,4 @@
+use std::path::Path;
 mod extension;
 
 use std::collections::BTreeSet;
@@ -50,7 +51,7 @@ impl<F: Files> TranscriptsFiller for ClaudeCodeDir<F> {
         file: &Session,
         cursor: Cursor,
     ) -> Result<Read, ReadFailure> {
-        let bytes = self.files.read_from(file.file(), cursor.into_inner())?;
+        let bytes = self.files.read_from(AsRef::<Path>::as_ref(file), cursor.into_inner())?;
         Read::complete(bytes.as_ref(), cursor)
     }
 }

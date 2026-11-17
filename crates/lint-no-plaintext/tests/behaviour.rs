@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use file_ports::{Bytes, Memory};
@@ -487,8 +488,8 @@ impl Packaged {
     }
 
     fn parsed(manifests: &Memory, source: &Source) -> SourceFile {
-        let shown = Sources::file(source.path(), source.text());
-        let path = source.path().to_path_buf();
+        let shown = Sources::file(AsRef::<Path>::as_ref(source), source.text());
+        let path = AsRef::<Path>::as_ref(source).to_path_buf();
         let placement = Placement::locate(manifests, &path);
         Self::read(SourceFile::parse_at(path.clone(), path, placement, shown.text().clone()))
     }

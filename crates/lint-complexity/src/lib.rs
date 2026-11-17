@@ -13,7 +13,7 @@ impl Lint for Complexity {
             Headline::new(
                 "report only, cyclomatic complexity per function, as a distribution per crate; a branchy function is a candidate for a standard trait, a generic over an existing trait, or a derive",
             ),
-            Crates::grouped(files).violations(),
+            Crates::grouped(files).listed().map(|found| found.violation()).collect(),
         )
     }
 }

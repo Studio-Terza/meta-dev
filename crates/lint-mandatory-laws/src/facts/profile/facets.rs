@@ -43,7 +43,7 @@ impl<'file> Facets<'file> {
         }
     }
 
-    pub(crate) fn merged(mut self, other: Facets<'file>) -> Facets<'file> {
+    fn merged(mut self, other: Facets<'file>) -> Facets<'file> {
         self.facts.extend(other.facts);
         self.exposure = self.exposure.max(other.exposure);
         self

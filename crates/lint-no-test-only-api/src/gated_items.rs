@@ -16,12 +16,6 @@ pub(crate) struct GatedItems<'file> {
     found: Vec<Flagged>,
 }
 
-impl<'file> GatedItems<'file> {
-    pub(crate) fn new(path: &'file Path) -> GatedItems<'file> {
-        GatedItems { path, found: Vec::new() }
-    }
-}
-
 impl<'ast> Watch<'ast> for GatedItems<'_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Item, Kind::ItemMod, Kind::ItemImpl, Kind::Field]
@@ -52,5 +46,11 @@ impl<'file> Finds<'file> for GatedItems<'file> {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
         let path = self.path;
         self.found.into_iter().map(|flagged| flagged.in_file(path)).collect()
+    }
+}
+
+impl<'file> From<&'file Path> for GatedItems<'file> {
+    fn from(path: &'file Path) -> GatedItems<'file> {
+        GatedItems { path, found: Vec::new() }
     }
 }

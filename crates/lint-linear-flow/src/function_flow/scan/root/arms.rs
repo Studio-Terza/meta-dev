@@ -1,3 +1,4 @@
+use newtype::Newtype;
 mod arm_shape;
 mod dispatch;
 
@@ -15,16 +16,12 @@ use crate::function_flow::found::Found;
 use arm_shape::ArmShape;
 use dispatch::Dispatch;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Newtype, Clone, Copy, Debug)]
 pub struct Arms<'file> {
     path: &'file Path,
 }
 
 impl<'file> Arms<'file> {
-    pub fn new(path: &'file Path) -> Arms<'file> {
-        Arms { path }
-    }
-
     pub fn matched(self, routed: &ExprMatch) -> Vec<Found<'file>> {
         routed.arms.iter().flat_map(|arm| self.arm_faults(arm)).collect()
     }

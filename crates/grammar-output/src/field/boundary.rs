@@ -92,6 +92,6 @@ impl Field for Cited {
 
     fn taken(token: Token) -> Result<Cited, Token> {
         let kept = token.clone();
-        token.expected(Kind::Cited).and_then(|text| Cited::read(&text).ok_or(kept))
+        token.expected(Kind::Cited).and_then(|text| text.parse::<Cited>().map_err(|_uncited| kept))
     }
 }

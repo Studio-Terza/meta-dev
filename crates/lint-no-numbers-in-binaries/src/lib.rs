@@ -28,7 +28,7 @@ impl SweptLint for NoNumbersInBinaries {
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
         let kinds = file.head().binary().map_or(&[][..], |_| &[Kind::ItemMod, Kind::LitInt, Kind::LitFloat][..]);
-        Box::new(Numbers { path: file.head().path(), kinds, lines: Vec::new() })
+        Box::new(Numbers { path: AsRef::<Path>::as_ref(file.head()), kinds, lines: Vec::new() })
     }
 }
 

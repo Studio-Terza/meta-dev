@@ -73,7 +73,7 @@ impl<'ast> Watch<'ast> for Ungenerated<'_> {
 
 impl<'file> From<&'file SourceFile> for Ungenerated<'file> {
     fn from(file: &'file SourceFile) -> Ungenerated<'file> {
-        Ungenerated { path: file.head().path(), open: Vec::new(), found: Vec::new() }
+        Ungenerated { path: AsRef::<Path>::as_ref(file.head()), open: Vec::new(), found: Vec::new() }
     }
 }
 

@@ -1,3 +1,4 @@
+use std::path::Path;
 mod finding;
 
 use lint_core::Headline;
@@ -38,7 +39,7 @@ impl PrivateFns {
             .filter(|(_, names)| Self::PER_TYPE.allows(Length::new(names.len())).is_none())
             .map(|(type_name, names)| {
                 Violation::new(
-                    Site::of_file(file.head().path()),
+                    Site::of_file(AsRef::<Path>::as_ref(file.head())),
                     Finding::TooManyPrivateFns { type_name, names, most: Self::PER_TYPE },
                 )
             })

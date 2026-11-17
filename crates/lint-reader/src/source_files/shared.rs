@@ -1,3 +1,4 @@
+use std::path::Path;
 mod assembly;
 mod boundary;
 mod declared;
@@ -83,7 +84,7 @@ impl<'tree> SharedRead<'tree> {
         held.extend(heads);
         let complete = expected.met(&held).map(|_| mem::take(&mut *held));
         let sorted = complete.map(|mut table| {
-            table.sort_by(|earlier, later| earlier.path().cmp(later.path()));
+            table.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier).cmp(AsRef::<Path>::as_ref(later)));
             table
         });
         sorted.map(|table| self.table.get_or_init(|| table));
@@ -116,7 +117,8 @@ impl<'tree, Port: Files> Explorer<'_, 'tree, Port> {
 
     fn kept(mut self, queued: &Queued<'tree>, file: SourceFile) -> Self {
         let node = queued.node();
-        let candidates = Modules::candidates(node.located().file(), node.children(), &file.syntax().items);
+        let candidates =
+            Modules::candidates(AsRef::<Path>::as_ref(node.located()), node.children(), &file.syntax().items);
         let mut state = self.shared.locked();
         let declared = Declared::read(state.learned(self.files, &candidates), node, &file.syntax().items);
         state.settled(queued, Ok(declared), self.share);

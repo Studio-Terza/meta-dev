@@ -1,3 +1,4 @@
+use lint_core::SourceFile;
 mod owners;
 mod ports;
 mod reserved_names;
@@ -61,7 +62,7 @@ impl WorkspaceLint for KeyDependencyRoles {
     type Facts<'head> = RoleFacts<'head>;
 
     fn gathered<'head>(parsed: &[Parsed<'_, 'head>]) -> RoleFacts<'head> {
-        parsed.iter().map(|found| Sweep::gathered(found.file(), RoleReading::gleaner(*found))).collect()
+        parsed.iter().map(|found| Sweep::gathered(<&SourceFile>::from(*found), RoleReading::gleaner(*found))).collect()
     }
 
     fn report<'file, 'head: 'file>(

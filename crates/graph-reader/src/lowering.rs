@@ -25,8 +25,8 @@ use syntax::{
 };
 
 use graph::{
-    Alias, Assigned, Building, Entry, Exposure, FileId, Function, Held, Implementation, Model, Mutation, Named, Origin,
-    Output, Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Held, Implementation, Model, Mutation,
+    Named, Origin, Output, Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
@@ -145,6 +145,7 @@ struct FnRow {
     located: Located,
     name: Name,
     exposure: Exposure,
+    evaluation: Evaluation,
     owner: Owner,
     entry: Entry,
     inputs: Vec<LoweredInput>,
@@ -181,6 +182,7 @@ impl Built for FnRow {
             .generic(parameters, self.mutation);
         let function = Function::new(self.name, self.owner, self.entry, signature)
             .exposed(self.exposure)
+            .evaluated(self.evaluation)
             .seated(footing.places().seat(self.region.joined(footing.outer()), self.place))
             .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, building, function)
@@ -331,7 +333,7 @@ struct FileShape {
 
 impl From<&SourceFile> for FileShape {
     fn from(source: &SourceFile) -> FileShape {
-        let path = source.head().path();
+        let path = AsRef::<Path>::as_ref(source.head());
         let parent = path.parent().unwrap_or_else(|| Path::new(""));
         let rooted = Some(path).filter(|candidate| *candidate == AsRef::<Path>::as_ref(source.head().crate_file()));
         let enclosure = rooted
@@ -540,6 +542,7 @@ impl Lowering<'_> {
         self.lowered.rows.functions.push(FnRow {
             located: self.here.located(Position::from(signature.ident.span())),
             exposure: Exposing::declared_by(visibility),
+            evaluation: signature.constness.map_or(Evaluation::Runtime, |_| Evaluation::Constant),
             owner: self.enclosure.owner(),
             entry: self.enclosure.entry(attributes, &name),
             inputs: generics.inputs(signature),

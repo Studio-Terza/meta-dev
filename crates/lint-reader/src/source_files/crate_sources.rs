@@ -44,7 +44,7 @@ impl CrateSources {
                 let found = text.map_err(|source| Unlocated::Root { root: root.to_path_buf(), source })?;
                 let source =
                     CrateSource::new(SourceText::new(found.into_inner()), Self::form(library.form()), dependencies);
-                Ok((Self::package(library.name()), source))
+                Ok((Self::package(AsRef::<CrateName>::as_ref(library)), source))
             })
             .collect()
     }

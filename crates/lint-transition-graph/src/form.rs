@@ -119,7 +119,7 @@ impl<'found> Form<'found> {
     }
 
     #[must_use]
-    pub fn written(&self) -> Option<&Form<'found>> {
+    pub fn hand_written(&self) -> Option<&Form<'found>> {
         self.sorted(Some(self), None, None)
     }
 

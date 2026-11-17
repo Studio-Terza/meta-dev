@@ -23,12 +23,13 @@ impl Session {
     }
 
     #[must_use]
-    pub fn file(&self) -> &Path {
-        &self.file
-    }
-
-    #[must_use]
     pub fn unread(&self, cursor: Cursor) -> Option<Cursor> {
         (self.size.into_inner() > cursor.into_inner().position()).then_some(cursor)
+    }
+}
+
+impl AsRef<Path> for Session {
+    fn as_ref(&self) -> &Path {
+        &self.file
     }
 }

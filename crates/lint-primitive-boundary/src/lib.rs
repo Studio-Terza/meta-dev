@@ -19,7 +19,7 @@ pub struct PrimitiveBoundary;
 impl ModelLint for PrimitiveBoundary {
     fn report(model: &Model) -> Report<'_> {
         let lexicon = Lexicon::new();
-        let scope = Scope::read(model);
+        let scope = Scope::from(model);
         let mut found: Vec<Violation<'_>> =
             Signatures::new(&lexicon, &scope).found(model).into_iter().chain(Texts::new(&scope).found(model)).collect();
         found.sort_by(|left, right| left.site().path().cmp(right.site().path()));

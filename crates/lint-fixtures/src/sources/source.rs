@@ -20,12 +20,13 @@ impl Source {
     }
 
     #[must_use]
-    pub fn path(&self) -> &'static Path {
-        Path::new(self.path.into_inner())
-    }
-
-    #[must_use]
     pub const fn text(&self) -> Text<'static> {
         self.text
+    }
+}
+
+impl AsRef<Path> for Source {
+    fn as_ref(&self) -> &Path {
+        Path::new(self.path.into_inner())
     }
 }

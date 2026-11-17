@@ -44,15 +44,20 @@ impl Metadata {
     pub fn directories(&self) -> BTreeMap<&CrateName, &Path> {
         self.packages
             .iter()
-            .filter_map(|package| Some((package.name(), package.directory_under(&self.workspace_root)?)))
+            .filter_map(|package| {
+                Some((AsRef::<CrateName>::as_ref(package), package.directory_under(&self.workspace_root)?))
+            })
             .collect()
     }
 
     #[must_use]
     pub fn libraries(&self) -> Vec<Library<'_>> {
         let members: BTreeSet<&PackageId> = self.workspace_members.iter().collect();
-        let named: BTreeMap<&PackageId, &CrateName> =
-            self.packages.iter().filter_map(|package| Some((package.package_id()?, package.name()))).collect();
+        let named: BTreeMap<&PackageId, &CrateName> = self
+            .packages
+            .iter()
+            .filter_map(|package| Some((package.package_id()?, AsRef::<CrateName>::as_ref(package))))
+            .collect();
         let nodes: BTreeMap<&PackageId, &Node> = self.nodes().iter().map(|node| (node.package_id(), node)).collect();
         let direct: BTreeSet<&PackageId> = members
             .iter()
@@ -75,7 +80,7 @@ impl Metadata {
                     .filter_map(|dependency| Some((dependency.krate(), *named.get(dependency.package_id())?)))
                     .collect();
                 let library = package.library()?;
-                Some(Library::new(package.name(), library.root(), library.form()?, dependencies))
+                Some(Library::new(AsRef::<CrateName>::as_ref(package), library.root(), library.form()?, dependencies))
             })
             .collect()
     }
@@ -85,7 +90,9 @@ impl Metadata {
         Readers::new(
             self.packages
                 .iter()
-                .filter_map(|package| package.readings().first().map(|_| (package.name(), package.readings())))
+                .filter_map(|package| {
+                    package.readings().first().map(|_| (AsRef::<CrateName>::as_ref(package), package.readings()))
+                })
                 .collect(),
         )
     }
@@ -97,7 +104,11 @@ impl Metadata {
     ) -> BTreeMap<&'meta CrateName, BTreeSet<&'meta CrateName>> {
         self.packages
             .iter()
-            .flat_map(|package| package.dependencies_among(members).map(move |dependency| (dependency, package.name())))
+            .flat_map(|package| {
+                package
+                    .dependencies_among(members)
+                    .map(move |dependency| (dependency, AsRef::<CrateName>::as_ref(package)))
+            })
             .fold(BTreeMap::new(), |mut dependents, (dependency, name)| {
                 dependents.entry(dependency).or_insert_with(BTreeSet::new).insert(name);
                 dependents
@@ -112,7 +123,7 @@ impl Metadata {
             .iter()
             .filter(|package| package.package_id().and_then(|id| members.get(id)).is_some())
             .filter_map(|package| package.test_support(&shipped))
-            .map(Package::name)
+            .map(AsRef::<CrateName>::as_ref)
             .collect()
     }
 

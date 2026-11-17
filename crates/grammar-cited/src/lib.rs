@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::Cited;
+pub use boundary::{Cited, Uncited};

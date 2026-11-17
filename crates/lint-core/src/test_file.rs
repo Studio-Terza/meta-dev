@@ -17,9 +17,10 @@ impl<'file> TestFile<'file> {
             placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
         })
     }
+}
 
-    #[must_use]
-    pub fn file(self) -> &'file SourceFile {
-        self.0
+impl<'file> From<TestFile<'file>> for &'file SourceFile {
+    fn from(test: TestFile<'file>) -> &'file SourceFile {
+        test.0
     }
 }

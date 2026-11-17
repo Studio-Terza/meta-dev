@@ -1,3 +1,4 @@
+use std::path::Path;
 mod declarations;
 mod declared_graphs;
 mod edge;
@@ -15,7 +16,7 @@ use declared_graphs::DeclaredGraphs;
 use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges, Written};
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Parsed, SourceFile, Violation};
-use lint_file::{Concluded, FileFacts, PrimedFacts, PrimedLint, Reads};
+use lint_file::{Concluded, PrimedFacts, PrimedLint, Reads};
 use lint_sweep::{Gathers, Watching};
 
 pub use foreign_matches::ForeignMatches;
@@ -46,16 +47,12 @@ impl PrimedFacts for StateGraph {
         DeclarationGathering::from(parsed)
     }
 
-    fn primer_completed(part: Option<Declarations>, _: &FileFacts<'_>) -> Option<Declarations> {
-        part
-    }
-
     fn recording<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> StateRecording<'run, 'head> {
-        let path = parsed.head().path();
-        let watchers = parsed.file().shipped().map(|_| StateWatchers {
+        let path = AsRef::<Path>::as_ref(parsed.head());
+        let watchers = <&SourceFile>::from(parsed).shipped().map(|_| StateWatchers {
             edges: EdgeScan::from(path),
-            fields: FieldVisibility::new(path),
-            graphs: DeclaredGraphs::new(parsed.file(), path),
+            fields: FieldVisibility::from(path),
+            graphs: DeclaredGraphs::new(<&SourceFile>::from(parsed), path),
         });
         StateRecording { watchers }
     }

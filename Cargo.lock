@@ -773,6 +773,7 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
+ "thiserror",
 ]
 
 [[package]]
@@ -825,6 +826,8 @@ name = "grammar-cited"
 version = "0.1.0"
 dependencies = [
  "grammar",
+ "laws",
+ "thiserror",
 ]
 
 [[package]]
@@ -874,6 +877,7 @@ version = "0.1.0"
 dependencies = [
  "grammar",
  "laws",
+ "thiserror",
 ]
 
 [[package]]
@@ -1852,6 +1856,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-sweep",
+ "newtype",
  "syntax",
  "syntax-lexer",
  "text-lines",
@@ -1954,13 +1959,11 @@ dependencies = [
 name = "lint-repeated-methods"
 version = "0.1.0"
 dependencies = [
+ "graph",
  "lint-core",
  "lint-file",
  "lint-fixtures",
  "lint-layout",
- "lint-sweep",
- "newtype",
- "syntax",
 ]
 
 [[package]]
@@ -3182,6 +3185,7 @@ version = "0.1.0"
 dependencies = [
  "grammar-banner",
  "laws",
+ "newtype",
  "serde",
  "text-lines",
 ]
