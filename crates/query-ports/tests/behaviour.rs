@@ -3,7 +3,9 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
+use std::process::ExitCode;
 
+use console_ports::{Complaint, Shown};
 use golden::golden;
 use query_cache::{Origin, Table};
 use query_ports::QueryCache;
@@ -73,15 +75,23 @@ impl Workspace {
 fn every_store_query_in_the_crates_gets_an_entry_and_entries_no_query_uses_are_removed() -> Result<(), Box<dyn Error>> {
     let workspace = Workspace::laid()?;
     let arguments = vec![OsString::from(workspace.path()), OsString::from(workspace.path().join("migrations"))];
-    let changes = QueryCache::try_from(arguments)?.prepared()?;
+    let answer = QueryCache::answered(arguments);
+    assert_eq!(answer.code(), ExitCode::SUCCESS);
     let kept = Workspace::named(KEPT);
     assert_eq!(workspace.cached()?, BTreeSet::from([kept.clone()]));
     let entry = fs::read_to_string(workspace.path().join(".sqlx").join(&kept))?;
     assert!(entry.contains(r#""query": "SELECT 1 AS one""#));
     assert!(entry.contains(r#""name": "one""#));
-    let printed = changes.to_string();
-    golden!("prepared.txt", &printed);
+    golden!("prepared.txt", AsRef::<str>::as_ref(AsRef::<Shown>::as_ref(&answer)));
     Ok(())
+}
+
+#[test]
+fn a_run_given_the_wrong_arguments_exits_with_failure_and_prints_its_usage_to_standard_error() {
+    let answer = QueryCache::answered(vec![OsString::from("only-a-root")]);
+    assert_eq!(answer.code(), ExitCode::FAILURE);
+    assert_eq!(AsRef::<str>::as_ref(AsRef::<Shown>::as_ref(&answer)), "");
+    golden!("usage.txt", AsRef::<str>::as_ref(AsRef::<Complaint>::as_ref(&answer)));
 }
 
 #[test]
