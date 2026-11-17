@@ -5,7 +5,7 @@ use lint_layout::Name;
 
 use super::Descend;
 use super::facts::Facts;
-use crate::contribution::{Contributed, Contributing, Contribution};
+use crate::contribution::{Contributed, Contributing, Contribution, Scope};
 
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ident;)*) => {
@@ -103,7 +103,7 @@ macro_rules! hooks {
 
             fn kinds(&self) -> &[Kind];
 
-            fn scopes(&self) -> &[Kind] {
+            fn scopes(&self) -> &[Scope] {
                 &[]
             }
 

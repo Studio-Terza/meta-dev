@@ -47,7 +47,7 @@ impl WatchingLint for PublicApiTests {
 
     fn watched(file: &SourceFile) -> Watched<'_> {
         file.shipped().map_or_else(
-            || Watched::Beside(PathReach::beside(file)),
+            || Watched::Beside(Contributing::new(PathReach::beside(file))),
             |_| Watched::Shipped(Contributing::new(TestCode::from(file))),
         )
     }
@@ -64,7 +64,7 @@ impl WatchingLint for PublicApiTests {
 #[derive(Debug)]
 pub enum Watched<'file> {
     Shipped(Contributing<TestCode<'file>>),
-    Beside(PathReach<'file>),
+    Beside(Contributing<PathReach<'file>>),
 }
 
 impl<'file> Gathers<Tested<'file>> for Watched<'file> {
@@ -78,7 +78,7 @@ impl<'file> Gathers<Tested<'file>> for Watched<'file> {
     fn gathered(self) -> Tested<'file> {
         match self {
             Watched::Shipped(contributing) => contributing.concluded(|code, (), in_source| code.tested(in_source)),
-            Watched::Beside(reach) => reach.tested(),
+            Watched::Beside(contributing) => contributing.concluded(|reach, (), reached| reach.tested(reached)),
         }
     }
 }

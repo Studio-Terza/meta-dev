@@ -61,7 +61,7 @@ impl Prior {
     }
 
     fn listing(mutants: &[&str]) -> String {
-        ["[", &mutants.join(", "), "]"].concat()
+        mutants.first().map_or_else(String::new, |_| ["[", &mutants.join(", "), "]"].concat())
     }
 
     fn planned(&self) -> Result<Planned, Box<dyn Error>> {

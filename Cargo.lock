@@ -1348,6 +1348,7 @@ dependencies = [
 name = "lint-arbitrary-newtypes"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
@@ -1536,6 +1537,7 @@ dependencies = [
 name = "lint-guard-must-use"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
@@ -1601,6 +1603,7 @@ dependencies = [
 name = "lint-long-exact-strings"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",
@@ -1750,6 +1753,7 @@ dependencies = [
 name = "lint-no-ignored-tests"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",

@@ -6,7 +6,7 @@ use syntax::{ItemFn, ItemMod, Macro, PathSegment};
 use lint_core::Walk;
 use lint_core::{Macros, SourceFile};
 use lint_layout::TestMarks;
-use lint_sweep::{Contribute, Contributed, Contribution, Descend, Facts, Kind};
+use lint_sweep::{Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
 use newtype::Counter;
 
 use super::count::Count;
@@ -77,8 +77,8 @@ impl Contribute for TestScan<'_> {
         &[Kind::ItemFn, Kind::Macro]
     }
 
-    fn scopes(&self) -> &'static [Kind] {
-        &[Kind::ItemMod]
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Kind::ItemMod)] }
     }
 
     fn on_item_fn(&self, _: &ItemFn, facts: &Facts<'_, ItemFn>) -> Contributed<(), Tally> {

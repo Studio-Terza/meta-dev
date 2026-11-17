@@ -101,7 +101,10 @@ impl Mutant {
     }
 
     pub(in super::super) fn listed(text: &Text) -> Result<Vec<Mutant>, serde_json::Error> {
-        serde_json::from_str(text.as_ref())
+        serde_json::Deserializer::from_str(text.as_ref())
+            .into_iter::<Vec<Mutant>>()
+            .next()
+            .unwrap_or_else(|| Ok(Vec::new()))
     }
 
     fn place(&self, line: u32) -> Place {

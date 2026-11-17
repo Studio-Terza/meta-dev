@@ -2,6 +2,7 @@ mod finding;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use algebra::{Monoid, Semigroup};
 use lint_core::Module;
 use lint_core::{Site, Violation};
 use lint_layout::Name;
@@ -17,26 +18,16 @@ pub struct Members<'file> {
 }
 
 impl<'file> Members<'file> {
-    pub fn declare(&mut self, name: Name, unmarked: Option<Site<'file>>) {
-        self.declared.entry(name).or_default().extend(unmarked);
+    pub fn declaring(name: Name, unmarked: Option<Site<'file>>) -> Members<'file> {
+        Members { declared: BTreeMap::from([(name, unmarked.into_iter().collect())]), ..Members::default() }
     }
 
-    pub fn alias(&mut self, name: Name, target: Option<Name>) {
-        self.aliases.extend(target.map(|aliased| (name, aliased)));
+    pub fn aliasing(name: Name, target: Option<Name>) -> Members<'file> {
+        Members { aliases: target.map(|aliased| (name, aliased)).into_iter().collect(), ..Members::default() }
     }
 
-    pub fn drop_implemented(&mut self, name: Option<Name>) {
-        self.dropped.extend(name);
-    }
-
-    fn merged(mut self, other: Members<'file>) -> Members<'file> {
-        self.declared = other.declared.into_iter().fold(self.declared, |mut declared, (name, sites)| {
-            declared.entry(name).or_default().extend(sites);
-            declared
-        });
-        self.aliases.extend(other.aliases);
-        self.dropped.extend(other.dropped);
-        self
+    pub fn dropping(name: Option<Name>) -> Members<'file> {
+        Members { dropped: name.into_iter().collect(), ..Members::default() }
     }
 
     pub fn declares(&self, name: &Name) -> Option<&Members<'file>> {
@@ -59,8 +50,16 @@ impl<'file> Members<'file> {
     }
 }
 
-impl<'file> FromIterator<Members<'file>> for Members<'file> {
-    fn from_iter<Parts: IntoIterator<Item = Members<'file>>>(parts: Parts) -> Members<'file> {
-        parts.into_iter().fold(Members::default(), Members::merged)
+impl Semigroup for Members<'_> {
+    fn combine(self, other: Self) -> Self {
+        let declared = other.declared.into_iter().fold(self.declared, |mut declared, (name, sites)| {
+            declared.entry(name).or_default().extend(sites);
+            declared
+        });
+        let mut aliases = self.aliases;
+        aliases.extend(other.aliases);
+        Members { declared, aliases, dropped: self.dropped.combine(other.dropped) }
     }
 }
+
+impl Monoid for Members<'_> {}
