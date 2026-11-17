@@ -52,7 +52,7 @@ jobs:
   mutants-sweep:
     needs: mutants-sweep-plan
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
