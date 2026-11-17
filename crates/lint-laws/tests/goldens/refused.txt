@@ -1,0 +1,2 @@
+laws are labels: the law macros lint laws emits appear only in the files it generates, so the graph owns every such law:
+crates/x/tests/behaviour.rs:1: a law the law runner generates, written by hand; label the type instead (derive Arbitrary, implement Monoid) and run lint laws to regenerate

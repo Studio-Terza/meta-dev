@@ -20,5 +20,8 @@ store-ports = { path = "../store-ports" }
 thiserror.workspace = true
 message-id = { path = "../message-id" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

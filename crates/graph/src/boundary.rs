@@ -1,6 +1,7 @@
 use std::fmt;
 
 use lint_layout::Name;
+use newtype::Arbitrary;
 
 use crate::item_path::ItemPath;
 use crate::type_ref::TypeRef;
@@ -18,7 +19,8 @@ impl FileId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[newtype(from = ItemId)]
 pub struct ItemId(usize);
 
 impl ItemId {

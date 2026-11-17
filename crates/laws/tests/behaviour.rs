@@ -160,3 +160,24 @@ table!(
         Sample::text(&bytes)?;
     }
 );
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Larger(u8);
+
+impl algebra::Semigroup for Larger {
+    fn combine(self, other: Larger) -> Larger {
+        Larger(self.0.max(other.0))
+    }
+}
+
+impl algebra::Monoid for Larger {
+    fn identity() -> Larger {
+        Larger(u8::MIN)
+    }
+}
+
+laws::monoid!(
+    the_larger_of_two_bytes_forms_a_monoid,
+    Larger,
+    proptest::strategy::Strategy::prop_map(any::<u8>(), Larger)
+);

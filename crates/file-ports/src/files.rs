@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Kind, Offset, Size, Text};
+use crate::{Bytes, FileFailure, Kind, Offset, Size, Text, Written};
 
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;
@@ -13,6 +13,14 @@ pub trait Files {
     }
 
     fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure>;
+
+    fn write_each(&self, written: Vec<Written>) -> Result<(), FileFailure> {
+        written.into_iter().try_for_each(|file| {
+            file.path().parent().map_or(Ok(()), |directory| self.create_directories(directory))?;
+            let path = file.path().to_path_buf();
+            self.write(&path, file.into_bytes())
+        })
+    }
 
     fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure>;
 

@@ -9,8 +9,5 @@ publish.workspace = true
 test = false
 doctest = false
 
-[dev-dependencies]
-laws = { path = "../laws" }
-
 [lints]
 workspace = true

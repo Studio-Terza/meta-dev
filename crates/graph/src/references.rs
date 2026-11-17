@@ -2,6 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use algebra::{Monoid, Semigroup};
+use newtype::Arbitrary;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::strategy::Strategy;
 
 use crate::boundary::ItemId;
 use crate::function::Function;
@@ -93,7 +96,8 @@ impl From<&PathUse> for Owned {
     }
 }
 
-#[derive(Debug)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = References::sampled)]
 pub struct References {
     targets: BTreeMap<ItemId, BTreeSet<ItemId>>,
     roots: BTreeMap<ItemId, PathBuf>,
@@ -108,6 +112,12 @@ impl References {
     #[must_use]
     pub fn root(&self, item: ItemId) -> Option<&Path> {
         self.roots.get(&item).map(PathBuf::as_path)
+    }
+
+    fn sampled() -> impl Strategy<Value = References> {
+        Strategy::prop_map(any::<(BTreeMap<ItemId, BTreeSet<ItemId>>, BTreeMap<ItemId, String>)>(), |(targets, roots)| {
+            References { targets, roots: roots.into_iter().map(|(item, root)| (item, PathBuf::from(root))).collect() }
+        })
     }
 }
 

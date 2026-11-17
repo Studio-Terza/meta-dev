@@ -31,6 +31,18 @@ pub(crate) enum Visibility {
     Restricted,
 }
 
+impl Visibility {
+    const MACRO_EXPORT: [Word<'static>; 1] = words!["macro_export"];
+
+    fn exported_by(attributes: &[Attribute]) -> Visibility {
+        attributes
+            .iter()
+            .filter_map(|attribute| attribute.path().get_ident().map(Name::from))
+            .find_map(|ident| ident.matches::<Whole>(&Self::MACRO_EXPORT).map(|_| Visibility::Visible))
+            .unwrap_or(Visibility::Private)
+    }
+}
+
 impl From<&syntax::Visibility> for Visibility {
     fn from(visibility: &syntax::Visibility) -> Visibility {
         match visibility {
@@ -126,11 +138,52 @@ impl DeclaredKind {
         }
     }
 
+    fn module(self) -> Option<ScopeId> {
+        match self {
+            DeclaredKind::Module(module) => Some(module),
+            DeclaredKind::OpaqueModule | DeclaredKind::Item(_) => None,
+        }
+    }
+
     fn item_kind(self) -> Option<ItemKind> {
         match self {
             DeclaredKind::Item(kind) => Some(kind),
             DeclaredKind::Module(_) | DeclaredKind::OpaqueModule => None,
         }
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct Below {
+    scope: ScopeId,
+    modules: Vec<Name>,
+}
+
+impl Below {
+    pub(super) fn root(scope: ScopeId, krate: &Name) -> Below {
+        Below { scope, modules: vec![krate.clone()] }
+    }
+
+    pub(super) fn scope(&self) -> ScopeId {
+        self.scope
+    }
+
+    pub(super) fn modules(&self) -> &[Name] {
+        &self.modules
+    }
+
+    pub(super) fn deeper(&self, entries: &Entries) -> Vec<Below> {
+        entries
+            .declared
+            .iter()
+            .filter(|declared| declared.visibility == Visibility::Visible)
+            .filter_map(|declared| {
+                Some(Below {
+                    scope: declared.kind.module()?,
+                    modules: self.modules.iter().chain([&declared.name]).cloned().collect(),
+                })
+            })
+            .collect()
     }
 }
 
@@ -436,8 +489,9 @@ impl From<&Item> for Entries {
             Item::Use(used) => Entries::from(used),
             Item::ExternCrate(declared) => Entries::from(declared),
             Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
-            Item::Macro(ItemMacro { ident: Some(ident), .. }) => Entries::from(Declared {
+            Item::Macro(ItemMacro { ident: Some(ident), attrs, .. }) => Entries::from(Declared {
                 domain: Domain::Macros,
+                visibility: Visibility::exported_by(attrs),
                 ..Declared::named_item(ident, &syntax::Visibility::Inherited, ItemKind::Macro)
             }),
             Item::Struct(declared) => {

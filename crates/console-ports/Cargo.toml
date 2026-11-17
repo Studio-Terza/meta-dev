@@ -12,5 +12,8 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

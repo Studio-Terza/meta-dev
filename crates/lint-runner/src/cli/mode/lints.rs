@@ -36,6 +36,7 @@ use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
+use lint_laws::HandWrittenLaws;
 use lint_linear_flow::{LinearBodies, PlainConditions, PureRouters};
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
@@ -149,7 +150,7 @@ type Workspaced =
 type Extracting = for<'model> fn(&'model Model) -> Vec<Report<'model>>;
 
 impl Lints {
-    const LINTS: [Entry; 59] = [
+    const LINTS: [Entry; 60] = [
         <Filed<NoComments> as Registered>::ENTRY,
         <Swept<NoFreeFns> as Registered>::ENTRY,
         <Filed<ThinMain> as Registered>::ENTRY,
@@ -172,6 +173,7 @@ impl Lints {
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
         Entry::spelled::<UnnamedPanics>(Work::Modelled(<UnnamedPanics as ModelLint>::report)),
+        Entry::spelled::<HandWrittenLaws>(Work::Modelled(<HandWrittenLaws as ModelLint>::report)),
         <Ruled<PublicSurface> as Registered>::ENTRY,
         Entry::spelled::<RepeatedMethods>(Work::Modelled(<RepeatedMethods as ModelLint>::report)),
         <Primed<StateGraph> as Registered>::ENTRY,
