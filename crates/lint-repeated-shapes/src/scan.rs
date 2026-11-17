@@ -1,5 +1,4 @@
 use lint_core::SourceFile;
-use std::mem;
 
 use syntax::{
     Attribute, Block, Expr, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Span, Spanned, TraitItemFn,
@@ -11,7 +10,7 @@ use std::path::Path;
 
 use lint_core::{Bound, Parsed, Site, Walk};
 use lint_layout::{LineNumber, TestMarks};
-use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Folding, Gathers, Kind as Node, Sweep, Visit, Watching};
 
 use crate::Occurrences;
 use crate::extent::Extent;
@@ -22,10 +21,21 @@ use crate::occurrence::Occurrence;
 pub struct Scan<'file> {
     path: &'file Path,
     kind: Kind,
-    outer: Vec<Kind>,
     shaper: Shaper,
-    occurrences: Vec<Occurrence<'file>>,
+}
+
+#[derive(Debug)]
+pub struct Scanning<'file> {
+    path: &'file Path,
+    folding: Folding<Scan<'file>>,
     tested: Vec<Occurrence<'file>>,
+}
+
+#[derive(Debug, Default)]
+pub struct Scanned<'file> {
+    kind: Option<Kind>,
+    outer: Vec<Kind>,
+    occurrences: Vec<Occurrence<'file>>,
 }
 
 impl<'file> Scan<'file> {
@@ -35,56 +45,66 @@ impl<'file> Scan<'file> {
         Sweep::gathered(<&SourceFile>::from(parsed), Self::scanning(parsed, equivalence)).found
     }
 
-    pub(crate) fn scanning(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Scan<'file> {
+    pub(crate) fn scanning(parsed: Parsed<'_, 'file>, equivalence: Equivalence) -> Scanning<'file> {
         let tests = parsed.test_modules().into_iter().flat_map(|module| {
-            Sweep::gathered(<&SourceFile>::from(module), Self::new(module, Kind::Tests, Vec::new(), equivalence)).found
+            Sweep::gathered(<&SourceFile>::from(module), Self::begun(module, Kind::Tests, Vec::new(), equivalence))
+                .found
         });
-        Self::new(parsed, Kind::of_role(parsed.head().placement().role()), tests.collect(), equivalence)
+        Self::begun(parsed, Kind::of_role(parsed.head().placement().role()), tests.collect(), equivalence)
     }
 
-    fn new(
+    fn begun(
         parsed: Parsed<'_, 'file>,
         kind: Kind,
         tested: Vec<Occurrence<'file>>,
         equivalence: Equivalence,
-    ) -> Scan<'file> {
+    ) -> Scanning<'file> {
         let shaper = Shaper::reading(<&SourceFile>::from(parsed).tokens(), equivalence);
-        Scan {
-            path: AsRef::<Path>::as_ref(parsed.head()),
-            kind,
-            outer: Vec::new(),
-            shaper,
-            occurrences: Vec::new(),
-            tested,
-        }
+        let path = AsRef::<Path>::as_ref(parsed.head());
+        Scanning { path, folding: Folding::from(Scan { path, kind, shaper }), tested }
     }
 
-    fn considered(&mut self, edges: Edges) -> Option<Bound> {
+    fn kind(&self, found: &Scanned<'file>) -> Kind {
+        found.kind.unwrap_or(self.kind)
+    }
+
+    fn considered(&self, found: Scanned<'file>, edges: Edges) -> Visit<Scanned<'file>> {
         let extent = Extent::spanning(edges.first, edges.last);
         let bounds = Bounds::from(extent);
         let large = Self::FLOOR.allows(self.shaper.sized(bounds)).map(|_| Self::FLOOR);
         let site = Site::new(self.path, LineNumber::from(edges.first));
-        let occurrence = large.map(|_| Occurrence::new(self.shaper.erasure().read(bounds), site, extent, self.kind));
-        self.occurrences.extend(occurrence);
-        large
+        let kind = self.kind(&found);
+        let occurrence = large.map(|_| Occurrence::new(self.shaper.erasure().read(bounds), site, extent, kind));
+        let descend = large.map_or(Descend::Over, |_| Descend::Into);
+        Visit::new(Scanned { occurrences: found.occurrences.into_iter().chain(occurrence).collect(), ..found }, descend)
     }
 
-    fn within(&mut self, attributes: &[Attribute]) -> Descend {
-        let inner = Some(self.kind)
+    fn within(&self, found: Scanned<'file>, attributes: &[Attribute]) -> Visit<Scanned<'file>> {
+        let current = self.kind(&found);
+        let inner = Some(current)
             .filter(|kind| *kind == Kind::Shipped)
             .filter(|_| Walk::outside_tests(attributes) == Walk::Entered)
             .filter(|_| TestMarks::mark_test(attributes).is_none())
             .unwrap_or(Kind::Tests);
-        self.outer.push(mem::replace(&mut self.kind, inner));
-        Descend::Into
-    }
-
-    fn without(&mut self) {
-        self.kind = self.outer.pop().unwrap_or(self.kind);
+        Visit::descending(Scanned {
+            kind: Some(inner),
+            outer: found.outer.into_iter().chain([current]).collect(),
+            ..found
+        })
     }
 }
 
-impl<'ast> Watch<'ast> for Scan<'_> {
+impl Scanned<'_> {
+    fn without(self) -> Self {
+        let mut outer = self.outer;
+        let kind = outer.pop().or(self.kind);
+        Scanned { kind, outer, ..self }
+    }
+}
+
+impl<'file> Fold for Scan<'file> {
+    type Found = Scanned<'file>;
+
     fn kinds(&self) -> &'static [Node] {
         &[
             Node::ItemMod,
@@ -98,66 +118,87 @@ impl<'ast> Watch<'ast> for Scan<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        self.within(&module.attrs)
+    fn on_item_mod(&self, found: Scanned<'file>, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Visit<Scanned<'file>> {
+        self.within(found, &module.attrs)
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.without();
+    fn off_item_mod(&self, found: Scanned<'file>, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Scanned<'file> {
+        found.without()
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        self.within(&item.attrs)
+    fn on_item_impl(&self, found: Scanned<'file>, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Visit<Scanned<'file>> {
+        self.within(found, &item.attrs)
     }
 
-    fn off_item_impl(&mut self, _: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) {
-        self.without();
+    fn off_item_impl(&self, found: Scanned<'file>, _: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Scanned<'file> {
+        found.without()
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.within(&function.attrs)
+    fn on_item_fn(&self, found: Scanned<'file>, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Visit<Scanned<'file>> {
+        self.within(found, &function.attrs)
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
-        self.without();
+    fn off_item_fn(&self, found: Scanned<'file>, _: &ItemFn, _: &Facts<'_, ItemFn>) -> Scanned<'file> {
+        found.without()
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.within(&function.attrs)
+    fn on_impl_item_fn(
+        &self,
+        found: Scanned<'file>,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Scanned<'file>> {
+        self.within(found, &function.attrs)
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.without();
+    fn off_impl_item_fn(&self, found: Scanned<'file>, _: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Scanned<'file> {
+        found.without()
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.within(&function.attrs)
+    fn on_trait_item_fn(
+        &self,
+        found: Scanned<'file>,
+        function: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+    ) -> Visit<Scanned<'file>> {
+        self.within(found, &function.attrs)
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
-        self.without();
+    fn off_trait_item_fn(&self, found: Scanned<'file>, _: &TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Scanned<'file> {
+        found.without()
     }
 
-    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
-        self.considered(Edges::of_block(block)).map_or(Descend::Over, |_| Descend::Into)
+    fn on_block(&self, found: Scanned<'file>, block: &Block, _: &Facts<'_, Block>) -> Visit<Scanned<'file>> {
+        self.considered(found, Edges::of_block(block))
     }
 
-    fn on_expr_match(&mut self, found: &'ast ExprMatch, _: &Facts<'_, ExprMatch>) -> Descend {
-        self.considered(Edges::of_match(found)).map_or(Descend::Over, |_| Descend::Into)
+    fn on_expr_match(
+        &self,
+        found: Scanned<'file>,
+        matched: &ExprMatch,
+        _: &Facts<'_, ExprMatch>,
+    ) -> Visit<Scanned<'file>> {
+        self.considered(found, Edges::of_match(matched))
     }
 
-    fn on_expr_closure(&mut self, found: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) -> Descend {
-        self.considered(Edges::of_closure(found)).map_or(Descend::Over, |_| Descend::Into)
+    fn on_expr_closure(
+        &self,
+        found: Scanned<'file>,
+        closure: &ExprClosure,
+        _: &Facts<'_, ExprClosure>,
+    ) -> Visit<Scanned<'file>> {
+        self.considered(found, Edges::of_closure(closure))
     }
 }
 
-impl<'file> Gathers<Occurrences<'file>> for Scan<'file> {
+impl<'file> Gathers<Occurrences<'file>> for Scanning<'file> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
+        Sweep::alone(&mut self.folding)
     }
 
     fn gathered(self) -> Occurrences<'file> {
-        Occurrences { path: self.path, found: self.occurrences.into_iter().chain(self.tested).collect() }
+        let scanned: Scanned<'file> = self.folding.concluded();
+        Occurrences { path: self.path, found: scanned.occurrences.into_iter().chain(self.tested).collect() }
     }
 }
 

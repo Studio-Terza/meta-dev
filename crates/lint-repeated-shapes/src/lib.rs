@@ -13,7 +13,7 @@ use lint_file::{ContextLint, Listed, Reads, RuledLint};
 
 use finding::Finding;
 use occurrence::Occurrence;
-use scan::Scan;
+use scan::{Scan, Scanning};
 
 #[derive(Debug)]
 pub struct RepeatedShapes;
@@ -63,9 +63,9 @@ impl ContextLint for RepeatedShapes {
     type Part<'head> = Occurrences<'head>;
     type Context<'head> = Listed<'head>;
 
-    type Gathering<'head> = Scan<'head>;
+    type Gathering<'head> = Scanning<'head>;
 
-    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Scan<'head> {
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> Scanning<'head> {
         Scan::scanning(parsed, Self::EQUIVALENCE)
     }
 }
