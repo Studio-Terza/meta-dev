@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use algebra::{Monoid, Semigroup};
+
 use crate::boundary::ItemId;
 use crate::function::Function;
 use crate::holding::Holding;
@@ -129,15 +131,17 @@ impl References {
     }
 }
 
-impl FromIterator<References> for References {
-    fn from_iter<Parts: IntoIterator<Item = References>>(parts: Parts) -> References {
-        parts.into_iter().fold(References::default(), |mut references, part| {
-            part.targets
-                .into_iter()
-                .for_each(|(owner, targets)| references.targets.entry(owner).or_default().extend(targets));
-            references.roots.extend(part.roots);
-            references
-        })
+impl Semigroup for References {
+    fn combine(mut self, part: References) -> References {
+        part.targets.into_iter().for_each(|(owner, targets)| self.targets.entry(owner).or_default().extend(targets));
+        self.roots.extend(part.roots);
+        self
+    }
+}
+
+impl Monoid for References {
+    fn identity() -> References {
+        References::default()
     }
 }
 
