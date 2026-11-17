@@ -381,12 +381,16 @@ impl Trees {
     }
 
     fn flagged(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Printed {
+        Trees::described(files, root, flags, NO_DEPENDENCIES)
+    }
+
+    fn described(files: &(impl Files + Sync), root: &Path, flags: &[&str], metadata: &str) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
         let exit = Cli::from_args(arguments).report_to(
             Ports::new(
                 files,
-                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                [(PathBuf::from("/"), Bytes::from(metadata))].into_iter().collect::<Recorded>(),
                 Monotonic::default(),
             ),
             &mut out,
@@ -495,6 +499,17 @@ impl Scratch {
 
     fn flagged(&self, flags: &[&str]) -> Printed {
         Trees::flagged(&self.files, &self.root, flags)
+    }
+
+    fn described(&self, flags: &[&str], metadata: &str) -> Printed {
+        Trees::described(&self.files, &self.root, flags, metadata)
+    }
+
+    fn metadata(&self) -> String {
+        let place = self.root.to_string_lossy();
+        format!(
+            "{{\"workspace_root\": \"{place}\", \"workspace_members\": [\"r\"], \"packages\": [{{\"name\": \"r\", \"id\": \"r\", \"manifest_path\": \"{place}/Cargo.toml\", \"dependencies\": []}}], \"resolve\": {{\"nodes\": [{{\"id\": \"r\", \"dependencies\": [], \"deps\": []}}]}}}}"
+        )
     }
 
     fn verdict(&self, flags: &[&str]) -> Verdict {
@@ -1054,5 +1069,14 @@ fn the_graph_dump_command_prints_the_model_the_same_way_twice() -> Result<(), Bo
     let opening = first.out.parse::<text_lines::Lines>().into_iter().flatten().next();
     assert_eq!((opening, first.out.contains("\"made\"")), (Some("Model {".to_owned()), true), "{}", first.out);
     assert_eq!(first.out, second.out);
+    Ok(())
+}
+
+#[test]
+fn the_crates_query_sizes_the_workspace_s_crates() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "pub struct A;\n")?;
+    let run = root.described(&["query", "--crates", "--in"], &root.metadata());
+    assert_eq!(run.out.matches("  r: 1 files, 1 lines").count(), 1, "{}{}", run.out, run.err);
     Ok(())
 }

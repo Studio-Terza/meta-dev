@@ -19,6 +19,7 @@ use lint_test_budget::TestBudget;
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
+use super::boundary::Dumped;
 use super::timings::Measured;
 use super::{Outcome, Sources, Verdict};
 use elegance::Elegance;
@@ -144,20 +145,5 @@ impl fmt::Display for Survey<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}", self.budget)?;
         self.reports.iter().try_for_each(|report| write!(formatter, "{report}"))
-    }
-}
-
-#[derive(Debug)]
-struct Dumped(String);
-
-impl From<&Model> for Dumped {
-    fn from(model: &Model) -> Dumped {
-        Dumped(format!("{model:#?}\n"))
-    }
-}
-
-impl fmt::Display for Dumped {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
     }
 }
