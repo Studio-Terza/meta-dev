@@ -4,8 +4,8 @@ use syntax::quote;
 use syntax::{GenericParam, LifetimeParam, WherePredicate};
 
 use super::Wrapped;
-use super::settings::Checking;
 use crate::marked::Marked;
+use crate::settings::Checking;
 
 pub trait Expansion {
     fn of(wrapped: Wrapped) -> TokenStream;

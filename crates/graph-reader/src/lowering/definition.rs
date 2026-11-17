@@ -1,4 +1,5 @@
 mod boundary;
+mod branches;
 mod reads;
 mod repetitions;
 
@@ -6,17 +7,17 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, Type};
 
-use body_lifts::{Body, BodyReading, Branching};
+use body_lifts::{Body, BodyReading, Branching, Propagated};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
 use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watch, Watching};
 
-use crate::branches::{Branches, Propagation};
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
 pub(super) use boundary::RowIndex;
+use branches::Branches;
 use reads::{Reads, ReadsLowered, SharedParameters};
 use repetitions::Repetitions;
 
@@ -39,6 +40,7 @@ enum LoweredInvocation {
 pub(super) struct LoweredDefinition {
     shape: Body,
     branching: Branching,
+    propagated: Propagated,
     invocations: Vec<LoweredInvocation>,
     repetitions: Vec<Repetition>,
     reads: ReadsLowered,
@@ -111,7 +113,7 @@ impl BodyGroup {
             tail: Reads::tail_call(body),
             rebound: Rebound::default(),
             invocations: Invocations::default(),
-            branches: Branches::new(Propagation::Ambient),
+            branches: Branches::opened(),
             repetitions: Repetitions::of_signature(signature),
             reads: Reads::default(),
         }
@@ -130,6 +132,7 @@ impl BodyGroup {
         LoweredDefinition {
             shape: self.shape,
             branching: self.branches.score(),
+            propagated: self.branches.propagated(),
             invocations: self.invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
             repetitions: self.repetitions.found(),
             reads: read,
@@ -153,7 +156,7 @@ impl LoweredDefinition {
     pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Definition {
         let invocations =
             self.invocations.into_iter().map(|invocation| invocation.resolved(resolving, scope)).collect();
-        Definition::new(self.shape, self.branching, invocations)
+        Definition::new(self.shape, self.branching, self.propagated, invocations)
             .repeated(self.repetitions)
             .reading(self.reads.resolved(resolving, scope))
     }

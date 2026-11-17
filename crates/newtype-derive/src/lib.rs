@@ -1,9 +1,12 @@
+mod generated;
 mod marked;
+mod settings;
 mod wrapped;
 
+use generated::Generated;
 use marked::Marked;
 use proc_macro::TokenStream;
-use wrapped::{CheckedDeserializing, Constructors, Deserializing, Formatting, Serializing, Strategy, Wrapped};
+use wrapped::{CheckedDeserializing, Constructors, Deserializing, Formatting, Serializing, Wrapped};
 
 #[proc_macro_derive(Newtype, attributes(newtype))]
 pub fn derive_newtype(input: TokenStream) -> TokenStream {
@@ -12,7 +15,7 @@ pub fn derive_newtype(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Arbitrary, attributes(newtype))]
 pub fn derive_arbitrary(input: TokenStream) -> TokenStream {
-    Wrapped::expanded::<Strategy>(input.into()).into()
+    Generated::expanded(input.into()).into()
 }
 
 #[proc_macro_derive(Display, attributes(newtype))]

@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 graph-reader = { path = "../graph-reader" }
 file-ports = { path = "../file-ports" }
+invariants = { path = "../invariants" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-placement = { path = "../lint-placement" }
