@@ -2,13 +2,14 @@ mod boundary;
 mod reads;
 mod repetitions;
 
+use lint_sweep::{Fold, Folding, Visit};
 use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, Type};
 
 use body_lifts::{Body, BodyReading, Branching};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
-use lint_core::{Extended, Fold, Folding, Syntax, Visit};
+use lint_core::{Extended, Syntax};
 use lint_layout::{Name, Whole, Word};
 use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watching};
 

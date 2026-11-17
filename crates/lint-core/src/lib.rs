@@ -1,6 +1,5 @@
 mod boundary;
 mod contents;
-mod drawn;
 mod extended;
 mod gate;
 mod headline;
@@ -12,7 +11,6 @@ mod readout;
 mod repo_file;
 mod report;
 mod source_file;
-mod support_modules;
 mod syntax;
 mod test_file;
 mod type_name;
@@ -21,7 +19,6 @@ mod watch;
 
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
-pub use drawn::Drawn;
 pub use extended::Extended;
 pub use gate::Gate;
 pub use headline::Headline;
@@ -34,11 +31,10 @@ pub use readout::{Readout, Unwalked};
 pub use repo_file::RepoFile;
 pub use report::Report;
 pub use source_file::{FileHead, Parsed, SourceFile};
-pub use support_modules::{SupportModules, SupportScan};
 pub use syntax::Syntax;
 pub use test_file::TestFile;
 pub use type_name::TypeName;
 pub use walk::Walk;
-pub use watch::{Address, ByKind, Descend, Facts, Fold, Folding, Kind, Visit, Watch, Watching};
+pub use watch::{Address, Descend, Facts};
 
 pub use lint_layout::SourceText;

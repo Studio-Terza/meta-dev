@@ -1,11 +1,12 @@
 mod shaped;
 
+use lint_sweep::{Fold, Visit};
 use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, ExprPath, Item, MemberText, Signature, Spine, Type};
 
 use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
-use lint_core::{Extended, Fold, Syntax, Visit};
+use lint_core::{Extended, Syntax};
 use lint_layout::{LineNumber, Name, Whole, Word};
 use lint_sweep::{Address, Descend, Facts, Kind};
 

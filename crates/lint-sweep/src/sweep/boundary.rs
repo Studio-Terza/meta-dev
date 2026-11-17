@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lint_core::Kind;
+use crate::Kind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Index(usize);

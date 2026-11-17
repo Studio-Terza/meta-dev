@@ -1,14 +1,10 @@
 mod boundary;
 mod facts;
-mod hooks;
 
 use crate::walk::Walk;
 
 pub use boundary::Address;
 pub use facts::Facts;
-pub use hooks::{ByKind, Fold, Folding, Kind, Visit, Watch};
-
-pub type Watching<'run> = dyn for<'ast> Watch<'ast> + 'run;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Descend {

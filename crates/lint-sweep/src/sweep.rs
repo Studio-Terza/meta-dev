@@ -4,9 +4,10 @@ use std::fmt;
 
 use syntax::{Around, Macro, Node, Walk};
 
-use lint_core::{
-    ByKind, Descend, Facts, Fold, Folding, Kind, Macros, SourceFile, Unwalked, Violation, Watch, Watching,
-};
+use lint_core::{Descend, Facts, Macros, SourceFile, Unwalked, Violation};
+
+use crate::Watching;
+use crate::hooks::{ByKind, Fold, Folding, Kind, Watch};
 use lint_layout::Name;
 
 pub use boundary::Member;
@@ -185,7 +186,7 @@ impl Sweeping<'_, '_> {
 }
 
 impl Around for Sweeping<'_, '_> {
-    lint_core::sweep_nodes!();
+    sweep_nodes!();
 }
 
 #[derive(Debug)]

@@ -1,8 +1,8 @@
 use lint_core::Extended;
 use lint_core::Headline;
-use lint_core::{Drawn, Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
 use lint_sweep::{Attaching, Attachment, Descend, Facts, Finds, Kind, Scoped};
+use lint_sweep::{Drawn, Fold, Folding, Visit};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;

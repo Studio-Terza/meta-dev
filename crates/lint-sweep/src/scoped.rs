@@ -1,6 +1,9 @@
 use std::fmt;
 
-use lint_core::{Address, Descend, Drawn, Fold, Folding, Kind, Violation, Watch, Watching};
+use lint_core::{Address, Descend, Violation};
+
+use crate::Watching;
+use crate::hooks::{Kind, Watch};
 
 use crate::{Finds, Gathers};
 
@@ -13,6 +16,10 @@ pub struct Attachment<Group> {
 impl<Group> Attachment<Group> {
     pub fn reaching<Node>(node: &Node, group: Group) -> Attachment<Group> {
         Attachment { root: Address::from(node), group }
+    }
+
+    pub(crate) fn regrouped<Other>(self, regroup: impl FnOnce(Group) -> Other) -> Attachment<Other> {
+        Attachment { root: self.root, group: regroup(self.group) }
     }
 }
 
@@ -201,7 +208,7 @@ impl<Parent: for<'any> Watch<'any> + Attaches<Group>, Group: Gathers<Group>> Sco
 impl<'ast, Parent: for<'any> Watch<'any> + Attaches<Group>, Group: Gathers<Group>> Watch<'ast>
     for Scoped<Parent, Group>
 {
-    lint_core::scope_nodes!();
+    scope_nodes!();
 }
 
 impl<'file, Parent: Finds<'file> + Attaches<Group>, Group: Gathers<Group> + fmt::Debug> Finds<'file>
@@ -209,64 +216,5 @@ impl<'file, Parent: Finds<'file> + Attaches<Group>, Group: Gathers<Group> + fmt:
 {
     fn found(self: Box<Self>) -> Vec<Violation<'file>> {
         Box::new(self.parent).found()
-    }
-}
-
-pub trait Attaching<Group: Fold>: Fold {
-    const ATTACHED: &'static [Kind];
-
-    fn attaching(&self, found: Self::Found) -> Drawn<Self::Found, Vec<Attachment<Group>>>;
-
-    fn detached(&self, found: Self::Found, group: Group::Found) -> Self::Found;
-}
-
-pub trait AttachingGroups<Group>: Fold {
-    const ATTACHED: &'static [Kind];
-
-    fn attaching(&self, found: Self::Found) -> Drawn<Self::Found, Vec<Attachment<Group>>>;
-
-    fn detached(&self, found: Self::Found, group: Group) -> Self::Found;
-}
-
-#[derive(Debug)]
-pub struct Grouped<Group: Fold>(Folding<Group>);
-
-impl<Group: Fold> Gathers<Grouped<Group>> for Grouped<Group> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(&mut self.0)
-    }
-
-    fn gathered(self) -> Grouped<Group> {
-        self
-    }
-}
-
-impl<Group: Fold> From<Attachment<Group>> for Attachment<Grouped<Group>> {
-    fn from(attachment: Attachment<Group>) -> Attachment<Grouped<Group>> {
-        Attachment { root: attachment.root, group: Grouped(Folding::from(attachment.group)) }
-    }
-}
-
-impl<Parent: Attaching<Group>, Group: Fold> AttachingGroups<Grouped<Group>> for Parent {
-    const ATTACHED: &'static [Kind] = <Parent as Attaching<Group>>::ATTACHED;
-
-    fn attaching(&self, found: Parent::Found) -> Drawn<Parent::Found, Vec<Attachment<Grouped<Group>>>> {
-        Attaching::attaching(self, found).mapped(|attached| attached.into_iter().map(Attachment::from).collect())
-    }
-
-    fn detached(&self, found: Parent::Found, group: Grouped<Group>) -> Parent::Found {
-        Attaching::detached(self, found, group.0.gathered())
-    }
-}
-
-impl<Parent: AttachingGroups<Group>, Group: Gathers<Group>> Attaches<Group> for Folding<Parent> {
-    const ATTACHED: &'static [Kind] = Parent::ATTACHED;
-
-    fn attaching(&mut self) -> Vec<Attachment<Group>> {
-        self.drawn(AttachingGroups::attaching)
-    }
-
-    fn detached(&mut self, group: Group) {
-        self.left(|fold, found| fold.detached(found, group));
     }
 }

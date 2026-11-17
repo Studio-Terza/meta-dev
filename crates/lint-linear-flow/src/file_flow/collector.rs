@@ -1,3 +1,4 @@
+use lint_sweep::{Fold, Folding, Visit};
 use std::path::Path;
 use syntax::{
     Block, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, ImplItemFn, Item, ItemFn, Local,
@@ -5,7 +6,7 @@ use syntax::{
 };
 
 use lint_core::Extended;
-use lint_core::{Fold, Folding, SourceFile, Visit};
+use lint_core::SourceFile;
 use lint_sweep::{Descend, Facts, Kind, Sweep};
 
 use lint_core::Violation;

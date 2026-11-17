@@ -1,3 +1,4 @@
+use lint_sweep::{Fold, Visit};
 use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::Spanned;
@@ -7,7 +8,7 @@ use syntax::{
 };
 
 use graph::{Looping, ParamIndex, Reached, Repeating, Repetition};
-use lint_core::{Extended, Fold, Syntax, Visit};
+use lint_core::{Extended, Syntax};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
 use lint_sweep::{Address, Descend, Facts, Kind};
 

@@ -1,3 +1,4 @@
+use lint_sweep::Folding;
 use std::iter;
 use std::path::Path;
 use std::path::PathBuf;
@@ -7,7 +8,6 @@ use lint_core::SourceFile;
 
 use crate::lowering::{BodyGroup, Lowered, Lowerer};
 use crate::planting::{Placing, Planting};
-use lint_core::Folding;
 use lint_sweep::{Gathers, Scoped, Sweep, Watching};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

@@ -12,6 +12,7 @@ mod seat;
 mod signature;
 mod uses;
 
+use lint_sweep::{Drawn, Fold, Visit};
 use std::ffi::OsStr;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -45,7 +46,6 @@ use definition::{LoweredDefinition, Mutations, RowIndex};
 use frames::{Enclosure, Frame};
 use held::{Holder, HoldingRow, Link};
 use laws::LawRow;
-use lint_core::{Drawn, Fold, Visit};
 use lint_sweep::{Address, AttachingGroups, Attachment, Descend, Facts, Kind};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;

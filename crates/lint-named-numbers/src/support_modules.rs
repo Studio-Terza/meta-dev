@@ -2,15 +2,15 @@ use std::path::{Path, PathBuf};
 
 use syntax::ItemMod;
 
-use crate::walk::Walk;
-use crate::watch::{Facts, Fold, Kind, Visit};
+use lint_core::Walk;
 use lint_layout::Name;
+use lint_sweep::{Facts, Fold, Kind, Visit};
 
 #[derive(Debug)]
-pub struct SupportScan;
+pub(crate) struct SupportScan;
 
 #[derive(Debug, Default)]
-pub struct SupportModules {
+pub(crate) struct SupportModules {
     names: Vec<Name>,
 }
 
@@ -20,7 +20,7 @@ impl SupportModules {
     const MODULE_FILE: &'static str = "mod.rs";
 
     #[must_use]
-    pub fn paths(&self, file: &Path) -> Vec<PathBuf> {
+    pub(crate) fn paths(&self, file: &Path) -> Vec<PathBuf> {
         let directory = Self::directory_of(file);
         self.names
             .iter()

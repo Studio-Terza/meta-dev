@@ -1,7 +1,7 @@
+use lint_sweep::{Fold, Visit};
 use syntax::{BinOp, ExprBinary, ExprForLoop, ExprIf, ExprMatch, ExprTry, ExprWhile, Item};
 
 use body_lifts::Branching;
-use lint_core::{Fold, Visit};
 use lint_sweep::{Descend, Facts, Kind};
 use newtype::Counter;
 

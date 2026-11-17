@@ -1,7 +1,8 @@
+use lint_sweep::Folding;
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro};
 
 use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
-use lint_core::{Folding, Macros, Syntax};
+use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
 use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};

@@ -1,5 +1,6 @@
-use lint_core::{Descend, Facts, Fold, Folding, Kind, SourceFile, SourceText, Visit, Watching};
+use lint_core::{Descend, Facts, SourceFile, SourceText};
 use lint_sweep::Sweep;
+use lint_sweep::{Fold, Folding, Kind, Visit, Watching};
 use syntax::Block;
 
 const NESTED: &str = "fn f() {\n    {\n        {\n        }\n    }\n}\nfn g() {\n    {\n    }\n}\n";

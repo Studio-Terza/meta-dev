@@ -4,9 +4,9 @@ use syntax::{Ident, Macro};
 
 use lint_layout::Name;
 
-use super::Descend;
-use super::facts::Facts;
-use crate::{Drawn, Extended};
+use lint_core::{Descend, Extended, Facts};
+
+use crate::Drawn;
 
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ident;)*) => {
@@ -166,7 +166,6 @@ macro_rules! hooks {
             )*
         }
 
-        #[macro_export]
         macro_rules! scope_nodes {
             () => {
                 fn kinds(&self) -> &[$crate::Kind] {
@@ -201,7 +200,6 @@ macro_rules! hooks {
             };
         }
 
-        #[macro_export]
         macro_rules! sweep_nodes {
             () => {
                 fn around(&mut self, node: Node<'_>, descend: &mut dyn FnMut(&mut Self)) {

@@ -1,10 +1,11 @@
+use lint_sweep::{Drawn, Fold, Folding, Visit};
 use std::path::Path;
 use syntax::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
 use body_lifts::Branching;
 use graph_reader::{Branches, Propagation};
 use lint_core::Extended;
-use lint_core::{Drawn, Fold, Folding, Site, SourceFile, Visit, Walk};
+use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
 use lint_sweep::{Attaching, Attachment, Descend, Facts, Gathers, Grouped, Kind, Scoped, Sweep, Watching};
 

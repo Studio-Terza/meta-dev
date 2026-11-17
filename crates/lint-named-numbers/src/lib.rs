@@ -1,4 +1,5 @@
 mod boundary;
+mod support_modules;
 
 use boundary::Numeral;
 use lint_core::{Headline, Parsed};
@@ -6,6 +7,7 @@ use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_sweep::{Descend, Facts, Fold, Folding, Gathers, Kind, Sweep, Visit, Watchers, Watching};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use support_modules::{SupportModules, SupportScan};
 
 use syntax::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitInt, Macro, TraitItemConst};
 
@@ -16,7 +18,6 @@ use lint_core::Problem;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::{SupportModules, SupportScan};
 use lint_layout::{LineNumber, Word, words};
 
 #[derive(Debug)]
