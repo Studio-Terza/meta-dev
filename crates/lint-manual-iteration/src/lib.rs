@@ -1,6 +1,7 @@
 use lint_core::Headline;
+use lint_core::{Drawn, Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Attaches, Attachment, Descend, Facts, Finds, Gathers, Kind, Scoped, Watch, Watching};
+use lint_sweep::{Attaching, Attachment, Descend, Facts, Finds, Kind, Scoped};
 use std::path::Path;
 use syntax::Span;
 use syntax::Spanned;
@@ -71,18 +72,17 @@ impl SweptLint for ManualIteration {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Scoped::new(Iterations {
-            path: AsRef::<Path>::as_ref(file.head()),
-            violations: Vec::new(),
-            opening: Vec::new(),
-            held: Vec::new(),
-        }))
+        Box::new(Scoped::new(Folding::from(Iterations { path: AsRef::<Path>::as_ref(file.head()) })))
     }
 }
 
 #[derive(Debug)]
 struct Iterations<'scan> {
     path: &'scan Path,
+}
+
+#[derive(Debug, Default)]
+struct Iterated<'scan> {
     violations: Vec<Violation<'scan>>,
     opening: Vec<Attachment<IteratorCalls>>,
     held: Vec<Vec<Violation<'scan>>>,
@@ -94,7 +94,28 @@ impl<'scan> Iterations<'scan> {
     }
 }
 
-impl<'ast> Watch<'ast> for Iterations<'_> {
+impl<'scan> Iterated<'scan> {
+    fn opened(self, opened: Option<Attachment<IteratorCalls>>) -> Iterated<'scan> {
+        match opened {
+            Some(attachment) => Iterated {
+                violations: Vec::new(),
+                opening: self.opening.into_iter().chain([attachment]).collect(),
+                held: self.held.into_iter().chain([self.violations]).collect(),
+            },
+            None => self,
+        }
+    }
+}
+
+impl<'scan> From<Iterated<'scan>> for Vec<Violation<'scan>> {
+    fn from(iterated: Iterated<'scan>) -> Vec<Violation<'scan>> {
+        iterated.violations
+    }
+}
+
+impl<'scan> Fold for Iterations<'scan> {
+    type Found = Iterated<'scan>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -108,42 +129,59 @@ impl<'ast> Watch<'ast> for Iterations<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Iterated<'scan>, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Iterated<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_impl(
+        &self,
+        found: Iterated<'scan>,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+    ) -> Visit<Iterated<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_trait(
+        &self,
+        found: Iterated<'scan>,
+        _: &ItemTrait,
+        facts: &Facts<'_, ItemTrait>,
+    ) -> Visit<Iterated<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Iterated<'scan>, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Iterated<'scan>> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_fn(&self, found: Iterated<'scan>, _: &ItemFn, facts: &Facts<'_, ItemFn>) -> Visit<Iterated<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, facts: &Facts<'_, ImplItemFn>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_impl_item_fn(
+        &self,
+        found: Iterated<'scan>,
+        _: &ImplItemFn,
+        facts: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Iterated<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
+    fn on_local(&self, found: Iterated<'scan>, local: &Local, _: &Facts<'_, Local>) -> Visit<Iterated<'scan>> {
         let init = Some(local)
             .filter(|candidate| matches!(&candidate.pat, Pat::Ident(binding) if binding.mutability.is_some()))
             .and_then(|mutable| mutable.init.as_ref());
-        let opened =
-            init.map(|found| Attachment::reaching(&*found.expr, IteratorCalls { found: None, local: local.span() }));
-        self.held.extend(opened.iter().map(|_| std::mem::take(&mut self.violations)));
-        self.opening.extend(opened);
-        Descend::Into
+        let opened = init.map(|initial| Attachment::reaching(&*initial.expr, IteratorCalls { local: local.span() }));
+        Visit::descending(found.opened(opened))
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
+    fn on_expr_for_loop(
+        &self,
+        found: Iterated<'scan>,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+    ) -> Visit<Iterated<'scan>> {
         let finding = ManualIteration::accumulator(&expr.body).map(|_| {
             self.violation(
                 expr.for_token.span,
@@ -153,65 +191,62 @@ impl<'ast> Watch<'ast> for Iterations<'_> {
                 ),
             )
         });
-        self.violations.extend(finding);
-        Descend::Into
+        Visit::descending(Iterated { violations: found.violations.into_iter().chain(finding).collect(), ..found })
     }
 }
 
-impl Attaches<IteratorCalls> for Iterations<'_> {
+impl<'scan> Attaching<IteratorCalls> for Iterations<'scan> {
     const ATTACHED: &'static [Kind] = &[Kind::Expr, Kind::ExprMethodCall];
 
-    fn attaching(&mut self) -> Vec<Attachment<IteratorCalls>> {
-        std::mem::take(&mut self.opening)
+    fn attaching(&self, found: Iterated<'scan>) -> Drawn<Iterated<'scan>, Vec<Attachment<IteratorCalls>>> {
+        Drawn::new(Iterated { opening: Vec::new(), ..found }, found.opening)
     }
 
-    fn detached(&mut self, calls: IteratorCalls) {
-        let inside = std::mem::take(&mut self.violations);
-        self.violations = self.held.pop().unwrap_or_default();
-        let finding = calls.found.map(|()| {
+    fn detached(&self, found: Iterated<'scan>, calls: Constructed) -> Iterated<'scan> {
+        let mut held = found.held;
+        let outer = held.pop().unwrap_or_default();
+        let finding = calls.found.and(calls.local).map(|span| {
             self.violation(
-                calls.local,
+                span,
                 Message::new(
                     Problem::new("mutable iterator local"),
                     Fix::new("drive it with combinators such as format, collect, or fold"),
                 ),
             )
         });
-        self.violations.extend(finding);
-        self.violations.extend(inside);
-    }
-}
-
-impl<'file> Finds<'file> for Iterations<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+        Iterated { violations: outer.into_iter().chain(finding).chain(found.violations).collect(), held, ..found }
     }
 }
 
 #[derive(Debug)]
 struct IteratorCalls {
-    found: Option<()>,
     local: Span,
 }
 
-impl Gathers<IteratorCalls> for IteratorCalls {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
-    }
-
-    fn gathered(self) -> IteratorCalls {
-        self
-    }
+#[derive(Debug, Default)]
+struct Constructed {
+    found: Option<()>,
+    local: Option<Span>,
 }
 
-impl<'ast> Watch<'ast> for IteratorCalls {
+impl Fold for IteratorCalls {
+    type Found = Constructed;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ExprMethodCall]
     }
 
-    fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
+    fn finished(&self, found: Constructed) -> Constructed {
+        Constructed { local: Some(self.local), ..found }
+    }
+
+    fn on_expr_method_call(
+        &self,
+        found: Constructed,
+        _: &ExprMethodCall,
+        facts: &Facts<'_, ExprMethodCall>,
+    ) -> Visit<Constructed> {
         let constructed = facts.name().and_then(|name| name.matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS));
-        self.found = self.found.or(constructed.map(|_| ()));
-        Descend::Into
+        Visit::descending(Constructed { found: found.found.or(constructed.map(|_| ())), ..found })
     }
 }

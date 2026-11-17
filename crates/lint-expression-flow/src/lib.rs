@@ -1,6 +1,7 @@
 use lint_core::Headline;
+use lint_core::{Drawn, Fold, Folding, Visit};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Attaches, Attachment, Descend, Facts, Finds, Gathers, Kind, Scoped, Watch, Watching};
+use lint_sweep::{Attaching, Attachment, Descend, Facts, Finds, Kind, Scoped};
 use std::collections::{BTreeMap, BTreeSet};
 
 use std::path::Path;
@@ -72,50 +73,81 @@ impl SweptLint for ExpressionFlow {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(Scoped::new(Flows {
-            path: AsRef::<Path>::as_ref(file.head()),
-            violations: Vec::new(),
-            opening: Vec::new(),
-            held: Vec::new(),
-        }))
+        Box::new(Scoped::new(Folding::from(Flows { path: AsRef::<Path>::as_ref(file.head()) })))
     }
 }
 
 #[derive(Debug)]
 struct Flows<'scan> {
     path: &'scan Path,
+}
+
+#[derive(Debug, Default)]
+struct Flowed<'scan> {
     violations: Vec<Violation<'scan>>,
     opening: Vec<Attachment<MutableLocals>>,
     held: Vec<Vec<Violation<'scan>>>,
 }
 
-impl Flows<'_> {
-    fn report(&mut self, spans: impl IntoIterator<Item = Span>, message: Message) {
+impl<'scan> Flows<'scan> {
+    fn flagged(&self, spans: impl IntoIterator<Item = Span>, message: Message) -> Vec<Violation<'scan>> {
         let path = self.path;
-        self.violations
-            .extend(spans.into_iter().map(|span| Violation::new(Site::new(path, LineNumber::from(span)), message)));
+        spans.into_iter().map(|span| Violation::new(Site::new(path, LineNumber::from(span)), message)).collect()
     }
 
-    fn function(&mut self, attributes: &[Attribute], signature: &Signature, body: Option<&Block>) -> Descend {
+    fn report(
+        &self,
+        found: Flowed<'scan>,
+        spans: impl IntoIterator<Item = Span>,
+        message: Message,
+    ) -> Visit<Flowed<'scan>> {
+        Visit::descending(found.flagged(self.flagged(spans, message)))
+    }
+
+    fn function(
+        found: Flowed<'scan>,
+        attributes: &[Attribute],
+        signature: &Signature,
+        body: Option<&Block>,
+    ) -> Visit<Flowed<'scan>> {
         let scanned = Descend::from(Walk::outside_tests(attributes))
             .entered()
             .and(body)
             .filter(|_| signature.constness.is_none());
-        scanned.map_or(Descend::Over, |block| self.body(block))
+        found.opened(scanned.map(|block| Attachment::reaching(block, MutableLocals)))
     }
 
     fn lonely_if(expr: &ExprIf) -> Option<Span> {
         expr.else_branch.is_none().then_some(expr.if_token.span)
     }
+}
 
-    fn body(&mut self, body: &Block) -> Descend {
-        self.opening.push(Attachment::reaching(body, MutableLocals { declared: BTreeMap::new(), touched: Vec::new() }));
-        self.held.push(std::mem::take(&mut self.violations));
-        Descend::Into
+impl<'scan> Flowed<'scan> {
+    fn flagged(self, more: Vec<Violation<'scan>>) -> Flowed<'scan> {
+        Flowed { violations: self.violations.into_iter().chain(more).collect(), ..self }
+    }
+
+    fn opened(self, opened: Option<Attachment<MutableLocals>>) -> Visit<Flowed<'scan>> {
+        match opened {
+            Some(attachment) => Visit::descending(Flowed {
+                violations: Vec::new(),
+                opening: self.opening.into_iter().chain([attachment]).collect(),
+                held: self.held.into_iter().chain([self.violations]).collect(),
+            }),
+            None => Visit::new(self, Descend::Over),
+        }
     }
 }
 
-impl<'ast> Watch<'ast> for Flows<'_> {
+impl<'scan> From<Flowed<'scan>> for Vec<Violation<'scan>> {
+    fn from(flowed: Flowed<'scan>) -> Vec<Violation<'scan>> {
+        flowed.violations
+    }
+}
+
+impl<'scan> Fold for Flows<'scan> {
+    type Found = Flowed<'scan>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::ItemMod,
@@ -137,117 +169,150 @@ impl<'ast> Watch<'ast> for Flows<'_> {
         ]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Flowed<'scan>, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Flowed<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_impl(&self, found: Flowed<'scan>, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Visit<Flowed<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_trait(&self, found: Flowed<'scan>, _: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Visit<Flowed<'scan>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, found: Flowed<'scan>, _: &Macro, _: &Facts<'_, Macro>) -> Visit<Flowed<'scan>> {
+        Visit::new(found, Descend::Expand)
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
-        Descend::Over
+    fn on_item_const(&self, found: Flowed<'scan>, _: &ItemConst, _: &Facts<'_, ItemConst>) -> Visit<Flowed<'scan>> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
-        Descend::Over
+    fn on_impl_item_const(
+        &self,
+        found: Flowed<'scan>,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+    ) -> Visit<Flowed<'scan>> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.function(&function.attrs, &function.sig, Some(&function.block))
+    fn on_item_fn(&self, found: Flowed<'scan>, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Visit<Flowed<'scan>> {
+        Self::function(found, &function.attrs, &function.sig, Some(&function.block))
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.function(&function.attrs, &function.sig, Some(&function.block))
+    fn on_impl_item_fn(
+        &self,
+        found: Flowed<'scan>,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Flowed<'scan>> {
+        Self::function(found, &function.attrs, &function.sig, Some(&function.block))
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.function(&function.attrs, &function.sig, function.default.as_ref())
+    fn on_trait_item_fn(
+        &self,
+        found: Flowed<'scan>,
+        function: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+    ) -> Visit<Flowed<'scan>> {
+        Self::function(found, &function.attrs, &function.sig, function.default.as_ref())
     }
 
-    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
+    fn on_block(&self, found: Flowed<'scan>, block: &Block, _: &Facts<'_, Block>) -> Visit<Flowed<'scan>> {
         let last = block.stmts.last();
         self.report(
+            found,
             block.stmts.iter().filter_map(|statement| ExpressionFlow::dropped(statement, last)).map(Spanned::span),
             Message::new(
                 Problem::new("if or match whose value is dropped"),
                 Fix::new("let it produce the value the function returns"),
             ),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_expr_if(&mut self, expr: &'ast ExprIf, _: &Facts<'_, ExprIf>) -> Descend {
+    fn on_expr_if(&self, found: Flowed<'scan>, expr: &ExprIf, _: &Facts<'_, ExprIf>) -> Visit<Flowed<'scan>> {
         self.report(
+            found,
             Self::lonely_if(expr),
             Message::new(
                 Problem::new("if without else yields nothing"),
                 Fix::new("use then_some, filter, or an else branch that produces the value"),
             ),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
+    fn on_expr_loop(&self, found: Flowed<'scan>, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Visit<Flowed<'scan>> {
         self.report(
+            found,
             [expr.loop_token.span],
             Message::new(Problem::new("loop"), Fix::new("drive an iterator with combinators, const fns excepted")),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
+    fn on_expr_for_loop(
+        &self,
+        found: Flowed<'scan>,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+    ) -> Visit<Flowed<'scan>> {
         self.report(
+            found,
             [expr.for_token.span],
             Message::new(Problem::new("for loop"), Fix::new("drive the iterator with combinators, const fns excepted")),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
+    fn on_expr_while(&self, found: Flowed<'scan>, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Visit<Flowed<'scan>> {
         self.report(
+            found,
             [expr.while_token.span],
             Message::new(
                 Problem::new("while loop"),
                 Fix::new("drive an iterator with combinators, const fns excepted"),
             ),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_expr_assign(&mut self, expr: &'ast ExprAssign, _: &Facts<'_, ExprAssign>) -> Descend {
+    fn on_expr_assign(
+        &self,
+        found: Flowed<'scan>,
+        expr: &ExprAssign,
+        _: &Facts<'_, ExprAssign>,
+    ) -> Visit<Flowed<'scan>> {
         self.report(
+            found,
             ExpressionFlow::assigned_local(&expr.left).map(|_| expr.eq_token.span),
             Message::new(
                 Problem::new("assignment to a local"),
                 Fix::new("build the value in one expression or give its type an updater method"),
             ),
-        );
-        Descend::Into
+        )
     }
 
-    fn on_expr_binary(&mut self, expr: &'ast ExprBinary, _: &Facts<'_, ExprBinary>) -> Descend {
+    fn on_expr_binary(
+        &self,
+        found: Flowed<'scan>,
+        expr: &ExprBinary,
+        _: &Facts<'_, ExprBinary>,
+    ) -> Visit<Flowed<'scan>> {
         self.report(
+            found,
             ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op)).map(|_| expr.op.span()),
             Message::new(
                 Problem::new("compound assignment to a local"),
                 Fix::new("build the value in one expression or give its type an updater method"),
             ),
-        );
-        Descend::Into
+        )
     }
 }
 
 #[derive(Debug)]
-struct MutableLocals {
+struct MutableLocals;
+
+#[derive(Debug, Default)]
+struct Locals {
     declared: BTreeMap<Name, Span>,
     touched: Vec<Name>,
 }
@@ -279,69 +344,59 @@ impl MutableLocals {
             writing.and_then(|_| invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).ok());
         arguments?.first().and_then(ExpressionFlow::assigned_local).map(Name::from)
     }
+}
 
+impl Locals {
     fn only_reassigned(&self) -> Vec<Span> {
         let touched: BTreeSet<&Name> = self.touched.iter().collect();
         let declared: BTreeSet<&Name> = self.declared.keys().collect();
         declared.difference(&touched).filter_map(|name| self.declared.get(*name)).copied().collect()
     }
+
+    fn touching(self, touched: Option<Name>) -> Locals {
+        Locals { touched: self.touched.into_iter().chain(touched).collect(), ..self }
+    }
 }
 
-impl<'ast> Watch<'ast> for MutableLocals {
+impl Fold for MutableLocals {
+    type Found = Locals;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Local, Kind::Expr, Kind::Macro]
     }
 
-    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
-        self.declared
-            .extend(Self::declared_mutable(local).map(|binding| (Name::from(&binding.ident), local.let_token.span)));
-        Descend::Into
+    fn on_local(&self, found: Locals, local: &Local, _: &Facts<'_, Local>) -> Visit<Locals> {
+        let declared = Self::declared_mutable(local).map(|binding| (Name::from(&binding.ident), local.let_token.span));
+        Visit::descending(Locals { declared: found.declared.into_iter().chain(declared).collect(), ..found })
     }
 
-    fn on_expr(&mut self, expr: &'ast Expr, _: &Facts<'_, Expr>) -> Descend {
-        self.touched.extend(Self::touched_by(expr).map(Name::from));
-        Descend::Into
+    fn on_expr(&self, found: Locals, expr: &Expr, _: &Facts<'_, Expr>) -> Visit<Locals> {
+        Visit::descending(found.touching(Self::touched_by(expr).map(Name::from)))
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.touched.extend(Self::written_to(invocation));
-        Descend::Expand
+    fn on_macro(&self, found: Locals, invocation: &Macro, _: &Facts<'_, Macro>) -> Visit<Locals> {
+        Visit::new(found.touching(Self::written_to(invocation)), Descend::Expand)
     }
 }
 
-impl Attaches<MutableLocals> for Flows<'_> {
+impl<'scan> Attaching<MutableLocals> for Flows<'scan> {
     const ATTACHED: &'static [Kind] = &[Kind::Block, Kind::Local, Kind::Expr, Kind::Macro];
 
-    fn attaching(&mut self) -> Vec<Attachment<MutableLocals>> {
-        std::mem::take(&mut self.opening)
+    fn attaching(&self, found: Flowed<'scan>) -> Drawn<Flowed<'scan>, Vec<Attachment<MutableLocals>>> {
+        Drawn::new(Flowed { opening: Vec::new(), ..found }, found.opening)
     }
 
-    fn detached(&mut self, locals: MutableLocals) {
-        let inside = std::mem::take(&mut self.violations);
-        self.violations = self.held.pop().unwrap_or_default();
-        self.report(
+    fn detached(&self, found: Flowed<'scan>, locals: Locals) -> Flowed<'scan> {
+        let mut held = found.held;
+        let outer = held.pop().unwrap_or_default();
+        let reassigned = self.flagged(
             locals.only_reassigned(),
             Message::new(
                 Problem::new("mutable local that is only reassigned"),
                 Fix::new("a mutable binding is borrowed as &mut or has methods called on it"),
             ),
         );
-        self.violations.extend(inside);
-    }
-}
-
-impl Gathers<MutableLocals> for MutableLocals {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
-    }
-
-    fn gathered(self) -> MutableLocals {
-        self
-    }
-}
-
-impl<'file> Finds<'file> for Flows<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+        let violations = outer.into_iter().chain(reassigned).chain(found.violations).collect();
+        Flowed { violations, held, ..found }
     }
 }

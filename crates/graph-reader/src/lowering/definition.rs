@@ -8,7 +8,7 @@ use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, T
 
 use body_lifts::{Body, BodyReading, Branching};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
-use lint_core::Syntax;
+use lint_core::{Folding, Syntax};
 use lint_layout::{Name, Whole, Word};
 use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watch, Watching};
 
@@ -69,7 +69,7 @@ pub(crate) struct BodyGroup {
     tail: Option<Address>,
     rebound: Rebound,
     invocations: Invocations,
-    branches: Branches,
+    branches: Folding<Branches>,
     repetitions: Repetitions,
     reads: Reads,
 }
@@ -111,7 +111,7 @@ impl BodyGroup {
             tail: Reads::tail_call(body),
             rebound: Rebound::default(),
             invocations: Invocations::default(),
-            branches: Branches::new(Propagation::Ambient),
+            branches: Folding::from(Branches::new(Propagation::Ambient)),
             repetitions: Repetitions::of_signature(signature),
             reads: Reads::default(),
         }
@@ -129,7 +129,7 @@ impl BodyGroup {
         });
         LoweredDefinition {
             shape: self.shape,
-            branching: self.branches.score(),
+            branching: self.branches.concluded(),
             invocations: self.invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
             repetitions: self.repetitions.found(),
             reads: read,

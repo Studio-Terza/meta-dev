@@ -1,78 +1,86 @@
 use std::path::Path;
 use syntax::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
+use body_lifts::Branching;
 use graph_reader::{Branches, Propagation};
-use lint_core::{Site, SourceFile, Walk};
+use lint_core::{Drawn, Fold, Folding, Site, SourceFile, Visit, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
-use lint_sweep::{Attaches, Attachment, Descend, Facts, Gathers, Kind, Scoped, Sweep, Watch, Watching};
+use lint_sweep::{Attaching, Attachment, Descend, Facts, Gathers, Grouped, Kind, Scoped, Sweep, Watching};
 
 use super::function::Function;
 
 #[derive(Debug)]
 pub(crate) struct Functions<'file> {
     file: &'file SourceFile,
-    opening: Vec<Attachment<Scoring<'file>>>,
-    found: Vec<Scoring<'file>>,
 }
 
 #[derive(Debug)]
-pub(crate) struct Scoring<'file> {
+struct Scoring<'file> {
     name: Name,
     line: LineNumber,
     site: Site<'file>,
-    branches: Branches,
 }
 
-impl<'file> Gathers<Scoring<'file>> for Scoring<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(&mut self.branches)
-    }
+#[derive(Debug)]
+struct Scored<'file> {
+    scoring: Scoring<'file>,
+    branching: Branching,
+}
 
-    fn gathered(self) -> Scoring<'file> {
-        self
-    }
+#[derive(Debug, Default)]
+pub(crate) struct Listed<'file> {
+    opening: Vec<Attachment<Branches>>,
+    open: Vec<Scoring<'file>>,
+    found: Vec<Scored<'file>>,
 }
 
 impl<'file> Functions<'file> {
     pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Function<'file>> {
-        let scan =
-            Sweep::gathered(file, Scanning(Scoped::new(Functions { file, opening: Vec::new(), found: Vec::new() })));
-        let mut found = scan.found;
-        found.sort_by_key(|scoring| scoring.line);
-        found.into_iter().map(|scoring| Function::new(scoring.name, scoring.site, scoring.branches.score())).collect()
+        let listed = Sweep::gathered(file, Scanning(Scoped::new(Folding::from(Functions { file }))));
+        let mut found = listed.found;
+        found.sort_by_key(|scored| scored.scoring.line);
+        found
+            .into_iter()
+            .map(|scored| Function::new(scored.scoring.name, scored.scoring.site, scored.branching))
+            .collect()
     }
 
-    fn recorded(&mut self, attributes: &[Attribute], name: &Ident, body: Option<&Block>) -> Descend {
+    fn recorded(
+        &self,
+        found: Listed<'file>,
+        attributes: &[Attribute],
+        name: &Ident,
+        body: Option<&Block>,
+    ) -> Visit<Listed<'file>> {
         let line = LineNumber::from(name.span());
         let site = Site::new(AsRef::<Path>::as_ref(self.file.head()), line);
         let opened = body
             .filter(|_| Walk::outside_tests(attributes) == Walk::Entered)
-            .filter(|_| TestMarks::mark_test(attributes).is_none())
-            .map(|block| {
-                Attachment::reaching(
-                    block,
-                    Scoring { name: Name::from(name), line, site, branches: Branches::new(Propagation::Branch) },
-                )
-            });
-        self.opening.extend(opened);
-        Descend::Into
+            .filter(|_| TestMarks::mark_test(attributes).is_none());
+        let attached = opened.map(|block| Attachment::reaching(block, Branches::new(Propagation::Branch)));
+        let scoring = opened.map(|_| Scoring { name: Name::from(name), line, site });
+        Visit::descending(Listed {
+            opening: found.opening.into_iter().chain(attached).collect(),
+            open: found.open.into_iter().chain(scoring).collect(),
+            ..found
+        })
     }
 }
 
 #[derive(Debug)]
-struct Scanning<'file>(Scoped<Functions<'file>, Scoring<'file>>);
+struct Scanning<'file>(Scoped<Folding<Functions<'file>>, Grouped<Branches>>);
 
-impl<'file> Gathers<Functions<'file>> for Scanning<'file> {
+impl<'file> Gathers<Listed<'file>> for Scanning<'file> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         std::iter::once::<&mut Watching<'_>>(&mut self.0)
     }
 
-    fn gathered(self) -> Functions<'file> {
-        self.0.into_parent()
+    fn gathered(self) -> Listed<'file> {
+        self.0.into_parent().concluded()
     }
 }
 
-impl<'file> Attaches<Scoring<'file>> for Functions<'file> {
+impl<'file> Attaching<Branches> for Functions<'file> {
     const ATTACHED: &'static [Kind] = &[
         Kind::Block,
         Kind::Item,
@@ -84,33 +92,47 @@ impl<'file> Attaches<Scoring<'file>> for Functions<'file> {
         Kind::ExprBinary,
     ];
 
-    fn attaching(&mut self) -> Vec<Attachment<Scoring<'file>>> {
-        std::mem::take(&mut self.opening)
+    fn attaching(&self, found: Listed<'file>) -> Drawn<Listed<'file>, Vec<Attachment<Branches>>> {
+        Drawn::new(Listed { opening: Vec::new(), ..found }, found.opening)
     }
 
-    fn detached(&mut self, scoring: Scoring<'file>) {
-        self.found.push(scoring);
+    fn detached(&self, found: Listed<'file>, branched: graph_reader::Branched) -> Listed<'file> {
+        let mut open = found.open;
+        let scored = open.pop().map(|scoring| Scored { scoring, branching: Branching::from(branched) });
+        Listed { open, found: found.found.into_iter().chain(scored).collect(), ..found }
     }
 }
 
-impl<'ast> Watch<'ast> for Functions<'_> {
+impl<'file> Fold for Functions<'file> {
+    type Found = Listed<'file>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemFn, Kind::ImplItemFn, Kind::TraitItemFn]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Listed<'file>, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Listed<'file>> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.recorded(&function.attrs, &function.sig.ident, Some(&function.block))
+    fn on_item_fn(&self, found: Listed<'file>, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Visit<Listed<'file>> {
+        self.recorded(found, &function.attrs, &function.sig.ident, Some(&function.block))
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.recorded(&function.attrs, &function.sig.ident, Some(&function.block))
+    fn on_impl_item_fn(
+        &self,
+        found: Listed<'file>,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Listed<'file>> {
+        self.recorded(found, &function.attrs, &function.sig.ident, Some(&function.block))
     }
 
-    fn on_trait_item_fn(&mut self, function: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.recorded(&function.attrs, &function.sig.ident, function.default.as_ref())
+    fn on_trait_item_fn(
+        &self,
+        found: Listed<'file>,
+        function: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+    ) -> Visit<Listed<'file>> {
+        self.recorded(found, &function.attrs, &function.sig.ident, function.default.as_ref())
     }
 }

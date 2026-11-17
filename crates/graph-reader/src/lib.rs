@@ -10,7 +10,7 @@ use graph::Model;
 use lint_core::{Readout, SourceFile};
 use lint_layout::Crates;
 
-pub use branches::{Branches, Propagation};
+pub use branches::{Branched, Branches, Propagation};
 pub use facts::{FileFacts, GroupLowering, ListedGroup, Listing};
 use lint_sweep::Sweep;
 pub use lowering::ReceiverSyntax;

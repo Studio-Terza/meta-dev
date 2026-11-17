@@ -6,6 +6,7 @@ use lint_layout::Name;
 
 use super::Descend;
 use super::facts::Facts;
+use crate::Drawn;
 
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ident;)*) => {
@@ -291,7 +292,11 @@ impl<Folded: Fold> Folding<Folded> {
         visit.descend
     }
 
-    pub(super) fn left(&mut self, step: impl FnOnce(&Folded, Folded::Found) -> Folded::Found) {
+    pub fn drawn<Out>(&mut self, step: impl FnOnce(&Folded, Folded::Found) -> Drawn<Folded::Found, Out>) -> Out {
+        step(&self.fold, mem::take(&mut self.found)).parted(|kept| self.found = kept)
+    }
+
+    pub fn left(&mut self, step: impl FnOnce(&Folded, Folded::Found) -> Folded::Found) {
         self.found = step(&self.fold, mem::take(&mut self.found));
     }
 }
