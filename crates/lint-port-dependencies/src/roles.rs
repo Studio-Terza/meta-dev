@@ -14,7 +14,7 @@ use lint_file::Gleaning;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_placement::{CrateName as PlacedName, Role as Placed};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Folding, Gathers, Kind, Sweep, Visit, Watching};
 use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
@@ -68,7 +68,7 @@ impl Gleaning for RoleReading {
                 path: AsRef::<Path>::as_ref(found),
             })
         });
-        RootReading { place, denied: BTreeSet::new() }
+        RootReading { place, denials: Folding::from(Denials) }
     }
 }
 
@@ -81,32 +81,44 @@ struct RootPlace<'head> {
 #[derive(Debug)]
 pub struct RootReading<'head> {
     place: Option<RootPlace<'head>>,
-    denied: BTreeSet<UsePath>,
+    denials: Folding<Denials>,
 }
 
-impl<'ast> Watch<'ast> for RootReading<'_> {
+#[derive(Debug)]
+pub struct Denials;
+
+#[derive(Debug, Default)]
+pub struct Denied(BTreeSet<UsePath>);
+
+impl Fold for Denials {
+    type Found = Denied;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Attribute, Kind::Item]
     }
 
-    fn on_attribute(&mut self, attribute: &'ast syntax::Attribute, _: &Facts<'_, syntax::Attribute>) -> Descend {
-        self.denied.extend(Undenied::denied_by(attribute));
-        Descend::Over
+    fn on_attribute(
+        &self,
+        found: Denied,
+        attribute: &syntax::Attribute,
+        _: &Facts<'_, syntax::Attribute>,
+    ) -> Visit<Denied> {
+        Visit::new(Denied(found.0.into_iter().chain(Undenied::denied_by(attribute)).collect()), Descend::Over)
     }
 
-    fn on_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) -> Descend {
-        Descend::Over
+    fn on_item(&self, found: Denied, _: &syntax::Item, _: &Facts<'_, syntax::Item>) -> Visit<Denied> {
+        Visit::new(found, Descend::Over)
     }
 }
 
 impl<'head> Gathers<RoleFile<'head>> for RootReading<'head> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         let rooted = self.place.as_ref().map(|_| ());
-        rooted.map_or_default(|()| Sweep::alone(self))
+        rooted.map_or_default(|()| Sweep::alone(&mut self.denials))
     }
 
     fn gathered(self) -> RoleFile<'head> {
-        let denied = self.denied;
+        let denied = self.denials.concluded::<Denied>().0;
         RoleFile { root: self.place.map(|place| RootDenial { package: place.package, path: place.path, denied }) }
     }
 }
