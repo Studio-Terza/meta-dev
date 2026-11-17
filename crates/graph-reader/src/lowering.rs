@@ -29,7 +29,7 @@ use graph::{
     Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Implementation, Model, Mutation, Named,
     Origin, Output, Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
-use lint_core::{SourceFile, Syntax};
+use lint_core::{Extended, SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
@@ -474,24 +474,41 @@ pub(crate) struct Plot<'read> {
     grown: Vec<Grown>,
 }
 
+#[derive(Debug)]
+pub(crate) struct Grew<'read> {
+    plot: Plot<'read>,
+    slots: Vec<Slot>,
+}
+
+impl<'read> Grew<'read> {
+    pub(crate) fn sown<Sown>(self, sow: impl FnOnce(Plot<'read>, Vec<Slot>) -> Sown) -> Sown {
+        sow(self.plot, self.slots)
+    }
+}
+
 impl<'read> Plot<'read> {
-    pub(crate) fn rooted(&mut self, top: Top<'read>, file: FileId, lowered: Lowered) -> Vec<Slot> {
+    pub(crate) fn rooted(self, top: Top<'read>, file: FileId, lowered: Lowered) -> Grew<'read> {
         self.grown_at(top, file, Region::SHIPPED, lowered)
     }
 
-    pub(crate) fn planted(&mut self, slot: Slot, file: FileId, lowered: Lowered) -> Vec<Slot> {
+    pub(crate) fn planted(self, slot: Slot, file: FileId, lowered: Lowered) -> Grew<'read> {
         let top = Top::Child { parent: slot.scope, name: slot.name, visibility: slot.visibility };
         self.grown_at(top, file, slot.region, lowered)
     }
 
-    pub(crate) fn opaque(&mut self, slot: Slot) {
-        self.space.declare(slot.scope, Declared::new(slot.name, slot.visibility, DeclaredKind::OpaqueModule));
+    #[must_use]
+    pub(crate) fn opaque(self, slot: Slot) -> Plot<'read> {
+        let declared = Declared::new(slot.name, slot.visibility, DeclaredKind::OpaqueModule);
+        Plot { space: self.space.declared(slot.scope, declared), ..self }
     }
 
-    fn grown_at(&mut self, top: Top<'read>, file: FileId, outer: Region, lowered: Lowered) -> Vec<Slot> {
-        let base = self.space.placed(top, lowered.openings);
-        self.grown.push(Grown { file, base, outer, rows: lowered.rows });
-        lowered.slots.into_iter().map(|slot| slot.placed(base, outer)).collect()
+    fn grown_at(self, top: Top<'read>, file: FileId, outer: Region, lowered: Lowered) -> Grew<'read> {
+        let grown = self.grown;
+        self.space.placed(top, lowered.openings, |space, base| {
+            let rows = lowered.rows;
+            let slots = lowered.slots.into_iter().map(|slot| slot.placed(base, outer)).collect();
+            Grew { plot: Plot { space, grown: grown.extended([Grown { file, base, outer, rows }]) }, slots }
+        })
     }
 
     pub(crate) fn built(self, mut building: Building) -> Model {
@@ -567,9 +584,15 @@ impl<'read> Lowering<'read> {
         entries: Entries,
         children: Arc<Path>,
     ) -> Box<Lowering<'read>> {
-        let scope = self.lowered.openings.opened(self.here.scope(), kind, entries);
+        let scope = self.lowered.openings.next_scope();
+        let parent = self.here.scope();
         self.context = self.context.entered(kind);
         self.here = Seat::new(scope, children);
+        self.reopened(|openings| openings.opened(parent, kind, entries))
+    }
+
+    pub(super) fn reopened(mut self: Box<Self>, change: impl FnOnce(Openings) -> Openings) -> Box<Lowering<'read>> {
+        self.lowered.openings = change(self.lowered.openings);
         self
     }
 
@@ -584,9 +607,8 @@ impl<'read> Lowering<'read> {
         )
     }
 
-    pub(super) fn declared(mut self: Box<Self>, scope: ScopeId, declared: Declared) -> Box<Lowering<'read>> {
-        self.lowered.openings.declare(scope, declared);
-        self
+    pub(super) fn declared(self: Box<Self>, scope: ScopeId, declared: Declared) -> Box<Lowering<'read>> {
+        self.reopened(|openings| openings.declared(scope, declared))
     }
 
     fn defined(mut self: Box<Self>, group: BodyGroup) -> Box<Lowering<'read>> {

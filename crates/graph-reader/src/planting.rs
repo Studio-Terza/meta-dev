@@ -68,29 +68,33 @@ impl<'read> Files<'read> {
         self.0.get(path).map(|unplanted| unplanted.file)
     }
 
-    fn filled(self, planted: &mut Plot<'read>, slots: Vec<Slot>) -> Files<'read> {
-        slots.into_iter().fold(self, |mut files, slot| {
-            files.slot_filled(planted, slot);
-            files
-        })
+    fn rooted(self, plot: Plot<'read>, root: Unplanted<'read>) -> Sown<'read> {
+        let top = root.placing.top(CrateForm::Planted);
+        plot.rooted(top, root.file, root.lowered)
+            .sown(|grown, slots| slots.into_iter().fold(Sown { files: self, plot: grown }, Sown::slot_filled))
+    }
+}
+
+#[derive(Debug)]
+struct Sown<'read> {
+    files: Files<'read>,
+    plot: Plot<'read>,
+}
+
+impl<'read> Sown<'read> {
+    fn slot_filled(mut self, slot: Slot) -> Sown<'read> {
+        let child = slot.found(&self.files).and_then(|path| self.files.0.remove(path.as_path()));
+        self.grown(slot, child)
     }
 
-    fn rooted(self, planted: &mut Plot<'read>, root: Unplanted<'read>) -> Files<'read> {
-        let slots = planted.rooted(root.placing.top(CrateForm::Planted), root.file, root.lowered);
-        self.filled(planted, slots)
-    }
-
-    fn slot_filled(&mut self, planted: &mut Plot<'read>, slot: Slot) {
-        match slot.found(self) {
-            Some(path) => self.planted_at(planted, slot, &path),
-            None => planted.opaque(slot),
+    fn grown(self, slot: Slot, child: Option<Unplanted<'read>>) -> Sown<'read> {
+        match child {
+            Some(removed) => self
+                .plot
+                .planted(slot, removed.file, removed.lowered)
+                .sown(|plot, slots| slots.into_iter().fold(Sown { files: self.files, plot }, Sown::slot_filled)),
+            None => Sown { plot: self.plot.opaque(slot), files: self.files },
         }
-    }
-
-    fn planted_at(&mut self, planted: &mut Plot<'read>, slot: Slot, path: &Path) {
-        let child = self.0.remove(path);
-        let slots = child.map_or_default(|removed| planted.planted(slot, removed.file, removed.lowered));
-        *self = std::mem::take(self).filled(planted, slots);
     }
 }
 
@@ -108,20 +112,20 @@ impl<'read> CrateFiles<'read> {
         CrateFiles { root, files: Files(files) }
     }
 
-    fn planted(self, planted: &mut Plot<'read>) {
-        self.remaining(planted).0.into_values().for_each(|island| {
-            let slots = planted.rooted(island.placing.island(), island.file, island.lowered);
-            slots.into_iter().fold(&mut *planted, |opaqued, slot| {
-                opaqued.opaque(slot);
-                opaqued
-            });
-        });
+    fn planted(self, plot: Plot<'read>) -> Plot<'read> {
+        let remaining = self.remaining(plot);
+        remaining.files.0.into_values().fold(remaining.plot, |planted, island| {
+            let top = island.placing.island();
+            planted
+                .rooted(top, island.file, island.lowered)
+                .sown(|grown, slots| slots.into_iter().fold(grown, Plot::opaque))
+        })
     }
 
-    fn remaining(self, planted: &mut Plot<'read>) -> Files<'read> {
+    fn remaining(self, plot: Plot<'read>) -> Sown<'read> {
         match self.root {
-            Some(root) => self.files.rooted(planted, root),
-            None => self.files,
+            Some(root) => self.files.rooted(plot, root),
+            None => Sown { files: self.files, plot },
         }
     }
 }
@@ -166,9 +170,6 @@ impl<'read> Planting<'read> {
     }
 
     fn planted(self) -> Plot<'read> {
-        self.crates.into_iter().fold(Plot::default(), |mut planted, krate| {
-            krate.planted(&mut planted);
-            planted
-        })
+        self.crates.into_iter().fold(Plot::default(), |planted, krate| krate.planted(planted))
     }
 }

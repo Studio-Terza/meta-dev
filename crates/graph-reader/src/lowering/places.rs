@@ -151,11 +151,10 @@ impl<'read> Lowering<'read> {
             .contexted(|_| outer)
     }
 
-    pub(super) fn expanded(mut self: Box<Self>, invocation: &Macro) -> Box<Lowering<'read>> {
+    pub(super) fn expanded(self: Box<Self>, invocation: &Macro) -> Box<Lowering<'read>> {
         let items = Macros::items_in_file(self.source, invocation);
         let scope = self.here.scope();
-        self.lowered.openings.absorb(scope, Entries::of_items(&items));
-        self.reentered(items.iter())
+        self.reopened(|openings| openings.absorbed(scope, Entries::of_items(&items))).reentered(items.iter())
     }
 
     fn reentered<'item>(self: Box<Self>, items: impl Iterator<Item = &'item syntax::Item>) -> Box<Lowering<'read>> {
