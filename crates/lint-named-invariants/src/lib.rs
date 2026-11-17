@@ -26,8 +26,10 @@ impl ModelLint for UnnamedPanics {
 impl ModelLint for NamedInvariants {
     fn report(model: &Model) -> Report<'_> {
         Report::new(
-            Headline::new("report only, named invariants per crate: the invariant! assertions shipped code makes"),
-            Named::per_crate(model.uses()).into_iter().map(Violation::from).collect(),
+            Headline::new(
+                "report only, named invariants per crate: the invariant! assertions shipped code makes, and the errors it ignores with a named reason through ignoring",
+            ),
+            Named::per_crate(model.uses(), model.calls()).into_iter().map(Violation::from).collect(),
         )
     }
 }
