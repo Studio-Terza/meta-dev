@@ -18,7 +18,7 @@ impl<'file> Module<'file> {
 
     #[must_use]
     pub fn of_head(head: &'file FileHead) -> Module<'file> {
-        Module { crate_file: head.crate_file(), path: head.placement().module().segments().to_vec() }
+        Module { crate_file: head.crate_file(), path: AsRef::<[Name]>::as_ref(head.placement().module()).to_vec() }
     }
 
     #[must_use]

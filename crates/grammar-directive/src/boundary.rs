@@ -21,7 +21,7 @@ enum Token {
     Word(String),
     #[regex(r"new[ \t]+[A-Za-z_][A-Za-z0-9_-]*", Fresh::lexed)]
     Fresh(Fresh),
-    #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*\.(0|[1-9][0-9]*)", |lexer| Cited::read(lexer.slice()))]
+    #[regex(r"[A-Za-z0-9_][A-Za-z0-9_-]*\.(0|[1-9][0-9]*)", |lexer| lexer.slice().parse::<Cited>().ok())]
     Segment(Cited),
     #[regex(r#""([^"\\\r\n]|\\["\\])*""#, Quote::lexed)]
     Quoted(Quote),

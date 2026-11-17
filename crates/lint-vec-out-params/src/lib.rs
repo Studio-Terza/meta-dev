@@ -21,7 +21,7 @@ impl SweptLint for VecOutParams {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(OutParams { path: file.head().path(), violations: Vec::new() })
+        Box::new(OutParams { path: AsRef::<Path>::as_ref(file.head()), violations: Vec::new() })
     }
 }
 

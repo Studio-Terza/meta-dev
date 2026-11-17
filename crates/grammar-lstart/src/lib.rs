@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::Stamp;
+pub use boundary::{Stamp, Unstamped};

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use grammar::logos::Logos;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,23 +18,36 @@ enum Index {
     Ordinal(u32),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Unanchored {
+    #[error("{0:?} names no message: an anchor is a message id, optionally followed by # and an index")]
+    Messageless(String),
+    #[error("{0:?} has something after # that is not one plain index, as in #3")]
+    Unindexed(String),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Anchoring {
     message: String,
     ordinal: Option<u32>,
 }
 
-impl Anchoring {
-    #[must_use]
-    pub fn read(text: &str) -> Option<Anchoring> {
-        let spelled: Vec<Spelling<'_>> = Spelling::lexer(text).collect::<Result<_, ()>>().ok()?;
-        let (message, rest) = spelled.split_first()?;
+impl FromStr for Anchoring {
+    type Err = Unanchored;
+
+    fn from_str(text: &str) -> Result<Anchoring, Unanchored> {
+        let spelled: Vec<Spelling<'_>> = Spelling::lexer(text).collect::<Result<_, ()>>().unwrap_or_default();
+        let (first, rest) = spelled.split_first().ok_or_else(|| Unanchored::Messageless(text.to_owned()))?;
+        let message = first.message().ok_or_else(|| Unanchored::Messageless(text.to_owned()))?;
         let ordinal = rest
             .first()
-            .map_or(Some(None), |_hash| <&[Spelling<'_>; 2]>::try_from(rest).ok().and_then(Index::hashed).map(Some));
-        message.message().zip(ordinal).map(|(said, index)| Anchoring { message: said.to_owned(), ordinal: index })
+            .map_or(Some(None), |_hash| <&[Spelling<'_>; 2]>::try_from(rest).ok().and_then(Index::hashed).map(Some))
+            .ok_or_else(|| Unanchored::Unindexed(text.to_owned()))?;
+        Ok(Anchoring { message: message.to_owned(), ordinal })
     }
+}
 
+impl Anchoring {
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message

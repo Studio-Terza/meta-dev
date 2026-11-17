@@ -29,10 +29,6 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn name(&self) -> &CrateName {
-        &self.name
-    }
-
     pub fn package_id(&self) -> Option<&PackageId> {
         self.id.as_ref()
     }
@@ -89,6 +85,12 @@ impl Package {
         &'package self,
         members: &BTreeMap<&CrateName, &Path>,
     ) -> impl Iterator<Item = &'package CrateName> {
-        self.dependencies.iter().map(Dependency::name).filter(|name| members.contains_key(*name))
+        self.dependencies.iter().map(AsRef::<CrateName>::as_ref).filter(|name| members.contains_key(*name))
+    }
+}
+
+impl AsRef<CrateName> for Package {
+    fn as_ref(&self) -> &CrateName {
+        &self.name
     }
 }

@@ -1,4 +1,5 @@
 use std::mem;
+use std::path::Path;
 use std::sync::{Mutex, PoisonError};
 
 use crate::repo_file::RepoFile;
@@ -60,7 +61,7 @@ impl Readout {
 
     #[must_use]
     pub fn sorted(mut self) -> Readout {
-        self.files.sort_by(|left, right| left.head().path().cmp(right.head().path()));
+        self.files.sort_by(|left, right| AsRef::<Path>::as_ref(left.head()).cmp(AsRef::<Path>::as_ref(right.head())));
         self.repo_files.sort();
         self.repo_files.dedup();
         self

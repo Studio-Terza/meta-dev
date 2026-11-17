@@ -40,7 +40,7 @@ impl SweptLint for NoFreeFns {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(FreeFns { path: file.head().path(), found: Vec::new() })
+        Box::new(FreeFns { path: AsRef::<StdPath>::as_ref(file.head()), found: Vec::new() })
     }
 }
 

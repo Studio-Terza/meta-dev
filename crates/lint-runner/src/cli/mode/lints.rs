@@ -171,7 +171,7 @@ impl Lints {
         Entry::spelled::<ProcessStarters>(Work::Modelled(<ProcessStarters as ModelLint>::report)),
         Entry::spelled::<RawResources>(Work::Modelled(<RawResources as ModelLint>::report)),
         <Ruled<PublicSurface> as Registered>::ENTRY,
-        <Ruled<RepeatedMethods> as Registered>::ENTRY,
+        Entry::spelled::<RepeatedMethods>(Work::Modelled(<RepeatedMethods as ModelLint>::report)),
         <Primed<StateGraph> as Registered>::ENTRY,
         <Ruled<GuardMustUse> as Registered>::ENTRY,
         <Judged<PublicApiTests> as Registered>::ENTRY,
@@ -531,7 +531,7 @@ pub(crate) struct Filer<'file> {
 
 impl<'file> Filer<'file> {
     pub(crate) fn started(claimed: Claimed<'file>) -> Filer<'file> {
-        let file = claimed.file();
+        let file = <&SourceFile>::from(claimed);
         let admitted: Vec<Admitted> = Lints::LINTS
             .iter()
             .enumerate()
@@ -583,7 +583,7 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
 
     fn gathered(self) -> FileWork<'file> {
         let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
-        let file = claimed.file();
+        let file = <&SourceFile>::from(claimed);
         let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found()]));
         let watched = listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, watcher.sorted())));
         let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));

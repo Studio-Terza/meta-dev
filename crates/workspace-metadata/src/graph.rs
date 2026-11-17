@@ -43,7 +43,7 @@ impl<'meta> FromIterator<&'meta Metadata> for Graph<'meta> {
             metadata.packages().iter().filter_map(|package| Some((package.package_id()?, package))).for_each(
                 |(id, package)| {
                     graph.packages.insert(id, package);
-                    graph.named.entry(package.name()).or_default().insert(id);
+                    graph.named.entry(AsRef::<CrateName>::as_ref(package)).or_default().insert(id);
                 },
             );
             graph.members.extend(metadata.members());
@@ -61,7 +61,8 @@ impl<'meta> Graph<'meta> {
             let reached = Closure::reached(&self.normal, BTreeSet::from([*id])).into_inner();
             (*id, reached.intersection(&self.members).copied().filter(|other| other != id).collect())
         });
-        Chain::from(below.collect::<BTreeMap<_, _>>()).placed(|id| self.packages.get(id).map(|package| package.name()))
+        Chain::from(below.collect::<BTreeMap<_, _>>())
+            .placed(|id| self.packages.get(id).map(|package| AsRef::<CrateName>::as_ref(*package)))
     }
 
     #[must_use]
@@ -75,13 +76,13 @@ impl<'meta> Graph<'meta> {
                 let owners: BTreeSet<&CrateName> = claims
                     .owners(dependent, required)
                     .into_iter()
-                    .filter_map(|owner| Some(self.package(owner)?.name()))
+                    .filter_map(|owner| Some(AsRef::<CrateName>::as_ref(self.package(owner)?)))
                     .collect();
-                let required_name = self.package(required)?.name();
+                let required_name = AsRef::<CrateName>::as_ref(self.package(required)?);
                 let dependent_package = self.package(dependent)?;
                 Some(owners).filter(|named| named.first().is_some()).map(|named| {
                     (
-                        dependent_package.name(),
+                        AsRef::<CrateName>::as_ref(dependent_package),
                         required_name,
                         Bypass::new(named, dependent_package.keys(required_name).collect()),
                     )
@@ -106,7 +107,7 @@ impl<'meta> Graph<'meta> {
             self.package(id).and_then(Package::port).and_then(PortTable::dependents).is_some_and(|named| named == role)
         });
         let named: Served<'meta> = self.declaring(role).into_iter().chain(ported).collect();
-        named.closed(self).iter().filter_map(|id| Some(self.package(id)?.name())).collect()
+        named.closed(self).iter().filter_map(|id| Some(AsRef::<CrateName>::as_ref(self.package(id)?))).collect()
     }
 
     pub(super) fn declaring(&self, role: Role) -> BTreeSet<&'meta PackageId> {

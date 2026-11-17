@@ -2,4 +2,4 @@
 
 mod boundary;
 
-pub use boundary::Anchoring;
+pub use boundary::{Anchoring, Unanchored};

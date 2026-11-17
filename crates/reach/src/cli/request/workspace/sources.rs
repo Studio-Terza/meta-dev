@@ -1,19 +1,16 @@
+use newtype::Newtype;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Newtype, Debug)]
 pub struct Sources<'meta> {
     directories: BTreeSet<&'meta Path>,
 }
 
-impl<'meta> Sources<'meta> {
+impl Sources<'_> {
     const MANIFEST: &'static str = "Cargo.toml";
     const SOURCE_TREE: &'static str = "src/**";
-
-    pub fn new(directories: BTreeSet<&'meta Path>) -> Sources<'meta> {
-        Sources { directories }
-    }
 }
 
 impl fmt::Display for Sources<'_> {

@@ -94,7 +94,7 @@ impl ContextLint for NoTestOnlyApi {
     type Gathering<'head> = FileManifest<'head>;
 
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> FileManifest<'head> {
-        FileManifest { path: parsed.head().path(), package: parsed.head().placement().package() }
+        FileManifest { path: AsRef::<Path>::as_ref(parsed.head()), package: parsed.head().placement().package() }
     }
 }
 
@@ -103,11 +103,11 @@ impl WatchingLint for NoTestOnlyApi {
     type Watched<'file> = Offered<'file>;
 
     fn watched(file: &SourceFile) -> Offered<'_> {
-        let path = file.head().path();
+        let path = AsRef::<Path>::as_ref(file.head());
         let shipped = file.shipped().map(|_| ());
         let gated =
-            shipped.into_iter().fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(GatedItems::new(path))));
-        let watchers = gated.and(Box::new(TestFeatures::new(path)));
+            shipped.into_iter().fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(GatedItems::from(path))));
+        let watchers = gated.and(Box::new(TestFeatures::from(path)));
         Offered { watchers, found: Vec::new() }
     }
 
@@ -116,7 +116,7 @@ impl WatchingLint for NoTestOnlyApi {
         found: Offered<'file>,
         test_only: &TestOnly<'head>,
     ) -> Vec<Violation<'file>> {
-        let path = file.head().path();
+        let path = AsRef::<Path>::as_ref(file.head());
         let package = file.head().placement().package();
         let manifest =
             test_only.manifests.get(package).filter(|last| **last == path).map(|_| Self::in_manifest(package, file));

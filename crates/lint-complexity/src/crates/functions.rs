@@ -1,3 +1,4 @@
+use std::path::Path;
 use syntax::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
 use graph_reader::{Branches, Propagation};
@@ -43,7 +44,7 @@ impl<'file> Functions<'file> {
 
     fn recorded(&mut self, attributes: &[Attribute], name: &Ident, body: Option<&Block>) -> Descend {
         let line = LineNumber::from(name.span());
-        let site = Site::new(self.file.head().path(), line);
+        let site = Site::new(AsRef::<Path>::as_ref(self.file.head()), line);
         let opened = body
             .filter(|_| Walk::outside_tests(attributes) == Walk::Entered)
             .filter(|_| TestMarks::mark_test(attributes).is_none())

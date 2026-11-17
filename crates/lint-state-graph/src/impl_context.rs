@@ -28,7 +28,7 @@ impl<'found> ImplContext<'found> {
     }
 
     pub fn edge_name(&self, function: &WrittenFn) -> Name {
-        self.kind.trait_name().map_or_else(|| function.name().clone(), Name::clone)
+        self.kind.trait_name().map_or_else(|| AsRef::<Name>::as_ref(function).clone(), Name::clone)
     }
 
     pub fn edge_source(&self, shape: &FunctionShape<'found, '_>) -> Option<&'found TypeName> {

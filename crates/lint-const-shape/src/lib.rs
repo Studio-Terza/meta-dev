@@ -36,7 +36,7 @@ impl SweptLint for ConstShape {
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
         Box::new(ConstContexts {
-            path: file.head().path(),
+            path: AsRef::<Path>::as_ref(file.head()),
             context: Contexts { current: Context::Surface, outer: Vec::new() },
             zone: Zone::of_file(file),
             zones: Vec::new(),

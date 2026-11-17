@@ -68,7 +68,7 @@ impl<'model> Reading<'model> {
     fn implemented(&self, implementation: &Implementation) -> Option<Profile<'model>> {
         let resolved: &Resolved = implementation.subject_type().named()?.as_ref();
         let typed = self.types.get(&resolved.crate_item()?)?;
-        let listed = implementation.written().map_or(&Self::DERIVED[..], |_| &Self::TRAITS[..]);
+        let listed = implementation.hand_written().map_or(&Self::DERIVED[..], |_| &Self::TRAITS[..]);
         let name = implementation.interface_name().filter(|found| found.matches::<Whole>(listed).is_some())?;
         Some(Profile::declared(Self::subject(*typed), typed.site, Exposure::Private, vec![name.clone()]))
     }

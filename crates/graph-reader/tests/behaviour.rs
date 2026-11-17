@@ -453,7 +453,7 @@ impl Read {
     fn written_sites(files: &[SourceFile]) -> Vec<String> {
         Reader::read_files(files)
             .implementations()
-            .filter_map(|found| found.entity().written().map(|_| found.site().to_string()))
+            .filter_map(|found| found.entity().hand_written().map(|_| found.site().to_string()))
             .collect()
     }
 }

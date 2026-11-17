@@ -53,7 +53,7 @@ impl<'found> Frontier<'found> {
     }
 
     fn ended(&self, to: &Name) -> Option<Vec<Member<'found>>> {
-        self.layer.iter().find(|member| member.name() == to).map(|end| self.walked(*end))
+        self.layer.iter().find(|member| <&Name>::from(**member) == to).map(|end| self.walked(*end))
     }
 
     fn widened(mut self, view: &Containment<'found, '_>) -> Option<Frontier<'found>> {

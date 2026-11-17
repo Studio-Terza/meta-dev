@@ -43,7 +43,7 @@ impl<'meta> Unit<'meta> {
             .filter_map(|(declarer, owned)| {
                 graph.resolved(owned).find(|id| reach.contains(id)).map_or(Some((declarer, owned)), |_reached| None)
             })
-            .filter_map(|(declarer, owned)| Some((graph.package(declarer)?.name(), owned)))
+            .filter_map(|(declarer, owned)| Some((AsRef::<CrateName>::as_ref(graph.package(declarer)?), owned)))
             .collect()
     }
 

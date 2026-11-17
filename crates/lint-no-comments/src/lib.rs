@@ -1,6 +1,7 @@
 use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
+use std::path::Path;
 
 use lint_core::Fix;
 use lint_core::Message;
@@ -20,7 +21,7 @@ impl FileLint for NoComments {
 
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let lines = Self::comment_lines(file.text()).into_iter();
-        lines.map(|line| Violation::new(Site::new(file.head().path(), line), Self::COMMENT)).collect()
+        lines.map(|line| Violation::new(Site::new(AsRef::<Path>::as_ref(file.head()), line), Self::COMMENT)).collect()
     }
 }
 

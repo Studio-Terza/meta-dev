@@ -14,11 +14,6 @@ impl<'meta> Chained<'meta> {
     pub(crate) fn new(name: &'meta CrateName, depth: usize, below: usize, above: usize) -> Chained<'meta> {
         Chained { depth, below, above, name }
     }
-
-    #[must_use]
-    pub fn name(&self) -> &'meta CrateName {
-        self.name
-    }
 }
 
 impl fmt::Display for Chained<'_> {
@@ -28,5 +23,11 @@ impl fmt::Display for Chained<'_> {
             "depth {} on the compile chain, {} workspace crates below it, {} above it",
             self.depth, self.below, self.above
         )
+    }
+}
+
+impl AsRef<CrateName> for Chained<'_> {
+    fn as_ref(&self) -> &CrateName {
+        self.name
     }
 }

@@ -212,7 +212,7 @@ impl TraitEntries<'_> {
             .into_iter()
             .chain(filler)
             .map(Entries::from)
-            .fold(Entries::default(), Entries::merged)
+            .collect::<Entries>()
     }
 }
 
@@ -284,7 +284,7 @@ impl Imported {
                 .iter()
                 .copied()
                 .map(|domain| Entries::from(Import { name: name.clone(), path: path.clone(), visibility, domain }))
-                .fold(Entries::default(), Entries::merged),
+                .collect::<Entries>(),
             Imported::Glob(path) => Entries::from(Glob { source: GlobSource::Path(path), visibility }),
         }
     }
@@ -426,10 +426,7 @@ impl From<&Macro> for Entries {
 impl From<&ItemUse> for Entries {
     fn from(used: &ItemUse) -> Entries {
         let visibility = Visibility::from(&used.vis);
-        UsePath::imported(used)
-            .into_iter()
-            .map(|imported| imported.entries(visibility))
-            .fold(Entries::default(), Entries::merged)
+        UsePath::imported(used).into_iter().map(|imported| imported.entries(visibility)).collect::<Entries>()
     }
 }
 
@@ -462,7 +459,7 @@ impl From<&Item> for Entries {
                 .into_iter()
                 .chain([Declared::named_item(&declared.sig.ident, &declared.vis, ItemKind::Function).valued()])
                 .map(Entries::from)
-                .fold(Entries::default(), Entries::merged),
+                .collect::<Entries>(),
             Item::Const(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Const).valued())
             }
@@ -486,15 +483,17 @@ impl From<&Stmt> for Entries {
 
 impl Entries {
     pub(crate) fn of_items(items: &[Item]) -> Entries {
-        items.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
+        items.iter().map(Entries::from).collect::<Entries>()
     }
 
     pub(crate) fn of_root(file: &File) -> Entries {
-        Entries::of_items(&file.items).merged(Entries::of_items(&MacroTree::expanded_items(&file.items)))
+        [Entries::of_items(&file.items), Entries::of_items(&MacroTree::expanded_items(&file.items))]
+            .into_iter()
+            .collect()
     }
 
     pub(crate) fn of_block(statements: &[Stmt]) -> Entries {
-        statements.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
+        statements.iter().map(Entries::from).collect::<Entries>()
     }
 
     pub(super) fn declare(&mut self, declared: Declared) {
@@ -626,11 +625,17 @@ impl Entries {
         globs.fold(with_named, CrateExports::with_glob)
     }
 
-    pub(crate) fn merged(mut self, other: Entries) -> Entries {
+    fn merged(mut self, other: Entries) -> Entries {
         self.declared.extend(other.declared);
         self.imports.extend(other.imports);
         other.externs.into_iter().for_each(|(name, externs)| self.externs.entry(name).or_default().extend(externs));
         self.globs.extend(other.globs);
         self
+    }
+}
+
+impl FromIterator<Entries> for Entries {
+    fn from_iter<Parts: IntoIterator<Item = Entries>>(parts: Parts) -> Entries {
+        parts.into_iter().fold(Entries::default(), Entries::merged)
     }
 }

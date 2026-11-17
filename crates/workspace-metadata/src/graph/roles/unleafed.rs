@@ -47,8 +47,15 @@ impl<'meta> Unleafed<'meta> {
         let at_compile = admitted.map(|_| ()).or(dependency.proc_macro().map(|_| ()));
         let held =
             at_compile.map_or_else(|| owned.first_in(&graph.normal_reach(required, owned.compiled())), |()| None)?;
-        let breaching = Breaching::new(lexer.name(), lexer.keys(dependency.name()).collect());
-        Some(Unleafed { breaching, dependency: dependency.name(), owned: graph.package(held)?.name() })
+        let breaching = Breaching::new(
+            AsRef::<CrateName>::as_ref(lexer),
+            lexer.keys(AsRef::<CrateName>::as_ref(dependency)).collect(),
+        );
+        Some(Unleafed {
+            breaching,
+            dependency: AsRef::<CrateName>::as_ref(dependency),
+            owned: AsRef::<CrateName>::as_ref(graph.package(held)?),
+        })
     }
 }
 

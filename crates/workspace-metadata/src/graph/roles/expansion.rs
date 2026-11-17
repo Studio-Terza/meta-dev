@@ -28,10 +28,10 @@ impl<'meta> Expansion<'meta> {
         let expanders = declared.expanders()?;
         let declaring = graph.declaring(expanders.role());
         Some(Expansion {
-            port: graph.package(unit.port())?.name(),
+            port: AsRef::<CrateName>::as_ref(graph.package(unit.port())?),
             expanders,
-            unit: unit.members().iter().filter_map(|id| Some(graph.package(id)?.name())).collect(),
-            declaring: declaring.iter().filter_map(|id| Some(graph.package(id)?.name())).collect(),
+            unit: unit.members().iter().filter_map(|id| Some(AsRef::<CrateName>::as_ref(graph.package(id)?))).collect(),
+            declaring: declaring.iter().filter_map(|id| Some(AsRef::<CrateName>::as_ref(graph.package(id)?))).collect(),
         })
     }
 

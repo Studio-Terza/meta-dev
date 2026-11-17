@@ -54,7 +54,12 @@ impl SweptLint for TypeShape {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(TypeShapes { path: file.head().path(), violations: Vec::new(), roots: Vec::new(), open: Vec::new() })
+        Box::new(TypeShapes {
+            path: AsRef::<Path>::as_ref(file.head()),
+            violations: Vec::new(),
+            roots: Vec::new(),
+            open: Vec::new(),
+        })
     }
 }
 

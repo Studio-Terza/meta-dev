@@ -27,7 +27,7 @@ impl<'model> From<&'model Model> for ModelCalls<'model> {
             .map(|placed| Called::invoked(placed, &named));
         let derived = model
             .implementations()
-            .filter(|placed| placed.entity().written().is_none())
+            .filter(|placed| placed.entity().hand_written().is_none())
             .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
             .filter_map(|placed| Called::derived(placed, &named));
         ModelCalls(invoked.chain(derived).collect())

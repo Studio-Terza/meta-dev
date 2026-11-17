@@ -37,10 +37,6 @@ impl Export {
         Export { name: Name::from(&module.ident), line: LineNumber::from(module.ident.span()) }
     }
 
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-
     pub fn line(&self) -> LineNumber {
         self.line
     }
@@ -48,5 +44,11 @@ impl Export {
     fn leaves(tree: &UseTree) -> Vec<Export> {
         let bound = UseLeaf::of_tree(tree).into_iter().filter_map(|leaf| leaf.end().bound());
         bound.map(|ident| Export { name: Name::from(ident), line: LineNumber::from(ident.span()) }).collect()
+    }
+}
+
+impl AsRef<Name> for Export {
+    fn as_ref(&self) -> &Name {
+        &self.name
     }
 }

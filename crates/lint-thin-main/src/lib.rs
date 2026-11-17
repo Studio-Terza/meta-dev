@@ -1,3 +1,4 @@
+use std::path::Path;
 mod finding;
 
 use finding::Finding;
@@ -28,7 +29,12 @@ impl FileLint for ThinMain {
             let outside = items.iter().filter(|item| Self::thin(item).is_none()).map(Self::keyword);
             let logic = outside.chain(inside_main);
             logic
-                .map(|span| Violation::new(Site::new(root.head().path(), LineNumber::from(span)), Finding::Logic))
+                .map(|span| {
+                    Violation::new(
+                        Site::new(AsRef::<Path>::as_ref(root.head()), LineNumber::from(span)),
+                        Finding::Logic,
+                    )
+                })
                 .collect()
         })
     }

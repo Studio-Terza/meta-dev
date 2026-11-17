@@ -43,17 +43,17 @@ impl<'path> Target<'path> {
         path: &'path UsePath,
         modules: &ModuleIndex<'_>,
     ) -> Option<Target<'path>> {
-        let first = path.segments().first()?;
+        let first = AsRef::<[Name]>::as_ref(path).first()?;
         let start = Self::start(Start::spelled(first), file)?;
         let anchor = first.matches::<Whole>(&Self::ANCHORS);
         let crate_root = AsRef::<Nest<'_>>::as_ref(file).krate()?;
         let child: Vec<&Name> = <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(file)).iter().chain([first]).collect();
         anchor.map(|_| ()).or_else(|| modules.same_as(crate_root, &child).map(|_| ()))?;
         let skip = anchor.into_iter().count();
-        let segments =
-            path.segments().iter().skip(skip).try_fold(start.iter().collect(), |segments, segment| {
-                Start::spelled(segment).advance(segments, segment)
-            })?;
+        let segments = AsRef::<[Name]>::as_ref(path)
+            .iter()
+            .skip(skip)
+            .try_fold(start.iter().collect(), |segments, segment| Start::spelled(segment).advance(segments, segment))?;
         Some(Target { crate_root, segments })
     }
 

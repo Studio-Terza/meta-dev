@@ -1,3 +1,5 @@
+use lint_layout::Name;
+use std::path::Path;
 mod export;
 mod finding;
 mod foreign_references;
@@ -49,7 +51,7 @@ impl ContextLint for PublicSurface {
     type Gathering<'head> = ReferenceGathering;
 
     fn gathering(parsed: Parsed<'_, '_>) -> ReferenceGathering {
-        ReferenceGathering(Reading::from(parsed.file()))
+        ReferenceGathering(Reading::from(<&SourceFile>::from(parsed)))
     }
 }
 
@@ -67,8 +69,8 @@ impl PublicSurface {
             .filter(|export| references.0.unnamed(&crate_name, export).is_some())
             .map(|export| {
                 Violation::new(
-                    Site::new(file.head().path(), export.line()),
-                    Finding::UnnamedExport { name: export.name() },
+                    Site::new(AsRef::<Path>::as_ref(file.head()), export.line()),
+                    Finding::UnnamedExport { name: AsRef::<Name>::as_ref(&export) },
                 )
             })
             .collect()

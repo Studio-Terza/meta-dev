@@ -1,5 +1,6 @@
 use lint_core::{Fix, Headline, Lint, Message, Problem, Report, Site, SourceFile, Violation};
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use std::path::Path;
 
 const SOURCES: &[Source] = &[Source::new(Located::new("a.rs"), Text::new("struct A;\n"))];
 
@@ -31,7 +32,7 @@ impl Lint for EveryFile {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let flagged = files.iter().map(|file| {
             Violation::new(
-                Site::of_file(file.head().path()),
+                Site::of_file(AsRef::<Path>::as_ref(file.head())),
                 Message::new(Problem::new("flagged"), Fix::new("unflag it")),
             )
         });

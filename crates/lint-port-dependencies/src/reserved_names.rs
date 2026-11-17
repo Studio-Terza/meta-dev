@@ -1,3 +1,4 @@
+use std::path::Path;
 mod counted_name;
 mod sqlx_name;
 
@@ -53,7 +54,7 @@ impl ReservedNames {
     }
 
     fn kept<'file, Reserving: Reserved>(file: &'file SourceFile, spelled: &[Spelled]) -> Vec<Violation<'file>> {
-        let path = file.head().path();
+        let path = AsRef::<Path>::as_ref(file.head());
         let name: &Name = file.head().placement().package().crate_name().borrow();
         let outside = name.matches::<Whole>(&Reserving::OWNERS).map_or(Some(spelled), |_| None);
         let named =

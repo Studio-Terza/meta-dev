@@ -1,16 +1,11 @@
+use newtype::Newtype;
 use std::fmt;
 
 use super::reached::Reached;
 
-#[derive(Debug)]
+#[derive(Newtype, Debug)]
 pub struct History<'meta> {
     reached: Reached<'meta>,
-}
-
-impl<'meta> History<'meta> {
-    pub fn new(reached: Reached<'meta>) -> History<'meta> {
-        History { reached }
-    }
 }
 
 impl fmt::Display for History<'_> {

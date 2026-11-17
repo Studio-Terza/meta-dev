@@ -1,4 +1,5 @@
 use std::iter;
+use std::path::Path;
 use std::path::PathBuf;
 
 use graph::{Model, Reach};
@@ -104,7 +105,10 @@ impl<'read> Listing<'read> {
                             .map(|(module, (listed, reached))| ListedFile {
                                 source: listed,
                                 reach: reached,
-                                order: Order { file: source.head().path().to_path_buf(), module: ModuleIndex(module) },
+                                order: Order {
+                                    file: AsRef::<Path>::as_ref(source.head()).to_path_buf(),
+                                    module: ModuleIndex(module),
+                                },
                             })
                             .collect(),
                     )

@@ -1,3 +1,4 @@
+use lint_core::SourceFile;
 mod finding;
 mod module_path;
 mod reexport_count;
@@ -63,16 +64,16 @@ pub struct ModuleGathering<'head> {
 impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> ModuleGathering<'head> {
         let head = parsed.head();
-        let file = parsed.file();
+        let file = <&SourceFile>::from(parsed);
         let module = file.shipped().map(|_| {
             let tests = file.test_modules().iter().map(|test| TestUses {
-                segments: test.head().placement().module().segments().to_vec(),
+                segments: AsRef::<[Name]>::as_ref(test.head().placement().module()).to_vec(),
                 uses: Sweep::gathered(test, UsePaths::default()),
             });
             ModuleUses {
-                file: head.path(),
+                file: AsRef::<Path>::as_ref(head),
                 crate_root: head.placement().crate_root(),
-                segments: head.placement().module().segments(),
+                segments: AsRef::<[Name]>::as_ref(head.placement().module()),
                 reexports: ReexportCount::of_file(file.syntax()),
                 uses: Vec::new(),
                 tests: tests.collect(),
