@@ -8,17 +8,17 @@ use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, T
 
 use body_lifts::{Body, BodyReading, Branching};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
-use lint_core::{Folding, Syntax};
+use lint_core::{Extended, Fold, Folding, Syntax, Visit};
 use lint_layout::{Name, Whole, Word};
-use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watching};
 
 use crate::branches::{Branches, Propagation};
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
 pub(super) use boundary::RowIndex;
-use reads::{Reads, ReadsLowered, SharedParameters};
-use repetitions::Repetitions;
+use reads::{Reading, Reads, ReadsLowered, SharedParameters};
+use repetitions::{Repeats, Repetitions};
 
 #[derive(Debug)]
 enum LoweredReceiving {
@@ -45,6 +45,12 @@ pub(super) struct LoweredDefinition {
 }
 
 #[derive(Debug)]
+struct Invoking;
+
+#[derive(Debug)]
+struct Rebinding;
+
+#[derive(Debug)]
 struct Calling {
     receiver: Option<Address>,
     called: Option<CallOrder>,
@@ -67,11 +73,11 @@ pub(crate) struct BodyGroup {
     parameters: BTreeMap<Name, TypeRef<Written>>,
     shared: SharedParameters,
     tail: Option<Address>,
-    rebound: Rebound,
-    invocations: Invocations,
+    rebound: Folding<Rebinding>,
+    invocations: Folding<Invoking>,
     branches: Folding<Branches>,
-    repetitions: Repetitions,
-    reads: Reads,
+    repetitions: Folding<Repeats>,
+    reads: Folding<Reading>,
 }
 
 impl BodyGroup {
@@ -109,11 +115,11 @@ impl BodyGroup {
             parameters,
             shared: Reads::shared_parameters(signature),
             tail: Reads::tail_call(body),
-            rebound: Rebound::default(),
-            invocations: Invocations::default(),
+            rebound: Folding::from(Rebinding),
+            invocations: Folding::from(Invoking),
             branches: Folding::from(Branches::new(Propagation::Ambient)),
-            repetitions: Repetitions::of_signature(signature),
-            reads: Reads::default(),
+            repetitions: Folding::from(Repeats::of_signature(signature)),
+            reads: Folding::from(Reading),
         }
     }
 
@@ -122,16 +128,18 @@ impl BodyGroup {
     }
 
     pub(super) fn lowered(self) -> LoweredDefinition {
-        let read = self.reads.settled(&self.scope, self.shared, self.tail, &self.rebound.0);
-        let bound = self.rebound.0.iter().fold(self.parameters, |mut kept: BTreeMap<Name, TypeRef<Written>>, name| {
+        let rebound: Rebound = self.rebound.concluded();
+        let invocations: Invocations = self.invocations.concluded();
+        let read = self.reads.concluded::<Reads>().settled(&self.scope, self.shared, self.tail, &rebound.0);
+        let bound = rebound.0.iter().fold(self.parameters, |mut kept: BTreeMap<Name, TypeRef<Written>>, name| {
             kept.remove(name);
             kept
         });
         LoweredDefinition {
             shape: self.shape,
             branching: self.branches.concluded(),
-            invocations: self.invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
-            repetitions: self.repetitions.found(),
+            invocations: invocations.made.into_iter().map(|made| made.bound(&bound)).collect(),
+            repetitions: self.repetitions.concluded::<Repetitions>().found(),
             reads: read,
         }
     }
@@ -203,8 +211,9 @@ impl LoweredReceiving {
 }
 
 impl Calling {
-    fn marked(&mut self, latest: Option<CallOrder>) {
-        self.called = latest;
+    fn marked(self, at: Address, latest: Option<CallOrder>) -> Calling {
+        let called = self.receiver.filter(|receiver| *receiver == at).map_or(self.called, |_| latest);
+        Calling { called, ..self }
     }
 }
 
@@ -228,15 +237,12 @@ impl Invocations {
         name.matches::<Whole>(&[Self::OWNER]).map_or(LoweredReceiving::Named(name), |_| LoweredReceiving::Owner)
     }
 
-    fn made(&mut self, made: Option<LoweredInvocation>, at: Address) -> Descend {
-        self.made.extend(made);
-        let latest = CallOrder::latest(&self.made);
-        self.calling
-            .last_mut()
-            .into_iter()
-            .filter(|calling| calling.receiver == Some(at))
-            .for_each(|calling| calling.marked(latest));
-        Descend::Into
+    fn made(self, invocation: Option<LoweredInvocation>, at: Address) -> Invocations {
+        let made = self.made.extended(invocation);
+        let latest = CallOrder::latest(&made);
+        let mut calling = self.calling;
+        let top = calling.pop().map(|open| open.marked(at, latest));
+        Invocations { made, calling: calling.extended(top) }
     }
 
     fn receiving(receiver: &Expr) -> Option<Address> {
@@ -248,47 +254,62 @@ impl Invocations {
     }
 }
 
-impl<'ast> Watch<'ast> for Invocations {
+impl Fold for Invoking {
+    type Found = Invocations;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Item, Kind::ExprMethodCall, Kind::ExprCall]
     }
 
-    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
-        Descend::Over
+    fn on_item(&self, found: Invocations, _: &Item, _: &Facts<'_, Item>) -> Visit<Invocations> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_expr_method_call(&mut self, found: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.calling.push(Calling { receiver: Self::receiving(&found.receiver), called: None });
-        Descend::Into
+    fn on_expr_method_call(
+        &self,
+        found: Invocations,
+        call: &ExprMethodCall,
+        _: &Facts<'_, ExprMethodCall>,
+    ) -> Visit<Invocations> {
+        let opened = Calling { receiver: Invocations::receiving(&call.receiver), called: None };
+        Visit::descending(Invocations { calling: found.calling.extended([opened]), ..found })
     }
 
-    fn off_expr_method_call(&mut self, found: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) {
-        let called = self.calling.pop().and_then(|calling| calling.called);
-        let receiver = Self::receiver(&found.receiver, called);
-        self.made(Some(LoweredInvocation::Method { receiver, name: Name::from(&found.method) }), Address::from(found));
+    fn off_expr_method_call(
+        &self,
+        found: Invocations,
+        call: &ExprMethodCall,
+        _: &Facts<'_, ExprMethodCall>,
+    ) -> Invocations {
+        let mut calling = found.calling;
+        let called = calling.pop().and_then(|open| open.called);
+        let receiver = Invocations::receiver(&call.receiver, called);
+        Invocations { calling, ..found }
+            .made(Some(LoweredInvocation::Method { receiver, name: Name::from(&call.method) }), Address::from(call))
     }
 
-    fn off_expr_call(&mut self, found: &'ast ExprCall, _: &Facts<'_, ExprCall>) {
-        let segments: Vec<Name> = Syntax::expr_path(&found.func)
+    fn off_expr_call(&self, found: Invocations, call: &ExprCall, _: &Facts<'_, ExprCall>) -> Invocations {
+        let segments: Vec<Name> = Syntax::expr_path(&call.func)
             .map_or_default(|path| path.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect());
         let owner = segments.iter().rev().nth(1).cloned();
         let made = segments.last().cloned().map(|name| LoweredInvocation::Path { owner, name });
-        self.made(made, Address::from(found));
+        found.made(made, Address::from(call))
     }
 }
 
-impl<'ast> Watch<'ast> for Rebound {
+impl Fold for Rebinding {
+    type Found = Rebound;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Item, Kind::PatIdent]
     }
 
-    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
-        Descend::Over
+    fn on_item(&self, found: Rebound, _: &Item, _: &Facts<'_, Item>) -> Visit<Rebound> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_pat_ident(&mut self, found: &'ast PatIdent, _: &Facts<'_, PatIdent>) -> Descend {
-        self.0.insert(Name::from(&found.ident));
-        Descend::Into
+    fn on_pat_ident(&self, found: Rebound, ident: &PatIdent, _: &Facts<'_, PatIdent>) -> Visit<Rebound> {
+        Visit::descending(Rebound(found.0.extended([Name::from(&ident.ident)])))
     }
 }
 

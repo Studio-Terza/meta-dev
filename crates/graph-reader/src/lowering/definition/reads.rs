@@ -2,12 +2,12 @@ mod shaped;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, MemberText, Signature, Spine, Type};
+use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, ExprPath, Item, MemberText, Signature, Spine, Type};
 
 use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
-use lint_core::Syntax;
+use lint_core::{Extended, Fold, Syntax, Visit};
 use lint_layout::{LineNumber, Name, Whole, Word};
-use lint_sweep::{Address, Descend, Facts, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Kind};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
@@ -158,6 +158,9 @@ struct LoweredRead {
     line: LineNumber,
 }
 
+#[derive(Debug)]
+pub(super) struct Reading;
+
 #[derive(Debug, Default)]
 pub(super) struct Reads {
     found: Vec<LoweredRead>,
@@ -226,14 +229,22 @@ impl Reads {
         only.and_then(Syntax::tail).and_then(Syntax::expr_call).map(Address::from)
     }
 
-    fn recorded(&mut self, path: impl Fn() -> UsePath, arguments: &[&Expr], line: LineNumber) -> Descend {
+    fn called(self, path: Option<&ExprPath>, call: &ExprCall) -> Visit<Reads> {
+        match path {
+            Some(found) => self.recorded(found, call),
+            None => Visit::descending(self),
+        }
+    }
+
+    fn recorded(self, called: &ExprPath, call: &ExprCall) -> Visit<Reads> {
+        let line = called.path.segments.last().map_or(LineNumber::FIRST, |last| LineNumber::from(last.ident.span()));
+        let path = || UsePath::from(&called.path);
         let passed: Vec<Shaped<Passed>> =
-            arguments.iter().map(|argument| Shaped::folded(argument, &Passed::leaf)).collect();
+            call.args.iter().map(|argument| Shaped::folded(argument, &Passed::leaf)).collect();
         let roots = passed.iter().filter_map(Shaped::leaf).filter_map(|leaf| leaf.clone().rooted());
         let found: Vec<LoweredRead> =
             roots.map(|rooted| LoweredRead { path: path(), rooted, passed: passed.clone(), line }).collect();
-        self.found.extend(found);
-        Descend::Into
+        Visit::descending(Reads { found: self.found.extended(found), ..self })
     }
 }
 
@@ -300,26 +311,22 @@ impl ReadsLowered {
     }
 }
 
-impl<'ast> Watch<'ast> for Reads {
+impl Fold for Reading {
+    type Found = Reads;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Item, Kind::ExprCall, Kind::ExprMethodCall]
     }
 
-    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
-        Descend::Over
+    fn on_item(&self, found: Reads, _: &Item, _: &Facts<'_, Item>) -> Visit<Reads> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_expr_method_call(&mut self, _: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.calls = self.calls.counted(facts.address());
-        Descend::Into
+    fn on_expr_method_call(&self, found: Reads, _: &ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Visit<Reads> {
+        Visit::descending(Reads { calls: found.calls.counted(facts.address()), ..found })
     }
 
-    fn on_expr_call(&mut self, call: &'ast ExprCall, facts: &Facts<'_, ExprCall>) -> Descend {
-        self.calls = self.calls.counted(facts.address());
-        Syntax::expr_path(&call.func).map_or(Descend::Into, |found| {
-            let line = found.path.segments.last().map_or(LineNumber::FIRST, |last| LineNumber::from(last.ident.span()));
-            let arguments: Vec<&Expr> = call.args.iter().collect();
-            self.recorded(|| UsePath::from(&found.path), &arguments, line)
-        })
+    fn on_expr_call(&self, found: Reads, call: &ExprCall, facts: &Facts<'_, ExprCall>) -> Visit<Reads> {
+        Reads { calls: found.calls.counted(facts.address()), ..found }.called(Syntax::expr_path(&call.func), call)
     }
 }

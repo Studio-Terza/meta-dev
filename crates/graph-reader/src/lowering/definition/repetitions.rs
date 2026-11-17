@@ -7,14 +7,13 @@ use syntax::{
 };
 
 use graph::{Looping, ParamIndex, Reached, Repeating, Repetition};
-use lint_core::Syntax;
+use lint_core::{Extended, Fold, Syntax, Visit};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
-use lint_sweep::{Address, Descend, Facts, Kind, Watch};
+use lint_sweep::{Address, Descend, Facts, Kind};
 
 #[derive(Debug)]
-struct Bindings {
+pub(super) struct Repeats {
     parameters: BTreeMap<Name, ParamIndex>,
-    shadowed: BTreeSet<Name>,
 }
 
 #[derive(Debug)]
@@ -32,14 +31,14 @@ struct CallScope {
     arguments: Vec<Repeated>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(super) struct Repetitions {
-    bindings: Bindings,
     within: Option<Repeating>,
     calls: Vec<CallScope>,
     loops: Vec<Repeated>,
     arguments: Entries,
     bodies: Entries,
+    shadowed: BTreeSet<Name>,
     shadows: Vec<BTreeSet<Name>>,
     found: Vec<Repetition>,
 }
@@ -53,45 +52,49 @@ struct PerElement;
 #[derive(Clone, Copy, Debug)]
 struct Bound;
 
-impl Repetitions {
-    pub(super) fn of_signature(signature: &Signature) -> Repetitions {
+impl Repeats {
+    pub(super) fn of_signature(signature: &Signature) -> Repeats {
         let parameters = signature
             .inputs
             .iter()
             .enumerate()
             .filter_map(|(index, input)| Some((Bound::named(input)?, ParamIndex::from(index))))
             .collect();
-        Repetitions {
-            bindings: Bindings { parameters, shadowed: BTreeSet::new() },
-            within: None,
-            calls: Vec::new(),
-            loops: Vec::new(),
-            arguments: Entries::default(),
-            bodies: Entries::default(),
-            shadows: Vec::new(),
-            found: Vec::new(),
-        }
+        Repeats { parameters }
     }
 
-    pub(super) fn found(self) -> Vec<Repetition> {
-        self.found
-    }
-
-    fn reached(&self, expression: &Expr) -> Option<Reached> {
+    fn reached(&self, found: &Repetitions, expression: &Expr) -> Option<Reached> {
         match expression {
-            Expr::Path(path) => self.bindings.reached(path),
+            Expr::Path(path) => self.bound(found, path),
             Expr::Field(field) => SelfField::reached(field),
             _ => None,
         }
+    }
+
+    fn bound(&self, found: &Repetitions, path: &ExprPath) -> Option<Reached> {
+        let name = Name::from(path.path.get_ident()?);
+        found.shadowed.get(&name).map_or(Some(&name), |_| None)?;
+        let index = *self.parameters.get(&name)?;
+        Some(Reached::Parameter { index, name })
+    }
+}
+
+impl Repetitions {
+    pub(super) fn found(self) -> Vec<Repetition> {
+        self.found
     }
 
     fn repetition(&self, reached: Reached, line: LineNumber, method: Option<Name>) -> Option<Repetition> {
         self.within.clone().map(|repeating| Repetition::new(reached, line, repeating, method))
     }
 
-    fn looped(&mut self, body: &Block, looping: Looping) -> Descend {
-        self.loops.push(Repeated { at: Address::from(body), repeating: Some(Repeating::Loop(looping)) });
-        Descend::Into
+    fn looped(self, body: &Block, looping: Looping) -> Visit<Repetitions> {
+        let pending = Repeated { at: Address::from(body), repeating: Some(Repeating::Loop(looping)) };
+        Visit::descending(Repetitions { loops: self.loops.extended([pending]), ..self })
+    }
+
+    fn flagged(self, more: Option<Repetition>, descend: Descend) -> Visit<Repetitions> {
+        Visit::new(Repetitions { found: self.found.extended(more), ..self }, descend)
     }
 }
 
@@ -106,21 +109,24 @@ impl CallScope {
 }
 
 impl Entries {
-    fn entered(&mut self, at: Address, repeating: Option<Repeating>, within: Option<Repeating>) -> Option<Repeating> {
-        let entering = repeating.map(|inner| Repeated { at, repeating: within.clone().or(Some(inner)) });
-        let outer = entering.as_ref().map(|_| Repeated { at, repeating: within.clone() });
-        let inner = entering.and_then(|found| found.repeating);
-        self.0.extend(outer);
-        inner.or(within)
+    fn entered(self, at: Address, repeating: Option<&Repeating>, within: Option<&Repeating>) -> Entries {
+        Entries(self.0.extended(repeating.map(|_| Repeated { at, repeating: within.cloned() })))
     }
 
-    fn left(&mut self, at: Address, within: Option<Repeating>) -> Option<Repeating> {
-        let leaving = self.0.last().filter(|top| top.at == at).map(|top| top.at);
-        leaving.and_then(|_| self.0.pop()).map_or(within, |outer| outer.repeating)
+    fn restored(&self, at: Address, within: Option<Repeating>) -> Option<Repeating> {
+        self.0.last().filter(|top| top.at == at).map_or(within, |outer| outer.repeating.clone())
+    }
+
+    fn left(self, at: Address) -> Entries {
+        let mut entries = self.0;
+        entries.pop_if(|top| top.at == at);
+        Entries(entries)
     }
 }
 
-impl<'ast> Watch<'ast> for Repetitions {
+impl Fold for Repeats {
+    type Found = Repetitions;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::Item,
@@ -136,45 +142,55 @@ impl<'ast> Watch<'ast> for Repetitions {
         ]
     }
 
-    fn on_item(&mut self, _: &'ast Item, _: &Facts<'_, Item>) -> Descend {
-        Descend::Over
+    fn on_item(&self, found: Repetitions, _: &Item, _: &Facts<'_, Item>) -> Visit<Repetitions> {
+        Visit::new(found, Descend::Over)
     }
 
-    fn on_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) -> Descend {
+    fn on_expr(&self, found: Repetitions, _: &Expr, facts: &Facts<'_, Expr>) -> Visit<Repetitions> {
         let at = facts.address();
-        let call = self.calls.last();
+        let call = found.calls.last();
         let skipped = call.and_then(|calling| calling.skipped(at));
         let argument = call.and_then(|calling| calling.argument(at));
-        self.within = self.arguments.entered(at, argument, self.within.take());
-        skipped.map_or(Descend::Into, |_| Descend::Over)
+        let arguments = found.arguments.entered(at, argument.as_ref(), found.within.as_ref());
+        let within = found.within.or(argument);
+        Visit::new(Repetitions { within, arguments, ..found }, skipped.map_or(Descend::Into, |_| Descend::Over))
     }
 
-    fn off_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) {
-        self.within = self.arguments.left(facts.address(), self.within.take());
-    }
-
-    fn on_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) -> Descend {
+    fn off_expr(&self, found: Repetitions, _: &Expr, facts: &Facts<'_, Expr>) -> Repetitions {
         let at = facts.address();
-        let looping = self
-            .loops
+        let within = found.arguments.restored(at, found.within);
+        Repetitions { arguments: found.arguments.left(at), within, ..found }
+    }
+
+    fn on_block(&self, found: Repetitions, _: &Block, facts: &Facts<'_, Block>) -> Visit<Repetitions> {
+        let at = facts.address();
+        let mut loops = found.loops;
+        let looping = loops
             .iter()
             .position(|pending| pending.at == at)
-            .map(|found| self.loops.swap_remove(found))
+            .map(|index| loops.swap_remove(index))
             .and_then(|pending| pending.repeating);
-        self.within = self.bodies.entered(at, looping, self.within.take());
-        Descend::Into
+        let bodies = found.bodies.entered(at, looping.as_ref(), found.within.as_ref());
+        let within = found.within.or(looping);
+        Visit::descending(Repetitions { within, loops, bodies, ..found })
     }
 
-    fn off_block(&mut self, _: &'ast Block, facts: &Facts<'_, Block>) {
-        self.within = self.bodies.left(facts.address(), self.within.take());
+    fn off_block(&self, found: Repetitions, _: &Block, facts: &Facts<'_, Block>) -> Repetitions {
+        let at = facts.address();
+        let within = found.bodies.restored(at, found.within);
+        Repetitions { bodies: found.bodies.left(at), within, ..found }
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Descend {
-        let reached = self.reached(&call.receiver);
+    fn on_expr_method_call(
+        &self,
+        found: Repetitions,
+        call: &ExprMethodCall,
+        facts: &Facts<'_, ExprMethodCall>,
+    ) -> Visit<Repetitions> {
+        let reached = self.reached(&found, &call.receiver);
         let skipped = reached.as_ref().map(|_| Address::from(call.receiver.as_ref()));
-        let found =
-            reached.and_then(|at| self.repetition(at, LineNumber::from(call.receiver.span()), facts.name().cloned()));
-        self.found.extend(found);
+        let repeated =
+            reached.and_then(|at| found.repetition(at, LineNumber::from(call.receiver.span()), facts.name().cloned()));
         let adaptor = PerElement::adaptor(call).map(Repeating::Closure);
         let arguments = call
             .args
@@ -182,54 +198,69 @@ impl<'ast> Watch<'ast> for Repetitions {
             .filter(|argument| Syntax::closure(argument).is_some())
             .map(|argument| Repeated { at: Address::from(argument), repeating: adaptor.clone() })
             .collect();
-        self.calls.push(CallScope { skipped, arguments });
-        Descend::Into
+        let calls = found.calls.extended([CallScope { skipped, arguments }]);
+        Repetitions { calls, ..found }.flagged(repeated, Descend::Into)
     }
 
-    fn off_expr_method_call(&mut self, _: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) {
-        self.calls.pop();
+    fn off_expr_method_call(
+        &self,
+        found: Repetitions,
+        _: &ExprMethodCall,
+        _: &Facts<'_, ExprMethodCall>,
+    ) -> Repetitions {
+        let mut calls = found.calls;
+        calls.pop();
+        Repetitions { calls, ..found }
     }
 
-    fn on_expr_closure(&mut self, closure: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) -> Descend {
+    fn on_expr_closure(
+        &self,
+        found: Repetitions,
+        closure: &ExprClosure,
+        _: &Facts<'_, ExprClosure>,
+    ) -> Visit<Repetitions> {
         let declared: BTreeSet<Name> = closure.inputs.iter().filter_map(Bound::pattern).collect();
-        let added: BTreeSet<Name> = declared.difference(&self.bindings.shadowed).cloned().collect();
-        self.bindings.shadowed.extend(added.iter().cloned());
-        self.shadows.push(added);
-        Descend::Into
+        let added: BTreeSet<Name> = declared.difference(&found.shadowed).cloned().collect();
+        let shadowed = found.shadowed.extended(added.iter().cloned());
+        Visit::descending(Repetitions { shadowed, shadows: found.shadows.extended([added]), ..found })
     }
 
-    fn off_expr_closure(&mut self, _: &'ast ExprClosure, _: &Facts<'_, ExprClosure>) {
-        let restored = self.shadows.pop().unwrap_or_default();
-        self.bindings.shadowed = self.bindings.shadowed.difference(&restored).cloned().collect();
+    fn off_expr_closure(&self, found: Repetitions, _: &ExprClosure, _: &Facts<'_, ExprClosure>) -> Repetitions {
+        let mut shadows = found.shadows;
+        let restored = shadows.pop().unwrap_or_default();
+        let shadowed = found.shadowed.difference(&restored).cloned().collect();
+        Repetitions { shadowed, shadows, ..found }
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
-        self.looped(&expr.body, Looping::For)
+    fn on_expr_for_loop(
+        &self,
+        found: Repetitions,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+    ) -> Visit<Repetitions> {
+        found.looped(&expr.body, Looping::For)
     }
 
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
-        self.looped(&expr.body, Looping::While)
+    fn on_expr_while(&self, found: Repetitions, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Visit<Repetitions> {
+        found.looped(&expr.body, Looping::While)
     }
 
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
-        self.looped(&expr.body, Looping::Bare)
+    fn on_expr_loop(&self, found: Repetitions, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Visit<Repetitions> {
+        found.looped(&expr.body, Looping::Bare)
     }
 
-    fn on_expr_path(&mut self, path: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
-        let found = self
-            .bindings
-            .reached(path)
-            .and_then(|reached| self.repetition(reached, LineNumber::from(path.path.span()), None));
-        self.found.extend(found);
-        Descend::Over
+    fn on_expr_path(&self, found: Repetitions, path: &ExprPath, _: &Facts<'_, ExprPath>) -> Visit<Repetitions> {
+        let repeated = self
+            .bound(&found, path)
+            .and_then(|reached| found.repetition(reached, LineNumber::from(path.path.span()), None));
+        found.flagged(repeated, Descend::Over)
     }
 
-    fn on_expr_field(&mut self, field: &'ast ExprField, _: &Facts<'_, ExprField>) -> Descend {
+    fn on_expr_field(&self, found: Repetitions, field: &ExprField, _: &Facts<'_, ExprField>) -> Visit<Repetitions> {
         let reached = SelfField::reached(field);
         let descend = reached.as_ref().map_or(Descend::Into, |_| Descend::Over);
-        let found = reached.and_then(|at| self.repetition(at, LineNumber::from(field.member.span()), None));
-        self.found.extend(found);
-        descend
+        let repeated = reached.and_then(|at| found.repetition(at, LineNumber::from(field.member.span()), None));
+        found.flagged(repeated, descend)
     }
 }
 
@@ -354,15 +385,6 @@ impl PerElement {
             Expr::MethodCall(call) => Name::from(&call.method).matches::<Whole>(&Self::SOURCES).map(|_| ()),
             _ => None,
         }
-    }
-}
-
-impl Bindings {
-    fn reached(&self, path: &ExprPath) -> Option<Reached> {
-        let name = Name::from(path.path.get_ident()?);
-        self.shadowed.get(&name).map_or(Some(&name), |_| None)?;
-        let index = *self.parameters.get(&name)?;
-        Some(Reached::Parameter { index, name })
     }
 }
 
