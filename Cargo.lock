@@ -1629,6 +1629,7 @@ dependencies = [
 name = "lint-module-nesting"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
