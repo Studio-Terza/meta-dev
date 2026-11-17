@@ -2123,6 +2123,7 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "laws",
  "lint-core",
