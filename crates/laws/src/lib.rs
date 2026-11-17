@@ -1,6 +1,33 @@
 pub use proptest;
 
 #[macro_export]
+macro_rules! monoid {
+    ($(#[$meta:meta])* $name:ident, $type:ty, $strategy:expr $(,)?) => {
+        mod $name {
+            use super::*;
+
+            $crate::associative!(
+                $(#[$meta])* combining_is_associative,
+                $strategy,
+                <$type as ::algebra::Semigroup>::combine
+            );
+            $crate::identity!(
+                $(#[$meta])* the_identity_changes_nothing,
+                $strategy,
+                <$type as ::algebra::Semigroup>::combine,
+                <$type as ::algebra::Monoid>::identity()
+            );
+            $crate::law!($(#[$meta])* concatenating_folds_from_the_identity, ($strategy, $strategy), pair, {
+                let (first, second) = pair;
+                let folded = <$type as ::algebra::Semigroup>::combine(first.clone(), second.clone());
+                let concatenated = <$type as ::algebra::Monoid>::concat([first, second]);
+                $crate::proptest::prop_assert_eq!(concatenated, folded, "concat is not the fold of combine");
+            });
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! law {
     ($(#[$meta:meta])* $name:ident, given $given:ident = $setup:expr, $strategy:expr, $value:ident, $body:block) => {
         $(#[$meta])*
