@@ -251,6 +251,16 @@ impl<Found> Visit<Found> {
     }
 }
 
+impl<Found> Visit<Found> {
+    #[must_use]
+    pub fn gated(found: Found, gate: Descend, next: impl FnOnce(Found) -> Visit<Found>) -> Visit<Found> {
+        match gate.entered() {
+            Some(_) => next(found),
+            None => Visit::new(found, gate),
+        }
+    }
+}
+
 impl<Item> Visit<Vec<Item>> {
     #[must_use]
     pub fn adding(found: Vec<Item>, more: impl IntoIterator<Item = Item>, descend: Descend) -> Visit<Vec<Item>> {

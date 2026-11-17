@@ -8,16 +8,15 @@ use lint_core::Site;
 use lint_core::Violation;
 use lint_layout::LineNumber;
 use lint_layout::Name;
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
 #[derive(Debug)]
 pub struct FieldVisibility<'scan> {
     path: &'scan Path,
-    violations: Vec<Violation<'scan>>,
 }
 
-impl FieldVisibility<'_> {
-    fn exposed(&mut self, item: &ItemStruct) -> Descend {
+impl<'scan> FieldVisibility<'scan> {
+    fn exposed(&self, found: Vec<Violation<'scan>>, item: &ItemStruct) -> Visit<Vec<Violation<'scan>>> {
         let exposed = item
             .fields
             .iter()
@@ -29,33 +28,33 @@ impl FieldVisibility<'_> {
                     Finding::ExposedField { field, index: Index::from(index), owner: Name::from(&item.ident) },
                 )
             });
-        self.violations.extend(exposed);
-        Descend::Over
+        Visit::adding(found, exposed, Descend::Over)
     }
 }
 
-impl<'ast> Watch<'ast> for FieldVisibility<'_> {
+impl<'file> Fold for FieldVisibility<'file> {
+    type Found = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemStruct]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Self::Found, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Self::Found> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
-        Descend::from(facts.gate()).then(|| self.exposed(item))
-    }
-}
-
-impl<'file> From<FieldVisibility<'file>> for Vec<Violation<'file>> {
-    fn from(scan: FieldVisibility<'file>) -> Vec<Violation<'file>> {
-        scan.violations
+    fn on_item_struct(
+        &self,
+        found: Self::Found,
+        item: &ItemStruct,
+        facts: &Facts<'_, ItemStruct>,
+    ) -> Visit<Self::Found> {
+        Visit::gated(found, Descend::from(facts.gate()), |open| self.exposed(open, item))
     }
 }
 
 impl<'scan> From<&'scan Path> for FieldVisibility<'scan> {
     fn from(path: &'scan Path) -> FieldVisibility<'scan> {
-        FieldVisibility { path, violations: Vec::new() }
+        FieldVisibility { path }
     }
 }

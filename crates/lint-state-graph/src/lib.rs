@@ -17,7 +17,7 @@ use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges, Written};
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Parsed, SourceFile, Violation};
 use lint_file::{Concluded, PrimedFacts, PrimedLint, Reads};
-use lint_sweep::{Gathers, Watching};
+use lint_sweep::{Folding, Gathers, Watching};
 
 pub use foreign_matches::ForeignMatches;
 
@@ -51,7 +51,7 @@ impl PrimedFacts for StateGraph {
         let path = AsRef::<Path>::as_ref(parsed.head());
         let watchers = <&SourceFile>::from(parsed).shipped().map(|_| StateWatchers {
             edges: EdgeScan::from(path),
-            fields: FieldVisibility::from(path),
+            fields: Folding::from(FieldVisibility::from(path)),
             graphs: DeclaredGraphs::new(<&SourceFile>::from(parsed), path),
         });
         StateRecording { watchers }
@@ -70,7 +70,7 @@ pub struct StateRecording<'run, 'head> {
 #[derive(Debug)]
 struct StateWatchers<'run, 'head> {
     edges: EdgeScan<'head>,
-    fields: FieldVisibility<'head>,
+    fields: Folding<FieldVisibility<'head>>,
     graphs: DeclaredGraphs<'run, 'head>,
 }
 
@@ -92,9 +92,16 @@ impl<'head> Gathers<StateRaw<'head>> for StateRecording<'_, 'head> {
     }
 
     fn gathered(self) -> StateRaw<'head> {
-        StateRaw(self.watchers.map(|watchers| RecordedState {
-            edges: watchers.edges.gathered(),
-            own: Vec::from(watchers.fields).into_iter().chain(Vec::from(watchers.graphs)).collect(),
+        StateRaw(self.watchers.map(|watchers| {
+            RecordedState {
+                edges: watchers.edges.gathered(),
+                own: watchers
+                    .fields
+                    .concluded::<Vec<Violation<'head>>>()
+                    .into_iter()
+                    .chain(Vec::from(watchers.graphs))
+                    .collect(),
+            }
         }))
     }
 }

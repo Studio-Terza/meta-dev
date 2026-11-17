@@ -8,7 +8,7 @@ use syntax::{Group, Literal, TokenStream, TokenTree};
 use lint_core::Syntax;
 use lint_layout::LineNumber;
 use lint_layout::Name;
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
 use std::path::Path;
 
@@ -21,7 +21,6 @@ use crate::flagged::Flagged;
 #[derive(Debug)]
 pub(crate) struct TestFeatures<'file> {
     path: &'file Path,
-    found: Vec<Flagged>,
 }
 
 impl TestFeatures<'_> {
@@ -62,35 +61,38 @@ impl TestFeatures<'_> {
     }
 }
 
-impl<'ast> Watch<'ast> for TestFeatures<'_> {
+impl<'file> Fold for TestFeatures<'file> {
+    type Found = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Attribute, Kind::Macro]
     }
 
-    fn on_attribute(&mut self, attribute: &'ast Attribute, _: &Facts<'_, Attribute>) -> Descend {
-        self.found.extend(
-            Self::condition(attribute.path()).into_iter().flat_map(|_| Self::scanned(attribute.to_token_stream())),
-        );
-        Descend::Into
+    fn on_attribute(&self, found: Self::Found, attribute: &Attribute, _: &Facts<'_, Attribute>) -> Visit<Self::Found> {
+        Visit::adding(
+            found,
+            Self::condition(attribute.path())
+                .into_iter()
+                .flat_map(|_| Self::scanned(attribute.to_token_stream()))
+                .map(|flagged| flagged.in_file(self.path)),
+            Descend::Into,
+        )
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.found.extend(
-            Self::condition(&invocation.path).into_iter().flat_map(|_| Self::scanned(invocation.tokens.clone())),
-        );
-        Descend::Over
-    }
-}
-
-impl<'file> Finds<'file> for TestFeatures<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.path;
-        self.found.into_iter().map(|flagged| flagged.in_file(path)).collect()
+    fn on_macro(&self, found: Self::Found, invocation: &Macro, _: &Facts<'_, Macro>) -> Visit<Self::Found> {
+        Visit::adding(
+            found,
+            Self::condition(&invocation.path)
+                .into_iter()
+                .flat_map(|_| Self::scanned(invocation.tokens.clone()))
+                .map(|flagged| flagged.in_file(self.path)),
+            Descend::Over,
+        )
     }
 }
 
 impl<'file> From<&'file Path> for TestFeatures<'file> {
     fn from(path: &'file Path) -> TestFeatures<'file> {
-        TestFeatures { path, found: Vec::new() }
+        TestFeatures { path }
     }
 }
