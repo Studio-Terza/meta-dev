@@ -172,3 +172,17 @@ fn a_generator_that_rejects_most_of_what_it_draws_fails() {
         proptest::strategy::Strategy::prop_filter(any::<u8>(), "not a multiple of four", |number| number % 4 == 0);
     assert!(matches!(laws::Generation::bounded(&strict), Err(proptest::test_runner::TestError::Abort(_))));
 }
+
+#[test]
+fn a_repeatable_run_draws_the_same_values_and_writes_no_regression_files() {
+    let drawn: Vec<u64> = (0..2_u8)
+        .flat_map(|_| {
+            let mut runner = proptest::test_runner::TestRunner::new(laws::Generation::repeatable());
+            proptest::strategy::Strategy::new_tree(&any::<u64>(), &mut runner)
+        })
+        .map(|tree| proptest::strategy::ValueTree::current(&tree))
+        .collect();
+    assert_eq!(drawn.first(), drawn.last());
+    assert_eq!(drawn.len(), 2);
+    assert!(laws::Generation::repeatable().failure_persistence.is_none());
+}
