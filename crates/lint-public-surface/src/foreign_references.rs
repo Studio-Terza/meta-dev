@@ -167,10 +167,11 @@ impl Contribute for ReferenceScan {
     }
 
     fn on_path(&self, path: &Path, _: &Facts<'_, Path>) -> Contributed<(), ForeignReferences> {
-        let mut references = ForeignReferences::owned_by(self.own_crate.as_ref());
-        path.segments.first().zip(path.segments.iter().nth(1)).into_iter().for_each(|(first, second)| {
+        let pair = path.segments.first().zip(path.segments.iter().nth(1));
+        Contributed::parted(pair.map_or_default(|(first, second)| {
+            let mut references = ForeignReferences::owned_by(self.own_crate.as_ref());
             references.record(Some(&first.ident), Leaf::Named(&second.ident));
-        });
-        Contributed::parted(references)
+            references
+        }))
     }
 }
