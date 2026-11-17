@@ -139,9 +139,10 @@ impl Decision {
             .chain(recalled.iter().map(Recalled::to_string));
         let told: Vec<String> = accounts.chain(nodes).collect();
         told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
-            let decided = Decision::telling(event, joined).written()?;
+            let decision = Decision::telling(event, joined);
+            let said = decision.said()?;
             let reported = store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>());
-            Ok(decided.kept(reported.map_err(Failure::from)))
+            Ok(Uttered::new(said, reported.map(|_reported| decision.outcome()).map_err(Failure::from)))
         })
     }
 
@@ -153,8 +154,12 @@ impl Decision {
     }
 
     fn written(&self) -> Result<Uttered, Failure> {
+        Ok(Uttered::new(self.said()?, Ok(self.outcome())))
+    }
+
+    fn said(&self) -> Result<Shown, Failure> {
         let json = serde_json::to_string(self).map_err(Failure::Render)?;
-        Ok(Uttered::new(Shown::said(format_args!("{json}\n")), Ok(self.outcome())))
+        Ok(Shown::said(format_args!("{json}\n")))
     }
 
     fn outcome(&self) -> Outcome {
