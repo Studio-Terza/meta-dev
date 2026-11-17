@@ -46,8 +46,10 @@ impl WatchingLint for PublicApiTests {
     type Watched<'file> = Watched<'file>;
 
     fn watched(file: &SourceFile) -> Watched<'_> {
-        file.shipped()
-            .map_or_else(|| Watched::Beside(PathReach::beside(file)), |_| Watched::Shipped(TestCode::from(file)))
+        file.shipped().map_or_else(
+            || Watched::Beside(Folding::from(PathReach::beside(file))),
+            |_| Watched::Shipped(Folding::from(TestCode::from(file))),
+        )
     }
 
     fn judged<'file, 'head: 'file>(
@@ -61,8 +63,8 @@ impl WatchingLint for PublicApiTests {
 
 #[derive(Debug)]
 pub enum Watched<'file> {
-    Shipped(TestCode<'file>),
-    Beside(PathReach<'file>),
+    Shipped(Folding<TestCode<'file>>),
+    Beside(Folding<PathReach<'file>>),
 }
 
 impl<'file> Gathers<Tested<'file>> for Watched<'file> {
@@ -75,8 +77,8 @@ impl<'file> Gathers<Tested<'file>> for Watched<'file> {
 
     fn gathered(self) -> Tested<'file> {
         match self {
-            Watched::Shipped(code) => code.tested(),
-            Watched::Beside(reach) => reach.tested(),
+            Watched::Shipped(code) => code.concluded_with(TestCode::tested),
+            Watched::Beside(reach) => reach.concluded_with(PathReach::tested),
         }
     }
 }

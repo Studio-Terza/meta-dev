@@ -277,7 +277,12 @@ impl<Folded: Fold> From<Folded> for Folding<Folded> {
 impl<Folded: Fold> Folding<Folded> {
     #[must_use]
     pub fn concluded<Part: From<Folded::Found>>(self) -> Part {
-        Part::from(self.fold.finished(self.found))
+        self.concluded_with(|_, found| Part::from(found))
+    }
+
+    pub fn concluded_with<Part>(self, conclude: impl FnOnce(&Folded, Folded::Found) -> Part) -> Part {
+        let found = self.fold.finished(self.found);
+        conclude(&self.fold, found)
     }
 
     pub(super) fn visited(&mut self, step: impl FnOnce(&Folded, Folded::Found) -> Visit<Folded::Found>) -> Descend {
