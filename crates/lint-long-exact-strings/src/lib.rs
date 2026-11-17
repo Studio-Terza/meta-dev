@@ -5,7 +5,7 @@ use assertions::Assertions;
 use lint_core::{Headline, SourceFile};
 use lint_file::{Reads, SweptLint};
 use lint_layout::{Word, words};
-use lint_sweep::Finds;
+use lint_sweep::{Contributing, Finds};
 
 #[derive(Debug)]
 pub struct LongExactStrings;
@@ -20,6 +20,6 @@ impl SweptLint for LongExactStrings {
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
         let asserting = file.text().mentioning(&Self::NAMED).map(|_| AsRef::<Path>::as_ref(file.head()));
-        Box::new(Assertions::new(file, asserting))
+        Box::new(Contributing::new(Assertions::new(file, asserting)))
     }
 }

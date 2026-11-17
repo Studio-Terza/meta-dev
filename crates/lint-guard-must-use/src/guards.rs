@@ -3,62 +3,73 @@ mod members;
 mod modules;
 mod type_key;
 
-use std::mem;
 use std::path::Path;
 
 use syntax::Punctuated;
 use syntax::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, MetaList, Token};
 
+use algebra::Monoid;
 use lint_core::Module;
 use lint_core::{Parsed, Site, Walk};
 use lint_layout::{LineNumber, Name, Word};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{
+    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Scope, Sweep, Watching,
+};
 
 use members::Members;
 pub use modules::Modules;
 
 #[derive(Debug)]
 pub struct Guards<'file> {
-    path: &'file Path,
+    scan: Contributing<GuardScan<'file>>,
     module: Module<'file>,
-    members: Members<'file>,
-    modules: Modules<'file>,
-    outer: Vec<Frame<'file>>,
+}
+
+#[derive(Debug)]
+pub struct GuardScan<'file> {
+    path: &'file Path,
     kinds: &'static [Kind],
 }
 
 #[derive(Debug)]
-struct Frame<'file> {
-    module: Module<'file>,
+pub struct Nested<'file> {
+    path: Vec<Name>,
     members: Members<'file>,
 }
 
+impl<'file> Nested<'file> {
+    fn under(self, name: Option<&Name>) -> Nested<'file> {
+        Nested { path: name.cloned().into_iter().chain(self.path).collect(), members: self.members }
+    }
+
+    fn filed(self, root: &Module<'file>) -> Modules<'file> {
+        let module = self.path.into_iter().fold(root.clone(), |within, name| within.within(name));
+        Modules::filed(module, self.members)
+    }
+}
+
 impl<'file> Guards<'file> {
-    const DROP: &str = "Drop";
     const KINDS: &'static [Kind] =
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemStruct, Kind::ItemEnum, Kind::ItemUnion, Kind::ItemType];
 
     pub fn scanning(parsed: Parsed<'_, 'file>) -> Guards<'file> {
         let head = parsed.head();
         let kinds = <&SourceFile>::from(parsed).shipped().map_or(&[][..], |_| Self::KINDS);
-        Guards {
-            path: AsRef::<Path>::as_ref(head),
-            module: Module::of_head(head),
-            members: Members::default(),
-            modules: Modules::default(),
-            outer: Vec::new(),
-            kinds,
-        }
+        let scan = Contributing::new(GuardScan { path: AsRef::<Path>::as_ref(head), kinds });
+        Guards { scan, module: Module::of_head(head) }
     }
+}
 
-    fn declared(&mut self, attributes: &[Attribute], name: &Ident) -> Descend {
+impl<'file> GuardScan<'file> {
+    const DROP: &str = "Drop";
+
+    fn declared(&self, attributes: &[Attribute], name: &Ident) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         let site = Site::new(self.path, LineNumber::from(name.span()));
-        Descend::from(Walk::outside_tests(attributes))
+        let members = Descend::from(Walk::outside_tests(attributes))
             .entered()
             .map(|_| attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None))
-            .into_iter()
-            .for_each(|mark| self.members.declare(Name::from(name), mark));
-        Descend::Over
+            .map_or_else(Members::default, |unmarked| Members::declaring(Name::from(name), unmarked));
+        Contributed::new(members, Vec::new(), Descend::Over)
     }
 }
 
@@ -87,70 +98,91 @@ impl MustUse {
     }
 }
 
-impl<'ast> Watch<'ast> for Guards<'_> {
+impl<'file> Contribute for GuardScan<'file> {
+    type Open = Members<'file>;
+    type Part = Vec<Nested<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        let inner = facts.name().map_or_else(|| self.module.clone(), |name| self.module.within(name.clone()));
-        let outer = mem::replace(&mut self.module, inner);
-        let around = mem::take(&mut self.members);
-        self.outer.push(Frame { module: outer, members: around });
-        Descend::from(facts.gate())
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Kind::ItemMod)] }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        let frame = self.outer.pop().unwrap_or(Frame { module: Module::UNPLACED, members: Members::default() });
-        let visited = mem::replace(&mut self.module, frame.module);
-        let within = mem::replace(&mut self.members, frame.members);
-        self.modules.file(visited, within);
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate())
+    fn off_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        inner: Contribution<Members<'file>, Vec<Nested<'file>>>,
+    ) -> Vec<Nested<'file>> {
+        inner.concluded(|members, nested| {
+            let own = Nested { path: Vec::new(), members };
+            [own].into_iter().chain(nested).map(|within| within.under(facts.name())).collect()
+        })
+    }
+
+    fn on_item_impl(
+        &self,
+        item: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+    ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
+        let dropped = Descend::from(facts.gate())
             .entered()
-            .into_iter()
-            .for_each(|_| self.members.drop_implemented(Name::implementing(item, Word::new(Self::DROP))));
-        Descend::Over
+            .map_or_else(Members::default, |_| Members::dropping(Name::implementing(item, Word::new(Self::DROP))));
+        Contributed::new(dropped, Vec::new(), Descend::Over)
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
+    fn on_item_struct(
+        &self,
+        item: &ItemStruct,
+        _: &Facts<'_, ItemStruct>,
+    ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
+    fn on_item_enum(
+        &self,
+        item: &ItemEnum,
+        _: &Facts<'_, ItemEnum>,
+    ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
 
-    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
+    fn on_item_union(
+        &self,
+        item: &ItemUnion,
+        _: &Facts<'_, ItemUnion>,
+    ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType, facts: &Facts<'_, ItemType>) -> Descend {
+    fn on_item_type(
+        &self,
+        item: &ItemType,
+        facts: &Facts<'_, ItemType>,
+    ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         let target = Name::of_type(&item.ty);
-        Descend::from(facts.gate())
-            .entered()
-            .map(|_| target)
-            .into_iter()
-            .zip(facts.name())
-            .for_each(|(aliased, name)| self.members.alias(name.clone(), aliased));
-        Descend::Over
+        let aliased = Descend::from(facts.gate()).entered().and(facts.name());
+        let members = aliased.map_or_else(Members::default, |name| Members::aliasing(name.clone(), target));
+        Contributed::new(members, Vec::new(), Descend::Over)
     }
 }
 
 impl<'file> Gathers<Modules<'file>> for Guards<'file> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
+        Sweep::alone(&mut self.scan)
     }
 
     fn gathered(self) -> Modules<'file> {
-        let mut modules = self.modules;
-        self.kinds
-            .first()
-            .map(|_| (self.module, self.members))
-            .into_iter()
-            .for_each(|(module, members)| modules.file(module, members));
-        modules
+        let module = self.module;
+        self.scan.concluded(|scan, members, nested| {
+            let own = scan.kinds.first().map(|_| Nested { path: Vec::new(), members });
+            Monoid::concat(own.into_iter().chain(nested).map(|within| within.filed(&module)))
+        })
     }
 }
