@@ -6,6 +6,7 @@ use lint_layout::{LineNumber, Name, Position};
 
 use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};
 
+use super::regions::MacroItems;
 use super::signature::Written;
 use super::{Enclosure, ImplRow, Lowering};
 use lint_sweep::{Descend, Scoped, Sweep};
@@ -149,7 +150,7 @@ impl Lowering<'_> {
 
     fn transcribed(&mut self, statements: &[Stmt]) -> &mut Self {
         let outer = self.context;
-        self.context = self.context.transcribed();
+        self.context = self.context.within_macro(MacroItems::Transcribed);
         let mut scoped = Scoped::new(&mut *self);
         statements
             .iter()
@@ -162,8 +163,11 @@ impl Lowering<'_> {
     fn expanded(&mut self, invocation: &Macro) -> &mut Self {
         let items = Macros::items_in_file(self.source, invocation);
         self.lowered.openings.absorb(self.here.scope(), Entries::of_items(&items));
+        let outer = self.context;
+        self.context = self.context.within_macro(MacroItems::Expanded);
         let mut scoped = Scoped::new(&mut *self);
         items.iter().for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
+        self.context = outer;
         self
     }
 

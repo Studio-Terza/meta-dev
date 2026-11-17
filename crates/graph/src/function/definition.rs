@@ -3,7 +3,7 @@ mod read;
 
 use std::fmt;
 
-use body_lifts::{Body, Branching};
+use body_lifts::{Body, Branching, Propagated};
 use lint_layout::{Casing, LineNumber, Name, Whole, Word};
 
 use crate::boundary::{CallOrder, ParamIndex};
@@ -36,6 +36,7 @@ pub enum CallOwner<'name> {
 pub struct Definition {
     shape: Body,
     branching: Branching,
+    propagated: Propagated,
     invocations: Vec<Invocation>,
     repetitions: Vec<Repetition>,
     reads: Vec<Read>,
@@ -43,8 +44,13 @@ pub struct Definition {
 
 impl Definition {
     #[must_use]
-    pub fn new(shape: Body, branching: Branching, invocations: Vec<Invocation>) -> Definition {
-        Definition { shape, branching, invocations, repetitions: Vec::new(), reads: Vec::new() }
+    pub fn new(shape: Body, branching: Branching, propagated: Propagated, invocations: Vec<Invocation>) -> Definition {
+        Definition { shape, branching, propagated, invocations, repetitions: Vec::new(), reads: Vec::new() }
+    }
+
+    #[must_use]
+    pub fn propagated(&self) -> Propagated {
+        self.propagated
     }
 
     #[must_use]

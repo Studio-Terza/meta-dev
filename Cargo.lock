@@ -1373,14 +1373,15 @@ name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "graph",
  "graph-reader",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
- "lint-sweep",
- "syntax",
+ "newtype",
 ]
 
 [[package]]
