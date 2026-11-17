@@ -18,11 +18,13 @@ use forwarder::{Forwarder, Owned};
 use lint_core::Syntax;
 use lint_core::Violation;
 use lint_layout::{Casing, Name};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
 #[derive(Debug)]
-pub struct Forwarders<'file> {
-    path: &'file Path,
+pub struct Forwarders;
+
+#[derive(Debug, Default)]
+pub struct Scope {
     structs: BTreeMap<Name, StructFields>,
     self_type: Name,
     self_ident: Option<Name>,
@@ -37,6 +39,10 @@ pub struct Forwarded<'file> {
 }
 
 impl<'file> Forwarded<'file> {
+    pub fn new(path: &'file Path, scope: Scope) -> Forwarded<'file> {
+        Forwarded { path, found: scope.found }
+    }
+
     pub fn declared(self, types: &WorkspaceTypes) -> Vec<Violation<'file>> {
         let path = self.path;
         let declared = self.found.into_iter().filter(|forwarder| types.declares(forwarder.owner()).is_some());
@@ -44,7 +50,7 @@ impl<'file> Forwarded<'file> {
     }
 }
 
-impl Forwarders<'_> {
+impl Scope {
     fn classify(&self, function: &ImplItemFn) -> Option<Forwarder> {
         let params: Vec<Parameter> = function.sig.inputs.iter().filter_map(Parameter::describe).collect();
         Some(function.block.stmts.as_slice())
@@ -96,58 +102,40 @@ impl Forwarders<'_> {
     }
 }
 
-impl Forwarders<'_> {
-    pub fn targeted(&mut self, segment: &PathSegment) -> Descend {
-        self.self_type = Name::from(&segment.ident);
-        self.self_ident = Some(Name::from(&segment.ident));
-        self.concrete = StructFields::type_arguments(segment);
-        Descend::Into
+impl Scope {
+    pub fn targeted(self, segment: &PathSegment) -> Scope {
+        Scope {
+            self_type: Name::from(&segment.ident),
+            self_ident: Some(Name::from(&segment.ident)),
+            concrete: StructFields::type_arguments(segment),
+            ..self
+        }
     }
 }
 
-impl<'ast> Watch<'ast> for Forwarders<'_> {
+impl Fold for Forwarders {
+    type Found = Scope;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemImpl, Kind::ImplItemFn]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, found: Scope, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Scope> {
+        Visit::new(found, Descend::from(facts.gate()))
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
-        self.structs.extend(facts.name().map(|name| (name.clone(), StructFields::describe(item))));
-        Descend::Over
+    fn on_item_struct(&self, found: Scope, item: &ItemStruct, facts: &Facts<'_, ItemStruct>) -> Visit<Scope> {
+        let mut structs = found.structs;
+        structs.extend(facts.name().map(|name| (name.clone(), StructFields::describe(item))));
+        Visit::new(Scope { structs, ..found }, Descend::Over)
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        ImplTarget::describe(item).walked_by(self)
+    fn on_item_impl(&self, found: Scope, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Visit<Scope> {
+        ImplTarget::describe(item).walked_by(found)
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.found.extend(self.classify(function));
-        Descend::Into
-    }
-}
-
-impl<'file> Gathers<Forwarded<'file>> for Forwarders<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
-    }
-
-    fn gathered(self) -> Forwarded<'file> {
-        Forwarded { path: self.path, found: self.found }
-    }
-}
-
-impl<'file> From<&'file Path> for Forwarders<'file> {
-    fn from(path: &'file Path) -> Forwarders<'file> {
-        Forwarders {
-            path,
-            structs: BTreeMap::new(),
-            self_type: Name::default(),
-            self_ident: None,
-            concrete: Vec::new(),
-            found: Vec::new(),
-        }
+    fn on_impl_item_fn(&self, found: Scope, function: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Visit<Scope> {
+        let forwarder = found.classify(function);
+        Visit::descending(Scope { found: found.found.into_iter().chain(forwarder).collect(), ..found })
     }
 }

@@ -2,7 +2,7 @@ use std::path::Path;
 mod forwarders;
 mod workspace_types;
 
-use forwarders::{Forwarded, Forwarders};
+use forwarders::{Forwarded, Forwarders, Scope};
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_sweep::Folding;
@@ -28,18 +28,18 @@ impl ContextLint for NoForwarders {
 }
 
 impl WatchingLint for NoForwarders {
-    type Found<'file> = Forwarded<'file>;
-    type Watched<'file> = Forwarders<'file>;
+    type Found<'file> = Scope;
+    type Watched<'file> = Folding<Forwarders>;
 
-    fn watched(file: &SourceFile) -> Forwarders<'_> {
-        Forwarders::from(AsRef::<Path>::as_ref(file.head()))
+    fn watched(_: &SourceFile) -> Folding<Forwarders> {
+        Folding::from(Forwarders)
     }
 
     fn judged<'file, 'head: 'file>(
-        _: &'file SourceFile,
-        found: Forwarded<'file>,
+        file: &'file SourceFile,
+        found: Scope,
         types: &WorkspaceTypes,
     ) -> Vec<Violation<'file>> {
-        found.declared(types)
+        Forwarded::new(AsRef::<Path>::as_ref(file.head()), found).declared(types)
     }
 }

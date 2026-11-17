@@ -1,8 +1,8 @@
 use syntax::{ItemImpl, PathSegment};
 
-use super::Forwarders;
+use super::Scope;
 use lint_core::Syntax;
-use lint_sweep::Descend;
+use lint_sweep::{Descend, Visit};
 
 pub enum ImplTarget<'ast> {
     Inherent(&'ast PathSegment),
@@ -17,10 +17,10 @@ impl<'ast> ImplTarget<'ast> {
             .map_or(ImplTarget::Skipped, ImplTarget::Inherent)
     }
 
-    pub fn walked_by(self, forwarders: &mut Forwarders<'_>) -> Descend {
+    pub fn walked_by(self, scope: Scope) -> Visit<Scope> {
         match self {
-            ImplTarget::Inherent(segment) => forwarders.targeted(segment),
-            ImplTarget::Skipped => Descend::Over,
+            ImplTarget::Inherent(segment) => Visit::descending(scope.targeted(segment)),
+            ImplTarget::Skipped => Visit::new(scope, Descend::Over),
         }
     }
 }
