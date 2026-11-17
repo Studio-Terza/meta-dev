@@ -5,10 +5,11 @@ use std::collections::BTreeMap;
 use syntax::{Ident, ItemUse, Macro, Path, UseLeaf, UseTree};
 
 use super::export::Export;
+use algebra::{Monoid, Semigroup};
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
 
 use crate_reach::CrateReach;
 
@@ -60,9 +61,15 @@ impl Reader {
 
 #[derive(Debug)]
 pub struct Reading {
-    references: ForeignReferences,
+    scan: Contributing<ReferenceScan>,
     reader: Reader,
     tested: Option<CrateName>,
+}
+
+#[derive(Debug)]
+pub struct ReferenceScan {
+    own_crate: Option<CrateName>,
+    reader: Reader,
 }
 
 impl From<&SourceFile> for Reading {
@@ -76,28 +83,38 @@ impl From<&SourceFile> for Reading {
         let shipped = file.shipped().map(|_| Reader::Shipped);
         let reader = shipped.or_else(|| own_tests.as_ref().map(|_| Reader::Tests)).unwrap_or(Reader::Neither);
         let own = shipped.and(own_crate);
-        Reading { references: ForeignReferences { own_crate: own, crates: BTreeMap::new() }, reader, tested: own_tests }
+        let scan = Contributing::new(ReferenceScan { own_crate: own, reader });
+        Reading { scan, reader, tested: own_tests }
     }
 }
 
 impl Gathers<ForeignReferences> for Reading {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
+        Sweep::alone(&mut self.scan)
     }
 
     fn gathered(self) -> ForeignReferences {
-        self.reader.kept(self.references, self.tested)
+        let read = self.scan.concluded(|_, (), references| references);
+        self.reader.kept(read, self.tested)
     }
 }
+
+impl Semigroup for ForeignReferences {
+    fn combine(mut self, other: ForeignReferences) -> ForeignReferences {
+        other.crates.into_iter().for_each(|(crate_name, reach)| {
+            self.crates.entry(crate_name).or_default().absorb(reach);
+        });
+        ForeignReferences { own_crate: self.own_crate.or(other.own_crate), ..self }
+    }
+}
+
+impl Monoid for ForeignReferences {}
 
 impl ForeignReferences {
     const TESTS: &'static str = "tests";
 
-    pub fn absorb(mut self, other: ForeignReferences) -> ForeignReferences {
-        other.crates.into_iter().for_each(|(crate_name, reach)| {
-            self.crates.entry(crate_name).or_default().absorb(reach);
-        });
-        self
+    fn owned_by(own_crate: Option<&CrateName>) -> ForeignReferences {
+        ForeignReferences { own_crate: own_crate.cloned(), crates: BTreeMap::new() }
     }
 
     pub fn unnamed<'export>(&self, crate_name: &CrateName, export: &'export Export) -> Option<&'export Export> {
@@ -128,7 +145,10 @@ impl ForeignReferences {
     }
 }
 
-impl<'ast> Watch<'ast> for Reading {
+impl Contribute for ReferenceScan {
+    type Open = ();
+    type Part = ForeignReferences;
+
     fn kinds(&self) -> &'static [Kind] {
         match self.reader {
             Reader::Shipped | Reader::Tests => &[Kind::ItemUse, Kind::Macro, Kind::Path],
@@ -136,19 +156,21 @@ impl<'ast> Watch<'ast> for Reading {
         }
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
-        self.references.used(&item.tree);
-        Descend::Over
+    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), ForeignReferences> {
+        let mut references = ForeignReferences::owned_by(self.own_crate.as_ref());
+        references.used(&item.tree);
+        Contributed::new((), references, Descend::Over)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Unfold
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), ForeignReferences> {
+        Contributed::descending(Descend::Unfold)
     }
 
-    fn on_path(&mut self, path: &'ast Path, _: &Facts<'_, Path>) -> Descend {
+    fn on_path(&self, path: &Path, _: &Facts<'_, Path>) -> Contributed<(), ForeignReferences> {
+        let mut references = ForeignReferences::owned_by(self.own_crate.as_ref());
         path.segments.first().zip(path.segments.iter().nth(1)).into_iter().for_each(|(first, second)| {
-            self.references.record(Some(&first.ident), Leaf::Named(&second.ident));
+            references.record(Some(&first.ident), Leaf::Named(&second.ident));
         });
-        Descend::Into
+        Contributed::parted(references)
     }
 }

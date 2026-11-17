@@ -1946,6 +1946,7 @@ dependencies = [
 name = "lint-public-surface"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
