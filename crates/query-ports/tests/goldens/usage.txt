@@ -1,0 +1,1 @@
+usage: describe_queries <workspace root> <migrations directory>
