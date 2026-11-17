@@ -1403,6 +1403,7 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "lint-layout",
  "lint-placement",
@@ -2158,6 +2159,7 @@ dependencies = [
 name = "lint-test-budget"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "graph-reader",
  "laws",

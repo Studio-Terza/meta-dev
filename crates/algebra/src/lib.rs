@@ -10,3 +10,24 @@ pub trait Monoid: Semigroup {
         parts.into_iter().fold(Self::identity(), Self::combine)
     }
 }
+
+impl Semigroup for () {
+    fn combine(self, (): ()) {}
+}
+
+impl Monoid for () {
+    fn identity() {}
+}
+
+impl<Item> Semigroup for Vec<Item> {
+    fn combine(mut self, other: Vec<Item>) -> Vec<Item> {
+        self.extend(other);
+        self
+    }
+}
+
+impl<Item> Monoid for Vec<Item> {
+    fn identity() -> Vec<Item> {
+        Vec::new()
+    }
+}
