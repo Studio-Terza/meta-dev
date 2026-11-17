@@ -6,6 +6,7 @@ use lint_core::Syntax;
 use super::struct_fields::StructFields;
 use lint_layout::Name;
 
+#[derive(Debug)]
 pub struct Parameter {
     name: Name,
     type_name: Option<Name>,
