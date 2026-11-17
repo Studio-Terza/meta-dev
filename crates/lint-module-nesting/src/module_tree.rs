@@ -15,7 +15,7 @@ use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
 use lint_placement::{CrateRoot, Krate, Level, Nest};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Folding, Gathers, Kind, Sweep, Visit, Watching};
 use reexport_count::ReexportCount;
 use syntax::ItemUse;
 use users::Users;
@@ -57,7 +57,7 @@ impl<'head> IntoIterator for ShippedModule<'head> {
 
 #[derive(Debug)]
 pub struct ModuleGathering<'head> {
-    uses: UsePaths,
+    uses: Folding<UsePaths>,
     module: Option<ModuleUses<'head>>,
 }
 
@@ -68,7 +68,7 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
         let module = file.shipped().map(|_| {
             let tests = file.test_modules().iter().map(|test| TestUses {
                 segments: AsRef::<[Name]>::as_ref(test.head().placement().module()).to_vec(),
-                uses: Sweep::gathered(test, UsePaths::default()),
+                uses: Sweep::gathered(test, Folding::from(UsePaths)),
             });
             ModuleUses {
                 file: AsRef::<Path>::as_ref(head),
@@ -79,7 +79,7 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
                 tests: tests.collect(),
             }
         });
-        ModuleGathering { uses: UsePaths::default(), module }
+        ModuleGathering { uses: Folding::from(UsePaths), module }
     }
 }
 
@@ -90,7 +90,7 @@ impl<'head> Gathers<ShippedModule<'head>> for ModuleGathering<'head> {
     }
 
     fn gathered(self) -> ShippedModule<'head> {
-        let uses = self.uses.0;
+        let uses: Vec<UsePath> = self.uses.concluded();
         ShippedModule(self.module.map(|module| ModuleUses { uses, ..module }))
     }
 }
@@ -106,27 +106,18 @@ impl<'head> FromIterator<ShippedModule<'head>> for Concluded<'head> {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct UsePaths(Vec<UsePath>);
+#[derive(Debug)]
+pub struct UsePaths;
 
-impl<'ast> Watch<'ast> for UsePaths {
+impl Fold for UsePaths {
+    type Found = Vec<UsePath>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemUse]
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
-        self.0.extend(UseEdges::of_tree(&item.tree));
-        Descend::Over
-    }
-}
-
-impl Gathers<Vec<UsePath>> for UsePaths {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> Vec<UsePath> {
-        self.0
+    fn on_item_use(&self, found: Vec<UsePath>, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Visit<Vec<UsePath>> {
+        Visit::adding(found, UseEdges::of_tree(&item.tree), Descend::Over)
     }
 }
 
