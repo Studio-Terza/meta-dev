@@ -5,8 +5,9 @@ use std::path::PathBuf;
 use graph::{Model, Reach};
 use lint_core::SourceFile;
 
-use crate::lowering::{BodyGroup, Lowered, Lowering};
+use crate::lowering::{BodyGroup, Lowered, Lowerer};
 use crate::planting::{Placing, Planting};
+use lint_core::Folding;
 use lint_sweep::{Gathers, Scoped, Sweep, Watching};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -30,7 +31,8 @@ impl<'read> ListedFile<'read> {
         FileLowering {
             source: self.source,
             order: self.order.clone(),
-            lowering: Scoped::new(Lowering::of_file(self.source, self.reach)),
+            lowering: Scoped::new(Folding::from(Lowerer::of_file(self.source, self.reach))),
+            lowerer: Lowerer::of_file(self.source, self.reach),
         }
     }
 }
@@ -39,7 +41,8 @@ impl<'read> ListedFile<'read> {
 struct FileLowering<'read> {
     source: &'read SourceFile,
     order: Order,
-    lowering: Scoped<Lowering<'read>, BodyGroup>,
+    lowering: Scoped<Folding<Lowerer<'read>>, BodyGroup>,
+    lowerer: Lowerer<'read>,
 }
 
 impl Gathers<FileFacts> for FileLowering<'_> {
@@ -51,7 +54,7 @@ impl Gathers<FileFacts> for FileLowering<'_> {
         FileFacts {
             order: self.order,
             placing: Placing::from(self.source),
-            lowered: self.lowering.into_parent().lowered(),
+            lowered: self.lowerer.lowered(self.lowering.into_parent().concluded()),
         }
     }
 }

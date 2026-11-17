@@ -220,6 +220,14 @@ pub trait Attaching<Group: Fold>: Fold {
     fn detached(&self, found: Self::Found, group: Group::Found) -> Self::Found;
 }
 
+pub trait AttachingGroups<Group>: Fold {
+    const ATTACHED: &'static [Kind];
+
+    fn attaching(&self, found: Self::Found) -> Drawn<Self::Found, Vec<Attachment<Group>>>;
+
+    fn detached(&self, found: Self::Found, group: Group) -> Self::Found;
+}
+
 #[derive(Debug)]
 pub struct Grouped<Group: Fold>(Folding<Group>);
 
@@ -239,14 +247,26 @@ impl<Group: Fold> From<Attachment<Group>> for Attachment<Grouped<Group>> {
     }
 }
 
-impl<Parent: Attaching<Group>, Group: Fold> Attaches<Grouped<Group>> for Folding<Parent> {
-    const ATTACHED: &'static [Kind] = Parent::ATTACHED;
+impl<Parent: Attaching<Group>, Group: Fold> AttachingGroups<Grouped<Group>> for Parent {
+    const ATTACHED: &'static [Kind] = <Parent as Attaching<Group>>::ATTACHED;
 
-    fn attaching(&mut self) -> Vec<Attachment<Grouped<Group>>> {
-        self.drawn(Attaching::attaching).into_iter().map(Attachment::from).collect()
+    fn attaching(&self, found: Parent::Found) -> Drawn<Parent::Found, Vec<Attachment<Grouped<Group>>>> {
+        Attaching::attaching(self, found).mapped(|attached| attached.into_iter().map(Attachment::from).collect())
     }
 
-    fn detached(&mut self, group: Grouped<Group>) {
-        self.left(|fold, found| fold.detached(found, group.0.gathered()));
+    fn detached(&self, found: Parent::Found, group: Grouped<Group>) -> Parent::Found {
+        Attaching::detached(self, found, group.0.gathered())
+    }
+}
+
+impl<Parent: AttachingGroups<Group>, Group: Gathers<Group>> Attaches<Group> for Folding<Parent> {
+    const ATTACHED: &'static [Kind] = Parent::ATTACHED;
+
+    fn attaching(&mut self) -> Vec<Attachment<Group>> {
+        self.drawn(AttachingGroups::attaching)
+    }
+
+    fn detached(&mut self, group: Group) {
+        self.left(|fold, found| fold.detached(found, group));
     }
 }

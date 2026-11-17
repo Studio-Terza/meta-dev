@@ -1,7 +1,7 @@
-use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
+use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro};
 
 use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
-use lint_core::{Macros, Syntax};
+use lint_core::{Folding, Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
 use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};
@@ -119,7 +119,7 @@ impl Places {
     }
 }
 
-impl Lowering<'_> {
+impl<'read> Lowering<'read> {
     fn placed(&mut self, row: PlaceRow) -> PlaceId {
         let places = &mut self.lowered.rows.places.places;
         let place = PlaceId(places.len());
@@ -140,31 +140,26 @@ impl Lowering<'_> {
         Descend::Into
     }
 
-    pub(super) fn macro_left(&mut self, item: &ItemMacro) -> &mut Self {
-        match &item.ident {
-            Some(_) => self.transcribed(&Macros::expanded(self.source, &item.mac)),
-            None => self.expanded(&item.mac),
-        }
-    }
-
-    fn transcribed(&mut self, statements: &[Stmt]) -> &mut Self {
+    pub(super) fn transcribed(self, item: &ItemMacro) -> Lowering<'read> {
+        let statements = Macros::expanded(self.source, &item.mac);
         let outer = self.context;
-        self.context = self.context.transcribed();
-        let mut scoped = Scoped::new(&mut *self);
-        statements
-            .iter()
-            .filter_map(Syntax::stmt_item)
-            .for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
-        self.context = outer;
-        self
+        let inner = Lowering { context: self.context.transcribed(), ..self };
+        let back = inner.reentered(statements.iter().filter_map(Syntax::stmt_item));
+        Lowering { context: outer, ..back }
     }
 
-    fn expanded(&mut self, invocation: &Macro) -> &mut Self {
+    pub(super) fn expanded(self, invocation: &Macro) -> Lowering<'read> {
         let items = Macros::items_in_file(self.source, invocation);
-        self.lowered.openings.absorb(self.here.scope(), Entries::of_items(&items));
-        let mut scoped = Scoped::new(&mut *self);
-        items.iter().for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
-        self
+        let mut opened = self;
+        opened.lowered.openings.absorb(opened.here.scope(), Entries::of_items(&items));
+        opened.reentered(items.iter())
+    }
+
+    fn reentered<'item>(self, items: impl Iterator<Item = &'item syntax::Item>) -> Lowering<'read> {
+        let origin = self.origin;
+        let mut scoped = Scoped::new(Folding::seeded(origin, Some(self)));
+        items.for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
+        origin.opened(scoped.into_parent().concluded())
     }
 
     pub(super) fn trait_owning(&mut self, ident: &Ident, attributes: &[Attribute]) -> PlaceId {

@@ -45,7 +45,8 @@ use definition::{LoweredDefinition, Mutations, RowIndex};
 use frames::{Enclosure, Frame};
 use held::{Holder, HoldingRow, Link};
 use laws::LawRow;
-use lint_sweep::{Address, Attaches, Attachment, Descend, Facts, Kind, Watch};
+use lint_core::{Drawn, Fold, Visit};
+use lint_sweep::{Address, AttachingGroups, Attachment, Descend, Facts, Kind};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
@@ -348,7 +349,9 @@ impl From<&SourceFile> for FileShape {
 }
 
 impl<'read> Lowering<'read> {
-    pub(crate) fn of_file(source: &'read SourceFile, reach: Reach) -> Lowering<'read> {
+    fn of_file(origin: Lowerer<'read>) -> Lowering<'read> {
+        let source = origin.source;
+        let reach = origin.reach;
         let syntax = source.syntax();
         let shape = FileShape::from(source);
         let lowered = Lowered {
@@ -358,6 +361,7 @@ impl<'read> Lowering<'read> {
         };
         Lowering {
             source,
+            origin,
             opening: Vec::new(),
             lowered,
             here: Seat::new(ScopeId::FIRST, shape.children),
@@ -369,26 +373,68 @@ impl<'read> Lowering<'read> {
             tables: Vec::new(),
         }
     }
+}
 
-    pub(crate) fn lowered(self) -> Lowered {
-        self.lowered
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Lowerer<'read> {
+    source: &'read SourceFile,
+    reach: Reach,
+}
+
+impl<'read> Lowerer<'read> {
+    pub(crate) fn of_file(source: &'read SourceFile, reach: Reach) -> Lowerer<'read> {
+        Lowerer { source, reach }
+    }
+
+    pub(crate) fn lowered(&self, found: Option<Lowering<'read>>) -> Lowered {
+        self.opened(found).lowered
+    }
+
+    fn opened(&self, found: Option<Lowering<'read>>) -> Lowering<'read> {
+        found.unwrap_or_else(|| Lowering::of_file(*self))
+    }
+
+    fn macro_left(lowering: Lowering<'read>, item: &ItemMacro) -> Lowering<'read> {
+        match &item.ident {
+            Some(_) => lowering.transcribed(item),
+            None => lowering.expanded(&item.mac),
+        }
+    }
+
+    fn stepped(
+        &self,
+        found: Option<Lowering<'read>>,
+        step: impl FnOnce(&mut Lowering<'read>) -> Descend,
+    ) -> Visit<Option<Lowering<'read>>> {
+        let mut lowering = self.opened(found);
+        let descend = step(&mut lowering);
+        Visit::new(Some(lowering), descend)
+    }
+
+    fn settled(&self, found: Option<Lowering<'read>>, step: impl FnOnce(&mut Lowering<'read>)) -> Lowering<'read> {
+        let mut lowering = self.opened(found);
+        step(&mut lowering);
+        lowering
     }
 }
 
-impl Attaches<BodyGroup> for Lowering<'_> {
+impl<'read> AttachingGroups<BodyGroup> for Lowerer<'read> {
     const ATTACHED: &'static [Kind] = BodyGroup::KINDS;
 
-    fn attaching(&mut self) -> Vec<Attachment<BodyGroup>> {
-        std::mem::take(&mut self.opening)
+    fn attaching(&self, found: Option<Lowering<'read>>) -> Drawn<Option<Lowering<'read>>, Vec<Attachment<BodyGroup>>> {
+        let lowering = self.opened(found);
+        Drawn::new(Some(Lowering { opening: Vec::new(), ..lowering }), lowering.opening)
     }
 
-    fn detached(&mut self, group: BodyGroup) {
-        let row = group.row();
-        let definition = group.lowered();
-        row.slot_in(&mut self.lowered.rows.functions)
-            .into_iter()
-            .zip([definition])
-            .for_each(|(function, lowered)| function.defined(lowered));
+    fn detached(&self, found: Option<Lowering<'read>>, group: BodyGroup) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            let row = group.row();
+            let definition = group.lowered();
+            row.slot_in(&mut lowering.lowered.rows.functions)
+                .into_iter()
+                .zip([definition])
+                .for_each(|(function, lowered)| function.defined(lowered));
+        }))
     }
 }
 
@@ -497,6 +543,7 @@ impl<'read> Plot<'read> {
 #[derive(Debug)]
 pub(crate) struct Lowering<'read> {
     source: &'read SourceFile,
+    origin: Lowerer<'read>,
     opening: Vec<Attachment<BodyGroup>>,
     lowered: Lowered,
     here: Seat,
@@ -576,9 +623,63 @@ impl Lowering<'_> {
         self.generics = Arc::new(generics);
         Descend::Into
     }
+
+    pub(super) fn item_mod_entered(&mut self, item: &ItemMod) -> Descend {
+        match &item.content {
+            Some((_, items)) => self.module_entered(item, items),
+            None => self.slotted(item),
+        }
+    }
+
+    pub(super) fn impl_scoped(&mut self, block: &ItemImpl) -> Descend {
+        self.context = self.context.within_item(&block.attrs);
+        self.impl_entered(block)
+    }
+
+    pub(super) fn trait_entered(&mut self, item: &ItemTrait) -> Descend {
+        let generics = self.generics.subjectless().extended(&item.generics);
+        self.trait_bounds(item, &generics);
+        let place = self.trait_owning(&item.ident, &item.attrs);
+        self.filler_owning(item);
+        self.context = self.context.within_item(&item.attrs).owned(place);
+        self.enclosed(Enclosure::Trait, generics)
+    }
+
+    pub(super) fn fn_entered(&mut self, item: &ItemFn) -> Descend {
+        let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
+        self.context = self.context.within_item(&item.attrs).owned(place);
+        let generics = self.function(&item.attrs, &item.vis, &item.sig, Some(&item.block));
+        self.enclosed(Enclosure::Body, generics)
+    }
+
+    pub(super) fn foreign_entered(&mut self, item: &ForeignItemFn) -> Descend {
+        self.enclosure = Enclosure::Foreign;
+        self.function(&item.attrs, &item.vis, &item.sig, None);
+        Descend::Into
+    }
+
+    pub(super) fn tabled(
+        &mut self,
+        at: Address,
+        ident: &Ident,
+        ty: &syntax::Type,
+        attributes: &[Attribute],
+    ) -> Descend {
+        self.tables.push(at);
+        self.valued(ident, ty, attributes)
+    }
+
+    pub(super) fn macro_owned(&mut self, item: &ItemMacro) -> Descend {
+        match &item.ident {
+            Some(ident) => self.owned_by(ident, Domain::Macros, &item.attrs),
+            None => Descend::Into,
+        }
+    }
 }
 
-impl<'ast> Watch<'ast> for Lowering<'_> {
+impl<'read> Fold for Lowerer<'read> {
+    type Found = Option<Lowering<'read>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[
             Kind::Item,
@@ -611,220 +712,412 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
         ]
     }
 
-    fn on_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) -> Descend {
-        self.saved()
+    fn on_item(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &syntax::Item,
+        _: &Facts<'_, syntax::Item>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, Lowering::saved)
     }
 
-    fn off_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) {
-        self.restored();
+    fn off_item(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &syntax::Item,
+        _: &Facts<'_, syntax::Item>,
+    ) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            lowering.restored();
+        }))
     }
 
-    fn on_type(&mut self, ty: &'ast syntax::Type, _: &Facts<'_, syntax::Type>) -> Descend {
-        self.types_used(ty);
-        Descend::Into
+    fn on_type(
+        &self,
+        found: Option<Lowering<'read>>,
+        ty: &syntax::Type,
+        _: &Facts<'_, syntax::Type>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.types_used(ty);
+            Descend::Into
+        })
     }
 
-    fn on_item_mod(&mut self, item: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        match &item.content {
-            Some((_, items)) => self.module_entered(item, items),
-            None => self.slotted(item),
-        }
+    fn on_item_mod(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemMod,
+        _: &Facts<'_, ItemMod>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.item_mod_entered(item))
     }
 
-    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
-        self.saved();
-        self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
-        Descend::Into
+    fn on_block(
+        &self,
+        found: Option<Lowering<'read>>,
+        block: &Block,
+        _: &Facts<'_, Block>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.saved();
+            lowering.entered(ScopeKind::Block, Entries::of_block(&block.stmts), lowering.here.children());
+            Descend::Into
+        })
     }
 
-    fn off_block(&mut self, _: &'ast Block, _: &Facts<'_, Block>) {
-        self.restored();
+    fn off_block(&self, found: Option<Lowering<'read>>, _: &Block, _: &Facts<'_, Block>) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            lowering.restored();
+        }))
     }
 
-    fn on_item_impl(&mut self, block: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        self.context = self.context.within_item(&block.attrs);
-        self.impl_entered(block)
+    fn on_item_impl(
+        &self,
+        found: Option<Lowering<'read>>,
+        block: &ItemImpl,
+        _: &Facts<'_, ItemImpl>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.impl_scoped(block))
     }
 
-    fn on_item_trait(&mut self, item: &'ast ItemTrait, _: &Facts<'_, ItemTrait>) -> Descend {
-        let generics = self.generics.subjectless().extended(&item.generics);
-        self.trait_bounds(item, &generics);
-        let place = self.trait_owning(&item.ident, &item.attrs);
-        self.filler_owning(item);
-        self.context = self.context.within_item(&item.attrs).owned(place);
-        self.enclosed(Enclosure::Trait, generics)
+    fn on_item_trait(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemTrait,
+        _: &Facts<'_, ItemTrait>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.trait_entered(item))
     }
 
-    fn on_item_fn(&mut self, item: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
-        self.context = self.context.within_item(&item.attrs).owned(place);
-        let generics = self.function(&item.attrs, &item.vis, &item.sig, Some(&item.block));
-        self.enclosed(Enclosure::Body, generics)
+    fn on_item_fn(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.fn_entered(item))
     }
 
-    fn on_impl_item_fn(&mut self, item: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.method_entered(&item.attrs, &item.vis, &item.sig, Some(&item.block))
+    fn on_impl_item_fn(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.method_entered(&item.attrs, &item.vis, &item.sig, Some(&item.block)))
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.restored();
+    fn off_impl_item_fn(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+    ) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            lowering.restored();
+        }))
     }
 
-    fn on_trait_item_fn(&mut self, item: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.method_entered(&item.attrs, &SynVisibility::Inherited, &item.sig, item.default.as_ref())
+    fn on_trait_item_fn(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.method_entered(&item.attrs, &SynVisibility::Inherited, &item.sig, item.default.as_ref())
+        })
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
-        self.restored();
+    fn off_trait_item_fn(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+    ) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            lowering.restored();
+        }))
     }
 
-    fn on_foreign_item_fn(&mut self, item: &'ast ForeignItemFn, _: &Facts<'_, ForeignItemFn>) -> Descend {
-        self.enclosure = Enclosure::Foreign;
-        self.function(&item.attrs, &item.vis, &item.sig, None);
-        Descend::Into
+    fn on_foreign_item_fn(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ForeignItemFn,
+        _: &Facts<'_, ForeignItemFn>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.foreign_entered(item))
     }
 
-    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
-        let generics = InScope::outside().extended(&item.generics);
-        let target = generics.lowered(&item.ty);
-        self.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
-        self.lowered.rows.aliases.push(AliasRow {
-            scope: self.here.scope(),
-            name: UsePath::from(&item.ident),
-            parameters: generics.declarations(&item.generics),
-            target,
-        });
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
+    fn on_item_type(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemType,
+        _: &Facts<'_, ItemType>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            let generics = InScope::outside().extended(&item.generics);
+            let target = generics.lowered(&item.ty);
+            lowering.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
+            lowering.lowered.rows.aliases.push(AliasRow {
+                scope: lowering.here.scope(),
+                name: UsePath::from(&item.ident),
+                parameters: generics.declarations(&item.generics),
+                target,
+            });
+            lowering.owned_by(&item.ident, Domain::Types, &item.attrs)
+        })
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
-        let scope = self.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
-        self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
-        self.struct_held(item, &scope, link);
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
+    fn on_item_struct(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemStruct,
+        _: &Facts<'_, ItemStruct>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            let scope = lowering.generics.extended(&item.generics);
+            let link = Link::declaring(&item.ident);
+            lowering.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
+            lowering.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
+            lowering.struct_held(item, &scope, link);
+            lowering.owned_by(&item.ident, Domain::Types, &item.attrs)
+        })
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
-        let scope = self.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
-        self.parameters(&Holder::named(&item.ident, Held::Bound), &item.generics, &link);
-        item.variants.iter().fold(&mut *self, |lowering, variant| {
-            lowering.hold(Holder::named(&variant.ident, Held::Variant), link.clone(), TypeRef::Tuple(Vec::new()));
-            let holder = Holder::named(&variant.ident, Held::EnumField);
-            lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
-            lowering
-        });
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
+    fn on_item_enum(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemEnum,
+        _: &Facts<'_, ItemEnum>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            let scope = lowering.generics.extended(&item.generics);
+            let link = Link::declaring(&item.ident);
+            lowering.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
+            lowering.parameters(&Holder::named(&item.ident, Held::Bound), &item.generics, &link);
+            item.variants.iter().fold(&mut *lowering, |varied, variant| {
+                varied.hold(Holder::named(&variant.ident, Held::Variant), link.clone(), TypeRef::Tuple(Vec::new()));
+                let holder = Holder::named(&variant.ident, Held::EnumField);
+                varied.fields_held(&holder, &link, variant.fields.iter(), &scope);
+                varied
+            });
+            lowering.owned_by(&item.ident, Domain::Types, &item.attrs)
+        })
     }
 
-    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
-        let scope = self.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
-        self.fields_held(&Holder::named(&item.ident, Held::UnionField), &link, item.fields.named.iter(), &scope);
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
+    fn on_item_union(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemUnion,
+        _: &Facts<'_, ItemUnion>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            let scope = lowering.generics.extended(&item.generics);
+            let link = Link::declaring(&item.ident);
+            lowering.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
+            lowering.fields_held(
+                &Holder::named(&item.ident, Held::UnionField),
+                &link,
+                item.fields.named.iter(),
+                &scope,
+            );
+            lowering.owned_by(&item.ident, Domain::Types, &item.attrs)
+        })
     }
 
-    fn on_item_const(&mut self, item: &'ast ItemConst, facts: &Facts<'_, ItemConst>) -> Descend {
-        self.tables.push(facts.address());
-        self.valued(&item.ident, &item.ty, &item.attrs)
+    fn on_item_const(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemConst,
+        facts: &Facts<'_, ItemConst>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.tabled(facts.address(), &item.ident, &item.ty, &item.attrs))
     }
 
-    fn on_item_static(&mut self, item: &'ast ItemStatic, facts: &Facts<'_, ItemStatic>) -> Descend {
-        self.tables.push(facts.address());
-        self.valued(&item.ident, &item.ty, &item.attrs)
+    fn on_item_static(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemStatic,
+        facts: &Facts<'_, ItemStatic>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.tabled(facts.address(), &item.ident, &item.ty, &item.attrs))
     }
 
-    fn off_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) {
-        self.tables.pop();
+    fn off_item_const(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &ItemConst,
+        _: &Facts<'_, ItemConst>,
+    ) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            lowering.tables.pop();
+        }))
     }
 
-    fn off_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) {
-        self.tables.pop();
+    fn off_item_static(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &ItemStatic,
+        _: &Facts<'_, ItemStatic>,
+    ) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            lowering.tables.pop();
+        }))
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, facts: &Facts<'_, ImplItemConst>) -> Descend {
-        self.tables.push(facts.address());
-        Descend::Into
+    fn on_impl_item_const(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &ImplItemConst,
+        facts: &Facts<'_, ImplItemConst>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.tables.push(facts.address());
+            Descend::Into
+        })
     }
 
-    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) {
-        self.tables.pop();
+    fn off_impl_item_const(
+        &self,
+        found: Option<Lowering<'read>>,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+    ) -> Option<Lowering<'read>> {
+        Some(self.settled(found, |lowering| {
+            lowering.tables.pop();
+        }))
     }
 
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.method_called(call);
-        Descend::Into
+    fn on_expr_method_call(
+        &self,
+        found: Option<Lowering<'read>>,
+        call: &ExprMethodCall,
+        _: &Facts<'_, ExprMethodCall>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.method_called(call);
+            Descend::Into
+        })
     }
 
-    fn on_expr_call(&mut self, call: &'ast ExprCall, _: &Facts<'_, ExprCall>) -> Descend {
-        self.path_called(call);
-        Descend::Into
+    fn on_expr_call(
+        &self,
+        found: Option<Lowering<'read>>,
+        call: &ExprCall,
+        _: &Facts<'_, ExprCall>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.path_called(call);
+            Descend::Into
+        })
     }
 
-    fn on_expr_macro(&mut self, expr: &'ast ExprMacro, _: &Facts<'_, ExprMacro>) -> Descend {
-        self.macro_called(expr);
-        Descend::Into
+    fn on_expr_macro(
+        &self,
+        found: Option<Lowering<'read>>,
+        expr: &ExprMacro,
+        _: &Facts<'_, ExprMacro>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.macro_called(expr);
+            Descend::Into
+        })
     }
 
-    fn on_expr_struct(&mut self, literal: &'ast syntax::ExprStruct, _: &Facts<'_, syntax::ExprStruct>) -> Descend {
-        self.struct_used(literal);
-        Descend::Into
+    fn on_expr_struct(
+        &self,
+        found: Option<Lowering<'read>>,
+        literal: &syntax::ExprStruct,
+        _: &Facts<'_, syntax::ExprStruct>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.struct_used(literal);
+            Descend::Into
+        })
     }
 
-    fn on_expr_path(&mut self, expression: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
-        self.path_used(expression);
-        Descend::Into
+    fn on_expr_path(
+        &self,
+        found: Option<Lowering<'read>>,
+        expression: &ExprPath,
+        _: &Facts<'_, ExprPath>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.path_used(expression);
+            Descend::Into
+        })
     }
 
-    fn on_expr_match(&mut self, expr: &'ast syntax::ExprMatch, _: &Facts<'_, syntax::ExprMatch>) -> Descend {
-        expr.arms.iter().for_each(|arm| self.pattern_used(&arm.pat));
-        Descend::Into
+    fn on_expr_match(
+        &self,
+        found: Option<Lowering<'read>>,
+        expr: &syntax::ExprMatch,
+        _: &Facts<'_, syntax::ExprMatch>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            expr.arms.iter().for_each(|arm| lowering.pattern_used(&arm.pat));
+            Descend::Into
+        })
     }
 
-    fn on_expr_let(&mut self, expr: &'ast syntax::ExprLet, _: &Facts<'_, syntax::ExprLet>) -> Descend {
-        self.pattern_used(&expr.pat);
-        Descend::Into
+    fn on_expr_let(
+        &self,
+        found: Option<Lowering<'read>>,
+        expr: &syntax::ExprLet,
+        _: &Facts<'_, syntax::ExprLet>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.pattern_used(&expr.pat);
+            Descend::Into
+        })
     }
 
-    fn on_local(&mut self, local: &'ast syntax::Local, _: &Facts<'_, syntax::Local>) -> Descend {
-        local
-            .init
-            .as_ref()
-            .filter(|init| init.diverge.is_some())
-            .into_iter()
-            .for_each(|_| self.pattern_used(&local.pat));
-        Descend::Into
+    fn on_local(
+        &self,
+        found: Option<Lowering<'read>>,
+        local: &syntax::Local,
+        _: &Facts<'_, syntax::Local>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            local
+                .init
+                .as_ref()
+                .filter(|init| init.diverge.is_some())
+                .into_iter()
+                .for_each(|_| lowering.pattern_used(&local.pat));
+            Descend::Into
+        })
     }
 
-    fn on_item_macro(&mut self, item: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) -> Descend {
-        match &item.ident {
-            Some(ident) => self.owned_by(ident, Domain::Macros, &item.attrs),
-            None => Descend::Into,
-        }
+    fn on_item_macro(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemMacro,
+        _: &Facts<'_, ItemMacro>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| lowering.macro_owned(item))
     }
 
-    fn off_item_macro(&mut self, item: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) {
-        self.macro_left(item);
+    fn off_item_macro(
+        &self,
+        found: Option<Lowering<'read>>,
+        item: &ItemMacro,
+        _: &Facts<'_, ItemMacro>,
+    ) -> Option<Lowering<'read>> {
+        Some(Self::macro_left(self.opened(found), item))
     }
 
-    fn on_macro(&mut self, invoked: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.macro_used(invoked);
-        Descend::Into
-    }
-}
-
-impl Attaches<BodyGroup> for &mut Lowering<'_> {
-    const ATTACHED: &'static [Kind] = BodyGroup::KINDS;
-
-    fn attaching(&mut self) -> Vec<Attachment<BodyGroup>> {
-        (**self).attaching()
-    }
-
-    fn detached(&mut self, group: BodyGroup) {
-        (**self).detached(group);
+    fn on_macro(
+        &self,
+        found: Option<Lowering<'read>>,
+        invoked: &Macro,
+        _: &Facts<'_, Macro>,
+    ) -> Visit<Option<Lowering<'read>>> {
+        self.stepped(found, |lowering| {
+            lowering.macro_used(invoked);
+            Descend::Into
+        })
     }
 }

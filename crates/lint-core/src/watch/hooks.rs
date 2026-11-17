@@ -276,6 +276,10 @@ impl<Folded: Fold> From<Folded> for Folding<Folded> {
 }
 
 impl<Folded: Fold> Folding<Folded> {
+    pub fn seeded(fold: Folded, found: Folded::Found) -> Folding<Folded> {
+        Folding { fold, found }
+    }
+
     #[must_use]
     pub fn concluded<Part: From<Folded::Found>>(self) -> Part {
         self.concluded_with(|_, found| Part::from(found))
