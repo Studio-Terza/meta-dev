@@ -24,7 +24,7 @@ impl Elegance {
         let transitions = Transitions::from(model);
         let system = TypeSystem::built_from(&extraction, &transitions);
         vec![
-            Complexity::report(files),
+            <Complexity as ModelLint>::report(model),
             TransitionGraph::report_graph(&system),
             DuplicateTransitions::report_graph(&system),
             CoreMutation::report_graph(&system),
