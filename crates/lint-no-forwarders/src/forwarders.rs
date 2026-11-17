@@ -7,10 +7,11 @@ mod struct_fields;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use algebra::{Monoid, Semigroup};
 use impl_target::ImplTarget;
 use parameter::Parameter;
 use struct_fields::StructFields;
-use syntax::{Expr, ImplItemFn, ItemImpl, ItemMod, ItemStruct, PathSegment, Stmt};
+use syntax::{Expr, Ident, ImplItemFn, ItemImpl, ItemMod, ItemStruct, Stmt};
 
 use super::workspace_types::WorkspaceTypes;
 use callee::Callee;
@@ -18,22 +19,51 @@ use forwarder::{Forwarder, Owned};
 use lint_core::Syntax;
 use lint_core::Violation;
 use lint_layout::{Casing, Name};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Watching};
 
 #[derive(Debug)]
 pub struct Forwarders<'file> {
     path: &'file Path,
-    structs: BTreeMap<Name, StructFields>,
-    self_type: Name,
-    self_ident: Option<Name>,
-    concrete: Vec<Name>,
-    found: Vec<Forwarder>,
 }
 
 #[derive(Debug)]
 pub struct Forwarded<'file> {
     path: &'file Path,
     found: Vec<Forwarder>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Target {
+    self_type: Name,
+    self_ident: Option<Name>,
+    concrete: Vec<Name>,
+}
+
+#[derive(Debug)]
+pub struct Candidate {
+    ident: Ident,
+    params: Vec<Parameter>,
+    tail: Expr,
+}
+
+#[derive(Debug)]
+pub struct Method {
+    target: Target,
+    candidate: Candidate,
+}
+
+#[derive(Debug, Default)]
+pub struct Unplaced(Vec<Candidate>);
+
+#[derive(Debug, Default)]
+pub struct Gleaned {
+    structs: BTreeMap<Name, StructFields>,
+    methods: Vec<Method>,
+}
+
+struct Classifying<'gleaned> {
+    structs: &'gleaned BTreeMap<Name, StructFields>,
+    target: &'gleaned Target,
 }
 
 impl<'file> Forwarded<'file> {
@@ -44,15 +74,19 @@ impl<'file> Forwarded<'file> {
     }
 }
 
-impl Forwarders<'_> {
-    fn classify(&self, function: &ImplItemFn) -> Option<Forwarder> {
-        let params: Vec<Parameter> = function.sig.inputs.iter().filter_map(Parameter::describe).collect();
-        Some(function.block.stmts.as_slice())
-            .filter(|statements| statements.len() == 1)
-            .and_then(<[Stmt]>::first)
-            .and_then(Syntax::tail)
-            .and_then(|tail| self.callee(tail, &params))
-            .map(|owned| owned.forwarder(&function.sig.ident))
+impl Gleaned {
+    fn classified(self) -> Vec<Forwarder> {
+        let structs = &self.structs;
+        self.methods
+            .iter()
+            .filter_map(|method| Classifying { structs, target: &method.target }.forwarder(&method.candidate))
+            .collect()
+    }
+}
+
+impl Classifying<'_> {
+    fn forwarder(&self, candidate: &Candidate) -> Option<Forwarder> {
+        self.callee(&candidate.tail, &candidate.params).map(|owned| owned.forwarder(&candidate.ident))
     }
 
     fn callee(&self, tail: &Expr, params: &[Parameter]) -> Option<Owned> {
@@ -72,12 +106,12 @@ impl Forwarders<'_> {
             Expr::Path(path) => path
                 .path
                 .is_ident("self")
-                .then_some(&self.self_type)
+                .then_some(&self.target.self_type)
                 .or_else(|| Parameter::named_by(params, &path.path).and_then(Parameter::type_name)),
             Expr::Field(field) => Syntax::expr_path(&field.base)
                 .filter(|base| base.path.is_ident("self"))
-                .and_then(|_| self.structs.get(&self.self_type))
-                .and_then(|fields| fields.field_type(&field.member, &self.concrete)),
+                .and_then(|_| self.structs.get(&self.target.self_type))
+                .and_then(|fields| fields.field_type(&field.member, &self.target.concrete)),
             _ => None,
         }
     }
@@ -89,65 +123,108 @@ impl Forwarders<'_> {
         let owner = leading
             .last()
             .filter(|owner| AsRef::<str>::as_ref(*owner) != "Self")
-            .or_else(|| leading.last().and(self.self_ident.as_ref()))?;
+            .or_else(|| leading.last().and(self.target.self_ident.as_ref()))?;
         (method.casing() == Casing::Lower)
             .then_some(owner)
             .map(|named| Owned::new(Callee::associated(named.clone(), method.clone()), named))
     }
 }
 
-impl Forwarders<'_> {
-    pub fn targeted(&mut self, segment: &PathSegment) -> Descend {
-        self.self_type = Name::from(&segment.ident);
-        self.self_ident = Some(Name::from(&segment.ident));
-        self.concrete = StructFields::type_arguments(segment);
-        Descend::Into
+impl Candidate {
+    fn tail_call(function: &ImplItemFn) -> Option<Candidate> {
+        let tail = Some(function.block.stmts.as_slice())
+            .filter(|statements| statements.len() == 1)
+            .and_then(<[Stmt]>::first)
+            .and_then(Syntax::tail)?;
+        Some(Candidate {
+            ident: function.sig.ident.clone(),
+            params: function.sig.inputs.iter().filter_map(Parameter::describe).collect(),
+            tail: tail.clone(),
+        })
     }
 }
 
-impl<'ast> Watch<'ast> for Forwarders<'_> {
+impl Semigroup for Unplaced {
+    fn combine(self, other: Unplaced) -> Unplaced {
+        Unplaced(self.0.combine(other.0))
+    }
+}
+
+impl Monoid for Unplaced {}
+
+impl Semigroup for Gleaned {
+    fn combine(mut self, other: Gleaned) -> Gleaned {
+        self.structs.extend(other.structs);
+        Gleaned { methods: self.methods.combine(other.methods), ..self }
+    }
+}
+
+impl Monoid for Gleaned {}
+
+impl Contribute for Forwarders<'_> {
+    type Open = Unplaced;
+    type Part = Gleaned;
+
     fn kinds(&self) -> &'static [Kind] {
-        &[Kind::ItemMod, Kind::ItemStruct, Kind::ItemImpl, Kind::ImplItemFn]
+        &[Kind::ItemMod, Kind::ItemStruct, Kind::ImplItemFn]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn scopes(&self) -> &'static [Kind] {
+        &[Kind::ItemImpl]
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, facts: &Facts<'_, ItemStruct>) -> Descend {
-        self.structs.extend(facts.name().map(|name| (name.clone(), StructFields::describe(item))));
-        Descend::Over
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<Unplaced, Gleaned> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        ImplTarget::describe(item).walked_by(self)
+    fn on_item_struct(&self, item: &ItemStruct, facts: &Facts<'_, ItemStruct>) -> Contributed<Unplaced, Gleaned> {
+        let structs = facts.name().map(|name| (name.clone(), StructFields::describe(item))).into_iter().collect();
+        Contributed::new(Unplaced::default(), Gleaned { structs, methods: Vec::new() }, Descend::Over)
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.found.extend(self.classify(function));
-        Descend::Into
+    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<Unplaced, Gleaned> {
+        Contributed::descending(ImplTarget::describe(item).target().map_or(Descend::Over, |_| Descend::Into))
+    }
+
+    fn off_item_impl(
+        &self,
+        item: &ItemImpl,
+        _: &Facts<'_, ItemImpl>,
+        inner: Contribution<Unplaced, Gleaned>,
+    ) -> Gleaned {
+        inner.concluded(|pending, gleaned| {
+            let methods = ImplTarget::describe(item).target().map_or_default(|target| target.placed(pending));
+            gleaned.combine(Gleaned { structs: BTreeMap::new(), methods })
+        })
+    }
+
+    fn on_impl_item_fn(&self, function: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Contributed<Unplaced, Gleaned> {
+        Contributed::new(
+            Unplaced(Candidate::tail_call(function).into_iter().collect()),
+            Gleaned::default(),
+            Descend::Into,
+        )
     }
 }
 
-impl<'file> Gathers<Forwarded<'file>> for Forwarders<'file> {
+impl Target {
+    fn placed(&self, unplaced: Unplaced) -> Vec<Method> {
+        unplaced.0.into_iter().map(|candidate| Method { target: self.clone(), candidate }).collect()
+    }
+}
+
+impl<'file> Gathers<Forwarded<'file>> for Contributing<Forwarders<'file>> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         std::iter::once::<&mut Watching<'_>>(self)
     }
 
     fn gathered(self) -> Forwarded<'file> {
-        Forwarded { path: self.path, found: self.found }
+        self.concluded(|forwarders, _, gleaned| Forwarded { path: forwarders.path, found: gleaned.classified() })
     }
 }
 
 impl<'file> From<&'file Path> for Forwarders<'file> {
     fn from(path: &'file Path) -> Forwarders<'file> {
-        Forwarders {
-            path,
-            structs: BTreeMap::new(),
-            self_type: Name::default(),
-            self_ident: None,
-            concrete: Vec::new(),
-            found: Vec::new(),
-        }
+        Forwarders { path }
     }
 }
