@@ -1,5 +1,64 @@
 pub use proptest;
 
+use proptest::strategy::Strategy;
+use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
+
+#[derive(Debug)]
+pub struct Generation;
+
+impl Generation {
+    pub const CASES: u32 = 256;
+
+    #[must_use]
+    pub fn repeatable() -> Config {
+        Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() }
+    }
+
+    pub fn bounded<Generating: Strategy>(strategy: &Generating) -> Result<(), TestError<Generating::Value>> {
+        TestRunner::new(Config { cases: Self::CASES, max_local_rejects: Self::CASES, ..Self::repeatable() })
+            .run(strategy, |_| Ok(()))
+    }
+}
+
+#[macro_export]
+macro_rules! generates {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr $(,)?) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+            $crate::Generation::bounded(&$strategy)?;
+            Ok(())
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! monoid {
+    ($(#[$meta:meta])* $name:ident, $type:ty, $strategy:expr $(,)?) => {
+        mod $name {
+            use super::*;
+
+            $crate::associative!(
+                $(#[$meta])* combining_is_associative,
+                $strategy,
+                <$type as ::algebra::Semigroup>::combine
+            );
+            $crate::identity!(
+                $(#[$meta])* the_identity_changes_nothing,
+                $strategy,
+                <$type as ::algebra::Semigroup>::combine,
+                <$type as ::algebra::Monoid>::identity()
+            );
+            $crate::law!($(#[$meta])* concatenating_folds_from_the_identity, ($strategy, $strategy), pair, {
+                let (first, second) = pair;
+                let folded = <$type as ::algebra::Semigroup>::combine(first.clone(), second.clone());
+                let concatenated = <$type as ::algebra::Monoid>::concat([first, second]);
+                $crate::proptest::prop_assert_eq!(concatenated, folded, "concat is not the fold of combine");
+            });
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! law {
     ($(#[$meta:meta])* $name:ident, given $given:ident = $setup:expr, $strategy:expr, $value:ident, $body:block) => {
@@ -7,11 +66,7 @@ macro_rules! law {
         #[test]
         fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
             let $given = $setup;
-            let mut runner = $crate::proptest::test_runner::TestRunner::new($crate::proptest::test_runner::Config {
-                failure_persistence: None,
-                rng_seed: $crate::proptest::test_runner::RngSeed::Fixed(0),
-                ..$crate::proptest::test_runner::Config::default()
-            });
+            let mut runner = $crate::proptest::test_runner::TestRunner::new($crate::Generation::repeatable());
             runner.run(&$strategy, |$value| {
                 let _: () = $body;
                 Ok(())
@@ -21,11 +76,7 @@ macro_rules! law {
     };
     ($(#[$meta:meta])* $name:ident, $strategy:expr, $value:ident, $body:block) => {
         $crate::proptest::proptest! {
-            #![proptest_config($crate::proptest::test_runner::Config {
-                failure_persistence: None,
-                rng_seed: $crate::proptest::test_runner::RngSeed::Fixed(0),
-                ..$crate::proptest::test_runner::Config::default()
-            })]
+            #![proptest_config($crate::Generation::repeatable())]
             $(#[$meta])*
             #[test]
             fn $name($value in $strategy) $body

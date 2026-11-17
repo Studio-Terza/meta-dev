@@ -30,21 +30,43 @@ pub enum Ground {
     Ports,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Writing {
+    Written,
+    Expanded,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Region {
     reach: Reach,
     zone: Zone,
     within: Within,
     ground: Ground,
+    writing: Writing,
 }
 
 impl Region {
-    pub const SHIPPED: Region =
-        Region { reach: Reach::Shipped, zone: Zone::Open, within: Within::Own, ground: Ground::Open };
+    pub const SHIPPED: Region = Region {
+        reach: Reach::Shipped,
+        zone: Zone::Open,
+        within: Within::Own,
+        ground: Ground::Open,
+        writing: Writing::Written,
+    };
 
     #[must_use]
     pub fn new(reach: Reach, zone: Zone, within: Within) -> Region {
-        Region { reach, zone, within, ground: Ground::Open }
+        Region { reach, zone, within, ground: Ground::Open, writing: Writing::Written }
+    }
+
+    #[must_use]
+    pub fn writing(self) -> Writing {
+        self.writing
+    }
+
+    #[must_use]
+    pub fn written(self, writing: Writing) -> Region {
+        Region { writing: self.writing.max(writing), ..self }
     }
 
     #[must_use]
@@ -89,12 +111,7 @@ impl Region {
 
     #[must_use]
     pub fn joined(self, other: Region) -> Region {
-        self.reached(other.reach).zoned(other.zone).inside(other.within).grounded(other.ground)
-    }
-
-    #[must_use]
-    pub fn ungrounded(self) -> Region {
-        Region { ground: Ground::Open, ..self }
+        self.reached(other.reach).zoned(other.zone).inside(other.within).grounded(other.ground).written(other.writing)
     }
 }
 

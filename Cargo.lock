@@ -12,6 +12,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "algebra"
+version = "0.1.0"
+dependencies = [
+ "laws",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1038,6 +1045,7 @@ dependencies = [
 name = "graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-lifts",
  "lint-layout",
  "newtype",
@@ -1288,6 +1296,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "invariants"
+version = "0.1.0"
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1369,14 +1381,15 @@ name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "graph",
  "graph-reader",
  "laws",
  "lint-core",
+ "lint-file",
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
- "lint-sweep",
- "syntax",
+ "newtype",
 ]
 
 [[package]]
@@ -1491,6 +1504,7 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "graph-reader",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1627,6 +1641,19 @@ dependencies = [
  "lint-sweep",
  "newtype",
  "syntax",
+]
+
+[[package]]
+name = "lint-named-invariants"
+version = "0.1.0"
+dependencies = [
+ "graph",
+ "graph-reader",
+ "laws",
+ "lint-core",
+ "lint-file",
+ "lint-fixtures",
+ "lint-layout",
 ]
 
 [[package]]
@@ -2037,6 +2064,7 @@ dependencies = [
  "lint-mandatory-laws",
  "lint-manual-iteration",
  "lint-module-nesting",
+ "lint-named-invariants",
  "lint-named-lifetimes",
  "lint-named-numbers",
  "lint-narrowed-returns",
@@ -3349,6 +3377,7 @@ dependencies = [
  "grammar-lines",
  "grammar-message",
  "grammar-output",
+ "invariants",
  "laws",
  "message-id",
  "newtype",
