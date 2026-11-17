@@ -7,16 +7,14 @@ use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
 pub struct Generation;
 
 impl Generation {
-    pub const CASES: u32 = 256;
-
     #[must_use]
     pub fn repeatable() -> Config {
         Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() }
     }
 
     pub fn bounded<Generating: Strategy>(strategy: &Generating) -> Result<(), TestError<Generating::Value>> {
-        TestRunner::new(Config { cases: Self::CASES, max_local_rejects: Self::CASES, ..Self::repeatable() })
-            .run(strategy, |_| Ok(()))
+        let repeatable = Self::repeatable();
+        TestRunner::new(Config { max_local_rejects: repeatable.cases, ..repeatable }).run(strategy, |_| Ok(()))
     }
 }
 

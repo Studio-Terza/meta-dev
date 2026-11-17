@@ -9,17 +9,6 @@ pub struct UsePath(Vec<Name>);
 
 impl UsePath {
     const SEPARATOR: &'static str = "::";
-
-    #[must_use]
-    pub fn rerooted(&self, root: &UsePath) -> UsePath {
-        UsePath(root.0.iter().chain(self.0.iter().skip(1)).cloned().collect())
-    }
-
-    #[must_use]
-    pub fn naming<'path>(&'path self, typed: impl Fn(&'path Name) -> Option<&'path Name>) -> UsePath {
-        let named = self.0.iter().position(|segment| typed(segment).is_some()).map_or(self.0.len(), |at| at + 1);
-        UsePath(self.0.iter().take(named).cloned().collect())
-    }
 }
 
 impl FromIterator<Name> for UsePath {

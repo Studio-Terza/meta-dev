@@ -46,3 +46,12 @@ laws::table!(
         [Laws::WhereDeclared] => 0,
     ]
 );
+
+#[test]
+fn an_equivalence_keeps_the_laws_its_comparison_keeps() {
+    let laws = ["first law", "second law"];
+    let compared = equivalence::Equivalence::erasing(&[]);
+    assert_eq!(compared.comparing(Laws::Matched).kept(&laws), laws);
+    assert_eq!(compared.comparing(Laws::WhereDeclared).kept(&laws).len(), 0);
+    assert_eq!(compared.kept(&laws).len(), 0);
+}

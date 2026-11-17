@@ -1,4 +1,4 @@
-use body_shape::{Bounds, Erasure, Literals, Reading, Shape};
+use body_shape::{Bounds, Erasure, Literals, Reading, Shape, Shaper};
 use equivalence::{Equivalence, Erased};
 use syntax::Item;
 
@@ -68,6 +68,15 @@ impl Shapes {
 
     fn prefix_size(text: &&str) -> String {
         Self::prefix(text).map_or_else(String::new, |reading| reading.shape().size().to_string())
+    }
+
+    fn shaped_size(text: &&str) -> String {
+        let shaped = syntax_lexer::Lexed::parsed(&format!("fn f() {text}")).ok().and_then(|mut lexed| {
+            let table = lexed.tokens_taken();
+            let bounds = lexed.into_file().items.iter().find_map(Self::body)?;
+            Some(Shaper::reading(&table, Self::BODIES).sized(bounds))
+        });
+        shaped.map_or_else(String::new, |count| count.to_string())
     }
 
     fn prefixes_alike(pair: &[&str]) -> bool {
@@ -173,4 +182,10 @@ laws::table!(
         ["fn f() { a(b) }", "fn f() { c }"] => true,
         ["fn f() { a(b) }", "fn g() { a(b) }"] => false,
     ]
+);
+
+laws::table!(
+    a_sign_folded_into_an_erased_literal_is_not_counted,
+    Shapes::shaped_size,
+    ["{ f(1) }" => "6", "{ f(-1) }" => "6", "{ f(a * 1) }" => "8"]
 );
