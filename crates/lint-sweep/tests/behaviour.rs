@@ -1,4 +1,4 @@
-use lint_core::{Descend, Facts, Kind, SourceFile, SourceText, Watch, Watching};
+use lint_core::{Descend, Facts, Fold, Folding, Kind, SourceFile, SourceText, Visit, Watching};
 use lint_sweep::Sweep;
 use syntax::Block;
 
@@ -6,31 +6,32 @@ const NESTED: &str = "fn f() {\n    {\n        {\n        }\n    }\n}\nfn g() {\
 
 #[derive(Debug, Default)]
 struct Recorder {
-    depth: usize,
     over_at: Option<usize>,
+}
+
+#[derive(Debug, Default)]
+struct Heard {
+    depth: usize,
     heard: Vec<String>,
 }
 
-impl Recorder {
-    fn passing_over(depth: usize) -> Recorder {
-        Recorder { over_at: Some(depth), ..Recorder::default() }
-    }
-}
+impl Fold for Recorder {
+    type Found = Heard;
 
-impl<'ast> Watch<'ast> for Recorder {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Block]
     }
 
-    fn on_block(&mut self, _: &'ast Block, _: &Facts<'_, Block>) -> Descend {
-        self.depth += 1;
-        self.heard.push(format!("on {}", self.depth));
-        self.over_at.filter(|at| *at == self.depth).map_or(Descend::Into, |_| Descend::Over)
+    fn on_block(&self, found: Heard, _: &Block, _: &Facts<'_, Block>) -> Visit<Heard> {
+        let depth = found.depth + 1;
+        let descend = self.over_at.filter(|at| *at == depth).map_or(Descend::Into, |_| Descend::Over);
+        let heard = found.heard.into_iter().chain([format!("on {depth}")]).collect();
+        Visit::new(Heard { depth, heard }, descend)
     }
 
-    fn off_block(&mut self, _: &'ast Block, _: &Facts<'_, Block>) {
-        self.heard.push(format!("off {}", self.depth));
-        self.depth -= 1;
+    fn off_block(&self, found: Heard, _: &Block, _: &Facts<'_, Block>) -> Heard {
+        let heard = found.heard.into_iter().chain([format!("off {}", found.depth)]).collect();
+        Heard { depth: found.depth - 1, heard }
     }
 }
 
@@ -38,12 +39,12 @@ impl<'ast> Watch<'ast> for Recorder {
 fn every_watcher_called_on_a_node_is_called_off_it_and_a_skipped_subtree_is_silent() {
     let file = SourceFile::parse("a.rs", SourceText::new(NESTED.to_owned()));
     let parsed = file.unwrap_or_else(|failure| unreachable!("the source parses: {failure}"));
-    let mut all = Recorder::default();
-    let mut skipping = Recorder::passing_over(2);
+    let mut all = Folding::from(Recorder::default());
+    let mut skipping = Folding::from(Recorder { over_at: Some(2) });
     let watchers: Vec<&mut Watching<'_>> = vec![&mut all, &mut skipping];
     Sweep::watching(&parsed, watchers);
     let walked = ["on 1", "on 2", "on 3", "off 3", "off 2", "off 1", "on 1", "on 2", "off 2", "off 1"];
     let skipped_over = ["on 1", "on 2", "off 2", "off 1", "on 1", "on 2", "off 2", "off 1"];
-    assert_eq!(all.heard, walked);
-    assert_eq!(skipping.heard, skipped_over);
+    assert_eq!(all.concluded::<Heard>().heard, walked);
+    assert_eq!(skipping.concluded::<Heard>().heard, skipped_over);
 }

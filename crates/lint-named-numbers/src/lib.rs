@@ -15,8 +15,8 @@ use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::SupportModules;
 use lint_core::Violation;
+use lint_core::{SupportModules, SupportScan};
 use lint_layout::{LineNumber, Word, words};
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ pub struct SupportPaths(BTreeSet<PathBuf>);
 #[derive(Debug)]
 pub struct SupportGathering<'head> {
     file: &'head std::path::Path,
-    modules: SupportModules,
+    modules: Folding<SupportScan>,
 }
 
 impl Gathers<SupportPaths> for SupportGathering<'_> {
@@ -37,7 +37,7 @@ impl Gathers<SupportPaths> for SupportGathering<'_> {
     }
 
     fn gathered(self) -> SupportPaths {
-        SupportPaths(self.modules.paths(self.file).into_iter().collect())
+        SupportPaths(self.modules.concluded::<SupportModules>().paths(self.file).into_iter().collect())
     }
 }
 
@@ -59,7 +59,7 @@ impl ContextLint for NamedNumbers {
     type Gathering<'head> = SupportGathering<'head>;
 
     fn gathering<'head>(parsed: Parsed<'_, 'head>) -> SupportGathering<'head> {
-        SupportGathering { file: AsRef::<Path>::as_ref(parsed.head()), modules: SupportModules::default() }
+        SupportGathering { file: AsRef::<Path>::as_ref(parsed.head()), modules: Folding::from(SupportScan) }
     }
 }
 

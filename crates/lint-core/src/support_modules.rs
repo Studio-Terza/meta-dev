@@ -3,8 +3,11 @@ use std::path::{Path, PathBuf};
 use syntax::ItemMod;
 
 use crate::walk::Walk;
-use crate::watch::{Descend, Facts, Kind, Watch};
+use crate::watch::{Facts, Fold, Kind, Visit};
 use lint_layout::Name;
+
+#[derive(Debug)]
+pub struct SupportScan;
 
 #[derive(Debug, Default)]
 pub struct SupportModules {
@@ -38,20 +41,20 @@ impl SupportModules {
     }
 }
 
-impl<'ast> Watch<'ast> for SupportModules {
+impl Fold for SupportScan {
+    type Found = SupportModules;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        self.names.extend(
-            module
-                .content
-                .as_ref()
-                .map_or(Some(module), |_| None)
-                .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Skipped)
-                .map(|support| Name::from(&support.ident)),
-        );
-        Descend::Into
+    fn on_item_mod(&self, found: SupportModules, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Visit<SupportModules> {
+        let support = module
+            .content
+            .as_ref()
+            .map_or(Some(module), |_| None)
+            .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Skipped)
+            .map(|support| Name::from(&support.ident));
+        Visit::descending(SupportModules { names: found.names.into_iter().chain(support).collect() })
     }
 }
