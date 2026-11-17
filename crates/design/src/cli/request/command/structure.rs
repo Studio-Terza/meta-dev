@@ -1,5 +1,6 @@
+use crate::Uttered;
+use crate::cli::request::command::printed::Lines;
 use std::collections::BTreeSet;
-use std::io::Write;
 
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_runs::{
@@ -16,12 +17,12 @@ use store_ports::{Store, StoreFailure};
 use structurer::{Attempt, Directives, Lapse, Readings, Said, SegmentRef};
 use transcript_ports::{Body, SessionId};
 
-use super::Printed;
 use super::apply::{Application, Parsed};
 use crate::Outcome;
 use crate::cli::failure::{Failure, Flail, Flails};
 use crate::cli::output::{Attempted, Count, Flailing, Lapsed, Line};
 use crate::cli::sequel::Sequel;
+use console_ports::Shown;
 
 #[derive(Debug)]
 pub struct Crew<'ports, D: Dispatch, C: Clock> {
@@ -446,7 +447,7 @@ impl Course {
 }
 
 impl Structured {
-    pub(crate) fn reported(self, out: &mut impl Write) -> Result<Outcome, Failure> {
+    pub(crate) fn reported(self) -> Uttered {
         let reaped = self
             .reaped
             .iter()
@@ -461,8 +462,8 @@ impl Structured {
         });
         let lines: Vec<Line> =
             reaped.chain(self.worked.iter().flat_map(|worked| worked.lines.iter().cloned())).chain(held).collect();
-        Printed::lines(out, &lines)?;
-        self.concluded().map(|jobs| Outcome::Structured { jobs })
+        let shown = Shown::said(Lines::from(&lines));
+        Uttered::new(shown, self.concluded().map(|jobs| Outcome::Structured { jobs }))
     }
 
     pub(crate) fn concluded(self) -> Result<Count, Failure> {

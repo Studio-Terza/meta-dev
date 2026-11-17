@@ -1,5 +1,5 @@
+use crate::cli::request::command::printed::Lines;
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Write;
 use std::iter;
 
 use design_model::{NodeId, Outline, Segment, SpanRelation};
@@ -13,14 +13,14 @@ use named_derive::Named;
 use newtype::Wrapping;
 use store_ports::Store;
 
-use super::printed::Printed;
 use super::rendering::Refs;
 use super::subject::Found;
-use crate::Outcome;
 use crate::cli::Viewed;
 use crate::cli::failure::Failure;
 use crate::cli::output::Line;
 use crate::cli::request::{Ground, Token};
+use crate::{Outcome, Uttered};
+use console_ports::Shown;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum View {
@@ -99,22 +99,18 @@ impl View {
             })
     }
 
-    pub fn written<F: Files, S: Store>(
-        self,
-        ground: &Ground<'_, F, S>,
-        out: &mut impl Write,
-    ) -> Result<Outcome, Failure> {
-        self.printed(ground, out).map(|_printed| Outcome::Viewed)
+    pub fn written<F: Files, S: Store>(self, ground: &Ground<'_, F, S>) -> Result<Uttered, Failure> {
+        self.printed(ground).map(|shown| Uttered::new(shown, Ok(Outcome::Viewed)))
     }
 
-    fn printed<F: Files, S: Store>(self, ground: &Ground<'_, F, S>, out: &mut impl Write) -> Result<Printed, Failure> {
+    fn printed<F: Files, S: Store>(self, ground: &Ground<'_, F, S>) -> Result<Shown, Failure> {
         match self {
-            View::Unplaced => View::unplaced(ground.store()).and_then(|lines| Printed::lines(out, &lines)),
+            View::Unplaced => View::unplaced(ground.store()).map(|lines| Shown::said(Lines::from(&lines))),
             View::Tree(tree, root) => root
                 .subtree(ground)
                 .and_then(|subtree| tree.lines(ground.store(), &subtree))
-                .and_then(|lines| Printed::lines(out, &lines)),
-            View::Notes => View::notes(ground).and_then(|notes| Printed::rendered(out, &notes)),
+                .map(|lines| Shown::said(Lines::from(&lines))),
+            View::Notes => View::notes(ground).map(|notes| Shown::said(&notes)),
         }
     }
 

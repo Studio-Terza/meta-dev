@@ -1,4 +1,4 @@
-use std::io::Write;
+use crate::cli::request::command::printed::Lines;
 
 use design_model::{Ordinal, Prefix};
 use design_store::{ShownMessage, Started, Stored};
@@ -7,10 +7,10 @@ use store_ports::Store;
 use structurer::SegmentRef;
 use transcript_ports::Uuid;
 
-use super::super::printed::Printed;
 use crate::cli::failure::{Failure, Unmatched};
 use crate::cli::request::Unresolved;
 use crate::cli::request::command::rendering::Refs;
+use console_ports::Shown as Printed;
 
 #[derive(Debug)]
 pub struct Shown(Stored);
@@ -36,8 +36,8 @@ impl Shown {
             .ok_or_else(|| Failure::from(Unresolved::Unsegmented(reference.clone())))
     }
 
-    pub fn printed(&self, store: &impl Store, out: &mut impl Write) -> Result<Printed, Failure> {
-        Printed::lines(out, &Refs::stored(store, &self.0)?)
+    pub fn printed(&self, store: &impl Store) -> Result<Printed, Failure> {
+        Ok(Printed::said(Lines::from(&Refs::stored(store, &self.0)?)))
     }
 
     fn prefixed(store: &impl Store, prefix: &Prefix) -> Result<Stored, Failure> {

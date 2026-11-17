@@ -143,15 +143,15 @@ impl Noting {
     fn reported(applying: &Applying, notes: &str) -> Reported {
         applying.files.create_directories(Path::new("/work/notes")).ok();
         applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
-        let mut out = Vec::new();
-        let landed = Cli::new(
+        let uttered = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&applying.files),
             Opening(|_path| applying.store.clone()),
             Staff::idle(),
         )
-        .report(&Run::root(), ["import-notes", NOTES].iter().map(OsString::from), &mut out);
-        Reported { landed, lines: Spread::parsed(&String::from_utf8(out).unwrap_or_default()) }
+        .report(&Run::root(), ["import-notes", NOTES].iter().map(OsString::from));
+        let text = super::Answered::said(&uttered);
+        Reported { landed: uttered.ended(), lines: Spread::parsed(&text) }
     }
 
     fn sorted(imported: Result<String, Failure>) -> Option<&'static str> {

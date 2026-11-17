@@ -62,6 +62,12 @@ impl Shown {
     }
 }
 
+impl Display for Shown {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 impl AsRef<str> for Shown {
     fn as_ref(&self) -> &str {
         &self.0
