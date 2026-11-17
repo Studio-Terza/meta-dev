@@ -26,7 +26,7 @@ use std::ffi::OsString;
 use crate::cli::command::Telling;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::Ports;
-pub(crate) use arguments::Arguments;
+pub(crate) use arguments::{Arguments, Flag};
 
 pub use compile_times::CompileTimes;
 pub use history::History;
