@@ -1,3 +1,6 @@
+use super::walk::{Frame, Grains};
+use super::FileRows;
+use algebra::{Monoid, Semigroup};
 mod tokens;
 
 use syntax::Spanned;
@@ -68,7 +71,7 @@ impl Built for UseRow {
             .and_then(|_| Some(resolving.path(scope, &self.written.qualifier()?, Domain::Types)))
             .zip(self.written.tail().last());
         let aliased = head.as_ref().and_then(|(parent, last)| building.aliased(parent)?.joined(last));
-        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);
+        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref());
         let member = head.as_ref().and_then(|(parent, last)| {
             let owner = building.aliased(parent).and_then(Resolved::crate_item).or_else(|| parent.crate_item())?;
             Some(Resolved::Member(Member::new(owner, (*last).clone())))
@@ -153,49 +156,38 @@ impl Qualified {
     }
 }
 
-impl Lowering<'_> {
-    pub(super) fn path_used(&mut self, expression: &ExprPath) {
+impl Frame<'_> {
+    pub(super) fn path_used(&self, expression: &ExprPath) -> Grains {
         let position = expression.path.segments.first().map(|first| Position::from(first.ident.span()));
-        let called = self.calling.take().filter(|at| *at == Address::from(expression));
-        let tabled = called.map_or(Some(()), |_| None).and(self.tables.last()).map(|_| ());
+        let called = self.calling.filter(|at| *at == Address::from(expression));
+        let tabled = called.map_or(Some(()), |_| None).and(self.tabled);
         let dispatched = tabled.map_or_default(|()| self.dispatched(expression));
-        dispatched.into_iter().zip(position).fold(&mut *self, |lowering, (path, at)| {
-            lowering.used(path, at, Mention::Dispatched);
-            lowering
-        });
-        let found = Qualified::written(expression).zip(position);
-        found.into_iter().fold(self, |lowering, (path, at)| {
-            lowering.used(path, at, Mention::Expression);
-            lowering
-        });
+        let mentioned = dispatched.into_iter().zip(position).map(|(path, at)| self.used(path, at, Mention::Dispatched));
+        let found = Qualified::written(expression).zip(position).map(|(path, at)| self.used(path, at, Mention::Expression));
+        Monoid::concat(mentioned.chain(found))
     }
 
-    pub(super) fn pattern_used(&mut self, pat: &Pat) {
+    pub(super) fn pattern_used(&self, pat: &Pat) -> Grains {
         let reached = PatTree::reached(pat, &|_, _| true);
-        reached.iter().filter_map(|found| Matched::path(found.pat())).fold(self, |lowering, path| {
-            lowering.used(UsePath::from(path), Position::from(path.span()), Mention::Matched);
-            lowering
-        });
+        let used = reached
+            .iter()
+            .filter_map(|found| Matched::path(found.pat()))
+            .map(|path| self.used(UsePath::from(path), Position::from(path.span()), Mention::Matched));
+        Monoid::concat(used)
     }
 
-    pub(super) fn struct_used(&mut self, literal: &ExprStruct) {
+    pub(super) fn struct_used(&self, literal: &ExprStruct) -> Grains {
         let position = literal.path.segments.first().map(|first| Position::from(first.ident.span()));
         let written = literal.qself.as_ref().map_or(Some(&literal.path), |_| None).zip(position);
-        written.into_iter().fold(self, |lowering, (path, at)| {
-            lowering.used(UsePath::from(path), at, Mention::Expression);
-            lowering
-        });
+        written.map_or_else(Grains::default, |(path, at)| self.used(UsePath::from(path), at, Mention::Expression))
     }
 
-    pub(super) fn types_used(&mut self, ty: &Type) {
+    pub(super) fn types_used(&self, ty: &Type) -> Grains {
         let position = Position::from(ty.span());
         let typed =
             self.context.in_body().and_then(|_| Typed::path(ty)).map(|path| (UsePath::from(path), Mention::Typed));
         let traits = Dispatch::objects(ty).into_iter().map(|path| (path, Mention::Dispatched));
-        traits.chain(typed).fold(self, |lowering, (path, mention)| {
-            lowering.used(path, position, mention);
-            lowering
-        });
+        Monoid::concat(traits.chain(typed).map(|(path, mention)| self.used(path, position, mention)))
     }
 
     fn dispatched(&self, expression: &ExprPath) -> Vec<UsePath> {
@@ -210,27 +202,24 @@ impl Lowering<'_> {
         member.map_or_default(|named| traits.map(|traited| traited.extended(&named)).collect())
     }
 
-    pub(super) fn macro_used(&mut self, invoked: &Macro) {
+    pub(super) fn macro_used(&self, invoked: &Macro) -> Grains {
         let position = invoked
             .path
             .segments
             .last()
             .map_or_else(|| Position::from(invoked.path.span()), |last| Position::from(last.ident.span()));
         let law = self.law_row(invoked);
-        self.lowered.rows.laws.extend(law);
         let quotes = QuoteRow::found(self.source, invoked, &self.here);
-        self.lowered.rows.quotes.extend(quotes);
-        self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
+        let lawful = Grains::from(FileRows { laws: law.into_iter().collect(), quotes, ..FileRows::default() });
+        let invoking = self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
         let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
         let interpolated =
             TokenPaths::interpolated(invoked).into_iter().map(|spelled| (spelled, Mention::Interpolated));
-        plain.chain(interpolated).fold(self, |lowering, (spelled, mention)| {
-            spelled.handed(|path, at| lowering.used(path, at, mention));
-            lowering
-        });
+        let spelled = plain.chain(interpolated).map(|(spelled, mention)| spelled.handed(|path, at| self.used(path, at, mention)));
+        lawful.combine(invoking).combine(Monoid::concat(spelled))
     }
 
-    fn used(&mut self, written: UsePath, position: Position, mention: Mention) {
+    fn used(&self, written: UsePath, position: Position, mention: Mention) -> Grains {
         let row = UseRow {
             located: self.here.located(position),
             written,
@@ -238,7 +227,7 @@ impl Lowering<'_> {
             region: self.context.region(),
             place: self.context.place(),
         };
-        self.lowered.rows.uses.push(row);
+        Grains::from(FileRows { uses: vec![row], ..FileRows::default() })
     }
 }
 

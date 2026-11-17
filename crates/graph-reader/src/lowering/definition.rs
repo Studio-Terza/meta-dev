@@ -63,7 +63,6 @@ struct Rebound(BTreeSet<Name>);
 
 #[derive(Debug)]
 pub(crate) struct BodyGroup {
-    row: RowIndex,
     scope: InScope,
     shape: Body,
     parameters: BTreeMap<Name, TypeRef<Written>>,
@@ -96,7 +95,7 @@ impl BodyGroup {
         Kind::ExprBinary,
     ];
 
-    pub(super) fn opened(row: RowIndex, scope: &InScope, signature: &Signature, body: &Block) -> BodyGroup {
+    pub(super) fn opened(scope: &InScope, signature: &Signature, body: &Block) -> BodyGroup {
         let parameters: BTreeMap<Name, TypeRef<Written>> = signature
             .inputs
             .iter()
@@ -105,7 +104,6 @@ impl BodyGroup {
             .map(|(name, ty)| (name, scope.lowered(ty).dereferenced().clone()))
             .collect();
         BodyGroup {
-            row,
             scope: scope.clone(),
             shape: BodyReading::classified(body),
             parameters,
@@ -117,10 +115,6 @@ impl BodyGroup {
             repetitions: Repetitions::of_signature(signature),
             reads: Reads::default(),
         }
-    }
-
-    pub(super) fn row(&self) -> RowIndex {
-        self.row
     }
 
     pub(super) fn lowered(self) -> LoweredDefinition {

@@ -1,3 +1,8 @@
+use std::sync::Arc;
+use super::walk::{Frame, Framed, Grains, Lowering};
+use super::FileRows;
+use crate::namespace::ScopeOp;
+use lint_sweep::{Address, Contributed, Contributing};
 use std::collections::BTreeMap;
 
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
@@ -11,8 +16,8 @@ use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeKey, ScopeMap
 
 use super::regions::MacroItems;
 use super::signature::Written;
-use super::{Enclosure, ImplRow, Lowering};
-use lint_sweep::{Descend, Scoped, Sweep};
+use super::{Enclosure, ImplRow};
+use lint_sweep::{Descend, Sweep};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct PlaceId(ScopeKey);
@@ -137,94 +142,126 @@ impl Places {
     }
 }
 
-impl Lowering<'_> {
-    fn placed(&mut self, row: PlaceRow) -> PlaceId {
-        let places = &mut self.lowered.rows.places.places;
-        let place = PlaceId(places.len());
-        places.push(row);
-        place
+#[derive(Debug)]
+pub(super) struct Owning {
+    pub(super) place: PlaceId,
+    pub(super) grains: Grains,
+}
+
+impl<'read> Frame<'read> {
+    fn placed(&self, key: Address, row: PlaceSeed) -> Owning {
+        let place = PlaceId(self.key(key));
+        let row = PlaceRow { key: place.clone(), subject: row.subject, owner: row.owner };
+        let rows = FileRows { places: PlaceRows { places: vec![row], subjects: Vec::new() }, ..FileRows::default() };
+        Owning { place, grains: Grains::from(rows) }
     }
 
-    pub(super) fn owning(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> PlaceId {
+    pub(super) fn owning(&self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> Owning {
         let line = Position::from(ident.span()).line();
         let region = self.context.within_item(attributes).region();
-        let owner = OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain, line, region };
-        self.placed(PlaceRow { subject: None, owner: Some(owner) })
+        let owner = OwnerRow { scope: self.here.scope().clone(), name: UsePath::from(ident), domain, line, region };
+        self.placed(Address::from(ident), PlaceSeed { subject: None, owner: Some(owner) })
     }
 
-    pub(super) fn owned_by(&mut self, ident: &Ident, domain: Domain, attributes: &[Attribute]) -> Descend {
-        let place = self.owning(ident, domain, attributes);
-        self.context = self.context.owned(place);
-        Descend::Into
+    pub(super) fn owned_by(
+        &self,
+        ident: &Ident,
+        domain: Domain,
+        attributes: &[Attribute],
+        rows: Grains,
+    ) -> Contributed<Framed<'read>, Grains> {
+        let Owning { place, grains } = self.owning(ident, domain, attributes);
+        let inner = Frame { context: self.context.owned(place), ..self.clone() };
+        Contributed::new(Framed::framing(inner), rows.combine(grains), Descend::Into)
     }
 
-    pub(super) fn macro_left(&mut self, item: &ItemMacro) -> &mut Self {
+    pub(super) fn macro_left(&self, item: &ItemMacro) -> Grains {
         match &item.ident {
-            Some(_) => self.transcribed(&Macros::expanded(self.source, &item.mac)),
-            None => self.expanded(&item.mac),
+            Some(_) => self.transcribed(item, &Macros::expanded(self.source, &item.mac)),
+            None => self.expanded(item, &item.mac),
         }
     }
 
-    fn transcribed(&mut self, statements: &[Stmt]) -> &mut Self {
-        let outer = self.context;
-        self.context = self.context.within_macro(MacroItems::Transcribed);
-        let mut scoped = Scoped::new(&mut *self);
-        statements
-            .iter()
-            .filter_map(Syntax::stmt_item)
-            .for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
-        self.context = outer;
-        self
+    fn expansion(&self, item: &ItemMacro, items: MacroItems) -> Lowering<'read> {
+        let within: Arc<[Address]> = self.within.iter().copied().chain([Address::from(item)]).collect();
+        Lowering::below(Frame { context: self.context.within_macro(items), within, ..self.clone() })
     }
 
-    fn expanded(&mut self, invocation: &Macro) -> &mut Self {
+    fn swept<'item>(lowering: Lowering<'read>, items: impl Iterator<Item = &'item syntax::Item>) -> Grains {
+        let mut contributing = Contributing::new(lowering);
+        items.for_each(|declared| Sweep::expanded_item(declared, &mut contributing));
+        contributing.concluded(|_, _, grains| grains)
+    }
+
+    fn transcribed(&self, item: &ItemMacro, statements: &[Stmt]) -> Grains {
+        Self::swept(self.expansion(item, MacroItems::Transcribed), statements.iter().filter_map(Syntax::stmt_item))
+    }
+
+    fn expanded(&self, item: &ItemMacro, invocation: &Macro) -> Grains {
         let items = Macros::items_in_file(self.source, invocation);
-        self.lowered.openings.absorb(self.here.scope(), Entries::of_items(&items));
-        let outer = self.context;
-        self.context = self.context.within_macro(MacroItems::Expanded);
-        let mut scoped = Scoped::new(&mut *self);
-        items.iter().for_each(|declared| Sweep::expanded_item(declared, &mut scoped));
-        self.context = outer;
-        self
+        let absorbed = ScopeOp::Absorbed { key: self.here.scope().clone(), entries: Entries::of_items(&items) };
+        let walked = Self::swept(self.expansion(item, MacroItems::Expanded), items.iter());
+        Grains { ops: vec![absorbed], ..Grains::default() }.combine(walked)
     }
 
-    pub(super) fn trait_owning(&mut self, ident: &Ident, attributes: &[Attribute]) -> PlaceId {
+    pub(super) fn trait_owning(&self, ident: &Ident, attributes: &[Attribute]) -> Owning {
         let line = Position::from(ident.span()).line();
         let region = self.context.within_item(attributes).region();
-        let owner =
-            OwnerRow { scope: self.here.scope(), name: UsePath::from(ident), domain: Domain::Types, line, region };
-        self.placed(PlaceRow { subject: None, owner: Some(owner) })
+        let owner = OwnerRow {
+            scope: self.here.scope().clone(),
+            name: UsePath::from(ident),
+            domain: Domain::Types,
+            line,
+            region,
+        };
+        self.placed(Address::from(ident), PlaceSeed { subject: None, owner: Some(owner) })
     }
 
-    pub(super) fn filler_owning(&mut self, item: &ItemTrait) {
+    pub(super) fn filler_owning(&self, item: &ItemTrait) -> Grains {
         let line = Position::from(item.ident.span()).line();
         let region = self.context.within_item(&item.attrs).region();
         let owner = PortMacro::marked(item).map(|found| OwnerRow {
-            scope: self.here.scope(),
+            scope: self.here.scope().clone(),
             name: UsePath::suffixed(&found.ident, PortMacro::FILLER),
             domain: Domain::Types,
             line,
             region,
         });
-        owner.into_iter().fold(self, |lowering, found| {
-            lowering.placed(PlaceRow { subject: None, owner: Some(found) });
-            lowering
-        });
+        owner.map_or_else(Grains::default, |found| {
+            self.placed(Address::from(item), PlaceSeed { subject: None, owner: Some(found) }).grains
+        })
     }
 
-    pub(super) fn impl_entered(&mut self, block: &ItemImpl) -> Descend {
+    pub(super) fn impl_entered(&self, block: &ItemImpl) -> Contributed<Framed<'read>, Grains> {
         let declared = self.generics.extended(&block.generics);
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
-        self.lowered.rows.impls.push(ImplRow::written(&self.here, self.context.region(), block, &declared));
-        let rows = &mut self.lowered.rows.places.subjects;
-        let subjected = SubjectId(rows.len());
-        let implemented =
-            block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
+        let implemented = ImplRow::written(&self.here, self.context.region(), block, &declared);
+        let key = self.key(Address::from(block));
         let traited = block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path));
-        rows.push(SubjectRow { scope: self.here.scope(), ty: subject, implemented, traited });
-        let place = self.placed(PlaceRow { subject: Some(subjected), owner: None });
-        self.context = self.context.of_impl(block, place);
-        self.enclosed(Enclosure::of_impl(block), generics)
+        let named =
+            block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
+        let subjected =
+            SubjectRow { key: key.clone(), scope: self.here.scope().clone(), ty: subject, implemented: named, traited };
+        let Owning { place, grains } =
+            self.placed(Address::from(&block.self_ty), PlaceSeed { subject: Some(key), owner: None });
+        let rows = FileRows {
+            impls: vec![implemented],
+            places: PlaceRows { subjects: vec![subjected], places: Vec::new() },
+            ..FileRows::default()
+        };
+        let inner = Frame {
+            context: self.context.of_impl(block, place),
+            enclosure: Enclosure::of_impl(block),
+            generics: Arc::new(generics),
+            ..self.clone()
+        };
+        Contributed::new(Framed::framing(inner), Grains::from(rows).combine(grains), Descend::Into)
     }
+}
+
+#[derive(Debug)]
+struct PlaceSeed {
+    subject: Option<ScopeKey>,
+    owner: Option<OwnerRow>,
 }

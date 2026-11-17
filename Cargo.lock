@@ -1080,6 +1080,7 @@ dependencies = [
 name = "graph-reader"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-lifts",
  "graph",
  "laws",
