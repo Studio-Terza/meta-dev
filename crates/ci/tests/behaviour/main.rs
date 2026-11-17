@@ -1394,6 +1394,8 @@ impl Cargo {
                 "2",
                 "--colors",
                 "never",
+                "--build-timeout",
+                "600",
                 "--output",
                 output,
                 "--",
@@ -1505,6 +1507,8 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
                 "2",
                 "--colors",
                 "never",
+                "--build-timeout",
+                "600",
                 "--output",
                 scratch.file("out").as_str(),
             ]
@@ -1697,6 +1701,8 @@ fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_
                 "2",
                 "--colors",
                 "never",
+                "--build-timeout",
+                "600",
                 "--output",
                 scratch.file("out/scoped").as_str(),
             ]
