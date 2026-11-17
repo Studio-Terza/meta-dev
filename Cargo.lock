@@ -12,6 +12,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "algebra"
+version = "0.1.0"
+dependencies = [
+ "laws",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1038,6 +1045,7 @@ dependencies = [
 name = "graph"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-lifts",
  "lint-layout",
  "newtype",
