@@ -12,8 +12,10 @@ use crate::cli::ports::Text;
 
 #[derive(Debug, Deserialize)]
 struct Package {
+    name: OneLine,
     id: OneLine,
     manifest_path: PathBuf,
+    dependencies: Vec<Dependency>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -24,24 +26,9 @@ enum Kind {
 }
 
 #[derive(Debug, Deserialize)]
-struct Linkage {
-    kind: Option<Kind>,
-}
-
-#[derive(Debug, Deserialize)]
 struct Dependency {
-    pkg: OneLine,
-    dep_kinds: Vec<Linkage>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Node {
-    deps: Vec<Dependency>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Resolve {
-    nodes: Vec<Node>,
+    name: OneLine,
+    kind: Option<Kind>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,7 +36,6 @@ pub(super) struct Metadata {
     packages: Vec<Package>,
     workspace_members: Vec<OneLine>,
     workspace_root: PathBuf,
-    resolve: Resolve,
 }
 
 #[derive(Debug, Default)]
@@ -89,11 +75,11 @@ impl Metadata {
 
     fn kinds(&self) -> BTreeMap<&OneLine, Linked> {
         let linked = self
-            .resolve
-            .nodes
+            .packages
             .iter()
-            .flat_map(|node| &node.deps)
-            .flat_map(|dependency| dependency.dep_kinds.iter().map(|linkage| (&dependency.pkg, linkage.kind)));
+            .filter(|package| self.workspace_members.contains(&package.id))
+            .flat_map(|package| &package.dependencies)
+            .map(|dependency| (&dependency.name, dependency.kind));
         linked.fold(BTreeMap::new(), |kinds, (package, kind)| {
             let mut grown: BTreeMap<&OneLine, Linked> = kinds;
             grown.entry(package).or_default().0.push(kind);
@@ -106,7 +92,7 @@ impl Metadata {
         self.packages
             .iter()
             .filter(|package| self.workspace_members.contains(&package.id))
-            .filter(|package| kinds.get(&package.id).and_then(Linked::dev_only).is_some())
+            .filter(|package| kinds.get(&package.name).and_then(Linked::dev_only).is_some())
             .filter_map(|package| package.manifest_path.parent())
             .filter_map(|directory| directory.strip_prefix(&self.workspace_root).ok())
             .map(Path::to_path_buf)
