@@ -1043,3 +1043,16 @@ fn a_tree_read_by_many_workers_reports_the_same_each_time() -> Result<(), Box<dy
     assert!(first.contains("src/first/inner.rs"), "{first}");
     Ok(())
 }
+
+#[test]
+fn the_graph_dump_command_prints_the_model_the_same_way_twice() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "pub struct A;\npub fn made() -> A {\n    A\n}\n")?;
+    let first = root.flagged(&["graph-dump"]);
+    let second = root.flagged(&["graph-dump"]);
+    assert_eq!(first.exit, ExitCode::SUCCESS);
+    let opening = first.out.parse::<text_lines::Lines>().into_iter().flatten().next();
+    assert_eq!((opening, first.out.contains("\"made\"")), (Some("Model {".to_owned()), true), "{}", first.out);
+    assert_eq!(first.out, second.out);
+    Ok(())
+}
