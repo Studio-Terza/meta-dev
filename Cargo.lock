@@ -2024,6 +2024,7 @@ dependencies = [
 name = "lint-repeated-shapes"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-shape",
  "equivalence",
  "laws",
