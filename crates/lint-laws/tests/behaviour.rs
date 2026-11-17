@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use file_ports::Written;
+use file_ports::{FileFailure, Files, Memory, Written};
 use golden::golden;
 use graph_reader::Reader;
 use lint_file::ModelLint;
@@ -32,16 +32,19 @@ impl Workspace {
 }
 
 #[test]
-fn each_crate_gets_one_runner_with_a_law_per_nameable_generator() {
+fn each_crate_gets_one_runner_with_a_law_per_nameable_generator() -> Result<(), FileFailure> {
     let model = Reader::read_files(&Sources::parsed(&Workspace::with(Source::new(
         Located::new("crates/x/tests/behaviour.rs"),
         Text::new("fn f() {}\n"),
     ))));
     let written: Vec<Written> = LawRunners::from(&model).written();
-    let paths: Vec<PathBuf> = written.iter().map(|file| file.path().to_path_buf()).collect();
-    assert_eq!(paths, [PathBuf::from("crates/x/tests/generated_laws.rs")]);
-    let text: Vec<u8> = written.into_iter().flat_map(|file| file.into_bytes().as_ref().to_vec()).collect();
-    golden!("runner.rs.txt", &String::from_utf8_lossy(&text));
+    let path = PathBuf::from("crates/x/tests/generated_laws.rs");
+    assert_eq!(written.iter().map(Written::path).collect::<Vec<_>>(), [path.as_path()]);
+    let disk = Memory::default();
+    disk.write_each(written)?;
+    let runner = disk.read_text(&path)?;
+    golden!("runner.rs.txt", runner.as_ref());
+    Ok(())
 }
 
 laws::table!(a_generated_law_written_outside_the_runner_is_refused, |sources: &Vec<Source>| Sources::flagged::<Queried<HandWrittenLaws>>(sources), [

@@ -115,9 +115,13 @@ impl References {
     }
 
     fn sampled() -> impl Strategy<Value = References> {
-        Strategy::prop_map(any::<(BTreeMap<ItemId, BTreeSet<ItemId>>, BTreeMap<ItemId, String>)>(), |(targets, roots)| {
-            References { targets, roots: roots.into_iter().map(|(item, root)| (item, PathBuf::from(root))).collect() }
-        })
+        Strategy::prop_map(
+            any::<(BTreeMap<ItemId, BTreeSet<ItemId>>, BTreeMap<ItemId, String>)>(),
+            |(targets, roots)| References {
+                targets,
+                roots: roots.into_iter().map(|(item, root)| (item, PathBuf::from(root))).collect(),
+            },
+        )
     }
 }
 

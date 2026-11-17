@@ -47,14 +47,14 @@ impl Export {
         building
     }
 
-    fn below(space: &Namespace<'_>, root: ScopeId, below: Below) -> Vec<Export> {
+    fn below(space: &Namespace<'_>, root: ScopeId, below: &Below) -> Vec<Export> {
         below.scope().row(&space.scopes).map_or_default(|row| {
             let own = row.entries().exported().map(|key| Export {
                 root,
                 path: UsePath::exported(below.modules(), key.name()),
                 domain: key.domain(),
             });
-            let nested = below.deeper(row.entries()).into_iter().flat_map(|deeper| Export::below(space, root, deeper));
+            let nested = below.deeper(row.entries()).into_iter().flat_map(|deeper| Export::below(space, root, &deeper));
             own.chain(nested).collect()
         })
     }
@@ -162,7 +162,7 @@ impl<'read> Namespace<'read> {
     }
 
     pub(crate) fn exports(&self) -> Vec<Export> {
-        self.crates.iter().flat_map(|(krate, root)| Export::below(self, *root, Below::root(*root, krate))).collect()
+        self.crates.iter().flat_map(|(krate, root)| Export::below(self, *root, &Below::root(*root, krate))).collect()
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {

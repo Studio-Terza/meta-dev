@@ -8,7 +8,7 @@ pub struct Runner<'model> {
     laws: Vec<Law<'model>>,
 }
 
-impl<'model> Runner<'model> {
+impl Runner<'_> {
     const TESTS: &'static str = "tests";
     const FILE: &'static str = "generated_laws.rs";
 

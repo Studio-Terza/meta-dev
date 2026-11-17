@@ -72,7 +72,7 @@ impl<'model> Labels<'model> {
     const MONOID: [Word<'static>; 2] = words!["algebra", "Monoid"];
 
     fn subject(wanted: Option<&Resolved>, placed: &Placed<'model, &'model graph::Implementation>) -> Option<ItemId> {
-        wanted.filter(|wanted| placed.entity().implemented() == Some(*wanted))?;
+        wanted.filter(|found| placed.entity().implemented() == Some(*found))?;
         placed.entity().subject_item()
     }
 

@@ -1,0 +1,7 @@
+{"workspace_root": "/", "workspace_members": ["laws", "x"], "packages": [
+  {"id": "laws", "name": "laws", "manifest_path": "/laws/Cargo.toml", "dependencies": []},
+  {"id": "x", "name": "x", "manifest_path": "/x/Cargo.toml", "dependencies": [{"name": "laws"}]}
+], "resolve": {"nodes": [
+  {"id": "laws", "dependencies": []},
+  {"id": "x", "dependencies": ["laws"]}
+]}}

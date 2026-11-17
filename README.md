@@ -427,6 +427,11 @@ A law states a property in one line and generates one `#[test]`. The strategy is
 a fallible decode. `idempotent!` checks `f(f(value)) == f(value)`. `table!` checks each `input => want`
 row and names the first broken row, without generated input. Attributes before the name go on the test.
 
+`generates!` checks a generator rather than a property: `laws::generates!(words_generate, any::<Word>())`
+draws 256 values and fails if the strategy rejected more than 256 draws along the way. A checked newtype or a
+fallible constructor whose check refuses most of what its inner strategy draws fails here, loudly, instead of
+making other laws slow or flaky.
+
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
 

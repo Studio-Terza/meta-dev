@@ -88,7 +88,7 @@ impl TestName<'_> {
     const GAP: char = '_';
 
     fn segment(segment: &Name, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        AsRef::<str>::as_ref(segment).char_indices().try_for_each(|(at, letter)| {
+        AsRef::<str>::as_ref(segment).chars().enumerate().try_for_each(|(at, letter)| {
             (at > 0)
                 .then_some(letter)
                 .filter(|found| found.is_uppercase())
