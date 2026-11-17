@@ -2,12 +2,10 @@ use std::collections::BTreeSet;
 
 use syntax::{ItemUse, UseLeaf, UseTree};
 
-use crate::watch::{Descend, Facts, Kind, Watch};
-
 use lint_layout::Name;
 use lint_layout::Word;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MacroAliases {
     original: Name,
     names: BTreeSet<Name>,
@@ -24,20 +22,14 @@ impl MacroAliases {
         Some(&self.original).filter(|original| *original == name).or_else(|| self.names.get(name))
     }
 
+    #[must_use]
+    pub fn used(self, item: &ItemUse) -> MacroAliases {
+        let renamed = self.renamed(&item.tree);
+        MacroAliases { names: self.names.into_iter().chain(renamed).collect(), ..self }
+    }
+
     fn renamed(&self, tree: &UseTree) -> Vec<Name> {
         let renames = UseLeaf::of_tree(tree).into_iter().filter_map(|leaf| leaf.end().renamed());
         renames.filter(|renamed| renamed.ident == self.original).map(|renamed| Name::from(&renamed.rename)).collect()
-    }
-}
-
-impl<'ast> Watch<'ast> for MacroAliases {
-    fn kinds(&self) -> &'static [Kind] {
-        &[Kind::ItemUse]
-    }
-
-    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
-        let renamed = self.renamed(&item.tree);
-        self.names.extend(renamed);
-        Descend::Over
     }
 }

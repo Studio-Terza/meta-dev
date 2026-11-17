@@ -7,7 +7,7 @@ use syntax::{Expr, ItemConst, Local};
 use lint_core::Syntax;
 use lint_layout::Name;
 
-pub use boundary::{BodyId, Scopes};
+pub use boundary::{BodyId, Scopes, Step};
 
 #[derive(Debug)]
 pub struct Bound {

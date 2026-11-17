@@ -52,7 +52,7 @@ impl PrimedFacts for StateGraph {
         let watchers = <&SourceFile>::from(parsed).shipped().map(|_| StateWatchers {
             edges: EdgeScan::from(path),
             fields: Folding::from(FieldVisibility::from(path)),
-            graphs: DeclaredGraphs::new(<&SourceFile>::from(parsed), path),
+            graphs: Folding::from(DeclaredGraphs::new(<&SourceFile>::from(parsed), path)),
         });
         StateRecording { watchers }
     }
@@ -71,7 +71,7 @@ pub struct StateRecording<'run, 'head> {
 struct StateWatchers<'run, 'head> {
     edges: EdgeScan<'head>,
     fields: Folding<FieldVisibility<'head>>,
-    graphs: DeclaredGraphs<'run, 'head>,
+    graphs: Folding<DeclaredGraphs<'run, 'head>>,
 }
 
 #[derive(Debug)]
@@ -99,7 +99,7 @@ impl<'head> Gathers<StateRaw<'head>> for StateRecording<'_, 'head> {
                     .fields
                     .concluded::<Vec<Violation<'head>>>()
                     .into_iter()
-                    .chain(Vec::from(watchers.graphs))
+                    .chain(watchers.graphs.concluded_with(DeclaredGraphs::checked))
                     .collect(),
             }
         }))

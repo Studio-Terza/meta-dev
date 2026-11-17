@@ -6,7 +6,7 @@ use syntax::{ItemMod, ItemUse, Macro, MacroTree};
 
 use lint_core::{MacroAliases, Macros, SourceFile, Violation, Walk};
 use lint_layout::{Name, Word};
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
 use graph::Graph;
 
@@ -14,7 +14,11 @@ use graph::Graph;
 pub struct DeclaredGraphs<'run, 'scan> {
     file: &'run SourceFile,
     path: &'scan Path,
-    names: MacroAliases,
+}
+
+#[derive(Debug, Default)]
+pub struct Seen {
+    names: Option<MacroAliases>,
     gates: Vec<Walk>,
     invocations: Vec<Macro>,
 }
@@ -23,52 +27,52 @@ impl<'run, 'scan> DeclaredGraphs<'run, 'scan> {
     const MACRO: &'static str = "states";
 
     pub fn new(file: &'run SourceFile, path: &'scan Path) -> DeclaredGraphs<'run, 'scan> {
-        DeclaredGraphs {
-            file,
-            path,
-            names: MacroAliases::new(Word::new(DeclaredGraphs::MACRO)),
-            gates: Vec::new(),
-            invocations: Vec::new(),
-        }
+        DeclaredGraphs { file, path }
     }
 
-    fn found_in(&self, invocation: &Macro) -> Vec<Violation<'scan>> {
+    fn names(found: &Seen) -> MacroAliases {
+        found.names.clone().unwrap_or_else(|| MacroAliases::new(Word::new(DeclaredGraphs::MACRO)))
+    }
+
+    pub fn checked(&self, found: Seen) -> Vec<Violation<'scan>> {
+        let names = Self::names(&found);
+        found.invocations.into_iter().flat_map(|invoked| self.found_in(&invoked, &names)).collect()
+    }
+
+    fn found_in(&self, invocation: &Macro, names: &MacroAliases) -> Vec<Violation<'scan>> {
         let nested = |inner: &Macro| Macros::nested(self.file, inner).to_vec();
         let stops = |found: &Macro| {
-            found.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))).map(|_| ())
+            found.path.segments.last().and_then(|last| names.call(&Name::from(&last.ident))).map(|_| ())
         };
         let graphs = MacroTree::frontier(invocation, &nested, &stops);
         graphs.iter().flat_map(|found| Graph::checked(found, self.path)).collect()
     }
 }
 
-impl<'ast> Watch<'ast> for DeclaredGraphs<'_, '_> {
+impl Fold for DeclaredGraphs<'_, '_> {
+    type Found = Seen;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemUse, Kind::Macro]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        self.gates.push(facts.gate());
-        Descend::Into
+    fn on_item_mod(&self, found: Seen, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Seen> {
+        Visit::descending(Seen { gates: found.gates.into_iter().chain([facts.gate()]).collect(), ..found })
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.gates.pop();
+    fn off_item_mod(&self, found: Seen, _: &ItemMod, _: &Facts<'_, ItemMod>) -> Seen {
+        let mut gates = found.gates;
+        gates.pop();
+        Seen { gates, ..found }
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, facts: &Facts<'_, ItemUse>) -> Descend {
-        self.names.on_item_use(item, facts)
+    fn on_item_use(&self, found: Seen, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Visit<Seen> {
+        let names = Self::names(&found).used(item);
+        Visit::new(Seen { names: Some(names), ..found }, Descend::Over)
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        let outside = self.gates.iter().all(|gate| *gate == Walk::Entered).then(|| invocation.clone());
-        self.invocations.extend(outside);
-        Descend::Over
-    }
-}
-
-impl<'file> From<DeclaredGraphs<'_, 'file>> for Vec<Violation<'file>> {
-    fn from(scan: DeclaredGraphs<'_, 'file>) -> Vec<Violation<'file>> {
-        scan.invocations.iter().flat_map(|invoked| scan.found_in(invoked)).collect()
+    fn on_macro(&self, found: Seen, invocation: &Macro, _: &Facts<'_, Macro>) -> Visit<Seen> {
+        let outside = found.gates.iter().all(|gate| *gate == Walk::Entered).then(|| invocation.clone());
+        Visit::new(Seen { invocations: found.invocations.into_iter().chain(outside).collect(), ..found }, Descend::Over)
     }
 }

@@ -13,9 +13,9 @@ use syntax::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, 
 
 use lint_core::{MacroAliases, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Descend, Facts, Fold, Kind, Visit};
 
-use bindings::{Bindings, BodyId, Bound, Scopes};
+use bindings::{Bindings, BodyId, Bound, Scopes, Step};
 use compared::Compared;
 use finding::Finding;
 use table_rows::TableRows;
@@ -24,8 +24,13 @@ use table_rows::TableRows;
 pub struct Assertions<'file> {
     file: &'file SourceFile,
     kinds: &'static [Kind],
+}
+
+#[derive(Debug, Default)]
+pub struct Asserted<'file> {
+    file: Option<&'file SourceFile>,
     scopes: Scopes,
-    tables: MacroAliases,
+    tables: Option<MacroAliases>,
     met: Vec<Met>,
 }
 
@@ -35,19 +40,33 @@ struct Met {
     body: Option<BodyId>,
 }
 
+#[derive(Debug)]
+struct Judge<'run, 'file> {
+    file: &'file SourceFile,
+    tables: &'run MacroAliases,
+}
+
 impl<'file> Assertions<'file> {
     const TABLE: Word<'static> = Word::new("table");
     const WATCHED: &'static [Kind] =
         &[Kind::ItemFn, Kind::ImplItemFn, Kind::ItemConst, Kind::Local, Kind::ItemUse, Kind::Macro];
 
     pub fn new(file: &'file SourceFile, asserting: Option<&'file Path>) -> Assertions<'file> {
-        Assertions {
-            file,
-            kinds: asserting.map_or(&[][..], |_| Self::WATCHED),
-            scopes: Scopes::default(),
-            tables: MacroAliases::new(Self::TABLE),
-            met: Vec::new(),
-        }
+        Assertions { file, kinds: asserting.map_or(&[][..], |_| Self::WATCHED) }
+    }
+}
+
+impl Asserted<'_> {
+    fn tables(&self) -> MacroAliases {
+        self.tables.clone().unwrap_or_else(|| MacroAliases::new(Assertions::TABLE))
+    }
+}
+
+impl<'file> Judge<'_, 'file> {
+    fn all(&self, asserted: &Asserted<'file>) -> Vec<Violation<'file>> {
+        let constants = asserted.scopes.constants();
+        let locals = |met: &Met| met.body.map_or_default(|id| id.locals(&asserted.scopes));
+        asserted.met.iter().flat_map(|met| self.judged(&met.invocation, &constants, &locals(met))).collect()
     }
 
     fn judged(&self, invocation: &Macro, constants: &Bindings<'_>, locals: &Bindings<'_>) -> Vec<Violation<'file>> {
@@ -58,7 +77,7 @@ impl<'file> Assertions<'file> {
     }
 
     fn assertion(&self, invocation: &Macro) -> Assertion {
-        Assertion::named(&invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident)), &self.tables)
+        Assertion::named(&invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident)), self.tables)
     }
 
     fn violation(
@@ -82,58 +101,75 @@ impl<'file> Assertions<'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for Assertions<'_> {
+impl<'file> Fold for Assertions<'file> {
+    type Found = Asserted<'file>;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.scopes.opened()
+    fn finished(&self, found: Asserted<'file>) -> Asserted<'file> {
+        Asserted { file: Some(self.file), ..found }
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
-        self.scopes.shut();
+    fn on_item_fn(&self, found: Asserted<'file>, _: &ItemFn, _: &Facts<'_, ItemFn>) -> Visit<Asserted<'file>> {
+        let scopes = found.scopes.stepped(Step::Open);
+        Visit::descending(Asserted { scopes, ..found })
     }
 
-    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.scopes.opened()
+    fn off_item_fn(&self, found: Asserted<'file>, _: &ItemFn, _: &Facts<'_, ItemFn>) -> Asserted<'file> {
+        let scopes = found.scopes.stepped(Step::Shut);
+        Asserted { scopes, ..found }
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.scopes.shut();
+    fn on_impl_item_fn(
+        &self,
+        found: Asserted<'file>,
+        _: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+    ) -> Visit<Asserted<'file>> {
+        let scopes = found.scopes.stepped(Step::Open);
+        Visit::descending(Asserted { scopes, ..found })
     }
 
-    fn on_item_const(&mut self, item: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
-        self.scopes.constant(Bound::constant(item));
-        Descend::Into
+    fn off_impl_item_fn(&self, found: Asserted<'file>, _: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Asserted<'file> {
+        let scopes = found.scopes.stepped(Step::Shut);
+        Asserted { scopes, ..found }
     }
 
-    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
-        self.scopes.local(Bound::local(local));
-        Descend::Into
+    fn on_item_const(
+        &self,
+        found: Asserted<'file>,
+        item: &ItemConst,
+        _: &Facts<'_, ItemConst>,
+    ) -> Visit<Asserted<'file>> {
+        let scopes = found.scopes.stepped(Step::Constant(Bound::constant(item)));
+        Visit::descending(Asserted { scopes, ..found })
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, facts: &Facts<'_, ItemUse>) -> Descend {
-        self.tables.on_item_use(item, facts)
+    fn on_local(&self, found: Asserted<'file>, local: &Local, _: &Facts<'_, Local>) -> Visit<Asserted<'file>> {
+        let scopes = found.scopes.stepped(Step::Local(Bound::local(local)));
+        Visit::descending(Asserted { scopes, ..found })
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.met.push(Met { invocation: invocation.clone(), body: self.scopes.current() });
-        Descend::Over
+    fn on_item_use(&self, found: Asserted<'file>, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Visit<Asserted<'file>> {
+        let tables = found.tables().used(item);
+        Visit::new(Asserted { tables: Some(tables), ..found }, Descend::Over)
+    }
+
+    fn on_macro(&self, found: Asserted<'file>, invocation: &Macro, _: &Facts<'_, Macro>) -> Visit<Asserted<'file>> {
+        let met = Met { invocation: invocation.clone(), body: found.scopes.current() };
+        Visit::new(Asserted { met: found.met.into_iter().chain([met]).collect(), ..found }, Descend::Over)
     }
 }
 
-impl<'file> Finds<'file> for Assertions<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let constants = self.scopes.constants();
-        self.met
-            .iter()
-            .flat_map(|met| {
-                self.judged(&met.invocation, &constants, &met.body.map_or_default(|id| id.locals(&self.scopes)))
-            })
-            .collect()
+impl<'file> From<Asserted<'file>> for Vec<Violation<'file>> {
+    fn from(asserted: Asserted<'file>) -> Vec<Violation<'file>> {
+        let tables = asserted.tables();
+        asserted.file.map_or_default(|file| Judge { file, tables: &tables }.all(&asserted))
     }
 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Assertion {
     Equality,

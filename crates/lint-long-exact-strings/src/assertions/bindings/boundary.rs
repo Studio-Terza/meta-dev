@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use super::{Bindings, Bound};
-use lint_sweep::Descend;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BodyId(usize);
@@ -32,25 +31,40 @@ pub struct Scopes {
     closed: BTreeMap<BodyId, Body>,
 }
 
+#[derive(Debug)]
+pub enum Step {
+    Open,
+    Shut,
+    Constant(Bound),
+    Local(Option<Bound>),
+}
+
 impl Scopes {
-    pub fn opened(&mut self) -> Descend {
-        let start = self.locals.len();
-        self.open.push(Body { id: BodyId(self.count), start, end: start });
-        self.count += 1;
-        Descend::Into
-    }
-
-    pub fn shut(&mut self) {
-        let end = self.locals.len();
-        self.closed.extend(self.open.pop().map(|body| (body.id, Body { end, ..body })));
-    }
-
-    pub fn constant(&mut self, bound: Bound) {
-        self.constants.push(bound);
-    }
-
-    pub fn local(&mut self, bound: Option<Bound>) {
-        self.locals.extend(bound);
+    #[must_use]
+    pub fn stepped(self, step: Step) -> Scopes {
+        match step {
+            Step::Open => Scopes {
+                open: self
+                    .open
+                    .iter()
+                    .copied()
+                    .chain([Body { id: BodyId(self.count), start: self.locals.len(), end: self.locals.len() }])
+                    .collect(),
+                count: self.count + 1,
+                ..self
+            },
+            Step::Shut => Scopes {
+                closed: self
+                    .closed
+                    .into_iter()
+                    .chain(self.open.last().map(|body| (body.id, Body { end: self.locals.len(), ..*body })))
+                    .collect(),
+                open: self.open.iter().take(self.open.len().saturating_sub(1)).copied().collect(),
+                ..self
+            },
+            Step::Constant(bound) => Scopes { constants: self.constants.into_iter().chain([bound]).collect(), ..self },
+            Step::Local(bound) => Scopes { locals: self.locals.into_iter().chain(bound).collect(), ..self },
+        }
     }
 
     pub fn current(&self) -> Option<BodyId> {
