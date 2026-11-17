@@ -63,9 +63,9 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         Contributing { contributor, kinds, frames: vec![Contribution::identity()] }
     }
 
-    pub fn concluded<Out>(self, into: impl FnOnce(Contributor::Open, Contributor::Part) -> Out) -> Out {
+    pub fn concluded<Out>(self, into: impl FnOnce(Contributor, Contributor::Open, Contributor::Part) -> Out) -> Out {
         let Contribution { open, part } = Monoid::concat(self.frames);
-        into(open, part)
+        into(self.contributor, open, part)
     }
 
     pub(crate) fn watched(&self) -> &[Kind] {

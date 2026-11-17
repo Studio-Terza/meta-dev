@@ -6,56 +6,64 @@ use syntax::{ExprBreak, ExprContinue, ExprReturn, Macro};
 
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Facts, Finds, Kind, Sweep, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind, Sweep};
 
 use finding::Finding;
 
 #[derive(Debug)]
 pub struct Exits<'file> {
     file: &'file SourceFile,
-    found: Vec<Violation<'file>>,
 }
 
-impl Exits<'_> {
-    fn record(&mut self, span: Span, finding: Finding) -> Descend {
-        self.found
-            .push(Violation::new(Site::new(AsRef::<Path>::as_ref(self.file.head()), LineNumber::from(span)), finding));
-        Descend::Into
+impl<'file> Exits<'file> {
+    fn record(&self, span: Span, finding: Finding) -> Contributed<(), Vec<Violation<'file>>> {
+        let site = Site::new(AsRef::<Path>::as_ref(self.file.head()), LineNumber::from(span));
+        Contributed::parted(vec![Violation::new(site, finding)])
     }
 }
 
 impl<'file> From<&'file SourceFile> for Exits<'file> {
     fn from(file: &'file SourceFile) -> Exits<'file> {
-        Exits { file, found: Vec::new() }
+        Exits { file }
     }
 }
 
-impl<'ast> Watch<'ast> for Exits<'_> {
+impl<'file> Contribute for Exits<'file> {
+    type Open = ();
+    type Part = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Macro, Kind::ExprReturn, Kind::ExprBreak, Kind::ExprContinue]
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Violation<'file>>> {
+        Contributed::descending(Descend::Expand)
     }
 
-    fn on_expr_return(&mut self, expr: &'ast ExprReturn, _: &Facts<'_, ExprReturn>) -> Descend {
+    fn on_expr_return(&self, expr: &ExprReturn, _: &Facts<'_, ExprReturn>) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.return_token.span, Finding::Return)
     }
 
-    fn on_expr_break(&mut self, expr: &'ast ExprBreak, _: &Facts<'_, ExprBreak>) -> Descend {
+    fn on_expr_break(&self, expr: &ExprBreak, _: &Facts<'_, ExprBreak>) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.break_token.span, Finding::Break)
     }
 
-    fn on_expr_continue(&mut self, expr: &'ast ExprContinue, _: &Facts<'_, ExprContinue>) -> Descend {
+    fn on_expr_continue(
+        &self,
+        expr: &ExprContinue,
+        _: &Facts<'_, ExprContinue>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.continue_token.span, Finding::Continue)
     }
 }
 
-impl<'file> Finds<'file> for Exits<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let modules = self.file.test_modules().iter();
-        let tested = modules.flat_map(|module| Sweep::found(module, Box::new(Exits::from(module))));
-        self.found.into_iter().chain(tested).collect()
+impl<'file> Concludes<'file> for Exits<'file> {
+    fn violations(self, (): (), found: Vec<Violation<'file>>) -> Vec<Violation<'file>> {
+        let tested = self
+            .file
+            .test_modules()
+            .iter()
+            .flat_map(|module| Sweep::found(module, Box::new(Contributing::new(Exits::from(module)))));
+        found.into_iter().chain(tested).collect()
     }
 }

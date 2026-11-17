@@ -2,7 +2,7 @@ use std::path::Path;
 
 use lint_core::{Headline, Violation};
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 use syntax::{ItemMod, LitFloat, LitInt};
 
 use lint_core::Fix;
@@ -28,7 +28,7 @@ impl SweptLint for NoNumbersInBinaries {
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
         let kinds = file.head().binary().map_or(&[][..], |_| &[Kind::ItemMod, Kind::LitInt, Kind::LitFloat][..]);
-        Box::new(Numbers { path: AsRef::<Path>::as_ref(file.head()), kinds, lines: Vec::new() })
+        Box::new(Contributing::new(Numbers { path: AsRef::<Path>::as_ref(file.head()), kinds }))
     }
 }
 
@@ -36,35 +36,31 @@ impl SweptLint for NoNumbersInBinaries {
 struct Numbers<'file> {
     path: &'file Path,
     kinds: &'static [Kind],
-    lines: Vec<LineNumber>,
 }
 
-impl<'ast> Watch<'ast> for Numbers<'_> {
+impl Contribute for Numbers<'_> {
+    type Open = ();
+    type Part = Vec<LineNumber>;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Vec<LineNumber>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_lit_int(&mut self, _: &'ast LitInt, facts: &Facts<'_, LitInt>) -> Descend {
-        self.lines.extend(facts.unnamed());
-        Descend::Into
+    fn on_lit_int(&self, _: &LitInt, facts: &Facts<'_, LitInt>) -> Contributed<(), Vec<LineNumber>> {
+        Contributed::parted(facts.unnamed().into_iter().collect())
     }
 
-    fn on_lit_float(&mut self, _: &'ast LitFloat, facts: &Facts<'_, LitFloat>) -> Descend {
-        self.lines.extend(facts.unnamed());
-        Descend::Into
+    fn on_lit_float(&self, _: &LitFloat, facts: &Facts<'_, LitFloat>) -> Contributed<(), Vec<LineNumber>> {
+        Contributed::parted(facts.unnamed().into_iter().collect())
     }
 }
 
-impl<'file> Finds<'file> for Numbers<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.path;
-        self.lines
-            .into_iter()
-            .map(|line| Violation::new(Site::new(path, line), NoNumbersInBinaries::IN_BINARY))
-            .collect()
+impl<'file> Concludes<'file> for Numbers<'file> {
+    fn violations(self, (): (), lines: Vec<LineNumber>) -> Vec<Violation<'file>> {
+        lines.into_iter().map(|line| Violation::new(Site::new(self.path, line), NoNumbersInBinaries::IN_BINARY)).collect()
     }
 }
