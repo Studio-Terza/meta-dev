@@ -1,0 +1,2 @@
+is a proc-macro whose closure reaches logos, which a port owns, outside the owning unit and not through a crate declaring [package.metadata.lexer]
+depends on grammar, which only a crate declaring [package.metadata.lexer] depends on
