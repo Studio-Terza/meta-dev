@@ -1,3 +1,5 @@
+use graph_reader::Reader;
+use lint_file::ModelLint;
 use lint_fixtures::{Lines, Located, Queried, Source, Sources, Text};
 use lint_named_invariants::{NamedInvariants, UnnamedPanics};
 
@@ -23,3 +25,18 @@ laws::table!(named_invariants_are_counted_once_per_crate, Sources::flagged::<Que
     [Source::new(Located::new("a.rs"), Text::new(NAMED))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(BARE_PANICS))] => Lines::default(),
 ]);
+
+#[test]
+fn a_crate_reports_its_named_invariant_count_with_the_report_fix() {
+    let sources = [
+        Source::new(Located::new("crates/x/src/lib.rs"), Text::new(NAMED)),
+        Source::new(Located::new("crates/x/src/b.rs"), Text::new(NAMED)),
+    ];
+    let text = NamedInvariants::report(&Reader::read_files(&Sources::parsed(&sources))).to_string();
+    assert!(
+        text.contains(
+            "crates/x/src/b.rs:3: crate x: 4 named invariants; report only: each named invariant marks a requirement a refinement type could carry instead"
+        ),
+        "{text}"
+    );
+}
