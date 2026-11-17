@@ -29,10 +29,10 @@ impl ContextLint for NoForwarders {
 
 impl WatchingLint for NoForwarders {
     type Found<'file> = Forwarded<'file>;
-    type Watched<'file> = Forwarders<'file>;
+    type Watched<'file> = Contributing<Forwarders<'file>>;
 
-    fn watched(file: &SourceFile) -> Forwarders<'_> {
-        Forwarders::from(AsRef::<Path>::as_ref(file.head()))
+    fn watched(file: &SourceFile) -> Contributing<Forwarders<'_>> {
+        Contributing::new(Forwarders::from(AsRef::<Path>::as_ref(file.head())))
     }
 
     fn judged<'file, 'head: 'file>(

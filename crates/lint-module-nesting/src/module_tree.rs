@@ -11,11 +11,12 @@ use super::ModuleNesting;
 use finding::Finding;
 use module_path::{InsideSibling, ModuleIndex, ModulePath, Target};
 
+use algebra::{Monoid, Semigroup};
 use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
 use lint_placement::{CrateRoot, Krate, Level, Nest};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
 use reexport_count::ReexportCount;
 use syntax::ItemUse;
 use users::Users;
@@ -57,7 +58,7 @@ impl<'head> IntoIterator for ShippedModule<'head> {
 
 #[derive(Debug)]
 pub struct ModuleGathering<'head> {
-    uses: UsePaths,
+    uses: Contributing<UseScan>,
     module: Option<ModuleUses<'head>>,
 }
 
@@ -68,7 +69,7 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
         let module = file.shipped().map(|_| {
             let tests = file.test_modules().iter().map(|test| TestUses {
                 segments: AsRef::<[Name]>::as_ref(test.head().placement().module()).to_vec(),
-                uses: Sweep::gathered(test, UsePaths::default()),
+                uses: Sweep::gathered(test, Contributing::new(UseScan)).0,
             });
             ModuleUses {
                 file: AsRef::<Path>::as_ref(head),
@@ -79,7 +80,7 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
                 tests: tests.collect(),
             }
         });
-        ModuleGathering { uses: UsePaths::default(), module }
+        ModuleGathering { uses: Contributing::new(UseScan), module }
     }
 }
 
@@ -90,7 +91,7 @@ impl<'head> Gathers<ShippedModule<'head>> for ModuleGathering<'head> {
     }
 
     fn gathered(self) -> ShippedModule<'head> {
-        let uses = self.uses.0;
+        let uses = self.uses.concluded(|_, (), used| used.0);
         ShippedModule(self.module.map(|module| ModuleUses { uses, ..module }))
     }
 }
@@ -109,24 +110,37 @@ impl<'head> FromIterator<ShippedModule<'head>> for Concluded<'head> {
 #[derive(Debug, Default)]
 pub struct UsePaths(Vec<UsePath>);
 
-impl<'ast> Watch<'ast> for UsePaths {
+#[derive(Debug)]
+pub struct UseScan;
+
+impl Semigroup for UsePaths {
+    fn combine(self, other: UsePaths) -> UsePaths {
+        UsePaths(self.0.combine(other.0))
+    }
+}
+
+impl Monoid for UsePaths {}
+
+impl Contribute for UseScan {
+    type Open = ();
+    type Part = UsePaths;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemUse]
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, _: &Facts<'_, ItemUse>) -> Descend {
-        self.0.extend(UseEdges::of_tree(&item.tree));
-        Descend::Over
+    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), UsePaths> {
+        Contributed::new((), UsePaths(UseEdges::of_tree(&item.tree).into_iter().collect()), Descend::Over)
     }
 }
 
-impl Gathers<Vec<UsePath>> for UsePaths {
+impl Gathers<UsePaths> for Contributing<UseScan> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         Sweep::alone(self)
     }
 
-    fn gathered(self) -> Vec<UsePath> {
-        self.0
+    fn gathered(self) -> UsePaths {
+        self.concluded(|_, (), used| used)
     }
 }
 
