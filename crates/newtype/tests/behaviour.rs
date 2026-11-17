@@ -1,5 +1,9 @@
+use std::collections::BTreeSet;
+
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
+use laws::proptest::strategy::{Strategy, ValueTree};
+use laws::proptest::test_runner::{TestError, TestRunner};
 use newtype::{Checked, CheckedDeserialize, Counter, Deserialize, Display, Newtype, Serialize, Wrapping};
 use newtype_derive::Arbitrary;
 
@@ -74,6 +78,84 @@ struct Shown(u32);
 
 #[derive(Newtype, Display)]
 struct Tagged<Tag>(Tag);
+
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
+enum Shape<Mark> {
+    Dot,
+    Line(Mark),
+    Box { wide: u8, tall: u16 },
+}
+
+impl<Mark> Shape<Mark> {
+    fn kind(&self) -> &'static str {
+        match self {
+            Shape::Dot => "dot",
+            Shape::Line(_) => "line",
+            Shape::Box { .. } => "box",
+        }
+    }
+}
+
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
+#[newtype(from = Span::ordered)]
+struct Span {
+    start: u8,
+    end: u8,
+}
+
+impl Span {
+    fn ordered(one: u8, other: u8) -> Span {
+        Span { start: one.min(other), end: one.max(other) }
+    }
+}
+
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
+#[newtype(checked, from = Ratio::try_new)]
+struct Ratio {
+    above: u8,
+    below: u8,
+}
+
+impl Ratio {
+    fn try_new(above: u8, below: u8) -> Result<Ratio, Empty> {
+        Some(Ratio { above, below }).filter(|ratio| ratio.below != 0).ok_or(Empty)
+    }
+}
+
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
+#[newtype(generate = Parity::sampled)]
+enum Parity {
+    Odd(u32),
+    Even(u32),
+}
+
+impl Parity {
+    fn sampled() -> impl laws::proptest::strategy::Strategy<Value = Parity> {
+        laws::proptest::strategy::Strategy::prop_map(any::<u32>(), Parity::from)
+    }
+
+    fn number(self) -> u32 {
+        match self {
+            Parity::Odd(number) | Parity::Even(number) => number,
+        }
+    }
+}
+
+impl From<u32> for Parity {
+    fn from(number: u32) -> Parity {
+        Some(number).filter(|candidate| candidate.is_multiple_of(2)).map_or(Parity::Odd(number), Parity::Even)
+    }
+}
+
+#[derive(Arbitrary, Debug)]
+#[newtype(checked, from = Refused::try_new)]
+struct Refused;
+
+impl Refused {
+    fn try_new() -> Result<Refused, Empty> {
+        Err(Empty)
+    }
+}
 
 struct Pairs;
 
@@ -235,4 +317,30 @@ laws::law!(a_generic_display_follows_its_parameter, any::<char>(), tag, {
 #[test]
 fn derived_constructors_build_constants() {
     assert_eq!((Pairs::THREE.count(), Pairs::NONE.count()), (3, 0));
+}
+
+#[test]
+fn an_enum_generates_every_variant() {
+    let mut runner = TestRunner::deterministic();
+    let kinds: BTreeSet<&str> =
+        (0..64_u8).flat_map(|_| any::<Shape<char>>().new_tree(&mut runner)).map(|tree| tree.current().kind()).collect();
+    assert_eq!(kinds, BTreeSet::from(["box", "dot", "line"]));
+}
+
+laws::law!(a_constructor_shapes_every_generated_value, any::<Span>(), span, {
+    prop_assert!(span.start <= span.end);
+});
+
+laws::law!(a_fallible_constructor_generates_only_what_it_accepts, any::<Ratio>(), ratio, {
+    prop_assert_eq!(Ratio::try_new(ratio.above, ratio.below), Ok(ratio));
+});
+
+laws::law!(a_named_generator_replaces_the_derived_one, any::<Parity>(), parity, {
+    prop_assert_eq!(Parity::from(parity.number()), parity);
+});
+
+#[test]
+fn a_constructor_that_refuses_everything_aborts_generation() {
+    let refused = TestRunner::deterministic().run(&any::<Refused>(), |_| Ok(()));
+    assert!(matches!(refused, Err(TestError::Abort(_))));
 }
