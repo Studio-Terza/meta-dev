@@ -7,7 +7,7 @@ use equivalence::Equivalence;
 use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Descend, Facts, Fold, Folding, Kind, Sweep, Visit};
 use syntax::{ItemImpl, ItemMod};
 
 use crate::end::Node;
@@ -30,7 +30,7 @@ impl<'file> Fillers<'file> {
         shipped.map_or_default(|found| {
             let krate = found.head().placement().package().crate_name();
             let erasure = Erasure::reading(<&SourceFile>::from(found).tokens(), equivalence);
-            Sweep::gathered(<&SourceFile>::from(found), Scan { krate, erasure, fillers: Fillers::default() })
+            Sweep::gathered(<&SourceFile>::from(found), Folding::from(Scan { krate, erasure }))
         })
     }
 
@@ -56,29 +56,20 @@ impl<'file> Fillers<'file> {
 struct Scan<'syntax, 'file> {
     krate: &'file CrateName,
     erasure: Erasure<'syntax>,
-    fillers: Fillers<'file>,
 }
 
-impl<'file> Gathers<Fillers<'file>> for Scan<'_, 'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
+impl<'file> Fold for Scan<'_, 'file> {
+    type Found = Fillers<'file>;
 
-    fn gathered(self) -> Fillers<'file> {
-        self.fillers
-    }
-}
-
-impl<'ast> Watch<'ast> for Scan<'_, '_> {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, fillers: Self::Found, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Visit<Self::Found> {
+        Visit::new(fillers, Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, found: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+    fn on_item_impl(&self, fillers: Self::Found, found: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Visit<Self::Found> {
         let interface =
             found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
         let filled = interface.zip(facts.name().cloned()).map(|(trait_name, filler)| Filled {
@@ -94,8 +85,8 @@ impl<'ast> Watch<'ast> for Scan<'_, '_> {
                 (Name::from(&method.sig.ident), self.erasure.read(Bounds::from(&method.block)).labels().clone())
             })
             .collect();
-        self.fillers.bodies.extend(filled.filter(|_| facts.gate() == Walk::Entered).map(|kept| (kept, methods)));
-        Descend::Over
+        let kept = filled.filter(|_| facts.gate() == Walk::Entered).map(|kept| (kept, methods));
+        Visit::new(Fillers { bodies: fillers.bodies.into_iter().chain(kept).collect() }, Descend::Over)
     }
 }
 
