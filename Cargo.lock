@@ -1928,6 +1928,7 @@ dependencies = [
 name = "lint-public-api-tests"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "laws",
  "lint-core",
  "lint-file",

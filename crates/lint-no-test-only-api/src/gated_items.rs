@@ -33,7 +33,9 @@ impl Contribute for GatedItems<'_> {
 
     fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<(), Vec<Flagged>> {
         let gated = ItemHead::gate_of(&item.attrs);
-        Contributed::parted(item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated)).collect())
+        Contributed::parted(
+            item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated)).collect(),
+        )
     }
 
     fn on_field(&self, field: &Field, _: &Facts<'_, Field>) -> Contributed<(), Vec<Flagged>> {

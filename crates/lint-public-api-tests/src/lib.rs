@@ -2,14 +2,14 @@ mod emitters;
 mod path_reach;
 mod test_code;
 
-use emitters::Emitters;
+use emitters::{EmitterScan, Emitters};
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::{Headline, Parsed};
 use lint_core::{SourceFile, Violation};
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_sweep::{Gathers, Watching};
+use lint_sweep::{Contributing, Gathers, Watching};
 use path_reach::PathReach;
 use test_code::{TestCode, Tested};
 
@@ -34,10 +34,10 @@ impl ContextLint for PublicApiTests {
     type Part<'head> = Emitters;
     type Context<'head> = Emitters;
 
-    type Gathering<'head> = Emitters;
+    type Gathering<'head> = Contributing<EmitterScan>;
 
-    fn gathering(_: Parsed<'_, '_>) -> Emitters {
-        Emitters::default()
+    fn gathering(_: Parsed<'_, '_>) -> Contributing<EmitterScan> {
+        Contributing::new(EmitterScan)
     }
 }
 

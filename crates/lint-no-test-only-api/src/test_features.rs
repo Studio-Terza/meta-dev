@@ -79,8 +79,10 @@ impl Contribute for TestFeatures<'_> {
     }
 
     fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Flagged>> {
-        let found =
-            Self::condition(&invocation.path).into_iter().flat_map(|_| Self::scanned(invocation.tokens.clone())).collect();
+        let found = Self::condition(&invocation.path)
+            .into_iter()
+            .flat_map(|_| Self::scanned(invocation.tokens.clone()))
+            .collect();
         Contributed::new((), found, Descend::Over)
     }
 }
