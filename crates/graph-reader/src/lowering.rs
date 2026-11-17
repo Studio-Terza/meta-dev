@@ -429,8 +429,9 @@ impl<'read> AttachingGroups<BodyGroup> for Lowerer<'read> {
         &self,
         found: Option<Box<Lowering<'read>>>,
     ) -> Drawn<Option<Box<Lowering<'read>>>, Vec<Attachment<BodyGroup>>> {
-        let lowering = *self.opened(found);
-        Drawn::new(Some(Box::new(Lowering { opening: Vec::new(), ..lowering })), lowering.opening)
+        let mut lowering = self.opened(found);
+        let opening = mem::take(&mut lowering.opening);
+        Drawn::new(Some(lowering), opening)
     }
 
     fn detached(&self, found: Option<Box<Lowering<'read>>>, group: BodyGroup) -> Option<Box<Lowering<'read>>> {
