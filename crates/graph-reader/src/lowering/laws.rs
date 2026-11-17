@@ -1,5 +1,4 @@
-use super::walk::{Frame, Grains};
-use super::FileRows;
+use super::Frame;
 mod reading;
 
 use std::collections::BTreeSet;
@@ -10,7 +9,6 @@ use syntax::{TokenStream, TokenTree};
 use graph::{Building, Law, LawKind, Operation, OperationOwner, Property, Route, Side, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
 
-use super::Lowering;
 use super::seat::{Built, Footing, Located};
 use super::signature::Written;
 use reading::Reading;

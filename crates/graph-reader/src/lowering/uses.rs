@@ -1,5 +1,5 @@
-use super::walk::{Frame, Grains};
 use super::FileRows;
+use super::{Frame, Grains};
 use algebra::{Monoid, Semigroup};
 mod tokens;
 
@@ -11,7 +11,6 @@ use lint_layout::{Name, Position, Whole, Word, words};
 
 use crate::namespace::UsePath;
 
-use super::Lowering;
 use super::places::PlaceId;
 use super::quotes::QuoteRow;
 use super::seat::{Built, Footing, Located};
@@ -163,7 +162,8 @@ impl Frame<'_> {
         let tabled = called.map_or(Some(()), |_| None).and(self.tabled);
         let dispatched = tabled.map_or_default(|()| self.dispatched(expression));
         let mentioned = dispatched.into_iter().zip(position).map(|(path, at)| self.used(path, at, Mention::Dispatched));
-        let found = Qualified::written(expression).zip(position).map(|(path, at)| self.used(path, at, Mention::Expression));
+        let found =
+            Qualified::written(expression).zip(position).map(|(path, at)| self.used(path, at, Mention::Expression));
         Monoid::concat(mentioned.chain(found))
     }
 
@@ -215,7 +215,8 @@ impl Frame<'_> {
         let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
         let interpolated =
             TokenPaths::interpolated(invoked).into_iter().map(|spelled| (spelled, Mention::Interpolated));
-        let spelled = plain.chain(interpolated).map(|(spelled, mention)| spelled.handed(|path, at| self.used(path, at, mention)));
+        let spelled =
+            plain.chain(interpolated).map(|(spelled, mention)| spelled.handed(|path, at| self.used(path, at, mention)));
         lawful.combine(invoking).combine(Monoid::concat(spelled))
     }
 

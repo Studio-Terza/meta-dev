@@ -1,9 +1,10 @@
-use std::sync::Arc;
-use super::walk::{Frame, Framed, Grains, Lowering};
 use super::FileRows;
+use super::walk::Lowering;
+use super::{Frame, Framed, Grains, Owning};
 use crate::namespace::ScopeOp;
 use lint_sweep::{Address, Contributed, Contributing};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
 
@@ -142,16 +143,10 @@ impl Places {
     }
 }
 
-#[derive(Debug)]
-pub(super) struct Owning {
-    pub(super) place: PlaceId,
-    pub(super) grains: Grains,
-}
-
 impl<'read> Frame<'read> {
-    fn placed(&self, key: Address, row: PlaceSeed) -> Owning {
+    fn placed(&self, key: Address, seed: PlaceSeed) -> Owning {
         let place = PlaceId(self.key(key));
-        let row = PlaceRow { key: place.clone(), subject: row.subject, owner: row.owner };
+        let row = PlaceRow { key: place.clone(), subject: seed.subject, owner: seed.owner };
         let rows = FileRows { places: PlaceRows { places: vec![row], subjects: Vec::new() }, ..FileRows::default() };
         Owning { place, grains: Grains::from(rows) }
     }

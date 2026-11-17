@@ -118,8 +118,13 @@ impl ScopeOp {
 
 #[derive(Debug)]
 pub(crate) struct Replayed {
-    pub(crate) openings: Openings,
-    pub(crate) scopes: ScopeMap,
+    openings: Openings,
+    scopes: ScopeMap,
+}
+impl Replayed {
+    pub(crate) fn concluded<Out>(self, into: impl FnOnce(Openings, ScopeMap) -> Out) -> Out {
+        into(self.openings, self.scopes)
+    }
 }
 
 impl Openings {

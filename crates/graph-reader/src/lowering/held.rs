@@ -1,5 +1,5 @@
-use super::walk::{Frame, Framed, Grains};
 use super::FileRows;
+use super::{Frame, Framed, Grains};
 use algebra::{Monoid, Semigroup};
 use lint_sweep::Contributed;
 use syntax::Spanned;
@@ -11,12 +11,11 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
+use super::ImplRow;
 use super::attributes::Attributes;
 use super::seat::{Built, Footing, Located};
 use super::signature::{InScope, Written};
-use super::{ImplRow, Lowering};
 use graph::{Region, TypeRef};
-use lint_sweep::Descend;
 
 #[derive(Clone, Debug)]
 pub(super) struct Holder {
@@ -83,7 +82,12 @@ impl Built for HoldingRow {
 }
 
 impl<'read> Frame<'read> {
-    pub(super) fn valued(&self, ident: &Ident, ty: &Type, attributes: &[Attribute]) -> Contributed<Framed<'read>, Grains> {
+    pub(super) fn valued(
+        &self,
+        ident: &Ident,
+        ty: &Type,
+        attributes: &[Attribute],
+    ) -> Contributed<Framed<'read>, Grains> {
         let target = self.generics.lowered(ty);
         let held = self.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
         self.owned_by(ident, Domain::Values, attributes, held)
@@ -118,9 +122,9 @@ impl<'read> Frame<'read> {
         parameters.combine(Monoid::concat(bounds))
     }
 
-    pub(super) fn struct_held(&self, item: &ItemStruct, scope: &InScope, link: Link) -> Grains {
+    pub(super) fn struct_held(&self, item: &ItemStruct, scope: &InScope, link: &Link) -> Grains {
         Syntax::newtype_field(&item.fields).map_or_else(
-            || self.fields_held(&Holder::named(&item.ident, Held::StructField), &link, item.fields.iter(), scope),
+            || self.fields_held(&Holder::named(&item.ident, Held::StructField), link, item.fields.iter(), scope),
             |field| self.hold(Holder::named(&item.ident, Held::NewtypeField), link.clone(), scope.lowered(&field.ty)),
         )
     }

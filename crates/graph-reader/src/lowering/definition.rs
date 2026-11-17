@@ -1,4 +1,3 @@
-mod boundary;
 mod branches;
 mod reads;
 mod repetitions;
@@ -16,7 +15,6 @@ use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watch, Watching};
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
-pub(super) use boundary::RowIndex;
 use branches::Branches;
 use reads::{Reads, ReadsLowered, SharedParameters};
 use repetitions::Repetitions;
@@ -76,25 +74,6 @@ pub(crate) struct BodyGroup {
 }
 
 impl BodyGroup {
-    pub(super) const KINDS: &'static [Kind] = &[
-        Kind::Block,
-        Kind::Item,
-        Kind::PatIdent,
-        Kind::Expr,
-        Kind::ExprCall,
-        Kind::ExprMethodCall,
-        Kind::ExprClosure,
-        Kind::ExprForLoop,
-        Kind::ExprWhile,
-        Kind::ExprLoop,
-        Kind::ExprPath,
-        Kind::ExprField,
-        Kind::ExprIf,
-        Kind::ExprTry,
-        Kind::ExprMatch,
-        Kind::ExprBinary,
-    ];
-
     pub(super) fn opened(scope: &InScope, signature: &Signature, body: &Block) -> BodyGroup {
         let parameters: BTreeMap<Name, TypeRef<Written>> = signature
             .inputs

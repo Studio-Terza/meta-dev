@@ -1,13 +1,5 @@
-use std::sync::Arc;
+use syntax::{Attribute, ItemImpl};
 
-use syntax::{Attribute, ItemImpl, ItemMod};
-
-use lint_sweep::Descend;
-
-use super::regions::Context;
-use super::seat::Seat;
-use super::signature::InScope;
-use super::{Lowering, Slot};
 use graph::{Entry, Owner};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
 
@@ -53,4 +45,3 @@ impl Enclosure {
         }
     }
 }
-

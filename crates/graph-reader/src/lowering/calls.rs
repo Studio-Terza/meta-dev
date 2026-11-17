@@ -1,5 +1,5 @@
-use super::walk::{Frame, Grains};
 use super::FileRows;
+use super::{Frame, Grains};
 use syntax::Spanned;
 use syntax::{ExprCall, ExprMacro, ExprMethodCall};
 
@@ -7,10 +7,8 @@ use graph::{Building, Call, Callee, ItemPath, MacroCall, Region};
 use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
-use super::Lowering;
 use super::places::PlaceId;
 use super::seat::{Built, Footing, Located};
-use lint_sweep::Address;
 
 #[derive(Debug)]
 pub(super) struct CallRow {
