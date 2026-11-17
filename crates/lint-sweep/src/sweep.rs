@@ -18,15 +18,12 @@ pub trait Gathers<Part> {
     fn gathered(self) -> Part;
 }
 
-pub trait Finds<'file>: for<'ast> Watch<'ast> + fmt::Debug {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>>;
+pub trait Finds<'file, Part = Vec<Violation<'file>>>: for<'ast> Watch<'ast> + fmt::Debug {
+    fn found(self: Box<Self>) -> Part;
 }
 
-impl<'file, Folded: Fold + fmt::Debug> Finds<'file> for Folding<Folded>
-where
-    Vec<Violation<'file>>: From<Folded::Found>,
-{
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
+impl<Part: From<Folded::Found>, Folded: Fold + fmt::Debug> Finds<'_, Part> for Folding<Folded> {
+    fn found(self: Box<Self>) -> Part {
         self.concluded()
     }
 }
@@ -39,10 +36,6 @@ impl<Folded: Fold> Gathers<Folded::Found> for Folding<Folded> {
     fn gathered(self) -> Folded::Found {
         self.concluded()
     }
-}
-
-pub trait Sorts<'file>: for<'ast> Watch<'ast> + fmt::Debug {
-    fn sorted(self: Box<Self>) -> Vec<Vec<Violation<'file>>>;
 }
 
 #[derive(Debug)]
@@ -60,7 +53,7 @@ impl Sweep {
     pub fn over_leads<'file, 'run>(
         file: &'file SourceFile,
         finds: &mut [Box<dyn Finds<'file> + 'run>],
-        sorts: &mut [Box<dyn Sorts<'file> + 'run>],
+        sorts: &mut [Box<dyn Finds<'file, Vec<Vec<Violation<'file>>>> + 'run>],
     ) {
         let found = finds.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });
         let sorting = sorts.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });

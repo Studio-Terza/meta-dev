@@ -21,7 +21,7 @@ use lint_file::{
 use lint_file::{ModelLint, WorkspaceLint};
 use lint_port_dependencies::RoleFacts;
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Finds, Gathers, Member, Sorts, Watching};
+use lint_sweep::{Finds, Gathers, Member, Watching};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -526,7 +526,7 @@ pub(crate) struct Filer<'file> {
     starts: Vec<TypeId>,
     sorting: Vec<TypeId>,
     finds: Vec<Box<dyn Finds<'file> + 'file>>,
-    sorts: Vec<Box<dyn Sorts<'file> + 'file>>,
+    sorts: Vec<Box<dyn Finds<'file, Vec<Vec<Violation<'file>>>> + 'file>>,
 }
 
 impl<'file> Filer<'file> {
@@ -585,7 +585,7 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
         let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
         let file = <&SourceFile>::from(claimed);
         let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found()]));
-        let watched = listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, watcher.sorted())));
+        let watched = listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, watcher.found())));
         let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));
         let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
         let found = admitted.into_iter().map(|found| (found.slot, Self::taken(&mut sorted, found.source)));

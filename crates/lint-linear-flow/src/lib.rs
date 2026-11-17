@@ -5,9 +5,9 @@ mod function_flow;
 mod tally;
 mod verdict;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, Lint, Report, SourceFile, Violation};
 use lint_file::{KinLint, Lead, Leader, Reads};
-use lint_sweep::{Member, Sorts};
+use lint_sweep::{Finds, Member};
 
 use file_flow::Collector;
 
@@ -32,7 +32,7 @@ pub struct FlowShapes;
 pub struct FlowRules;
 
 impl FlowRules {
-    fn watcher(file: &SourceFile) -> Box<dyn Sorts<'_> + '_> {
+    fn watcher(file: &SourceFile) -> Box<dyn Finds<'_, Vec<Vec<Violation<'_>>>> + '_> {
         Box::new(Collector::watching(file))
     }
 }

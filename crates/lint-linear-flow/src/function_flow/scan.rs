@@ -41,46 +41,58 @@ impl<'file> Opened<'file> {
         }
     }
 
-    pub fn entered(&mut self, block: &Block) {
-        self.body = self.body.filter(|body| *body != Address::from(block));
+    #[must_use]
+    pub fn entered(self, block: &Block) -> Opened<'file> {
+        Opened { body: self.body.filter(|body| *body != Address::from(block)), ..self }
     }
 
-    pub fn active(&mut self) -> Option<&mut Opened<'file>> {
-        self.body.map_or(Some(self), |_| None)
+    #[must_use]
+    pub fn active(self, change: impl FnOnce(Opened<'file>) -> Opened<'file>) -> Opened<'file> {
+        match self.body {
+            None => change(self),
+            Some(_) => self,
+        }
     }
 
     pub fn closed(self) -> FunctionFlow<'file> {
         FunctionFlow { site: self.site, shape: self.shape, found: self.found.into_iter().chain(self.faults).collect() }
     }
 
-    pub fn record(&mut self, span: Span, finding: Option<Finding>) {
+    #[must_use]
+    pub fn record(self, span: Span, finding: Option<Finding>) -> Opened<'file> {
         let path = self.path;
-        self.found.extend(finding.map(|flagged| Found::new(Site::new(path, LineNumber::from(span)), flagged)));
+        let flagged = finding.map(|flagged| Found::new(Site::new(path, LineNumber::from(span)), flagged));
+        Opened { found: self.found.into_iter().chain(flagged).collect(), ..self }
     }
 
-    pub fn branched(&mut self, expr: &ExprIf) {
+    #[must_use]
+    pub fn branched(self, expr: &ExprIf) -> Opened<'file> {
         let rooted = self.root.filter(|root| *root == Address::from(expr));
-        self.record(expr.if_token.span, rooted.map_or_else(|| Some(Finding::branching(&expr.cond)), |_| None));
+        self.record(expr.if_token.span, rooted.map_or_else(|| Some(Finding::branching(&expr.cond)), |_| None))
     }
 
-    pub fn matched(&mut self, expr: &ExprMatch) {
+    #[must_use]
+    pub fn matched(self, expr: &ExprMatch) -> Opened<'file> {
         let rooted = self.root.filter(|root| *root == Address::from(expr));
-        self.record(expr.match_token.span, rooted.map_or(Some(Finding::Match), |_| None));
+        self.record(expr.match_token.span, rooted.map_or(Some(Finding::Match), |_| None))
     }
 
-    pub fn bound(&mut self, local: &Local) {
+    #[must_use]
+    pub fn bound(self, local: &Local) -> Opened<'file> {
         let otherwise = local.init.as_ref().and_then(|init| init.diverge.as_ref());
         self.record(
             otherwise.map_or_else(Span::call_site, |(token, _)| token.span),
             otherwise.map(|_| Finding::LetElse),
-        );
+        )
     }
 
-    pub fn joined(&mut self, expr: &ExprBinary) {
-        self.record(expr.op.span(), Finding::joining(expr.op));
+    #[must_use]
+    pub fn joined(self, expr: &ExprBinary) -> Opened<'file> {
+        self.record(expr.op.span(), Finding::joining(expr.op))
     }
 
-    pub fn negated(&mut self, expr: &ExprUnary) {
-        self.record(expr.op.span(), Finding::negating(expr.op));
+    #[must_use]
+    pub fn negated(self, expr: &ExprUnary) -> Opened<'file> {
+        self.record(expr.op.span(), Finding::negating(expr.op))
     }
 }
