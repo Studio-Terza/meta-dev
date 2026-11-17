@@ -7,6 +7,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use console_ports::Answer;
 use query_cache::Table;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -72,6 +73,12 @@ impl QueryCache {
     const DIRECTORY: &'static str = ".sqlx";
     const DATABASE: &'static str = "SQLite";
     const MEMORY: &'static str = "sqlite::memory:";
+
+    pub fn answered(arguments: Vec<OsString>) -> Answer {
+        let prepared = QueryCache::try_from(arguments).and_then(|cache| cache.prepared());
+        let shown = prepared.as_ref().map_or_default(ToString::to_string);
+        Answer::reported(prepared).showing(shown)
+    }
 
     pub fn prepared(&self) -> Result<Changes, Uncached> {
         let queries = Sources::queries(&self.root)?;
