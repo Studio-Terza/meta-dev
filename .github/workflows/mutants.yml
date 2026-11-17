@@ -29,10 +29,10 @@ jobs:
       - name: mutants in shard
         env:
           SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
-        run: cargo run --locked -q --bin ci -- mutants-shard "$SHARD" "$RUNNER_TEMP"
+        run: cargo run --locked --bin ci -- mutants-shard "$SHARD" "$RUNNER_TEMP"
       - name: which tests failed per mutant
         if: always()
-        run: cargo run --locked -q --bin mutation-shard -- "$RUNNER_TEMP/mutants.out" "$RUNNER_TEMP/mutants.out/matrix.json"
+        run: cargo run --locked --bin mutation-shard -- "$RUNNER_TEMP/mutants.out" "$RUNNER_TEMP/mutants.out/matrix.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -55,9 +55,9 @@ jobs:
           pattern: shard-*
           path: shards
       - name: summary
-        run: cargo run --locked -q --bin ci -- shard-summary shards "$GITHUB_STEP_SUMMARY"
+        run: cargo run --locked --bin ci -- shard-summary shards "$GITHUB_STEP_SUMMARY"
       - name: matrix
-        run: cargo run --locked -q --bin ci -- matrix shards . matrix "$GITHUB_STEP_SUMMARY"
+        run: cargo run --locked --bin ci -- matrix shards . matrix "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: mutation-matrix

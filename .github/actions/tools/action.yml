@@ -7,7 +7,7 @@ runs:
     - name: tools key
       id: key
       shell: bash
-      run: cargo run --locked -q --bin ci -- tools-key "$METADATA" "$GITHUB_OUTPUT"
+      run: cargo run --locked --bin ci -- tools-key "$METADATA" "$GITHUB_OUTPUT"
     - uses: actions/cache@v4
       id: tools
       with:
@@ -16,7 +16,7 @@ runs:
     - name: tools
       if: steps.tools.outputs.cache-hit != 'true'
       shell: bash
-      run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
+      run: cargo run --locked --bin ci -- tools target/debug "$TOOLS"
     - name: reach
       shell: bash
       run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_BASE_REF" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'

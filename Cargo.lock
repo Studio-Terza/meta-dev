@@ -1647,6 +1647,7 @@ dependencies = [
 name = "lint-module-nesting"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1891,6 +1892,7 @@ dependencies = [
 name = "lint-port-dependencies"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "laws",
  "lint-core",
@@ -1963,6 +1965,7 @@ dependencies = [
 name = "lint-public-surface"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",

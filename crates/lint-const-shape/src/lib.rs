@@ -149,11 +149,11 @@ impl<'scan> Candidates<'scan> {
     fn split(self, length: &impl Spanned) -> Split<'scan> {
         let range = length.span().byte_range();
         let inside = |span: &Span| range.contains(&span.byte_range().start);
-        let (casts, outside_casts): (Vec<Span>, Vec<Span>) = self.casts.into_iter().partition(inside);
+        let (_, outside_casts): (Vec<Span>, Vec<Span>) = self.casts.into_iter().partition(inside);
         let (loops, outside_loops): (Vec<Looped>, Vec<Looped>) =
             self.loops.into_iter().partition(|looped| inside(&looped.span));
         Split {
-            length: Candidates { casts, loops, ..Candidates::default() },
+            length: Candidates { loops, ..Candidates::default() },
             rest: Candidates {
                 found: self.found,
                 casts: outside_casts,

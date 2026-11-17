@@ -59,8 +59,17 @@ enum Scenario {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 enum Summary {
     MissedMutant,
+    Timeout,
     #[serde(other)]
     Other,
+}
+impl Summary {
+    fn unproven(self) -> Option<()> {
+        match self {
+            Summary::MissedMutant | Summary::Timeout => Some(()),
+            Summary::Other => None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,7 +101,10 @@ impl Mutant {
     }
 
     pub(in super::super) fn listed(text: &Text) -> Result<Vec<Mutant>, serde_json::Error> {
-        serde_json::from_str(text.as_ref())
+        serde_json::Deserializer::from_str(text.as_ref())
+            .into_iter::<Vec<Mutant>>()
+            .next()
+            .unwrap_or_else(|| Ok(Vec::new()))
     }
 
     fn place(&self, line: u32) -> Place {
@@ -152,7 +164,7 @@ impl Outcomes {
     pub(in super::super) fn missed(self) -> Vec<Mutant> {
         self.outcomes
             .into_iter()
-            .filter(|outcome| outcome.summary == Summary::MissedMutant)
+            .filter(|outcome| outcome.summary.unproven().is_some())
             .filter_map(|outcome| outcome.scenario.mutant())
             .collect()
     }

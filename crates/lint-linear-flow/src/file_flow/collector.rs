@@ -99,21 +99,11 @@ impl<'file> Contribute for Collector<'file> {
                 Scope::new(Kind::ItemFn),
                 Scope::new(Kind::ImplItemFn),
                 Scope::new(Kind::TraitItemFn),
-                Scope::new(Kind::Signature),
             ]
         }
     }
 
     fn off_item(&self, _: &Item, _: &Facts<'_, Item>, inner: Contribution<(), Flows<'file>>) -> Flows<'file> {
-        inner.concluded(|(), flows| flows.settled())
-    }
-
-    fn off_signature(
-        &self,
-        _: &Signature,
-        _: &Facts<'_, Signature>,
-        inner: Contribution<(), Flows<'file>>,
-    ) -> Flows<'file> {
         inner.concluded(|(), flows| flows.settled())
     }
 
