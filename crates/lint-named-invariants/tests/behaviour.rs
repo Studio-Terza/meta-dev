@@ -37,5 +37,10 @@ fn each_crate_counts_its_named_invariants_and_its_named_ignores() {
         Source::new(Located::new("crates/x/src/b.rs"), Text::new(IGNORED)),
     ];
     let text = NamedInvariants::report(&Reader::read_files(&Sources::parsed(&sources))).to_string();
-    assert!(text.contains("2 named invariants, 1 errors ignored with a named reason"), "{text}");
+    assert!(
+        text.contains(
+            "crates/x/src/b.rs:3: crate x: 2 named invariants, 1 errors ignored with a named reason; report only: each named invariant or ignored error marks a requirement a refinement type could carry instead"
+        ),
+        "{text}"
+    );
 }
