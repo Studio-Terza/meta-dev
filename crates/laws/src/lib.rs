@@ -1,5 +1,37 @@
 pub use proptest;
 
+use proptest::strategy::Strategy;
+use proptest::test_runner::{Config, RngSeed, TestError, TestRunner};
+
+#[derive(Debug)]
+pub struct Generation;
+
+impl Generation {
+    pub const CASES: u32 = 256;
+
+    #[must_use]
+    pub fn repeatable() -> Config {
+        Config { failure_persistence: None, rng_seed: RngSeed::Fixed(0), ..Config::default() }
+    }
+
+    pub fn bounded<Generating: Strategy>(strategy: &Generating) -> Result<(), TestError<Generating::Value>> {
+        TestRunner::new(Config { cases: Self::CASES, max_local_rejects: Self::CASES, ..Self::repeatable() })
+            .run(strategy, |_| Ok(()))
+    }
+}
+
+#[macro_export]
+macro_rules! generates {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr $(,)?) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
+            $crate::Generation::bounded(&$strategy)?;
+            Ok(())
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! monoid {
     ($(#[$meta:meta])* $name:ident, $type:ty, $strategy:expr $(,)?) => {
@@ -34,11 +66,7 @@ macro_rules! law {
         #[test]
         fn $name() -> Result<(), Box<dyn ::std::error::Error>> {
             let $given = $setup;
-            let mut runner = $crate::proptest::test_runner::TestRunner::new($crate::proptest::test_runner::Config {
-                failure_persistence: None,
-                rng_seed: $crate::proptest::test_runner::RngSeed::Fixed(0),
-                ..$crate::proptest::test_runner::Config::default()
-            });
+            let mut runner = $crate::proptest::test_runner::TestRunner::new($crate::Generation::repeatable());
             runner.run(&$strategy, |$value| {
                 let _: () = $body;
                 Ok(())
@@ -48,11 +76,7 @@ macro_rules! law {
     };
     ($(#[$meta:meta])* $name:ident, $strategy:expr, $value:ident, $body:block) => {
         $crate::proptest::proptest! {
-            #![proptest_config($crate::proptest::test_runner::Config {
-                failure_persistence: None,
-                rng_seed: $crate::proptest::test_runner::RngSeed::Fixed(0),
-                ..$crate::proptest::test_runner::Config::default()
-            })]
+            #![proptest_config($crate::Generation::repeatable())]
             $(#[$meta])*
             #[test]
             fn $name($value in $strategy) $body
