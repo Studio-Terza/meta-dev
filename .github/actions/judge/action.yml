@@ -14,7 +14,7 @@ runs:
       shell: bash
       env:
         ARGS: ${{ inputs.stages }} --report-only test-compile clippy
-      run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" $ARGS'
+      run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked --bin gate-limits -- ci/limits.toml "$MEASURED" $ARGS'
     - name: step times
       if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
       shell: bash
