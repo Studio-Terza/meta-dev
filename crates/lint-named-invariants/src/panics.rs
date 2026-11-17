@@ -1,8 +1,8 @@
 mod named;
 
-use graph::{Mention, PathUse, Placed, Reach, Region};
+use graph::{Call, ItemPath, Mention, PathUse, Placed, Reach, Region};
 use lint_core::{Fix, Message, Problem, Violation};
-use lint_layout::{PathTail, Word, words};
+use lint_layout::{Name, PathTail, Whole, Word, words};
 
 pub(crate) use named::Named;
 
@@ -23,6 +23,7 @@ impl Panics {
         words!["debug_assert_ne"],
     ];
     const NAMED: [Word<'static>; 1] = words!["invariant"];
+    const IGNORING: [Word<'static>; 1] = words!["ignoring"];
     const REFUSED: Message = Message::new(
         Problem::new("a panic that names no invariant"),
         Fix::new("name it: invariant!(holds, Invariant::X), or invariant!(broken Invariant::X) where an arm crashes"),
@@ -34,8 +35,14 @@ impl Panics {
         Some(Violation::new(placed.site(), Self::REFUSED))
     }
 
-    fn named(placed: &Placed<'_, &PathUse>) -> Option<()> {
-        Self::shipped(*placed)?.spelling(PathTail::new(&Self::NAMED)).map(|_| ())
+    fn named<'model>(placed: &Placed<'model, &'model PathUse>) -> Option<&'model ItemPath> {
+        Self::shipped(*placed)?.spelling(PathTail::new(&Self::NAMED))
+    }
+
+    fn ignoring<'model>(placed: &Placed<'model, &'model Call>) -> Option<&'model Name> {
+        let call = placed.entity();
+        Some(AsRef::<Region>::as_ref(call).reach()).filter(|reach| *reach == Reach::Shipped)?;
+        call.callee().method().filter(|method| method.matches::<Whole>(&Self::IGNORING).is_some())
     }
 
     fn shipped<'model>(placed: Placed<'model, &'model PathUse>) -> Option<&'model PathUse> {
