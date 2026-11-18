@@ -35,7 +35,7 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{
     Declared, DeclaredKind, Domain, ItemIds, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap,
-    ScopeOp, Seeds, Sowing, Sown, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
+    ScopeOp, Seeds, Sowing, Sown, StdNames, Top, TranscribedRow, Transcriptions, Unbased, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
 use crate::planting::Unclaimed;
@@ -391,7 +391,7 @@ struct Grown {
 }
 
 impl Grown {
-    fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Places {
+    fn settled(&self, resolving: &Unbased<'_, '_, '_>) -> Places {
         self.rows.places.settled(&resolving.based(self.base), &self.scopes)
     }
 }
@@ -488,13 +488,14 @@ impl Plot<'_> {
         let issued = space.issued();
         let ids = ItemIds::from(&issued);
         let unexpanded = Transcriptions::default();
-        let naming = Resolving::new(Resolver::new(&space, &tables), &ids, &unexpanded);
+        let naming = Unbased::new(Resolver::new(&space, &tables), &ids, &unexpanded);
         let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
             let based = naming.based(grown.base);
             grown.rows.transcribed.iter().filter_map(move |row| row.settled(based, &grown.scopes))
         }));
-        let resolving = Resolving::new(Resolver::new(&space, &tables), &ids, &transcriptions);
-        let exports: Exports = Monoid::concat(space.exports().iter().map(|export| export.recorded(&resolving)));
+        let resolving = Unbased::new(Resolver::new(&space, &tables), &ids, &transcriptions);
+        let rooted = resolving.based(ScopeId::FIRST);
+        let exports: Exports = Monoid::concat(space.exports().iter().map(|export| export.recorded(&rooted)));
         let places: Vec<Places> = Parallel::available().mapped(&self.grown, |grown| grown.settled(&resolving));
         let declarations: ModelPart =
             Monoid::concat(self.grown.iter().zip(&places).map(|(grown, seated)| seated.placed(grown.file)));

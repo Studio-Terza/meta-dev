@@ -20,19 +20,28 @@ pub(crate) struct Resolving<'ids, 'tables, 'rows> {
     base: ScopeId,
 }
 
-impl<'ids, 'tables, 'rows> Resolving<'ids, 'tables, 'rows> {
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Unbased<'ids, 'tables, 'rows> {
+    resolver: Resolver<'tables, 'rows>,
+    ids: &'ids ItemIds,
+    transcriptions: &'ids Transcriptions,
+}
+
+impl<'ids, 'tables, 'rows> Unbased<'ids, 'tables, 'rows> {
     pub(crate) fn new(
         resolver: Resolver<'tables, 'rows>,
         ids: &'ids ItemIds,
         transcriptions: &'ids Transcriptions,
-    ) -> Resolving<'ids, 'tables, 'rows> {
-        Resolving { resolver, ids, transcriptions, base: ScopeId::FIRST }
+    ) -> Unbased<'ids, 'tables, 'rows> {
+        Unbased { resolver, ids, transcriptions }
     }
 
     pub(crate) fn based(self, base: ScopeId) -> Resolving<'ids, 'tables, 'rows> {
-        Resolving { base, ..self }
+        Resolving { resolver: self.resolver, ids: self.ids, transcriptions: self.transcriptions, base }
     }
+}
 
+impl<'ids> Resolving<'ids, '_, '_> {
     pub(crate) fn transcriptions(&self) -> &'ids Transcriptions {
         self.transcriptions
     }
