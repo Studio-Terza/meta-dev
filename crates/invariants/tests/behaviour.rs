@@ -96,3 +96,12 @@ fn a_joined_thread_gives_its_value_or_carries_its_panic_on() {
     let carried = panic::catch_unwind(|| std::thread::spawn(|| invariant!(broken Invariant::Narrow)).join().rejoined());
     assert_eq!(Caught::message(carried).as_deref(), Some("broken invariant: the count fits a byte"));
 }
+
+#[test]
+fn a_detailed_holding_invariant_crashes_with_the_error_it_was_given() {
+    let crashed = panic::catch_unwind(|| invariant!(holding u8::try_from(300_u16), Invariant::Narrow, detailed));
+    assert_eq!(
+        Caught::message(crashed).as_deref(),
+        Some("broken invariant: the count fits a byte: number too large to fit in target type")
+    );
+}
