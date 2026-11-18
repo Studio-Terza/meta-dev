@@ -51,7 +51,7 @@ impl Prior {
             .iter()
             .map(summarized("MissedMutant"))
             .chain(timed_out.iter().map(summarized("Timeout")))
-            .chain([CAUGHT_BEFORE].iter().map(summarized("CaughtMutant")));
+            .chain([["{\"scenario\": {\"Mutant\": ", CAUGHT_BEFORE, "}, \"phase_results\": [{\"phase\": \"Build\", \"duration\": 3000.0}, {\"phase\": \"Test\", \"duration\": 3000.0}], \"summary\": \"CaughtMutant\"}"].concat()]);
         [
             "{\"outcomes\": [{\"scenario\": \"Baseline\", \"summary\": \"Success\"}",
             &missed.map(|outcome| [", ", &outcome].concat()).collect::<String>(),
@@ -94,10 +94,6 @@ impl Prior {
                 ExactReply {
                     asked: Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", since_diff.as_str()]),
                     text: Prior::listing(&self.since),
-                },
-                ExactReply {
-                    asked: Invocation::new("cargo", ["mutants", "--list", "--in-diff", diff.as_str()]),
-                    text: "m\n".repeat(self.listed.len()),
                 },
                 ExactReply {
                     asked: Invocation::new(
@@ -215,10 +211,10 @@ fn without_a_kept_prior_the_plan_lists_every_changed_line_as_before() -> Result<
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     let diff = scratch.file("c.diff");
-    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", diff.as_str()]);
+    let listed = Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", diff.as_str()]);
     let script = Script {
         changed: "+changed\n".to_owned(),
-        exact: vec![ExactReply { asked: listed, text: "m\n".repeat(3) }],
+        exact: vec![ExactReply { asked: listed, text: super::Listing::of(3) }],
         ..Script::new()
     };
     let prior = scratch.file("prior");
@@ -498,5 +494,22 @@ fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), Box<
     }
     .planned()?;
     assert_eq!(planned.selected, ["crates/a/src/lib.rs:3:5: replace f -> bool with true"]);
+    Ok(())
+}
+
+#[test]
+fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Result<(), Box<dyn Error>> {
+    let planned = Prior {
+        timed_out: &[],
+        survivors: &[SURVIVOR],
+        since_head: TEST_EDITED,
+        moved: NOTHING_MOVED,
+        listed: vec![SURVIVOR, UNTOUCHED],
+        since: Vec::new(),
+        earlier_tests: "",
+        since_tests: "",
+    }
+    .planned()?;
+    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":153}]"#]);
     Ok(())
 }
