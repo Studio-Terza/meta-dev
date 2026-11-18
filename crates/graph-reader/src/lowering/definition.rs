@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use syntax::{Block, Expr, ExprCall, ExprMethodCall, PatIdent, Signature, Type};
 
 use body_lifts::{Body, BodyReading, Branching, Propagated};
-use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
+use graph::{CallOrder, Definition, Invocation, Invoking, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
 use lint_sweep::Address;
@@ -239,9 +239,8 @@ impl LoweredDefinition {
     pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Definition {
         let invocations =
             self.invocations.into_iter().map(|invocation| invocation.resolved(resolving, scope)).collect();
-        Definition::new(self.shape, self.branching, self.propagated, invocations)
-            .repeated(self.repetitions)
-            .reading(self.reads.resolved(resolving, scope))
+        Invoking::new(self.shape, self.branching, self.propagated, invocations)
+            .walked(self.repetitions, self.reads.resolved(resolving, scope))
     }
 }
 

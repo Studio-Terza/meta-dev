@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::{Block, Expr, ExprCall, ExprField, MemberText, Signature, Spine, Type};
 
-use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
+use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef, Unpassed};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name, Whole, Word};
 use lint_sweep::Address;
@@ -293,7 +293,7 @@ impl ReadsLowered {
             .into_iter()
             .map(|read| {
                 let arguments = Lowered::all_resolved(read.arguments, resolving, scope);
-                Read::new(read.spelled.reader(resolving, scope), read.parameter, read.fields, read.line)
+                Unpassed::new(read.spelled.reader(resolving, scope), read.parameter, read.fields, read.line)
                     .passing(arguments)
             })
             .collect()

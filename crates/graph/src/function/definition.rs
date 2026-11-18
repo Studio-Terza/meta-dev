@@ -9,7 +9,7 @@ use lint_layout::{Casing, LineNumber, Name, Whole, Word};
 use crate::boundary::{CallOrder, ParamIndex};
 use crate::type_ref::{Named, TypeRef};
 pub use operator::{Infix, Operator, Prefix};
-pub use read::{Argument, Read, Reader};
+pub use read::{Argument, Read, Reader, Unpassed};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Receiving {
@@ -42,25 +42,31 @@ pub struct Definition {
     reads: Vec<Read>,
 }
 
-impl Definition {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Invoking {
+    shape: Body,
+    branching: Branching,
+    propagated: Propagated,
+    invocations: Vec<Invocation>,
+}
+
+impl Invoking {
     #[must_use]
-    pub fn new(shape: Body, branching: Branching, propagated: Propagated, invocations: Vec<Invocation>) -> Definition {
-        Definition { shape, branching, propagated, invocations, repetitions: Vec::new(), reads: Vec::new() }
+    pub fn new(shape: Body, branching: Branching, propagated: Propagated, invocations: Vec<Invocation>) -> Invoking {
+        Invoking { shape, branching, propagated, invocations }
     }
 
+    #[must_use]
+    pub fn walked(self, repetitions: Vec<Repetition>, reads: Vec<Read>) -> Definition {
+        let Invoking { shape, branching, propagated, invocations } = self;
+        Definition { shape, branching, propagated, invocations, repetitions, reads }
+    }
+}
+
+impl Definition {
     #[must_use]
     pub fn propagated(&self) -> Propagated {
         self.propagated
-    }
-
-    #[must_use]
-    pub fn repeated(self, repetitions: Vec<Repetition>) -> Definition {
-        Definition { repetitions, ..self }
-    }
-
-    #[must_use]
-    pub fn reading(self, reads: Vec<Read>) -> Definition {
-        Definition { reads, ..self }
     }
 
     #[must_use]
