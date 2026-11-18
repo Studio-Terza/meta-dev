@@ -138,7 +138,7 @@ impl Lowers for ImplRow {
         let subject =
             Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scopes().scope(located.scope())));
         let implementation =
-            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer())).parameterised(
+            Implementation::new(subject, implemented, self.origin, self.region.combine(footing.outer())).parameterised(
                 self.parameters
                     .into_iter()
                     .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
@@ -170,6 +170,7 @@ struct FnRow {
     constraints: Vec<TypeRef<Written>>,
     parameters: Vec<LoweredParameter>,
     mutation: Mutation,
+    mutated: Vec<TypeRef<Written>>,
     definition: Option<LoweredDefinition>,
     region: Region,
     place: Option<PlaceId>,
@@ -191,12 +192,16 @@ impl Lowers for FnRow {
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
-        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints)
-            .generic(parameters, self.mutation);
+        let mutated = self.mutated.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
+        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints).generic(
+            parameters,
+            self.mutation,
+            mutated,
+        );
         let function = Function::new(self.name, self.owner, self.entry, signature)
             .exposed(self.exposure)
             .evaluated(self.evaluation)
-            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref()))
+            .seated(footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref()))
             .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, function)
     }
@@ -277,7 +282,7 @@ impl Slot<ScopeKey> {
             children: seat.children(),
             form: SlotForm::from(item.attrs.as_slice()),
             visibility: Visibility::from(&item.vis),
-            region: Regions::of_module(region, item),
+            region: region.combine(Regions::of_module(item)),
         }
     }
 
@@ -288,7 +293,7 @@ impl Slot<ScopeKey> {
             children: self.children,
             form: self.form,
             visibility: self.visibility,
-            region: self.region.joined(outer),
+            region: self.region.combine(outer),
         }
     }
 }
@@ -572,19 +577,18 @@ enum Grain {
     Place(PlaceRows),
     Op(ScopeOp),
     Slot(Slot<ScopeKey>),
-    Body(BodyPart),
     Transcribed(TranscribedRow),
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Grains {
     grains: Catenation<Grain>,
-    bodied: Option<()>,
+    bodies: Catenation<BodyPart>,
 }
 
 impl Semigroup for Grains {
     fn combine(self, other: Grains) -> Grains {
-        Grains { grains: self.grains.combine(other.grains), bodied: self.bodied.or(other.bodied) }
+        Grains { grains: self.grains.combine(other.grains), bodies: self.bodies.combine(other.bodies) }
     }
 }
 
@@ -592,8 +596,7 @@ impl Monoid for Grains {}
 
 impl From<Grain> for Grains {
     fn from(grain: Grain) -> Grains {
-        let bodied = grain.bodied();
-        Grains { grains: Catenation::from(vec![grain]), bodied }
+        Grains { grains: Catenation::from(vec![grain]), bodies: Catenation::default() }
     }
 }
 
@@ -631,7 +634,6 @@ impl From<Grain> for Sorted {
             Grain::Place(places) => Sorted::from(FileRows { places, ..FileRows::default() }),
             Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
             Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
-            Grain::Body(_) => Sorted::default(),
         }
     }
 }
@@ -649,42 +651,6 @@ impl From<Grains> for Sorted {
 }
 
 impl Grain {
-    fn body(self) -> Option<BodyPart> {
-        match self {
-            Grain::Body(part) => Some(part),
-            Grain::Impl(_)
-            | Grain::Function(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
-    fn bodied(&self) -> Option<()> {
-        match self {
-            Grain::Body(_) => Some(()),
-            Grain::Impl(_)
-            | Grain::Function(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
     fn function(&self) -> Option<&FnRow> {
         match self {
             Grain::Function(row) => Some(row),
@@ -698,8 +664,7 @@ impl Grain {
             | Grain::Transcribed(_)
             | Grain::Place(_)
             | Grain::Op(_)
-            | Grain::Slot(_)
-            | Grain::Body(_) => None,
+            | Grain::Slot(_) => None,
         }
     }
 
@@ -713,12 +678,12 @@ impl Grain {
 
 impl From<BodyPart> for Grains {
     fn from(part: BodyPart) -> Grains {
-        Grains::from(Grain::Body(part))
+        Grains { grains: Catenation::default(), bodies: Catenation::from(vec![part]) }
     }
 }
 
 impl Grains {
     fn closed(self) -> Grains {
-        Grains { grains: self.grains.into_iter().filter(|grain| grain.bodied().is_none()).collect(), bodied: None }
+        Grains { grains: self.grains, bodies: Catenation::default() }
     }
 }

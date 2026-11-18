@@ -1,5 +1,6 @@
 mod operators;
 
+use crate::transitions::handle::Handle;
 use crate::transitions::{Ground, Wrapping};
 use body_lifts::Body;
 use graph::Mutation;
@@ -22,9 +23,12 @@ impl<'found> Acting<'found> {
     pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Option<Acting<'found>> {
         let ends = edge.ends();
         let function = edge.transition().function();
-        ends.subject(function.mutation(), function.wrapping())
-            .and_then(|subject| Acting::unwrapped(subject, ends.takes(), function.takings()))
-            .map(|subject| Acting::about(subject, ends.takes()))
+        let subject = ends.subject(function.mutation(), function.wrapping())?;
+        subject
+            .node()
+            .copied()
+            .and_then(|node| Acting::unwrapped(node, ends.takes(), function.takings()))
+            .map(|node| Acting::about(node, subject, ends.takes()))
             .filter(|acting| acting.grounded().is_some())
             .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
     }
@@ -46,9 +50,9 @@ impl<'found> Acting<'found> {
         fixed_by.map_or(Some(self), |fixing| Operators::named(fixing).and(self.pure()))
     }
 
-    fn about(subject: Node<'found>, takes: &[End<'found>]) -> Acting<'found> {
+    fn about(subject: Node<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {
         let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
-            takes.iter().copied().partition(|taken| taken.node() == Some(&subject));
+            takes.iter().copied().partition(|taken| taken.alike(given).is_some());
         Acting { subject, held: Count::new(held.len()), parameters }
     }
 
@@ -86,7 +90,7 @@ impl<'found> Form<'found> {
         let function = transition.function();
         let ground = *AsRef::<Ground>::as_ref(transition);
         Form::lifted(function.body())
-            .or_else(|| Form::through_store(ground, function.mutation()))
+            .or_else(|| Form::through_store(ground, function.mutation(), function.held()))
             .unwrap_or_else(|| Form::acted(edge, ground))
     }
 
@@ -97,8 +101,9 @@ impl<'found> Form<'found> {
         }
     }
 
-    fn through_store(ground: Ground, mutation: Mutation) -> Option<Form<'found>> {
-        matches!((ground, mutation), (Ground::Store, Mutation::ThroughSelf)).then_some(Form::Store)
+    fn through_store(ground: Ground, mutation: Mutation, handle: Handle) -> Option<Form<'found>> {
+        let owned = matches!((ground, mutation), (Ground::Store, Mutation::ThroughSelf));
+        handle.operating(mutation, ground).or(owned.then_some(())).map(|()| Form::Store)
     }
 
     fn acted(edge: &Edge<'found, '_>, ground: Ground) -> Form<'found> {

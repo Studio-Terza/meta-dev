@@ -45,7 +45,7 @@ impl Written {
     }
 
     pub(super) fn typed(ty: &TypeRef<Written>, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> TypeRef {
-        ty.mapped(&mut |written: &Written| written.sited(resolving, scope))
+        ty.mapped(|written: &Written| written.sited(resolving, scope))
     }
 
     fn sited(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Sited {

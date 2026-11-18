@@ -1,7 +1,7 @@
 use crate::lifecycle::{Live, Refinable};
 use crate::{
-    AnyStage, Artifact, Basis, Casting, Condition, Dropped, Entry, Misstaged, NodeId, Reason, Refining, Role, Terminal,
-    Title, Vague,
+    AnyStage, Artifact, Basis, Casting, Condition, Dropped, Entry, Inherited, Misstaged, NodeId, Reason, Refining,
+    Role, Terminal, Title, Vague,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -16,6 +16,22 @@ pub struct Node<S> {
 
 pub type AnyNode = Node<AnyStage>;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Loaded {
+    identity: NodeId,
+    entry: Entry,
+    casting: Casting,
+    stage: AnyStage,
+}
+
+impl Loaded {
+    #[must_use]
+    pub fn described(self, basis: Basis, title: Option<Title>) -> AnyNode {
+        let Loaded { identity, entry, casting, stage } = self;
+        Node { identity, entry, title, casting, stage, basis }
+    }
+}
+
 impl Node<Vague> {
     #[must_use]
     pub fn new(identity: NodeId, entry: Entry) -> Node<Vague> {
@@ -24,9 +40,9 @@ impl Node<Vague> {
     }
 
     #[must_use]
-    pub fn proposed(identity: NodeId, entry: Entry, parent: Casting) -> Node<Vague> {
-        let casting = parent.inherited(entry.provenance());
-        Node { identity, entry, title: None, casting, stage: Vague, basis: Basis::Vague }
+    pub fn proposed(identity: NodeId, entry: Entry, parent: Inherited, title: Title) -> Node<Vague> {
+        let casting = parent.casting(entry.provenance());
+        Node { identity, entry, title: Some(title), casting, stage: Vague, basis: Basis::Vague }
     }
 }
 
@@ -53,8 +69,8 @@ impl Node<Live> {
 
 impl AnyNode {
     #[must_use]
-    pub fn loaded(identity: NodeId, entry: Entry, casting: Casting, stage: AnyStage) -> AnyNode {
-        Node { identity, entry, title: None, casting, stage, basis: Basis::Vague }
+    pub fn loaded(identity: NodeId, entry: Entry, casting: Casting, stage: AnyStage) -> Loaded {
+        Loaded { identity, entry, casting, stage }
     }
 
     pub fn narrowed<S: TryFrom<AnyStage, Error = AnyStage>>(self) -> Result<Node<S>, Misstaged> {
@@ -75,11 +91,6 @@ impl<S: Into<AnyStage>> Node<S> {
 
 impl<S> Node<S> {
     #[must_use]
-    pub fn titled(self, title: Title) -> Node<S> {
-        Node { title: Some(title), ..self }
-    }
-
-    #[must_use]
     pub fn identity(&self) -> NodeId {
         self.identity
     }
@@ -97,11 +108,6 @@ impl<S> Node<S> {
     #[must_use]
     pub fn casting(&self) -> Casting {
         self.casting
-    }
-
-    #[must_use]
-    pub fn based(self, basis: Basis) -> Node<S> {
-        Node { basis, ..self }
     }
 
     #[must_use]

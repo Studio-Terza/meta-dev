@@ -1,8 +1,10 @@
+mod boundary;
+
 use std::fmt;
 
 use grammar_directive::{Lexed, Location};
-use grammar_output::field::{Integer, Phrase, Word};
-use grammar_output::{Fields, Unread};
+use grammar_output::field::{Phrase, Word};
+use grammar_output::{Fields, Mapped, Parsed, Unread};
 use named_derive::Named;
 
 use crate::briefing::Quoting;
@@ -86,19 +88,11 @@ impl fmt::Display for Briefed<'_> {
     }
 }
 
-impl Misread {
-    pub(crate) fn read(fields: &mut Fields) -> Result<Misread, Unread> {
-        let missing = fields.field::<Word<Missing>>()?;
-        let at = Location::new(fields.field::<Integer<_>>()?, fields.field::<Integer<_>>()?);
-        missing.misread(at, fields)
-    }
-}
-
 impl Missing {
-    fn misread(self, at: Location, fields: &mut Fields) -> Result<Misread, Unread> {
+    fn misread(self, at: Location, fields: Fields) -> Result<Parsed<Misread, Fields>, Unread> {
         match self {
-            Missing::Expected => fields.field::<Phrase<_>>().map(|wanted| Misread::Expected { at, wanted }),
-            Missing::Arity => fields.field::<Word<_>>().map(|verb| Misread::Arity { at, verb }),
+            Missing::Expected => fields.field::<Phrase<_>>().mapped(|wanted| Misread::Expected { at, wanted }),
+            Missing::Arity => fields.field::<Word<_>>().mapped(|verb| Misread::Arity { at, verb }),
         }
     }
 }

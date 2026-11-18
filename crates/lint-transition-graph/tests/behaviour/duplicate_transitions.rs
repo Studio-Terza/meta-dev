@@ -40,6 +40,10 @@ const SELF_LOOP: &str =
     "struct A;\nstruct B;\nimpl A {\n    fn with(&self, b: &B) -> A {}\n    fn without(&self, b: &B) -> A {}\n}\n";
 const LIFTED: &str = "struct A;\nstruct B;\nimpl A {\n    fn b(&self) -> &B { &self.b }\n    fn made(&self) -> B {}\n}\nmod store {\n    impl A {\n        fn b_mut(&mut self) -> B {}\n    }\n}\n";
 
+const ARGUMENTS_APART: &str = "struct P<T>(T);\nstruct A;\nstruct B;\nstruct S;\nimpl S {\n    fn a(&self) -> P<A> {}\n    fn b(&self) -> P<B> {}\n}\n";
+const ARGUMENTS_SAME: &str =
+    "struct P<T>(T);\nstruct A;\nstruct S;\nimpl S {\n    fn a(&self) -> P<A> {}\n    fn e(&self) -> P<A> {}\n}\n";
+
 laws::table!(
     input_types_joined_to_one_output_more_than_once_are_listed,
     Duplicates::shows,
@@ -58,6 +62,8 @@ laws::table!(
         [ACTED_PAIR, "x::A, x::Factor -> x::A has"] => vec!["crates/x/src/lib.rs:4: x::A, x::Factor -> x::A has 2 transitions: x::A::scale at crates/x/src/lib.rs:4, x::A::scaled at crates/x/src/lib.rs:5; keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it; delete a hand-written copy of a map, filter or fold over the element transition; where the transitions mean different things, give each its own output type"],
         [PURE_PAIR, "has 2 transitions"] => Vec::<String>::new(),
         [PURE_PAIR, "has 3 transitions"] => Vec::<String>::new(),
+        [ARGUMENTS_APART, "has 2 transitions"] => Vec::<String>::new(),
+        [ARGUMENTS_SAME, "x::S -> x::P has"] => vec!["crates/x/src/lib.rs:5: x::S -> x::P has 2 transitions: x::S::a at crates/x/src/lib.rs:5, x::S::e at crates/x/src/lib.rs:6; keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it; delete a hand-written copy of a map, filter or fold over the element transition; where the transitions mean different things, give each its own output type"],
         [CHILDREN, "x::A -> x::A has"] => vec!["crates/x/src/lib.rs:3: x::A -> x::A has 2 transitions: x::A::children at crates/x/src/lib.rs:3, x::A::kids at crates/x/src/lib.rs:4; keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it; delete a hand-written copy of a map, filter or fold over the element transition; where the transitions mean different things, give each its own output type"],
         [FROM_PARTS, "x::A -> x::A has"] => vec!["crates/x/src/lib.rs:3: x::A -> x::A has 2 transitions: x::A::from_parts at crates/x/src/lib.rs:3, x::A::merge_all at crates/x/src/lib.rs:4; keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it; delete a hand-written copy of a map, filter or fold over the element transition; where the transitions mean different things, give each its own output type"],
         [FOREIGN_ORD, "has 2 transitions"] => Vec::<String>::new(),

@@ -2,14 +2,16 @@ use std::fmt;
 use std::iter;
 
 use grammar_cited::Cited;
-use grammar_output::{Fields, Unread};
+use grammar_output::Record;
 
 use crate::SegmentRef;
 
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, Record)]
 #[error("the reply gives no directive to segment {first} and {} more of its job's segments", rest.len())]
 pub struct Uncovered {
+    #[field(Cited, via = SegmentRef::from)]
     first: SegmentRef,
+    #[repeated(Cited, via = SegmentRef::from)]
     rest: Vec<SegmentRef>,
 }
 
@@ -19,16 +21,6 @@ impl Uncovered {
     #[must_use]
     pub fn new(first: SegmentRef, rest: Vec<SegmentRef>) -> Uncovered {
         Uncovered { first, rest }
-    }
-}
-
-impl TryFrom<&mut Fields> for Uncovered {
-    type Error = Unread;
-
-    fn try_from(fields: &mut Fields) -> Result<Uncovered, Unread> {
-        let first = SegmentRef::from(&fields.field::<Cited>()?);
-        let rest = iter::from_fn(|| fields.optional::<Cited>()).map(|cited| SegmentRef::from(&cited));
-        Ok(Uncovered::new(first, rest.collect()))
     }
 }
 

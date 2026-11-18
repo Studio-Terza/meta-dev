@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use design_model::{NodeId, Ordinal, Segment};
+use design_model::{NodeId, NodeRelation, Ordinal, Segment, SegmentRelation};
 use newtype::{Arbitrary, Counter, Newtype, Wrapping};
 use store_ports::{Columns, Statements, StoreFailure, Written};
 
-use super::{Acyclic, Closed, Refuses};
+use super::{Acyclic, Closed, Cycle, Refines, Refuses, SegmentCorrects, SegmentSupersedes, Supersedes};
 use message_id::Uuid;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -170,5 +170,61 @@ WHERE
             ancestor: Keyed,
             descendant: Keyed
         ))
+    }
+}
+
+impl Acyclic for Refines {
+    type End = NodeId;
+
+    const CLOSED: Closed = Closed::Refines;
+
+    fn keyed(end: &NodeId, _statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+        Ok(Keyed::node(*end))
+    }
+
+    fn cycle(source: NodeId, target: NodeId) -> Cycle {
+        Cycle::Nodes { source, relation: NodeRelation::Refines, target }
+    }
+}
+
+impl Acyclic for Supersedes {
+    type End = NodeId;
+
+    const CLOSED: Closed = Closed::Supersedes;
+
+    fn keyed(end: &NodeId, _statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+        Ok(Keyed::node(*end))
+    }
+
+    fn cycle(source: NodeId, target: NodeId) -> Cycle {
+        Cycle::Nodes { source, relation: NodeRelation::Supersedes, target }
+    }
+}
+
+impl Acyclic for SegmentSupersedes {
+    type End = Segment;
+
+    const CLOSED: Closed = Closed::SegmentSupersedes;
+
+    fn keyed(end: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+        Keyed::segment(end, statements)
+    }
+
+    fn cycle(source: Segment, target: Segment) -> Cycle {
+        Cycle::Segments { source, relation: SegmentRelation::Supersedes, target }
+    }
+}
+
+impl Acyclic for SegmentCorrects {
+    type End = Segment;
+
+    const CLOSED: Closed = Closed::SegmentCorrects;
+
+    fn keyed(end: &Segment, statements: &mut Statements<'_>) -> Result<Keyed, StoreFailure> {
+        Keyed::segment(end, statements)
+    }
+
+    fn cycle(source: Segment, target: Segment) -> Cycle {
+        Cycle::Segments { source, relation: SegmentRelation::Corrects, target }
     }
 }

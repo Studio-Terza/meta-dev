@@ -5,7 +5,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar_output::field::{Quoted, Word};
-use grammar_output::{Fields, Unread};
+use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
 use named_derive::Named;
 
 use crate::briefing::Quoting;
@@ -43,12 +43,20 @@ impl Lapse {
     pub fn refused(refusal: &dyn Error) -> Lapse {
         Lapse(Lapsed::Refused(Reason::told(refusal)))
     }
+}
 
-    pub(crate) fn read(fields: &mut Fields) -> Result<Lapse, Unread> {
-        match fields.field::<Word<Lapsing>>()? {
-            Lapsing::Misread => Misread::read(fields).map(Lapse::from),
-            Lapsing::Refused => fields.field::<Quoted<Reason>>().map(|refusal| Lapse(Lapsed::Refused(refusal))),
-            Lapsing::Uncovered => Uncovered::try_from(fields).map(Lapse::from),
+impl Record for Lapse {
+    fn read(fields: Fields) -> Result<Parsed<Lapse, Fields>, Unread> {
+        fields.field::<Word<Lapsing>>()?.concluded(Lapsing::lapse)
+    }
+}
+
+impl Lapsing {
+    fn lapse(self, fields: Fields) -> Result<Parsed<Lapse, Fields>, Unread> {
+        match self {
+            Lapsing::Misread => fields.record::<Misread>().mapped(Lapse::from),
+            Lapsing::Refused => fields.field::<Quoted<Reason>>().mapped(|reason| Lapse(Lapsed::Refused(reason))),
+            Lapsing::Uncovered => fields.record::<Uncovered>().mapped(Lapse::from),
         }
     }
 }
@@ -85,8 +93,6 @@ impl FromStr for Lapse {
     type Err = Unread;
 
     fn from_str(text: &str) -> Result<Lapse, Unread> {
-        let mut fields = Fields::lexed(text)?;
-        let lapse = Lapse::read(&mut fields)?;
-        fields.ended(lapse)
+        Fields::lexed(text)?.record::<Lapse>()?.ended()
     }
 }

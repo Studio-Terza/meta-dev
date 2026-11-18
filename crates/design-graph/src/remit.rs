@@ -1,11 +1,10 @@
+mod boundary;
+
 use std::collections::BTreeSet;
 
 use design_model::{JobId, Segment};
 use port_core::Op;
-use store_ports::{Batch, Query, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
-
-use design_jobs::JobState;
 
 use crate::{Covered, Refusal, Unpaid};
 
@@ -39,11 +38,6 @@ impl Remit {
         self.segments().into_iter().flatten().map(|segment| AsRef::<Uuid>::as_ref(segment).clone()).collect()
     }
 
-    pub(crate) fn paid(&self, statements: &mut Statements<'_>) -> Result<Paid, Refusal> {
-        let covered = self.covered().rows(statements)?;
-        self.settled(&covered)
-    }
-
     fn settled(&self, covered: &BTreeSet<Segment>) -> Result<Paid, Refusal> {
         match self {
             Remit::Unbounded => Ok(Paid::Unbounded),
@@ -67,10 +61,10 @@ impl Paid {
             .map_or(Ok(Paid::Job(job)), |(first, rest)| Err(Refusal::Unpaid(Unpaid::new(first.clone(), rest.to_vec()))))
     }
 
-    pub(crate) fn closed(self, state: JobState, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    fn job(self) -> Option<JobId> {
         match self {
-            Paid::Unbounded => Ok(Written::default()),
-            Paid::Job(job) => state.closing(job).written(statements),
+            Paid::Unbounded => None,
+            Paid::Job(job) => Some(job),
         }
     }
 }
@@ -78,13 +72,5 @@ impl Paid {
 impl From<Remit> for JobRepeated {
     fn from(remit: Remit) -> JobRepeated {
         JobRepeated(remit)
-    }
-}
-
-impl Batch for JobRepeated {
-    type Failure = Refusal;
-
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
-        Ok(self.0.paid(statements)?.closed(JobState::Repeated, statements)?)
     }
 }

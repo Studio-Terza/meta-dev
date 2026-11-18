@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod node_index;
 
-use crate::traversal::Traversal;
+use crate::traversal::{Event, Trees};
 use node_index::NodeIndex;
 
 #[derive(Clone, Debug)]
@@ -41,14 +41,16 @@ impl<Node: Ord> ItemGraph<Node> {
     pub fn tangles(&self) -> Vec<Vec<&Node>> {
         let everyone = (0..self.names.len()).map(NodeIndex::from);
         let forward = |node: NodeIndex| self.links.get(node.into_inner()).into_iter().flatten().copied();
-        let finished = Traversal::trees(everyone, forward).into_iter().flatten().rev();
+        let finished: Vec<NodeIndex> = Event::walked(everyone, forward).filter_map(Event::finished).collect();
         let backward = Self::reversed(&self.links);
-        let distinct: BTreeSet<Vec<NodeIndex>> = Traversal::trees(finished, |node: NodeIndex| {
+        let components: Trees<NodeIndex> = Event::walked(finished.iter().rev().copied(), |node: NodeIndex| {
             backward.get(node.into_inner()).into_iter().flatten().copied()
         })
-        .into_iter()
-        .map(|component| component.into_iter().collect::<BTreeSet<NodeIndex>>().into_iter().collect())
         .collect();
+        let distinct: BTreeSet<Vec<NodeIndex>> = components
+            .into_iter()
+            .map(|component| component.into_iter().collect::<BTreeSet<NodeIndex>>().into_iter().collect())
+            .collect();
         let mut tangles: Vec<Vec<NodeIndex>> = distinct.into_iter().collect();
         tangles.sort_by_key(|tangle| std::cmp::Reverse(tangle.len()));
         tangles.into_iter().map(|tangle| tangle.into_iter().filter_map(|index| self.name_at(index)).collect()).collect()
