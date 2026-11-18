@@ -100,3 +100,21 @@ fn a_pinned_macro_reads_its_nested_calls_once_and_a_copy_reads_them_afresh() -> 
     assert_eq!(Macros::nested(&file, &copied).len(), nested.len());
     Ok(())
 }
+
+const RULES: &str = "macro_rules! made {\n    ($($name:ident),*) => {\n        $(impl $crate::Kind for $name {\n            fn f() -> ::a::B { c::d() }\n        })*\n        fn tail() -> e::F {}\n    };\n}";
+
+const NOT_RULES: &str = "other! {\n    fn f() -> a::B {}\n}";
+
+#[test]
+fn a_macro_rules_transcriber_mentions_its_paths_with_each_metavariable_as_its_name() -> Result<(), Box<dyn Error>> {
+    let rules: syntax::ItemMacro = syntax::parse::parse_str(RULES)?;
+    let other: syntax::ItemMacro = syntax::parse::parse_str(NOT_RULES)?;
+    let mentioned: Vec<String> = Macros::mentioned(&rules.mac)
+        .paths()
+        .iter()
+        .map(|path| syntax::ToTokens::to_token_stream(path).to_string())
+        .collect();
+    assert_eq!(mentioned, ["crate :: Kind", "name", ":: a :: B", "c :: d", "e :: F"]);
+    assert!(Macros::mentioned(&other.mac).paths().is_empty());
+    Ok(())
+}
