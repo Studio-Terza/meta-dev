@@ -350,6 +350,7 @@ dependencies = [
  "design-model",
  "named-derive",
  "newtype",
+ "states",
  "store-ports",
  "thiserror",
 ]
@@ -405,6 +406,7 @@ dependencies = [
  "newtype",
  "port-core",
  "sqlite-ports",
+ "states",
  "store-ports",
  "thiserror",
  "transcript-ports",
