@@ -1,4 +1,5 @@
 mod block;
+mod header;
 mod ignored;
 mod kind;
 
@@ -7,7 +8,7 @@ use std::iter;
 use std::path::Path;
 
 use syntax::parse::{Parse, ParseStream};
-use syntax::{Attribute, Ident, Macro, Token, Visibility, braced};
+use syntax::{Attribute, Macro, Visibility, braced};
 
 use lint_core::{Site, TypeName, Violation};
 use lint_layout::LineNumber;
@@ -16,6 +17,7 @@ use crate::declared_graphs::graph::ignored::Ignored;
 use crate::edge::Edge;
 use crate::finding::Finding;
 use block::Block;
+use header::Header;
 use invariants::Ignoring;
 use kind::Kind;
 
@@ -59,8 +61,7 @@ impl Parse for Graph {
     fn parse(input: ParseStream) -> syntax::Result<Graph> {
         Attribute::parse_outer(input)?;
         input.parse::<Visibility>()?;
-        input.parse::<Token![mod]>()?;
-        input.parse::<Ident>()?;
+        input.parse::<Header>()?;
         let content;
         braced!(content in input);
         iter::from_fn(|| content.cursor().token_tree().map(|_| content.parse()))
