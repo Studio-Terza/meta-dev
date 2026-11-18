@@ -54,6 +54,12 @@ macro_rules! invariant {
     (broken $named:expr) => {
         ::core::panic!("broken invariant: {}", $named)
     };
+    (holding $result:expr, $named:expr, detailed $(,)?) => {
+        match $result {
+            Ok(value) => value,
+            Err(failure) => $crate::invariant!(broken $named, failure),
+        }
+    };
     (holding $result:expr, $named:expr $(,)?) => {
         match $result {
             Ok(value) => value,

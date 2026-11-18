@@ -44,7 +44,7 @@ impl<'ast> Watch<'ast> for Recorder {
 #[test]
 fn every_watcher_called_on_a_node_is_called_off_it_and_a_skipped_subtree_is_silent() {
     let file = SourceFile::parse("a.rs", SourceText::new(NESTED.to_owned()));
-    let parsed = invariant!(holding file, Invariant::FixtureParses);
+    let parsed = invariant!(holding file, Invariant::FixtureParses, detailed);
     let mut all = Recorder::default();
     let mut skipping = Recorder::passing_over(2);
     let watchers: Vec<&mut Watching<'_>> = vec![&mut all, &mut skipping];
