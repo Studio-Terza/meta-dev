@@ -1,4 +1,4 @@
-use lint_layout::{Matching, Name, Whole, Word, words};
+use lint_layout::{Fit, Matching, Name, Whole, Word, words};
 
 #[derive(Debug)]
 pub(crate) struct FeatureWord;
@@ -8,7 +8,7 @@ impl FeatureWord {
 }
 
 impl Matching for FeatureWord {
-    fn holds<'word>(feature: &Name, word: Word<'word>) -> Option<Word<'word>> {
-        feature.words().iter().find_map(|chunk| Whole::holds(chunk, word))
+    fn holds(feature: &Name, word: Word<'_>) -> Fit {
+        Fit::from(feature.words().iter().find(|chunk| Whole::holds(chunk, word) == Fit::Fits))
     }
 }

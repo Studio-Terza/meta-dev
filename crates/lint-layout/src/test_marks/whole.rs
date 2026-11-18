@@ -1,6 +1,6 @@
 use newtype::Wrapping;
 
-use crate::matching::Matching;
+use crate::matching::{Fit, Matching};
 use crate::name::Name;
 use crate::word::Word;
 
@@ -8,7 +8,7 @@ use crate::word::Word;
 pub struct Whole;
 
 impl Matching for Whole {
-    fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Word<'word>> {
-        (AsRef::<str>::as_ref(name) == word.into_inner()).then_some(word)
+    fn holds(name: &Name, word: Word<'_>) -> Fit {
+        Fit::from(Some(name).filter(|spelled| AsRef::<str>::as_ref(*spelled) == word.into_inner()))
     }
 }
