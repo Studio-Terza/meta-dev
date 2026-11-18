@@ -2824,5 +2824,5 @@ struct Runner;
 
 impl Runner {
     const LIMITED: &'static str =
-        r#"--config=target.'cfg(target_os = "linux")'.runner = ["prlimit", "--as=6442450944", "--cpu=300", "--"]"#;
+        r#"--config=target.'cfg(target_os = "linux")'.runner = ["prlimit", "--data=6442450944", "--cpu=300", "--"]"#;
 }
