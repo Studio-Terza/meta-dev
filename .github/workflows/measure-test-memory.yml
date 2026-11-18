@@ -1,0 +1,28 @@
+name: measure test memory
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/measure-test-memory.yml
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
+  CARGO_PROFILE_DEV_OPT_LEVEL: "0"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/sqlite
+      - name: every test binary under GNU time
+        run: cargo test --workspace --locked --no-fail-fast --config "target.'cfg(target_os = \"linux\")'.runner = [\"/usr/bin/time\", \"-f\", \"PEAK %M KiB rss %e s wall %U s user %S s sys %C\"]" 2>&1 | grep '^PEAK' | sort -k2 -n
