@@ -1,6 +1,7 @@
 use syntax::Macro;
 
-use graph::{Alias, AliasParameter, Building, ItemPath, Named, Primitive, Resolved, Sited, TypeRef};
+use algebra::Monoid;
+use graph::{Alias, AliasParameter, Aliases, ItemPath, Named, Primitive, Resolved, Sited, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
 
 use super::binding::Binding;
@@ -123,11 +124,10 @@ impl StdAlias {
     const PARAMETER: Word<'static> = Word::new("T");
     const RESULT: [Word<'static>; 3] = words!["std", "result", "Result"];
 
-    fn declared(self, mut building: Building) -> Building {
+    fn declared(self) -> Aliases {
         let result = Sited::implied(Resolved::Std(Self::RESULT.into_iter().collect()));
         let target = TypeRef::Named(Named::new(result, vec![self.ok.side(), self.err.side()]));
-        building.std_alias(self.alias.iter().copied().collect(), Alias::new(self.ok.parameters(), target));
-        building
+        Aliases::std(self.alias.iter().copied().collect(), Alias::new(self.ok.parameters(), target))
     }
 }
 
@@ -528,8 +528,8 @@ impl StdNames {
         },
     ];
 
-    pub(crate) fn aliased(building: Building) -> Building {
-        Self::STD_ALIASES.iter().fold(building, |built, alias| alias.declared(built))
+    pub(crate) fn aliased() -> Aliases {
+        Monoid::concat(Self::STD_ALIASES.iter().map(|alias| alias.declared()))
     }
 
     pub(super) fn resolved(path: ItemPath) -> Resolved {
