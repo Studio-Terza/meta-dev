@@ -388,6 +388,22 @@ fn a_shared_adaptor_chained_on_another_still_repeats_per_element() {
 }
 
 #[test]
+fn a_self_field_read_in_a_loop_repeats_per_pass() {
+    let model = Read::model(
+        "struct Counter {\n    limit: u8,\n}\nimpl Counter {\n    fn f(&self, ids: Vec<u8>) -> u8 {\n        ids.iter().map(|id| id.min(&self.limit)).sum()\n    }\n}\n",
+    );
+    let fields: Vec<String> = model
+        .functions()
+        .filter_map(|placed| placed.entity().definition())
+        .flat_map(|definition| {
+            definition.repetitions().iter().filter(|repetition| repetition.reach().index().is_none())
+        })
+        .map(|repetition| AsRef::<lint_layout::Name>::as_ref(repetition.reach()).to_string())
+        .collect();
+    assert_eq!(fields, ["limit"]);
+}
+
+#[test]
 fn a_struct_literal_uses_its_type_path() {
     let model = Read::model("struct Point {\n    x: u8,\n}\nfn f() -> Point {\n    Point { x: 1 }\n}\n");
     let literals: Vec<String> = model

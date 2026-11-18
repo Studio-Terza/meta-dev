@@ -181,7 +181,9 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         cursors: Option<Cursors<'_>>,
         around: &Around<'_, Contributor::Open>,
     ) -> Walked<Contributor::Open, Contributor::Part> {
-        let positions = cursors.into_iter().flatten().map(Some).chain(iter::repeat(None));
+        let unindexed = cursors.as_ref().map_or(Some(()), |_| None);
+        let fallback = iter::repeat(None).map_while(|none| unindexed.map(|()| none));
+        let positions = cursors.into_iter().flatten().map(Some).chain(fallback);
         nodes.into_iter().zip(positions).fold(Walked::default(), |walked, (node, cursor)| {
             let next = self.walked(
                 file,

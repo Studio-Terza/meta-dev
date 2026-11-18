@@ -24,13 +24,6 @@ impl Walk {
         Self::skipped_by_any(attributes.iter().map(Self::of_attribute))
     }
 
-    pub fn enter(attributes: &[Attribute], visit: impl FnOnce()) {
-        match Self::outside_tests(attributes) {
-            Walk::Entered => visit(),
-            Walk::Skipped => {}
-        }
-    }
-
     fn of_attribute(attribute: &Attribute) -> Walk {
         Some(attribute)
             .filter(|candidate| candidate.path().is_ident("cfg"))

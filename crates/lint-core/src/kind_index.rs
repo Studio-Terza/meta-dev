@@ -29,7 +29,7 @@ pub(crate) struct Indexed<'index> {
 pub(crate) struct Cursors<'index> {
     index: &'index KindIndex,
     at: Offset,
-    end: Offset,
+    rest: &'index [Subtree],
 }
 
 #[derive(Debug, Default)]
@@ -93,7 +93,7 @@ impl From<&syntax::File> for KindIndex {
 
 impl KindIndex {
     pub(crate) fn top(&self) -> Cursors<'_> {
-        Cursors { index: self, at: Offset::zero(), end: Offset::new(self.0.len()) }
+        Cursors { index: self, at: Offset::zero(), rest: &self.0 }
     }
 
     fn subtree(&self, at: Offset) -> Option<&Subtree> {
@@ -107,8 +107,10 @@ impl<'index> Indexed<'index> {
     }
 
     pub(crate) fn children(self) -> Cursors<'index> {
+        let start = self.at.incremented();
         let size = self.index.subtree(self.at).map_or(Offset::zero().incremented(), |here| here.size);
-        Cursors { index: self.index, at: self.at.incremented(), end: self.at.plus(size) }
+        let rest = self.index.0.get(start.count()..self.at.plus(size).count()).unwrap_or_default();
+        Cursors { index: self.index, at: start, rest }
     }
 }
 
@@ -116,9 +118,10 @@ impl<'index> Iterator for Cursors<'index> {
     type Item = Indexed<'index>;
 
     fn next(&mut self) -> Option<Indexed<'index>> {
-        let here = Some(self.at).filter(|at| *at < self.end)?;
-        let size = self.index.subtree(here).map_or(Offset::zero().incremented(), |subtree| subtree.size);
-        self.at = here.plus(size);
+        let (first, _) = self.rest.split_first()?;
+        let here = self.at;
+        self.at = here.plus(first.size);
+        self.rest = self.rest.get(first.size.count()..).unwrap_or_default();
         Some(Indexed { index: self.index, at: here })
     }
 }
