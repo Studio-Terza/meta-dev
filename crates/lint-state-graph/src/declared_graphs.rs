@@ -78,12 +78,22 @@ impl Contribute for DeclaredGraphs<'_, '_> {
         inner.concluded(|(), invoked| invoked.gated(facts.gate()))
     }
 
-    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), Invoked> {
+    fn on_item_use(
+        &self,
+        item: &ItemUse,
+        _: &Facts<'_, ItemUse>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Invoked> {
         let aliases = self.names.renamed(&item.tree);
         Contributed::new((), Invoked { aliases, invocations: Vec::new() }, Descend::Over)
     }
 
-    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Invoked> {
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Invoked> {
         Contributed::new(
             (),
             Invoked { aliases: Aliases::default(), invocations: vec![invocation.clone()] },

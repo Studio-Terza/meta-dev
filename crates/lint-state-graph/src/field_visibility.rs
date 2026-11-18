@@ -41,11 +41,21 @@ impl<'scan> Contribute for FieldVisibility<'scan> {
         &[Kind::ItemMod, Kind::ItemStruct]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Exposed<'scan> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Exposed<'scan> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_struct(&self, item: &ItemStruct, facts: &Facts<'_, ItemStruct>) -> Exposed<'scan> {
+    fn on_item_struct(
+        &self,
+        item: &ItemStruct,
+        facts: &Facts<'_, ItemStruct>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Exposed<'scan> {
         let descend = Descend::from(facts.gate());
         let exposed = descend.entered().map_or_default(|_| self.exposed(item));
         Contributed::new((), exposed, descend.then(|| Descend::Over))

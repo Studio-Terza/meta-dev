@@ -57,7 +57,12 @@ impl<'file> Contribute for FreeFns<'file> {
         &[Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Contributed<(), Vec<Violation<'file>>> {
+    fn on_item_fn(
+        &self,
+        function: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         let name = &function.sig.ident;
         let free = NoFreeFns::exemption(function).map_or_else(
             || Some(Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::FreeFn { name })),
@@ -66,7 +71,12 @@ impl<'file> Contribute for FreeFns<'file> {
         Contributed::parted(free.into_iter().collect())
     }
 
-    fn on_macro(&self, _: &syntax::Macro, _: &Facts<'_, syntax::Macro>) -> Contributed<(), Vec<Violation<'file>>> {
+    fn on_macro(
+        &self,
+        _: &syntax::Macro,
+        _: &Facts<'_, syntax::Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         Contributed::descending(Descend::Expand)
     }
 }

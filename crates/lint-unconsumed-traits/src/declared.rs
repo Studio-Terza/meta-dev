@@ -77,11 +77,21 @@ impl<'file> Contribute for Declared<'file> {
         &[Kind::ItemMod, Kind::ItemTrait]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Declarations<'file>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Declarations<'file>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&self, block: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Contributed<(), Declarations<'file>> {
+    fn on_item_trait(
+        &self,
+        block: &ItemTrait,
+        facts: &Facts<'_, ItemTrait>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Declarations<'file>> {
         let site = Site::new(self.path, LineNumber::from(block.ident.span()));
         let declaration = facts.name().map(|name| Declaration::new(name.clone(), Self::provided(block), site));
         let found = Self::with_methods(block)

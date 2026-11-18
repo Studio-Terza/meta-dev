@@ -69,25 +69,50 @@ impl<'file> Contribute for VagueNames<'file> {
         &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl, Kind::ItemFn, Kind::ImplItemFn]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Noted<'file> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Noted<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Noted<'file> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Noted<'file> {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Noted<'file> {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Noted<'file> {
         Contributed::descending(
             Descend::from(facts.gate()).then(|| facts.inherent().map_or(Descend::Over, |_| Descend::Into)),
         )
     }
 
-    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Noted<'file> {
+    fn on_item_fn(
+        &self,
+        function: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Noted<'file> {
         self.noted(&function.attrs, &function.sig.ident)
     }
 
-    fn on_impl_item_fn(&self, function: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Noted<'file> {
+    fn on_impl_item_fn(
+        &self,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Noted<'file> {
         self.noted(&function.attrs, &function.sig.ident)
     }
 }

@@ -91,15 +91,30 @@ impl Contribute for PrivateFnCounter<'_> {
         &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), PrivateNames> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), PrivateNames> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), PrivateNames> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), PrivateNames> {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<(), PrivateNames> {
+    fn on_item_impl(
+        &self,
+        item: &ItemImpl,
+        _: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), PrivateNames> {
         let counted =
             Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)));
         let private: Vec<Name> =

@@ -48,6 +48,7 @@ impl<'file> Contribute for ShortLifetimes<'file> {
         &self,
         parameter: &LifetimeParam,
         _: &Facts<'_, LifetimeParam>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         let name = &parameter.lifetime.ident;
         let short = (Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| {
@@ -56,7 +57,12 @@ impl<'file> Contribute for ShortLifetimes<'file> {
         Contributed::new((), short.into_iter().collect(), Descend::Over)
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Violation<'file>>> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         Contributed::descending(Descend::Expand)
     }
 }

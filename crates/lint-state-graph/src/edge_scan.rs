@@ -129,11 +129,21 @@ impl Contribute for ImplScan {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Vec<WrittenImpl>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<WrittenImpl>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&self, item: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Vec<WrittenImpl>> {
+    fn on_item_impl(
+        &self,
+        item: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<WrittenImpl>> {
         let descend = Descend::from(facts.gate());
         Contributed::new((), descend.entered().map(|_| WrittenImpl::from(item)).into_iter().collect(), descend)
     }

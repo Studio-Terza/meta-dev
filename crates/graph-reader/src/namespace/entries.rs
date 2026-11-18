@@ -572,6 +572,10 @@ impl Entries {
         statements.iter().map(Entries::from).collect::<Entries>()
     }
 
+    pub(super) fn of_declared(declared: Declared) -> Entries {
+        Entries { declared: vec![declared], ..Entries::default() }
+    }
+
     pub(super) fn declare(&mut self, declared: Declared) {
         self.declared.push(declared);
     }

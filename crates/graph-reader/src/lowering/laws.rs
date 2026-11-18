@@ -1,3 +1,4 @@
+use super::Frame;
 mod reading;
 
 use std::collections::BTreeSet;
@@ -8,7 +9,6 @@ use syntax::{TokenStream, TokenTree};
 use graph::{Building, Law, LawKind, Operation, OperationOwner, Property, Route, Side, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
 
-use super::Lowering;
 use super::seat::{Built, Footing, Located};
 use super::signature::Written;
 use crate::namespace::TokenNames;
@@ -114,9 +114,11 @@ impl Mentions {
 impl LoweredOwner {
     fn resolved(self, footing: &Footing<'_>, located: &Located) -> OperationOwner {
         match self {
-            LoweredOwner::Typed(ty) => {
-                OperationOwner::Typed(Written::typed(&ty, &footing.resolving(), located.scope()))
-            }
+            LoweredOwner::Typed(ty) => OperationOwner::Typed(Written::typed(
+                &ty,
+                &footing.resolving(),
+                footing.scopes().scope(located.scope()),
+            )),
             LoweredOwner::Operand => OperationOwner::Operand,
         }
     }
@@ -138,7 +140,7 @@ impl Built for LawRow {
     }
 }
 
-impl Lowering<'_> {
+impl Frame<'_> {
     pub(super) fn law_row(&self, invocation: &Macro) -> Option<LawRow> {
         Kinds::of_macro(invocation).map(|kind| {
             let title = invocation.path.segments.last().map_or_default(|last| Name::from(&last.ident));

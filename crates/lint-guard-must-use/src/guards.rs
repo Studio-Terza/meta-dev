@@ -113,7 +113,12 @@ impl<'file> Contribute for GuardScan<'file> {
         const { &[Scope::new(Kind::ItemMod)] }
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
@@ -133,6 +138,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         let dropped = Descend::from(facts.gate())
             .entered()
@@ -144,6 +150,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemStruct,
         _: &Facts<'_, ItemStruct>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
@@ -152,6 +159,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
@@ -160,6 +168,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemUnion,
         _: &Facts<'_, ItemUnion>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
@@ -168,6 +177,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemType,
         facts: &Facts<'_, ItemType>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         let target = Name::of_type(&item.ty);
         let aliased = Descend::from(facts.gate()).entered().and(facts.name());

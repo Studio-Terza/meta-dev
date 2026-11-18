@@ -69,7 +69,12 @@ impl Contribute for TestFeatures<'_> {
         &[Kind::Attribute, Kind::Macro]
     }
 
-    fn on_attribute(&self, attribute: &Attribute, _: &Facts<'_, Attribute>) -> Contributed<(), Vec<Flagged>> {
+    fn on_attribute(
+        &self,
+        attribute: &Attribute,
+        _: &Facts<'_, Attribute>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Flagged>> {
         Contributed::parted(
             Self::condition(attribute.path())
                 .into_iter()
@@ -78,7 +83,12 @@ impl Contribute for TestFeatures<'_> {
         )
     }
 
-    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Flagged>> {
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Flagged>> {
         let found = Self::condition(&invocation.path)
             .into_iter()
             .flat_map(|_| Self::scanned(invocation.tokens.clone()))

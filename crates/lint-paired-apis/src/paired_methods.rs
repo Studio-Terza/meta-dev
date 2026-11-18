@@ -63,11 +63,21 @@ impl<'file> Contribute for PairedMethods<'file> {
         self.kinds
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), PairedOwners<'file>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), PairedOwners<'file>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), PairedOwners<'file>> {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), PairedOwners<'file>> {
         let methods = facts
             .inherent()
             .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
@@ -75,7 +85,12 @@ impl<'file> Contribute for PairedMethods<'file> {
         self.owned_by(facts.name().cloned(), &methods)
     }
 
-    fn on_item_trait(&self, block: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Contributed<(), PairedOwners<'file>> {
+    fn on_item_trait(
+        &self,
+        block: &ItemTrait,
+        facts: &Facts<'_, ItemTrait>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), PairedOwners<'file>> {
         let entered = Descend::from(facts.gate()).entered();
         let declared = entered.map_or_default(|_| Self::declared_methods(block));
         self.owned_by(entered.and_then(|_| facts.name().cloned()), &declared)

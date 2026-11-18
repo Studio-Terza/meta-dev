@@ -166,15 +166,30 @@ impl Contribute for ReferenceScan {
         }
     }
 
-    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), ForeignReferences> {
+    fn on_item_use(
+        &self,
+        item: &ItemUse,
+        _: &Facts<'_, ItemUse>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), ForeignReferences> {
         Contributed::new((), self.used(&item.tree), Descend::Over)
     }
 
-    fn on_macro(&self, invoked: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), ForeignReferences> {
+    fn on_macro(
+        &self,
+        invoked: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), ForeignReferences> {
         Contributed::new((), self.transcribed(invoked), Descend::Unfold)
     }
 
-    fn on_path(&self, path: &Path, _: &Facts<'_, Path>) -> Contributed<(), ForeignReferences> {
+    fn on_path(
+        &self,
+        path: &Path,
+        _: &Facts<'_, Path>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), ForeignReferences> {
         Contributed::parted(self.pathed(path))
     }
 }
