@@ -1,18 +1,47 @@
+use std::collections::BTreeMap;
 use std::fmt;
+use std::time::Duration;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use super::super::kept::{Mutant, Spent};
+
+#[derive(Debug, Default)]
+pub(super) struct Costs(BTreeMap<String, Duration>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Shards {
-    mutants: usize,
+    each: Vec<Duration>,
     count: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Matrix(Shards);
 
 #[derive(Clone, Copy, Debug)]
 struct Planned {
     index: usize,
-    mutants: usize,
+    seconds: Duration,
+}
+
+impl Costs {
+    const JOBS: u32 = 2;
+    const UNMEASURED: Duration = Duration::from_secs(11);
+
+    pub(super) fn measured(spent: Vec<Spent>) -> Costs {
+        Costs(
+            Spent::averaged(spent)
+                .into_iter()
+                .filter_map(|(package, mean)| Some((package, mean.checked_div(Self::JOBS)?)))
+                .collect(),
+        )
+    }
+
+    pub(super) fn per_mutant(&self, mutant: &Mutant) -> Duration {
+        self.0.get(&mutant.package()).copied().unwrap_or(Self::UNMEASURED)
+    }
+
+    pub(super) fn unmeasured(mutants: usize) -> Vec<Duration> {
+        vec![Self::UNMEASURED; mutants]
+    }
 }
 
 impl Shards {
@@ -21,40 +50,39 @@ impl Shards {
     const OTHER_JOBS_OF_A_RUN: usize = 6;
     const MOST: usize = Self::FREE_PLAN_CONCURRENT_JOBS - Self::OTHER_JOBS_OF_A_RUN;
 
-    pub(super) fn for_mutants(mutants: usize) -> Shards {
-        Shards { mutants, count: mutants.div_ceil(Self::MUTANTS_EACH).clamp(1, Self::MOST) }
+    pub(super) fn for_mutants(each: Vec<Duration>) -> Shards {
+        let count = each.len().div_ceil(Self::MUTANTS_EACH).clamp(1, Self::MOST);
+        Shards { each, count }
     }
 
     pub(super) fn matrix(self) -> Matrix {
         Matrix(self)
     }
 
-    fn planned(self) -> impl Iterator<Item = Planned> {
-        let even = self.mutants / self.count;
-        let left = self.mutants % self.count;
-        (0..self.count).map(move |index| Planned { index, mutants: even + usize::from(index < left) })
+    fn planned(&self) -> impl Iterator<Item = Planned> + '_ {
+        (0..self.count)
+            .map(move |index| Planned { index, seconds: self.each.iter().skip(index).step_by(self.count).sum() })
     }
 }
 
 impl Planned {
-    const SETUP_SECONDS: usize = 94;
-    const SECONDS_PER_MUTANT: usize = 7;
-    const MARGIN_NUMERATOR: usize = 3;
-    const MARGIN_DENOMINATOR: usize = 2;
-    const SECONDS_PER_MINUTE: usize = 60;
-    const FLOOR_MINUTES: usize = 45;
-    const HOSTED_RUNNER_MINUTES: usize = 360;
+    const SETUP: Duration = Duration::from_secs(94);
+    const MARGIN_NUMERATOR: u32 = 3;
+    const MARGIN_DENOMINATOR: u32 = 2;
+    const SECONDS_PER_MINUTE: u64 = 60;
+    const FLOOR_MINUTES: u64 = 45;
+    const HOSTED_RUNNER_MINUTES: u64 = 360;
 
-    fn minutes(self) -> usize {
-        let predicted = Self::SETUP_SECONDS + Self::SECONDS_PER_MUTANT * self.mutants;
-        let capped = (predicted * Self::MARGIN_NUMERATOR).div_ceil(Self::MARGIN_DENOMINATOR * Self::SECONDS_PER_MINUTE);
-        capped.clamp(Self::FLOOR_MINUTES, Self::HOSTED_RUNNER_MINUTES)
+    fn minutes(self) -> u64 {
+        let predicted = Self::SETUP.saturating_add(self.seconds);
+        let margined = predicted.saturating_mul(Self::MARGIN_NUMERATOR) / Self::MARGIN_DENOMINATOR;
+        margined.as_secs().div_ceil(Self::SECONDS_PER_MINUTE).clamp(Self::FLOOR_MINUTES, Self::HOSTED_RUNNER_MINUTES)
     }
 }
 
 impl fmt::Display for Shards {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "mutants: {} to test in {} shards", self.mutants, self.count)
+        write!(formatter, "mutants: {} to test in {} shards", self.each.len(), self.count)
     }
 }
 
