@@ -85,7 +85,7 @@ impl Contribute for TestScan<'_> {
         &self,
         _: &ItemFn,
         facts: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Tally> {
         Contributed::parted(Tally::tested(Count::new(facts.test_mark().into_iter().count())))
     }
@@ -104,7 +104,7 @@ impl Contribute for TestScan<'_> {
         &self,
         invocation: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Tally> {
         Contributed::new((), Tally::tested(self.tests_in(invocation)), Descend::Over)
     }

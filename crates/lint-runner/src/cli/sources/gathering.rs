@@ -27,13 +27,12 @@ struct Claim<'listing, 'read, 'run> {
 impl<'read, 'run> Claim<'_, 'read, 'run> {
     fn gathered<Part, Filed: Gathers<Part>>(self, starting: &impl Fn(Claimed<'read>) -> Filed) -> Joined<'run, Part> {
         let parsed = Parsed::new(self.file, self.head);
-        let mut lowering: GroupLowering<'_> = self.group.lowering();
+        let lowering: GroupLowering<'_> = self.group.lowering();
         let claimed = Claimed { order: self.order, file: self.file };
-        let mut filing = starting(claimed);
-        let joining = lowering.watching().into_iter().chain(filing.watching()).collect();
-        let contexts = Contributed::joined(parsed, self.unwalked, joining);
-        let gathered = Gathered { head: self.head, facts: lowering.gathered(), contexts };
-        Joined { gathered, filed: filing.gathered() }
+        let filing = starting(claimed);
+        let contexts = Contributed::joined(parsed, self.unwalked);
+        let gathered = Gathered { head: self.head, facts: lowering.gathered(self.file), contexts };
+        Joined { gathered, filed: filing.gathered(self.file) }
     }
 }
 

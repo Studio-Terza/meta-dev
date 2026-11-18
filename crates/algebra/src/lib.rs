@@ -23,3 +23,71 @@ impl<Item> Semigroup for Vec<Item> {
 }
 
 impl<Item> Monoid for Vec<Item> {}
+
+#[derive(Debug, Default)]
+pub enum Catenation<Item> {
+    #[default]
+    Empty,
+    Leaf(Vec<Item>),
+    Joined(Box<Catenation<Item>>, Box<Catenation<Item>>),
+}
+
+#[derive(Debug)]
+pub struct Leaves<Item> {
+    pending: Vec<Catenation<Item>>,
+}
+
+#[derive(Debug)]
+struct Opened<Item> {
+    leaf: Vec<Item>,
+    children: Vec<Catenation<Item>>,
+}
+
+impl<Item> Semigroup for Catenation<Item> {
+    fn combine(self, other: Catenation<Item>) -> Catenation<Item> {
+        Catenation::Joined(Box::new(self), Box::new(other))
+    }
+}
+
+impl<Item> Monoid for Catenation<Item> {}
+
+impl<Item> From<Vec<Item>> for Catenation<Item> {
+    fn from(items: Vec<Item>) -> Catenation<Item> {
+        Catenation::Leaf(items)
+    }
+}
+
+impl<Item> FromIterator<Item> for Catenation<Item> {
+    fn from_iter<Items: IntoIterator<Item = Item>>(items: Items) -> Catenation<Item> {
+        Catenation::Leaf(items.into_iter().collect())
+    }
+}
+
+impl<Item> IntoIterator for Catenation<Item> {
+    type Item = Item;
+    type IntoIter = std::iter::Flatten<Leaves<Item>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Leaves { pending: vec![self] }.flatten()
+    }
+}
+
+impl<Item> Catenation<Item> {
+    fn opened(self) -> Opened<Item> {
+        match self {
+            Catenation::Empty => Opened { leaf: Vec::new(), children: Vec::new() },
+            Catenation::Leaf(leaf) => Opened { leaf, children: Vec::new() },
+            Catenation::Joined(first, second) => Opened { leaf: Vec::new(), children: vec![*second, *first] },
+        }
+    }
+}
+
+impl<Item> Iterator for Leaves<Item> {
+    type Item = Vec<Item>;
+
+    fn next(&mut self) -> Option<Vec<Item>> {
+        let Opened { leaf, children } = self.pending.pop()?.opened();
+        self.pending.extend(children);
+        Some(leaf)
+    }
+}

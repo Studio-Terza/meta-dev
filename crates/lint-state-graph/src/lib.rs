@@ -17,7 +17,7 @@ use edge_scan::{EdgeIndex, EdgeScan, ScannedEdges, Written};
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Parsed, SourceFile, Violation};
 use lint_file::{Concluded, PrimedFacts, PrimedLint, Reads};
-use lint_sweep::{Contributing, Gathers, Watching};
+use lint_sweep::{Contributing, Gathers};
 
 pub use foreign_matches::ForeignMatches;
 
@@ -84,22 +84,15 @@ struct RecordedState<'head> {
 }
 
 impl<'head> Gathers<StateRaw<'head>> for StateRecording<'_, 'head> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        self.watchers.as_mut().map_or_default(|watchers| {
-            let own: Vec<&mut Watching<'_>> = vec![&mut watchers.fields, &mut watchers.graphs];
-            watchers.edges.watching().into_iter().chain(own).collect::<Vec<_>>()
-        })
-    }
-
-    fn gathered(self) -> StateRaw<'head> {
+    fn gathered(self, file: &SourceFile) -> StateRaw<'head> {
         StateRaw(self.watchers.map(|watchers| {
             RecordedState {
-                edges: watchers.edges.gathered(),
+                edges: watchers.edges.gathered(file),
                 own: watchers
                     .fields
-                    .concluded(|_, (), found| found)
+                    .concluded(file, |_, (), found| found)
                     .into_iter()
-                    .chain(watchers.graphs.concluded(|graphs, (), invoked| graphs.found(invoked)))
+                    .chain(watchers.graphs.concluded(file, |graphs, (), invoked| graphs.found(invoked)))
                     .collect(),
             }
         }))

@@ -16,7 +16,7 @@ use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
 use lint_placement::{CrateRoot, Krate, Level, Nest};
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep};
 use reexport_count::ReexportCount;
 use syntax::ItemUse;
 use users::Users;
@@ -85,14 +85,10 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
 }
 
 impl<'head> Gathers<ShippedModule<'head>> for ModuleGathering<'head> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        let module = self.module.as_ref();
-        module.map_or_default(|_| Sweep::alone(&mut self.uses))
-    }
-
-    fn gathered(self) -> ShippedModule<'head> {
-        let uses = self.uses.concluded(|_, (), used| used.0);
-        ShippedModule(self.module.map(|module| ModuleUses { uses, ..module }))
+    fn gathered(self, file: &SourceFile) -> ShippedModule<'head> {
+        ShippedModule(
+            self.module.map(|module| ModuleUses { uses: self.uses.concluded(file, |_, (), used| used.0), ..module }),
+        )
     }
 }
 
@@ -133,19 +129,15 @@ impl Contribute for UseScan {
         &self,
         item: &ItemUse,
         _: &Facts<'_, ItemUse>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), UsePaths> {
         Contributed::new((), UsePaths(UseEdges::of_tree(&item.tree).into_iter().collect()), Descend::Over)
     }
 }
 
 impl Gathers<UsePaths> for Contributing<UseScan> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> UsePaths {
-        self.concluded(|_, (), used| used)
+    fn gathered(self, file: &SourceFile) -> UsePaths {
+        self.concluded(file, |_, (), used| used)
     }
 }
 

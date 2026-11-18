@@ -5,7 +5,7 @@ use syntax::{ItemEnum, ItemStruct, ItemTrait};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 
 #[derive(Debug, Default)]
 pub struct WorkspaceTypes(BTreeSet<Name>);
@@ -61,7 +61,7 @@ impl Contribute for TypeGathering {
         &self,
         item: &ItemStruct,
         _: &Facts<'_, ItemStruct>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), WorkspaceTypes> {
         Self::declared(&item.ident)
     }
@@ -70,7 +70,7 @@ impl Contribute for TypeGathering {
         &self,
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), WorkspaceTypes> {
         Self::declared(&item.ident)
     }
@@ -79,18 +79,14 @@ impl Contribute for TypeGathering {
         &self,
         item: &ItemTrait,
         _: &Facts<'_, ItemTrait>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), WorkspaceTypes> {
         Self::declared(&item.ident)
     }
 }
 
 impl Gathers<WorkspaceTypes> for Contributing<TypeGathering> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> WorkspaceTypes {
-        self.concluded(|_, (), types| types)
+    fn gathered(self, file: &SourceFile) -> WorkspaceTypes {
+        self.concluded(file, |_, (), types| types)
     }
 }

@@ -8,7 +8,7 @@ use equivalence::Equivalence;
 use lint_core::{Parsed, Syntax, Walk};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep};
 use syntax::{ItemImpl, ItemMod};
 
 use crate::end::Node;
@@ -60,12 +60,8 @@ struct Scan<'syntax, 'file> {
 }
 
 impl<'file> Gathers<Fillers<'file>> for Contributing<Scan<'_, 'file>> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> Fillers<'file> {
-        self.concluded(|_, (), fillers| fillers)
+    fn gathered(self, file: &SourceFile) -> Fillers<'file> {
+        self.concluded(file, |_, (), fillers| fillers)
     }
 }
 
@@ -81,7 +77,7 @@ impl<'file> Contribute for Scan<'_, 'file> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Fillers<'file>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -90,7 +86,7 @@ impl<'file> Contribute for Scan<'_, 'file> {
         &self,
         found: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Fillers<'file>> {
         let interface =
             found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));

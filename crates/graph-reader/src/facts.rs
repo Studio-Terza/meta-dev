@@ -7,7 +7,7 @@ use lint_core::SourceFile;
 
 use crate::lowering::{Lowered, Lowering};
 use crate::planting::{Placing, Planting};
-use lint_sweep::{Contributing, Gathers, Sweep, Watching};
+use lint_sweep::{Contributing, Gathers, Sweep};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct ModuleIndex(usize);
@@ -43,15 +43,11 @@ struct FileLowering<'read> {
 }
 
 impl Gathers<FileFacts> for FileLowering<'_> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.lowering)
-    }
-
-    fn gathered(self) -> FileFacts {
+    fn gathered(self, _: &SourceFile) -> FileFacts {
         FileFacts {
             order: self.order,
             placing: Placing::from(self.source),
-            lowered: self.lowering.concluded(|lowering, _, grains| lowering.lowered(grains)),
+            lowered: self.lowering.concluded(self.source, |lowering, _, grains| lowering.lowered(grains)),
         }
     }
 }
@@ -63,13 +59,8 @@ pub struct GroupLowering<'read> {
 }
 
 impl Gathers<Vec<FileFacts>> for GroupLowering<'_> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        self.head.as_mut().map(Gathers::watching).into_iter().flatten()
-    }
-
-    fn gathered(self) -> Vec<FileFacts> {
-        let swept = self.modules.into_iter().map(|module| Sweep::gathered(module.source, module));
-        self.head.into_iter().map(Gathers::gathered).chain(swept).collect()
+    fn gathered(self, _: &SourceFile) -> Vec<FileFacts> {
+        self.head.into_iter().chain(self.modules).map(|lowering| Sweep::gathered(lowering.source, lowering)).collect()
     }
 }
 

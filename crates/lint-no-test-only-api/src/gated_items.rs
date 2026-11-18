@@ -27,7 +27,7 @@ impl Contribute for GatedItems<'_> {
         &self,
         item: &Item,
         _: &Facts<'_, Item>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Flagged>> {
         Contributed::parted(ItemHead::of_item(item).and_then(|head| head.flagged(None)).into_iter().collect())
     }
@@ -36,7 +36,7 @@ impl Contribute for GatedItems<'_> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Flagged>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -45,7 +45,7 @@ impl Contribute for GatedItems<'_> {
         &self,
         item: &ItemImpl,
         _: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Flagged>> {
         let gated = ItemHead::gate_of(&item.attrs);
         Contributed::parted(
@@ -57,7 +57,7 @@ impl Contribute for GatedItems<'_> {
         &self,
         field: &Field,
         _: &Facts<'_, Field>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Flagged>> {
         Contributed::parted(ItemHead::of_field(field).flagged(None).into_iter().collect())
     }

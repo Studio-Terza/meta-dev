@@ -12,9 +12,7 @@ use lint_core::{Headline, Parsed, Site, SourceFile, Syntax, Violation};
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
-use lint_sweep::{
-    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope, Sweep, Watching,
-};
+use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope};
 
 pub use declaration::Declaration;
 use declarations::Declarations;
@@ -144,7 +142,7 @@ impl<'file> Contribute for PredicateScan<'file> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Unresolved<'file>>> {
         let found = facts.inherent().and_then(|block| {
             Some(self.predicates(block))
@@ -158,23 +156,18 @@ impl<'file> Contribute for PredicateScan<'file> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Unresolved<'file>>> {
         Contributed::descending(Descend::Expand)
     }
 }
 
 impl<'file> Gathers<Candidates<'file>> for Predicates<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.scan)
-    }
-
-    fn gathered(self) -> Candidates<'file> {
+    fn gathered(self, file: &SourceFile) -> Candidates<'file> {
         let module = self.file.head().placement().module();
-        Candidates(
-            self.scan
-                .concluded(|_, (), pending| pending.into_iter().filter_map(|found| found.candidate(module)).collect()),
-        )
+        Candidates(self.scan.concluded(file, |_, (), pending| {
+            pending.into_iter().filter_map(|found| found.candidate(module)).collect()
+        }))
     }
 }
 

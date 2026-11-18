@@ -3,11 +3,10 @@ use std::borrow::Cow;
 use syntax::{ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
 
 use lint_core::Parsed;
+use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::{CrateRoot, ModulePath};
-use lint_sweep::{
-    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope, Sweep, Watching,
-};
+use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope};
 
 use super::Kind;
 use super::declaration::{Declaration, Declared};
@@ -87,7 +86,7 @@ impl Contribute for DeclarationScan {
         &self,
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Self::record(&item.ident, Kind::Enum)
     }
@@ -96,7 +95,7 @@ impl Contribute for DeclarationScan {
         &self,
         item: &ItemStruct,
         _: &Facts<'_, ItemStruct>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Self::record(&item.ident, Kind::Other)
     }
@@ -105,7 +104,7 @@ impl Contribute for DeclarationScan {
         &self,
         item: &ItemUnion,
         _: &Facts<'_, ItemUnion>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Self::record(&item.ident, Kind::Other)
     }
@@ -114,20 +113,16 @@ impl Contribute for DeclarationScan {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Contributed::descending(Descend::Expand)
     }
 }
 
 impl<'head> Gathers<Vec<Declaration<'head>>> for Declarations<'head> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.scan)
-    }
-
-    fn gathered(self) -> Vec<Declaration<'head>> {
+    fn gathered(self, file: &SourceFile) -> Vec<Declaration<'head>> {
         let Declarations { crate_root, module, scan } = self;
-        scan.concluded(|_, types, nested| {
+        scan.concluded(file, |_, types, nested| {
             [Nested { path: Vec::new(), types }]
                 .into_iter()
                 .chain(nested)

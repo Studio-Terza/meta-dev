@@ -5,7 +5,7 @@ use syntax::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 
 #[derive(Debug, Default)]
 pub struct Consumers {
@@ -28,12 +28,8 @@ impl From<&SourceFile> for Consuming {
 }
 
 impl Gathers<Consumers> for Contributing<Consuming> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> Consumers {
-        self.concluded(|_, (), consumers| consumers)
+    fn gathered(self, file: &SourceFile) -> Consumers {
+        self.concluded(file, |_, (), consumers| consumers)
     }
 }
 
@@ -75,7 +71,7 @@ impl Contribute for Consuming {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Consumers> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -84,7 +80,7 @@ impl Contribute for Consuming {
         &self,
         bound: &TraitBound,
         _: &Facts<'_, TraitBound>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Consumers> {
         let bounds = bound.path.segments.last().map(|segment| Name::from(&segment.ident)).into_iter().collect();
         Contributed::parted(Consumers { bounds, called: BTreeSet::new() })
@@ -94,7 +90,7 @@ impl Contribute for Consuming {
         &self,
         _: &ExprMethodCall,
         facts: &Facts<'_, ExprMethodCall>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Consumers> {
         Consumers::called(facts.name().cloned())
     }
@@ -103,7 +99,7 @@ impl Contribute for Consuming {
         &self,
         path: &ExprPath,
         _: &Facts<'_, ExprPath>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Consumers> {
         Consumers::called(
             path.path

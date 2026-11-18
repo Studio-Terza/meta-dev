@@ -4,7 +4,7 @@ mod clone_sites;
 use clone_sites::CloneSites;
 use lint_core::{Gate, Headline, Lint, Parsed, Report, SourceFile, Violation};
 use lint_file::Gleaning;
-use lint_sweep::{Contributing, Gathers, Sweep, Watching};
+use lint_sweep::{Contributing, Gathers};
 
 #[derive(Debug)]
 pub struct Clones;
@@ -49,11 +49,7 @@ impl Gleaning for Clones {
 }
 
 impl<'head> Gathers<CloneFindings<'head>> for Contributing<CloneSites<'head>> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> CloneFindings<'head> {
-        CloneFindings(self.concluded(|_, (), found| found))
+    fn gathered(self, file: &SourceFile) -> CloneFindings<'head> {
+        CloneFindings(self.concluded(file, |_, (), found| found))
     }
 }

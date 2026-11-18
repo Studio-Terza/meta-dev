@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile, Violation};
-use lint_sweep::{Finds, Gathers, Member, Sweep, Watching};
+use lint_sweep::{Finds, Gathers, Member, Sweep};
 
 pub use concluded::{Concluded, Listed};
 pub use lead::{Lead, Leader, SortStart, Start};
@@ -183,13 +183,8 @@ struct Walking<Gathering, Watched> {
 impl<Part, Found, Gathering: Gathers<Part>, Watched: Gathers<Found>> Gathers<Walked<Part, Found>>
     for Walking<Gathering, Watched>
 {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        let watched = self.watched.as_mut().map(Gathers::watching).into_iter().flatten();
-        self.gathering.watching().into_iter().chain(watched)
-    }
-
-    fn gathered(self) -> Walked<Part, Found> {
-        Walked { part: self.gathering.gathered(), found: self.watched.map(Gathers::gathered) }
+    fn gathered(self, file: &SourceFile) -> Walked<Part, Found> {
+        Walked { part: self.gathering.gathered(file), found: self.watched.map(|watched| watched.gathered(file)) }
     }
 }
 
@@ -254,20 +249,22 @@ impl<'file, Checked: PrimedLint> PrimedWalk<'file, Checked> {
 }
 
 #[derive(Debug)]
+struct Both<First, Second> {
+    first: First,
+    second: Second,
+}
+
+#[derive(Debug)]
 struct Two<First, Second> {
     first: First,
     second: Second,
 }
 
-impl<FirstPart, SecondPart, First: Gathers<FirstPart>, Second: Gathers<SecondPart>> Gathers<Two<FirstPart, SecondPart>>
+impl<FirstPart, SecondPart, First: Gathers<FirstPart>, Second: Gathers<SecondPart>> Gathers<Both<FirstPart, SecondPart>>
     for Two<First, Second>
 {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        self.first.watching().into_iter().chain(self.second.watching())
-    }
-
-    fn gathered(self) -> Two<FirstPart, SecondPart> {
-        Two { first: self.first.gathered(), second: self.second.gathered() }
+    fn gathered(self, file: &SourceFile) -> Both<FirstPart, SecondPart> {
+        Both { first: self.first.gathered(file), second: self.second.gathered(file) }
     }
 }
 
