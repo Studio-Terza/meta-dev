@@ -135,6 +135,10 @@ const RULE_ACROSS_CRATES: [Fixture; 2] = [
     Fixture::new("crates/a/src/lib.rs", "#[macro_export]\nmacro_rules! make {\n    ($($t:tt)*) => {};\n}\n"),
     Fixture::new("crates/b/src/lib.rs", "a::make!(Mark);\nimpl Clone for R {}\n"),
 ];
+const RULE_UNEXPORTED_ACROSS_CRATES: [Fixture; 2] = [
+    Fixture::new("crates/a/src/lib.rs", "macro_rules! make {\n    ($($t:tt)*) => {};\n}\n"),
+    Fixture::new("crates/b/src/lib.rs", "a::make!(Mark);\nimpl Clone for R {}\n"),
+];
 const RULE_ACROSS: [Fixture; 2] = [
     Fixture::new("src/lib.rs", "#[macro_export]\nmacro_rules! make {\n    ($($t:tt)*) => {};\n}\nmod x;\n"),
     Fixture::new("src/x.rs", "crate::make!(Mark);\nimpl Clone for R {}\n"),
@@ -787,6 +791,7 @@ laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     RENAMED_ACROSS => [Expect::std_trait(&["std", "clone", "Clone"])],
     RULE_ACROSS => [Expect::std_trait(&["std", "clone", "Clone"])],
     RULE_ACROSS_CRATES => [Expect::std_trait(&["std", "clone", "Clone"])],
+    RULE_UNEXPORTED_ACROSS_CRATES => [Expect::unknown(&["Clone"])],
     PARENT_GLOB => [Expect::std_trait(&["std", "clone", "Clone"])],
     SIBLING_GLOB => [Expect::std_trait(&["std", "cmp", "PartialEq"])],
     PARENT_DECLARES => [Expect::krate(&["crate", "Clone"])],
@@ -1017,10 +1022,12 @@ laws::table!(an_item_after_a_scope_reads_as_if_the_scope_had_closed, |text: &&st
     AFTER_GENERIC_DECLARED => [Expect::named(Expect::item("Out", ItemKind::Struct), Vec::new())],
 ]);
 
-const EXPANDED_AFTER_FN: &str = "fn first() {\n    struct Hidden;\n}\nmacro_rules! make {\n    () => {\n        fn made() -> Hidden { todo!() }\n    };\n}\nmake!();\n";
+const EXPANDED_LIKE_FIRST: &str = "fn first() {\n    struct Hidden;\n}\nmacro_rules! make {\n    () => {\n        fn made() {\n            impl Clone for Hidden {}\n        }\n    };\n}\nmake!();\n";
+const GENERIC_BODY: &str = "fn f<T>(value: T) {\n    impl Clone for Wrap<T> {}\n}\n";
 
-laws::table!(an_expanded_item_resolves_in_the_scope_of_its_invocation, |text: &&str| Read::outputs(text), [
-    EXPANDED_AFTER_FN => [Expect::named(Expect::unknown(&["Hidden"]), Vec::new())],
+laws::table!(a_body_s_items_resolve_in_the_scopes_of_their_own_function, |text: &&str| Read::subjects(text), [
+    EXPANDED_LIKE_FIRST => [Expect::named(Expect::unknown(&["Hidden"]), Vec::new())],
+    GENERIC_BODY => [Expect::named(Expect::unknown(&["Wrap"]), vec![Expect::param("T")])],
 ]);
 
 const MACRO_BODIES: &str = "outer! {\n    fn inside() -> u8 { 0 }\n}\nmacro_rules! make {\n    () => {\n        fn made() -> char { 'a' }\n    };\n}\n";
