@@ -1,6 +1,6 @@
 states::states! {
     pub stored RunState in run {
-        start Running {
+        start Running as Ended {
             replied -> Replied,
             unreadable -> Unreadable,
             errored -> Errored,
