@@ -40,13 +40,10 @@ impl<'walk, 'graph, 'found, 'file> Route<'walk, 'graph, 'found, 'file> {
         Some(Route { group, places, joined }).filter(|route| route.places.len() >= Self::LEAST_PLACES)
     }
 
-    fn outside<'edge>(
-        group: &Group<Leg<'walk, 'graph, 'found, 'file>>,
-        joined: &'edge Edge<'found, 'file>,
-    ) -> Option<&'edge Edge<'found, 'file>> {
+    fn outside(group: &Group<Leg<'walk, 'graph, 'found, 'file>>, joined: &Edge<'found, 'file>) -> Option<()> {
         let walkers = group.members().iter().map(|member| member.walk().edge());
         let called = group.members().iter().flat_map(|member| member.called().iter().copied());
-        walkers.chain(called).find(|edge| ptr::eq(*edge, joined)).map_or(Some(joined), |_| None)
+        walkers.chain(called).find(|edge| ptr::eq(*edge, joined)).map_or(Some(()), |_| None)
     }
 
     fn holes(&self) -> Holes {

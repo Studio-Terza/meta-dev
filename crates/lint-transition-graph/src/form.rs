@@ -27,27 +27,27 @@ impl<'found> Acting<'found> {
         subject
             .node()
             .copied()
-            .and_then(|node| Acting::unwrapped(node, ends.takes(), function.takings()))
+            .filter(|node| Acting::unwrapped(*node, ends.takes(), function.takings()).is_some())
             .map(|node| Acting::about(node, subject, ends.takes()))
             .filter(|acting| acting.grounded().is_some())
             .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
     }
 
-    fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<Node<'found>> {
+    fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<()> {
         let wrapped = takes
             .iter()
             .zip(takings)
             .filter(|(_, taking)| **taking != Wrapping::Plain)
             .find(|(taken, _)| taken.node() == Some(&subject));
-        wrapped.map_or(Some(subject), |_| None)
+        wrapped.map_or(Some(()), |_| None)
     }
 
     fn grounded(&self) -> Option<Count> {
         self.held.nonzero().or_else(|| self.pure().map(|_| self.held))
     }
 
-    fn admitted(&self, fixed_by: Option<&Name>) -> Option<&Acting<'found>> {
-        fixed_by.map_or(Some(self), |fixing| Operators::named(fixing).and(self.pure()))
+    fn admitted(&self, fixed_by: Option<&Name>) -> Option<()> {
+        fixed_by.map_or(Some(()), |fixing| Operators::named(fixing).and(self.pure()).map(|_| ()))
     }
 
     fn about(subject: Node<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {

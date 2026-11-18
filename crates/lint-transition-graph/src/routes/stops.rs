@@ -70,8 +70,8 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
             .then(|| AsRef::<End<'found>>::as_ref(edge.ends()).as_ref())
     }
 
-    fn closes(edge: &Edge<'found, 'file>, from: &Hop<'found>, to: &Hop<'found>) -> Option<Hop<'found>> {
-        Option::<Hop<'found>>::from(edge.ends()).filter(|hop| hop.joins(from, to).is_some())
+    fn closes(edge: &Edge<'found, 'file>, from: &Hop<'found>, to: &Hop<'found>) -> Option<()> {
+        Option::<Hop<'found>>::from(edge.ends()).and_then(|hop| hop.joins(from, to))
     }
 
     fn resolved(&self, callee: &Name, owner: CallOwner<'_>) -> Option<&'graph Edge<'found, 'file>> {
