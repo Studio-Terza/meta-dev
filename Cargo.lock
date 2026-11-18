@@ -2076,6 +2076,7 @@ dependencies = [
 name = "lint-roots"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "invariants",
  "lint-layout",

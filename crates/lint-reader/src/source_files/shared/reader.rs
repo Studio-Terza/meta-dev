@@ -6,7 +6,7 @@ use lint_core::{FileHead, Readout, SourceFile};
 use lint_placement::Packages;
 
 use super::boundary::Partition;
-use super::protocol::{Assignment, Parsed, Reads, Sighting};
+use super::protocol::{Assignment, Parsed, Reads, Report};
 use crate::source_files::located::{Located, Node};
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl<'tree> Order<'tree> {
 pub struct Reader<'tree> {
     packages: &'tree Packages,
     orders: Receiver<Order<'tree>>,
-    sighted: Sender<Vec<Sighting<'tree>>>,
+    sighted: Sender<Report<'tree>>,
     heads: Sender<Vec<FileHead>>,
 }
 
@@ -36,13 +36,13 @@ pub struct Reader<'tree> {
 pub(super) struct Remote<'tree> {
     hand: Partition,
     orders: Sender<Order<'tree>>,
-    sighted: Receiver<Vec<Sighting<'tree>>>,
+    sighted: Receiver<Report<'tree>>,
     heads: Receiver<Vec<FileHead>>,
 }
 
 #[derive(Debug)]
 pub(super) struct Dispatched<'remote, 'tree> {
-    sighted: &'remote Receiver<Vec<Sighting<'tree>>>,
+    sighted: &'remote Receiver<Report<'tree>>,
 }
 
 #[derive(Debug)]
@@ -88,10 +88,10 @@ impl<'tree> Reader<'tree> {
         kept: BTreeMap<Located<'tree>, SourceFile>,
         nodes: Vec<Node<'tree>>,
     ) -> Readout {
-        Parsed::read(files, self.packages, nodes).concluded(|sightings, fresh| {
+        Parsed::read(files, self.packages, nodes, |report, fresh| {
             let mut held = kept;
             held.extend(fresh);
-            self.sighted.send(sightings).map_or_default(|()| self.awaiting(files, held))
+            self.sighted.send(report).map_or_default(|()| self.awaiting(files, held))
         })
     }
 
@@ -131,7 +131,7 @@ impl Assembling<'_> {
 }
 
 impl<'tree> Dispatched<'_, 'tree> {
-    pub(super) fn sighted(self) -> Vec<Sighting<'tree>> {
+    pub(super) fn sighted(self) -> Report<'tree> {
         self.sighted.recv().unwrap_or_default()
     }
 }

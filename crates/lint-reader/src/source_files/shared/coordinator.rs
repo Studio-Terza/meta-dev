@@ -2,16 +2,16 @@ mod assembly;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::OnceLock;
 
 use algebra::{Monoid, Semigroup};
 use file_ports::Files;
 use lint_core::{FileHead, Readout, RepoFile, SourceFile};
-use lint_roots::{Fact, Survey};
+use lint_roots::Survey;
 
 use super::boundary::{Hands, Partition};
-use super::protocol::{Assigned, Assignment, Due, Parsed, Reads, Sighting};
+use super::protocol::{Assigned, Assignment, Due, Parsed, Reads, Report, Sighting};
 use super::reader::{Dispatched, Linked, Reader, Remote};
 use crate::source_files::Stage;
 use crate::source_files::declared::{Declared, Kind};
@@ -111,8 +111,10 @@ impl<'tree> Level<'tree> {
         Level { due, seen: visited }
     }
 
-    fn dealt(self, hands: &Hands) -> Dealt<'tree> {
-        Dealt { assigned: hands.dealt(self.due), seen: self.seen }
+    fn dealt(self, hands: &Hands, files: &impl Files) -> Dealt<'tree> {
+        let weighed =
+            |due: &Due<'tree>| files.size(AsRef::<Path>::as_ref(AsRef::<Located>::as_ref(due))).unwrap_or_default();
+        Dealt { assigned: hands.dealt(self.due, weighed), seen: self.seen }
     }
 }
 
@@ -125,6 +127,7 @@ struct Sending<'remote, 'tree> {
 #[derive(Debug, Default)]
 struct Sighted<'tree> {
     sightings: Vec<Sighting<'tree>>,
+    survey: Survey,
     kept: BTreeMap<Located<'tree>, SourceFile>,
     dead: BTreeSet<Partition>,
 }
@@ -178,7 +181,7 @@ struct Exploring<'run, 'shared, 'tree, Port> {
 impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
     fn explored(&self, level: Level<'tree>, survey: Survey, hands: Hands) -> Explored<'tree> {
         match level.due.first() {
-            Some(_) => self.levelled(level.dealt(&hands), survey, hands),
+            Some(_) => self.levelled(level.dealt(&hands, self.files), survey, hands),
             None => Explored { gathered: Gathered::default(), survey },
         }
     }
@@ -190,8 +193,7 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
         let live: Hands = every.difference(&sighted.dead).copied().collect();
         let parsed_by =
             |found: &Assigned<'tree>| sighted.dead.get(&found.hand()).map_or(found.hand(), |_| Partition::MAIN);
-        let candidates: Vec<PathBuf> = sighted.sightings.iter().flat_map(Sighting::candidates).collect();
-        let learned = survey.learn(self.files, Fact::Followed, &candidates);
+        let learned = survey.combine(sighted.survey);
         let known = &learned;
         let outcomes: Outcomes<'tree> = sighted
             .sightings
@@ -238,9 +240,10 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
         let returned = refused.into_iter().flat_map(|sending| sending.sent.map_or_else(|nodes| nodes, |_| Vec::new()));
         let local = by_hand.remove(&Partition::MAIN).unwrap_or_default().into_iter().chain(returned).collect();
         let packages = &self.coordinator.shared.stage.packages;
-        Parsed::read(self.files, packages, local).concluded(|own, kept| {
-            let remote = waiting.into_iter().flat_map(|sending| sending.sent.into_iter()).flat_map(Dispatched::sighted);
-            Sighted { sightings: own.into_iter().chain(remote).collect(), kept, dead }
+        Parsed::read(self.files, packages, local, |own, kept| {
+            let remote = waiting.into_iter().flat_map(|sending| sending.sent.into_iter()).map(Dispatched::sighted);
+            let report: Report<'tree> = Monoid::concat(iter::once(own).chain(remote));
+            report.concluded(|sightings, survey| Sighted { sightings, survey, kept, dead })
         })
     }
 }

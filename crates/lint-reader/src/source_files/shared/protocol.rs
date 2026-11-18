@@ -6,6 +6,7 @@ use file_ports::Files;
 use lint_core::{Readout, RepoFile, SourceFile};
 use lint_layout::Failure;
 use lint_placement::{CrateFile, Packages};
+use lint_roots::{Fact, Survey};
 
 use super::boundary::Partition;
 use crate::source_files::located::{Located, Node};
@@ -133,6 +134,26 @@ impl<'tree> AsRef<Located<'tree>> for Sighting<'tree> {
 }
 
 #[derive(Debug, Default)]
+pub(super) struct Report<'tree> {
+    sightings: Vec<Sighting<'tree>>,
+    survey: Survey,
+}
+
+impl Semigroup for Report<'_> {
+    fn combine(self, other: Self) -> Self {
+        Report { sightings: self.sightings.combine(other.sightings), survey: self.survey.combine(other.survey) }
+    }
+}
+
+impl Monoid for Report<'_> {}
+
+impl<'tree> Report<'tree> {
+    pub(super) fn concluded<Out>(self, into: impl FnOnce(Vec<Sighting<'tree>>, Survey) -> Out) -> Out {
+        into(self.sightings, self.survey)
+    }
+}
+
+#[derive(Debug, Default)]
 pub(super) struct Parsed<'tree> {
     sightings: Vec<Sighting<'tree>>,
     kept: BTreeMap<Located<'tree>, SourceFile>,
@@ -149,10 +170,19 @@ impl Semigroup for Parsed<'_> {
 impl Monoid for Parsed<'_> {}
 
 impl<'tree> Parsed<'tree> {
-    pub(super) fn read(files: &impl Files, packages: &Packages, nodes: Vec<Node<'tree>>) -> Parsed<'tree> {
+    pub(super) fn read<Out>(
+        files: &impl Files,
+        packages: &Packages,
+        nodes: Vec<Node<'tree>>,
+        into: impl FnOnce(Report<'tree>, BTreeMap<Located<'tree>, SourceFile>) -> Out,
+    ) -> Out {
         let located: Vec<Located<'tree>> = nodes.iter().map(|node| node.located().clone()).collect();
-        let parsed = Located::parsed_many(files, packages, &located);
-        Monoid::concat(nodes.into_iter().zip(parsed).map(|(node, source)| Parsed::sighted(node, source)))
+        let sources = Located::parsed_many(files, packages, &located);
+        let parsed: Parsed<'tree> =
+            Monoid::concat(nodes.into_iter().zip(sources).map(|(node, source)| Parsed::sighted(node, source)));
+        let candidates: Vec<PathBuf> = parsed.sightings.iter().flat_map(Sighting::candidates).collect();
+        let survey = Survey::default().learn(files, Fact::Followed, &candidates);
+        into(Report { sightings: parsed.sightings, survey }, parsed.kept)
     }
 
     fn sighted(node: Node<'tree>, source: Result<SourceFile, Failure>) -> Parsed<'tree> {
@@ -173,12 +203,5 @@ impl<'tree> Parsed<'tree> {
                 kept: BTreeMap::new(),
             },
         }
-    }
-
-    pub(super) fn concluded<Out>(
-        self,
-        into: impl FnOnce(Vec<Sighting<'tree>>, BTreeMap<Located<'tree>, SourceFile>) -> Out,
-    ) -> Out {
-        into(self.sightings, self.kept)
     }
 }
