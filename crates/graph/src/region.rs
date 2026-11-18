@@ -1,42 +1,48 @@
+use algebra::{Monoid, Semigroup};
 use lint_layout::Name;
 
 use crate::boundary::ItemId;
 use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reach {
+    #[default]
     Shipped,
     Transcribed,
     Test,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Zone {
+    #[default]
     Open,
     Boundary,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Within {
+    #[default]
     Own,
     TraitImpl,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ground {
+    #[default]
     Open,
     Store,
     Ports,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Writing {
+    #[default]
     Written,
     Expanded,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Region {
     reach: Reach,
     zone: Zone,
@@ -65,18 +71,8 @@ impl Region {
     }
 
     #[must_use]
-    pub fn written(self, writing: Writing) -> Region {
-        Region { writing: self.writing.max(writing), ..self }
-    }
-
-    #[must_use]
     pub fn ground(self) -> Ground {
         self.ground
-    }
-
-    #[must_use]
-    pub fn grounded(self, ground: Ground) -> Region {
-        Region { ground: self.ground.max(ground), ..self }
     }
 
     #[must_use]
@@ -93,25 +89,49 @@ impl Region {
     pub fn within(self) -> Within {
         self.within
     }
+}
 
-    #[must_use]
-    pub fn reached(self, reach: Reach) -> Region {
-        Region { reach: self.reach.max(reach), ..self }
+impl Semigroup for Region {
+    fn combine(self, other: Region) -> Region {
+        Region {
+            reach: self.reach.max(other.reach),
+            zone: self.zone.max(other.zone),
+            within: self.within.max(other.within),
+            ground: self.ground.max(other.ground),
+            writing: self.writing.max(other.writing),
+        }
     }
+}
 
-    #[must_use]
-    pub fn zoned(self, zone: Zone) -> Region {
-        Region { zone: self.zone.max(zone), ..self }
+impl Monoid for Region {}
+
+impl From<Reach> for Region {
+    fn from(reach: Reach) -> Region {
+        Region { reach, ..Region::SHIPPED }
     }
+}
 
-    #[must_use]
-    pub fn inside(self, within: Within) -> Region {
-        Region { within: self.within.max(within), ..self }
+impl From<Zone> for Region {
+    fn from(zone: Zone) -> Region {
+        Region { zone, ..Region::SHIPPED }
     }
+}
 
-    #[must_use]
-    pub fn joined(self, other: Region) -> Region {
-        self.reached(other.reach).zoned(other.zone).inside(other.within).grounded(other.ground).written(other.writing)
+impl From<Within> for Region {
+    fn from(within: Within) -> Region {
+        Region { within, ..Region::SHIPPED }
+    }
+}
+
+impl From<Ground> for Region {
+    fn from(ground: Ground) -> Region {
+        Region { ground, ..Region::SHIPPED }
+    }
+}
+
+impl From<Writing> for Region {
+    fn from(writing: Writing) -> Region {
+        Region { writing, ..Region::SHIPPED }
     }
 }
 

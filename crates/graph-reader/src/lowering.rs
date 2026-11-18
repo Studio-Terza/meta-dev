@@ -138,7 +138,7 @@ impl Lowers for ImplRow {
         let subject =
             Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scopes().scope(located.scope())));
         let implementation =
-            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer())).parameterised(
+            Implementation::new(subject, implemented, self.origin, self.region.combine(footing.outer())).parameterised(
                 self.parameters
                     .into_iter()
                     .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
@@ -196,7 +196,7 @@ impl Lowers for FnRow {
         let function = Function::new(self.name, self.owner, self.entry, signature)
             .exposed(self.exposure)
             .evaluated(self.evaluation)
-            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref()))
+            .seated(footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref()))
             .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, function)
     }
@@ -277,7 +277,7 @@ impl Slot<ScopeKey> {
             children: seat.children(),
             form: SlotForm::from(item.attrs.as_slice()),
             visibility: Visibility::from(&item.vis),
-            region: Regions::of_module(region, item),
+            region: region.combine(Regions::of_module(item)),
         }
     }
 
@@ -288,7 +288,7 @@ impl Slot<ScopeKey> {
             children: self.children,
             form: self.form,
             visibility: self.visibility,
-            region: self.region.joined(outer),
+            region: self.region.combine(outer),
         }
     }
 }
