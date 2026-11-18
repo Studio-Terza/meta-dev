@@ -7,14 +7,14 @@ use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use design_jobs::{OpenJobs, job};
 use design_model::{
     AnyNode, Casting, Entered, Entry, Facet, JobId, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal,
     Prefix, Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_runs::{
     Account, FailuresReported, FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRetried, NextJob,
-    OpenJobs, Retold, RunSpawned, Spawned, Succession, SuccessionNew, UnplacedSegments, UnreportedFailures,
-    Unstructured,
+    Retold, RunSpawned, Spawned, Succession, SuccessionNew, UnplacedSegments, UnreportedFailures, Unstructured,
 };
 use design_store::{
     AppliedFile, Cast, ContextNodes, Covered, Cycle, Directed, Directions, Holding, JobRepeated, Linked, NextNode,
@@ -817,6 +817,10 @@ impl Proposals {
         Ok(store.write(Directions::new(Provenance::from(Entered::Apply), file, directed, Remit::Unbounded))?)
     }
 
+    fn open(store: &Port<'_, Sqlite>) -> Result<Vec<JobId>, Box<dyn Error>> {
+        Ok(store.read(OpenJobs)?.iter().map(job::Open::key).copied().collect())
+    }
+
     fn unseen(store: &Port<'_, Sqlite>, contents: &str) -> Result<Unseen, Box<dyn Error>> {
         match store.read(AppliedFile::from(Bytes::from(contents)))? {
             Seen::Unseen(unseen) => Ok(unseen),
@@ -891,7 +895,7 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
     let directed = vec![Proposals::child(root, 2)?, Directed::Conversational { segment: asked.clone() }];
     let refusal = store.write(Directions::new(Provenance::from(Entered::Apply), unpaid, directed.clone(), job)).err();
     assert!(matches!(refusal, Some(Refusal::Unpaid(_))));
-    assert_eq!(store.read(OpenJobs)?, [first, second]);
+    assert_eq!(Proposals::open(&store)?, [first, second]);
     let kept = Proposals::unseen(&store, "kept")?;
     store.write(Directions::new(
         Provenance::from(Entered::Apply),
@@ -900,9 +904,9 @@ fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused(
         Remit::job(first, [asked.clone()]),
     ))?;
     assert!(matches!(store.write(JobRepeated::from(Remit::job(second, [answered]))), Err(Refusal::Unpaid(_))));
-    assert_eq!(store.read(OpenJobs)?, [second]);
+    assert_eq!(Proposals::open(&store)?, [second]);
     store.write(JobRepeated::from(Remit::job(second, [asked])))?;
-    assert_eq!(store.read(OpenJobs)?, []);
+    assert_eq!(Proposals::open(&store)?, []);
     let other = Proposals::unseen(&store, "other")?;
     store.write(Directions::new(Provenance::from(Entered::Apply), other, Vec::new(), Remit::Unbounded))?;
     let seen = [
@@ -1653,7 +1657,7 @@ fn a_retold_account_of_an_already_reported_failure_is_reported_again() -> Result
     store.write(JobOpened::from(first))?;
     store.write(JobOpened::from(second))?;
     store.write(JobHalted::new(first, Halted::Flailed, Account::told(&"went on")))?;
-    store.write([first].into_iter().collect::<FailuresReported>())?;
+    store.write(store.read(UnreportedFailures)?.into_iter().collect::<FailuresReported>())?;
     let retold = vec![Retold::new(first, Account::told(&"went on, then halted"))];
     store.write(JobHalted::new(second, Halted::Stalled, Account::told(&"stalled")).retelling(retold))?;
     let told: Vec<String> =

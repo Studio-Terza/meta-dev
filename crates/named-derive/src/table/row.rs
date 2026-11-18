@@ -1,6 +1,6 @@
 mod boundary;
 
-use syntax::{Ident, LitStr, Variant};
+use syntax::{Attribute, Ident, LitStr, Variant};
 
 use super::case::Case;
 use boundary::Spelled;
@@ -14,18 +14,27 @@ impl Row {
     const ATTRIBUTE: &'static str = "name";
 
     pub fn declared(variant: &Variant, case: Case) -> syntax::Result<Vec<Row>> {
+        let spelled = Row::spelled(&variant.ident, case);
         let named = variant
             .attrs
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE))
-            .map(|attribute| attribute.parse_args().map(|name| Row { variant: variant.ident.clone(), name }))
+            .map(|attribute| Row::named(attribute, &spelled))
             .collect::<syntax::Result<Vec<Row>>>()?;
-        Ok(Row::defaulted(named, &variant.ident, case))
+        Ok(Row::defaulted(named, spelled))
     }
 
-    fn defaulted(named: Vec<Row>, variant: &Ident, case: Case) -> Vec<Row> {
+    fn named(attribute: &Attribute, spelled: &Row) -> syntax::Result<Row> {
+        let name: LitStr = attribute.parse_args()?;
+        let span = name.span();
+        (name.value() != spelled.name.value())
+            .then_some(Row { variant: spelled.variant.clone(), name })
+            .ok_or_else(|| syntax::Error::new(span, "this #[name] is the variant's default spelling; remove it"))
+    }
+
+    fn defaulted(named: Vec<Row>, spelled: Row) -> Vec<Row> {
         match named.first() {
-            None => vec![Row::spelled(variant, case)],
+            None => vec![spelled],
             Some(_declared) => named,
         }
     }

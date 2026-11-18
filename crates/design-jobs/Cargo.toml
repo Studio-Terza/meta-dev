@@ -14,6 +14,7 @@ doctest = false
 [dependencies]
 design-model = { path = "../design-model" }
 named-derive = { path = "../named-derive" }
+port-core = { path = "../port-core" }
 states = { path = "../states" }
 newtype = { path = "../newtype" }
 store-ports = { path = "../store-ports" }

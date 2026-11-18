@@ -262,6 +262,7 @@ name = "design"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "design-jobs",
  "design-model",
  "design-runs",
  "design-store",
@@ -350,6 +351,7 @@ dependencies = [
  "design-model",
  "named-derive",
  "newtype",
+ "port-core",
  "states",
  "store-ports",
  "thiserror",
