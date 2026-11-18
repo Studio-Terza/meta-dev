@@ -3,6 +3,7 @@ mod facts;
 mod hooks;
 
 use algebra::{Monoid, Semigroup};
+use newtype::Arbitrary;
 
 use crate::walk::Walk;
 
@@ -10,7 +11,7 @@ pub use boundary::Address;
 pub use facts::Facts;
 pub use hooks::{Contribute, Kind};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Descend {
     #[default]
     Into,
