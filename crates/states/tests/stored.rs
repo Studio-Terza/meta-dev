@@ -109,3 +109,17 @@ fn a_held_state_moves_its_row_and_a_stale_one_is_refused() -> Result<(), Box<dyn
     assert_eq!(*door::Opened::held(key).key(), key);
     Ok(())
 }
+
+#[test]
+fn a_held_state_moves_to_a_target_named_at_runtime_only_along_a_declared_edge() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<Bare>());
+    let key = Doors::placed(&store, Door::Opened)?;
+    let unlisted = store.write(door::Opened::held(key).moved(Door::Locked));
+    assert!(matches!(unlisted, Err(StoreFailure::Unmoved(_))));
+    store.write(door::Opened::held(key).moved(Door::Shut))?;
+    let elsewhere = store.write(door::Opened::held(key).moved(Door::Shut));
+    assert!(matches!(elsewhere, Err(StoreFailure::Unmoved(_))));
+    store.write(door::Shut::held(key).moved(Door::Locked))?;
+    Ok(())
+}

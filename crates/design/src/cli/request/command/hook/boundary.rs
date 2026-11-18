@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use console_ports::{Heard, Shown};
-use design_runs::{Account, FailuresReported, Unreported, UnreportedFailures};
+use design_runs::{Account, FailuresReported, UnreportedFailures};
 use design_store::Recalled;
 use grammar_search::Terms;
 use newtype::Wrapping;
@@ -141,7 +141,7 @@ impl Decision {
         told.first().map(|_first| told.join("\n")).map_or(Ok(Uttered::silent(Ok(Outcome::Hooked(event)))), |joined| {
             let decision = Decision::telling(event, joined);
             let said = decision.said()?;
-            let reported = store.write(unreported.iter().map(Unreported::job).collect::<FailuresReported>());
+            let reported = store.write(unreported.into_iter().collect::<FailuresReported>());
             Ok(Uttered::new(said, reported.map(|_reported| decision.outcome()).map_err(Failure::from)))
         })
     }

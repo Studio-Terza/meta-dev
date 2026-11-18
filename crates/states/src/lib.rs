@@ -73,6 +73,10 @@ macro_rules! states {
                 &self.0
             }
 
+            pub fn moved(self, to: super::$lifecycle) -> ::store_ports::Moved<super::$lifecycle> {
+                ::store_ports::Moved::new(self.0, ::store_ports::Edge::new(super::$lifecycle::$state, to))
+            }
+
             $(
                 pub fn $edge(self) -> ::store_ports::Moved<super::$lifecycle> {
                     ::store_ports::Moved::new(self.0, ::store_ports::Edge::new(super::$lifecycle::$state, super::$lifecycle::$target))
