@@ -11,6 +11,7 @@ use lint_layout::{Name, TestMarks, Whole, Word, words};
 use super::Lowering;
 use super::seat::{Built, Footing, Located};
 use super::signature::Written;
+use crate::namespace::TokenNames;
 use reading::Reading;
 
 #[derive(Clone, Debug)]
@@ -97,20 +98,8 @@ impl Mentions {
 
     fn beyond_title(tokens: TokenStream, kind: LawKind) -> BTreeSet<Name> {
         match kind.titled() {
-            Some(_) => Self::named(tokens.into_iter().skip_while(|tree| Self::separator(tree).is_none()).skip(1)),
-            None => Self::named(tokens.into_iter()),
-        }
-    }
-
-    fn named(trees: impl Iterator<Item = TokenTree>) -> BTreeSet<Name> {
-        trees.flat_map(Self::tree_names).collect()
-    }
-
-    fn tree_names(tree: TokenTree) -> BTreeSet<Name> {
-        match tree {
-            TokenTree::Ident(ident) => BTreeSet::from([Name::from(&ident)]),
-            TokenTree::Group(group) => Self::named(group.stream().into_iter()),
-            TokenTree::Punct(_) | TokenTree::Literal(_) => BTreeSet::new(),
+            Some(_) => TokenNames::named(tokens.into_iter().skip_while(|tree| Self::separator(tree).is_none()).skip(1)),
+            None => TokenNames::named(tokens.into_iter()),
         }
     }
 

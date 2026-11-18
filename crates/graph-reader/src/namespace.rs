@@ -6,6 +6,7 @@ mod items;
 mod port_macro;
 mod resolver;
 mod resolving;
+mod rules;
 mod scope;
 mod settling;
 mod std_names;
@@ -15,18 +16,21 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use graph::{Building, Unresolved};
+use graph::Building;
 use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::ScopeId;
+use entries::DeclaredAt;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
 pub(crate) use graph::Domain;
 pub(crate) use items::ItemIds;
 pub(crate) use port_macro::PortMacro;
 pub(crate) use resolver::Resolver;
 pub(crate) use resolving::{Invoked, Invoker, Resolving, TranscribedRow, Transcriptions};
+use rules::RulesDefinition;
+pub(crate) use rules::TokenNames;
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;
@@ -90,6 +94,15 @@ pub(crate) enum Top<'read> {
     Child { parent: ScopeId, name: Name, visibility: Visibility },
 }
 
+impl Top<'_> {
+    fn root(&self, base: ScopeId, space: &Namespace<'_>) -> Option<ScopeId> {
+        match self {
+            Top::Root { .. } => Some(base),
+            Top::Child { parent, .. } => Anchor::Crate.anchored(space.anchors(*parent)),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Namespace<'read> {
     scopes: Vec<ScopeRow>,
@@ -100,11 +113,22 @@ pub(crate) struct Namespace<'read> {
 impl<'read> Namespace<'read> {
     pub(crate) fn placed(&mut self, top: Top<'read>, openings: Openings) -> ScopeId {
         let base = ScopeId::after(&self.scopes);
+        let root = top.root(base, self);
+
         self.topped(top, openings.top.above(base));
-        openings.nested.into_iter().fold(base, |placed, opening| {
+        let placed = openings.nested.into_iter().fold(base, |placed, opening| {
             self.opened(opening.parent.above(placed), opening.kind, opening.entries.above(placed));
             placed
-        })
+        });
+        let exported = self.exported_aliases(base);
+        let rooted = exported.into_iter().filter_map(|declared| Some(declared).zip(root));
+        rooted.for_each(|(declared, scope)| self.declare(scope, declared));
+        placed
+    }
+
+    pub(super) fn exported_aliases(&self, base: ScopeId) -> Vec<Declared> {
+        let placed = ScopeId::ids(&self.scopes).zip(&self.scopes).filter(|(scope, _)| *scope >= base);
+        placed.flat_map(|(scope, row)| row.entries().exported_aliases(scope)).collect()
     }
 
     fn topped(&mut self, top: Top<'read>, entries: Entries) {
@@ -184,13 +208,8 @@ impl<'read> Namespace<'read> {
             .and_then(|root| root.row(&self.scopes).and_then(|row| row.entries().prelude(name, self, root)))
     }
 
-    pub(super) fn expanded(&self, viewer: ScopeId) -> Unresolved {
-        self.chain(viewer)
-            .iter()
-            .filter_map(|scope| scope.row(&self.scopes))
-            .map(|row| row.entries().unresolved())
-            .max()
-            .unwrap_or(Unresolved::Unbound)
+    pub(super) fn rules(&self, at: DeclaredAt) -> Option<RulesDefinition> {
+        at.scope().row(&self.scopes).and_then(|row| row.entries().rules(at.declared_id()))
     }
 
     pub(super) fn within_reach(&self, level: ScopeId, from: ScopeId) -> Option<ScopeId> {

@@ -1,6 +1,7 @@
+use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
 
-use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
+use graph::{Building, FileId, ItemDeclaration, ItemId, Mention, Region, Resolved, Seat, TypeRef};
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
@@ -153,7 +154,12 @@ impl Lowering<'_> {
         let row = TranscribedRow::read(self.here.scope(), ident, definition);
         self.lowered.rows.transcribed.push(row);
         let statements = Macros::expanded(self.source, definition);
-        self.transcribed(&statements)
+        let anchored = TranscribedRow::anchored(definition);
+        let lowering = anchored.iter().fold(self, |lowering, path| {
+            lowering.used(UsePath::from(path), Position::from(path.span()), Mention::Expanded);
+            lowering
+        });
+        lowering.transcribed(&statements)
     }
 
     fn transcribed(&mut self, statements: &[Stmt]) -> &mut Self {

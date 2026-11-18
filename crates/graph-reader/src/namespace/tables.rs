@@ -2,7 +2,7 @@ mod components;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use graph::Domain;
+use graph::{Domain, Unresolved};
 use lint_layout::Name;
 
 use super::boundary::{GlobId, Lattice, ScopeId};
@@ -86,8 +86,7 @@ impl<'rows> FromIterator<Keyed<'rows, Row<'rows>>> for Explicit<'rows> {
         placed.sort_by(|left, right| left.key.cmp(&right.key).then(left.value.layer.cmp(&right.value.layer)));
         let grouped = placed.chunk_by(|left, right| left.key == right.key).filter_map(|same| {
             let first = same.first()?;
-            let layer = same.iter().take_while(|row| row.value.layer == first.value.layer).map(|row| row.value);
-            Some((first.key, layer.collect()))
+            Some((first.key, same.iter().map(|row| row.value).collect()))
         });
         Explicit(grouped.collect())
     }
@@ -103,7 +102,9 @@ impl<'rows> Explicit<'rows> {
 
     fn named(&self, key: Key<'_>, sight: Sight) -> Option<View<'rows>> {
         let rows = self.0.get(&key)?;
-        Some(rows.iter().fold(View::ABSENT, |found, row| found.union(row.seen(sight))))
+        let layers = rows.chunk_by(|left, right| left.layer == right.layer);
+        let views = layers.map(|layer| layer.iter().map(|row| row.seen(sight)).fold(View::ABSENT, View::union));
+        Some(views.fold(View::ABSENT, |found, view| found.or_else(|| view)))
     }
 }
 
@@ -342,6 +343,7 @@ pub(crate) struct Tables<'rows> {
     explicit: Vec<Explicit<'rows>>,
     fixed: Vec<Vec<GlobView<'rows>>>,
     modules: Vec<Vec<ModuleGlob<'rows>>>,
+    declaring: Vec<Vec<Declaring<'rows>>>,
 }
 
 impl<'rows> Tables<'rows> {
@@ -349,13 +351,43 @@ impl<'rows> Tables<'rows> {
         explicit: Vec<Explicit<'rows>>,
         fixed: Vec<Vec<GlobView<'rows>>>,
         unsettled: Vec<Vec<ModuleGlob<'rows>>>,
+        declaring: Vec<Vec<Declaring<'rows>>>,
     ) -> Tables<'rows> {
         let modules = Exposure { explicit: &explicit, fixed: &fixed }.settled(unsettled);
-        Tables { explicit, fixed, modules }
+        Tables { explicit, fixed, modules, declaring }
+    }
+
+    pub(super) fn unresolved(&self, scope: ScopeId, name: &Name) -> Unresolved {
+        let globs = scope.row(&self.declaring).into_iter().flatten();
+        globs.map(|declaring| declaring.unresolved(name)).fold(Unresolved::Unbound, Ord::max)
     }
 
     pub(super) fn found(&self, scope: ScopeId, key: Key<'_>, lookup: Lookup) -> View<'rows> {
         let names = Names { explicit: &self.explicit, fixed: &self.fixed, modules: &self.modules };
         names.found(scope, key, lookup)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Declaring<'rows> {
+    Nothing,
+    Anything,
+    Only(&'rows [Name]),
+}
+
+impl Declaring<'_> {
+    fn unresolved(self, name: &Name) -> Unresolved {
+        match self {
+            Declaring::Nothing => Unresolved::Unbound,
+            Declaring::Anything => Unresolved::PossiblyMacroDeclared,
+            Declaring::Only(names) => Declaring::listed(names, name),
+        }
+    }
+
+    fn listed(names: &[Name], name: &Name) -> Unresolved {
+        match names.iter().find(|listed| *listed == name) {
+            Some(_) => Unresolved::PossiblyMacroDeclared,
+            None => Unresolved::Unbound,
+        }
     }
 }

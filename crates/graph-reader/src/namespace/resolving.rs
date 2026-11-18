@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use syntax::{Ident, Macro};
+use syntax::{Ident, Macro, Path};
 
 use graph::{Building, Domain, FileId, ItemId, ItemPath, Member, Mention, PathUse, Resolved, Seat};
 use lint_core::Macros;
@@ -72,8 +72,15 @@ pub(crate) struct Invoker<'grown, 'invoked> {
 
 impl TranscribedRow {
     pub(crate) fn read(scope: ScopeId, ident: &Ident, definition: &Macro) -> TranscribedRow {
-        let mentioned = Macros::mentioned(definition).paths().iter().map(UsePath::from).collect();
+        let found = Macros::mentioned(definition);
+        let paths = found.paths().iter().map(UsePath::from);
+        let mentioned = paths.filter(|path| path.crate_anchored().is_none()).collect();
         TranscribedRow { scope, name: UsePath::from(ident), mentioned }
+    }
+
+    pub(crate) fn anchored(definition: &Macro) -> Vec<Path> {
+        let paths = Macros::mentioned(definition).paths().to_vec();
+        paths.into_iter().filter(|path| UsePath::from(path).crate_anchored().is_some()).collect()
     }
 
     pub(crate) fn settled(&self, resolving: Resolving<'_, '_, '_>) -> Option<Transcription> {
