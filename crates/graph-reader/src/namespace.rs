@@ -24,7 +24,7 @@ use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::{KeyRole, NodeKey, ScopeId, ScopeKey, ScopeMap};
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
-use entries::{DeclaredAt, Sight};
+use entries::{DeclaredAt, Local, Sight};
 pub(crate) use graph::Domain;
 pub(crate) use items::ItemIds;
 pub(crate) use port_macro::PortMacro;
@@ -56,12 +56,12 @@ impl Export {
 struct Opening {
     parent: ScopeId,
     kind: ScopeKind,
-    entries: Entries,
+    entries: Local,
 }
 
 #[derive(Debug)]
 pub(crate) struct Openings {
-    top: Entries,
+    top: Local,
     nested: Vec<Opening>,
 }
 
@@ -83,7 +83,7 @@ impl ScopeOp {
     fn shaped(&self, scopes: &ScopeMap) -> Option<Opening> {
         match self {
             ScopeOp::Opened { parent, kind, .. } => {
-                Some(Opening { parent: scopes.scope(parent), kind: *kind, entries: Entries::default() })
+                Some(Opening { parent: scopes.scope(parent), kind: *kind, entries: Local::default() })
             }
             ScopeOp::Absorbed { .. } | ScopeOp::Declared { .. } => None,
         }
@@ -134,9 +134,12 @@ impl Openings {
         });
         let mut merged: Vec<Entries> = chunked.into_iter().map(|chunks| chunks.into_iter().collect()).collect();
         let nested_entries = merged.split_off(1);
-        let top_entries = [top].into_iter().chain(merged).collect();
-        let nested =
-            shapes.into_iter().zip(nested_entries).map(|(shape, entries)| Opening { entries, ..shape }).collect();
+        let top_entries = Local::from([top].into_iter().chain(merged).collect::<Entries>());
+        let nested = shapes
+            .into_iter()
+            .zip(nested_entries)
+            .map(|(shape, entries)| Opening { entries: Local::from(entries), ..shape })
+            .collect();
         Replayed { openings: Openings { top: top_entries, nested }, scopes }
     }
 }

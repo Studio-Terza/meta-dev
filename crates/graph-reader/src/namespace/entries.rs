@@ -152,11 +152,11 @@ impl DeclaredKind {
         }
     }
 
-    fn above(self, base: ScopeId) -> DeclaredKind {
+    fn module(self) -> Option<ScopeId> {
         match self {
-            DeclaredKind::Module(module) => DeclaredKind::Module(module.above(base)),
+            DeclaredKind::Module(module) => Some(module),
             DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Rules(_) | DeclaredKind::Alias(_) => {
-                self
+                None
             }
         }
     }
@@ -444,6 +444,25 @@ impl Glob {
 }
 
 #[derive(Debug, Default)]
+pub(crate) struct Local(Entries);
+
+impl From<Entries> for Local {
+    fn from(entries: Entries) -> Local {
+        Local(entries)
+    }
+}
+
+impl Local {
+    pub(super) fn placed(self, base: ScopeId) -> Entries {
+        let rebased = |declared: Declared| {
+            let kind = declared.kind.module().map_or(declared.kind, |module| DeclaredKind::Module(module.above(base)));
+            Declared { kind, ..declared }
+        };
+        Entries { declared: self.0.declared.into_iter().map(rebased).collect(), ..self.0 }
+    }
+}
+
+#[derive(Debug, Default)]
 pub(crate) struct Entries {
     declared: Vec<Declared>,
     imports: Vec<Import>,
@@ -570,15 +589,6 @@ impl Entries {
                 ..Declared::new(name, Visibility::Visible, DeclaredKind::Alias(at))
             })
             .collect()
-    }
-
-    pub(super) fn above(self, base: ScopeId) -> Entries {
-        let declared = self
-            .declared
-            .into_iter()
-            .map(|declared| Declared { kind: declared.kind.above(base), ..declared })
-            .collect();
-        Entries { declared, ..self }
     }
 
     pub(super) fn issued(&self, krate: Option<&Name>) -> Vec<Option<ModelItem>> {
