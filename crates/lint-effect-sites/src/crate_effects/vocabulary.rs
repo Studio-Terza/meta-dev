@@ -95,7 +95,8 @@ impl Vocabulary {
             | Mention::Interpolated
             | Mention::Dispatched
             | Mention::Typed
-            | Mention::Matched => Self::LONG.iter().chain(&Self::SHORT).find_map(|tail| tail.effected(used)),
+            | Mention::Matched
+            | Mention::Expanded => Self::LONG.iter().chain(&Self::SHORT).find_map(|tail| tail.effected(used)),
         }
     }
 

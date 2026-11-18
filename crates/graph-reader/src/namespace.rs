@@ -26,7 +26,7 @@ pub(crate) use graph::Domain;
 pub(crate) use items::ItemIds;
 pub(crate) use port_macro::PortMacro;
 pub(crate) use resolver::Resolver;
-pub(crate) use resolving::Resolving;
+pub(crate) use resolving::{Invoked, Invoker, Resolving, TranscribedRow, Transcriptions};
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;

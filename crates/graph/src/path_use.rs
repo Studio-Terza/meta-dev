@@ -14,6 +14,7 @@ pub enum Mention {
     Dispatched,
     Typed,
     Matched,
+    Expanded,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

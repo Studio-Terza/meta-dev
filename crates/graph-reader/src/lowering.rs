@@ -10,6 +10,7 @@ mod quotes;
 mod regions;
 mod seat;
 mod signature;
+
 mod uses;
 
 use std::ffi::OsStr;
@@ -33,7 +34,7 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{
     Declared, DeclaredKind, Domain, Entries, Exposing, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind,
-    Seeds, StdNames, Top, UsePath, Visibility,
+    Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
 use crate::planting::Files;
@@ -52,6 +53,7 @@ use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
 pub use signature::ReceiverSyntax;
 use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Written};
+
 use uses::UseRow;
 
 #[derive(Debug)]
@@ -284,6 +286,7 @@ pub(crate) struct FileRows {
     laws: Vec<LawRow>,
     quotes: Vec<QuoteRow>,
     places: PlaceRows,
+    transcribed: Vec<TranscribedRow>,
 }
 
 impl FileRows {
@@ -456,7 +459,13 @@ impl<'read> Plot<'read> {
         let settled = seeds.settled();
         let tables = seeds.tables(&settled);
         let ids = self.space.issued(&mut building);
-        let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids);
+        let unexpanded = Transcriptions::default();
+        let naming = Resolving::new(Resolver::new(&self.space, &tables), &ids, &unexpanded);
+        let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
+            let based = naming.based(grown.base);
+            grown.rows.transcribed.iter().filter_map(move |row| row.settled(based))
+        }));
+        let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids, &transcriptions);
         let exports = self.space.exports();
         let with_exports =
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
