@@ -6,12 +6,14 @@ use std::path::{Path, PathBuf};
 
 use crate::crate_file::CrateFile;
 use crate::crate_root::CrateRoot;
+use crate::ignored::Ignored;
 use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::packages::Packages;
 use crate::role::Role;
 use build_script::BuildScript;
 use file_ports::Files;
+use invariants::Ignoring;
 use lint_layout::{Name, Whole, Word};
 use source_directory::SourceDirectory;
 use target_directory::TargetDirectory;
@@ -42,7 +44,7 @@ impl Placement {
 
     pub(crate) fn placed(root: Option<&PackageRoot>, package: &Path, file: &Path) -> Placement {
         file.strip_prefix(package)
-            .ok()
+            .ignoring(Ignored::Outside)
             .zip(root.cloned())
             .and_then(|(inside, package_root)| Self::in_package(package_root, package, inside))
             .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
@@ -108,7 +110,7 @@ impl Placement {
 
     fn in_package(root: PackageRoot, package: &Path, inside: &Path) -> Option<Placement> {
         let first = inside.components().next()?;
-        let rest = inside.strip_prefix(first).ok()?;
+        let rest = inside.strip_prefix(first).ignoring(Ignored::Outside)?;
         let directory = first.as_os_str().to_str()?;
         PackageDirectory::from(directory).placed(root, &package.join(directory), rest)
     }

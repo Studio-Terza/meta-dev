@@ -19,6 +19,8 @@ use timer_ports::Timer;
 
 use super::boundary::Queue;
 use super::timings::{Measured, Step, Stopwatch, Table, Timing, Timings, Worker};
+use crate::cli::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(crate) struct Wired<'run, F, C, T> {
@@ -123,7 +125,7 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
     {
         let timer = self.wired.timer;
         let waiting = Stopwatch::started(timer);
-        let described = self.located().done().as_ref().ok();
+        let described = self.located().done().as_ref().ignoring(Ignored::Unlocated);
         let waited = waiting.stopped(Step::Model.waited());
         let settled = complete.settled(
             &self.gathering,

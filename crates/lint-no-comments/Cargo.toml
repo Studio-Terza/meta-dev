@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
@@ -18,3 +19,6 @@ syntax = { path = "../syntax" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
