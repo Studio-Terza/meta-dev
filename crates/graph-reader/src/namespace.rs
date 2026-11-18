@@ -9,6 +9,7 @@ mod resolving;
 mod rules;
 mod scope;
 mod settling;
+mod sown;
 mod std_names;
 mod tables;
 mod use_path;
@@ -16,7 +17,7 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use graph::Building;
+use graph::{Exports, Issued};
 use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
@@ -34,6 +35,7 @@ pub(crate) use rules::TokenNames;
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;
+pub(crate) use sown::{Sowing, Sown};
 pub(crate) use std_names::StdNames;
 pub(crate) use use_path::UsePath;
 
@@ -45,9 +47,8 @@ pub(crate) struct Export {
 }
 
 impl Export {
-    pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>, mut building: Building) -> Building {
-        building.export(self.domain, self.path.written(), &resolving.path(self.root, &self.path, self.domain));
-        building
+    pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>) -> Exports {
+        Exports::export(self.domain, self.path.written(), &resolving.path(self.root, &self.path, self.domain))
     }
 }
 
@@ -148,16 +149,38 @@ struct Chunk {
 
 #[derive(Debug)]
 pub(crate) enum Top<'read> {
-    Root { form: CrateForm, name: Option<&'read Name>, dependencies: &'read Dependencies },
+    Root(Rooted<'read>),
     Child { parent: ScopeId, name: Name, visibility: Visibility },
 }
 
-impl Top<'_> {
-    fn root(&self, base: ScopeId, space: &Namespace<'_>) -> Option<ScopeId> {
+impl<'read> Top<'read> {
+    fn root(&self, sowing: Sowing<'_, 'read>) -> Option<ScopeId> {
         match self {
-            Top::Root { .. } => Some(base),
-            Top::Child { parent, .. } => Anchor::Crate.anchored(space.anchors(*parent)),
+            Top::Root(_) => Some(sowing.base()),
+            Top::Child { parent, .. } => Anchor::Crate.anchored(sowing.anchors(*parent)),
         }
+    }
+
+    fn sown(self, sowing: Sowing<'_, 'read>, entries: Entries) -> Sown<'read> {
+        match self {
+            Top::Root(rooted) => rooted.sown(sowing.base(), entries),
+            Top::Child { parent, name, visibility } => {
+                sowing.child(parent, Declared::new(name, visibility, DeclaredKind::Module(sowing.base())), entries)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Rooted<'read> {
+    form: CrateForm,
+    name: Option<&'read Name>,
+    dependencies: &'read Dependencies,
+}
+
+impl<'read> Rooted<'read> {
+    pub(crate) fn new(form: CrateForm, name: Option<&'read Name>, dependencies: &'read Dependencies) -> Rooted<'read> {
+        Rooted { form, name, dependencies }
     }
 }
 
@@ -169,67 +192,6 @@ pub(crate) struct Namespace<'read> {
 }
 
 impl<'read> Namespace<'read> {
-    pub(crate) fn placed(&mut self, top: Top<'read>, openings: Openings) -> ScopeId {
-        let base = ScopeId::after(&self.scopes);
-        let root = top.root(base, self);
-
-        self.topped(top, openings.top.above(base));
-        let placed = openings.nested.into_iter().fold(base, |placed, opening| {
-            self.opened(opening.parent.above(placed), opening.kind, opening.entries.above(placed));
-            placed
-        });
-        let exported = self.exported_aliases(base);
-        let rooted = exported.into_iter().filter_map(|declared| Some(declared).zip(root));
-        rooted.for_each(|(declared, scope)| self.declare(scope, declared));
-        placed
-    }
-
-    pub(super) fn exported_aliases(&self, base: ScopeId) -> Vec<Declared> {
-        let placed = ScopeId::ids(&self.scopes).zip(&self.scopes).filter(|(scope, _)| *scope >= base);
-        placed.flat_map(|(scope, row)| row.entries().exported_aliases(scope)).collect()
-    }
-
-    fn topped(&mut self, top: Top<'read>, entries: Entries) {
-        match top {
-            Top::Root { form, name, dependencies } => self.planted(form, name, dependencies, entries),
-            Top::Child { parent, name, visibility } => self.child_opened(parent, name, visibility, entries),
-        }
-    }
-
-    fn child_opened(&mut self, parent: ScopeId, name: Name, visibility: Visibility, entries: Entries) {
-        let scope = self.opened(parent, ScopeKind::Module, entries);
-        self.declare(parent, Declared::new(name, visibility, DeclaredKind::Module(scope)));
-    }
-
-    fn planted(
-        &mut self,
-        form: CrateForm,
-        name: Option<&'read Name>,
-        dependencies: &'read Dependencies,
-        entries: Entries,
-    ) {
-        let root = ScopeId::after(&self.scopes);
-        self.scopes.push(ScopeRow::root(root, form, entries));
-        self.crates.extend(name.map(|crate_name| (crate_name, root)));
-        self.dependencies.insert(root, dependencies);
-    }
-
-    fn opened(&mut self, parent: ScopeId, kind: ScopeKind, entries: Entries) -> ScopeId {
-        let scope = ScopeId::after(&self.scopes);
-        let child = parent.row(&self.scopes).map(|row| kind.opened(row, scope, entries));
-        self.scopes.extend(child);
-        scope
-    }
-
-    pub(crate) fn declare(&mut self, scope: ScopeId, declared: Declared) {
-        scope
-            .row_mut(&mut self.scopes)
-            .map(ScopeRow::entries_mut)
-            .zip(Some(declared))
-            .into_iter()
-            .for_each(|(entries, item)| entries.declare(item));
-    }
-
     pub(crate) fn exports(&self) -> Vec<Export> {
         self.crates
             .iter()
@@ -244,12 +206,9 @@ impl<'read> Namespace<'read> {
             .collect()
     }
 
-    pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {
+    pub(crate) fn issued(&self) -> Issued {
         let roots: BTreeMap<ScopeId, &Name> = self.crates.iter().map(|(name, root)| (*root, *name)).collect();
-        self.scopes
-            .iter()
-            .map(|row| row.issued(building, row.outermost().and_then(|root| roots.get(&root).copied())))
-            .collect()
+        self.scopes.iter().map(|row| row.issued(row.outermost().and_then(|root| roots.get(&root).copied()))).collect()
     }
 
     pub(super) fn anchors(&self, scope: ScopeId) -> Anchors {
