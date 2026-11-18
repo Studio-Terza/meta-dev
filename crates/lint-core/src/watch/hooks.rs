@@ -1,11 +1,14 @@
-use syntax::{Ident, Macro};
+use syntax::{Ident, Macro, Node};
 
 use algebra::Monoid;
 use lint_layout::Name;
 
 use super::Descend;
 use super::facts::Facts;
-use crate::contribution::{Around, Contributed, Contributing, Contribution, Scope};
+use crate::contribution::{Around, Contributed, Contributing, Contribution, Scope, Visit, Walked};
+use crate::kind_index::Indexed;
+use crate::macros::Macros;
+use crate::source_file::SourceFile;
 
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ident;)*) => {
@@ -18,83 +21,14 @@ macro_rules! hooks {
 
         impl Kind {
             pub const ALL: &'static [Kind] = &[Kind::Macro, Kind::Ident, $(Kind::$kind,)*];
-        }
 
-        #[derive(Debug)]
-        pub struct ByKind<Value> {
-            on_macro: Value,
-            on_ident: Value,
-            $($on: Value,)*
-        }
-
-        impl<Value> ByKind<Value> {
-            pub fn filled(mut fill: impl FnMut(Kind) -> Value) -> ByKind<Value> {
-                ByKind { on_macro: fill(Kind::Macro), on_ident: fill(Kind::Ident), $($on: fill(Kind::$kind),)* }
-            }
-
-            pub fn get(&self, kind: Kind) -> &Value {
-                match kind {
-                    Kind::Macro => &self.on_macro,
-                    Kind::Ident => &self.on_ident,
-                    $(Kind::$kind => &self.$on,)*
+            pub(crate) fn of(node: Node<'_>) -> Kind {
+                match node {
+                    Node::Macro(_) => Kind::Macro,
+                    Node::Ident(_) => Kind::Ident,
+                    $(Node::$kind(_) => Kind::$kind,)*
                 }
             }
-        }
-
-        pub trait Watch<'ast> {
-            fn kinds(&self) -> &[Kind];
-
-            fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-                Descend::Into
-            }
-
-            fn off_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) {}
-
-            fn on_ident(&mut self, _: &'ast Ident, _: &Name) -> Descend {
-                Descend::Into
-            }
-
-            fn off_ident(&mut self, _: &'ast Ident) {}
-
-            $(
-                fn $on(&mut self, _: &'ast syntax::$node, _: &Facts<'_, syntax::$node>) -> Descend {
-                    Descend::Into
-                }
-
-                fn $off(&mut self, _: &'ast syntax::$node, _: &Facts<'_, syntax::$node>) {}
-            )*
-        }
-
-        impl<'ast, Inner: Watch<'ast> + ?Sized> Watch<'ast> for &mut Inner {
-            fn kinds(&self) -> &[Kind] {
-                (**self).kinds()
-            }
-
-            fn on_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
-                (**self).on_macro(node, facts)
-            }
-
-            fn off_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) {
-                (**self).off_macro(node, facts);
-            }
-
-            fn on_ident(&mut self, node: &'ast Ident, name: &Name) -> Descend {
-                (**self).on_ident(node, name)
-            }
-
-            fn off_ident(&mut self, node: &'ast Ident) {
-                (**self).off_ident(node);
-            }
-
-            $(
-                fn $on(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) -> Descend {
-                    (**self).$on(node, facts)
-                }
-
-                fn $off(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) {
-                    (**self).$off(node, facts);
-                }
-            )*
         }
 
         pub trait Contribute {
@@ -107,7 +41,7 @@ macro_rules! hooks {
                 &[]
             }
 
-            fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _: Around<'_, Self::Open, Self::Part>) -> Contributed<Self::Open, Self::Part> {
+            fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _: &Around<'_, Self::Open>) -> Contributed<Self::Open, Self::Part> {
                 Contributed::descending(Descend::Into)
             }
 
@@ -115,7 +49,7 @@ macro_rules! hooks {
                 inner.concluded(|_, part| part)
             }
 
-            fn on_ident(&self, _: &Ident, _: &Name, _: Around<'_, Self::Open, Self::Part>) -> Contributed<Self::Open, Self::Part> {
+            fn on_ident(&self, _: &Ident, _: &Name, _: &Around<'_, Self::Open>) -> Contributed<Self::Open, Self::Part> {
                 Contributed::descending(Descend::Into)
             }
 
@@ -124,7 +58,7 @@ macro_rules! hooks {
             }
 
             $(
-                fn $on(&self, _: &syntax::$node, _: &Facts<'_, syntax::$node>, _: Around<'_, Self::Open, Self::Part>) -> Contributed<Self::Open, Self::Part> {
+                fn $on(&self, _: &syntax::$node, _: &Facts<'_, syntax::$node>, _: &Around<'_, Self::Open>) -> Contributed<Self::Open, Self::Part> {
                     Contributed::descending(Descend::Into)
                 }
 
@@ -139,94 +73,90 @@ macro_rules! hooks {
             )*
         }
 
-        impl<'ast, Contributor: Contribute> Watch<'ast> for Contributing<Contributor> {
-            fn kinds(&self) -> &[Kind] {
-                self.watched()
-            }
-
-            fn on_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
-                self.entered(Kind::Macro, |contributor, around| contributor.on_macro(node, facts, around))
-            }
-
-            fn off_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) {
-                self.left(Kind::Macro, |contributor, inner| contributor.off_macro(node, facts, inner));
-            }
-
-            fn on_ident(&mut self, node: &'ast Ident, name: &Name) -> Descend {
-                self.entered(Kind::Ident, |contributor, around| contributor.on_ident(node, name, around))
-            }
-
-            fn off_ident(&mut self, node: &'ast Ident) {
-                self.left(Kind::Ident, |contributor, inner| contributor.off_ident(node, inner));
+        impl<Contributor: Contribute> Contributing<Contributor> {
+            pub(crate) fn dispatched(
+                &self,
+                file: Option<&SourceFile>,
+                node: Node<'_>,
+                indexed: Option<Indexed<'_>>,
+                around: &Around<'_, Contributor::Open>,
+            ) -> Walked<Contributor::Open, Contributor::Part> {
+                match node {
+                    Node::Macro(found) => self.macro_walked(file, found, indexed, around),
+                    Node::Ident(found) => self.ident_walked(file, found, indexed, around),
+                    $(Node::$kind(found) => match self.watches(Kind::$kind) {
+                        None => self.unwatched(file, node, indexed.map(Indexed::children), around),
+                        Some(kind) => self.$visit(file, kind, found, indexed, around),
+                    },)*
+                }
             }
 
             $(
-                fn $on(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) -> Descend {
-                    self.entered(Kind::$kind, |contributor, around| contributor.$on(node, facts, around))
-                }
-
-                fn $off(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) {
-                    self.left(Kind::$kind, |contributor, inner| contributor.$off(node, facts, inner));
+                fn $visit(
+                    &self,
+                    file: Option<&SourceFile>,
+                    kind: Kind,
+                    found: &syntax::$node,
+                    indexed: Option<Indexed<'_>>,
+                    around: &Around<'_, Contributor::Open>,
+                ) -> Walked<Contributor::Open, Contributor::Part> {
+                    let facts = Facts::new(found);
+                    self.entered(
+                        Visit::new(file, kind, Node::$kind(found), indexed),
+                        around,
+                        |contributor: &Contributor, around: &Around<'_, Contributor::Open>| contributor.$on(found, &facts, around),
+                        |contributor: &Contributor, inner| contributor.$off(found, &facts, inner),
+                    )
                 }
             )*
-        }
 
-        #[macro_export]
-        macro_rules! scope_nodes {
-            () => {
-                fn kinds(&self) -> &[$crate::Kind] {
-                    &self.kinds
+            fn macro_walked(
+                &self,
+                file: Option<&SourceFile>,
+                found: &Macro,
+                indexed: Option<Indexed<'_>>,
+                around: &Around<'_, Contributor::Open>,
+            ) -> Walked<Contributor::Open, Contributor::Part> {
+                file.map_or_default(|source| Macros::pin(source, found));
+                let node = Node::Macro(found);
+                match self.watches(Kind::Macro) {
+                    None => self.unwatched(file, node, indexed.map(Indexed::children), around),
+                    Some(kind) => self.macro_entered(Visit::new(file, kind, node, indexed), found, around),
                 }
+            }
 
-                fn on_macro(&mut self, node: &'ast syntax::Macro, facts: &$crate::Facts<'_, syntax::Macro>) -> $crate::Descend {
-                    self.entered($crate::Kind::Macro, $crate::Address::from(node), &mut |watcher| watcher.on_macro(node, facts))
-                }
+            fn macro_entered(
+                &self,
+                visit: Visit<'_, '_, '_>,
+                found: &Macro,
+                around: &Around<'_, Contributor::Open>,
+            ) -> Walked<Contributor::Open, Contributor::Part> {
+                let facts = Facts::new(found);
+                self.entered(
+                    visit,
+                    around,
+                    |contributor: &Contributor, around: &Around<'_, Contributor::Open>| contributor.on_macro(found, &facts, around),
+                    |contributor: &Contributor, inner| contributor.off_macro(found, &facts, inner),
+                )
+            }
 
-                fn off_macro(&mut self, node: &'ast syntax::Macro, facts: &$crate::Facts<'_, syntax::Macro>) {
-                    self.left($crate::Kind::Macro, $crate::Address::from(node), &mut |watcher| watcher.off_macro(node, facts));
-                }
-
-                fn on_ident(&mut self, node: &'ast syntax::Ident, name: &lint_layout::Name) -> $crate::Descend {
-                    self.entered($crate::Kind::Ident, $crate::Address::from(node), &mut |watcher| watcher.on_ident(node, name))
-                }
-
-                fn off_ident(&mut self, node: &'ast syntax::Ident) {
-                    self.left($crate::Kind::Ident, $crate::Address::from(node), &mut |watcher| watcher.off_ident(node));
-                }
-
-                $(
-                    fn $on(&mut self, node: &'ast syntax::$node, facts: &$crate::Facts<'_, syntax::$node>) -> $crate::Descend {
-                        self.entered($crate::Kind::$kind, $crate::Address::from(node), &mut |watcher| watcher.$on(node, facts))
-                    }
-
-                    fn $off(&mut self, node: &'ast syntax::$node, facts: &$crate::Facts<'_, syntax::$node>) {
-                        self.left($crate::Kind::$kind, $crate::Address::from(node), &mut |watcher| watcher.$off(node, facts));
-                    }
-                )*
-            };
-        }
-
-        #[macro_export]
-        macro_rules! sweep_nodes {
-            () => {
-                fn around(&mut self, node: Node<'_>, descend: &mut dyn FnMut(&mut Self)) {
-                    match node {
-                        Node::Macro(found) => self.macro_around(found, descend),
-                        Node::Ident(found) => self.ident_around(found),
-                        $(
-                            Node::$kind(found) => {
-                                let facts = $crate::Facts::new(found);
-                                self.around_kind(
-                                    $crate::Kind::$kind,
-                                    |watcher| watcher.$on(found, &facts),
-                                    descend,
-                                    |watcher| watcher.$off(found, &facts),
-                                );
-                            }
-                        )*
-                    }
-                }
-            };
+            fn ident_walked(
+                &self,
+                file: Option<&SourceFile>,
+                found: &Ident,
+                indexed: Option<Indexed<'_>>,
+                around: &Around<'_, Contributor::Open>,
+            ) -> Walked<Contributor::Open, Contributor::Part> {
+                let name = self.watches(Kind::Ident).map(|_| Name::from(found));
+                name.map_or_default(|named| {
+                    self.entered(
+                        Visit::new(file, Kind::Ident, Node::Ident(found), indexed),
+                        around,
+                        |contributor: &Contributor, around: &Around<'_, Contributor::Open>| contributor.on_ident(found, &named, around),
+                        |contributor: &Contributor, inner| contributor.off_ident(found, inner),
+                    )
+                })
+            }
         }
     };
 }

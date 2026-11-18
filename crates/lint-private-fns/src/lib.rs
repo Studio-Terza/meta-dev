@@ -95,7 +95,7 @@ impl Contribute for PrivateFnCounter<'_> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), PrivateNames> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -104,7 +104,7 @@ impl Contribute for PrivateFnCounter<'_> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), PrivateNames> {
         Contributed::descending(Descend::Expand)
     }
@@ -113,7 +113,7 @@ impl Contribute for PrivateFnCounter<'_> {
         &self,
         item: &ItemImpl,
         _: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), PrivateNames> {
         let counted =
             Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)));

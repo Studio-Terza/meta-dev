@@ -75,7 +75,7 @@ impl<'file> Contribute for OutParams<'file> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Found<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -84,17 +84,12 @@ impl<'file> Contribute for OutParams<'file> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Found<'file> {
         Contributed::descending(facts.inherent().map_or(Descend::Over, |_| Descend::Into))
     }
 
-    fn on_macro(
-        &self,
-        _: &Macro,
-        _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
-    ) -> Found<'file> {
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _around: &lint_sweep::Around<'_, Self::Open>) -> Found<'file> {
         Contributed::descending(Descend::Expand)
     }
 
@@ -102,7 +97,7 @@ impl<'file> Contribute for OutParams<'file> {
         &self,
         signature: &Signature,
         facts: &Facts<'_, Signature>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Found<'file> {
         let path = self.path;
         let found = signature

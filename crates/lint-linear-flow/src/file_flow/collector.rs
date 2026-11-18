@@ -7,9 +7,7 @@ use syntax::{
 
 use algebra::{Monoid, Semigroup};
 use lint_core::SourceFile;
-use lint_sweep::{
-    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Ranked, Ranks, Scope, Sweep,
-};
+use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Ranked, Ranks, Scope};
 
 use super::FileFlow;
 use crate::finding::{Finding, Rule};
@@ -42,9 +40,7 @@ impl<'file> Flows<'file> {
 
 impl<'file> Collector<'file> {
     pub fn collected(file: &'file SourceFile) -> Vec<FunctionFlow<'file>> {
-        let mut collecting = Contributing::new(Collector { file });
-        Sweep::watching(file, vec![&mut collecting]);
-        collecting.concluded(|_, (), flows| flows.closed)
+        Contributing::new(Collector { file }).concluded(file, |_, (), flows| flows.closed)
     }
 
     pub fn watching(file: &'file SourceFile) -> Contributing<Collector<'file>> {
@@ -138,7 +134,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Contributed::descending(Descend::Expand)
     }
@@ -147,7 +143,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         expr: &ExprIf,
         _: &Facts<'_, ExprIf>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::branched(self.path(), expr))
     }
@@ -156,7 +152,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         expr: &ExprMatch,
         _: &Facts<'_, ExprMatch>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::matched(self.path(), expr))
     }
@@ -165,7 +161,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         expr: &ExprWhile,
         _: &Facts<'_, ExprWhile>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::looped(self.path(), expr.while_token.span, Finding::While))
     }
@@ -174,7 +170,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         expr: &ExprForLoop,
         _: &Facts<'_, ExprForLoop>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::looped(self.path(), expr.for_token.span, Finding::For))
     }
@@ -183,7 +179,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         expr: &ExprLoop,
         _: &Facts<'_, ExprLoop>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::looped(self.path(), expr.loop_token.span, Finding::Loop))
     }
@@ -192,7 +188,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         local: &Local,
         _: &Facts<'_, Local>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::bound(self.path(), local))
     }
@@ -201,7 +197,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         expr: &ExprBinary,
         _: &Facts<'_, ExprBinary>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::joined(self.path(), expr))
     }
@@ -210,7 +206,7 @@ impl<'file> Contribute for Collector<'file> {
         &self,
         expr: &ExprUnary,
         _: &Facts<'_, ExprUnary>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::negated(self.path(), expr))
     }

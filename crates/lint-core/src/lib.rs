@@ -4,6 +4,7 @@ mod contribution;
 mod gate;
 mod headline;
 mod ignored;
+mod kind_index;
 mod lint;
 mod macro_aliases;
 mod macros;
@@ -38,6 +39,6 @@ pub use syntax::Syntax;
 pub use test_file::TestFile;
 pub use type_name::TypeName;
 pub use walk::Walk;
-pub use watch::{Address, ByKind, Contribute, Descend, Facts, Kind, Watch, Watching};
+pub use watch::{Address, Contribute, Descend, Facts, Kind};
 
 pub use lint_layout::SourceText;

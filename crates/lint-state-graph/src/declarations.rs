@@ -8,7 +8,7 @@ use syntax::{ItemImpl, ItemMod, ItemType};
 
 use lint_core::Parsed;
 use lint_core::TypeName;
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 pub use vertex::Vertex;
 
 #[derive(Debug)]
@@ -42,14 +42,11 @@ impl From<Parsed<'_, '_>> for DeclarationGathering {
 }
 
 impl Gathers<Option<Declarations>> for DeclarationGathering {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        let all: Vec<&mut Watching<'_>> = vec![&mut self.reading];
-        self.shipped.map_or_default(|()| all)
-    }
-
-    fn gathered(self) -> Option<Declarations> {
-        let reading = self.reading.concluded(|_, (), reading| reading);
-        self.shipped.map(|()| Declarations { vertices: reading.vertices, aliases: reading.aliases })
+    fn gathered(self, file: &SourceFile) -> Option<Declarations> {
+        self.shipped.map(|()| {
+            let reading = self.reading.concluded(file, |_, (), reading| reading);
+            Declarations { vertices: reading.vertices, aliases: reading.aliases }
+        })
     }
 }
 
@@ -113,7 +110,7 @@ impl Contribute for DeclarationScan {
         &self,
         item: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), DeclarationReading> {
         let descend = Descend::from(facts.gate());
         let vertices = descend.entered().and_then(|_| Declarations::vertex(item)).into_iter().collect();
@@ -124,7 +121,7 @@ impl Contribute for DeclarationScan {
         &self,
         item: &ItemType,
         _: &Facts<'_, ItemType>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), DeclarationReading> {
         let aliases = BTreeMap::from([(TypeName::named(&item.ident), TypeName::from_type(&item.ty))]);
         Contributed::new((), DeclarationReading { vertices: BTreeSet::new(), aliases }, Descend::Over)
@@ -134,7 +131,7 @@ impl Contribute for DeclarationScan {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), DeclarationReading> {
         Contributed::descending(Descend::from(facts.gate()))
     }

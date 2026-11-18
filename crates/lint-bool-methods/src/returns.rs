@@ -55,7 +55,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -64,7 +64,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         function: &ItemFn,
         _: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         self.opened(&function.attrs, &function.sig)
     }
@@ -73,7 +73,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         Contributed::descending(
             facts.inherent().map_or(Descend::Over, |_| Descend::Into).then(|| Descend::from(facts.gate())),
@@ -84,7 +84,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         method: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }
@@ -93,7 +93,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         _: &ItemTrait,
         facts: &Facts<'_, ItemTrait>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -102,7 +102,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         method: &TraitItemFn,
         _: &Facts<'_, TraitItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }

@@ -82,7 +82,7 @@ impl Contribute for DeclaredGraphs<'_, '_> {
         &self,
         item: &ItemUse,
         _: &Facts<'_, ItemUse>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Invoked> {
         let aliases = self.names.renamed(&item.tree);
         Contributed::new((), Invoked { aliases, invocations: Vec::new() }, Descend::Over)
@@ -92,7 +92,7 @@ impl Contribute for DeclaredGraphs<'_, '_> {
         &self,
         invocation: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Invoked> {
         Contributed::new(
             (),

@@ -63,7 +63,7 @@ impl Contribute for SupportScan {
         &self,
         module: &ItemMod,
         _: &Facts<'_, ItemMod>,
-        _around: crate::Around<'_, Self::Open, Self::Part>,
+        _around: &crate::Around<'_, Self::Open>,
     ) -> Contributed<(), SupportModules> {
         let names = module
             .content

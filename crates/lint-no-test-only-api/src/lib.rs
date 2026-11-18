@@ -20,7 +20,7 @@ use lint_core::{FileHead, Headline, Parsed, Report};
 use lint_file::WorkspaceLint;
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_placement::{CrateName, PackageRoot};
-use lint_sweep::{Contributing, Gathers, Watchers, Watching};
+use lint_sweep::{Contributing, Finds, Gathers, Watchers};
 use offered::{Offer, Used};
 use test_features::TestFeatures;
 use workspace_metadata::Metadata;
@@ -56,13 +56,12 @@ pub struct TestOnly<'head> {
     manifests: BTreeMap<&'head PackageRoot, &'head Path>,
 }
 
-impl<'head> Gathers<FileManifest<'head>> for FileManifest<'head> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Vec::new()
-    }
+#[derive(Debug)]
+pub struct ManifestGathering<'head>(FileManifest<'head>);
 
-    fn gathered(self) -> FileManifest<'head> {
-        self
+impl<'head> Gathers<FileManifest<'head>> for ManifestGathering<'head> {
+    fn gathered(self, _: &SourceFile) -> FileManifest<'head> {
+        self.0
     }
 }
 
@@ -91,25 +90,28 @@ impl ContextLint for NoTestOnlyApi {
     type Part<'head> = FileManifest<'head>;
     type Context<'head> = TestOnly<'head>;
 
-    type Gathering<'head> = FileManifest<'head>;
+    type Gathering<'head> = ManifestGathering<'head>;
 
-    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> FileManifest<'head> {
-        FileManifest { path: AsRef::<Path>::as_ref(parsed.head()), package: parsed.head().placement().package() }
+    fn gathering<'head>(parsed: Parsed<'_, 'head>) -> ManifestGathering<'head> {
+        ManifestGathering(FileManifest {
+            path: AsRef::<Path>::as_ref(parsed.head()),
+            package: parsed.head().placement().package(),
+        })
     }
 }
 
 impl WatchingLint for NoTestOnlyApi {
     type Found<'file> = Offered<'file>;
-    type Watched<'file> = Offered<'file>;
+    type Watched<'file> = Offering<'file>;
 
-    fn watched(file: &SourceFile) -> Offered<'_> {
+    fn watched(file: &SourceFile) -> Offering<'_> {
         let path = AsRef::<Path>::as_ref(file.head());
         let shipped = file.shipped().map(|_| ());
-        let gated = shipped
-            .into_iter()
-            .fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(Contributing::new(GatedItems::from(path)))));
-        let watchers = gated.and(Box::new(Contributing::new(TestFeatures::from(path))));
-        Offered { watchers, found: Vec::new() }
+        let gated =
+            shipped.map(|()| -> Box<dyn Finds<'_> + '_> { Box::new(Contributing::new(GatedItems::from(path))) });
+        let features: Box<dyn Finds<'_> + '_> = Box::new(Contributing::new(TestFeatures::from(path)));
+        let watchers = gated.into_iter().chain([features]).collect();
+        Offering { watchers }
     }
 
     fn judged<'file, 'head: 'file>(
@@ -126,19 +128,18 @@ impl WatchingLint for NoTestOnlyApi {
 }
 
 #[derive(Debug)]
-pub struct Offered<'file> {
+pub struct Offering<'file> {
     watchers: Watchers<'file>,
+}
+
+#[derive(Debug)]
+pub struct Offered<'file> {
     found: Vec<Violation<'file>>,
 }
 
-impl<'file> Gathers<Offered<'file>> for Offered<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        self.watchers.watching()
-    }
-
-    fn gathered(self) -> Offered<'file> {
-        let found = self.watchers.gathered();
-        Offered { watchers: Watchers::none(), found }
+impl<'file> Gathers<Offered<'file>> for Offering<'file> {
+    fn gathered(self, file: &SourceFile) -> Offered<'file> {
+        Offered { found: self.watchers.gathered(file) }
     }
 }
 

@@ -178,7 +178,7 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shapes<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -187,7 +187,7 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shapes<'scan>> {
         Contributed::descending(facts.inherent().map_or(Descend::Over, |_| Descend::Into))
     }
@@ -196,7 +196,7 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         &self,
         item: &ItemStruct,
         _: &Facts<'_, ItemStruct>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shapes<'scan>> {
         self.fields(&item.fields)
     }
@@ -214,7 +214,7 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         &self,
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shapes<'scan>> {
         let found =
             item.variants.iter().flat_map(|variant| variant.fields.iter().filter_map(|field| self.bool_field(field)));
@@ -244,7 +244,7 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shapes<'scan>> {
         Contributed::descending(Descend::Expand)
     }
@@ -272,7 +272,7 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         &self,
         tuple: &TypeTuple,
         _: &Facts<'_, TypeTuple>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shapes<'scan>> {
         Self::loose(tuple.elems.first().map(|_| TypeShape::TUPLE))
     }
@@ -281,7 +281,7 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         &self,
         path: &TypePath,
         _: &Facts<'_, TypePath>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shapes<'scan>> {
         Self::loose(TypeShape::string_error(path))
     }

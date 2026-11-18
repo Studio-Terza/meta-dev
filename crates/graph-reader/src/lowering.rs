@@ -14,7 +14,7 @@ mod signature;
 mod uses;
 mod walk;
 
-use algebra::{Monoid, Semigroup};
+use algebra::{Catenation, Monoid, Semigroup};
 use std::ffi::OsStr;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -556,7 +556,7 @@ enum Grain {
 
 #[derive(Debug, Default)]
 pub(crate) struct Grains {
-    grains: Vec<Grain>,
+    grains: Catenation<Grain>,
     bodied: Option<()>,
 }
 
@@ -571,7 +571,7 @@ impl Monoid for Grains {}
 impl From<Grain> for Grains {
     fn from(grain: Grain) -> Grains {
         let bodied = grain.bodied();
-        Grains { grains: vec![grain], bodied }
+        Grains { grains: Catenation::from(vec![grain]), bodied }
     }
 }
 

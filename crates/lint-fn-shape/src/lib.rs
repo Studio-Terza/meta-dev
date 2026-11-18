@@ -194,7 +194,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -203,7 +203,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -212,7 +212,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         _: &ItemTrait,
         facts: &Facts<'_, ItemTrait>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -221,7 +221,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         Contributed::descending(Descend::Expand)
     }
@@ -230,7 +230,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         _: &ItemFn,
         facts: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -239,7 +239,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         _: &ImplItemFn,
         facts: &Facts<'_, ImplItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -248,7 +248,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         signature: &Signature,
         _: &Facts<'_, Signature>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         let typed = signature.inputs.iter().filter(|argument| matches!(argument, FnArg::Typed(_))).count();
         let wide = FnShape::PARAMETERS.allows(Length::new(typed)).map_or(Some(signature.ident.span()), |_| None);
@@ -261,7 +261,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         local: &Local,
         _: &Facts<'_, Local>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         let boolean =
             FnShape::binds_bool(local).map(|binding| Self::found(self.path, binding.span(), Finding::BooleanLocal));
@@ -277,7 +277,7 @@ impl<'scan> Contribute for Shapes<'scan> {
         &self,
         call: &ExprMethodCall,
         _: &Facts<'_, ExprMethodCall>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Shaped<'scan>> {
         Self::findings(
             call.args

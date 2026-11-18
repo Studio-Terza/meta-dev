@@ -13,12 +13,13 @@ use super::function_shape::{Body, FunctionShape, Returns};
 use super::impl_context::WrittenImpl;
 use super::impl_context::{ImplContext, ImplKind};
 use crate::receiving::Receiving;
+use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::{Bound, Site};
 use lint_file::Concluded;
 use lint_layout::{Length, Name};
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 use role::Role;
 
 #[derive(Debug)]
@@ -43,12 +44,8 @@ pub struct Written<'file> {
 }
 
 impl<'file> Gathers<Written<'file>> for EdgeScan<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(&mut self.impls)
-    }
-
-    fn gathered(self) -> Written<'file> {
-        Written { path: self.path, impls: self.impls.concluded(|_, (), impls| impls) }
+    fn gathered(self, file: &SourceFile) -> Written<'file> {
+        Written { path: self.path, impls: self.impls.concluded(file, |_, (), impls| impls) }
     }
 }
 
@@ -133,7 +130,7 @@ impl Contribute for ImplScan {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<WrittenImpl>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -142,7 +139,7 @@ impl Contribute for ImplScan {
         &self,
         item: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<WrittenImpl>> {
         let descend = Descend::from(facts.gate());
         Contributed::new((), descend.entered().map(|_| WrittenImpl::from(item)).into_iter().collect(), descend)

@@ -6,9 +6,7 @@ use crate::walk::Walk;
 
 pub use boundary::Address;
 pub use facts::Facts;
-pub use hooks::{ByKind, Contribute, Kind, Watch};
-
-pub type Watching<'run> = dyn for<'ast> Watch<'ast> + 'run;
+pub use hooks::{Contribute, Kind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Descend {
@@ -36,5 +34,15 @@ impl Descend {
     #[must_use]
     pub fn then(self, next: impl FnOnce() -> Descend) -> Descend {
         self.entered().map_or(self, |_| next())
+    }
+}
+
+impl Descend {
+    pub(crate) fn descends(self) -> Option<()> {
+        matches!(self, Descend::Into | Descend::Unfold).then_some(())
+    }
+
+    pub(crate) fn expanding<Invocation>(self, invocation: Option<Invocation>) -> Option<Invocation> {
+        invocation.filter(|_| matches!(self, Descend::Expand | Descend::Unfold))
     }
 }

@@ -230,7 +230,7 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Candidates<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -348,7 +348,7 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Candidates<'scan>> {
         Contributed::descending(Descend::Expand)
     }
@@ -357,7 +357,7 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         &self,
         cast: &ExprCast,
         _: &Facts<'_, ExprCast>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Candidates<'scan>> {
         Contributed::parted(Candidates { casts: vec![cast.as_token.span], ..Candidates::default() })
     }
@@ -366,7 +366,7 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         &self,
         expr: &ExprWhile,
         _: &Facts<'_, ExprWhile>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Candidates<'scan>> {
         let counted = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted);
         Contributed::parted(Candidates {
@@ -388,7 +388,7 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         &self,
         expr: &ExprLoop,
         _: &Facts<'_, ExprLoop>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Candidates<'scan>> {
         Self::looped(
             expr.loop_token.span,
@@ -403,7 +403,7 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         &self,
         expr: &ExprForLoop,
         _: &Facts<'_, ExprForLoop>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Candidates<'scan>> {
         Self::looped(
             expr.for_token.span,

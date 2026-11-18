@@ -11,7 +11,7 @@ use std::path::Path;
 use lint_core::{Bound, Parsed, Site, Walk};
 use lint_layout::{LineNumber, TestMarks};
 use lint_sweep::{
-    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope, Sweep, Watching,
+    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope, Sweep,
 };
 
 use crate::Occurrences;
@@ -198,7 +198,7 @@ impl<'file> Contribute for ShapeScan<'file> {
         &self,
         block: &Block,
         _: &Facts<'_, Block>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Sighted<'file>>> {
         self.considered(Edges::of_block(block))
     }
@@ -207,7 +207,7 @@ impl<'file> Contribute for ShapeScan<'file> {
         &self,
         found: &ExprMatch,
         _: &Facts<'_, ExprMatch>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Sighted<'file>>> {
         self.considered(Edges::of_match(found))
     }
@@ -216,20 +216,16 @@ impl<'file> Contribute for ShapeScan<'file> {
         &self,
         found: &ExprClosure,
         _: &Facts<'_, ExprClosure>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Sighted<'file>>> {
         self.considered(Edges::of_closure(found))
     }
 }
 
 impl<'file> Gathers<Occurrences<'file>> for Scan<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.shapes)
-    }
-
-    fn gathered(self) -> Occurrences<'file> {
+    fn gathered(self, file: &SourceFile) -> Occurrences<'file> {
         let kind = self.kind;
-        let sighted = self.shapes.concluded(|_, (), sighted| sighted);
+        let sighted = self.shapes.concluded(file, |_, (), sighted| sighted);
         let found = sighted.into_iter().map(|found| found.occurrence(kind)).chain(self.tested).collect();
         Occurrences { path: self.path, found }
     }

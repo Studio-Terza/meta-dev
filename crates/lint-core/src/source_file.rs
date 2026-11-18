@@ -2,8 +2,10 @@ mod boundary;
 mod head;
 mod located;
 
+use std::cell::OnceCell;
 use std::path::PathBuf;
 
+use crate::kind_index::KindIndex;
 use crate::macros::Expansions;
 use boundary::Nesting;
 use file_ports::Absent;
@@ -23,6 +25,7 @@ pub struct SourceFile {
     tokens: syntax_lexer::TokenTable,
     test_modules: Vec<SourceFile>,
     expansions: Expansions,
+    kind_index: OnceCell<KindIndex>,
 }
 
 impl SourceFile {
@@ -48,6 +51,7 @@ impl SourceFile {
                 syntax: lexed.into_file(),
                 test_modules: Vec::new(),
                 expansions: Expansions::default(),
+                kind_index: OnceCell::new(),
             }),
             Err(source) => Err(Failure::Parse { path, line: LineNumber::from(source.span()), source }),
         }
@@ -132,5 +136,11 @@ impl<'file> From<&'file SourceFile> for Parsed<'file, 'file> {
 impl<'syntax> From<Parsed<'syntax, '_>> for &'syntax SourceFile {
     fn from(parsed: Parsed<'syntax, '_>) -> &'syntax SourceFile {
         parsed.file
+    }
+}
+
+impl SourceFile {
+    pub(crate) fn kind_index(&self) -> &KindIndex {
+        self.kind_index.get_or_init(|| KindIndex::from(&self.syntax))
     }
 }

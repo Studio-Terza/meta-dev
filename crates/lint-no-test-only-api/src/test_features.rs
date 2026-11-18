@@ -73,7 +73,7 @@ impl Contribute for TestFeatures<'_> {
         &self,
         attribute: &Attribute,
         _: &Facts<'_, Attribute>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Flagged>> {
         Contributed::parted(
             Self::condition(attribute.path())
@@ -87,7 +87,7 @@ impl Contribute for TestFeatures<'_> {
         &self,
         invocation: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Flagged>> {
         let found = Self::condition(&invocation.path)
             .into_iter()
