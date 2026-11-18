@@ -43,7 +43,7 @@ use definition::{BodyPart, LoweredDefinition};
 use frames::Enclosure;
 use held::HoldingRow;
 use laws::LawRow;
-use lint_sweep::Address;
+use lint_sweep::{Address, WalkPosition};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
@@ -505,7 +505,8 @@ pub(super) struct Frame<'read> {
     context: Context,
     calling: Option<Address>,
     tabled: Option<()>,
-    within: Arc<[Address]>,
+    within: Arc<[WalkPosition]>,
+    at: WalkPosition,
 }
 
 #[derive(Debug, Default)]

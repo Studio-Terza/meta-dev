@@ -23,6 +23,7 @@ pub struct Contributing<Contributor: Contribute> {
     contributor: Contributor,
     kinds: Vec<Kind>,
     frames: Vec<Contribution<Contributor::Open, Contributor::Part>>,
+    entered: WalkPosition,
 }
 
 impl<Open: Monoid, Part: Monoid> Contributed<Open, Part> {
@@ -41,12 +42,21 @@ impl<Open: Monoid, Part: Monoid> Contributed<Open, Part> {
         Contributed::new(Open::default(), Part::default(), descend)
     }
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WalkPosition(usize);
+
 #[derive(Debug)]
 pub struct Around<'frames, Open, Part> {
     frames: &'frames [Contribution<Open, Part>],
+    position: WalkPosition,
 }
 
 impl<'frames, Open, Part> Around<'frames, Open, Part> {
+    #[must_use]
+    pub fn position(&self) -> WalkPosition {
+        self.position
+    }
+
     pub fn nearest(&self) -> impl Iterator<Item = &'frames Open> {
         self.frames.iter().rev().map(|frame| &frame.open)
     }
@@ -70,7 +80,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
     pub fn new(contributor: Contributor) -> Contributing<Contributor> {
         let kinds =
             contributor.kinds().iter().copied().chain(contributor.scopes().iter().map(|scope| scope.0)).collect();
-        Contributing { contributor, kinds, frames: vec![Contribution::default()] }
+        Contributing { contributor, kinds, frames: vec![Contribution::default()], entered: WalkPosition::default() }
     }
 
     pub fn concluded<Out>(self, into: impl FnOnce(Contributor, Contributor::Open, Contributor::Part) -> Out) -> Out {
@@ -90,7 +100,9 @@ impl<Contributor: Contribute> Contributing<Contributor> {
             Around<'_, Contributor::Open, Contributor::Part>,
         ) -> Contributed<Contributor::Open, Contributor::Part>,
     ) -> Descend {
-        let Contributed { within, descend } = contributed(&self.contributor, Around { frames: &self.frames });
+        let position = self.entered;
+        self.entered = position.next();
+        let Contributed { within, descend } = contributed(&self.contributor, Around { frames: &self.frames, position });
         let opened = self.contributor.scopes().contains(&Scope(kind)).then(Contribution::default);
         let top = opened.unwrap_or_else(|| self.frames.pop().unwrap_or_default());
         self.frames.push(top.combine(within));
@@ -110,6 +122,12 @@ impl<Contributor: Contribute> Contributing<Contributor> {
             top.combine(Contribution { open: Contributor::Open::default(), part })
         });
         self.frames.extend(merged);
+    }
+}
+
+impl WalkPosition {
+    fn next(self) -> WalkPosition {
+        WalkPosition(self.0 + 1)
     }
 }
 

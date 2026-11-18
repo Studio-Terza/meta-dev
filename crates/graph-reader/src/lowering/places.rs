@@ -1,7 +1,7 @@
 use super::walk::Lowering;
 use super::{Frame, Framed, Grain, Grains, Owning};
 use crate::namespace::ScopeOp;
-use lint_sweep::{Address, Contributed, Contributing};
+use lint_sweep::{Contributed, Contributing, WalkPosition};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -13,7 +13,9 @@ use graph::{Building, FileId, ItemDeclaration, ItemId, Mention, Region, Resolved
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
-use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeKey, ScopeMap, TranscribedRow, UsePath};
+use crate::namespace::{
+    Domain, Entries, KeyRole, NodeKey, PortMacro, Resolving, ScopeKey, ScopeMap, TranscribedRow, UsePath,
+};
 
 use super::regions::MacroItems;
 use super::signature::Written;
@@ -150,8 +152,8 @@ impl Places {
 }
 
 impl<'read> Frame<'read> {
-    fn placed(&self, key: Address, seed: PlaceSeed) -> Owning {
-        let place = PlaceId(ScopeKey::reached(&self.within, key));
+    fn placed(&self, role: KeyRole, seed: PlaceSeed) -> Owning {
+        let place = PlaceId(ScopeKey::reached(&self.within, NodeKey::new(self.at, role)));
         let row = PlaceRow { key: place.clone(), subject: seed.subject, owner: seed.owner };
         let rows = Grain::Place(PlaceRows { places: vec![row], subjects: Vec::new() });
         Owning { place, grains: Grains::from(rows) }
@@ -161,7 +163,7 @@ impl<'read> Frame<'read> {
         let line = Position::from(ident.span()).line();
         let region = self.context.within_item(attributes).region();
         let owner = OwnerRow { scope: self.here.scope().clone(), name: UsePath::from(ident), domain, line, region };
-        self.placed(Address::from(ident), PlaceSeed { subject: None, owner: Some(owner) })
+        self.placed(KeyRole::Owner, PlaceSeed { subject: None, owner: Some(owner) })
     }
 
     pub(super) fn owned_by(
@@ -179,7 +181,7 @@ impl<'read> Frame<'read> {
     pub(super) fn macro_left(&self, item: &ItemMacro) -> Grains {
         match &item.ident {
             Some(ident) => self.rules_defined(item, ident),
-            None => self.expanded(item, &item.mac),
+            None => self.expanded(&item.mac),
         }
     }
 
@@ -190,11 +192,11 @@ impl<'read> Frame<'read> {
             .iter()
             .map(|path| self.used(UsePath::from(path), Position::from(path.span()), Mention::Expanded))
             .fold(row, Semigroup::combine);
-        attributed.combine(self.transcribed(item, &Macros::expanded(self.source, &item.mac)))
+        attributed.combine(self.transcribed(&Macros::expanded(self.source, &item.mac)))
     }
 
-    pub(super) fn expansion(&self, item: &ItemMacro, items: MacroItems) -> Lowering<'read> {
-        let within: Arc<[Address]> = self.within.iter().copied().chain([Address::from(item)]).collect();
+    pub(super) fn expansion(&self, items: MacroItems) -> Lowering<'read> {
+        let within: Arc<[WalkPosition]> = self.within.iter().copied().chain([self.at]).collect();
         Lowering::below(Frame { context: self.context.within_macro(items), within, ..self.clone() })
     }
 
@@ -204,14 +206,14 @@ impl<'read> Frame<'read> {
         contributing.concluded(|_, _, grains| grains)
     }
 
-    pub(super) fn transcribed(&self, item: &ItemMacro, statements: &[Stmt]) -> Grains {
-        Self::swept(self.expansion(item, MacroItems::Transcribed), statements.iter().filter_map(Syntax::stmt_item))
+    pub(super) fn transcribed(&self, statements: &[Stmt]) -> Grains {
+        Self::swept(self.expansion(MacroItems::Transcribed), statements.iter().filter_map(Syntax::stmt_item))
     }
 
-    pub(super) fn expanded(&self, item: &ItemMacro, invocation: &Macro) -> Grains {
+    pub(super) fn expanded(&self, invocation: &Macro) -> Grains {
         let items = Macros::items_in_file(self.source, invocation);
         let absorbed = ScopeOp::Absorbed { key: self.here.scope().clone(), entries: Entries::of_items(&items) };
-        let walked = Self::swept(self.expansion(item, MacroItems::Expanded), items.iter());
+        let walked = Self::swept(self.expansion(MacroItems::Expanded), items.iter());
         Grains::from(Grain::Op(absorbed)).combine(walked)
     }
 
@@ -225,7 +227,7 @@ impl<'read> Frame<'read> {
             line,
             region,
         };
-        self.placed(Address::from(ident), PlaceSeed { subject: None, owner: Some(owner) })
+        self.placed(KeyRole::Owner, PlaceSeed { subject: None, owner: Some(owner) })
     }
 
     pub(super) fn filler_owning(&self, item: &ItemTrait) -> Grains {
@@ -239,7 +241,7 @@ impl<'read> Frame<'read> {
             region,
         });
         owner.map_or_else(Grains::default, |found| {
-            self.placed(Address::from(item), PlaceSeed { subject: None, owner: Some(found) }).grains
+            self.placed(KeyRole::Filler, PlaceSeed { subject: None, owner: Some(found) }).grains
         })
     }
 
@@ -248,14 +250,13 @@ impl<'read> Frame<'read> {
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
         let implemented = ImplRow::written(&self.here, self.context.region(), block, &declared);
-        let key = ScopeKey::reached(&self.within, Address::from(block));
+        let key = ScopeKey::reached(&self.within, NodeKey::new(self.at, KeyRole::Scope));
         let traited = block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path));
         let named =
             block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
         let subjected =
             SubjectRow { key: key.clone(), scope: self.here.scope().clone(), ty: subject, implemented: named, traited };
-        let Owning { place, grains } =
-            self.placed(Address::from(&block.self_ty), PlaceSeed { subject: Some(key), owner: None });
+        let Owning { place, grains } = self.placed(KeyRole::Subject, PlaceSeed { subject: Some(key), owner: None });
         let rows: Grains =
             [Grain::Impl(implemented), Grain::Place(PlaceRows { subjects: vec![subjected], places: Vec::new() })]
                 .into_iter()

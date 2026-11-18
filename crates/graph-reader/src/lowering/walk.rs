@@ -11,7 +11,9 @@ use algebra::{Monoid, Semigroup};
 use graph::{Evaluation, Reach};
 use lint_core::SourceFile;
 use lint_layout::{Name, Position};
-use lint_sweep::{Address, Around, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope, Sweep};
+use lint_sweep::{
+    Address, Around, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope, Sweep, WalkPosition,
+};
 
 use super::attributes::Attributes;
 use super::definition::{BodyGroup, BodyPart, Branches, Mutations};
@@ -21,7 +23,9 @@ use super::regions::{Context, Regions};
 use super::seat::Seat;
 use super::signature::{InScope, LoweredParameter};
 use super::{AliasRow, FileShape, FnRow, Frame, Framed, Grain, Grains, Lowered, Slot, Sorted};
-use crate::namespace::{Domain, Entries, Exposing, Openings, ScopeKey, ScopeKind, ScopeOp, UsePath, Visibility};
+use crate::namespace::{
+    Domain, Entries, Exposing, KeyRole, NodeKey, Openings, ScopeKey, ScopeKind, ScopeOp, UsePath, Visibility,
+};
 use graph::Held;
 
 #[derive(Debug)]
@@ -44,8 +48,8 @@ impl<'read> Frame<'read> {
         Frame { context, ..self.clone() }
     }
 
-    fn entered(&self, node: Address, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Opened<'read> {
-        let key = ScopeKey::reached(&self.within, node);
+    fn entered(&self, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Opened<'read> {
+        let key = ScopeKey::reached(&self.within, NodeKey::new(self.at, KeyRole::Scope));
         let op = ScopeOp::Opened { key: key.clone(), parent: self.here.scope().clone(), kind, entries };
         let frame = Frame { here: Seat::new(key, children), context: self.context.entered(kind), ..self.clone() };
         Opened { frame, op }
@@ -93,8 +97,7 @@ impl<'read> Frame<'read> {
     pub(super) fn module_entered(&self, item: &ItemMod, items: &[syntax::Item]) -> Grown<'read> {
         let name = Name::from(&item.ident);
         let children = Arc::from(self.here.children().join(&name));
-        let Opened { frame: inner, op } =
-            self.entered(Address::from(item), ScopeKind::Module, Entries::of_items(items), children);
+        let Opened { frame: inner, op } = self.entered(ScopeKind::Module, Entries::of_items(items), children);
         let declared = ScopeOp::Declared {
             key: self.here.scope().clone(),
             name,
@@ -160,6 +163,7 @@ impl<'read> Lowering<'read> {
             calling: None,
             tabled: None,
             within: Arc::from([]),
+            at: WalkPosition::default(),
         };
         Lowering { top }
     }
@@ -168,6 +172,10 @@ impl<'read> Lowering<'read> {
         let sorted = Sorted::from(grains);
         let replayed = Openings::replayed(Entries::of_items(&self.top.source.syntax().items), sorted.ops);
         replayed.concluded(|openings, scopes| Lowered { openings, scopes, slots: sorted.slots, rows: sorted.rows })
+    }
+
+    fn positioned(&self, around: &Around<'_, Framed<'read>, Grains>) -> Frame<'read> {
+        Frame { at: around.position(), ..self.frame(around).clone() }
     }
 
     fn frame<'around>(&'around self, around: &Around<'around, Framed<'read>, Grains>) -> &'around Frame<'read> {
@@ -244,18 +252,14 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemMod>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         item.content.as_ref().map_or_else(|| frame.slotted(item), |(_, items)| frame.module_entered(item, items))
     }
 
     fn on_block(&self, block: &Block, _: &Facts<'_, Block>, around: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
-        let frame = self.frame(&around);
-        let Opened { frame: inner, op } = frame.entered(
-            Address::from(block),
-            ScopeKind::Block,
-            Entries::of_block(&block.stmts),
-            frame.here.children(),
-        );
+        let frame = self.positioned(&around);
+        let Opened { frame: inner, op } =
+            frame.entered(ScopeKind::Block, Entries::of_block(&block.stmts), frame.here.children());
         inner.framed(Grains::from(Grain::Op(op)), Descend::Into)
     }
 
@@ -265,7 +269,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemImpl>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         frame.with_context(frame.context.within_item(&block.attrs)).impl_entered(block)
     }
 
@@ -275,7 +279,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemTrait>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         let generics = frame.generics.subjectless().extended(&item.generics);
         let bounds = frame.trait_bounds(item, &generics);
         let owning = frame.trait_owning(&item.ident, &item.attrs);
@@ -291,7 +295,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemFn>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         let owning = frame.owning(&item.sig.ident, Domain::Values, &item.attrs);
         let inner = frame.with_context(owning.within(&frame.context.within_item(&item.attrs)));
         let Functioned { row, generics } = inner.function(&item.attrs, &item.vis, &item.sig);
@@ -356,7 +360,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemType>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         let generics = InScope::outside().extended(&item.generics);
         let target = generics.lowered(&item.ty);
         let held = frame.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
@@ -376,7 +380,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemStruct>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         let scope = frame.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         let rows = frame
@@ -392,7 +396,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemEnum>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         let scope = frame.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         let variants = item.variants.iter().map(|variant| {
@@ -417,7 +421,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemUnion>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         let scope = frame.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         let rows = frame.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident).combine(frame.fields_held(
@@ -435,7 +439,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemConst>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let tabled = self.frame(&around).in_table();
+        let tabled = self.positioned(&around).in_table();
         tabled.valued(&item.ident, &item.ty, &item.attrs)
     }
 
@@ -445,7 +449,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemStatic>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let tabled = self.frame(&around).in_table();
+        let tabled = self.positioned(&around).in_table();
         tabled.valued(&item.ident, &item.ty, &item.attrs)
     }
 
@@ -455,7 +459,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ImplItemConst>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let tabled = self.frame(&around).in_table();
+        let tabled = self.positioned(&around).in_table();
         tabled.framed(Grains::default(), Descend::Into)
     }
 
@@ -550,7 +554,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemMacro>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.positioned(&around);
         item.ident.as_ref().map_or_else(
             || frame.clone().framed(Grains::default(), Descend::Into),
             |ident| frame.owned_by(ident, Domain::Macros, &item.attrs, Grains::default()),

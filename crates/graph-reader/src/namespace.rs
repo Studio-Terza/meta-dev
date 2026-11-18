@@ -21,7 +21,7 @@ use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
 use binding::Binding;
-pub(crate) use boundary::{ScopeId, ScopeKey, ScopeMap};
+pub(crate) use boundary::{KeyRole, NodeKey, ScopeId, ScopeKey, ScopeMap};
 use entries::DeclaredAt;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
 pub(crate) use graph::Domain;

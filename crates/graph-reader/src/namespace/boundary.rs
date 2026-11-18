@@ -80,13 +80,33 @@ impl<Entry: Lattice> Lattice for Vec<Entry> {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ScopeKey {
-    within: std::sync::Arc<[lint_sweep::Address]>,
-    at: Option<lint_sweep::Address>,
+    within: std::sync::Arc<[lint_sweep::WalkPosition]>,
+    at: Option<NodeKey>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct NodeKey {
+    position: lint_sweep::WalkPosition,
+    role: KeyRole,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum KeyRole {
+    Scope,
+    Owner,
+    Filler,
+    Subject,
 }
 
 impl ScopeKey {
-    pub(crate) fn reached(within: &std::sync::Arc<[lint_sweep::Address]>, node: lint_sweep::Address) -> ScopeKey {
-        ScopeKey { within: std::sync::Arc::clone(within), at: Some(node) }
+    pub(crate) fn reached(within: &std::sync::Arc<[lint_sweep::WalkPosition]>, at: NodeKey) -> ScopeKey {
+        ScopeKey { within: std::sync::Arc::clone(within), at: Some(at) }
+    }
+}
+
+impl NodeKey {
+    pub(crate) fn new(position: lint_sweep::WalkPosition, role: KeyRole) -> NodeKey {
+        NodeKey { position, role }
     }
 }
 
