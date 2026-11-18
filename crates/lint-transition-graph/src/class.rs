@@ -9,10 +9,10 @@ pub(crate) enum Class {
 }
 
 impl Class {
-    pub(crate) fn covering(self, covered: Count) -> Count {
+    pub(crate) fn covered(self) -> Count {
         match self {
-            Class::Covered => covered.incremented(),
-            Class::Primitive => covered,
+            Class::Covered => Count::zero().incremented(),
+            Class::Primitive => Count::zero(),
         }
     }
 }

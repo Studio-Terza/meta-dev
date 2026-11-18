@@ -3,6 +3,7 @@ mod share;
 use std::collections::BTreeSet;
 use std::fmt;
 
+use algebra::{Monoid, Semigroup};
 use lint_core::Fix;
 use lint_core::{Site, Violation};
 use newtype::Counter;
@@ -32,21 +33,20 @@ impl Coverage {
     ) -> Coverage {
         let edges: Vec<&Edge<'found, 'file>> = listed.collect();
         let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
-        edges
-            .iter()
-            .fold(Coverage::default(), |tally, edge| tally.counted(edge.form(), edge.ends().class()))
-            .algebraic(system.algebras(), &sites)
+        let counted = Coverage::concat(edges.iter().map(|edge| Coverage::counted(edge.form(), edge.ends().class())));
+        counted.combine(Coverage::algebraic(system.algebras(), &sites))
     }
 
-    fn counted(self, form: &Form<'_>, class: Class) -> Coverage {
+    fn counted(form: &Form<'_>, class: Class) -> Coverage {
+        let one = Count::zero().incremented();
         form.sorted(
-            Coverage { written: self.written.incremented(), covered: class.covering(self.covered), ..self },
-            Coverage { lifts: self.lifts.incremented(), ..self },
-            Coverage { operations: self.operations.incremented(), ..self },
+            Coverage { written: one, covered: class.covered(), ..Coverage::default() },
+            Coverage { lifts: one, ..Coverage::default() },
+            Coverage { operations: one, ..Coverage::default() },
         )
     }
 
-    fn algebraic<'file>(self, algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
+    fn algebraic<'file>(algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
         let operations: Vec<_> = algebras
             .types()
             .filter_map(|node| algebras.of_type(node))
@@ -56,7 +56,7 @@ impl Coverage {
         Coverage {
             algebraic: Count::new(operations.len()),
             partial: Count::new(operations.iter().filter(|operation| operation.partial() == Totality::Partial).count()),
-            ..self
+            ..Coverage::default()
         }
     }
 
@@ -64,6 +64,21 @@ impl Coverage {
         first.map(|site| Violation::new(site, Workspace(self)))
     }
 }
+
+impl Semigroup for Coverage {
+    fn combine(self, other: Coverage) -> Coverage {
+        Coverage {
+            written: self.written.plus(other.written),
+            covered: self.covered.plus(other.covered),
+            lifts: self.lifts.plus(other.lifts),
+            operations: self.operations.plus(other.operations),
+            algebraic: self.algebraic.plus(other.algebraic),
+            partial: self.partial.plus(other.partial),
+        }
+    }
+}
+
+impl Monoid for Coverage {}
 
 impl fmt::Display for Coverage {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
