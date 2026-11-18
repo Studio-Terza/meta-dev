@@ -3,8 +3,8 @@ mod boundary;
 use boundary::Numeral;
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Kind, Watchers};
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::Gathers;
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind, Watchers};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -33,13 +33,9 @@ pub struct SupportGathering<'head> {
 }
 
 impl Gathers<SupportPaths> for SupportGathering<'_> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.modules)
-    }
-
-    fn gathered(self) -> SupportPaths {
+    fn gathered(self, source: &SourceFile) -> SupportPaths {
         let file = self.file;
-        SupportPaths(self.modules.concluded(|_, (), modules| modules).paths(file).into_iter().collect())
+        SupportPaths(self.modules.concluded(source, |_, (), modules| modules).paths(file).into_iter().collect())
     }
 }
 
@@ -72,7 +68,7 @@ impl WatchingLint for NamedNumbers {
     fn watched(file: &SourceFile) -> Watchers<'_> {
         let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
         let numbers = counted.map(|found| Contributing::new(Numbers { path: AsRef::<Path>::as_ref(found.head()) }));
-        numbers.into_iter().fold(Watchers::none(), |watchers, watched| watchers.and(Box::new(watched)))
+        numbers.into_iter().map(|watched| -> Box<dyn Finds<'_> + '_> { Box::new(watched) }).collect()
     }
 
     fn judged<'file, 'head: 'file>(
@@ -128,7 +124,7 @@ impl Contribute for Numbers<'_> {
         &self,
         module: &ItemMod,
         _: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Lines {
         Contributed::descending(Gate::BOUNDARY.outside(module))
     }
@@ -137,7 +133,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Lines {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -146,7 +142,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &ItemConst,
         _: &Facts<'_, ItemConst>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Lines {
         Contributed::descending(Descend::Over)
     }
@@ -155,7 +151,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &ImplItemConst,
         _: &Facts<'_, ImplItemConst>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Lines {
         Contributed::descending(Descend::Over)
     }
@@ -164,7 +160,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &TraitItemConst,
         _: &Facts<'_, TraitItemConst>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Lines {
         Contributed::descending(Descend::Over)
     }
@@ -173,26 +169,16 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &ExprConst,
         _: &Facts<'_, ExprConst>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Lines {
         Contributed::descending(Descend::Over)
     }
 
-    fn on_macro(
-        &self,
-        _: &Macro,
-        _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
-    ) -> Lines {
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _around: &lint_sweep::Around<'_, Self::Open>) -> Lines {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_lit_int(
-        &self,
-        _: &LitInt,
-        facts: &Facts<'_, LitInt>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
-    ) -> Lines {
+    fn on_lit_int(&self, _: &LitInt, facts: &Facts<'_, LitInt>, _around: &lint_sweep::Around<'_, Self::Open>) -> Lines {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }
 
@@ -200,7 +186,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &LitFloat,
         facts: &Facts<'_, LitFloat>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Lines {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }

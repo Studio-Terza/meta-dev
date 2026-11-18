@@ -40,7 +40,7 @@ impl<'file> Contribute for Exits<'file> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         Contributed::descending(Descend::Expand)
     }
@@ -49,7 +49,7 @@ impl<'file> Contribute for Exits<'file> {
         &self,
         expr: &ExprReturn,
         _: &Facts<'_, ExprReturn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.return_token.span, Finding::Return)
     }
@@ -58,7 +58,7 @@ impl<'file> Contribute for Exits<'file> {
         &self,
         expr: &ExprBreak,
         _: &Facts<'_, ExprBreak>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.break_token.span, Finding::Break)
     }
@@ -67,7 +67,7 @@ impl<'file> Contribute for Exits<'file> {
         &self,
         expr: &ExprContinue,
         _: &Facts<'_, ExprContinue>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.continue_token.span, Finding::Continue)
     }

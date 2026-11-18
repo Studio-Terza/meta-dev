@@ -1,5 +1,6 @@
 mod finding;
 
+use algebra::Semigroup;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
@@ -56,7 +57,7 @@ impl<'file> VagueNames<'file> {
         let descend = Descend::from(Walk::outside_tests(attributes));
         let site = Site::new(self.path, LineNumber::from(ident.span()));
         let name = Name::from(ident);
-        let vague = descend.entered().and_then(|_| LiteralNames::vague(&name));
+        let vague = descend.entered().and_then(|()| LiteralNames::vague(&name));
         Contributed::new((), vague.map(|finding| Violation::new(site, finding)).into_iter().collect(), descend)
     }
 }
@@ -73,17 +74,12 @@ impl<'file> Contribute for VagueNames<'file> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Noted<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_macro(
-        &self,
-        _: &Macro,
-        _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
-    ) -> Noted<'file> {
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _around: &lint_sweep::Around<'_, Self::Open>) -> Noted<'file> {
         Contributed::descending(Descend::Expand)
     }
 
@@ -91,10 +87,10 @@ impl<'file> Contribute for VagueNames<'file> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Noted<'file> {
         Contributed::descending(
-            Descend::from(facts.gate()).then(|| facts.inherent().map_or(Descend::Over, |_| Descend::Into)),
+            Descend::from(facts.gate()).combine(facts.inherent().map_or(Descend::Over, |_| Descend::Into)),
         )
     }
 
@@ -102,7 +98,7 @@ impl<'file> Contribute for VagueNames<'file> {
         &self,
         function: &ItemFn,
         _: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Noted<'file> {
         self.noted(&function.attrs, &function.sig.ident)
     }
@@ -111,7 +107,7 @@ impl<'file> Contribute for VagueNames<'file> {
         &self,
         function: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Noted<'file> {
         self.noted(&function.attrs, &function.sig.ident)
     }

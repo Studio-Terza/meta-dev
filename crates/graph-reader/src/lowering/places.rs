@@ -20,7 +20,7 @@ use crate::namespace::{
 use super::regions::MacroItems;
 use super::signature::Written;
 use super::{Enclosure, ImplRow};
-use lint_sweep::{Descend, Sweep};
+use lint_sweep::Descend;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct PlaceId(ScopeKey);
@@ -201,9 +201,8 @@ impl<'read> Frame<'read> {
     }
 
     pub(super) fn swept<'item>(lowering: Lowering<'read>, items: impl Iterator<Item = &'item syntax::Item>) -> Grains {
-        let mut contributing = Contributing::new(lowering);
-        items.for_each(|declared| Sweep::expanded_item(declared, &mut contributing));
-        contributing.concluded(|_, _, grains| grains)
+        let contributing = Contributing::new(lowering);
+        contributing.contributed_items(items).concluded(|_, grains| grains)
     }
 
     pub(super) fn transcribed(&self, statements: &[Stmt]) -> Grains {

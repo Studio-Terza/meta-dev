@@ -102,7 +102,7 @@ impl Contribute for Assertions<'_> {
         &self,
         item: &ItemConst,
         _: &Facts<'_, ItemConst>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Asserted> {
         Contributed::parted(Asserted::constant(item))
     }
@@ -111,7 +111,7 @@ impl Contribute for Assertions<'_> {
         &self,
         local: &Local,
         _: &Facts<'_, Local>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Asserted> {
         Contributed::parted(Asserted::local(local))
     }
@@ -120,7 +120,7 @@ impl Contribute for Assertions<'_> {
         &self,
         item: &ItemUse,
         _: &Facts<'_, ItemUse>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Asserted> {
         Contributed::new((), Asserted::aliased(self.tables.renamed(&item.tree)), Descend::Over)
     }
@@ -129,7 +129,7 @@ impl Contribute for Assertions<'_> {
         &self,
         invocation: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Asserted> {
         Contributed::new((), Asserted::met(invocation), Descend::Over)
     }

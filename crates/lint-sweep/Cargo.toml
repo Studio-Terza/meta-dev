@@ -16,6 +16,7 @@ syntax = { path = "../syntax" }
 
 [dev-dependencies]
 invariants = { path = "../invariants" }
+algebra = { path = "../algebra" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-fixtures = { path = "../lint-fixtures" }

@@ -10,12 +10,13 @@ use std::path::Path;
 
 use algebra::{Monoid, Semigroup};
 use graph::Model;
+use lint_core::SourceFile;
 use lint_core::{FileHead, Parsed, Site, Violation};
 use lint_file::Gleaning;
 use lint_layout::LineNumber;
 use lint_layout::{Name, UsePath};
 use lint_placement::{CrateName as PlacedName, Role as Placed};
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 use workspace_metadata::{CrateName, Expansion, Role};
 
 use crate::owners::Owners;
@@ -112,7 +113,7 @@ impl Contribute for DenialScan {
         &self,
         attribute: &syntax::Attribute,
         _: &Facts<'_, syntax::Attribute>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Denials> {
         Contributed::new((), Denials(Undenied::denied_by(attribute).into_iter().collect()), Descend::Over)
     }
@@ -121,21 +122,21 @@ impl Contribute for DenialScan {
         &self,
         _: &syntax::Item,
         _: &Facts<'_, syntax::Item>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Denials> {
         Contributed::descending(Descend::Over)
     }
 }
 
 impl<'head> Gathers<RoleFile<'head>> for RootReading<'head> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        let rooted = self.place.as_ref().map(|_| ());
-        rooted.map_or_default(|()| Sweep::alone(&mut self.scan))
-    }
-
-    fn gathered(self) -> RoleFile<'head> {
-        let denied = self.scan.concluded(|_, (), denials| denials.0);
-        RoleFile { root: self.place.map(|place| RootDenial { package: place.package, path: place.path, denied }) }
+    fn gathered(self, file: &SourceFile) -> RoleFile<'head> {
+        RoleFile {
+            root: self.place.map(|place| RootDenial {
+                package: place.package,
+                path: place.path,
+                denied: self.scan.concluded(file, |_, (), denials| denials.0),
+            }),
+        }
     }
 }
 

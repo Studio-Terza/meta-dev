@@ -13,9 +13,7 @@ use algebra::Monoid;
 use lint_core::Module;
 use lint_core::{Parsed, Site, Walk};
 use lint_layout::{LineNumber, Name, Word};
-use lint_sweep::{
-    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Scope, Sweep, Watching,
-};
+use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Scope};
 
 use crate::guards::ignored::Ignored;
 use invariants::Ignoring;
@@ -70,7 +68,7 @@ impl<'file> GuardScan<'file> {
         let site = Site::new(self.path, LineNumber::from(name.span()));
         let members = Descend::from(Walk::outside_tests(attributes))
             .entered()
-            .map(|_| attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None))
+            .map(|()| attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None))
             .map_or_else(Members::default, |unmarked| Members::declaring(Name::from(name), unmarked));
         Contributed::new(members, Vec::new(), Descend::Over)
     }
@@ -117,7 +115,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -138,11 +136,11 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         let dropped = Descend::from(facts.gate())
             .entered()
-            .map_or_else(Members::default, |_| Members::dropping(Name::implementing(item, Word::new(Self::DROP))));
+            .map_or_else(Members::default, |()| Members::dropping(Name::implementing(item, Word::new(Self::DROP))));
         Contributed::new(dropped, Vec::new(), Descend::Over)
     }
 
@@ -150,7 +148,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemStruct,
         _: &Facts<'_, ItemStruct>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
@@ -159,7 +157,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
@@ -168,7 +166,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemUnion,
         _: &Facts<'_, ItemUnion>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         self.declared(&item.attrs, &item.ident)
     }
@@ -177,7 +175,7 @@ impl<'file> Contribute for GuardScan<'file> {
         &self,
         item: &ItemType,
         facts: &Facts<'_, ItemType>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         let target = Name::of_type(&item.ty);
         let aliased = Descend::from(facts.gate()).entered().and(facts.name());
@@ -187,13 +185,9 @@ impl<'file> Contribute for GuardScan<'file> {
 }
 
 impl<'file> Gathers<Modules<'file>> for Guards<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.scan)
-    }
-
-    fn gathered(self) -> Modules<'file> {
+    fn gathered(self, file: &SourceFile) -> Modules<'file> {
         let module = self.module;
-        self.scan.concluded(|scan, members, nested| {
+        self.scan.concluded(file, |scan, members, nested| {
             let own = scan.kinds.first().map(|_| Nested { path: Vec::new(), members });
             Monoid::concat(own.into_iter().chain(nested).map(|within| within.filed(&module)))
         })
