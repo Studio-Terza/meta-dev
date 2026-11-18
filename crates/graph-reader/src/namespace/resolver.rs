@@ -178,7 +178,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), importing: None };
         resolver
             .path(path, scope, Domain::Types)
-            .target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
+            .target(|module| self.space.sight(module, scope).unwrap_or(Sight::ByGlob))
     }
 
     pub(super) fn invoked_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId, written: &Written) -> Target {
@@ -234,7 +234,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
                 .found(
                     module,
                     Key::new(domain, segment),
-                    Lookup::new(Sight::ByPath.beyond(self.space.within_reach(module, viewer)), None, Reading::Written),
+                    Lookup::new(self.space.sight(module, viewer).unwrap_or(Sight::ByPath), None, Reading::Written),
                 )
                 .settled(|| Outer::Assumed(Binding::Absent), || self.expanded(module, segment)),
         }

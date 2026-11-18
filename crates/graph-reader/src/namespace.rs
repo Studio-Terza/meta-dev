@@ -23,8 +23,8 @@ use lint_layout::{Dependencies, Name};
 use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::{KeyRole, NodeKey, ScopeId, ScopeKey, ScopeMap};
-use entries::DeclaredAt;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
+use entries::{DeclaredAt, Sight};
 pub(crate) use graph::Domain;
 pub(crate) use items::ItemIds;
 pub(crate) use port_macro::PortMacro;
@@ -229,8 +229,8 @@ impl<'read> Namespace<'read> {
         at.scope().row(&self.scopes).and_then(|row| row.entries().rules(at.declared_id()))
     }
 
-    pub(super) fn within_reach(&self, level: ScopeId, from: ScopeId) -> Option<ScopeId> {
-        from.row(&self.scopes).and_then(|row| row.ancestor(level))
+    pub(super) fn sight(&self, level: ScopeId, from: ScopeId) -> Option<Sight> {
+        from.row(&self.scopes).and_then(|row| row.sight(level))
     }
 
     pub(super) fn workspace(&self, name: &Name) -> Option<ScopeId> {

@@ -54,11 +54,11 @@ impl From<&VisRestricted> for Visibility {
 }
 
 impl Visibility {
-    fn seen(self, restricted: Admission) -> Admission {
+    fn settled(self) -> Option<Admission> {
         match self {
-            Visibility::Private => Admission::Hidden,
-            Visibility::Visible => Admission::Shown,
-            Visibility::Restricted => restricted,
+            Visibility::Private => Some(Admission::Hidden),
+            Visibility::Visible => Some(Admission::Shown),
+            Visibility::Restricted => None,
         }
     }
 }
@@ -74,15 +74,8 @@ impl Sight {
     pub(super) fn admits(self, visibility: Visibility) -> Admission {
         match self {
             Sight::Inside => Admission::Shown,
-            Sight::ByPath => visibility.seen(Admission::Shown),
-            Sight::ByGlob => visibility.seen(Admission::Obscured),
-        }
-    }
-
-    pub(super) fn beyond(self, reach: Option<ScopeId>) -> Sight {
-        match reach {
-            Some(_) => Sight::Inside,
-            None => self,
+            Sight::ByPath => visibility.settled().unwrap_or(Admission::Shown),
+            Sight::ByGlob => visibility.settled().unwrap_or(Admission::Obscured),
         }
     }
 }
