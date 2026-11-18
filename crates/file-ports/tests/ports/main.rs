@@ -1,7 +1,12 @@
+mod ignored;
+
 use std::io;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Text};
+use invariants::Ignoring;
+
+use ignored::Ignored;
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -101,7 +106,8 @@ impl Checks {
         assert_eq!(contract.copied()?, Text::new("copied".to_owned()));
         assert_eq!(contract.nested()?, vec![contract.at("outer/a.txt"), contract.at("outer/inner")]);
         let [real, dotted] = std::thread::scope(|scope| scope.spawn(|| contract.resolved()).join())
-            .unwrap_or_else(|_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Other))))?;
+            .ignoring(Ignored::Panicked)
+            .unwrap_or_else(|| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Other))))?;
         assert_eq!(dotted, real);
         assert_eq!(contract.missing(), ["missing", "missing", "missing", "missing", "missing", "missing", "Missing"]);
         assert_eq!(contract.not_text(), "failed");
@@ -163,13 +169,8 @@ fn cached_remembers_a_disk_failure_with_its_message_until_something_is_written_t
     let missing = matches!(cached.read_text(&later), Err(FileFailure::Missing(_)));
     cached.write(&scratch.path().join("other.txt"), Bytes::from("other"))?;
     assert_eq!(first, remembered);
-    assert_eq!(
-        first.map_err(|said| said
-            == Disk
-                .canonical(&scratch.path().join("absent"))
-                .map_or_else(|failure| failure.to_string(), |_| String::new())),
-        Err(true)
-    );
+    let fresh = Disk.canonical(&scratch.path().join("absent"));
+    assert!(matches!((first, fresh), (Err(said), Err(failure)) if said == failure.to_string()));
     assert_eq!((missing, cached.read_text(&later)?.as_ref().to_owned()), (false, "now here".to_owned()));
     Ok(())
 }
@@ -242,15 +243,15 @@ impl Batches {
         assert_eq!(texts.iter().map(AsRef::as_ref).collect::<Vec<&str>>(), ["a", "a"]);
         assert_eq!(files.kinds(&[a.clone(), absent.clone()]), [Kind::File, Kind::Missing]);
         let canonical = files.canonical_many(&[a, absent.clone()]);
-        assert_eq!(canonical.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
+        assert!(matches!(canonical.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
         let listed = files.entries_many(&[root.join("copies"), absent]);
-        assert_eq!(listed.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
+        assert!(matches!(listed.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
         assert_eq!(listed.into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?, [b]);
         files.write(&root.join("c.txt"), Bytes::from("c"))?;
         let copied = files.copy_each_into(&[root.join("none"), root.join("c.txt")], &root.join("copies"));
-        assert_eq!(copied.iter().map(Result::is_ok).collect::<Vec<bool>>(), [false, true]);
+        assert!(matches!(copied.as_slice(), [Err(FileFailure::Missing(_)), Ok(())]));
         assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(files.copy_into(&[root.join("none")], &root.join("copies")).is_err());
+        assert!(matches!(files.copy_into(&[root.join("none")], &root.join("copies")), Err(FileFailure::Missing(_))));
         let mirrored = Memory::default();
         files.mirror(root, &mirrored)?;
         assert_eq!(
@@ -261,12 +262,12 @@ impl Batches {
             })?
         );
         assert_eq!(mirrored.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(files.mirror(&root.join("none"), &Memory::default()).is_err());
+        assert!(matches!(files.mirror(&root.join("none"), &Memory::default()), Err(FileFailure::Missing(_))));
         files.write(&root.join("copies/deep.txt"), Bytes::from("12345"))?;
         assert_eq!(files.size(&root.join("copies/deep.txt"))?, Size::new(5));
         assert_eq!(files.bytes_below(&root.join("copies"))?, Size::new(7));
-        assert!(files.bytes_below(&root.join("nothing-here")).is_err());
-        assert!(files.size(&root.join("nothing-here")).is_err());
+        assert!(matches!(files.bytes_below(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
+        assert!(matches!(files.size(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
         Ok(())
     }
 }
@@ -297,7 +298,8 @@ impl Tails {
 
 laws::law!(
     read_from_agrees_between_disk_and_memory,
-    laws::proptest::strategy::Strategy::prop_filter_map(0i64..16, "an offset", |at| Offset::try_new(at).ok()),
+    laws::proptest::strategy::Strategy::prop_filter_map(0i64..16, "an offset", |at| Offset::try_new(at)
+        .ignoring(Ignored::Negative)),
     at,
     {
         let scratch = tempfile::tempdir()
@@ -308,7 +310,7 @@ laws::law!(
             .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
         let on_disk = Tails::of(&Disk, scratch.path(), at);
         let in_memory = Tails::of(&memory, Path::new("/scratch"), at);
-        laws::proptest::prop_assert_eq!(on_disk.ok(), in_memory.ok());
+        laws::proptest::prop_assert_eq!(on_disk.ignoring(Ignored::Failing), in_memory.ignoring(Ignored::Failing));
     }
 );
 

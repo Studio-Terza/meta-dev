@@ -1,7 +1,10 @@
 use std::fmt;
 use std::io::Write;
 
+use invariants::Ignoring;
 use newtype::{Arbitrary, Newtype};
+
+use crate::Ignored;
 
 #[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Bytes(Vec<u8>);
@@ -15,6 +18,6 @@ impl AsRef<[u8]> for Bytes {
 impl<Shown: fmt::Display + ?Sized> From<&Shown> for Bytes {
     fn from(shown: &Shown) -> Bytes {
         let mut bytes = Vec::new();
-        write!(bytes, "{shown}").map_or_else(|_| Bytes::default(), |()| Bytes(bytes))
+        write!(bytes, "{shown}").ignoring(Ignored::Unformattable).map_or_else(Bytes::default, |()| Bytes(bytes))
     }
 }

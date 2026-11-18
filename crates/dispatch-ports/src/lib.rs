@@ -33,3 +33,12 @@ pub use stderr::Stderr;
 pub use system_clock::SystemClock;
 pub use wall::{Deadline, Due, Pause, Timeout, Wall};
 pub use watch::{Stall, Stalled, Watch, Watched, Watching};
+
+invariants::ignored! {
+    pub(crate) enum Ignored {
+        NotRunning => "a listing that does not read as a start time means no process holds the pid",
+        NotAStamp => "any part that does not read as a start stamp field makes the whole text Unstarted",
+        BeforeEpoch => "a clock set before the Unix epoch reads as the epoch",
+        BeyondRange => "seconds past the i64 range saturate at its maximum",
+    }
+}

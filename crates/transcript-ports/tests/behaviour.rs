@@ -4,6 +4,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
+use invariants::{Ignoring, ignored};
 use laws::proptest::prelude::{any, prop_assert_eq};
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
@@ -13,6 +14,14 @@ use transcript_ports::{
     Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
     Unrecognised,
 };
+
+ignored! {
+    enum Ignored {
+        Unseeded => "seeding a fresh in-memory store does not fail; were it to, the read finds no session",
+        Unread => "a read that fails yields nothing, which the case then reports",
+        Refused => "a text the check or parse refuses is the None the case expects",
+    }
+}
 
 const DIRECTORY: &str = "/projects/work";
 const SESSION: &str = "/projects/work/s1.jsonl";
@@ -85,8 +94,8 @@ impl Transcript {
 
     fn directory(&self) -> ClaudeCodeDir<Memory> {
         let memory = Memory::default();
-        memory.create_directories(Path::new(DIRECTORY)).ok();
-        memory.append(Path::new(SESSION), &Bytes::from(&self.0)).ok();
+        memory.create_directories(Path::new(DIRECTORY)).ignoring(Ignored::Unseeded);
+        memory.append(Path::new(SESSION), &Bytes::from(&self.0)).ignoring(Ignored::Unseeded);
         ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY))
     }
 
@@ -99,18 +108,18 @@ impl Transcript {
     }
 
     fn sessions(&self) -> Vec<Session> {
-        Transcripts::sessions(&Run::root().port(self.directory())).unwrap_or_default()
+        Transcripts::sessions(&Run::root().port(self.directory())).ignoring(Ignored::Unread).unwrap_or_default()
     }
 
     fn calls(&self) -> Option<Counted> {
         let run = Run::root();
         let port = run.port(self.directory());
-        let sessions = Transcripts::sessions(&port).ok()?;
+        let sessions = Transcripts::sessions(&port).ignoring(Ignored::Unread)?;
         sessions
             .iter()
             .map(|session| Transcripts::read_from(&port, session, Cursor::default()))
             .collect::<Result<Vec<_>, _>>()
-            .ok()?;
+            .ignoring(Ignored::Unread)?;
         drop(port);
         let measured = run.finish();
         Some(Counted {
@@ -163,7 +172,10 @@ struct Cases;
 
 impl Cases {
     fn classified(line: &str) -> Vec<String> {
-        Transcript::holding(line).read(Cursor::default()).map_or_default(|read| Gathered::from(read).classes)
+        Transcript::holding(line)
+            .read(Cursor::default())
+            .ignoring(Ignored::Unread)
+            .map_or_default(|read| Gathered::from(read).classes)
     }
 
     fn kind(kind: &&str) -> Vec<String> {
@@ -284,7 +296,7 @@ fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
 laws::table!(
     a_message_uuid_is_read_only_when_it_is_one_bare_word,
     |uuid: &&str| {
-        Transcript::holding(&Lines::typed(uuid)).read(Cursor::default()).ok().map(|read| {
+        Transcript::holding(&Lines::typed(uuid)).read(Cursor::default()).ignoring(Ignored::Unread).map(|read| {
             Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect::<Vec<String>>()
         })
     },
@@ -301,7 +313,7 @@ laws::table!(
 laws::table!(
     a_line_whose_session_is_blank_yields_no_record,
     |session: &&str| {
-        Transcript::holding(&Lines::in_session(session)).read(Cursor::default()).ok().map(|read| {
+        Transcript::holding(&Lines::in_session(session)).read(Cursor::default()).ignoring(Ignored::Unread).map(|read| {
             Views::records(read).into_iter().map(|record| record.session().to_string()).collect::<Vec<String>>()
         })
     },
@@ -490,31 +502,31 @@ laws::roundtrip!(
     an_authorship_is_read_back_from_its_display,
     select(vec![Authorship::Owner, Authorship::Lead]),
     |author: &Authorship| author.to_string(),
-    |name: &String| name.parse::<Authorship>().ok(),
+    |name: &String| name.parse::<Authorship>().ignoring(Ignored::Refused),
     Some,
 );
 
 laws::table!(
     a_name_of_neither_party_is_no_authorship,
-    |name: &&str| name.parse::<Authorship>().ok(),
+    |name: &&str| name.parse::<Authorship>().ignoring(Ignored::Refused),
     ["human" => None, "" => None],
 );
 
 laws::table!(
     an_instant_is_made_only_from_non_blank_text,
-    |text: &&str| Instant::try_new((*text).to_owned()).ok().map(|instant| instant.to_string()),
+    |text: &&str| Instant::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|instant| instant.to_string()),
     ["" => None, "2026-01-01T00:00:01Z" => Some(String::from("2026-01-01T00:00:01Z"))],
 );
 
 laws::table!(
     a_kind_is_made_only_from_non_blank_text,
-    |text: &&str| Kind::try_new((*text).to_owned()).ok().map(|kind| kind.to_string()),
+    |text: &&str| Kind::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|kind| kind.to_string()),
     ["" => None, "summary" => Some(String::from("summary"))],
 );
 
 laws::table!(
     a_session_id_is_made_only_from_non_blank_text,
-    |text: &&str| SessionId::try_new((*text).to_owned()).ok().map(|session| session.to_string()),
+    |text: &&str| SessionId::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|session| session.to_string()),
     ["" => None, "s1" => Some(String::from("s1"))],
 );
 
@@ -522,7 +534,7 @@ laws::roundtrip!(
     an_instant_is_rebuilt_from_its_display,
     any::<Instant>(),
     |instant: &Instant| instant.to_string(),
-    |text: &String| Instant::try_new(text.clone()).ok(),
+    |text: &String| Instant::try_new(text.clone()).ignoring(Ignored::Refused),
     Some,
 );
 
@@ -530,7 +542,7 @@ laws::roundtrip!(
     a_kind_is_rebuilt_from_its_display,
     any::<Kind>(),
     |kind: &Kind| kind.to_string(),
-    |text: &String| Kind::try_new(text.clone()).ok(),
+    |text: &String| Kind::try_new(text.clone()).ignoring(Ignored::Refused),
     Some,
 );
 
@@ -538,13 +550,13 @@ laws::roundtrip!(
     a_session_id_is_rebuilt_from_its_display,
     any::<SessionId>(),
     |session: &SessionId| session.to_string(),
-    |text: &String| SessionId::try_new(text.clone()).ok(),
+    |text: &String| SessionId::try_new(text.clone()).ignoring(Ignored::Refused),
     Some,
 );
 
 laws::table!(
     a_body_holding_a_nul_is_refused_and_any_other_text_is_kept_whole,
-    |text: &&str| transcript_ports::Body::try_new((*text).to_owned()).ok().map(|body| body.to_string()),
+    |text: &&str| transcript_ports::Body::try_new((*text).to_owned()).ignoring(Ignored::Refused).map(|body| body.to_string()),
     [
         "said\0plainly" => None,
         "said plainly" => Some("said plainly".to_owned()),

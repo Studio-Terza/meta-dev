@@ -1,6 +1,9 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use invariants::Ignoring;
+
 use super::{Deadline, Pause, Timeout, Wall};
+use crate::Ignored;
 
 impl Deadline {
     #[must_use]
@@ -18,8 +21,8 @@ impl Wall {
 
 impl From<SystemTime> for Wall {
     fn from(time: SystemTime) -> Wall {
-        let seconds = time.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-        Wall(i64::try_from(seconds).unwrap_or(i64::MAX))
+        let seconds = time.duration_since(UNIX_EPOCH).ignoring(Ignored::BeforeEpoch).unwrap_or_default().as_secs();
+        Wall(i64::try_from(seconds).ignoring(Ignored::BeyondRange).unwrap_or(i64::MAX))
     }
 }
 

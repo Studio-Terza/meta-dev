@@ -14,12 +14,7 @@ impl Body {
         parts
             .into_iter()
             .enumerate()
-            .map(|(at, part)| {
-                place(
-                    u32::try_from(at).unwrap_or_else(|_unnumbered| invariant!(broken Invariant::EveryPartHasAU32Place)),
-                    part,
-                )
-            })
+            .map(|(at, part)| place(invariant!(holding u32::try_from(at), Invariant::EveryPartHasAU32Place), part))
             .collect()
     }
 }

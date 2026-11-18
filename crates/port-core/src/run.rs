@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
+use invariants::Unpoisoned;
 use newtype::Counter;
 
 use super::calls::Calls;
@@ -76,18 +77,18 @@ impl Run {
     }
 
     pub fn finish(self) -> Measured {
-        let calls = self.ledger.calls.into_inner().unwrap_or_else(PoisonError::into_inner);
-        let failures = self.ledger.failures.into_inner().unwrap_or_else(PoisonError::into_inner);
+        let calls = self.ledger.calls.into_inner().unpoisoned();
+        let failures = self.ledger.failures.into_inner().unpoisoned();
         Measured { snapshot: Snapshot::counted(calls), failures }
     }
 
     pub(crate) fn count(&self, name: OpName) {
-        let mut calls = self.ledger.calls.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut calls = self.ledger.calls.lock().unpoisoned();
         let entry = calls.entry(name).or_default();
         *entry = entry.incremented();
     }
 
     pub(crate) fn fail(&self, resource: OpName, failure: Box<dyn Error + Send + Sync>) {
-        self.ledger.failures.lock().unwrap_or_else(PoisonError::into_inner).push(ReleaseFailure { resource, failure });
+        self.ledger.failures.lock().unpoisoned().push(ReleaseFailure { resource, failure });
     }
 }

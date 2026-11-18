@@ -67,3 +67,18 @@ macro_rules! invariant {
         }
     };
 }
+
+invariants! {
+    enum Invariant {
+        LockNotPoisoned =>
+            "no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written",
+    }
+}
+
+pub trait Unpoisoned<Guard>: Into<Result<Guard, std::sync::PoisonError<Guard>>> {
+    fn unpoisoned(self) -> Guard {
+        invariant!(holding self.into(), Invariant::LockNotPoisoned)
+    }
+}
+
+impl<Guard> Unpoisoned<Guard> for std::sync::LockResult<Guard> {}
