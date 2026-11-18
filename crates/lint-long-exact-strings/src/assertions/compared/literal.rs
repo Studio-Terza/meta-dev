@@ -3,6 +3,8 @@ use syntax::{Expr, Lit};
 use lint_layout::Name;
 
 use super::super::pinning::Pinning;
+use crate::assertions::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reading {
@@ -22,7 +24,7 @@ impl Literal {
 
     fn read(literal: &Lit) -> Option<Pinning> {
         match literal {
-            Lit::Str(text) => text.value().parse().ok(),
+            Lit::Str(text) => text.value().parse().ignoring(Ignored::Unparsed),
             Lit::ByteStr(bytes) => Some(
                 bytes
                     .value()

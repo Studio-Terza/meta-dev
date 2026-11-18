@@ -1,6 +1,7 @@
 mod crate_file;
 mod crate_name;
 mod crate_root;
+mod ignored;
 mod module_path;
 mod nest;
 mod package_root;

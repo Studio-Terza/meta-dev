@@ -1,8 +1,12 @@
+mod ignored;
+
 use lint_core::Headline;
 use lint_file::{FileLint, Reads};
 use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
 use std::path::Path;
 
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
@@ -35,7 +39,7 @@ impl NoComments {
         tokenize(source.get(shebang..).unwrap_or_default(), FrontmatterAllowed::Yes)
             .scan(shebang, |offset, token| {
                 let start = *offset;
-                *offset += usize::try_from(token.len).ok()?;
+                *offset += usize::try_from(token.len).ignoring(Ignored::BeyondRange)?;
                 Some((start, token.kind))
             })
             .filter(|(_, kind)| matches!(kind, TokenKind::LineComment { .. } | TokenKind::BlockComment { .. }))

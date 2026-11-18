@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use crate::ignored::Ignored;
 use file_ports::Files;
+use invariants::Ignoring;
 use lint_layout::Failure;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,8 +39,8 @@ impl<'given> Tree<'given> {
     #[must_use]
     pub fn display(&self, file: &Path) -> PathBuf {
         let shown = Some(self.given).filter(|given| *given != Path::new(Self::CURRENT));
-        file.strip_prefix(&self.canonical).map_or_else(
-            |_| file.to_path_buf(),
+        file.strip_prefix(&self.canonical).ignoring(Ignored::Outside).map_or_else(
+            || file.to_path_buf(),
             |inside| shown.map_or_else(|| inside.to_path_buf(), |given| given.join(inside)),
         )
     }

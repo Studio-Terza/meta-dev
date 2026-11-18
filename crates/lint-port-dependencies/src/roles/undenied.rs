@@ -1,9 +1,13 @@
+mod ignored;
+
 use std::collections::BTreeSet;
 use std::fmt;
 
 use syntax::Punctuated;
 use syntax::{Path, Token};
 
+use crate::roles::undenied::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::{Finding, Fix};
 use lint_layout::{Name, UsePath, Word, words};
 use workspace_metadata::Role;
@@ -25,7 +29,9 @@ impl Undenied {
     pub(super) fn denied_by(attribute: &syntax::Attribute) -> Vec<UsePath> {
         Some(attribute)
             .filter(|leveled| Self::LEVELS.iter().any(|level| leveled.path().is_ident(level)))
-            .and_then(|kept| kept.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
+            .and_then(|kept| {
+                kept.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ignoring(Ignored::Unparsed)
+            })
             .into_iter()
             .flatten()
             .map(|path| UsePath::from(&path))

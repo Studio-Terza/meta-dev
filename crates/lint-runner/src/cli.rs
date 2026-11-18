@@ -1,4 +1,5 @@
 mod boundary;
+mod ignored;
 mod mode;
 mod outcome;
 mod sources;
@@ -90,9 +91,7 @@ impl Cli {
     ) -> Verdict {
         match self.mode.refusal() {
             Some(refused) => Verdict::refused(refused, err),
-            None => StackSize::LINT
-                .ran(|| self.linted(self.staged(wired), wired, out, err))
-                .unwrap_or_else(|failure| Verdict::refused(&failure, err)),
+            None => Verdict::ran(StackSize::LINT.ran(|| self.linted(self.staged(wired), wired, out, err)), err),
         }
     }
 

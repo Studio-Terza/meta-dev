@@ -8,6 +8,8 @@ use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use lint_runner::{Cli, Ports};
 use timer_ports::Monotonic;
 
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 use text_lines::Lines;
 
 const FIXTURES: &str = "tests/fixtures";
@@ -91,7 +93,7 @@ impl Corpus {
             .flatten()
             .map(|copied| (copied.path, copied.bytes))
             .collect();
-        let described = corpus.read(&fixture.join(METADATA)).unwrap_or_else(|_| Bytes::from(NO_DEPENDENCIES));
+        let described = Self::described(corpus.read(&fixture.join(METADATA)))?;
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(
             Ports::new(&root, [(PathBuf::from(""), described)].into_iter().collect::<Recorded>(), Monotonic::default()),
@@ -124,7 +126,7 @@ impl Corpus {
         let (colon, _) = site.rmatch_indices(LINE_START).next()?;
         Some(Violation {
             path: site.get(..colon)?,
-            at: site.get(colon + LINE_START.len()..)?.parse().ok()?,
+            at: site.get(colon + LINE_START.len()..)?.parse().ignoring(Ignored::Unparsed)?,
             said: line.get(end + SITE_END.len()..)?,
         })
     }
@@ -138,10 +140,21 @@ impl Corpus {
 
     fn verify(fixture: &Path, output: &str) -> Vec<String> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
-        golden::verdict!(format!("lints/{name}.txt"), output)
-            .err()
-            .into_iter()
-            .map(|failure| failure.to_string())
-            .collect()
+        Self::failed(golden::verdict!(format!("lints/{name}.txt"), output))
+    }
+
+    fn failed<Verified>(verdict: Result<Verified, impl std::fmt::Display>) -> Vec<String> {
+        match verdict {
+            Ok(_verified) => Vec::new(),
+            Err(failure) => vec![failure.to_string()],
+        }
+    }
+
+    fn described(read: Result<Bytes, FileFailure>) -> Result<Bytes, FileFailure> {
+        match read {
+            Ok(bytes) => Ok(bytes),
+            Err(FileFailure::Missing(_)) => Ok(Bytes::from(NO_DEPENDENCIES)),
+            Err(failure @ FileFailure::Failed(_)) => Err(failure),
+        }
     }
 }

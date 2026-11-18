@@ -78,9 +78,11 @@ use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
 use crate::cli::boundary::{FileOrder, Helper, Helpers, Rendered, Slot, Worked, Workers};
+use crate::cli::ignored::Ignored;
 use crate::cli::sources::{Claimed, Holding, Priming, Settled};
 use crate::cli::timings::{Measured, Named, Step, Stopwatch, Worker};
 use crate::cli::{Outcome, Sources, Verdict};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct Lints;
@@ -102,7 +104,7 @@ impl Crew<'_> {
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
         let first = sources.earlier().chain([readout.timing()]);
         let table = sources.wired().table(first.chain(worked.timings().iter().copied()));
-        let outcome = Lints::gathered(readout.done(), sources.located().done().as_ref().err(), worked);
+        let outcome = Lints::gathered(readout.done(), sources.located().done(), worked);
         outcome.surveyed(&[table], out, err)
     }
 }
@@ -226,17 +228,21 @@ impl Lints {
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
     ) -> Crew<'scope> {
-        let helpers = Workers::available()
-            .helpers()
-            .filter_map(|index| Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ok());
-        let locating = Helper::spawned(scope, move || Self::locating(sources)).ok();
+        let helpers = Workers::available().helpers().filter_map(|index| {
+            Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ignoring(Ignored::Unspawned)
+        });
+        let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
         Crew { helpers: locating.into_iter().chain(helpers).collect() }
     }
 
-    fn gathered<'run>(readout: &'run Readout, unlocated: Option<&'run Unlocated>, worked: Worked) -> Outcome<'run> {
+    fn gathered<'run>(
+        readout: &'run Readout,
+        located: &'run Result<Described, Unlocated>,
+        worked: Worked,
+    ) -> Outcome<'run> {
         let mut rendered = worked.into_rendered(|slot| slot.picked(&Self::LINTS).and_then(Entry::headline));
         rendered.sort_by_key(Rendered::slot);
-        unlocated.map_or_else(|| Outcome::from_rendered(rendered, readout.failures()), Outcome::Unlocated)
+        Outcome::located(located, rendered, readout.failures())
     }
 
     fn locating(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Worked {
@@ -732,7 +738,7 @@ struct Ground<'run> {
 
 impl<'run> Ground<'run> {
     fn awaited(sources: &'run Sources<impl Files, impl Cargo, impl Timer + Sync>) -> Option<Ground<'run>> {
-        let described = sources.located().done().as_ref().ok()?;
+        let described = sources.located().done().as_ref().ignoring(Ignored::Unlocated)?;
         let roles = Settled::from(sources.gathering()).roles();
         let model = sources.gathering().model()?;
         Some(Ground { heads: sources.gathering().heads(), described, roles, model })

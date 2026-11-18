@@ -2,12 +2,19 @@ use std::path::PathBuf;
 
 use file_ports::{Bytes, Memory};
 use graph_reader::Reader;
+use invariants::{Ignoring, ignored};
 use lint_core::{SourceFile, SourceText};
 use lint_file::ModelLint;
 use lint_placement::Placement;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+
+ignored! {
+    enum Ignored {
+        Unparsed => "a source that does not parse has no count, so the row reads usize::MAX and fails",
+    }
+}
 
 const IMPORTED: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
 const OTHER_COMMAND: &str = "use clap::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
@@ -254,6 +261,8 @@ impl Packages {
         let path = PathBuf::from("/r/src/lib.rs");
         let placement = Placement::locate(&files, &path);
         let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
-        parsed.map_or(usize::MAX, |file| ProcessStarters::report(&Reader::read_files(&[file])).violations().len())
+        parsed
+            .ignoring(Ignored::Unparsed)
+            .map_or(usize::MAX, |file| ProcessStarters::report(&Reader::read_files(&[file])).violations().len())
     }
 }
