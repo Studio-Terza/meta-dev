@@ -9,6 +9,7 @@ use text_lines::Lines;
 
 use super::super::super::journal::Journal;
 use super::super::kept::{Commits, Mutant, Outcomes};
+use super::boundary::Costs;
 use super::tested::Reach;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Invocation, Ports, Text};
@@ -56,13 +57,23 @@ impl Prior {
     }
 
     fn missed(&self, ports: &impl Ports) -> Result<Vec<Mutant>, Failure<'static>> {
+        Ok(self.outcomes(ports)?.into_iter().flat_map(Outcomes::missed).collect())
+    }
+}
+
+impl Prior {
+    pub(super) fn costs(&self, ports: &impl Ports) -> Result<Costs, Failure<'static>> {
+        let marker = ports.files().read_text(&self.directory.join(Self::TESTED)).ok();
+        let outcomes = marker.map_or(Ok(Vec::new()), |_| self.outcomes(ports))?;
+        Ok(Costs::measured(outcomes.into_iter().flat_map(Outcomes::spent).collect()))
+    }
+
+    fn outcomes(&self, ports: &impl Ports) -> Result<Vec<Outcomes>, Failure<'static>> {
         let downloads = self.directory.join(Self::DOWNLOADED);
         let shards = ports.files().entries(&downloads).map_err(|failure| Failure::unusable(downloads, failure))?;
         let journals: Vec<Journal> = shards.iter().map(|shard| Journal::from(shard.join(Self::OUTCOMES))).collect();
         let read: Vec<Text> =
             Journal::read_present(ports.files(), journals).into_iter().flatten().collect::<Result<_, _>>()?;
-        let outcomes: Vec<Outcomes> =
-            read.iter().map(Outcomes::read).collect::<Result<_, _>>().map_err(Failure::Outcomes)?;
-        Ok(outcomes.into_iter().flat_map(Outcomes::missed).collect())
+        read.iter().map(Outcomes::read).collect::<Result<_, _>>().map_err(Failure::Outcomes)
     }
 }

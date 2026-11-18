@@ -1567,7 +1567,8 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_t
             ":(glob)crates/e/src/**/*.rs",
         ],
     );
-    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
+    let listed =
+        Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()]);
     let fake = Script {
         exact: vec![
             ExactReply {
@@ -1577,7 +1578,7 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_t
             ExactReply { asked: consumed.clone(), text: "crates/e/src/lib.rs\ncrates/d/tests/u.rs\n".to_owned() },
             ExactReply { asked: kept.clone(), text: "+changed\n".to_owned() },
             ExactReply { asked: whole.clone(), text: "+whole\n".to_owned() },
-            ExactReply { asked: listed.clone(), text: "m\n".repeat(61) },
+            ExactReply { asked: listed.clone(), text: Listing::of(61) },
         ],
         ..Script::new()
     };
@@ -1614,7 +1615,16 @@ fn a_plan_with_no_changed_tests_asks_no_graph_and_keeps_the_changed_lines() -> R
     );
     let fake = Script {
         changed: "+a line\n".to_owned(),
-        exact: vec![ExactReply { asked: named, text: String::new() }],
+        exact: vec![
+            ExactReply { asked: named, text: String::new() },
+            ExactReply {
+                asked: Invocation::new(
+                    "cargo",
+                    ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()],
+                ),
+                text: Listing::of(1),
+            },
+        ],
         ..Script::new()
     };
     let answer = scratch.answer(
@@ -1640,8 +1650,9 @@ impl Plans {
 
     fn shards(mutants: usize) -> Vec<String> {
         let scratch = Scratch::fresh();
-        let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
-        let fake = Script { exact: vec![ExactReply { asked: listed, text: "m\n".repeat(mutants) }], ..Script::new() };
+        let listed =
+            Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()]);
+        let fake = Script { exact: vec![ExactReply { asked: listed, text: Listing::of(mutants) }], ..Script::new() };
         scratch.answer(
             &fake,
             &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint", "-p"],
@@ -1657,8 +1668,8 @@ laws::table!(
         0 => [r#"shards=[{"index":0,"minutes":45}]"#],
         60 => [r#"shards=[{"index":0,"minutes":45}]"#],
         61 => [r#"shards=[{"index":0,"minutes":45},{"index":1,"minutes":45}]"#],
-        5_068 => [Plans::capped(&[66; 14])],
-        5_095 => [Plans::capped(&[67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 66])],
+        5_068 => [Plans::capped(&[102; 14])],
+        5_069 => [Plans::capped(&[103, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102])],
         100_000 => [Plans::capped(&[360; 14])],
     ]
 );
@@ -2758,13 +2769,14 @@ fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Re
             ":(glob)crates/d/src/**/*.rs",
         ],
     );
-    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
+    let listed =
+        Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()]);
     let fake = Script {
         exact: vec![
             ExactReply { asked: named.clone(), text: "crates/d/tests/behaviour.rs\n".to_owned() },
             ExactReply { asked: kept.clone(), text: "+changed\n".to_owned() },
             ExactReply { asked: whole.clone(), text: "+whole\n".to_owned() },
-            ExactReply { asked: listed.clone(), text: "m\n".repeat(3) },
+            ExactReply { asked: listed.clone(), text: Listing::of(3) },
         ],
         ..Script::new()
     };
@@ -2831,4 +2843,14 @@ struct Runner;
 impl Runner {
     const LIMITED: &'static str =
         r#"--config=target.'cfg(target_os = "linux")'.runner = ["prlimit", "--data=6442450944", "--cpu=300", "--"]"#;
+}
+
+struct Listing;
+
+impl Listing {
+    const MUTANT: &'static str = r#"{"name": "crates/m/src/lib.rs:1:1: replace m -> u8 with 0", "file": "crates/m/src/lib.rs", "function": {"function_name": "m"}, "span": {"start": {"line": 1, "column": 1}}, "replacement": "0", "genre": "FnValue"}"#;
+
+    fn of(mutants: usize) -> String {
+        format!("[{}]", vec![Self::MUTANT; mutants].join(", "))
+    }
 }
