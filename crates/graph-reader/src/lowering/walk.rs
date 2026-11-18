@@ -72,6 +72,7 @@ impl<'read> Frame<'read> {
             constraints: generics.constraints(&signature.generics),
             parameters: LoweredParameter::declared(&generics, &signature.generics),
             mutation: Mutations::signed(signature),
+            mutated: Mutations::mutated(&generics, signature),
             definition: None,
             region: self.context.region(),
             place: self.context.place(),

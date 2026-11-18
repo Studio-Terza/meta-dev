@@ -130,6 +130,22 @@ pub struct Signature {
     constraints: Vec<TypeRef>,
     parameters: Vec<Parameter>,
     mutation: Mutation,
+    mutated: Mutated,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Mutated(Vec<TypeRef>);
+
+impl AsRef<[TypeRef]> for Mutated {
+    fn as_ref(&self) -> &[TypeRef] {
+        &self.0
+    }
+}
+
+impl AsRef<Mutated> for Signature {
+    fn as_ref(&self) -> &Mutated {
+        &self.mutated
+    }
 }
 
 impl From<Output> for Signature {
@@ -140,6 +156,7 @@ impl From<Output> for Signature {
             constraints: Vec::new(),
             parameters: Vec::new(),
             mutation: Mutation::Absent,
+            mutated: Mutated::default(),
         }
     }
 }
@@ -147,12 +164,19 @@ impl From<Output> for Signature {
 impl Signature {
     #[must_use]
     pub fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Signature {
-        Signature { inputs, output, constraints, parameters: Vec::new(), mutation: Mutation::Absent }
+        Signature {
+            inputs,
+            output,
+            constraints,
+            parameters: Vec::new(),
+            mutation: Mutation::Absent,
+            mutated: Mutated::default(),
+        }
     }
 
     #[must_use]
-    pub fn generic(self, parameters: Vec<Parameter>, mutation: Mutation) -> Signature {
-        Signature { parameters, mutation, ..self }
+    pub fn generic(self, parameters: Vec<Parameter>, mutation: Mutation, mutated: Vec<TypeRef>) -> Signature {
+        Signature { parameters, mutation, mutated: Mutated(mutated), ..self }
     }
 
     #[must_use]

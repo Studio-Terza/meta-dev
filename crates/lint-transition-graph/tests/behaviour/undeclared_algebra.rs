@@ -98,3 +98,50 @@ laws::table!(
         ],
     ]
 );
+
+const STORE_PORTS: &str = "pub trait Execute {}\npub type Statements<'run> = dyn Execute + 'run;\n";
+
+const PORTS: Source = Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new(STORE_PORTS));
+
+const HANDLE_BOUNDARY: &str = "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>) {}\n}\n";
+
+const HANDLE_CORE: &str = "pub fn read(statements: &mut store_ports::Statements<'_>) {}\n";
+
+const HANDLE_DIRECT: &str = "mod boundary {\n    pub fn read(statements: &mut dyn store_ports::Execute) {}\n}\n";
+
+const HANDLE_LOCAL: &str =
+    "trait Execute {}\ntype Statements<'run> = dyn Execute + 'run;\npub fn read(statements: &mut Statements<'_>) {}\n";
+
+const HANDLE_STORE: &str = "mod store {\n    pub fn read(statements: &mut store_ports::Statements<'_>) {}\n}\n";
+
+laws::table!(
+    a_mut_store_ports_statements_parameter_in_a_boundary_module_is_a_store_operation,
+    Fixture::reported,
+    [
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_BOUNDARY))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_DIRECT))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_STORE))] => Vec::<String>::new(),
+    ]
+);
+
+laws::table!(
+    a_mut_store_ports_statements_parameter_outside_a_boundary_module_is_still_mutating,
+    Fixture::reported,
+    [
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_CORE))] => vec![
+            "crates/x/src/lib.rs:1: x::read is an undeclared mutating &mut; return a new value, or move the mutation into a store operation".to_owned(),
+            Fixture::workspace("crates/x/src/lib.rs:1: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 0 binary, 1 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
+
+laws::table!(
+    a_local_trait_named_execute_is_not_the_store_port,
+    Fixture::reported,
+    [
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_LOCAL))] => vec![
+            "crates/x/src/lib.rs:3: x::read is an undeclared mutating &mut; return a new value, or move the mutation into a store operation".to_owned(),
+            Fixture::workspace("crates/x/src/lib.rs:3: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 0 binary, 1 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);

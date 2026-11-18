@@ -170,6 +170,7 @@ struct FnRow {
     constraints: Vec<TypeRef<Written>>,
     parameters: Vec<LoweredParameter>,
     mutation: Mutation,
+    mutated: Vec<TypeRef<Written>>,
     definition: Option<LoweredDefinition>,
     region: Region,
     place: Option<PlaceId>,
@@ -191,8 +192,12 @@ impl Lowers for FnRow {
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
-        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints)
-            .generic(parameters, self.mutation);
+        let mutated = self.mutated.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
+        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints).generic(
+            parameters,
+            self.mutation,
+            mutated,
+        );
         let function = Function::new(self.name, self.owner, self.entry, signature)
             .exposed(self.exposure)
             .evaluated(self.evaluation)

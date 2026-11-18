@@ -1,5 +1,6 @@
 mod endpoints;
 mod peeling;
+mod porting;
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -20,6 +21,7 @@ use crate::transitions::resolved::Resolved;
 use crate::transitions::wrapping::Wrapping;
 use endpoints::Endpoints;
 use peeling::Peeling;
+use porting::Porting;
 
 #[derive(Debug)]
 pub(crate) struct Reading<'file> {
@@ -192,6 +194,7 @@ impl<'file> Scope<'_, 'file> {
         Some(
             Transitive::new(placed.site(), AsRef::<Name>::as_ref(function).clone(), takes, gives)
                 .shaped(signature.mutation(), definition.shape())
+                .holding(Porting::from(self.reading).held(signature))
                 .wrapped(
                     signature.output().written().map_or(Wrapping::Plain, peeled),
                     signature.inputs().iter().map(|input| input.typed().map_or(Wrapping::Plain, peeled)).collect(),
