@@ -1,5 +1,6 @@
 use std::fmt;
 
+use algebra::Semigroup;
 use newtype::Wrapping;
 
 use crate::cli::command::step::seconds::Seconds;
@@ -10,16 +11,18 @@ pub struct Range {
     most: Seconds,
 }
 
-impl Range {
-    pub(super) fn spanning(self, other: Range) -> Range {
+impl Semigroup for Range {
+    fn combine(self, other: Range) -> Range {
         Range {
             least: Seconds::new(self.least.into_inner().min(other.least.into_inner())),
             most: Seconds::new(self.most.into_inner().max(other.most.into_inner())),
         }
     }
+}
 
-    pub(super) fn below(self, total: Seconds) -> Option<Range> {
-        (total > self.most).then_some(self)
+impl Range {
+    pub(super) fn below(self, total: Seconds) -> Option<()> {
+        (total > self.most).then_some(())
     }
 }
 

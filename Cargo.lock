@@ -138,6 +138,7 @@ dependencies = [
 name = "ci"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "file-ports",
  "gate-limits",
@@ -2089,6 +2090,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "cargo-ports",
  "file-ports",
  "golden",

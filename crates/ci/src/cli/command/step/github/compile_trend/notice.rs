@@ -4,6 +4,8 @@ mod range;
 use std::cmp::Ordering;
 use std::fmt;
 
+use algebra::Semigroup;
+
 use super::build::Build;
 use super::fortnight::Fortnight;
 use crate::cli::ports::Text;
@@ -33,12 +35,12 @@ impl<'builds> Notice<'builds> {
         earlier: &'builds [Build],
         fortnight: &'builds Fortnight,
     ) -> Notice<'builds> {
-        let range = earlier.iter().map(Build::total).map(Range::from).reduce(Range::spanning);
+        let range = earlier.iter().map(Build::total).map(Range::from).reduce(Range::combine);
         Notice { today, earlier, fortnight, range }
     }
 
     pub(super) fn slower(&self) -> Option<&Notice<'builds>> {
-        self.range.and_then(|range| range.below(self.today.total())).map(|_| self)
+        self.range.and_then(|range| range.below(self.today.total())).map(|()| self)
     }
 
     pub(super) fn reported<'notice>(&'notice self, merged: &'notice Text) -> Report<'notice> {
