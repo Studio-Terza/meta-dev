@@ -554,6 +554,17 @@ fn a_workspace_flag_without_a_path_is_a_usage_failure() {
 }
 
 #[test]
+fn a_trailing_value_flag_or_a_flag_before_its_verb_is_a_usage_failure() {
+    let refused = [
+        Invocation::output(&Session::typical(), &["drop", "n2", "--reason"]),
+        Invocation::output(&Session::typical(), &["--dry-run", "ingest"]),
+        Invocation::output(&Session::typical(), &["--all", "search", "thanks"]),
+        Invocation::output(&Session::typical(), &["--workspace"]),
+    ];
+    assert!(refused.iter().all(|attempt| matches!(attempt, Err(Failure::Usage))));
+}
+
+#[test]
 fn show_reads_the_store_not_the_live_transcript() {
     let store = Sqlite::in_memory::<StreamSchema>();
     let before = Invocation::against(&store, &Session::typical(), &["show", "o1"]);
