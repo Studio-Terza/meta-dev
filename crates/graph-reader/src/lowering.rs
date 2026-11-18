@@ -558,19 +558,18 @@ enum Grain {
     Place(PlaceRows),
     Op(ScopeOp),
     Slot(Slot<ScopeKey>),
-    Body(BodyPart),
     Transcribed(TranscribedRow),
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Grains {
     grains: Catenation<Grain>,
-    bodied: Option<()>,
+    bodies: Catenation<BodyPart>,
 }
 
 impl Semigroup for Grains {
     fn combine(self, other: Grains) -> Grains {
-        Grains { grains: self.grains.combine(other.grains), bodied: self.bodied.or(other.bodied) }
+        Grains { grains: self.grains.combine(other.grains), bodies: self.bodies.combine(other.bodies) }
     }
 }
 
@@ -578,8 +577,7 @@ impl Monoid for Grains {}
 
 impl From<Grain> for Grains {
     fn from(grain: Grain) -> Grains {
-        let bodied = grain.bodied();
-        Grains { grains: Catenation::from(vec![grain]), bodied }
+        Grains { grains: Catenation::from(vec![grain]), bodies: Catenation::default() }
     }
 }
 
@@ -617,7 +615,6 @@ impl From<Grain> for Sorted {
             Grain::Place(places) => Sorted::from(FileRows { places, ..FileRows::default() }),
             Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
             Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
-            Grain::Body(_) => Sorted::default(),
         }
     }
 }
@@ -635,42 +632,6 @@ impl From<Grains> for Sorted {
 }
 
 impl Grain {
-    fn body(self) -> Option<BodyPart> {
-        match self {
-            Grain::Body(part) => Some(part),
-            Grain::Impl(_)
-            | Grain::Function(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
-    fn bodied(&self) -> Option<()> {
-        match self {
-            Grain::Body(_) => Some(()),
-            Grain::Impl(_)
-            | Grain::Function(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
     fn function(&self) -> Option<&FnRow> {
         match self {
             Grain::Function(row) => Some(row),
@@ -684,8 +645,7 @@ impl Grain {
             | Grain::Transcribed(_)
             | Grain::Place(_)
             | Grain::Op(_)
-            | Grain::Slot(_)
-            | Grain::Body(_) => None,
+            | Grain::Slot(_) => None,
         }
     }
 
@@ -699,12 +659,12 @@ impl Grain {
 
 impl From<BodyPart> for Grains {
     fn from(part: BodyPart) -> Grains {
-        Grains::from(Grain::Body(part))
+        Grains { grains: Catenation::default(), bodies: Catenation::from(vec![part]) }
     }
 }
 
 impl Grains {
     fn closed(self) -> Grains {
-        Grains { grains: self.grains.into_iter().filter(|grain| grain.bodied().is_none()).collect(), bodied: None }
+        Grains { grains: self.grains, bodies: Catenation::default() }
     }
 }
