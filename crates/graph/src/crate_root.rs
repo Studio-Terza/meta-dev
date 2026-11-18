@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use algebra::{Monoid, Semigroup};
 use lint_layout::{LibraryForm, Name, PackageName};
 
 use crate::domain::Domain;
@@ -125,27 +126,55 @@ impl Globs {
     }
 }
 
+impl Semigroup for CrateExports {
+    fn combine(self, other: CrateExports) -> CrateExports {
+        let named = other.named.into_iter().fold(self.named, |mut held, (name, bound)| {
+            let merged = Bound(held.remove(&name).unwrap_or_default()).combine(Bound(bound));
+            held.insert(name, merged.0);
+            held
+        });
+        let declared = self.declared.into_iter().chain(other.declared).collect();
+        CrateExports { named, declared, globs: Globs(self.globs.0.combine(other.globs.0)) }
+    }
+}
+
+impl Monoid for CrateExports {}
+
+#[derive(Debug)]
+struct Bound(Vec<Reexport>);
+
+impl Semigroup for Bound {
+    fn combine(self, other: Bound) -> Bound {
+        Bound(other.0.into_iter().fold(self.0, |mut kept, reexport| {
+            kept.retain(|seen| *seen != reexport);
+            kept.push(reexport);
+            kept
+        }))
+    }
+}
+
+impl FromIterator<(Name, Reexport)> for CrateExports {
+    fn from_iter<Bound: IntoIterator<Item = (Name, Reexport)>>(bound: Bound) -> CrateExports {
+        Monoid::concat(bound.into_iter().map(|(name, reexport)| CrateExports {
+            named: BTreeMap::from([(name, vec![reexport])]),
+            ..CrateExports::default()
+        }))
+    }
+}
+
+impl FromIterator<Name> for CrateExports {
+    fn from_iter<Declared: IntoIterator<Item = Name>>(declared: Declared) -> CrateExports {
+        CrateExports { declared: declared.into_iter().collect(), ..CrateExports::default() }
+    }
+}
+
+impl FromIterator<Reexport> for CrateExports {
+    fn from_iter<Globbed: IntoIterator<Item = Reexport>>(globbed: Globbed) -> CrateExports {
+        CrateExports { globs: Globs(globbed.into_iter().collect()), ..CrateExports::default() }
+    }
+}
+
 impl CrateExports {
-    #[must_use]
-    pub fn with_named(mut self, name: Name, reexport: Reexport) -> CrateExports {
-        let bound = self.named.entry(name).or_default();
-        bound.retain(|seen| *seen != reexport);
-        bound.push(reexport);
-        self
-    }
-
-    #[must_use]
-    pub fn with_declared(mut self, name: Name) -> CrateExports {
-        self.declared.insert(name);
-        self
-    }
-
-    #[must_use]
-    pub fn with_glob(mut self, reexport: Reexport) -> CrateExports {
-        self.globs.0.push(reexport);
-        self
-    }
-
     pub fn packages(&self) -> impl Iterator<Item = &PackageName> {
         self.named.values().flatten().chain(&self.globs.0).filter_map(Reexport::package)
     }
@@ -192,16 +221,24 @@ impl Root {
     }
 }
 
+impl Semigroup for CrateRoots {
+    fn combine(self, other: CrateRoots) -> CrateRoots {
+        CrateRoots(self.0.into_iter().chain(other.0).collect())
+    }
+}
+
+impl Monoid for CrateRoots {}
+
+impl FromIterator<(PackageName, Root)> for CrateRoots {
+    fn from_iter<Rooted: IntoIterator<Item = (PackageName, Root)>>(rooted: Rooted) -> CrateRoots {
+        CrateRoots(rooted.into_iter().collect())
+    }
+}
+
 impl CrateRoots {
     #[must_use]
     pub fn root(&self, package: &PackageName) -> Option<&Root> {
         self.0.get(package)
-    }
-
-    #[must_use]
-    pub fn with_root(mut self, package: PackageName, root: Root) -> CrateRoots {
-        self.0.insert(package, root);
-        self
     }
 
     #[must_use]

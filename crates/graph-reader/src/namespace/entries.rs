@@ -694,11 +694,9 @@ impl Entries {
             .iter()
             .filter(|glob| shown(glob.visibility))
             .map(|glob| glob.source.reexport(dependencies, &declared));
-        let with_declared =
-            declared.iter().fold(CrateExports::default(), |exports, name| exports.with_declared((*name).clone()));
-        let with_named =
-            imported.chain(externs).fold(with_declared, |exports, (name, reexport)| exports.with_named(name, reexport));
-        globs.fold(with_named, CrateExports::with_glob)
+        let own: CrateExports = declared.iter().map(|name| (*name).clone()).collect();
+        let named: CrateExports = imported.chain(externs).collect();
+        own.combine(named).combine(globs.collect())
     }
 }
 

@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use syntax::{File, Item, ItemMod};
 
+use algebra::Semigroup;
 use graph::{CrateExports, CrateRoots, Implementation, Model, Origin, Root};
 use lint_layout::{CrateSource, Crates, Dependencies, Name, PackageName};
 
@@ -44,9 +45,8 @@ impl Closing {
     fn widened(self, crates: &Crates) -> Closing {
         let fresh: BTreeSet<PackageName> =
             self.pending.into_iter().filter(|package| self.read.root(package).is_none()).collect();
-        let read = fresh
-            .iter()
-            .fold(self.read, |roots, package| roots.with_root(package.clone(), RootFile::read(crates, package)));
+        let read =
+            self.read.combine(fresh.iter().map(|package| (package.clone(), RootFile::read(crates, package))).collect());
         let pending = fresh.iter().filter_map(|package| read.root(package)).flat_map(Root::packages).cloned().collect();
         Closing { read, pending }
     }
