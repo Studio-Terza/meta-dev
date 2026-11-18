@@ -141,11 +141,6 @@ impl<'found> Form<'found> {
         }
     }
 
-    #[must_use]
-    pub fn hand_written(&self) -> Option<&Form<'found>> {
-        self.sorted(Some(self), None, None)
-    }
-
     pub(crate) fn ported(&self) -> Option<Effect> {
         match self {
             Form::Port => Some(Effect),

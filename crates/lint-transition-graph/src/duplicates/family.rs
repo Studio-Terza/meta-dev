@@ -23,7 +23,7 @@ impl<'found, 'file> Family<'found, 'file> {
     pub(super) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Family<'found, 'file>> {
         let keyed = edges
             .iter()
-            .filter_map(|edge| edge.form().hand_written().map(|_| edge))
+            .filter_map(|edge| edge.form().sorted(Some(edge), None, None))
             .filter(|edge| edge.form().algebraic().and_then(Acting::pure).is_none())
             .fold(BTreeMap::new(), |mut keys: BTreeMap<Key<'found>, Vec<&'found Transition<'found, 'file>>>, edge| {
                 edge.ends()

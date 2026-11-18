@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use graph::{
-    Entry, Function, Implementation, Input, ItemId, ItemKind, Model, Owner as Seated, Parameter, Placed, Reach, Region,
-    Seat, TypeRef,
+    Entry, Function, Implementation, Input, ItemId, ItemKind, Model, Origin, Owner as Seated, Parameter, Placed, Reach,
+    Region, Seat, TypeRef,
 };
 use lint_core::Site;
 use lint_layout::{Name, Whole, Word, words};
@@ -81,7 +81,7 @@ impl<'file> Reading<'file> {
             .model
             .implementations()
             .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
-            .filter(|placed| placed.entity().hand_written().is_some())
+            .filter(|placed| placed.entity().origin() == Origin::Written)
             .map(|placed| self.implemented(placed));
         let traits = self
             .model

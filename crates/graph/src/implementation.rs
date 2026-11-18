@@ -13,6 +13,15 @@ pub enum Origin {
     Derived,
 }
 
+impl Origin {
+    pub fn sorted<Sorted>(self, written: Sorted, derived: Sorted) -> Sorted {
+        match self {
+            Origin::Written => written,
+            Origin::Derived => derived,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Subject {
     written: Name,
@@ -110,14 +119,6 @@ impl Implementation {
     #[must_use]
     pub fn assigned(&self) -> &[Assigned] {
         &self.assigned
-    }
-
-    #[must_use]
-    pub fn hand_written(&self) -> Option<&Implementation> {
-        match self.origin {
-            Origin::Written => Some(self),
-            Origin::Derived => None,
-        }
     }
 
     #[must_use]

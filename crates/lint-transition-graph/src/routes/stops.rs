@@ -49,7 +49,7 @@ pub(super) struct Stops<'graph, 'found, 'file> {
 impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
     pub(super) fn indexed(edges: &'graph [Edge<'found, 'file>]) -> Stops<'graph, 'found, 'file> {
         let joins: Vec<&'graph Edge<'found, 'file>> =
-            edges.iter().filter(|edge| edge.form().hand_written().is_some()).collect();
+            edges.iter().filter_map(|edge| edge.form().sorted(Some(edge), None, None)).collect();
         let named = edges.iter().fold(BTreeMap::new(), |mut named: BTreeMap<_, Vec<_>>, edge| {
             named.entry(AsRef::<Name>::as_ref(edge.transition().function())).or_default().push(edge);
             named

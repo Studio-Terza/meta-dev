@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 
-use graph::{Implementation, ItemId, ItemPath, Mention, Model, PathUse, Placed, Reach, Region, Resolved, Spelling};
+use graph::{
+    Implementation, ItemId, ItemPath, Mention, Model, Origin, PathUse, Placed, Reach, Region, Resolved, Spelling,
+};
 use lint_core::Site;
 use lint_layout::Name;
 
@@ -27,7 +29,7 @@ impl<'model> From<&'model Model> for ModelCalls<'model> {
             .map(|placed| Called::invoked(placed, &named));
         let derived = model
             .implementations()
-            .filter(|placed| placed.entity().hand_written().is_none())
+            .filter(|placed| placed.entity().origin() == Origin::Derived)
             .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
             .filter_map(|placed| Called::derived(placed, &named));
         ModelCalls(invoked.chain(derived).collect())

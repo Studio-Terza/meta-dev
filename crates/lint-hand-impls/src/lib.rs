@@ -40,7 +40,7 @@ impl HandImpls {
         guarded: &ItemPath,
         declared: Option<&Resolved>,
     ) -> Option<Violation<'model>> {
-        let implementation = found.entity().hand_written()?;
+        let implementation = found.entity().origin().sorted(Some(found.entity()), None)?;
         let implemented = implementation.implemented()?;
         let derivable = implemented
             .std()
