@@ -16,7 +16,7 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use graph::Building;
+use graph::{Exports, Issued};
 use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
@@ -45,9 +45,8 @@ pub(crate) struct Export {
 }
 
 impl Export {
-    pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>, mut building: Building) -> Building {
-        building.export(self.domain, self.path.written(), &resolving.path(self.root, &self.path, self.domain));
-        building
+    pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>) -> Exports {
+        Exports::export(self.domain, self.path.written(), &resolving.path(self.root, &self.path, self.domain))
     }
 }
 
@@ -244,12 +243,9 @@ impl<'read> Namespace<'read> {
             .collect()
     }
 
-    pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {
+    pub(crate) fn issued(&self) -> Issued {
         let roots: BTreeMap<ScopeId, &Name> = self.crates.iter().map(|(name, root)| (*root, *name)).collect();
-        self.scopes
-            .iter()
-            .map(|row| row.issued(building, row.outermost().and_then(|root| roots.get(&root).copied())))
-            .collect()
+        self.scopes.iter().map(|row| row.issued(row.outermost().and_then(|root| roots.get(&root).copied()))).collect()
     }
 
     pub(super) fn anchors(&self, scope: ScopeId) -> Anchors {
