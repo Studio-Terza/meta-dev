@@ -1589,7 +1589,10 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_t
         Printed { exit: ExitCode::SUCCESS, out: vec!["mutants: 61 to test in 2 shards"], err: Vec::<&str>::new() }
     );
     assert_eq!(Text::lines(&scratch.read("c.diff")), ["+changed", "+whole"]);
-    assert_eq!(Text::lines(&scratch.read("plan.txt")), ["shards=[0,1]"]);
+    assert_eq!(
+        Text::lines(&scratch.read("plan.txt")),
+        [r#"shards=[{"index":0,"minutes":45},{"index":1,"minutes":45}]"#]
+    );
     assert_eq!(*fake.calls.borrow(), [named, consumed, kept, whole, listed]);
     Ok(())
 }
@@ -1621,6 +1624,15 @@ fn a_plan_with_no_changed_tests_asks_no_graph_and_keeps_the_changed_lines() -> R
 struct Plans;
 
 impl Plans {
+    fn capped(minutes: &[usize]) -> String {
+        let planned: Vec<String> = minutes
+            .iter()
+            .enumerate()
+            .map(|(index, cap)| format!(r#"{{"index":{index},"minutes":{cap}}}"#))
+            .collect();
+        format!("shards=[{}]", planned.join(","))
+    }
+
     fn shards(mutants: usize) -> Vec<String> {
         let scratch = Scratch::fresh();
         let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
@@ -1637,10 +1649,12 @@ laws::table!(
     shards_grow_with_the_mutants_up_to_a_ceiling,
     |mutants: &usize| Plans::shards(*mutants),
     [
-        0 => ["shards=[0]"],
-        60 => ["shards=[0]"],
-        61 => ["shards=[0,1]"],
-        100_000 => ["shards=[0,1,2,3,4,5,6,7,8,9,10,11,12,13]"],
+        0 => [r#"shards=[{"index":0,"minutes":45}]"#],
+        60 => [r#"shards=[{"index":0,"minutes":45}]"#],
+        61 => [r#"shards=[{"index":0,"minutes":45},{"index":1,"minutes":45}]"#],
+        5_068 => [Plans::capped(&[66; 14])],
+        5_095 => [Plans::capped(&[67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 66])],
+        100_000 => [Plans::capped(&[360; 14])],
     ]
 );
 
@@ -1651,7 +1665,7 @@ fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -
     let answer = scratch
         .answer(&fake, &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint"]);
     assert_eq!(Text::lines(&answer.out), ["mutants: 0 to test in 1 shards"]);
-    assert_eq!(Text::lines(&scratch.read("plan.txt")), ["shards=[0]"]);
+    assert_eq!(Text::lines(&scratch.read("plan.txt")), [r#"shards=[{"index":0,"minutes":45}]"#]);
     assert!(fake.calls.borrow().is_empty());
     Ok(())
 }
