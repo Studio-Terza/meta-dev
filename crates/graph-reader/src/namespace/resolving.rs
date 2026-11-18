@@ -6,7 +6,7 @@ use graph::{Building, Domain, FileId, ItemId, ItemPath, Member, Mention, PathUse
 use lint_core::Macros;
 use lint_layout::LineNumber;
 
-use super::boundary::ScopeId;
+use super::boundary::{ScopeId, ScopeKey, ScopeMap};
 use super::items::ItemIds;
 use super::resolver::Resolver;
 use super::use_path::UsePath;
@@ -42,7 +42,7 @@ impl<'ids, 'tables, 'rows> Resolving<'ids, 'tables, 'rows> {
 
 #[derive(Debug)]
 pub(crate) struct TranscribedRow {
-    scope: ScopeId,
+    scope: ScopeKey,
     name: UsePath,
     mentioned: Vec<UsePath>,
 }
@@ -71,7 +71,7 @@ pub(crate) struct Invoker<'grown, 'invoked> {
 }
 
 impl TranscribedRow {
-    pub(crate) fn read(scope: ScopeId, ident: &Ident, definition: &Macro) -> TranscribedRow {
+    pub(crate) fn read(scope: ScopeKey, ident: &Ident, definition: &Macro) -> TranscribedRow {
         let found = Macros::mentioned(definition);
         let paths = found.paths().iter().map(UsePath::from);
         let mentioned = paths.filter(|path| path.crate_anchored().is_none()).collect();
@@ -83,8 +83,8 @@ impl TranscribedRow {
         paths.into_iter().filter(|path| UsePath::from(path).crate_anchored().is_some()).collect()
     }
 
-    pub(crate) fn settled(&self, resolving: Resolving<'_, '_, '_>) -> Option<Transcription> {
-        let defined = resolving.path(self.scope, &self.name, Domain::Macros).crate_item()?;
+    pub(crate) fn settled(&self, resolving: Resolving<'_, '_, '_>, scopes: &ScopeMap) -> Option<Transcription> {
+        let defined = resolving.path(scopes.scope(&self.scope), &self.name, Domain::Macros).crate_item()?;
         let transcribed = self.mentioned.clone();
         Some(Transcription { defined, transcribed })
     }

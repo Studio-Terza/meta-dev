@@ -98,19 +98,39 @@ impl Contribute for Assertions<'_> {
         inner.concluded(|(), asserted| asserted.bodied())
     }
 
-    fn on_item_const(&self, item: &ItemConst, _: &Facts<'_, ItemConst>) -> Contributed<(), Asserted> {
+    fn on_item_const(
+        &self,
+        item: &ItemConst,
+        _: &Facts<'_, ItemConst>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Asserted> {
         Contributed::parted(Asserted::constant(item))
     }
 
-    fn on_local(&self, local: &Local, _: &Facts<'_, Local>) -> Contributed<(), Asserted> {
+    fn on_local(
+        &self,
+        local: &Local,
+        _: &Facts<'_, Local>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Asserted> {
         Contributed::parted(Asserted::local(local))
     }
 
-    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), Asserted> {
+    fn on_item_use(
+        &self,
+        item: &ItemUse,
+        _: &Facts<'_, ItemUse>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Asserted> {
         Contributed::new((), Asserted::aliased(self.tables.renamed(&item.tree)), Descend::Over)
     }
 
-    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Asserted> {
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Asserted> {
         Contributed::new((), Asserted::met(invocation), Descend::Over)
     }
 }

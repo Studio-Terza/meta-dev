@@ -124,39 +124,84 @@ impl Contribute for Numbers<'_> {
         ]
     }
 
-    fn on_item_mod(&self, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Lines {
+    fn on_item_mod(
+        &self,
+        module: &ItemMod,
+        _: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::descending(Gate::BOUNDARY.outside(module))
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Lines {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_const(&self, _: &ItemConst, _: &Facts<'_, ItemConst>) -> Lines {
+    fn on_item_const(
+        &self,
+        _: &ItemConst,
+        _: &Facts<'_, ItemConst>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::descending(Descend::Over)
     }
 
-    fn on_impl_item_const(&self, _: &ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Lines {
+    fn on_impl_item_const(
+        &self,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::descending(Descend::Over)
     }
 
-    fn on_trait_item_const(&self, _: &TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Lines {
+    fn on_trait_item_const(
+        &self,
+        _: &TraitItemConst,
+        _: &Facts<'_, TraitItemConst>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::descending(Descend::Over)
     }
 
-    fn on_expr_const(&self, _: &ExprConst, _: &Facts<'_, ExprConst>) -> Lines {
+    fn on_expr_const(
+        &self,
+        _: &ExprConst,
+        _: &Facts<'_, ExprConst>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::descending(Descend::Over)
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Lines {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_lit_int(&self, _: &LitInt, facts: &Facts<'_, LitInt>) -> Lines {
+    fn on_lit_int(
+        &self,
+        _: &LitInt,
+        facts: &Facts<'_, LitInt>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }
 
-    fn on_lit_float(&self, _: &LitFloat, facts: &Facts<'_, LitFloat>) -> Lines {
+    fn on_lit_float(
+        &self,
+        _: &LitFloat,
+        facts: &Facts<'_, LitFloat>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Lines {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }
 }

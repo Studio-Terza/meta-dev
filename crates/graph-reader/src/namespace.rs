@@ -21,7 +21,7 @@ use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
 use binding::Binding;
-pub(crate) use boundary::ScopeId;
+pub(crate) use boundary::{KeyRole, NodeKey, ScopeId, ScopeKey, ScopeMap};
 use entries::Below;
 use entries::DeclaredAt;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
@@ -77,28 +77,86 @@ pub(crate) struct Openings {
     nested: Vec<Opening>,
 }
 
+#[derive(Debug)]
+pub(crate) enum ScopeOp {
+    Opened { key: ScopeKey, parent: ScopeKey, kind: ScopeKind, entries: Entries },
+    Absorbed { key: ScopeKey, entries: Entries },
+    Declared { key: ScopeKey, name: Name, visibility: Visibility, module: ScopeKey },
+}
+
+impl ScopeOp {
+    fn opened(&self) -> Option<&ScopeKey> {
+        match self {
+            ScopeOp::Opened { key, .. } => Some(key),
+            ScopeOp::Absorbed { .. } | ScopeOp::Declared { .. } => None,
+        }
+    }
+
+    fn shaped(&self, scopes: &ScopeMap) -> Option<Opening> {
+        match self {
+            ScopeOp::Opened { parent, kind, .. } => {
+                Some(Opening { parent: scopes.scope(parent), kind: *kind, entries: Entries::default() })
+            }
+            ScopeOp::Absorbed { .. } | ScopeOp::Declared { .. } => None,
+        }
+    }
+
+    fn chunk(self, scopes: &ScopeMap) -> Chunk {
+        match self {
+            ScopeOp::Opened { key, entries, .. } | ScopeOp::Absorbed { key, entries } => {
+                Chunk { scope: scopes.scope(&key), entries }
+            }
+            ScopeOp::Declared { key, name, visibility, module } => Chunk {
+                scope: scopes.scope(&key),
+                entries: Entries::of_declared(Declared::new(
+                    name,
+                    visibility,
+                    DeclaredKind::Module(scopes.scope(&module)),
+                )),
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Replayed {
+    openings: Openings,
+    scopes: ScopeMap,
+}
+impl Replayed {
+    pub(crate) fn concluded<Out>(self, into: impl FnOnce(Openings, ScopeMap) -> Out) -> Out {
+        into(self.openings, self.scopes)
+    }
+}
+
 impl Openings {
-    pub(crate) fn new(top: Entries) -> Openings {
-        Openings { top, nested: Vec::new() }
+    pub(crate) fn replayed(top: Entries, ops: Vec<ScopeOp>) -> Replayed {
+        let scopes = ScopeMap::keyed(ops.iter().filter_map(ScopeOp::opened).cloned());
+        let shapes: Vec<Opening> = ops.iter().filter_map(|op| op.shaped(&scopes)).collect();
+        let seeded: Vec<Vec<Entries>> = std::iter::repeat_with(Vec::new).take(shapes.len() + 1).collect();
+        let chunked = ops.into_iter().map(|op| op.chunk(&scopes)).fold(seeded, |chunked, chunk| {
+            let mut grown = chunked;
+            chunk
+                .scope
+                .row_mut(&mut grown)
+                .into_iter()
+                .zip([chunk.entries])
+                .for_each(|(held, entries)| held.push(entries));
+            grown
+        });
+        let mut merged: Vec<Entries> = chunked.into_iter().map(|chunks| chunks.into_iter().collect()).collect();
+        let nested_entries = merged.split_off(1);
+        let top_entries = [top].into_iter().chain(merged).collect();
+        let nested =
+            shapes.into_iter().zip(nested_entries).map(|(shape, entries)| Opening { entries, ..shape }).collect();
+        Replayed { openings: Openings { top: top_entries, nested }, scopes }
     }
+}
 
-    pub(crate) fn opened(&mut self, parent: ScopeId, kind: ScopeKind, entries: Entries) -> ScopeId {
-        let scope = ScopeId::after(&self.nested).nested();
-        self.nested.push(Opening { parent, kind, entries });
-        scope
-    }
-
-    pub(crate) fn absorb(&mut self, scope: ScopeId, entries: Entries) {
-        let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
-        let held = nested.map_or(&mut self.top, |opening| &mut opening.entries);
-        *held = [std::mem::take(held), entries].into_iter().collect();
-    }
-
-    pub(crate) fn declare(&mut self, scope: ScopeId, declared: Declared) {
-        let top = &mut self.top;
-        let nested = scope.below_top().and_then(|index| index.row_mut(&mut self.nested));
-        nested.map_or(top, |opening| &mut opening.entries).declare(declared);
-    }
+#[derive(Debug)]
+struct Chunk {
+    scope: ScopeId,
+    entries: Entries,
 }
 
 #[derive(Debug)]

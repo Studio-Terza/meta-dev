@@ -20,7 +20,8 @@ pub(super) struct QuoteRow {
 
 impl Built for QuoteRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let invoked = footing.resolving().path(self.located.scope(), &self.written, Domain::Macros);
+        let invoked =
+            footing.resolving().path(footing.scopes().scope(self.located.scope()), &self.written, Domain::Macros);
         let kept = Some(invoked).filter(|resolved| resolved.std().is_none());
         let line = self.line;
         kept.map(|found| Quoted::new(found, self.quote)).into_iter().fold(building, |mut built, quoted| {

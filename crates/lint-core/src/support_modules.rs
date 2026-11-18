@@ -59,7 +59,12 @@ impl Contribute for SupportScan {
         &[Kind::ItemMod]
     }
 
-    fn on_item_mod(&self, module: &ItemMod, _: &Facts<'_, ItemMod>) -> Contributed<(), SupportModules> {
+    fn on_item_mod(
+        &self,
+        module: &ItemMod,
+        _: &Facts<'_, ItemMod>,
+        _around: crate::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), SupportModules> {
         let names = module
             .content
             .as_ref()

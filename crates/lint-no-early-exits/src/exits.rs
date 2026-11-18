@@ -36,15 +36,30 @@ impl<'file> Contribute for Exits<'file> {
         &[Kind::Macro, Kind::ExprReturn, Kind::ExprBreak, Kind::ExprContinue]
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Violation<'file>>> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_expr_return(&self, expr: &ExprReturn, _: &Facts<'_, ExprReturn>) -> Contributed<(), Vec<Violation<'file>>> {
+    fn on_expr_return(
+        &self,
+        expr: &ExprReturn,
+        _: &Facts<'_, ExprReturn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.return_token.span, Finding::Return)
     }
 
-    fn on_expr_break(&self, expr: &ExprBreak, _: &Facts<'_, ExprBreak>) -> Contributed<(), Vec<Violation<'file>>> {
+    fn on_expr_break(
+        &self,
+        expr: &ExprBreak,
+        _: &Facts<'_, ExprBreak>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.break_token.span, Finding::Break)
     }
 
@@ -52,6 +67,7 @@ impl<'file> Contribute for Exits<'file> {
         &self,
         expr: &ExprContinue,
         _: &Facts<'_, ExprContinue>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         self.record(expr.continue_token.span, Finding::Continue)
     }

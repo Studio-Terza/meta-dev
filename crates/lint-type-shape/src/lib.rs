@@ -174,15 +174,30 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         }
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Shapes<'scan>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Shapes<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Shapes<'scan>> {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Shapes<'scan>> {
         Contributed::descending(facts.inherent().map_or(Descend::Over, |_| Descend::Into))
     }
 
-    fn on_item_struct(&self, item: &ItemStruct, _: &Facts<'_, ItemStruct>) -> Contributed<(), Shapes<'scan>> {
+    fn on_item_struct(
+        &self,
+        item: &ItemStruct,
+        _: &Facts<'_, ItemStruct>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Shapes<'scan>> {
         self.fields(&item.fields)
     }
 
@@ -195,7 +210,12 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         inner.concluded(|(), shapes| shapes.rooted(item.fields.iter().map(|field| &field.ty), self))
     }
 
-    fn on_item_enum(&self, item: &ItemEnum, _: &Facts<'_, ItemEnum>) -> Contributed<(), Shapes<'scan>> {
+    fn on_item_enum(
+        &self,
+        item: &ItemEnum,
+        _: &Facts<'_, ItemEnum>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Shapes<'scan>> {
         let found =
             item.variants.iter().flat_map(|variant| variant.fields.iter().filter_map(|field| self.bool_field(field)));
         Contributed::parted(Shapes { found: found.collect(), ..Shapes::default() })
@@ -220,7 +240,12 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         inner.concluded(|(), shapes| shapes.rooted([&*item.ty], self))
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Shapes<'scan>> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Shapes<'scan>> {
         Contributed::descending(Descend::Expand)
     }
 
@@ -243,11 +268,21 @@ impl<'scan> Contribute for TypeShapes<'scan> {
         inner.concluded(|(), shapes| shapes.within(ty))
     }
 
-    fn on_type_tuple(&self, tuple: &TypeTuple, _: &Facts<'_, TypeTuple>) -> Contributed<(), Shapes<'scan>> {
+    fn on_type_tuple(
+        &self,
+        tuple: &TypeTuple,
+        _: &Facts<'_, TypeTuple>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Shapes<'scan>> {
         Self::loose(tuple.elems.first().map(|_| TypeShape::TUPLE))
     }
 
-    fn on_type_path(&self, path: &TypePath, _: &Facts<'_, TypePath>) -> Contributed<(), Shapes<'scan>> {
+    fn on_type_path(
+        &self,
+        path: &TypePath,
+        _: &Facts<'_, TypePath>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Shapes<'scan>> {
         Self::loose(TypeShape::string_error(path))
     }
 }

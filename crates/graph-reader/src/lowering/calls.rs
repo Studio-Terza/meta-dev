@@ -1,3 +1,4 @@
+use super::{Frame, Grain, Grains};
 use syntax::Spanned;
 use syntax::{ExprCall, ExprMacro, ExprMethodCall};
 
@@ -5,10 +6,8 @@ use graph::{Building, Call, Callee, ItemPath, MacroCall, Region};
 use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
-use super::Lowering;
 use super::places::PlaceId;
 use super::seat::{Built, Footing, Located};
-use lint_sweep::Address;
 
 #[derive(Debug)]
 pub(super) struct CallRow {
@@ -20,7 +19,7 @@ pub(super) struct CallRow {
 
 impl Built for CallRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place);
+        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref());
         self.located.call(footing, building, Call::new(self.callee, seat))
     }
 }
@@ -43,29 +42,27 @@ impl CallPath<'_> {
     }
 }
 
-impl Lowering<'_> {
-    pub(super) fn method_called(&mut self, call: &ExprMethodCall) {
-        self.called(Position::from(call.method.span()), Callee::Method(Name::from(&call.method)));
+impl Frame<'_> {
+    pub(super) fn method_called(&self, call: &ExprMethodCall) -> Grains {
+        self.called(Position::from(call.method.span()), Callee::Method(Name::from(&call.method)))
     }
 
-    pub(super) fn path_called(&mut self, call: &ExprCall) {
-        self.calling = Syntax::expr_path(&call.func).map(Address::from);
-        Syntax::expr_path(&call.func).into_iter().fold(self, |lowering, path| {
+    pub(super) fn path_called(&self, call: &ExprCall) -> Grains {
+        Syntax::expr_path(&call.func).map_or_else(Grains::default, |path| {
             let called = CallPath { path: &path.path };
-            lowering.called(called.position(), Callee::Path(called.written()));
-            lowering
-        });
+            self.called(called.position(), Callee::Path(called.written()))
+        })
     }
 
-    pub(super) fn macro_called(&mut self, expression: &ExprMacro) {
+    pub(super) fn macro_called(&self, expression: &ExprMacro) -> Grains {
         let invoked = &expression.mac;
         let called = CallPath { path: &invoked.path };
-        self.called(Position::from(invoked.path.span()), Callee::Macro(MacroCall::from(called.written())));
+        self.called(Position::from(invoked.path.span()), Callee::Macro(MacroCall::from(called.written())))
     }
 
-    fn called(&mut self, position: Position, callee: Callee) {
+    fn called(&self, position: Position, callee: Callee) -> Grains {
         let located = self.here.located(position);
         let row = CallRow { located, callee, region: self.context.region(), place: self.context.place() };
-        self.lowered.rows.calls.push(row);
+        Grains::from(Grain::Call(row))
     }
 }
