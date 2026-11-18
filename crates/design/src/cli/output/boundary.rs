@@ -2,8 +2,9 @@ use std::fmt;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, Artifact, Basis, Condition, Facet, JobId, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason,
-    Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
+    AnyNode, Artifact, Basis, Condition, Confidence, Explicitness, Facet, JobId, Kin, NodeEdge, NodeId, NodeRelation,
+    Prefix, Project, Provenance, Reason, Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity,
+    Stage, Standing, Title,
 };
 use design_runs::{Excerpt, RunState};
 use design_store::AppliedId;
@@ -11,7 +12,7 @@ use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
 use grammar_cited::Cited;
 use grammar_output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
-use grammar_output::{Fields, Unread};
+use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
 use named_derive::Named;
 use newtype::Wrapping;
 use stream::{Relation, Shape};
@@ -23,15 +24,24 @@ use crate::cli::count::Count;
 use crate::cli::noted::{Note, Noted};
 use crate::cli::viewed::Seen;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Record)]
 pub struct Summary {
+    #[field(Id<_>)]
     node: NodeId,
+    #[field(Phrase<_>)]
     project: Project,
+    #[field(Word<_>)]
     facet: Facet,
+    #[field(Word<_>)]
     stage: Stage,
+    #[field(Word<_>)]
     basis: Basis,
+    #[field(Word<_>)]
     role: Role,
+    #[past(Key::Entered)]
+    #[field(Word<_>)]
     entered: Provenance,
+    #[optional(Quoted<_>)]
     title: Option<Title>,
 }
 
@@ -156,10 +166,13 @@ pub enum Line {
     Noted(Noted),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Record)]
 pub struct RefusedLink {
+    #[record]
     source: Anchored,
+    #[field(Bare<_>)]
     relation: Relation,
+    #[record]
     target: Anchored,
 }
 
@@ -172,16 +185,23 @@ pub struct Attempted {
     reply: Option<Excerpt>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Record)]
 pub struct Flailing {
+    #[field(Cited, via = SegmentRef::from)]
     segment: SegmentRef,
+    #[past(Spend::Job)]
+    #[field(Integer<_>, via = JobId::new)]
     job: JobId,
+    #[past(Key::Run)]
+    #[field(Integer<_>, via = RunId::new)]
     run: RunId,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Record)]
 pub struct Lapsed {
+    #[field(Integer<_>, via = JobId::new)]
     job: JobId,
+    #[field(Phrase<_>)]
     lapse: Lapse,
 }
 
@@ -270,9 +290,7 @@ impl FromStr for Line {
     type Err = Unread;
 
     fn from_str(text: &str) -> Result<Line, Unread> {
-        let mut fields = Fields::lexed(text)?;
-        let line = Line::read(&mut fields)?;
-        fields.ended(line)
+        Fields::lexed(text)?.record::<Line>()?.ended()
     }
 }
 
@@ -373,116 +391,67 @@ impl fmt::Display for Line {
     }
 }
 
-impl Line {
-    fn read(fields: &mut Fields) -> Result<Line, Unread> {
-        fields
-            .optional::<Word<Seen>>()
-            .map(|seen| Viewed::read(seen, fields).map(Line::Viewed))
-            .or_else(|| fields.optional::<Word<Note>>().map(|note| Noted::read(note, fields).map(Line::Noted)))
-            .unwrap_or_else(|| fields.field::<Word<Key>>().and_then(|key| key.line(fields)))
+impl Record for Line {
+    fn read(fields: Fields) -> Result<Parsed<Line, Fields>, Unread> {
+        fields.optional::<Word<Seen>>().concluded(Seen::lined)
+    }
+}
+
+impl Seen {
+    fn lined(seen: Option<Seen>, fields: Fields) -> Result<Parsed<Line, Fields>, Unread> {
+        match seen {
+            Some(found) => found.viewed(fields).mapped(Line::Viewed),
+            None => fields.optional::<Word<Note>>().concluded(Note::lined),
+        }
+    }
+}
+
+impl Note {
+    fn lined(note: Option<Note>, fields: Fields) -> Result<Parsed<Line, Fields>, Unread> {
+        match note {
+            Some(found) => found.noted(fields).mapped(Line::Noted),
+            None => fields.field::<Word<Key>>()?.concluded(Key::line),
+        }
     }
 }
 
 impl Key {
-    fn line(self, fields: &mut Fields) -> Result<Line, Unread> {
+    fn line(self, fields: Fields) -> Result<Parsed<Line, Fields>, Unread> {
         match self {
-            Key::Session => Ok(Line::Read {
-                session: fields.field::<Quoted<_>>()?,
-                cursor: Cursor::new(fields.past(&[Key::Read, Key::To])?.field::<Bare<Offset>>()?),
-            }),
-            Key::Authorship => Ok(Line::Authored {
-                author: fields.field::<Word<_>>()?,
-                count: Count::new(fields.field::<Integer<_>>()?),
-            }),
-            Key::Unrecognised => Ok(Line::Unrecognised {
-                kind: fields.field::<Quoted<_>>()?,
-                count: Count::new(fields.field::<Integer<_>>()?),
-            }),
-            Key::Form => {
-                Ok(Line::Formed { shape: fields.field::<Word<_>>()?, count: Count::new(fields.field::<Integer<_>>()?) })
-            }
-            Key::Relation => Ok(Line::Related {
-                relation: fields.field::<Word<_>>()?,
-                count: Count::new(fields.field::<Integer<_>>()?),
-            }),
-            Key::Written => Ok(Line::Written(Count::new(fields.field::<Integer<_>>()?))),
-            Key::Hit => Ok(Line::Hit {
-                segment: SegmentRef::from(&fields.field::<Cited>()?),
-                author: fields.field::<Word<_>>()?,
-                stamp: fields.field::<Quoted<_>>()?,
-                body: fields.field::<Quoted<_>>()?,
-            }),
-            Key::Root => Ok(Line::Root {
-                node: fields.field::<Id<_>>()?,
-                project: fields.past(&[Key::Project])?.field::<Phrase<_>>()?,
-            }),
-            Key::Consumes => Ok(Line::Consumes {
-                node: fields.field::<Id<_>>()?,
-                project: fields.past(&[Key::Project])?.field::<Phrase<_>>()?,
-            }),
-            Key::Node => Summary::read(fields).map(Line::Node),
-            Key::Artifact => Ok(Line::Artifact(fields.field::<Phrase<_>>()?)),
-            Key::Condition => Ok(Line::Condition(fields.field::<Phrase<_>>()?)),
-            Key::Reason => Ok(Line::Reason(fields.field::<Phrase<_>>()?)),
-            Key::Ancestor => Ok(Line::Relative { kin: Kin::Ancestor, node: Summary::read(fields)? }),
-            Key::Child => Ok(Line::Relative { kin: Kin::Child, node: Summary::read(fields)? }),
-            Key::Edge => Ok(Line::Edge {
-                edge: NodeEdge::new(fields.field::<Id<_>>()?, fields.field::<Word<_>>()?, fields.field::<Id<_>>()?),
-                entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-            }),
-            Key::Role => Ok(Line::Role {
-                role: fields.field::<Word<_>>()?,
-                entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-            }),
-            Key::Placed => Ok(Line::Placed {
-                relation: fields.field::<Word<_>>()?,
-                segment: SegmentRef::from(&fields.field::<Cited>()?),
-                author: fields.field::<Word<_>>()?,
-                sense: fields.optional::<Word<_>>().map(|kind| Remark::sensed(kind, fields)).transpose()?,
-                entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-                body: fields.field::<Quoted<_>>()?,
-            }),
-            Key::Message => Ok(Line::Message {
-                uuid: fields.field::<Bare<_>>()?,
-                author: fields.field::<Word<_>>()?,
-                session: fields.past(&[Key::Session])?.field::<Quoted<_>>()?,
-                stamp: fields.past(&[Key::At])?.field::<Quoted<_>>()?,
-            }),
-            Key::Segment => Ok(Line::Segment {
-                segment: SegmentRef::from(&fields.field::<Cited>()?),
-                shape: fields.field::<Bare<_>>()?,
-                body: fields.field::<Quoted<_>>()?,
-            }),
-            Key::Link => Ok(Line::Link {
-                source: Anchored::read(fields)?,
-                relation: fields.field::<Bare<_>>()?,
-                target: Anchored::read(fields)?,
-            }),
-            Key::Refused => RefusedLink::read(fields.past(&[Key::Link])?).map(Line::Refused),
-            Key::Annotation => Ok(Line::Annotated {
-                remark: Remark::read(fields)?,
-                standing: fields.field::<Word<_>>()?,
-                entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-            }),
-            Key::Applied => Ok(Line::Applied(fields.field::<Phrase<_>>()?)),
-            Key::Proposed => Ok(Line::Proposed {
-                node: fields.field::<Id<_>>()?,
-                directive: fields.past(&[Key::By])?.field::<Phrase<_>>()?,
-            }),
-            Key::Uncovered => Ok(Line::Uncovered(SegmentRef::from(&fields.field::<Cited>()?))),
-            Key::Already => Ok(Line::Repeated {
-                file: AppliedId::new(fields.past(&[Key::Applied, Key::File])?.field::<Integer<_>>()?),
-                stamp: fields.past(&[Key::At])?.field::<Quoted<_>>()?,
-            }),
-            Key::Reaped => {
-                Ok(Line::Reaped { run: RunId::new(fields.field::<Integer<_>>()?), state: fields.field::<Word<_>>()? })
-            }
-            Key::Interrupted => Ok(Line::Interrupted(JobId::new(fields.past(&[Spend::Job])?.field::<Integer<_>>()?))),
-            Key::Run => Attempted::read(fields).map(Line::Ran),
-            Key::Retried => Lapsed::read(fields).map(Line::Retried),
-            Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
-            Key::FlailedSegment => Flailing::read(fields).map(Line::FlailedSegment),
-            Key::Owed => Flailing::read(fields).map(Line::Owed),
+            Key::Session => fields.record::<Reading>().map(Parsed::converted),
+            Key::Authorship => fields.record::<Authored>().map(Parsed::converted),
+            Key::Unrecognised => fields.record::<Unrecognised>().map(Parsed::converted),
+            Key::Form => fields.record::<Formed>().map(Parsed::converted),
+            Key::Relation => fields.record::<Related>().map(Parsed::converted),
+            Key::Written => fields.field::<Integer<_>>().mapped(|count| Line::Written(Count::new(count))),
+            Key::Hit => fields.record::<Hit>().map(Parsed::converted),
+            Key::Root => fields.record::<Rooted>().map(Parsed::converted),
+            Key::Consumes => fields.record::<Consuming>().map(Parsed::converted),
+            Key::Node => fields.record::<Summary>().mapped(Line::Node),
+            Key::Artifact => fields.field::<Phrase<_>>().mapped(Line::Artifact),
+            Key::Condition => fields.field::<Phrase<_>>().mapped(Line::Condition),
+            Key::Reason => fields.field::<Phrase<_>>().mapped(Line::Reason),
+            Key::Ancestor => fields.record::<Summary>().mapped(|node| Line::Relative { kin: Kin::Ancestor, node }),
+            Key::Child => fields.record::<Summary>().mapped(|node| Line::Relative { kin: Kin::Child, node }),
+            Key::Edge => fields.record::<Edged>().map(Parsed::converted),
+            Key::Role => fields.record::<Cast>().map(Parsed::converted),
+            Key::Placed => fields.record::<Placed>().map(Parsed::converted),
+            Key::Message => fields.record::<Messaged>().map(Parsed::converted),
+            Key::Segment => fields.record::<Segmented>().map(Parsed::converted),
+            Key::Link => fields.record::<RefusedLink>().map(Parsed::converted),
+            Key::Refused => fields.past(&[Key::Link])?.record::<RefusedLink>().mapped(Line::Refused),
+            Key::Annotation => fields.record::<Annotated>().map(Parsed::converted),
+            Key::Applied => fields.field::<Phrase<_>>().mapped(Line::Applied),
+            Key::Proposed => fields.record::<Proposed>().map(Parsed::converted),
+            Key::Uncovered => fields.field::<Cited>().mapped(|cited| Line::Uncovered(SegmentRef::from(cited))),
+            Key::Already => fields.record::<Repeated>().map(Parsed::converted),
+            Key::Reaped => fields.record::<Reaped>().map(Parsed::converted),
+            Key::Interrupted => fields.record::<Interrupted>().map(Parsed::converted),
+            Key::Run => fields.record::<Attempt>().mapped(|attempt| Line::Ran(Attempted::from(attempt))),
+            Key::Retried => fields.record::<Lapsed>().mapped(Line::Retried),
+            Key::Flailed => fields.record::<Lapsed>().mapped(Line::Flailed),
+            Key::FlailedSegment => fields.record::<Flailing>().mapped(Line::FlailedSegment),
+            Key::Owed => fields.record::<Flailing>().mapped(Line::Owed),
             Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
         }
     }
@@ -516,14 +485,6 @@ impl RefusedLink {
     pub fn new(source: Anchored, relation: Relation, target: Anchored) -> RefusedLink {
         RefusedLink { source, relation, target }
     }
-
-    fn read(fields: &mut Fields) -> Result<RefusedLink, Unread> {
-        Ok(RefusedLink {
-            source: Anchored::read(fields)?,
-            relation: fields.field::<Bare<_>>()?,
-            target: Anchored::read(fields)?,
-        })
-    }
 }
 
 impl fmt::Display for RefusedLink {
@@ -532,29 +493,78 @@ impl fmt::Display for RefusedLink {
     }
 }
 
+impl Record for Anchored {
+    fn read(fields: Fields) -> Result<Parsed<Anchored, Fields>, Unread> {
+        fields.optional::<Cited>().concluded(Anchored::cited)
+    }
+}
+
 impl Anchored {
-    fn read(fields: &mut Fields) -> Result<Anchored, Unread> {
-        fields.optional::<Cited>().map_or_else(
-            || fields.field::<Bare<_>>().map(Anchored::Message),
-            |cited| Ok(Anchored::Segment(SegmentRef::from(&cited))),
-        )
+    fn cited(cited: Option<Cited>, fields: Fields) -> Result<Parsed<Anchored, Fields>, Unread> {
+        match cited {
+            Some(found) => Ok(Parsed::new(Anchored::Segment(SegmentRef::from(found)), fields)),
+            None => fields.field::<Bare<_>>().mapped(Anchored::Message),
+        }
+    }
+}
+
+impl Record for Sensed {
+    fn read(fields: Fields) -> Result<Parsed<Sensed, Fields>, Unread> {
+        fields.optional::<Word<SenseKind>>().concluded(Sensed::kinded)
+    }
+}
+
+impl Sensed {
+    fn kinded(kind: Option<SenseKind>, fields: Fields) -> Result<Parsed<Sensed, Fields>, Unread> {
+        match kind {
+            Some(found) => fields.record::<Graded>().mapped(|graded| {
+                Sensed(Some(Sense::new(found, graded.specificity, graded.confidence, graded.explicitness)))
+            }),
+            None => Ok(Parsed::new(Sensed(None), fields)),
+        }
+    }
+}
+
+impl Record for Used {
+    fn read(fields: Fields) -> Result<Parsed<Used, Fields>, Unread> {
+        fields.optional::<Word<Spend>>().concluded(Used::spent)
+    }
+}
+
+impl Used {
+    fn spent(spend: Option<Spend>, fields: Fields) -> Result<Parsed<Used, Fields>, Unread> {
+        match spend {
+            Some(found) => found.used(fields),
+            None => Ok(Parsed::new(Used(None), fields)),
+        }
+    }
+}
+
+impl Spend {
+    fn used(self, fields: Fields) -> Result<Parsed<Used, Fields>, Unread> {
+        match self {
+            Spend::Tokens => fields.record::<Spent>().mapped(|spent| Used(Some(Usage::from(spent)))),
+            Spend::Job => Err(Unread::Unkeyed),
+        }
+    }
+}
+
+impl Record for Replied {
+    fn read(fields: Fields) -> Result<Parsed<Replied, Fields>, Unread> {
+        fields.optional::<Word<Replying>>().concluded(Replied::replying)
+    }
+}
+
+impl Replied {
+    fn replying(replying: Option<Replying>, fields: Fields) -> Result<Parsed<Replied, Fields>, Unread> {
+        match replying {
+            Some(Replying::Reply) => fields.field::<Quoted<_>>().mapped(|reply| Replied(Some(reply))),
+            None => Ok(Parsed::new(Replied(None), fields)),
+        }
     }
 }
 
 impl Summary {
-    fn read(fields: &mut Fields) -> Result<Summary, Unread> {
-        Ok(Summary {
-            node: fields.field::<Id<_>>()?,
-            project: fields.field::<Phrase<_>>()?,
-            facet: fields.field::<Word<_>>()?,
-            stage: fields.field::<Word<_>>()?,
-            basis: fields.field::<Word<_>>()?,
-            role: fields.field::<Word<_>>()?,
-            entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-            title: fields.optional::<Quoted<_>>(),
-        })
-    }
-
     fn rendered(&self) -> String {
         let Summary { node, project, facet, stage, basis, role, entered, title } = self;
         let titled = title.as_ref().map_or_default(|named| format!(" {}", Line::quoted(named)));
@@ -567,33 +577,24 @@ impl Summary {
     }
 }
 
-impl Remark {
-    fn sensed(kind: SenseKind, fields: &mut Fields) -> Result<Sense, Unread> {
-        Ok(Sense::new(kind, fields.field::<Word<_>>()?, fields.field::<Word<_>>()?, fields.field::<Word<_>>()?))
+impl Record for Remark {
+    fn read(fields: Fields) -> Result<Parsed<Remark, Fields>, Unread> {
+        fields.field::<Word<Remarked>>()?.concluded(Remarked::remark)
     }
+}
 
-    fn read(fields: &mut Fields) -> Result<Remark, Unread> {
-        match fields.field::<Word<Remarked>>()? {
-            Remarked::Place => Ok(Remark::Place {
-                segment: SegmentRef::from(&fields.field::<Cited>()?),
-                relation: fields.field::<Word<_>>()?,
-                node: fields.field::<Id<_>>()?,
-            }),
-            Remarked::Sense => Ok(Remark::Sense {
-                segment: SegmentRef::from(&fields.field::<Cited>()?),
-                sense: Remark::sensed(fields.field::<Word<_>>()?, fields)?,
-            }),
-            Remarked::Link => Ok(Remark::Link {
-                source: SegmentRef::from(&fields.field::<Cited>()?),
-                relation: fields.field::<Word<_>>()?,
-                target: SegmentRef::from(&fields.field::<Cited>()?),
-            }),
-            Remarked::Conversational => {
-                Ok(Remark::Conversational { segment: SegmentRef::from(&fields.field::<Cited>()?) })
-            }
+impl Remarked {
+    fn remark(self, fields: Fields) -> Result<Parsed<Remark, Fields>, Unread> {
+        match self {
+            Remarked::Place => fields.record::<Placing>().map(Parsed::converted),
+            Remarked::Sense => fields.record::<Sensing>().map(Parsed::converted),
+            Remarked::Link => fields.record::<Relating>().map(Parsed::converted),
+            Remarked::Conversational => fields.record::<Conversing>().map(Parsed::converted),
         }
     }
+}
 
+impl Remark {
     fn rendered(&self) -> String {
         match self {
             Remark::Place { segment, relation, node } => {
@@ -616,36 +617,6 @@ impl Attempted {
     pub fn replied(self, reply: Option<Excerpt>) -> Attempted {
         Attempted { reply, ..self }
     }
-
-    fn read(fields: &mut Fields) -> Result<Attempted, Unread> {
-        Ok(Attempted {
-            run: RunId::new(fields.field::<Integer<_>>()?),
-            job: JobId::new(fields.past(&[Spend::Job])?.field::<Integer<_>>()?),
-            state: fields.field::<Word<_>>()?,
-            usage: Attempted::usage(fields.optional::<Word<Spend>>(), fields)?,
-            reply: fields
-                .optional::<Word<Replying>>()
-                .map(|Replying::Reply| fields.field::<Quoted<_>>())
-                .transpose()?,
-        })
-    }
-
-    fn usage(key: Option<Spend>, fields: &mut Fields) -> Result<Option<Usage>, Unread> {
-        match key {
-            None => Ok(None),
-            Some(Spend::Tokens) => Attempted::tokens(fields).map(Some),
-            Some(Spend::Job) => Err(Unread::Unkeyed),
-        }
-    }
-
-    fn tokens(fields: &mut Fields) -> Result<Usage, Unread> {
-        Ok(Usage::new(
-            Tokens::new(fields.field::<Integer<_>>()?),
-            Tokens::new(fields.field::<Integer<_>>()?),
-            Tokens::new(fields.field::<Integer<_>>()?),
-            Tokens::new(fields.field::<Integer<_>>()?),
-        ))
-    }
 }
 
 impl fmt::Display for Attempted {
@@ -663,14 +634,6 @@ impl Flailing {
     #[must_use]
     pub fn new(segment: SegmentRef, job: JobId, run: RunId) -> Flailing {
         Flailing { segment, job, run }
-    }
-
-    fn read(fields: &mut Fields) -> Result<Flailing, Unread> {
-        Ok(Flailing {
-            segment: SegmentRef::from(&fields.field::<Cited>()?),
-            job: JobId::new(fields.past(&[Spend::Job])?.field::<Integer<_>>()?),
-            run: RunId::new(fields.past(&[Key::Run])?.field::<Integer<_>>()?),
-        })
     }
 }
 
@@ -693,14 +656,423 @@ impl Lapsed {
     pub fn new(job: JobId, lapse: Lapse) -> Lapsed {
         Lapsed { job, lapse }
     }
-
-    fn read(fields: &mut Fields) -> Result<Lapsed, Unread> {
-        Ok(Lapsed { job: JobId::new(fields.field::<Integer<_>>()?), lapse: fields.field::<Phrase<_>>()? })
-    }
 }
 
 impl fmt::Display for Lapsed {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} {}", self.job.into_inner(), Line::quoted(&Retried::from(&self.lapse)))
+    }
+}
+
+#[derive(Debug, Record)]
+struct Reading {
+    #[field(Quoted<_>)]
+    session: SessionId,
+    #[past(Key::Read, Key::To)]
+    #[field(Bare<Offset>, via = Cursor::new)]
+    cursor: Cursor,
+}
+
+#[derive(Debug, Record)]
+struct Authored {
+    #[field(Word<_>)]
+    author: Authorship,
+    #[field(Integer<_>, via = Count::new)]
+    count: Count,
+}
+
+#[derive(Debug, Record)]
+struct Unrecognised {
+    #[field(Quoted<_>)]
+    kind: Kind,
+    #[field(Integer<_>, via = Count::new)]
+    count: Count,
+}
+
+#[derive(Debug, Record)]
+struct Formed {
+    #[field(Word<_>)]
+    shape: Shape,
+    #[field(Integer<_>, via = Count::new)]
+    count: Count,
+}
+
+#[derive(Debug, Record)]
+struct Related {
+    #[field(Word<_>)]
+    relation: Relation,
+    #[field(Integer<_>, via = Count::new)]
+    count: Count,
+}
+
+#[derive(Debug, Record)]
+struct Hit {
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+    #[field(Word<_>)]
+    author: Authorship,
+    #[field(Quoted<_>)]
+    stamp: Instant,
+    #[field(Quoted<_>)]
+    body: Body,
+}
+
+#[derive(Debug, Record)]
+struct Rooted {
+    #[field(Id<_>)]
+    node: NodeId,
+    #[past(Key::Project)]
+    #[field(Phrase<_>)]
+    project: Project,
+}
+
+#[derive(Debug, Record)]
+struct Consuming {
+    #[field(Id<_>)]
+    node: NodeId,
+    #[past(Key::Project)]
+    #[field(Phrase<_>)]
+    project: Project,
+}
+
+#[derive(Debug, Record)]
+struct Edged {
+    #[field(Id<_>)]
+    source: NodeId,
+    #[field(Word<_>)]
+    relation: NodeRelation,
+    #[field(Id<_>)]
+    target: NodeId,
+    #[past(Key::Entered)]
+    #[field(Word<_>)]
+    entered: Provenance,
+}
+
+#[derive(Debug, Record)]
+struct Cast {
+    #[field(Word<_>)]
+    role: Role,
+    #[past(Key::Entered)]
+    #[field(Word<_>)]
+    entered: Provenance,
+}
+
+#[derive(Debug, Record)]
+struct Graded {
+    #[field(Word<_>)]
+    specificity: Specificity,
+    #[field(Word<_>)]
+    confidence: Confidence,
+    #[field(Word<_>)]
+    explicitness: Explicitness,
+}
+
+#[derive(Debug)]
+struct Sensed(Option<Sense>);
+
+#[derive(Debug, Record)]
+struct Placed {
+    #[field(Word<_>)]
+    relation: SpanRelation,
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+    #[field(Word<_>)]
+    author: Authorship,
+    #[record]
+    sense: Sensed,
+    #[past(Key::Entered)]
+    #[field(Word<_>)]
+    entered: Provenance,
+    #[field(Quoted<_>)]
+    body: Body,
+}
+
+#[derive(Debug, Record)]
+struct Messaged {
+    #[field(Bare<_>)]
+    uuid: Uuid,
+    #[field(Word<_>)]
+    author: Authorship,
+    #[past(Key::Session)]
+    #[field(Quoted<_>)]
+    session: SessionId,
+    #[past(Key::At)]
+    #[field(Quoted<_>)]
+    stamp: Instant,
+}
+
+#[derive(Debug, Record)]
+struct Segmented {
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+    #[field(Bare<_>)]
+    shape: Shape,
+    #[field(Quoted<_>)]
+    body: Body,
+}
+
+#[derive(Debug, Record)]
+struct Annotated {
+    #[record]
+    remark: Remark,
+    #[field(Word<_>)]
+    standing: Standing,
+    #[past(Key::Entered)]
+    #[field(Word<_>)]
+    entered: Provenance,
+}
+
+#[derive(Debug, Record)]
+struct Proposed {
+    #[field(Id<_>)]
+    node: NodeId,
+    #[past(Key::By)]
+    #[field(Phrase<_>)]
+    directive: Directive,
+}
+
+#[derive(Debug, Record)]
+struct Repeated {
+    #[past(Key::Applied, Key::File)]
+    #[field(Integer<_>, via = AppliedId::new)]
+    file: AppliedId,
+    #[past(Key::At)]
+    #[field(Quoted<_>)]
+    stamp: Instant,
+}
+
+#[derive(Debug, Record)]
+struct Reaped {
+    #[field(Integer<_>, via = RunId::new)]
+    run: RunId,
+    #[field(Word<_>)]
+    state: RunState,
+}
+
+#[derive(Debug, Record)]
+struct Interrupted {
+    #[past(Spend::Job)]
+    #[field(Integer<_>, via = JobId::new)]
+    job: JobId,
+}
+
+#[derive(Debug, Record)]
+struct Placing {
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+    #[field(Word<_>)]
+    relation: SpanRelation,
+    #[field(Id<_>)]
+    node: NodeId,
+}
+
+#[derive(Debug, Record)]
+struct Sensing {
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+    #[field(Word<_>)]
+    kind: SenseKind,
+    #[record]
+    graded: Graded,
+}
+
+#[derive(Debug, Record)]
+struct Relating {
+    #[field(Cited, via = SegmentRef::from)]
+    source: SegmentRef,
+    #[field(Word<_>)]
+    relation: SegmentRelation,
+    #[field(Cited, via = SegmentRef::from)]
+    target: SegmentRef,
+}
+
+#[derive(Debug, Record)]
+struct Conversing {
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+}
+
+#[derive(Debug, Record)]
+struct Spent {
+    #[field(Integer<_>, via = Tokens::new)]
+    input: Tokens,
+    #[field(Integer<_>, via = Tokens::new)]
+    output: Tokens,
+    #[field(Integer<_>, via = Tokens::new)]
+    written: Tokens,
+    #[field(Integer<_>, via = Tokens::new)]
+    read: Tokens,
+}
+
+#[derive(Debug, Record)]
+struct Attempt {
+    #[field(Integer<_>, via = RunId::new)]
+    run: RunId,
+    #[past(Spend::Job)]
+    #[field(Integer<_>, via = JobId::new)]
+    job: JobId,
+    #[field(Word<_>)]
+    state: RunState,
+    #[record]
+    usage: Used,
+    #[record]
+    reply: Replied,
+}
+
+#[derive(Debug)]
+struct Used(Option<Usage>);
+
+#[derive(Debug)]
+struct Replied(Option<Excerpt>);
+
+impl From<Spent> for Usage {
+    fn from(spent: Spent) -> Usage {
+        Usage::new(spent.input, spent.output, spent.written, spent.read)
+    }
+}
+
+impl From<Attempt> for Attempted {
+    fn from(read: Attempt) -> Attempted {
+        Attempted { run: read.run, job: read.job, state: read.state, usage: read.usage.0, reply: read.reply.0 }
+    }
+}
+
+impl From<Reading> for Line {
+    fn from(read: Reading) -> Line {
+        Line::Read { session: read.session, cursor: read.cursor }
+    }
+}
+
+impl From<Authored> for Line {
+    fn from(read: Authored) -> Line {
+        Line::Authored { author: read.author, count: read.count }
+    }
+}
+
+impl From<Unrecognised> for Line {
+    fn from(read: Unrecognised) -> Line {
+        Line::Unrecognised { kind: read.kind, count: read.count }
+    }
+}
+
+impl From<Formed> for Line {
+    fn from(read: Formed) -> Line {
+        Line::Formed { shape: read.shape, count: read.count }
+    }
+}
+
+impl From<Related> for Line {
+    fn from(read: Related) -> Line {
+        Line::Related { relation: read.relation, count: read.count }
+    }
+}
+
+impl From<Hit> for Line {
+    fn from(read: Hit) -> Line {
+        Line::Hit { segment: read.segment, author: read.author, stamp: read.stamp, body: read.body }
+    }
+}
+
+impl From<Rooted> for Line {
+    fn from(read: Rooted) -> Line {
+        Line::Root { node: read.node, project: read.project }
+    }
+}
+
+impl From<Consuming> for Line {
+    fn from(read: Consuming) -> Line {
+        Line::Consumes { node: read.node, project: read.project }
+    }
+}
+
+impl From<Edged> for Line {
+    fn from(read: Edged) -> Line {
+        Line::Edge { edge: NodeEdge::new(read.source, read.relation, read.target), entered: read.entered }
+    }
+}
+
+impl From<Cast> for Line {
+    fn from(read: Cast) -> Line {
+        Line::Role { role: read.role, entered: read.entered }
+    }
+}
+
+impl From<Placed> for Line {
+    fn from(read: Placed) -> Line {
+        let Placed { relation, segment, author, sense, entered, body } = read;
+        Line::Placed { relation, segment, author, sense: sense.0, entered, body }
+    }
+}
+
+impl From<Messaged> for Line {
+    fn from(read: Messaged) -> Line {
+        Line::Message { uuid: read.uuid, author: read.author, session: read.session, stamp: read.stamp }
+    }
+}
+
+impl From<Segmented> for Line {
+    fn from(read: Segmented) -> Line {
+        Line::Segment { segment: read.segment, shape: read.shape, body: read.body }
+    }
+}
+
+impl From<RefusedLink> for Line {
+    fn from(read: RefusedLink) -> Line {
+        Line::Link { source: read.source, relation: read.relation, target: read.target }
+    }
+}
+
+impl From<Annotated> for Line {
+    fn from(read: Annotated) -> Line {
+        Line::Annotated { remark: read.remark, standing: read.standing, entered: read.entered }
+    }
+}
+
+impl From<Proposed> for Line {
+    fn from(read: Proposed) -> Line {
+        Line::Proposed { node: read.node, directive: read.directive }
+    }
+}
+
+impl From<Repeated> for Line {
+    fn from(read: Repeated) -> Line {
+        Line::Repeated { file: read.file, stamp: read.stamp }
+    }
+}
+
+impl From<Reaped> for Line {
+    fn from(read: Reaped) -> Line {
+        Line::Reaped { run: read.run, state: read.state }
+    }
+}
+
+impl From<Interrupted> for Line {
+    fn from(read: Interrupted) -> Line {
+        Line::Interrupted(read.job)
+    }
+}
+
+impl From<Placing> for Remark {
+    fn from(read: Placing) -> Remark {
+        Remark::Place { segment: read.segment, relation: read.relation, node: read.node }
+    }
+}
+
+impl From<Sensing> for Remark {
+    fn from(read: Sensing) -> Remark {
+        let Graded { specificity, confidence, explicitness } = read.graded;
+        Remark::Sense { segment: read.segment, sense: Sense::new(read.kind, specificity, confidence, explicitness) }
+    }
+}
+
+impl From<Relating> for Remark {
+    fn from(read: Relating) -> Remark {
+        Remark::Link { source: read.source, relation: read.relation, target: read.target }
+    }
+}
+
+impl From<Conversing> for Remark {
+    fn from(read: Conversing) -> Remark {
+        Remark::Conversational { segment: read.segment }
     }
 }

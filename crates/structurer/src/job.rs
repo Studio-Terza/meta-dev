@@ -1,11 +1,16 @@
 use design_model::Outline;
+use grammar_cited::Cited;
+use grammar_output::Record;
+use grammar_output::field::Quoted;
 use transcript_ports::Body;
 
 use crate::SegmentRef;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Record)]
 pub struct Said {
+    #[field(Cited, via = SegmentRef::from)]
     segment: SegmentRef,
+    #[field(Quoted<_>)]
     body: Body,
 }
 

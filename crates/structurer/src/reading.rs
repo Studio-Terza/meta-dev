@@ -172,6 +172,7 @@ impl<'line> Term<'line> {
     pub(crate) fn segment(&self) -> Result<SegmentRef, Misread> {
         self.atom()
             .and_then(|lexed| lexed.piece().cited())
+            .cloned()
             .map(SegmentRef::from)
             .ok_or_else(|| Misread::expected(self.located(), Wanted::Segment))
     }
