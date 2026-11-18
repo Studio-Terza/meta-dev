@@ -7,7 +7,7 @@ use syntax::{
     Token, VisRestricted,
 };
 
-use graph::{Building, CrateExports, Domain, Exposure, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport};
+use graph::{CrateExports, Domain, Exposure, Item as ModelItem, ItemKind, ItemPath, Reexport};
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
@@ -210,15 +210,13 @@ impl Declared {
         }
     }
 
-    fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Option<ItemId> {
+    fn issued(&self, krate: Option<&Name>) -> Option<ModelItem> {
         let kind = self.kind.item_kind()?;
         Some(
-            building.declared(
-                ModelItem::new(self.name.clone(), kind)
-                    .marked(self.marks.clone())
-                    .homed(krate.cloned())
-                    .exposed(self.exposure),
-            ),
+            ModelItem::new(self.name.clone(), kind)
+                .marked(self.marks.clone())
+                .homed(krate.cloned())
+                .exposed(self.exposure),
         )
     }
 }
@@ -598,8 +596,8 @@ impl Entries {
         Entries { declared, ..self }
     }
 
-    pub(super) fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Vec<Option<ItemId>> {
-        self.declared.iter().map(|declared| declared.issued(building, krate)).collect()
+    pub(super) fn issued(&self, krate: Option<&Name>) -> Vec<Option<ModelItem>> {
+        self.declared.iter().map(|declared| declared.issued(krate)).collect()
     }
 
     pub(super) fn exported(&self) -> impl Iterator<Item = Key<'_>> {

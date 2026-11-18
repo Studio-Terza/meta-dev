@@ -3,12 +3,12 @@ use algebra::Semigroup;
 use syntax::Spanned;
 use syntax::{ExprCall, ExprMacro, ExprMethodCall};
 
-use graph::{Building, Call, Callee, ItemPath, MacroCall, Region};
+use graph::{Call, Callee, ItemPath, MacroCall, ModelPart, Region};
 use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
 use super::places::PlaceId;
-use super::seat::{Built, Footing, Located};
+use super::seat::{Footing, Located, Lowers};
 
 #[derive(Debug)]
 pub(super) struct CallRow {
@@ -18,10 +18,10 @@ pub(super) struct CallRow {
     place: Option<PlaceId>,
 }
 
-impl Built for CallRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for CallRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
-        self.located.call(footing, building, Call::new(self.callee, seat))
+        self.located.call(footing, Call::new(self.callee, seat))
     }
 }
 

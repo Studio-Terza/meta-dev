@@ -1,7 +1,7 @@
-mod building;
 mod declarations;
 mod file_model;
 mod filed;
+mod part;
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -27,10 +27,10 @@ use crate::quoted::Quoted;
 use crate::references::{Consumed, Consumers, References};
 use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
-pub use building::Building;
-pub(crate) use declarations::{Aliases, Declarations};
-pub(crate) use file_model::FileModel;
+pub use declarations::{Aliases, Declarations, Exports, Issued};
+pub use file_model::{FileModel, FileTable};
 pub(crate) use filed::Filed;
+pub use part::ModelPart;
 
 #[derive(Debug, Default)]
 pub struct Model {

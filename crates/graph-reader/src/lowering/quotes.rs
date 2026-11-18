@@ -1,14 +1,14 @@
 use syntax::Spanned;
 use syntax::{Macro, MacroTree};
 
-use graph::{Building, Domain, Quote, Quoted};
+use graph::{Domain, ModelPart, Quote, Quoted};
 use lint_core::{Macros, SourceFile};
 use lint_layout::{LineNumber, Position};
 
 use crate::namespace::UsePath;
 
 use super::boundary::Quotation;
-use super::seat::{Built, Footing, Located, Seat};
+use super::seat::{Footing, Located, Lowers, Seat};
 
 #[derive(Debug)]
 pub(super) struct QuoteRow {
@@ -18,16 +18,13 @@ pub(super) struct QuoteRow {
     quote: Quote,
 }
 
-impl Built for QuoteRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for QuoteRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let invoked =
             footing.resolving().path(footing.scopes().scope(self.located.scope()), &self.written, Domain::Macros);
         let kept = Some(invoked).filter(|resolved| resolved.std().is_none());
         let line = self.line;
-        kept.map(|found| Quoted::new(found, self.quote)).into_iter().fold(building, |mut built, quoted| {
-            built.quoted(footing.file(), line, quoted);
-            built
-        })
+        kept.map_or_default(|found| ModelPart::quoted(footing.file(), line, Quoted::new(found, self.quote)))
     }
 }
 

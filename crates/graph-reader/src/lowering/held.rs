@@ -4,7 +4,7 @@ use lint_sweep::Contributed;
 use syntax::Spanned;
 use syntax::{Attribute, Field, Generics, Ident, ItemStruct, ItemTrait, Type};
 
-use graph::{Building, Held, Holding, ItemId};
+use graph::{Held, Holding, ItemId, ModelPart};
 use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
@@ -12,7 +12,7 @@ use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
 use super::ImplRow;
 use super::attributes::Attributes;
-use super::seat::{Built, Footing, Located};
+use super::seat::{Footing, Located, Lowers};
 use super::signature::{InScope, Written};
 use graph::{Region, TypeRef};
 
@@ -69,14 +69,14 @@ pub(super) struct HoldingRow {
     ty: TypeRef<Written>,
 }
 
-impl Built for HoldingRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for HoldingRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let declares = self.link.declares(resolving, scope);
         let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
             .placed(self.region.combine(footing.outer()), declares);
-        self.located.holding(footing, building, holding)
+        self.located.holding(footing, holding)
     }
 }
 
