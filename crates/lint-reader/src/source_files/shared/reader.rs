@@ -6,7 +6,7 @@ use lint_core::{FileHead, Readout, SourceFile};
 use lint_placement::Packages;
 
 use super::boundary::Partition;
-use super::protocol::{Assignment, Parsed, Reads, Reply};
+use super::protocol::{Assignment, Parsed, Reads, Report};
 use crate::source_files::located::{Located, Node};
 
 #[derive(Debug)]
@@ -26,10 +26,9 @@ impl<'tree> Order<'tree> {
 
 #[derive(Debug)]
 pub struct Reader<'tree> {
-    hand: Partition,
     packages: &'tree Packages,
     orders: Receiver<Order<'tree>>,
-    replies: Sender<Reply<'tree>>,
+    sighted: Sender<Report<'tree>>,
     heads: Sender<Vec<FileHead>>,
 }
 
@@ -37,7 +36,13 @@ pub struct Reader<'tree> {
 pub(super) struct Remote<'tree> {
     hand: Partition,
     orders: Sender<Order<'tree>>,
+    sighted: Receiver<Report<'tree>>,
     heads: Receiver<Vec<FileHead>>,
+}
+
+#[derive(Debug)]
+pub(super) struct Dispatched<'remote, 'tree> {
+    sighted: &'remote Receiver<Report<'tree>>,
 }
 
 #[derive(Debug)]
@@ -47,12 +52,13 @@ pub(super) struct Linked<'tree> {
 }
 
 impl<'tree> Linked<'tree> {
-    pub(super) fn new(packages: &'tree Packages, hand: Partition, replies: Sender<Reply<'tree>>) -> Linked<'tree> {
+    pub(super) fn new(packages: &'tree Packages, hand: Partition) -> Linked<'tree> {
         let (order, orders) = mpsc::channel();
+        let (sight, sighted) = mpsc::channel();
         let (head, heads) = mpsc::channel();
         Linked {
-            reader: Reader { hand, packages, orders, replies, heads: head },
-            remote: Remote { hand, orders: order, heads },
+            reader: Reader { packages, orders, sighted: sight, heads: head },
+            remote: Remote { hand, orders: order, sighted, heads },
         }
     }
 
@@ -85,7 +91,7 @@ impl<'tree> Reader<'tree> {
         Parsed::read(files, self.packages, nodes, |report, fresh| {
             let mut held = kept;
             held.extend(fresh);
-            self.replies.send(Reply::new(self.hand, report)).map_or_default(|()| self.awaiting(files, held))
+            self.sighted.send(report).map_or_default(|()| self.awaiting(files, held))
         })
     }
 
@@ -101,8 +107,11 @@ impl<'tree> Remote<'tree> {
         self.hand
     }
 
-    pub(super) fn dispatched(&self, nodes: Vec<Node<'tree>>) -> Result<(), Vec<Node<'tree>>> {
-        self.orders.send(Order::Parse(nodes)).map_err(|refused| refused.0.parsing())
+    pub(super) fn dispatched(&self, nodes: Vec<Node<'tree>>) -> Result<Dispatched<'_, 'tree>, Vec<Node<'tree>>> {
+        self.orders
+            .send(Order::Parse(nodes))
+            .map(|()| Dispatched { sighted: &self.sighted })
+            .map_err(|refused| refused.0.parsing())
     }
 
     pub(super) fn assigned(&self, assignment: Assignment<'tree>) -> Option<Assembling<'_>> {
@@ -118,5 +127,11 @@ pub(super) struct Assembling<'remote> {
 impl Assembling<'_> {
     pub(super) fn heads(self) -> Vec<FileHead> {
         self.heads.recv().unwrap_or_default()
+    }
+}
+
+impl<'tree> Dispatched<'_, 'tree> {
+    pub(super) fn sighted(self) -> Report<'tree> {
+        self.sighted.recv().unwrap_or_default()
     }
 }

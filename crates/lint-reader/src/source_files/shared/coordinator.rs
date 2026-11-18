@@ -1,24 +1,22 @@
 mod assembly;
-mod tide;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::path::Path;
 use std::sync::OnceLock;
-use std::sync::mpsc::{self, Receiver};
 
 use algebra::{Monoid, Semigroup};
-use file_ports::{Files, Size};
-use lint_core::{FileHead, Readout, RepoFile};
+use file_ports::Files;
+use lint_core::{FileHead, Readout, RepoFile, SourceFile};
+use lint_roots::Survey;
 
-use super::boundary::{Flights, Partition, Rank};
-use super::protocol::{Assignment, Parsed, Reads, Reply, Report};
-use super::reader::{Linked, Reader, Remote};
+use super::boundary::{Hands, Partition};
+use super::protocol::{Assigned, Assignment, Due, Parsed, Reads, Report, Sighting};
+use super::reader::{Dispatched, Linked, Reader, Remote};
 use crate::source_files::Stage;
 use crate::source_files::declared::{Declared, Kind};
 use crate::source_files::located::{Located, Node};
-use assembly::{Assembled, Planner};
-use tide::{Ebb, Explored, Key, Lineage, Offer, Settled, Surge, Tide};
+use assembly::{Assembled, Outcomes, Planner};
 
 #[derive(Debug)]
 pub struct SharedRead<'tree> {
@@ -36,7 +34,6 @@ pub struct Crew<'shared, 'tree> {
 pub struct Coordinator<'shared, 'tree> {
     shared: &'shared SharedRead<'tree>,
     remotes: Vec<Remote<'tree>>,
-    replies: Receiver<Reply<'tree>>,
 }
 
 impl<'tree> SharedRead<'tree> {
@@ -46,11 +43,10 @@ impl<'tree> SharedRead<'tree> {
     }
 
     pub fn crew(&self, helpers: impl IntoIterator<Item = Partition>) -> Crew<'_, 'tree> {
-        let (sender, replies) = mpsc::channel();
-        let linked = helpers.into_iter().map(|hand| Linked::new(&self.stage.packages, hand, sender.clone()));
+        let linked = helpers.into_iter().map(|hand| Linked::new(&self.stage.packages, hand));
         let (readers, remotes): (Vec<Reader<'tree>>, Vec<Remote<'tree>>) =
             linked.map(|link| link.concluded(|reader, remote| (reader, remote))).unzip();
-        Crew { coordinator: Coordinator { shared: self, remotes, replies }, readers }
+        Crew { coordinator: Coordinator { shared: self, remotes }, readers }
     }
 
     #[must_use]
@@ -65,209 +61,189 @@ impl<'shared, 'tree> Crew<'shared, 'tree> {
     }
 }
 
-impl Reads for Coordinator<'_, '_> {
-    fn read(self, files: &impl Files) -> Readout {
-        let stage = self.shared.stage;
-        let starts: Vec<Node<'_>> = stage
-            .trees
-            .iter()
-            .zip(&stage.staged)
-            .flat_map(|(tree, staged)| staged.iter().flat_map(|entry| entry.starts(tree)))
-            .collect();
-        let offers = starts.into_iter().enumerate().map(|(index, node)| {
-            Offer::new(Key::rooted(Rank::from(index), AsRef::<Path>::as_ref(node.located())), node, None)
-        });
-        let current = Current { coordinator: &self, files };
-        let first = current.offered(Ebb::from(&Tide::default()), offers.collect());
-        let explored = Flow { current: &current }.flowed(first);
-        let repo_files: Vec<RepoFile> =
-            stage.staged.iter().flatten().flat_map(|entry| entry.repo_files()).cloned().collect();
-        explored.concluded(|outcomes, placed, kept, survey| {
-            let planned = Planner::new(&outcomes, &survey).planned(stage);
-            let taken = planned.into_iter().scan(outcomes, |owned, found| {
-                let outcome = owned.remove(found.as_ref());
-                Some(found.taken(outcome, &placed))
-            });
-            <Assembled<'_> as Monoid>::concat(taken).concluded(|mains, failures| {
-                let mut assigned = mains;
-                let assembling: Vec<_> = self
-                    .remotes
-                    .iter()
-                    .filter_map(|remote| {
-                        let mine = assigned.remove(&remote.hand()).unwrap_or_default();
-                        remote.assigned(Assignment::new(mine, repo_files.clone(), Vec::new()))
-                    })
-                    .collect();
-                let own = assigned.remove(&Partition::MAIN).unwrap_or_default();
-                let readout = Assignment::new(own, repo_files, failures).readout(kept);
-                let mut heads: Vec<FileHead> = readout.files().iter().map(|file| file.head().clone()).collect();
-                heads.extend(assembling.into_iter().flat_map(|waiting| waiting.heads()));
-                heads.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier).cmp(AsRef::<Path>::as_ref(later)));
-                self.shared.table.get_or_init(|| heads);
-                readout
-            })
-        })
+#[derive(Debug, Default)]
+struct Gathered<'tree> {
+    outcomes: Outcomes<'tree>,
+    hands: BTreeMap<Located<'tree>, Partition>,
+    kept: BTreeMap<Located<'tree>, SourceFile>,
+}
+
+impl Semigroup for Gathered<'_> {
+    fn combine(self, other: Self) -> Self {
+        let mut outcomes = self.outcomes;
+        outcomes.extend(other.outcomes);
+        let mut hands = self.hands;
+        hands.extend(other.hands);
+        let mut kept = self.kept;
+        kept.extend(other.kept);
+        Gathered { outcomes, hands, kept }
     }
 }
 
+impl Monoid for Gathered<'_> {}
+
 #[derive(Debug)]
-struct Current<'run, 'shared, 'tree, Port> {
-    coordinator: &'run Coordinator<'shared, 'tree>,
-    files: &'run Port,
+struct Explored<'tree> {
+    gathered: Gathered<'tree>,
+    survey: Survey,
 }
 
 #[derive(Debug)]
-struct Sending<'tree> {
-    hand: Partition,
-    sent: Result<(), Vec<Node<'tree>>>,
+struct Level<'tree> {
+    due: Vec<Due<'tree>>,
+    seen: BTreeSet<Located<'tree>>,
 }
 
 #[derive(Debug)]
 struct Dealt<'tree> {
-    offer: Offer<'tree>,
-    hand: Partition,
-    weight: Size,
+    assigned: Vec<Assigned<'tree>>,
+    seen: BTreeSet<Located<'tree>>,
 }
 
-impl<'tree, Port: Files> Current<'_, '_, 'tree, Port> {
-    fn parsed(&self, ebb: Ebb<'_, 'tree>) -> Tide<'tree> {
-        let nodes = ebb.waiting();
-        let located: Vec<Located<'tree>> = nodes.iter().map(|node| node.located().clone()).collect();
-        let packages = &self.coordinator.shared.stage.packages;
-        Parsed::read(self.files, packages, nodes, |report, kept| {
-            let landing = Tide::from(Surge::landing(located, kept, Flights::default()));
-            landing.combine(self.applied(ebb, Partition::MAIN, report))
-        })
+impl<'tree> Level<'tree> {
+    fn started(starts: Vec<Node<'tree>>) -> Level<'tree> {
+        Level::after(BTreeSet::new(), starts.into_iter().map(|node| Due::new(node, None)))
     }
 
-    fn landed(&self, ebb: Ebb<'_, 'tree>) -> Tide<'tree> {
-        self.coordinator.replies.recv().map_or_else(
-            |_| Tide::from(Surge::stranded()),
-            |reply| {
-                let landing = Tide::from(Surge::landing(Vec::new(), BTreeMap::new(), Flights::LANDED));
-                reply.concluded(|hand, report| landing.combine(self.applied(ebb, hand, report)))
-            },
-        )
+    fn after(seen: BTreeSet<Located<'tree>>, found: impl Iterator<Item = Due<'tree>>) -> Level<'tree> {
+        let mut visited = seen;
+        let due = found.filter(|next| visited.insert(AsRef::<Located>::as_ref(next).clone())).collect();
+        Level { due, seen: visited }
     }
 
-    fn applied(&self, ebb: Ebb<'_, 'tree>, hand: Partition, report: Report<'tree>) -> Tide<'tree> {
-        report.concluded(|sightings, facts| {
-            let current = sightings.into_iter().filter_map(|sighting| {
-                let claim = ebb.claim(sighting.node().located()).filter(|claim| claim.node() == sighting.node())?;
-                Some(Settled::new(claim, hand, sighting.sought().map(|sought| Declared::resolved(&sought, &facts))))
-            });
-            let settled: Vec<Settled<'tree>> = current.collect();
-            let offers: Vec<Offer<'tree>> = settled.iter().flat_map(|found| found.offers(ebb, hand, &facts)).collect();
-            let offered = self.offered(ebb, offers);
-            Tide::from(Surge::settling(settled, facts)).combine(offered)
-        })
+    fn dealt(self, hands: &Hands, files: &impl Files) -> Dealt<'tree> {
+        let weighed =
+            |due: &Due<'tree>| files.size(AsRef::<Path>::as_ref(AsRef::<Located>::as_ref(due))).unwrap_or_default();
+        Dealt { assigned: hands.dealt(self.due, weighed), seen: self.seen }
     }
+}
 
-    fn offered(&self, ebb: Ebb<'_, 'tree>, offers: Vec<Offer<'tree>>) -> Tide<'tree> {
-        let mut best: BTreeMap<Located<'tree>, Offer<'tree>> = BTreeMap::new();
-        offers.into_iter().filter(|offer| offer.beats(ebb.claim(offer.as_ref())).is_some()).for_each(|offer| {
-            let held = best.remove(offer.as_ref());
-            let kept = held.filter(|earlier| earlier.precedes(&offer).is_some()).unwrap_or(offer);
-            best.insert(AsRef::<Located>::as_ref(&kept).clone(), kept);
+#[derive(Debug)]
+struct Sending<'remote, 'tree> {
+    hand: Partition,
+    sent: Result<Dispatched<'remote, 'tree>, Vec<Node<'tree>>>,
+}
+
+#[derive(Debug, Default)]
+struct Sighted<'tree> {
+    sightings: Vec<Sighting<'tree>>,
+    survey: Survey,
+    kept: BTreeMap<Located<'tree>, SourceFile>,
+    dead: BTreeSet<Partition>,
+}
+
+impl Reads for Coordinator<'_, '_> {
+    fn read(self, files: &impl Files) -> Readout {
+        let stage = self.shared.stage;
+        let starts = stage
+            .trees
+            .iter()
+            .zip(&stage.staged)
+            .flat_map(|(tree, staged)| staged.iter().flat_map(|entry| entry.starts(tree)));
+        let hands: Hands = iter::once(Partition::MAIN).chain(self.remotes.iter().map(Remote::hand)).collect();
+        let exploring = Exploring { coordinator: &self, files };
+        let explored = exploring.explored(Level::started(starts.collect()), Survey::default(), hands);
+        let planned = Planner::new(&explored.gathered.outcomes, &explored.survey).planned(stage);
+        let Gathered { outcomes, hands: placed, kept } = explored.gathered;
+        let taken = planned.into_iter().scan(outcomes, |owned, found| {
+            let outcome = owned.remove(found.as_ref());
+            Some(found.taken(outcome, &placed))
         });
-        let remotes = &self.coordinator.remotes;
-        let live: Vec<Partition> = iter::once(Partition::MAIN)
-            .chain(remotes.iter().map(Remote::hand))
-            .filter(|hand| ebb.dead(*hand).is_none())
-            .collect();
-        let dealt: Vec<Dealt<'tree>> = best
-            .into_values()
-            .scan(BTreeMap::new(), |batch: &mut BTreeMap<Partition, Size>, offer| {
-                let weight =
-                    self.files.size(AsRef::<Path>::as_ref(AsRef::<Located>::as_ref(&offer))).unwrap_or_default();
-                let weighed = |hand: &Partition| {
-                    [ebb.load(*hand), batch.get(hand).copied().unwrap_or_default()].into_iter().sum::<Size>()
-                };
-                let lightest = live.iter().min_by_key(|hand| (weighed(hand), **hand)).copied();
-                let hand = offer.owner().or(lightest).unwrap_or(Partition::MAIN);
-                let total = [batch.get(&hand).copied().unwrap_or_default(), weight].into_iter().sum();
-                batch.insert(hand, total);
-                Some(Dealt { offer, hand, weight })
+        let repo_files: Vec<RepoFile> =
+            stage.staged.iter().flatten().flat_map(|entry| entry.repo_files()).cloned().collect();
+        <Assembled<'_> as Monoid>::concat(taken).concluded(|mains, failures| {
+            let mut assigned = mains;
+            let assembling: Vec<_> = self
+                .remotes
+                .iter()
+                .filter_map(|remote| {
+                    let mine = assigned.remove(&remote.hand()).unwrap_or_default();
+                    remote.assigned(Assignment::new(mine, repo_files.clone(), Vec::new()))
+                })
+                .collect();
+            let own = assigned.remove(&Partition::MAIN).unwrap_or_default();
+            let readout = Assignment::new(own, repo_files, failures).readout(kept);
+            let mut heads: Vec<FileHead> = readout.files().iter().map(|file| file.head().clone()).collect();
+            heads.extend(assembling.into_iter().flat_map(|waiting| waiting.heads()));
+            heads.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier).cmp(AsRef::<Path>::as_ref(later)));
+            self.shared.table.get_or_init(|| heads);
+            readout
+        })
+    }
+}
+
+#[derive(Debug)]
+struct Exploring<'run, 'shared, 'tree, Port> {
+    coordinator: &'run Coordinator<'shared, 'tree>,
+    files: &'run Port,
+}
+
+impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
+    fn explored(&self, level: Level<'tree>, survey: Survey, hands: Hands) -> Explored<'tree> {
+        match level.due.first() {
+            Some(_) => self.levelled(level.dealt(&hands, self.files), survey, hands),
+            None => Explored { gathered: Gathered::default(), survey },
+        }
+    }
+
+    fn levelled(&self, dealt: Dealt<'tree>, survey: Survey, hands: Hands) -> Explored<'tree> {
+        let assigned = dealt.assigned;
+        let sighted = self.sighted(&assigned, &hands);
+        let every: BTreeSet<Partition> = hands.live().collect();
+        let live: Hands = every.difference(&sighted.dead).copied().collect();
+        let parsed_by =
+            |found: &Assigned<'tree>| sighted.dead.get(&found.hand()).map_or(found.hand(), |_| Partition::MAIN);
+        let learned = survey.combine(sighted.survey);
+        let known = &learned;
+        let outcomes: Outcomes<'tree> = sighted
+            .sightings
+            .into_iter()
+            .map(|sighting| {
+                let located = AsRef::<Located>::as_ref(&sighting).clone();
+                (located, sighting.sought().map(|sought| Declared::resolved(&sought, known)))
             })
             .collect();
-        let mut by_hand: BTreeMap<Partition, Vec<Node<'tree>>> = BTreeMap::new();
-        dealt.iter().for_each(|found| by_hand.entry(found.hand).or_default().push(found.offer.node().clone()));
-        let local: Vec<Node<'tree>> = by_hand.remove(&Partition::MAIN).unwrap_or_default();
-        let sendings: Vec<Sending<'tree>> = remotes
+        let next: Vec<Due<'tree>> = assigned
             .iter()
+            .flat_map(|found| {
+                let hand = parsed_by(found);
+                let home = found.node().home();
+                let declared = outcomes.get(found.node().located()).into_iter().flatten();
+                let modules = declared.clone().flat_map(|done| done.children(Kind::Module));
+                let tests = declared.flat_map(|done| done.children(Kind::Test));
+                let owned = modules.map(move |module| Due::new(home.child(module, known), found.owned_by(hand)));
+                owned.chain(tests.map(move |test| Due::new(home.child(test, known), Some(hand))))
+            })
+            .collect();
+        let following = Level::after(dealt.seen, next.into_iter());
+        let hands_of = assigned.iter().map(|found| (found.node().located().clone(), parsed_by(found))).collect();
+        let deeper = self.explored(following, learned, live);
+        let own = Gathered { outcomes, hands: hands_of, kept: sighted.kept };
+        Explored { gathered: own.combine(deeper.gathered), survey: deeper.survey }
+    }
+
+    fn sighted(&self, assigned: &[Assigned<'tree>], hands: &Hands) -> Sighted<'tree> {
+        let mut by_hand: BTreeMap<Partition, Vec<Node<'tree>>> = BTreeMap::new();
+        assigned.iter().for_each(|found| by_hand.entry(found.hand()).or_default().push(found.node().clone()));
+        let live: BTreeSet<Partition> = hands.live().collect();
+        let remotes = self.coordinator.remotes.iter().filter(|remote| live.contains(&remote.hand()));
+        let sendings: Vec<Sending<'_, 'tree>> = remotes
             .filter_map(|remote| {
                 let nodes = by_hand.remove(&remote.hand()).unwrap_or_default();
                 nodes.first()?;
                 Some(Sending { hand: remote.hand(), sent: remote.dispatched(nodes) })
             })
             .collect();
-        let flights = Monoid::concat(sendings.iter().filter(|sending| sending.sent.is_ok()).map(|_| Flights::SENT));
-        let dead: Vec<Partition> =
-            sendings.iter().filter(|sending| sending.sent.is_err()).map(|sending| sending.hand).collect();
-        let returned =
-            sendings.into_iter().flat_map(|sending| sending.sent.map_or_else(|nodes| nodes, |()| Vec::new()));
-        let claims = dealt.into_iter().map(|found| found.offer.claimed(found.hand, found.weight)).collect();
-        Tide::from(Surge::dispatched(claims, flights, local.into_iter().chain(returned).collect(), dead))
-    }
-}
-
-#[derive(Debug)]
-struct Flow<'current, 'run, 'shared, 'tree, Port> {
-    current: &'current Current<'run, 'shared, 'tree, Port>,
-}
-
-impl<'tree, Port: Files> Flow<'_, '_, '_, 'tree, Port> {
-    fn flowed(&self, tide: Tide<'tree>) -> Explored<'tree> {
-        match Ebb::from(&tide).waiting().first().map(|_| ()) {
-            Some(()) => self.drained(tide),
-            None => self.waited(tide),
-        }
-    }
-
-    fn waited(&self, tide: Tide<'tree>) -> Explored<'tree> {
-        match Ebb::from(&tide).airborne() {
-            Some(()) => self.landing(tide),
-            None => tide.explored(),
-        }
-    }
-
-    fn drained(&self, tide: Tide<'tree>) -> Explored<'tree> {
-        let surge = self.current.parsed(Ebb::from(&tide));
-        self.flowed(tide.combine(surge))
-    }
-
-    fn landing(&self, tide: Tide<'tree>) -> Explored<'tree> {
-        let surge = self.current.landed(Ebb::from(&tide));
-        self.flowed(tide.combine(surge))
-    }
-}
-
-impl<'tree> Settled<'tree> {
-    fn offers(&self, ebb: Ebb<'_, 'tree>, hand: Partition, facts: &lint_roots::Survey) -> Vec<Offer<'tree>> {
-        let claim = self.claim(ebb);
-        let declared = self.declared();
-        claim
-            .into_iter()
-            .flat_map(|held| {
-                let home = held.node().home();
-                let modules = declared.into_iter().flat_map(|done| done.children(Kind::Module)).map(move |module| {
-                    let node = home.child(module, facts);
-                    Offer::new(
-                        Key::from(Lineage::new(held.key(), AsRef::<Path>::as_ref(node.located()))),
-                        node,
-                        held.owned_by(hand),
-                    )
-                });
-                let tests = declared.into_iter().flat_map(|done| done.children(Kind::Test)).map(move |test| {
-                    let node = home.child(test, facts);
-                    Offer::new(
-                        Key::from(Lineage::new(held.key(), AsRef::<Path>::as_ref(node.located()))),
-                        node,
-                        Some(hand),
-                    )
-                });
-                modules.chain(tests).collect::<Vec<_>>()
-            })
-            .collect()
+        let (waiting, refused): (Vec<Sending<'_, 'tree>>, Vec<Sending<'_, 'tree>>) =
+            sendings.into_iter().partition(|sending| sending.sent.is_ok());
+        let dead: BTreeSet<Partition> = refused.iter().map(|sending| sending.hand).collect();
+        let returned = refused.into_iter().flat_map(|sending| sending.sent.map_or_else(|nodes| nodes, |_| Vec::new()));
+        let local = by_hand.remove(&Partition::MAIN).unwrap_or_default().into_iter().chain(returned).collect();
+        let packages = &self.coordinator.shared.stage.packages;
+        Parsed::read(self.files, packages, local, |own, kept| {
+            let remote = waiting.into_iter().flat_map(|sending| sending.sent.into_iter()).map(Dispatched::sighted);
+            let report: Report<'tree> = Monoid::concat(iter::once(own).chain(remote));
+            report.concluded(|sightings, survey| Sighted { sightings, survey, kept, dead })
+        })
     }
 }

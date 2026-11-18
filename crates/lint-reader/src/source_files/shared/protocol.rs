@@ -17,6 +17,53 @@ pub trait Reads {
 }
 
 #[derive(Debug)]
+pub(super) struct Due<'tree> {
+    node: Node<'tree>,
+    owner: Option<Partition>,
+}
+
+impl<'tree> Due<'tree> {
+    pub(super) fn new(node: Node<'tree>, owner: Option<Partition>) -> Due<'tree> {
+        Due { node, owner }
+    }
+
+    pub(super) fn owner(&self) -> Option<Partition> {
+        self.owner
+    }
+
+    pub(super) fn assigned(self, hand: Partition) -> Assigned<'tree> {
+        Assigned { node: self.node, owner: self.owner, hand }
+    }
+}
+
+impl<'tree> AsRef<Located<'tree>> for Due<'tree> {
+    fn as_ref(&self) -> &Located<'tree> {
+        self.node.located()
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct Assigned<'tree> {
+    node: Node<'tree>,
+    owner: Option<Partition>,
+    hand: Partition,
+}
+
+impl<'tree> Assigned<'tree> {
+    pub(super) fn node(&self) -> &Node<'tree> {
+        &self.node
+    }
+
+    pub(super) fn hand(&self) -> Partition {
+        self.hand
+    }
+
+    pub(super) fn owned_by(&self, hand: Partition) -> Option<Partition> {
+        self.owner.map(|_| hand)
+    }
+}
+
+#[derive(Debug)]
 pub(super) struct Main<'tree> {
     located: Located<'tree>,
     crate_file: CrateFile,
@@ -66,21 +113,23 @@ impl<'tree> Assignment<'tree> {
 
 #[derive(Debug)]
 pub(super) struct Sighting<'tree> {
-    node: Node<'tree>,
+    located: Located<'tree>,
     sought: Result<Vec<Sought>, Failure>,
 }
 
 impl<'tree> Sighting<'tree> {
-    pub(super) fn node(&self) -> &Node<'tree> {
-        &self.node
-    }
-
     pub(super) fn sought(self) -> Result<Vec<Sought>, Failure> {
         self.sought
     }
 
-    fn candidates(&self) -> impl Iterator<Item = PathBuf> + '_ {
+    pub(super) fn candidates(&self) -> impl Iterator<Item = PathBuf> + '_ {
         self.sought.iter().flatten().flat_map(Sought::candidates)
+    }
+}
+
+impl<'tree> AsRef<Located<'tree>> for Sighting<'tree> {
+    fn as_ref(&self) -> &Located<'tree> {
+        &self.located
     }
 }
 
@@ -90,25 +139,17 @@ pub(super) struct Report<'tree> {
     survey: Survey,
 }
 
+impl Semigroup for Report<'_> {
+    fn combine(self, other: Self) -> Self {
+        Report { sightings: self.sightings.combine(other.sightings), survey: self.survey.combine(other.survey) }
+    }
+}
+
+impl Monoid for Report<'_> {}
+
 impl<'tree> Report<'tree> {
     pub(super) fn concluded<Out>(self, into: impl FnOnce(Vec<Sighting<'tree>>, Survey) -> Out) -> Out {
         into(self.sightings, self.survey)
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct Reply<'tree> {
-    hand: Partition,
-    report: Report<'tree>,
-}
-
-impl<'tree> Reply<'tree> {
-    pub(super) fn new(hand: Partition, report: Report<'tree>) -> Reply<'tree> {
-        Reply { hand, report }
-    }
-
-    pub(super) fn concluded<Out>(self, into: impl FnOnce(Partition, Report<'tree>) -> Out) -> Out {
-        into(self.hand, self.report)
     }
 }
 
@@ -148,16 +189,19 @@ impl<'tree> Parsed<'tree> {
         match source {
             Ok(file) => Parsed {
                 sightings: vec![Sighting {
+                    located: node.located().clone(),
                     sought: Ok(Sought::within(
                         AsRef::<Path>::as_ref(node.located()),
                         node.children(),
                         &file.syntax().items,
                     )),
-                    node: node.clone(),
                 }],
                 kept: BTreeMap::from([(node.located().clone(), file)]),
             },
-            Err(failure) => Parsed { sightings: vec![Sighting { node, sought: Err(failure) }], kept: BTreeMap::new() },
+            Err(failure) => Parsed {
+                sightings: vec![Sighting { located: node.located().clone(), sought: Err(failure) }],
+                kept: BTreeMap::new(),
+            },
         }
     }
 }
