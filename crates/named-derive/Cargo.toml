@@ -15,3 +15,8 @@ syntax = { path = "../syntax" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+newtype = { path = "../newtype" }
+thiserror.workspace = true

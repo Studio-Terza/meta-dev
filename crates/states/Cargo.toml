@@ -7,6 +7,12 @@ publish.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }
+named-derive = { path = "../named-derive" }
+store-ports = { path = "../store-ports" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+sqlite-ports = { path = "../sqlite-ports" }
+thiserror.workspace = true
 
 [lib]
 test = false
