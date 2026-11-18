@@ -1625,11 +1625,8 @@ struct Plans;
 
 impl Plans {
     fn capped(minutes: &[usize]) -> String {
-        let planned: Vec<String> = minutes
-            .iter()
-            .enumerate()
-            .map(|(index, cap)| format!(r#"{{"index":{index},"minutes":{cap}}}"#))
-            .collect();
+        let planned: Vec<String> =
+            minutes.iter().enumerate().map(|(index, cap)| format!(r#"{{"index":{index},"minutes":{cap}}}"#)).collect();
         format!("shards=[{}]", planned.join(","))
     }
 
