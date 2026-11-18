@@ -213,10 +213,11 @@ impl Root {
         }
     }
 
-    fn macros(&self) -> Option<&Root> {
+    fn form(&self) -> Option<LibraryForm> {
         match self {
-            Root::ProcMacro(_) => Some(self),
-            Root::Read(_) | Root::Unread => None,
+            Root::Read(_) => Some(LibraryForm::Rust),
+            Root::ProcMacro(_) => Some(LibraryForm::ProcMacro),
+            Root::Unread => None,
         }
     }
 }
@@ -262,9 +263,9 @@ impl CrateRoots {
     }
 
     fn chosen<'bound>(&self, bound: &'bound [Reexport], domain: Domain) -> Vec<&'bound Reexport> {
-        let (macros, others): (Vec<&Reexport>, Vec<&Reexport>) = bound
-            .iter()
-            .partition(|reexport| reexport.package().and_then(|package| self.0.get(package)?.macros()).is_some());
+        let (macros, others): (Vec<&Reexport>, Vec<&Reexport>) = bound.iter().partition(|reexport| {
+            reexport.package().and_then(|package| self.0.get(package)?.form()) == Some(LibraryForm::ProcMacro)
+        });
         domain.chosen(macros, others)
     }
 }

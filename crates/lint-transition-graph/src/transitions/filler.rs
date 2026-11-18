@@ -47,6 +47,12 @@ impl Implemented {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Ownership {
+    Owned,
+    Free,
+}
+
 impl Filler {
     pub(crate) fn trait_name<'name>(&'name self, selfish: &'name Name) -> Option<&'name Name> {
         match self {
@@ -70,10 +76,10 @@ impl Filler {
         }
     }
 
-    pub(crate) fn owned(&self) -> Option<&Filler> {
+    pub(crate) fn ownership(&self) -> Ownership {
         match self {
-            Filler::Free => None,
-            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Some(self),
+            Filler::Free => Ownership::Free,
+            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Ownership::Owned,
         }
     }
 }

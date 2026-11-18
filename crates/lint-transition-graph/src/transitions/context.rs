@@ -4,7 +4,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::transitions::endpoint::Endpoint;
-use crate::transitions::filler::Filler;
+use crate::transitions::filler::{Filler, Ownership};
 use crate::transitions::function::Function;
 use crate::transitions::ground::Ground;
 
@@ -51,7 +51,7 @@ impl<'file> Context<'file> {
 
     #[must_use]
     pub fn subject(&self) -> Option<&Endpoint> {
-        self.filler.owned().map(|_| &self.selfish)
+        (self.filler.ownership() == Ownership::Owned).then_some(&self.selfish)
     }
 
     #[must_use]
@@ -74,8 +74,8 @@ impl AsRef<CrateName> for Context<'_> {
 
 impl fmt::Display for Context<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.filler.owned() {
-            Some(_) => write!(formatter, "{}::{}", self.krate, AsRef::<Name>::as_ref(&self.selfish)),
+        match self.subject() {
+            Some(selfish) => write!(formatter, "{}::{}", self.krate, AsRef::<Name>::as_ref(selfish)),
             None => write!(formatter, "{}", self.krate),
         }
     }
