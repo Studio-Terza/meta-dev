@@ -3,7 +3,7 @@ use std::iter;
 use graph::Item;
 use lint_layout::Name;
 
-use super::anchor::{Anchor, Anchors, Child};
+use super::anchor::{Anchor, Anchors};
 use super::boundary::ScopeId;
 use super::entries::{Entries, Sight};
 
@@ -16,7 +16,7 @@ pub(crate) enum CrateForm {
 impl CrateForm {
     pub(super) fn anchors(self, root: ScopeId) -> Anchors {
         match self {
-            CrateForm::Planted => Anchors::rooted(root),
+            CrateForm::Planted => Anchors::from(root),
             CrateForm::Island => Anchors::default(),
         }
     }
@@ -29,10 +29,10 @@ pub(crate) enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub(super) fn child(self, parent: Anchors, scope: ScopeId) -> Child {
+    pub(super) fn entered(self, scope: ScopeId) -> Anchors {
         match self {
-            ScopeKind::Module => Child::Module { parent, module: scope },
-            ScopeKind::Block => Child::Block(parent),
+            ScopeKind::Module => Anchors::from(scope),
+            ScopeKind::Block => Anchors::default(),
         }
     }
 
