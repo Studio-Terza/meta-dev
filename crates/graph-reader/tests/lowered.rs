@@ -45,7 +45,7 @@ impl Read {
     }
 
     fn resolved(ty: &TypeRef) -> TypeRef<Resolved> {
-        ty.mapped(&mut |sited: &Sited| AsRef::<Resolved>::as_ref(sited).clone())
+        ty.mapped(|sited: &Sited| AsRef::<Resolved>::as_ref(sited).clone())
     }
 
     fn spelt(text: &str) -> Vec<Sited> {
