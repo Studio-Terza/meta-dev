@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use syntax::{Ident, ItemImpl, Type};
 
-use crate::matching::Matching;
+use crate::matching::{Fitted, Matching};
 use crate::word::Word;
 use boundary::Spelling;
 pub use camel_word::CamelWord;
@@ -54,8 +54,8 @@ impl Name {
     }
 
     #[must_use]
-    pub fn matches<'word, Rule: Matching>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
-        words.iter().find_map(|word| Rule::holds(self, *word)).map(Word::from)
+    pub fn matches<'word, Rule: Matching>(&self, words: &[Word<'word>]) -> Option<Fitted<'word>> {
+        words.iter().find_map(|word| Rule::holds(self, *word))
     }
 
     #[must_use]

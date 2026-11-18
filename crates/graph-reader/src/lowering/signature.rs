@@ -153,9 +153,13 @@ impl Semigroup for Declared {
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Generic<'scope>(&'scope Name);
 
-impl AsRef<Name> for Generic<'_> {
-    fn as_ref(&self) -> &Name {
-        self.0
+impl Generic<'_> {
+    pub(super) fn param(self) -> Resolved {
+        Resolved::Param(self.0.clone())
+    }
+
+    fn parameter(self, position: Position) -> TypeRef<Written> {
+        Written::parameter(self.0.clone(), Spelling::Written([self.0.clone()].into_iter().collect(), position))
     }
 }
 
@@ -252,10 +256,7 @@ impl InScope {
     fn held(&self, path: &syntax::Path, position: Position) -> Option<TypeRef<Written>> {
         let first = path.segments.first().map(|first| Name::from(&first.ident));
         let declared = first.as_ref().and_then(|head| self.generic(head));
-        let parameter = declared.map(|generic| {
-            let name = AsRef::<Name>::as_ref(&generic);
-            Written::parameter(name.clone(), Spelling::Written([name.clone()].into_iter().collect(), position))
-        });
+        let parameter = declared.map(|generic| generic.parameter(position));
         let subject = first
             .as_ref()
             .and_then(|head| head.matches::<Whole>(&[Self::SELF]))

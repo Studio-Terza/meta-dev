@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::name::Name;
 use crate::word::Word;
 
@@ -10,9 +12,9 @@ impl<'word> From<Word<'word>> for Fitted<'word> {
     }
 }
 
-impl<'word> From<Fitted<'word>> for Word<'word> {
-    fn from(fitted: Fitted<'word>) -> Word<'word> {
-        fitted.0
+impl fmt::Display for Fitted<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
     }
 }
 

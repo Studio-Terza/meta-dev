@@ -1,4 +1,4 @@
-use lint_layout::{Name, Whole, Word, words};
+use lint_layout::{Fitted, Name, Whole, Word, words};
 
 #[derive(Debug)]
 pub(crate) struct Operators;
@@ -29,7 +29,7 @@ impl Operators {
         "ShrAssign"
     ];
 
-    pub(crate) fn named(name: &Name) -> Option<Word<'static>> {
+    pub(crate) fn named(name: &Name) -> Option<Fitted<'static>> {
         name.matches::<Whole>(&Self::NAMES)
     }
 }

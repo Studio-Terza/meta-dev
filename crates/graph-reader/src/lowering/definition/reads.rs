@@ -12,13 +12,13 @@ use lint_sweep::Address;
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
-use super::super::signature::{InScope, Written};
+use super::super::signature::{Generic, InScope, Written};
 use shaped::Shaped;
 
 #[derive(Clone, Debug)]
 enum Spelled {
     Path(UsePath),
-    Generic { owner: Name, name: Name },
+    Generic { owner: Resolved, name: Name },
     Subject { subject: TypeRef<Written>, name: Name },
 }
 
@@ -244,9 +244,7 @@ impl Spelled {
     fn under(path: UsePath, scope: &InScope) -> Spelled {
         let single = path.qualifier().map(|parent| parent.written()).filter(|parent| parent.as_ref().len() == 1);
         let head = single.as_ref().and_then(|parent| parent.last().cloned());
-        let owner = head
-            .as_ref()
-            .and_then(|parent| scope.generic(parent).map(|generic| AsRef::<Name>::as_ref(&generic).clone()));
+        let owner = head.as_ref().and_then(|parent| scope.generic(parent).map(Generic::param));
         let last = path.written().last().cloned();
         let subject =
             head.filter(|parent| parent.matches::<Whole>(&[Self::SUBJECT]).is_some()).map(|_| scope.current_subject());
@@ -258,7 +256,7 @@ impl Spelled {
     fn reader(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Reader {
         match self {
             Spelled::Path(path) => Self::path_reader(&path, resolving, scope),
-            Spelled::Generic { owner, name } => Reader::Associated { owner: Resolved::Param(owner), name },
+            Spelled::Generic { owner, name } => Reader::Associated { owner, name },
             Spelled::Subject { subject, name } => Self::subject_reader(&subject, name, resolving, scope),
         }
     }
