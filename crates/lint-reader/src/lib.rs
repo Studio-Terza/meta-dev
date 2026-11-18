@@ -1,3 +1,5 @@
 mod source_files;
 
-pub use source_files::{CrateSources, Described, Partition, SharedRead, SourceFiles, Stage, Unlocated};
+pub use source_files::{
+    CrateSources, Crew, Described, Partition, Reader, Reads, SharedRead, SourceFiles, Stage, Unlocated,
+};

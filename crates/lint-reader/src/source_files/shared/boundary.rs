@@ -1,4 +1,4 @@
-use lint_core::FileHead;
+use super::protocol::{Assigned, Due};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Partition(usize);
@@ -13,39 +13,31 @@ impl From<usize> for Partition {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(super) enum Change {
-    Lifted,
-    Landed,
-}
+#[derive(Clone, Debug)]
+pub(super) struct Hands(Vec<Partition>);
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct Flights(usize);
-
-impl Flights {
-    pub(super) fn flown(self, change: Change) -> Flights {
-        match change {
-            Change::Lifted => Flights(self.0 + 1),
-            Change::Landed => Flights(self.0.saturating_sub(1)),
-        }
-    }
-
-    pub(super) fn airborne(self) -> Option<Flights> {
-        Some(self).filter(|flights| flights.0 > 0)
+impl FromIterator<Partition> for Hands {
+    fn from_iter<Found: IntoIterator<Item = Partition>>(found: Found) -> Hands {
+        Hands(found.into_iter().collect())
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct Expected(usize);
-
-impl Expected {
-    pub(super) fn met(self, heads: &[FileHead]) -> Option<Expected> {
-        Some(self).filter(|expected| heads.len() == expected.0)
+impl Hands {
+    pub(super) fn dealt<'tree>(&self, due: Vec<Due<'tree>>) -> Vec<Assigned<'tree>> {
+        let live = &self.0;
+        due.into_iter()
+            .scan(0, |dealt: &mut usize, found| {
+                let hand = found.owner().unwrap_or_else(|| {
+                    let turn = live.get(*dealt % live.len().max(1)).copied().unwrap_or(Partition::MAIN);
+                    *dealt += 1;
+                    turn
+                });
+                Some(found.assigned(hand))
+            })
+            .collect()
     }
-}
 
-impl Expected {
-    pub(super) fn counted(count: usize) -> Expected {
-        Expected(count)
+    pub(super) fn live(&self) -> impl Iterator<Item = Partition> + '_ {
+        self.0.iter().copied()
     }
 }

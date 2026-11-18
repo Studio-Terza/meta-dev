@@ -19,8 +19,8 @@ use lint_test_budget::TestBudget;
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
-use super::boundary::Dumped;
-use super::timings::Measured;
+use super::boundary::{Dumped, Workers};
+use super::timings::{Measured, Worker};
 use super::{Outcome, Sources, Verdict};
 use crate::cli::ignored::Ignored;
 use elegance::Elegance;
@@ -81,13 +81,21 @@ impl Mode {
         }
     }
 
-    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
+    pub(crate) fn helpers(&self) -> Vec<Worker> {
+        match self {
+            Mode::Gate => Workers::available().helpers().map(Worker::from).collect(),
+            Mode::Report | Mode::Query(_) | Mode::Dump(_) => Vec::new(),
+        }
+    }
+
+    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
         &self,
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
+        readers: Vec<lint_reader::Reader<'run>>,
     ) -> Run<'scope, '_> {
         match self {
-            Mode::Gate => Run::Gate(Lints::started(scope, sources)),
+            Mode::Gate => Run::Gate(Lints::started(scope, sources, readers)),
             Mode::Report => Run::Report,
             Mode::Query(found) => Run::Query(found.as_ref().ignoring(Ignored::Refused)),
             Mode::Dump(_) => Run::Dump,

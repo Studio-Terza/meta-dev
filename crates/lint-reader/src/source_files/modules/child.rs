@@ -15,13 +15,13 @@ impl Child {
     }
 
     #[must_use]
-    pub fn canonical(self, survey: &Survey) -> Child {
-        let path = survey.canonical(&self.path).map(Path::to_path_buf).unwrap_or(self.path);
-        Child { path, ..self }
+    pub fn canonical<'child>(&'child self, survey: &'child Survey) -> &'child Path {
+        survey.canonical(&self.path).unwrap_or(&self.path)
     }
 
-    pub fn visit<Output>(self, then: impl FnOnce(&Path, &Path) -> Output) -> Output {
-        then(&self.path, &self.children_directory)
+    #[must_use]
+    pub fn children(&self) -> &Path {
+        &self.children_directory
     }
 }
 

@@ -2017,6 +2017,7 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "cargo-ports",
  "file-ports",
  "invariants",
