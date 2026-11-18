@@ -6,7 +6,9 @@ use lint_layout::Name;
 use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::Binding;
-use super::boundary::{GlobId, Lattice, ScopeId};
+use algebra::Semigroup;
+
+use super::boundary::{GlobId, ScopeId};
 use super::entries::{DeclaredAt, Sight};
 use super::rules::{RulesDefinition, Written};
 use super::settling::Target;
@@ -116,11 +118,11 @@ impl Resolution {
     }
 }
 
-impl Lattice for Resolution {
-    fn joined(&self, computed: Resolution) -> Resolution {
+impl Semigroup for Resolution {
+    fn combine(self, computed: Resolution) -> Resolution {
         match self {
             Resolution::Waiting => computed,
-            Resolution::Bound(held) => computed.kept(held),
+            Resolution::Bound(held) => computed.kept(&held),
         }
     }
 }

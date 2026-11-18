@@ -4,7 +4,9 @@ use graph::ItemPath;
 use lint_layout::Name;
 
 use super::binding::Binding;
-use super::boundary::{GlobId, Lattice, ScopeId};
+use algebra::Semigroup;
+
+use super::boundary::{GlobId, Lattice, Pointwise, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::resolver::{Resolution, Resolver};
 use super::rules::{RulesDefinition, Written};
@@ -144,25 +146,28 @@ impl ScopeSettling {
     }
 }
 
-impl Lattice for Target {
-    fn joined(&self, computed: Target) -> Target {
+impl Semigroup for Target {
+    fn combine(self, computed: Target) -> Target {
         match self {
             Target::Waiting => computed,
-            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => computed.kept(self),
+            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => computed.kept(&self),
         }
     }
 }
 
-impl Lattice for ScopeSettling {
-    fn joined(&self, computed: ScopeSettling) -> ScopeSettling {
-        ScopeSettling { imports: self.imports.joined(computed.imports), targets: self.targets.joined(computed.targets) }
+impl Semigroup for ScopeSettling {
+    fn combine(self, computed: ScopeSettling) -> ScopeSettling {
+        let imports = Pointwise::from(self.imports).combine(Pointwise::from(computed.imports));
+        let targets = Pointwise::from(self.targets).combine(Pointwise::from(computed.targets));
+        ScopeSettling { imports: imports.into(), targets: targets.into() }
     }
 }
 
 impl Seeds<'_> {
     pub(crate) fn settled(&self) -> Vec<ScopeSettling> {
         let unsettled: Vec<ScopeSettling> = self.space.scopes.iter().map(|row| row.entries().unsettled()).collect();
-        unsettled.settled(|settling| self.advanced(settling)).into_iter().map(ScopeSettling::forced).collect()
+        let settled = Pointwise::from(unsettled).settled(|settling| Pointwise::from(self.advanced(settling.as_ref())));
+        Vec::from(settled).into_iter().map(ScopeSettling::forced).collect()
     }
 
     pub(crate) fn tables<'rows>(&'rows self, settling: &'rows [ScopeSettling]) -> Tables<'rows> {
