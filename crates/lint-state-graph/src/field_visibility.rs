@@ -4,6 +4,7 @@ use syntax::Spanned;
 use syntax::{Index, ItemMod, ItemStruct, Visibility};
 
 use super::finding::Finding;
+use algebra::Semigroup;
 use lint_core::Site;
 use lint_core::Violation;
 use lint_layout::LineNumber;
@@ -57,8 +58,8 @@ impl<'scan> Contribute for FieldVisibility<'scan> {
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Exposed<'scan> {
         let descend = Descend::from(facts.gate());
-        let exposed = descend.entered().map_or_default(|_| self.exposed(item));
-        Contributed::new((), exposed, descend.then(|| Descend::Over))
+        let exposed = descend.entered().map_or_default(|()| self.exposed(item));
+        Contributed::new((), exposed, descend.combine(Descend::Over))
     }
 }
 

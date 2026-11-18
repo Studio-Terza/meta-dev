@@ -53,7 +53,7 @@ impl Placed {
     fn marked(attributes: &[Attribute]) -> Placed {
         Descend::from(Walk::outside_tests(attributes))
             .entered()
-            .and_then(|_| TestMarks::mark_test(attributes).map_or(Some(Placed::Item), |_| None))
+            .and_then(|()| TestMarks::mark_test(attributes).map_or(Some(Placed::Item), |_| None))
             .unwrap_or(Placed::Test)
     }
 

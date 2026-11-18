@@ -232,14 +232,17 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         let Contributed { within, descend } = on(&self.contributor, around);
         let scoping = Scoping::among(self.contributor.scopes(), visit.kind);
         let frame = Frame { open: &within.open, enclosing: around.frame };
-        let inner = Around { frame: scoping.framed(&frame).or(around.frame), position: around.position.following() };
-        let children = descend.descends().map_or_default(|()| {
-            self.siblings(visit.file, visit.node.children(), visit.indexed.map(Indexed::children), &inner)
+        let inner = Around {
+            frame: scoping.framed(&frame).or(around.frame),
+            position: around.position.combine(WalkPosition::ONE),
+        };
+        let children = descend.descending(visit.node).map_or_default(|node| {
+            self.siblings(visit.file, node.children(), visit.indexed.map(Indexed::children), &inner)
         });
         let after = Around { frame: inner.frame, position: inner.position.combine(children.entered) };
         let expansion = self.siblings(visit.file, visit.expanded(descend).iter().map(Node::Stmt), None, &after);
         let below = children.combine(expansion);
-        let entered = below.entered.following();
+        let entered = below.entered.combine(WalkPosition::ONE);
         let merged = within.combine(below.contribution);
         scoping.walked(merged, entered, |inside| off(&self.contributor, inside))
     }
@@ -279,10 +282,7 @@ impl Scoping {
 }
 
 impl WalkPosition {
-    #[must_use]
-    pub fn following(self) -> WalkPosition {
-        WalkPosition(self.0 + 1)
-    }
+    const ONE: WalkPosition = WalkPosition(1);
 }
 
 impl Scope {

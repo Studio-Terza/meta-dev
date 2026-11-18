@@ -142,7 +142,7 @@ impl Contribute for ImplScan {
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<WrittenImpl>> {
         let descend = Descend::from(facts.gate());
-        Contributed::new((), descend.entered().map(|_| WrittenImpl::from(item)).into_iter().collect(), descend)
+        Contributed::new((), descend.entered().map(|()| WrittenImpl::from(item)).into_iter().collect(), descend)
     }
 }
 

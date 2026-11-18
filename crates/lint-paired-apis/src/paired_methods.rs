@@ -92,7 +92,7 @@ impl<'file> Contribute for PairedMethods<'file> {
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), PairedOwners<'file>> {
         let entered = Descend::from(facts.gate()).entered();
-        let declared = entered.map_or_default(|_| Self::declared_methods(block));
-        self.owned_by(entered.and_then(|_| facts.name().cloned()), &declared)
+        let declared = entered.map_or_default(|()| Self::declared_methods(block));
+        self.owned_by(entered.and_then(|()| facts.name().cloned()), &declared)
     }
 }

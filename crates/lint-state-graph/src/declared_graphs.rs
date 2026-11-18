@@ -37,7 +37,7 @@ impl Monoid for Invoked {}
 
 impl Invoked {
     fn gated(self, gate: Walk) -> Invoked {
-        let invocations = Descend::from(gate).entered().map_or_else(Vec::new, |_| self.invocations);
+        let invocations = Descend::from(gate).entered().map_or_else(Vec::new, |()| self.invocations);
         Invoked { aliases: self.aliases, invocations }
     }
 }

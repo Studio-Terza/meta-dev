@@ -68,7 +68,7 @@ impl<'file> GuardScan<'file> {
         let site = Site::new(self.path, LineNumber::from(name.span()));
         let members = Descend::from(Walk::outside_tests(attributes))
             .entered()
-            .map(|_| attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None))
+            .map(|()| attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None))
             .map_or_else(Members::default, |unmarked| Members::declaring(Name::from(name), unmarked));
         Contributed::new(members, Vec::new(), Descend::Over)
     }
@@ -140,7 +140,7 @@ impl<'file> Contribute for GuardScan<'file> {
     ) -> Contributed<Members<'file>, Vec<Nested<'file>>> {
         let dropped = Descend::from(facts.gate())
             .entered()
-            .map_or_else(Members::default, |_| Members::dropping(Name::implementing(item, Word::new(Self::DROP))));
+            .map_or_else(Members::default, |()| Members::dropping(Name::implementing(item, Word::new(Self::DROP))));
         Contributed::new(dropped, Vec::new(), Descend::Over)
     }
 

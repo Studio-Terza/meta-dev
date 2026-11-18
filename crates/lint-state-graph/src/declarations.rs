@@ -113,7 +113,7 @@ impl Contribute for DeclarationScan {
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), DeclarationReading> {
         let descend = Descend::from(facts.gate());
-        let vertices = descend.entered().and_then(|_| Declarations::vertex(item)).into_iter().collect();
+        let vertices = descend.entered().and_then(|()| Declarations::vertex(item)).into_iter().collect();
         Contributed::new((), DeclarationReading { vertices, aliases: BTreeMap::new() }, descend)
     }
 

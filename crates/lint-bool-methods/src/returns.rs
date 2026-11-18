@@ -3,6 +3,7 @@ mod finding;
 
 use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
+use algebra::Semigroup;
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;
 use lint_sweep::{Concludes, Contribute, Contributed, Descend, Facts, Kind};
@@ -32,7 +33,7 @@ impl<'file> Returns<'file> {
 
     fn opened(&self, attributes: &[Attribute], signature: &Signature) -> Returned<'file> {
         let descend = Descend::from(Walk::outside_tests(attributes));
-        let flagged = descend.entered().and_then(|_| self.flagged(signature));
+        let flagged = descend.entered().and_then(|()| self.flagged(signature));
         Contributed::new((), flagged.into_iter().collect(), descend)
     }
 }
@@ -76,7 +77,7 @@ impl<'file> Contribute for Returns<'file> {
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         Contributed::descending(
-            facts.inherent().map_or(Descend::Over, |_| Descend::Into).then(|| Descend::from(facts.gate())),
+            facts.inherent().map_or(Descend::Over, |_| Descend::Into).combine(Descend::from(facts.gate())),
         )
     }
 

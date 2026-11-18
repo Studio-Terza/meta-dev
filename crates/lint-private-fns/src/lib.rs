@@ -116,9 +116,13 @@ impl Contribute for PrivateFnCounter<'_> {
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), PrivateNames> {
         let counted =
-            Descend::from(Walk::outside_tests(&item.attrs)).then(|| Descend::from(Walk::inherent_impls(item)));
-        let private: Vec<Name> =
-            counted.entered().map(|_| Self::private_names(item).collect::<Vec<Name>>()).into_iter().flatten().collect();
+            Descend::from(Walk::outside_tests(&item.attrs)).combine(Descend::from(Walk::inherent_impls(item)));
+        let private: Vec<Name> = counted
+            .entered()
+            .map(|()| Self::private_names(item).collect::<Vec<Name>>())
+            .into_iter()
+            .flatten()
+            .collect();
         let names = PrivateNames(BTreeMap::from([(TypeName::from_type(&item.self_ty), private)]));
         Contributed::new((), names, Descend::Over)
     }
