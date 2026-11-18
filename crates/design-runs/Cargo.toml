@@ -16,6 +16,7 @@ design-jobs = { path = "../design-jobs" }
 design-model = { path = "../design-model" }
 dispatch-ports = { path = "../dispatch-ports" }
 named-derive = { path = "../named-derive" }
+states = { path = "../states" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }

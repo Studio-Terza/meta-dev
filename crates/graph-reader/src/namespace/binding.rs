@@ -2,7 +2,7 @@ use graph::{External, ItemId, ItemPath, Primitive, Resolved, Unresolved};
 use lint_layout::{Dependencies, Name};
 
 use super::boundary::ScopeId;
-use super::entries::{DeclaredId, Sight};
+use super::entries::{DeclaredAt, DeclaredId, Sight};
 use super::items::ItemIds;
 use super::resolver::Resolution;
 use super::settling::Target;
@@ -27,6 +27,18 @@ impl Binding {
             Binding::External(external) => Resolution::Bound(Binding::External(external.joined(segment))),
             Binding::Unknown(cause) => Resolution::Bound(Binding::Unknown(cause)),
             Binding::Item(..) | Binding::Primitive(_) | Binding::Absent => Resolution::Bound(Binding::UNBOUND),
+        }
+    }
+
+    pub(super) fn declared(&self) -> Option<DeclaredAt> {
+        match self {
+            Binding::Item(scope, item) => Some(DeclaredAt::new(*scope, *item)),
+            Binding::Module(_)
+            | Binding::Std(_)
+            | Binding::External(_)
+            | Binding::Primitive(_)
+            | Binding::Unknown(_)
+            | Binding::Absent => None,
         }
     }
 

@@ -28,13 +28,25 @@ ignored! {
     }
 }
 
-struct Misreading;
+enum Misreading {
+    Parsed,
+    Lapsed(Lapse),
+}
 
-impl Misreading {
-    fn of(reply: &str) -> Option<Lapse> {
+impl From<&str> for Misreading {
+    fn from(reply: &str) -> Misreading {
         match reply.parse::<Directives>() {
-            Ok(_directives) => None,
-            Err(misread) => Some(Lapse::from(misread)),
+            Ok(_directives) => Misreading::Parsed,
+            Err(misread) => Misreading::Lapsed(Lapse::from(misread)),
+        }
+    }
+}
+
+impl From<Misreading> for Option<Lapse> {
+    fn from(misreading: Misreading) -> Option<Lapse> {
+        match misreading {
+            Misreading::Parsed => None,
+            Misreading::Lapsed(lapse) => Some(lapse),
         }
     }
 }
@@ -256,7 +268,8 @@ impl Jobs {
             "[^\u{0}]{0,30}".prop_map(|refusal| Lapse::refused(&io::Error::other(refusal))),
             (Generated::segment(), vec(Generated::segment(), 0..Job::SEGMENTS))
                 .prop_map(|(first, rest)| Lapse::from(Uncovered::new(first, rest))),
-            "[ -~]{0,30}".prop_filter_map("a misread reply", |reply| Misreading::of(&reply)),
+            "[ -~]{0,30}"
+                .prop_filter_map("a misread reply", |reply| Option::<Lapse>::from(Misreading::from(reply.as_str()))),
         ]
     }
 
@@ -320,7 +333,7 @@ laws::law!(
             .parse()
             .map_err(|misread: Misread| laws::proptest::test_runner::TestCaseError::fail(misread.to_string()))?;
         laws::proptest::prop_assert_eq!(parsed, Reading::Parsed { directives, attempt: attempt.clone() });
-        let misread = Misreading::of("place(");
+        let misread = Option::<Lapse>::from(Misreading::from("place("));
         laws::proptest::prop_assert_eq!(
             Some(attempt.clone().read(&Reply::new("place(".to_owned()))),
             misread.map(|lapse| attempt.lapsed(lapse))

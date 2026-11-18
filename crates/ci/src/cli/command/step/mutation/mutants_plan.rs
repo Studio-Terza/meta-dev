@@ -90,7 +90,7 @@ impl Step for MutantsPlan {
         let said = choice.iter().map(Shown::said).chain([Shown::said(format_args!("{shards}\n"))]).collect();
         Ok(Telling::reported(
             said,
-            self.output.append(ports.files(), format_args!("shards={}\n", shards.indices())).map(|()| Exit::Success),
+            self.output.append(ports.files(), format_args!("shards={}\n", shards.matrix())).map(|()| Exit::Success),
         ))
     }
 }

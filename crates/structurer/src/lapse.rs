@@ -30,11 +30,8 @@ enum Lapsed {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Lapsing {
-    #[name("misread")]
     Misread,
-    #[name("refused")]
     Refused,
-    #[name("uncovered")]
     Uncovered,
 }
 

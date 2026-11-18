@@ -10,7 +10,7 @@ use store_ports::{
 
 states::states! {
     pub stored Door in door {
-        start Shut { open -> Opened, lock -> Locked }
+        start Shut as Leaving { open -> Opened, lock -> Locked }
         state Opened { close -> Shut }
         terminal Locked {}
     }
@@ -107,5 +107,20 @@ fn a_held_state_moves_its_row_and_a_stale_one_is_refused() -> Result<(), Box<dyn
     store.write(door::Opened::held(key).close())?;
     store.write(door::Shut::held(key).lock())?;
     assert_eq!(*door::Opened::held(key).key(), key);
+    Ok(())
+}
+
+#[test]
+fn a_held_state_moves_to_a_declared_target_chosen_at_runtime() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<Bare>());
+    let chosen = [door::Leaving::Opened, door::Leaving::Locked];
+    assert_eq!(chosen.map(Door::from), [Door::Opened, Door::Locked]);
+    let key = Doors::placed(&store, Door::Shut)?;
+    store.write(door::Shut::held(key).moved(door::Leaving::Opened))?;
+    let stale = store.write(door::Shut::held(key).moved(door::Leaving::Locked));
+    assert!(matches!(stale, Err(StoreFailure::Unmoved(_))));
+    store.write(door::Opened::held(key).close())?;
+    store.write(door::Shut::held(key).moved(door::Leaving::Locked))?;
     Ok(())
 }

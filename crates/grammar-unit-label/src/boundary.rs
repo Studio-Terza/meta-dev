@@ -58,13 +58,9 @@ pub struct Target {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
-    #[name("bin")]
     Bin,
-    #[name("test")]
     Test,
-    #[name("bench")]
     Bench,
-    #[name("example")]
     Example,
 }
 

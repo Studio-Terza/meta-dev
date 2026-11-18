@@ -45,16 +45,12 @@ pub enum Root {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[named(kebab)]
 enum Lens {
-    #[name("current-decision")]
     CurrentDecision,
-    #[name("open-questions")]
     OpenQuestions,
-    #[name("outline")]
     Outline,
-    #[name("unplaced")]
     Unplaced,
-    #[name("notes")]
     Notes,
 }
 

@@ -67,9 +67,7 @@ impl Misread {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Missing {
-    #[name("expected")]
     Expected,
-    #[name("arity")]
     Arity,
 }
 

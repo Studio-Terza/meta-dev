@@ -2,8 +2,8 @@ use invariants::{Ignoring, ignored};
 use syntax::parse::{Parser, parse_str, parse2};
 use syntax::{
     Application, Applied, Block, BlockItems, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro, File, Fold,
-    Group, Ident, Macro, MacroTree, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens, TokenStream,
-    TokenTree, Type, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
+    Group, Ident, Macro, MacroTree, Mentioned, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens,
+    TokenStream, TokenTree, Type, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
 };
 
 ignored! {
@@ -195,5 +195,15 @@ fn outermost_types_are_the_types_an_expression_names_without_their_parts() -> Re
     let length: Expr = parse_str("size_of::<Vec<u8>>() + N as usize")?;
     let named: Vec<String> = TypeTree::outermost(&length).iter().map(|ty| ty.to_token_stream().to_string()).collect();
     assert_eq!(named, ["Vec < u8 >", "usize"]);
+    Ok(())
+}
+
+#[test]
+fn mentioned_collects_every_path_and_each_use_tree_in_its_statements() -> Result<(), Error> {
+    let block: Block = parse_str("{ use ::a::B; fn f() -> c::D { e::g() } }")?;
+    let mentioned = Mentioned::in_statements(&block.stmts);
+    let paths: Vec<String> = mentioned.paths().iter().map(|path| path.to_token_stream().to_string()).collect();
+    let uses: Vec<String> = mentioned.uses().iter().map(|tree| tree.to_token_stream().to_string()).collect();
+    assert_eq!((paths, uses), (vec!["c :: D".to_owned(), "e :: g".to_owned()], vec!["a :: B".to_owned()]));
     Ok(())
 }

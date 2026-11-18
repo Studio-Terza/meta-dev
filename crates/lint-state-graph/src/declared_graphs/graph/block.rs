@@ -54,6 +54,8 @@ impl Parse for Block {
     fn parse(input: ParseStream) -> syntax::Result<Block> {
         let kind = input.parse()?;
         let state: Ident = input.parse()?;
+        let choosing = input.parse::<Option<Token![as]>>()?;
+        choosing.map(|_as| input.parse::<Ident>()).transpose()?;
         let content;
         braced!(content in input);
         Ok(Block {

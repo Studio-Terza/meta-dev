@@ -157,7 +157,7 @@ fn a_survivor_a_test_only_commit_fixes_is_selected_again_and_nothing_else_is() -
         planned.out,
         ["mutants: 1 selected since h0: its 1 survivors and the lines changed since", "mutants: 1 to test in 1 shards"]
     );
-    assert_eq!(planned.shards, ["shards=[0]"]);
+    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":45}]"#]);
     Ok(())
 }
 
@@ -195,7 +195,7 @@ fn a_prior_whose_survivors_are_all_caught_and_no_line_changed_selects_nothing() 
     }
     .planned()?;
     assert_eq!(planned.selected, Vec::<String>::new());
-    assert_eq!(planned.shards, ["shards=[0]"]);
+    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":45}]"#]);
     Ok(())
 }
 

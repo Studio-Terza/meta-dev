@@ -10,6 +10,7 @@ pub use readers::block_items::BlockItems;
 pub use readers::boundary::{LitText, MemberText, Past, PatEdge, PatReached, PatSpine, PatTree, Spine, TypeSpine};
 pub use readers::expr_shapes::{Application, Constructed};
 pub use readers::macro_tree::MacroTree;
+pub use readers::mentioned::Mentioned;
 pub use readers::nested::Nested;
 pub use readers::type_fold::{ExprTree, Fold, TypeTree};
 pub use readers::use_leaf::UseLeaf;
