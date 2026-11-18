@@ -9,6 +9,7 @@ use super::{ExactReply, Scratch, Script, Text};
 const SURVIVOR: &str = r#"{"name": "crates/a/src/lib.rs:3:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 3, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const SURVIVOR_MOVED: &str = r#"{"name": "crates/a/src/lib.rs:4:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 4, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const ADDED: &str = r#"{"name": "crates/a/src/lib.rs:9:5: replace g -> u8 with 0", "file": "crates/a/src/lib.rs", "function": {"function_name": "g"}, "span": {"start": {"line": 9, "column": 5}}, "replacement": "0", "genre": "FnValue"}"#;
+const ELSEWHERE: &str = r#"{"name": "crates/b/src/lib.rs:2:5: replace e -> u8 with 0", "file": "crates/b/src/lib.rs", "function": {"function_name": "e"}, "span": {"start": {"line": 2, "column": 5}}, "replacement": "0", "genre": "FnValue"}"#;
 const UNTOUCHED: &str = r#"{"name": "crates/a/src/lib.rs:20:5: replace h -> u8 with 1", "file": "crates/a/src/lib.rs", "function": {"function_name": "h"}, "span": {"start": {"line": 20, "column": 5}}, "replacement": "1", "genre": "FnValue"}"#;
 const CAUGHT_BEFORE: &str = r#"{"name": "crates/a/src/lib.rs:12:5: replace k -> u8 with 1", "file": "crates/a/src/lib.rs", "function": {"function_name": "k"}, "span": {"start": {"line": 12, "column": 5}}, "replacement": "1", "genre": "FnValue"}"#;
 
@@ -172,6 +173,7 @@ fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down
         planned.selected,
         ["crates/a/src/lib.rs:4:5: replace f -> bool with true", "crates/a/src/lib.rs:9:5: replace g -> u8 with 0"]
     );
+    assert_eq!(planned.out.last().map(String::as_str), Some("mutants: 2 to test in 1 shards"));
     Ok(())
 }
 
@@ -504,7 +506,7 @@ fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Re
         survivors: &[SURVIVOR],
         since_head: TEST_EDITED,
         moved: NOTHING_MOVED,
-        listed: vec![SURVIVOR, UNTOUCHED],
+        listed: vec![SURVIVOR, UNTOUCHED, ELSEWHERE],
         since: Vec::new(),
         earlier_tests: "",
         since_tests: "",
