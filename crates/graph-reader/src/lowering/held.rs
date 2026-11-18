@@ -47,12 +47,8 @@ pub(super) struct Link {
 }
 
 impl Link {
-    pub(super) fn declaring(ident: &Ident) -> Link {
-        Link { name: UsePath::from(ident), domain: Domain::Types }
-    }
-
-    pub(super) fn valued(self) -> Link {
-        Link { domain: Domain::Values, ..self }
+    pub(super) fn declaring(ident: &Ident, domain: Domain) -> Link {
+        Link { name: UsePath::from(ident), domain }
     }
 
     fn declares(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Option<ItemId> {
@@ -89,7 +85,7 @@ impl<'read> Frame<'read> {
     ) -> Contributed<Framed<'read>, Grains> {
         let tabled = Frame { tabled: Some(()), ..self.clone() };
         let target = tabled.generics.lowered(ty);
-        let held = tabled.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
+        let held = tabled.hold(Holder::named(ident, Held::Value), Link::declaring(ident, Domain::Values), target);
         tabled.owned_by(ident, Domain::Values, attributes, held)
     }
 
@@ -111,7 +107,7 @@ impl<'read> Frame<'read> {
 
     pub(super) fn trait_bounds(&self, item: &ItemTrait, scope: &InScope) -> Grains {
         let holder = Holder::named(&item.ident, Held::Bound);
-        let link = Link::declaring(&item.ident);
+        let link = Link::declaring(&item.ident, Domain::Types);
         let associated =
             item.items.iter().filter_map(Syntax::trait_type).map(|declared| scope.bounded(declared.bounds.iter()));
         let parameters = self.parameters(&holder, &item.generics, &link);

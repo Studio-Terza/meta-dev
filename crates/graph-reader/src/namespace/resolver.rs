@@ -148,21 +148,19 @@ struct Walks<'walk, 'tables, 'rows, 'key, Imports> {
 }
 
 impl<'rows, Imports: Levels> Walks<'_, '_, 'rows, '_, Imports> {
-    fn walk(&self, reading: Reading) -> View<'rows> {
-        self.resolver.walked(self.levels, self.key, Lookup::new(Sight::Inside, self.resolver.ignored, reading))
-    }
-
     fn settled(&self, dispute: Dispute) -> View<'rows> {
         match dispute {
             Dispute::Clear => self.written,
-            Dispute::Contested => self.deferred(self.walk(Reading::Explicit).deference()),
+            Dispute::Contested => {
+                self.deferred(self.resolver.walked(self.levels, self.key, Reading::Explicit).deference())
+            }
         }
     }
 
     fn deferred(&self, deference: Deference) -> View<'rows> {
         match deference {
             Deference::Stands => self.written,
-            Deference::Defers => self.walk(Reading::Imported),
+            Deference::Defers => self.resolver.walked(self.levels, self.key, Reading::Imported),
         }
     }
 }
@@ -297,12 +295,13 @@ impl<'tables, 'rows, Imports: Levels> Resolver<'tables, 'rows, Imports> {
 
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
         let levels = self.imports.levels(self.space.chain(scope), key);
-        let written = self.walked(levels, key, Lookup::new(Sight::Inside, self.ignored, reading));
+        let written = self.walked(levels, key, reading);
         Walks { resolver: self, levels, key, written }.settled(written.dispute())
     }
 
-    fn walked(&self, levels: &[ScopeId], key: Key<'_>, first: Lookup) -> View<'rows> {
-        let lookups = iter::once(first).chain(iter::repeat(first.outer()));
+    fn walked(&self, levels: &[ScopeId], key: Key<'_>, reading: Reading) -> View<'rows> {
+        let first = Lookup::new(Sight::Inside, self.ignored, reading);
+        let lookups = iter::once(first).chain(iter::repeat(Lookup::new(Sight::Inside, None, reading)));
         let views = levels.iter().zip(lookups).map(|(level, lookup)| self.tables.found(*level, key, lookup));
         View::from(Nearest::concat(views.map(Nearest::from)))
     }

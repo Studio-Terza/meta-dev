@@ -337,7 +337,8 @@ impl<'read> Contribute for Lowering<'read> {
         let frame = self.frame(around);
         let generics = InScope::from(&item.generics);
         let target = generics.lowered(&item.ty);
-        let held = frame.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
+        let link = Link::declaring(&item.ident, Domain::Types);
+        let held = frame.hold(Holder::named(&item.ident, Held::Alias), link, target.clone());
         let alias = AliasRow {
             scope: frame.here.scope().clone(),
             name: UsePath::from(&item.ident),
@@ -356,7 +357,7 @@ impl<'read> Contribute for Lowering<'read> {
     ) -> Grown<'read> {
         let frame = self.frame(around);
         let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
-        let link = Link::declaring(&item.ident);
+        let link = Link::declaring(&item.ident, Domain::Types);
         let rows = frame
             .attributed(&Attributes::from(item.attrs.as_slice()), &item.ident)
             .combine(frame.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link))
@@ -372,7 +373,7 @@ impl<'read> Contribute for Lowering<'read> {
     ) -> Grown<'read> {
         let frame = self.frame(around);
         let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
-        let link = Link::declaring(&item.ident);
+        let link = Link::declaring(&item.ident, Domain::Types);
         let variants = item.variants.iter().map(|variant| {
             let unit = frame.hold(
                 Holder::named(&variant.ident, Held::Variant),
@@ -397,7 +398,7 @@ impl<'read> Contribute for Lowering<'read> {
     ) -> Grown<'read> {
         let frame = self.frame(around);
         let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
-        let link = Link::declaring(&item.ident);
+        let link = Link::declaring(&item.ident, Domain::Types);
         let rows = frame.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident).combine(frame.fields_held(
             &Holder::named(&item.ident, Held::UnionField),
             &link,
