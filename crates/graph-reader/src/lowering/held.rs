@@ -100,7 +100,7 @@ impl<'read> Frame<'read> {
 
     pub(super) fn attributed(&self, attributes: &Attributes, ident: &Ident) -> Grains {
         let rows = ImplRow::derives(&self.here, self.context.region(), attributes, ident);
-        rows.into_iter().map(Grain::Impl).collect()
+        Monoid::concat(rows.into_iter().map(Grain::Impl).map(Grains::from))
     }
 
     pub(super) fn parameters(&self, holder: &Holder, generics: &Generics, link: &Link) -> Grains {

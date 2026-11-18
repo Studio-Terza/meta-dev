@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use syntax::Spanned;
-use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
+use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Stmt};
 
 use algebra::{Monoid, Semigroup};
 use graph::{Building, FileId, ItemDeclaration, ItemId, Mention, Region, Resolved, Seat, TypeRef};
@@ -181,7 +181,7 @@ impl<'read> Frame<'read> {
     pub(super) fn macro_left(&self, item: &ItemMacro) -> Grains {
         match &item.ident {
             Some(ident) => self.rules_defined(item, ident),
-            None => self.expanded(&item.mac),
+            None => self.expanded(&Macros::items_in_file(self.source, &item.mac)),
         }
     }
 
@@ -210,9 +210,8 @@ impl<'read> Frame<'read> {
         Self::swept(self.expansion(MacroItems::Transcribed), statements.iter().filter_map(Syntax::stmt_item))
     }
 
-    pub(super) fn expanded(&self, invocation: &Macro) -> Grains {
-        let items = Macros::items_in_file(self.source, invocation);
-        let absorbed = ScopeOp::Absorbed { key: self.here.scope().clone(), entries: Entries::of_items(&items) };
+    pub(super) fn expanded(&self, items: &[syntax::Item]) -> Grains {
+        let absorbed = ScopeOp::Absorbed { key: self.here.scope().clone(), entries: Entries::of_items(items) };
         let walked = Self::swept(self.expansion(MacroItems::Expanded), items.iter());
         Grains::from(Grain::Op(absorbed)).combine(walked)
     }
@@ -257,10 +256,11 @@ impl<'read> Frame<'read> {
         let subjected =
             SubjectRow { key: key.clone(), scope: self.here.scope().clone(), ty: subject, implemented: named, traited };
         let Owning { place, grains } = self.placed(KeyRole::Subject, PlaceSeed { subject: Some(key), owner: None });
-        let rows: Grains =
+        let rows: Grains = Monoid::concat(
             [Grain::Impl(implemented), Grain::Place(PlaceRows { subjects: vec![subjected], places: Vec::new() })]
                 .into_iter()
-                .collect();
+                .map(Grains::from),
+        );
         let inner = Frame {
             context: self.context.of_impl(block, place),
             enclosure: Enclosure::of_impl(block),

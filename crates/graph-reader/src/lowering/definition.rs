@@ -2,7 +2,6 @@ use algebra::{Monoid, Semigroup};
 mod branches;
 mod reads;
 mod repeats;
-mod repetitions;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -17,7 +16,7 @@ use lint_sweep::Address;
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
-pub(super) use branches::Branches;
+pub(super) use branches::{Branch, Branches};
 use reads::{Reads, ReadsLowered, SharedParameters};
 use repeats::Parameters;
 pub(super) use repeats::Repeats;
@@ -48,14 +47,14 @@ pub(super) struct LoweredDefinition {
 }
 
 #[derive(Debug)]
-enum Pending {
+enum PendingReceiver {
     Settled(LoweredReceiving),
     CallAt(Address),
 }
 
 #[derive(Debug)]
 enum PendingInvocation {
-    Method { receiver: Pending, name: Name },
+    Method { receiver: PendingReceiver, name: Name },
     Path { owner: Option<Name>, name: Name },
 }
 
@@ -114,40 +113,35 @@ impl BodyPart {
         BodyPart { branches, ..BodyPart::default() }
     }
 
-    pub(super) fn method_entered(found: &ExprMethodCall) -> BodyPart {
-        BodyPart { reads: Reads::counted(Address::from(found)), repeats: Repeats::method(found), ..BodyPart::default() }
-    }
-
-    pub(super) fn call_entered(found: &ExprCall) -> BodyPart {
-        BodyPart { reads: Reads::called(found, Address::from(found)), ..BodyPart::default() }
-    }
-
-    pub(super) fn method_made(found: &ExprMethodCall) -> BodyPart {
+    pub(super) fn method_call(found: &ExprMethodCall) -> BodyPart {
         let receiver = Self::receiver(&found.receiver);
         let invocation = PendingInvocation::Method { receiver, name: Name::from(&found.method) };
         let made =
             Made { at: Address::from(found), closed: found.paren_token.span.close(), invocation: Some(invocation) };
-        BodyPart { made: vec![made], ..BodyPart::default() }
+        let counted = Reads::counted(Address::from(found));
+        BodyPart { made: vec![made], reads: counted, repeats: Repeats::method(found), ..BodyPart::default() }
     }
 
-    pub(super) fn call_made(found: &ExprCall) -> BodyPart {
+    pub(super) fn call(found: &ExprCall) -> BodyPart {
         let segments: Vec<Name> = Syntax::expr_path(&found.func)
             .map_or_default(|path| path.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect());
         let owner = segments.iter().rev().nth(1).cloned();
         let invocation = segments.last().cloned().map(|name| PendingInvocation::Path { owner, name });
         let made = Made { at: Address::from(found), closed: found.paren_token.span.close(), invocation };
-        BodyPart { made: vec![made], ..BodyPart::default() }
+        BodyPart { made: vec![made], reads: Reads::called(found, Address::from(found)), ..BodyPart::default() }
     }
 
-    fn receiver(found: &Expr) -> Pending {
+    fn receiver(found: &Expr) -> PendingReceiver {
         match found {
-            Expr::Path(path) => Pending::Settled(
+            Expr::Path(path) => PendingReceiver::Settled(
                 path.path.get_ident().map_or(LoweredReceiving::Unknown, |ident| Self::named(Name::from(ident))),
             ),
-            Expr::MethodCall(inner) => Pending::CallAt(Address::from(inner)),
+            Expr::MethodCall(inner) => PendingReceiver::CallAt(Address::from(inner)),
             Expr::Call(call) => Syntax::expr_path(&call.func)
-                .map_or(Pending::Settled(LoweredReceiving::Unknown), |_| Pending::CallAt(Address::from(call))),
-            _ => Pending::Settled(LoweredReceiving::Unknown),
+                .map_or(PendingReceiver::Settled(LoweredReceiving::Unknown), |_| {
+                    PendingReceiver::CallAt(Address::from(call))
+                }),
+            _ => PendingReceiver::Settled(LoweredReceiving::Unknown),
         }
     }
 
@@ -167,8 +161,11 @@ impl Made {
 
     fn receiving(&self) -> Option<Address> {
         match &self.invocation {
-            Some(PendingInvocation::Method { receiver: Pending::CallAt(at), .. }) => Some(*at),
-            Some(PendingInvocation::Method { receiver: Pending::Settled(_), .. } | PendingInvocation::Path { .. })
+            Some(PendingInvocation::Method { receiver: PendingReceiver::CallAt(at), .. }) => Some(*at),
+            Some(
+                PendingInvocation::Method { receiver: PendingReceiver::Settled(_), .. }
+                | PendingInvocation::Path { .. },
+            )
             | None => None,
         }
     }
@@ -189,11 +186,11 @@ impl PendingInvocation {
     }
 }
 
-impl Pending {
+impl PendingReceiver {
     fn settled(self, order: Option<CallOrder>) -> LoweredReceiving {
         match self {
-            Pending::Settled(receiving) => receiving,
-            Pending::CallAt(_) => order.map_or(LoweredReceiving::Unknown, LoweredReceiving::Call),
+            PendingReceiver::Settled(receiving) => receiving,
+            PendingReceiver::CallAt(_) => order.map_or(LoweredReceiving::Unknown, LoweredReceiving::Call),
         }
     }
 }
@@ -231,7 +228,7 @@ impl BodyGroup {
             .filter_map(|(found, order)| found.settled(order))
             .map(|invocation| invocation.bound(&bound))
             .collect();
-        let branches = Branches::opened().combine(part.branches);
+        let branches = Branches::from(Branch::Taken).combine(part.branches);
         LoweredDefinition {
             shape: self.shape,
             branching: branches.score(),

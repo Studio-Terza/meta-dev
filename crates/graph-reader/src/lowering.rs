@@ -575,14 +575,6 @@ impl From<Grain> for Grains {
     }
 }
 
-impl FromIterator<Grain> for Grains {
-    fn from_iter<Found: IntoIterator<Item = Grain>>(found: Found) -> Grains {
-        let grains: Vec<Grain> = found.into_iter().collect();
-        let bodied = grains.iter().find_map(Grain::bodied);
-        Grains { grains, bodied }
-    }
-}
-
 #[derive(Debug, Default)]
 struct Sorted {
     rows: FileRows,
@@ -605,16 +597,16 @@ impl Monoid for Sorted {}
 impl From<Grain> for Sorted {
     fn from(grain: Grain) -> Sorted {
         match grain {
-            Grain::Impl(row) => Sorted::of(FileRows { impls: vec![row], ..FileRows::default() }),
-            Grain::Function(row) => Sorted::of(FileRows { functions: vec![row], ..FileRows::default() }),
-            Grain::Alias(row) => Sorted::of(FileRows { aliases: vec![row], ..FileRows::default() }),
-            Grain::Holding(row) => Sorted::of(FileRows { holdings: vec![row], ..FileRows::default() }),
-            Grain::Call(row) => Sorted::of(FileRows { calls: vec![row], ..FileRows::default() }),
-            Grain::Use(row) => Sorted::of(FileRows { uses: vec![row], ..FileRows::default() }),
-            Grain::Law(row) => Sorted::of(FileRows { laws: vec![row], ..FileRows::default() }),
-            Grain::Quote(row) => Sorted::of(FileRows { quotes: vec![row], ..FileRows::default() }),
-            Grain::Transcribed(row) => Sorted::of(FileRows { transcribed: vec![row], ..FileRows::default() }),
-            Grain::Place(places) => Sorted::of(FileRows { places, ..FileRows::default() }),
+            Grain::Impl(row) => Sorted::from(FileRows { impls: vec![row], ..FileRows::default() }),
+            Grain::Function(row) => Sorted::from(FileRows { functions: vec![row], ..FileRows::default() }),
+            Grain::Alias(row) => Sorted::from(FileRows { aliases: vec![row], ..FileRows::default() }),
+            Grain::Holding(row) => Sorted::from(FileRows { holdings: vec![row], ..FileRows::default() }),
+            Grain::Call(row) => Sorted::from(FileRows { calls: vec![row], ..FileRows::default() }),
+            Grain::Use(row) => Sorted::from(FileRows { uses: vec![row], ..FileRows::default() }),
+            Grain::Law(row) => Sorted::from(FileRows { laws: vec![row], ..FileRows::default() }),
+            Grain::Quote(row) => Sorted::from(FileRows { quotes: vec![row], ..FileRows::default() }),
+            Grain::Transcribed(row) => Sorted::from(FileRows { transcribed: vec![row], ..FileRows::default() }),
+            Grain::Place(places) => Sorted::from(FileRows { places, ..FileRows::default() }),
             Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
             Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
             Grain::Body(_) => Sorted::default(),
@@ -622,8 +614,8 @@ impl From<Grain> for Sorted {
     }
 }
 
-impl Sorted {
-    fn of(rows: FileRows) -> Sorted {
+impl From<FileRows> for Sorted {
+    fn from(rows: FileRows) -> Sorted {
         Sorted { rows, ..Sorted::default() }
     }
 }
@@ -704,8 +696,7 @@ impl From<BodyPart> for Grains {
 }
 
 impl Grains {
-    fn unbodied(self) -> Grains {
-        let grains = self.grains.into_iter().filter(|grain| grain.bodied().is_none()).collect();
-        Grains { grains, bodied: None }
+    fn closed(self) -> Grains {
+        Grains { grains: self.grains.into_iter().filter(|grain| grain.bodied().is_none()).collect(), bodied: None }
     }
 }

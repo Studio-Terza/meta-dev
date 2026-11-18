@@ -101,7 +101,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         ) -> Contributed<Contributor::Open, Contributor::Part>,
     ) -> Descend {
         let position = self.entered;
-        self.entered = position.next();
+        self.entered = position.following();
         let Contributed { within, descend } = contributed(&self.contributor, Around { frames: &self.frames, position });
         let opened = self.contributor.scopes().contains(&Scope(kind)).then(Contribution::default);
         let top = opened.unwrap_or_else(|| self.frames.pop().unwrap_or_default());
@@ -126,7 +126,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
 }
 
 impl WalkPosition {
-    fn next(self) -> WalkPosition {
+    fn following(self) -> WalkPosition {
         WalkPosition(self.0 + 1)
     }
 }

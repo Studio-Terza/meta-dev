@@ -1,4 +1,5 @@
 mod boundary;
+mod words;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,8 +11,8 @@ use graph::{Looping, ParamIndex, Reached, Repeating, Repetition};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name};
 
-use super::repetitions::{Bound, PerElement, SelfField};
 use boundary::Extent;
+use words::{Bound, PerElement, SelfField};
 
 #[derive(Debug)]
 struct Context {

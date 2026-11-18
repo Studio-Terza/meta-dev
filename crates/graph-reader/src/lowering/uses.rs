@@ -233,7 +233,9 @@ impl Frame<'_> {
             .map_or_else(|| Position::from(invoked.path.span()), |last| Position::from(last.ident.span()));
         let law = self.law_row(invoked);
         let quotes = QuoteRow::found(self.source, invoked, &self.here);
-        let lawful: Grains = law.into_iter().map(Grain::Law).chain(quotes.into_iter().map(Grain::Quote)).collect();
+        let lawful: Grains = Monoid::concat(
+            law.into_iter().map(Grain::Law).chain(quotes.into_iter().map(Grain::Quote)).map(Grains::from),
+        );
         let invoking = self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
         let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
         let interpolated =
