@@ -33,17 +33,30 @@ pub(crate) struct Lowering<'read> {
 
 type Grown<'read> = Contributed<Framed<'read>, Grains>;
 
-impl<'read> Frame<'read> {
-    pub(super) fn in_table(&self) -> Frame<'read> {
-        Frame { tabled: Some(()), ..self.clone() }
-    }
+#[derive(Debug)]
+struct Nested<'up, 'read> {
+    parent: &'up Frame<'read>,
+    context: Context,
+}
 
+impl<'read> From<Nested<'_, 'read>> for Frame<'read> {
+    fn from(nested: Nested<'_, 'read>) -> Frame<'read> {
+        Frame { context: nested.context, ..nested.parent.clone() }
+    }
+}
+
+#[derive(Debug)]
+struct Tabled<'read>(Frame<'read>);
+
+impl<'read> From<Tabled<'read>> for Frame<'read> {
+    fn from(tabled: Tabled<'read>) -> Frame<'read> {
+        Frame { tabled: Some(()), ..tabled.0 }
+    }
+}
+
+impl<'read> Frame<'read> {
     pub(super) fn framed(self, grains: Grains, descend: Descend) -> Grown<'read> {
         Contributed::new(Framed(Some(Box::new(self))), grains, descend)
-    }
-
-    pub(super) fn with_context(&self, context: Context) -> Frame<'read> {
-        Frame { context, ..self.clone() }
     }
 
     fn entered(&self, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Opened<'read> {
@@ -87,7 +100,7 @@ impl<'read> Frame<'read> {
         visibility: &SynVisibility,
         signature: &SynSignature,
     ) -> Grown<'read> {
-        let inner = self.with_context(self.context.within_item(attributes));
+        let inner = Frame::from(Nested { parent: self, context: self.context.within_item(attributes) });
         let Functioned { row, generics } = inner.function(attributes, visibility, signature);
         let frame = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
         frame.framed(Grains::from(Grain::Function(row)), Descend::Into)
@@ -171,6 +184,10 @@ impl<'read> Lowering<'read> {
     fn frame(&self, around: &Around<'_, Framed<'read>>) -> Frame<'read> {
         let nearest = around.nearest().find_map(|framed| framed.0.as_deref()).unwrap_or(&self.top);
         Frame { at: around.position(), ..nearest.clone() }
+    }
+
+    fn tabled(&self, around: &Around<'_, Framed<'read>>) -> Tabled<'read> {
+        Tabled(self.frame(around))
     }
 
     pub(super) fn below(frame: Frame<'read>) -> Lowering<'read> {
@@ -259,7 +276,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        frame.with_context(frame.context.within_item(&block.attrs)).impl_entered(block)
+        Frame::from(Nested { parent: &frame, context: frame.context.within_item(&block.attrs) }).impl_entered(block)
     }
 
     fn on_item_trait(
@@ -281,7 +298,8 @@ impl<'read> Contribute for Lowering<'read> {
     fn on_item_fn(&self, item: &ItemFn, _: &Facts<'_, ItemFn>, around: &Around<'_, Framed<'read>>) -> Grown<'read> {
         let frame = self.frame(around);
         let owning = frame.owning(&item.sig.ident, Domain::Values, &item.attrs);
-        let inner = frame.with_context(owning.within(&frame.context.within_item(&item.attrs)));
+        let context = owning.within(&frame.context.within_item(&item.attrs));
+        let inner = Frame::from(Nested { parent: &frame, context });
         let Functioned { row, generics } = inner.function(&item.attrs, &item.vis, &item.sig);
         let body = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
         body.framed(owning.grains.combine(Grains::from(Grain::Function(row))), Descend::Into)
@@ -423,8 +441,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemConst>,
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(around).in_table();
-        tabled.valued(&item.ident, &item.ty, &item.attrs)
+        Frame::from(self.tabled(around)).valued(&item.ident, &item.ty, &item.attrs)
     }
 
     fn on_item_static(
@@ -433,8 +450,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ItemStatic>,
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(around).in_table();
-        tabled.valued(&item.ident, &item.ty, &item.attrs)
+        Frame::from(self.tabled(around)).valued(&item.ident, &item.ty, &item.attrs)
     }
 
     fn on_impl_item_const(
@@ -443,8 +459,7 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ImplItemConst>,
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(around).in_table();
-        tabled.framed(Grains::default(), Descend::Into)
+        Frame::from(self.tabled(around)).framed(Grains::default(), Descend::Into)
     }
 
     fn on_expr_method_call(
