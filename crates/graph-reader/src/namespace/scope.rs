@@ -14,7 +14,7 @@ pub(crate) enum CrateForm {
 }
 
 impl CrateForm {
-    fn anchors(self, root: ScopeId) -> Anchors {
+    pub(super) fn anchors(self, root: ScopeId) -> Anchors {
         match self {
             CrateForm::Planted => Anchors::rooted(root),
             CrateForm::Island => Anchors::default(),
@@ -29,23 +29,14 @@ pub(crate) enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub(super) fn opened(self, parent: &ScopeRow, scope: ScopeId, entries: Entries) -> ScopeRow {
-        ScopeRow {
-            anchors: self.anchors(parent.anchors, scope),
-            chain: self.chain(&parent.chain, scope),
-            ancestry: iter::once(scope).chain(parent.ancestry.iter().copied()).collect(),
-            entries,
-        }
-    }
-
-    fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
+    pub(super) fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
         match self {
             ScopeKind::Module => parent.nested(scope),
             ScopeKind::Block => parent,
         }
     }
 
-    fn chain(self, parent: &[ScopeId], scope: ScopeId) -> Vec<ScopeId> {
+    pub(super) fn chain(self, parent: &[ScopeId], scope: ScopeId) -> Vec<ScopeId> {
         match self {
             ScopeKind::Module => vec![scope],
             ScopeKind::Block => iter::once(scope).chain(parent.iter().copied()).collect(),
@@ -62,8 +53,8 @@ pub(super) struct ScopeRow {
 }
 
 impl ScopeRow {
-    pub(super) fn root(scope: ScopeId, form: CrateForm, entries: Entries) -> ScopeRow {
-        ScopeRow { anchors: form.anchors(scope), chain: vec![scope], ancestry: vec![scope], entries }
+    pub(super) fn new(anchors: Anchors, chain: Vec<ScopeId>, ancestry: Vec<ScopeId>, entries: Entries) -> ScopeRow {
+        ScopeRow { anchors, chain, ancestry, entries }
     }
 
     pub(super) fn anchors(&self) -> Anchors {
@@ -76,10 +67,6 @@ impl ScopeRow {
 
     pub(super) fn entries(&self) -> &Entries {
         &self.entries
-    }
-
-    pub(super) fn entries_mut(&mut self) -> &mut Entries {
-        &mut self.entries
     }
 
     pub(super) fn outermost(&self) -> Option<ScopeId> {

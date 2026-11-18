@@ -19,6 +19,10 @@ impl ScopeId {
         (0..rows.len()).map(ScopeId)
     }
 
+    pub(super) fn row_after<Row>(self, base: ScopeId, rows: &[Row]) -> Option<&Row> {
+        self.0.checked_sub(base.0).and_then(|index| rows.get(index))
+    }
+
     pub(super) fn row_mut<Row>(self, rows: &mut [Row]) -> Option<&mut Row> {
         rows.get_mut(self.0)
     }
