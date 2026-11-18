@@ -252,10 +252,6 @@ impl UsePath {
         }
     }
 
-    pub(crate) fn crate_anchored(&self) -> Option<()> {
-        self.segments.first().and_then(Anchor::spelled).filter(|anchor| *anchor == Anchor::Crate).map(|_| ())
-    }
-
     pub(crate) fn tail(&self) -> &[Name] {
         self.segments.get(1..).unwrap_or_default()
     }
