@@ -7,7 +7,7 @@ use serde::Deserialize;
 use text_lines::{Lines, OneLine};
 
 use super::super::super::kept::{Commits, Tree};
-use super::super::boundary::Shards;
+use super::super::boundary::{Costs, Shards};
 use crate::cli::ports::Text;
 
 #[derive(Debug, Deserialize)]
@@ -146,7 +146,7 @@ impl Choice {
     pub(in super::super) fn shards(&self) -> Option<Shards> {
         match self {
             Choice::Full(_) => None,
-            Choice::Chosen { selected, .. } => Some(Shards::for_mutants(*selected)),
+            Choice::Chosen { selected, .. } => Some(Shards::for_mutants(Costs::unmeasured(*selected))),
         }
     }
 }
