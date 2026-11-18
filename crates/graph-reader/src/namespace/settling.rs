@@ -108,15 +108,6 @@ impl Target {
         names.iter().flat_map(Key::every).map(|key| Keyed::new(key, View::CONFLICT)).collect()
     }
 
-    fn kept(self, held: &Target) -> Target {
-        match self {
-            Target::Waiting => held.clone(),
-            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => {
-                [self].into_iter().find(|found| found == held).unwrap_or(Target::Opaque)
-            }
-        }
-    }
-
     fn forced(self) -> Target {
         match self {
             Target::Waiting | Target::Opaque => Target::Opaque,
@@ -154,7 +145,9 @@ impl Semigroup for Target {
     fn combine(self, computed: Target) -> Target {
         match self {
             Target::Waiting => computed,
-            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => computed.kept(&self),
+            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => {
+                Some(self).filter(|held| [Target::Waiting, held.clone()].contains(&computed)).unwrap_or(Target::Opaque)
+            }
         }
     }
 }
