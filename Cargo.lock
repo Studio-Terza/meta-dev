@@ -261,6 +261,7 @@ dependencies = [
 name = "design"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "design-jobs",
  "design-model",

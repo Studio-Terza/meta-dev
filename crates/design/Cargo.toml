@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+algebra = { path = "../algebra" }
 console-ports = { path = "../console-ports" }
 design-model = { path = "../design-model" }
 design-jobs = { path = "../design-jobs" }
