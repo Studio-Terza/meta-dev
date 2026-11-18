@@ -75,13 +75,6 @@ pub(crate) enum Resolution {
 }
 
 impl Resolution {
-    pub(super) fn present(&self) -> Option<&Resolution> {
-        match self {
-            Resolution::Waiting => Some(self),
-            Resolution::Bound(binding) => binding.present().map(|_| self),
-        }
-    }
-
     pub(super) fn declared(&self) -> Option<DeclaredAt> {
         match self {
             Resolution::Waiting => None,
@@ -125,11 +118,11 @@ impl From<Option<Binding>> for Resolution {
     }
 }
 
-impl<'rows> From<&'rows Resolution> for View<'rows> {
-    fn from(resolution: &'rows Resolution) -> View<'rows> {
+impl<'rows> From<&'rows Resolution> for Option<View<'rows>> {
+    fn from(resolution: &'rows Resolution) -> Option<View<'rows>> {
         match resolution {
-            Resolution::Waiting => View::WAITING,
-            Resolution::Bound(binding) => View::from(binding),
+            Resolution::Waiting => Some(View::WAITING),
+            Resolution::Bound(binding) => (*binding != Binding::Absent).then(|| View::from(binding)),
         }
     }
 }

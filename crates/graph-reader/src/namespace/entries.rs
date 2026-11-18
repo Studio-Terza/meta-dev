@@ -357,7 +357,7 @@ struct Import {
 
 impl Import {
     fn row<'rows>(&'rows self, resolution: &'rows Resolution) -> Option<Keyed<'rows, Row<'rows>>> {
-        let row = Row::new(Layer::Imported, self.visibility, View::from(resolution.present()?));
+        let row = Row::new(Layer::Imported, self.visibility, Option::<View>::from(resolution)?);
         Some(Keyed::new(Key::new(self.domain, &self.name), row))
     }
 }

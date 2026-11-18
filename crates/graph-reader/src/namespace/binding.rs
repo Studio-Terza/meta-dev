@@ -70,18 +70,6 @@ impl Binding {
 impl Binding {
     pub(super) const UNBOUND: Binding = Binding::Unknown(Unresolved::Unbound);
 
-    pub(super) fn present(&self) -> Option<&Binding> {
-        match self {
-            Binding::Absent => None,
-            Binding::Module(_)
-            | Binding::Item(..)
-            | Binding::Std(_)
-            | Binding::External(_)
-            | Binding::Primitive(_)
-            | Binding::Unknown(_) => Some(self),
-        }
-    }
-
     pub(super) fn external(first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         let package = dependencies.and_then(|declared| declared.package(first)).cloned();
         Binding::External(External::new(package, ItemPath::default().joined(first)))
