@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use syntax::MacroTree;
 use syntax::Punctuated;
 use syntax::{
-    Attribute, File, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, StmtMacro,
-    Token, VisRestricted,
+    Attribute, File, Ident, Item, ItemExternCrate, ItemFn, ItemMacro, ItemTrait, ItemUse, Macro, Meta, Stmt, Token,
+    VisRestricted,
 };
 
 use graph::{
@@ -18,6 +18,7 @@ use super::anchor::Anchor;
 use super::binding::Binding;
 use super::boundary::{GlobId, ScopeId};
 use super::resolver::{Resolution, Resolver};
+use super::rules::{Rules, Written};
 use super::settling::{ScopeSettling, Seed, Target};
 use super::std_names::{Expansion, StdNames};
 use super::tables::{Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
@@ -340,6 +341,7 @@ impl Extern {
 enum GlobSource {
     Path(UsePath),
     Expansion,
+    Scoped(Written),
 }
 
 impl GlobSource {
@@ -347,12 +349,14 @@ impl GlobSource {
         match self {
             GlobSource::Path(_) => Target::Waiting,
             GlobSource::Expansion => Target::Opaque,
+            GlobSource::Scoped(written) => Target::scoped(written.names()),
         }
     }
 
-    fn unresolved(&self) -> Unresolved {
+    fn unresolved(&self, name: &Name) -> Unresolved {
         match self {
             GlobSource::Path(_) => Unresolved::Unbound,
+            GlobSource::Scoped(written) => written.unresolved(name),
             GlobSource::Expansion => Unresolved::PossiblyMacroDeclared,
         }
     }
@@ -360,7 +364,7 @@ impl GlobSource {
     fn reexport(&self, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
         match self {
             GlobSource::Path(path) => path.reexport(dependencies, declared),
-            GlobSource::Expansion => Reexport::Opaque,
+            GlobSource::Expansion | GlobSource::Scoped(_) => Reexport::Opaque,
         }
     }
 
@@ -368,6 +372,7 @@ impl GlobSource {
         match self {
             GlobSource::Path(path) => resolver.glob_target(path, scope, glob),
             GlobSource::Expansion => Target::Opaque,
+            GlobSource::Scoped(written) => Target::scoped(written.names()),
         }
     }
 }
@@ -380,6 +385,10 @@ struct Glob {
 
 impl Glob {
     const EXPANSION: Glob = Glob { source: GlobSource::Expansion, visibility: Visibility::Visible };
+
+    fn scoped(invoked: &Macro) -> Glob {
+        Glob { source: GlobSource::Scoped(Written::from(invoked)), visibility: Visibility::Visible }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -419,6 +428,15 @@ impl From<&Macro> for Entries {
         match StdNames::expansion(invoked) {
             Expansion::Statement => Entries::default(),
             Expansion::Items => Entries::from(Glob::EXPANSION),
+        }
+    }
+}
+
+impl Entries {
+    pub(super) fn scoped(invoked: &Macro) -> Entries {
+        match StdNames::expansion(invoked) {
+            Expansion::Statement => Entries::default(),
+            Expansion::Items => Entries::from(Glob::scoped(invoked)),
         }
     }
 }
@@ -471,29 +489,23 @@ impl From<&Item> for Entries {
     }
 }
 
-impl From<&Stmt> for Entries {
-    fn from(statement: &Stmt) -> Entries {
-        match statement {
-            Stmt::Item(item) => Entries::from(item),
-            Stmt::Macro(StmtMacro { mac, .. }) => Entries::from(mac),
-            Stmt::Local(_) | Stmt::Expr(..) => Entries::default(),
-        }
-    }
-}
-
 impl Entries {
-    pub(crate) fn of_items(items: &[Item]) -> Entries {
-        items.iter().map(Entries::from).collect::<Entries>()
+    pub(crate) fn of_items(items: &[Item], rules: &Rules) -> Entries {
+        items.iter().map(|item| rules.item_entries(item)).collect::<Entries>()
     }
 
     pub(crate) fn of_root(file: &File) -> Entries {
-        [Entries::of_items(&file.items), Entries::of_items(&MacroTree::expanded_items(&file.items))]
-            .into_iter()
-            .collect()
+        let unscoped = Rules::default();
+        [
+            Entries::of_items(&file.items, &unscoped),
+            Entries::of_items(&MacroTree::expanded_items(&file.items), &unscoped),
+        ]
+        .into_iter()
+        .collect()
     }
 
-    pub(crate) fn of_block(statements: &[Stmt]) -> Entries {
-        statements.iter().map(Entries::from).collect::<Entries>()
+    pub(crate) fn of_block(statements: &[Stmt], rules: &Rules) -> Entries {
+        statements.iter().map(|statement| rules.statement_entries(statement)).collect::<Entries>()
     }
 
     pub(super) fn declare(&mut self, declared: Declared) {
@@ -520,8 +532,8 @@ impl Entries {
         declared.chain(imported).filter(|(_, visibility)| *visibility == Visibility::Visible).map(|(key, _)| key)
     }
 
-    pub(super) fn unresolved(&self) -> Unresolved {
-        self.globs.iter().map(|glob| glob.source.unresolved()).max().unwrap_or(Unresolved::Unbound)
+    pub(super) fn unresolved(&self, name: &Name) -> Unresolved {
+        self.globs.iter().map(|glob| glob.source.unresolved(name)).max().unwrap_or(Unresolved::Unbound)
     }
 
     pub(super) fn prelude(&self, name: &Name, space: &Namespace, root: ScopeId) -> Option<Binding> {

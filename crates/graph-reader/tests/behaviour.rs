@@ -65,6 +65,10 @@ const MACRO_ASSERT: &str = "struct R;\nfn f() {\n    assert!(true);\n    impl Cl
 const MACRO_STD_STATEMENTS: &str =
     "fn f() {\n    println!(\"a\");\n    let v = vec![1];\n    debug_assert_eq!(v, v);\n    impl Clone for R {}\n}\n";
 const MACRO_PATHED_STATEMENT: &str = "fn f() {\n    std::println!(\"a\");\n    impl Clone for R {}\n}\n";
+const RULE_MAY_DECLARE: &str =
+    "macro_rules! make {\n    ($($t:tt)*) => {};\n}\nmake!(Mark);\nimpl Mark for R {}\nimpl Clone for R {}\n";
+const RULE_STATEMENT: &str =
+    "macro_rules! make {\n    ($($t:tt)*) => {};\n}\nfn f() {\n    make!(Mark);\n    impl Clone for R {}\n}\n";
 const BLOCK_CHAIN: &str = "fn f() {\n    use std::fmt::Debug as Show;\n    {\n        impl Show for R {}\n    }\n    mod m {\n        impl Show for R {}\n    }\n}\n";
 const BLOCK_SUPER: &str = "use std::clone::Clone as Dup;\nfn f() {\n    use std::fmt::Debug as Dup;\n    mod m {\n        impl super::Dup for R {}\n    }\n}\n";
 const CFG_ALTERNATIVES: &str = "#[cfg(unix)]\ntrait Clone {}\n#[cfg(windows)]\ntrait Clone {}\nimpl Clone for R {}\n";
@@ -125,6 +129,10 @@ const PRIMITIVE_PAST_GLOB: &str = "use other::*;\nfn f() -> u8 {}\n";
 const PRIMITIVE_PAST_EXPANSION: &str = "make!();\nfn f() -> bool {}\n";
 const DERIVE_CONDITIONAL: &str = "#[cfg_attr(feature = \"serde\", derive(Clone), derive(Debug))]\n#[cfg_attr(unix, cfg_attr(test, derive(Hash)))]\n#[cfg_attr(windows, allow(dead_code))]\nstruct A;\n";
 
+const RULE_ACROSS: [Fixture; 2] = [
+    Fixture::new("src/lib.rs", "#[macro_export]\nmacro_rules! make {\n    ($($t:tt)*) => {};\n}\nmod x;\n"),
+    Fixture::new("src/x.rs", "crate::make!(Mark);\nimpl Clone for R {}\n"),
+];
 const RENAMED_ACROSS: [Fixture; 2] = [
     Fixture::new("src/lib.rs", "pub use std::clone::Clone as Dup;\nmod x;\n"),
     Fixture::new("src/x.rs", "use crate::Dup;\nimpl Dup for R {}\n"),
@@ -746,7 +754,6 @@ laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| 
     MACRO_CALL => [Expect::unknown(&["Clone"])],
     MACRO_STATEMENT => [Expect::unknown(&["Clone"])],
     MACRO_DEFINED => [Expect::std_trait(&["std", "clone", "Clone"])],
-    MACRO_DEFINED_CALLED => [Expect::unknown(&["Clone"])],
     MACRO_PATHED_STATEMENT => [Expect::unknown(&["Clone"])],
 ]);
 
@@ -757,6 +764,12 @@ laws::table!(a_name_no_outer_scope_supplies_may_be_one_an_item_macro_in_its_modu
     MACRO_ELSEWHERE => [Expect::unknown(&["n", "Mark"]), Expect::unknown(&["Mark"])],
 ]);
 
+laws::table!(a_workspace_macro_hides_only_the_names_its_invocation_writes, |text: &&str| Read::resolved(text), [
+    MACRO_DEFINED_CALLED => [Expect::std_trait(&["std", "clone", "Clone"])],
+    RULE_MAY_DECLARE => [Expect::possibly_macro_declared(&["Mark"]), Expect::std_trait(&["std", "clone", "Clone"])],
+    RULE_STATEMENT => [Expect::std_trait(&["std", "clone", "Clone"])],
+]);
+
 laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(text), [
     MACRO_ASSERT => [Expect::std_trait(&["std", "clone", "Clone"])],
     MACRO_STD_STATEMENTS => [Expect::std_trait(&["std", "clone", "Clone"])],
@@ -764,6 +777,7 @@ laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(t
 
 laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     RENAMED_ACROSS => [Expect::std_trait(&["std", "clone", "Clone"])],
+    RULE_ACROSS => [Expect::std_trait(&["std", "clone", "Clone"])],
     PARENT_GLOB => [Expect::std_trait(&["std", "clone", "Clone"])],
     SIBLING_GLOB => [Expect::std_trait(&["std", "cmp", "PartialEq"])],
     PARENT_DECLARES => [Expect::krate(&["crate", "Clone"])],

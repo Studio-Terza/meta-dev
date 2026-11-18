@@ -6,6 +6,7 @@ mod items;
 mod port_macro;
 mod resolver;
 mod resolving;
+mod rules;
 mod scope;
 mod settling;
 mod std_names;
@@ -27,6 +28,7 @@ pub(crate) use items::ItemIds;
 pub(crate) use port_macro::PortMacro;
 pub(crate) use resolver::Resolver;
 pub(crate) use resolving::{Invoked, Invoker, Resolving, TranscribedRow, Transcriptions};
+pub(crate) use rules::{Rules, TokenNames};
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;
@@ -184,11 +186,11 @@ impl<'read> Namespace<'read> {
             .and_then(|root| root.row(&self.scopes).and_then(|row| row.entries().prelude(name, self, root)))
     }
 
-    pub(super) fn expanded(&self, viewer: ScopeId) -> Unresolved {
+    pub(super) fn expanded(&self, viewer: ScopeId, name: &Name) -> Unresolved {
         self.chain(viewer)
             .iter()
             .filter_map(|scope| scope.row(&self.scopes))
-            .map(|row| row.entries().unresolved())
+            .map(|row| row.entries().unresolved(name))
             .max()
             .unwrap_or(Unresolved::Unbound)
     }

@@ -1,11 +1,13 @@
 use std::iter;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use graph::{Model, Reach};
 use lint_core::SourceFile;
 
 use crate::lowering::{BodyGroup, Lowered, Lowering};
+use crate::namespace::Rules;
 use crate::planting::{Placing, Planting};
 use lint_sweep::{Gathers, Scoped, Sweep, Watching};
 
@@ -22,6 +24,7 @@ struct Order {
 struct ListedFile<'read> {
     source: &'read SourceFile,
     reach: Reach,
+    rules: Arc<Rules>,
     order: Order,
 }
 
@@ -30,7 +33,7 @@ impl<'read> ListedFile<'read> {
         FileLowering {
             source: self.source,
             order: self.order.clone(),
-            lowering: Scoped::new(Lowering::of_file(self.source, self.reach)),
+            lowering: Scoped::new(Lowering::of_file(self.source, self.reach, Arc::clone(&self.rules))),
         }
     }
 }
@@ -92,6 +95,7 @@ pub struct Listing<'read>(Vec<ListedGroup<'read>>);
 impl<'read> Listing<'read> {
     #[must_use]
     pub fn of_files(files: &'read [SourceFile]) -> Listing<'read> {
+        let rules = Rules::read(files);
         Listing(
             files
                 .iter()
@@ -105,6 +109,7 @@ impl<'read> Listing<'read> {
                             .map(|(module, (listed, reached))| ListedFile {
                                 source: listed,
                                 reach: reached,
+                                rules: Arc::clone(&rules),
                                 order: Order {
                                     file: AsRef::<Path>::as_ref(source.head()).to_path_buf(),
                                     module: ModuleIndex(module),

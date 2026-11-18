@@ -177,7 +177,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         self.chained(viewer, Key::new(Domain::Macros, first), Reading::Written).contested(
             || derive.map(|found| Binding::Std(found.path())),
             || Outer::from(derive),
-            || self.space.expanded(viewer),
+            || self.space.expanded(viewer, first),
         )
     }
 
@@ -185,7 +185,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         self.chained(viewer, key, Reading::Written).contested(
             || None,
             || Outer::Assumed(Binding::UNBOUND),
-            || self.space.expanded(viewer),
+            || self.space.expanded(viewer, key.name()),
         )
     }
 
@@ -193,7 +193,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         self.chained(viewer, Key::new(Domain::Types, first), reading).contested(
             || shape.builtin(first, reading, self.space, viewer),
             || shape.fallback(first, reading, self.space, viewer),
-            || self.space.expanded(viewer),
+            || self.space.expanded(viewer, first),
         )
     }
 
@@ -207,7 +207,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
                     Key::new(domain, segment),
                     Lookup::new(Sight::ByPath.beyond(self.space.within_reach(module, viewer)), None, Reading::Written),
                 )
-                .settled(|| Outer::Assumed(Binding::Absent), || self.space.expanded(module)),
+                .settled(|| Outer::Assumed(Binding::Absent), || self.space.expanded(module, segment)),
         }
     }
 
