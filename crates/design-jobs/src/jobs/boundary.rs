@@ -1,7 +1,17 @@
 use design_model::JobId;
-use store_ports::{Prepared, Staged};
+use port_core::Op;
+use store_ports::{Columns, Prepared, Query, Staged, Statements, StoreFailure};
 
 use super::JobState;
+use super::state::job;
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct OpenJobs;
+
+#[derive(Debug, Columns)]
+struct OpenJobRow {
+    id: JobId,
+}
 
 impl Staged for JobState {
     type Key = JobId;
@@ -23,5 +33,28 @@ WHERE
             from: JobState,
             to: JobState
         )
+    }
+}
+
+impl Query for OpenJobs {
+    type Rows = Vec<job::Open>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<job::Open>, StoreFailure> {
+        let open = JobState::Open;
+        let rows = statements.rows(store_ports::query!(
+            OpenJobRow,
+            r#"
+SELECT
+  id
+FROM
+  jobs
+WHERE
+  state = ?1
+ORDER BY
+  id
+"#,
+            open: JobState
+        ))?;
+        Ok(rows.into_iter().map(|row| job::Open::held(row.id)).collect())
     }
 }

@@ -1,7 +1,8 @@
 mod boundary;
 mod state;
 
-pub use state::JobState;
+pub use boundary::OpenJobs;
+pub use state::{JobState, job};
 
 use design_model::JobId;
 use store_ports::{Edge, Moved};
