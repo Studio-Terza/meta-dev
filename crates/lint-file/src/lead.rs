@@ -45,7 +45,7 @@ impl Lead {
 
     #[must_use]
     pub fn member_of(self, file: &SourceFile, member: Member) -> Vec<Violation<'_>> {
-        let swept = self.swept().map(|start| vec![start(file).found(file)]);
+        let swept = self.swept().map(|start| vec![start(file).found(file).into_iter().collect()]);
         let sorted = self.sorting().map(|start| Vec::from(start(file).sorted(file)));
         let lists = self.scanned(file).or(swept).or(sorted).unwrap_or_default();
         lists.into_iter().nth(member.index()).unwrap_or_default()

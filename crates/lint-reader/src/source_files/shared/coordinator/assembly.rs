@@ -85,16 +85,13 @@ impl<'tree> Planned<'tree> {
 struct Plan<'tree> {
     order: Vec<Planned<'tree>>,
     seen: BTreeSet<PathBuf>,
-    consumed: BTreeSet<Located<'tree>>,
 }
 
 impl Semigroup for Plan<'_> {
     fn combine(self, other: Self) -> Self {
         let mut seen = self.seen;
         seen.extend(other.seen);
-        let mut consumed = self.consumed;
-        consumed.extend(other.consumed);
-        Plan { order: self.order.combine(other.order), seen, consumed }
+        Plan { order: self.order.combine(other.order), seen }
     }
 }
 
@@ -106,30 +103,23 @@ struct Marks<'up, 'tree> {
     up: Option<&'up Marks<'up, 'tree>>,
 }
 
-impl<'tree> Marks<'_, 'tree> {
+impl Marks<'_, '_> {
     fn seen(self, path: &Path) -> Option<()> {
         self.plan.seen.get(path).map(|_| ()).or_else(|| self.up.and_then(|up| up.seen(path)))
-    }
-
-    fn consumed(self, located: &Located<'tree>) -> Option<()> {
-        self.plan.consumed.get(located).map(|_| ()).or_else(|| self.up.and_then(|up| up.consumed(located)))
     }
 }
 
 #[derive(Debug, Default)]
 struct Tested<'tree> {
     found: Vec<Located<'tree>>,
-    seen: BTreeSet<PathBuf>,
     consumed: BTreeSet<Located<'tree>>,
 }
 
 impl Semigroup for Tested<'_> {
     fn combine(self, other: Self) -> Self {
-        let mut seen = self.seen;
-        seen.extend(other.seen);
         let mut consumed = self.consumed;
         consumed.extend(other.consumed);
-        Tested { found: self.found.combine(other.found), seen, consumed }
+        Tested { found: self.found.combine(other.found), consumed }
     }
 }
 
@@ -139,17 +129,11 @@ impl Monoid for Tested<'_> {}
 struct TestMarks<'up, 'tree> {
     tested: &'up Tested<'tree>,
     up: Option<&'up TestMarks<'up, 'tree>>,
-    outer: Marks<'up, 'tree>,
 }
 
 impl<'tree> TestMarks<'_, 'tree> {
-    fn seen(self, path: &Path) -> Option<()> {
-        self.tested.seen.get(path).map(|_| ()).or_else(|| self.up.and_then(|up| up.seen(path)))
-    }
-
     fn consumed(self, located: &Located<'tree>) -> Option<()> {
-        let tested = self.tested.consumed.get(located).map(|_| ());
-        tested.or_else(|| self.up.map_or_else(|| self.outer.consumed(located), |up| up.consumed(located)))
+        self.tested.consumed.get(located).map(|_| ()).or_else(|| self.up.and_then(|up| up.consumed(located)))
     }
 }
 
@@ -202,22 +186,18 @@ impl<'tree> Rooted<'_, 'tree> {
     }
 
     fn fresh(self, located: &Located<'tree>, marks: Marks<'_, 'tree>) -> Plan<'tree> {
-        let found = marks.consumed(located).map_or_else(|| self.outcomes.get(located), |()| None);
-        let claimed = Plan { consumed: found.map(|_| located.clone()).into_iter().collect(), ..Plan::default() };
-        let inner = Marks { plan: &claimed, up: Some(&marks) };
+        let found = self.outcomes.get(located);
         let declared = found.and_then(|outcome| outcome.iter().next());
         let failed = found.filter(|outcome| outcome.is_err()).map(|_| Planned::Failed(located.clone()));
-        let rest = declared.map_or_default(|done| self.declared(located.clone(), done, inner));
+        let rest = declared.map_or_default(|done| self.declared(located.clone(), done, marks));
         let failing = Plan { order: failed.into_iter().collect(), ..Plan::default() };
-        claimed.combine(failing).combine(rest)
+        failing.combine(rest)
     }
 
     fn declared(self, located: Located<'tree>, declared: &Declared, marks: Marks<'_, 'tree>) -> Plan<'tree> {
-        let tested = Testing { rooted: self }.tests(declared.children(Kind::Test), marks);
-        let Tested { found, consumed, .. } = tested;
+        let tested = Testing { rooted: self }.tests(declared.children(Kind::Test));
         let main = Plan {
-            order: vec![Planned::Main(Main::new(located, self.crate_file.clone(), found))],
-            consumed,
+            order: vec![Planned::Main(Main::new(located, self.crate_file.clone(), tested.found))],
             ..Plan::default()
         };
         let after = Marks { plan: &main, up: Some(&marks) };
@@ -235,22 +215,16 @@ struct Testing<'plan, 'tree> {
 }
 
 impl<'tree> Testing<'_, 'tree> {
-    fn tests(self, tests: &[Child], outer: Marks<'_, 'tree>) -> Tested<'tree> {
+    fn tests(self, tests: &[Child]) -> Tested<'tree> {
         tests.iter().fold(Tested::default(), |tested, test| {
-            let marks = TestMarks { tested: &tested, up: None, outer };
+            let marks = TestMarks { tested: &tested, up: None };
             let next = self.file(test.canonical(self.rooted.survey), marks);
             tested.combine(next)
         })
     }
 
     fn file(self, path: &Path, marks: TestMarks<'_, 'tree>) -> Tested<'tree> {
-        let unseen = marks.seen(path).map_or(Some(()), |()| None);
-        unseen.map_or_default(|()| {
-            let seeing = Tested { seen: BTreeSet::from([path.to_path_buf()]), ..Tested::default() };
-            let inner = TestMarks { tested: &seeing, up: Some(&marks), outer: marks.outer };
-            let rest = self.fresh(&self.rooted.home.located(path), inner);
-            seeing.combine(rest)
-        })
+        self.fresh(&self.rooted.home.located(path), marks)
     }
 
     fn fresh(self, located: &Located<'tree>, marks: TestMarks<'_, 'tree>) -> Tested<'tree> {
@@ -259,16 +233,12 @@ impl<'tree> Testing<'_, 'tree> {
         let own = Tested {
             found: declared.map(|_| located.clone()).into_iter().collect(),
             consumed: found.map(|_| located.clone()).into_iter().collect(),
-            ..Tested::default()
         };
-        let inner = TestMarks { tested: &own, up: Some(&marks), outer: marks.outer };
+        let inner = TestMarks { tested: &own, up: Some(&marks) };
         let nested =
             declared.into_iter().flat_map(|done| done.children(Kind::Module).iter().chain(done.children(Kind::Test)));
         let below = nested.fold(Tested::default(), |tested, child| {
-            let next = self.file(
-                child.canonical(self.rooted.survey),
-                TestMarks { tested: &tested, up: Some(&inner), outer: marks.outer },
-            );
+            let next = self.file(child.canonical(self.rooted.survey), TestMarks { tested: &tested, up: Some(&inner) });
             tested.combine(next)
         });
         own.combine(below)

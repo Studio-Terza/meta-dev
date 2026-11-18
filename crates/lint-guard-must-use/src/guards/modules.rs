@@ -22,11 +22,7 @@ impl<'file> FromIterator<Modules<'file>> for Modules<'file> {
 
 impl Semigroup for Modules<'_> {
     fn combine(self, other: Self) -> Self {
-        Modules(other.0.into_iter().fold(self.0, |mut merged, (module, members)| {
-            let filed = merged.remove(&module).unwrap_or_default().combine(members);
-            merged.insert(module, filed);
-            merged
-        }))
+        Modules(self.0.combine(other.0))
     }
 }
 
