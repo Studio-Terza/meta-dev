@@ -1,11 +1,15 @@
+use std::collections::BTreeSet;
+
 use graph::ItemPath;
+use lint_layout::Name;
 
 use super::binding::Binding;
 use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::resolver::{Resolution, Resolver};
+use super::rules::{RulesDefinition, Written};
 use super::std_names::{Listed, StdNames};
-use super::tables::{Exposed, GlobView, Key, Keyed, Layer, ModuleGlob, Row, Tables};
+use super::tables::{Declaring, Exposed, GlobView, Key, Keyed, Layer, ModuleGlob, Row, Tables};
 use super::view::View;
 use super::{Namespace, ScopeRow};
 use crate::parallel::Parallel;
@@ -47,6 +51,7 @@ pub(super) enum Target {
     Waiting,
     Module(ScopeId, Sight),
     Listed(Vec<Listed>),
+    Scoped(Vec<Name>),
     Opaque,
 }
 
@@ -58,6 +63,17 @@ impl Target {
         }
     }
 
+    pub(super) fn narrowed(rules: Option<RulesDefinition>, written: &Written) -> Target {
+        match rules {
+            Some(_) => Target::scoped(written.names()),
+            None => Target::Opaque,
+        }
+    }
+
+    fn scoped(names: &BTreeSet<Name>) -> Target {
+        Target::Scoped(names.iter().cloned().collect())
+    }
+
     pub(super) fn fixed(&self, id: GlobId, visibility: Visibility) -> Option<GlobView<'_>> {
         match self {
             Target::Waiting => Some(GlobView::new(id, visibility, Exposed::from(View::UNEXPANDED))),
@@ -66,6 +82,7 @@ impl Target {
                 Some(GlobView::new(id, visibility, listed.iter().flat_map(Listed::views).collect()))
             }
             Target::Opaque => Some(GlobView::new(id, visibility, Exposed::from(View::CONFLICT))),
+            Target::Scoped(names) => Some(GlobView::new(id, visibility, Target::shadowed(names))),
         }
     }
 
@@ -74,14 +91,25 @@ impl Target {
             Target::Module(module, sight) => {
                 Some(ModuleGlob::new(GlobView::new(id, visibility, Exposed::default()), *module, *sight))
             }
-            Target::Waiting | Target::Listed(_) | Target::Opaque => None,
+            Target::Waiting | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => None,
         }
+    }
+
+    pub(super) fn declaring(&self) -> Declaring<'_> {
+        match self {
+            Target::Scoped(names) => Declaring::Only(names),
+            Target::Waiting | Target::Module(..) | Target::Listed(_) | Target::Opaque => Declaring::Anything,
+        }
+    }
+
+    fn shadowed(names: &[Name]) -> Exposed<'_> {
+        names.iter().flat_map(Key::every).map(|key| Keyed::new(key, View::CONFLICT)).collect()
     }
 
     fn kept(self, held: &Target) -> Target {
         match self {
             Target::Waiting => held.clone(),
-            Target::Module(..) | Target::Listed(_) | Target::Opaque => {
+            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => {
                 [self].into_iter().find(|found| found == held).unwrap_or(Target::Opaque)
             }
         }
@@ -92,6 +120,7 @@ impl Target {
             Target::Waiting | Target::Opaque => Target::Opaque,
             Target::Module(module, sight) => Target::Module(module, sight),
             Target::Listed(listed) => Target::Listed(listed),
+            Target::Scoped(names) => Target::Scoped(names),
         }
     }
 }
@@ -119,7 +148,7 @@ impl Lattice for Target {
     fn joined(&self, computed: Target) -> Target {
         match self {
             Target::Waiting => computed,
-            Target::Module(..) | Target::Listed(_) | Target::Opaque => computed.kept(self),
+            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => computed.kept(self),
         }
     }
 }
@@ -147,7 +176,8 @@ impl Seeds<'_> {
         });
         let fixed = scopes.iter().zip(settling).map(|(row, settled)| row.entries().fixed(&settled.targets));
         let modules = scopes.iter().zip(settling).map(|(row, settled)| row.entries().modules(&settled.targets));
-        Tables::new(explicit, fixed.collect(), modules.collect())
+        let declaring = scopes.iter().zip(settling).map(|(row, settled)| row.entries().declaring(&settled.targets));
+        Tables::new(explicit, fixed.collect(), modules.collect(), declaring.collect())
     }
 
     fn advanced(&self, settling: &[ScopeSettling]) -> Vec<ScopeSettling> {
