@@ -948,6 +948,7 @@ dependencies = [
  "grammar-search",
  "laws",
  "newtype",
+ "record-derive",
  "thiserror",
 ]
 
@@ -2719,6 +2720,13 @@ dependencies = [
  "text-lines",
  "thiserror",
  "workspace-metadata",
+]
+
+[[package]]
+name = "record-derive"
+version = "0.1.0"
+dependencies = [
+ "syntax",
 ]
 
 [[package]]
