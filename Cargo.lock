@@ -905,6 +905,7 @@ dependencies = [
 name = "grammar-message"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "grammar",
  "laws",
  "newtype",
@@ -1640,6 +1641,7 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "graph-reader",
  "laws",
@@ -2442,6 +2444,7 @@ dependencies = [
 name = "mutation-report"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "file-ports",
  "golden",
@@ -3173,6 +3176,7 @@ dependencies = [
 name = "stream"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "grammar-anchor",
  "grammar-message",
