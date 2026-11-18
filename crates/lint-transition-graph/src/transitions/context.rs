@@ -17,16 +17,26 @@ pub struct Context<'file> {
     functions: Vec<Function<'file>>,
 }
 
+#[derive(Debug)]
+pub(crate) struct Grounded {
+    krate: CrateName,
+    selfish: Endpoint,
+    ground: Ground,
+    filler: Filler,
+}
+
+impl Grounded {
+    pub(crate) fn new(krate: &Name, selfish: Endpoint, ground: Ground, filler: Filler) -> Grounded {
+        Grounded { krate: CrateName::from(krate), selfish, ground, filler }
+    }
+
+    pub(crate) fn with_functions<'file>(self, functions: impl IntoIterator<Item = Function<'file>>) -> Context<'file> {
+        let Grounded { krate, selfish, ground, filler } = self;
+        Context { krate, selfish, ground, filler, functions: functions.into_iter().collect() }
+    }
+}
+
 impl<'file> Context<'file> {
-    pub(crate) fn new(krate: &Name, selfish: Endpoint, ground: Ground, filler: Filler) -> Context<'file> {
-        Context { krate: CrateName::from(krate), selfish, ground, filler, functions: Vec::new() }
-    }
-
-    pub(crate) fn with_functions(mut self, functions: impl IntoIterator<Item = Function<'file>>) -> Context<'file> {
-        self.functions.extend(functions);
-        self
-    }
-
     pub(crate) fn selfish(&self) -> &Endpoint {
         &self.selfish
     }

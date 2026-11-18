@@ -12,10 +12,10 @@ use graph::{
 use lint_core::Site;
 use lint_layout::{Name, Whole, Word, words};
 
-use crate::transitions::context::Context;
+use crate::transitions::context::{Context, Grounded};
 use crate::transitions::endpoint::{Endpoint, Nature, Unnamed};
 use crate::transitions::filler::{Filler, Implemented};
-use crate::transitions::function::Function as Transitive;
+use crate::transitions::function::{Function as Transitive, Outlined};
 use crate::transitions::ground::Ground;
 use crate::transitions::resolved::Resolved;
 use crate::transitions::wrapping::Wrapping;
@@ -99,7 +99,7 @@ impl<'file> Reading<'file> {
             .filter(|placed| placed.entity().entry() != Entry::Test)
             .map(|placed| {
                 let scope = Scope { reading: self, parameters: Vec::new(), output: None };
-                Context::new(
+                Grounded::new(
                     placed.krate(),
                     Endpoint::from(Unnamed::Opaque),
                     Ground::from(*AsRef::<Region>::as_ref(placed.entity())),
@@ -143,7 +143,7 @@ impl<'file> Reading<'file> {
             })
             .filter_map(|function| scope.function(*function));
         let functions: Vec<Transitive<'file>> = seated.collect();
-        Context::new(placed.krate(), selfish, Ground::from(*AsRef::<Region>::as_ref(implementation)), filler)
+        Grounded::new(placed.krate(), selfish, Ground::from(*AsRef::<Region>::as_ref(implementation)), filler)
             .with_functions(functions)
     }
 
@@ -158,7 +158,7 @@ impl<'file> Reading<'file> {
             .filter_map(|function| scope.function(*function))
             .collect();
         let region: &Region = placed.entity().as_ref();
-        Context::new(
+        Grounded::new(
             placed.krate(),
             Endpoint::new(Nature::Interface, name.clone()),
             Ground::from(*region),
@@ -192,7 +192,7 @@ impl<'file> Scope<'_, 'file> {
             .map_or(Resolved::Found(Endpoint::from(Unnamed::Unit)), |ty| ty.outlined(Endpoints::new(&inner)));
         let peeled = |ty: &TypeRef| ty.outlined(Peeling::new(&inner));
         Some(
-            Transitive::new(placed.site(), AsRef::<Name>::as_ref(function).clone(), takes, gives)
+            Outlined::new(placed.site(), AsRef::<Name>::as_ref(function).clone(), takes, gives)
                 .shaped(signature.mutation(), definition.shape(), Porting::from(self.reading).held(signature))
                 .wrapped(
                     signature.output().written().map_or(Wrapping::Plain, peeled),
