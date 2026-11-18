@@ -92,7 +92,7 @@ impl Contribute for TestCode<'_> {
         &self,
         module: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), InSource> {
         let walk = facts.gate();
         let lines = InSource::lines((walk == Walk::Skipped).then(|| LineNumber::from(module.ident.span())));
@@ -103,7 +103,7 @@ impl Contribute for TestCode<'_> {
         &self,
         item: &ItemImpl,
         _: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), InSource> {
         Self::gated(&item.attrs, LineNumber::from(item.impl_token.span))
     }
@@ -112,7 +112,7 @@ impl Contribute for TestCode<'_> {
         &self,
         method: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), InSource> {
         Self::gated(&method.attrs, LineNumber::from(method.sig.ident.span()))
     }
@@ -121,7 +121,7 @@ impl Contribute for TestCode<'_> {
         &self,
         function: &ItemFn,
         facts: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), InSource> {
         let line = LineNumber::from(function.sig.ident.span());
         let walk = Walk::outside_tests(&function.attrs);
@@ -134,7 +134,7 @@ impl Contribute for TestCode<'_> {
         &self,
         invocation: &Macro,
         facts: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), InSource> {
         let line = LineNumber::from(invocation.bang_token.span);
         let law = facts.law().map(|_| line);

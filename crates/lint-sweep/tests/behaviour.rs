@@ -1,6 +1,7 @@
+use algebra::{Monoid, Semigroup};
 use invariants::{invariant, invariants};
-use lint_core::{Descend, Facts, Kind, SourceFile, SourceText, Watch, Watching};
-use lint_sweep::Sweep;
+use lint_core::{SourceFile, SourceText};
+use lint_sweep::{Around, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Kind, Scope};
 use syntax::{Block, ExprBinary, Macro};
 
 invariants! {
@@ -12,76 +13,91 @@ invariants! {
 const NESTED: &str = "fn f() {\n    {\n        {\n        }\n    }\n}\nfn g() {\n    {\n    }\n}\n";
 
 #[derive(Debug, Default)]
+struct Depth(Option<usize>);
+
+impl Semigroup for Depth {
+    fn combine(self, other: Depth) -> Depth {
+        Depth(self.0.or(other.0))
+    }
+}
+
+impl Monoid for Depth {}
+
+#[derive(Debug)]
 struct Recorder {
-    depth: usize,
     over_at: Option<usize>,
-    heard: Vec<String>,
 }
 
 impl Recorder {
-    fn passing_over(depth: usize) -> Recorder {
-        Recorder { over_at: Some(depth), ..Recorder::default() }
-    }
+    const SCOPES: [Scope; 1] = [Scope::new(Kind::Block)];
 }
 
-impl<'ast> Watch<'ast> for Recorder {
+impl Contribute for Recorder {
+    type Open = Depth;
+    type Part = Vec<String>;
+
     fn kinds(&self) -> &'static [Kind] {
-        &[Kind::Block]
+        &[]
     }
 
-    fn on_block(&mut self, _: &'ast Block, _: &Facts<'_, Block>) -> Descend {
-        self.depth += 1;
-        self.heard.push(format!("on {}", self.depth));
-        self.over_at.filter(|at| *at == self.depth).map_or(Descend::Into, |_| Descend::Over)
+    fn scopes(&self) -> &'static [Scope] {
+        &Recorder::SCOPES
     }
 
-    fn off_block(&mut self, _: &'ast Block, _: &Facts<'_, Block>) {
-        self.heard.push(format!("off {}", self.depth));
-        self.depth -= 1;
+    fn on_block(&self, _: &Block, _: &Facts<'_, Block>, around: &Around<'_, Depth>) -> Contributed<Depth, Vec<String>> {
+        let depth = around.nearest().count() + 1;
+        let descend = self.over_at.filter(|at| *at == depth).map_or(Descend::Into, |_| Descend::Over);
+        Contributed::new(Depth(Some(depth)), vec![format!("on {depth}")], descend)
+    }
+
+    fn off_block(&self, _: &Block, _: &Facts<'_, Block>, inner: Contribution<Depth, Vec<String>>) -> Vec<String> {
+        inner.concluded(|depth, heard| heard.into_iter().chain(depth.0.map(|closed| format!("off {closed}"))).collect())
     }
 }
 
 #[test]
-fn every_watcher_called_on_a_node_is_called_off_it_and_a_skipped_subtree_is_silent() {
+fn every_scope_entered_is_closed_and_a_skipped_subtree_is_silent() {
     let file = SourceFile::parse("a.rs", SourceText::new(NESTED.to_owned()));
     let parsed = invariant!(holding file, Invariant::FixtureParses, detailed);
-    let mut all = Recorder::default();
-    let mut skipping = Recorder::passing_over(2);
-    let watchers: Vec<&mut Watching<'_>> = vec![&mut all, &mut skipping];
-    Sweep::watching(&parsed, watchers);
+    let all = Contributing::new(Recorder { over_at: None }).concluded(&parsed, |_, _, heard| heard);
+    let skipping = Contributing::new(Recorder { over_at: Some(2) }).concluded(&parsed, |_, _, heard| heard);
     let walked = ["on 1", "on 2", "on 3", "off 3", "off 2", "off 1", "on 1", "on 2", "off 2", "off 1"];
     let skipped_over = ["on 1", "on 2", "off 2", "off 1", "on 1", "on 2", "off 2", "off 1"];
-    assert_eq!(all.heard, walked);
-    assert_eq!(skipping.heard, skipped_over);
+    assert_eq!(all, walked);
+    assert_eq!(skipping, skipped_over);
 }
 
 const SUMMED: &str = "fn f() {\n    let a = 1 + 2;\n    m!(3 + 4);\n}\n";
 
-#[derive(Debug, Default)]
-struct Unfolding {
-    sums: usize,
-}
+#[derive(Debug)]
+struct Unfolding;
 
-impl<'ast> Watch<'ast> for Unfolding {
+impl Contribute for Unfolding {
+    type Open = ();
+    type Part = Vec<()>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Macro, Kind::ExprBinary]
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Unfold
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>, _: &Around<'_, ()>) -> Contributed<(), Vec<()>> {
+        Contributed::descending(Descend::Unfold)
     }
 
-    fn on_expr_binary(&mut self, _: &'ast ExprBinary, _: &Facts<'_, ExprBinary>) -> Descend {
-        self.sums += 1;
-        Descend::Into
+    fn on_expr_binary(
+        &self,
+        _: &ExprBinary,
+        _: &Facts<'_, ExprBinary>,
+        _: &Around<'_, ()>,
+    ) -> Contributed<(), Vec<()>> {
+        Contributed::parted(vec![()])
     }
 }
 
 #[test]
-fn a_watcher_that_unfolds_a_macro_hears_what_the_macro_holds() {
+fn a_contributor_that_unfolds_a_macro_hears_what_the_macro_holds() {
     let file = SourceFile::parse("a.rs", SourceText::new(SUMMED.to_owned()));
     let parsed = invariant!(holding file, Invariant::FixtureParses, detailed);
-    let mut unfolding = Unfolding::default();
-    Sweep::watching(&parsed, vec![&mut unfolding]);
-    assert_eq!(unfolding.sums, 2);
+    let sums = Contributing::new(Unfolding).concluded(&parsed, |_, (), sums| sums);
+    assert_eq!(sums.len(), 2);
 }

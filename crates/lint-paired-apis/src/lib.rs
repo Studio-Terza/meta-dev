@@ -9,7 +9,7 @@ use algebra::{Monoid, Semigroup};
 use declared::Declared;
 use lint_core::{Headline, Lint, Parsed, Report, SourceFile};
 use lint_file::Gleaning;
-use lint_sweep::{Contributing, Gathers, Sweep, Watching};
+use lint_sweep::{Contributing, Gathers};
 use owner::Owner;
 use paired_methods::PairedMethods;
 use pairs::Pairs;
@@ -63,12 +63,8 @@ impl<'head> From<&PairedOwners<'head>> for Report<'head> {
 pub struct PairedGleaner<'head>(Contributing<PairedMethods<'head>>);
 
 impl<'head> Gathers<PairedOwners<'head>> for PairedGleaner<'head> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.0)
-    }
-
-    fn gathered(self) -> PairedOwners<'head> {
-        self.0.concluded(|_, (), owners| owners)
+    fn gathered(self, file: &SourceFile) -> PairedOwners<'head> {
+        self.0.concluded(file, |_, (), owners| owners)
     }
 }
 

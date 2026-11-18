@@ -16,10 +16,11 @@ use syntax::{Expr, Ident, ImplItemFn, ItemImpl, ItemMod, ItemStruct, Stmt};
 use super::workspace_types::WorkspaceTypes;
 use callee::Callee;
 use forwarder::{Forwarder, Owned};
+use lint_core::SourceFile;
 use lint_core::Syntax;
 use lint_core::Violation;
 use lint_layout::{Casing, Name};
-use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Scope, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Scope};
 
 #[derive(Debug)]
 pub struct Forwarders<'file> {
@@ -177,7 +178,7 @@ impl Contribute for Forwarders<'_> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Unplaced, Gleaned> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -186,7 +187,7 @@ impl Contribute for Forwarders<'_> {
         &self,
         item: &ItemStruct,
         facts: &Facts<'_, ItemStruct>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Unplaced, Gleaned> {
         let structs = facts.name().map(|name| (name.clone(), StructFields::describe(item))).into_iter().collect();
         Contributed::new(Unplaced::default(), Gleaned { structs, methods: Vec::new() }, Descend::Over)
@@ -196,7 +197,7 @@ impl Contribute for Forwarders<'_> {
         &self,
         item: &ItemImpl,
         _: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Unplaced, Gleaned> {
         Contributed::descending(ImplTarget::describe(item).target().map_or(Descend::Over, |_| Descend::Into))
     }
@@ -217,7 +218,7 @@ impl Contribute for Forwarders<'_> {
         &self,
         function: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Unplaced, Gleaned> {
         Contributed::new(
             Unplaced(Candidate::tail_call(function).into_iter().collect()),
@@ -234,12 +235,8 @@ impl Target {
 }
 
 impl<'file> Gathers<Forwarded<'file>> for Contributing<Forwarders<'file>> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
-    }
-
-    fn gathered(self) -> Forwarded<'file> {
-        self.concluded(|forwarders, _, gleaned| Forwarded { path: forwarders.path, found: gleaned.classified() })
+    fn gathered(self, file: &SourceFile) -> Forwarded<'file> {
+        self.concluded(file, |forwarders, _, gleaned| Forwarded { path: forwarders.path, found: gleaned.classified() })
     }
 }
 

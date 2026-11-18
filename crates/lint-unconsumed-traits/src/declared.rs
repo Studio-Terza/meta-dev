@@ -6,7 +6,7 @@ use algebra::{Monoid, Semigroup};
 use syntax::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 
 use crate::Consumers;
 use finding::Finding;
@@ -81,7 +81,7 @@ impl<'file> Contribute for Declared<'file> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Declarations<'file>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -90,7 +90,7 @@ impl<'file> Contribute for Declared<'file> {
         &self,
         block: &ItemTrait,
         facts: &Facts<'_, ItemTrait>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Declarations<'file>> {
         let site = Site::new(self.path, LineNumber::from(block.ident.span()));
         let declaration = facts.name().map(|name| Declaration::new(name.clone(), Self::provided(block), site));
@@ -102,12 +102,8 @@ impl<'file> Contribute for Declared<'file> {
 }
 
 impl<'file> Gathers<Declarations<'file>> for Contributing<Declared<'file>> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
-    }
-
-    fn gathered(self) -> Declarations<'file> {
-        self.concluded(|_, (), found| found)
+    fn gathered(self, file: &SourceFile) -> Declarations<'file> {
+        self.concluded(file, |_, (), found| found)
     }
 }
 

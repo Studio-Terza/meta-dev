@@ -1,5 +1,5 @@
 use syn::visit::{self, Visit};
-use syn::{Block, File, Ident, Item, Macro, Stmt};
+use syn::{File, Ident, Macro};
 
 #[macro_export]
 macro_rules! node_kinds {
@@ -81,47 +81,50 @@ macro_rules! nodes {
             $($kind(&'ast syn::$node),)*
         }
 
-        impl<'ast, Visitor: Around + ?Sized> Visit<'ast> for Walk<'_, Visitor> {
+        impl<'ast> Visit<'ast> for Children<'ast> {
             fn visit_macro(&mut self, node: &'ast Macro) {
-                self.0.around(Node::Macro(node), &mut |around| visit::visit_macro(&mut Walk(around), node));
+                self.0.push(Node::Macro(node));
             }
 
             fn visit_ident(&mut self, node: &'ast Ident) {
-                self.0.around(Node::Ident(node), &mut |_| {});
+                self.0.push(Node::Ident(node));
             }
 
             $(
                 fn $visit(&mut self, node: &'ast syn::$node) {
-                    self.0.around(Node::$kind(node), &mut |around| visit::$visit(&mut Walk(around), node));
+                    self.0.push(Node::$kind(node));
                 }
             )*
+        }
+
+        impl<'ast> Node<'ast> {
+            #[must_use]
+            pub fn children(self) -> Vec<Node<'ast>> {
+                match self {
+                    Node::Macro(node) => Children::collected(|children| visit::visit_macro(children, node)),
+                    Node::Ident(_) => Vec::new(),
+                    $(Node::$kind(node) => Children::collected(|children| visit::$visit(children, node)),)*
+                }
+            }
         }
     };
 }
 
+struct Children<'ast>(Vec<Node<'ast>>);
+
 node_kinds!(nodes);
 
-pub trait Around {
-    fn around(&mut self, node: Node<'_>, descend: &mut dyn FnMut(&mut Self));
+impl<'ast> Children<'ast> {
+    fn collected(visiting: impl FnOnce(&mut Children<'ast>)) -> Vec<Node<'ast>> {
+        let mut children = Children(Vec::new());
+        visiting(&mut children);
+        children.0
+    }
 }
 
-#[derive(Debug)]
-pub struct Walk<'walk, Visitor: ?Sized>(&'walk mut Visitor);
-
-impl<'walk, Visitor: Around + ?Sized> Walk<'walk, Visitor> {
-    pub fn file(visitor: &'walk mut Visitor, file: &File) {
-        Walk(visitor).visit_file(file);
-    }
-
-    pub fn stmt(visitor: &'walk mut Visitor, stmt: &Stmt) {
-        Walk(visitor).visit_stmt(stmt);
-    }
-
-    pub fn item_node(visitor: &'walk mut Visitor, item: &Item) {
-        Walk(visitor).visit_item(item);
-    }
-
-    pub fn block_node(visitor: &'walk mut Visitor, block: &Block) {
-        Walk(visitor).visit_block(block);
+impl<'ast> Node<'ast> {
+    #[must_use]
+    pub fn top_level(file: &'ast File) -> Vec<Node<'ast>> {
+        Children::collected(|children| visit::visit_file(children, file))
     }
 }

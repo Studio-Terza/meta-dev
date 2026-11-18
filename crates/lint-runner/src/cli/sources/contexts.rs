@@ -13,7 +13,7 @@ use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_shapes::RepeatedShapes;
 use lint_state_graph::StateGraph;
-use lint_sweep::{Gathers, Sweep, Watching};
+use lint_sweep::{Gathers, Sweep};
 use lint_unconsumed_traits::UnconsumedTraits;
 
 pub(crate) trait Holding<'run, Lint: ContextLint> {
@@ -78,25 +78,30 @@ macro_rules! contexts {
         }
 
         impl<'run> Contributed<'run> {
-            pub(crate) fn joined(parsed: Parsed<'_, 'run>, unwalked: Unwalked, joining: Vec<&mut Watching<'_>>) -> Contributed<'run> {
-                let mut gatherings = Gatherings {
+            pub(crate) fn joined(parsed: Parsed<'_, 'run>, unwalked: Unwalked) -> Contributed<'run> {
+                let gatherings = Gatherings {
                     $($field: <$lint as ContextLint>::gathering(parsed),)*
                     $($primed: <$prime as PrimedFacts>::priming(parsed),)*
                     $($gleaned: <$glean as Gleaning>::gleaner(parsed),)*
                 };
-                let mut recordings = Recordings { $($primed: <$prime as PrimedFacts>::recording(parsed),)* };
-                let mut watching: Vec<&mut Watching<'_>> =
-                    joining.into_iter().map(|joined| -> &mut Watching<'_> { joined }).collect();
-                $(watching.extend(gatherings.$field.watching());)*
-                $(watching.extend(gatherings.$primed.watching());)*
-                $(watching.extend(recordings.$primed.watching());)*
-                $(watching.extend(gatherings.$gleaned.watching());)*
-                Sweep::once(unwalked, <&SourceFile>::from(parsed), watching);
+                let recordings = Recordings { $($primed: <$prime as PrimedFacts>::recording(parsed),)* };
+                Sweep::once(unwalked, <&SourceFile>::from(parsed), Joint { gatherings, recordings })
+            }
+        }
+
+        struct Joint<'file, 'run: 'file> {
+            gatherings: Gatherings<'file, 'run>,
+            recordings: Recordings<'file, 'run>,
+        }
+
+        impl<'file, 'run: 'file> Gathers<Contributed<'run>> for Joint<'file, 'run> {
+            fn gathered(self, file: &SourceFile) -> Contributed<'run> {
+                let Joint { gatherings, recordings } = self;
                 Contributed {
-                    $($field: gatherings.$field.gathered(),)*
-                    $($primed: gatherings.$primed.gathered(),)*
-                    $($gleaned: gatherings.$gleaned.gathered(),)*
-                    recorded: Recorded { $($primed: recordings.$primed.gathered(),)* },
+                    $($field: gatherings.$field.gathered(file),)*
+                    $($primed: gatherings.$primed.gathered(file),)*
+                    $($gleaned: gatherings.$gleaned.gathered(file),)*
+                    recorded: Recorded { $($primed: recordings.$primed.gathered(file),)* },
                 }
             }
         }

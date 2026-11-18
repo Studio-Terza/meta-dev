@@ -10,7 +10,7 @@ use finding::Finding;
 use foreign_references::{ForeignReferences, Reading};
 use lint_core::{Headline, Parsed};
 use lint_file::{ContextLint, Reads, RuledLint};
-use lint_sweep::{Gathers, Watching};
+use lint_sweep::Gathers;
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -27,12 +27,8 @@ pub struct References(ForeignReferences);
 pub struct ReferenceGathering(Reading);
 
 impl Gathers<References> for ReferenceGathering {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        self.0.watching()
-    }
-
-    fn gathered(self) -> References {
-        References(self.0.gathered())
+    fn gathered(self, file: &SourceFile) -> References {
+        References(self.0.gathered(file))
     }
 }
 

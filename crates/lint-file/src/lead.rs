@@ -1,5 +1,5 @@
 use lint_core::{SourceFile, Violation};
-use lint_sweep::{Finds, Member, Sorts, Sweep};
+use lint_sweep::{Finds, Member, Sorts};
 
 pub type Start = for<'file> fn(&'file SourceFile) -> Box<dyn Finds<'file> + 'file>;
 
@@ -45,13 +45,9 @@ impl Lead {
 
     #[must_use]
     pub fn member_of(self, file: &SourceFile, member: Member) -> Vec<Violation<'_>> {
-        let lists = self.scanned(file).unwrap_or_else(|| {
-            let mut finds: Vec<Box<dyn Finds<'_> + '_>> = self.swept().map(|start| start(file)).into_iter().collect();
-            let mut sorts: Vec<Box<dyn Sorts<'_> + '_>> = self.sorting().map(|start| start(file)).into_iter().collect();
-            Sweep::over_leads(file, &mut finds, &mut sorts);
-            let found = finds.into_iter().map(|watcher| vec![watcher.found()]);
-            found.chain(sorts.into_iter().map(|sorting| Vec::from(sorting.sorted()))).next().unwrap_or_default()
-        });
+        let swept = self.swept().map(|start| vec![start(file).found(file)]);
+        let sorted = self.sorting().map(|start| Vec::from(start(file).sorted(file)));
+        let lists = self.scanned(file).or(swept).or(sorted).unwrap_or_default();
         lists.into_iter().nth(member.index()).unwrap_or_default()
     }
 }
