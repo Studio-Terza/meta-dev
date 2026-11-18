@@ -1,5 +1,5 @@
 use crate::crate_name::CrateName;
-use crate::metadata::{Package, Sharing};
+use crate::metadata::Package;
 use crate::package_id::PackageId;
 
 use super::super::unit::Unit;
@@ -23,7 +23,7 @@ impl<'unit, 'meta> Claim<'unit, 'meta> {
     pub(super) fn reached(package: &'meta PackageId, named: &Package, unit: &'unit Unit<'meta>) -> Claim<'unit, 'meta> {
         let owner = unit.port();
         let name = AsRef::<CrateName>::as_ref(named);
-        let shared = unit.declarations().values().find(|declared| declared.sharing(name) == Sharing::Shared);
+        let shared = unit.declarations().values().find_map(|declared| declared.shares(name));
         Claim { package, open: shared.map_or(Some(owner), |_| None), unit }
     }
 

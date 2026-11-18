@@ -4,7 +4,7 @@ mod finding;
 use effect_paths::EffectPaths;
 use finding::Finding;
 use graph::{Harness, Model};
-use lint_core::{Gate, Gating, Headline, Report, Violation};
+use lint_core::{Gate, Headline, Report, Violation};
 use lint_file::ModelLint;
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ impl ModelLint for NoTestIo {
             model
                 .uses()
                 .filter(|placed| placed.harness() == Harness::TestTarget)
-                .filter(|placed| Gate::PORTS.names_crate(placed.krate()) == Gating::Open)
+                .filter(|placed| Gate::PORTS.names_crate(placed.krate()).is_none())
                 .filter_map(|placed| {
                     paths.effect(placed.entity()).map(|path| Violation::new(placed.site(), Finding::from(path.clone())))
                 })

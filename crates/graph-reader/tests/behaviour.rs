@@ -471,7 +471,8 @@ impl Read {
     fn written_sites(files: &[SourceFile]) -> Vec<String> {
         Reader::read_files(files)
             .implementations()
-            .filter_map(|found| found.entity().origin().sorted(Some(found.site().to_string()), None))
+            .filter(|found| found.entity().origin() == graph::Origin::Written)
+            .map(|found| found.site().to_string())
             .collect()
     }
 }

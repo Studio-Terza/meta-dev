@@ -11,10 +11,13 @@ use crate::count::Count;
 use crate::edge::Edge;
 use crate::form::Form;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Counting {
-    Counted,
-    Skipped,
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Counted<'edge, 'found, 'file>(&'edge Edge<'found, 'file>);
+
+impl<'edge, 'found, 'file> From<Counted<'edge, 'found, 'file>> for &'edge Edge<'found, 'file> {
+    fn from(counted: Counted<'edge, 'found, 'file>) -> &'edge Edge<'found, 'file> {
+        counted.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -26,14 +29,16 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counting(edge: &Edge<'_, '_>) -> Counting {
+    pub(super) fn counts<'edge, 'found, 'file>(
+        edge: &'edge Edge<'found, 'file>,
+    ) -> Option<Counted<'edge, 'found, 'file>> {
         let mutating = Some(edge)
             .filter(|candidate| *AsRef::<Ground>::as_ref(candidate.transition()) == Ground::Core)
             .filter(|core| {
                 matches!(core.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
             })
-            .map_or(Counting::Skipped, |_| Counting::Counted);
-        edge.form().sorted(mutating, mutating, Counting::Counted)
+            .map(Counted);
+        edge.form().sorted(mutating, mutating, Some(Counted(edge)))
     }
 
     pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(

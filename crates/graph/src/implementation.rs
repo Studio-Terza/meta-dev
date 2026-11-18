@@ -13,15 +13,6 @@ pub enum Origin {
     Derived,
 }
 
-impl Origin {
-    pub fn sorted<Sorted>(self, written: Sorted, derived: Sorted) -> Sorted {
-        match self {
-            Origin::Written => written,
-            Origin::Derived => derived,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Subject {
     written: Name,

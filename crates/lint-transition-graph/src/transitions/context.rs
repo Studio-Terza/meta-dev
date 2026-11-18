@@ -4,7 +4,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::transitions::endpoint::Endpoint;
-use crate::transitions::filler::{Filler, Ownership};
+use crate::transitions::filler::Filler;
 use crate::transitions::function::Function;
 use crate::transitions::ground::Ground;
 
@@ -51,7 +51,7 @@ impl<'file> Context<'file> {
 
     #[must_use]
     pub fn subject(&self) -> Option<&Endpoint> {
-        (self.filler.ownership() == Ownership::Owned).then_some(&self.selfish)
+        self.filler.subject(&self.selfish).map(<&Endpoint>::from)
     }
 
     #[must_use]

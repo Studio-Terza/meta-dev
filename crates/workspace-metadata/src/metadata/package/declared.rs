@@ -12,7 +12,7 @@ use crate::format::Format;
 use crate::role::Role;
 pub use expanders::{Expanders, MacroName};
 use lexer_table::LexerTable;
-pub use port_table::{PortTable, Sharing};
+pub use port_table::PortTable;
 use reach_table::ReachTable;
 
 #[derive(Clone, Debug, Deserialize)]

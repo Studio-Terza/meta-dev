@@ -1,6 +1,6 @@
 mod finding;
 
-use graph::{Domain, External, Implementation, ItemPath, Model, Placed, Resolved};
+use graph::{Domain, External, Implementation, ItemPath, Model, Origin, Placed, Resolved};
 use lint_core::{Headline, Report, Violation};
 use lint_file::ModelLint;
 use lint_layout::{Whole, Word, words};
@@ -40,7 +40,7 @@ impl HandImpls {
         guarded: &ItemPath,
         declared: Option<&Resolved>,
     ) -> Option<Violation<'model>> {
-        let implementation = found.entity().origin().sorted(Some(found.entity()), None)?;
+        let implementation = Some(found.entity()).filter(|written| written.origin() == Origin::Written)?;
         let implemented = implementation.implemented()?;
         let derivable = implemented
             .std()

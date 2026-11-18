@@ -2,7 +2,7 @@ mod boundary;
 
 use newtype::{Arbitrary, Display, Newtype};
 
-use crate::matching::{Fit, Matching};
+use crate::matching::{Fitted, Matching};
 use crate::name::Name;
 use crate::word::Word;
 use boundary::Letters;
@@ -29,7 +29,7 @@ impl AsRef<Name> for Hump {
 }
 
 impl Matching for CamelWord {
-    fn holds(name: &Name, word: Word<'_>) -> Fit {
-        Fit::from(name.humps().find(|hump| *hump.as_ref() == Name::from(word)))
+    fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Fitted<'word>> {
+        name.humps().find(|hump| *hump.as_ref() == Name::from(word)).map(|_| Fitted::from(word))
     }
 }

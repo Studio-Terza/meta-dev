@@ -1,6 +1,5 @@
 use lint_layout::Name;
 use lint_placement::Level;
-use lint_placement::Lineage;
 use lint_placement::Nest;
 use std::path::Path;
 
@@ -8,21 +7,15 @@ use super::ModulePath;
 
 pub struct InsideSibling;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Siding {
-    Inside,
-    Elsewhere,
-}
-
 impl InsideSibling {
-    pub fn placed(this: &ModulePath<'_>, module: &ModulePath<'_>) -> Siding {
+    pub fn holder<'module>(this: &ModulePath<'_>, module: &ModulePath<'module>) -> Option<Nest<'module>> {
         let length = <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(module)).len();
+        let inside = *AsRef::<Nest<'_>>::as_ref(this);
         AsRef::<Nest<'_>>::as_ref(module)
             .parent()
             .filter(|parent| parent.level() != Level::Workspace)
-            .filter(|parent| parent.relation(*AsRef::<Nest<'_>>::as_ref(this)) == Lineage::Holds)
-            .filter(|_| <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(this)).len() >= length)
-            .map_or(Siding::Elsewhere, |_| Siding::Inside)
+            .filter(|parent| inside.lineage().any(|outer| outer == *parent))
+            .filter(|_| <&[Name]>::from(inside).len() >= length)
     }
 
     pub fn home<'file>(user: &ModulePath<'file>, module: &ModulePath<'_>) -> ModulePath<'file> {

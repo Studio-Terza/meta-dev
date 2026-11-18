@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::str::FromStr;
 
-use crate::matching::{Fit, Matching};
+use crate::matching::{Fitted, Matching};
 use crate::name::Name;
 use crate::word::Word;
 use newtype::Wrapping;
@@ -36,9 +36,13 @@ impl FromStr for Wildcard {
 }
 
 impl Matching for Wildcard {
-    fn holds(name: &Name, pattern: Word<'_>) -> Fit {
+    fn holds<'word>(name: &Name, pattern: Word<'word>) -> Option<Fitted<'word>> {
         let letters = pattern.into_inner().parse::<Wildcard>();
         let spelled = name.to_string().parse::<Wildcard>();
-        Fit::from(letters.iter().zip(&spelled).find_map(|(wanted, found)| Self::agrees(&wanted.0, &found.0)))
+        letters
+            .iter()
+            .zip(&spelled)
+            .find_map(|(wanted, found)| Self::agrees(&wanted.0, &found.0))
+            .map(|_| Fitted::from(pattern))
     }
 }

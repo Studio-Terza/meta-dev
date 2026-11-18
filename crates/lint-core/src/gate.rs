@@ -12,22 +12,12 @@ use crate::walk::Walk;
 use crate::watch::Descend;
 use suffix::Suffix;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Gating {
-    Gated,
-    Open,
-}
+#[derive(Clone, Copy, Debug)]
+pub struct Admitted<'item, Item>(&'item Item);
 
-impl Gating {
-    pub fn chosen<Kind>(self, gated: Kind, open: Kind) -> Kind {
-        match self {
-            Gating::Gated => gated,
-            Gating::Open => open,
-        }
-    }
-
-    fn descend(self) -> Descend {
-        self.chosen(Descend::Over, Descend::Into)
+impl<Item> AsRef<Item> for Admitted<'_, Item> {
+    fn as_ref(&self) -> &Item {
+        self.0
     }
 }
 
@@ -43,34 +33,32 @@ impl Gate {
     pub const STORE: Gate = Gate { module: Word::new("store"), package_suffix: Some(Word::new("store")) };
 
     #[must_use]
-    pub fn admits(&self, file: &FileHead) -> Gating {
+    pub fn admits<'head>(&self, file: &'head FileHead) -> Option<Admitted<'head, FileHead>> {
         let placement = file.placement();
         self.package_suffix
             .and_then(|suffix| placement.crate_root().package()?.matches::<Suffix>(&[suffix]))
-            .map(|_| Gating::Gated)
+            .map(|_| Admitted(file))
             .or_else(|| {
                 AsRef::<[Name]>::as_ref(placement.module())
                     .iter()
                     .find(|segment| **segment == Name::from(self.module))
-                    .map(|_| Gating::Gated)
+                    .map(|_| Admitted(file))
             })
-            .unwrap_or(Gating::Open)
     }
 
     #[must_use]
-    pub fn names_crate(&self, krate: &Name) -> Gating {
-        self.package_suffix
-            .and_then(|suffix| krate.matches::<Suffix>(&[suffix]))
-            .map_or(Gating::Open, |_| Gating::Gated)
+    pub fn names_crate<'name>(&self, krate: &'name Name) -> Option<Admitted<'name, Name>> {
+        self.package_suffix.and_then(|suffix| krate.matches::<Suffix>(&[suffix])).map(|_| Admitted(krate))
     }
 
     #[must_use]
     pub fn outside(&self, module: &ItemMod) -> Descend {
-        Descend::from(Walk::outside_tests(&module.attrs)).combine(self.names(module).descend())
+        Descend::from(Walk::outside_tests(&module.attrs))
+            .combine(self.names(module).map_or(Descend::Into, |_| Descend::Over))
     }
 
     #[must_use]
-    pub fn names(&self, module: &ItemMod) -> Gating {
-        Some(&module.ident).filter(|ident| **ident == self.module.into_inner()).map_or(Gating::Open, |_| Gating::Gated)
+    pub fn names<'module>(&self, module: &'module ItemMod) -> Option<Admitted<'module, ItemMod>> {
+        Some(module).filter(|named| named.ident == self.module.into_inner()).map(Admitted)
     }
 }

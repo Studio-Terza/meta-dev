@@ -8,9 +8,12 @@ use crate::role::Role;
 use super::expanders::Expanders;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Sharing {
-    Shared,
-    Unshared,
+pub struct Shared<'table>(&'table CrateName);
+
+impl AsRef<CrateName> for Shared<'_> {
+    fn as_ref(&self) -> &CrateName {
+        self.0
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -29,8 +32,8 @@ impl PortTable {
         &self.owns
     }
 
-    pub fn sharing(&self, package: &CrateName) -> Sharing {
-        self.shared.get(package).map_or(Sharing::Unshared, |_| Sharing::Shared)
+    pub fn shares(&self, package: &CrateName) -> Option<Shared<'_>> {
+        self.shared.get(package).map(Shared)
     }
 
     pub fn dependents(&self) -> Option<Role> {

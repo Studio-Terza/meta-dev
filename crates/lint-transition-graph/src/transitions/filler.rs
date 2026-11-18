@@ -47,10 +47,13 @@ impl Implemented {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Ownership {
-    Owned,
-    Free,
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Subject<'selfish>(&'selfish Endpoint);
+
+impl<'selfish> From<Subject<'selfish>> for &'selfish Endpoint {
+    fn from(subject: Subject<'selfish>) -> &'selfish Endpoint {
+        subject.0
+    }
 }
 
 impl Filler {
@@ -76,10 +79,10 @@ impl Filler {
         }
     }
 
-    pub(crate) fn ownership(&self) -> Ownership {
+    pub(crate) fn subject<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<Subject<'selfish>> {
         match self {
-            Filler::Free => Ownership::Free,
-            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Ownership::Owned,
+            Filler::Free => None,
+            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Some(Subject(selfish)),
         }
     }
 }

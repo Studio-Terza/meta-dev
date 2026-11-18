@@ -73,11 +73,11 @@ enum Zone {
 
 impl Zone {
     fn of_file(file: &SourceFile) -> Zone {
-        Gate::BOUNDARY.admits(file.head()).chosen(Zone::Boundary, Zone::Elsewhere)
+        Gate::BOUNDARY.admits(file.head()).map_or(Zone::Elsewhere, |_| Zone::Boundary)
     }
 
     fn of_module(module: &ItemMod) -> Zone {
-        Gate::BOUNDARY.names(module).chosen(Zone::Boundary, Zone::Elsewhere)
+        Gate::BOUNDARY.names(module).map_or(Zone::Elsewhere, |_| Zone::Boundary)
     }
 }
 

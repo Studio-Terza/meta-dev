@@ -9,13 +9,13 @@ use std::path::Path;
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{InsideSibling, ModuleIndex, ModulePath, Siding, Target};
+use module_path::{InsideSibling, ModuleIndex, ModulePath, Target};
 
 use algebra::{Monoid, Semigroup};
 use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
 use lint_layout::{Name, UseEdges, UsePath};
-use lint_placement::{CrateRoot, Krate, Level, Lineage, Nest};
+use lint_placement::{CrateRoot, Krate, Level, Nest};
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep};
 use reexport_count::ReexportCount;
 use syntax::ItemUse;
@@ -209,12 +209,12 @@ impl<'file> ModuleTree<'file> {
             .callers_of(module)?
             .iter()
             .filter(|user| {
-                AsRef::<Nest<'_>>::as_ref(module).relation(*AsRef::<Nest<'_>>::as_ref(*user)) != Lineage::Holds
+                AsRef::<Nest<'_>>::as_ref(*user).lineage().all(|outer| outer != *AsRef::<Nest<'_>>::as_ref(module))
             })
             .collect();
         outsiders
             .iter()
-            .all(|user| InsideSibling::placed(user, module) == Siding::Inside)
+            .all(|user| InsideSibling::holder(user, module).is_some())
             .then(|| {
                 let homes: BTreeSet<ModulePath<'file>> =
                     outsiders.iter().map(|user| InsideSibling::home(user, module)).collect();

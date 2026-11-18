@@ -2,7 +2,7 @@ use std::path::Path;
 mod clone_sites;
 
 use clone_sites::CloneSites;
-use lint_core::{Gate, Gating, Headline, Lint, Parsed, Report, SourceFile, Violation};
+use lint_core::{Gate, Headline, Lint, Parsed, Report, SourceFile, Violation};
 use lint_file::Gleaning;
 use lint_sweep::{Contributing, Gathers};
 
@@ -43,8 +43,7 @@ impl Gleaning for Clones {
     type Gleaner<'run, 'head: 'run> = Contributing<CloneSites<'head>>;
 
     fn gleaner<'run, 'head: 'run>(parsed: Parsed<'run, 'head>) -> Contributing<CloneSites<'head>> {
-        let core =
-            <&SourceFile>::from(parsed).shipped().filter(|found| Gate::BOUNDARY.admits(found.head()) == Gating::Open);
+        let core = <&SourceFile>::from(parsed).shipped().filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
         Contributing::new(CloneSites::new(AsRef::<Path>::as_ref(parsed.head()), core.map(|_| ())))
     }
 }

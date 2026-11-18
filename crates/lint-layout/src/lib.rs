@@ -27,7 +27,7 @@ pub use failure::Failure;
 pub use library_tests::LibraryTests;
 pub use line_number::LineNumber;
 pub use manifest::{KeyLines, Manifest, TableKey};
-pub use matching::{Fit, Matching};
+pub use matching::{Fitted, Matching};
 pub use name::{CamelWord, Casing, Length, Lowered, Name, Prefix};
 pub use package_name::PackageName;
 pub use path_dependencies::PathDependencies;

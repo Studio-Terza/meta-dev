@@ -2,7 +2,7 @@ mod stored;
 
 use std::collections::BTreeMap;
 
-use graph::{Function, Implementation, ItemId, ItemKind, Model, Owner, Reach, Region, Resolved, Seat};
+use graph::{Function, Implementation, ItemId, ItemKind, Model, Origin, Owner, Reach, Region, Resolved, Seat};
 use lint_core::Site;
 use lint_layout::{Name, Whole, Word, words};
 
@@ -46,6 +46,8 @@ impl<'model> Reading<'model> {
     const TYPES: [ItemKind; 2] = [ItemKind::Struct, ItemKind::Enum];
     const TRAITS: [Word<'static>; 5] = words!["Display", "FromStr", "Serialize", "Deserialize", "Record"];
     const DERIVED: [Word<'static>; 3] = words!["Serialize", "Deserialize", "Record"];
+    const LISTED: [(Origin, &'static [Word<'static>]); 2] =
+        [(Origin::Written, &Self::TRAITS), (Origin::Derived, &Self::DERIVED)];
     const METHODS: [Word<'static>; 2] = words!["encode", "decode"];
     const LEADS: [Word<'static>; 2] = words!["to", "from"];
     const OWNERS: [Owner; 2] = [Owner::Inherent, Owner::TraitImpl];
@@ -72,7 +74,10 @@ impl<'model> Reading<'model> {
     fn implemented(&self, implementation: &Implementation) -> Option<Profile<'model>> {
         let resolved: &Resolved = implementation.subject_type().named()?.as_ref();
         let typed = self.types.get(&resolved.crate_item()?)?;
-        let listed = implementation.origin().sorted(&Self::TRAITS[..], &Self::DERIVED[..]);
+        let listed = Self::LISTED
+            .iter()
+            .find(|(origin, _)| *origin == implementation.origin())
+            .map_or(&[][..], |(_, listed)| *listed);
         let name = implementation.interface_name().filter(|found| found.matches::<Whole>(listed).is_some())?;
         Stores::record(name).map_or(Some(()), |()| self.stores.admits(implementation))?;
         Some(Profile::declared(Self::subject(*typed), typed.site, Exposure::Private, vec![name.clone()]))

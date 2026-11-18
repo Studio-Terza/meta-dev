@@ -2,17 +2,20 @@ use crate::name::Name;
 use crate::word::Word;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Fit {
-    Fits,
-    Misses,
+pub struct Fitted<'word>(Word<'word>);
+
+impl<'word> From<Word<'word>> for Fitted<'word> {
+    fn from(word: Word<'word>) -> Fitted<'word> {
+        Fitted(word)
+    }
 }
 
-impl<Found> From<Option<Found>> for Fit {
-    fn from(found: Option<Found>) -> Fit {
-        found.map_or(Fit::Misses, |_| Fit::Fits)
+impl<'word> From<Fitted<'word>> for Word<'word> {
+    fn from(fitted: Fitted<'word>) -> Word<'word> {
+        fitted.0
     }
 }
 
 pub trait Matching {
-    fn holds(name: &Name, word: Word<'_>) -> Fit;
+    fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Fitted<'word>>;
 }

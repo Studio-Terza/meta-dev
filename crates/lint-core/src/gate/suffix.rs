@@ -1,4 +1,4 @@
-use lint_layout::Fit;
+use lint_layout::Fitted;
 use lint_layout::Matching;
 use lint_layout::Name;
 use lint_layout::Word;
@@ -7,7 +7,7 @@ use lint_layout::Word;
 pub struct Suffix;
 
 impl Matching for Suffix {
-    fn holds(name: &Name, word: Word<'_>) -> Fit {
-        Fit::from(name.words().last().filter(|last| last.lowered() == Name::from(word).lowered()))
+    fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Fitted<'word>> {
+        name.words().last().filter(|last| last.lowered() == Name::from(word).lowered()).map(|_| Fitted::from(word))
     }
 }
