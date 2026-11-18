@@ -1,5 +1,5 @@
 use graph::{
-    Function, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Origin, Owner, Parameter, Placed, Reach,
+    Entry, Function, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Origin, Owner, Parameter, Placed, Reach,
     Region, Resolved, Seat,
 };
 use lint_layout::Name;
@@ -42,7 +42,7 @@ impl<'model> From<&'model Model> for Catalog<'model> {
             functions: model
                 .functions()
                 .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
-                .filter(|placed| placed.entity().called().is_some())
+                .filter(|placed| placed.entity().entry() == Entry::Called)
                 .collect(),
             implementations: model
                 .implementations()

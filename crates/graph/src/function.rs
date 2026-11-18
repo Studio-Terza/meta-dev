@@ -264,14 +264,6 @@ impl Function {
     }
 
     #[must_use]
-    pub fn called(&self) -> Option<&Function> {
-        match self.entry {
-            Entry::Called => Some(self),
-            Entry::Test | Entry::Main => None,
-        }
-    }
-
-    #[must_use]
     pub fn entry(&self) -> Entry {
         self.entry
     }
