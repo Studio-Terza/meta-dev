@@ -109,18 +109,33 @@ impl Contribute for DeclarationScan {
         &[Kind::ItemImpl, Kind::ItemType, Kind::ItemMod]
     }
 
-    fn on_item_impl(&self, item: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), DeclarationReading> {
+    fn on_item_impl(
+        &self,
+        item: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), DeclarationReading> {
         let descend = Descend::from(facts.gate());
         let vertices = descend.entered().and_then(|_| Declarations::vertex(item)).into_iter().collect();
         Contributed::new((), DeclarationReading { vertices, aliases: BTreeMap::new() }, descend)
     }
 
-    fn on_item_type(&self, item: &ItemType, _: &Facts<'_, ItemType>) -> Contributed<(), DeclarationReading> {
+    fn on_item_type(
+        &self,
+        item: &ItemType,
+        _: &Facts<'_, ItemType>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), DeclarationReading> {
         let aliases = BTreeMap::from([(TypeName::named(&item.ident), TypeName::from_type(&item.ty))]);
         Contributed::new((), DeclarationReading { vertices: BTreeSet::new(), aliases }, Descend::Over)
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), DeclarationReading> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), DeclarationReading> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 }

@@ -140,7 +140,12 @@ impl<'file> Contribute for PredicateScan<'file> {
         inner.concluded(|(), pending| pending.into_iter().map(|within| within.under(facts.name())).collect())
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Vec<Unresolved<'file>>> {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Unresolved<'file>>> {
         let found = facts.inherent().and_then(|block| {
             Some(self.predicates(block))
                 .filter(|found| found.is_empty().then_some(()).is_none())
@@ -149,7 +154,12 @@ impl<'file> Contribute for PredicateScan<'file> {
         Contributed::parted(found.into_iter().collect())
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Unresolved<'file>>> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Unresolved<'file>>> {
         Contributed::descending(Descend::Expand)
     }
 }

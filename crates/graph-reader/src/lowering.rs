@@ -12,28 +12,26 @@ mod seat;
 mod signature;
 
 mod uses;
+mod walk;
 
+use algebra::{Monoid, Semigroup};
 use std::ffi::OsStr;
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use syntax::Spanned;
-use syntax::{
-    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, ExprPath, ForeignItemFn, Ident, ImplItemConst, ImplItemFn,
-    ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion,
-    Macro, Signature as SynSignature, TraitItemFn, Visibility as SynVisibility,
-};
+use syntax::{Attribute, Ident, ItemImpl, ItemMod};
 
 use graph::{
-    Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Held, Implementation, Model, Mutation,
-    Named, Origin, Output, Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Implementation, Model, Mutation, Named,
+    Origin, Output, Owner, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
-    Declared, DeclaredKind, Domain, Entries, Exposing, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind,
+    Declared, DeclaredKind, Domain, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap, ScopeOp,
     Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
@@ -41,12 +39,11 @@ use crate::planting::Files;
 use attributes::Attributes;
 use boundary::SelfType;
 use calls::CallRow;
-pub(crate) use definition::BodyGroup;
-use definition::{LoweredDefinition, Mutations, RowIndex};
-use frames::{Enclosure, Frame};
-use held::{Holder, HoldingRow, Link};
+use definition::{BodyPart, LoweredDefinition};
+use frames::Enclosure;
+use held::HoldingRow;
 use laws::LawRow;
-use lint_sweep::{Address, Attaches, Attachment, Descend, Facts, Kind, Watch};
+use lint_sweep::{Address, WalkPosition};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
@@ -55,6 +52,7 @@ pub use signature::ReceiverSyntax;
 use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Written};
 
 use uses::UseRow;
+pub(crate) use walk::Lowering;
 
 #[derive(Debug)]
 struct ImplRow {
@@ -125,16 +123,23 @@ impl Built for ImplRow {
         let resolving = footing.resolving();
         let implemented = self.implemented.map(|path| {
             let spelling = Spelling::Written(path.written(), located.position());
-            Sited::new(resolving.path(located.scope(), &path, self.domain), spelling)
+            Sited::new(resolving.path(footing.scopes().scope(located.scope()), &path, self.domain), spelling)
         });
-        let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, located.scope()));
+        let subject =
+            Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scopes().scope(located.scope())));
         let implementation =
             Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer())).parameterised(
-                self.parameters.into_iter().map(|parameter| parameter.resolved(&resolving, located.scope())).collect(),
+                self.parameters
+                    .into_iter()
+                    .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
+                    .collect(),
                 self.assigned
                     .iter()
                     .map(|assigned| {
-                        Assigned::new(assigned.name.clone(), Written::typed(&assigned.ty, &resolving, located.scope()))
+                        Assigned::new(
+                            assigned.name.clone(),
+                            Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
+                        )
                     })
                     .collect(),
             );
@@ -161,10 +166,6 @@ struct FnRow {
 }
 
 impl FnRow {
-    fn defined(&mut self, definition: LoweredDefinition) {
-        self.definition = Some(definition);
-    }
-
     fn resolved(resolving: &Resolving<'_, '_, '_>, scope: ScopeId, output: Option<TypeRef<Written>>) -> Output {
         match output {
             Some(ty) => Output::Written(Written::typed(&ty, resolving, scope)),
@@ -175,7 +176,7 @@ impl FnRow {
 
 impl Built for FnRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let scope = self.located.scope();
+        let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
@@ -185,7 +186,7 @@ impl Built for FnRow {
         let function = Function::new(self.name, self.owner, self.entry, signature)
             .exposed(self.exposure)
             .evaluated(self.evaluation)
-            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place))
+            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref()))
             .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, building, function)
     }
@@ -193,7 +194,7 @@ impl Built for FnRow {
 
 #[derive(Debug)]
 struct AliasRow {
-    scope: ScopeId,
+    scope: ScopeKey,
     name: UsePath,
     parameters: Vec<DeclaredParameter>,
     target: TypeRef<Written>,
@@ -202,10 +203,10 @@ struct AliasRow {
 impl Built for AliasRow {
     fn built(self, footing: Footing<'_>, mut building: Building) -> Building {
         let resolving = &footing.resolving();
-        let declared = resolving.path(self.scope, &self.name, Domain::Types).crate_item();
-        let parameters =
-            self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, self.scope)).collect();
-        let alias = Alias::new(parameters, Written::typed(&self.target, resolving, self.scope));
+        let scope = footing.scopes().scope(&self.scope);
+        let declared = resolving.path(scope, &self.name, Domain::Types).crate_item();
+        let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
+        let alias = Alias::new(parameters, Written::typed(&self.target, resolving, scope));
         declared.into_iter().zip([alias]).for_each(|(item, aliased)| building.alias(item, aliased));
         building
     }
@@ -219,7 +220,7 @@ enum SlotForm {
 
 impl From<&[Attribute]> for SlotForm {
     fn from(attributes: &[Attribute]) -> SlotForm {
-        match attributes.iter().find(|attribute| attribute.path().is_ident(Slot::PATH)) {
+        match attributes.iter().find(|attribute| attribute.path().is_ident(Slot::<ScopeId>::PATH)) {
             Some(_) => SlotForm::Pathed,
             None => SlotForm::Conventional,
         }
@@ -236,8 +237,8 @@ impl SlotForm {
 }
 
 #[derive(Debug)]
-pub(crate) struct Slot {
-    scope: ScopeId,
+pub(crate) struct Slot<Scope = ScopeId> {
+    scope: Scope,
     name: Name,
     children: Arc<Path>,
     form: SlotForm,
@@ -245,7 +246,7 @@ pub(crate) struct Slot {
     region: Region,
 }
 
-impl Slot {
+impl<Scope> Slot<Scope> {
     const PATH: &'static str = "path";
     const EXTENSION: &'static str = "rs";
     const MODULE_FILE: &'static str = "mod.rs";
@@ -258,10 +259,12 @@ impl Slot {
         let found_nested = files.present(&nested).map(|_| nested);
         self.form.chosen(found_flat.xor(found_nested))
     }
+}
 
-    fn new(seat: &Seat, region: Region, item: &ItemMod) -> Slot {
+impl Slot<ScopeKey> {
+    fn new(seat: &Seat, region: Region, item: &ItemMod) -> Slot<ScopeKey> {
         Slot {
-            scope: seat.scope(),
+            scope: seat.scope().clone(),
             name: Name::from(&item.ident),
             children: seat.children(),
             form: SlotForm::from(item.attrs.as_slice()),
@@ -270,8 +273,15 @@ impl Slot {
         }
     }
 
-    fn placed(self, base: ScopeId, outer: Region) -> Slot {
-        Slot { scope: self.scope.above(base), region: self.region.joined(outer), ..self }
+    fn placed(self, base: ScopeId, scopes: &ScopeMap, outer: Region) -> Slot {
+        Slot {
+            scope: scopes.scope(&self.scope).above(base),
+            name: self.name,
+            children: self.children,
+            form: self.form,
+            visibility: self.visibility,
+            region: self.region.joined(outer),
+        }
     }
 }
 
@@ -288,6 +298,25 @@ pub(crate) struct FileRows {
     places: PlaceRows,
     transcribed: Vec<TranscribedRow>,
 }
+
+impl Semigroup for FileRows {
+    fn combine(self, other: FileRows) -> FileRows {
+        FileRows {
+            impls: self.impls.combine(other.impls),
+            functions: self.functions.combine(other.functions),
+            aliases: self.aliases.combine(other.aliases),
+            holdings: self.holdings.combine(other.holdings),
+            calls: self.calls.combine(other.calls),
+            uses: self.uses.combine(other.uses),
+            laws: self.laws.combine(other.laws),
+            quotes: self.quotes.combine(other.quotes),
+            places: self.places.combine(other.places),
+            transcribed: self.transcribed.combine(other.transcribed),
+        }
+    }
+}
+
+impl Monoid for FileRows {}
 
 impl FileRows {
     fn spread<'footing>(self, footing: Footing<'footing>, columns: Columns<'footing>) -> Columns<'footing> {
@@ -324,7 +353,8 @@ impl<'footing, Row: Built> Footed<'footing, Row> {
 #[derive(Debug)]
 pub(crate) struct Lowered {
     openings: Openings,
-    slots: Vec<Slot>,
+    scopes: ScopeMap,
+    slots: Vec<Slot<ScopeKey>>,
     rows: FileRows,
 }
 
@@ -342,56 +372,11 @@ impl From<&SourceFile> for FileShape {
         let enclosure = rooted
             .and_then(|root| source.head().placement().executable_root(source.head().located().within(root)))
             .map_or_default(|_| Enclosure::BinaryRoot);
-        let module = rooted
-            .map_or(Some(path), |_| None)
-            .filter(|candidate| candidate.file_name().is_none_or(|name| name != OsStr::new(Slot::MODULE_FILE)));
+        let module = rooted.map_or(Some(path), |_| None).filter(|candidate| {
+            candidate.file_name().is_none_or(|name| name != OsStr::new(Slot::<ScopeId>::MODULE_FILE))
+        });
         let children = module.map_or_else(|| parent.to_path_buf(), |stem| stem.with_extension(""));
         FileShape { enclosure, children: Arc::from(children) }
-    }
-}
-
-impl<'read> Lowering<'read> {
-    pub(crate) fn of_file(source: &'read SourceFile, reach: Reach) -> Lowering<'read> {
-        let syntax = source.syntax();
-        let shape = FileShape::from(source);
-        let lowered = Lowered {
-            openings: Openings::new(Entries::of_items(&syntax.items)),
-            slots: Vec::new(),
-            rows: FileRows::default(),
-        };
-        Lowering {
-            source,
-            opening: Vec::new(),
-            lowered,
-            here: Seat::new(ScopeId::FIRST, shape.children),
-            enclosure: shape.enclosure,
-            generics: Arc::new(InScope::outside()),
-            context: Context::outermost(Regions::of_file(source, reach)),
-            frames: Vec::new(),
-            calling: None,
-            tables: Vec::new(),
-        }
-    }
-
-    pub(crate) fn lowered(self) -> Lowered {
-        self.lowered
-    }
-}
-
-impl Attaches<BodyGroup> for Lowering<'_> {
-    const ATTACHED: &'static [Kind] = BodyGroup::KINDS;
-
-    fn attaching(&mut self) -> Vec<Attachment<BodyGroup>> {
-        std::mem::take(&mut self.opening)
-    }
-
-    fn detached(&mut self, group: BodyGroup) {
-        let row = group.row();
-        let definition = group.lowered();
-        row.slot_in(&mut self.lowered.rows.functions)
-            .into_iter()
-            .zip([definition])
-            .for_each(|(function, lowered)| function.defined(lowered));
     }
 }
 
@@ -401,6 +386,13 @@ struct Grown {
     base: ScopeId,
     outer: Region,
     rows: FileRows,
+    scopes: ScopeMap,
+}
+
+impl Grown {
+    fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Places {
+        self.rows.places.settled(&resolving.based(self.base), &self.scopes)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -450,8 +442,9 @@ impl<'read> Plot<'read> {
 
     fn grown_at(&mut self, top: Top<'read>, file: FileId, outer: Region, lowered: Lowered) -> Vec<Slot> {
         let base = self.space.placed(top, lowered.openings);
-        self.grown.push(Grown { file, base, outer, rows: lowered.rows });
-        lowered.slots.into_iter().map(|slot| slot.placed(base, outer)).collect()
+        let slots = lowered.slots.into_iter().map(|slot| slot.placed(base, &lowered.scopes, outer)).collect();
+        self.grown.push(Grown { file, base, outer, rows: lowered.rows, scopes: lowered.scopes });
+        slots
     }
 
     pub(crate) fn built(self, mut building: Building) -> Model {
@@ -463,26 +456,26 @@ impl<'read> Plot<'read> {
         let naming = Resolving::new(Resolver::new(&self.space, &tables), &ids, &unexpanded);
         let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
             let based = naming.based(grown.base);
-            grown.rows.transcribed.iter().filter_map(move |row| row.settled(based))
+            grown.rows.transcribed.iter().filter_map(move |row| row.settled(based, &grown.scopes))
         }));
         let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids, &transcriptions);
         let exports = self.space.exports();
         let with_exports =
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
-        let places: Vec<Places> =
-            Parallel::available().mapped(&self.grown, |grown| grown.rows.places.settled(&resolving.based(grown.base)));
+        let places: Vec<Places> = Parallel::available().mapped(&self.grown, |grown| grown.settled(&resolving));
         let with_places = self
             .grown
             .iter()
             .zip(&places)
             .fold(with_exports, |built, (grown, seated)| seated.placed(grown.file, built));
-        let mut footed: Vec<Footed<'_, FileRows>> = self
-            .grown
-            .into_iter()
+        let mut planted = self.grown;
+        let mut footed: Vec<Footed<'_, FileRows>> = planted
+            .iter_mut()
             .zip(&places)
-            .map(|(grown, seated)| Footed {
-                footing: Footing::new(resolving.based(grown.base), grown.file, grown.outer, seated),
-                row: grown.rows,
+            .map(|(file, seated)| {
+                let row = mem::take(&mut file.rows);
+                let rooted: &Grown = file;
+                Footed { footing: Footing::new(resolving.based(rooted.base), rooted, seated), row }
             })
             .collect();
         let aliases: Vec<Footed<'_, AliasRow>> = footed
@@ -503,337 +496,207 @@ impl<'read> Plot<'read> {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct Lowering<'read> {
+#[derive(Clone, Debug)]
+pub(super) struct Frame<'read> {
     source: &'read SourceFile,
-    opening: Vec<Attachment<BodyGroup>>,
-    lowered: Lowered,
     here: Seat,
     enclosure: Enclosure,
     generics: Arc<InScope>,
     context: Context,
-    frames: Vec<Frame>,
     calling: Option<Address>,
-    tables: Vec<Address>,
+    tabled: Option<()>,
+    within: Arc<[WalkPosition]>,
+    at: WalkPosition,
 }
 
-impl Lowering<'_> {
-    fn entered(&mut self, kind: ScopeKind, entries: Entries, children: Arc<Path>) -> Seat {
-        let scope = self.lowered.openings.opened(self.here.scope(), kind, entries);
-        self.context = self.context.entered(kind);
-        let inner = Seat::new(scope, children);
-        std::mem::replace(&mut self.here, inner)
-    }
+#[derive(Debug, Default)]
+pub(crate) struct Framed<'read>(Option<Box<Frame<'read>>>);
 
-    fn module_entered(&mut self, item: &ItemMod, items: &[syntax::Item]) -> Descend {
-        let name = Name::from(&item.ident);
-        let children = Arc::from(self.here.children().join(&name));
-        let outer = self.entered(ScopeKind::Module, Entries::of_items(items), children);
-        let module = Declared::new(name, Visibility::from(&item.vis), DeclaredKind::Module(self.here.scope()));
-        self.lowered.openings.declare(outer.scope(), module);
-        self.enclosure = Enclosure::Module;
-        self.context = self.context.within_module(item);
-        Descend::Into
-    }
-
-    fn function(
-        &mut self,
-        attributes: &[Attribute],
-        visibility: &SynVisibility,
-        signature: &SynSignature,
-        body: Option<&Block>,
-    ) -> InScope {
-        let generics = self.generics.extended(&signature.generics);
-        let name = Name::from(&signature.ident);
-        let row = RowIndex::from(self.lowered.rows.functions.as_slice());
-        self.opening
-            .extend(body.map(|block| Attachment::reaching(block, BodyGroup::opened(row, &generics, signature, block))));
-        self.lowered.rows.functions.push(FnRow {
-            located: self.here.located(Position::from(signature.ident.span())),
-            exposure: Exposing::declared_by(visibility),
-            evaluation: signature.constness.map_or(Evaluation::Runtime, |_| Evaluation::Constant),
-            owner: self.enclosure.owner(),
-            entry: self.enclosure.entry(attributes, &name),
-            inputs: generics.inputs(signature),
-            output: generics.output(&signature.output),
-            constraints: generics.constraints(&signature.generics),
-            parameters: LoweredParameter::declared(&generics, &signature.generics),
-            mutation: Mutations::signed(signature),
-            definition: None,
-            region: self.context.region(),
-            place: self.context.place(),
-            name,
-        });
-        generics
-    }
-
-    pub(super) fn method_entered(
-        &mut self,
-        attributes: &[Attribute],
-        visibility: &SynVisibility,
-        signature: &SynSignature,
-        body: Option<&Block>,
-    ) -> Descend {
-        self.saved();
-        self.context = self.context.within_item(attributes);
-        let generics = self.function(attributes, visibility, signature, body);
-        self.enclosed(Enclosure::Body, generics)
-    }
-
-    fn enclosed(&mut self, enclosure: Enclosure, generics: InScope) -> Descend {
-        self.enclosure = enclosure;
-        self.generics = Arc::new(generics);
-        Descend::Into
+impl Semigroup for Framed<'_> {
+    fn combine(self, other: Self) -> Self {
+        Framed(self.0.or(other.0))
     }
 }
 
-impl<'ast> Watch<'ast> for Lowering<'_> {
-    fn kinds(&self) -> &'static [Kind] {
-        &[
-            Kind::Item,
-            Kind::Type,
-            Kind::ItemMod,
-            Kind::Block,
-            Kind::ItemImpl,
-            Kind::ItemTrait,
-            Kind::ItemFn,
-            Kind::ImplItemFn,
-            Kind::TraitItemFn,
-            Kind::ForeignItemFn,
-            Kind::ItemType,
-            Kind::ItemStruct,
-            Kind::ItemEnum,
-            Kind::ItemUnion,
-            Kind::ItemConst,
-            Kind::ItemStatic,
-            Kind::ImplItemConst,
-            Kind::ExprMethodCall,
-            Kind::ExprCall,
-            Kind::ExprMacro,
-            Kind::ExprPath,
-            Kind::ExprStruct,
-            Kind::ExprMatch,
-            Kind::ExprLet,
-            Kind::Local,
-            Kind::ItemMacro,
-            Kind::Macro,
-        ]
-    }
+impl Monoid for Framed<'_> {}
 
-    fn on_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) -> Descend {
-        self.saved()
+impl<'read> Framed<'read> {
+    pub(super) fn framing(frame: Frame<'read>) -> Framed<'read> {
+        Framed(Some(Box::new(frame)))
     }
+}
+#[derive(Debug)]
+pub(super) struct Owning {
+    place: PlaceId,
+    grains: Grains,
+}
 
-    fn off_item(&mut self, _: &'ast syntax::Item, _: &Facts<'_, syntax::Item>) {
-        self.restored();
+impl Owning {
+    fn within(&self, context: &Context) -> Context {
+        context.owned(self.place.clone())
     }
+}
 
-    fn on_type(&mut self, ty: &'ast syntax::Type, _: &Facts<'_, syntax::Type>) -> Descend {
-        self.types_used(ty);
-        Descend::Into
+#[derive(Debug)]
+enum Grain {
+    Impl(ImplRow),
+    Function(FnRow),
+    Alias(AliasRow),
+    Holding(HoldingRow),
+    Call(CallRow),
+    Use(UseRow),
+    Law(LawRow),
+    Quote(QuoteRow),
+    Place(PlaceRows),
+    Op(ScopeOp),
+    Slot(Slot<ScopeKey>),
+    Body(BodyPart),
+    Transcribed(TranscribedRow),
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Grains {
+    grains: Vec<Grain>,
+    bodied: Option<()>,
+}
+
+impl Semigroup for Grains {
+    fn combine(self, other: Grains) -> Grains {
+        Grains { grains: self.grains.combine(other.grains), bodied: self.bodied.or(other.bodied) }
     }
+}
 
-    fn on_item_mod(&mut self, item: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        match &item.content {
-            Some((_, items)) => self.module_entered(item, items),
-            None => self.slotted(item),
+impl Monoid for Grains {}
+
+impl From<Grain> for Grains {
+    fn from(grain: Grain) -> Grains {
+        let bodied = grain.bodied();
+        Grains { grains: vec![grain], bodied }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Sorted {
+    rows: FileRows,
+    ops: Vec<ScopeOp>,
+    slots: Vec<Slot<ScopeKey>>,
+}
+
+impl Semigroup for Sorted {
+    fn combine(self, other: Sorted) -> Sorted {
+        Sorted {
+            rows: self.rows.combine(other.rows),
+            ops: self.ops.combine(other.ops),
+            slots: self.slots.combine(other.slots),
+        }
+    }
+}
+
+impl Monoid for Sorted {}
+
+impl From<Grain> for Sorted {
+    fn from(grain: Grain) -> Sorted {
+        match grain {
+            Grain::Impl(row) => Sorted::from(FileRows { impls: vec![row], ..FileRows::default() }),
+            Grain::Function(row) => Sorted::from(FileRows { functions: vec![row], ..FileRows::default() }),
+            Grain::Alias(row) => Sorted::from(FileRows { aliases: vec![row], ..FileRows::default() }),
+            Grain::Holding(row) => Sorted::from(FileRows { holdings: vec![row], ..FileRows::default() }),
+            Grain::Call(row) => Sorted::from(FileRows { calls: vec![row], ..FileRows::default() }),
+            Grain::Use(row) => Sorted::from(FileRows { uses: vec![row], ..FileRows::default() }),
+            Grain::Law(row) => Sorted::from(FileRows { laws: vec![row], ..FileRows::default() }),
+            Grain::Quote(row) => Sorted::from(FileRows { quotes: vec![row], ..FileRows::default() }),
+            Grain::Transcribed(row) => Sorted::from(FileRows { transcribed: vec![row], ..FileRows::default() }),
+            Grain::Place(places) => Sorted::from(FileRows { places, ..FileRows::default() }),
+            Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
+            Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
+            Grain::Body(_) => Sorted::default(),
+        }
+    }
+}
+
+impl From<FileRows> for Sorted {
+    fn from(rows: FileRows) -> Sorted {
+        Sorted { rows, ..Sorted::default() }
+    }
+}
+
+impl From<Grains> for Sorted {
+    fn from(grains: Grains) -> Sorted {
+        Monoid::concat(grains.grains.into_iter().map(Sorted::from))
+    }
+}
+
+impl Grain {
+    fn body(self) -> Option<BodyPart> {
+        match self {
+            Grain::Body(part) => Some(part),
+            Grain::Impl(_)
+            | Grain::Function(_)
+            | Grain::Alias(_)
+            | Grain::Holding(_)
+            | Grain::Call(_)
+            | Grain::Use(_)
+            | Grain::Law(_)
+            | Grain::Quote(_)
+            | Grain::Transcribed(_)
+            | Grain::Place(_)
+            | Grain::Op(_)
+            | Grain::Slot(_) => None,
         }
     }
 
-    fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
-        self.saved();
-        self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
-        Descend::Into
-    }
-
-    fn off_block(&mut self, _: &'ast Block, _: &Facts<'_, Block>) {
-        self.restored();
-    }
-
-    fn on_item_impl(&mut self, block: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        self.context = self.context.within_item(&block.attrs);
-        self.impl_entered(block)
-    }
-
-    fn on_item_trait(&mut self, item: &'ast ItemTrait, _: &Facts<'_, ItemTrait>) -> Descend {
-        let generics = self.generics.subjectless().extended(&item.generics);
-        self.trait_bounds(item, &generics);
-        let place = self.trait_owning(&item.ident, &item.attrs);
-        self.filler_owning(item);
-        self.context = self.context.owned(place);
-        self.enclosed(Enclosure::Trait, generics)
-    }
-
-    fn on_item_fn(&mut self, item: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        let place = self.owning(&item.sig.ident, Domain::Values, &item.attrs);
-        self.context = self.context.within_item(&item.attrs).owned(place);
-        let generics = self.function(&item.attrs, &item.vis, &item.sig, Some(&item.block));
-        self.enclosed(Enclosure::Body, generics)
-    }
-
-    fn on_impl_item_fn(&mut self, item: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.method_entered(&item.attrs, &item.vis, &item.sig, Some(&item.block))
-    }
-
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.restored();
-    }
-
-    fn on_trait_item_fn(&mut self, item: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.method_entered(&item.attrs, &SynVisibility::Inherited, &item.sig, item.default.as_ref())
-    }
-
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
-        self.restored();
-    }
-
-    fn on_foreign_item_fn(&mut self, item: &'ast ForeignItemFn, _: &Facts<'_, ForeignItemFn>) -> Descend {
-        self.enclosure = Enclosure::Foreign;
-        self.function(&item.attrs, &item.vis, &item.sig, None);
-        Descend::Into
-    }
-
-    fn on_item_type(&mut self, item: &'ast ItemType, _: &Facts<'_, ItemType>) -> Descend {
-        let generics = InScope::outside().extended(&item.generics);
-        let target = generics.lowered(&item.ty);
-        self.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
-        self.lowered.rows.aliases.push(AliasRow {
-            scope: self.here.scope(),
-            name: UsePath::from(&item.ident),
-            parameters: generics.declarations(&item.generics),
-            target,
-        });
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
-    }
-
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
-        let scope = self.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
-        self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
-        self.struct_held(item, &scope, link);
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
-    }
-
-    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
-        let scope = self.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
-        self.parameters(&Holder::named(&item.ident, Held::Bound), &item.generics, &link);
-        item.variants.iter().fold(&mut *self, |lowering, variant| {
-            lowering.hold(Holder::named(&variant.ident, Held::Variant), link.clone(), TypeRef::Tuple(Vec::new()));
-            let holder = Holder::named(&variant.ident, Held::EnumField);
-            lowering.fields_held(&holder, &link, variant.fields.iter(), &scope);
-            lowering
-        });
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
-    }
-
-    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
-        let scope = self.generics.extended(&item.generics);
-        let link = Link::declaring(&item.ident);
-        self.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident);
-        self.fields_held(&Holder::named(&item.ident, Held::UnionField), &link, item.fields.named.iter(), &scope);
-        self.owned_by(&item.ident, Domain::Types, &item.attrs)
-    }
-
-    fn on_item_const(&mut self, item: &'ast ItemConst, facts: &Facts<'_, ItemConst>) -> Descend {
-        self.tables.push(facts.address());
-        self.valued(&item.ident, &item.ty, &item.attrs)
-    }
-
-    fn on_item_static(&mut self, item: &'ast ItemStatic, facts: &Facts<'_, ItemStatic>) -> Descend {
-        self.tables.push(facts.address());
-        self.valued(&item.ident, &item.ty, &item.attrs)
-    }
-
-    fn off_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) {
-        self.tables.pop();
-    }
-
-    fn off_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) {
-        self.tables.pop();
-    }
-
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, facts: &Facts<'_, ImplItemConst>) -> Descend {
-        self.tables.push(facts.address());
-        Descend::Into
-    }
-
-    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) {
-        self.tables.pop();
-    }
-
-    fn on_expr_method_call(&mut self, call: &'ast ExprMethodCall, _: &Facts<'_, ExprMethodCall>) -> Descend {
-        self.method_called(call);
-        Descend::Into
-    }
-
-    fn on_expr_call(&mut self, call: &'ast ExprCall, _: &Facts<'_, ExprCall>) -> Descend {
-        self.path_called(call);
-        Descend::Into
-    }
-
-    fn on_expr_macro(&mut self, expr: &'ast ExprMacro, _: &Facts<'_, ExprMacro>) -> Descend {
-        self.macro_called(expr);
-        Descend::Into
-    }
-
-    fn on_expr_struct(&mut self, literal: &'ast syntax::ExprStruct, _: &Facts<'_, syntax::ExprStruct>) -> Descend {
-        self.struct_used(literal);
-        Descend::Into
-    }
-
-    fn on_expr_path(&mut self, expression: &'ast ExprPath, _: &Facts<'_, ExprPath>) -> Descend {
-        self.path_used(expression);
-        Descend::Into
-    }
-
-    fn on_expr_match(&mut self, expr: &'ast syntax::ExprMatch, _: &Facts<'_, syntax::ExprMatch>) -> Descend {
-        expr.arms.iter().for_each(|arm| self.pattern_used(&arm.pat));
-        Descend::Into
-    }
-
-    fn on_expr_let(&mut self, expr: &'ast syntax::ExprLet, _: &Facts<'_, syntax::ExprLet>) -> Descend {
-        self.pattern_used(&expr.pat);
-        Descend::Into
-    }
-
-    fn on_local(&mut self, local: &'ast syntax::Local, _: &Facts<'_, syntax::Local>) -> Descend {
-        local
-            .init
-            .as_ref()
-            .filter(|init| init.diverge.is_some())
-            .into_iter()
-            .for_each(|_| self.pattern_used(&local.pat));
-        Descend::Into
-    }
-
-    fn on_item_macro(&mut self, item: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) -> Descend {
-        match &item.ident {
-            Some(ident) => self.owned_by(ident, Domain::Macros, &item.attrs),
-            None => Descend::Into,
+    fn bodied(&self) -> Option<()> {
+        match self {
+            Grain::Body(_) => Some(()),
+            Grain::Impl(_)
+            | Grain::Function(_)
+            | Grain::Alias(_)
+            | Grain::Holding(_)
+            | Grain::Call(_)
+            | Grain::Use(_)
+            | Grain::Law(_)
+            | Grain::Quote(_)
+            | Grain::Transcribed(_)
+            | Grain::Place(_)
+            | Grain::Op(_)
+            | Grain::Slot(_) => None,
         }
     }
 
-    fn off_item_macro(&mut self, item: &'ast ItemMacro, _: &Facts<'_, ItemMacro>) {
-        self.macro_left(item);
+    fn function(&self) -> Option<&FnRow> {
+        match self {
+            Grain::Function(row) => Some(row),
+            Grain::Impl(_)
+            | Grain::Alias(_)
+            | Grain::Holding(_)
+            | Grain::Call(_)
+            | Grain::Use(_)
+            | Grain::Law(_)
+            | Grain::Quote(_)
+            | Grain::Transcribed(_)
+            | Grain::Place(_)
+            | Grain::Op(_)
+            | Grain::Slot(_)
+            | Grain::Body(_) => None,
+        }
     }
 
-    fn on_macro(&mut self, invoked: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.macro_used(invoked);
-        Descend::Into
+    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
+        match self {
+            Grain::Function(row) => Grain::Function(FnRow { definition: definition.or(row.definition), ..row }),
+            other => other,
+        }
     }
 }
 
-impl Attaches<BodyGroup> for &mut Lowering<'_> {
-    const ATTACHED: &'static [Kind] = BodyGroup::KINDS;
-
-    fn attaching(&mut self) -> Vec<Attachment<BodyGroup>> {
-        (**self).attaching()
+impl From<BodyPart> for Grains {
+    fn from(part: BodyPart) -> Grains {
+        Grains::from(Grain::Body(part))
     }
+}
 
-    fn detached(&mut self, group: BodyGroup) {
-        (**self).detached(group);
+impl Grains {
+    fn closed(self) -> Grains {
+        Grains { grains: self.grains.into_iter().filter(|grain| grain.bodied().is_none()).collect(), bodied: None }
     }
 }

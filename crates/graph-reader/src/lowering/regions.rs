@@ -69,7 +69,7 @@ impl From<ScopeKind> for Spot {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Context {
     region: Region,
     place: Option<PlaceId>,
@@ -82,31 +82,31 @@ impl Context {
     }
 
     pub(super) fn within_item(&self, attributes: &[Attribute]) -> Context {
-        Context { region: Regions::tested(self.region, attributes), ..*self }
+        Context { region: Regions::tested(self.region, attributes), ..self.clone() }
     }
 
     pub(super) fn within_module(&self, item: &ItemMod) -> Context {
-        Context { region: Regions::of_module(self.region, item), ..*self }
+        Context { region: Regions::of_module(self.region, item), ..self.clone() }
     }
 
     pub(super) fn of_impl(&self, block: &ItemImpl, place: PlaceId) -> Context {
-        Context { region: self.region.inside(Self::within(block)), place: Some(place), ..*self }
+        Context { region: self.region.inside(Self::within(block)), place: Some(place), spot: self.spot }
     }
 
     pub(super) fn within_macro(&self, items: MacroItems) -> Context {
-        Context { region: items.region(self.region), ..*self }
+        Context { region: items.region(self.region), ..self.clone() }
     }
 
     pub(super) fn owned(&self, place: PlaceId) -> Context {
-        Context { place: Some(place), ..*self }
+        Context { place: Some(place), region: self.region, spot: self.spot }
     }
 
     pub(super) fn entered(&self, kind: ScopeKind) -> Context {
-        Context { spot: Spot::from(kind), ..*self }
+        Context { spot: Spot::from(kind), ..self.clone() }
     }
 
     pub(super) fn in_body(&self) -> Option<Context> {
-        Some(*self).filter(|context| context.spot == Spot::Body)
+        Some(self.clone()).filter(|context| context.spot == Spot::Body)
     }
 
     pub(super) fn region(&self) -> Region {
@@ -114,7 +114,7 @@ impl Context {
     }
 
     pub(super) fn place(&self) -> Option<PlaceId> {
-        self.place
+        self.place.clone()
     }
 
     fn within(block: &ItemImpl) -> Within {

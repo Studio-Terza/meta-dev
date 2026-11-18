@@ -26,14 +26,6 @@ impl ScopeId {
     pub(crate) fn above(self, base: ScopeId) -> ScopeId {
         ScopeId(self.0 + base.0)
     }
-
-    pub(super) fn nested(self) -> ScopeId {
-        ScopeId(self.0 + 1)
-    }
-
-    pub(super) fn below_top(self) -> Option<ScopeId> {
-        self.0.checked_sub(1).map(ScopeId)
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -83,5 +75,53 @@ pub(super) trait Lattice: Eq + Sized {
 impl<Entry: Lattice> Lattice for Vec<Entry> {
     fn joined(&self, computed: Vec<Entry>) -> Vec<Entry> {
         self.iter().zip(computed).map(|(held, found)| held.joined(found)).collect()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct ScopeKey {
+    within: std::sync::Arc<[lint_sweep::WalkPosition]>,
+    at: Option<NodeKey>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct NodeKey {
+    position: lint_sweep::WalkPosition,
+    role: KeyRole,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum KeyRole {
+    Scope,
+    Owner,
+    Filler,
+    Subject,
+}
+
+impl ScopeKey {
+    pub(crate) fn reached(within: &std::sync::Arc<[lint_sweep::WalkPosition]>, at: NodeKey) -> ScopeKey {
+        ScopeKey { within: std::sync::Arc::clone(within), at: Some(at) }
+    }
+}
+
+impl NodeKey {
+    pub(crate) fn new(position: lint_sweep::WalkPosition, role: KeyRole) -> NodeKey {
+        NodeKey { position, role }
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ScopeMap(std::collections::BTreeMap<ScopeKey, ScopeId>);
+
+impl ScopeMap {
+    pub(crate) fn scope(&self, key: &ScopeKey) -> ScopeId {
+        self.0.get(key).copied().unwrap_or(ScopeId::FIRST)
+    }
+
+    pub(super) fn keyed(keys: impl IntoIterator<Item = ScopeKey>) -> ScopeMap {
+        let top = [(ScopeKey::default(), ScopeId::FIRST)];
+        ScopeMap(
+            top.into_iter().chain(keys.into_iter().enumerate().map(|(index, key)| (key, ScopeId(index + 1)))).collect(),
+        )
     }
 }

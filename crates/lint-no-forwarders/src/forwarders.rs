@@ -173,16 +173,31 @@ impl Contribute for Forwarders<'_> {
         const { &[Scope::new(Kind::ItemImpl)] }
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<Unplaced, Gleaned> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Unplaced, Gleaned> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_struct(&self, item: &ItemStruct, facts: &Facts<'_, ItemStruct>) -> Contributed<Unplaced, Gleaned> {
+    fn on_item_struct(
+        &self,
+        item: &ItemStruct,
+        facts: &Facts<'_, ItemStruct>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Unplaced, Gleaned> {
         let structs = facts.name().map(|name| (name.clone(), StructFields::describe(item))).into_iter().collect();
         Contributed::new(Unplaced::default(), Gleaned { structs, methods: Vec::new() }, Descend::Over)
     }
 
-    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<Unplaced, Gleaned> {
+    fn on_item_impl(
+        &self,
+        item: &ItemImpl,
+        _: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Unplaced, Gleaned> {
         Contributed::descending(ImplTarget::describe(item).target().map_or(Descend::Over, |_| Descend::Into))
     }
 
@@ -198,7 +213,12 @@ impl Contribute for Forwarders<'_> {
         })
     }
 
-    fn on_impl_item_fn(&self, function: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Contributed<Unplaced, Gleaned> {
+    fn on_impl_item_fn(
+        &self,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Unplaced, Gleaned> {
         Contributed::new(
             Unplaced(Candidate::tail_call(function).into_iter().collect()),
             Gleaned::default(),

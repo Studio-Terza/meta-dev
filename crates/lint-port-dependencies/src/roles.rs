@@ -112,11 +112,17 @@ impl Contribute for DenialScan {
         &self,
         attribute: &syntax::Attribute,
         _: &Facts<'_, syntax::Attribute>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<(), Denials> {
         Contributed::new((), Denials(Undenied::denied_by(attribute).into_iter().collect()), Descend::Over)
     }
 
-    fn on_item(&self, _: &syntax::Item, _: &Facts<'_, syntax::Item>) -> Contributed<(), Denials> {
+    fn on_item(
+        &self,
+        _: &syntax::Item,
+        _: &Facts<'_, syntax::Item>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Denials> {
         Contributed::descending(Descend::Over)
     }
 }

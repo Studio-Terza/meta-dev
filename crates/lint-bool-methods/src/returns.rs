@@ -51,29 +51,59 @@ impl<'file> Contribute for Returns<'file> {
         &[Kind::ItemMod, Kind::ItemFn, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemTrait, Kind::TraitItemFn]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Returned<'file> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Returned<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Returned<'file> {
+    fn on_item_fn(
+        &self,
+        function: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Returned<'file> {
         self.opened(&function.attrs, &function.sig)
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Returned<'file> {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Returned<'file> {
         Contributed::descending(
             facts.inherent().map_or(Descend::Over, |_| Descend::Into).then(|| Descend::from(facts.gate())),
         )
     }
 
-    fn on_impl_item_fn(&self, method: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Returned<'file> {
+    fn on_impl_item_fn(
+        &self,
+        method: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }
 
-    fn on_item_trait(&self, _: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Returned<'file> {
+    fn on_item_trait(
+        &self,
+        _: &ItemTrait,
+        facts: &Facts<'_, ItemTrait>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Returned<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_trait_item_fn(&self, method: &TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Returned<'file> {
+    fn on_trait_item_fn(
+        &self,
+        method: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }
 }

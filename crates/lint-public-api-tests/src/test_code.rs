@@ -88,21 +88,41 @@ impl Contribute for TestCode<'_> {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_mod(&self, module: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), InSource> {
+    fn on_item_mod(
+        &self,
+        module: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), InSource> {
         let walk = facts.gate();
         let lines = InSource::lines((walk == Walk::Skipped).then(|| LineNumber::from(module.ident.span())));
         Contributed::new((), lines, Descend::from(walk))
     }
 
-    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<(), InSource> {
+    fn on_item_impl(
+        &self,
+        item: &ItemImpl,
+        _: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), InSource> {
         Self::gated(&item.attrs, LineNumber::from(item.impl_token.span))
     }
 
-    fn on_impl_item_fn(&self, method: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Contributed<(), InSource> {
+    fn on_impl_item_fn(
+        &self,
+        method: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), InSource> {
         Self::gated(&method.attrs, LineNumber::from(method.sig.ident.span()))
     }
 
-    fn on_item_fn(&self, function: &ItemFn, facts: &Facts<'_, ItemFn>) -> Contributed<(), InSource> {
+    fn on_item_fn(
+        &self,
+        function: &ItemFn,
+        facts: &Facts<'_, ItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), InSource> {
         let line = LineNumber::from(function.sig.ident.span());
         let walk = Walk::outside_tests(&function.attrs);
         let skipped = (walk == Walk::Skipped).then_some(line);
@@ -110,7 +130,12 @@ impl Contribute for TestCode<'_> {
         Contributed::new((), InSource::lines(skipped.into_iter().chain(marked)), Descend::from(walk))
     }
 
-    fn on_macro(&self, invocation: &Macro, facts: &Facts<'_, Macro>) -> Contributed<(), InSource> {
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        facts: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), InSource> {
         let line = LineNumber::from(invocation.bang_token.span);
         let law = facts.law().map(|_| line);
         let called =

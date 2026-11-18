@@ -1,3 +1,6 @@
+use super::{Frame, Framed, Grain, Grains};
+use algebra::{Monoid, Semigroup};
+use lint_sweep::Contributed;
 use syntax::Spanned;
 use syntax::{Attribute, Field, Generics, Ident, ItemStruct, ItemTrait, Type};
 
@@ -7,12 +10,11 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
+use super::ImplRow;
 use super::attributes::Attributes;
 use super::seat::{Built, Footing, Located};
 use super::signature::{InScope, Written};
-use super::{ImplRow, Lowering};
 use graph::{Region, TypeRef};
-use lint_sweep::Descend;
 
 #[derive(Clone, Debug)]
 pub(super) struct Holder {
@@ -69,7 +71,7 @@ pub(super) struct HoldingRow {
 
 impl Built for HoldingRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let scope = self.located.scope();
+        let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let declares = self.link.declares(resolving, scope);
         let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
@@ -78,62 +80,61 @@ impl Built for HoldingRow {
     }
 }
 
-impl Lowering<'_> {
-    pub(super) fn valued(&mut self, ident: &Ident, ty: &Type, attributes: &[Attribute]) -> Descend {
+impl<'read> Frame<'read> {
+    pub(super) fn valued(
+        &self,
+        ident: &Ident,
+        ty: &Type,
+        attributes: &[Attribute],
+    ) -> Contributed<Framed<'read>, Grains> {
         let target = self.generics.lowered(ty);
-        self.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
-        self.owned_by(ident, Domain::Values, attributes)
+        let held = self.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
+        self.owned_by(ident, Domain::Values, attributes, held)
     }
 
-    pub(super) fn hold(&mut self, holder: Holder, link: Link, ty: TypeRef<Written>) {
+    pub(super) fn hold(&self, holder: Holder, link: Link, ty: TypeRef<Written>) -> Grains {
         let located = self.here.located(holder.position);
-        self.lowered.rows.holdings.push(HoldingRow { located, holder, region: self.context.region(), link, ty });
+        let row = HoldingRow { located, holder, region: self.context.region(), link, ty };
+        Grains::from(Grain::Holding(row))
     }
 
-    pub(super) fn attributed(&mut self, attributes: &Attributes, ident: &Ident) {
+    pub(super) fn attributed(&self, attributes: &Attributes, ident: &Ident) -> Grains {
         let rows = ImplRow::derives(&self.here, self.context.region(), attributes, ident);
-        self.lowered.rows.impls.extend(rows);
+        Monoid::concat(rows.into_iter().map(Grain::Impl).map(Grains::from))
     }
 
-    pub(super) fn parameters(&mut self, holder: &Holder, generics: &Generics, link: &Link) {
+    pub(super) fn parameters(&self, holder: &Holder, generics: &Generics, link: &Link) -> Grains {
         let scope = self.generics.extended(generics);
-        scope.constraints(generics).into_iter().fold(self, |lowering, ty| {
-            lowering.hold(holder.clone(), link.clone(), ty);
-            lowering
-        });
+        Monoid::concat(scope.constraints(generics).into_iter().map(|ty| self.hold(holder.clone(), link.clone(), ty)))
     }
 
-    pub(super) fn trait_bounds(&mut self, item: &ItemTrait, scope: &InScope) {
+    pub(super) fn trait_bounds(&self, item: &ItemTrait, scope: &InScope) -> Grains {
         let holder = Holder::named(&item.ident, Held::Bound);
         let link = Link::declaring(&item.ident);
         let associated =
             item.items.iter().filter_map(Syntax::trait_type).map(|declared| scope.bounded(declared.bounds.iter()));
-        self.parameters(&holder, &item.generics, &link);
-        [scope.bounded(item.supertraits.iter())].into_iter().chain(associated).fold(self, |lowering, ty| {
-            lowering.hold(holder.clone(), link.clone(), ty);
-            lowering
-        });
+        let parameters = self.parameters(&holder, &item.generics, &link);
+        let bounds = [scope.bounded(item.supertraits.iter())]
+            .into_iter()
+            .chain(associated)
+            .map(|ty| self.hold(holder.clone(), link.clone(), ty));
+        parameters.combine(Monoid::concat(bounds))
     }
 
-    pub(super) fn struct_held(&mut self, item: &ItemStruct, scope: &InScope, link: Link) {
-        match Syntax::newtype_field(&item.fields) {
-            Some(field) => self.hold(Holder::named(&item.ident, Held::NewtypeField), link, scope.lowered(&field.ty)),
-            None => {
-                self.fields_held(&Holder::named(&item.ident, Held::StructField), &link, item.fields.iter(), scope);
-            }
-        }
+    pub(super) fn struct_held(&self, item: &ItemStruct, scope: &InScope, link: &Link) -> Grains {
+        Syntax::newtype_field(&item.fields).map_or_else(
+            || self.fields_held(&Holder::named(&item.ident, Held::StructField), link, item.fields.iter(), scope),
+            |field| self.hold(Holder::named(&item.ident, Held::NewtypeField), link.clone(), scope.lowered(&field.ty)),
+        )
     }
 
     pub(super) fn fields_held<'field>(
-        &mut self,
+        &self,
         holder: &Holder,
         link: &Link,
         fields: impl Iterator<Item = &'field Field>,
         scope: &InScope,
-    ) {
-        fields.fold(self, |lowering, field| {
-            lowering.hold(holder.field(field), link.clone(), scope.lowered(&field.ty));
-            lowering
-        });
+    ) -> Grains {
+        Monoid::concat(fields.map(|field| self.hold(holder.field(field), link.clone(), scope.lowered(&field.ty))))
     }
 }

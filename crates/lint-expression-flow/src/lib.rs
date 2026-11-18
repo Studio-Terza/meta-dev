@@ -201,32 +201,67 @@ impl<'scan> Contribute for Flows<'scan> {
         const { &[Scope::new(Kind::ItemFn), Scope::new(Kind::ImplItemFn), Scope::new(Kind::TraitItemFn)] }
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Flowed<'scan>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Flowed<'scan>> {
+    fn on_item_impl(
+        &self,
+        _: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&self, _: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Contributed<(), Flowed<'scan>> {
+    fn on_item_trait(
+        &self,
+        _: &ItemTrait,
+        facts: &Facts<'_, ItemTrait>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Flowed<'scan>> {
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         let touched = MutableLocals::written_to(invocation).into_iter().collect();
         Contributed::new((), Flowed { touched, ..Flowed::default() }, Descend::Expand)
     }
 
-    fn on_item_const(&self, _: &ItemConst, _: &Facts<'_, ItemConst>) -> Contributed<(), Flowed<'scan>> {
+    fn on_item_const(
+        &self,
+        _: &ItemConst,
+        _: &Facts<'_, ItemConst>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Contributed::descending(Descend::Over)
     }
 
-    fn on_impl_item_const(&self, _: &ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Contributed<(), Flowed<'scan>> {
+    fn on_impl_item_const(
+        &self,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Contributed::descending(Descend::Over)
     }
 
-    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Contributed<(), Flowed<'scan>> {
+    fn on_item_fn(
+        &self,
+        function: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Self::function(&function.attrs, &function.sig, Some(&function.block))
     }
 
@@ -239,7 +274,12 @@ impl<'scan> Contribute for Flows<'scan> {
         self.closed(&function.attrs, &function.sig, Some(&function.block), inner)
     }
 
-    fn on_impl_item_fn(&self, function: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Contributed<(), Flowed<'scan>> {
+    fn on_impl_item_fn(
+        &self,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Self::function(&function.attrs, &function.sig, Some(&function.block))
     }
 
@@ -252,7 +292,12 @@ impl<'scan> Contribute for Flows<'scan> {
         self.closed(&function.attrs, &function.sig, Some(&function.block), inner)
     }
 
-    fn on_trait_item_fn(&self, function: &TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Contributed<(), Flowed<'scan>> {
+    fn on_trait_item_fn(
+        &self,
+        function: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         Self::function(&function.attrs, &function.sig, function.default.as_ref())
     }
 
@@ -265,7 +310,12 @@ impl<'scan> Contribute for Flows<'scan> {
         self.closed(&function.attrs, &function.sig, function.default.as_ref(), inner)
     }
 
-    fn on_block(&self, block: &Block, _: &Facts<'_, Block>) -> Contributed<(), Flowed<'scan>> {
+    fn on_block(
+        &self,
+        block: &Block,
+        _: &Facts<'_, Block>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         let last = block.stmts.last();
         self.reported(
             block.stmts.iter().filter_map(|statement| ExpressionFlow::dropped(statement, last)).map(Spanned::span),
@@ -276,7 +326,12 @@ impl<'scan> Contribute for Flows<'scan> {
         )
     }
 
-    fn on_expr_if(&self, expr: &ExprIf, _: &Facts<'_, ExprIf>) -> Contributed<(), Flowed<'scan>> {
+    fn on_expr_if(
+        &self,
+        expr: &ExprIf,
+        _: &Facts<'_, ExprIf>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         self.reported(
             ExpressionFlow::lonely_if(expr),
             Message::new(
@@ -286,21 +341,36 @@ impl<'scan> Contribute for Flows<'scan> {
         )
     }
 
-    fn on_expr_loop(&self, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Contributed<(), Flowed<'scan>> {
+    fn on_expr_loop(
+        &self,
+        expr: &ExprLoop,
+        _: &Facts<'_, ExprLoop>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         self.reported(
             [expr.loop_token.span],
             Message::new(Problem::new("loop"), Fix::new("drive an iterator with combinators, const fns excepted")),
         )
     }
 
-    fn on_expr_for_loop(&self, expr: &ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Contributed<(), Flowed<'scan>> {
+    fn on_expr_for_loop(
+        &self,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         self.reported(
             [expr.for_token.span],
             Message::new(Problem::new("for loop"), Fix::new("drive the iterator with combinators, const fns excepted")),
         )
     }
 
-    fn on_expr_while(&self, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Contributed<(), Flowed<'scan>> {
+    fn on_expr_while(
+        &self,
+        expr: &ExprWhile,
+        _: &Facts<'_, ExprWhile>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         self.reported(
             [expr.while_token.span],
             Message::new(
@@ -310,7 +380,12 @@ impl<'scan> Contribute for Flows<'scan> {
         )
     }
 
-    fn on_expr_assign(&self, expr: &ExprAssign, _: &Facts<'_, ExprAssign>) -> Contributed<(), Flowed<'scan>> {
+    fn on_expr_assign(
+        &self,
+        expr: &ExprAssign,
+        _: &Facts<'_, ExprAssign>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         self.reported(
             ExpressionFlow::assigned_local(&expr.left).map(|_| expr.eq_token.span),
             Message::new(
@@ -320,7 +395,12 @@ impl<'scan> Contribute for Flows<'scan> {
         )
     }
 
-    fn on_expr_binary(&self, expr: &ExprBinary, _: &Facts<'_, ExprBinary>) -> Contributed<(), Flowed<'scan>> {
+    fn on_expr_binary(
+        &self,
+        expr: &ExprBinary,
+        _: &Facts<'_, ExprBinary>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         self.reported(
             ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op)).map(|_| expr.op.span()),
             Message::new(
@@ -330,13 +410,23 @@ impl<'scan> Contribute for Flows<'scan> {
         )
     }
 
-    fn on_local(&self, local: &Local, _: &Facts<'_, Local>) -> Contributed<(), Flowed<'scan>> {
+    fn on_local(
+        &self,
+        local: &Local,
+        _: &Facts<'_, Local>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         let declared = MutableLocals::declared_mutable(local)
             .map(|binding| Declared { name: Name::from(&binding.ident), span: local.let_token.span });
         Contributed::parted(Flowed { declared: declared.into_iter().collect(), ..Flowed::default() })
     }
 
-    fn on_expr(&self, expr: &Expr, _: &Facts<'_, Expr>) -> Contributed<(), Flowed<'scan>> {
+    fn on_expr(
+        &self,
+        expr: &Expr,
+        _: &Facts<'_, Expr>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flowed<'scan>> {
         let touched = MutableLocals::touched_by(expr).map(Name::from);
         Contributed::parted(Flowed { touched: touched.into_iter().collect(), ..Flowed::default() })
     }
