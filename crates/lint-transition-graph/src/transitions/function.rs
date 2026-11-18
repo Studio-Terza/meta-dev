@@ -38,13 +38,9 @@ impl<'file> Function<'file> {
         }
     }
 
-    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body) -> Function<'file> {
+    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, handle: Handle) -> Function<'file> {
         self.mutation = mutation;
         self.body = body;
-        self
-    }
-
-    pub(crate) fn holding(mut self, handle: Handle) -> Function<'file> {
         self.handle = handle;
         self
     }

@@ -193,8 +193,7 @@ impl<'file> Scope<'_, 'file> {
         let peeled = |ty: &TypeRef| ty.outlined(Peeling::new(&inner));
         Some(
             Transitive::new(placed.site(), AsRef::<Name>::as_ref(function).clone(), takes, gives)
-                .shaped(signature.mutation(), definition.shape())
-                .holding(Porting::from(self.reading).held(signature))
+                .shaped(signature.mutation(), definition.shape(), Porting::from(self.reading).held(signature))
                 .wrapped(
                     signature.output().written().map_or(Wrapping::Plain, peeled),
                     signature.inputs().iter().map(|input| input.typed().map_or(Wrapping::Plain, peeled)).collect(),
