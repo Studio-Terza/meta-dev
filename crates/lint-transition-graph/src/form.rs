@@ -5,6 +5,7 @@ use crate::transitions::{Ground, Wrapping};
 use body_lifts::Body;
 use graph::Mutation;
 use lint_layout::Name;
+use newtype::Counter;
 
 use crate::algebra::Totality;
 use crate::count::Count;
@@ -50,11 +51,28 @@ pub struct Acting<'found> {
 struct Unwrapped<'found>(Node<'found>);
 
 #[derive(Debug)]
-struct Admitted<'found>(Acting<'found>);
+struct Candidate<'found> {
+    subject: Node<'found>,
+    held: Count,
+    parameters: Vec<End<'found>>,
+}
 
-impl<'found> From<Admitted<'found>> for Acting<'found> {
-    fn from(admitted: Admitted<'found>) -> Acting<'found> {
-        admitted.0
+impl<'found> Candidate<'found> {
+    fn about(unwrapped: Unwrapped<'found>, given: &End<'found>, takes: &[End<'found>]) -> Candidate<'found> {
+        let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
+            takes.iter().copied().partition(|taken| taken.alike(given).is_some());
+        Candidate { subject: unwrapped.0, held: Count::new(held.len()), parameters }
+    }
+
+    fn admitted(self, fixed_by: Option<&Name>) -> Option<Acting<'found>> {
+        let operating = fixed_by.map(|fixing| Operators::named(fixing).is_some_and(|_| self.parameters.is_empty()));
+        let held = Some(self.held);
+        let grounded = self.parameters.first().map_or(held, |_| held.filter(|count| *count > Count::zero()));
+        grounded.filter(|_| operating.is_none_or(|operator| operator)).map(|count| Acting {
+            subject: self.subject,
+            held: count,
+            parameters: self.parameters,
+        })
     }
 }
 
@@ -67,10 +85,8 @@ impl<'found> Acting<'found> {
             .node()
             .copied()
             .and_then(|node| Acting::unwrapped(node, ends.takes(), function.takings()))
-            .map(|unwrapped| Acting::about(unwrapped, subject, ends.takes()))
-            .filter(|acting| acting.grounded().is_some())
-            .and_then(|acting| acting.admitted(edge.fixed_by()))
-            .map(Acting::from)
+            .map(|unwrapped| Candidate::about(unwrapped, subject, ends.takes()))
+            .and_then(|candidate| candidate.admitted(edge.fixed_by()))
     }
 
     fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<Unwrapped<'found>> {
@@ -80,21 +96,6 @@ impl<'found> Acting<'found> {
             .filter(|(_, taking)| **taking != Wrapping::Plain)
             .find(|(taken, _)| taken.node() == Some(&subject));
         wrapped.map_or(Some(Unwrapped(subject)), |_| None)
-    }
-
-    fn grounded(&self) -> Option<Count> {
-        self.held.positive().map(Count::from).or_else(|| self.parameters.first().map_or(Some(self.held), |_| None))
-    }
-
-    fn admitted(self, fixed_by: Option<&Name>) -> Option<Admitted<'found>> {
-        let operating = fixed_by.map(|fixing| Operators::named(fixing).is_some_and(|_| self.parameters.is_empty()));
-        operating.is_none_or(|operator| operator).then_some(Admitted(self))
-    }
-
-    fn about(unwrapped: Unwrapped<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {
-        let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
-            takes.iter().copied().partition(|taken| taken.alike(given).is_some());
-        Acting { subject: unwrapped.0, held: Count::new(held.len()), parameters }
     }
 
     pub(crate) fn held(&self) -> Count {

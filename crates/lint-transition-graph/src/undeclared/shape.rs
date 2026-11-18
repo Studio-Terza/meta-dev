@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 
 use algebra::{Monoid, Semigroup};
@@ -93,9 +94,11 @@ impl Shape {
     }
 
     fn of_acting(acting: &Acting<'_>) -> Option<Shape> {
-        let held = Count::from(acting.held().positive()?);
-        let single = (held == Count::new(1)).then_some(Shape::Unary);
-        Some(acting.parameters().first().map_or_else(|| single.unwrap_or(Shape::Binary), |_| Shape::Builder))
+        match acting.held().cmp(&Count::new(1)) {
+            Ordering::Less => None,
+            Ordering::Equal => Some(acting.parameters().first().map_or(Shape::Unary, |_| Shape::Builder)),
+            Ordering::Greater => Some(acting.parameters().first().map_or(Shape::Binary, |_| Shape::Builder)),
+        }
     }
 
     fn fix(self) -> Fix {
