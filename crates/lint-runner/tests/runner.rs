@@ -499,6 +499,13 @@ impl Scratch {
         Trees::reported_through(&self.files, std::slice::from_ref(&self.root))
     }
 
+    fn judged(sources: &&[[&str; 2]]) -> Option<usize> {
+        Scratch::package().map_or(None, |root| {
+            let written = sources.iter().try_for_each(|[path, text]| root.write(path, text).map(|_| ()));
+            written.map_or(None, |()| Some(root.reported().violations()))
+        })
+    }
+
     fn reported_at(&self, below: &str) -> Reported {
         Trees::reported_through(&self.files, &[self.at(below)])
     }
@@ -769,6 +776,44 @@ fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), Box<dy
     assert_eq!(root.reported().violations(), 2);
     Ok(())
 }
+
+const PATH_CYCLE: &[[&str; 2]] = &[
+    ["src/lib.rs", "mod a;\n"],
+    ["src/a.rs", "// a\n#[path = \"b.rs\"]\nmod b;\n"],
+    ["src/b.rs", "// b\n#[path = \"a.rs\"]\nmod a;\n"],
+];
+const TWO_ROOTS: &[[&str; 2]] = &[
+    ["src/lib.rs", "mod shared;\n"],
+    ["src/main.rs", "mod shared;\nfn main() {}\n"],
+    ["src/shared.rs", "// shared\n"],
+];
+const TEST_THEN_MODULE: &[[&str; 2]] = &[
+    ["src/lib.rs", "mod a;\n#[cfg(test)]\nmod checks;\n"],
+    ["src/a.rs", "#[path = \"checks.rs\"]\nmod checks;\n"],
+    ["src/checks.rs", "// checks\n"],
+];
+const MODULE_THEN_TEST: &[[&str; 2]] = &[
+    ["src/lib.rs", "mod shared;\nmod a;\n"],
+    ["src/a.rs", "#[cfg(test)]\n#[path = \"shared.rs\"]\nmod again;\n"],
+    ["src/shared.rs", "// shared\n"],
+];
+const TEST_CYCLE: &[[&str; 2]] = &[
+    ["src/lib.rs", "#[cfg(test)]\nmod t;\n"],
+    ["src/t.rs", "// t\n#[path = \"u.rs\"]\nmod u;\n"],
+    ["src/u.rs", "// u\n#[path = \"t.rs\"]\nmod t;\n"],
+];
+
+laws::table!(
+    a_file_reached_twice_or_in_a_cycle_is_read_once,
+    Scratch::judged,
+    [
+        PATH_CYCLE => Some(2),
+        TWO_ROOTS => Some(2),
+        TEST_THEN_MODULE => Some(1),
+        MODULE_THEN_TEST => Some(2),
+        TEST_CYCLE => Some(1),
+    ]
+);
 
 #[test]
 fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Error>> {

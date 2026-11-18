@@ -43,8 +43,4 @@ impl Hands {
             })
             .collect()
     }
-
-    pub(super) fn live(&self) -> impl Iterator<Item = Partition> + '_ {
-        self.0.iter().copied()
-    }
 }

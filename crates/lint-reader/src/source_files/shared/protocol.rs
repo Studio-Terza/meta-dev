@@ -32,7 +32,7 @@ impl<'tree> Due<'tree> {
     }
 
     pub(super) fn assigned(self, hand: Partition) -> Assigned<'tree> {
-        Assigned { node: self.node, owner: self.owner, hand }
+        Assigned { node: self.node, hand }
     }
 }
 
@@ -45,7 +45,6 @@ impl<'tree> AsRef<Located<'tree>> for Due<'tree> {
 #[derive(Debug)]
 pub(super) struct Assigned<'tree> {
     node: Node<'tree>,
-    owner: Option<Partition>,
     hand: Partition,
 }
 
@@ -56,10 +55,6 @@ impl<'tree> Assigned<'tree> {
 
     pub(super) fn hand(&self) -> Partition {
         self.hand
-    }
-
-    pub(super) fn owned_by(&self, hand: Partition) -> Option<Partition> {
-        self.owner.map(|_| hand)
     }
 }
 

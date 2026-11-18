@@ -31,6 +31,7 @@ pub struct Crew<'shared, 'tree> {
     readers: Vec<Reader<'tree>>,
 }
 
+#[must_use]
 #[derive(Debug)]
 pub struct Coordinator<'shared, 'tree> {
     shared: &'shared SharedRead<'tree>,
@@ -53,6 +54,12 @@ impl<'tree> SharedRead<'tree> {
     #[must_use]
     pub fn heads(&self) -> &[FileHead] {
         self.table.wait()
+    }
+}
+
+impl Drop for Coordinator<'_, '_> {
+    fn drop(&mut self) {
+        self.shared.table.get_or_init(Vec::new);
     }
 }
 
@@ -119,18 +126,11 @@ impl<'tree> Level<'tree> {
     }
 }
 
-#[derive(Debug)]
-struct Sending<'remote, 'tree> {
-    hand: Partition,
-    sent: Result<Dispatched<'remote, 'tree>, Vec<Node<'tree>>>,
-}
-
 #[derive(Debug, Default)]
 struct Sighted<'tree> {
     sightings: Vec<Sighting<'tree>>,
     survey: Survey,
     kept: BTreeMap<Located<'tree>, SourceFile>,
-    dead: BTreeSet<Partition>,
 }
 
 impl Reads for Coordinator<'_, '_> {
@@ -188,11 +188,7 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
 
     fn levelled(&self, dealt: Dealt<'tree>, survey: Survey, hands: &Hands) -> Explored<'tree> {
         let assigned = dealt.assigned;
-        let sighted = self.sighted(&assigned, hands);
-        let every: BTreeSet<Partition> = hands.live().collect();
-        let live: Hands = every.difference(&sighted.dead).copied().collect();
-        let parsed_by =
-            |found: &Assigned<'tree>| sighted.dead.get(&found.hand()).map_or(found.hand(), |_| Partition::MAIN);
+        let sighted = self.sighted(&assigned);
         let learned = survey.combine(sighted.survey);
         let known = &learned;
         let outcomes: Outcomes<'tree> = sighted
@@ -204,48 +200,44 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
             })
             .collect();
         let next = assigned.iter().flat_map(|found| {
-            let hand = parsed_by(found);
+            let hand = found.hand();
             let home = found.node().home();
             let declared = outcomes.get(found.node().located()).into_iter().flatten();
             let modules = declared.clone().flat_map(|done| done.children(Kind::Module));
             let tests = declared.flat_map(|done| done.children(Kind::Test));
-            let owned = modules.map(move |module| Due::new(home.child(module, known), found.owned_by(hand)));
+            let owned = modules.map(move |module| Due::new(home.child(module, known), None));
             owned.chain(tests.map(move |test| Due::new(home.child(test, known), Some(hand))))
         });
         let following = Level::after(dealt.seen, next);
-        let hands_of = assigned.iter().map(|found| (found.node().located().clone(), parsed_by(found))).collect();
-        let deeper = self.explored(following, learned, &live);
+        let hands_of = assigned.iter().map(|found| (found.node().located().clone(), found.hand())).collect();
+        let deeper = self.explored(following, learned, hands);
         let own = Gathered { outcomes, hands: hands_of, kept: sighted.kept };
         Explored { gathered: own.combine(deeper.gathered), survey: deeper.survey }
     }
 
-    fn sighted(&self, assigned: &[Assigned<'tree>], hands: &Hands) -> Sighted<'tree> {
+    fn sighted(&self, assigned: &[Assigned<'tree>]) -> Sighted<'tree> {
         let grouped: BTreeMap<Partition, Vec<Node<'tree>>> =
             assigned.iter().fold(BTreeMap::new(), |mut by: BTreeMap<Partition, Vec<Node<'tree>>>, found| {
                 by.entry(found.hand()).or_default().push(found.node().clone());
                 by
             });
         let mut by_hand = grouped;
-        let live: BTreeSet<Partition> = hands.live().collect();
-        let remotes = self.coordinator.remotes.iter().filter(|remote| live.contains(&remote.hand()));
-        let sendings: Vec<Sending<'_, 'tree>> = remotes
+        let waiting: Vec<Dispatched<'_, 'tree>> = self
+            .coordinator
+            .remotes
+            .iter()
             .filter_map(|remote| {
                 let nodes = by_hand.remove(&remote.hand()).unwrap_or_default();
                 nodes.first()?;
-                Some(Sending { hand: remote.hand(), sent: remote.dispatched(nodes) })
+                remote.dispatched(nodes)
             })
             .collect();
-        let (waiting, refused): (Vec<Sending<'_, 'tree>>, Vec<Sending<'_, 'tree>>) =
-            sendings.into_iter().partition(|sending| sending.sent.is_ok());
-        let dead: BTreeSet<Partition> = refused.iter().map(|sending| sending.hand).collect();
-        let returned = refused.into_iter().flat_map(|sending| sending.sent.map_or_else(|nodes| nodes, |_| Vec::new()));
-        let local: Vec<Node<'tree>> =
-            by_hand.remove(&Partition::MAIN).unwrap_or_default().into_iter().chain(returned).collect();
+        let local: Vec<Node<'tree>> = by_hand.remove(&Partition::MAIN).unwrap_or_default();
         let packages = &self.coordinator.shared.stage.packages;
         Parsed::read(self.files, packages, &local, |own, kept| {
-            let remote = waiting.into_iter().flat_map(|sending| sending.sent.into_iter()).map(Dispatched::sighted);
-            let report: Report<'tree> = Monoid::concat(iter::once(own).chain(remote));
-            report.concluded(|sightings, survey| Sighted { sightings, survey, kept, dead })
+            let report: Report<'tree> =
+                Monoid::concat(iter::once(own).chain(waiting.into_iter().map(Dispatched::sighted)));
+            report.concluded(|sightings, survey| Sighted { sightings, survey, kept })
         })
     }
 }

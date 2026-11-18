@@ -2094,6 +2094,7 @@ dependencies = [
  "graph-query",
  "graph-reader",
  "invariants",
+ "laws",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",

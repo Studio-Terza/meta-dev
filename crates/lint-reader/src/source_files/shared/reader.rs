@@ -15,15 +15,6 @@ enum Order<'tree> {
     Assemble(Assignment<'tree>),
 }
 
-impl<'tree> Order<'tree> {
-    fn parsing(self) -> Vec<Node<'tree>> {
-        match self {
-            Order::Parse(nodes) => nodes,
-            Order::Assemble(_) => Vec::new(),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Reader<'tree> {
     packages: &'tree Packages,
@@ -102,11 +93,8 @@ impl<'tree> Remote<'tree> {
         self.hand
     }
 
-    pub(super) fn dispatched(&self, nodes: Vec<Node<'tree>>) -> Result<Dispatched<'_, 'tree>, Vec<Node<'tree>>> {
-        self.orders
-            .send(Order::Parse(nodes))
-            .map(|()| Dispatched { sighted: &self.sighted })
-            .map_err(|refused| refused.0.parsing())
+    pub(super) fn dispatched(&self, nodes: Vec<Node<'tree>>) -> Option<Dispatched<'_, 'tree>> {
+        self.orders.send(Order::Parse(nodes)).map_or(None, |()| Some(Dispatched { sighted: &self.sighted }))
     }
 
     pub(super) fn assigned(&self, assignment: Assignment<'tree>) -> Option<Assembling<'_>> {
