@@ -21,39 +21,26 @@ pub struct Excerpt(String);
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunState {
-    #[name("running")]
     Running,
-    #[name("replied")]
     Replied,
-    #[name("unreadable")]
     Unreadable,
-    #[name("errored")]
     Errored,
-    #[name("overdue")]
     Overdue,
-    #[name("killed")]
     Killed,
-    #[name("gone")]
     Gone,
-    #[name("failed")]
     Failed,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Halted {
-    #[name("flailed")]
     Flailed,
-    #[name("stalled")]
     Stalled,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Delivery {
-    #[name("unreported")]
     Unreported,
-    #[name("reported")]
     Reported,
-    #[name("withdrawn")]
     Withdrawn,
 }
 

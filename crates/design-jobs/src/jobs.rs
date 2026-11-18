@@ -6,17 +6,11 @@ use store_ports::{Edge, Lifecycle, Moved};
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JobState {
-    #[name("open")]
     Open,
-    #[name("applied")]
     Applied,
-    #[name("repeated")]
     Repeated,
-    #[name("flailed")]
     Flailed,
-    #[name("stalled")]
     Stalled,
-    #[name("interrupted")]
     Interrupted,
 }
 
