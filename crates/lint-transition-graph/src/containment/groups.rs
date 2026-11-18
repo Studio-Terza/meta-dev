@@ -2,7 +2,7 @@ use lint_layout::Name;
 use std::collections::BTreeSet;
 use std::fmt;
 
-use graph::Traversal;
+use graph::{Event, Trees};
 
 use crate::count::Count;
 
@@ -19,10 +19,11 @@ impl<'found> Groups<'found> {
         directed: impl Iterator<Item = Link<'found>>,
     ) -> Groups<'found> {
         let links = Containment::adjacency(directed.flat_map(|link| [link, link.reversed()]));
-        let mut groups: Vec<Vec<Member<'found>>> =
-            Traversal::trees(members.iter().copied(), |member: Member<'found>| {
-                links.get(&member).into_iter().flatten().copied()
-            })
+        let trees: Trees<Member<'found>> = Event::walked(members.iter().copied(), |member: Member<'found>| {
+            links.get(&member).into_iter().flatten().copied()
+        })
+        .collect();
+        let mut groups: Vec<Vec<Member<'found>>> = trees
             .into_iter()
             .map(|group| group.into_iter().collect::<BTreeSet<Member<'found>>>().into_iter().collect())
             .collect();

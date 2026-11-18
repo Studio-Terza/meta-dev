@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use graph::{
-    Function, Holding, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Origin, Placed, Reach, References,
-    Region, Resolved, Seat, Traversal, TypeRef,
+    Event, Function, Holding, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Origin, Placed, Reach,
+    References, Region, Resolved, Seat, TypeRef,
 };
 use lint_core::Site;
 use lint_layout::Name;
@@ -120,7 +120,7 @@ impl<'file> Members<'file> {
             let used = standing(item).and_then(|found| targets.get(&found)).into_iter().flatten().copied();
             used.filter(move |target| self.crates.get(target) == krate)
         };
-        let ends = Traversal::trees(reached.0, &next).into_iter().flatten();
+        let ends = Event::walked(reached.0, &next).filter_map(Event::finished);
         ends.filter_map(|end| self.declarations.get(&end)).map(|member| Link::new(holder, *member)).collect()
     }
 
