@@ -226,7 +226,12 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         }
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Candidates<'scan>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Candidates<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
@@ -339,15 +344,30 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         self.lengths(variant.discriminant.iter().map(|(_, discriminant)| discriminant), inner)
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Candidates<'scan>> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Candidates<'scan>> {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_expr_cast(&self, cast: &ExprCast, _: &Facts<'_, ExprCast>) -> Contributed<(), Candidates<'scan>> {
+    fn on_expr_cast(
+        &self,
+        cast: &ExprCast,
+        _: &Facts<'_, ExprCast>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Candidates<'scan>> {
         Contributed::parted(Candidates { casts: vec![cast.as_token.span], ..Candidates::default() })
     }
 
-    fn on_expr_while(&self, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Contributed<(), Candidates<'scan>> {
+    fn on_expr_while(
+        &self,
+        expr: &ExprWhile,
+        _: &Facts<'_, ExprWhile>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Candidates<'scan>> {
         let counted = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted);
         Contributed::parted(Candidates {
             loops: counted
@@ -364,7 +384,12 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         })
     }
 
-    fn on_expr_loop(&self, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Contributed<(), Candidates<'scan>> {
+    fn on_expr_loop(
+        &self,
+        expr: &ExprLoop,
+        _: &Facts<'_, ExprLoop>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Candidates<'scan>> {
         Self::looped(
             expr.loop_token.span,
             Message::new(
@@ -374,7 +399,12 @@ impl<'scan> Contribute for ConstContexts<'scan> {
         )
     }
 
-    fn on_expr_for_loop(&self, expr: &ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Contributed<(), Candidates<'scan>> {
+    fn on_expr_for_loop(
+        &self,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Candidates<'scan>> {
         Self::looped(
             expr.for_token.span,
             Message::new(

@@ -83,19 +83,39 @@ impl Contribute for DeclarationScan {
         })
     }
 
-    fn on_item_enum(&self, item: &ItemEnum, _: &Facts<'_, ItemEnum>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+    fn on_item_enum(
+        &self,
+        item: &ItemEnum,
+        _: &Facts<'_, ItemEnum>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Self::record(&item.ident, Kind::Enum)
     }
 
-    fn on_item_struct(&self, item: &ItemStruct, _: &Facts<'_, ItemStruct>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+    fn on_item_struct(
+        &self,
+        item: &ItemStruct,
+        _: &Facts<'_, ItemStruct>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Self::record(&item.ident, Kind::Other)
     }
 
-    fn on_item_union(&self, item: &ItemUnion, _: &Facts<'_, ItemUnion>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+    fn on_item_union(
+        &self,
+        item: &ItemUnion,
+        _: &Facts<'_, ItemUnion>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Self::record(&item.ident, Kind::Other)
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<Vec<Declared>, Vec<Nested>> {
         Contributed::descending(Descend::Expand)
     }
 }

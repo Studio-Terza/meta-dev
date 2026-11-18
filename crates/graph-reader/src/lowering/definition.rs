@@ -5,13 +5,13 @@ mod repetitions;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{Block, Expr, ExprCall, ExprMethodCall, Item, PatIdent, Signature, Type};
+use syntax::{Block, Expr, ExprCall, ExprMethodCall, PatIdent, Signature, Type};
 
 use body_lifts::{Body, BodyReading, Branching, Propagated};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
-use lint_sweep::{Address, Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Address, Gathers, Watching};
 
 use crate::namespace::{Resolving, ScopeId};
 
@@ -169,7 +169,9 @@ impl Made {
 impl PendingInvocation {
     fn settled(self, order: Option<CallOrder>) -> LoweredInvocation {
         match self {
-            PendingInvocation::Method { receiver, name } => LoweredInvocation::Method { receiver: receiver.settled(order), name },
+            PendingInvocation::Method { receiver, name } => {
+                LoweredInvocation::Method { receiver: receiver.settled(order), name }
+            }
             PendingInvocation::Path { owner, name } => LoweredInvocation::Path { owner, name },
         }
     }
@@ -207,7 +209,7 @@ impl BodyGroup {
         let rebound: BTreeSet<Name> = part.rebound.into_iter().collect();
         let read = part.reads.settled(&self.scope, self.shared, self.tail, &rebound);
         let bound: BTreeMap<Name, TypeRef<Written>> =
-            self.parameters.into_iter().filter(|(name, _)| rebound.get(name).is_none()).collect();
+            self.parameters.into_iter().filter(|(name, _)| rebound.contains(name).then_some(()).is_none()).collect();
         let orders: Vec<Option<CallOrder>> = part.made.iter().map(|made| made.order(&part.made)).collect();
         let invocations = part
             .made

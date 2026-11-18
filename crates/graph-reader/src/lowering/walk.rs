@@ -462,7 +462,9 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ExprMethodCall>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).method_called(call).combine(Grains::from(BodyPart::method_entered(call))))
+        Contributed::parted(
+            self.frame(&around).method_called(call).combine(Grains::from(BodyPart::method_entered(call))),
+        )
     }
 
     fn on_expr_call(
@@ -560,43 +562,93 @@ impl<'read> Contribute for Lowering<'read> {
         })
     }
 
-    fn on_expr_if(&self, _: &syntax::ExprIf, _: &Facts<'_, syntax::ExprIf>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+    fn on_expr_if(
+        &self,
+        _: &syntax::ExprIf,
+        _: &Facts<'_, syntax::ExprIf>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
     }
 
-    fn on_expr_while(&self, _: &syntax::ExprWhile, _: &Facts<'_, syntax::ExprWhile>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+    fn on_expr_while(
+        &self,
+        _: &syntax::ExprWhile,
+        _: &Facts<'_, syntax::ExprWhile>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
     }
 
-    fn on_expr_for_loop(&self, _: &syntax::ExprForLoop, _: &Facts<'_, syntax::ExprForLoop>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+    fn on_expr_for_loop(
+        &self,
+        _: &syntax::ExprForLoop,
+        _: &Facts<'_, syntax::ExprForLoop>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
     }
 
-    fn on_expr_try(&self, _: &syntax::ExprTry, _: &Facts<'_, syntax::ExprTry>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+    fn on_expr_try(
+        &self,
+        _: &syntax::ExprTry,
+        _: &Facts<'_, syntax::ExprTry>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::propagating())))
     }
 
-    fn on_expr_binary(&self, found: &syntax::ExprBinary, _: &Facts<'_, syntax::ExprBinary>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+    fn on_expr_binary(
+        &self,
+        found: &syntax::ExprBinary,
+        _: &Facts<'_, syntax::ExprBinary>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::joined(found))))
     }
 
-    fn on_pat_ident(&self, found: &syntax::PatIdent, _: &Facts<'_, syntax::PatIdent>, _: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
+    fn on_pat_ident(
+        &self,
+        found: &syntax::PatIdent,
+        _: &Facts<'_, syntax::PatIdent>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::rebinding(found)))
     }
 
-    fn off_expr_method_call(&self, call: &ExprMethodCall, _: &Facts<'_, ExprMethodCall>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+    fn off_expr_method_call(
+        &self,
+        call: &ExprMethodCall,
+        _: &Facts<'_, ExprMethodCall>,
+        inner: Contribution<Framed<'read>, Grains>,
+    ) -> Grains {
         inner.concluded(|_, grown| grown.combine(Grains::from(BodyPart::method_made(call))))
     }
 
-    fn off_expr_call(&self, call: &ExprCall, _: &Facts<'_, ExprCall>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+    fn off_expr_call(
+        &self,
+        call: &ExprCall,
+        _: &Facts<'_, ExprCall>,
+        inner: Contribution<Framed<'read>, Grains>,
+    ) -> Grains {
         inner.concluded(|_, grown| grown.combine(Grains::from(BodyPart::call_made(call))))
     }
 
-    fn off_item(&self, _: &syntax::Item, _: &Facts<'_, syntax::Item>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+    fn off_item(
+        &self,
+        _: &syntax::Item,
+        _: &Facts<'_, syntax::Item>,
+        inner: Contribution<Framed<'read>, Grains>,
+    ) -> Grains {
         inner.concluded(|_, grown| grown.unbodied())
     }
 
-    fn off_signature(&self, _: &SynSignature, _: &Facts<'_, SynSignature>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
+    fn off_signature(
+        &self,
+        _: &SynSignature,
+        _: &Facts<'_, SynSignature>,
+        inner: Contribution<Framed<'read>, Grains>,
+    ) -> Grains {
         inner.concluded(|_, grown| grown.unbodied())
     }
 

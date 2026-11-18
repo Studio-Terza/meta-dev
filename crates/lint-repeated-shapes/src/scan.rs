@@ -194,15 +194,30 @@ impl<'file> Contribute for ShapeScan<'file> {
         Self::closed(&function.attrs, inner)
     }
 
-    fn on_block(&self, block: &Block, _: &Facts<'_, Block>) -> Contributed<(), Vec<Sighted<'file>>> {
+    fn on_block(
+        &self,
+        block: &Block,
+        _: &Facts<'_, Block>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Sighted<'file>>> {
         self.considered(Edges::of_block(block))
     }
 
-    fn on_expr_match(&self, found: &ExprMatch, _: &Facts<'_, ExprMatch>) -> Contributed<(), Vec<Sighted<'file>>> {
+    fn on_expr_match(
+        &self,
+        found: &ExprMatch,
+        _: &Facts<'_, ExprMatch>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Sighted<'file>>> {
         self.considered(Edges::of_match(found))
     }
 
-    fn on_expr_closure(&self, found: &ExprClosure, _: &Facts<'_, ExprClosure>) -> Contributed<(), Vec<Sighted<'file>>> {
+    fn on_expr_closure(
+        &self,
+        found: &ExprClosure,
+        _: &Facts<'_, ExprClosure>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Sighted<'file>>> {
         self.considered(Edges::of_closure(found))
     }
 }

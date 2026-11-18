@@ -3,12 +3,12 @@ mod shaped;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use syntax::{Block, Expr, ExprCall, ExprField, ExprMethodCall, Item, MemberText, Signature, Spine, Type};
+use syntax::{Block, Expr, ExprCall, ExprField, MemberText, Signature, Spine, Type};
 
 use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name, Whole, Word};
-use lint_sweep::{Address, Descend, Facts, Kind, Watch};
+use lint_sweep::Address;
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
@@ -300,7 +300,6 @@ impl ReadsLowered {
             .collect()
     }
 }
-
 
 impl Semigroup for Reads {
     fn combine(self, other: Reads) -> Reads {
