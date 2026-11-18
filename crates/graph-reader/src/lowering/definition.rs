@@ -1,6 +1,7 @@
 use algebra::{Monoid, Semigroup};
 mod branches;
 mod reads;
+mod repeats;
 mod repetitions;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,14 +12,15 @@ use body_lifts::{Body, BodyReading, Branching, Propagated};
 use graph::{CallOrder, Definition, Invocation, Mutation, Receiving, Repetition, TypeRef};
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
-use lint_sweep::{Address, Gathers, Watching};
+use lint_sweep::Address;
 
 use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
 pub(super) use branches::Branches;
 use reads::{Reads, ReadsLowered, SharedParameters};
-use repetitions::Repetitions;
+use repeats::Parameters;
+pub(super) use repeats::Repeats;
 
 #[derive(Debug)]
 enum LoweredReceiving {
@@ -70,6 +72,7 @@ pub(crate) struct BodyPart {
     made: Vec<Made>,
     branches: Branches,
     reads: Reads,
+    repeats: Repeats,
 }
 
 impl Semigroup for BodyPart {
@@ -79,6 +82,7 @@ impl Semigroup for BodyPart {
             made: self.made.combine(other.made),
             branches: self.branches.combine(other.branches),
             reads: self.reads.combine(other.reads),
+            repeats: self.repeats.combine(other.repeats),
         }
     }
 }
@@ -92,7 +96,7 @@ pub(crate) struct BodyGroup {
     parameters: BTreeMap<Name, TypeRef<Written>>,
     shared: SharedParameters,
     tail: Option<Address>,
-    repetitions: Repetitions,
+    reached: Parameters,
 }
 
 impl BodyPart {
@@ -102,12 +106,16 @@ impl BodyPart {
         BodyPart { rebound: vec![Name::from(&found.ident)], ..BodyPart::default() }
     }
 
+    pub(super) fn repeating(repeats: Repeats) -> BodyPart {
+        BodyPart { repeats, ..BodyPart::default() }
+    }
+
     pub(super) fn branching(branches: Branches) -> BodyPart {
         BodyPart { branches, ..BodyPart::default() }
     }
 
     pub(super) fn method_entered(found: &ExprMethodCall) -> BodyPart {
-        BodyPart { reads: Reads::counted(Address::from(found)), ..BodyPart::default() }
+        BodyPart { reads: Reads::counted(Address::from(found)), repeats: Repeats::method(found), ..BodyPart::default() }
     }
 
     pub(super) fn call_entered(found: &ExprCall) -> BodyPart {
@@ -205,7 +213,7 @@ impl BodyGroup {
             parameters,
             shared: Reads::shared_parameters(signature),
             tail: Reads::tail_call(body),
-            repetitions: Repetitions::of_signature(signature),
+            reached: Parameters::of_signature(signature),
         }
     }
 
@@ -229,22 +237,12 @@ impl BodyGroup {
             branching: branches.score(),
             propagated: branches.propagated(),
             invocations,
-            repetitions: self.repetitions.found(),
+            repetitions: part.repeats.found(&self.reached),
             reads: read,
         }
     }
 }
 
-impl Gathers<BodyGroup> for BodyGroup {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        let members: [&mut Watching<'_>; _] = [&mut self.repetitions];
-        members
-    }
-
-    fn gathered(self) -> BodyGroup {
-        self
-    }
-}
 impl LoweredDefinition {
     pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Definition {
         let invocations =

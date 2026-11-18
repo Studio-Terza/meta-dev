@@ -8,15 +8,13 @@ use syntax::{
 };
 
 use algebra::{Monoid, Semigroup};
-use graph::{Evaluation, Reach};
+use graph::{Evaluation, Looping, Reach};
 use lint_core::SourceFile;
 use lint_layout::{Name, Position};
-use lint_sweep::{
-    Address, Around, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope, Sweep, WalkPosition,
-};
+use lint_sweep::{Address, Around, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope, WalkPosition};
 
 use super::attributes::Attributes;
-use super::definition::{BodyGroup, BodyPart, Branches, Mutations};
+use super::definition::{BodyGroup, BodyPart, Branches, Mutations, Repeats};
 use super::frames::Enclosure;
 use super::held::{Holder, Link};
 use super::regions::{Context, Regions};
@@ -125,11 +123,7 @@ impl<'read> Frame<'read> {
             let (bodies, kept): (Vec<Grain>, Vec<Grain>) =
                 grown.grains.into_iter().partition(|grain| grain.bodied().is_some());
             let part: BodyPart = Monoid::concat(bodies.into_iter().filter_map(super::Grain::body));
-            let definition = body.map(|block| {
-                let mut group = BodyGroup::opened(&generics, signature, block);
-                Sweep::block_in(self.source, block, lint_sweep::Gathers::watching(&mut group).into_iter().collect());
-                lint_sweep::Gathers::gathered(group).lowered(part)
-            });
+            let definition = body.map(|block| BodyGroup::opened(&generics, signature, block).lowered(part));
             let own = kept.iter().position(|grain| grain.function().is_some());
             let mut ahead = kept;
             let rest = ahead.split_off(own.map_or(ahead.len(), |found| found + 1));
@@ -206,6 +200,9 @@ impl<'read> Contribute for Lowering<'read> {
             Kind::ExprIf,
             Kind::ExprWhile,
             Kind::ExprForLoop,
+            Kind::ExprLoop,
+            Kind::ExprClosure,
+            Kind::ExprField,
             Kind::ExprTry,
             Kind::ExprBinary,
             Kind::PatIdent,
@@ -514,7 +511,8 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, ExprPath>,
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).path_used(expression))
+        let repeated = Grains::from(BodyPart::repeating(Repeats::path(expression)));
+        Contributed::parted(self.frame(&around).path_used(expression).combine(repeated))
     }
 
     fn on_expr_match(
@@ -584,20 +582,49 @@ impl<'read> Contribute for Lowering<'read> {
 
     fn on_expr_while(
         &self,
-        _: &syntax::ExprWhile,
+        expr: &syntax::ExprWhile,
         _: &Facts<'_, syntax::ExprWhile>,
         _: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
+        let looped = BodyPart::repeating(Repeats::looped(&expr.body, Looping::While));
+        Contributed::parted(Grains::from(BodyPart::branching(Branches::branched()).combine(looped)))
+    }
+
+    fn on_expr_loop(
+        &self,
+        expr: &syntax::ExprLoop,
+        _: &Facts<'_, syntax::ExprLoop>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::repeating(Repeats::looped(&expr.body, Looping::Bare))))
+    }
+
+    fn on_expr_closure(
+        &self,
+        closure: &syntax::ExprClosure,
+        _: &Facts<'_, syntax::ExprClosure>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::repeating(Repeats::closure(closure))))
+    }
+
+    fn on_expr_field(
+        &self,
+        field: &syntax::ExprField,
+        _: &Facts<'_, syntax::ExprField>,
+        _: Around<'_, Framed<'read>, Grains>,
+    ) -> Grown<'read> {
+        Contributed::parted(Grains::from(BodyPart::repeating(Repeats::field(field))))
     }
 
     fn on_expr_for_loop(
         &self,
-        _: &syntax::ExprForLoop,
+        expr: &syntax::ExprForLoop,
         _: &Facts<'_, syntax::ExprForLoop>,
         _: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
-        Contributed::parted(Grains::from(BodyPart::branching(Branches::branched())))
+        let looped = BodyPart::repeating(Repeats::looped(&expr.body, Looping::For));
+        Contributed::parted(Grains::from(BodyPart::branching(Branches::branched()).combine(looped)))
     }
 
     fn on_expr_try(
