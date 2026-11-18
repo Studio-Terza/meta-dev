@@ -5,7 +5,7 @@ use std::fmt;
 use std::ops::Add;
 
 use lint_core::SourceFile;
-use lint_sweep::{Contributing, Gathers, Sweep, Watching};
+use lint_sweep::{Contributing, Gathers, Sweep};
 use newtype::Counter;
 
 use count::Count;
@@ -74,14 +74,10 @@ impl<'file> From<&'file SourceFile> for BudgetGathering<'file> {
 }
 
 impl Gathers<CrateBudget> for BudgetGathering<'_> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.scan)
-    }
-
-    fn gathered(self) -> CrateBudget {
+    fn gathered(self, source: &SourceFile) -> CrateBudget {
         let share = self.share;
         let unscanned = self.file;
-        let file = self.scan.concluded(|_, (), tally| tally).counted(|tests, test_lines| CrateBudget {
+        let file = self.scan.concluded(source, |_, (), tally| tally).counted(|tests, test_lines| CrateBudget {
             test_lines: share.test_lines(test_lines, unscanned.lines),
             tests,
             ..unscanned
@@ -91,12 +87,8 @@ impl Gathers<CrateBudget> for BudgetGathering<'_> {
 }
 
 impl Gathers<CrateBudget> for Contributing<TestScan<'_>> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> CrateBudget {
-        self.concluded(|_, (), tally| tally).counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
+    fn gathered(self, source: &SourceFile) -> CrateBudget {
+        self.concluded(source, |_, (), tally| tally).counted(|tests, _| CrateBudget { tests, ..CrateBudget::default() })
     }
 }
 

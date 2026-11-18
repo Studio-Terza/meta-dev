@@ -4,9 +4,10 @@ use algebra::{Monoid, Semigroup};
 use syntax::ItemMacro;
 
 use lint_core::Macros;
+use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_layout::TestMarks;
-use lint_sweep::{Contribute, Contributed, Contributing, Facts, Gathers, Kind, Sweep, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Facts, Gathers, Kind};
 
 #[derive(Debug, Default)]
 pub struct Emitters {
@@ -21,12 +22,8 @@ impl EmitterScan {
 }
 
 impl Gathers<Emitters> for Contributing<EmitterScan> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> Emitters {
-        self.concluded(|_, (), emitters| emitters)
+    fn gathered(self, file: &SourceFile) -> Emitters {
+        self.concluded(file, |_, (), emitters| emitters)
     }
 }
 
@@ -63,7 +60,7 @@ impl Contribute for EmitterScan {
         &self,
         definition: &ItemMacro,
         _: &Facts<'_, ItemMacro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Emitters> {
         let names = definition
             .ident

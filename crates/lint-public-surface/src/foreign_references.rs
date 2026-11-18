@@ -9,7 +9,7 @@ use algebra::{Monoid, Semigroup};
 use lint_core::{Macros, SourceFile};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 
 use crate_reach::CrateReach;
 
@@ -85,12 +85,8 @@ impl From<&SourceFile> for Reading {
 }
 
 impl Gathers<ForeignReferences> for Reading {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(&mut self.scan)
-    }
-
-    fn gathered(self) -> ForeignReferences {
-        let read = self.scan.concluded(|_, (), references| references);
+    fn gathered(self, file: &SourceFile) -> ForeignReferences {
+        let read = self.scan.concluded(file, |_, (), references| references);
         self.reader.kept(read, self.tested)
     }
 }
@@ -170,7 +166,7 @@ impl Contribute for ReferenceScan {
         &self,
         item: &ItemUse,
         _: &Facts<'_, ItemUse>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), ForeignReferences> {
         Contributed::new((), self.used(&item.tree), Descend::Over)
     }
@@ -179,7 +175,7 @@ impl Contribute for ReferenceScan {
         &self,
         invoked: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), ForeignReferences> {
         Contributed::new((), self.transcribed(invoked), Descend::Unfold)
     }
@@ -188,7 +184,7 @@ impl Contribute for ReferenceScan {
         &self,
         path: &Path,
         _: &Facts<'_, Path>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), ForeignReferences> {
         Contributed::parted(self.pathed(path))
     }

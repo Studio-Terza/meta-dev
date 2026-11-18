@@ -50,7 +50,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<LineNumber>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -59,7 +59,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &LitInt,
         facts: &Facts<'_, LitInt>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<LineNumber>> {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }
@@ -68,7 +68,7 @@ impl Contribute for Numbers<'_> {
         &self,
         _: &LitFloat,
         facts: &Facts<'_, LitFloat>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<LineNumber>> {
         Contributed::parted(facts.unnamed().into_iter().collect())
     }

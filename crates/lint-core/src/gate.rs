@@ -2,6 +2,8 @@ mod suffix;
 
 use syntax::ItemMod;
 
+use algebra::Semigroup;
+
 use lint_layout::{Name, Word};
 use lint_placement::Placement;
 use newtype::Wrapping;
@@ -51,7 +53,7 @@ impl Gate {
     #[must_use]
     pub fn outside(&self, module: &ItemMod) -> Descend {
         Descend::from(Walk::outside_tests(&module.attrs))
-            .then(|| self.names(module).map_or(Descend::Into, |_| Descend::Over))
+            .combine(self.names(module).map_or(Descend::Into, |_| Descend::Over))
     }
 
     #[must_use]

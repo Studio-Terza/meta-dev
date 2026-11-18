@@ -9,7 +9,7 @@ use lint_core::Problem;
 use lint_core::{Headline, Parsed};
 use lint_core::{SourceFile, Violation};
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_sweep::{Contributing, Gathers, Watching};
+use lint_sweep::{Contributing, Gathers};
 use path_reach::PathReach;
 use test_code::{TestCode, Tested};
 
@@ -68,17 +68,12 @@ pub enum Watched<'file> {
 }
 
 impl<'file> Gathers<Tested<'file>> for Watched<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+    fn gathered(self, file: &SourceFile) -> Tested<'file> {
         match self {
-            Watched::Shipped(code) => std::iter::once::<&mut Watching<'_>>(code),
-            Watched::Beside(reach) => std::iter::once::<&mut Watching<'_>>(reach),
-        }
-    }
-
-    fn gathered(self) -> Tested<'file> {
-        match self {
-            Watched::Shipped(contributing) => contributing.concluded(|code, (), in_source| code.tested(in_source)),
-            Watched::Beside(contributing) => contributing.concluded(|reach, (), reached| reach.tested(reached)),
+            Watched::Shipped(contributing) => {
+                contributing.concluded(file, |code, (), in_source| code.tested(in_source))
+            }
+            Watched::Beside(contributing) => contributing.concluded(file, |reach, (), reached| reach.tested(reached)),
         }
     }
 }

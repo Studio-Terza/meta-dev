@@ -168,7 +168,7 @@ impl<'read> Lowering<'read> {
         replayed.concluded(|openings, scopes| Lowered { openings, scopes, slots: sorted.slots, rows: sorted.rows })
     }
 
-    fn frame(&self, around: &Around<'_, Framed<'read>, Grains>) -> Frame<'read> {
+    fn frame(&self, around: &Around<'_, Framed<'read>>) -> Frame<'read> {
         let nearest = around.nearest().find_map(|framed| framed.0.as_deref()).unwrap_or(&self.top);
         Frame { at: around.position(), ..nearest.clone() }
     }
@@ -235,23 +235,18 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         ty: &syntax::Type,
         _: &Facts<'_, syntax::Type>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).types_used(ty))
+        Contributed::parted(self.frame(around).types_used(ty))
     }
 
-    fn on_item_mod(
-        &self,
-        item: &ItemMod,
-        _: &Facts<'_, ItemMod>,
-        around: Around<'_, Framed<'read>, Grains>,
-    ) -> Grown<'read> {
-        let frame = self.frame(&around);
+    fn on_item_mod(&self, item: &ItemMod, _: &Facts<'_, ItemMod>, around: &Around<'_, Framed<'read>>) -> Grown<'read> {
+        let frame = self.frame(around);
         item.content.as_ref().map_or_else(|| frame.slotted(item), |(_, items)| frame.module_entered(item, items))
     }
 
-    fn on_block(&self, block: &Block, _: &Facts<'_, Block>, around: Around<'_, Framed<'read>, Grains>) -> Grown<'read> {
-        let frame = self.frame(&around);
+    fn on_block(&self, block: &Block, _: &Facts<'_, Block>, around: &Around<'_, Framed<'read>>) -> Grown<'read> {
+        let frame = self.frame(around);
         let Opened { frame: inner, op } =
             frame.entered(ScopeKind::Block, Entries::of_block(&block.stmts), frame.here.children());
         inner.framed(Grains::from(Grain::Op(op)), Descend::Into)
@@ -261,9 +256,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         block: &ItemImpl,
         _: &Facts<'_, ItemImpl>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         frame.with_context(frame.context.within_item(&block.attrs)).impl_entered(block)
     }
 
@@ -271,9 +266,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemTrait,
         _: &Facts<'_, ItemTrait>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let generics = frame.generics.subjectless().extended(&item.generics);
         let bounds = frame.trait_bounds(item, &generics);
         let owning = frame.trait_owning(&item.ident, &item.attrs);
@@ -283,13 +278,8 @@ impl<'read> Contribute for Lowering<'read> {
         inner.framed(bounds.combine(owning.grains).combine(filler), Descend::Into)
     }
 
-    fn on_item_fn(
-        &self,
-        item: &ItemFn,
-        _: &Facts<'_, ItemFn>,
-        around: Around<'_, Framed<'read>, Grains>,
-    ) -> Grown<'read> {
-        let frame = self.frame(&around);
+    fn on_item_fn(&self, item: &ItemFn, _: &Facts<'_, ItemFn>, around: &Around<'_, Framed<'read>>) -> Grown<'read> {
+        let frame = self.frame(around);
         let owning = frame.owning(&item.sig.ident, Domain::Values, &item.attrs);
         let inner = frame.with_context(owning.within(&frame.context.within_item(&item.attrs)));
         let Functioned { row, generics } = inner.function(&item.attrs, &item.vis, &item.sig);
@@ -305,9 +295,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        self.frame(&around).method_entered(&item.attrs, &item.vis, &item.sig)
+        self.frame(around).method_entered(&item.attrs, &item.vis, &item.sig)
     }
 
     fn off_impl_item_fn(
@@ -323,9 +313,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &TraitItemFn,
         _: &Facts<'_, TraitItemFn>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        self.frame(&around).method_entered(&item.attrs, &SynVisibility::Inherited, &item.sig)
+        self.frame(around).method_entered(&item.attrs, &SynVisibility::Inherited, &item.sig)
     }
 
     fn off_trait_item_fn(
@@ -341,9 +331,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ForeignItemFn,
         _: &Facts<'_, ForeignItemFn>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let foreign = Frame { enclosure: Enclosure::Foreign, ..self.frame(&around).clone() };
+        let foreign = Frame { enclosure: Enclosure::Foreign, ..self.frame(around).clone() };
         let Functioned { row, .. } = foreign.function(&item.attrs, &item.vis, &item.sig);
         Contributed::parted(Grains::from(Grain::Function(row)))
     }
@@ -352,9 +342,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemType,
         _: &Facts<'_, ItemType>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let generics = InScope::outside().extended(&item.generics);
         let target = generics.lowered(&item.ty);
         let held = frame.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
@@ -372,9 +362,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemStruct,
         _: &Facts<'_, ItemStruct>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let scope = frame.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         let rows = frame
@@ -388,9 +378,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemEnum,
         _: &Facts<'_, ItemEnum>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let scope = frame.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         let variants = item.variants.iter().map(|variant| {
@@ -413,9 +403,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemUnion,
         _: &Facts<'_, ItemUnion>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let scope = frame.generics.extended(&item.generics);
         let link = Link::declaring(&item.ident);
         let rows = frame.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident).combine(frame.fields_held(
@@ -431,9 +421,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemConst,
         _: &Facts<'_, ItemConst>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(&around).in_table();
+        let tabled = self.frame(around).in_table();
         tabled.valued(&item.ident, &item.ty, &item.attrs)
     }
 
@@ -441,9 +431,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemStatic,
         _: &Facts<'_, ItemStatic>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(&around).in_table();
+        let tabled = self.frame(around).in_table();
         tabled.valued(&item.ident, &item.ty, &item.attrs)
     }
 
@@ -451,9 +441,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         _: &ImplItemConst,
         _: &Facts<'_, ImplItemConst>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let tabled = self.frame(&around).in_table();
+        let tabled = self.frame(around).in_table();
         tabled.framed(Grains::default(), Descend::Into)
     }
 
@@ -461,18 +451,18 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         call: &ExprMethodCall,
         _: &Facts<'_, ExprMethodCall>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).method_called(call).combine(Grains::from(BodyPart::method_call(call))))
+        Contributed::parted(self.frame(around).method_called(call).combine(Grains::from(BodyPart::method_call(call))))
     }
 
     fn on_expr_call(
         &self,
         call: &ExprCall,
         _: &Facts<'_, ExprCall>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let calling = Frame { calling: lint_core::Syntax::expr_path(&call.func).map(Address::from), ..frame.clone() };
         let called = frame.path_called(call).combine(Grains::from(BodyPart::call(call)));
         calling.framed(called, Descend::Into)
@@ -482,37 +472,37 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         expr: &ExprMacro,
         _: &Facts<'_, ExprMacro>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).macro_called(expr))
+        Contributed::parted(self.frame(around).macro_called(expr))
     }
 
     fn on_expr_struct(
         &self,
         literal: &syntax::ExprStruct,
         _: &Facts<'_, syntax::ExprStruct>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).struct_used(literal))
+        Contributed::parted(self.frame(around).struct_used(literal))
     }
 
     fn on_expr_path(
         &self,
         expression: &ExprPath,
         _: &Facts<'_, ExprPath>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let repeated = Grains::from(BodyPart::repeating(Repeats::path(expression)));
-        Contributed::parted(self.frame(&around).path_used(expression).combine(repeated))
+        Contributed::parted(self.frame(around).path_used(expression).combine(repeated))
     }
 
     fn on_expr_match(
         &self,
         expr: &syntax::ExprMatch,
         _: &Facts<'_, syntax::ExprMatch>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let patterns: Grains = Monoid::concat(expr.arms.iter().map(|arm| frame.pattern_used(&arm.pat)));
         Contributed::parted(patterns.combine(Grains::from(BodyPart::branching(Branches::matched(expr)))))
     }
@@ -521,18 +511,18 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         expr: &syntax::ExprLet,
         _: &Facts<'_, syntax::ExprLet>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).pattern_used(&expr.pat))
+        Contributed::parted(self.frame(around).pattern_used(&expr.pat))
     }
 
     fn on_local(
         &self,
         local: &syntax::Local,
         _: &Facts<'_, syntax::Local>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         let diverging = local.init.as_ref().filter(|init| init.diverge.is_some());
         Contributed::parted(diverging.map_or_else(Grains::default, |_| frame.pattern_used(&local.pat)))
     }
@@ -541,9 +531,9 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         item: &ItemMacro,
         _: &Facts<'_, ItemMacro>,
-        around: Around<'_, Framed<'read>, Grains>,
+        around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
-        let frame = self.frame(&around);
+        let frame = self.frame(around);
         item.ident.as_ref().map_or_else(
             || frame.clone().framed(Grains::default(), Descend::Into),
             |ident| frame.owned_by(ident, Domain::Macros, &item.attrs, Grains::default()),
@@ -566,7 +556,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         _: &syntax::ExprIf,
         _: &Facts<'_, syntax::ExprIf>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::from(Branch::Taken))))
     }
@@ -575,7 +565,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         expr: &syntax::ExprWhile,
         _: &Facts<'_, syntax::ExprWhile>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let looped = BodyPart::repeating(Repeats::looped(&expr.body, Looping::While));
         Contributed::parted(Grains::from(BodyPart::branching(Branches::from(Branch::Taken)).combine(looped)))
@@ -585,7 +575,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         expr: &syntax::ExprLoop,
         _: &Facts<'_, syntax::ExprLoop>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::repeating(Repeats::looped(&expr.body, Looping::Bare))))
     }
@@ -594,7 +584,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         closure: &syntax::ExprClosure,
         _: &Facts<'_, syntax::ExprClosure>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::repeating(Repeats::closure(closure))))
     }
@@ -603,7 +593,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         field: &syntax::ExprField,
         _: &Facts<'_, syntax::ExprField>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::repeating(Repeats::field(field))))
     }
@@ -612,7 +602,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         expr: &syntax::ExprForLoop,
         _: &Facts<'_, syntax::ExprForLoop>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let looped = BodyPart::repeating(Repeats::looped(&expr.body, Looping::For));
         Contributed::parted(Grains::from(BodyPart::branching(Branches::from(Branch::Taken)).combine(looped)))
@@ -622,7 +612,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         _: &syntax::ExprTry,
         _: &Facts<'_, syntax::ExprTry>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::from(Branch::Propagated))))
     }
@@ -631,7 +621,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         found: &syntax::ExprBinary,
         _: &Facts<'_, syntax::ExprBinary>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::branching(Branches::joined(found))))
     }
@@ -640,7 +630,7 @@ impl<'read> Contribute for Lowering<'read> {
         &self,
         found: &syntax::PatIdent,
         _: &Facts<'_, syntax::PatIdent>,
-        _: Around<'_, Framed<'read>, Grains>,
+        _: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         Contributed::parted(Grains::from(BodyPart::rebinding(found)))
     }
@@ -663,12 +653,7 @@ impl<'read> Contribute for Lowering<'read> {
         inner.concluded(|_, grown| grown.closed())
     }
 
-    fn on_macro(
-        &self,
-        invoked: &Macro,
-        _: &Facts<'_, Macro>,
-        around: Around<'_, Framed<'read>, Grains>,
-    ) -> Grown<'read> {
-        Contributed::parted(self.frame(&around).macro_used(invoked))
+    fn on_macro(&self, invoked: &Macro, _: &Facts<'_, Macro>, around: &Around<'_, Framed<'read>>) -> Grown<'read> {
+        Contributed::parted(self.frame(around).macro_used(invoked))
     }
 }

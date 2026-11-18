@@ -1373,6 +1373,7 @@ dependencies = [
 name = "lint-bool-methods"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1429,6 +1430,7 @@ dependencies = [
  "algebra",
  "file-ports",
  "invariants",
+ "laws",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -1625,6 +1627,7 @@ dependencies = [
 name = "lint-literal-names"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -2225,6 +2228,7 @@ dependencies = [
 name = "lint-sweep"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "invariants",
  "lint-core",
  "lint-fixtures",

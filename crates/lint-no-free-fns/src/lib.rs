@@ -61,7 +61,7 @@ impl<'file> Contribute for FreeFns<'file> {
         &self,
         function: &ItemFn,
         _: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         let name = &function.sig.ident;
         let free = NoFreeFns::exemption(function).map_or_else(
@@ -75,7 +75,7 @@ impl<'file> Contribute for FreeFns<'file> {
         &self,
         _: &syntax::Macro,
         _: &Facts<'_, syntax::Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         Contributed::descending(Descend::Expand)
     }

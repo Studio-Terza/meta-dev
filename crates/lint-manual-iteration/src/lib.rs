@@ -140,7 +140,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -149,7 +149,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -158,7 +158,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         _: &ItemTrait,
         facts: &Facts<'_, ItemTrait>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -167,7 +167,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         _: &Macro,
         _: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         Contributed::descending(Descend::Expand)
     }
@@ -176,7 +176,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         _: &ItemFn,
         facts: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -185,7 +185,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         _: &ImplItemFn,
         facts: &Facts<'_, ImplItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -216,7 +216,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         expr: &ExprForLoop,
         _: &Facts<'_, ExprForLoop>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         let finding = ManualIteration::accumulator(&expr.body).map(|_| {
             self.violation(
@@ -234,7 +234,7 @@ impl<'scan> Contribute for Iterations<'scan> {
         &self,
         call: &ExprMethodCall,
         facts: &Facts<'_, ExprMethodCall>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Iterated<'scan>> {
         let constructed = facts.name().and_then(|name| name.matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS));
         let span = constructed.map(|_| call.method.span());

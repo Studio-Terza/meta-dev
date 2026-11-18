@@ -3,6 +3,7 @@ mod finding;
 
 use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
+use algebra::Semigroup;
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;
 use lint_sweep::{Concludes, Contribute, Contributed, Descend, Facts, Kind};
@@ -32,7 +33,7 @@ impl<'file> Returns<'file> {
 
     fn opened(&self, attributes: &[Attribute], signature: &Signature) -> Returned<'file> {
         let descend = Descend::from(Walk::outside_tests(attributes));
-        let flagged = descend.entered().and_then(|_| self.flagged(signature));
+        let flagged = descend.entered().and_then(|()| self.flagged(signature));
         Contributed::new((), flagged.into_iter().collect(), descend)
     }
 }
@@ -55,7 +56,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         _: &ItemMod,
         facts: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -64,7 +65,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         function: &ItemFn,
         _: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         self.opened(&function.attrs, &function.sig)
     }
@@ -73,10 +74,10 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         _: &ItemImpl,
         facts: &Facts<'_, ItemImpl>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         Contributed::descending(
-            facts.inherent().map_or(Descend::Over, |_| Descend::Into).then(|| Descend::from(facts.gate())),
+            facts.inherent().map_or(Descend::Over, |_| Descend::Into).combine(Descend::from(facts.gate())),
         )
     }
 
@@ -84,7 +85,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         method: &ImplItemFn,
         _: &Facts<'_, ImplItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }
@@ -93,7 +94,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         _: &ItemTrait,
         facts: &Facts<'_, ItemTrait>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         Contributed::descending(Descend::from(facts.gate()))
     }
@@ -102,7 +103,7 @@ impl<'file> Contribute for Returns<'file> {
         &self,
         method: &TraitItemFn,
         _: &Facts<'_, TraitItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }

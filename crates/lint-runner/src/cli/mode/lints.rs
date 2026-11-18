@@ -21,7 +21,7 @@ use lint_file::{
 use lint_file::{ModelLint, WorkspaceLint};
 use lint_port_dependencies::RoleFacts;
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Finds, Gathers, Member, Sorts, Watching};
+use lint_sweep::{Finds, Gathers, Member, Sorts};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -585,18 +585,12 @@ impl<'file> Filer<'file> {
 }
 
 impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        let found = self.finds.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() });
-        let sorted = found.chain(self.sorts.iter_mut().map(|watcher| -> &mut Watching<'_> { watcher.as_mut() }));
-        sorted.chain(self.rulings.iter_mut().flat_map(|ruling| ruling.pending.watching()))
-    }
-
-    fn gathered(self) -> FileWork<'file> {
+    fn gathered(self, _: &SourceFile) -> FileWork<'file> {
         let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
         let file = <&SourceFile>::from(claimed);
-        let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found()]));
+        let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found(file)]));
         let watched =
-            listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, Vec::from(watcher.sorted()))));
+            listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, Vec::from(watcher.sorted(file)))));
         let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));
         let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
         let found = admitted.into_iter().map(|found| (found.slot, Self::taken(&mut sorted, found.source)));
@@ -696,8 +690,6 @@ trait Judges {
 }
 
 pub(crate) trait Awaits<'file>: fmt::Debug {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>>;
-
     fn judged<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>>;
 }
 
@@ -711,13 +703,9 @@ impl<'file, Lint: WatchingLint + fmt::Debug> Awaits<'file> for Waiting<'file, Li
 where
     for<'settled, 'run> Settled<'settled, 'run>: Holding<'run, Lint>,
 {
-    fn watching(&mut self) -> Vec<&mut Watching<'_>> {
-        self.watched.watching().into_iter().collect()
-    }
-
     fn judged<'run: 'file>(self: Box<Self>, settled: Settled<'_, 'run>) -> Vec<Violation<'file>> {
         let Waiting { file, watched } = *self;
-        Lint::judged(file, watched.gathered(), settled.held())
+        Lint::judged(file, watched.gathered(file), settled.held())
     }
 }
 

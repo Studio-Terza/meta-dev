@@ -143,7 +143,7 @@ impl Contribute for SkipMarks<'_> {
         &self,
         module: &ItemMod,
         _: &Facts<'_, ItemMod>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<LineNumber>, Marks> {
         Contributed::new(Gate::lines_in(&module.attrs), Marks::default(), Descend::Into)
     }
@@ -156,7 +156,7 @@ impl Contribute for SkipMarks<'_> {
         &self,
         function: &ItemFn,
         _: &Facts<'_, ItemFn>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<LineNumber>, Marks> {
         Contributed::parted(Self::skips(&function.attrs, Marked::among(&function.attrs, None)))
     }
@@ -165,7 +165,7 @@ impl Contribute for SkipMarks<'_> {
         &self,
         invocation: &Macro,
         facts: &Facts<'_, Macro>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<LineNumber>, Marks> {
         let attributes = Macros::attributes_in_file(self.file, invocation);
         let marks = Self::skips(&attributes, Marked::among(&attributes, facts.law()));
@@ -176,7 +176,7 @@ impl Contribute for SkipMarks<'_> {
         &self,
         attribute: &Attribute,
         _: &Facts<'_, Attribute>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Vec<LineNumber>, Marks> {
         let unrun = self
             .unrun

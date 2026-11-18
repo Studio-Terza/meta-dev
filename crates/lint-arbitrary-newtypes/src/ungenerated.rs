@@ -70,7 +70,7 @@ impl<'file> Contribute for Ungenerated<'file> {
         &self,
         _: &TypeReference,
         _: &Facts<'_, TypeReference>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Holding, Vec<Violation<'file>>> {
         Contributed::new(Holding::Borrowing, Vec::new(), Descend::Into)
     }
@@ -79,7 +79,7 @@ impl<'file> Contribute for Ungenerated<'file> {
         &self,
         _: &Lifetime,
         _: &Facts<'_, Lifetime>,
-        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+        _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<Holding, Vec<Violation<'file>>> {
         Contributed::new(Holding::Borrowing, Vec::new(), Descend::Into)
     }
