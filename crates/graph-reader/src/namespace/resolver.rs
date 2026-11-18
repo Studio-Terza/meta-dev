@@ -168,6 +168,18 @@ impl<'rows> Walks<'_, '_, 'rows, '_> {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub(super) struct Importer<'tables, 'rows> {
+    parent: Resolver<'tables, 'rows>,
+    key: Key<'tables>,
+}
+
+impl<'tables, 'rows> From<Importer<'tables, 'rows>> for Resolver<'tables, 'rows> {
+    fn from(importer: Importer<'tables, 'rows>) -> Resolver<'tables, 'rows> {
+        Resolver { importing: Some(importer.key), ..importer.parent }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Importing<'tables>(Option<Key<'tables>>);
 
 impl Importing<'_> {
@@ -192,8 +204,8 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         Resolver { space, tables, ignored: None, importing: None }
     }
 
-    pub(super) fn importing(self, key: Key<'tables>) -> Resolver<'tables, 'rows> {
-        Resolver { space: self.space, tables: self.tables, ignored: self.ignored, importing: Some(key) }
+    pub(super) fn importer(self, key: Key<'tables>) -> Importer<'tables, 'rows> {
+        Importer { parent: self, key }
     }
 
     pub(super) fn path(&self, path: &UsePath, viewer: ScopeId, domain: Domain) -> Resolution {

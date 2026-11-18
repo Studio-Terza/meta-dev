@@ -648,7 +648,8 @@ impl Entries {
             self.imports
                 .iter()
                 .map(|import| {
-                    resolver.importing(Key::new(import.domain, &import.name)).path(&import.path, scope, import.domain)
+                    let importer = resolver.importer(Key::new(import.domain, &import.name));
+                    Resolver::from(importer).path(&import.path, scope, import.domain)
                 })
                 .collect(),
             self.globs
