@@ -139,7 +139,7 @@ struct Importing<'tables>(Option<Key<'tables>>);
 
 impl Importing<'_> {
     fn levels<'levels>(self, levels: &'levels [ScopeId], key: Key<'_>) -> &'levels [ScopeId] {
-        match self.0.filter(|importing| *importing == key) {
+        match self.0.filter(|importing| *importing == key).filter(|_| key.domain() != Domain::Macros) {
             Some(_) => levels.get(1..).unwrap_or_default(),
             None => levels,
         }

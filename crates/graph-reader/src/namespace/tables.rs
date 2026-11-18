@@ -86,8 +86,7 @@ impl<'rows> FromIterator<Keyed<'rows, Row<'rows>>> for Explicit<'rows> {
         placed.sort_by(|left, right| left.key.cmp(&right.key).then(left.value.layer.cmp(&right.value.layer)));
         let grouped = placed.chunk_by(|left, right| left.key == right.key).filter_map(|same| {
             let first = same.first()?;
-            let layer = same.iter().take_while(|row| row.value.layer == first.value.layer).map(|row| row.value);
-            Some((first.key, layer.collect()))
+            Some((first.key, same.iter().map(|row| row.value).collect()))
         });
         Explicit(grouped.collect())
     }
@@ -103,7 +102,9 @@ impl<'rows> Explicit<'rows> {
 
     fn named(&self, key: Key<'_>, sight: Sight) -> Option<View<'rows>> {
         let rows = self.0.get(&key)?;
-        Some(rows.iter().fold(View::ABSENT, |found, row| found.union(row.seen(sight))))
+        let layers = rows.chunk_by(|left, right| left.layer == right.layer);
+        let views = layers.map(|layer| layer.iter().map(|row| row.seen(sight)).fold(View::ABSENT, View::union));
+        Some(views.fold(View::ABSENT, |found, view| found.or_else(|| view)))
     }
 }
 

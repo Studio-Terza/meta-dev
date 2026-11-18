@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use graph::{
-    Arrayed, Callee, Held, ItemPath, MacroCall, Mention, Named, Owner, Primitive, Reach, Region, Resolved, Seat, Sited,
-    Spelling, TypeRef, Within, Zone,
+    Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, Named, Owner, Primitive, Reach,
+    Region, Resolved, Seat, Sited, Spelling, TypeRef, Within, Zone,
 };
 use graph_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -410,4 +410,24 @@ fn an_invocation_names_what_its_macro_transcriber_names_where_it_resolves() {
         .collect();
     expanded.sort();
     assert_eq!(expanded, ["Thing::from", "crate::Kept"]);
+}
+
+const DEFINING: &str = "pub struct Kept;\n#[macro_export]\nmacro_rules! made {\n    () => {\n        fn f() -> $crate::Kept {\n            todo!()\n        }\n    };\n}\n";
+const INVOKING: &str = "pub enum Kept {}\na::made!();\n";
+
+#[test]
+fn a_dollar_crate_path_names_the_defining_crate_when_another_crate_invokes_the_macro() -> Result<(), Failure> {
+    let files = [
+        SourceFile::parse("crates/a/src/lib.rs", SourceText::new(DEFINING.to_owned()))?,
+        SourceFile::parse("crates/b/src/lib.rs", SourceText::new(INVOKING.to_owned()))?,
+    ];
+    let model = Reader::read_files(&files);
+    let expanded: Vec<Option<Item>> = model
+        .uses()
+        .filter(|placed| placed.entity().mention() == Mention::Expanded)
+        .map(|placed| placed.entity().resolved().crate_item().and_then(|item| model.declared(item)).cloned())
+        .collect();
+    let kept = Item::new(Name::from("Kept"), ItemKind::Struct).homed(Some(Name::from("a"))).exposed(Exposure::Public);
+    assert_eq!(expanded, [Some(kept)]);
+    Ok(())
 }

@@ -67,6 +67,7 @@ const MACRO_STD_STATEMENTS: &str =
 const MACRO_PATHED_STATEMENT: &str = "fn f() {\n    std::println!(\"a\");\n    impl Clone for R {}\n}\n";
 const RULE_MAY_DECLARE: &str =
     "macro_rules! make {\n    ($($t:tt)*) => {};\n}\nmake!(Mark);\nimpl Mark for R {}\nimpl Clone for R {}\n";
+const RULE_REEXPORTED: &str = "mod inner {\n    macro_rules! made {\n        ($($t:tt)*) => {};\n    }\n    pub(crate) use made;\n}\ninner::made!(Mark);\nimpl Clone for R {}\n";
 const FOREIGN_NAMESAKE: &str = "mod a {\n    macro_rules! make {\n        ($($t:tt)*) => {};\n    }\n}\nserde::make!(Mark);\nimpl Clone for R {}\n";
 const RULE_STATEMENT: &str =
     "macro_rules! make {\n    ($($t:tt)*) => {};\n}\nfn f() {\n    make!(Mark);\n    impl Clone for R {}\n}\n";
@@ -130,6 +131,10 @@ const PRIMITIVE_PAST_GLOB: &str = "use other::*;\nfn f() -> u8 {}\n";
 const PRIMITIVE_PAST_EXPANSION: &str = "make!();\nfn f() -> bool {}\n";
 const DERIVE_CONDITIONAL: &str = "#[cfg_attr(feature = \"serde\", derive(Clone), derive(Debug))]\n#[cfg_attr(unix, cfg_attr(test, derive(Hash)))]\n#[cfg_attr(windows, allow(dead_code))]\nstruct A;\n";
 
+const RULE_ACROSS_CRATES: [Fixture; 2] = [
+    Fixture::new("crates/a/src/lib.rs", "#[macro_export]\nmacro_rules! make {\n    ($($t:tt)*) => {};\n}\n"),
+    Fixture::new("crates/b/src/lib.rs", "a::make!(Mark);\nimpl Clone for R {}\n"),
+];
 const RULE_ACROSS: [Fixture; 2] = [
     Fixture::new("src/lib.rs", "#[macro_export]\nmacro_rules! make {\n    ($($t:tt)*) => {};\n}\nmod x;\n"),
     Fixture::new("src/x.rs", "crate::make!(Mark);\nimpl Clone for R {}\n"),
@@ -770,6 +775,7 @@ laws::table!(a_workspace_macro_hides_only_the_names_its_invocation_writes, |text
     MACRO_DEFINED_CALLED => [Expect::std_trait(&["std", "clone", "Clone"])],
     RULE_MAY_DECLARE => [Expect::possibly_macro_declared(&["Mark"]), Expect::std_trait(&["std", "clone", "Clone"])],
     RULE_STATEMENT => [Expect::std_trait(&["std", "clone", "Clone"])],
+    RULE_REEXPORTED => [Expect::std_trait(&["std", "clone", "Clone"])],
 ]);
 
 laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(text), [
@@ -780,6 +786,7 @@ laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(t
 laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     RENAMED_ACROSS => [Expect::std_trait(&["std", "clone", "Clone"])],
     RULE_ACROSS => [Expect::std_trait(&["std", "clone", "Clone"])],
+    RULE_ACROSS_CRATES => [Expect::std_trait(&["std", "clone", "Clone"])],
     PARENT_GLOB => [Expect::std_trait(&["std", "clone", "Clone"])],
     SIBLING_GLOB => [Expect::std_trait(&["std", "cmp", "PartialEq"])],
     PARENT_DECLARES => [Expect::krate(&["crate", "Clone"])],

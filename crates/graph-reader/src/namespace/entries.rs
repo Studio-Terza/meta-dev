@@ -96,7 +96,7 @@ pub(super) enum Admission {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct DeclaredId(usize);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct DeclaredAt {
     scope: ScopeId,
     item: DeclaredId,
@@ -127,35 +127,56 @@ pub(crate) enum DeclaredKind {
     Module(ScopeId),
     OpaqueModule,
     Item(ItemKind),
-    Rules,
+    Rules(Export),
+    Alias(DeclaredAt),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Export {
+    Local,
+    Exported,
 }
 
 impl DeclaredKind {
+    const EXPORTED: DeclaredKind = DeclaredKind::Rules(Export::Exported);
+
+    fn rules(self) -> Option<RulesDefinition> {
+        match self {
+            DeclaredKind::Rules(_) => Some(RulesDefinition),
+            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Alias(_) => {
+                None
+            }
+        }
+    }
+
     fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
         match self {
             DeclaredKind::Module(module) => Binding::Module(module),
             DeclaredKind::OpaqueModule => Binding::UNBOUND,
-            DeclaredKind::Item(_) | DeclaredKind::Rules => Binding::Item(level, item),
+            DeclaredKind::Item(_) | DeclaredKind::Rules(_) => Binding::Item(level, item),
+            DeclaredKind::Alias(at) => Binding::Item(at.scope(), at.declared_id()),
         }
     }
 
     fn above(self, base: ScopeId) -> DeclaredKind {
         match self {
             DeclaredKind::Module(module) => DeclaredKind::Module(module.above(base)),
-            DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Rules => self,
+            DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Rules(_) | DeclaredKind::Alias(_) => {
+                self
+            }
         }
     }
 
     fn item_kind(self) -> Option<ItemKind> {
         match self {
             DeclaredKind::Item(kind) => Some(kind),
-            DeclaredKind::Rules => Some(ItemKind::Macro),
-            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule => None,
+            DeclaredKind::Rules(_) => Some(ItemKind::Macro),
+            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule | DeclaredKind::Alias(_) => None,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Declared {
     name: Name,
     visibility: Visibility,
@@ -212,6 +233,34 @@ impl Exposing {
             syntax::Visibility::Restricted(_) => Exposure::Restricted,
             syntax::Visibility::Inherited => Exposure::Hidden,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MacroRules<'item> {
+    ident: &'item Ident,
+    attributes: &'item [Attribute],
+}
+
+impl MacroRules<'_> {
+    const EXPORT: [Word<'static>; 1] = words!["macro_export"];
+
+    fn entries(self) -> Entries {
+        Entries::from(Declared {
+            domain: Domain::Macros,
+            ..Declared::new(Name::from(self.ident), Visibility::Private, DeclaredKind::Rules(self.export()))
+        })
+    }
+
+    fn export(self) -> Export {
+        match self.attributes.iter().find_map(MacroRules::export_mark) {
+            Some(()) => Export::Exported,
+            None => Export::Local,
+        }
+    }
+
+    fn export_mark(attribute: &Attribute) -> Option<()> {
+        attribute.path().get_ident().map(Name::from).and_then(|name| name.matches::<Whole>(&Self::EXPORT)).map(|_| ())
     }
 }
 
@@ -461,11 +510,9 @@ impl From<&Item> for Entries {
             Item::Use(used) => Entries::from(used),
             Item::ExternCrate(declared) => Entries::from(declared),
             Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
-            Item::Macro(ItemMacro { ident: Some(ident), .. }) => Entries::from(Declared {
-                domain: Domain::Macros,
-                kind: DeclaredKind::Rules,
-                ..Declared::named_item(ident, &syntax::Visibility::Inherited, ItemKind::Macro)
-            }),
+            Item::Macro(ItemMacro { ident: Some(ident), attrs, .. }) => {
+                MacroRules { ident, attributes: attrs }.entries()
+            }
             Item::Struct(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))
             }
@@ -526,6 +573,18 @@ impl Entries {
         self.declared.push(declared);
     }
 
+    pub(super) fn exported_aliases(&self, scope: ScopeId) -> Vec<Declared> {
+        let exported = self.declared.iter().enumerate().filter(|(_, declared)| declared.kind == DeclaredKind::EXPORTED);
+        let aliased =
+            exported.map(|(index, declared)| (declared.name.clone(), DeclaredAt::new(scope, DeclaredId(index))));
+        aliased
+            .map(|(name, at)| Declared {
+                domain: Domain::Macros,
+                ..Declared::new(name, Visibility::Visible, DeclaredKind::Alias(at))
+            })
+            .collect()
+    }
+
     pub(super) fn above(self, base: ScopeId) -> Entries {
         let declared = self
             .declared
@@ -547,7 +606,7 @@ impl Entries {
     }
 
     pub(super) fn rules(&self, item: DeclaredId) -> Option<RulesDefinition> {
-        item.row(&self.declared).filter(|declared| declared.kind == DeclaredKind::Rules).map(|_| RulesDefinition)
+        item.row(&self.declared).and_then(|declared| declared.kind.rules())
     }
 
     pub(super) fn declaring<'rows>(&self, targets: &'rows [Target]) -> Vec<Declaring<'rows>> {

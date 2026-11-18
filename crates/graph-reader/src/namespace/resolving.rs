@@ -50,11 +50,23 @@ pub(crate) struct TranscribedRow {
 #[derive(Debug)]
 pub(crate) struct Transcription {
     defined: ItemId,
-    transcribed: Vec<UsePath>,
+    transcribed: Vec<Transcribed>,
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Transcriptions(HashMap<ItemId, Vec<UsePath>>);
+pub(crate) struct Transcriptions(HashMap<ItemId, Vec<Transcribed>>);
+
+#[derive(Clone, Debug)]
+enum Transcribed {
+    Fixed(ItemPath, Resolved),
+    Open(UsePath),
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Site<'grown> {
+    resolving: Resolving<'grown, 'grown, 'grown>,
+    scope: ScopeId,
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct Invoked {
@@ -65,8 +77,7 @@ pub(crate) struct Invoked {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Invoker<'grown, 'invoked> {
-    resolving: Resolving<'grown, 'grown, 'grown>,
-    scope: ScopeId,
+    site: Site<'grown>,
     invoked: &'invoked Invoked,
 }
 
@@ -78,7 +89,8 @@ impl TranscribedRow {
 
     pub(crate) fn settled(&self, resolving: Resolving<'_, '_, '_>) -> Option<Transcription> {
         let defined = resolving.path(self.scope, &self.name, Domain::Macros).crate_item()?;
-        let transcribed = self.mentioned.clone();
+        let site = Site { resolving, scope: self.scope };
+        let transcribed = self.mentioned.iter().map(|path| Transcribed::read(path, site)).collect();
         Some(Transcription { defined, transcribed })
     }
 }
@@ -99,22 +111,11 @@ impl<'grown, 'invoked> Invoker<'grown, 'invoked> {
         scope: ScopeId,
         invoked: &'invoked Invoked,
     ) -> Invoker<'grown, 'invoked> {
-        Invoker { resolving, scope, invoked }
-    }
-
-    fn found(self, path: &UsePath) -> Resolved {
-        let typed = self.resolving.path(self.scope, path, Domain::Types);
-        let valued =
-            || Some(self.resolving.path(self.scope, path, Domain::Values)).filter(|found| found.known().is_some());
-        let member = || {
-            let owner = self.resolving.path(self.scope, &path.qualifier()?, Domain::Types).crate_item()?;
-            Some(Resolved::Member(Member::new(owner, path.tail().last()?.clone())))
-        };
-        typed.known().cloned().or_else(valued).or_else(member).unwrap_or(typed)
+        Invoker { site: Site { resolving, scope }, invoked }
     }
 
     fn used(self, path: &UsePath) -> Option<PathUse> {
-        self.mentioned(path.written(), self.found(path))
+        self.mentioned(path.written(), self.site.found(path))
     }
 
     fn mentioned(self, written: ItemPath, resolved: Resolved) -> Option<PathUse> {
@@ -130,9 +131,38 @@ impl Transcriptions {
 
     pub(crate) fn expanded(&self, definition: &Resolved, invoker: Invoker<'_, '_>, building: Building) -> Building {
         let transcribed = definition.crate_item().and_then(|item| self.0.get(&item)).map_or(&[][..], Vec::as_slice);
-        transcribed.iter().filter_map(|path| invoker.used(path)).fold(building, |mut built, used| {
+        transcribed.iter().filter_map(|path| path.used(invoker)).fold(building, |mut built, used| {
             built.path_use(invoker.invoked.file, invoker.invoked.line, used);
             built
         })
+    }
+}
+
+impl Site<'_> {
+    fn found(self, path: &UsePath) -> Resolved {
+        let typed = self.resolving.path(self.scope, path, Domain::Types);
+        let valued =
+            || Some(self.resolving.path(self.scope, path, Domain::Values)).filter(|found| found.known().is_some());
+        let member = || {
+            let owner = self.resolving.path(self.scope, &path.qualifier()?, Domain::Types).crate_item()?;
+            Some(Resolved::Member(Member::new(owner, path.tail().last()?.clone())))
+        };
+        typed.known().cloned().or_else(valued).or_else(member).unwrap_or(typed)
+    }
+}
+
+impl Transcribed {
+    fn read(path: &UsePath, site: Site<'_>) -> Transcribed {
+        match path.crate_anchored() {
+            Some(()) => Transcribed::Fixed(path.written(), site.found(path)),
+            None => Transcribed::Open(path.clone()),
+        }
+    }
+
+    fn used(&self, invoker: Invoker<'_, '_>) -> Option<PathUse> {
+        match self {
+            Transcribed::Fixed(written, resolved) => invoker.mentioned(written.clone(), resolved.clone()),
+            Transcribed::Open(path) => invoker.used(path),
+        }
     }
 }

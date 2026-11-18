@@ -94,6 +94,15 @@ pub(crate) enum Top<'read> {
     Child { parent: ScopeId, name: Name, visibility: Visibility },
 }
 
+impl Top<'_> {
+    fn root(&self, base: ScopeId, space: &Namespace<'_>) -> Option<ScopeId> {
+        match self {
+            Top::Root { .. } => Some(base),
+            Top::Child { parent, .. } => Anchor::Crate.anchored(space.anchors(*parent)),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Namespace<'read> {
     scopes: Vec<ScopeRow>,
@@ -104,11 +113,22 @@ pub(crate) struct Namespace<'read> {
 impl<'read> Namespace<'read> {
     pub(crate) fn placed(&mut self, top: Top<'read>, openings: Openings) -> ScopeId {
         let base = ScopeId::after(&self.scopes);
+        let root = top.root(base, self);
+
         self.topped(top, openings.top.above(base));
-        openings.nested.into_iter().fold(base, |placed, opening| {
+        let placed = openings.nested.into_iter().fold(base, |placed, opening| {
             self.opened(opening.parent.above(placed), opening.kind, opening.entries.above(placed));
             placed
-        })
+        });
+        let exported = self.exported_aliases(base);
+        let rooted = exported.into_iter().filter_map(|declared| Some(declared).zip(root));
+        rooted.for_each(|(declared, scope)| self.declare(scope, declared));
+        placed
+    }
+
+    pub(super) fn exported_aliases(&self, base: ScopeId) -> Vec<Declared> {
+        let placed = ScopeId::ids(&self.scopes).zip(&self.scopes).filter(|(scope, _)| *scope >= base);
+        placed.flat_map(|(scope, row)| row.entries().exported_aliases(scope)).collect()
     }
 
     fn topped(&mut self, top: Top<'read>, entries: Entries) {
