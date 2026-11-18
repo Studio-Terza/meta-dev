@@ -1,6 +1,7 @@
 use std::panic;
+use std::sync::Mutex;
 
-use invariants::{Ignoring, ignored, invariant, invariants};
+use invariants::{Ignoring, Unpoisoned, ignored, invariant, invariants};
 
 invariants! {
     enum Invariant {
@@ -69,4 +70,22 @@ fn a_held_result_gives_its_value_or_crashes_on_the_named_invariant() {
 fn an_ignored_error_names_its_reason_and_keeps_the_value() {
     assert_eq!(u8::try_from(300_u16).ignoring(Ignored::Wide), None);
     assert_eq!(u8::try_from(30_u16).ignoring(Ignored::Wide), Some(30));
+}
+
+#[test]
+fn a_lock_gives_its_guard_until_a_holder_panics_and_then_crashes_on_the_poison() {
+    let lock = Mutex::new(7_u8);
+    assert_eq!(*lock.lock().unpoisoned(), 7);
+    let poisoning = panic::catch_unwind(|| {
+        let _held = lock.lock().unpoisoned();
+        invariant!(broken Invariant::Positive)
+    });
+    assert_eq!(Caught::message(poisoning).as_deref(), Some("broken invariant: the count is positive"));
+    let crashed = panic::catch_unwind(|| *lock.lock().unpoisoned());
+    assert_eq!(
+        Caught::message(crashed).as_deref(),
+        Some(
+            "broken invariant: no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written"
+        )
+    );
 }

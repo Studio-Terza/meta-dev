@@ -123,6 +123,15 @@ impl Lockable {
             Lockable::Broken => Err(Gone),
         }
     }
+
+    fn failure(self) -> Option<String> {
+        match self {
+            Lockable::Intact => None,
+            Lockable::Broken => {
+                Some(format!("releasing {} failed: {Gone} (0 further release failures)", SessionLock::NAME))
+            }
+        }
+    }
 }
 
 trait Query: Op {
@@ -356,7 +365,11 @@ laws::law!(a_failed_release_on_drop_shows_in_the_measured_failures, select(Locka
     drop(port);
     let measured = run.finish();
     prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-    prop_assert_eq!(measured.settled().is_err(), lockable == Lockable::Broken);
+    let said = match measured.settled() {
+        Ok(_snapshot) => None,
+        Err(failures) => Some(failures.to_string()),
+    };
+    prop_assert_eq!(said, lockable.failure());
 });
 
 laws::law!(a_resource_is_released_exactly_once_whether_ended_or_dropped, any::<bool>(), ending, {

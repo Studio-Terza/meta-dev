@@ -243,15 +243,15 @@ impl Batches {
         assert_eq!(texts.iter().map(AsRef::as_ref).collect::<Vec<&str>>(), ["a", "a"]);
         assert_eq!(files.kinds(&[a.clone(), absent.clone()]), [Kind::File, Kind::Missing]);
         let canonical = files.canonical_many(&[a, absent.clone()]);
-        assert_eq!(canonical.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
+        assert!(matches!(canonical.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
         let listed = files.entries_many(&[root.join("copies"), absent]);
-        assert_eq!(listed.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
+        assert!(matches!(listed.as_slice(), [Ok(_), Err(FileFailure::Missing(_))]));
         assert_eq!(listed.into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?, [b]);
         files.write(&root.join("c.txt"), Bytes::from("c"))?;
         let copied = files.copy_each_into(&[root.join("none"), root.join("c.txt")], &root.join("copies"));
-        assert_eq!(copied.iter().map(Result::is_ok).collect::<Vec<bool>>(), [false, true]);
+        assert!(matches!(copied.as_slice(), [Err(FileFailure::Missing(_)), Ok(())]));
         assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(files.copy_into(&[root.join("none")], &root.join("copies")).is_err());
+        assert!(matches!(files.copy_into(&[root.join("none")], &root.join("copies")), Err(FileFailure::Missing(_))));
         let mirrored = Memory::default();
         files.mirror(root, &mirrored)?;
         assert_eq!(
@@ -262,12 +262,12 @@ impl Batches {
             })?
         );
         assert_eq!(mirrored.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
-        assert!(files.mirror(&root.join("none"), &Memory::default()).is_err());
+        assert!(matches!(files.mirror(&root.join("none"), &Memory::default()), Err(FileFailure::Missing(_))));
         files.write(&root.join("copies/deep.txt"), Bytes::from("12345"))?;
         assert_eq!(files.size(&root.join("copies/deep.txt"))?, Size::new(5));
         assert_eq!(files.bytes_below(&root.join("copies"))?, Size::new(7));
-        assert!(files.bytes_below(&root.join("nothing-here")).is_err());
-        assert!(files.size(&root.join("nothing-here")).is_err());
+        assert!(matches!(files.bytes_below(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
+        assert!(matches!(files.size(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
         Ok(())
     }
 }
