@@ -6,6 +6,7 @@ pub enum Heading {
     TimedOut,
     KillingNothing,
     KilledWithoutGolden,
+    Unviable,
 }
 
 impl fmt::Display for Heading {
@@ -15,6 +16,7 @@ impl fmt::Display for Heading {
             Heading::TimedOut => formatter.write_str("Timed out mutants"),
             Heading::KillingNothing => formatter.write_str("Tests that kill no mutant"),
             Heading::KilledWithoutGolden => formatter.write_str("Mutants killed while no golden test fails"),
+            Heading::Unviable => formatter.write_str("Unviable mutants by crate"),
         }
     }
 }

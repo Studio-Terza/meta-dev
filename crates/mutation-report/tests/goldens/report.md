@@ -19,3 +19,7 @@
 ### Mutants killed while no golden test fails (1)
 
 - m-killed-nongolden -> b1 :: plain
+
+### Unviable mutants by crate (1)
+
+- all crates: 0 of 5 unviable

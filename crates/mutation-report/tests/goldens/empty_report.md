@@ -17,3 +17,7 @@ none
 ### Mutants killed while no golden test fails (0)
 
 none
+
+### Unviable mutants by crate (1)
+
+- all crates: 0 of 0 unviable
