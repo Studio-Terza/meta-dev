@@ -2,6 +2,7 @@ use std::path::Path;
 use std::slice;
 
 mod gate;
+mod ignored;
 
 use syntax::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 use syntax::{Ident, TokenTree};
@@ -13,6 +14,8 @@ use lint_core::{Site, SourceFile, Violation};
 use lint_sweep::{Concludes, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
 
 use crate::NoIgnoredTests;
+use crate::skip_marks::ignored::Ignored;
+use invariants::Ignoring;
 use lint_layout::Name;
 use lint_layout::TestMarks;
 use lint_layout::Whole;
@@ -75,17 +78,22 @@ impl<'file> SkipMarks<'file> {
     }
 
     fn skip(attribute: &Attribute) -> Option<Word<'static>> {
-        attribute.meta.require_list().ok().filter(|list| list.path.is_ident(Self::CONDITIONAL_ATTRIBUTE)).map_or_else(
-            || {
-                attribute
-                    .meta
-                    .path()
-                    .segments
-                    .last()
-                    .and_then(|last| Name::from(&last.ident).matches::<Whole>(&Self::SKIPPING))
-            },
-            Self::skip_named,
-        )
+        attribute
+            .meta
+            .require_list()
+            .ignoring(Ignored::Unparsed)
+            .filter(|list| list.path.is_ident(Self::CONDITIONAL_ATTRIBUTE))
+            .map_or_else(
+                || {
+                    attribute
+                        .meta
+                        .path()
+                        .segments
+                        .last()
+                        .and_then(|last| Name::from(&last.ident).matches::<Whole>(&Self::SKIPPING))
+                },
+                Self::skip_named,
+            )
     }
 
     fn skips(attributes: &[Attribute], marked: Marked) -> Marks {

@@ -2,10 +2,11 @@ use crate::Uttered;
 use crate::cli::request::command::printed::Lines;
 use std::collections::BTreeSet;
 
+use design_jobs::{OpenJobs, job};
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_runs::{
     Account, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns, NextJob,
-    NextRun, OpenJobs, Retold, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    NextRun, Retold, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured, run,
 };
 use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
@@ -154,11 +155,11 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let reaped = self
             .store
             .read(LiveRuns)?
-            .iter()
+            .into_iter()
             .filter(|stored| AsRef::<Deadline>::as_ref(stored.spawned()).due(now) == Due::Passed)
             .map(|stored| Reaper(self).reaped(stored))
             .collect::<Result<Vec<Reaped>, Failure>>()?;
-        let interrupted = self.store.read(OpenJobs)?;
+        let interrupted = self.store.read(OpenJobs)?.iter().map(job::Open::key).copied().collect();
         self.store.write(JobsInterrupted)?;
         let unplaced = self.store.read(Unstructured)?;
         let chunks = unplaced.chunks(structurer::Job::SEGMENTS);
@@ -216,15 +217,17 @@ impl<S: Store, D: Dispatch, C: Clock> Structure<'_, S, D, C> {
 }
 
 impl<S: Store, D: Dispatch, C: Clock> Reaper<'_, '_, S, D, C> {
-    fn reaped(&self, stored: &StoredRun) -> Result<Reaped, Failure> {
+    fn reaped(&self, stored: StoredRun) -> Result<Reaped, Failure> {
         let Structure { store, crew } = self.0;
         let spawned = stored.spawned();
         let current = crew.dispatch.started(spawned.pid())?;
         let same = spawned.started().filter(|recorded| current.as_ref() == Some(*recorded));
         let ended = same.map(|_same| crew.dispatch.kill(spawned.pid())).transpose()?;
-        let state = ended.map_or(RunState::Gone, Reaped::state);
-        store.write(RunEnded::new(stored.identity(), state, None))?;
-        Ok(Reaped { run: stored.identity(), state })
+        let ending = ended.map_or(run::Ended::Gone, Reaped::ended);
+        let run = stored.identity();
+        store.write(stored.reaped(ending))?;
+        let state = RunState::from(ending);
+        Ok(Reaped { run, state })
     }
 }
 
@@ -328,10 +331,10 @@ impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
 }
 
 impl Reaped {
-    fn state(ended: Ended) -> RunState {
+    fn ended(ended: Ended) -> run::Ended {
         match ended {
-            Ended::Killed => RunState::Killed,
-            Ended::Absent => RunState::Gone,
+            Ended::Killed => run::Ended::Killed,
+            Ended::Absent => run::Ended::Gone,
         }
     }
 }

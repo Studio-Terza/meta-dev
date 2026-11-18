@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::contents::Contents;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RepoFile {
@@ -43,6 +45,6 @@ impl RepoFile {
 
     #[must_use]
     pub fn below(&self, directory: &Path) -> Option<&Path> {
-        self.inside.strip_prefix(directory).ok()
+        self.inside.strip_prefix(directory).ignoring(Ignored::Outside)
     }
 }

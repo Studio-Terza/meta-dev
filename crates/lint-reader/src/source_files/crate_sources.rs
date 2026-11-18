@@ -8,6 +8,8 @@ use newtype::Wrapping;
 use workspace_metadata::{CrateName, Form, Library, Metadata};
 
 use super::{Described, Unlocated};
+use crate::source_files::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct CrateSources;
@@ -66,7 +68,9 @@ impl CrateSources {
         let enclosing: BTreeSet<&Path> = candidates
             .iter()
             .zip(Manifest::read_many(files, &candidates))
-            .filter_map(|(directory, read)| read.ok().flatten()?.workspace().map(|_| *directory))
+            .filter_map(|(directory, read)| {
+                read.ignoring(Ignored::NotAManifest).flatten()?.workspace().map(|_| *directory)
+            })
             .collect();
         packages
             .iter()

@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 thiserror.workspace = true
 

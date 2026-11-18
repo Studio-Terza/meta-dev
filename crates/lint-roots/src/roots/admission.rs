@@ -4,7 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use super::regrouped::Regrouped;
+use crate::ignored::Ignored;
 use file_ports::Files;
+use invariants::Ignoring;
 use lint_layout::Failure;
 use lint_layout::Manifest;
 use workspace::Workspace;
@@ -20,8 +22,10 @@ impl Admission {
         files: &impl Files,
         groups: Vec<Result<Vec<Manifest>, Failure>>,
     ) -> Vec<Result<Vec<Manifest>, Failure>> {
-        let roots: Vec<Vec<PathBuf>> =
-            groups.iter().map(|group| group.as_ref().map_or_else(|_| Vec::new(), |found| Self::roots(found))).collect();
+        let roots: Vec<Vec<PathBuf>> = groups
+            .iter()
+            .map(|group| group.as_ref().ignoring(Ignored::Unread).map_or_default(|found| Self::roots(found)))
+            .collect();
         let loaded = Regrouped::like(&roots, Workspace::load_many(files, &roots.concat()));
         groups
             .into_iter()

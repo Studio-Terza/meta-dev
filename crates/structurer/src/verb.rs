@@ -7,17 +7,11 @@ use crate::{Directive, Misread};
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
-    #[name("place")]
     Place,
-    #[name("sense")]
     Sense,
-    #[name("link")]
     Link,
-    #[name("propose")]
     Propose,
-    #[name("supersede")]
     Supersede,
-    #[name("conversational")]
     Conversational,
 }
 
@@ -39,19 +33,16 @@ pub enum Form {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum New {
-    #[name("new")]
     New,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Refines {
-    #[name("refines")]
     Refines,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum By {
-    #[name("by")]
     By,
 }
 

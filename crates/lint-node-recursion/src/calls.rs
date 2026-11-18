@@ -1,5 +1,6 @@
 mod boundary;
 mod finding;
+mod ignored;
 mod key;
 mod takes_node;
 
@@ -9,8 +10,10 @@ use graph::{Function, Model, Placed};
 use lint_core::Violation;
 use lint_layout::{Name, Word};
 
+use crate::calls::ignored::Ignored;
 use boundary::Callable;
 use finding::Recursive;
+use invariants::Ignoring;
 use key::Key;
 use takes_node::TakesNode;
 
@@ -68,7 +71,7 @@ impl<'model> CallGraph<'model> {
                 .iter()
                 .filter_map(|invocation| caller.called(invocation))
                 .filter_map(|key| self.keyed.get(&key))
-                .filter_map(|candidates| <&[Callable; 1]>::try_from(candidates.as_slice()).ok())
+                .filter_map(|candidates| <&[Callable; 1]>::try_from(candidates.as_slice()).ignoring(Ignored::Ambiguous))
                 .map(|[only]| *only)
                 .collect()
         })

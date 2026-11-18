@@ -186,114 +186,67 @@ pub struct Lapsed {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[named(kebab)]
 pub(crate) enum Key {
-    #[name("session")]
     Session,
-    #[name("read")]
     Read,
-    #[name("to")]
     To,
-    #[name("authorship")]
     Authorship,
-    #[name("unrecognised")]
     Unrecognised,
-    #[name("form")]
     Form,
-    #[name("relation")]
     Relation,
-    #[name("written")]
     Written,
-    #[name("hit")]
     Hit,
-    #[name("root")]
     Root,
-    #[name("consumes")]
     Consumes,
-    #[name("project")]
     Project,
-    #[name("node")]
     Node,
-    #[name("artifact")]
     Artifact,
-    #[name("condition")]
     Condition,
-    #[name("reason")]
     Reason,
-    #[name("ancestor")]
     Ancestor,
-    #[name("child")]
     Child,
-    #[name("edge")]
     Edge,
-    #[name("role")]
     Role,
-    #[name("entered")]
     Entered,
-    #[name("placed")]
     Placed,
-    #[name("message")]
     Message,
-    #[name("at")]
     At,
-    #[name("segment")]
     Segment,
-    #[name("link")]
     Link,
-    #[name("refused")]
     Refused,
-    #[name("annotation")]
     Annotation,
-    #[name("applied")]
     Applied,
-    #[name("proposed")]
     Proposed,
-    #[name("by")]
     By,
-    #[name("uncovered")]
     Uncovered,
-    #[name("already")]
     Already,
-    #[name("file")]
     File,
-    #[name("reaped")]
     Reaped,
-    #[name("interrupted")]
     Interrupted,
-    #[name("run")]
     Run,
-    #[name("retried")]
     Retried,
-    #[name("flailed")]
     Flailed,
-    #[name("flailed-segment")]
     FlailedSegment,
-    #[name("owed")]
     Owed,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Spend {
-    #[name("job")]
     Job,
-    #[name("tokens")]
     Tokens,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Replying {
-    #[name("reply")]
     Reply,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Remarked {
-    #[name("place")]
     Place,
-    #[name("sense")]
     Sense,
-    #[name("link")]
     Link,
-    #[name("conversational")]
     Conversational,
 }
 

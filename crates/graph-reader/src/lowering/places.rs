@@ -1,4 +1,3 @@
-use super::FileRows;
 use super::walk::Lowering;
 use super::{Frame, Framed, Grain, Grains, Owning};
 use crate::namespace::ScopeOp;
@@ -6,14 +5,15 @@ use lint_sweep::{Address, Contributed, Contributing};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
 
 use algebra::{Monoid, Semigroup};
-use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
+use graph::{Building, FileId, ItemDeclaration, ItemId, Mention, Region, Resolved, Seat, TypeRef};
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
-use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeKey, ScopeMap, UsePath};
+use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeKey, ScopeMap, TranscribedRow, UsePath};
 
 use super::regions::MacroItems;
 use super::signature::Written;
@@ -178,9 +178,19 @@ impl<'read> Frame<'read> {
 
     pub(super) fn macro_left(&self, item: &ItemMacro) -> Grains {
         match &item.ident {
-            Some(_) => self.transcribed(item, &Macros::expanded(self.source, &item.mac)),
+            Some(ident) => self.rules_defined(item, ident),
             None => self.expanded(item, &item.mac),
         }
+    }
+
+    fn rules_defined(&self, item: &ItemMacro, ident: &Ident) -> Grains {
+        let row = Grains::from(Grain::Transcribed(TranscribedRow::read(self.here.scope().clone(), ident, &item.mac)));
+        let anchored = TranscribedRow::anchored(&item.mac);
+        let attributed = anchored
+            .iter()
+            .map(|path| self.used(UsePath::from(path), Position::from(path.span()), Mention::Expanded))
+            .fold(row, Semigroup::combine);
+        attributed.combine(self.transcribed(item, &Macros::expanded(self.source, &item.mac)))
     }
 
     pub(super) fn expansion(&self, item: &ItemMacro, items: MacroItems) -> Lowering<'read> {

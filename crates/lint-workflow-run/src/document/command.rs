@@ -1,10 +1,12 @@
 use crate::characters::Characters;
+use crate::document::ignored::Ignored;
 use crate::document::key::Key;
 use crate::document::lines::Lines;
 use crate::document::text::Text;
 use crate::excerpt::Excerpt;
 use crate::finding::Finding;
 use crate::word::Word;
+use invariants::Ignoring;
 
 mod inline;
 mod unquoted;
@@ -46,7 +48,7 @@ impl Command<'_> {
             .or_else(|| self.keyword().map(|word| Finding::Control { word }))
             .or_else(|| {
                 (setting == Key::Run)
-                    .then(|| Unquoted::new(self.0, Hidden::Quoted).parsed::<Inline>().ok())
+                    .then(|| Unquoted::new(self.0, Hidden::Quoted).parsed::<Inline>().ignoring(Ignored::Unparsed))
                     .flatten()
                     .and_then(Inline::program)
                     .map(|word| Finding::Inline { word })

@@ -16,10 +16,9 @@ pub(in super::super) struct Tested {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[named(kebab)]
 pub(in super::super) enum Reaching {
-    #[name("changed")]
     Changed,
-    #[name("consumed-by")]
     ConsumedBy,
 }
 

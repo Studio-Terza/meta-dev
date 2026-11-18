@@ -1,4 +1,3 @@
-use super::FileRows;
 use super::{Frame, Grain, Grains};
 use syntax::Spanned;
 use syntax::{ExprCall, ExprMacro, ExprMethodCall};

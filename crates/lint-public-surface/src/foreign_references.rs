@@ -6,7 +6,7 @@ use syntax::{Ident, ItemUse, Macro, Path, UseLeaf, UseTree};
 
 use super::export::Export;
 use algebra::{Monoid, Semigroup};
-use lint_core::SourceFile;
+use lint_core::{Macros, SourceFile};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep, Watching};
@@ -136,6 +136,17 @@ impl ReferenceScan {
         Monoid::concat(reached.map(|(first, reach)| self.recorded(first, reach)))
     }
 
+    fn pathed(&self, path: &Path) -> ForeignReferences {
+        let pair = path.segments.first().zip(path.segments.iter().nth(1));
+        pair.map_or_default(|(first, second)| self.recorded(Some(&first.ident), Leaf::Named(&second.ident)))
+    }
+
+    fn transcribed(&self, definition: &Macro) -> ForeignReferences {
+        let mentioned = Macros::mentioned(definition);
+        let pathed = mentioned.paths().iter().map(|path| self.pathed(path));
+        Monoid::concat(pathed.chain(mentioned.uses().iter().map(|tree| self.used(tree))))
+    }
+
     fn recorded(&self, first: Option<&Ident>, leaf: Leaf<'_>) -> ForeignReferences {
         first
             .map(CrateName::from)
@@ -166,11 +177,11 @@ impl Contribute for ReferenceScan {
 
     fn on_macro(
         &self,
-        _: &Macro,
+        invoked: &Macro,
         _: &Facts<'_, Macro>,
         _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<(), ForeignReferences> {
-        Contributed::descending(Descend::Unfold)
+        Contributed::new((), self.transcribed(invoked), Descend::Unfold)
     }
 
     fn on_path(
@@ -179,9 +190,6 @@ impl Contribute for ReferenceScan {
         _: &Facts<'_, Path>,
         _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
     ) -> Contributed<(), ForeignReferences> {
-        let pair = path.segments.first().zip(path.segments.iter().nth(1));
-        Contributed::parted(
-            pair.map_or_default(|(first, second)| self.recorded(Some(&first.ident), Leaf::Named(&second.ident))),
-        )
+        Contributed::parted(self.pathed(path))
     }
 }

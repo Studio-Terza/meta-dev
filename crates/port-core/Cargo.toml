@@ -9,6 +9,7 @@ publish.workspace = true
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-derive = { path = "../port-derive" }
 thiserror.workspace = true

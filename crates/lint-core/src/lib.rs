@@ -3,6 +3,7 @@ mod contents;
 mod contribution;
 mod gate;
 mod headline;
+mod ignored;
 mod lint;
 mod macro_aliases;
 mod macros;

@@ -134,6 +134,7 @@ fn the_report_lists_survivors_idle_tests_and_kills_that_no_golden_saw() -> Resul
             "timed_out": ["m-timeout"],
             "tests_that_kill_nothing": ["b1 :: unused", "b2 :: other"],
             "killed_with_no_golden_failing": ["m-killed-nongolden -> b1 :: plain"],
+            "unviable": ["all crates: 0 of 5 unviable"],
         })
     );
     Ok(())
@@ -363,4 +364,26 @@ impl Checkout {
     fn json(&self) -> Value {
         self.text("report.json").and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
     }
+}
+
+#[test]
+fn unviable_mutants_are_counted_for_all_crates_and_for_each_crate() -> Result<(), Box<dyn Error>> {
+    let checkout = Checkout::new()?;
+    checkout.shard(
+        "shard-0",
+        &json!({
+            "baseline": ["b1 :: plain"],
+            "mutants": [
+                Shards::mutant("crates/a/src/lib.rs:1:1: replace f with g", "Unviable", &[]),
+                Shards::mutant("crates/a/src/lib.rs:2:1: replace h with i", "CaughtMutant", &["b1 :: plain"]),
+                Shards::mutant("crates/b/src/lib.rs:1:1: replace j with k", "Unviable", &[]),
+            ],
+        }),
+    )?;
+    assert_eq!(checkout.report().exit, ExitCode::SUCCESS);
+    assert_eq!(
+        checkout.field("unviable"),
+        json!(["all crates: 2 of 3 unviable", "a: 1 of 2 unviable", "b: 1 of 1 unviable"])
+    );
+    Ok(())
 }

@@ -1,6 +1,7 @@
 mod bindings;
 mod compared;
 mod finding;
+mod ignored;
 mod pinning;
 mod table_rows;
 
@@ -15,9 +16,11 @@ use lint_core::{Aliased, MacroAliases, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
 use lint_sweep::{Concludes, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
 
+use crate::assertions::ignored::Ignored;
 use bindings::{Asserted, Bindings, Judging, Met};
 use compared::Compared;
 use finding::Finding;
+use invariants::Ignoring;
 use table_rows::TableRows;
 
 #[derive(Debug)]
@@ -193,6 +196,7 @@ impl Assertion {
     fn arguments(invocation: &Macro) -> Vec<Expr> {
         invocation
             .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
+            .ignoring(Ignored::Unparsed)
             .map_or_default(|arguments| arguments.into_iter().collect())
     }
 

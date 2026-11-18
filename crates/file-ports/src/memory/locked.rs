@@ -1,4 +1,6 @@
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Mutex, MutexGuard};
+
+use invariants::Unpoisoned;
 
 #[derive(Debug, Default)]
 pub struct Locked<Held>(Mutex<Held>);
@@ -9,6 +11,6 @@ impl<Held> Locked<Held> {
     }
 
     pub fn held(&self) -> MutexGuard<'_, Held> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+        self.0.lock().unpoisoned()
     }
 }

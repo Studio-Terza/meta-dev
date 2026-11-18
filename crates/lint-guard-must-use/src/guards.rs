@@ -1,4 +1,5 @@
 use lint_core::SourceFile;
+mod ignored;
 mod members;
 mod modules;
 mod type_key;
@@ -16,6 +17,8 @@ use lint_sweep::{
     Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind, Scope, Sweep, Watching,
 };
 
+use crate::guards::ignored::Ignored;
+use invariants::Ignoring;
 use members::Members;
 pub use modules::Modules;
 
@@ -84,7 +87,7 @@ impl MustUse {
             attribute
                 .meta
                 .require_list()
-                .ok()
+                .ignoring(Ignored::Unparsed)
                 .filter(|list| list.path.is_ident(Self::CONDITIONAL))
                 .and_then(Self::conditional)
                 .map(|_| attribute)
@@ -93,7 +96,7 @@ impl MustUse {
 
     fn conditional(list: &MetaList) -> Option<Meta> {
         list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-            .ok()
+            .ignoring(Ignored::Unparsed)
             .and_then(|nested| nested.into_iter().skip(1).find(|meta| meta.path().is_ident(Self::MUST_USE)))
     }
 }

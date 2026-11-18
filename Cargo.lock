@@ -262,6 +262,7 @@ name = "design"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "design-jobs",
  "design-model",
  "design-runs",
  "design-store",
@@ -350,6 +351,8 @@ dependencies = [
  "design-model",
  "named-derive",
  "newtype",
+ "port-core",
+ "states",
  "store-ports",
  "thiserror",
 ]
@@ -405,6 +408,7 @@ dependencies = [
  "newtype",
  "port-core",
  "sqlite-ports",
+ "states",
  "store-ports",
  "thiserror",
  "transcript-ports",
@@ -458,6 +462,7 @@ name = "dispatch-fakes"
 version = "0.1.0"
 dependencies = [
  "dispatch-ports",
+ "invariants",
  "port-core",
 ]
 
@@ -467,6 +472,7 @@ version = "0.1.0"
 dependencies = [
  "grammar-lstart",
  "grammar-reply",
+ "invariants",
  "laws",
  "named-derive",
  "newtype",
@@ -590,6 +596,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 name = "file-ports"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "laws",
  "newtype",
  "tempfile",
@@ -1350,6 +1357,7 @@ name = "lint-arbitrary-newtypes"
 version = "0.1.0"
 dependencies = [
  "algebra",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1418,6 +1426,7 @@ version = "0.1.0"
 dependencies = [
  "algebra",
  "file-ports",
+ "invariants",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -1479,6 +1488,7 @@ name = "lint-expression-flow"
 version = "0.1.0"
 dependencies = [
  "algebra",
+ "invariants",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1542,6 +1552,7 @@ name = "lint-guard-must-use"
 version = "0.1.0"
 dependencies = [
  "algebra",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1569,6 +1580,7 @@ name = "lint-layout"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "invariants",
  "laws",
  "newtype",
  "serde_core",
@@ -1609,6 +1621,7 @@ name = "lint-long-exact-strings"
 version = "0.1.0"
 dependencies = [
  "algebra",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1711,8 +1724,10 @@ dependencies = [
 name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "ra-ap-rustc_lexer",
  "syntax",
@@ -1760,6 +1775,7 @@ name = "lint-no-ignored-tests"
 version = "0.1.0"
 dependencies = [
  "algebra",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1815,6 +1831,7 @@ dependencies = [
  "file-ports",
  "graph",
  "graph-reader",
+ "invariants",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1829,6 +1846,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "graph-reader",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1845,6 +1863,7 @@ name = "lint-node-recursion"
 version = "0.1.0"
 dependencies = [
  "graph",
+ "invariants",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1871,6 +1890,7 @@ name = "lint-placement"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "invariants",
  "laws",
  "lint-layout",
  "lint-mandatory-laws",
@@ -1895,6 +1915,7 @@ version = "0.1.0"
 dependencies = [
  "algebra",
  "graph",
+ "invariants",
  "laws",
  "lint-core",
  "lint-effect-sites",
@@ -1941,6 +1962,7 @@ dependencies = [
  "file-ports",
  "graph",
  "graph-reader",
+ "invariants",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1953,6 +1975,7 @@ name = "lint-public-api-tests"
 version = "0.1.0"
 dependencies = [
  "algebra",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -1994,6 +2017,7 @@ version = "0.1.0"
 dependencies = [
  "cargo-ports",
  "file-ports",
+ "invariants",
  "lint-core",
  "lint-layout",
  "lint-placement",
@@ -2050,6 +2074,7 @@ name = "lint-roots"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "invariants",
  "lint-layout",
  "newtype",
 ]
@@ -2064,6 +2089,7 @@ dependencies = [
  "graph",
  "graph-query",
  "graph-reader",
+ "invariants",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",
@@ -2139,6 +2165,7 @@ name = "lint-rust-only"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "invariants",
  "lint-core",
  "newtype",
 ]
@@ -2149,6 +2176,7 @@ version = "0.1.0"
 dependencies = [
  "algebra",
  "graph",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -2165,6 +2193,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "graph-reader",
+ "invariants",
  "laws",
  "lint-core",
  "lint-file",
@@ -2178,6 +2207,7 @@ dependencies = [
 name = "lint-sweep"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -2225,6 +2255,7 @@ dependencies = [
  "equivalence",
  "graph",
  "graph-reader",
+ "invariants",
  "laws",
  "lint-core",
  "lint-distinct-signatures",
@@ -2281,6 +2312,7 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "grammar-program",
+ "invariants",
  "laws",
  "lint-core",
  "lint-layout",
@@ -2429,7 +2461,10 @@ dependencies = [
 name = "named-derive"
 version = "0.1.0"
 dependencies = [
+ "laws",
+ "newtype",
  "syntax",
+ "thiserror",
 ]
 
 [[package]]
@@ -2526,6 +2561,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 name = "port-core"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "laws",
  "newtype",
  "port-derive",
@@ -3072,6 +3108,12 @@ name = "states"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "named-derive",
+ "newtype",
+ "port-core",
+ "sqlite-ports",
+ "store-ports",
+ "thiserror",
 ]
 
 [[package]]

@@ -1,4 +1,3 @@
-use super::FileRows;
 use super::{Frame, Framed, Grain, Grains};
 use algebra::{Monoid, Semigroup};
 use lint_sweep::Contributed;

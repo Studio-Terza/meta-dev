@@ -1,9 +1,11 @@
+mod case;
 mod row;
 
 use syntax::TokenStream;
 use syntax::{Data, DataEnum, DeriveInput, Ident, LitStr, Variant, Visibility};
 use syntax::{format_ident, quote, quote_spanned};
 
+use case::Case;
 use row::Row;
 
 pub struct Table {
@@ -19,8 +21,12 @@ impl Table {
             .map_or_else(|error| error.to_compile_error(), |table| table.generated())
     }
 
-    fn read(DeriveInput { vis, ident, data, .. }: DeriveInput) -> syntax::Result<Table> {
-        let rows = Self::variants(data).iter().map(Row::declared).collect::<syntax::Result<Vec<Vec<Row>>>>()?;
+    fn read(DeriveInput { attrs, vis, ident, data, .. }: DeriveInput) -> syntax::Result<Table> {
+        let case = Case::declared(&attrs)?;
+        let rows = Self::variants(data)
+            .iter()
+            .map(|variant| Row::declared(variant, case))
+            .collect::<syntax::Result<Vec<Vec<Row>>>>()?;
         Ok(Table { visibility: vis, ident, rows: rows.into_iter().flatten().collect() })
     }
 

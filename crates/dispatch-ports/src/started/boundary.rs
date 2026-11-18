@@ -2,8 +2,11 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar_lstart::Stamp;
+use invariants::Ignoring;
 use named_derive::Named;
 use newtype::Spelled;
+
+use crate::Ignored;
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Weekday {
@@ -68,16 +71,16 @@ pub struct Unstarted(String);
 
 impl Started {
     fn read(text: &str) -> Option<Started> {
-        let stamp = Stamp::try_from(text).ok()?;
+        let stamp = Stamp::try_from(text).ignoring(Ignored::NotAStamp)?;
         let [weekday, month] = stamp.words();
         let [day, hour, minute, second, year] = stamp.numbers();
         Some(Started {
-            weekday: weekday.parse().ok()?,
-            month: month.parse().ok()?,
-            day: u8::try_from(day).ok()?,
-            hour: u8::try_from(hour).ok()?,
-            minute: u8::try_from(minute).ok()?,
-            second: u8::try_from(second).ok()?,
+            weekday: weekday.parse().ignoring(Ignored::NotAStamp)?,
+            month: month.parse().ignoring(Ignored::NotAStamp)?,
+            day: u8::try_from(day).ignoring(Ignored::NotAStamp)?,
+            hour: u8::try_from(hour).ignoring(Ignored::NotAStamp)?,
+            minute: u8::try_from(minute).ignoring(Ignored::NotAStamp)?,
+            second: u8::try_from(second).ignoring(Ignored::NotAStamp)?,
             year,
         })
     }

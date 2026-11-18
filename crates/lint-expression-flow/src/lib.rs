@@ -1,3 +1,5 @@
+mod ignored;
+
 use algebra::{Monoid, Semigroup};
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
@@ -16,6 +18,8 @@ use syntax::{
     Stmt, Token, TraitItemFn,
 };
 
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
@@ -462,8 +466,9 @@ impl MutableLocals {
 
     fn written_to(invocation: &Macro) -> Option<Name> {
         let writing = Self::WRITING_MACROS.iter().find(|name| invocation.path.is_ident(name));
-        let arguments =
-            writing.and_then(|_| invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).ok());
+        let arguments = writing.and_then(|_| {
+            invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).ignoring(Ignored::Unparsed)
+        });
         arguments?.first().and_then(ExpressionFlow::assigned_local).map(Name::from)
     }
 }

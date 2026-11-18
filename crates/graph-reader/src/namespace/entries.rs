@@ -7,9 +7,7 @@ use syntax::{
     Token, VisRestricted,
 };
 
-use graph::{
-    Building, CrateExports, Domain, Exposure, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport, Unresolved,
-};
+use graph::{Building, CrateExports, Domain, Exposure, Item as ModelItem, ItemId, ItemKind, ItemPath, Reexport};
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
@@ -18,9 +16,10 @@ use super::anchor::Anchor;
 use super::binding::Binding;
 use super::boundary::{GlobId, ScopeId};
 use super::resolver::{Resolution, Resolver};
+use super::rules::{RulesDefinition, Written};
 use super::settling::{ScopeSettling, Seed, Target};
 use super::std_names::{Expansion, StdNames};
-use super::tables::{Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
+use super::tables::{Declaring, Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
 use super::use_path::{Leaf, UsePath};
 use super::view::View;
 
@@ -97,6 +96,26 @@ pub(super) enum Admission {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct DeclaredId(usize);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct DeclaredAt {
+    scope: ScopeId,
+    item: DeclaredId,
+}
+
+impl DeclaredAt {
+    pub(super) fn new(scope: ScopeId, item: DeclaredId) -> DeclaredAt {
+        DeclaredAt { scope, item }
+    }
+
+    pub(super) fn scope(self) -> ScopeId {
+        self.scope
+    }
+
+    pub(super) fn declared_id(self) -> DeclaredId {
+        self.item
+    }
+}
+
 impl DeclaredId {
     pub(super) fn row<Row>(self, rows: &[Row]) -> Option<&Row> {
         rows.get(self.0)
@@ -108,33 +127,56 @@ pub(crate) enum DeclaredKind {
     Module(ScopeId),
     OpaqueModule,
     Item(ItemKind),
+    Rules(Export),
+    Alias(DeclaredAt),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Export {
+    Local,
+    Exported,
 }
 
 impl DeclaredKind {
+    const EXPORTED: DeclaredKind = DeclaredKind::Rules(Export::Exported);
+
+    fn rules(self) -> Option<RulesDefinition> {
+        match self {
+            DeclaredKind::Rules(_) => Some(RulesDefinition),
+            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Alias(_) => {
+                None
+            }
+        }
+    }
+
     fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
         match self {
             DeclaredKind::Module(module) => Binding::Module(module),
             DeclaredKind::OpaqueModule => Binding::UNBOUND,
-            DeclaredKind::Item(_) => Binding::Item(level, item),
+            DeclaredKind::Item(_) | DeclaredKind::Rules(_) => Binding::Item(level, item),
+            DeclaredKind::Alias(at) => Binding::Item(at.scope(), at.declared_id()),
         }
     }
 
     fn above(self, base: ScopeId) -> DeclaredKind {
         match self {
             DeclaredKind::Module(module) => DeclaredKind::Module(module.above(base)),
-            DeclaredKind::OpaqueModule | DeclaredKind::Item(_) => self,
+            DeclaredKind::OpaqueModule | DeclaredKind::Item(_) | DeclaredKind::Rules(_) | DeclaredKind::Alias(_) => {
+                self
+            }
         }
     }
 
     fn item_kind(self) -> Option<ItemKind> {
         match self {
             DeclaredKind::Item(kind) => Some(kind),
-            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule => None,
+            DeclaredKind::Rules(_) => Some(ItemKind::Macro),
+            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule | DeclaredKind::Alias(_) => None,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Declared {
     name: Name,
     visibility: Visibility,
@@ -191,6 +233,34 @@ impl Exposing {
             syntax::Visibility::Restricted(_) => Exposure::Restricted,
             syntax::Visibility::Inherited => Exposure::Hidden,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MacroRules<'item> {
+    ident: &'item Ident,
+    attributes: &'item [Attribute],
+}
+
+impl MacroRules<'_> {
+    const EXPORT: [Word<'static>; 1] = words!["macro_export"];
+
+    fn entries(self) -> Entries {
+        Entries::from(Declared {
+            domain: Domain::Macros,
+            ..Declared::new(Name::from(self.ident), Visibility::Private, DeclaredKind::Rules(self.export()))
+        })
+    }
+
+    fn export(self) -> Export {
+        match self.attributes.iter().find_map(MacroRules::export_mark) {
+            Some(()) => Export::Exported,
+            None => Export::Local,
+        }
+    }
+
+    fn export_mark(attribute: &Attribute) -> Option<()> {
+        attribute.path().get_ident().map(Name::from).and_then(|name| name.matches::<Whole>(&Self::EXPORT)).map(|_| ())
     }
 }
 
@@ -339,35 +409,34 @@ impl Extern {
 #[derive(Debug)]
 enum GlobSource {
     Path(UsePath),
-    Expansion,
+    Invoked(UsePath, Written),
 }
 
 impl GlobSource {
     fn unsettled(&self) -> Target {
         match self {
-            GlobSource::Path(_) => Target::Waiting,
-            GlobSource::Expansion => Target::Opaque,
+            GlobSource::Path(_) | GlobSource::Invoked(..) => Target::Waiting,
         }
     }
 
-    fn unresolved(&self) -> Unresolved {
+    fn declaring<'rows>(&self, target: &'rows Target) -> Declaring<'rows> {
         match self {
-            GlobSource::Path(_) => Unresolved::Unbound,
-            GlobSource::Expansion => Unresolved::PossiblyMacroDeclared,
+            GlobSource::Path(_) => Declaring::Nothing,
+            GlobSource::Invoked(..) => target.declaring(),
         }
     }
 
     fn reexport(&self, dependencies: &Dependencies, declared: &BTreeSet<&Name>) -> Reexport {
         match self {
             GlobSource::Path(path) => path.reexport(dependencies, declared),
-            GlobSource::Expansion => Reexport::Opaque,
+            GlobSource::Invoked(..) => Reexport::Opaque,
         }
     }
 
     fn target(&self, resolver: &Resolver<'_, '_>, scope: ScopeId, glob: GlobId) -> Target {
         match self {
             GlobSource::Path(path) => resolver.glob_target(path, scope, glob),
-            GlobSource::Expansion => Target::Opaque,
+            GlobSource::Invoked(path, written) => resolver.invoked_target(path, scope, glob, written),
         }
     }
 }
@@ -379,7 +448,12 @@ struct Glob {
 }
 
 impl Glob {
-    const EXPANSION: Glob = Glob { source: GlobSource::Expansion, visibility: Visibility::Visible };
+    fn invoked(invoked: &Macro) -> Glob {
+        Glob {
+            source: GlobSource::Invoked(UsePath::from(&invoked.path), Written::from(invoked)),
+            visibility: Visibility::Visible,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -418,7 +492,7 @@ impl From<&Macro> for Entries {
     fn from(invoked: &Macro) -> Entries {
         match StdNames::expansion(invoked) {
             Expansion::Statement => Entries::default(),
-            Expansion::Items => Entries::from(Glob::EXPANSION),
+            Expansion::Items => Entries::from(Glob::invoked(invoked)),
         }
     }
 }
@@ -436,10 +510,9 @@ impl From<&Item> for Entries {
             Item::Use(used) => Entries::from(used),
             Item::ExternCrate(declared) => Entries::from(declared),
             Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
-            Item::Macro(ItemMacro { ident: Some(ident), .. }) => Entries::from(Declared {
-                domain: Domain::Macros,
-                ..Declared::named_item(ident, &syntax::Visibility::Inherited, ItemKind::Macro)
-            }),
+            Item::Macro(ItemMacro { ident: Some(ident), attrs, .. }) => {
+                MacroRules { ident, attributes: attrs }.entries()
+            }
             Item::Struct(declared) => {
                 Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))
             }
@@ -496,12 +569,24 @@ impl Entries {
         statements.iter().map(Entries::from).collect::<Entries>()
     }
 
-    pub(super) fn declaring(declared: Declared) -> Entries {
+    pub(super) fn of_declared(declared: Declared) -> Entries {
         Entries { declared: vec![declared], ..Entries::default() }
     }
 
     pub(super) fn declare(&mut self, declared: Declared) {
         self.declared.push(declared);
+    }
+
+    pub(super) fn exported_aliases(&self, scope: ScopeId) -> Vec<Declared> {
+        let exported = self.declared.iter().enumerate().filter(|(_, declared)| declared.kind == DeclaredKind::EXPORTED);
+        let aliased =
+            exported.map(|(index, declared)| (declared.name.clone(), DeclaredAt::new(scope, DeclaredId(index))));
+        aliased
+            .map(|(name, at)| Declared {
+                domain: Domain::Macros,
+                ..Declared::new(name, Visibility::Visible, DeclaredKind::Alias(at))
+            })
+            .collect()
     }
 
     pub(super) fn above(self, base: ScopeId) -> Entries {
@@ -524,8 +609,12 @@ impl Entries {
         declared.chain(imported).filter(|(_, visibility)| *visibility == Visibility::Visible).map(|(key, _)| key)
     }
 
-    pub(super) fn unresolved(&self) -> Unresolved {
-        self.globs.iter().map(|glob| glob.source.unresolved()).max().unwrap_or(Unresolved::Unbound)
+    pub(super) fn rules(&self, item: DeclaredId) -> Option<RulesDefinition> {
+        item.row(&self.declared).and_then(|declared| declared.kind.rules())
+    }
+
+    pub(super) fn declaring<'rows>(&self, targets: &'rows [Target]) -> Vec<Declaring<'rows>> {
+        self.globs.iter().zip(targets).map(|(glob, target)| glob.source.declaring(target)).collect()
     }
 
     pub(super) fn prelude(&self, name: &Name, space: &Namespace, root: ScopeId) -> Option<Binding> {

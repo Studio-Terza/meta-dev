@@ -119,9 +119,9 @@ impl<'read> Frame<'read> {
     ) -> Grains {
         inner.concluded(|framed, grown| {
             let generics = framed.0.map_or_else(|| Arc::clone(&self.generics), |frame| frame.generics);
-            let (bodies, kept): (Vec<Box<Grain>>, Vec<Box<Grain>>) =
+            let (bodies, kept): (Vec<Grain>, Vec<Grain>) =
                 grown.grains.into_iter().partition(|grain| grain.bodied().is_some());
-            let part: BodyPart = Monoid::concat(bodies.into_iter().filter_map(|grain| grain.body()));
+            let part: BodyPart = Monoid::concat(bodies.into_iter().filter_map(super::Grain::body));
             let definition = body.map(|block| {
                 let mut group = BodyGroup::opened(&generics, signature, block);
                 Sweep::block_in(self.source, block, lint_sweep::Gathers::watching(&mut group).into_iter().collect());
@@ -130,7 +130,7 @@ impl<'read> Frame<'read> {
             let own = kept.iter().position(|grain| grain.function().is_some());
             let mut ahead = kept;
             let rest = ahead.split_off(own.map_or(ahead.len(), |found| found + 1));
-            let defined = own.and_then(|_| ahead.pop()).map(|function| Box::new(function.defined(definition)));
+            let defined = own.and_then(|_| ahead.pop()).map(|function| function.defined(definition));
             Grains { grains: ahead.into_iter().chain(defined).chain(rest).collect(), bodied: None }
         })
     }

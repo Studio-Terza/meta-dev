@@ -4,11 +4,8 @@ use crate::Stage;
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Basis {
-    #[name("set")]
     Set,
-    #[name("decided")]
     Decided,
-    #[name("vague")]
     Vague,
 }
 

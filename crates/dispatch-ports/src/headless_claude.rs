@@ -4,11 +4,13 @@ use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+use invariants::Ignoring;
 use port_core::Pass;
 
 use crate::agent_run::Exchange;
 use crate::{
-    Agent, AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Job, Output, Pid, Prompt, Started, dispatch_ops,
+    Agent, AgentRun, Bell, DispatchFailure, DispatchFiller, Ended, Ignored, Job, Output, Pid, Prompt, Started,
+    dispatch_ops,
 };
 
 #[derive(Clone, Debug)]
@@ -69,7 +71,9 @@ impl DispatchFiller for HeadlessClaude {
             .env(name, value)
             .output()
             .map_err(DispatchFailure::Lookup)?;
-        Ok(str::from_utf8(&listed.stdout).ok().and_then(|text| text.parse::<Started>().ok()))
+        Ok(str::from_utf8(&listed.stdout)
+            .ignoring(Ignored::NotRunning)
+            .and_then(|text| text.parse::<Started>().ignoring(Ignored::NotRunning)))
     }
 
     fn kill(&self, _pass: Pass<'_, dispatch_ops::Kill>, pid: Pid) -> Result<Ended, DispatchFailure> {

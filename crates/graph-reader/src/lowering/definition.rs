@@ -220,7 +220,7 @@ impl BodyGroup {
         let invocations = made
             .into_iter()
             .zip(orders)
-            .filter_map(|(made, order)| made.settled(order))
+            .filter_map(|(found, order)| found.settled(order))
             .map(|invocation| invocation.bound(&bound))
             .collect();
         let branches = Branches::opened().combine(part.branches);

@@ -1,6 +1,8 @@
 mod boundary;
+mod lifecycles;
 
 pub use boundary::{Release, ReleaseNew, Succession, SuccessionNew};
+pub use lifecycles::{Delivery, RunState, delivery, run};
 
 use std::fmt;
 
@@ -10,7 +12,6 @@ use dispatch_ports::{Deadline, Finished, Pid, Reply, Stall, Stalled, Started, Us
 use named_derive::Named;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use port_core::Op;
-use store_ports::{Edge, Lifecycle};
 use transcript_ports::{Body, SessionId};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
@@ -20,41 +21,9 @@ pub struct Account(String);
 pub struct Excerpt(String);
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RunState {
-    #[name("running")]
-    Running,
-    #[name("replied")]
-    Replied,
-    #[name("unreadable")]
-    Unreadable,
-    #[name("errored")]
-    Errored,
-    #[name("overdue")]
-    Overdue,
-    #[name("killed")]
-    Killed,
-    #[name("gone")]
-    Gone,
-    #[name("failed")]
-    Failed,
-}
-
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Halted {
-    #[name("flailed")]
     Flailed,
-    #[name("stalled")]
     Stalled,
-}
-
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Delivery {
-    #[name("unreported")]
-    Unreported,
-    #[name("reported")]
-    Reported,
-    #[name("withdrawn")]
-    Withdrawn,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -88,11 +57,8 @@ pub struct Retold {
 #[derive(Clone, Copy, Debug, Op)]
 pub struct UnreportedFailures;
 
-#[derive(Clone, Debug, Op)]
-pub struct FailuresReported(Vec<JobId>);
-
-#[derive(Clone, Copy, Debug, Op)]
-pub struct OpenJobs;
+#[derive(Debug, Op)]
+pub struct FailuresReported(Vec<delivery::Unreported>);
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct JobsInterrupted;
@@ -153,10 +119,16 @@ pub struct Ran {
     reply: Option<Excerpt>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct StoredRun {
-    run: RunId,
+    held: run::Running,
     spawned: Spawned,
+}
+
+#[derive(Debug, Op)]
+pub struct RunReaped {
+    held: run::Running,
+    ended: run::Ended,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -172,9 +144,9 @@ pub struct Hold {
     rest: Vec<Flailed>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Unreported {
-    job: JobId,
+    held: delivery::Unreported,
     account: Account,
 }
 
@@ -207,26 +179,6 @@ impl AsRef<Deadline> for Spawned {
     fn as_ref(&self) -> &Deadline {
         &self.deadline
     }
-}
-
-impl Lifecycle for RunState {
-    const EDGES: &'static [Edge<RunState>] = &[
-        Edge::new(RunState::Running, RunState::Replied),
-        Edge::new(RunState::Running, RunState::Unreadable),
-        Edge::new(RunState::Running, RunState::Errored),
-        Edge::new(RunState::Running, RunState::Overdue),
-        Edge::new(RunState::Running, RunState::Killed),
-        Edge::new(RunState::Running, RunState::Gone),
-        Edge::new(RunState::Running, RunState::Failed),
-    ];
-}
-
-impl Lifecycle for Delivery {
-    const EDGES: &'static [Edge<Delivery>] = &[
-        Edge::new(Delivery::Unreported, Delivery::Reported),
-        Edge::new(Delivery::Reported, Delivery::Unreported),
-        Edge::new(Delivery::Unreported, Delivery::Withdrawn),
-    ];
 }
 
 impl From<&Stall> for RunState {
@@ -289,16 +241,9 @@ impl From<Halted> for JobState {
     }
 }
 
-impl FromIterator<JobId> for FailuresReported {
-    fn from_iter<Jobs: IntoIterator<Item = JobId>>(jobs: Jobs) -> FailuresReported {
-        FailuresReported(jobs.into_iter().collect())
-    }
-}
-
-impl Unreported {
-    #[must_use]
-    pub fn job(&self) -> JobId {
-        self.job
+impl FromIterator<Unreported> for FailuresReported {
+    fn from_iter<Failures: IntoIterator<Item = Unreported>>(failures: Failures) -> FailuresReported {
+        FailuresReported(failures.into_iter().map(|failure| failure.held).collect())
     }
 }
 
@@ -388,12 +333,17 @@ impl Ran {
 impl StoredRun {
     #[must_use]
     pub fn identity(&self) -> RunId {
-        self.run
+        *self.held.key()
     }
 
     #[must_use]
     pub fn spawned(&self) -> &Spawned {
         &self.spawned
+    }
+
+    #[must_use]
+    pub fn reaped(self, ended: run::Ended) -> RunReaped {
+        RunReaped { held: self.held, ended }
     }
 }
 

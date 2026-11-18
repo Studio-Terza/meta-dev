@@ -8,9 +8,10 @@ use dispatch_ports::{
     Agent, AgentRun, Clock, Deadline, Dispatch, Ended, Finished, HeadlessClaude, Job, Pause, Pid, Prompt, Reply, Stall,
     Started, SystemClock, Timeout, Tokens, Usage, Watch, Watched, Woke,
 };
+use invariants::Ignoring;
 use port_core::Run;
 
-use super::{FakeClock, Sleep, Wait, Waits, Watching};
+use super::{FakeClock, Ignored, Sleep, Wait, Waits, Watching};
 
 #[test]
 fn a_live_process_group_has_a_start_time_until_it_is_killed() -> Result<(), Box<dyn Error>> {
@@ -64,12 +65,14 @@ impl Stalling {
                 run.port(HeadlessClaude::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")), Agent::new("sh", arguments)));
             let clock = run.port(FakeClock::new(Sleep::STILL, &waits));
             let deadline = Deadline::after(clock.now(), Timeout::new(1));
-            let held = agent.dispatch(&Job::due_by(deadline), &Prompt::new("x".repeat(Stalling::PROMPT))).ok()?;
+            let held = agent
+                .dispatch(&Job::due_by(deadline), &Prompt::new("x".repeat(Stalling::PROMPT)))
+                .ignoring(Ignored::Unstalled)?;
             let pid = held.pid();
-            let watched = Watch::over(&agent, &clock).watched(held).ok()?;
-            Some(Stalled { watched, left: agent.started(pid).ok()? })
+            let watched = Watch::over(&agent, &clock).watched(held).ignoring(Ignored::Unstalled)?;
+            Some(Stalled { watched, left: agent.started(pid).ignoring(Ignored::Unstalled)? })
         };
-        run.finish().settled().ok()?;
+        run.finish().settled().ignoring(Ignored::Unstalled)?;
         ended
     }
 }

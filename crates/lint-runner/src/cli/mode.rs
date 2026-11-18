@@ -22,7 +22,9 @@ use workspace_metadata::Metadata;
 use super::boundary::Dumped;
 use super::timings::Measured;
 use super::{Outcome, Sources, Verdict};
+use crate::cli::ignored::Ignored;
 use elegance::Elegance;
+use invariants::Ignoring;
 use lints::{Crew, Lints};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -87,7 +89,7 @@ impl Mode {
         match self {
             Mode::Gate => Run::Gate(Lints::started(scope, sources)),
             Mode::Report => Run::Report,
-            Mode::Query(found) => Run::Query(found.as_ref().ok()),
+            Mode::Query(found) => Run::Query(found.as_ref().ignoring(Ignored::Refused)),
             Mode::Dump(_) => Run::Dump,
         }
     }
@@ -125,7 +127,7 @@ impl Run<'_, '_> {
     }
 
     fn workspaces<'run>(sources: &'run Sources<impl Files, impl Cargo, impl Timer>) -> &'run [Metadata] {
-        sources.located().done().as_ref().ok().map_or(&[][..], Described::workspaces)
+        sources.located().done().as_ref().ignoring(Ignored::Unlocated).map_or(&[][..], Described::workspaces)
     }
 }
 

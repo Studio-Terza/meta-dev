@@ -10,6 +10,7 @@ mod quotes;
 mod regions;
 mod seat;
 mod signature;
+
 mod uses;
 mod walk;
 
@@ -31,7 +32,7 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{
     Declared, DeclaredKind, Domain, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap, ScopeOp,
-    Seeds, StdNames, Top, UsePath, Visibility,
+    Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
 use crate::planting::Files;
@@ -49,6 +50,7 @@ use regions::{Context, Regions};
 use seat::{Built, Footing, Located, Seat};
 pub use signature::ReceiverSyntax;
 use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Written};
+
 use uses::UseRow;
 pub(crate) use walk::Lowering;
 
@@ -294,6 +296,7 @@ pub(crate) struct FileRows {
     laws: Vec<LawRow>,
     quotes: Vec<QuoteRow>,
     places: PlaceRows,
+    transcribed: Vec<TranscribedRow>,
 }
 
 impl Semigroup for FileRows {
@@ -308,6 +311,7 @@ impl Semigroup for FileRows {
             laws: self.laws.combine(other.laws),
             quotes: self.quotes.combine(other.quotes),
             places: self.places.combine(other.places),
+            transcribed: self.transcribed.combine(other.transcribed),
         }
     }
 }
@@ -448,7 +452,13 @@ impl<'read> Plot<'read> {
         let settled = seeds.settled();
         let tables = seeds.tables(&settled);
         let ids = self.space.issued(&mut building);
-        let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids);
+        let unexpanded = Transcriptions::default();
+        let naming = Resolving::new(Resolver::new(&self.space, &tables), &ids, &unexpanded);
+        let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
+            let based = naming.based(grown.base);
+            grown.rows.transcribed.iter().filter_map(move |row| row.settled(based, &grown.scopes))
+        }));
+        let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids, &transcriptions);
         let exports = self.space.exports();
         let with_exports =
             exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
@@ -527,7 +537,7 @@ impl Owning {
 }
 
 #[derive(Debug)]
-pub(crate) enum Grain {
+enum Grain {
     Impl(ImplRow),
     Function(FnRow),
     Alias(AliasRow),
@@ -540,11 +550,12 @@ pub(crate) enum Grain {
     Op(ScopeOp),
     Slot(Slot<ScopeKey>),
     Body(BodyPart),
+    Transcribed(TranscribedRow),
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Grains {
-    grains: Vec<Box<Grain>>,
+    grains: Vec<Grain>,
     bodied: Option<()>,
 }
 
@@ -559,14 +570,14 @@ impl Monoid for Grains {}
 impl From<Grain> for Grains {
     fn from(grain: Grain) -> Grains {
         let bodied = grain.bodied();
-        Grains { grains: vec![Box::new(grain)], bodied }
+        Grains { grains: vec![grain], bodied }
     }
 }
 
 impl FromIterator<Grain> for Grains {
     fn from_iter<Found: IntoIterator<Item = Grain>>(found: Found) -> Grains {
-        let grains: Vec<Box<Grain>> = found.into_iter().map(Box::new).collect();
-        let bodied = grains.iter().find_map(|grain| grain.bodied());
+        let grains: Vec<Grain> = found.into_iter().collect();
+        let bodied = grains.iter().find_map(Grain::bodied);
         Grains { grains, bodied }
     }
 }
@@ -601,6 +612,7 @@ impl From<Grain> for Sorted {
             Grain::Use(row) => Sorted::of(FileRows { uses: vec![row], ..FileRows::default() }),
             Grain::Law(row) => Sorted::of(FileRows { laws: vec![row], ..FileRows::default() }),
             Grain::Quote(row) => Sorted::of(FileRows { quotes: vec![row], ..FileRows::default() }),
+            Grain::Transcribed(row) => Sorted::of(FileRows { transcribed: vec![row], ..FileRows::default() }),
             Grain::Place(places) => Sorted::of(FileRows { places, ..FileRows::default() }),
             Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
             Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
@@ -617,13 +629,13 @@ impl Sorted {
 
 impl From<Grains> for Sorted {
     fn from(grains: Grains) -> Sorted {
-        Monoid::concat(grains.grains.into_iter().map(|grain| Sorted::from(*grain)))
+        Monoid::concat(grains.grains.into_iter().map(Sorted::from))
     }
 }
 
 impl Grain {
-    fn body(self: Box<Self>) -> Option<BodyPart> {
-        match *self {
+    fn body(self) -> Option<BodyPart> {
+        match self {
             Grain::Body(part) => Some(part),
             Grain::Impl(_)
             | Grain::Function(_)
@@ -633,6 +645,7 @@ impl Grain {
             | Grain::Use(_)
             | Grain::Law(_)
             | Grain::Quote(_)
+            | Grain::Transcribed(_)
             | Grain::Place(_)
             | Grain::Op(_)
             | Grain::Slot(_) => None,
@@ -650,6 +663,7 @@ impl Grain {
             | Grain::Use(_)
             | Grain::Law(_)
             | Grain::Quote(_)
+            | Grain::Transcribed(_)
             | Grain::Place(_)
             | Grain::Op(_)
             | Grain::Slot(_) => None,
@@ -666,6 +680,7 @@ impl Grain {
             | Grain::Use(_)
             | Grain::Law(_)
             | Grain::Quote(_)
+            | Grain::Transcribed(_)
             | Grain::Place(_)
             | Grain::Op(_)
             | Grain::Slot(_)

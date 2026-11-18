@@ -7,10 +7,12 @@ use grammar_program::Program;
 use newtype::{Newtype, Wrapping};
 
 use crate::characters::Characters;
+use crate::document::ignored::Ignored;
 use crate::document::lines::Lines;
 use crate::excerpt::Excerpt;
 use crate::word::Word;
 use expansion::Expansion;
+use invariants::Ignoring;
 
 #[derive(Newtype, Clone, Copy, Debug, Default)]
 pub struct Text<'text>(&'text str);
@@ -31,7 +33,10 @@ impl<'text> Text<'text> {
         self.0
             .match_indices(expansion)
             .find_map(|(at, found)| {
-                self.0.get(at + found.len()..).map(Text).and_then(|rest| Expansion::try_from(rest).ok())
+                self.0
+                    .get(at + found.len()..)
+                    .map(Text)
+                    .and_then(|rest| Expansion::try_from(rest).ignoring(Ignored::Unparsed))
             })
             .map(|_| Self::EXPANSION)
     }
@@ -39,7 +44,7 @@ impl<'text> Text<'text> {
     pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Excerpt> {
         self.0
             .parse::<Program>()
-            .ok()
+            .ignoring(Ignored::Unparsed)
             .map(Program::into_inner)
             .filter(|word| known.iter().all(|shell| shell.into_inner() != *word))
             .map(Excerpt::new)
