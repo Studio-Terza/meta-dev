@@ -1,5 +1,7 @@
 use crate::Uttered;
 use crate::cli::request::command::printed::Lines;
+use crate::cli::request::ignored::Ignored;
+use invariants::Ignoring;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -196,8 +198,12 @@ impl<S: Store> Sheet<'_, S> {
             .flat_map(notes::Entry::cites)
             .map(|cite: &Cite| Prefix::new(cite.clone().into_inner()))
             .collect();
-        let quoted: QuotedSegments =
-            entries.iter().flat_map(notes::Entry::quotes).filter_map(Result::ok).cloned().collect();
+        let quoted: QuotedSegments = entries
+            .iter()
+            .flat_map(notes::Entry::quotes)
+            .filter_map(|quote| quote.ignoring(Ignored::Unclosed))
+            .cloned()
+            .collect();
         Ok(Answers { root, next, cited: self.store.read(cited)?, quoted: self.store.read(quoted)? })
     }
 
@@ -233,21 +239,17 @@ impl Answers {
             .into_iter()
             .map(|cite| Sought { reference: Reference::Cite(cite.clone()), found: self.cite(cite) })
             .collect();
-        let authors: Vec<&Speech> = citations.iter().filter_map(|cited| cited.found.as_ref().ok()).collect();
+        let authors: Vec<&Speech> =
+            citations.iter().filter_map(|cited| cited.found.as_ref().ignoring(Ignored::Missed)).collect();
         let cited: BTreeSet<Uuid> = authors.iter().map(|author| author.message.clone()).collect();
         let dates = entry.dates();
         let quotations: Vec<Sought<Vec<Segment>>> = entry
             .quotes()
             .into_iter()
-            .map(|quote| {
-                quote.map_or_else(Sought::unclosed, |closed| Sought {
-                    reference: Reference::Quote(closed.clone()),
-                    found: self.quote(closed, &cited, &dates),
-                })
-            })
+            .map(|quote| Sought::quoted(quote, |closed| self.quote(closed, &cited, &dates)))
             .collect();
         let quoted: BTreeSet<&Segment> =
-            quotations.iter().filter_map(|quoted| quoted.found.as_ref().ok()).flatten().collect();
+            quotations.iter().filter_map(|quoted| quoted.found.as_ref().ignoring(Ignored::Missed)).flatten().collect();
         let owned: Vec<&Speech> = authors.iter().copied().filter(|author| author.author == Authorship::Owner).collect();
         let anchors = Count::new(quoted.len().saturating_add(owned.len()));
         let resolved = voice.anchored(quoted, &owned);
@@ -312,12 +314,12 @@ impl Answers {
 
 impl Speech {
     fn anchor(&self) -> Anchor<'_> {
-        <&[Segment; 1]>::try_from(self.segments.as_slice()).map_or_else(
-            |_several| {
+        match <&[Segment; 1]>::try_from(self.segments.as_slice()) {
+            Ok([whole]) => Anchor::Whole(whole),
+            Err(_several) => {
                 Anchor::Ambiguous(Ambiguity { cite: self.cite.clone(), segments: Count::new(self.segments.len()) })
-            },
-            |[whole]| Anchor::Whole(whole),
-        )
+            }
+        }
     }
 
     fn anchors<'heard>(owned: &[&'heard Speech]) -> Vec<Anchor<'heard>> {
@@ -365,12 +367,22 @@ impl Miss {
 }
 
 impl<Found> Sought<Found> {
+    fn quoted(quote: Result<&Quote, &Unclosed>, found: impl FnOnce(&Quote) -> Result<Found, Miss>) -> Sought<Found> {
+        match quote {
+            Ok(closed) => Sought { reference: Reference::Quote(closed.clone()), found: found(closed) },
+            Err(unclosed) => Sought::unclosed(unclosed),
+        }
+    }
+
     fn unclosed(unclosed: &Unclosed) -> Sought<Found> {
         Sought { reference: Reference::Quote(unclosed.clone().into_inner()), found: Err(Miss::Unclosed) }
     }
 
     fn missed(&self) -> Option<Missed> {
-        self.found.as_ref().err().map(|miss| Missed { reference: self.reference.clone(), miss: *miss })
+        match &self.found {
+            Ok(_found) => None,
+            Err(miss) => Some(Missed { reference: self.reference.clone(), miss: *miss }),
+        }
     }
 }
 

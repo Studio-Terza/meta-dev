@@ -1,4 +1,6 @@
 use crate::cli::request::command::printed::Lines;
+use crate::cli::request::ignored::Ignored;
+use invariants::Ignoring;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
@@ -61,7 +63,7 @@ struct Subtree(Vec<Outline>);
 
 impl Lens {
     fn spoken(token: &Token) -> Result<Lens, Failure> {
-        token.text().and_then(|word| word.parse().ok()).ok_or(Failure::Usage)
+        token.text().and_then(|word| word.parse().ignoring(Ignored::Unparsed)).ok_or(Failure::Usage)
     }
 
     fn tree(self) -> Result<Tree, View> {
@@ -75,7 +77,10 @@ impl Lens {
     }
 
     fn configured(self) -> View {
-        self.tree().map_or_else(|whole| whole, |tree| View::Tree(tree, Root::Configured))
+        match self.tree() {
+            Ok(tree) => View::Tree(tree, Root::Configured),
+            Err(whole) => whole,
+        }
     }
 
     fn rooted(self, token: &Token) -> Result<View, Failure> {

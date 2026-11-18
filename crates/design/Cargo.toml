@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
 design-model = { path = "../design-model" }
 design-runs = { path = "../design-runs" }

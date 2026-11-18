@@ -1,4 +1,6 @@
 use crate::cli::request::command::printed::Lines;
+use crate::cli::request::ignored::Ignored;
+use invariants::Ignoring;
 
 use design_model::{Ordinal, Prefix};
 use design_store::{ShownMessage, Started, Stored};
@@ -17,7 +19,7 @@ pub struct Shown(Stored);
 
 impl Shown {
     pub fn message(store: &impl Store, prefix: &Prefix) -> Result<Shown, Failure> {
-        let named = Uuid::try_new(prefix.clone().into_inner()).ok();
+        let named = Uuid::try_new(prefix.clone().into_inner()).ignoring(Ignored::NotAUuid);
         let exact = named.map(|uuid| store.read(ShownMessage::named(uuid))).transpose()?.flatten();
         let stored = exact.map_or_else(|| Shown::prefixed(store, prefix), Ok)?;
         Ok(Shown(stored))

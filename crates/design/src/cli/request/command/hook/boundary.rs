@@ -111,11 +111,15 @@ impl Stopping {
 
     pub fn decided(&self, concluded: Result<Count, Failure>, store: &impl Store) -> Result<Uttered, Failure> {
         match self.continuation.0 {
-            Some(Continuing) => concluded.map_or_else(
-                |halt| Decision::Notice { system_message: halt.to_string() }.written(),
-                |_jobs| Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))),
-            ),
+            Some(Continuing) => Self::continued(concluded),
             None => Decision::told(store, HookEvent::Stop, &[]),
+        }
+    }
+
+    fn continued(concluded: Result<Count, Failure>) -> Result<Uttered, Failure> {
+        match concluded {
+            Ok(_jobs) => Ok(Uttered::silent(Ok(Outcome::Hooked(HookEvent::Stop)))),
+            Err(halt) => Decision::Notice { system_message: halt.to_string() }.written(),
         }
     }
 }

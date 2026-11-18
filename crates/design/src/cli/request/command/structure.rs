@@ -1,5 +1,7 @@
 use crate::Uttered;
 use crate::cli::request::command::printed::Lines;
+use crate::cli::request::ignored::Ignored;
+use invariants::Ignoring;
 use std::collections::BTreeSet;
 
 use design_model::{JobId, Provenance, RunId, Segment};
@@ -9,8 +11,8 @@ use design_runs::{
 };
 use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
-    AgentRun, Clock, Deadline, Dispatch, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout, Watch, Watched,
-    Watching,
+    AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Ended, Fault, Finished, Job, Prompt, Stall, Timeout,
+    Watch, Watched, Watching,
 };
 use port_core::Held;
 use store_ports::{Store, StoreFailure};
@@ -234,11 +236,8 @@ impl<S: Store, D: Dispatch, C: Clock> Attempts<'_, '_, S, D, C> {
         let run = store.read(NextRun)?;
         let deadline = Deadline::after(crew.clock.now(), Structure::<S, D, C>::TIMEOUT);
         let record = RunRecord { structure: self.structure, job: self.id, run };
-        let watched =
-            crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt))).map_or_else(
-                |failure| Ok(Watched::Stalled(Stall::Unspawned(Fault::from(failure)))),
-                |held| record.ended(held, deadline),
-            )?;
+        let dispatched = crew.dispatch.dispatch(&Job::due_by(deadline), &Prompt::from(&self.job.briefing(&attempt)));
+        let watched = record.spawned(dispatched, deadline)?;
         let retried = attempt.lapse().cloned();
         let step = watched.visited(Stepping { attempts: self, run, attempt })?;
         self.continued(run, retried, step)
@@ -317,13 +316,29 @@ impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
     fn ended(&self, held: Held<'_, AgentRun>, deadline: Deadline) -> Result<Watched, Failure> {
         let Structure { store, crew } = self.structure;
         let looked = crew.dispatch.started(held.pid());
-        let started = looked.as_ref().ok().cloned().flatten();
+        let started = looked.as_ref().ignoring(Ignored::Unlooked).cloned().flatten();
         store.write(RunSpawned::new(self.run, self.job, Spawned::new(held.pid(), started, deadline)))?;
-        let watched = looked
-            .and_then(|_started| Watch::over(crew.dispatch, crew.clock).watched(held))
-            .unwrap_or_else(|failure| Watched::Stalled(Stall::Failed(Fault::from(failure))));
+        let watched = Self::watched(looked.and_then(|_started| Watch::over(crew.dispatch, crew.clock).watched(held)));
         store.write(watched.visited(RunEnding { run: self.run }))?;
         Ok(watched)
+    }
+
+    fn spawned(
+        &self,
+        dispatched: Result<Held<'_, AgentRun>, DispatchFailure>,
+        deadline: Deadline,
+    ) -> Result<Watched, Failure> {
+        match dispatched {
+            Ok(held) => self.ended(held, deadline),
+            Err(failure) => Ok(Watched::Stalled(Stall::Unspawned(Fault::from(failure)))),
+        }
+    }
+
+    fn watched(watching: Result<Watched, DispatchFailure>) -> Watched {
+        match watching {
+            Ok(watched) => watched,
+            Err(failure) => Watched::Stalled(Stall::Failed(Fault::from(failure))),
+        }
     }
 }
 
