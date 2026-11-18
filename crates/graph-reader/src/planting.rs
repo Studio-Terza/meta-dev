@@ -1,14 +1,15 @@
 use std::borrow::Borrow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use algebra::{Monoid, Semigroup};
 use graph::{Building, FileHome, FileId, Harness, Model};
 use lint_core::{SourceFile, TestFile};
 use lint_layout::{Dependencies, Name};
 use lint_placement::{Placement, Role};
 
-use crate::lowering::{Lowered, Plot, Slot};
-use crate::namespace::{CrateForm, Top};
+use crate::lowering::{Lowered, Plot, Plotting, SlotAt};
+use crate::namespace::{CrateForm, Rooted, Top};
 
 #[derive(Debug)]
 pub(crate) struct Placing {
@@ -45,11 +46,11 @@ impl Placing {
     }
 
     fn top(&self, form: CrateForm) -> Top<'_> {
-        Top::Root { form, name: self.name.as_ref(), dependencies: &self.dependencies }
+        Top::Root(Rooted::new(form, self.name.as_ref(), &self.dependencies))
     }
 
     fn island(&self) -> Top<'_> {
-        Top::Root { form: CrateForm::Island, name: None, dependencies: &self.dependencies }
+        Top::Root(Rooted::new(CrateForm::Island, None, &self.dependencies))
     }
 }
 
@@ -61,36 +62,100 @@ struct Unplanted<'read> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Files<'read>(BTreeMap<&'read Path, Unplanted<'read>>);
+struct Files<'read>(BTreeMap<&'read Path, Unplanted<'read>>);
+
+#[derive(Clone, Copy, Debug)]
+struct Claims<'up, 'read> {
+    claimed: &'up BTreeSet<&'read Path>,
+    up: Option<&'up Claims<'up, 'read>>,
+}
+
+impl Claims<'_, '_> {
+    fn holds(self, path: &Path) -> Option<()> {
+        self.claimed.get(path).map(|_| ()).or_else(|| self.up.and_then(|up| up.holds(path)))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Unclaimed<'files, 'up, 'read> {
+    files: &'files Files<'read>,
+    claims: Claims<'up, 'read>,
+}
+
+impl Unclaimed<'_, '_, '_> {
+    pub(crate) fn present(self, path: &Path) -> Option<FileId> {
+        self.claims.holds(path).map_or_else(|| self.files.0.get(path).map(|unplanted| unplanted.file), |()| None)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Sprout {
+    Root(FileId),
+    Island(FileId),
+    Child { at: SlotAt, file: FileId },
+    Opaque(SlotAt),
+}
+
+impl Sprout {
+    fn file(self) -> Option<FileId> {
+        match self {
+            Sprout::Root(file) | Sprout::Island(file) | Sprout::Child { file, .. } => Some(file),
+            Sprout::Opaque(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Sprouts<'read> {
+    order: Vec<Sprout>,
+    claimed: BTreeSet<&'read Path>,
+}
+
+impl Semigroup for Sprouts<'_> {
+    fn combine(self, other: Self) -> Self {
+        let mut claimed = self.claimed;
+        claimed.extend(other.claimed);
+        Sprouts { order: self.order.combine(other.order), claimed }
+    }
+}
+
+impl Monoid for Sprouts<'_> {}
+
+impl From<Sprout> for Sprouts<'_> {
+    fn from(sprout: Sprout) -> Self {
+        Sprouts { order: vec![sprout], claimed: BTreeSet::new() }
+    }
+}
+
+impl<'read> Sprouts<'read> {
+    fn island(unplanted: &Unplanted<'read>) -> Sprouts<'read> {
+        let opaque = SlotAt::every(unplanted.file, &unplanted.lowered).map(|at| Sprouts::from(Sprout::Opaque(at)));
+        Sprouts::from(Sprout::Island(unplanted.file)).combine(Monoid::concat(opaque))
+    }
+}
 
 impl<'read> Files<'read> {
-    pub(crate) fn present(&self, path: &Path) -> Option<FileId> {
-        self.0.get(path).map(|unplanted| unplanted.file)
-    }
-
-    fn filled(self, planted: &mut Plot<'read>, slots: Vec<Slot>) -> Files<'read> {
-        slots.into_iter().fold(self, |mut files, slot| {
-            files.slot_filled(planted, slot);
-            files
+    fn branches(&self, parent: &Unplanted<'read>, claims: Claims<'_, 'read>) -> Sprouts<'read> {
+        let slots = SlotAt::every(parent.file, &parent.lowered).zip(parent.lowered.slots());
+        slots.fold(Sprouts::default(), |sprouts, (at, slot)| {
+            let here = Claims { claimed: &sprouts.claimed, up: Some(&claims) };
+            let found = slot.found(Unclaimed { files: self, claims: here });
+            let next = self.sprouted(at, found.as_deref(), here);
+            sprouts.combine(next)
         })
     }
 
-    fn rooted(self, planted: &mut Plot<'read>, root: Unplanted<'read>) -> Files<'read> {
-        let slots = planted.rooted(root.placing.top(CrateForm::Planted), root.file, root.lowered);
-        self.filled(planted, slots)
-    }
-
-    fn slot_filled(&mut self, planted: &mut Plot<'read>, slot: Slot) {
-        match slot.found(self) {
-            Some(path) => self.planted_at(planted, slot, &path),
-            None => planted.opaque(slot),
-        }
-    }
-
-    fn planted_at(&mut self, planted: &mut Plot<'read>, slot: Slot, path: &Path) {
-        let child = self.0.remove(path);
-        let slots = child.map_or_default(|removed| planted.planted(slot, removed.file, removed.lowered));
-        *self = std::mem::take(self).filled(planted, slots);
+    fn sprouted(&self, at: SlotAt, found: Option<&Path>, claims: Claims<'_, 'read>) -> Sprouts<'read> {
+        let child = found.and_then(|path| self.0.get_key_value(path));
+        child.map_or_else(
+            || Sprouts::from(Sprout::Opaque(at)),
+            |(path, unplanted)| {
+                let claimed = BTreeSet::from([*path]);
+                let below = self.branches(unplanted, Claims { claimed: &claimed, up: Some(&claims) });
+                let own = Sprouts { order: vec![Sprout::Child { at, file: unplanted.file }], claimed };
+                own.combine(below)
+            },
+        )
     }
 }
 
@@ -108,20 +173,42 @@ impl<'read> CrateFiles<'read> {
         CrateFiles { root, files: Files(files) }
     }
 
-    fn planted(self, planted: &mut Plot<'read>) {
-        self.remaining(planted).0.into_values().for_each(|island| {
-            let slots = planted.rooted(island.placing.island(), island.file, island.lowered);
-            slots.into_iter().fold(&mut *planted, |opaqued, slot| {
-                opaqued.opaque(slot);
-                opaqued
-            });
+    fn sprouts(&self) -> Sprouts<'read> {
+        let none = BTreeSet::new();
+        let rooted = self.root.as_ref().map_or_default(|root| {
+            let below = self.files.branches(root, Claims { claimed: &none, up: None });
+            Sprouts::from(Sprout::Root(root.file)).combine(below)
         });
+        let claims = Claims { claimed: &rooted.claimed, up: None };
+        let remaining = self.files.0.iter().filter(|(path, _)| claims.holds(path).is_none());
+        let islands = Monoid::concat(remaining.map(|(_, island)| Sprouts::island(island)));
+        rooted.combine(islands)
     }
 
-    fn remaining(self, planted: &mut Plot<'read>) -> Files<'read> {
-        match self.root {
-            Some(root) => self.files.rooted(planted, root),
-            None => self.files,
+    fn unplanted(self) -> impl Iterator<Item = Unplanted<'read>> {
+        self.root.into_iter().chain(self.files.0.into_values())
+    }
+}
+
+#[derive(Debug)]
+struct Sprouting<'read> {
+    sprout: Sprout,
+    unplanted: Option<Unplanted<'read>>,
+}
+
+impl<'read> Sprouting<'read> {
+    fn grown(self, plotting: Plotting<'_, 'read>) -> Plot<'read> {
+        match self.sprout {
+            Sprout::Root(_) => self
+                .unplanted
+                .map_or_default(|root| plotting.rooted(root.placing.top(CrateForm::Planted), root.file, root.lowered)),
+            Sprout::Island(_) => self
+                .unplanted
+                .map_or_default(|island| plotting.rooted(island.placing.island(), island.file, island.lowered)),
+            Sprout::Child { at, .. } => {
+                self.unplanted.map_or_default(|child| plotting.planted(at, child.file, child.lowered))
+            }
+            Sprout::Opaque(at) => plotting.opaque(at),
         }
     }
 }
@@ -166,9 +253,15 @@ impl<'read> Planting<'read> {
     }
 
     fn planted(self) -> Plot<'read> {
-        self.crates.into_iter().fold(Plot::default(), |mut planted, krate| {
-            krate.planted(&mut planted);
-            planted
+        let sprouts: Sprouts<'read> = Monoid::concat(self.crates.iter().map(CrateFiles::sprouts));
+        let owned: BTreeMap<FileId, Unplanted<'read>> =
+            self.crates.into_iter().flat_map(CrateFiles::unplanted).map(|file| (file.file, file)).collect();
+        let sproutings = sprouts.order.into_iter().scan(owned, |waiting, sprout| {
+            Some(Sprouting { sprout, unplanted: sprout.file().and_then(|file| waiting.remove(&file)) })
+        });
+        sproutings.fold(Plot::default(), |plot, sprouting| {
+            let grown = sprouting.grown(Plotting::from(&plot));
+            plot.combine(grown)
         })
     }
 }
