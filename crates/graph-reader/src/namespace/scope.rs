@@ -3,7 +3,7 @@ use std::iter;
 use graph::Item;
 use lint_layout::Name;
 
-use super::anchor::{Anchor, Anchors};
+use super::anchor::{Anchor, Anchors, Child};
 use super::boundary::ScopeId;
 use super::entries::{Entries, Sight};
 
@@ -29,10 +29,10 @@ pub(crate) enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub(super) fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
+    pub(super) fn child(self, parent: Anchors, scope: ScopeId) -> Child {
         match self {
-            ScopeKind::Module => parent.nested(scope),
-            ScopeKind::Block => parent,
+            ScopeKind::Module => Child::Module { parent, module: scope },
+            ScopeKind::Block => Child::Block(parent),
         }
     }
 

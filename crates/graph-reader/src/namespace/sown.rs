@@ -34,7 +34,7 @@ impl From<Nesting<'_>> for ScopeShape {
     fn from(nesting: Nesting<'_>) -> ScopeShape {
         let Nesting { parent, kind, scope } = nesting;
         ScopeShape {
-            anchors: kind.anchors(parent.anchors, scope),
+            anchors: Anchors::from(kind.child(parent.anchors, scope)),
             chain: kind.chain(&parent.chain, scope),
             ancestry: iter::once(scope).chain(parent.ancestry.iter().copied()).collect(),
         }

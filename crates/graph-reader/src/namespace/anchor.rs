@@ -61,8 +61,21 @@ impl Anchors {
     pub(super) fn rooted(root: ScopeId) -> Anchors {
         Anchors { module: Some(root), above: None, root: Some(root) }
     }
+}
 
-    pub(super) fn nested(self, module: ScopeId) -> Anchors {
-        Anchors { module: Some(module), above: self.module, root: self.root }
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Child {
+    Module { parent: Anchors, module: ScopeId },
+    Block(Anchors),
+}
+
+impl From<Child> for Anchors {
+    fn from(child: Child) -> Anchors {
+        match child {
+            Child::Module { parent, module } => {
+                Anchors { module: Some(module), above: parent.module, root: parent.root }
+            }
+            Child::Block(parent) => parent,
+        }
     }
 }
