@@ -61,25 +61,18 @@ macro_rules! monoid {
 
 #[macro_export]
 macro_rules! action {
-    ($(#[$meta:meta])* $name:ident, $target:ty, $actor:ty, $targets:expr, $actors:expr $(,)?) => {
+    ($(#[$meta:meta])* $name:ident, $targets:expr, $acted:expr, $actors:expr $(,)?) => {
         mod $name {
             use super::*;
 
             $crate::law!($(#[$meta])* acting_by_the_identity_changes_nothing, $targets, value, {
-                let acted = <$target as ::algebra::Act<$actor>>::acted(
-                    value.clone(),
-                    <$actor as ::core::default::Default>::default(),
-                );
+                let acted = $acted(value.clone(), ::core::default::Default::default());
                 $crate::proptest::prop_assert_eq!(acted, Some(value), "the identity moved the value");
             });
             $crate::law!($(#[$meta])* acting_twice_is_acting_by_the_combination, ($targets, $actors, $actors), triple, {
                 let (value, first, second) = triple;
-                let twice = <$target as ::algebra::Act<$actor>>::acted(value.clone(), first.clone())
-                    .and_then(|once| <$target as ::algebra::Act<$actor>>::acted(once, second.clone()));
-                let combined = <$target as ::algebra::Act<$actor>>::acted(
-                    value,
-                    <$actor as ::algebra::Semigroup>::combine(first, second),
-                );
+                let twice = $acted(value.clone(), first.clone()).and_then(|once| $acted(once, second.clone()));
+                let combined = $acted(value, ::algebra::Semigroup::combine(first, second));
                 $crate::proptest::prop_assert_eq!(twice, combined, "acting twice differs from acting by the combination");
             });
         }

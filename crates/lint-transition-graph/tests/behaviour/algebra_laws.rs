@@ -50,7 +50,7 @@ const OTHER_ADD: &str = "struct B;\nimpl Add for B {\n    type Output = B;\n    
 fn an_unlawed_add_is_listed_with_its_type_and_the_fix() {
     let text = Declared::of(&[Declared::at("crates/x/src/lib.rs", ADD)]);
     assert!(
-        text.contains("crates/x/src/lib.rs:4: crate x: 1 of 1 algebra operations declare no law; x::A: add; declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package, calling the operation as Type::function, <Type as Trait>::function or a closure that calls it on its parameters"),
+        text.contains("crates/x/src/lib.rs:4: crate x: 1 of 1 algebra operations declare no law; x::A: add; declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing!, distributive! or action! in a test of the same package, calling the operation as Type::function, <Type as Trait>::function or a closure that calls it on its parameters"),
         "{text}"
     );
 }
@@ -95,6 +95,25 @@ fn a_law_naming_the_type_and_the_function_clears_the_operation() {
             .iter()
             .all(|law| Declared::lawed(ADD, law).matches("declare no law").count() == 0)
     );
+}
+
+const ACTING: &str = "pub trait Act<Actor> {\n    fn acted(self, by: Actor) -> Option<Self>;\n}\n";
+const ACTED_ON: &str = "use algebra::Act;\npub struct Path;\npub struct Place;\nimpl Act<Path> for Place {\n    fn acted(self, by: Path) -> Option<Place> {}\n}\n";
+const ACTION_LAW: &str = "laws::action!(paths_act, any::<Place>(), <Place as Act<Path>>::acted, any::<Path>());\n";
+
+#[test]
+fn an_action_law_clears_the_action() {
+    let unlawed = Declared::of(&[
+        Declared::at("crates/algebra/src/lib.rs", ACTING),
+        Declared::at("crates/x/src/lib.rs", ACTED_ON),
+    ]);
+    assert!(unlawed.contains("x::Place: acted"), "{unlawed}");
+    let lawed = Declared::of(&[
+        Declared::at("crates/algebra/src/lib.rs", ACTING),
+        Declared::at("crates/x/src/lib.rs", ACTED_ON),
+        Declared::at("crates/x/tests/t.rs", ACTION_LAW),
+    ]);
+    assert_eq!(lawed.matches("x::Place").count(), 0, "{lawed}");
 }
 
 #[test]

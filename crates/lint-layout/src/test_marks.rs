@@ -14,7 +14,8 @@ pub struct TestMarks;
 
 impl TestMarks {
     const ATTRIBUTE: [Word<'static>; 3] = words!["test", "rstest", "test_case"];
-    const LAWS: [Word<'static>; 12] = words![
+    const LAWS: [Word<'static>; 13] = words![
+        "action",
         "crud",
         "law",
         "roundtrip",
