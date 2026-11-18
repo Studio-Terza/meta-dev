@@ -58,7 +58,7 @@ pub use placed::{FileHome, Harness, Placed};
 pub use primitive::Primitive;
 pub use quoted::Quoted;
 pub use references::{Consumers, References};
-pub use region::{Ground, Reach, Region, Seat, Within, Writing, Zone};
+pub use region::{Ground, Reach, Region, Seat, Unowned, Within, Writing, Zone};
 pub use resolved::{Nominal, Resolved};
 pub use sited::{Sited, Spelling};
 pub use traversal::{Event, Trees};

@@ -9,7 +9,7 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Stmt};
 
 use algebra::{Monoid, Semigroup};
-use graph::{FileId, ItemDeclaration, ItemId, Mention, ModelPart, Region, Resolved, Seat, TypeRef};
+use graph::{FileId, ItemDeclaration, ItemId, Mention, ModelPart, Region, Resolved, Seat, TypeRef, Unowned};
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
@@ -143,10 +143,11 @@ impl Places {
 
     pub(super) fn seat(&self, region: Region, place: Option<&PlaceId>) -> Seat {
         let found = place.and_then(|id| self.places.get(id));
-        Seat::new(region, found.and_then(|seated| seated.subject.clone()))
-            .owned(found.and_then(|seated| seated.owner))
-            .implementing(found.and_then(|seated| seated.implemented.clone()))
-            .traited(found.and_then(|seated| seated.traited.clone()))
+        Unowned::new(region, found.and_then(|seated| seated.subject.clone())).owned(
+            found.and_then(|seated| seated.owner),
+            found.and_then(|seated| seated.implemented.clone()),
+            found.and_then(|seated| seated.traited.clone()),
+        )
     }
 }
 
