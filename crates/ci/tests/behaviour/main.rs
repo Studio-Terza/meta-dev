@@ -2544,7 +2544,7 @@ impl Scratch {
     }
 
     fn fresh() -> Scratch {
-        invariant!(holding Scratch::new(), Invariant::MemoryTakesADirectory)
+        invariant!(holding Scratch::new(), Invariant::MemoryTakesADirectory, detailed)
     }
 
     fn answer<Argument: AsRef<str>>(&self, script: &Script, arguments: &[Argument]) -> Answer {

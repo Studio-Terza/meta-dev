@@ -326,7 +326,7 @@ fn a_module_file_below_a_test_gated_module_file_is_read_at_test_reach() {
     let files = [("src/lib.rs", GATED_ROOT), ("src/gated.rs", GATED), ("src/gated/deeper.rs", DEEPER)]
         .map(|(path, text)| SourceFile::parse(path, SourceText::new(text.to_owned())));
     let parsed: Vec<SourceFile> =
-        files.into_iter().map(|file| invariant!(holding file, Invariant::FixturesParse)).collect();
+        files.into_iter().map(|file| invariant!(holding file, Invariant::FixturesParse, detailed)).collect();
     let reaches: BTreeSet<(String, Reach)> = Reader::read_files(&parsed)
         .functions()
         .map(|found| (found.site().to_string(), AsRef::<Region>::as_ref(found.entity()).reach()))

@@ -100,7 +100,7 @@ impl Asked {
         let model = Reader::read_files(&files);
         let transitions = Transitions::from(&model);
         let system = TypeSystem::built_from(&extraction, &transitions);
-        let query = invariant!(holding Self::query(words), Invariant::QueryReads);
+        let query = invariant!(holding Self::query(words), Invariant::QueryReads, detailed);
         query.reply(&system).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 
@@ -108,7 +108,7 @@ impl Asked {
         let files = Self::tree();
         let model = Reader::read_files(&files);
         let transitions = Transitions::from(&model);
-        let query = invariant!(holding Self::query(words), Invariant::QueryReads);
+        let query = invariant!(holding Self::query(words), Invariant::QueryReads, detailed);
         query.matches(&transitions).to_string().parse::<Lines>().into_iter().flatten().collect()
     }
 }
@@ -353,7 +353,7 @@ fn crate_sizes_count_files_and_lines_and_place_each_crate_on_the_compile_chain()
         Source::new(Located::new("crates/shop/src/till.rs"), Text::new("pub struct Line;\npub struct Till;\n")),
         Source::new(Located::new("crates/bank/src/lib.rs"), Text::new("pub struct Ledger;\n")),
     ]);
-    let query = invariant!(holding Asked::query(&["--crates"]), Invariant::QueryReads);
+    let query = invariant!(holding Asked::query(&["--crates"]), Invariant::QueryReads, detailed);
     let answer = query.answered(&files, std::slice::from_ref(&metadata)).to_string();
     assert_eq!(
         answer.parse::<Lines>().into_iter().flatten().collect::<Vec<String>>(),
@@ -378,8 +378,7 @@ fn a_method_naming_its_own_type_is_shaped_as_taking_and_giving_itself() {
     let files = Sources::parsed(&CART);
     let model = Reader::read_files(&files);
     let transitions = Transitions::from(&model);
-    let query =
-        invariant!(holding Asked::query(&["--role", "fn combine(&self, other: Self) -> Self"]), Invariant::QueryReads);
+    let query = invariant!(holding Asked::query(&["--role", "fn combine(&self, other: Self) -> Self"]), Invariant::QueryReads, detailed);
     let found: Vec<String> = query.matches(&transitions).to_string().parse::<Lines>().into_iter().flatten().collect();
     assert_eq!(
         found,
@@ -403,8 +402,7 @@ const FACADE: [Source; 4] = [
 #[test]
 fn a_test_file_consumes_the_crate_that_declares_what_it_names_through_a_re_export() {
     let files = Sources::parsed(&FACADE);
-    let query =
-        invariant!(holding Asked::query(&["--consumed-by", "crates/facade/tests/behaviour.rs"]), Invariant::QueryReads);
+    let query = invariant!(holding Asked::query(&["--consumed-by", "crates/facade/tests/behaviour.rs"]), Invariant::QueryReads, detailed);
     let answered = query.answered(&files, &[]).to_string();
     let roots: Vec<String> = answered.parse::<Lines>().into_iter().flatten().collect();
     assert_eq!(roots, ["crates/inner/src/lib.rs"]);
