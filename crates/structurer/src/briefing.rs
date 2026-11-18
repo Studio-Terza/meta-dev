@@ -33,21 +33,13 @@ enum Brief {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Key {
-    #[name("rule")]
     Rule,
-    #[name("form")]
     Form,
-    #[name("choices")]
     Choices,
-    #[name("example")]
     Example,
-    #[name("segment")]
     Segment,
-    #[name("asked")]
     Asked,
-    #[name("node")]
     Node,
-    #[name("retry")]
     Retry,
 }
 
@@ -92,20 +84,14 @@ pub(crate) enum Sample {
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[named(kebab)]
 enum Choice {
-    #[name("span-relation")]
     SpanRelation,
-    #[name("segment-relation")]
     SegmentRelation,
-    #[name("kind")]
     Kind,
-    #[name("specificity")]
     Specificity,
-    #[name("confidence")]
     Confidence,
-    #[name("explicitness")]
     Explicitness,
-    #[name("facet")]
     Facet,
 }
 

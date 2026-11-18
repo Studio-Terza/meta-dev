@@ -30,11 +30,8 @@ pub enum Viewed {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Seen {
-    #[name("outline")]
     Outline,
-    #[name("standing")]
     Standing,
-    #[name("unplaced")]
     Unplaced,
 }
 

@@ -29,11 +29,8 @@ pub enum Reference {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Miss {
-    #[name("unheard")]
     Unheard,
-    #[name("ambiguous")]
     Ambiguous,
-    #[name("unclosed")]
     Unclosed,
 }
 
@@ -47,37 +44,24 @@ pub struct Reconciliation {
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Part {
-    #[name("line")]
     Line,
-    #[name("quote")]
     Quote,
-    #[name("cite")]
     Cite,
-    #[name("lines")]
     Lines,
-    #[name("nodes")]
     Nodes,
-    #[name("rulings")]
     Rulings,
-    #[name("anchored")]
     Anchored,
-    #[name("segments")]
     Segments,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[named(kebab)]
 pub(crate) enum Note {
-    #[name("imported")]
     Imported,
-    #[name("unresolved")]
     Unresolved,
-    #[name("unanchored")]
     Unanchored,
-    #[name("ambiguous-anchor")]
     AmbiguousAnchor,
-    #[name("reconciled")]
     Reconciled,
-    #[name("cites")]
     Cites,
 }
 

@@ -17,8 +17,6 @@ pub use unclosed::Unclosed;
 #[derive(Named, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Ending {
     #[default]
-    #[name("break")]
     Break,
-    #[name("open")]
     Open,
 }

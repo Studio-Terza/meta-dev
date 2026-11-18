@@ -13,7 +13,6 @@ use crate::cli::failure::Failure;
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 enum Keyed {
-    #[name("job")]
     Job,
 }
 

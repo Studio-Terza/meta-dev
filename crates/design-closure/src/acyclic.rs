@@ -7,14 +7,11 @@ use store_ports::{Statements, StoreFailure};
 pub use boundary::{Closing, Keyed};
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[named(kebab)]
 pub enum Closed {
-    #[name("refines")]
     Refines,
-    #[name("supersedes")]
     Supersedes,
-    #[name("segment-supersedes")]
     SegmentSupersedes,
-    #[name("segment-corrects")]
     SegmentCorrects,
 }
 

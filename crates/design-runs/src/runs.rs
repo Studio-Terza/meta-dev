@@ -22,9 +22,7 @@ pub struct Excerpt(String);
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Halted {
-    #[name("flailed")]
     Flailed,
-    #[name("stalled")]
     Stalled,
 }
 

@@ -4,13 +4,9 @@ use crate::form::{Form, Forms};
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shape {
-    #[name("sentence")]
     Sentence,
-    #[name("item")]
     Item,
-    #[name("bullet")]
     Bullet,
-    #[name("quote")]
     Quote,
 }
 
