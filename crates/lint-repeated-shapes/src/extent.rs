@@ -9,10 +9,8 @@ pub(crate) struct Extent {
 }
 
 impl Extent {
-    pub(crate) fn holds<'inner>(&self, inner: &'inner Extent) -> Option<&'inner Extent> {
-        Some(inner)
-            .filter(|candidate| self.start <= candidate.start)
-            .filter(|starting_inside| starting_inside.end <= self.end)
+    pub(crate) fn holds(&self, inner: &Extent) -> Option<()> {
+        Some(()).filter(|()| self.start <= inner.start).filter(|()| inner.end <= self.end)
     }
 
     pub(crate) fn spanning(first: Span, last: Span) -> Extent {

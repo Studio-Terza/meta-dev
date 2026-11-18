@@ -17,7 +17,7 @@ pub enum Limit {
 impl Limit {
     pub fn ordered(self) -> Option<Limit> {
         match self {
-            Limit::Levels { warn, block } => Self::exceeded(warn, block).map_or(Some(self), |_| None),
+            Limit::Levels { warn, block } => Self::exceeded(warn, block).map_or(Some(self), |()| None),
             Limit::Record(_) => Some(self),
         }
     }
@@ -25,27 +25,28 @@ impl Limit {
     pub fn judge(&self, measured: Seconds) -> Verdict {
         match self {
             Limit::Levels { warn, block } => Self::leveled(measured, *warn, *block),
-            Limit::Record(record) => Self::exceeded(measured, *record).map_or(Verdict::Within, |_| Verdict::Block),
+            Limit::Record(record) => Self::exceeded(measured, *record).map_or(Verdict::Within, |()| Verdict::Block),
         }
     }
 
     pub fn lowered(self, measured: Seconds) -> Result<Seconds, Refusal> {
         match self {
             Limit::Levels { .. } => Err(Refusal::Levels),
-            Limit::Record(record) => Self::exceeded(measured, record)
-                .map_or(Ok(measured), |exceeded| Err(Refusal::Above { record: exceeded })),
+            Limit::Record(record) => {
+                Self::exceeded(measured, record).map_or(Ok(measured), |()| Err(Refusal::Above { record }))
+            }
         }
     }
 
     fn leveled(measured: Seconds, warn: Seconds, block: Seconds) -> Verdict {
         Self::exceeded(measured, block)
-            .map(|_| Verdict::Block)
-            .or_else(|| Self::exceeded(measured, warn).map(|_| Verdict::Warn))
+            .map(|()| Verdict::Block)
+            .or_else(|| Self::exceeded(measured, warn).map(|()| Verdict::Warn))
             .unwrap_or(Verdict::Within)
     }
 
-    fn exceeded(measured: Seconds, level: Seconds) -> Option<Seconds> {
-        (measured > level).then_some(level)
+    fn exceeded(measured: Seconds, level: Seconds) -> Option<()> {
+        (measured > level).then_some(())
     }
 }
 

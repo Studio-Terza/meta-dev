@@ -1,6 +1,7 @@
 use std::fmt;
 use std::iter;
 
+use algebra::Semigroup;
 use lint_layout::Name;
 
 use crate::crate_root::CrateRoot;
@@ -64,13 +65,8 @@ impl<'found> Nest<'found> {
     }
 
     #[must_use]
-    pub fn holding(self, inner: Nest<'found>) -> Option<Nest<'found>> {
-        inner.lineage().find(|outer| *outer == self)
-    }
-
-    #[must_use]
-    pub fn common(self, other: Nest<'found>) -> Nest<'found> {
-        self.lineage().find(|outer| outer.holding(other).is_some()).unwrap_or(Nest { krate: None, segments: &[] })
+    pub fn holding(self, inner: Nest<'found>) -> Option<()> {
+        inner.lineage().find(|outer| *outer == self).map(|_| ())
     }
 
     #[must_use]
@@ -82,6 +78,12 @@ impl<'found> Nest<'found> {
     #[must_use]
     pub fn krate(&self) -> Option<Krate<'found>> {
         self.krate
+    }
+}
+
+impl Semigroup for Nest<'_> {
+    fn combine(self, other: Self) -> Self {
+        self.lineage().find(|outer| outer.holding(other).is_some()).unwrap_or(Nest { krate: None, segments: &[] })
     }
 }
 

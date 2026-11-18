@@ -1896,6 +1896,7 @@ dependencies = [
 name = "lint-placement"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "invariants",
  "laws",
