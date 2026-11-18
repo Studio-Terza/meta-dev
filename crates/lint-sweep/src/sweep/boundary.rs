@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::Kind;
 
@@ -25,17 +25,17 @@ impl Index {
 #[derive(Clone, Debug)]
 pub(super) struct Muting {
     muted: Vec<Option<usize>>,
-    awake: usize,
+    awake: BTreeSet<usize>,
     depth: usize,
 }
 
 impl Muting {
     pub(super) fn new(watchers: usize) -> Muting {
-        Muting { muted: vec![None; watchers], awake: watchers, depth: 0 }
+        Muting { muted: vec![None; watchers], awake: (0..watchers).collect(), depth: 0 }
     }
 
     pub(super) fn awake(&self) -> Option<usize> {
-        Some(self.awake).filter(|awake| *awake > 0)
+        self.awake.first().copied()
     }
 
     pub(super) fn entering(&mut self) {
@@ -45,7 +45,7 @@ impl Muting {
     pub(super) fn silence(&mut self, index: Index) {
         let depth = self.depth;
         let silenced = self.muted.get_mut(index.0).map(|muted| muted.replace(depth));
-        self.awake -= silenced.map_or(0, |_| 1);
+        silenced.map(|_| self.awake.remove(&index.0));
     }
 
     pub(super) fn heard(&self, index: Index) -> Option<Index> {
@@ -55,8 +55,11 @@ impl Muting {
 
     pub(super) fn leaving(&mut self, listening: &[Index]) {
         let depth = self.depth;
-        let woken = listening.iter().filter_map(|index| self.muted.get_mut(index.0)?.take_if(|muted| *muted == depth));
-        self.awake += woken.count();
+        let woken: Vec<usize> = listening
+            .iter()
+            .filter_map(|index| self.muted.get_mut(index.0)?.take_if(|muted| *muted == depth).map(|_| index.0))
+            .collect();
+        self.awake.extend(woken);
         self.depth -= 1;
     }
 
@@ -66,7 +69,7 @@ impl Muting {
             muted: (0..self.muted.len())
                 .map(|index| kept.iter().find(|held| held.0 == index).map_or(Some(depth), |_| None))
                 .collect(),
-            awake: kept.len(),
+            awake: kept.iter().map(|held| held.0).collect(),
             depth,
         };
         std::mem::replace(self, hushed)

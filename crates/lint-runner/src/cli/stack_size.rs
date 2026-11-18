@@ -1,5 +1,5 @@
+use invariants::Rejoined;
 use std::io;
-use std::panic::resume_unwind;
 use std::thread::{self, ScopedJoinHandle};
 
 #[derive(Clone, Copy, Debug)]
@@ -17,6 +17,6 @@ impl StackSize {
 
     pub fn ran<Ran: Send>(self, work: impl FnOnce() -> Ran + Send) -> io::Result<Ran> {
         let joined = thread::scope(|scope| self.builder().spawn_scoped(scope, work).map(ScopedJoinHandle::join));
-        joined.map(|ran| ran.unwrap_or_else(|payload| resume_unwind(payload)))
+        joined.map(Rejoined::rejoined)
     }
 }

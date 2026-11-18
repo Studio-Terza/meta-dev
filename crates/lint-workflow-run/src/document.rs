@@ -1,6 +1,7 @@
 mod command;
 mod environment;
 mod found;
+mod ignored;
 mod key;
 mod lines;
 mod local;

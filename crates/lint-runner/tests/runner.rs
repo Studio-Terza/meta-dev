@@ -16,6 +16,8 @@ use cargo_ports::{Recorded, Toolchain};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
@@ -342,7 +344,8 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
     root.write("src/lib.rs", CLEAN)?;
     let timed = Trees::timed(&root.files, &root.root, &["--timings"])?;
     let untimed = Trees::timed(&root.files, &root.root, &[])?;
-    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(MOST_READERS);
+    let workers =
+        thread::available_parallelism().ignoring(Ignored::Unknown).map_or(1, NonZeroUsize::get).min(MOST_READERS);
     let rows = [
         "lint timings in milliseconds, took then started:\n",
         "  phase total\n",
@@ -376,7 +379,10 @@ impl Trees {
                 .entries(path)?
                 .iter()
                 .try_fold(0, |found, entry| Ok(found + Self::occurrences(files, entry, needle)?)),
-            _ => Ok(files.read_text(path).map_or(0, |text| text.as_ref().matches(needle).count())),
+            _ => Ok(files
+                .read_text(path)
+                .ignoring(Ignored::Unreadable)
+                .map_or(0, |text| text.as_ref().matches(needle).count())),
         }
     }
 
@@ -398,8 +404,8 @@ impl Trees {
         );
         Printed {
             exit,
-            out: String::from_utf8(out).unwrap_or_default(),
-            err: String::from_utf8(err).unwrap_or_default(),
+            out: String::from_utf8(out).ignoring(Ignored::NotUtf8).unwrap_or_default(),
+            err: String::from_utf8(err).ignoring(Ignored::NotUtf8).unwrap_or_default(),
         }
     }
 
@@ -444,7 +450,7 @@ impl Trees {
             &mut out,
             &mut err,
         );
-        Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
+        Reported { exit, err: format!("\n{}", String::from_utf8(err).ignoring(Ignored::NotUtf8).unwrap_or_default()) }
     }
 }
 

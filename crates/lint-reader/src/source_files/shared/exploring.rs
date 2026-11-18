@@ -10,7 +10,9 @@ use super::boundary::Partition;
 use super::boundary::{Change, Flights};
 use super::declared::{Declared, Explored};
 use crate::source_files::Stage;
+use crate::source_files::ignored::Ignored;
 use crate::source_files::located::{Located, Node};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(super) struct Queued<'tree> {
@@ -72,7 +74,10 @@ impl<'tree> Exploring<'tree> {
     }
 
     pub(super) fn settled(&mut self, queued: &Queued<'tree>, explored: Explored, share: Partition) {
-        let next = explored.as_ref().map_or_default(|declared| queued.nested(declared, &self.survey, share));
+        let next = explored
+            .as_ref()
+            .ignoring(Ignored::Unread)
+            .map_or_default(|declared| queued.nested(declared, &self.survey, share));
         let fresh: Vec<Queued<'tree>> =
             next.into_iter().filter(|found| self.visited.insert(found.node.located().clone())).collect();
         self.queue.extend(fresh);

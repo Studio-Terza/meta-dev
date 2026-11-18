@@ -1,5 +1,7 @@
 use std::iter;
 
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 use syntax::parse::Speculative;
 use syntax::parse::{Parse, ParseStream};
 use syntax::{Macro, Token};
@@ -13,8 +15,9 @@ impl MacroCalls {
 
     #[must_use]
     pub fn within(invocation: &Macro) -> Vec<Macro> {
-        Self::banged(invocation.tokens.clone())
-            .map_or_default(|tokens| syntax::parse::parse2::<MacroCalls>(tokens).map_or_default(|calls| calls.0))
+        Self::banged(invocation.tokens.clone()).map_or_default(|tokens| {
+            syntax::parse::parse2::<MacroCalls>(tokens).ignoring(Ignored::Unparsed).map_or_default(|calls| calls.0)
+        })
     }
 
     fn banged(tokens: TokenStream) -> Option<TokenStream> {
@@ -32,8 +35,8 @@ impl MacroCalls {
     fn step(input: ParseStream) -> syntax::Result<Vec<Macro>> {
         let metavariable = input.parse::<Option<Token![$]>>()?;
         let attempt = input.fork();
-        attempt.parse::<Macro>().map_or_else(
-            |_| input.parse().and_then(Self::skipped),
+        attempt.parse::<Macro>().ignoring(Ignored::Unparsed).map_or_else(
+            || input.parse().and_then(Self::skipped),
             |found| {
                 input.advance_to(&attempt);
                 Ok(metavariable.map_or_else(|| vec![found], |_| Vec::new()))

@@ -10,6 +10,8 @@ use text_lines::Lines;
 use timer_ports::Monotonic;
 
 use crate::fakes::FakeLinked;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 const CLEAN: &str = "struct A;\n";
@@ -77,7 +79,7 @@ impl Checkout {
             &mut out,
             &mut err,
         );
-        Run { exit, err: String::from_utf8(err).unwrap_or_default() }
+        Run { exit, err: String::from_utf8(err).ignoring(Ignored::NotUtf8).unwrap_or_default() }
     }
 
     fn checked(&self) -> Run {
