@@ -12,6 +12,8 @@ const DISGUISED: &str = "use std::ops::Add;\nuse algebra::{Monoid, Semigroup};\n
 
 const NAMESAKE: &str = "pub trait Semigroup {\n    fn combine(self, other: Self) -> Self;\n}\npub struct C;\nimpl Semigroup for C {\n    fn combine(self, other: C) -> C {}\n}\n";
 
+const NAMESAKE_VISIT: &str = "mod local {\n    pub trait Visit {\n        fn visit(&mut self);\n    }\n}\npub struct A;\nimpl local::Visit for A {\n    fn visit(&mut self) {}\n}\npub struct B;\nimpl syn::visit::Visit<'_> for B {\n    fn visit_item(&mut self, item: &syn::Item) {}\n}\n";
+
 const LIBRARY: Source = Source::new(Located::new("crates/algebra/src/lib.rs"), Text::new(ALGEBRA));
 const WORKSPACE_FIX: &str =
     "remove each site with the fix its own finding names; the lint blocks once the workspace count reaches zero";
@@ -68,6 +70,17 @@ laws::table!(
         [LIBRARY, Source::new(Located::new("crates/y/src/lib.rs"), Text::new(NAMESAKE))] => vec![
             "crates/y/src/lib.rs:6: y::C::combine is an undeclared binary (T, T) -> T; implement algebra::Semigroup for the type and make this its combine".to_owned(),
             Fixture::workspace("crates/y/src/lib.rs:6: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 1 binary, 0 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
+
+laws::table!(
+    only_a_trait_resolved_outside_the_workspace_fixes_a_signature,
+    Fixture::reported,
+    [
+        [LIBRARY, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(NAMESAKE_VISIT))] => vec![
+            "crates/x/src/lib.rs:8: x::A::visit is an undeclared mutating &mut; return a new value, or move the mutation into a store operation".to_owned(),
+            Fixture::workspace("crates/x/src/lib.rs:8: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 0 binary, 1 mutating; 0 std impls are an undeclared algebra; 1 edges with a signature fixed by a foreign trait are counted apart"),
         ],
     ]
 );
