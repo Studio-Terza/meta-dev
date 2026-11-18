@@ -12,6 +12,7 @@ use syntax::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, L
 
 use lint_core::Fix;
 use lint_core::Gate;
+use lint_core::Gating;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Site;
@@ -66,7 +67,7 @@ impl WatchingLint for NamedNumbers {
     type Watched<'file> = Watchers<'file>;
 
     fn watched(file: &SourceFile) -> Watchers<'_> {
-        let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
+        let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()) == Gating::Open);
         let numbers = counted.map(|found| Contributing::new(Numbers { path: AsRef::<Path>::as_ref(found.head()) }));
         numbers.into_iter().map(|watched| -> Box<dyn Finds<'_> + '_> { Box::new(watched) }).collect()
     }

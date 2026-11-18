@@ -39,9 +39,7 @@ impl<'file> Contribute for CloneSites<'file> {
         facts: &Facts<'_, ItemMod>,
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
-        Contributed::descending(
-            Gate::BOUNDARY.names(module).map_or_else(|| Descend::from(facts.gate()), |_| Descend::Over),
-        )
+        Contributed::descending(Gate::BOUNDARY.names(module).chosen(Descend::Over, Descend::from(facts.gate())))
     }
 
     fn on_expr_method_call(
