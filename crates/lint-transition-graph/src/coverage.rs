@@ -9,10 +9,8 @@ use lint_core::{Site, Violation};
 use newtype::Counter;
 
 use crate::algebra::{Algebra, Algebras, Totality};
-use crate::class::Class;
 use crate::count::Count;
 use crate::edge::Edge;
-use crate::form::Form;
 use crate::system::TypeSystem;
 pub(crate) use share::Share;
 
@@ -33,17 +31,22 @@ impl Coverage {
     ) -> Coverage {
         let edges: Vec<&Edge<'found, 'file>> = listed.collect();
         let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
-        let counted = Coverage::concat(edges.iter().map(|edge| Coverage::counted(edge.form(), edge.ends().class())));
+        let counted = Coverage::concat(edges.iter().map(|edge| Coverage::counted(edge)));
         counted.combine(Coverage::algebraic(system.algebras(), &sites))
     }
 
-    fn counted(form: &Form<'_>, class: Class) -> Coverage {
+    fn counted(edge: &Edge<'_, '_>) -> Coverage {
         let one = Count::zero().incremented();
-        form.sorted(
-            Coverage { written: one, covered: class.covered(), ..Coverage::default() },
-            Coverage { lifts: one, ..Coverage::default() },
-            Coverage { operations: one, ..Coverage::default() },
-        )
+        let written = edge.form().writing(edge).map(|written| Coverage {
+            written: one,
+            covered: written.as_ref().ends().class().covered(),
+            ..Coverage::default()
+        });
+        written
+            .or_else(|| {
+                edge.form().lifting(one).map(|lifts| Coverage { lifts: *lifts.as_ref(), ..Coverage::default() })
+            })
+            .unwrap_or(Coverage { operations: one, ..Coverage::default() })
     }
 
     fn algebraic<'file>(algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {

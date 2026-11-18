@@ -22,7 +22,8 @@ impl GraphLint for RepeatedRoutes {
         let walks: Vec<Walk<'_, '_, 'file>> = system
             .edges()
             .iter()
-            .filter_map(|edge| edge.form().sorted(Some(edge), None, None))
+            .filter_map(|edge| edge.form().writing(edge))
+            .map(|written| *written.as_ref())
             .map(|edge| stops.walked(edge))
             .collect();
         let routes: Vec<Route<'_, '_, '_, 'file>> = Groups::grouped(walks.iter().flat_map(Walk::legs))

@@ -14,10 +14,13 @@ impl Role {
     pub(super) fn read(edge: &Edge<'_, '_>) -> Option<Role> {
         let form = edge.form();
         let effect = form.ported().map(|_| Role::Port);
-        let role = form.algebraic().map_or_else(
-            || effect.unwrap_or_else(|| form.sorted(Role::Written, Role::Lift, Role::Store)),
-            |_| Role::Operation,
-        );
+        let role = form
+            .algebraic()
+            .map(|_| Role::Operation)
+            .or(effect)
+            .or_else(|| form.lifting(Role::Lift).map(|lifted| *lifted.as_ref()))
+            .or_else(|| form.storing(Role::Store).map(|stored| *stored.as_ref()))
+            .unwrap_or(Role::Written);
         edge.transition().context().trait_name().map_or(Some(role), |_| None)
     }
 }

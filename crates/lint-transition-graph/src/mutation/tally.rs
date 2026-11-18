@@ -9,7 +9,6 @@ use newtype::Counter;
 
 use crate::count::Count;
 use crate::edge::Edge;
-use crate::form::Form;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Counted<'edge, 'found, 'file>(&'edge Edge<'found, 'file>);
@@ -38,20 +37,21 @@ impl Tally {
                 matches!(core.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
             })
             .map(Counted);
-        edge.form().sorted(mutating, mutating, Some(Counted(edge)))
+        edge.form().storing(edge).map(|stored| Counted(stored.as_ref())).or(mutating)
     }
 
     pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Tally {
         edges.fold(Tally::default(), |tally, edge| {
-            tally.by_form(edge.form(), edge.transition().function().mutation()).fixed(edge.form(), edge.fixed_by())
+            tally.by_form(edge, edge.transition().function().mutation()).fixed(edge, edge.fixed_by())
         })
     }
 
-    fn by_form(self, form: &Form<'_>, mutation: Mutation) -> Tally {
-        let mutating = self.by_mutation(mutation);
-        form.sorted(mutating, mutating, Tally { operations: self.operations.incremented(), ..self })
+    fn by_form(self, edge: &Edge<'_, '_>, mutation: Mutation) -> Tally {
+        edge.form()
+            .storing(Tally { operations: self.operations.incremented(), ..self })
+            .map_or_else(|| self.by_mutation(mutation), |stored| *stored.as_ref())
     }
 
     fn by_mutation(self, mutation: Mutation) -> Tally {
@@ -63,9 +63,9 @@ impl Tally {
         }
     }
 
-    fn fixed(self, form: &Form<'_>, fixed_by: Option<&Name>) -> Tally {
+    fn fixed(self, edge: &Edge<'_, '_>, fixed_by: Option<&Name>) -> Tally {
         let fixing = fixed_by.map_or(self, |_| Tally { fixed: self.fixed.incremented(), ..self });
-        form.sorted(fixing, fixing, self)
+        edge.form().storing(self).map_or(fixing, |stored| *stored.as_ref())
     }
 
     pub(super) fn violation(self, first: Option<Site<'_>>) -> Option<Violation<'_>> {
