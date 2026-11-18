@@ -416,18 +416,21 @@ const DEFINING: &str = "pub struct Kept;\n#[macro_export]\nmacro_rules! made {\n
 const INVOKING: &str = "pub enum Kept {}\na::made!();\n";
 
 #[test]
-fn a_dollar_crate_path_names_the_defining_crate_when_another_crate_invokes_the_macro() -> Result<(), Failure> {
+fn a_dollar_crate_path_is_used_by_the_defining_crate_not_by_the_crate_that_invokes_the_macro() -> Result<(), Failure> {
     let files = [
         SourceFile::parse("crates/a/src/lib.rs", SourceText::new(DEFINING.to_owned()))?,
         SourceFile::parse("crates/b/src/lib.rs", SourceText::new(INVOKING.to_owned()))?,
     ];
     let model = Reader::read_files(&files);
-    let expanded: Vec<Option<Item>> = model
+    let expanded: Vec<(String, Option<Item>)> = model
         .uses()
         .filter(|placed| placed.entity().mention() == Mention::Expanded)
-        .map(|placed| placed.entity().resolved().crate_item().and_then(|item| model.declared(item)).cloned())
+        .map(|placed| {
+            let item = placed.entity().resolved().crate_item().and_then(|item| model.declared(item)).cloned();
+            (placed.site().to_string(), item)
+        })
         .collect();
     let kept = Item::new(Name::from("Kept"), ItemKind::Struct).homed(Some(Name::from("a"))).exposed(Exposure::Public);
-    assert_eq!(expanded, [Some(kept)]);
+    assert_eq!(expanded, [("crates/a/src/lib.rs:5".to_owned(), Some(kept))]);
     Ok(())
 }

@@ -40,7 +40,25 @@ const PRINTED: &str = "use std::io::{self, Write};\nfn f() {\n    writeln!(io::s
 const FAKES: &str =
     "use file_ports::{Files, Memory};\nfn f() {\n    Memory::default().read(std::path::Path::new(\"a\"));\n}\n";
 
-const CASES: [Case; 28] = [
+const WRAPPED: &str =
+    "macro_rules! disk {\n    () => {\n        file_ports::Disk\n    };\n}\nfn f() {\n    disk!();\n}\n";
+const DEFINER: &str = "pub use file_ports::Disk;\n#[macro_export]\nmacro_rules! mirrored {\n    () => {\n        $crate::Disk\n    };\n}\n";
+const DEFINER_INVOKED: &str = "fn f() {\n    g::mirrored!();\n}\n";
+
+const CASES: [Case; 30] = [
+    Case::new(
+        Title::new("a test-local macro wrapping a real port"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(WRAPPED))],
+        Flagged::new(&["tests/a.rs:3", "tests/a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("another crate's macro using that crate's own port"),
+        &[
+            Source::new(Located::new("crates/g/src/lib.rs"), Text::new(DEFINER)),
+            Source::new(Located::new("crates/t/tests/a.rs"), Text::new(DEFINER_INVOKED)),
+        ],
+        Flagged::new(&[]),
+    ),
     Case::new(
         Title::new("qualified read"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(READ))],

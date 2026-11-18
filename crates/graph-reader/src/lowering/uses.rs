@@ -254,7 +254,7 @@ impl Lowering<'_> {
         });
     }
 
-    fn used(&mut self, written: UsePath, position: Position, mention: Mention) {
+    pub(super) fn used(&mut self, written: UsePath, position: Position, mention: Mention) {
         let row = UseRow {
             located: self.here.located(position),
             written,
