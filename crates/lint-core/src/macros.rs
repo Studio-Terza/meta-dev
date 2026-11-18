@@ -4,7 +4,7 @@ use syntax::Punctuated;
 use syntax::parse::Speculative;
 use syntax::parse::{ParseStream, Parser};
 use syntax::quote;
-use syntax::{Attribute, Block, Expr, Item, Macro, Stmt, Token};
+use syntax::{Attribute, Block, Expr, Item, Macro, Mentioned, Stmt, Token};
 use syntax::{Group, TokenStream, TokenTree};
 
 use crate::source_file::SourceFile;
@@ -13,7 +13,7 @@ use crate::watch::Address;
 
 mod boundary;
 
-pub use boundary::Expansions;
+pub use boundary::{Expansions, Transcriber};
 
 #[derive(Debug)]
 pub struct Macros;
@@ -32,6 +32,18 @@ impl Macros {
             .into_iter()
             .flat_map(|tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default())
             .collect()
+    }
+
+    #[must_use]
+    pub fn mentioned(definition: &Macro) -> Mentioned {
+        let rules = definition.path.get_ident().filter(|ident| *ident == "macro_rules");
+        let statements: Vec<Stmt> = rules
+            .map_or_default(|_| Self::transcribers(definition.tokens.clone()))
+            .into_iter()
+            .map(Transcriber::substituted)
+            .flat_map(|tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default())
+            .collect();
+        Mentioned::in_statements(&statements)
     }
 
     #[must_use]
