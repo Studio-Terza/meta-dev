@@ -21,9 +21,9 @@ use design::{
 };
 use design_model::{
     AnyStage, Artifact, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, JobId,
-    Kin, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Ordinal, Outline, Prefix, Project, Provenance, Reason,
-    Refining, Role, RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal,
-    Title, Vague,
+    Kin, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role,
+    RunId, SegmentRelation, Sense, SenseKind, Sketch, SpanRelation, Specificity, Stage, Standing, Terminal, Title,
+    Vague,
 };
 use design_runs::{Excerpt, FailuresReported, RunState};
 use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
@@ -2213,10 +2213,8 @@ impl Generated {
         )
             .prop_map(|((node, project, facet, entered), (role, cast, stage, basis), title)| {
                 let entry = Entry::new(project, facet, entered);
-                let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
-                Summary::from(
-                    &title.into_iter().fold(loaded.based(basis), |titled, text| titled.titled(Title::new(text))),
-                )
+                let casting = Casting::new(role, cast);
+                Summary::from(&Node::loaded(node, entry, casting, stage).described(basis, title.map(Title::new)))
             })
             .boxed()
     }
@@ -2384,10 +2382,7 @@ impl Generated {
                 )
             )
                 .prop_map(|((node, project, facet, stage), (basis, parent, title))| Viewed::Outlined(
-                    Outline::new(node, project, facet, stage)
-                        .based(basis)
-                        .parented(parent)
-                        .titled(title.map(Title::new))
+                    Sketch::new(node, project, facet, stage).described(basis, title.map(Title::new), parent)
                 )),
             (
                 (Generated::node(), select(SpanRelation::VARIANTS), Generated::segment()),

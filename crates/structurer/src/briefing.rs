@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use design_model::{
-    Confidence, Explicitness, Facet, Outline, SegmentRelation, SenseKind, SpanRelation, Specificity, Title,
+    Confidence, Explicitness, Facet, Outline, SegmentRelation, SenseKind, Sketch, SpanRelation, Specificity, Title,
 };
 use grammar_cited::Cited;
 use grammar_output::field::{Id, Phrase, Quoted, Word};
@@ -291,16 +291,15 @@ impl Said {
 
 impl Outlined<'_> {
     pub fn read(fields: &mut Fields) -> Result<Outline, Unread> {
-        let outline = Outline::new(
+        let sketch = Sketch::new(
             fields.field::<Id<_>>()?,
             fields.field::<Phrase<_>>()?,
             fields.field::<Word<_>>()?,
             fields.field::<Word<_>>()?,
         );
-        Ok(outline
-            .based(fields.field::<Word<_>>()?)
-            .parented(fields.optional::<Id<_>>())
-            .titled(fields.optional::<Quoted<_>>()))
+        let basis = fields.field::<Word<_>>()?;
+        let parent = fields.optional::<Id<_>>();
+        Ok(sketch.described(basis, fields.optional::<Quoted<_>>(), parent))
     }
 }
 

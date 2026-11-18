@@ -4,7 +4,7 @@ use std::io;
 
 use design_model::{
     Basis, Confidence, Explicitness, Facet, NodeId, Ordinal, Outline, Prefix, Project, SegmentRelation, Sense,
-    SenseKind, SpanRelation, Specificity, Stage, Title,
+    SenseKind, Sketch, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
 use laws::proptest::arbitrary::any;
@@ -217,9 +217,8 @@ impl Jobs {
             (option::of("[^\u{0}]{0,24}"), option::of(0..i64::MAX), "[a-z][a-z0-9-]{0,8}"),
         )
             .prop_filter_map("a project name", |((id, facet, stage, basis), (title, parent, project))| {
-                let outline =
-                    Outline::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage).based(basis);
-                Some(outline.titled(title.map(Title::new)).parented(parent.map(NodeId::new)))
+                let sketch = Sketch::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage);
+                Some(sketch.described(basis, title.map(Title::new), parent.map(NodeId::new)))
             })
     }
 
