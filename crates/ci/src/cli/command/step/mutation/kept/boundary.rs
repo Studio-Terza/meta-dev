@@ -1,4 +1,7 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsStr;
+use std::path::Path;
+use std::time::Duration;
 
 use grammar_hunk::Patch;
 use serde::Deserialize;
@@ -74,8 +77,21 @@ impl Summary {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct PhaseResult {
+    duration: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(in super::super) struct Spent {
+    package: String,
+    seconds: Duration,
+}
+
 #[derive(Debug, Deserialize)]
 struct Outcome {
+    #[serde(default)]
+    phase_results: Vec<PhaseResult>,
     scenario: Scenario,
     summary: Summary,
 }
@@ -197,5 +213,49 @@ impl AsRef<str> for Tree {
 impl AsRef<str> for Head {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl Outcomes {
+    pub(in super::super) fn spent(self) -> Vec<Spent> {
+        self.outcomes.into_iter().filter_map(Outcome::spent).collect()
+    }
+}
+
+impl Outcome {
+    fn spent(self) -> Option<Spent> {
+        let phases = self.phase_results.first().map(|_| &self.phase_results)?;
+        let seconds = phases
+            .iter()
+            .map(|phase| Duration::try_from_secs_f64(phase.duration).ignoring(Ignored::BeyondRange))
+            .sum::<Option<Duration>>()?;
+        let mutant = self.scenario.mutant()?;
+        Some(Spent { package: mutant.package(), seconds })
+    }
+}
+
+impl Spent {
+    pub(in super::super) fn averaged(spent: Vec<Spent>) -> BTreeMap<String, Duration> {
+        let grouped = spent.into_iter().fold(BTreeMap::new(), |mut by: BTreeMap<String, Vec<Duration>>, found| {
+            by.entry(found.package).or_default().push(found.seconds);
+            by
+        });
+        grouped
+            .into_iter()
+            .filter_map(|(package, durations)| {
+                let runs = u32::try_from(durations.len()).ignoring(Ignored::BeyondRange)?;
+                Some((package, durations.iter().sum::<Duration>().checked_div(runs)?))
+            })
+            .collect()
+    }
+}
+
+impl Mutant {
+    const MEMBERS: &'static str = "crates";
+
+    pub(in super::super) fn package(&self) -> String {
+        let parts: Vec<&OsStr> = Path::new(self.file.as_ref()).iter().collect();
+        let member = parts.first().filter(|top| **top == Self::MEMBERS).and_then(|_| parts.get(1));
+        member.or(parts.first()).and_then(|part| part.to_str()).unwrap_or_default().to_owned()
     }
 }

@@ -11,6 +11,7 @@ use invariants::Ignoring;
 const SURVIVOR: &str = r#"{"name": "crates/a/src/lib.rs:3:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 3, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const SURVIVOR_MOVED: &str = r#"{"name": "crates/a/src/lib.rs:4:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 4, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const ADDED: &str = r#"{"name": "crates/a/src/lib.rs:9:5: replace g -> u8 with 0", "file": "crates/a/src/lib.rs", "function": {"function_name": "g"}, "span": {"start": {"line": 9, "column": 5}}, "replacement": "0", "genre": "FnValue"}"#;
+const ELSEWHERE: &str = r#"{"name": "crates/b/src/lib.rs:2:5: replace e -> u8 with 0", "file": "crates/b/src/lib.rs", "function": {"function_name": "e"}, "span": {"start": {"line": 2, "column": 5}}, "replacement": "0", "genre": "FnValue"}"#;
 const UNTOUCHED: &str = r#"{"name": "crates/a/src/lib.rs:20:5: replace h -> u8 with 1", "file": "crates/a/src/lib.rs", "function": {"function_name": "h"}, "span": {"start": {"line": 20, "column": 5}}, "replacement": "1", "genre": "FnValue"}"#;
 const CAUGHT_BEFORE: &str = r#"{"name": "crates/a/src/lib.rs:12:5: replace k -> u8 with 1", "file": "crates/a/src/lib.rs", "function": {"function_name": "k"}, "span": {"start": {"line": 12, "column": 5}}, "replacement": "1", "genre": "FnValue"}"#;
 
@@ -53,7 +54,7 @@ impl Prior {
             .iter()
             .map(summarized("MissedMutant"))
             .chain(timed_out.iter().map(summarized("Timeout")))
-            .chain([CAUGHT_BEFORE].iter().map(summarized("CaughtMutant")));
+            .chain([["{\"scenario\": {\"Mutant\": ", CAUGHT_BEFORE, "}, \"phase_results\": [{\"phase\": \"Build\", \"duration\": 3000.0}, {\"phase\": \"Test\", \"duration\": 3000.0}], \"summary\": \"CaughtMutant\"}"].concat()]);
         [
             "{\"outcomes\": [{\"scenario\": \"Baseline\", \"summary\": \"Success\"}",
             &missed.map(|outcome| [", ", &outcome].concat()).collect::<String>(),
@@ -96,10 +97,6 @@ impl Prior {
                 ExactReply {
                     asked: Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", since_diff.as_str()]),
                     text: Prior::listing(&self.since),
-                },
-                ExactReply {
-                    asked: Invocation::new("cargo", ["mutants", "--list", "--in-diff", diff.as_str()]),
-                    text: "m\n".repeat(self.listed.len()),
                 },
                 ExactReply {
                     asked: Invocation::new(
@@ -178,6 +175,7 @@ fn a_fix_commit_s_changed_lines_are_mutated_and_a_survivor_follows_its_line_down
         planned.selected,
         ["crates/a/src/lib.rs:4:5: replace f -> bool with true", "crates/a/src/lib.rs:9:5: replace g -> u8 with 0"]
     );
+    assert_eq!(planned.out.last().map(String::as_str), Some("mutants: 2 to test in 1 shards"));
     Ok(())
 }
 
@@ -218,10 +216,10 @@ fn without_a_kept_prior_the_plan_lists_every_changed_line_as_before() -> Result<
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     let diff = scratch.file("c.diff");
-    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", diff.as_str()]);
+    let listed = Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", diff.as_str()]);
     let script = Script {
         changed: "+changed\n".to_owned(),
-        exact: vec![ExactReply { asked: listed, text: "m\n".repeat(3) }],
+        exact: vec![ExactReply { asked: listed, text: super::Listing::of(3) }],
         ..Script::new()
     };
     let prior = scratch.file("prior");
@@ -502,5 +500,22 @@ fn a_survivor_that_timed_out_in_the_scope_is_selected_again() -> Result<(), Box<
     }
     .planned()?;
     assert_eq!(planned.selected, ["crates/a/src/lib.rs:3:5: replace f -> bool with true"]);
+    Ok(())
+}
+
+#[test]
+fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Result<(), Box<dyn Error>> {
+    let planned = Prior {
+        timed_out: &[],
+        survivors: &[SURVIVOR],
+        since_head: TEST_EDITED,
+        moved: NOTHING_MOVED,
+        listed: vec![SURVIVOR, UNTOUCHED, ELSEWHERE],
+        since: Vec::new(),
+        earlier_tests: "",
+        since_tests: "",
+    }
+    .planned()?;
+    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":153}]"#]);
     Ok(())
 }
