@@ -275,7 +275,7 @@ impl Seen {
     }
 
     fn typed(model: &Model, ty: &TypeRef) -> TypeRef<Seen> {
-        ty.mapped(&mut |sited: &Sited| Seen::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
+        ty.mapped(|sited: &Sited| Seen::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
     }
 }
 

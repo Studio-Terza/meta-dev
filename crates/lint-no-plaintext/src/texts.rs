@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use graph::{
-    Held, Holding, ItemId, ItemPath, Model, Named, Placed, Primitive, Resolved, Sited, Spelling, TypeRef, TypeUses,
-    Unresolved,
+    Held, Holding, ItemId, ItemPath, Model, Named, Placed, Primitive, Resolved, Sited, Spelling, TypeRef, Unresolved,
 };
 use lint_layout::{Position, Word, words};
 
@@ -72,9 +71,7 @@ impl Texts {
 
     pub(crate) fn content(&self, ty: &TypeRef) -> Option<Content> {
         let string: ItemPath = Self::STRING.into_iter().collect();
-        let mut leaves = Leaves { texts: self, string, found: Vec::new() };
-        ty.each_use(&mut leaves);
-        leaves.found.into_iter().min()
+        ty.uses().into_iter().filter_map(|named| self.leaf(&string, named.as_ref())).min()
     }
 
     fn widened(&self, wrappers: &[Wrapper]) -> Texts {
@@ -105,36 +102,15 @@ impl Texts {
 }
 
 #[derive(Debug)]
-struct Leaves<'texts> {
-    texts: &'texts Texts,
-    string: ItemPath,
-    found: Vec<Content>,
-}
-
-impl TypeUses for Leaves<'_> {
-    fn named(&mut self, named: &Named<Sited>) {
-        self.found.extend(self.texts.leaf(&self.string, named.as_ref()));
-        named.each_inner_use(self);
-    }
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct Spots {
-    found: Vec<Position>,
-}
+pub(crate) struct Spots;
 
 impl Spots {
     pub(crate) fn first(ty: &TypeRef) -> Option<Position> {
-        let mut spots = Spots::default();
-        ty.each_use(&mut spots);
-        spots.found.into_iter().next()
+        ty.uses().into_iter().find_map(Spots::spotted)
     }
-}
 
-impl TypeUses for Spots {
-    fn named(&mut self, named: &Named<Sited>) {
+    fn spotted(named: &Named<Sited>) -> Option<Position> {
         let sited: &Sited = named.as_ref();
-        self.found.extend(AsRef::<Spelling>::as_ref(sited).position());
-        named.each_inner_use(self);
+        AsRef::<Spelling>::as_ref(sited).position()
     }
 }

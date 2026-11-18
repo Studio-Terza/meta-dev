@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use graph::{ItemPath, Model, Named, Resolved, Site, Sited, Spelling, TypeRef, TypeUses};
+use graph::{ItemPath, Model, Named, Resolved, Site, Sited, Spelling, TypeRef};
 use lint_core::Violation;
 use lint_layout::{Name, Position};
 
@@ -30,35 +30,29 @@ struct TypeWalk<'walk, 'model> {
     lexicon: &'walk Lexicon,
     scope: &'walk Scope<'model>,
     file: &'walk Path,
-    found: Vec<Candidate>,
 }
 
 impl TypeWalk<'_, '_> {
-    fn spelled(&mut self, named: &Named<Sited>, written: &ItemPath, position: Position) {
+    fn found(&self, named: &Named<Sited>) -> Vec<Candidate> {
+        let spelling: &Spelling = AsRef::<Sited>::as_ref(named).as_ref();
+        let spelled = spelling.written().zip(spelling.position());
+        spelled.into_iter().flat_map(|(written, position)| self.spelled(named, written, position)).collect()
+    }
+
+    fn spelled(&self, named: &Named<Sited>, written: &ItemPath, position: Position) -> Vec<Candidate> {
         let resolved: &Resolved = named.as_ref();
         let solo = Lone::within(written);
         let identity = self.lexicon.identity(resolved, written);
         let direct = identity.and_then(|known| known.direct(solo));
         let target = solo.and(self.scope.local_alias(resolved, self.file)).and_then(TypeRef::named);
         let aliased = target.and_then(|local| self.aliased(local));
-        self.found.extend(direct.into_iter().chain(aliased).map(|found| Candidate { identity: found, position }));
-        named.each_inner_use(self);
+        direct.into_iter().chain(aliased).map(|found| Candidate { identity: found, position }).collect()
     }
 
     fn aliased(&self, target: &Named<Sited>) -> Option<Identity> {
         let written = AsRef::<Spelling>::as_ref(AsRef::<Sited>::as_ref(target)).written();
         written
             .and_then(|path| self.lexicon.identity(target.as_ref(), path).and_then(|identity| identity.aliased(path)))
-    }
-}
-
-impl TypeUses for TypeWalk<'_, '_> {
-    fn named(&mut self, named: &Named<Sited>) {
-        let spelling: &Spelling = AsRef::<Sited>::as_ref(named).as_ref();
-        spelling.written().zip(spelling.position()).into_iter().fold(self, |walk, (written, position)| {
-            walk.spelled(named, written, position);
-            walk
-        });
     }
 }
 
@@ -93,10 +87,10 @@ impl<'read, 'model> Signatures<'read, 'model> {
         context: &Name,
         types: impl Iterator<Item = &'ty TypeRef>,
     ) -> Vec<Ranked<'model>> {
-        let mut walk = TypeWalk { lexicon: self.lexicon, scope: self.scope, file: site.path(), found: Vec::new() };
-        types.for_each(|ty| ty.each_use(&mut walk));
-        walk.found
-            .into_iter()
+        let walk = TypeWalk { lexicon: self.lexicon, scope: self.scope, file: site.path() };
+        types
+            .flat_map(TypeRef::uses)
+            .flat_map(|named| walk.found(named))
             .map(|found| Ranked {
                 spot: Spot { path: site.path(), position: found.position },
                 violation: Violation::new(

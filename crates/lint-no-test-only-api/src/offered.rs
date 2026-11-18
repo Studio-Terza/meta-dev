@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use graph::{Exposure, Function, Held, Holding, Implementation, Input, ItemId, Member, Model, Named, Origin, Owner};
 use graph::{Harness, Placed, Reach};
-use graph::{Region, Resolved, Seat, Site, Sited, TypeUses};
+use graph::{Region, Resolved, Seat, Site, Sited};
 use lint_core::Violation;
 use lint_layout::{Name, Whole, Word, words};
 
@@ -106,10 +106,9 @@ impl Offering {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct Making {
     owner: ItemId,
-    found: Option<ItemId>,
 }
 
 impl Making {
@@ -119,19 +118,14 @@ impl Making {
         Some(function.owner()).filter(|kind| *kind == Owner::Inherent)?;
         let received = function.signature().inputs().iter().find_map(Input::receiver);
         let output = received.map_or_else(|| function.signature().output().written(), |_| None)?;
-        let mut making = Making { owner, found: None };
-        output.each_use(&mut making);
-        making.found
+        let making = Making { owner };
+        output.uses().into_iter().find_map(|named| making.made(named))
     }
-}
 
-impl TypeUses for Making {
-    fn named(&mut self, named: &Named<Sited>) {
+    fn made(self, named: &Named<Sited>) -> Option<ItemId> {
         let resolved: &Resolved = named.as_ref();
         let own = resolved.crate_item().filter(|item| *item == self.owner);
-        let selfed = resolved.parameter().and_then(|name| name.matches::<Whole>(&Self::SELF)).map(|_| self.owner);
-        self.found = self.found.or(own).or(selfed);
-        named.each_inner_use(self);
+        own.or_else(|| resolved.parameter().and_then(|name| name.matches::<Whole>(&Self::SELF)).map(|_| self.owner))
     }
 }
 

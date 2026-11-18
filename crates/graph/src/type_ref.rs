@@ -1,27 +1,24 @@
 use std::convert::Infallible;
 
-use std::fmt;
+use std::{fmt, vec};
 
 use lint_layout::Name;
 
 mod outline;
 
+use crate::boundary::ItemId;
 use crate::resolved::Resolved;
 use crate::sited::{Sited, Spelling};
 
 pub use outline::{Bounds, Element, Grouped, Outline};
 
-pub trait TypeUses {
-    fn named(&mut self, named: &Named<Sited>);
-}
-
 pub(crate) trait Rebuild<From> {
     type Into;
     type Fail;
 
-    fn path(&mut self, path: &From) -> Self::Into;
+    fn path(&self, path: &From) -> Self::Into;
 
-    fn child(&mut self, ty: &TypeRef<From>) -> Result<TypeRef<Self::Into>, Self::Fail>;
+    fn child(&self, ty: &TypeRef<From>) -> Result<TypeRef<Self::Into>, Self::Fail>;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -96,7 +93,7 @@ impl<Bound> Named<Bound> {
         Parts { first: &self.arguments, rest: &self.bindings }
     }
 
-    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<Named<Rule::Into>, Rule::Fail> {
+    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &Rule) -> Result<Named<Rule::Into>, Rule::Fail> {
         Ok(Named {
             path: rule.path(&self.path),
             arguments: TypeRef::each_rebuilt(&self.arguments, rule)?,
@@ -123,10 +120,6 @@ impl Named<Sited> {
         self.arguments.first().or(self.bindings.first()).map(Element::from)
     }
 
-    pub fn each_inner_use(&self, uses: &mut impl TypeUses) {
-        self.parts().children().for_each(|ty| ty.each_use(uses));
-    }
-
     #[must_use]
     pub fn last_spelled(&self) -> Option<&Name> {
         AsRef::<Spelling>::as_ref(&self.path).written()?.last()
@@ -143,7 +136,7 @@ impl<Bound> Arrayed<Bound> {
         Parts { first: std::slice::from_ref(&*self.element), rest: &self.measured }
     }
 
-    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<Arrayed<Rule::Into>, Rule::Fail> {
+    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &Rule) -> Result<Arrayed<Rule::Into>, Rule::Fail> {
         Ok(Arrayed {
             element: Box::new(rule.child(&self.element)?),
             measured: TypeRef::each_rebuilt(&self.measured, rule)?,
@@ -166,7 +159,7 @@ impl<Bound> Projection<Bound> {
         Parts { first: std::slice::from_ref(&*self.subject), rest: &self.arguments }
     }
 
-    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<Projection<Rule::Into>, Rule::Fail> {
+    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &Rule) -> Result<Projection<Rule::Into>, Rule::Fail> {
         Ok(Projection {
             subject: Box::new(rule.child(&self.subject)?),
             arguments: TypeRef::each_rebuilt(&self.arguments, rule)?,
@@ -185,13 +178,13 @@ impl<Bound> Callable<Bound> {
         Parts { first: &self.inputs, rest: std::slice::from_ref(&*self.output) }
     }
 
-    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<Callable<Rule::Into>, Rule::Fail> {
+    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &Rule) -> Result<Callable<Rule::Into>, Rule::Fail> {
         Ok(Callable { inputs: TypeRef::each_rebuilt(&self.inputs, rule)?, output: Box::new(rule.child(&self.output)?) })
     }
 }
 
 impl<Bound> TypeRef<Bound> {
-    pub fn mapped<Into>(&self, resolve: &mut impl FnMut(&Bound) -> Into) -> TypeRef<Into> {
+    pub fn mapped<Into>(&self, resolve: impl Fn(&Bound) -> Into) -> TypeRef<Into> {
         let Ok(mapped) = Mapping { resolve }.child(self);
         mapped
     }
@@ -256,7 +249,7 @@ impl<Bound> TypeRef<Bound> {
         }
     }
 
-    pub(crate) fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<TypeRef<Rule::Into>, Rule::Fail> {
+    pub(crate) fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &Rule) -> Result<TypeRef<Rule::Into>, Rule::Fail> {
         match self {
             TypeRef::Named(named) => named.rebuilt(rule).map(TypeRef::Named),
             TypeRef::Tuple(elements) => TypeRef::each_rebuilt(elements, rule).map(TypeRef::Tuple),
@@ -287,18 +280,18 @@ impl<Bound> TypeRef<Bound> {
 
     fn each_rebuilt<Rule: Rebuild<Bound>>(
         types: &[TypeRef<Bound>],
-        rule: &mut Rule,
+        rule: &Rule,
     ) -> Result<Vec<TypeRef<Rule::Into>>, Rule::Fail> {
         types.iter().map(|ty| rule.child(ty)).collect()
     }
 }
 
 impl TypeRef {
-    pub fn each_use(&self, uses: &mut impl TypeUses) {
-        match self.named() {
-            Some(named) => uses.named(named),
-            None => self.parts().children().for_each(|child| child.each_use(uses)),
-        }
+    #[must_use]
+    pub fn uses(&self) -> Uses<'_> {
+        let named = self.named();
+        let inner = named.map_or_else(|| self.parts(), Named::parts);
+        Uses(named.into_iter().chain(inner.children().flat_map(TypeRef::uses)).collect())
     }
 
     pub fn outlined<Shape: Outline>(&self, outline: Shape) -> Shape::Kind {
@@ -317,19 +310,37 @@ impl TypeRef {
 }
 
 #[derive(Debug)]
-struct Mapping<'resolve, Resolve> {
-    resolve: &'resolve mut Resolve,
+pub struct Uses<'ty>(Vec<&'ty Named<Sited>>);
+
+impl<'ty> IntoIterator for Uses<'ty> {
+    type Item = &'ty Named<Sited>;
+    type IntoIter = vec::IntoIter<&'ty Named<Sited>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
 }
 
-impl<From, Into, Resolve: FnMut(&From) -> Into> Rebuild<From> for Mapping<'_, Resolve> {
+impl Uses<'_> {
+    pub fn items(self) -> impl Iterator<Item = ItemId> {
+        self.0.into_iter().filter_map(|named| AsRef::<Resolved>::as_ref(named).crate_item())
+    }
+}
+
+#[derive(Debug)]
+struct Mapping<Resolve> {
+    resolve: Resolve,
+}
+
+impl<From, Into, Resolve: Fn(&From) -> Into> Rebuild<From> for Mapping<Resolve> {
     type Into = Into;
     type Fail = Infallible;
 
-    fn path(&mut self, path: &From) -> Into {
+    fn path(&self, path: &From) -> Into {
         (self.resolve)(path)
     }
 
-    fn child(&mut self, ty: &TypeRef<From>) -> Result<TypeRef<Into>, Infallible> {
+    fn child(&self, ty: &TypeRef<From>) -> Result<TypeRef<Into>, Infallible> {
         ty.rebuilt(self)
     }
 }
