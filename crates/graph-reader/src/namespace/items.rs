@@ -1,4 +1,4 @@
-use graph::ItemId;
+use graph::{Issued, ItemId};
 
 use super::boundary::ScopeId;
 use super::entries::DeclaredId;
@@ -6,9 +6,9 @@ use super::entries::DeclaredId;
 #[derive(Debug, Default)]
 pub(crate) struct ItemIds(Vec<Vec<Option<ItemId>>>);
 
-impl FromIterator<Vec<Option<ItemId>>> for ItemIds {
-    fn from_iter<Scopes: IntoIterator<Item = Vec<Option<ItemId>>>>(scopes: Scopes) -> ItemIds {
-        ItemIds(scopes.into_iter().collect())
+impl From<&Issued> for ItemIds {
+    fn from(issued: &Issued) -> ItemIds {
+        ItemIds(issued.scopes().to_vec())
     }
 }
 
