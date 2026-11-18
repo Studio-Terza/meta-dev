@@ -98,7 +98,7 @@ impl From<&PathUse> for Owned {
     }
 }
 
-#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
 #[newtype(generate = References::sampled)]
 pub struct References {
     targets: BTreeMap<ItemId, BTreeSet<ItemId>>,
@@ -141,7 +141,7 @@ impl References {
         let foreign = home.map_or(owner, |_| None);
         let link = home.or_else(|| traited.filter(at_home));
         let targets: BTreeSet<ItemId> = reached.0.into_iter().chain(foreign).collect();
-        link.map_or_else(References::identity, |found| References {
+        link.map_or_default(|found| References {
             targets: BTreeMap::from([(found, targets.into_iter().filter(|target| *target != found).collect())]),
             roots: BTreeMap::from([(found, placed.root().to_path_buf())]),
         })
@@ -156,11 +156,7 @@ impl Semigroup for References {
     }
 }
 
-impl Monoid for References {
-    fn identity() -> References {
-        References { targets: BTreeMap::new(), roots: BTreeMap::new() }
-    }
-}
+impl Monoid for References {}
 
 type CrateFiles<'model> = BTreeMap<&'model Path, BTreeSet<&'model Path>>;
 

@@ -4,9 +4,10 @@ use std::path::Path;
 
 use syntax::{ItemMod, ItemUse, Macro, MacroTree};
 
-use lint_core::{MacroAliases, Macros, SourceFile, Violation, Walk};
+use algebra::{Monoid, Semigroup};
+use lint_core::{Aliases, MacroAliases, Macros, SourceFile, Violation, Walk};
 use lint_layout::{Name, Word};
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_sweep::{Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
 
 use graph::Graph;
 
@@ -15,60 +16,78 @@ pub struct DeclaredGraphs<'run, 'scan> {
     file: &'run SourceFile,
     path: &'scan Path,
     names: MacroAliases,
-    gates: Vec<Walk>,
+}
+
+#[derive(Debug, Default)]
+pub struct Invoked {
+    aliases: Aliases,
     invocations: Vec<Macro>,
+}
+
+impl Semigroup for Invoked {
+    fn combine(self, other: Invoked) -> Invoked {
+        Invoked {
+            aliases: self.aliases.combine(other.aliases),
+            invocations: self.invocations.combine(other.invocations),
+        }
+    }
+}
+
+impl Monoid for Invoked {}
+
+impl Invoked {
+    fn gated(self, gate: Walk) -> Invoked {
+        let invocations = Descend::from(gate).entered().map_or_else(Vec::new, |_| self.invocations);
+        Invoked { aliases: self.aliases, invocations }
+    }
 }
 
 impl<'run, 'scan> DeclaredGraphs<'run, 'scan> {
     const MACRO: &'static str = "states";
 
     pub fn new(file: &'run SourceFile, path: &'scan Path) -> DeclaredGraphs<'run, 'scan> {
-        DeclaredGraphs {
-            file,
-            path,
-            names: MacroAliases::new(Word::new(DeclaredGraphs::MACRO)),
-            gates: Vec::new(),
-            invocations: Vec::new(),
-        }
+        DeclaredGraphs { file, path, names: MacroAliases::new(Word::new(DeclaredGraphs::MACRO)) }
     }
 
-    fn found_in(&self, invocation: &Macro) -> Vec<Violation<'scan>> {
-        let nested = |inner: &Macro| Macros::nested(self.file, inner).to_vec();
+    pub fn found(self, invoked: Invoked) -> Vec<Violation<'scan>> {
+        let Invoked { aliases, invocations } = invoked;
+        let DeclaredGraphs { file, path, names: macros } = self;
+        let names = macros.aliased(aliases);
+        let nested = |inner: &Macro| Macros::nested(file, inner).to_vec();
         let stops = |found: &Macro| {
-            found.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))).map(|_| ())
+            found.path.segments.last().and_then(|last| names.call(&Name::from(&last.ident))).map(|_| ())
         };
-        let graphs = MacroTree::frontier(invocation, &nested, &stops);
-        graphs.iter().flat_map(|found| Graph::checked(found, self.path)).collect()
+        let graphs = invocations.iter().flat_map(|invocation| MacroTree::frontier(invocation, &nested, &stops));
+        graphs.flat_map(|found| Graph::checked(&found, path)).collect()
     }
 }
 
-impl<'ast> Watch<'ast> for DeclaredGraphs<'_, '_> {
+impl Contribute for DeclaredGraphs<'_, '_> {
+    type Open = ();
+    type Part = Invoked;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemUse, Kind::Macro]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        self.gates.push(facts.gate());
-        Descend::Into
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Kind::ItemMod)] }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.gates.pop();
+    fn off_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>, inner: Contribution<(), Invoked>) -> Invoked {
+        inner.concluded(|(), invoked| invoked.gated(facts.gate()))
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, facts: &Facts<'_, ItemUse>) -> Descend {
-        self.names.on_item_use(item, facts)
+    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), Invoked> {
+        let aliases = self.names.renamed(&item.tree);
+        Contributed::new((), Invoked { aliases, invocations: Vec::new() }, Descend::Over)
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        let outside = self.gates.iter().all(|gate| *gate == Walk::Entered).then(|| invocation.clone());
-        self.invocations.extend(outside);
-        Descend::Over
-    }
-}
-
-impl<'file> From<DeclaredGraphs<'_, 'file>> for Vec<Violation<'file>> {
-    fn from(scan: DeclaredGraphs<'_, 'file>) -> Vec<Violation<'file>> {
-        scan.invocations.iter().flat_map(|invoked| scan.found_in(invoked)).collect()
+    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Invoked> {
+        Contributed::new(
+            (),
+            Invoked { aliases: Aliases::default(), invocations: vec![invocation.clone()] },
+            Descend::Over,
+        )
     }
 }

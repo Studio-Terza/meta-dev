@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock};
 
+use invariants::{Ignoring, Unpoisoned};
 use newtype::Wrapping;
 
 mod boundary;
 
 use boundary::Recall;
 
-use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
+use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Text};
 
 #[derive(Debug)]
 pub struct Cached<'files, F> {
@@ -33,13 +34,13 @@ impl<Value: Clone> Memo<Value> {
     }
 
     fn slot(&self, path: &Path) -> Arc<OnceLock<Recall<Value>>> {
-        let mut slots = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut slots = self.0.lock().unpoisoned();
         let found = slots.get(path).map(Arc::clone);
         found.unwrap_or_else(|| Arc::clone(slots.entry(path.to_path_buf()).or_default()))
     }
 
     fn forgotten(&self) {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).clear();
+        self.0.lock().unpoisoned().clear();
     }
 }
 
@@ -66,7 +67,10 @@ impl<'files, F: Files> Cached<'files, F> {
     }
 
     fn decoded(&self, path: &Path) -> Result<Text, FileFailure> {
-        let read = self.read(path).ok().and_then(|bytes| String::from_utf8(bytes.into_inner()).ok());
+        let read = self
+            .read(path)
+            .ignoring(Ignored::Undecoded)
+            .and_then(|bytes| String::from_utf8(bytes.into_inner()).ignoring(Ignored::Undecoded));
         read.map(Text::new).map_or_else(|| self.files.read_text(path), Ok)
     }
 }
@@ -105,7 +109,10 @@ impl<F: Files> Files for Cached<'_, F> {
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        self.kinds.recalled(path, || Ok(self.files.kind(path))).unwrap_or_else(|_| self.files.kind(path))
+        self.kinds
+            .recalled(path, || Ok(self.files.kind(path)))
+            .ignoring(Ignored::KindRecalled)
+            .unwrap_or_else(|| self.files.kind(path))
     }
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {

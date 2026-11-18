@@ -1,5 +1,7 @@
-use std::sync::{Arc, Condvar, Mutex, PoisonError, WaitTimeoutResult};
+use std::sync::{Arc, Condvar, Mutex, WaitTimeoutResult};
 use std::time::Duration;
+
+use invariants::Unpoisoned;
 
 #[derive(Debug)]
 pub struct Bell(Arc<Peal>);
@@ -36,13 +38,11 @@ impl Bell {
         Ringer(Arc::clone(&self.0))
     }
 
+    #[must_use]
     pub fn waited(&self, pause: Duration) -> Woke {
-        let listening = self.0.chime.lock().unwrap_or_else(PoisonError::into_inner);
-        let (mut heard, lapsed) = self
-            .0
-            .heard
-            .wait_timeout_while(listening, pause, |chime| *chime == Chime::Quiet)
-            .unwrap_or_else(PoisonError::into_inner);
+        let listening = self.0.chime.lock().unpoisoned();
+        let (mut heard, lapsed) =
+            self.0.heard.wait_timeout_while(listening, pause, |chime| *chime == Chime::Quiet).unpoisoned();
         *heard = Chime::Quiet;
         Woke::from(lapsed)
     }
@@ -50,7 +50,7 @@ impl Bell {
 
 impl Ringer {
     pub fn ring(&self) {
-        *self.0.chime.lock().unwrap_or_else(PoisonError::into_inner) = Chime::Rung;
+        *self.0.chime.lock().unpoisoned() = Chime::Rung;
         self.0.heard.notify_all();
     }
 }

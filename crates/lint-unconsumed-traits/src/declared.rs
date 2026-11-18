@@ -2,10 +2,11 @@ use std::path::Path;
 mod declaration;
 mod finding;
 
+use algebra::{Monoid, Semigroup};
 use syntax::{ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Watching};
 
 use crate::Consumers;
 use finding::Finding;
@@ -16,11 +17,18 @@ use declaration::Declaration;
 #[derive(Debug)]
 pub struct Declared<'file> {
     path: &'file std::path::Path,
-    found: Vec<Declaration<'file>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Declarations<'file>(Vec<Declaration<'file>>);
+
+impl Semigroup for Declarations<'_> {
+    fn combine(self, other: Self) -> Self {
+        Declarations(self.0.combine(other.0))
+    }
+}
+
+impl Monoid for Declarations<'_> {}
 
 impl<'file> Declarations<'file> {
     pub(crate) fn unconsumed(self, consumers: &Consumers) -> Vec<Violation<'file>> {
@@ -61,39 +69,40 @@ impl Declared<'_> {
     }
 }
 
-impl<'ast> Watch<'ast> for Declared<'_> {
+impl<'file> Contribute for Declared<'file> {
+    type Open = ();
+    type Part = Declarations<'file>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemTrait]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Declarations<'file>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_trait(&mut self, block: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+    fn on_item_trait(&self, block: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Contributed<(), Declarations<'file>> {
         let site = Site::new(self.path, LineNumber::from(block.ident.span()));
         let declaration = facts.name().map(|name| Declaration::new(name.clone(), Self::provided(block), site));
-        self.found.extend(
-            Self::with_methods(block)
-                .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
-                .and(declaration),
-        );
-        Descend::Over
+        let found = Self::with_methods(block)
+            .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
+            .and(declaration);
+        Contributed::new((), Declarations(found.into_iter().collect()), Descend::Over)
     }
 }
 
-impl<'file> Gathers<Declarations<'file>> for Declared<'file> {
+impl<'file> Gathers<Declarations<'file>> for Contributing<Declared<'file>> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
         std::iter::once::<&mut Watching<'_>>(self)
     }
 
     fn gathered(self) -> Declarations<'file> {
-        Declarations(self.found)
+        self.concluded(|_, (), found| found)
     }
 }
 
 impl<'file> From<&'file SourceFile> for Declared<'file> {
     fn from(file: &'file SourceFile) -> Declared<'file> {
-        Declared { path: AsRef::<Path>::as_ref(file.head()), found: Vec::new() }
+        Declared { path: AsRef::<Path>::as_ref(file.head()) }
     }
 }

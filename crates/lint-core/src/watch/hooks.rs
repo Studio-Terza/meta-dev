@@ -1,9 +1,11 @@
 use syntax::{Ident, Macro};
 
+use algebra::Monoid;
 use lint_layout::Name;
 
 use super::Descend;
 use super::facts::Facts;
+use crate::contribution::{Contributed, Contributing, Contribution, Scope};
 
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ident;)*) => {
@@ -91,6 +93,80 @@ macro_rules! hooks {
 
                 fn $off(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) {
                     (**self).$off(node, facts);
+                }
+            )*
+        }
+
+        pub trait Contribute {
+            type Open: Monoid;
+            type Part: Monoid;
+
+            fn kinds(&self) -> &[Kind];
+
+            fn scopes(&self) -> &[Scope] {
+                &[]
+            }
+
+            fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<Self::Open, Self::Part> {
+                Contributed::descending(Descend::Into)
+            }
+
+            fn off_macro(&self, _: &Macro, _: &Facts<'_, Macro>, inner: Contribution<Self::Open, Self::Part>) -> Self::Part {
+                inner.concluded(|_, part| part)
+            }
+
+            fn on_ident(&self, _: &Ident, _: &Name) -> Contributed<Self::Open, Self::Part> {
+                Contributed::descending(Descend::Into)
+            }
+
+            fn off_ident(&self, _: &Ident, inner: Contribution<Self::Open, Self::Part>) -> Self::Part {
+                inner.concluded(|_, part| part)
+            }
+
+            $(
+                fn $on(&self, _: &syntax::$node, _: &Facts<'_, syntax::$node>) -> Contributed<Self::Open, Self::Part> {
+                    Contributed::descending(Descend::Into)
+                }
+
+                fn $off(
+                    &self,
+                    _: &syntax::$node,
+                    _: &Facts<'_, syntax::$node>,
+                    inner: Contribution<Self::Open, Self::Part>,
+                ) -> Self::Part {
+                    inner.concluded(|_, part| part)
+                }
+            )*
+        }
+
+        impl<'ast, Contributor: Contribute> Watch<'ast> for Contributing<Contributor> {
+            fn kinds(&self) -> &[Kind] {
+                self.watched()
+            }
+
+            fn on_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
+                self.entered(Kind::Macro, |contributor| contributor.on_macro(node, facts))
+            }
+
+            fn off_macro(&mut self, node: &'ast Macro, facts: &Facts<'_, Macro>) {
+                self.left(Kind::Macro, |contributor, inner| contributor.off_macro(node, facts, inner));
+            }
+
+            fn on_ident(&mut self, node: &'ast Ident, name: &Name) -> Descend {
+                self.entered(Kind::Ident, |contributor| contributor.on_ident(node, name))
+            }
+
+            fn off_ident(&mut self, node: &'ast Ident) {
+                self.left(Kind::Ident, |contributor, inner| contributor.off_ident(node, inner));
+            }
+
+            $(
+                fn $on(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) -> Descend {
+                    self.entered(Kind::$kind, |contributor| contributor.$on(node, facts))
+                }
+
+                fn $off(&mut self, node: &'ast syntax::$node, facts: &Facts<'_, syntax::$node>) {
+                    self.left(Kind::$kind, |contributor, inner| contributor.$off(node, facts, inner));
                 }
             )*
         }

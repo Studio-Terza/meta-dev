@@ -161,7 +161,7 @@ table!(
     }
 );
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Larger(u8);
 
 impl algebra::Semigroup for Larger {
@@ -170,11 +170,7 @@ impl algebra::Semigroup for Larger {
     }
 }
 
-impl algebra::Monoid for Larger {
-    fn identity() -> Larger {
-        Larger(u8::MIN)
-    }
-}
+impl algebra::Monoid for Larger {}
 
 laws::monoid!(
     the_larger_of_two_bytes_forms_a_monoid,

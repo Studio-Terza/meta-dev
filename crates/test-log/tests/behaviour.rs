@@ -33,6 +33,7 @@ laws::table!(
         "Running x (target/debug/deps/n)\ntest t ... ok\n" => "<n :: t>",
         "Running x (target/ignored) (target/debug/deps/last)\ntest t ... ok\n" => "<last :: t>",
         "Doc-tests a b\ntest t ... ok\n" => "<doc-a :: t>",
+        "Running tests/behaviour.rs (target/debug/build/graph/0a1b/out/behaviour-0a1b)\ntest t ... ok\n" => "<graph.behaviour :: t>",
     ]
 );
 

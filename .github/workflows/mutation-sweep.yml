@@ -50,16 +50,17 @@ jobs:
           path: ${{ runner.temp }}/changed.diff
 
   mutants-sweep:
+    name: mutants-sweep (${{ matrix.shard.index }})
     needs: mutants-sweep-plan
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ matrix.shard.minutes }}
     strategy:
       fail-fast: false
       matrix:
-        index: ${{ fromJSON(needs.mutants-sweep-plan.outputs.shards) }}
+        shard: ${{ fromJSON(needs.mutants-sweep-plan.outputs.shards) }}
     env:
       CARGO_PROFILE_DEV_OPT_LEVEL: "0"
-      SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
+      SHARD: ${{ matrix.shard.index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@v4
         with:

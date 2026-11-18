@@ -1,6 +1,7 @@
 mod bindings;
 mod compared;
 mod finding;
+mod ignored;
 mod pinning;
 mod table_rows;
 
@@ -11,28 +12,22 @@ use lint_core::{Macros, SourceFile};
 use syntax::Punctuated;
 use syntax::{BinOp, Expr, ImplItemFn, ItemConst, ItemFn, ItemUse, Local, Macro, MacroTree, Token};
 
-use lint_core::{MacroAliases, Site, Violation};
+use lint_core::{Aliased, MacroAliases, Site, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contribution, Descend, Facts, Kind, Scope};
 
-use bindings::{Bindings, BodyId, Bound, Scopes};
+use crate::assertions::ignored::Ignored;
+use bindings::{Asserted, Bindings, Judging, Met};
 use compared::Compared;
 use finding::Finding;
+use invariants::Ignoring;
 use table_rows::TableRows;
 
 #[derive(Debug)]
 pub struct Assertions<'file> {
     file: &'file SourceFile,
     kinds: &'static [Kind],
-    scopes: Scopes,
     tables: MacroAliases,
-    met: Vec<Met>,
-}
-
-#[derive(Debug)]
-struct Met {
-    invocation: Macro,
-    body: Option<BodyId>,
 }
 
 impl<'file> Assertions<'file> {
@@ -41,15 +36,11 @@ impl<'file> Assertions<'file> {
         &[Kind::ItemFn, Kind::ImplItemFn, Kind::ItemConst, Kind::Local, Kind::ItemUse, Kind::Macro];
 
     pub fn new(file: &'file SourceFile, asserting: Option<&'file Path>) -> Assertions<'file> {
-        Assertions {
-            file,
-            kinds: asserting.map_or(&[][..], |_| Self::WATCHED),
-            scopes: Scopes::default(),
-            tables: MacroAliases::new(Self::TABLE),
-            met: Vec::new(),
-        }
+        Assertions { file, kinds: asserting.map_or(&[][..], |_| Self::WATCHED), tables: MacroAliases::new(Self::TABLE) }
     }
+}
 
+impl<'file> Judge<'file> {
     fn judged(&self, invocation: &Macro, constants: &Bindings<'_>, locals: &Bindings<'_>) -> Vec<Violation<'file>> {
         let nested = |inner: &Macro| Macros::nested(self.file, inner).to_vec();
         let stops = |found: &Macro| self.assertion(found).compared(found).map(|_| ());
@@ -82,58 +73,76 @@ impl<'file> Assertions<'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for Assertions<'_> {
+impl Contribute for Assertions<'_> {
+    type Open = ();
+    type Part = Asserted;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.scopes.opened()
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Kind::ItemFn), Scope::new(Kind::ImplItemFn)] }
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
-        self.scopes.shut();
+    fn off_item_fn(&self, _: &ItemFn, _: &Facts<'_, ItemFn>, inner: Contribution<(), Asserted>) -> Asserted {
+        inner.concluded(|(), asserted| asserted.bodied())
     }
 
-    fn on_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.scopes.opened()
+    fn off_impl_item_fn(
+        &self,
+        _: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        inner: Contribution<(), Asserted>,
+    ) -> Asserted {
+        inner.concluded(|(), asserted| asserted.bodied())
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.scopes.shut();
+    fn on_item_const(&self, item: &ItemConst, _: &Facts<'_, ItemConst>) -> Contributed<(), Asserted> {
+        Contributed::parted(Asserted::constant(item))
     }
 
-    fn on_item_const(&mut self, item: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
-        self.scopes.constant(Bound::constant(item));
-        Descend::Into
+    fn on_local(&self, local: &Local, _: &Facts<'_, Local>) -> Contributed<(), Asserted> {
+        Contributed::parted(Asserted::local(local))
     }
 
-    fn on_local(&mut self, local: &'ast Local, _: &Facts<'_, Local>) -> Descend {
-        self.scopes.local(Bound::local(local));
-        Descend::Into
+    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), Asserted> {
+        Contributed::new((), Asserted::aliased(self.tables.renamed(&item.tree)), Descend::Over)
     }
 
-    fn on_item_use(&mut self, item: &'ast ItemUse, facts: &Facts<'_, ItemUse>) -> Descend {
-        self.tables.on_item_use(item, facts)
-    }
-
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.met.push(Met { invocation: invocation.clone(), body: self.scopes.current() });
-        Descend::Over
+    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Asserted> {
+        Contributed::new((), Asserted::met(invocation), Descend::Over)
     }
 }
 
-impl<'file> Finds<'file> for Assertions<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let constants = self.scopes.constants();
-        self.met
-            .iter()
-            .flat_map(|met| {
-                self.judged(&met.invocation, &constants, &met.body.map_or_default(|id| id.locals(&self.scopes)))
-            })
-            .collect()
+impl<'file> Concludes<'file> for Assertions<'file> {
+    fn violations(self, (): (), asserted: Asserted) -> Vec<Violation<'file>> {
+        asserted.concluded(|aliases, judging| {
+            let Assertions { file, tables, .. } = self;
+            Judge { file, tables: tables.aliased(aliases) }.all(&judging)
+        })
     }
 }
+
+impl<'file> Judge<'file> {
+    pub fn all(&self, judging: &Judging) -> Vec<Violation<'file>> {
+        let constants = judging.constants();
+        let mut found: Vec<Violation<'file>> = judging.met().flat_map(|met| self.met(met, &constants)).collect();
+        found.sort_by_key(|violation| *violation.site());
+        found
+    }
+
+    fn met(&self, met: Met<'_>, constants: &Bindings<'_>) -> Vec<Violation<'file>> {
+        met.judged(|invocation, locals| self.judged(invocation, constants, &locals))
+    }
+}
+
+#[derive(Debug)]
+struct Judge<'file> {
+    file: &'file SourceFile,
+    tables: Aliased,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Assertion {
     Equality,
@@ -147,7 +156,7 @@ impl Assertion {
     const ASSERT: &str = "assert";
     const SIDES_LENGTH: usize = 2;
 
-    fn named(name: &Name, tables: &MacroAliases) -> Assertion {
+    fn named(name: &Name, tables: &Aliased) -> Assertion {
         name.matches::<Whole>(&Self::EQUALITIES)
             .map(|_| Assertion::Equality)
             .or_else(|| (*name == Name::from(Self::ASSERT)).then_some(Assertion::Bare))
@@ -167,6 +176,7 @@ impl Assertion {
     fn arguments(invocation: &Macro) -> Vec<Expr> {
         invocation
             .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
+            .ignoring(Ignored::Unparsed)
             .map_or_default(|arguments| arguments.into_iter().collect())
     }
 

@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Descend, Facts, Finds, Kind};
 use std::path::Path;
 
 use syntax::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
@@ -40,55 +40,60 @@ impl SweptLint for LiteralNames {
     const READS: Reads = Reads::Shipped;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(VagueNames { path: AsRef::<Path>::as_ref(file.head()), found: Vec::new() })
+        Box::new(Contributing::new(VagueNames { path: AsRef::<Path>::as_ref(file.head()) }))
     }
 }
 
 #[derive(Debug)]
 struct VagueNames<'file> {
     path: &'file Path,
-    found: Vec<Violation<'file>>,
 }
 
-impl VagueNames<'_> {
-    fn noted(&mut self, attributes: &[Attribute], ident: &Ident) -> Descend {
+type Noted<'file> = Contributed<(), Vec<Violation<'file>>>;
+
+impl<'file> VagueNames<'file> {
+    fn noted(&self, attributes: &[Attribute], ident: &Ident) -> Noted<'file> {
         let descend = Descend::from(Walk::outside_tests(attributes));
         let site = Site::new(self.path, LineNumber::from(ident.span()));
         let name = Name::from(ident);
         let vague = descend.entered().and_then(|_| LiteralNames::vague(&name));
-        self.found.extend(vague.map(|finding| Violation::new(site, finding)));
-        descend
+        Contributed::new((), vague.map(|finding| Violation::new(site, finding)).into_iter().collect(), descend)
     }
 }
 
-impl<'ast> Watch<'ast> for VagueNames<'_> {
+impl<'file> Contribute for VagueNames<'file> {
+    type Open = ();
+    type Part = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::Macro, Kind::ItemImpl, Kind::ItemFn, Kind::ImplItemFn]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Noted<'file> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Noted<'file> {
+        Contributed::descending(Descend::Expand)
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        Descend::from(facts.gate()).then(|| facts.inherent().map_or(Descend::Over, |_| Descend::Into))
+    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Noted<'file> {
+        Contributed::descending(
+            Descend::from(facts.gate()).then(|| facts.inherent().map_or(Descend::Over, |_| Descend::Into)),
+        )
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
+    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Noted<'file> {
         self.noted(&function.attrs, &function.sig.ident)
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
+    fn on_impl_item_fn(&self, function: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Noted<'file> {
         self.noted(&function.attrs, &function.sig.ident)
     }
 }
 
-impl<'file> Finds<'file> for VagueNames<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.found
+impl<'file> Concludes<'file> for VagueNames<'file> {
+    fn violations(self, (): (), found: Vec<Violation<'file>>) -> Vec<Violation<'file>> {
+        found
     }
 }

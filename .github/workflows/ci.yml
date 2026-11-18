@@ -214,37 +214,49 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: ./.github/actions/toolchain
       - uses: ./.github/actions/tools
       - uses: taiki-e/install-action@v2
         if: env.MUTANTS_SCOPE != ''
         with:
           tool: cargo-mutants@27.1.0
+      - name: earlier result
+        if: env.MUTANTS_SCOPE != ''
+        env:
+          PRIOR: ${{ runner.temp }}/prior
+        run: '"$TOOLS/ci" mutants-prior "$GITHUB_REPOSITORY" "$GITHUB_HEAD_REF" "$PRIOR"'
       - name: plan
         id: plan
-        run: '"$TOOLS/ci" mutants-plan "$RUNNER_TEMP/changed.diff" "$GITHUB_OUTPUT" changed $MUTANTS_SCOPE'
+        env:
+          EARLIER: --prior ${{ runner.temp }}/prior ${{ env.METADATA }}
+        run: '"$TOOLS/ci" mutants-plan "$RUNNER_TEMP/changed.diff" "$GITHUB_OUTPUT" changed $EARLIER $MUTANTS_SCOPE'
       - uses: actions/upload-artifact@v4
         if: env.MUTANTS_SCOPE != ''
         with:
           name: changed-diff
-          path: ${{ runner.temp }}/changed.diff
+          path: |
+            ${{ runner.temp }}/changed.diff
+            ${{ runner.temp }}/prior/selected.txt
 
   mutants-shard:
     if: github.event_name == 'pull_request'
+    name: mutants-shard (${{ matrix.shard.index }})
     needs: mutants-plan
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ matrix.shard.minutes }}
     strategy:
       fail-fast: false
       matrix:
-        index: ${{ fromJSON(needs.mutants-plan.outputs.shards) }}
+        shard: ${{ fromJSON(needs.mutants-plan.outputs.shards) }}
     env:
       CARGO_PROFILE_DEV_OPT_LEVEL: "0"
-      SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
+      SHARD: ${{ matrix.shard.index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -262,7 +274,15 @@ jobs:
           name: changed-diff
           path: ${{ runner.temp }}
       - name: mutants in changed lines
-        run: '"$TOOLS/ci" mutants-changed "$RUNNER_TEMP/changed.diff" "$RUNNER_TEMP" "$SHARD" $MUTANTS_SCOPE'
+        env:
+          CHOSEN: --selected ${{ runner.temp }}/prior/selected.txt --kept ${{ runner.temp }}/kept
+        run: '"$TOOLS/ci" mutants-changed "$RUNNER_TEMP/changed.diff" "$RUNNER_TEMP" "$SHARD" $CHOSEN $MUTANTS_SCOPE'
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: mutants-result-${{ matrix.shard.index }}-of-${{ strategy.job-total }}
+          path: ${{ runner.temp }}/kept/
+          if-no-files-found: ignore
 
   mutants:
     if: always() && github.event_name == 'pull_request'

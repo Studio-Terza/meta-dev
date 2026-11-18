@@ -17,6 +17,22 @@ const MACRO_USER: Source = Source::new(
     Located::new("crates/b/src/lib.rs"),
     Text::new("use a::Used;\nfn f() {\n    println!(\"{:?}\", a::Unused);\n}\n"),
 );
+const TRANSCRIBER_USER: Source = Source::new(
+    Located::new("crates/b/src/lib.rs"),
+    Text::new(
+        "use a::Used;\nmacro_rules! made {\n    ($($name:ident),*) => {\n        $(impl ::a::Unused for $name {})*\n    };\n}\n",
+    ),
+);
+const TRANSCRIBED_IMPORT: Source = Source::new(
+    Located::new("crates/b/src/lib.rs"),
+    Text::new("use a::Used;\nmacro_rules! made {\n    ($name:ident) => {\n        use ::a::Unused;\n    };\n}\n"),
+);
+const PLACEHOLDER_LED: Source = Source::new(
+    Located::new("crates/b/src/lib.rs"),
+    Text::new(
+        "use a::Used;\nmacro_rules! made {\n    ($krate:ident) => {\n        impl $krate::Unused for () {}\n    };\n}\n",
+    ),
+);
 const GLOB_USER: Source = Source::new(Located::new("crates/b/src/lib.rs"), Text::new("use a::*;\n"));
 const CRATE_ONLY: Source = Source::new(
     Located::new("crates/a/src/lib.rs"),
@@ -42,12 +58,19 @@ const MODULE_GROUP_USER: Source =
     Source::new(Located::new("crates/b/src/lib.rs"), Text::new("use a::{used::Thing, inner};\n"));
 const MODULE_BARE_USER: Source = Source::new(Located::new("crates/b/src/lib.rs"), Text::new("use a::used;\n"));
 
-const CASES: [Case; 19] = [
+const CASES: [Case; 22] = [
     Case::new(Title::new("no dependent"), &[LONELY], Flagged::new(&[])),
     Case::new(Title::new("used by itself"), &[EXPORTER, USER, SELF_USER], Flagged::new(&["crates/a/src/lib.rs:2"])),
     Case::new(Title::new("named by its binary"), &[EXPORTER, USER, BINARY], Flagged::new(&[])),
     Case::new(Title::new("exporter alone"), &[EXPORTER], Flagged::new(&[])),
     Case::new(Title::new("named in a macro"), &[EXPORTER, MACRO_USER], Flagged::new(&[])),
+    Case::new(Title::new("named in a macro_rules transcriber"), &[EXPORTER, TRANSCRIBER_USER], Flagged::new(&[])),
+    Case::new(Title::new("imported in a macro_rules transcriber"), &[EXPORTER, TRANSCRIBED_IMPORT], Flagged::new(&[])),
+    Case::new(
+        Title::new("a path led by a metavariable names no crate"),
+        &[EXPORTER, PLACEHOLDER_LED],
+        Flagged::new(&["crates/a/src/lib.rs:2"]),
+    ),
     Case::new(Title::new("named by a glob"), &[EXPORTER, GLOB_USER], Flagged::new(&[])),
     Case::new(Title::new("a glob in a third crate"), &[EXPORTER, USER, OTHER_GLOB], Flagged::new(&[])),
     Case::new(

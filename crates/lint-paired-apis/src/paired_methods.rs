@@ -7,8 +7,9 @@ use syntax::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
 use lint_core::Module;
 use lint_core::{FileHead, Parsed, Site, Syntax, Walk};
 use lint_layout::{LineNumber, Name};
-use lint_sweep::{Descend, Facts, Gathers, Kind, Sweep, Watch, Watching};
+use lint_sweep::{Contribute, Contributed, Descend, Facts, Kind};
 
+use crate::PairedOwners;
 use crate::declared::Declared;
 use crate::owner::Owner;
 
@@ -16,7 +17,6 @@ use crate::owner::Owner;
 pub struct PairedMethods<'file> {
     head: &'file FileHead,
     module: Module<'file>,
-    found: BTreeMap<Owner<'file>, Vec<Declared<'file>>>,
     kinds: &'static [Kind],
 }
 
@@ -26,7 +26,7 @@ impl<'file> PairedMethods<'file> {
         let kinds = <&SourceFile>::from(parsed)
             .shipped()
             .map_or(&[][..], |_| &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemTrait][..]);
-        PairedMethods { head, module: Module::of_head(head), found: BTreeMap::new(), kinds }
+        PairedMethods { head, module: Module::of_head(head), kinds }
     }
 
     fn public_methods(block: &ItemImpl) -> Vec<&Ident> {
@@ -43,49 +43,41 @@ impl<'file> PairedMethods<'file> {
         block.items.iter().filter_map(Syntax::trait_fn).map(|method| &method.sig.ident).collect()
     }
 
-    fn owned_by(&mut self, owner: Option<Name>, methods: &[&Ident]) {
+    fn owned_by(&self, owner: Option<Name>, methods: &[&Ident]) -> Contributed<(), PairedOwners<'file>> {
         let path = AsRef::<Path>::as_ref(self.head);
-        let declared = methods
+        let declared: Vec<Declared<'file>> = methods
             .iter()
-            .map(|method| Declared::new(Name::from(*method), Site::new(path, LineNumber::from(method.span()))));
-        owner.zip(Some(declared)).into_iter().for_each(|(name, listed)| {
-            self.found.entry(Owner::new(&self.module, name)).or_default().extend(listed);
-        });
+            .map(|method| Declared::new(Name::from(*method), Site::new(path, LineNumber::from(method.span()))))
+            .collect();
+        let owners =
+            owner.map(|name| (Owner::new(&self.module, name), declared)).into_iter().collect::<BTreeMap<_, _>>();
+        Contributed::new((), PairedOwners::new(owners), Descend::Over)
     }
 }
 
-impl<'ast> Watch<'ast> for PairedMethods<'_> {
+impl<'file> Contribute for PairedMethods<'file> {
+    type Open = ();
+    type Part = PairedOwners<'file>;
+
     fn kinds(&self) -> &'static [Kind] {
         self.kinds
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), PairedOwners<'file>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), PairedOwners<'file>> {
         let methods = facts
             .inherent()
             .filter(|candidate| Walk::outside_tests(&candidate.attrs) == Walk::Entered)
             .map_or_default(Self::public_methods);
-        self.owned_by(facts.name().cloned(), &methods);
-        Descend::Over
+        self.owned_by(facts.name().cloned(), &methods)
     }
 
-    fn on_item_trait(&mut self, block: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
+    fn on_item_trait(&self, block: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Contributed<(), PairedOwners<'file>> {
         let entered = Descend::from(facts.gate()).entered();
         let declared = entered.map_or_default(|_| Self::declared_methods(block));
-        self.owned_by(entered.and_then(|_| facts.name().cloned()), &declared);
-        Descend::Over
-    }
-}
-
-impl<'file> Gathers<BTreeMap<Owner<'file>, Vec<Declared<'file>>>> for PairedMethods<'file> {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
-    }
-
-    fn gathered(self) -> BTreeMap<Owner<'file>, Vec<Declared<'file>>> {
-        self.found
+        self.owned_by(entered.and_then(|_| facts.name().cloned()), &declared)
     }
 }

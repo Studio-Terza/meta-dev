@@ -2,7 +2,9 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Files, Kind, Offset, Size, Text};
+use invariants::Ignoring;
+
+use crate::{Bytes, FileFailure, Files, Ignored, Kind, Offset, Size, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Disk;
@@ -50,7 +52,9 @@ impl Files for Disk {
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        fs::symlink_metadata(path).map_or(Kind::Missing, |metadata| Kind::from(metadata.file_type()))
+        fs::symlink_metadata(path)
+            .ignoring(Ignored::Unreadable)
+            .map_or(Kind::Missing, |metadata| Kind::from(metadata.file_type()))
     }
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {

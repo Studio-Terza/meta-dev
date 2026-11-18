@@ -20,7 +20,7 @@ use lint_core::{FileHead, Headline, Parsed, Report};
 use lint_file::WorkspaceLint;
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_placement::{CrateName, PackageRoot};
-use lint_sweep::{Gathers, Watchers, Watching};
+use lint_sweep::{Contributing, Gathers, Watchers, Watching};
 use offered::{Offer, Used};
 use test_features::TestFeatures;
 use workspace_metadata::Metadata;
@@ -105,9 +105,10 @@ impl WatchingLint for NoTestOnlyApi {
     fn watched(file: &SourceFile) -> Offered<'_> {
         let path = AsRef::<Path>::as_ref(file.head());
         let shipped = file.shipped().map(|_| ());
-        let gated =
-            shipped.into_iter().fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(GatedItems::from(path))));
-        let watchers = gated.and(Box::new(TestFeatures::from(path)));
+        let gated = shipped
+            .into_iter()
+            .fold(Watchers::none(), |watchers, ()| watchers.and(Box::new(Contributing::new(GatedItems::from(path)))));
+        let watchers = gated.and(Box::new(Contributing::new(TestFeatures::from(path))));
         Offered { watchers, found: Vec::new() }
     }
 

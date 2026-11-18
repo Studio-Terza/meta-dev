@@ -39,6 +39,7 @@ const BOXED_VIEW: &str = "impl Open {\n    pub fn next(&self) -> Box<Closed> {\n
 const ALIASED: &str = "use states::states as lifecycle;\nlifecycle! {\n    mod door {\n        start Open { shut -> Shut }\n        state Lost {}\n        terminal Shut {}\n    }\n}\n";
 const GROUPED_ALIAS: &str = "use states::{states as lifecycle, other};\nfn f() {\n    lifecycle! {\n        mod door {\n            start Open { shut -> Shut }\n            state Lost {}\n            terminal Shut {}\n        }\n    }\n}\n";
 const BEHIND_CFG_IF: &str = "cfg_if::cfg_if! {\n    if #[cfg(unix)] {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    }\n}\n";
+const STORED: &str = "states! {\n    pub stored Door in door {\n        start Open as Closing { shut -> Shut }\n        state Lost {}\n        terminal Shut {}\n    }\n}\n";
 const BEHIND_MACRO_RULES: &str = "macro_rules! door {\n    () => {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    };\n}\ndoor!();\n";
 
 const CASES: [Case; 13] = [
@@ -161,6 +162,7 @@ laws::table!(declared_graphs_that_break_are_flagged, Sources::flagged::<Primed<S
     [Source::new(Located::new("a.rs"), Text::new(NO_TERMINAL))] => Lines::from(["a.rs:3"]),
     [Source::new(Located::new("a.rs"), Text::new(NOT_A_GRAPH))] => Lines::from(["a.rs:2"]),
     [Source::new(Located::new("a.rs"), Text::new(ALIASED))] => Lines::from(["a.rs:5", "a.rs:5"]),
+    [Source::new(Located::new("a.rs"), Text::new(STORED))] => Lines::from(["a.rs:4", "a.rs:4"]),
     [Source::new(Located::new("a.rs"), Text::new(GROUPED_ALIAS))] => Lines::from(["a.rs:6", "a.rs:6"]),
     [Source::new(Located::new("a.rs"), Text::new(BEHIND_CFG_IF))] => Lines::from(["a.rs:6", "a.rs:6"]),
     [Source::new(Located::new("a.rs"), Text::new(BEHIND_MACRO_RULES))] => Lines::from(["a.rs:6", "a.rs:6"]),

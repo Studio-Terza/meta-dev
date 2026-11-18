@@ -3,7 +3,6 @@ use std::io;
 use std::iter;
 use std::num::NonZeroUsize;
 use std::ops::Range;
-use std::panic::resume_unwind;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, Scope, ScopedJoinHandle};
 
@@ -13,6 +12,8 @@ use lint_core::{Headline, Report, Violation};
 
 use super::stack_size::StackSize;
 use super::timings::Timing;
+use crate::cli::ignored::Ignored;
+use invariants::{Ignoring, Rejoined};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Slot(usize);
@@ -147,7 +148,12 @@ impl Workers {
     const MOST_READERS: usize = 4;
 
     pub(crate) fn available() -> Workers {
-        Workers(thread::available_parallelism().map_or(1, NonZeroUsize::get).min(Self::MOST_READERS))
+        Workers(
+            thread::available_parallelism()
+                .ignoring(Ignored::Unknown)
+                .map_or(1, NonZeroUsize::get)
+                .min(Self::MOST_READERS),
+        )
     }
 
     pub(crate) fn helpers(self) -> Range<usize> {
@@ -169,6 +175,20 @@ impl<'scope> Helper<'scope> {
     }
 
     pub(crate) fn joined(self) -> Worked {
-        self.0.join().unwrap_or_else(|payload| resume_unwind(payload))
+        self.0.join().rejoined()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Dumped<'model>(&'model graph::Model);
+
+impl<'model> From<&'model graph::Model> for Dumped<'model> {
+    fn from(model: &'model graph::Model) -> Dumped<'model> {
+        Dumped(model)
+    }
+}
+impl fmt::Display for Dumped<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&format!("{:#?}\n", self.0))
     }
 }

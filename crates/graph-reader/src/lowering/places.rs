@@ -1,13 +1,15 @@
+use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Macro, Stmt};
 
-use graph::{Building, FileId, ItemDeclaration, ItemId, Region, Resolved, Seat, TypeRef};
+use graph::{Building, FileId, ItemDeclaration, ItemId, Mention, Region, Resolved, Seat, TypeRef};
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
-use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, UsePath};
+use crate::namespace::{Domain, Entries, PortMacro, Resolving, ScopeId, TranscribedRow, UsePath};
 
 use super::regions::MacroItems;
 use super::signature::Written;
+
 use super::{Enclosure, ImplRow, Lowering};
 use lint_sweep::{Descend, Scoped, Sweep};
 
@@ -143,9 +145,21 @@ impl Lowering<'_> {
 
     pub(super) fn macro_left(&mut self, item: &ItemMacro) -> &mut Self {
         match &item.ident {
-            Some(_) => self.transcribed(&Macros::expanded(self.source, &item.mac)),
+            Some(ident) => self.defined(ident, &item.mac),
             None => self.expanded(&item.mac),
         }
+    }
+
+    fn defined(&mut self, ident: &Ident, definition: &Macro) -> &mut Self {
+        let row = TranscribedRow::read(self.here.scope(), ident, definition);
+        self.lowered.rows.transcribed.push(row);
+        let statements = Macros::expanded(self.source, definition);
+        let anchored = TranscribedRow::anchored(definition);
+        let lowering = anchored.iter().fold(self, |lowering, path| {
+            lowering.used(UsePath::from(path), Position::from(path.span()), Mention::Expanded);
+            lowering
+        });
+        lowering.transcribed(&statements)
     }
 
     fn transcribed(&mut self, statements: &[Stmt]) -> &mut Self {

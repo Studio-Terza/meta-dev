@@ -2,11 +2,12 @@
 
 #[path = "../generated/laws.rs"]
 mod generated_laws;
+mod ignored;
 mod ports;
 
 use std::error::Error;
 use std::iter;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use dispatch_ports::{
@@ -14,11 +15,14 @@ use dispatch_ports::{
     Finished, Job, Output, Pause, Pid, Prompt, Reply, Stall, Stalled, Started, Stderr, Timeout, Tokens, Told,
     Unreadable, Usage, Wall, Watch, Watched, Woke, clock_ops, dispatch_ops,
 };
+use invariants::{Ignoring, Unpoisoned};
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Pass, Port, Released, Run, Snapshot};
+
+use ignored::Ignored;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Envelope {
@@ -43,6 +47,7 @@ impl Envelope {
 
     fn errored(told: &str) -> Envelope {
         Told::try_new(told.to_owned())
+            .ignoring(Ignored::Untold)
             .map_or(Envelope::Garbled, |inked| Envelope::Read(Output::Errored(Errored::new(inked, Usage::default()))))
     }
 
@@ -97,7 +102,7 @@ struct Waits(Mutex<Vec<Wait>>);
 
 impl Waits {
     fn recorded(self) -> Vec<Wait> {
-        self.0.into_inner().unwrap_or_else(PoisonError::into_inner)
+        self.0.into_inner().unpoisoned()
     }
 }
 
@@ -116,16 +121,16 @@ impl<'waits> FakeClock<'waits> {
 
 impl ClockFiller for FakeClock<'_> {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
-        *self.now.lock().unwrap_or_else(PoisonError::into_inner)
+        *self.now.lock().unpoisoned()
     }
 
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
         let wait = Wait { pause, woke: bell.waited(Duration::ZERO) };
-        let mut waits = self.waits.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut waits = self.waits.0.lock().unpoisoned();
         let slept =
             Some(self.sleep).filter(|sleep| sleep.after == waits.len()).map_or(Pause::new(0), |sleep| sleep.slept);
         waits.push(wait);
-        let mut now = self.now.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut now = self.now.lock().unpoisoned();
         *now = now.after(wait.granted()).after(slept);
         *now
     }
@@ -158,7 +163,7 @@ impl DispatchFiller for FakeDispatch {
         _pass: Pass<'_, dispatch_ops::Output>,
         _run: &mut AgentRun,
     ) -> Result<Option<Output>, DispatchFailure> {
-        let mut polls = self.polls.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut polls = self.polls.lock().unpoisoned();
         *polls = polls.saturating_add(1);
         Ok(self.finishing.filter(|finishing| *finishing == *polls).map(|_| Output::Finished(FakeDispatch::finished())))
     }
@@ -306,7 +311,9 @@ impl Starts {
             1970..2200_u16,
         )
             .prop_filter_map("a start time", |(weekday, month, day, hour, minute, second, year)| {
-                format!("{weekday} {month} {day:>2} {hour:02}:{minute:02}:{second:02} {year}").parse().ok()
+                format!("{weekday} {month} {day:>2} {hour:02}:{minute:02}:{second:02} {year}")
+                    .parse()
+                    .ignoring(Ignored::Unparsed)
             })
     }
 }
@@ -315,7 +322,7 @@ laws::roundtrip!(
     a_start_time_reads_back_as_it_is_rendered,
     Starts::any(),
     |started: &Started| started.to_string(),
-    |text: &String| text.parse::<Started>().ok(),
+    |text: &String| text.parse::<Started>().ignoring(Ignored::Unparsed),
     Some
 );
 

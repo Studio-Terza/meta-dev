@@ -6,7 +6,7 @@ use lint_core::{Site, Violation};
 use crate::finding::Rule;
 use crate::verdict::Verdict;
 use found::Found;
-pub use scan::Opened;
+pub use scan::Candidate;
 
 #[derive(Debug)]
 pub struct FunctionFlow<'file> {

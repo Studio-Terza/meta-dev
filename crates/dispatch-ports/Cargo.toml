@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 grammar-lstart = { path = "../grammar-lstart" }
 grammar-reply = { path = "../grammar-reply" }
 named-derive = { path = "../named-derive" }

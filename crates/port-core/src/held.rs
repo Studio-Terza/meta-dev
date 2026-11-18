@@ -81,7 +81,10 @@ impl Run {
     }
 
     fn dropped<R: Release>(&self, resource: &mut R) {
-        self.released(resource).err().into_iter().for_each(|failure| self.fail(R::NAME, Box::new(failure)));
+        match self.released(resource) {
+            Ok(_receipt) => (),
+            Err(failure) => self.fail(R::NAME, Box::new(failure)),
+        }
     }
 }
 

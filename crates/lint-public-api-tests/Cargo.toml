@@ -10,6 +10,8 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
+algebra = { path = "../algebra" }
 lint-sweep = { path = "../lint-sweep" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }

@@ -1,4 +1,5 @@
 mod macro_calls;
+mod transcriber;
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -9,6 +10,7 @@ use syntax::{Attribute, Item, Macro, MacroTree, Stmt};
 use super::Macros;
 use crate::watch::Address;
 use macro_calls::MacroCalls;
+pub use transcriber::Transcriber;
 
 #[derive(Debug, Default)]
 struct Memo<Facts>(RefCell<HashMap<Address, Facts>>);

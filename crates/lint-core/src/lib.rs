@@ -1,7 +1,9 @@
 mod boundary;
 mod contents;
+mod contribution;
 mod gate;
 mod headline;
+mod ignored;
 mod lint;
 mod macro_aliases;
 mod macros;
@@ -19,22 +21,23 @@ mod watch;
 
 pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
+pub use contribution::{Contributed, Contributing, Contribution, Scope};
 pub use gate::Gate;
 pub use headline::Headline;
 pub use lint::Lint;
 pub use lint_layout::Site;
-pub use macro_aliases::MacroAliases;
+pub use macro_aliases::{Aliased, Aliases, MacroAliases};
 pub use macros::Macros;
 pub use module::Module;
 pub use readout::{Readout, Unwalked};
 pub use repo_file::RepoFile;
 pub use report::Report;
 pub use source_file::{FileHead, Parsed, SourceFile};
-pub use support_modules::SupportModules;
+pub use support_modules::SupportScan;
 pub use syntax::Syntax;
 pub use test_file::TestFile;
 pub use type_name::TypeName;
 pub use walk::Walk;
-pub use watch::{Address, ByKind, Descend, Facts, Kind, Watch, Watching};
+pub use watch::{Address, ByKind, Contribute, Descend, Facts, Kind, Watch, Watching};
 
 pub use lint_layout::SourceText;

@@ -8,7 +8,7 @@ use syntax::{Group, Literal, TokenStream, TokenTree};
 use lint_core::Syntax;
 use lint_layout::LineNumber;
 use lint_layout::Name;
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Descend, Facts, Kind};
 
 use std::path::Path;
 
@@ -21,7 +21,6 @@ use crate::flagged::Flagged;
 #[derive(Debug)]
 pub(crate) struct TestFeatures<'file> {
     path: &'file Path,
-    found: Vec<Flagged>,
 }
 
 impl TestFeatures<'_> {
@@ -62,35 +61,40 @@ impl TestFeatures<'_> {
     }
 }
 
-impl<'ast> Watch<'ast> for TestFeatures<'_> {
+impl Contribute for TestFeatures<'_> {
+    type Open = ();
+    type Part = Vec<Flagged>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Attribute, Kind::Macro]
     }
 
-    fn on_attribute(&mut self, attribute: &'ast Attribute, _: &Facts<'_, Attribute>) -> Descend {
-        self.found.extend(
-            Self::condition(attribute.path()).into_iter().flat_map(|_| Self::scanned(attribute.to_token_stream())),
-        );
-        Descend::Into
+    fn on_attribute(&self, attribute: &Attribute, _: &Facts<'_, Attribute>) -> Contributed<(), Vec<Flagged>> {
+        Contributed::parted(
+            Self::condition(attribute.path())
+                .into_iter()
+                .flat_map(|_| Self::scanned(attribute.to_token_stream()))
+                .collect(),
+        )
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        self.found.extend(
-            Self::condition(&invocation.path).into_iter().flat_map(|_| Self::scanned(invocation.tokens.clone())),
-        );
-        Descend::Over
+    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Flagged>> {
+        let found = Self::condition(&invocation.path)
+            .into_iter()
+            .flat_map(|_| Self::scanned(invocation.tokens.clone()))
+            .collect();
+        Contributed::new((), found, Descend::Over)
     }
 }
 
-impl<'file> Finds<'file> for TestFeatures<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        let path = self.path;
-        self.found.into_iter().map(|flagged| flagged.in_file(path)).collect()
+impl<'file> Concludes<'file> for TestFeatures<'file> {
+    fn violations(self, (): (), found: Vec<Flagged>) -> Vec<Violation<'file>> {
+        found.into_iter().map(|flagged| flagged.in_file(self.path)).collect()
     }
 }
 
 impl<'file> From<&'file Path> for TestFeatures<'file> {
     fn from(path: &'file Path) -> TestFeatures<'file> {
-        TestFeatures { path, found: Vec::new() }
+        TestFeatures { path }
     }
 }

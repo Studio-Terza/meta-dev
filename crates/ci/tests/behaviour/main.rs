@@ -13,12 +13,14 @@ use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
-const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
-const CLIPPY_FIXTURE: &str = include_str!("metadata/clippy_targets.json");
-const TIMINGS_UNITS: &str = include_str!("timings/units.json");
-const TIMINGS_METADATA: &str = include_str!("timings/metadata.json");
-const EVERY_PLATFORM: &str = include_str!("timings/every-platform.json");
-const HOST_PLATFORM: &str = include_str!("timings/host-platform.json");
+mod incremental;
+
+const METADATA: &str = include_str!("../../../reach/tests/metadata/workspace.json");
+const CLIPPY_FIXTURE: &str = include_str!("../metadata/clippy_targets.json");
+const TIMINGS_UNITS: &str = include_str!("../timings/units.json");
+const TIMINGS_METADATA: &str = include_str!("../timings/metadata.json");
+const EVERY_PLATFORM: &str = include_str!("../timings/every-platform.json");
+const HOST_PLATFORM: &str = include_str!("../timings/host-platform.json");
 const HOST: &str = "x86_64-unknown-linux-gnu";
 const GRAPH_PATH: [&str; 6] = [
     "graph-path 2.50 seconds, the longest chain of clippy units, counting only units sccache never caches:",
@@ -76,6 +78,7 @@ struct Script {
     metadata: String,
     answers: Vec<Reply>,
     exact: Vec<ExactReply>,
+    refused: Vec<Invocation>,
     failing: Option<&'static str>,
     logged_text: String,
     calls: RefCell<Vec<Invocation>>,
@@ -91,6 +94,7 @@ impl Script {
             metadata: METADATA.to_owned(),
             answers: Vec::new(),
             exact: Vec::new(),
+            refused: Vec::new(),
             failing: None,
             logged_text: String::new(),
             calls: RefCell::new(Vec::new()),
@@ -161,6 +165,11 @@ impl Ports for Fake<'_> {
 
     fn output(&self, invocation: &Invocation) -> io::Result<ci::ports::Text> {
         self.script.recorded(invocation)?;
+        self.script
+            .refused
+            .iter()
+            .find(|refused| *refused == invocation)
+            .map_or(Ok(()), |_| Err(io::Error::other("refused")))?;
         Ok(ci::ports::Text::new(self.script.answer_to(invocation)))
     }
 
@@ -1580,7 +1589,10 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_t
         Printed { exit: ExitCode::SUCCESS, out: vec!["mutants: 61 to test in 2 shards"], err: Vec::<&str>::new() }
     );
     assert_eq!(Text::lines(&scratch.read("c.diff")), ["+changed", "+whole"]);
-    assert_eq!(Text::lines(&scratch.read("plan.txt")), ["shards=[0,1]"]);
+    assert_eq!(
+        Text::lines(&scratch.read("plan.txt")),
+        [r#"shards=[{"index":0,"minutes":45},{"index":1,"minutes":45}]"#]
+    );
     assert_eq!(*fake.calls.borrow(), [named, consumed, kept, whole, listed]);
     Ok(())
 }
@@ -1612,6 +1624,12 @@ fn a_plan_with_no_changed_tests_asks_no_graph_and_keeps_the_changed_lines() -> R
 struct Plans;
 
 impl Plans {
+    fn capped(minutes: &[usize]) -> String {
+        let planned: Vec<String> =
+            minutes.iter().enumerate().map(|(index, cap)| format!(r#"{{"index":{index},"minutes":{cap}}}"#)).collect();
+        format!("shards=[{}]", planned.join(","))
+    }
+
     fn shards(mutants: usize) -> Vec<String> {
         let scratch = Scratch::fresh();
         let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
@@ -1628,10 +1646,12 @@ laws::table!(
     shards_grow_with_the_mutants_up_to_a_ceiling,
     |mutants: &usize| Plans::shards(*mutants),
     [
-        0 => ["shards=[0]"],
-        60 => ["shards=[0]"],
-        61 => ["shards=[0,1]"],
-        100_000 => ["shards=[0,1,2,3,4,5,6,7,8,9,10,11,12,13]"],
+        0 => [r#"shards=[{"index":0,"minutes":45}]"#],
+        60 => [r#"shards=[{"index":0,"minutes":45}]"#],
+        61 => [r#"shards=[{"index":0,"minutes":45},{"index":1,"minutes":45}]"#],
+        5_068 => [Plans::capped(&[66; 14])],
+        5_095 => [Plans::capped(&[67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 66])],
+        100_000 => [Plans::capped(&[360; 14])],
     ]
 );
 
@@ -1642,7 +1662,7 @@ fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -
     let answer = scratch
         .answer(&fake, &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint"]);
     assert_eq!(Text::lines(&answer.out), ["mutants: 0 to test in 1 shards"]);
-    assert_eq!(Text::lines(&scratch.read("plan.txt")), ["shards=[0]"]);
+    assert_eq!(Text::lines(&scratch.read("plan.txt")), [r#"shards=[{"index":0,"minutes":45}]"#]);
     assert!(fake.calls.borrow().is_empty());
     Ok(())
 }
@@ -2767,6 +2787,29 @@ fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Box<
             vec!["mutants: none missed".to_owned()],
             2
         )
+    );
+    Ok(())
+}
+
+#[test]
+fn a_mutant_its_own_crate_missed_that_times_out_in_the_scope_is_still_a_survivor() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.directory("out/mutants.out")?;
+    scratch.directory("out/scoped/mutants.out")?;
+    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    scratch.write("out/scoped/mutants.out/timeout.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    let answer = scratch.answer(
+        &Script::new(),
+        &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "--test-package=a"],
+    );
+    assert_eq!(answer.exit, ExitCode::from(2));
+    assert_eq!(
+        Text::lines(&answer.out),
+        [
+            "mutants: 0 timed out on their own crate's tests",
+            "mutants missed:",
+            "src/a.rs:1:5: replace f -> bool with true"
+        ]
     );
     Ok(())
 }

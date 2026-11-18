@@ -4,19 +4,38 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::PublicApiTests;
+use algebra::{Monoid, Semigroup};
 use lint_core::Macros;
 use lint_core::Walk;
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 use lint_layout::Name;
 use lint_layout::TestMarks;
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_sweep::{Contribute, Contributed, Descend, Facts, Kind};
 
 #[derive(Debug)]
 pub struct TestCode<'file> {
     file: &'file SourceFile,
+}
+
+#[derive(Debug, Default)]
+pub struct InSource {
     lines: Vec<LineNumber>,
     invoked: Vec<Invoked>,
+}
+
+impl Semigroup for InSource {
+    fn combine(self, other: InSource) -> InSource {
+        InSource { lines: self.lines.combine(other.lines), invoked: self.invoked.combine(other.invoked) }
+    }
+}
+
+impl Monoid for InSource {}
+
+impl InSource {
+    fn lines(lines: impl IntoIterator<Item = LineNumber>) -> InSource {
+        InSource { lines: lines.into_iter().collect(), invoked: Vec::new() }
+    }
 }
 
 #[derive(Debug)]
@@ -48,46 +67,50 @@ impl<'file> Tested<'file> {
 impl<'file> TestCode<'file> {
     const DEFINITION: &'static str = "macro_rules";
 
-    pub(crate) fn tested(self) -> Tested<'file> {
+    pub(crate) fn tested(self, in_source: InSource) -> Tested<'file> {
         let path = AsRef::<Path>::as_ref(self.file.head());
-        let found = self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::IN_SOURCE));
-        Tested { path, found: found.collect(), invoked: self.invoked }
+        let found =
+            in_source.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::IN_SOURCE));
+        Tested { path, found: found.collect(), invoked: in_source.invoked }
     }
 
-    fn gated(&mut self, attributes: &[Attribute], line: LineNumber) -> Descend {
+    fn gated(attributes: &[Attribute], line: LineNumber) -> Contributed<(), InSource> {
         let walk = Walk::outside_tests(attributes);
-        self.lines.extend((walk == Walk::Skipped).then_some(line));
-        Descend::from(walk)
+        Contributed::new((), InSource::lines((walk == Walk::Skipped).then_some(line)), Descend::from(walk))
     }
 }
 
-impl<'ast> Watch<'ast> for TestCode<'_> {
+impl Contribute for TestCode<'_> {
+    type Open = ();
+    type Part = InSource;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemFn, Kind::Macro]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
+    fn on_item_mod(&self, module: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), InSource> {
         let walk = facts.gate();
-        self.lines.extend((walk == Walk::Skipped).then(|| LineNumber::from(module.ident.span())));
-        Descend::from(walk)
+        let lines = InSource::lines((walk == Walk::Skipped).then(|| LineNumber::from(module.ident.span())));
+        Contributed::new((), lines, Descend::from(walk))
     }
 
-    fn on_item_impl(&mut self, item: &'ast ItemImpl, _: &Facts<'_, ItemImpl>) -> Descend {
-        self.gated(&item.attrs, LineNumber::from(item.impl_token.span))
+    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<(), InSource> {
+        Self::gated(&item.attrs, LineNumber::from(item.impl_token.span))
     }
 
-    fn on_impl_item_fn(&mut self, method: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.gated(&method.attrs, LineNumber::from(method.sig.ident.span()))
+    fn on_impl_item_fn(&self, method: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Contributed<(), InSource> {
+        Self::gated(&method.attrs, LineNumber::from(method.sig.ident.span()))
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, facts: &Facts<'_, ItemFn>) -> Descend {
+    fn on_item_fn(&self, function: &ItemFn, facts: &Facts<'_, ItemFn>) -> Contributed<(), InSource> {
         let line = LineNumber::from(function.sig.ident.span());
-        let descend = self.gated(&function.attrs, line);
-        self.lines.extend(facts.test_mark().filter(|_| descend == Descend::Into).map(|_| line));
-        descend
+        let walk = Walk::outside_tests(&function.attrs);
+        let skipped = (walk == Walk::Skipped).then_some(line);
+        let marked = facts.test_mark().filter(|_| walk == Walk::Entered).map(|_| line);
+        Contributed::new((), InSource::lines(skipped.into_iter().chain(marked)), Descend::from(walk))
     }
 
-    fn on_macro(&mut self, invocation: &'ast Macro, facts: &Facts<'_, Macro>) -> Descend {
+    fn on_macro(&self, invocation: &Macro, facts: &Facts<'_, Macro>) -> Contributed<(), InSource> {
         let line = LineNumber::from(invocation.bang_token.span);
         let law = facts.law().map(|_| line);
         let called =
@@ -96,15 +119,14 @@ impl<'ast> Watch<'ast> for TestCode<'_> {
             Macros::attributes_in_file(self.file, call).iter().find_map(TestMarks::test).map(|_| line)
         });
         let settled = law.or(marked);
-        self.lines.extend(settled);
         let named = invocation.path.get_ident().map(|name| Invoked { name: Name::from(name), line });
-        self.invoked.extend(settled.map_or(named, |_| None));
-        Descend::Over
+        let invoked = settled.map_or(named, |_| None).into_iter().collect();
+        Contributed::new((), InSource { lines: settled.into_iter().collect(), invoked }, Descend::Over)
     }
 }
 
 impl<'file> From<&'file SourceFile> for TestCode<'file> {
     fn from(file: &'file SourceFile) -> TestCode<'file> {
-        TestCode { file, lines: Vec::new(), invoked: Vec::new() }
+        TestCode { file }
     }
 }

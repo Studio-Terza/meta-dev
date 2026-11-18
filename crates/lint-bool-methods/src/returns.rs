@@ -5,15 +5,16 @@ use syntax::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signat
 
 use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Descend, Facts, Kind};
 
 use finding::Finding;
 
 #[derive(Debug)]
 pub struct Returns<'file> {
     file: &'file SourceFile,
-    found: Vec<Violation<'file>>,
 }
+
+type Returned<'file> = Contributed<(), Vec<Violation<'file>>>;
 
 impl<'file> Returns<'file> {
     fn flagged(&self, signature: &Signature) -> Option<Violation<'file>> {
@@ -29,52 +30,56 @@ impl<'file> Returns<'file> {
             })
     }
 
-    fn opened(&mut self, attributes: &[Attribute], signature: &Signature) -> Descend {
+    fn opened(&self, attributes: &[Attribute], signature: &Signature) -> Returned<'file> {
         let descend = Descend::from(Walk::outside_tests(attributes));
         let flagged = descend.entered().and_then(|_| self.flagged(signature));
-        self.found.extend(flagged);
-        descend
+        Contributed::new((), flagged.into_iter().collect(), descend)
     }
 }
 
 impl<'file> From<&'file SourceFile> for Returns<'file> {
     fn from(file: &'file SourceFile) -> Returns<'file> {
-        Returns { file, found: Vec::new() }
+        Returns { file }
     }
 }
 
-impl<'ast> Watch<'ast> for Returns<'_> {
+impl<'file> Contribute for Returns<'file> {
+    type Open = ();
+    type Part = Vec<Violation<'file>>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod, Kind::ItemFn, Kind::ItemImpl, Kind::ImplItemFn, Kind::ItemTrait, Kind::TraitItemFn]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Returned<'file> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
+    fn on_item_fn(&self, function: &ItemFn, _: &Facts<'_, ItemFn>) -> Returned<'file> {
         self.opened(&function.attrs, &function.sig)
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
-        facts.inherent().map_or(Descend::Over, |_| Descend::Into).then(|| Descend::from(facts.gate()))
+    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Returned<'file> {
+        Contributed::descending(
+            facts.inherent().map_or(Descend::Over, |_| Descend::Into).then(|| Descend::from(facts.gate())),
+        )
     }
 
-    fn on_impl_item_fn(&mut self, method: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
+    fn on_impl_item_fn(&self, method: &ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }
 
-    fn on_item_trait(&mut self, _: &'ast ItemTrait, facts: &Facts<'_, ItemTrait>) -> Descend {
-        Descend::from(facts.gate())
+    fn on_item_trait(&self, _: &ItemTrait, facts: &Facts<'_, ItemTrait>) -> Returned<'file> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_trait_item_fn(&mut self, method: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
+    fn on_trait_item_fn(&self, method: &TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Returned<'file> {
         self.opened(&method.attrs, &method.sig)
     }
 }
 
-impl<'file> Finds<'file> for Returns<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.found
+impl<'file> Concludes<'file> for Returns<'file> {
+    fn violations(self, (): (), found: Vec<Violation<'file>>) -> Vec<Violation<'file>> {
+        found
     }
 }

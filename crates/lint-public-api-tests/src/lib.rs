@@ -2,14 +2,14 @@ mod emitters;
 mod path_reach;
 mod test_code;
 
-use emitters::Emitters;
+use emitters::{EmitterScan, Emitters};
 use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::{Headline, Parsed};
 use lint_core::{SourceFile, Violation};
 use lint_file::{ContextLint, Reads, WatchingLint};
-use lint_sweep::{Gathers, Watching};
+use lint_sweep::{Contributing, Gathers, Watching};
 use path_reach::PathReach;
 use test_code::{TestCode, Tested};
 
@@ -34,10 +34,10 @@ impl ContextLint for PublicApiTests {
     type Part<'head> = Emitters;
     type Context<'head> = Emitters;
 
-    type Gathering<'head> = Emitters;
+    type Gathering<'head> = Contributing<EmitterScan>;
 
-    fn gathering(_: Parsed<'_, '_>) -> Emitters {
-        Emitters::default()
+    fn gathering(_: Parsed<'_, '_>) -> Contributing<EmitterScan> {
+        Contributing::new(EmitterScan)
     }
 }
 
@@ -46,8 +46,10 @@ impl WatchingLint for PublicApiTests {
     type Watched<'file> = Watched<'file>;
 
     fn watched(file: &SourceFile) -> Watched<'_> {
-        file.shipped()
-            .map_or_else(|| Watched::Beside(PathReach::beside(file)), |_| Watched::Shipped(TestCode::from(file)))
+        file.shipped().map_or_else(
+            || Watched::Beside(Contributing::new(PathReach::beside(file))),
+            |_| Watched::Shipped(Contributing::new(TestCode::from(file))),
+        )
     }
 
     fn judged<'file, 'head: 'file>(
@@ -61,8 +63,8 @@ impl WatchingLint for PublicApiTests {
 
 #[derive(Debug)]
 pub enum Watched<'file> {
-    Shipped(TestCode<'file>),
-    Beside(PathReach<'file>),
+    Shipped(Contributing<TestCode<'file>>),
+    Beside(Contributing<PathReach<'file>>),
 }
 
 impl<'file> Gathers<Tested<'file>> for Watched<'file> {
@@ -75,8 +77,8 @@ impl<'file> Gathers<Tested<'file>> for Watched<'file> {
 
     fn gathered(self) -> Tested<'file> {
         match self {
-            Watched::Shipped(code) => code.tested(),
-            Watched::Beside(reach) => reach.tested(),
+            Watched::Shipped(contributing) => contributing.concluded(|code, (), in_source| code.tested(in_source)),
+            Watched::Beside(contributing) => contributing.concluded(|reach, (), reached| reach.tested(reached)),
         }
     }
 }

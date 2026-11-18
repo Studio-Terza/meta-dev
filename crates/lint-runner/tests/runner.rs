@@ -16,6 +16,8 @@ use cargo_ports::{Recorded, Toolchain};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
 use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
@@ -342,7 +344,8 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
     root.write("src/lib.rs", CLEAN)?;
     let timed = Trees::timed(&root.files, &root.root, &["--timings"])?;
     let untimed = Trees::timed(&root.files, &root.root, &[])?;
-    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(MOST_READERS);
+    let workers =
+        thread::available_parallelism().ignoring(Ignored::Unknown).map_or(1, NonZeroUsize::get).min(MOST_READERS);
     let rows = [
         "lint timings in milliseconds, took then started:\n",
         "  phase total\n",
@@ -376,17 +379,24 @@ impl Trees {
                 .entries(path)?
                 .iter()
                 .try_fold(0, |found, entry| Ok(found + Self::occurrences(files, entry, needle)?)),
-            _ => Ok(files.read_text(path).map_or(0, |text| text.as_ref().matches(needle).count())),
+            _ => Ok(files
+                .read_text(path)
+                .ignoring(Ignored::Unreadable)
+                .map_or(0, |text| text.as_ref().matches(needle).count())),
         }
     }
 
     fn flagged(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Printed {
+        Trees::described(files, root, flags, NO_DEPENDENCIES)
+    }
+
+    fn described(files: &(impl Files + Sync), root: &Path, flags: &[&str], metadata: &str) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
         let exit = Cli::from_args(arguments).report_to(
             Ports::new(
                 files,
-                [(PathBuf::from("/"), Bytes::from(NO_DEPENDENCIES))].into_iter().collect::<Recorded>(),
+                [(PathBuf::from("/"), Bytes::from(metadata))].into_iter().collect::<Recorded>(),
                 Monotonic::default(),
             ),
             &mut out,
@@ -394,8 +404,8 @@ impl Trees {
         );
         Printed {
             exit,
-            out: String::from_utf8(out).unwrap_or_default(),
-            err: String::from_utf8(err).unwrap_or_default(),
+            out: String::from_utf8(out).ignoring(Ignored::NotUtf8).unwrap_or_default(),
+            err: String::from_utf8(err).ignoring(Ignored::NotUtf8).unwrap_or_default(),
         }
     }
 
@@ -440,7 +450,7 @@ impl Trees {
             &mut out,
             &mut err,
         );
-        Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
+        Reported { exit, err: format!("\n{}", String::from_utf8(err).ignoring(Ignored::NotUtf8).unwrap_or_default()) }
     }
 }
 
@@ -495,6 +505,17 @@ impl Scratch {
 
     fn flagged(&self, flags: &[&str]) -> Printed {
         Trees::flagged(&self.files, &self.root, flags)
+    }
+
+    fn described(&self, flags: &[&str], metadata: &str) -> Printed {
+        Trees::described(&self.files, &self.root, flags, metadata)
+    }
+
+    fn metadata(&self) -> String {
+        let place = self.root.to_string_lossy();
+        format!(
+            "{{\"workspace_root\": \"{place}\", \"workspace_members\": [\"r\"], \"packages\": [{{\"name\": \"r\", \"id\": \"r\", \"manifest_path\": \"{place}/Cargo.toml\", \"dependencies\": []}}], \"resolve\": {{\"nodes\": [{{\"id\": \"r\", \"dependencies\": [], \"deps\": []}}]}}}}"
+        )
     }
 
     fn verdict(&self, flags: &[&str]) -> Verdict {
@@ -1041,5 +1062,27 @@ fn a_tree_read_by_many_workers_reports_the_same_each_time() -> Result<(), Box<dy
     let runs: Vec<String> = std::iter::repeat_with(|| root.reported().err).take(8).collect();
     assert!(runs.iter().all(|run| *run == first), "{runs:?}");
     assert!(first.contains("src/first/inner.rs"), "{first}");
+    Ok(())
+}
+
+#[test]
+fn the_graph_dump_command_prints_the_model_the_same_way_twice() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "pub struct A;\npub fn made() -> A {\n    A\n}\n")?;
+    let first = root.flagged(&["graph-dump"]);
+    let second = root.flagged(&["graph-dump"]);
+    assert_eq!(first.exit, ExitCode::SUCCESS);
+    let opening = first.out.parse::<text_lines::Lines>().into_iter().flatten().next();
+    assert_eq!((opening, first.out.contains("\"made\"")), (Some("Model {".to_owned()), true), "{}", first.out);
+    assert_eq!(first.out, second.out);
+    Ok(())
+}
+
+#[test]
+fn the_crates_query_sizes_the_workspace_s_crates() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "pub struct A;\n")?;
+    let run = root.described(&["query", "--crates", "--in"], &root.metadata());
+    assert_eq!(run.out.matches("  r: 1 files, 1 lines").count(), 1, "{}{}", run.out, run.err);
     Ok(())
 }

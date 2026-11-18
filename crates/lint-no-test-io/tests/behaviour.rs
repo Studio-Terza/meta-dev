@@ -2,12 +2,19 @@ use std::path::PathBuf;
 
 use file_ports::{Bytes, Memory};
 use graph_reader::Reader;
+use invariants::{Ignoring, ignored};
 use lint_core::{SourceFile, SourceText};
 use lint_file::ModelLint;
 use lint_no_test_io::NoTestIo;
 use lint_placement::Placement;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+
+ignored! {
+    enum Ignored {
+        Unparsed => "a source that does not parse has no count, so the row reads usize::MAX and fails",
+    }
+}
 
 const READ: &str = "fn f() {\n    std::fs::read_to_string(\"a\");\n}\n";
 const PARENT: &str = "fn f() {\n    std::fs::read_to_string(\"a\");\n}\nmod b;\n";
@@ -33,7 +40,25 @@ const PRINTED: &str = "use std::io::{self, Write};\nfn f() {\n    writeln!(io::s
 const FAKES: &str =
     "use file_ports::{Files, Memory};\nfn f() {\n    Memory::default().read(std::path::Path::new(\"a\"));\n}\n";
 
-const CASES: [Case; 28] = [
+const WRAPPED: &str =
+    "macro_rules! disk {\n    () => {\n        file_ports::Disk\n    };\n}\nfn f() {\n    disk!();\n}\n";
+const DEFINER: &str = "pub use file_ports::Disk;\n#[macro_export]\nmacro_rules! mirrored {\n    () => {\n        $crate::Disk\n    };\n}\n";
+const DEFINER_INVOKED: &str = "fn f() {\n    g::mirrored!();\n}\n";
+
+const CASES: [Case; 30] = [
+    Case::new(
+        Title::new("a test-local macro wrapping a real port"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(WRAPPED))],
+        Flagged::new(&["tests/a.rs:3", "tests/a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("another crate's macro using that crate's own port"),
+        &[
+            Source::new(Located::new("crates/g/src/lib.rs"), Text::new(DEFINER)),
+            Source::new(Located::new("crates/t/tests/a.rs"), Text::new(DEFINER_INVOKED)),
+        ],
+        Flagged::new(&[]),
+    ),
     Case::new(
         Title::new("qualified read"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(READ))],
@@ -197,6 +222,7 @@ fn tests_of_a_crate_whose_name_ends_in_ports_check_its_real_fillers() {
             let path = PathBuf::from("/r/tests/a.rs");
             let placement = Placement::locate(&files, &path);
             SourceFile::parse_at(path.clone(), path, placement, SourceText::new(DISK.to_owned()))
+                .ignoring(Ignored::Unparsed)
                 .map_or(usize::MAX, |file| NoTestIo::report(&Reader::read_files(&[file])).violations().len())
         })
         .collect();

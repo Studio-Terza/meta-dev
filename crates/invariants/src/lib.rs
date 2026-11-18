@@ -54,6 +54,12 @@ macro_rules! invariant {
     (broken $named:expr) => {
         ::core::panic!("broken invariant: {}", $named)
     };
+    (holding $result:expr, $named:expr, detailed $(,)?) => {
+        match $result {
+            Ok(value) => value,
+            Err(failure) => $crate::invariant!(broken $named, failure),
+        }
+    };
     (holding $result:expr, $named:expr $(,)?) => {
         match $result {
             Ok(value) => value,
@@ -67,3 +73,29 @@ macro_rules! invariant {
         }
     };
 }
+
+invariants! {
+    enum Invariant {
+        LockNotPoisoned =>
+            "no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written",
+    }
+}
+
+pub trait Unpoisoned<Guard>: Into<Result<Guard, std::sync::PoisonError<Guard>>> {
+    fn unpoisoned(self) -> Guard {
+        invariant!(holding self.into(), Invariant::LockNotPoisoned)
+    }
+}
+
+impl<Guard> Unpoisoned<Guard> for std::sync::LockResult<Guard> {}
+
+pub trait Rejoined<Value>: Into<std::thread::Result<Value>> {
+    fn rejoined(self) -> Value {
+        match self.into() {
+            Ok(value) => value,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
+}
+
+impl<Value> Rejoined<Value> for std::thread::Result<Value> {}

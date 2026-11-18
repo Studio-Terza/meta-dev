@@ -25,21 +25,22 @@ impl WorkflowRun {
             .contents()
             .read()
             .map_err(Excerpt::from)
-            .and_then(|bytes| String::from_utf8(bytes.clone().into_inner()).map_err(Excerpt::from));
-        text.map_or_else(
-            |reason| vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { reason })],
-            |decoded| Self::violations_in(file, decoded.parse(), actions),
-        )
+            .and_then(|bytes| String::from_utf8(bytes.clone().into_inner()).map_err(Excerpt::from))
+            .map(|decoded| decoded.parse());
+        Self::violations_of(file, text, actions)
     }
 
-    fn violations_in<'file>(
+    fn violations_of<'file>(
         file: &'file RepoFile,
-        parsed: Result<Document, ScanError>,
+        text: Result<Result<Document, ScanError>, Excerpt>,
         actions: Actions<'_>,
     ) -> Vec<Violation<'file>> {
-        match parsed {
-            Ok(document) => document.findings(actions).into_iter().map(|found| found.violation(file.shown())).collect(),
-            Err(error) => vec![Violation::new(
+        match text {
+            Err(reason) => vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { reason })],
+            Ok(Ok(document)) => {
+                document.findings(actions).into_iter().map(|found| found.violation(file.shown())).collect()
+            }
+            Ok(Err(error)) => vec![Violation::new(
                 Site::new(file.shown(), LineNumber::from(error.marker().line())),
                 Finding::Unparsable { reason: Excerpt::new(error.info().to_owned()) },
             )],

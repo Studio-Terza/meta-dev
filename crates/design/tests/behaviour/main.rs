@@ -389,7 +389,7 @@ struct Answered {
 }
 
 impl Answered {
-    fn said(uttered: &design::Uttered) -> String {
+    fn said<State>(uttered: &design::Uttered<State>) -> String {
         AsRef::<str>::as_ref(AsRef::<Shown>::as_ref(uttered)).to_owned()
     }
 

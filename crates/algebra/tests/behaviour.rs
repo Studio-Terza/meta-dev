@@ -1,6 +1,6 @@
 use algebra::{Monoid, Semigroup};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 struct Joined(Vec<u8>);
 
 impl Semigroup for Joined {
@@ -9,11 +9,7 @@ impl Semigroup for Joined {
     }
 }
 
-impl Monoid for Joined {
-    fn identity() -> Joined {
-        Joined(Vec::new())
-    }
-}
+impl Monoid for Joined {}
 
 #[test]
 fn concatenating_nothing_gives_the_identity_and_keeps_order() {

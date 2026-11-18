@@ -5,16 +5,16 @@ mod finding;
 mod kind;
 mod known;
 
-use std::borrow::Cow;
-
 use syntax::Spanned;
-use syntax::{ItemImpl, ItemMod, Macro};
+use syntax::{ItemImpl, ItemMod, Macro, Type};
 
 use lint_core::{Headline, Parsed, Site, SourceFile, Syntax, Violation};
 use lint_file::{ContextLint, Reads, WatchingLint};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
-use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Watch, Watching};
+use lint_sweep::{
+    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope, Sweep, Watching,
+};
 
 pub use declaration::Declaration;
 use declarations::Declarations;
@@ -70,13 +70,34 @@ pub struct Candidates<'file>(Vec<Candidate<'file>>);
 
 #[derive(Debug)]
 pub struct Predicates<'file> {
-    candidates: Vec<Candidate<'file>>,
-    outer: Vec<Cow<'file, ModulePath>>,
     file: &'file SourceFile,
-    module: Cow<'file, ModulePath>,
+    scan: Contributing<PredicateScan<'file>>,
 }
 
-impl<'file> Predicates<'file> {
+#[derive(Debug)]
+pub struct PredicateScan<'file> {
+    file: &'file SourceFile,
+}
+
+#[derive(Debug)]
+pub struct Unresolved<'file> {
+    path: Vec<Name>,
+    implemented: Type,
+    violations: Vec<Violation<'file>>,
+}
+
+impl<'file> Unresolved<'file> {
+    fn under(self, name: Option<&Name>) -> Unresolved<'file> {
+        Unresolved { path: name.cloned().into_iter().chain(self.path).collect(), ..self }
+    }
+
+    fn candidate(self, module: &ModulePath) -> Option<Candidate<'file>> {
+        let placed = self.path.into_iter().fold(module.clone(), |within, name| within.child(name));
+        Target::implemented(&placed, &self.implemented).map(|target| Candidate { target, violations: self.violations })
+    }
+}
+
+impl<'file> PredicateScan<'file> {
     fn predicates(&self, block: &ItemImpl) -> Vec<Violation<'file>> {
         block
             .items
@@ -98,56 +119,57 @@ impl<'file> Predicates<'file> {
     }
 }
 
-impl<'ast> Watch<'ast> for Predicates<'_> {
+impl<'file> Contribute for PredicateScan<'file> {
+    type Open = ();
+    type Part = Vec<Unresolved<'file>>;
+
     fn kinds(&self) -> &'static [Node] {
-        &[Node::ItemMod, Node::ItemImpl, Node::Macro]
+        &[Node::ItemImpl, Node::Macro]
     }
 
-    fn on_item_mod(&mut self, _: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        let inner =
-            facts.name().map_or_else(|| self.module.clone(), |name| Cow::Owned(self.module.child(name.clone())));
-        self.outer.push(std::mem::replace(&mut self.module, inner));
-        Descend::Into
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Node::ItemMod)] }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.module = self.outer.pop().unwrap_or_else(|| Cow::Borrowed(self.file.head().placement().module()));
+    fn off_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        inner: Contribution<(), Vec<Unresolved<'file>>>,
+    ) -> Vec<Unresolved<'file>> {
+        inner.concluded(|(), pending| pending.into_iter().map(|within| within.under(facts.name())).collect())
     }
 
-    fn on_item_impl(&mut self, _: &'ast ItemImpl, facts: &Facts<'_, ItemImpl>) -> Descend {
+    fn on_item_impl(&self, _: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Vec<Unresolved<'file>>> {
         let found = facts.inherent().and_then(|block| {
-            let target = Target::implemented(&self.module, &block.self_ty)?;
-            let violations = self.predicates(block);
-            Some(violations)
+            Some(self.predicates(block))
                 .filter(|found| found.is_empty().then_some(()).is_none())
-                .map(|found| Candidate { target, violations: found })
+                .map(|violations| Unresolved { path: Vec::new(), implemented: Type::clone(&block.self_ty), violations })
         });
-        self.candidates.extend(found);
-        Descend::Into
+        Contributed::parted(found.into_iter().collect())
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Vec<Unresolved<'file>>> {
+        Contributed::descending(Descend::Expand)
     }
 }
 
 impl<'file> Gathers<Candidates<'file>> for Predicates<'file> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        std::iter::once::<&mut Watching<'_>>(self)
+        Sweep::alone(&mut self.scan)
     }
 
     fn gathered(self) -> Candidates<'file> {
-        Candidates(self.candidates)
+        let module = self.file.head().placement().module();
+        Candidates(
+            self.scan
+                .concluded(|_, (), pending| pending.into_iter().filter_map(|found| found.candidate(module)).collect()),
+        )
     }
 }
 
 impl<'file> From<&'file SourceFile> for Predicates<'file> {
     fn from(file: &'file SourceFile) -> Predicates<'file> {
-        Predicates {
-            candidates: Vec::new(),
-            outer: Vec::new(),
-            file,
-            module: Cow::Borrowed(file.head().placement().module()),
-        }
+        Predicates { file, scan: Contributing::new(PredicateScan { file }) }
     }
 }

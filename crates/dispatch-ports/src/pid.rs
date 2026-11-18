@@ -8,8 +8,6 @@ pub struct Pid(u32);
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ended {
-    #[name("killed")]
     Killed,
-    #[name("absent")]
     Absent,
 }

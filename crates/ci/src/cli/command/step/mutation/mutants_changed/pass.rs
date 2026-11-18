@@ -24,6 +24,12 @@ pub(super) struct Pass {
 #[derive(Debug)]
 pub(super) struct Survivors(Vec<Text>);
 
+impl From<Vec<Text>> for Survivors {
+    fn from(names: Vec<Text>) -> Survivors {
+        Survivors(names)
+    }
+}
+
 impl Survivors {
     const EXAMINE: &'static str = "--re";
 
@@ -40,6 +46,7 @@ impl Survivors {
 
 impl Pass {
     const OUTCOMES: &'static str = "mutants.out";
+    const OUTCOMES_FILE: &'static str = "outcomes.json";
 
     pub(super) fn within(output: PathBuf) -> Pass {
         Pass { output }
@@ -76,9 +83,13 @@ impl Pass {
             Journal::read_present(files, journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
         let tested: BTreeSet<Text> = read.iter().flatten().flat_map(Self::names).collect();
         expected.selected(&tested)?;
-        let missed: Vec<String> =
-            self.listed(files, Outcome::Missed)?.iter().map(|name| [name.as_ref(), "\n"].concat()).collect();
+        let unproven = self.listed(files, Outcome::Missed)?.into_iter().chain(self.listed(files, Outcome::Timeout)?);
+        let missed: Vec<String> = unproven.map(|name| [name.as_ref(), "\n"].concat()).collect();
         Ok(Verdict::from(&Text::new(missed.concat())).told())
+    }
+
+    pub(super) fn outcomes(&self) -> PathBuf {
+        self.output.join(Self::OUTCOMES).join(Self::OUTCOMES_FILE)
     }
 
     fn listed(&self, files: &impl Files, outcome: Outcome) -> Result<Vec<Text>, Failure<'static>> {

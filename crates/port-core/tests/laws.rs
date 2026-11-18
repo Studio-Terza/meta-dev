@@ -1,8 +1,9 @@
 #[path = "generated/laws.rs"]
 mod generated_laws;
 
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
+use invariants::{Ignoring, Unpoisoned, ignored};
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
 use newtype::Counter;
@@ -10,6 +11,12 @@ use port_core::{
     Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run,
     Snapshot, port,
 };
+
+ignored! {
+    enum Ignored {
+        Unlocked => "a fallible lock that fails holds nothing, as an optional lock that finds none",
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Session(String);
@@ -70,7 +77,7 @@ impl Memory {
     }
 
     fn listed(&self) -> Vec<Session> {
-        self.sessions.lock().unwrap_or_else(PoisonError::into_inner).clone()
+        self.sessions.lock().unpoisoned().clone()
     }
 }
 
@@ -117,6 +124,15 @@ impl Lockable {
         match self {
             Lockable::Intact => receipt,
             Lockable::Broken => Err(Gone),
+        }
+    }
+
+    fn failure(self) -> Option<String> {
+        match self {
+            Lockable::Intact => None,
+            Lockable::Broken => {
+                Some(format!("releasing {} failed: {Gone} (0 further release failures)", SessionLock::NAME))
+            }
         }
     }
 }
@@ -298,7 +314,7 @@ impl Acquisition {
 
     fn held<'port>(self, port: &'port Port<'_, Memory>, session: &Session) -> Option<Held<'port, SessionLock>> {
         match self {
-            Acquisition::Fallible => Transcripts::lock(port, session).ok(),
+            Acquisition::Fallible => Transcripts::lock(port, session).ignoring(Ignored::Unlocked),
             Acquisition::Optional => Transcripts::try_lock(port, session),
             Acquisition::Bare => Some(Transcripts::lock_bare(port, session)),
         }
@@ -352,7 +368,11 @@ laws::law!(a_failed_release_on_drop_shows_in_the_measured_failures, select(Locka
     drop(port);
     let measured = run.finish();
     prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-    prop_assert_eq!(measured.settled().is_err(), lockable == Lockable::Broken);
+    let said = match measured.settled() {
+        Ok(_snapshot) => None,
+        Err(failures) => Some(failures.to_string()),
+    };
+    prop_assert_eq!(said, lockable.failure());
 });
 
 laws::law!(a_resource_is_released_exactly_once_whether_ended_or_dropped, any::<bool>(), ending, {

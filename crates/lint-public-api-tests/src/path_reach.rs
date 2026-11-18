@@ -1,11 +1,16 @@
+mod ignored;
+
 use std::path::{Component, Path, PathBuf};
 
 use syntax::ItemMod;
 
 use super::PublicApiTests;
+use crate::path_reach::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::{Site, SourceFile, Syntax, Violation};
 use lint_layout::LineNumber;
-use lint_sweep::{Descend, Facts, Kind, Watch};
+use lint_layout::Name;
+use lint_sweep::{Contribute, Contribution, Facts, Kind, Scope};
 
 use super::test_code::Tested;
 
@@ -14,7 +19,6 @@ pub struct PathReach<'file> {
     path: &'file Path,
     directory: PathBuf,
     source: PathBuf,
-    lines: Vec<LineNumber>,
 }
 
 impl<'file> PathReach<'file> {
@@ -27,7 +31,6 @@ impl<'file> PathReach<'file> {
             path: AsRef::<Path>::as_ref(file.head()),
             directory: AsRef::<Path>::as_ref(file.head()).parent().map_or_default(Path::to_path_buf),
             source: Self::lexical(&package.join(Self::SOURCE_DIRECTORY)),
-            lines: Vec::new(),
         }
     }
 
@@ -51,36 +54,56 @@ impl<'file> PathReach<'file> {
             .attrs
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::PATH_ATTRIBUTE))
-            .filter_map(|attribute| attribute.meta.require_name_value().ok())
+            .filter_map(|attribute| attribute.meta.require_name_value().ignoring(Ignored::Unparsed))
             .find_map(|pair| Syntax::string_literal(&pair.value))
             .map(|path| PathBuf::from(path.value()))
     }
 }
 
-impl<'ast> Watch<'ast> for PathReach<'_> {
+#[derive(Debug)]
+pub struct Reached {
+    target: PathBuf,
+    line: LineNumber,
+}
+
+impl Reached {
+    fn under(self, name: Option<&Name>) -> Reached {
+        let directory = name.map_or_else(PathBuf::new, |within| AsRef::<Path>::as_ref(within).to_path_buf());
+        Reached { target: directory.join(self.target), line: self.line }
+    }
+}
+
+impl Contribute for PathReach<'_> {
+    type Open = ();
+    type Part = Vec<Reached>;
+
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::ItemMod]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        self.lines.extend(
-            Self::target(module)
-                .filter(|target| Self::lexical(&self.directory.join(target)).starts_with(&self.source))
-                .map(|_| LineNumber::from(module.ident.span())),
-        );
-        self.directory.extend(facts.name());
-        Descend::Into
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Kind::ItemMod)] }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.directory.pop();
+    fn off_item_mod(
+        &self,
+        module: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        inner: Contribution<(), Vec<Reached>>,
+    ) -> Vec<Reached> {
+        let own = Self::target(module).map(|target| Reached { target, line: LineNumber::from(module.ident.span()) });
+        let nested = inner.concluded(|(), reached| reached);
+        own.into_iter().chain(nested.into_iter().map(|within| within.under(facts.name()))).collect()
     }
 }
 
 impl<'file> PathReach<'file> {
-    pub(crate) fn tested(self) -> Tested<'file> {
+    pub(crate) fn tested(self, reached: Vec<Reached>) -> Tested<'file> {
         let path = self.path;
-        let found = self.lines.into_iter().map(|line| Violation::new(Site::new(path, line), PublicApiTests::REACH));
+        let found = reached
+            .into_iter()
+            .filter(|reach| Self::lexical(&self.directory.join(&reach.target)).starts_with(&self.source))
+            .map(|reach| Violation::new(Site::new(path, reach.line), PublicApiTests::REACH));
         Tested::reached(found.collect(), path)
     }
 }
