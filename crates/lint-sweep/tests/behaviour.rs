@@ -1,7 +1,7 @@
 use invariants::{invariant, invariants};
 use lint_core::{Descend, Facts, Kind, SourceFile, SourceText, Watch, Watching};
-use lint_sweep::Sweep;
-use syntax::Block;
+use lint_sweep::{Attaches, Attachment, Gathers, Scoped, Sweep};
+use syntax::{Block, ExprBinary, Macro};
 
 invariants! {
     enum Invariant {
@@ -53,4 +53,58 @@ fn every_watcher_called_on_a_node_is_called_off_it_and_a_skipped_subtree_is_sile
     let skipped_over = ["on 1", "on 2", "off 2", "off 1", "on 1", "on 2", "off 2", "off 1"];
     assert_eq!(all.heard, walked);
     assert_eq!(skipping.heard, skipped_over);
+}
+
+const SUMMED: &str = "fn f() {\n    let a = 1 + 2;\n    m!(3 + 4);\n}\n";
+
+#[derive(Debug, Default)]
+struct Unfolding {
+    sums: usize,
+}
+
+#[derive(Debug)]
+struct Unattached;
+
+impl Gathers<Unattached> for Unattached {
+    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
+        Vec::new()
+    }
+
+    fn gathered(self) -> Unattached {
+        self
+    }
+}
+
+impl Attaches<Unattached> for Unfolding {
+    const ATTACHED: &'static [Kind] = &[];
+
+    fn attaching(&mut self) -> Vec<Attachment<Unattached>> {
+        Vec::new()
+    }
+
+    fn detached(&mut self, _: Unattached) {}
+}
+
+impl<'ast> Watch<'ast> for Unfolding {
+    fn kinds(&self) -> &'static [Kind] {
+        &[Kind::Macro, Kind::ExprBinary]
+    }
+
+    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
+        Descend::Unfold
+    }
+
+    fn on_expr_binary(&mut self, _: &'ast ExprBinary, _: &Facts<'_, ExprBinary>) -> Descend {
+        self.sums += 1;
+        Descend::Into
+    }
+}
+
+#[test]
+fn a_scoped_watcher_that_unfolds_a_macro_hears_what_the_macro_holds() {
+    let file = SourceFile::parse("a.rs", SourceText::new(SUMMED.to_owned()));
+    let parsed = invariant!(holding file, Invariant::FixtureParses, detailed);
+    let mut scoped = Scoped::<Unfolding, Unattached>::new(Unfolding::default());
+    Sweep::watching(&parsed, vec![&mut scoped]);
+    assert_eq!(scoped.into_parent().sums, 2);
 }

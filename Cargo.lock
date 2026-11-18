@@ -1738,6 +1738,7 @@ dependencies = [
  "invariants",
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "ra-ap-rustc_lexer",
  "syntax",
@@ -2474,7 +2475,10 @@ dependencies = [
 name = "named-derive"
 version = "0.1.0"
 dependencies = [
+ "laws",
+ "newtype",
  "syntax",
+ "thiserror",
 ]
 
 [[package]]
@@ -3123,6 +3127,12 @@ name = "states"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "named-derive",
+ "newtype",
+ "port-core",
+ "sqlite-ports",
+ "store-ports",
+ "thiserror",
 ]
 
 [[package]]
