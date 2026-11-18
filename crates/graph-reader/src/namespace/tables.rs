@@ -5,12 +5,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use graph::{Domain, Unresolved};
 use lint_layout::Name;
 
-use algebra::Semigroup;
+use algebra::{Monoid, Semigroup};
 
 use super::boundary::{GlobId, Pointwise, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::use_path::Reading;
-use super::view::View;
+use super::view::{Nearest, View};
 use components::{Components, Settling};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -106,7 +106,7 @@ impl<'rows> Explicit<'rows> {
         let rows = self.0.get(&key)?;
         let layers = rows.chunk_by(|left, right| left.layer == right.layer);
         let views = layers.map(|layer| layer.iter().map(|row| row.seen(sight)).fold(View::ABSENT, View::combine));
-        Some(views.fold(View::ABSENT, |found, view| found.or_else(|| view)))
+        Some(View::from(Nearest::concat(views.map(Nearest::from))))
     }
 }
 

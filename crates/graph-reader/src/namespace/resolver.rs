@@ -6,7 +6,7 @@ use lint_layout::Name;
 use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::Binding;
-use algebra::Semigroup;
+use algebra::{Monoid, Semigroup};
 
 use super::boundary::{GlobId, ScopeId};
 use super::entries::{DeclaredAt, Sight};
@@ -15,7 +15,7 @@ use super::settling::Target;
 use super::std_names::{Canonical, StdNames, Table};
 use super::tables::{Key, Lookup, Tables};
 use super::use_path::{Reading, Shape, UsePath};
-use super::view::View;
+use super::view::{Conflicted, Deferral, Nearest, View};
 
 #[derive(Debug)]
 pub(super) enum Outer {
@@ -252,17 +252,15 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
         let levels = Importing(self.importing).levels(self.space.chain(scope), key);
         let first = |asked: Reading| Lookup::new(Sight::Inside, self.ignored, asked);
-        self.walked(levels, key, first(reading)).disputed(
-            || self.walked(levels, key, first(Reading::Explicit)),
-            || self.walked(levels, key, first(Reading::Imported)),
-        )
+        let written = self.walked(levels, key, first(reading));
+        let explicit = || self.walked(levels, key, first(Reading::Explicit));
+        let deferred = |Deferral| self.walked(levels, key, first(Reading::Imported));
+        written.conflict().map_or(written, |Conflicted| explicit().deferral().map_or(written, deferred))
     }
 
     fn walked(&self, levels: &[ScopeId], key: Key<'_>, first: Lookup) -> View<'rows> {
         let lookups = iter::once(first).chain(iter::repeat(first.outer()));
-        levels
-            .iter()
-            .zip(lookups)
-            .fold(View::ABSENT, |found, (level, lookup)| found.or_else(|| self.tables.found(*level, key, lookup)))
+        let views = levels.iter().zip(lookups).map(|(level, lookup)| self.tables.found(*level, key, lookup));
+        View::from(Nearest::concat(views.map(Nearest::from)))
     }
 }
