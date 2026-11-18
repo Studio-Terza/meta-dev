@@ -36,7 +36,7 @@ macro_rules! states {
     (
         $(#[$meta:meta])*
         $vis:vis stored $lifecycle:ident in $proofs:ident {
-            $($kind:ident $state:ident { $($edge:ident -> $target:ident),* $(,)? })*
+            $($kind:ident $state:ident $(as $targets:ident)? { $($edge:ident -> $target:ident),* $(,)? })*
         }
     ) => {
         $(#[$meta])*
@@ -54,7 +54,29 @@ macro_rules! states {
         $vis mod $proofs {
             $(
                 $crate::states!(@ held $kind $lifecycle $state { $($edge -> $target),* });
+                $crate::states!(@ choosing $lifecycle $state [$($targets)?] { $($target),* });
             )*
+        }
+    };
+    (@ choosing $lifecycle:ident $state:ident [] { $($target:ident),* }) => {};
+    (@ choosing $lifecycle:ident $state:ident [$targets:ident] { $($target:ident),* }) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub enum $targets {
+            $($target),*
+        }
+
+        impl ::core::convert::From<$targets> for super::$lifecycle {
+            fn from(target: $targets) -> super::$lifecycle {
+                match target {
+                    $($targets::$target => super::$lifecycle::$target),*
+                }
+            }
+        }
+
+        impl $state {
+            pub fn moved(self, to: $targets) -> ::store_ports::Moved<super::$lifecycle> {
+                ::store_ports::Moved::new(self.0, ::store_ports::Edge::new(super::$lifecycle::$state, super::$lifecycle::from(to)))
+            }
         }
     };
     (@ held terminal $lifecycle:ident $state:ident { $($edge:ident -> $target:ident),* }) => {};
@@ -71,10 +93,6 @@ macro_rules! states {
             #[must_use]
             pub fn key(&self) -> &<super::$lifecycle as ::store_ports::Staged>::Key {
                 &self.0
-            }
-
-            pub fn moved(self, to: super::$lifecycle) -> ::store_ports::Moved<super::$lifecycle> {
-                ::store_ports::Moved::new(self.0, ::store_ports::Edge::new(super::$lifecycle::$state, to))
             }
 
             $(

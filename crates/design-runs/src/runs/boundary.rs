@@ -672,7 +672,7 @@ impl Batch for RunReaped {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let RunReaped { held, state } = self;
-        held.moved(state).written(statements)
+        let RunReaped { held, ended } = self;
+        held.moved(ended).written(statements)
     }
 }

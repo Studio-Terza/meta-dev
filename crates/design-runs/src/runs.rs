@@ -130,7 +130,7 @@ pub struct StoredRun {
 #[derive(Debug, Op)]
 pub struct RunReaped {
     held: run::Running,
-    state: RunState,
+    ended: run::Ended,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -344,8 +344,8 @@ impl StoredRun {
     }
 
     #[must_use]
-    pub fn reaped(self, state: RunState) -> RunReaped {
-        RunReaped { held: self.held, state }
+    pub fn reaped(self, ended: run::Ended) -> RunReaped {
+        RunReaped { held: self.held, ended }
     }
 }
 

@@ -6,7 +6,7 @@ use design_jobs::{OpenJobs, job};
 use design_model::{JobId, Provenance, RunId, Segment};
 use design_runs::{
     Account, Flailed, FlailedSegments, Halted, JobFlailed, JobHalted, JobOpened, JobsInterrupted, LiveRuns, NextJob,
-    NextRun, Retold, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured,
+    NextRun, Retold, RunEnded, RunSpawned, RunState, RunsOf, Spawned, StoredRun, Unplaced, Unstructured, run,
 };
 use design_store::{Asked, AskedEarlier, ContextNodes, Remit};
 use dispatch_ports::{
@@ -223,9 +223,10 @@ impl<S: Store, D: Dispatch, C: Clock> Reaper<'_, '_, S, D, C> {
         let current = crew.dispatch.started(spawned.pid())?;
         let same = spawned.started().filter(|recorded| current.as_ref() == Some(*recorded));
         let ended = same.map(|_same| crew.dispatch.kill(spawned.pid())).transpose()?;
-        let state = ended.map_or(RunState::Gone, Reaped::state);
+        let ending = ended.map_or(run::Ended::Gone, Reaped::ended);
         let run = stored.identity();
-        store.write(stored.reaped(state))?;
+        store.write(stored.reaped(ending))?;
+        let state = RunState::from(ending);
         Ok(Reaped { run, state })
     }
 }
@@ -330,10 +331,10 @@ impl<S: Store, D: Dispatch, C: Clock> RunRecord<'_, '_, S, D, C> {
 }
 
 impl Reaped {
-    fn state(ended: Ended) -> RunState {
+    fn ended(ended: Ended) -> run::Ended {
         match ended {
-            Ended::Killed => RunState::Killed,
-            Ended::Absent => RunState::Gone,
+            Ended::Killed => run::Ended::Killed,
+            Ended::Absent => run::Ended::Gone,
         }
     }
 }
