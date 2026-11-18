@@ -2,6 +2,7 @@ mod boundary;
 mod entry;
 mod heading;
 mod section;
+mod unviable;
 
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -16,6 +17,7 @@ use heading::Heading;
 use section::Section;
 use serde::Serialize;
 use text_lines::OneLine;
+use unviable::Unviable;
 
 use super::failure::Failure;
 use super::golden_tests::GoldenTests;
@@ -32,6 +34,7 @@ pub struct Summary {
     timed_out: Vec<Entry>,
     tests_that_kill_nothing: Vec<TestName>,
     killed_with_no_golden_failing: Vec<Entry>,
+    unviable: Vec<Entry>,
 }
 
 impl Summary {
@@ -55,6 +58,7 @@ impl Summary {
             timed_out: Entry::named_with(&mutants, Verdict::Timeout),
             tests_that_kill_nothing: baseline.difference(&killers).cloned().collect(),
             killed_with_no_golden_failing: Self::killed_without_golden(&mutants, golden),
+            unviable: Unviable::by_crate(&mutants),
         }
     }
 
@@ -96,6 +100,7 @@ impl fmt::Display for Summary {
         write!(formatter, "{}", Section::new(Heading::Surviving, &self.surviving))?;
         write!(formatter, "{}", Section::new(Heading::TimedOut, &self.timed_out))?;
         write!(formatter, "{}", Section::new(Heading::KillingNothing, &self.tests_that_kill_nothing))?;
-        write!(formatter, "{}", Section::new(Heading::KilledWithoutGolden, &self.killed_with_no_golden_failing))
+        write!(formatter, "{}", Section::new(Heading::KilledWithoutGolden, &self.killed_with_no_golden_failing))?;
+        write!(formatter, "{}", Section::new(Heading::Unviable, &self.unviable))
     }
 }
