@@ -32,3 +32,10 @@ pub use session_id::SessionId;
 pub use skipped::Skipped;
 pub use transcripts::{Transcripts, transcripts_ops};
 pub use unrecognised::Unrecognised;
+
+invariants::ignored! {
+    pub(crate) enum Ignored {
+        Unparsed => "a line that does not parse as an entry is kept as an unreadable unrecognised line",
+        Oversized => "text pieces whose join passes u32::MAX bytes say nothing",
+    }
+}

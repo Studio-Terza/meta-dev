@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 dispatch-ports = { path = "../dispatch-ports" }
 port-core = { path = "../port-core" }
 

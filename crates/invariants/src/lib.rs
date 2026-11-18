@@ -67,3 +67,14 @@ macro_rules! invariant {
         }
     };
 }
+
+pub trait Unpoisoned<Guard>: Into<Result<Guard, std::sync::PoisonError<Guard>>> {
+    fn unpoisoned(self) -> Guard {
+        match self.into() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+}
+
+impl<Guard> Unpoisoned<Guard> for std::sync::LockResult<Guard> {}

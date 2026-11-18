@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Kind, Offset, Size, Text};
+use invariants::Ignoring;
+
+use crate::{Bytes, FileFailure, Ignored, Kind, Offset, Size, Text};
 
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;
@@ -8,7 +10,7 @@ pub trait Files {
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure>;
 
     fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
-        let skipped = usize::try_from(offset.position()).unwrap_or(usize::MAX);
+        let skipped = usize::try_from(offset.position()).ignoring(Ignored::BeyondRange).unwrap_or(usize::MAX);
         self.read(path).map(|bytes| Bytes::new(bytes.as_ref().iter().skip(skipped).copied().collect()))
     }
 

@@ -1,8 +1,9 @@
 mod boundary;
 
 use std::collections::VecDeque;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
+use invariants::Unpoisoned;
 use port_core::Pass;
 
 use boundary::Spawns;
@@ -39,12 +40,12 @@ impl Scripted {
 
     #[must_use]
     pub fn prompts(&self) -> Vec<Prompt> {
-        self.prompts.lock().unwrap_or_else(PoisonError::into_inner).clone()
+        self.prompts.lock().unpoisoned().clone()
     }
 
     #[must_use]
     pub fn kills(&self) -> Vec<Pid> {
-        self.kills.lock().unwrap_or_else(PoisonError::into_inner).clone()
+        self.kills.lock().unpoisoned().clone()
     }
 
     fn alive(&self, pid: Pid) -> Option<&Living> {
@@ -59,10 +60,10 @@ impl DispatchFiller for &Scripted {
         job: &Job,
         prompt: &Prompt,
     ) -> Result<AgentRun, DispatchFailure> {
-        let mut prompts = self.prompts.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut prompts = self.prompts.lock().unpoisoned();
         prompts.push(prompt.clone());
-        let reply = self.replies.lock().unwrap_or_else(PoisonError::into_inner).pop_front().flatten();
-        *self.current.lock().unwrap_or_else(PoisonError::into_inner) = reply;
+        let reply = self.replies.lock().unpoisoned().pop_front().flatten();
+        *self.current.lock().unpoisoned() = reply;
         Ok(AgentRun::new(Spawns::pid(prompts.len()), *job.as_ref()))
     }
 
@@ -71,7 +72,7 @@ impl DispatchFiller for &Scripted {
         _pass: Pass<'_, dispatch_ops::Output>,
         _run: &mut AgentRun,
     ) -> Result<Option<Output>, DispatchFailure> {
-        Ok(self.current.lock().unwrap_or_else(PoisonError::into_inner).take())
+        Ok(self.current.lock().unpoisoned().take())
     }
 
     fn started(&self, _pass: Pass<'_, dispatch_ops::Started>, pid: Pid) -> Result<Option<Started>, DispatchFailure> {
@@ -79,7 +80,7 @@ impl DispatchFiller for &Scripted {
     }
 
     fn kill(&self, _pass: Pass<'_, dispatch_ops::Kill>, pid: Pid) -> Result<Ended, DispatchFailure> {
-        self.kills.lock().unwrap_or_else(PoisonError::into_inner).push(pid);
+        self.kills.lock().unpoisoned().push(pid);
         Ok(self.alive(pid).map_or(Ended::Absent, |_| Ended::Killed))
     }
 }
@@ -99,11 +100,11 @@ impl Stepped {
 
 impl ClockFiller for Stepped {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
-        *self.now.lock().unwrap_or_else(PoisonError::into_inner)
+        *self.now.lock().unpoisoned()
     }
 
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
-        let mut now = self.now.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut now = self.now.lock().unpoisoned();
         *now = now.after(pause).after(self.sleep);
         *now
     }

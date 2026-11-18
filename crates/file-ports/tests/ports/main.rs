@@ -1,7 +1,12 @@
+mod ignored;
+
 use std::io;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Text};
+use invariants::Ignoring;
+
+use ignored::Ignored;
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -101,7 +106,8 @@ impl Checks {
         assert_eq!(contract.copied()?, Text::new("copied".to_owned()));
         assert_eq!(contract.nested()?, vec![contract.at("outer/a.txt"), contract.at("outer/inner")]);
         let [real, dotted] = std::thread::scope(|scope| scope.spawn(|| contract.resolved()).join())
-            .unwrap_or_else(|_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Other))))?;
+            .ignoring(Ignored::Panicked)
+            .unwrap_or_else(|| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Other))))?;
         assert_eq!(dotted, real);
         assert_eq!(contract.missing(), ["missing", "missing", "missing", "missing", "missing", "missing", "Missing"]);
         assert_eq!(contract.not_text(), "failed");
@@ -163,13 +169,8 @@ fn cached_remembers_a_disk_failure_with_its_message_until_something_is_written_t
     let missing = matches!(cached.read_text(&later), Err(FileFailure::Missing(_)));
     cached.write(&scratch.path().join("other.txt"), Bytes::from("other"))?;
     assert_eq!(first, remembered);
-    assert_eq!(
-        first.map_err(|said| said
-            == Disk
-                .canonical(&scratch.path().join("absent"))
-                .map_or_else(|failure| failure.to_string(), |_| String::new())),
-        Err(true)
-    );
+    let fresh = Disk.canonical(&scratch.path().join("absent"));
+    assert!(matches!((first, fresh), (Err(said), Err(failure)) if said == failure.to_string()));
     assert_eq!((missing, cached.read_text(&later)?.as_ref().to_owned()), (false, "now here".to_owned()));
     Ok(())
 }
@@ -297,7 +298,8 @@ impl Tails {
 
 laws::law!(
     read_from_agrees_between_disk_and_memory,
-    laws::proptest::strategy::Strategy::prop_filter_map(0i64..16, "an offset", |at| Offset::try_new(at).ok()),
+    laws::proptest::strategy::Strategy::prop_filter_map(0i64..16, "an offset", |at| Offset::try_new(at)
+        .ignoring(Ignored::Negative)),
     at,
     {
         let scratch = tempfile::tempdir()
@@ -308,7 +310,7 @@ laws::law!(
             .map_err(|failure| laws::proptest::test_runner::TestCaseError::fail(failure.to_string()))?;
         let on_disk = Tails::of(&Disk, scratch.path(), at);
         let in_memory = Tails::of(&memory, Path::new("/scratch"), at);
-        laws::proptest::prop_assert_eq!(on_disk.ok(), in_memory.ok());
+        laws::proptest::prop_assert_eq!(on_disk.ignoring(Ignored::Failing), in_memory.ignoring(Ignored::Failing));
     }
 );
 

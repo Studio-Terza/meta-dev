@@ -6,9 +6,10 @@ use std::io;
 use std::ops::Bound;
 use std::path::{Path, PathBuf};
 
+use invariants::Ignoring;
 use newtype::Wrapping;
 
-use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
+use crate::{Bytes, FileFailure, Files, Ignored, Kind, Size, Text};
 use locked::Locked;
 use resolved::Resolved;
 
@@ -73,7 +74,7 @@ impl Files for Memory {
     }
 
     fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
-        let held = self.stored(path).unwrap_or_default().into_inner();
+        let held = self.stored(path).ignoring(Ignored::Unstored).unwrap_or_default().into_inner();
         let joined = held.into_iter().chain(bytes.as_ref().iter().copied()).collect();
         self.write(path, Bytes::new(joined))
     }
@@ -106,7 +107,7 @@ impl Files for Memory {
                         .range::<Path, _>((Bound::Included(directory), Bound::Unbounded))
                         .take_while(|held| held.starts_with(directory)),
                 )
-                .filter_map(|held| held.strip_prefix(directory).ok())
+                .filter_map(|held| held.strip_prefix(directory).ignoring(Ignored::Outside))
                 .filter_map(|inside| inside.components().next())
                 .map(|first| directory.join(first))
                 .collect();

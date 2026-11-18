@@ -1,4 +1,6 @@
-use crate::{Body, Line, Unrecognised};
+use invariants::Ignoring;
+
+use crate::{Body, Ignored, Line, Unrecognised};
 
 #[derive(Debug)]
 pub enum Said {
@@ -34,7 +36,7 @@ impl Said {
 
     fn after(self, before: Body) -> Said {
         match self {
-            Said::Text(text) => before.joined(&text).map_or(Said::Silent, Said::Text),
+            Said::Text(text) => before.joined(&text).ignoring(Ignored::Oversized).map_or(Said::Silent, Said::Text),
             Said::Silent => Said::Text(before),
             Said::Unrecognised(unrecognised) => Said::Unrecognised(unrecognised),
         }

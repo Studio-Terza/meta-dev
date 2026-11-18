@@ -458,6 +458,7 @@ name = "dispatch-fakes"
 version = "0.1.0"
 dependencies = [
  "dispatch-ports",
+ "invariants",
  "port-core",
 ]
 
@@ -467,6 +468,7 @@ version = "0.1.0"
 dependencies = [
  "grammar-lstart",
  "grammar-reply",
+ "invariants",
  "laws",
  "named-derive",
  "newtype",
@@ -590,6 +592,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 name = "file-ports"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "laws",
  "newtype",
  "tempfile",
@@ -2525,6 +2528,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 name = "port-core"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "laws",
  "newtype",
  "port-derive",

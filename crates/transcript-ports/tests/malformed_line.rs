@@ -1,8 +1,15 @@
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
+use invariants::{Ignoring, ignored};
 use port_core::Run;
 use transcript_ports::{ClaudeCodeDir, Cursor, Line, Transcripts};
+
+ignored! {
+    enum Ignored {
+        Unread => "a seed, read or settle that fails yields no kinds, which the case then reports",
+    }
+}
 
 struct Torn(&'static str);
 
@@ -11,15 +18,17 @@ impl Torn {
 
     fn kinds(&self) -> Option<Vec<String>> {
         let memory = Memory::default();
-        memory.create_directories(Path::new("/p")).ok()?;
-        memory.append(Path::new("/p/s1.jsonl"), &Bytes::from(&[Self::GOOD, self.0, Self::GOOD].concat())).ok()?;
+        memory.create_directories(Path::new("/p")).ignoring(Ignored::Unread)?;
+        memory
+            .append(Path::new("/p/s1.jsonl"), &Bytes::from(&[Self::GOOD, self.0, Self::GOOD].concat()))
+            .ignoring(Ignored::Unread)?;
         let run = Run::root();
         let read = {
             let port = run.port(ClaudeCodeDir::new(memory, PathBuf::from("/p")));
-            let sessions = Transcripts::sessions(&port).ok()?;
-            Transcripts::read_from(&port, sessions.first()?, Cursor::default()).ok()?
+            let sessions = Transcripts::sessions(&port).ignoring(Ignored::Unread)?;
+            Transcripts::read_from(&port, sessions.first()?, Cursor::default()).ignoring(Ignored::Unread)?
         };
-        run.finish().settled().ok()?;
+        run.finish().settled().ignoring(Ignored::Unread)?;
         Some(read.into_iter().map(|line| Torn::kind(&line)).collect())
     }
 

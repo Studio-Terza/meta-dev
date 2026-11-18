@@ -1,5 +1,6 @@
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
+use invariants::{Ignoring, Unpoisoned, ignored};
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
 use newtype::Counter;
@@ -7,6 +8,12 @@ use port_core::{
     Calls, Counted, Held, Measured, Metered, Op, Pass, Port, Release, ReleaseReceipt, Released, Resource, Run,
     Snapshot, port,
 };
+
+ignored! {
+    enum Ignored {
+        Unlocked => "a fallible lock that fails holds nothing, as an optional lock that finds none",
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Session(String);
@@ -67,7 +74,7 @@ impl Memory {
     }
 
     fn listed(&self) -> Vec<Session> {
-        self.sessions.lock().unwrap_or_else(PoisonError::into_inner).clone()
+        self.sessions.lock().unpoisoned().clone()
     }
 }
 
@@ -295,7 +302,7 @@ impl Acquisition {
 
     fn held<'port>(self, port: &'port Port<'_, Memory>, session: &Session) -> Option<Held<'port, SessionLock>> {
         match self {
-            Acquisition::Fallible => Transcripts::lock(port, session).ok(),
+            Acquisition::Fallible => Transcripts::lock(port, session).ignoring(Ignored::Unlocked),
             Acquisition::Optional => Transcripts::try_lock(port, session),
             Acquisition::Bare => Some(Transcripts::lock_bare(port, session)),
         }

@@ -1,4 +1,7 @@
+use invariants::Ignoring;
 use newtype::{Arbitrary, Checked, Display, Newtype};
+
+use crate::Ignored;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[newtype(checked, strategy = 0..=i64::MAX)]
@@ -19,7 +22,10 @@ impl Checked for Offset {
 impl Offset {
     #[must_use]
     pub fn advanced(self, consumed: usize) -> Option<Offset> {
-        i64::try_from(consumed).ok().and_then(|counted| self.0.checked_add(counted)).map(Offset)
+        i64::try_from(consumed)
+            .ignoring(Ignored::BeyondRange)
+            .and_then(|counted| self.0.checked_add(counted))
+            .map(Offset)
     }
 
     #[must_use]
