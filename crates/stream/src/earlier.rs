@@ -1,3 +1,4 @@
+use algebra::Semigroup;
 use transcript_ports::{Line, Record, Skipped};
 
 use crate::{Message, Stream};
@@ -16,6 +17,8 @@ impl Earlier {
 
     #[must_use]
     pub fn resumed(self, lines: impl IntoIterator<Item = Line>) -> Stream {
-        lines.into_iter().fold(Stream::after(self.messages, self.skipped), |stream, line| line.gathered(stream))
+        lines
+            .into_iter()
+            .fold(Stream::after(self.messages, self.skipped), |stream, line| stream.combine(line.gathered()))
     }
 }
