@@ -52,7 +52,7 @@ pub use item_path::ItemPath;
 pub use law::{Law, LawKind, Operation, OperationOwner, Property, Route, Side};
 pub use lint_layout::Site;
 pub use member::Member;
-pub use model::{Building, Model};
+pub use model::{Aliases, Declarations, Exports, FileModel, FileTable, Issued, Model, ModelPart};
 pub use path_use::{Mention, PathUse};
 pub use placed::{FileHome, Harness, Placed};
 pub use primitive::Primitive;
