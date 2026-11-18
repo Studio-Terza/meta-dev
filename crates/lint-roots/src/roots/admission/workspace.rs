@@ -2,10 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::path::{Path, PathBuf};
 
+use crate::ignored::Ignored;
 use crate::roots::directory::Directory;
 use crate::roots::regrouped::Regrouped;
 use crate::survey::{Fact, Survey};
 use file_ports::Files;
+use invariants::Ignoring;
 use lint_layout::Failure;
 use lint_layout::{Manifest, PathDependencies};
 
@@ -81,7 +83,7 @@ impl Workspace {
         directory: &'path Path,
         manifests: &BTreeMap<PathBuf, Manifest>,
     ) -> Option<&'path Path> {
-        let relative = directory.strip_prefix(root).unwrap_or(directory);
+        let relative = directory.strip_prefix(root).ignoring(Ignored::Outside).unwrap_or(directory);
         (directory == root).then_some(directory).or_else(|| {
             manifests
                 .get(root)

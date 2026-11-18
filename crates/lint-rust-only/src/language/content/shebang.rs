@@ -3,6 +3,8 @@ mod boundary;
 use file_ports::Bytes;
 
 use super::scan_bytes::ScanBytes;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Shebang(Option<String>);
@@ -20,7 +22,7 @@ impl Shebang {
             .filter(|_| line.get(..Self::ATTRIBUTE.len()) != Some(Self::ATTRIBUTE))
             .and(line.get(Self::MARK.len()..))?
             .parse()
-            .ok()
+            .ignoring(Ignored::Unparsed)
     }
 
     pub(crate) fn foreign(self) -> Option<Shebang> {

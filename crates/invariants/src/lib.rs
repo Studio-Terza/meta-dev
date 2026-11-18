@@ -82,3 +82,14 @@ pub trait Unpoisoned<Guard>: Into<Result<Guard, std::sync::PoisonError<Guard>>> 
 }
 
 impl<Guard> Unpoisoned<Guard> for std::sync::LockResult<Guard> {}
+
+pub trait Rejoined<Value>: Into<std::thread::Result<Value>> {
+    fn rejoined(self) -> Value {
+        match self.into() {
+            Ok(value) => value,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
+}
+
+impl<Value> Rejoined<Value> for std::thread::Result<Value> {}

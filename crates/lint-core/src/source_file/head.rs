@@ -6,6 +6,8 @@ use std::sync::OnceLock;
 use lint_placement::{CrateFile, Placement, Role};
 
 use super::located::Located;
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 use manifest_file::ManifestFile;
 
 #[derive(Clone, Debug)]
@@ -69,7 +71,7 @@ impl FileHead {
     #[must_use]
     pub fn binary(&self) -> Option<&CrateFile> {
         let source = self.placement.crate_root().directory().join(Self::SOURCE);
-        let inside = self.crate_file.as_ref().strip_prefix(source).ok();
+        let inside = self.crate_file.as_ref().strip_prefix(source).ignoring(Ignored::Outside);
         inside.map(Role::in_source).filter(|role| *role == Role::BinaryRoot).map(|_| &self.crate_file)
     }
 
@@ -81,7 +83,11 @@ impl FileHead {
     #[must_use]
     pub fn manifest_file(&self) -> &ManifestFile {
         self.manifest.get_or_init(|| {
-            let inside = self.located.within(&self.path).strip_prefix(self.placement.package().root().directory()).ok();
+            let inside = self
+                .located
+                .within(&self.path)
+                .strip_prefix(self.placement.package().root().directory())
+                .ignoring(Ignored::Outside);
             let depth = inside.map_or(0, |relative| relative.components().count());
             ManifestFile::from(self.path.ancestors().nth(depth).unwrap_or(&self.path).join(Self::MANIFEST))
         })

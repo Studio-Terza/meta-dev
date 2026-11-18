@@ -2,7 +2,7 @@ use std::fmt;
 use std::io::{self, Write};
 
 use lint_layout::Failure;
-use lint_reader::Unlocated;
+use lint_reader::{Described, Unlocated};
 
 use super::Verdict;
 use super::boundary::Rendered;
@@ -24,6 +24,17 @@ impl<'run> Outcome<'run> {
             .map_or(Outcome::Violations { reports, failures }, |_| Outcome::Clean)
     }
 
+    pub(crate) fn located(
+        located: &'run Result<Described, Unlocated>,
+        reports: Vec<Rendered>,
+        failures: &'run [Failure],
+    ) -> Outcome<'run> {
+        match located {
+            Ok(_described) => Outcome::from_rendered(reports, failures),
+            Err(unlocated) => Outcome::Unlocated(unlocated),
+        }
+    }
+
     pub(crate) fn written(&self, err: &mut impl Write) -> Verdict {
         match self {
             Outcome::Clean => Verdict::Clean,
@@ -35,7 +46,7 @@ impl<'run> Outcome<'run> {
     pub(crate) fn surveyed(&self, survey: &[impl fmt::Display], out: &mut impl Write, err: &mut impl Write) -> Verdict {
         let surveyed = self.survey(survey).iter().try_for_each(|shown| write!(out, "{}", Listed(shown)));
         let verdict = self.written(err);
-        surveyed.map_or_else(|failure| Verdict::refused(&Unwritten::Output(failure), err), |()| verdict)
+        Verdict::ran(surveyed.map(|()| verdict).map_err(Unwritten::Output), err)
     }
 
     fn survey<'shown, Shown>(&self, survey: &'shown [Shown]) -> Option<&'shown [Shown]> {
@@ -46,8 +57,8 @@ impl<'run> Outcome<'run> {
     }
 
     fn listed(reports: &[Rendered], failures: &[Failure], err: &mut impl Write) -> Verdict {
-        write!(err, "{}{}", Listed(reports), Failed(failures))
-            .map_or_else(|failure| Verdict::refused(&Unwritten::Findings(failure), err), |()| Verdict::Violations)
+        let listed = write!(err, "{}{}", Listed(reports), Failed(failures));
+        Verdict::ran(listed.map(|()| Verdict::Violations).map_err(Unwritten::Findings), err)
     }
 }
 

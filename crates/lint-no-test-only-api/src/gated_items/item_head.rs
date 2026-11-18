@@ -1,3 +1,5 @@
+mod ignored;
+
 use syntax::Spanned;
 use syntax::{Attribute, Field, ImplItem, Item, MetaList, Visibility};
 use syntax::{Ident, TokenTree};
@@ -7,6 +9,8 @@ use lint_layout::LineNumber;
 
 use crate::finding::{Finding, Gate};
 use crate::flagged::Flagged;
+use crate::gated_items::item_head::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(super) struct ItemHead<'item> {
@@ -64,7 +68,7 @@ impl<'item> ItemHead<'item> {
         attribute
             .meta
             .require_list()
-            .ok()
+            .ignoring(Ignored::Unparsed)
             .filter(|list| list.path.is_ident(Self::DOCUMENTATION))
             .and_then(Self::hidden_named)
             .map(|_| attribute)

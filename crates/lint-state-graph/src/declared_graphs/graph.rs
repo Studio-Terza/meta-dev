@@ -1,4 +1,5 @@
 mod block;
+mod ignored;
 mod kind;
 
 use std::collections::BTreeSet;
@@ -11,17 +12,19 @@ use syntax::{Attribute, Ident, Macro, Token, Visibility, braced};
 use lint_core::{Site, TypeName, Violation};
 use lint_layout::LineNumber;
 
+use crate::declared_graphs::graph::ignored::Ignored;
 use crate::edge::Edge;
 use crate::finding::Finding;
 use block::Block;
+use invariants::Ignoring;
 use kind::Kind;
 
 pub struct Graph(Vec<Block>);
 
 impl Graph {
     pub fn checked<'file>(invocation: &Macro, path: &'file Path) -> Vec<Violation<'file>> {
-        invocation.parse_body::<Graph>().map_or_else(
-            |_| {
+        invocation.parse_body::<Graph>().ignoring(Ignored::Unparsed).map_or_else(
+            || {
                 let site = Site::new(path, LineNumber::from(invocation.bang_token.span));
                 vec![Violation::new(site, Finding::UnreadableGraph)]
             },

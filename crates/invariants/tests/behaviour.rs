@@ -1,7 +1,7 @@
 use std::panic;
 use std::sync::Mutex;
 
-use invariants::{Ignoring, Unpoisoned, ignored, invariant, invariants};
+use invariants::{Ignoring, Rejoined, Unpoisoned, ignored, invariant, invariants};
 
 invariants! {
     enum Invariant {
@@ -88,4 +88,11 @@ fn a_lock_gives_its_guard_until_a_holder_panics_and_then_crashes_on_the_poison()
             "broken invariant: no thread panics while it holds a lock, so no lock is poisoned; were one, its state may be half-written"
         )
     );
+}
+
+#[test]
+fn a_joined_thread_gives_its_value_or_carries_its_panic_on() {
+    assert_eq!(std::thread::spawn(|| 5_u8).join().rejoined(), 5);
+    let carried = panic::catch_unwind(|| std::thread::spawn(|| invariant!(broken Invariant::Narrow)).join().rejoined());
+    assert_eq!(Caught::message(carried).as_deref(), Some("broken invariant: the count fits a byte"));
 }

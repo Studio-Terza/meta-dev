@@ -1,6 +1,13 @@
+use invariants::{invariant, invariants};
 use lint_core::{Descend, Facts, Kind, SourceFile, SourceText, Watch, Watching};
 use lint_sweep::Sweep;
 use syntax::Block;
+
+invariants! {
+    enum Invariant {
+        FixtureParses => "the nested fixture is valid Rust, so it parses",
+    }
+}
 
 const NESTED: &str = "fn f() {\n    {\n        {\n        }\n    }\n}\nfn g() {\n    {\n    }\n}\n";
 
@@ -37,7 +44,7 @@ impl<'ast> Watch<'ast> for Recorder {
 #[test]
 fn every_watcher_called_on_a_node_is_called_off_it_and_a_skipped_subtree_is_silent() {
     let file = SourceFile::parse("a.rs", SourceText::new(NESTED.to_owned()));
-    let parsed = file.unwrap_or_else(|failure| unreachable!("the source parses: {failure}"));
+    let parsed = invariant!(holding file, Invariant::FixtureParses);
     let mut all = Recorder::default();
     let mut skipping = Recorder::passing_over(2);
     let watchers: Vec<&mut Watching<'_>> = vec![&mut all, &mut skipping];

@@ -2,6 +2,8 @@ mod part;
 
 use std::path::{Component, Path};
 
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::RepoFile;
 use part::Part;
 
@@ -22,6 +24,6 @@ impl Platform {
     }
 
     fn component_naming_tests(part: Component<'_>) -> Option<Part> {
-        part.as_os_str().to_string_lossy().parse::<Part>().ok().and_then(Part::naming_tests)
+        part.as_os_str().to_string_lossy().parse::<Part>().ignoring(Ignored::Unparsed).and_then(Part::naming_tests)
     }
 }

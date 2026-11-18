@@ -2,6 +2,8 @@ use lint_core::SourceFile;
 use lint_layout::Failure;
 
 use super::super::opened::Opened;
+use crate::source_files::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct Shelved {
@@ -14,7 +16,7 @@ impl Shelved {
     }
 
     pub fn parsed(&self) -> Option<&SourceFile> {
-        self.parsed.as_ref()?.as_ref().ok()
+        self.parsed.as_ref()?.as_ref().ignoring(Ignored::Unread)
     }
 }
 

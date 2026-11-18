@@ -11,6 +11,8 @@ use lint_layout::{Name, Whole, Word, words};
 
 use super::bindings::Bindings;
 use super::pinning::Pinning;
+use crate::assertions::ignored::Ignored;
+use invariants::Ignoring;
 use literal::{Literal, Reading};
 
 #[derive(Debug)]
@@ -48,6 +50,7 @@ impl Step<'_> {
         let name = invocation.path.segments.last().map(|last| Name::from(&last.ident));
         let arguments: Vec<Expr> = invocation
             .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
+            .ignoring(Ignored::Unparsed)
             .map_or_default(|arguments| arguments.into_iter().collect());
         let formatted = name.as_ref().and_then(|named| named.matches::<Whole>(&Self::FORMATS)).map(|_| {
             let literal = arguments.first().and_then(Syntax::literal);
