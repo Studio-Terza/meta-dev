@@ -24,7 +24,7 @@ impl<'found, 'file> CrateMutation<'found, 'file> {
             name,
             first: edges.iter().map(|edge| edge.site()).min(),
             tally: Tally::counted(edges.iter().copied()),
-            operations: edges.iter().copied().filter_map(Edge::stored).collect(),
+            operations: edges.iter().copied().filter_map(|edge| edge.form().sorted(None, None, Some(edge))).collect(),
         }
     }
 

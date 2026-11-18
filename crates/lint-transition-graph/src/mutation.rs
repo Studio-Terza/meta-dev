@@ -6,7 +6,7 @@ use crate::edge::Edge;
 use crate::system::TypeSystem;
 use crate_mutation::CrateMutation;
 use lint_core::{Headline, Report};
-use tally::Tally;
+use tally::{Counting, Tally};
 
 #[derive(Debug)]
 pub struct CoreMutation;
@@ -14,7 +14,8 @@ pub struct CoreMutation;
 impl GraphLint for CoreMutation {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         let edges = system.edges();
-        let counted: Vec<&Edge<'_, 'file>> = edges.iter().filter_map(Tally::counts).collect();
+        let counted: Vec<&Edge<'_, 'file>> =
+            edges.iter().filter(|edge| Tally::counting(edge) == Counting::Counted).collect();
         let grouped = Edge::by_crate(counted.iter().copied());
         Report::new(
             Headline::new(
