@@ -1,4 +1,5 @@
 use super::{Frame, Grain, Grains};
+use algebra::Semigroup;
 use syntax::Spanned;
 use syntax::{ExprCall, ExprMacro, ExprMethodCall};
 
@@ -19,7 +20,7 @@ pub(super) struct CallRow {
 
 impl Built for CallRow {
     fn built(self, footing: Footing<'_>, building: Building) -> Building {
-        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref());
+        let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
         self.located.call(footing, building, Call::new(self.callee, seat))
     }
 }
