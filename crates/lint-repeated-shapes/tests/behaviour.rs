@@ -194,6 +194,8 @@ const TESTS: &[Source] = &[
     Source::new(Located::new("tests/a.rs"), Text::new(BODY)),
     Source::new(Located::new("tests/b.rs"), Text::new(RENAMED)),
 ];
+const IN_TEST_MODULE: &[Source] =
+    &[Source::new(Located::new("a.rs"), Text::new(TESTS_A)), Source::new(Located::new("b.rs"), Text::new(RENAMED))];
 const MIXED: &[Source] =
     &[Source::new(Located::new("a.rs"), Text::new(BODY)), Source::new(Located::new("tests/b.rs"), Text::new(RENAMED))];
 
@@ -240,6 +242,7 @@ laws::table!(
         SHIPPED => "a.rs:1: 46 tokens in 2 shipped copies, also at b.rs:1, differing literals: 4; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
         TESTS => "tests/a.rs:1: 46 tokens in 2 test copies, also at tests/b.rs:1, differing literals: 4; make the copies rows of one laws::table!, or state the property they share with a law macro such as laws::roundtrip! or laws::idempotent!",
         MIXED => "a.rs:1: 46 tokens in 2 test and shipped copies, also at tests/b.rs:1, differing literals: 4; the test re-implements shipped logic; test through the shipped code instead of copying it",
+        IN_TEST_MODULE => "a.rs:3: 46 tokens in 2 test and shipped copies, also at b.rs:1, differing literals: 4; the test re-implements shipped logic; test through the shipped code instead of copying it",
         AFTER_TESTS => "a.rs:11: 46 tokens in 2 shipped copies, also at b.rs:1, differing literals: 4; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
         AFTER_TRAIT_TESTS => "a.rs:4: 46 tokens in 2 shipped copies, also at b.rs:1, differing literals: 4; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
     ]

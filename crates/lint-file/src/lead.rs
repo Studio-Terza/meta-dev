@@ -50,7 +50,7 @@ impl Lead {
             let mut sorts: Vec<Box<dyn Sorts<'_> + '_>> = self.sorting().map(|start| start(file)).into_iter().collect();
             Sweep::over_leads(file, &mut finds, &mut sorts);
             let found = finds.into_iter().map(|watcher| vec![watcher.found()]);
-            found.chain(sorts.into_iter().map(Sorts::sorted)).next().unwrap_or_default()
+            found.chain(sorts.into_iter().map(|sorting| Vec::from(sorting.sorted()))).next().unwrap_or_default()
         });
         lists.into_iter().nth(member.index()).unwrap_or_default()
     }

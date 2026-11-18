@@ -1403,6 +1403,7 @@ dependencies = [
 name = "lint-const-shape"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1477,6 +1478,7 @@ dependencies = [
 name = "lint-expression-flow"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1525,6 +1527,7 @@ dependencies = [
 name = "lint-fn-shape"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1578,6 +1581,7 @@ dependencies = [
 name = "lint-linear-flow"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -1631,6 +1635,7 @@ dependencies = [
 name = "lint-manual-iteration"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",
@@ -2026,6 +2031,7 @@ dependencies = [
 name = "lint-repeated-shapes"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "body-shape",
  "equivalence",
  "laws",
@@ -2235,6 +2241,7 @@ dependencies = [
 name = "lint-type-shape"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "lint-core",
  "lint-file",
  "lint-fixtures",

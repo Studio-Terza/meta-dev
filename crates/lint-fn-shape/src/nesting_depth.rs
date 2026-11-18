@@ -1,5 +1,4 @@
-use std::ops::{AddAssign, SubAssign};
-
+use algebra::{Monoid, Semigroup};
 use lint_core::Bound;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -14,14 +13,10 @@ impl NestingDepth {
     }
 }
 
-impl AddAssign for NestingDepth {
-    fn add_assign(&mut self, other: NestingDepth) {
-        self.0 += other.0;
+impl Semigroup for NestingDepth {
+    fn combine(self, other: NestingDepth) -> NestingDepth {
+        NestingDepth(self.0 + other.0)
     }
 }
 
-impl SubAssign for NestingDepth {
-    fn sub_assign(&mut self, other: NestingDepth) {
-        self.0 -= other.0;
-    }
-}
+impl Monoid for NestingDepth {}

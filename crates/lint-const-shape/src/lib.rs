@@ -1,8 +1,10 @@
+use algebra::{Monoid, Semigroup};
 use lint_core::Headline;
 use lint_file::{Reads, SweptLint};
-use lint_sweep::{Address, Descend, Facts, Finds, Kind, Watch};
+use lint_sweep::{Concludes, Contribute, Contributed, Contributing, Contribution, Descend, Facts, Finds, Kind, Scope};
 use std::path::Path;
 use syntax::Span;
+use syntax::Spanned;
 
 use syntax::{
     Expr, ExprCast, ExprConst, ExprForLoop, ExprLoop, ExprRepeat, ExprWhile, ImplItemConst, ImplItemFn, ItemConst,
@@ -35,14 +37,10 @@ impl SweptLint for ConstShape {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        Box::new(ConstContexts {
+        Box::new(Contributing::new(ConstContexts {
             path: AsRef::<Path>::as_ref(file.head()),
-            context: Contexts { current: Context::Surface, outer: Vec::new() },
             zone: Zone::of_file(file),
-            zones: Vec::new(),
-            pending: Vec::new(),
-            violations: Vec::new(),
-        })
+        }))
     }
 }
 
@@ -78,19 +76,104 @@ impl Zone {
         Gate::BOUNDARY.admits(file.head()).map_or(Zone::Elsewhere, |_| Zone::Boundary)
     }
 
-    fn entering(self, module: &ItemMod) -> Zone {
-        Gate::BOUNDARY.names(module).map_or(self, |_| Zone::Boundary)
+    fn of_module(module: &ItemMod) -> Zone {
+        Gate::BOUNDARY.names(module).map_or(Zone::Elsewhere, |_| Zone::Boundary)
     }
 }
 
 #[derive(Debug)]
 struct ConstContexts<'scan> {
     path: &'scan Path,
-    context: Contexts,
     zone: Zone,
-    zones: Vec<Zone>,
-    pending: Vec<Address>,
-    violations: Vec<Violation<'scan>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Looped {
+    span: Span,
+    message: Message,
+}
+
+#[derive(Debug, Default)]
+struct Candidates<'scan> {
+    found: Vec<Violation<'scan>>,
+    casts: Vec<Span>,
+    surface_casts: Vec<Span>,
+    loops: Vec<Looped>,
+}
+
+impl Semigroup for Candidates<'_> {
+    fn combine(self, other: Self) -> Self {
+        Candidates {
+            found: self.found.combine(other.found),
+            casts: self.casts.combine(other.casts),
+            surface_casts: self.surface_casts.combine(other.surface_casts),
+            loops: self.loops.combine(other.loops),
+        }
+    }
+}
+
+impl Monoid for Candidates<'_> {}
+
+impl<'scan> Candidates<'scan> {
+    const CAST: Message =
+        Message::new(Problem::new("as cast outside a const fn"), Fix::new("use From, TryFrom, or an EnumMap"));
+
+    fn within(self, context: Context, scan: &ConstContexts<'scan>) -> Candidates<'scan> {
+        match context {
+            Context::Const => Candidates {
+                found: self
+                    .found
+                    .into_iter()
+                    .chain(self.loops.into_iter().map(|looped| scan.violation(looped.span, looped.message)))
+                    .collect(),
+                casts: Vec::new(),
+                surface_casts: self.surface_casts,
+                loops: Vec::new(),
+            },
+            Context::Surface => Candidates {
+                found: self.found,
+                casts: Vec::new(),
+                surface_casts: self.surface_casts.combine(self.casts),
+                loops: Vec::new(),
+            },
+        }
+    }
+
+    fn zoned(self, zone: Zone) -> Candidates<'scan> {
+        match zone {
+            Zone::Boundary => Candidates { found: self.found, ..Candidates::default() },
+            Zone::Elsewhere => self,
+        }
+    }
+
+    fn split(self, length: &impl Spanned) -> Split<'scan> {
+        let range = length.span().byte_range();
+        let inside = |span: &Span| range.contains(&span.byte_range().start);
+        let (_, outside_casts): (Vec<Span>, Vec<Span>) = self.casts.into_iter().partition(inside);
+        let (loops, outside_loops): (Vec<Looped>, Vec<Looped>) =
+            self.loops.into_iter().partition(|looped| inside(&looped.span));
+        Split {
+            length: Candidates { loops, ..Candidates::default() },
+            rest: Candidates {
+                found: self.found,
+                casts: outside_casts,
+                surface_casts: self.surface_casts,
+                loops: outside_loops,
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Split<'scan> {
+    length: Candidates<'scan>,
+    rest: Candidates<'scan>,
+}
+
+impl<'scan> Split<'scan> {
+    fn constant(self, scan: &ConstContexts<'scan>) -> Candidates<'scan> {
+        self.rest.combine(self.length.within(Context::Const, scan))
+    }
 }
 
 impl<'scan> ConstContexts<'scan> {
@@ -98,221 +181,216 @@ impl<'scan> ConstContexts<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
-    fn cast_finding(&self, cast: &ExprCast) -> Option<Violation<'scan>> {
-        Some(self)
-            .filter(|scan| scan.context.current == Context::Surface)
-            .filter(|scan| scan.zone == Zone::Elsewhere)
-            .map(|scan| {
-                scan.violation(
-                    cast.as_token.span,
-                    Message::new(
-                        Problem::new("as cast outside a const fn"),
-                        Fix::new("use From, TryFrom, or an EnumMap"),
-                    ),
-                )
-            })
+    fn closed(&self, context: Context, inner: Contribution<(), Candidates<'scan>>) -> Candidates<'scan> {
+        inner.concluded(|(), candidates| candidates.within(context, self))
     }
 
-    fn loop_finding(&self, span: Span, message: Message) -> Option<Violation<'scan>> {
-        (self.context.current == Context::Const).then(|| self.violation(span, message))
+    fn lengths<'length>(
+        &self,
+        lengths: impl IntoIterator<Item = &'length Expr>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        let candidates = inner.concluded(|(), candidates| candidates);
+        lengths.into_iter().fold(candidates, |remaining, length| remaining.split(length).constant(self))
+    }
+
+    fn looped(span: Span, message: Message) -> Contributed<(), Candidates<'scan>> {
+        Contributed::parted(Candidates { loops: vec![Looped { span, message }], ..Candidates::default() })
     }
 }
 
-#[derive(Debug)]
-struct Contexts {
-    current: Context,
-    outer: Vec<Context>,
-}
+impl<'scan> Contribute for ConstContexts<'scan> {
+    type Open = ();
+    type Part = Candidates<'scan>;
 
-impl Contexts {
-    fn within(&mut self, context: Context) -> Descend {
-        self.outer.push(std::mem::replace(&mut self.current, context));
-        Descend::Into
-    }
-
-    fn restored(&mut self) {
-        self.current = self.outer.pop().unwrap_or(Context::Surface);
-    }
-}
-
-impl<'ast> Watch<'ast> for ConstContexts<'_> {
     fn kinds(&self) -> &'static [Kind] {
-        &[
-            Kind::ItemMod,
-            Kind::ItemFn,
-            Kind::ImplItemFn,
-            Kind::TraitItemFn,
-            Kind::ItemConst,
-            Kind::ItemStatic,
-            Kind::ImplItemConst,
-            Kind::TraitItemConst,
-            Kind::ExprConst,
-            Kind::TypeArray,
-            Kind::ExprRepeat,
-            Kind::Variant,
-            Kind::Macro,
-            Kind::ExprCast,
-            Kind::ExprWhile,
-            Kind::ExprLoop,
-            Kind::ExprForLoop,
-            Kind::Expr,
-        ]
+        &[Kind::ItemMod, Kind::Macro, Kind::ExprCast, Kind::ExprWhile, Kind::ExprLoop, Kind::ExprForLoop]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, facts: &Facts<'_, ItemMod>) -> Descend {
-        self.zones.push(self.zone);
-        self.zone = self.zone.entering(module);
-        Descend::from(facts.gate())
+    fn scopes(&self) -> &'static [Scope] {
+        const {
+            &[
+                Scope::new(Kind::ItemMod),
+                Scope::new(Kind::ItemFn),
+                Scope::new(Kind::ImplItemFn),
+                Scope::new(Kind::TraitItemFn),
+                Scope::new(Kind::ItemConst),
+                Scope::new(Kind::ItemStatic),
+                Scope::new(Kind::ImplItemConst),
+                Scope::new(Kind::TraitItemConst),
+                Scope::new(Kind::ExprConst),
+                Scope::new(Kind::TypeArray),
+                Scope::new(Kind::ExprRepeat),
+                Scope::new(Kind::Variant),
+            ]
+        }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.zone = self.zones.pop().unwrap_or(self.zone);
+    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Candidates<'scan>> {
+        Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_fn(&mut self, function: &'ast ItemFn, _: &Facts<'_, ItemFn>) -> Descend {
-        self.context.within(Context::of_fn(function.sig.constness.as_ref()))
+    fn off_item_mod(
+        &self,
+        module: &ItemMod,
+        _: &Facts<'_, ItemMod>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        let zone = Zone::of_module(module);
+        inner.concluded(|(), candidates| candidates.zoned(zone))
     }
 
-    fn off_item_fn(&mut self, _: &'ast ItemFn, _: &Facts<'_, ItemFn>) {
-        self.context.restored();
+    fn off_item_fn(
+        &self,
+        function: &ItemFn,
+        _: &Facts<'_, ItemFn>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::of_fn(function.sig.constness.as_ref()), inner)
     }
 
-    fn on_impl_item_fn(&mut self, function: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) -> Descend {
-        self.context.within(Context::of_fn(function.sig.constness.as_ref()))
+    fn off_impl_item_fn(
+        &self,
+        function: &ImplItemFn,
+        _: &Facts<'_, ImplItemFn>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::of_fn(function.sig.constness.as_ref()), inner)
     }
 
-    fn off_impl_item_fn(&mut self, _: &'ast ImplItemFn, _: &Facts<'_, ImplItemFn>) {
-        self.context.restored();
+    fn off_trait_item_fn(
+        &self,
+        _: &TraitItemFn,
+        _: &Facts<'_, TraitItemFn>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::Surface, inner)
     }
 
-    fn on_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) -> Descend {
-        self.context.within(Context::Surface)
+    fn off_item_const(
+        &self,
+        _: &ItemConst,
+        _: &Facts<'_, ItemConst>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::Const, inner)
     }
 
-    fn off_trait_item_fn(&mut self, _: &'ast TraitItemFn, _: &Facts<'_, TraitItemFn>) {
-        self.context.restored();
+    fn off_item_static(
+        &self,
+        _: &ItemStatic,
+        _: &Facts<'_, ItemStatic>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::Const, inner)
     }
 
-    fn on_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn off_impl_item_const(
+        &self,
+        _: &ImplItemConst,
+        _: &Facts<'_, ImplItemConst>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::Const, inner)
     }
 
-    fn off_item_const(&mut self, _: &'ast ItemConst, _: &Facts<'_, ItemConst>) {
-        self.context.restored();
+    fn off_trait_item_const(
+        &self,
+        _: &TraitItemConst,
+        _: &Facts<'_, TraitItemConst>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::Const, inner)
     }
 
-    fn on_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) -> Descend {
-        self.context.within(Context::Const)
+    fn off_expr_const(
+        &self,
+        _: &ExprConst,
+        _: &Facts<'_, ExprConst>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.closed(Context::Const, inner)
     }
 
-    fn off_item_static(&mut self, _: &'ast ItemStatic, _: &Facts<'_, ItemStatic>) {
-        self.context.restored();
+    fn off_type_array(
+        &self,
+        array: &TypeArray,
+        _: &Facts<'_, TypeArray>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.lengths([&array.len], inner)
     }
 
-    fn on_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn off_expr_repeat(
+        &self,
+        repeat: &ExprRepeat,
+        _: &Facts<'_, ExprRepeat>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.lengths([&*repeat.len], inner)
     }
 
-    fn off_impl_item_const(&mut self, _: &'ast ImplItemConst, _: &Facts<'_, ImplItemConst>) {
-        self.context.restored();
+    fn off_variant(
+        &self,
+        variant: &Variant,
+        _: &Facts<'_, Variant>,
+        inner: Contribution<(), Candidates<'scan>>,
+    ) -> Candidates<'scan> {
+        self.lengths(variant.discriminant.iter().map(|(_, discriminant)| discriminant), inner)
     }
 
-    fn on_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Candidates<'scan>> {
+        Contributed::descending(Descend::Expand)
     }
 
-    fn off_trait_item_const(&mut self, _: &'ast TraitItemConst, _: &Facts<'_, TraitItemConst>) {
-        self.context.restored();
+    fn on_expr_cast(&self, cast: &ExprCast, _: &Facts<'_, ExprCast>) -> Contributed<(), Candidates<'scan>> {
+        Contributed::parted(Candidates { casts: vec![cast.as_token.span], ..Candidates::default() })
     }
 
-    fn on_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) -> Descend {
-        self.context.within(Context::Const)
+    fn on_expr_while(&self, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Contributed<(), Candidates<'scan>> {
+        let counted = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted);
+        Contributed::parted(Candidates {
+            loops: counted
+                .map(|_| Looped {
+                    span: expr.while_token.span,
+                    message: Message::new(
+                        Problem::new("counter loop in const context"),
+                        Fix::new("walk a slice with while let [head, rest @ ..]"),
+                    ),
+                })
+                .into_iter()
+                .collect(),
+            ..Candidates::default()
+        })
     }
 
-    fn off_expr_const(&mut self, _: &'ast ExprConst, _: &Facts<'_, ExprConst>) {
-        self.context.restored();
-    }
-
-    fn on_type_array(&mut self, array: &'ast TypeArray, _: &Facts<'_, TypeArray>) -> Descend {
-        self.pending.push(Address::from(&array.len));
-        Descend::Into
-    }
-
-    fn on_expr_repeat(&mut self, repeat: &'ast ExprRepeat, _: &Facts<'_, ExprRepeat>) -> Descend {
-        self.pending.push(Address::from(&*repeat.len));
-        Descend::Into
-    }
-
-    fn on_variant(&mut self, variant: &'ast Variant, _: &Facts<'_, Variant>) -> Descend {
-        self.pending.extend(variant.discriminant.iter().map(|(_, discriminant)| Address::from(discriminant)));
-        Descend::Into
-    }
-
-    fn on_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) -> Descend {
-        let at = facts.address();
-        let pending = self.pending.iter().rposition(|waiting| *waiting == at);
-        pending.map_or(Descend::Into, |_| self.context.within(Context::Const))
-    }
-
-    fn off_expr(&mut self, _: &'ast Expr, facts: &Facts<'_, Expr>) {
-        let at = facts.address();
-        self.pending.iter().rposition(|waiting| *waiting == at).into_iter().for_each(|index| {
-            self.pending.remove(index);
-            self.context.restored();
-        });
-    }
-
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
-    }
-
-    fn on_expr_cast(&mut self, cast: &'ast ExprCast, _: &Facts<'_, ExprCast>) -> Descend {
-        let finding = self.cast_finding(cast);
-        self.violations.extend(finding);
-        Descend::Into
-    }
-
-    fn on_expr_while(&mut self, expr: &'ast ExprWhile, _: &Facts<'_, ExprWhile>) -> Descend {
-        let finding = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted).map(|_| {
-            self.loop_finding(
-                expr.while_token.span,
-                Message::new(
-                    Problem::new("counter loop in const context"),
-                    Fix::new("walk a slice with while let [head, rest @ ..]"),
-                ),
-            )
-        });
-        self.violations.extend(finding.flatten());
-        Descend::Into
-    }
-
-    fn on_expr_loop(&mut self, expr: &'ast ExprLoop, _: &Facts<'_, ExprLoop>) -> Descend {
-        let finding = self.loop_finding(
+    fn on_expr_loop(&self, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Contributed<(), Candidates<'scan>> {
+        Self::looped(
             expr.loop_token.span,
             Message::new(
                 Problem::new("open loop in const context"),
                 Fix::new("walk a slice with while let or recurse"),
             ),
-        );
-        self.violations.extend(finding);
-        Descend::Into
+        )
     }
 
-    fn on_expr_for_loop(&mut self, expr: &'ast ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Descend {
-        let finding = self.loop_finding(
+    fn on_expr_for_loop(&self, expr: &ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Contributed<(), Candidates<'scan>> {
+        Self::looped(
             expr.for_token.span,
             Message::new(
                 Problem::new("for loop in const context"),
                 Fix::new("walk a slice with while let [head, rest @ ..]"),
             ),
-        );
-        self.violations.extend(finding);
-        Descend::Into
+        )
     }
 }
 
-impl<'file> Finds<'file> for ConstContexts<'file> {
-    fn found(self: Box<Self>) -> Vec<Violation<'file>> {
-        self.violations
+impl<'scan> Concludes<'scan> for ConstContexts<'scan> {
+    fn violations(self, (): (), candidates: Candidates<'scan>) -> Vec<Violation<'scan>> {
+        let Candidates { found, casts, surface_casts, .. } = candidates.zoned(self.zone);
+        let cast = casts.into_iter().chain(surface_casts).map(|span| self.violation(span, Candidates::CAST));
+        let mut violations: Vec<Violation<'scan>> = found.into_iter().chain(cast).collect();
+        violations.sort_by_key(|violation| *violation.site());
+        violations
     }
 }
