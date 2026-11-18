@@ -78,7 +78,10 @@ impl<'file> From<&Shaped<'_, 'file>> for Option<Violation<'file>> {
 
 impl Shape {
     fn of_edge(edge: &Edge<'_, '_>) -> Option<Shape> {
-        let mutation = edge.transition().function().mutation();
+        let function = edge.transition().function();
+        let ground = *AsRef::<Ground>::as_ref(edge.transition());
+        let mutation =
+            function.held().operating(function.mutation(), ground).map_or(function.mutation(), |()| Mutation::Absent);
         Shape::of_mutation(mutation).or_else(|| edge.form().algebraic().and_then(Shape::of_acting))
     }
 

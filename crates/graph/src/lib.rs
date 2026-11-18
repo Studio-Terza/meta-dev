@@ -40,8 +40,8 @@ pub use function::definition::{
     Repeating, Repetition,
 };
 pub use function::{
-    Entry, Evaluation, Function, Input, MethodShape, Mutation, Output, Owner, Parameter, Receiver, Returned, Signature,
-    Taken,
+    Entry, Evaluation, Function, Input, MethodShape, Mutated, Mutation, Output, Owner, Parameter, Receiver, Returned,
+    Signature, Taken,
 };
 pub use holding::{Held, Holding};
 pub use implementation::{Assigned, Implementation, Interface, Origin, Subject};

@@ -1,5 +1,6 @@
 mod operators;
 
+use crate::transitions::handle::Handle;
 use crate::transitions::{Ground, Wrapping};
 use body_lifts::Body;
 use graph::Mutation;
@@ -86,7 +87,7 @@ impl<'found> Form<'found> {
         let function = transition.function();
         let ground = *AsRef::<Ground>::as_ref(transition);
         Form::lifted(function.body())
-            .or_else(|| Form::through_store(ground, function.mutation()))
+            .or_else(|| Form::through_store(ground, function.mutation(), function.held()))
             .unwrap_or_else(|| Form::acted(edge, ground))
     }
 
@@ -97,8 +98,9 @@ impl<'found> Form<'found> {
         }
     }
 
-    fn through_store(ground: Ground, mutation: Mutation) -> Option<Form<'found>> {
-        matches!((ground, mutation), (Ground::Store, Mutation::ThroughSelf)).then_some(Form::Store)
+    fn through_store(ground: Ground, mutation: Mutation, handle: Handle) -> Option<Form<'found>> {
+        let owned = matches!((ground, mutation), (Ground::Store, Mutation::ThroughSelf));
+        handle.operating(mutation, ground).or(owned.then_some(())).map(|()| Form::Store)
     }
 
     fn acted(edge: &Edge<'found, '_>, ground: Ground) -> Form<'found> {

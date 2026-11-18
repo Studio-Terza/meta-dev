@@ -4,6 +4,7 @@ use lint_layout::Name;
 
 use graph::{Invocation, Mutation};
 
+use super::handle::Handle;
 use super::resolved::Resolved;
 use super::wrapping::Wrapping;
 
@@ -14,6 +15,7 @@ pub struct Function<'file> {
     takes: Vec<Resolved>,
     gives: Resolved,
     mutation: Mutation,
+    handle: Handle,
     body: Body,
     branching: Branching,
     wrapping: Wrapping,
@@ -29,6 +31,7 @@ impl<'file> Function<'file> {
             takes,
             gives,
             mutation: Mutation::Absent,
+            handle: Handle::Owned,
             body: Body::Written,
             branching: Branching::new(1),
             wrapping: Wrapping::Plain,
@@ -41,6 +44,11 @@ impl<'file> Function<'file> {
         self.mutation = mutation;
         self.body = body;
         self.branching = branching;
+        self
+    }
+
+    pub(crate) fn holding(mut self, handle: Handle) -> Function<'file> {
+        self.handle = handle;
         self
     }
 
@@ -66,6 +74,11 @@ impl<'file> Function<'file> {
     #[must_use]
     pub fn mutation(&self) -> Mutation {
         self.mutation
+    }
+
+    #[must_use]
+    pub fn held(&self) -> Handle {
+        self.handle
     }
 
     #[must_use]
