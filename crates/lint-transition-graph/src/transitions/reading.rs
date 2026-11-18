@@ -160,7 +160,7 @@ impl<'file> Reading<'file> {
         let region: &Region = placed.entity().as_ref();
         Grounded::new(
             placed.krate(),
-            Endpoint::new(Nature::Interface, name.clone()),
+            Endpoint::new(Nature::Interface, name.clone(), None),
             Ground::from(*region),
             Filler::Provided,
         )

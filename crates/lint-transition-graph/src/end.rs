@@ -184,12 +184,8 @@ pub(crate) struct Ends<'found> {
 }
 
 impl<'found> Ends<'found> {
-    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>) -> Ends<'found> {
-        Ends { takes, gives, implementer: None }
-    }
-
-    pub(crate) fn implemented_by(self, implementer: Option<End<'found>>) -> Ends<'found> {
-        Ends { implementer, ..self }
+    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>, implementer: Option<End<'found>>) -> Ends<'found> {
+        Ends { takes, gives, implementer }
     }
 
     pub(crate) fn placed(&self, place: Place) -> impl Iterator<Item = &End<'found>> {

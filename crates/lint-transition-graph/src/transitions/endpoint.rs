@@ -41,8 +41,8 @@ impl Unnamed {
 }
 
 impl Endpoint {
-    pub(crate) fn new(nature: Nature, name: Name) -> Endpoint {
-        Endpoint { nature, name, origin: None, arguments: Vec::new() }
+    pub(crate) fn new(nature: Nature, name: Name, origin: Option<Name>) -> Endpoint {
+        Endpoint { nature, name, origin, arguments: Vec::new() }
     }
 
     pub(crate) fn declared(name: Name, origin: Option<Name>, arguments: Vec<Argument>) -> Endpoint {
@@ -52,10 +52,6 @@ impl Endpoint {
     #[must_use]
     pub fn arguments(&self) -> &[Argument] {
         &self.arguments
-    }
-
-    pub(crate) fn originating(self, origin: Option<Name>) -> Endpoint {
-        Endpoint { origin, ..self }
     }
 
     #[must_use]

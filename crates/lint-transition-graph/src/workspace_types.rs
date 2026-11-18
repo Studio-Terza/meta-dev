@@ -71,9 +71,8 @@ impl<'found> WorkspaceTypes<'found> {
         let from: &Name = AsRef::<CrateName>::as_ref(&transition).borrow();
         let end = |endpoint: &'found Endpoint| self.end(from, endpoint, fixed_by);
         let implementer = transition.implementer().map(Implementer::endpoint).map(end);
-        let ends =
-            Ends::new(Inputs::iter(transition.takes()).map(end).collect(), end(Output::endpoint(transition.gives())))
-                .implemented_by(implementer);
+        let takes = Inputs::iter(transition.takes()).map(end).collect();
+        let ends = Ends::new(takes, end(Output::endpoint(transition.gives())), implementer);
         Edge::new(transition, ends, fixed_by)
     }
 
