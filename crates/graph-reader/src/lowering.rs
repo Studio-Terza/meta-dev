@@ -16,6 +16,7 @@ mod uses;
 mod walk;
 
 use algebra::{Catenation, Monoid, Semigroup};
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -34,12 +35,12 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{
     Declared, DeclaredKind, Domain, ItemIds, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap,
-    ScopeOp, Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
+    ScopeOp, Seeds, Sowing, Sown, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
-use crate::planting::Files;
+use crate::planting::Unclaimed;
 use attributes::Attributes;
-use boundary::SelfType;
+use boundary::{SelfType, SlotOrdinal};
 use calls::CallRow;
 use definition::{BodyPart, LoweredDefinition};
 use frames::Enclosure;
@@ -258,7 +259,7 @@ impl<Scope> Slot<Scope> {
     const EXTENSION: &'static str = "rs";
     const MODULE_FILE: &'static str = "mod.rs";
 
-    pub(crate) fn found(&self, files: &Files<'_>) -> Option<PathBuf> {
+    pub(crate) fn found(&self, files: Unclaimed<'_, '_, '_>) -> Option<PathBuf> {
         let named = self.children.join(&self.name);
         let flat = named.with_extension(Self::EXTENSION);
         let nested = named.join(Self::MODULE_FILE);
@@ -390,47 +391,105 @@ impl Grown {
     }
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct Plot<'read> {
-    space: Namespace<'read>,
-    grown: Vec<Grown>,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct SlotAt {
+    file: FileId,
+    ordinal: SlotOrdinal,
 }
 
-impl<'read> Plot<'read> {
-    pub(crate) fn rooted(&mut self, top: Top<'read>, file: FileId, lowered: Lowered) -> Vec<Slot> {
+impl SlotAt {
+    pub(crate) fn every(file: FileId, lowered: &Lowered) -> impl Iterator<Item = SlotAt> + use<> {
+        SlotOrdinal::every(&lowered.slots).map(move |ordinal| SlotAt { file, ordinal })
+    }
+
+    fn placed<'plot>(self, plot: &'plot Plot<'_>) -> Option<&'plot Slot> {
+        plot.slots.get(&self)
+    }
+}
+
+impl Lowered {
+    pub(crate) fn slots(&self) -> &[Slot<ScopeKey>] {
+        &self.slots
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Plot<'read> {
+    space: Sown<'read>,
+    grown: Vec<Grown>,
+    slots: BTreeMap<SlotAt, Slot>,
+}
+
+impl Semigroup for Plot<'_> {
+    fn combine(self, other: Self) -> Self {
+        let mut slots = self.slots;
+        slots.extend(other.slots);
+        Plot { space: self.space.combine(other.space), grown: self.grown.combine(other.grown), slots }
+    }
+}
+
+impl Monoid for Plot<'_> {}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Plotting<'plot, 'read> {
+    plot: &'plot Plot<'read>,
+}
+
+impl<'plot, 'read> From<&'plot Plot<'read>> for Plotting<'plot, 'read> {
+    fn from(plot: &'plot Plot<'read>) -> Plotting<'plot, 'read> {
+        Plotting { plot }
+    }
+}
+
+impl<'read> Plotting<'_, 'read> {
+    pub(crate) fn rooted(self, top: Top<'read>, file: FileId, lowered: Lowered) -> Plot<'read> {
         self.grown_at(top, file, Region::SHIPPED, lowered)
     }
 
-    pub(crate) fn planted(&mut self, slot: Slot, file: FileId, lowered: Lowered) -> Vec<Slot> {
-        let top = Top::Child { parent: slot.scope, name: slot.name, visibility: slot.visibility };
-        self.grown_at(top, file, slot.region, lowered)
+    pub(crate) fn planted(self, at: SlotAt, file: FileId, lowered: Lowered) -> Plot<'read> {
+        at.placed(self.plot).map_or_default(|slot| {
+            let top = Top::Child { parent: slot.scope, name: slot.name.clone(), visibility: slot.visibility };
+            self.grown_at(top, file, slot.region, lowered)
+        })
     }
 
-    pub(crate) fn opaque(&mut self, slot: Slot) {
-        self.space.declare(slot.scope, Declared::new(slot.name, slot.visibility, DeclaredKind::OpaqueModule));
+    pub(crate) fn opaque(self, at: SlotAt) -> Plot<'read> {
+        at.placed(self.plot).map_or_default(|slot| {
+            let declared = Declared::new(slot.name.clone(), slot.visibility, DeclaredKind::OpaqueModule);
+            Plot { space: Sown::declaring(slot.scope, declared), ..Plot::default() }
+        })
     }
 
-    fn grown_at(&mut self, top: Top<'read>, file: FileId, outer: Region, lowered: Lowered) -> Vec<Slot> {
-        let base = self.space.placed(top, lowered.openings);
-        let slots = lowered.slots.into_iter().map(|slot| slot.placed(base, &lowered.scopes, outer)).collect();
-        self.grown.push(Grown { file, base, outer, rows: lowered.rows, scopes: lowered.scopes });
-        slots
+    fn grown_at(self, top: Top<'read>, file: FileId, outer: Region, lowered: Lowered) -> Plot<'read> {
+        let sowing = Sowing::from(&self.plot.space);
+        let base = sowing.base();
+        let space = sowing.placed(top, lowered.openings);
+        let ordinals = SlotOrdinal::every(&lowered.slots);
+        let slots = ordinals
+            .zip(lowered.slots)
+            .map(|(ordinal, slot)| (SlotAt { file, ordinal }, slot.placed(base, &lowered.scopes, outer)))
+            .collect();
+        let grown = vec![Grown { file, base, outer, rows: lowered.rows, scopes: lowered.scopes }];
+        Plot { space, grown, slots }
     }
+}
 
+impl Plot<'_> {
     pub(crate) fn built(self, files: FileTable) -> Model {
-        let seeds = Seeds::from(&self.space);
+        let space = Namespace::from(self.space);
+        let seeds = Seeds::from(&space);
         let settled = seeds.settled();
         let tables = seeds.tables(&settled);
-        let issued = self.space.issued();
+        let issued = space.issued();
         let ids = ItemIds::from(&issued);
         let unexpanded = Transcriptions::default();
-        let naming = Resolving::new(Resolver::new(&self.space, &tables), &ids, &unexpanded);
+        let naming = Resolving::new(Resolver::new(&space, &tables), &ids, &unexpanded);
         let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
             let based = naming.based(grown.base);
             grown.rows.transcribed.iter().filter_map(move |row| row.settled(based, &grown.scopes))
         }));
-        let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids, &transcriptions);
-        let exports: Exports = Monoid::concat(self.space.exports().iter().map(|export| export.recorded(&resolving)));
+        let resolving = Resolving::new(Resolver::new(&space, &tables), &ids, &transcriptions);
+        let exports: Exports = Monoid::concat(space.exports().iter().map(|export| export.recorded(&resolving)));
         let places: Vec<Places> = Parallel::available().mapped(&self.grown, |grown| grown.settled(&resolving));
         let declarations: ModelPart =
             Monoid::concat(self.grown.iter().zip(&places).map(|(grown, seated)| seated.placed(grown.file)));
