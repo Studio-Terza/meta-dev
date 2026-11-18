@@ -51,7 +51,7 @@ impl Kinds {
 
 impl From<Kind> for Kinds {
     fn from(kind: Kind) -> Kinds {
-        Kinds(Kind::ALL.iter().take_while(|listed| **listed != kind).fold(1_u128, |bit, _| bit << 1_u32))
+        Kinds(kind.bit())
     }
 }
 

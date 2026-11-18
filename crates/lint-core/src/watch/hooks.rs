@@ -10,6 +10,17 @@ use crate::kind_index::Indexed;
 use crate::macros::Macros;
 use crate::source_file::SourceFile;
 
+macro_rules! kind_bits {
+    (@arms $value:expr; [$($done:tt)*]; $shift:expr;) => {
+        match $value {
+            $($done)*
+        }
+    };
+    (@arms $value:expr; [$($done:tt)*]; $shift:expr; $kind:ident $($rest:ident)*) => {
+        kind_bits!(@arms $value; [$($done)* Kind::$kind => 1_u128 << ($shift),]; $shift + 1_u32; $($rest)*)
+    };
+}
+
 macro_rules! hooks {
     ($($kind:ident $on:ident $off:ident $visit:ident $node:ident;)*) => {
         #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -21,6 +32,10 @@ macro_rules! hooks {
 
         impl Kind {
             pub const ALL: &'static [Kind] = &[Kind::Macro, Kind::Ident, $(Kind::$kind,)*];
+
+            pub(crate) fn bit(self) -> u128 {
+                kind_bits!(@arms self; []; 0_u32; Macro Ident $($kind)*)
+            }
 
             pub(crate) fn of(node: Node<'_>) -> Kind {
                 match node {
