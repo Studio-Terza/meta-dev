@@ -47,20 +47,14 @@ pub(crate) struct TranscribedRow {
     mentioned: Vec<UsePath>,
 }
 
-#[derive(Clone, Debug)]
-enum Transcribed {
-    Fixed(ItemPath, Resolved),
-    Open(UsePath),
-}
-
 #[derive(Debug)]
 pub(crate) struct Transcription {
     defined: ItemId,
-    transcribed: Vec<Transcribed>,
+    transcribed: Vec<UsePath>,
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Transcriptions(HashMap<ItemId, Vec<Transcribed>>);
+pub(crate) struct Transcriptions(HashMap<ItemId, Vec<UsePath>>);
 
 #[derive(Clone, Debug)]
 pub(crate) struct Invoked {
@@ -84,24 +78,8 @@ impl TranscribedRow {
 
     pub(crate) fn settled(&self, resolving: Resolving<'_, '_, '_>) -> Option<Transcription> {
         let defined = resolving.path(self.scope, &self.name, Domain::Macros).crate_item()?;
-        let transcribed = self.mentioned.iter().map(|path| Transcribed::read(path, resolving, self.scope)).collect();
+        let transcribed = self.mentioned.clone();
         Some(Transcription { defined, transcribed })
-    }
-}
-
-impl Transcribed {
-    fn read(path: &UsePath, resolving: Resolving<'_, '_, '_>, scope: ScopeId) -> Transcribed {
-        match path.crate_anchored() {
-            Some(()) => Transcribed::Fixed(path.written(), resolving.path(scope, path, Domain::Types)),
-            None => Transcribed::Open(path.clone()),
-        }
-    }
-
-    fn used(&self, invoker: Invoker<'_, '_>) -> Option<PathUse> {
-        match self {
-            Transcribed::Fixed(written, resolved) => invoker.mentioned(written.clone(), resolved.clone()),
-            Transcribed::Open(path) => invoker.mentioned(path.written(), invoker.found(path)),
-        }
     }
 }
 
@@ -135,6 +113,10 @@ impl<'grown, 'invoked> Invoker<'grown, 'invoked> {
         typed.known().cloned().or_else(valued).or_else(member).unwrap_or(typed)
     }
 
+    fn used(self, path: &UsePath) -> Option<PathUse> {
+        self.mentioned(path.written(), self.found(path))
+    }
+
     fn mentioned(self, written: ItemPath, resolved: Resolved) -> Option<PathUse> {
         resolved.known()?;
         Some(self.invoked.used(written, resolved))
@@ -148,7 +130,7 @@ impl Transcriptions {
 
     pub(crate) fn expanded(&self, definition: &Resolved, invoker: Invoker<'_, '_>, building: Building) -> Building {
         let transcribed = definition.crate_item().and_then(|item| self.0.get(&item)).map_or(&[][..], Vec::as_slice);
-        transcribed.iter().filter_map(|path| path.used(invoker)).fold(building, |mut built, used| {
+        transcribed.iter().filter_map(|path| invoker.used(path)).fold(building, |mut built, used| {
             built.path_use(invoker.invoked.file, invoker.invoked.line, used);
             built
         })
