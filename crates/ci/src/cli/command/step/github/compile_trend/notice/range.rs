@@ -1,8 +1,10 @@
+use std::cmp::Ordering;
 use std::fmt;
 
 use algebra::Semigroup;
 use newtype::Wrapping;
 
+use super::super::Pace;
 use crate::cli::command::step::seconds::Seconds;
 
 #[derive(Clone, Copy, Debug)]
@@ -21,8 +23,11 @@ impl Semigroup for Range {
 }
 
 impl Range {
-    pub(super) fn below(self, total: Seconds) -> Option<()> {
-        (total > self.most).then_some(())
+    pub(super) fn pace(self, total: Seconds) -> Pace {
+        match total.partial_cmp(&self.most) {
+            Some(Ordering::Greater) => Pace::Slower,
+            Some(Ordering::Less | Ordering::Equal) | None => Pace::Steady,
+        }
     }
 }
 

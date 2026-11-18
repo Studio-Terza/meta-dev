@@ -3,7 +3,7 @@ mod inside_sibling;
 mod target;
 
 pub use index::ModuleIndex;
-pub use inside_sibling::InsideSibling;
+pub use inside_sibling::{InsideSibling, Siding};
 pub use target::Target;
 
 use lint_layout::InFile;

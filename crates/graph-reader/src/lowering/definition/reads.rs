@@ -244,7 +244,9 @@ impl Spelled {
     fn under(path: UsePath, scope: &InScope) -> Spelled {
         let single = path.qualifier().map(|parent| parent.written()).filter(|parent| parent.as_ref().len() == 1);
         let head = single.as_ref().and_then(|parent| parent.last().cloned());
-        let owner = head.as_ref().and_then(|parent| scope.generic(parent).map(|()| parent.clone()));
+        let owner = head
+            .as_ref()
+            .and_then(|parent| scope.generic(parent).map(|generic| AsRef::<Name>::as_ref(&generic).clone()));
         let last = path.written().last().cloned();
         let subject =
             head.filter(|parent| parent.matches::<Whole>(&[Self::SUBJECT]).is_some()).map(|_| scope.current_subject());

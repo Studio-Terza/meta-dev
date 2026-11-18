@@ -15,7 +15,7 @@ use super::settling::Target;
 use super::std_names::{Canonical, StdNames, Table};
 use super::tables::{Key, Lookup, Tables};
 use super::use_path::{Reading, Shape, UsePath};
-use super::view::{Conflicted, Deferral, Nearest, View};
+use super::view::{Nearest, View};
 
 #[derive(Debug)]
 pub(super) enum Outer {
@@ -130,6 +130,46 @@ impl<'rows> From<&'rows Resolution> for View<'rows> {
         match resolution {
             Resolution::Waiting => View::WAITING,
             Resolution::Bound(binding) => View::from(binding),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Dispute {
+    Clear,
+    Contested,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Deference {
+    Stands,
+    Defers,
+}
+
+#[derive(Debug)]
+struct Walks<'walk, 'tables, 'rows, 'key> {
+    resolver: &'walk Resolver<'tables, 'rows>,
+    levels: &'walk [ScopeId],
+    key: Key<'key>,
+    written: View<'rows>,
+}
+
+impl<'rows> Walks<'_, '_, 'rows, '_> {
+    fn walk(&self, reading: Reading) -> View<'rows> {
+        self.resolver.walked(self.levels, self.key, Lookup::new(Sight::Inside, self.resolver.ignored, reading))
+    }
+
+    fn settled(&self, dispute: Dispute) -> View<'rows> {
+        match dispute {
+            Dispute::Clear => self.written,
+            Dispute::Contested => self.deferred(self.walk(Reading::Explicit).deference()),
+        }
+    }
+
+    fn deferred(&self, deference: Deference) -> View<'rows> {
+        match deference {
+            Deference::Stands => self.written,
+            Deference::Defers => self.walk(Reading::Imported),
         }
     }
 }
@@ -249,11 +289,8 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
 
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
         let levels = Importing(self.importing).levels(self.space.chain(scope), key);
-        let first = |asked: Reading| Lookup::new(Sight::Inside, self.ignored, asked);
-        let written = self.walked(levels, key, first(reading));
-        let explicit = || self.walked(levels, key, first(Reading::Explicit));
-        let deferred = |Deferral| self.walked(levels, key, first(Reading::Imported));
-        written.conflict().map_or(written, |Conflicted| explicit().deferral().map_or(written, deferred))
+        let written = self.walked(levels, key, Lookup::new(Sight::Inside, self.ignored, reading));
+        Walks { resolver: self, levels, key, written }.settled(written.dispute())
     }
 
     fn walked(&self, levels: &[ScopeId], key: Key<'_>, first: Lookup) -> View<'rows> {

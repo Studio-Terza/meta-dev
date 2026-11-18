@@ -6,6 +6,7 @@ use std::fmt;
 
 use algebra::Semigroup;
 
+use super::Pace;
 use super::build::Build;
 use super::fortnight::Fortnight;
 use crate::cli::ports::Text;
@@ -39,8 +40,8 @@ impl<'builds> Notice<'builds> {
         Notice { today, earlier, fortnight, range }
     }
 
-    pub(super) fn slower(&self) -> Option<&Notice<'builds>> {
-        self.range.and_then(|range| range.below(self.today.total())).map(|()| self)
+    pub(super) fn pace(&self) -> Pace {
+        self.range.map_or(Pace::Steady, |range| range.pace(self.today.total()))
     }
 
     pub(super) fn reported<'notice>(&'notice self, merged: &'notice Text) -> Report<'notice> {

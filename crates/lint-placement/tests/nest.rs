@@ -2,7 +2,7 @@ use algebra::Semigroup;
 use lint_layout::Name;
 use std::path::PathBuf;
 
-use lint_placement::{CrateRoot, Krate, Level, Nest};
+use lint_placement::{CrateRoot, Krate, Level, Lineage, Nest};
 
 struct Tree {
     krate: Name,
@@ -45,9 +45,9 @@ fn each_place_knows_its_level() {
 fn an_outer_place_holds_its_inner_ones_and_not_its_neighbours() {
     let tree = Tree::new();
     let other = Nest::module(Krate::Named(&tree.other), &tree.segments);
-    assert_eq!(tree.at(1).holding(tree.at(2)), Some(()));
-    assert_eq!(tree.at(2).holding(tree.at(1)), None);
-    assert_eq!(tree.at(1).holding(other), None);
+    assert_eq!(tree.at(1).relation(tree.at(2)), Lineage::Holds);
+    assert_eq!(tree.at(2).relation(tree.at(1)), Lineage::Within);
+    assert_eq!(tree.at(1).relation(other), Lineage::Apart);
     assert_eq!(tree.at(2).combine(other), Nest::WORKSPACE);
     assert_eq!(tree.at(2).combine(tree.at(1)), tree.at(1));
 }

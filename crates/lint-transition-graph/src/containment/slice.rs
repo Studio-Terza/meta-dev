@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use graph::ItemGraph;
+use lint_placement::Lineage;
 
 use super::cluster::{Cluster, Part};
 use super::groups::Groups;
@@ -27,7 +28,7 @@ impl<'found> Cut<'found> {
                     .get(export)
                     .into_iter()
                     .flatten()
-                    .filter(|user| cluster.holding(user.cluster()).is_none())
+                    .filter(|user| cluster.relation(user.cluster()) != Lineage::Holds)
                     .map(|user| Link::new(*user, *export))
             })
             .collect();

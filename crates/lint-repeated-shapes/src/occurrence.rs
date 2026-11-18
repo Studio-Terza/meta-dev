@@ -2,7 +2,7 @@ use body_shape::{Labels, Literals, Reading, Shape, TokenCount};
 use equivalence::{Keyed, Nested};
 use lint_core::Site;
 
-use crate::extent::Extent;
+use crate::extent::{Cover, Extent};
 use crate::kind::Kind;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -60,7 +60,7 @@ impl<'file> Nested for Occurrence<'file> {
     fn lies_within<'outer>(&self, outer: &'outer Occurrence<'file>) -> Option<&'outer Occurrence<'file>> {
         Some(outer)
             .filter(|candidate| self.site.path() == candidate.site.path())
-            .and_then(|same_file| same_file.extent.holds(&self.extent).map(|()| same_file))
+            .filter(|same_file| same_file.extent.cover(&self.extent) == Cover::Covers)
     }
 }
 

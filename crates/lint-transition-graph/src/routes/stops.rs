@@ -1,8 +1,12 @@
 use std::collections::BTreeMap;
+use std::fmt;
+use std::ptr;
 
+use equivalence::Group;
 use lint_layout::Name;
 use newtype::{Arbitrary, Newtype};
 
+use super::leg::Leg;
 use super::walk::Walk;
 use crate::edge::Edge;
 use crate::end::{End, Hop};
@@ -11,6 +15,29 @@ use graph::CallOwner;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Stop(usize);
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Joined<'graph, 'found, 'file>(&'graph Edge<'found, 'file>);
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Outside<'graph, 'found, 'file>(&'graph Edge<'found, 'file>);
+
+impl<'graph, 'found, 'file> Joined<'graph, 'found, 'file> {
+    pub(super) fn outside(
+        self,
+        group: &Group<Leg<'_, 'graph, 'found, 'file>>,
+    ) -> Option<Outside<'graph, 'found, 'file>> {
+        let walkers = group.members().iter().map(|member| member.walk().edge());
+        let called = group.members().iter().flat_map(|member| member.called().iter().copied());
+        walkers.chain(called).find(|edge| ptr::eq(*edge, self.0)).map_or(Some(Outside(self.0)), |_| None)
+    }
+}
+
+impl fmt::Display for Outside<'_, '_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "; {} already joins its ends", self.0.transition())
+    }
+}
 
 #[derive(Debug)]
 pub(super) struct Stops<'graph, 'found, 'file> {
@@ -60,9 +87,9 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
         &self,
         first: &Edge<'found, 'file>,
         last: &Edge<'found, 'file>,
-    ) -> Option<&'graph Edge<'found, 'file>> {
+    ) -> Option<Joined<'graph, 'found, 'file>> {
         let ends = Option::<Hop<'found>>::from(first.ends()).zip(Option::<Hop<'found>>::from(last.ends()));
-        ends.and_then(|(from, to)| self.joins.iter().copied().find(|edge| Self::closes(edge, &from, &to).is_some()))
+        ends.and_then(|(from, to)| self.joins.iter().copied().find_map(|edge| Self::closes(edge, &from, &to)))
     }
 
     fn output(edge: &'graph Edge<'found, 'file>) -> Option<&'graph Name> {
@@ -70,8 +97,13 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
             .then(|| AsRef::<End<'found>>::as_ref(edge.ends()).as_ref())
     }
 
-    fn closes(edge: &Edge<'found, 'file>, from: &Hop<'found>, to: &Hop<'found>) -> Option<()> {
-        Option::<Hop<'found>>::from(edge.ends()).and_then(|hop| hop.joins(from, to))
+    fn closes(
+        edge: &'graph Edge<'found, 'file>,
+        from: &Hop<'found>,
+        to: &Hop<'found>,
+    ) -> Option<Joined<'graph, 'found, 'file>> {
+        let hop = Option::<Hop<'found>>::from(edge.ends())?;
+        (hop.takes() == from.takes()).then_some(Joined(edge)).filter(|_| hop.gives() == to.gives())
     }
 
     fn resolved(&self, callee: &Name, owner: CallOwner<'_>) -> Option<&'graph Edge<'found, 'file>> {

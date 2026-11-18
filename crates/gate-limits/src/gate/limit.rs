@@ -17,7 +17,7 @@ pub enum Limit {
 impl Limit {
     pub fn ordered(self) -> Option<Limit> {
         match self {
-            Limit::Levels { warn, block } => Self::exceeded(warn, block).map_or(Some(self), |()| None),
+            Limit::Levels { warn, block } => Self::exceeded(warn, block).map_or(Some(self), |_| None),
             Limit::Record(_) => Some(self),
         }
     }
@@ -25,7 +25,7 @@ impl Limit {
     pub fn judge(&self, measured: Seconds) -> Verdict {
         match self {
             Limit::Levels { warn, block } => Self::leveled(measured, *warn, *block),
-            Limit::Record(record) => Self::exceeded(measured, *record).map_or(Verdict::Within, |()| Verdict::Block),
+            Limit::Record(record) => Self::exceeded(measured, *record).map_or(Verdict::Within, |_| Verdict::Block),
         }
     }
 
@@ -33,20 +33,29 @@ impl Limit {
         match self {
             Limit::Levels { .. } => Err(Refusal::Levels),
             Limit::Record(record) => {
-                Self::exceeded(measured, record).map_or(Ok(measured), |()| Err(Refusal::Above { record }))
+                Self::exceeded(measured, record).map_or(Ok(measured), |exceeded| Err(Refusal::from(exceeded)))
             }
         }
     }
 
     fn leveled(measured: Seconds, warn: Seconds, block: Seconds) -> Verdict {
         Self::exceeded(measured, block)
-            .map(|()| Verdict::Block)
-            .or_else(|| Self::exceeded(measured, warn).map(|()| Verdict::Warn))
+            .map(|_| Verdict::Block)
+            .or_else(|| Self::exceeded(measured, warn).map(|_| Verdict::Warn))
             .unwrap_or(Verdict::Within)
     }
 
-    fn exceeded(measured: Seconds, level: Seconds) -> Option<()> {
-        (measured > level).then_some(())
+    fn exceeded(measured: Seconds, level: Seconds) -> Option<Exceeded> {
+        (measured > level).then_some(Exceeded(level))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Exceeded(Seconds);
+
+impl From<Exceeded> for Refusal {
+    fn from(exceeded: Exceeded) -> Refusal {
+        Refusal::Above { record: exceeded.0 }
     }
 }
 

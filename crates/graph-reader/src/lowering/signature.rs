@@ -150,6 +150,15 @@ impl Semigroup for Declared {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Generic<'scope>(&'scope Name);
+
+impl AsRef<Name> for Generic<'_> {
+    fn as_ref(&self) -> &Name {
+        self.0
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub(super) struct InScope {
     declared: Declared,
@@ -186,8 +195,8 @@ impl From<Declared> for InScope {
 impl InScope {
     const SELF: Word<'static> = Word::new("Self");
 
-    pub(super) fn generic(&self, name: &Name) -> Option<()> {
-        self.declared.parameters.iter().find(|parameter| *parameter == name).map(|_| ())
+    pub(super) fn generic(&self, name: &Name) -> Option<Generic<'_>> {
+        self.declared.parameters.iter().find(|parameter| *parameter == name).map(Generic)
     }
 
     pub(super) fn traits_of(&self, param: &Name) -> Vec<&UsePath> {
@@ -242,8 +251,9 @@ impl InScope {
 
     fn held(&self, path: &syntax::Path, position: Position) -> Option<TypeRef<Written>> {
         let first = path.segments.first().map(|first| Name::from(&first.ident));
-        let declared = first.as_ref().and_then(|head| self.generic(head).map(|()| head));
-        let parameter = declared.map(|name| {
+        let declared = first.as_ref().and_then(|head| self.generic(head));
+        let parameter = declared.map(|generic| {
+            let name = AsRef::<Name>::as_ref(&generic);
             Written::parameter(name.clone(), Spelling::Written([name.clone()].into_iter().collect(), position))
         });
         let subject = first

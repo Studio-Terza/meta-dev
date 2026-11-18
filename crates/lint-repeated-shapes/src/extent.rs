@@ -8,9 +8,15 @@ pub(crate) struct Extent {
     end: Place,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Cover {
+    Covers,
+    Misses,
+}
+
 impl Extent {
-    pub(crate) fn holds(&self, inner: &Extent) -> Option<()> {
-        Some(()).filter(|()| self.start <= inner.start).filter(|()| inner.end <= self.end)
+    pub(crate) fn cover(&self, inner: &Extent) -> Cover {
+        (self.start <= inner.start).then_some(Cover::Covers).filter(|_| inner.end <= self.end).unwrap_or(Cover::Misses)
     }
 
     pub(crate) fn spanning(first: Span, last: Span) -> Extent {

@@ -38,6 +38,13 @@ impl<'found> Krate<'found> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Lineage {
+    Holds,
+    Within,
+    Apart,
+}
+
 impl<'found> Nest<'found> {
     pub const WORKSPACE: Nest<'static> = Nest { krate: None, segments: &[] };
 
@@ -65,8 +72,13 @@ impl<'found> Nest<'found> {
     }
 
     #[must_use]
-    pub fn holding(self, inner: Nest<'found>) -> Option<()> {
-        inner.lineage().find(|outer| *outer == self).map(|_| ())
+    pub fn relation(self, other: Nest<'found>) -> Lineage {
+        other
+            .lineage()
+            .find(|outer| *outer == self)
+            .map(|_| Lineage::Holds)
+            .or_else(|| self.lineage().find(|outer| *outer == other).map(|_| Lineage::Within))
+            .unwrap_or(Lineage::Apart)
     }
 
     #[must_use]
@@ -83,7 +95,9 @@ impl<'found> Nest<'found> {
 
 impl Semigroup for Nest<'_> {
     fn combine(self, other: Self) -> Self {
-        self.lineage().find(|outer| outer.holding(other).is_some()).unwrap_or(Nest { krate: None, segments: &[] })
+        self.lineage()
+            .find(|outer| outer.relation(other) == Lineage::Holds)
+            .unwrap_or(Nest { krate: None, segments: &[] })
     }
 }
 

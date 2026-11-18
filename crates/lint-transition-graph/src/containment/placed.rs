@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::{Fix, Headline, Violation};
+use lint_placement::Lineage;
 
 use super::cluster::Cluster;
 use super::member::Member;
@@ -34,7 +35,7 @@ struct Misplaced<'found> {
 impl<'found> Misplaced<'found> {
     fn found(view: &Containment<'found, '_>, member: Member<'found>) -> Option<Misplaced<'found>> {
         let lowest = view.users_within(member)?;
-        let outside = lowest.holding(member.cluster()).map_or(Some(lowest), |()| None)?;
+        let outside = Some(lowest).filter(|cluster| cluster.relation(member.cluster()) != Lineage::Holds)?;
         Some(Misplaced { member, lowest: outside })
     }
 }

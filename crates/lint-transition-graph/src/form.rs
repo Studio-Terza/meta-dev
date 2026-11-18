@@ -19,6 +19,18 @@ pub struct Acting<'found> {
     parameters: Vec<End<'found>>,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Unwrapped<'found>(Node<'found>);
+
+#[derive(Debug)]
+struct Admitted<'found>(Acting<'found>);
+
+impl<'found> From<Admitted<'found>> for Acting<'found> {
+    fn from(admitted: Admitted<'found>) -> Acting<'found> {
+        admitted.0
+    }
+}
+
 impl<'found> Acting<'found> {
     pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Option<Acting<'found>> {
         let ends = edge.ends();
@@ -27,33 +39,35 @@ impl<'found> Acting<'found> {
         subject
             .node()
             .copied()
-            .filter(|node| Acting::unwrapped(*node, ends.takes(), function.takings()).is_some())
-            .map(|node| Acting::about(node, subject, ends.takes()))
+            .and_then(|node| Acting::unwrapped(node, ends.takes(), function.takings()))
+            .map(|unwrapped| Acting::about(unwrapped, subject, ends.takes()))
             .filter(|acting| acting.grounded().is_some())
-            .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
+            .and_then(|acting| acting.admitted(edge.fixed_by()))
+            .map(Acting::from)
     }
 
-    fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<()> {
+    fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<Unwrapped<'found>> {
         let wrapped = takes
             .iter()
             .zip(takings)
             .filter(|(_, taking)| **taking != Wrapping::Plain)
             .find(|(taken, _)| taken.node() == Some(&subject));
-        wrapped.map_or(Some(()), |_| None)
+        wrapped.map_or(Some(Unwrapped(subject)), |_| None)
     }
 
     fn grounded(&self) -> Option<Count> {
         self.held.nonzero().or_else(|| self.pure().map(|_| self.held))
     }
 
-    fn admitted(&self, fixed_by: Option<&Name>) -> Option<()> {
-        fixed_by.map_or(Some(()), |fixing| Operators::named(fixing).and(self.pure()).map(|_| ()))
+    fn admitted(self, fixed_by: Option<&Name>) -> Option<Admitted<'found>> {
+        let fixing = fixed_by.map(Operators::named);
+        Some(self).filter(|acting| fixing.is_none_or(|named| named.and(acting.pure()).is_some())).map(Admitted)
     }
 
-    fn about(subject: Node<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {
+    fn about(unwrapped: Unwrapped<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {
         let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
             takes.iter().copied().partition(|taken| taken.alike(given).is_some());
-        Acting { subject, held: Count::new(held.len()), parameters }
+        Acting { subject: unwrapped.0, held: Count::new(held.len()), parameters }
     }
 
     pub(crate) fn held(&self) -> Count {

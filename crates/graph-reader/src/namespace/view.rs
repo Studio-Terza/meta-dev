@@ -3,7 +3,7 @@ use graph::Unresolved;
 
 use super::binding::Binding;
 use super::entries::Admission;
-use super::resolver::{Outer, Resolution};
+use super::resolver::{Deference, Dispute, Outer, Resolution};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 enum Found<'rows> {
@@ -48,10 +48,7 @@ impl<'rows> Found<'rows> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Conflicted;
-
-#[derive(Clone, Copy, Debug)]
-pub(super) struct Deferral;
+struct Conflicted;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 enum Determinacy {
@@ -69,10 +66,10 @@ impl Determinacy {
         }
     }
 
-    fn deferral(self) -> Option<Deferral> {
+    fn deference(self) -> Deference {
         match self {
-            Determinacy::Determined => None,
-            Determinacy::Weak | Determinacy::Strong => Some(Deferral),
+            Determinacy::Determined => Deference::Stands,
+            Determinacy::Weak | Determinacy::Strong => Deference::Defers,
         }
     }
 
@@ -109,15 +106,15 @@ impl<'rows> View<'rows> {
         View { found: self.found.undisputed(), pending: self.pending }
     }
 
-    pub(super) fn conflict(self) -> Option<Conflicted> {
-        self.found.bindings().err()
+    pub(super) fn dispute(self) -> Dispute {
+        self.found.bindings().map_or(Dispute::Contested, |_| Dispute::Clear)
     }
 
-    pub(super) fn deferral(self) -> Option<Deferral> {
+    pub(super) fn deference(self) -> Deference {
         match self.found {
-            Found::One(_) => Some(Deferral),
-            Found::Conflict => None,
-            Found::Nothing => self.pending.deferral(),
+            Found::One(_) => Deference::Defers,
+            Found::Conflict => Deference::Stands,
+            Found::Nothing => self.pending.deference(),
         }
     }
 
