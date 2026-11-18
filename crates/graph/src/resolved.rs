@@ -1,8 +1,9 @@
+use algebra::Semigroup;
 use lint_layout::Name;
 
 use crate::boundary::ItemId;
 use crate::external::External;
-use crate::item_path::ItemPath;
+use crate::item_path::{ItemPath, Segment};
 use crate::member::Member;
 use crate::primitive::Primitive;
 use crate::unresolved::Unresolved;
@@ -48,10 +49,14 @@ impl Resolved {
     }
 
     #[must_use]
-    pub fn joined(&self, segment: &Name) -> Option<Resolved> {
+    pub fn joined(&self, segment: Segment<'_>) -> Option<Resolved> {
         match self {
-            Resolved::Std(path) | Resolved::StdTrait(path) => Some(Resolved::Std(path.joined(segment))),
-            Resolved::External(external) => Some(Resolved::External(external.joined(segment))),
+            Resolved::Std(path) | Resolved::StdTrait(path) => {
+                Some(Resolved::Std(path.clone().combine(ItemPath::from(segment))))
+            }
+            Resolved::External(external) => {
+                Some(Resolved::External(external.clone().combine(External::from(ItemPath::from(segment)))))
+            }
             Resolved::Crate(_)
             | Resolved::Member(_)
             | Resolved::Primitive(_)

@@ -48,7 +48,7 @@ pub use implementation::{Assigned, Implementation, Interface, Origin, Subject, U
 pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind, Unplaced};
 pub use item_declaration::ItemDeclaration;
 pub use item_graph::ItemGraph;
-pub use item_path::ItemPath;
+pub use item_path::{ItemPath, Segment};
 pub use law::{Law, LawKind, Operation, OperationOwner, Property, Route, Side};
 pub use lint_layout::Site;
 pub use member::Member;

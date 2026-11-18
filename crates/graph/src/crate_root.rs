@@ -5,7 +5,7 @@ use lint_layout::{LibraryForm, Name, PackageName};
 
 use crate::domain::Domain;
 use crate::external::External;
-use crate::item_path::ItemPath;
+use crate::item_path::{ItemPath, Segment};
 use crate::resolved::Resolved;
 use crate::unresolved::Unresolved;
 
@@ -96,7 +96,7 @@ impl Found {
 
     fn seen_through(self, source: &External, name: &Name) -> Found {
         match self {
-            Found::Own => Found::Through(source.joined(name)),
+            Found::Own => Found::Through(source.clone().combine(External::from(ItemPath::from(Segment::from(name))))),
             Found::Through(_) | Found::Absent | Found::Opaque => self,
         }
     }
@@ -104,7 +104,7 @@ impl Found {
     fn resolved(self, rest: &[Name], written: &External) -> Option<Resolved> {
         match self {
             Found::Through(target) => {
-                Some(Resolved::External(rest.iter().fold(target, |path, segment| path.joined(segment))))
+                Some(Resolved::External(target.combine(External::from(rest.iter().cloned().collect::<ItemPath>()))))
             }
             Found::Own => None,
             Found::Absent | Found::Opaque => Some(Resolved::Unknown(written.path().clone(), Unresolved::Unread)),

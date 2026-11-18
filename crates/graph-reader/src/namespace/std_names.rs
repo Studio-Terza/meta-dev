@@ -1,7 +1,7 @@
 use syntax::Macro;
 
-use algebra::Monoid;
-use graph::{Alias, AliasParameter, Aliases, ItemPath, Named, Primitive, Resolved, Sited, TypeRef};
+use algebra::{Monoid, Semigroup};
+use graph::{Alias, AliasParameter, Aliases, ItemPath, Named, Primitive, Resolved, Segment, Sited, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
 
 use super::binding::Binding;
@@ -150,7 +150,10 @@ impl StdGlob {
         self.members
             .iter()
             .map(|member| Name::from(member.name))
-            .map(|name| Listed { binding: Binding::Std(module.joined(&name)), name })
+            .map(|name| Listed {
+                binding: Binding::Std(module.clone().combine(ItemPath::from(Segment::from(&name)))),
+                name,
+            })
             .collect()
     }
 }

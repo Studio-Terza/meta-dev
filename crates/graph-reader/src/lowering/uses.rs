@@ -5,7 +5,7 @@ mod tokens;
 use syntax::Spanned;
 use syntax::{ExprPath, ExprStruct, Macro, Pat, PatTree, QSelf, Type, TypeParamBound};
 
-use graph::{Domain, Member, Mention, ModelPart, PathUse, Region, Resolved, Seat};
+use graph::{Domain, Member, Mention, ModelPart, PathUse, Region, Resolved, Seat, Segment};
 use lint_layout::{Name, Position, Whole, Word, words};
 
 use crate::namespace::{Invoked, Invoker, UsePath};
@@ -91,7 +91,7 @@ impl Lowers for UseRow {
             .zip(self.written.tail().last());
         let declared = footing.aliases();
         let target = |parent: &Resolved| declared.target(parent).map(AsRef::<Resolved>::as_ref);
-        let aliased = head.as_ref().and_then(|(parent, last)| target(parent)?.joined(last));
+        let aliased = head.as_ref().and_then(|(parent, last)| target(parent)?.joined(Segment::from(*last)));
         let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
         let member = head.as_ref().and_then(|(parent, last)| {
             let owner = target(parent).and_then(Resolved::crate_item).or_else(|| parent.crate_item())?;

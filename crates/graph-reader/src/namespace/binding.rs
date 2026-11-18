@@ -1,5 +1,5 @@
 use algebra::Semigroup;
-use graph::{External, ItemId, ItemPath, Primitive, Resolved, Unresolved};
+use graph::{External, ItemId, ItemPath, Primitive, Resolved, Segment, Unresolved};
 use lint_layout::{Dependencies, Name};
 
 use super::boundary::ScopeId;
@@ -24,8 +24,10 @@ impl Binding {
     pub(super) fn stepped(self, segment: &Name, entered: impl FnOnce(ScopeId) -> Resolution) -> Resolution {
         match self {
             Binding::Module(module) => entered(module),
-            Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
-            Binding::External(external) => Resolution::Bound(Binding::External(external.joined(segment))),
+            Binding::Std(path) => Resolution::Bound(Binding::Std(path.combine(ItemPath::from(Segment::from(segment))))),
+            Binding::External(external) => Resolution::Bound(Binding::External(
+                external.combine(External::from(ItemPath::from(Segment::from(segment)))),
+            )),
             Binding::Unknown(cause) => Resolution::Bound(Binding::Unknown(cause)),
             Binding::Item(..) | Binding::Primitive(_) | Binding::Absent => Resolution::Bound(Binding::UNBOUND),
         }
@@ -72,7 +74,7 @@ impl Binding {
 
     pub(super) fn external(first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         let package = dependencies.and_then(|declared| declared.package(first)).cloned();
-        Binding::External(External::new(package, ItemPath::default().joined(first)))
+        Binding::External(External::new(package, ItemPath::from(Segment::from(first))))
     }
 
     fn issued(item: Option<ItemId>, written: ItemPath) -> Resolved {
