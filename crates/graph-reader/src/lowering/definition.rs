@@ -1,5 +1,6 @@
 use algebra::{Monoid, Semigroup};
 mod branches;
+mod ordering;
 mod reads;
 mod repeats;
 
@@ -17,6 +18,7 @@ use crate::namespace::{Resolving, ScopeId};
 
 use super::signature::{InScope, Written};
 pub(super) use branches::{Branch, Branches};
+use ordering::CallOrders;
 use reads::{Reads, ReadsLowered, SharedParameters};
 use repeats::Parameters;
 pub(super) use repeats::Repeats;
@@ -151,14 +153,6 @@ impl BodyPart {
 }
 
 impl Made {
-    fn order(&self, made: &[Made]) -> Option<CallOrder> {
-        let at = self.receiving()?;
-        let completed = made.iter().position(|found| found.at == at).map_or(0, |index| index + 1);
-        let earlier = made.get(..completed).unwrap_or_default();
-        let counted: Vec<&Made> = earlier.iter().filter(|found| found.invocation.is_some()).collect();
-        CallOrder::latest(&counted)
-    }
-
     fn receiving(&self) -> Option<Address> {
         match &self.invocation {
             Some(PendingInvocation::Method { receiver: PendingReceiver::CallAt(at), .. }) => Some(*at),
@@ -221,7 +215,8 @@ impl BodyGroup {
             self.parameters.into_iter().filter(|(name, _)| rebound.contains(name).then_some(()).is_none()).collect();
         let mut made = part.made;
         made.sort_by_key(|found| found.closed.byte_range().end);
-        let orders: Vec<Option<CallOrder>> = made.iter().map(|found| found.order(&made)).collect();
+        let ordering = CallOrders::from(made.as_slice());
+        let orders: Vec<Option<CallOrder>> = made.iter().map(|found| ordering.order(found)).collect();
         let invocations = made
             .into_iter()
             .zip(orders)

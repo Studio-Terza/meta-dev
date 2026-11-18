@@ -66,7 +66,8 @@ impl Monoid for Repeats {}
 
 impl Repeats {
     pub(crate) fn looped(body: &Block, looping: Looping) -> Repeats {
-        let context = Context { extent: Extent::from(body.span()), repeating: Repeating::Loop(looping) };
+        let context =
+            Context { extent: Extent::from(body.brace_token.span.join()), repeating: Repeating::Loop(looping) };
         Repeats { contexts: vec![context], ..Repeats::default() }
     }
 
@@ -100,7 +101,9 @@ impl Repeats {
             .args
             .iter()
             .filter(|argument| Syntax::closure(argument).is_some())
-            .filter_map(|argument| Some(Context { extent: Extent::from(argument.span()), repeating: adaptor.clone()? }))
+            .filter_map(|argument| {
+                adaptor.clone().map(|repeating| Context { extent: Extent::from(argument.span()), repeating })
+            })
             .collect();
         let receiver = Repeats::receiving(&call.receiver, Name::from(&call.method));
         Repeats { contexts, ..receiver }
@@ -108,9 +111,8 @@ impl Repeats {
 
     fn receiving(receiver: &Expr, method: Name) -> Repeats {
         let touched = Touched::of_expression(receiver);
-        let extent = Extent::from(receiver.span());
         let candidates = touched.map(|found| Candidate {
-            extent,
+            extent: Extent::from(receiver.span()),
             touched: found,
             line: LineNumber::from(receiver.span()),
             method: Some(method),
