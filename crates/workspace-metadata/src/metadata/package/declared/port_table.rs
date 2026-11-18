@@ -7,6 +7,12 @@ use crate::role::Role;
 
 use super::expanders::Expanders;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sharing {
+    Shared,
+    Unshared,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PortTable {
@@ -23,8 +29,8 @@ impl PortTable {
         &self.owns
     }
 
-    pub fn shares(&self, package: &CrateName) -> Option<&CrateName> {
-        self.shared.get(package)
+    pub fn sharing(&self, package: &CrateName) -> Sharing {
+        self.shared.get(package).map_or(Sharing::Unshared, |_| Sharing::Shared)
     }
 
     pub fn dependents(&self) -> Option<Role> {

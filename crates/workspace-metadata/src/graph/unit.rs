@@ -46,12 +46,4 @@ impl<'meta> Unit<'meta> {
             .filter_map(|(declarer, owned)| Some((AsRef::<CrateName>::as_ref(graph.package(declarer)?), owned)))
             .collect()
     }
-
-    pub(super) fn holds(&self, package: &PackageId) -> Option<&'meta PackageId> {
-        self.members.get(package).copied()
-    }
-
-    pub(super) fn shares(&self, package: &CrateName) -> Option<&'meta CrateName> {
-        self.declarations.values().find_map(|declared| declared.shares(package))
-    }
 }
