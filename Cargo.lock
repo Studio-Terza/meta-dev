@@ -1722,6 +1722,7 @@ dependencies = [
  "invariants",
  "lint-core",
  "lint-file",
+ "lint-fixtures",
  "lint-layout",
  "ra-ap-rustc_lexer",
  "syntax",
