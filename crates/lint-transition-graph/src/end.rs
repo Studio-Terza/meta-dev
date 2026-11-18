@@ -5,6 +5,7 @@ use crate::class::Class;
 use crate::count::Count;
 use crate::key::Key;
 use crate::transitions::Wrapping;
+use crate::transitions::endpoint::Argument;
 use graph::Mutation;
 use lint_layout::{Name, Whole, Word};
 
@@ -104,22 +105,28 @@ pub struct End<'found> {
     place: Place,
     name: &'found Name,
     node: Option<Node<'found>>,
+    arguments: &'found [Argument],
 }
 
 impl<'found> End<'found> {
     const UNIT: Word<'static> = Word::new("()");
 
     pub(crate) fn placed(place: Place, name: &'found Name) -> End<'found> {
-        End { place, name, node: None }
+        End { place, name, node: None, arguments: &[] }
     }
 
-    pub(crate) fn domain(node: Node<'found>) -> End<'found> {
-        End { place: Place::Domain, name: node.name, node: Some(node) }
+    pub(crate) fn domain(node: Node<'found>, arguments: &'found [Argument]) -> End<'found> {
+        End { place: Place::Domain, name: node.name, node: Some(node), arguments }
     }
 
     #[must_use]
     pub fn node(&self) -> Option<&Node<'found>> {
         self.node.as_ref()
+    }
+
+    pub(crate) fn alike(&self, other: &End<'found>) -> Option<()> {
+        let node = self.node.filter(|own| Some(own) == other.node.as_ref());
+        node.filter(|_| self.arguments == other.arguments).map(|_| ())
     }
 
     fn spelling(&self) -> Spelling<'_, 'found> {
@@ -174,13 +181,13 @@ impl<'found> Ends<'found> {
         &self.takes
     }
 
-    pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<Node<'found>> {
+    pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<&End<'found>> {
         let receiver = Some(mutation)
             .filter(|candidate| *candidate == Mutation::ThroughSelf)
             .filter(|_| wrapping == Wrapping::Plain)
             .and_then(|_| self.gives.unit())
             .and_then(|_| self.takes.first().or(self.implementer.as_ref()));
-        self.gives.node.or_else(|| receiver.and_then(|end| end.node))
+        self.gives.node.map(|_| &self.gives).or_else(|| receiver.filter(|end| end.node.is_some()))
     }
 
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {

@@ -14,6 +14,8 @@ const NAMESAKE: &str = "pub trait Semigroup {\n    fn combine(self, other: Self)
 
 const NAMESAKE_VISIT: &str = "mod local {\n    pub trait Visit {\n        fn visit(&mut self);\n    }\n}\npub struct A;\nimpl local::Visit for A {\n    fn visit(&mut self) {}\n}\npub struct B;\nimpl syn::visit::Visit<'_> for B {\n    fn visit_item(&mut self, item: &syn::Item) {}\n}\n";
 
+const TYPESTATE: &str = "pub struct Refining;\npub type Refined = Refining;\npub struct Title;\npub struct Node<S> {\n    stage: S,\n}\nimpl<S> Node<S> {\n    pub fn refine(self) -> Node<Refining> {}\n    pub fn titled(self, title: Title) -> Node<S> {}\n    pub fn staged<T>(self, stage: T) -> Node<T> {}\n}\nimpl Node<Refining> {\n    pub fn renamed(self) -> Node<Refined> {}\n}\n";
+
 const LIBRARY: Source = Source::new(Located::new("crates/algebra/src/lib.rs"), Text::new(ALGEBRA));
 const WORKSPACE_FIX: &str =
     "remove each site with the fix its own finding names; the lint blocks once the workspace count reaches zero";
@@ -81,6 +83,18 @@ laws::table!(
         [LIBRARY, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(NAMESAKE_VISIT))] => vec![
             "crates/x/src/lib.rs:8: x::A::visit is an undeclared mutating &mut; return a new value, or move the mutation into a store operation".to_owned(),
             Fixture::workspace("crates/x/src/lib.rs:8: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 0 binary, 1 mutating; 0 std impls are an undeclared algebra; 1 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
+
+laws::table!(
+    a_typestate_edge_is_no_same_type_edge_but_equal_arguments_are_even_through_an_alias,
+    Fixture::reported,
+    [
+        [LIBRARY, Source::new(Located::new("crates/z/src/lib.rs"), Text::new(TYPESTATE))] => vec![
+            "crates/z/src/lib.rs:9: z::Node::titled is an undeclared builder (T, X) -> T; make each fixed step a typestate edge T<S1> to T<S2>, or turn a per-item accumulation into contributions merged by a declared algebra::Monoid".to_owned(),
+            "crates/z/src/lib.rs:13: z::Node::renamed is an undeclared unary T -> T; write the refinement type this produces (transition-graph D14), so the edge goes from the type to a new type".to_owned(),
+            Fixture::workspace("crates/z/src/lib.rs:9: workspace: 2 undeclared same-type edges, 1 unary, 1 builder, 0 binary, 0 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
         ],
     ]
 );
