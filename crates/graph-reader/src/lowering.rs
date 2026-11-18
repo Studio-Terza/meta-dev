@@ -25,15 +25,16 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMod};
 
 use graph::{
-    Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Implementation, Interface, Model,
-    Mutation, Named, Origin, Output, Owner, Region, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Function,
+    Implementation, Interface, Model, ModelPart, Mutation, Named, Origin, Output, Owner, Region, Signature, Sited,
+    Spelling, Subject, TypeRef,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
-    Declared, DeclaredKind, Domain, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap, ScopeOp,
-    Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
+    Declared, DeclaredKind, Domain, ItemIds, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap,
+    ScopeOp, Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
 use crate::planting::Files;
@@ -49,7 +50,7 @@ use lint_sweep::{Address, WalkPosition};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
-use seat::{Built, Footing, Located, Seat};
+use seat::{Footing, Located, Lowers, Seat};
 pub use signature::ReceiverSyntax;
 use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Written};
 
@@ -123,8 +124,8 @@ impl ImplRow {
     }
 }
 
-impl Built for ImplRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for ImplRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let located = self.located;
         let resolving = footing.resolving();
         let implemented = self.implemented.map(|path| {
@@ -151,7 +152,7 @@ impl Built for ImplRow {
                     })
                     .collect(),
             );
-        located.implementation(footing, building, implementation)
+        located.implementation(footing, implementation)
     }
 }
 
@@ -182,8 +183,8 @@ impl FnRow {
     }
 }
 
-impl Built for FnRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for FnRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
@@ -196,7 +197,7 @@ impl Built for FnRow {
             .evaluated(self.evaluation)
             .seated(footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref()))
             .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
-        self.located.function(footing, building, function)
+        self.located.function(footing, function)
     }
 }
 
@@ -208,15 +209,13 @@ struct AliasRow {
     target: TypeRef<Written>,
 }
 
-impl Built for AliasRow {
-    fn built(self, footing: Footing<'_>, mut building: Building) -> Building {
-        let resolving = &footing.resolving();
-        let scope = footing.scopes().scope(&self.scope);
+impl AliasRow {
+    fn declared(self, resolving: &Resolving<'_, '_, '_>, scopes: &ScopeMap) -> Aliases {
+        let scope = scopes.scope(&self.scope);
         let declared = resolving.path(scope, &self.name, Domain::Types).crate_item();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
         let alias = Alias::new(parameters, Written::typed(&self.target, resolving, scope));
-        declared.into_iter().zip([alias]).for_each(|(item, aliased)| building.alias(item, aliased));
-        building
+        declared.map_or_default(|item| Aliases::declaring(item, alias))
     }
 }
 
@@ -326,36 +325,24 @@ impl Semigroup for FileRows {
 
 impl Monoid for FileRows {}
 
-impl FileRows {
-    fn spread<'footing>(self, footing: Footing<'footing>, columns: Columns<'footing>) -> Columns<'footing> {
-        Columns {
-            aliases: Footed::appended(columns.aliases, footing, self.aliases),
-            impls: Footed::appended(columns.impls, footing, self.impls),
-            functions: Footed::appended(columns.functions, footing, self.functions),
-            holdings: Footed::appended(columns.holdings, footing, self.holdings),
-            calls: Footed::appended(columns.calls, footing, self.calls),
-            uses: Footed::appended(columns.uses, footing, self.uses),
-            laws: Footed::appended(columns.laws, footing, self.laws),
-            quotes: Footed::appended(columns.quotes, footing, self.quotes),
-        }
+impl Lowers for FileRows {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
+        Monoid::concat([
+            footing.every(self.impls),
+            footing.every(self.functions),
+            footing.every(self.holdings),
+            footing.every(self.calls),
+            footing.every(self.uses),
+            footing.every(self.laws),
+            footing.every(self.quotes),
+        ])
     }
 }
 
 #[derive(Debug)]
-struct Footed<'footing, Row> {
+struct Footed<'footing> {
     footing: Footing<'footing>,
-    row: Row,
-}
-
-impl<'footing, Row: Built> Footed<'footing, Row> {
-    fn appended(mut column: Vec<Self>, footing: Footing<'footing>, rows: Vec<Row>) -> Vec<Self> {
-        column.extend(rows.into_iter().map(|row| Footed { footing, row }));
-        column
-    }
-
-    fn every_built(column: Vec<Self>, building: Building) -> Building {
-        column.into_iter().fold(building, |built, footed| footed.row.built(footed.footing, built))
-    }
+    rows: FileRows,
 }
 
 #[derive(Debug)]
@@ -404,31 +391,6 @@ impl Grown {
 }
 
 #[derive(Debug, Default)]
-struct Columns<'footing> {
-    aliases: Vec<Footed<'footing, AliasRow>>,
-    impls: Vec<Footed<'footing, ImplRow>>,
-    functions: Vec<Footed<'footing, FnRow>>,
-    holdings: Vec<Footed<'footing, HoldingRow>>,
-    calls: Vec<Footed<'footing, CallRow>>,
-    uses: Vec<Footed<'footing, UseRow>>,
-    laws: Vec<Footed<'footing, LawRow>>,
-    quotes: Vec<Footed<'footing, QuoteRow>>,
-}
-
-impl Columns<'_> {
-    fn built(self, building: Building) -> Building {
-        let with_aliases = Footed::every_built(self.aliases, building);
-        let with_impls = Footed::every_built(self.impls, with_aliases);
-        let with_functions = Footed::every_built(self.functions, with_impls);
-        let with_holdings = Footed::every_built(self.holdings, with_functions);
-        let with_calls = Footed::every_built(self.calls, with_holdings);
-        let with_uses = Footed::every_built(self.uses, with_calls);
-        let with_laws = Footed::every_built(self.laws, with_uses);
-        Footed::every_built(self.quotes, with_laws)
-    }
-}
-
-#[derive(Debug, Default)]
 pub(crate) struct Plot<'read> {
     space: Namespace<'read>,
     grown: Vec<Grown>,
@@ -455,11 +417,12 @@ impl<'read> Plot<'read> {
         slots
     }
 
-    pub(crate) fn built(self, mut building: Building) -> Model {
+    pub(crate) fn built(self, files: FileTable) -> Model {
         let seeds = Seeds::from(&self.space);
         let settled = seeds.settled();
         let tables = seeds.tables(&settled);
-        let ids = self.space.issued(&mut building);
+        let issued = self.space.issued();
+        let ids = ItemIds::from(&issued);
         let unexpanded = Transcriptions::default();
         let naming = Resolving::new(Resolver::new(&self.space, &tables), &ids, &unexpanded);
         let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
@@ -467,40 +430,32 @@ impl<'read> Plot<'read> {
             grown.rows.transcribed.iter().filter_map(move |row| row.settled(based, &grown.scopes))
         }));
         let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids, &transcriptions);
-        let exports = self.space.exports();
-        let with_exports =
-            exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
+        let exports: Exports = Monoid::concat(self.space.exports().iter().map(|export| export.recorded(&resolving)));
         let places: Vec<Places> = Parallel::available().mapped(&self.grown, |grown| grown.settled(&resolving));
-        let with_places = self
-            .grown
-            .iter()
-            .zip(&places)
-            .fold(with_exports, |built, (grown, seated)| seated.placed(grown.file, built));
+        let declarations: ModelPart =
+            Monoid::concat(self.grown.iter().zip(&places).map(|(grown, seated)| seated.placed(grown.file)));
         let mut planted = self.grown;
-        let mut footed: Vec<Footed<'_, FileRows>> = planted
-            .iter_mut()
+        let mut taken: Vec<FileRows> = planted.iter_mut().map(|file| mem::take(&mut file.rows)).collect();
+        let declared: Aliases = Monoid::concat(taken.iter_mut().zip(&planted).flat_map(|(row, grown)| {
+            let based = resolving.based(grown.base);
+            mem::take(&mut row.aliases).into_iter().map(move |alias| alias.declared(&based, &grown.scopes))
+        }));
+        let aliases = StdNames::aliased().combine(declared);
+        let parked: Vec<Parked<Footed<'_>>> = taken
+            .into_iter()
+            .zip(&planted)
             .zip(&places)
-            .map(|(file, seated)| {
-                let row = mem::take(&mut file.rows);
-                let rooted: &Grown = file;
-                Footed { footing: Footing::new(resolving.based(rooted.base), rooted, seated), row }
+            .map(|((rows, grown), seated)| Footed {
+                footing: Footing::new(resolving.based(grown.base), grown, seated, &aliases),
+                rows,
             })
+            .map(Parked::from)
             .collect();
-        let aliases: Vec<Footed<'_, AliasRow>> = footed
-            .iter_mut()
-            .flat_map(|file| {
-                let footing = file.footing;
-                mem::take(&mut file.row.aliases).into_iter().map(move |row| Footed { footing, row })
-            })
-            .collect();
-        let with_aliases = Footed::every_built(aliases, with_places);
-        let parked: Vec<Parked<Footed<'_, FileRows>>> = footed.into_iter().map(Parked::from).collect();
         let fragments = Parallel::available().shares(&parked).worked(|share| {
-            let files = share.iter().filter_map(Parked::taken);
-            let columns = files.fold(Columns::default(), |columns, file| file.row.spread(file.footing, columns));
-            columns.built(with_aliases.fragment())
+            Monoid::concat(share.iter().filter_map(Parked::taken).map(|file| file.rows.lowered(file.footing)))
         });
-        fragments.into_iter().fold(with_aliases, Building::absorbed).built()
+        let part = declarations.combine(Monoid::concat(fragments));
+        Model::lowered(files, Declarations::issued(issued, aliases, exports), part)
     }
 }
 

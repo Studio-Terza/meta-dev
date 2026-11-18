@@ -9,7 +9,7 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Stmt};
 
 use algebra::{Monoid, Semigroup};
-use graph::{Building, FileId, ItemDeclaration, ItemId, Mention, Region, Resolved, Seat, TypeRef};
+use graph::{FileId, ItemDeclaration, ItemId, Mention, ModelPart, Region, Resolved, Seat, TypeRef};
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
@@ -135,11 +135,10 @@ pub(super) struct Places {
 }
 
 impl Places {
-    pub(super) fn placed(&self, file: FileId, building: Building) -> Building {
-        self.order.iter().filter_map(|id| self.places.get(id)?.declared).fold(building, |mut built, declared| {
-            built.placed(file, declared.line, ItemDeclaration::new(declared.item, declared.region));
-            built
-        })
+    pub(super) fn placed(&self, file: FileId) -> ModelPart {
+        Monoid::concat(self.order.iter().filter_map(|id| self.places.get(id)?.declared).map(|declared| {
+            ModelPart::placed(file, declared.line, ItemDeclaration::new(declared.item, declared.region))
+        }))
     }
 
     pub(super) fn seat(&self, region: Region, place: Option<&PlaceId>) -> Seat {

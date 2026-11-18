@@ -5,14 +5,14 @@ mod tokens;
 use syntax::Spanned;
 use syntax::{ExprPath, ExprStruct, Macro, Pat, PatTree, QSelf, Type, TypeParamBound};
 
-use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved, Seat};
+use graph::{Domain, Member, Mention, ModelPart, PathUse, Region, Resolved, Seat};
 use lint_layout::{Name, Position, Whole, Word, words};
 
 use crate::namespace::{Invoked, Invoker, UsePath};
 
 use super::places::PlaceId;
 use super::quotes::QuoteRow;
-use super::seat::{Built, Footing, Located};
+use super::seat::{Footing, Located, Lowers};
 
 use lint_sweep::Address;
 use tokens::TokenPaths;
@@ -51,12 +51,11 @@ impl UseRow {
         Some(Resolved::Member(Member::new(seat.owner()?, last.clone())))
     }
 
-    fn expanded(&self, footing: Footing<'_>, resolved: &Resolved, invoked: &Invoked, building: Building) -> Building {
+    fn expanded(&self, footing: Footing<'_>, resolved: &Resolved, invoked: &Invoked) -> ModelPart {
         match self.mention {
             Mention::Invoked => footing.resolving().transcriptions().expanded(
                 resolved,
                 Invoker::new(footing.resolving(), footing.scopes().scope(self.located.scope()), invoked),
-                building,
             ),
             Mention::Expression
             | Mention::InMacro
@@ -64,7 +63,7 @@ impl UseRow {
             | Mention::Dispatched
             | Mention::Typed
             | Mention::Matched
-            | Mention::Expanded => building,
+            | Mention::Expanded => ModelPart::default(),
         }
     }
 
@@ -81,8 +80,8 @@ impl UseRow {
     }
 }
 
-impl Built for UseRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for UseRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let resolving = footing.resolving();
         let scope = footing.scopes().scope(self.located.scope());
         let direct = resolving.path(scope, &self.written, self.domain());
@@ -90,10 +89,12 @@ impl Built for UseRow {
             .unresolved()
             .and_then(|_| Some(resolving.path(scope, &self.written.qualifier()?, Domain::Types)))
             .zip(self.written.tail().last());
-        let aliased = head.as_ref().and_then(|(parent, last)| building.aliased(parent)?.joined(last));
+        let declared = footing.aliases();
+        let target = |parent: &Resolved| declared.target(parent).map(AsRef::<Resolved>::as_ref);
+        let aliased = head.as_ref().and_then(|(parent, last)| target(parent)?.joined(last));
         let seat = footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref());
         let member = head.as_ref().and_then(|(parent, last)| {
-            let owner = building.aliased(parent).and_then(Resolved::crate_item).or_else(|| parent.crate_item())?;
+            let owner = target(parent).and_then(Resolved::crate_item).or_else(|| parent.crate_item())?;
             Some(Resolved::Member(Member::new(owner, (*last).clone())))
         });
         let valued = || {
@@ -104,13 +105,10 @@ impl Built for UseRow {
         let written = self.written.written();
         let line = self.located.position().line();
         let invoked = Invoked::new(footing.file(), line, seat.clone());
-        let expanded = self.expanded(footing, &resolved, &invoked, building);
+        let expanded = self.expanded(footing, &resolved, &invoked);
         let named = self.kept(&resolved).map(|_| ()).map(|()| resolved);
         let used = named.map(|kept| PathUse::new(written, kept, self.mention, seat));
-        used.into_iter().fold(expanded, |mut built, found| {
-            built.path_use(footing.file(), line, found);
-            built
-        })
+        expanded.combine(used.map_or_default(|found| ModelPart::path_use(footing.file(), line, found)))
     }
 }
 #[derive(Debug)]
