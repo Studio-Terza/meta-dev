@@ -101,6 +101,18 @@ enum Spelling<'end, 'found> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Identity<'found> {
+    node: Node<'found>,
+    arguments: &'found [Argument],
+}
+
+impl fmt::Display for Identity<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.node)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct End<'found> {
     place: Place,
     name: &'found Name,
@@ -125,8 +137,11 @@ impl<'found> End<'found> {
     }
 
     pub(crate) fn alike(&self, other: &End<'found>) -> Option<()> {
-        let node = self.node.filter(|own| Some(own) == other.node.as_ref());
-        node.filter(|_| self.arguments == other.arguments).map(|_| ())
+        self.identity().filter(|own| Some(*own) == other.identity()).map(|_| ())
+    }
+
+    pub(crate) fn identity(&self) -> Option<Identity<'found>> {
+        self.node.map(|node| Identity { node, arguments: self.arguments })
     }
 
     fn spelling(&self) -> Spelling<'_, 'found> {
@@ -202,12 +217,13 @@ impl<'found> Ends<'found> {
     }
 
     pub(crate) fn key(&self) -> Option<Key<'found>> {
-        let mut takes: Vec<Node<'found>> = self.takes.iter().map(|taken| taken.node).collect::<Option<Vec<Node>>>()?;
-        let gives = self.gives.node?;
+        let mut takes: Vec<Identity<'found>> =
+            self.takes.iter().map(End::identity).collect::<Option<Vec<Identity>>>()?;
+        let gives = self.gives.identity()?;
         let selector = self
             .implementer
             .as_ref()
-            .and_then(|implementer| implementer.node)
+            .and_then(End::identity)
             .filter(|implementer| *implementer != gives)
             .filter(|implementer| takes.iter().all(|taken| taken != implementer));
         takes.extend(selector);

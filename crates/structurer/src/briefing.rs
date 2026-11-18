@@ -139,18 +139,14 @@ impl Choice {
     ];
 
     fn read(self, fields: Fields) -> Result<Parsed<Choice, Fields>, Unread> {
-        self.passed(fields).map(|rest| Parsed::new(self, rest))
-    }
-
-    fn passed(self, fields: Fields) -> Result<Fields, Unread> {
         match self {
-            Choice::SpanRelation => fields.past(SpanRelation::VARIANTS),
-            Choice::SegmentRelation => fields.past(SegmentRelation::VARIANTS),
-            Choice::Kind => fields.past(SenseKind::VARIANTS),
-            Choice::Specificity => fields.past(Specificity::VARIANTS),
-            Choice::Confidence => fields.past(Confidence::VARIANTS),
-            Choice::Explicitness => fields.past(Explicitness::VARIANTS),
-            Choice::Facet => fields.past(Facet::VARIANTS),
+            Choice::SpanRelation => fields.passing(SpanRelation::VARIANTS, self),
+            Choice::SegmentRelation => fields.passing(SegmentRelation::VARIANTS, self),
+            Choice::Kind => fields.passing(SenseKind::VARIANTS, self),
+            Choice::Specificity => fields.passing(Specificity::VARIANTS, self),
+            Choice::Confidence => fields.passing(Confidence::VARIANTS, self),
+            Choice::Explicitness => fields.passing(Explicitness::VARIANTS, self),
+            Choice::Facet => fields.passing(Facet::VARIANTS, self),
         }
     }
 

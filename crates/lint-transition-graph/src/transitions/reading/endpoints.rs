@@ -79,7 +79,17 @@ impl Argument {
 
     fn expanded(ty: &TypeRef, endpoints: Endpoints<'_, '_, '_>) -> Argument {
         let parameter = ty.named().and_then(|named| AsRef::<Target>::as_ref(named).parameter().cloned());
-        parameter.map_or_else(|| Argument::Typed(ty.outlined(endpoints).or_opaque()), Argument::Parameter)
+        let wrapper = ty.named().and_then(|named| {
+            let target: &Target = named.as_ref();
+            let wrapped = target.std().and_then(ItemPath::last);
+            let last = wrapped.filter(|name| name.matches::<Whole>(&Endpoints::WRAPPERS).is_some())?;
+            let listed = Argument::listed(named, endpoints);
+            Some(Argument::Typed(Endpoint::declared(last.clone(), Some(Name::from(Endpoints::STD)), listed)))
+        });
+        parameter
+            .map(Argument::Parameter)
+            .or(wrapper)
+            .unwrap_or_else(|| Argument::Typed(ty.outlined(endpoints).or_opaque()))
     }
 }
 

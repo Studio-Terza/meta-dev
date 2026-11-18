@@ -10,19 +10,13 @@ pub trait Record: Sized {
     fn read(fields: Fields) -> Result<Parsed<Self, Fields>, Unread>;
 }
 
-pub trait Mapped<T>: Sized {
-    fn parsed(self) -> Result<Parsed<T, Fields>, Unread>;
-
-    fn mapped<Into>(self, convert: impl FnOnce(T) -> Into) -> Result<Parsed<Into, Fields>, Unread> {
-        self.parsed().map(|read| read.map(convert))
+pub trait Mapped<T>: Into<Result<Parsed<T, Fields>, Unread>> {
+    fn mapped<Converted>(self, convert: impl FnOnce(T) -> Converted) -> Result<Parsed<Converted, Fields>, Unread> {
+        self.into().map(|read| read.map(convert))
     }
 }
 
-impl<T> Mapped<T> for Result<Parsed<T, Fields>, Unread> {
-    fn parsed(self) -> Result<Parsed<T, Fields>, Unread> {
-        self
-    }
-}
+impl<T> Mapped<T> for Result<Parsed<T, Fields>, Unread> {}
 
 impl<T, Rest> Parsed<T, Rest> {
     #[must_use]

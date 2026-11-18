@@ -185,6 +185,10 @@ impl Fields {
         })
     }
 
+    pub fn passing<K: FromStr + PartialEq, T>(self, keys: &[K], value: T) -> Result<Parsed<T, Fields>, Unread> {
+        self.past(keys).map(|rest| Parsed::new(value, rest))
+    }
+
     pub fn record<R: Record>(self) -> Result<Parsed<R, Fields>, Unread> {
         R::read(self)
     }
