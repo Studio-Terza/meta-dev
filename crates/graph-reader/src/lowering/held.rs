@@ -4,7 +4,7 @@ use lint_sweep::Contributed;
 use syntax::Spanned;
 use syntax::{Attribute, Field, Generics, Ident, ItemStruct, ItemTrait, Type};
 
-use graph::{Held, Holding, ItemId, ModelPart};
+use graph::{Held, ItemId, ModelPart, Unsited};
 use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
@@ -74,7 +74,7 @@ impl Lowers for HoldingRow {
         let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let declares = self.link.declares(resolving, scope);
-        let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
+        let holding = Unsited::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
             .placed(self.region.combine(footing.outer()), declares);
         self.located.holding(footing, holding)
     }

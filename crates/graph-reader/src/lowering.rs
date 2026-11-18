@@ -26,9 +26,9 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMod};
 
 use graph::{
-    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Implementation,
-    Interface, Model, ModelPart, Mutation, Named, Origin, Output, Owner, Region, Signature, Signed, Sited, Spelling,
-    Subject, TypeRef,
+    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Interface, Model,
+    ModelPart, Monomorphic, Mutation, Named, Origin, Output, Owner, Region, Signed, Sited, Spelling, Subject, TypeRef,
+    Unparameterised,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
@@ -138,21 +138,22 @@ impl Lowers for ImplRow {
         let subject =
             Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scopes().scope(located.scope())));
         let implementation =
-            Implementation::new(subject, implemented, self.origin, self.region.combine(footing.outer())).parameterised(
-                self.parameters
-                    .into_iter()
-                    .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
-                    .collect(),
-                self.assigned
-                    .iter()
-                    .map(|assigned| {
-                        Assigned::new(
-                            assigned.name.clone(),
-                            Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
-                        )
-                    })
-                    .collect(),
-            );
+            Unparameterised::new(subject, implemented, self.origin, self.region.combine(footing.outer()))
+                .parameterised(
+                    self.parameters
+                        .into_iter()
+                        .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
+                        .collect(),
+                    self.assigned
+                        .iter()
+                        .map(|assigned| {
+                            Assigned::new(
+                                assigned.name.clone(),
+                                Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
+                            )
+                        })
+                        .collect(),
+                );
         located.implementation(footing, implementation)
     }
 }
@@ -193,7 +194,7 @@ impl Lowers for FnRow {
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
         let mutated = self.mutated.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
-        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints).generic(
+        let signature = Monomorphic::new(inputs, Self::resolved(resolving, scope, self.output), constraints).generic(
             parameters,
             self.mutation,
             mutated,

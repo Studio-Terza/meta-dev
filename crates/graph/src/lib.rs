@@ -40,11 +40,11 @@ pub use function::definition::{
     Repeating, Repetition,
 };
 pub use function::{
-    Entry, Evaluation, Function, Input, MethodShape, Mutated, Mutation, Output, Owner, Parameter, Receiver, Returned,
-    Signature, Signed, Taken,
+    Entry, Evaluation, Function, Input, MethodShape, Monomorphic, Mutated, Mutation, Output, Owner, Parameter,
+    Receiver, Returned, Signature, Signed, Taken,
 };
-pub use holding::{Held, Holding};
-pub use implementation::{Assigned, Implementation, Interface, Origin, Subject};
+pub use holding::{Held, Holding, Unsited};
+pub use implementation::{Assigned, Implementation, Interface, Origin, Subject, Unparameterised};
 pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind, Unplaced};
 pub use item_declaration::ItemDeclaration;
 pub use item_graph::ItemGraph;

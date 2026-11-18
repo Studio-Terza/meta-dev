@@ -161,24 +161,27 @@ impl From<Output> for Signature {
     }
 }
 
-impl Signature {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Monomorphic {
+    inputs: Vec<Input>,
+    output: Output,
+    constraints: Vec<TypeRef>,
+}
+
+impl Monomorphic {
     #[must_use]
-    pub fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Signature {
-        Signature {
-            inputs,
-            output,
-            constraints,
-            parameters: Vec::new(),
-            mutation: Mutation::Absent,
-            mutated: Mutated::default(),
-        }
+    pub fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Monomorphic {
+        Monomorphic { inputs, output, constraints }
     }
 
     #[must_use]
     pub fn generic(self, parameters: Vec<Parameter>, mutation: Mutation, mutated: Vec<TypeRef>) -> Signature {
-        Signature { parameters, mutation, mutated: Mutated(mutated), ..self }
+        let Monomorphic { inputs, output, constraints } = self;
+        Signature { inputs, output, constraints, parameters, mutation, mutated: Mutated(mutated) }
     }
+}
 
+impl Signature {
     #[must_use]
     pub fn mutation(&self) -> Mutation {
         self.mutation
