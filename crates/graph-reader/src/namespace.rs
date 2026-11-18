@@ -16,19 +16,21 @@ mod view;
 
 use std::collections::BTreeMap;
 
-use graph::{Building, Unresolved};
+use graph::Building;
 use lint_layout::{Dependencies, Name};
 
 use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::ScopeId;
+use entries::DeclaredAt;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
 pub(crate) use graph::Domain;
 pub(crate) use items::ItemIds;
 pub(crate) use port_macro::PortMacro;
 pub(crate) use resolver::Resolver;
 pub(crate) use resolving::{Invoked, Invoker, Resolving, TranscribedRow, Transcriptions};
-pub(crate) use rules::{Rules, TokenNames};
+use rules::RulesDefinition;
+pub(crate) use rules::TokenNames;
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;
@@ -186,13 +188,8 @@ impl<'read> Namespace<'read> {
             .and_then(|root| root.row(&self.scopes).and_then(|row| row.entries().prelude(name, self, root)))
     }
 
-    pub(super) fn expanded(&self, viewer: ScopeId, name: &Name) -> Unresolved {
-        self.chain(viewer)
-            .iter()
-            .filter_map(|scope| scope.row(&self.scopes))
-            .map(|row| row.entries().unresolved(name))
-            .max()
-            .unwrap_or(Unresolved::Unbound)
+    pub(super) fn rules(&self, at: DeclaredAt) -> Option<RulesDefinition> {
+        at.scope().row(&self.scopes).and_then(|row| row.entries().rules(at.declared_id()))
     }
 
     pub(super) fn within_reach(&self, level: ScopeId, from: ScopeId) -> Option<ScopeId> {

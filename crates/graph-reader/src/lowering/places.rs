@@ -170,7 +170,7 @@ impl Lowering<'_> {
 
     fn expanded(&mut self, invocation: &Macro) -> &mut Self {
         let items = Macros::items_in_file(self.source, invocation);
-        self.lowered.openings.absorb(self.here.scope(), Entries::of_items(&items, &self.rules));
+        self.lowered.openings.absorb(self.here.scope(), Entries::of_items(&items));
         let outer = self.context;
         self.context = self.context.within_macro(MacroItems::Expanded);
         let mut scoped = Scoped::new(&mut *self);

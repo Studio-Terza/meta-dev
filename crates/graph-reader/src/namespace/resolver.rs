@@ -7,7 +7,8 @@ use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::Binding;
 use super::boundary::{GlobId, Lattice, ScopeId};
-use super::entries::Sight;
+use super::entries::{DeclaredAt, Sight};
+use super::rules::{RulesDefinition, Written};
 use super::settling::Target;
 use super::std_names::{Canonical, StdNames, Table};
 use super::tables::{Key, Lookup, Tables};
@@ -76,6 +77,20 @@ impl Resolution {
         match self {
             Resolution::Waiting => Some(self),
             Resolution::Bound(binding) => binding.present().map(|_| self),
+        }
+    }
+
+    pub(super) fn declared(&self) -> Option<DeclaredAt> {
+        match self {
+            Resolution::Waiting => None,
+            Resolution::Bound(binding) => binding.declared(),
+        }
+    }
+
+    pub(super) fn narrowed(self, rules: Option<RulesDefinition>, written: &Written) -> Target {
+        match self {
+            Resolution::Waiting => Target::Waiting,
+            Resolution::Bound(_) => Target::narrowed(rules, written),
         }
     }
 
@@ -164,6 +179,18 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
             .target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
     }
 
+    pub(super) fn invoked_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId, written: &Written) -> Target {
+        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), importing: None };
+        let found = resolver.path(path, scope, Domain::Macros);
+        let rules = found.declared().and_then(|at| self.space.rules(at));
+        found.narrowed(rules, written)
+    }
+
+    pub(super) fn expanded(&self, viewer: ScopeId, name: &Name) -> Unresolved {
+        let chain = self.space.chain(viewer).iter();
+        chain.map(|scope| self.tables.unresolved(*scope, name)).fold(Unresolved::Unbound, Ord::max)
+    }
+
     pub(super) fn space(&self) -> &'tables Namespace<'tables> {
         self.space
     }
@@ -177,7 +204,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         self.chained(viewer, Key::new(Domain::Macros, first), Reading::Written).contested(
             || derive.map(|found| Binding::Std(found.path())),
             || Outer::from(derive),
-            || self.space.expanded(viewer, first),
+            || self.expanded(viewer, first),
         )
     }
 
@@ -185,7 +212,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         self.chained(viewer, key, Reading::Written).contested(
             || None,
             || Outer::Assumed(Binding::UNBOUND),
-            || self.space.expanded(viewer, key.name()),
+            || self.expanded(viewer, key.name()),
         )
     }
 
@@ -193,7 +220,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         self.chained(viewer, Key::new(Domain::Types, first), reading).contested(
             || shape.builtin(first, reading, self.space, viewer),
             || shape.fallback(first, reading, self.space, viewer),
-            || self.space.expanded(viewer, first),
+            || self.expanded(viewer, first),
         )
     }
 
@@ -207,7 +234,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
                     Key::new(domain, segment),
                     Lookup::new(Sight::ByPath.beyond(self.space.within_reach(module, viewer)), None, Reading::Written),
                 )
-                .settled(|| Outer::Assumed(Binding::Absent), || self.space.expanded(module, segment)),
+                .settled(|| Outer::Assumed(Binding::Absent), || self.expanded(module, segment)),
         }
     }
 

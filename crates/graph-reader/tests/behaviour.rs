@@ -67,6 +67,7 @@ const MACRO_STD_STATEMENTS: &str =
 const MACRO_PATHED_STATEMENT: &str = "fn f() {\n    std::println!(\"a\");\n    impl Clone for R {}\n}\n";
 const RULE_MAY_DECLARE: &str =
     "macro_rules! make {\n    ($($t:tt)*) => {};\n}\nmake!(Mark);\nimpl Mark for R {}\nimpl Clone for R {}\n";
+const FOREIGN_NAMESAKE: &str = "mod a {\n    macro_rules! make {\n        ($($t:tt)*) => {};\n    }\n}\nserde::make!(Mark);\nimpl Clone for R {}\n";
 const RULE_STATEMENT: &str =
     "macro_rules! make {\n    ($($t:tt)*) => {};\n}\nfn f() {\n    make!(Mark);\n    impl Clone for R {}\n}\n";
 const BLOCK_CHAIN: &str = "fn f() {\n    use std::fmt::Debug as Show;\n    {\n        impl Show for R {}\n    }\n    mod m {\n        impl Show for R {}\n    }\n}\n";
@@ -752,6 +753,7 @@ laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resol
 
 laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| Read::resolved(text), [
     MACRO_CALL => [Expect::unknown(&["Clone"])],
+    FOREIGN_NAMESAKE => [Expect::unknown(&["Clone"])],
     MACRO_STATEMENT => [Expect::unknown(&["Clone"])],
     MACRO_DEFINED => [Expect::std_trait(&["std", "clone", "Clone"])],
     MACRO_PATHED_STATEMENT => [Expect::unknown(&["Clone"])],

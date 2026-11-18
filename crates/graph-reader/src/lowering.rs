@@ -33,8 +33,8 @@ use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
-    Declared, DeclaredKind, Domain, Entries, Exposing, Namespace, Openings, Resolver, Resolving, Rules, ScopeId,
-    ScopeKind, Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
+    Declared, DeclaredKind, Domain, Entries, Exposing, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKind,
+    Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
 use crate::planting::Files;
@@ -351,11 +351,11 @@ impl From<&SourceFile> for FileShape {
 }
 
 impl<'read> Lowering<'read> {
-    pub(crate) fn of_file(source: &'read SourceFile, reach: Reach, rules: Arc<Rules>) -> Lowering<'read> {
+    pub(crate) fn of_file(source: &'read SourceFile, reach: Reach) -> Lowering<'read> {
         let syntax = source.syntax();
         let shape = FileShape::from(source);
         let lowered = Lowered {
-            openings: Openings::new(Entries::of_items(&syntax.items, &rules)),
+            openings: Openings::new(Entries::of_items(&syntax.items)),
             slots: Vec::new(),
             rows: FileRows::default(),
         };
@@ -366,7 +366,6 @@ impl<'read> Lowering<'read> {
             here: Seat::new(ScopeId::FIRST, shape.children),
             enclosure: shape.enclosure,
             generics: Arc::new(InScope::outside()),
-            rules,
             context: Context::outermost(Regions::of_file(source, reach)),
             frames: Vec::new(),
             calling: None,
@@ -512,7 +511,6 @@ pub(crate) struct Lowering<'read> {
     here: Seat,
     enclosure: Enclosure,
     generics: Arc<InScope>,
-    rules: Arc<Rules>,
     context: Context,
     frames: Vec<Frame>,
     calling: Option<Address>,
@@ -530,7 +528,7 @@ impl Lowering<'_> {
     fn module_entered(&mut self, item: &ItemMod, items: &[syntax::Item]) -> Descend {
         let name = Name::from(&item.ident);
         let children = Arc::from(self.here.children().join(&name));
-        let outer = self.entered(ScopeKind::Module, Entries::of_items(items, &self.rules), children);
+        let outer = self.entered(ScopeKind::Module, Entries::of_items(items), children);
         let module = Declared::new(name, Visibility::from(&item.vis), DeclaredKind::Module(self.here.scope()));
         self.lowered.openings.declare(outer.scope(), module);
         self.enclosure = Enclosure::Module;
@@ -644,7 +642,7 @@ impl<'ast> Watch<'ast> for Lowering<'_> {
 
     fn on_block(&mut self, block: &'ast Block, _: &Facts<'_, Block>) -> Descend {
         self.saved();
-        self.entered(ScopeKind::Block, Entries::of_block(&block.stmts, &self.rules), self.here.children());
+        self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
         Descend::Into
     }
 

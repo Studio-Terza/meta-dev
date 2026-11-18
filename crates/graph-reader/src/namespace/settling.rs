@@ -7,8 +7,9 @@ use super::binding::Binding;
 use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::resolver::{Resolution, Resolver};
+use super::rules::{RulesDefinition, Written};
 use super::std_names::{Listed, StdNames};
-use super::tables::{Exposed, GlobView, Key, Keyed, Layer, ModuleGlob, Row, Tables};
+use super::tables::{Declaring, Exposed, GlobView, Key, Keyed, Layer, ModuleGlob, Row, Tables};
 use super::view::View;
 use super::{Namespace, ScopeRow};
 use crate::parallel::Parallel;
@@ -62,7 +63,14 @@ impl Target {
         }
     }
 
-    pub(super) fn scoped(names: &BTreeSet<Name>) -> Target {
+    pub(super) fn narrowed(rules: Option<RulesDefinition>, written: &Written) -> Target {
+        match rules {
+            Some(_) => Target::scoped(written.names()),
+            None => Target::Opaque,
+        }
+    }
+
+    fn scoped(names: &BTreeSet<Name>) -> Target {
         Target::Scoped(names.iter().cloned().collect())
     }
 
@@ -84,6 +92,13 @@ impl Target {
                 Some(ModuleGlob::new(GlobView::new(id, visibility, Exposed::default()), *module, *sight))
             }
             Target::Waiting | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => None,
+        }
+    }
+
+    pub(super) fn declaring(&self) -> Declaring<'_> {
+        match self {
+            Target::Scoped(names) => Declaring::Only(names),
+            Target::Waiting | Target::Module(..) | Target::Listed(_) | Target::Opaque => Declaring::Anything,
         }
     }
 
@@ -161,7 +176,8 @@ impl Seeds<'_> {
         });
         let fixed = scopes.iter().zip(settling).map(|(row, settled)| row.entries().fixed(&settled.targets));
         let modules = scopes.iter().zip(settling).map(|(row, settled)| row.entries().modules(&settled.targets));
-        Tables::new(explicit, fixed.collect(), modules.collect())
+        let declaring = scopes.iter().zip(settling).map(|(row, settled)| row.entries().declaring(&settled.targets));
+        Tables::new(explicit, fixed.collect(), modules.collect(), declaring.collect())
     }
 
     fn advanced(&self, settling: &[ScopeSettling]) -> Vec<ScopeSettling> {
