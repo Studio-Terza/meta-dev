@@ -81,7 +81,7 @@ struct LoweredAssigned {
 impl ImplRow {
     fn written(seat: &Seat, region: Region, block: &ItemImpl, scope: &InScope) -> ImplRow {
         let ty = scope.lowered(&block.self_ty);
-        let within = scope.subject(ty.clone());
+        let within = scope.clone().combine(InScope::from(ty.clone()));
         ImplRow {
             located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),

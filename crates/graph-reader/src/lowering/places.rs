@@ -18,7 +18,7 @@ use crate::namespace::{
 };
 
 use super::regions::MacroItems;
-use super::signature::Written;
+use super::signature::{InScope, Written};
 use super::{Enclosure, ImplRow};
 use lint_sweep::Descend;
 
@@ -243,9 +243,9 @@ impl<'read> Frame<'read> {
     }
 
     pub(super) fn impl_entered(&self, block: &ItemImpl) -> Contributed<Framed<'read>, Grains> {
-        let declared = self.generics.extended(&block.generics);
+        let declared = InScope::clone(&self.generics).combine(InScope::from(&block.generics));
         let subject = declared.lowered(&block.self_ty);
-        let generics = declared.subject(subject.clone());
+        let generics = declared.clone().combine(InScope::from(subject.clone()));
         let implemented = ImplRow::written(&self.here, self.context.region(), block, &declared);
         let key = ScopeKey::reached(&self.within, NodeKey::new(self.at, KeyRole::Scope));
         let traited = block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path));

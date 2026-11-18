@@ -59,7 +59,7 @@ impl<'read> Frame<'read> {
         visibility: &SynVisibility,
         signature: &SynSignature,
     ) -> Functioned {
-        let generics = self.generics.extended(&signature.generics);
+        let generics = InScope::clone(&self.generics).combine(InScope::from(&signature.generics));
         let name = Name::from(&signature.ident);
         let row = FnRow {
             located: self.here.located(Position::from(signature.ident.span())),
@@ -152,7 +152,7 @@ impl<'read> Lowering<'read> {
             source,
             here: Seat::new(ScopeKey::default(), shape.children),
             enclosure: shape.enclosure,
-            generics: Arc::new(InScope::outside()),
+            generics: Arc::new(InScope::default()),
             context: Context::outermost(Regions::of_file(source, reach)),
             calling: None,
             tabled: None,
@@ -269,7 +269,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let generics = frame.generics.subjectless().extended(&item.generics);
+        let generics = InScope::from(frame.generics.declared().clone()).combine(InScope::from(&item.generics));
         let bounds = frame.trait_bounds(item, &generics);
         let owning = frame.trait_owning(&item.ident, &item.attrs);
         let filler = frame.filler_owning(item);
@@ -345,7 +345,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let generics = InScope::outside().extended(&item.generics);
+        let generics = InScope::from(&item.generics);
         let target = generics.lowered(&item.ty);
         let held = frame.hold(Holder::named(&item.ident, Held::Alias), Link::declaring(&item.ident), target.clone());
         let alias = AliasRow {
@@ -365,7 +365,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let scope = frame.generics.extended(&item.generics);
+        let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
         let link = Link::declaring(&item.ident);
         let rows = frame
             .attributed(&Attributes::from(item.attrs.as_slice()), &item.ident)
@@ -381,7 +381,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let scope = frame.generics.extended(&item.generics);
+        let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
         let link = Link::declaring(&item.ident);
         let variants = item.variants.iter().map(|variant| {
             let unit = frame.hold(
@@ -406,7 +406,7 @@ impl<'read> Contribute for Lowering<'read> {
         around: &Around<'_, Framed<'read>>,
     ) -> Grown<'read> {
         let frame = self.frame(around);
-        let scope = frame.generics.extended(&item.generics);
+        let scope = InScope::clone(&frame.generics).combine(InScope::from(&item.generics));
         let link = Link::declaring(&item.ident);
         let rows = frame.attributed(&Attributes::from(item.attrs.as_slice()), &item.ident).combine(frame.fields_held(
             &Holder::named(&item.ident, Held::UnionField),

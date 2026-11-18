@@ -104,7 +104,7 @@ impl<'read> Frame<'read> {
     }
 
     pub(super) fn parameters(&self, holder: &Holder, generics: &Generics, link: &Link) -> Grains {
-        let scope = self.generics.extended(generics);
+        let scope = InScope::clone(&self.generics).combine(InScope::from(generics));
         Monoid::concat(scope.constraints(generics).into_iter().map(|ty| self.hold(holder.clone(), link.clone(), ty)))
     }
 
