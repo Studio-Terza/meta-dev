@@ -583,13 +583,18 @@ enum Grain {
 
 #[derive(Debug, Default)]
 pub(crate) struct Grains {
-    grains: Catenation<Grain>,
+    sown: Catenation<Grain>,
     bodies: Catenation<BodyPart>,
+    opened: Option<Box<FnRow>>,
 }
 
 impl Semigroup for Grains {
     fn combine(self, other: Grains) -> Grains {
-        Grains { grains: self.grains.combine(other.grains), bodies: self.bodies.combine(other.bodies) }
+        Grains {
+            sown: self.sown.combine(other.sown),
+            bodies: self.bodies.combine(other.bodies),
+            opened: self.opened.or(other.opened),
+        }
     }
 }
 
@@ -597,7 +602,13 @@ impl Monoid for Grains {}
 
 impl From<Grain> for Grains {
     fn from(grain: Grain) -> Grains {
-        Grains { grains: Catenation::from(vec![grain]), bodies: Catenation::default() }
+        Grains { sown: Catenation::from(vec![grain]), ..Grains::default() }
+    }
+}
+
+impl From<FnRow> for Grains {
+    fn from(row: FnRow) -> Grains {
+        Grains { opened: Some(Box::new(row)), ..Grains::default() }
     }
 }
 
@@ -647,44 +658,24 @@ impl From<FileRows> for Sorted {
 
 impl From<Grains> for Sorted {
     fn from(grains: Grains) -> Sorted {
-        Monoid::concat(grains.grains.into_iter().map(Sorted::from))
-    }
-}
-
-impl Grain {
-    fn function(&self) -> Option<&FnRow> {
-        match self {
-            Grain::Function(row) => Some(row),
-            Grain::Impl(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
-    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
-        match self {
-            Grain::Function(row) => Grain::Function(FnRow { definition: definition.or(row.definition), ..row }),
-            other => other,
-        }
+        Monoid::concat(grains.sown.into_iter().map(Sorted::from))
     }
 }
 
 impl From<BodyPart> for Grains {
     fn from(part: BodyPart) -> Grains {
-        Grains { grains: Catenation::default(), bodies: Catenation::from(vec![part]) }
+        Grains { bodies: Catenation::from(vec![part]), ..Grains::default() }
     }
 }
 
 impl Grains {
     fn closed(self) -> Grains {
-        Grains { grains: self.grains, bodies: Catenation::default() }
+        Grains { bodies: Catenation::default(), ..self }
+    }
+}
+
+impl FnRow {
+    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
+        Grain::Function(FnRow { definition: definition.or(self.definition), ..self })
     }
 }

@@ -7,7 +7,7 @@ use syntax::{
     Macro, Signature as SynSignature, TraitItemFn, Visibility as SynVisibility,
 };
 
-use algebra::{Monoid, Semigroup};
+use algebra::{Catenation, Monoid, Semigroup};
 use graph::{Evaluation, Looping, Reach};
 use lint_core::SourceFile;
 use lint_layout::{Name, Position};
@@ -82,7 +82,7 @@ impl<'read> Frame<'read> {
         let inner = Frame { context: self.context.within_item(attributes), ..self.clone() };
         let Functioned { row, generics } = inner.function(attributes, visibility, signature);
         let frame = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
-        frame.framed(Grains::from(Grain::Function(row)), Descend::Into)
+        frame.framed(Grains::from(row), Descend::Into)
     }
 
     pub(super) fn module_entered(&self, item: &ItemMod, items: &[syntax::Item]) -> Grown<'read> {
@@ -113,14 +113,11 @@ impl<'read> Frame<'read> {
     ) -> Grains {
         inner.concluded(|framed, grown| {
             let generics = framed.0.map_or_else(|| Arc::clone(&self.generics), |frame| frame.generics);
-            let kept: Vec<Grain> = grown.grains.into_iter().collect();
-            let part: BodyPart = Monoid::concat(grown.bodies);
+            let Grains { sown, bodies, opened } = grown;
+            let part: BodyPart = Monoid::concat(bodies);
             let definition = body.map(|block| BodyGroup::opened(&generics, signature, block).lowered(part));
-            let own = kept.iter().position(|grain| grain.function().is_some());
-            let mut ahead = kept;
-            let rest = ahead.split_off(own.map_or(ahead.len(), |found| found + 1));
-            let defined = own.and_then(|_| ahead.pop()).map(|function| function.defined(definition));
-            Grains { grains: ahead.into_iter().chain(defined).chain(rest).collect(), ..Grains::default() }
+            let defined = opened.map(|row| FnRow::defined(*row, definition));
+            Grains { sown: defined.into_iter().collect::<Catenation<Grain>>().combine(sown), ..Grains::default() }
         })
     }
 }
@@ -277,7 +274,7 @@ impl<'read> Contribute for Lowering<'read> {
         let inner = Frame { context, ..frame.clone() };
         let Functioned { row, generics } = inner.function(&item.attrs, &item.vis, &item.sig);
         let body = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
-        body.framed(owning.grains.combine(Grains::from(Grain::Function(row))), Descend::Into)
+        body.framed(owning.grains.combine(Grains::from(row)), Descend::Into)
     }
 
     fn off_item_fn(&self, item: &ItemFn, _: &Facts<'_, ItemFn>, inner: Contribution<Framed<'read>, Grains>) -> Grains {

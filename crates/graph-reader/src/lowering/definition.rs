@@ -247,7 +247,7 @@ impl BodyGroup {
         let bound: BTreeMap<Name, TypeRef<Written>> =
             self.parameters.into_iter().filter(|(name, _)| rebound.contains(name).then_some(()).is_none()).collect();
         let mut made = part.made;
-        made.sort_by_key(|found| found.closed.byte_range().end);
+        made.sort_by_cached_key(|found| found.closed.byte_range().end);
         let ordering = CallOrders::from(made.as_slice());
         let orders: Vec<Option<CallOrder>> = made.iter().map(|found| ordering.order(found)).collect();
         let invocations = made
