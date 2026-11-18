@@ -1,16 +1,20 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+mod ignored;
 mod ports;
 
 use std::error::Error;
 
 use design::{Failure, Flail, Flails, HookEvent, Line, Sequel, Unmatched};
 use design_model::{JobId, Prefix};
+use invariants::Ignoring;
 use newtype::Enumerated;
 use ports::Design;
 use serde_json::Value;
 use structurer::{Directives, Lapse};
 use text_lines::Lines;
+
+use ignored::Ignored;
 
 #[test]
 fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Box<dyn Error>> {
@@ -47,7 +51,7 @@ fn the_hook_settings_are_json_naming_for_every_event_a_command_that_runs_its_hoo
     let commanded = HookEvent::VARIANTS
         .iter()
         .filter_map(|event| {
-            let named = serde_json::to_value(event).ok()?;
+            let named = serde_json::to_value(event).ignoring(Ignored::Unnamed)?;
             let command = settings.get("hooks")?.get(named.as_str()?)?.get(0)?.get("hooks")?.get(0)?.get("command")?;
             command.as_str()?.contains(&format!(" hook {event}")).then_some(*event)
         })
@@ -131,18 +135,20 @@ fn a_run_killed_during_its_second_job_leaves_the_first_job_s_flail_told_and_the_
     let told = design.in_work(&["hook", "user-prompt-submit"], "")?;
     let restarted = design.in_work(&["hook", "stop"], stopping)?;
     let unrun = design.in_work(&["show", "job", "4"], "")?;
-    let lapse = "place(".parse::<Directives>().err().map(Lapse::from);
+    let lapse = "place(".parse::<Directives>().map(drop).map_err(Lapse::from);
     let flail = |job, sequel| {
-        let flails = lapse.clone().map(|flailed| Flails::new(Flail::new(JobId::new(job), flailed), Vec::new()));
-        flails.map(|gathered| Failure::Flailed { flails: gathered, sequel }.to_string())
+        let flails = lapse.clone().map_err(|flailed| Flails::new(Flail::new(JobId::new(job), flailed), Vec::new()));
+        flails.map_err(|gathered| Failure::Flailed { flails: gathered, sequel }.to_string())
     };
     let [first, second] = [flail(1, Sequel::WentOn), flail(3, Sequel::NoMoreJobs)];
     let context: Value = serde_json::from_slice(&told.stdout)?;
     let decision: Value = serde_json::from_slice(&restarted.stdout)?;
     let specific = context.get("hookSpecificOutput").and_then(|specific| specific.get("additionalContext"));
     assert_eq!((killed.status.code(), killed.stdout), (None, Vec::new()));
-    assert_eq!(specific.and_then(Value::as_str), first.as_deref());
-    assert_eq!(decision.get("reason").and_then(Value::as_str), second.as_deref());
+    assert!(matches!((specific.and_then(Value::as_str), &first), (Some(said), Err(expected)) if said == expected));
+    assert!(
+        matches!((decision.get("reason").and_then(Value::as_str), &second), (Some(said), Err(expected)) if said == expected)
+    );
     let refused = String::from_utf8(unrun.stderr)?;
     assert_eq!(unrun.status.code(), Some(1_i32));
     assert_eq!(
@@ -161,12 +167,15 @@ struct Answer {
 
 impl Answer {
     fn given(arguments: &&[&str]) -> Option<Answer> {
-        let output = Design::with_a_session_in_work().ok()?.in_work(arguments, "").ok()?;
-        let stdout = String::from_utf8(output.stdout).ok()?;
+        let output = Design::with_a_session_in_work()
+            .ignoring(Ignored::Unrun)?
+            .in_work(arguments, "")
+            .ignoring(Ignored::Unrun)?;
+        let stdout = String::from_utf8(output.stdout).ignoring(Ignored::NotUtf8)?;
         let unparsed = stdout.parse::<Lines>().into_iter().flatten().filter(|line| line.parse::<Line>().is_err());
         Some(Answer {
             code: output.status.code(),
-            stderr: String::from_utf8(output.stderr).ok()?,
+            stderr: String::from_utf8(output.stderr).ignoring(Ignored::NotUtf8)?,
             unparsed: unparsed.collect(),
         })
     }

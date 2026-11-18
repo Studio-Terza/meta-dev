@@ -6,7 +6,9 @@ use grammar_hunk::Patch;
 use super::super::super::kept::Commits;
 use super::boundary::{Metadata, Reason, TestCode};
 use crate::cli::command::failure::Failure;
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::{Invocation, Ports, Text};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub(super) struct Edits<'run> {
@@ -33,11 +35,16 @@ impl<'run> Edits<'run> {
                 "git",
                 ["grep", "-l", "-F", Self::CFG_TEST, self.commits.head().as_ref(), "--", "*.rs"],
             ))
+            .ignoring(Ignored::Ungrepped)
             .unwrap_or_default();
         let path = self.metadata.to_path_buf();
         let text = ports.files().read_text(&path).map_err(|failure| Failure::unusable(path, failure))?;
         let metadata = Metadata::read(&text).map_err(Failure::Metadata)?;
         let tests = TestCode::new(&metadata, &grepped, self.commits);
-        Ok(logged.as_ref().parse::<Patch>().ok().map_or(Some(Reason::Unreadable), |patch| tests.edited(&patch)))
+        Ok(logged
+            .as_ref()
+            .parse::<Patch>()
+            .ignoring(Ignored::Unparsed)
+            .map_or(Some(Reason::Unreadable), |patch| tests.edited(&patch)))
     }
 }

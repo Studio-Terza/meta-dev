@@ -43,10 +43,7 @@ impl Cli {
     }
 
     pub fn report_to(&self, files: &impl Files) -> Answer {
-        self.gate(files).map_or_else(
-            |failure| Answer::complained(ExitCode::FAILURE, format_args!("{failure}\n")),
-            |gate| self.reported(&gate),
-        )
+        Answer::answered(self.gate(files).map(|gate| self.reported(&gate)))
     }
 
     fn reported(&self, gate: &Gate) -> Answer {

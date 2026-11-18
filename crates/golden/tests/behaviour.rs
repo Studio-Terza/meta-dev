@@ -1,11 +1,14 @@
 mod differences;
+mod ignored;
 
 use std::ffi::{OsStr, OsString};
 
+use crate::ignored::Ignored;
 use console_ports::Variables;
 use file_ports::{Files, Kind};
 use fixture::Fixture;
 use golden::{Difference, Failure, Golden, Mode, Output, golden};
+use invariants::Ignoring;
 use laws::proptest;
 use laws::{roundtrip, table};
 use proptest::prelude::any;
@@ -52,7 +55,7 @@ fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn s
 
 table!(
     recording_is_chosen_only_by_the_exact_value_outside_ci,
-    |(record, ci): &(Option<&str>, Option<&str>)| Mode::chosen(record.map(OsStr::new), ci.map(OsStr::new)).ok(),
+    |(record, ci): &(Option<&str>, Option<&str>)| Mode::chosen(record.map(OsStr::new), ci.map(OsStr::new)).ignoring(Ignored::Refused),
     [
         (None, None) => Some(Mode::Check),
         (None, Some("true")) => Some(Mode::Check),
@@ -67,7 +70,7 @@ roundtrip!(
     any_text_is_recorded_exactly,
     any::<String>(),
     |text: &String| Fixture::recorded_through_the_api(text),
-    |fixture: &Option<Fixture>| fixture.as_ref()?.text().ok(),
+    |fixture: &Option<Fixture>| fixture.as_ref()?.text().ignoring(Ignored::Unread),
     Some
 );
 
@@ -137,7 +140,10 @@ mod fixture {
     use console_ports::Variables;
     use file_ports::{Bytes, FileFailure, Files, Memory};
     use golden::{Golden, Mode, Output};
+    use invariants::Ignoring;
     use newtype::Wrapping;
+
+    use crate::ignored::Ignored;
 
     #[derive(Default)]
     pub struct Fixture {
@@ -190,8 +196,10 @@ mod fixture {
         }
 
         pub fn recorded_through_the_api(text: &str) -> Option<Self> {
-            let fixture = Self::new().ok()?;
-            Self::golden().verify_in(&Variables::default(), &fixture.files, Mode::Record, Output::new(text)).ok()?;
+            let fixture = Self::new().ignoring(Ignored::Unread)?;
+            Self::golden()
+                .verify_in(&Variables::default(), &fixture.files, Mode::Record, Output::new(text))
+                .ignoring(Ignored::Unread)?;
             Some(fixture)
         }
     }

@@ -5,6 +5,8 @@ use text_lines::OneLine;
 
 use super::super::build::Build;
 use crate::cli::command::step::seconds::Seconds;
+use crate::cli::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct Growth<'name> {
@@ -16,7 +18,8 @@ pub struct Growth<'name> {
 impl<'name> Growth<'name> {
     pub(super) fn against(name: &'name OneLine, today: Seconds, earlier: &[Build]) -> Growth<'name> {
         let listed: Vec<Seconds> = earlier.iter().filter_map(|build| build.of_crate(name)).collect();
-        let count = u32::try_from(listed.len().max(1)).map_or(f64::from(u32::MAX), f64::from);
+        let count =
+            u32::try_from(listed.len().max(1)).ignoring(Ignored::BeyondRange).map_or(f64::from(u32::MAX), f64::from);
         let average = Seconds::new(listed.into_iter().sum::<Seconds>().into_inner() / count);
         Growth { name, today, average }
     }

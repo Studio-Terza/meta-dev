@@ -1,6 +1,7 @@
 use std::fmt;
 
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 use named_derive::Named;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
@@ -27,7 +28,10 @@ pub trait Unit: Sized {
 
     #[must_use]
     fn labelled(text: &str) -> Option<Self> {
-        text.parse::<Fixed>().ok().map(Self::fixed).or_else(|| Target::read(text).map(Self::target))
+        text.parse::<Fixed>()
+            .ignoring(Unlexed::NotThisGrammar)
+            .map(Self::fixed)
+            .or_else(|| Target::read(text).map(Self::target))
     }
 }
 
@@ -79,8 +83,8 @@ impl Target {
     }
 
     fn read(text: &str) -> Option<Target> {
-        let pieces = Piece::lexer(text).collect::<Result<Vec<Piece>, ()>>().ok()?;
-        let [space, name, kind, mode] = <&[Piece; 4]>::try_from(pieces.as_slice()).ok()?;
+        let pieces = Piece::lexer(text).collect::<Result<Vec<Piece>, ()>>().ignoring(Unlexed::NotThisGrammar)?;
+        let [space, name, kind, mode] = <&[Piece; 4]>::try_from(pieces.as_slice()).ignoring(Unlexed::OtherShape)?;
         Some(space)
             .filter(|leading| **leading == Piece::Space)
             .and_then(|_space| Some(Target { name: name.named()?.to_owned(), kind: kind.kind()?, mode: mode.mode()? }))

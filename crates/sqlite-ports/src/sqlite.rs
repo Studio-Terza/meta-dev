@@ -6,10 +6,11 @@ mod place;
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use port_core::Pass;
 
+use invariants::Unpoisoned;
 use migrations::Migrations;
 use opened::Opened;
 use place::Place;
@@ -57,7 +58,7 @@ impl Shared {
         prepare: impl FnOnce(&Path) -> io::Result<()>,
         body: impl FnOnce(&mut Opened) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
-        let mut slot = self.opened.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut slot = self.opened.lock().unpoisoned();
         let opened = slot.take().map_or_else(|| self.place.opened(prepare, self.migrations), Ok)?;
         body(slot.insert(opened))
     }

@@ -8,7 +8,9 @@ use text_lines::{Lines, OneLine};
 
 use super::super::super::kept::{Commits, Tree};
 use super::super::boundary::Shards;
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::Text;
+use invariants::Ignoring;
 
 #[derive(Debug, Deserialize)]
 struct Package {
@@ -94,7 +96,7 @@ impl Metadata {
             .filter(|package| self.workspace_members.contains(&package.id))
             .filter(|package| kinds.get(&package.name).and_then(Linked::dev_only).is_some())
             .filter_map(|package| package.manifest_path.parent())
-            .filter_map(|directory| directory.strip_prefix(&self.workspace_root).ok())
+            .filter_map(|directory| directory.strip_prefix(&self.workspace_root).ignoring(Ignored::Outside))
             .map(Path::to_path_buf)
             .collect()
     }

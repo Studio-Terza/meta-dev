@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Checked, Display, Newtype};
 
 use grammar_unspelled::Unspelled;
@@ -22,8 +23,8 @@ impl Checked for Date {
     fn checked(day: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Spelling, ()>> = Spelling::lexer(day).collect();
         <[Result<Spelling, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .map(|_day| day)
             .ok_or(Unspelled)
     }

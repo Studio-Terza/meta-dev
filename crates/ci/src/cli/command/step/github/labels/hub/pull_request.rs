@@ -1,7 +1,9 @@
 use text_lines::Lines;
 
 use super::super::check::Check;
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::Text;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct PullRequest(Text);
@@ -22,7 +24,7 @@ impl PullRequest {
             .into_iter()
             .flatten()
             .skip(1)
-            .filter_map(|name| name.parse::<Check>().ok())
+            .filter_map(|name| name.parse::<Check>().ignoring(Ignored::Unparsed))
             .find(|carried| *carried == check)
             .map(|_| self)
     }

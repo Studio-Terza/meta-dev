@@ -5,6 +5,7 @@ use graph::{
     Spelling, TypeRef, Within, Zone,
 };
 use graph_reader::Reader;
+use invariants::{invariant, invariants};
 use lint_core::{SourceFile, SourceText};
 use lint_layout::{Failure, Name};
 
@@ -182,6 +183,11 @@ impl Expect {
         CalledRow { site: site.to_owned(), callee, reach }
     }
 }
+invariants! {
+    enum Invariant {
+        FixturesParse => "the gated module fixtures are valid Rust, so each parses",
+    }
+}
 
 const REFERENCE: &str = "fn f(x: &u8) {}\n";
 const POINTER: &str = "fn f(x: *const u8) {}\n";
@@ -319,7 +325,8 @@ const DEEPER: &str = "pub fn deep() {}\n";
 fn a_module_file_below_a_test_gated_module_file_is_read_at_test_reach() {
     let files = [("src/lib.rs", GATED_ROOT), ("src/gated.rs", GATED), ("src/gated/deeper.rs", DEEPER)]
         .map(|(path, text)| SourceFile::parse(path, SourceText::new(text.to_owned())));
-    let parsed: Vec<SourceFile> = files.into_iter().filter_map(Result::ok).collect();
+    let parsed: Vec<SourceFile> =
+        files.into_iter().map(|file| invariant!(holding file, Invariant::FixturesParse)).collect();
     let reaches: BTreeSet<(String, Reach)> = Reader::read_files(&parsed)
         .functions()
         .map(|found| (found.site().to_string(), AsRef::<Region>::as_ref(found.entity()).reach()))

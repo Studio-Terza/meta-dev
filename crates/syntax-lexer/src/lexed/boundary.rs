@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
+use crate::ignored::Ignored;
 use crate::lexeme::{Kinded, LexemeKind, Symbol};
+use invariants::Ignoring;
 use syntax::{Delimiter, Group, Ident, Span, TokenStream, TokenTree};
 
 #[derive(Debug)]
@@ -86,7 +88,7 @@ impl From<syntax::LineColumn> for Place {
 impl Place {
     #[must_use]
     pub fn line(self) -> usize {
-        usize::try_from(self.line).unwrap_or(usize::MAX)
+        usize::try_from(self.line).ignoring(Ignored::BeyondRange).unwrap_or(usize::MAX)
     }
 }
 
@@ -205,7 +207,7 @@ struct Offset;
 
 impl Offset {
     fn counted(count: usize) -> u32 {
-        u32::try_from(count).unwrap_or(u32::MAX)
+        u32::try_from(count).ignoring(Ignored::BeyondRange).unwrap_or(u32::MAX)
     }
 }
 

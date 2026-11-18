@@ -1,6 +1,10 @@
+mod ignored;
+
 use super::boundary::Binary;
 use super::boundary::TestResult;
 use super::reading::Reading;
+use crate::line::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Line {
@@ -22,6 +26,10 @@ impl Line {
 
 impl From<&str> for Line {
     fn from(text: &str) -> Line {
-        text.parse().map(Line::Binary).or_else(|_| text.parse().map(Line::Result)).unwrap_or(Line::Other)
+        text.parse()
+            .map(Line::Binary)
+            .or_else(|_| text.parse().map(Line::Result))
+            .ignoring(Ignored::Other)
+            .unwrap_or(Line::Other)
     }
 }

@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 lint-sweep = { path = "../lint-sweep" }
 newtype = { path = "../newtype" }
 body-lifts = { path = "../body-lifts" }

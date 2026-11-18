@@ -131,6 +131,13 @@ impl Found {
         Found::Unreadable(failure.to_string())
     }
 
+    pub(super) fn reported(looked: Result<Found, impl fmt::Display>) -> Found {
+        match looked {
+            Ok(found) => found,
+            Err(failure) => Found::failed(&failure),
+        }
+    }
+
     pub(super) fn tested(&self) -> Option<&Text> {
         match self {
             Found::Reused { tested, .. } => Some(tested),

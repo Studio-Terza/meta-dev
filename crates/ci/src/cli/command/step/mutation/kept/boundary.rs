@@ -5,7 +5,9 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 use text_lines::{Lines, OneLine};
 
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::Text;
+use invariants::Ignoring;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 struct Function {
@@ -173,7 +175,7 @@ impl Outcomes {
 impl Commits {
     pub(in super::super) fn read(text: &Text) -> Option<Commits> {
         let lines: Vec<String> = text.as_ref().parse::<Lines>().into_iter().flatten().collect();
-        let [tree, head] = <[String; 2]>::try_from(lines).ok()?;
+        let [tree, head] = <[String; 2]>::try_from(lines).ignoring(Ignored::OtherShape)?;
         Some(Commits { tree: Tree(tree), head: Head(head) })
     }
 

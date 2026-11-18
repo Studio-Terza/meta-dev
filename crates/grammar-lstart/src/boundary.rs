@@ -1,4 +1,5 @@
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -6,7 +7,7 @@ use grammar::logos::Logos;
 enum Piece<'text> {
     #[regex("[A-Z][a-z][a-z]", |lexer| lexer.slice())]
     Word(&'text str),
-    #[regex("[0-9]+", |lexer| lexer.slice().parse::<u16>().ok())]
+    #[regex("[0-9]+", |lexer| lexer.slice().parse::<u16>().ignoring(Unlexed::OutOfRange))]
     Number(u16),
     #[token(":")]
     Colon,

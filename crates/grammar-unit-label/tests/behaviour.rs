@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use grammar::{Ignoring, Unlexed};
 use grammar_unit_label::{Fixed, Target, Unit};
 use laws::proptest::sample::select;
 
@@ -69,6 +70,6 @@ laws::roundtrip!(
     a_fixed_label_is_displayed_and_parsed_back,
     select(vec![Fixed::Built, Fixed::Checked, Fixed::CheckedTest, Fixed::BuildScript, Fixed::BuildRun]),
     |fixed: &Fixed| fixed.to_string(),
-    |text: &String| text.parse::<Fixed>().ok(),
+    |text: &String| text.parse::<Fixed>().ignoring(Unlexed::NotThisGrammar),
     Some
 );

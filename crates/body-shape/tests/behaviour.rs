@@ -1,6 +1,13 @@
 use body_shape::{Bounds, Erasure, Literals, Reading, Shape};
 use equivalence::{Equivalence, Erased};
+use invariants::{Ignoring, ignored};
 use syntax::Item;
+
+ignored! {
+    enum Ignored {
+        Unlexed => "a fixture that does not lex yields no shape, which the case reports",
+    }
+}
 
 struct Shapes;
 
@@ -15,7 +22,7 @@ impl Shapes {
     }
 
     fn read(text: &str, equivalence: Equivalence) -> Option<Reading> {
-        let mut lexed = syntax_lexer::Lexed::parsed(&format!("fn f() {text}")).ok()?;
+        let mut lexed = syntax_lexer::Lexed::parsed(&format!("fn f() {text}")).ignoring(Ignored::Unlexed)?;
         let table = lexed.tokens_taken();
         let bounds = lexed.into_file().items.iter().find_map(Self::body)?;
         Some(Erasure::reading(&table, equivalence).read(bounds))
@@ -60,7 +67,7 @@ impl Shapes {
     }
 
     fn prefix(text: &str) -> Option<Reading> {
-        let table = syntax_lexer::Lexed::parsed(text).ok()?.tokens_taken();
+        let table = syntax_lexer::Lexed::parsed(text).ignoring(Ignored::Unlexed)?.tokens_taken();
         let lexemes = table.lexemes();
         let bounds = Bounds::new(lexemes.first()?.place(), lexemes.get(Self::PREFIX)?.place());
         Some(Erasure::reading(&table, Self::BODIES).read(bounds))

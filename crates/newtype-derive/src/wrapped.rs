@@ -7,6 +7,7 @@ use syntax::{DeriveInput, Generics, Ident};
 use crate::settings::Settings;
 pub use expansion::{CheckedDeserializing, Constructors, Deserializing, Expansion, Formatting, Serializing, Strategy};
 use only_field::OnlyField;
+use syntax::Compiled;
 
 pub struct Wrapped {
     ident: Ident,
@@ -17,11 +18,11 @@ pub struct Wrapped {
 
 impl Wrapped {
     pub fn expanded<Derived: Expansion>(tokens: TokenStream) -> TokenStream {
-        syntax::parse::parse2(tokens).map_or_else(|error| error.to_compile_error(), Self::derived::<Derived>)
+        syntax::parse::parse2(tokens).map(Self::derived::<Derived>).compiled()
     }
 
     pub fn derived<Derived: Expansion>(input: DeriveInput) -> TokenStream {
-        Self::split(input).map_or_else(|error| error.to_compile_error(), Derived::of)
+        Self::split(input).map(Derived::of).compiled()
     }
 
     fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syntax::Result<Wrapped> {

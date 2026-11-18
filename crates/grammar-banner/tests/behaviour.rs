@@ -1,11 +1,12 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use grammar::{Ignoring, Unlexed};
 use grammar_banner::Banner;
 use laws::proptest::prelude::prop_assert_eq;
 
 laws::table!(
     a_banner_label_is_exactly_one_plain_word,
-    |label: &&str| Banner::try_new((*label).to_owned()).ok().map(Banner::into_inner),
+    |label: &&str| Banner::try_new((*label).to_owned()).ignoring(Unlexed::NotThisGrammar).map(Banner::into_inner),
     [
         "grammar" => Some("grammar".to_owned()),
         "doc-test_log" => Some("doc-test_log".to_owned()),

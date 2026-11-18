@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 use super::Lexemes;
 use crate::lexeme::Lexeme;
@@ -49,7 +50,7 @@ impl Lexemes {
             .filter(|(_, range)| range.end > 1)
             .map(|(token, range)| {
                 Lexeme::new(
-                    token.unwrap_or(Token::Plain).mark(),
+                    token.ignoring(Unlexed::NotThisGrammar).unwrap_or(Token::Plain).mark(),
                     Ink::spanned(range.clone()),
                     Ink::inked(sentinel.get(range.clone()).unwrap_or_default(), range.start),
                 )
@@ -91,7 +92,7 @@ impl Ink {
 
 impl Token {
     fn numbered(lexer: &grammar::logos::Lexer<'_, Token>) -> Option<usize> {
-        lexer.slice().chars().filter(char::is_ascii_digit).collect::<String>().parse().ok()
+        lexer.slice().chars().filter(char::is_ascii_digit).collect::<String>().parse().ignoring(Unlexed::OutOfRange)
     }
 
     fn mark(self) -> Mark {

@@ -1,6 +1,8 @@
+use crate::ignored::Ignored;
+use invariants::Ignoring;
+use invariants::{Rejoined, Unpoisoned};
 use std::num::NonZeroUsize;
-use std::panic;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 use std::thread::{self, Scope, ScopedJoinHandle};
 
 #[derive(Debug)]
@@ -8,7 +10,7 @@ struct Running<'scope, Mapped>(Vec<ScopedJoinHandle<'scope, Mapped>>);
 
 impl<Mapped> Running<'_, Mapped> {
     fn joined(self) -> Vec<Mapped> {
-        self.0.into_iter().map(|done| done.join().unwrap_or_else(|failure| panic::resume_unwind(failure))).collect()
+        self.0.into_iter().map(|done| done.join().rejoined()).collect()
     }
 }
 
@@ -39,7 +41,7 @@ impl<Item> From<Item> for Parked<Item> {
 
 impl<Item> Parked<Item> {
     pub(crate) fn taken(&self) -> Option<Item> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).take()
+        self.0.lock().unpoisoned().take()
     }
 }
 
@@ -50,7 +52,12 @@ impl Parallel {
     const MOST_SHARES: usize = 4;
 
     pub(crate) fn available() -> Parallel {
-        Parallel(thread::available_parallelism().map_or(1, NonZeroUsize::get).min(Self::MOST_SHARES))
+        Parallel(
+            thread::available_parallelism()
+                .ignoring(Ignored::Unknown)
+                .map_or(1, NonZeroUsize::get)
+                .min(Self::MOST_SHARES),
+        )
     }
 
     pub(crate) fn mapped<Item: Sync, Mapped: Send>(

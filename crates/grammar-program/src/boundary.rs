@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Checked, Newtype};
 
 use grammar_unspelled::Unspelled;
@@ -23,8 +24,8 @@ impl Checked for Program {
     fn checked(word: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Spelling<'_>, ()>> = Spelling::lexer(word).collect();
         <[Result<Spelling<'_>, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .filter(|Spelling::Word(lexed)| *lexed == word.as_str())
             .map(|_word| word)
             .ok_or(Unspelled)
@@ -37,7 +38,7 @@ impl FromStr for Program {
     fn from_str(command: &str) -> Result<Program, Unspelled> {
         Spelling::lexer(command)
             .next()
-            .and_then(Result::ok)
+            .and_then(|lexed| lexed.ignoring(Unlexed::NotThisGrammar))
             .ok_or(Unspelled)
             .and_then(|Spelling::Word(word)| Program::try_new(word.to_owned()))
     }

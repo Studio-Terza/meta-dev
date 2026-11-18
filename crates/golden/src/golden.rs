@@ -1,3 +1,5 @@
+mod ignored;
+
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
@@ -5,7 +7,9 @@ use console_ports::Environment;
 use file_ports::{Bytes, FileFailure, Files, Kind};
 use newtype::Wrapping;
 
+use crate::golden::ignored::Ignored;
 use crate::{Difference, Failure, Mode, Output};
+use invariants::Ignoring;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Golden {
@@ -67,11 +71,13 @@ impl Golden {
 
     fn record(self, current: Result<Mode, Failure>, files: &impl Files, actual: Output<'_>) -> Result<(), Failure> {
         let fresh = (files.kind(&self.package.join(Self::MANIFEST)) == Kind::Missing).then_some(());
-        let written = fresh.or_else(|| current.ok().filter(|mode| *mode == Mode::Record).map(|_| ())).map(|()| {
-            files
-                .create_directories(self.path.parent().unwrap_or(Path::new("")))
-                .and_then(|()| files.write(&self.path, Bytes::from(actual.into_inner())))
-        });
+        let written = fresh
+            .or_else(|| current.ignoring(Ignored::Unchosen).filter(|mode| *mode == Mode::Record).map(|_| ()))
+            .map(|()| {
+                files
+                    .create_directories(self.path.parent().unwrap_or(Path::new("")))
+                    .and_then(|()| files.write(&self.path, Bytes::from(actual.into_inner())))
+            });
         self.recorded(written)
     }
 

@@ -2,6 +2,7 @@ use std::str::FromStr;
 use std::vec::IntoIter;
 
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -49,7 +50,7 @@ impl Iterator for Broken<'_> {
     type Item = Line;
 
     fn next(&mut self) -> Option<Line> {
-        let piece = self.0.next()?.unwrap_or(Piece::Text);
+        let piece = self.0.next()?.ignoring(Unlexed::NotThisGrammar).unwrap_or(Piece::Text);
         Some(piece.line(&mut self.0))
     }
 }

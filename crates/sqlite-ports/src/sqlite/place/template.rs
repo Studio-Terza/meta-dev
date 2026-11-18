@@ -1,9 +1,10 @@
 use std::any::TypeId;
 use std::collections::BTreeMap;
-use std::sync::{Arc, LazyLock, Mutex, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::sqlite::migrations::Migrations;
 use crate::sqlite::opened::{Opened, Snapshot};
+use invariants::Unpoisoned;
 use store_ports::StoreFailure;
 
 #[derive(Debug, Default)]
@@ -23,12 +24,12 @@ static TEMPLATES: LazyLock<Mutex<BTreeMap<TypeId, Arc<Template>>>> = LazyLock::n
 
 impl Template {
     pub(super) fn shared(migrations: Migrations) -> Arc<Template> {
-        let mut templates = TEMPLATES.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut templates = TEMPLATES.lock().unpoisoned();
         Arc::clone(templates.entry(migrations.schema()).or_default())
     }
 
     pub(super) fn opened(&self, migrations: Migrations) -> Result<Opened, StoreFailure> {
-        self.image.lock().unwrap_or_else(PoisonError::into_inner).opened(migrations)
+        self.image.lock().unpoisoned().opened(migrations)
     }
 }
 

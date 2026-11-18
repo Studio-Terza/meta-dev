@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -14,7 +15,7 @@ enum Spelling<'text> {
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
 enum Index {
-    #[regex("0|[1-9][0-9]*", |lexer| lexer.slice().parse().ok())]
+    #[regex("0|[1-9][0-9]*", |lexer| lexer.slice().parse().ignoring(Unlexed::OutOfRange))]
     Ordinal(u32),
 }
 
@@ -36,12 +37,15 @@ impl FromStr for Anchoring {
     type Err = Unanchored;
 
     fn from_str(text: &str) -> Result<Anchoring, Unanchored> {
-        let spelled: Vec<Spelling<'_>> = Spelling::lexer(text).collect::<Result<_, ()>>().unwrap_or_default();
+        let spelled: Vec<Spelling<'_>> =
+            Spelling::lexer(text).collect::<Result<_, ()>>().ignoring(Unlexed::NotThisGrammar).unwrap_or_default();
         let (first, rest) = spelled.split_first().ok_or_else(|| Unanchored::Messageless(text.to_owned()))?;
         let message = first.message().ok_or_else(|| Unanchored::Messageless(text.to_owned()))?;
         let ordinal = rest
             .first()
-            .map_or(Some(None), |_hash| <&[Spelling<'_>; 2]>::try_from(rest).ok().and_then(Index::hashed).map(Some))
+            .map_or(Some(None), |_hash| {
+                <&[Spelling<'_>; 2]>::try_from(rest).ignoring(Unlexed::OtherShape).and_then(Index::hashed).map(Some)
+            })
             .ok_or_else(|| Unanchored::Unindexed(text.to_owned()))?;
         Ok(Anchoring { message: message.to_owned(), ordinal })
     }
@@ -77,8 +81,8 @@ impl Index {
     fn read(digits: &str) -> Option<u32> {
         let spelled: Vec<Result<Index, ()>> = Index::lexer(digits).collect();
         <[Result<Index, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .map(|Index::Ordinal(ordinal)| ordinal)
     }
 }

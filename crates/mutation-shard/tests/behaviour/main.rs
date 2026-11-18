@@ -1,3 +1,5 @@
+mod ignored;
+
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
@@ -5,6 +7,8 @@ use std::process::ExitCode;
 
 use console_ports::Complaint;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
+use ignored::Ignored;
+use invariants::Ignoring;
 use mutation_shard::Cli;
 use serde_json::{Value, json};
 
@@ -266,8 +270,8 @@ impl Mutants {
     fn matrix(&self) -> Value {
         self.files
             .read_text(&self.destination())
-            .ok()
-            .and_then(|text| serde_json::from_str(text.as_ref()).ok())
+            .ignoring(Ignored::Unread)
+            .and_then(|text| serde_json::from_str(text.as_ref()).ignoring(Ignored::Unread))
             .unwrap_or_default()
     }
 }

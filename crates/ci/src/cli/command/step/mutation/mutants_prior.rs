@@ -81,7 +81,7 @@ impl Step for MutantsPrior {
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
-        let found = self.looked(ports).unwrap_or_else(|failure| Found::failed(&failure));
+        let found = Found::reported(self.looked(ports));
         Ok(Telling::reported(vec![Shown::said(found)], Ok(Exit::Success)))
     }
 }

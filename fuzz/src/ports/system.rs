@@ -1,3 +1,5 @@
+mod ignored;
+
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::fs;
@@ -6,7 +8,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use crate::ports::system::ignored::Ignored;
 use file_ports::{Bytes, Text};
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct Case {
@@ -57,7 +61,10 @@ impl Crashes {
     #[must_use]
     pub fn budget(self) -> Duration {
         Duration::from_secs(
-            env::var(Self::SECONDS).ok().and_then(|text| text.parse().ok()).unwrap_or(Self::DEFAULT_SECONDS),
+            env::var(Self::SECONDS)
+                .ignoring(Ignored::Unset)
+                .and_then(|text| text.parse().ignoring(Ignored::Unset))
+                .unwrap_or(Self::DEFAULT_SECONDS),
         )
     }
 
@@ -79,8 +86,8 @@ impl Crashes {
     pub fn keep(self, case: &Case) -> Option<PathBuf> {
         let directory = Self::directory()?;
         let file = case.kept(&directory);
-        fs::create_dir_all(&directory).ok()?;
-        fs::write(&file, case).ok()?;
+        fs::create_dir_all(&directory).ignoring(Ignored::Unkept)?;
+        fs::write(&file, case).ignoring(Ignored::Unkept)?;
         Some(file)
     }
 }

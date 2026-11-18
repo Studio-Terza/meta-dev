@@ -2,6 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Checked, Newtype};
 
 use grammar_unspelled::Unspelled;
@@ -47,7 +48,8 @@ impl<'text> Spelling<'text> {
     fn running(after: &[Spelling<'text>]) -> Option<&'text str> {
         let last = after.iter().rposition(|spelling| *spelling == Spelling::Target)?;
         let window = after.get(last..)?.get(..5)?;
-        let [_target, profile, deps, name, close] = <&[Spelling<'text>; 5]>::try_from(window).ok()?;
+        let [_target, profile, deps, name, close] =
+            <&[Spelling<'text>; 5]>::try_from(window).ignoring(Unlexed::OtherShape)?;
         profile.word()?;
         Some(deps).filter(|spelling| **spelling == Spelling::Deps)?;
         Some(close).filter(|spelling| **spelling == Spelling::Close)?;
@@ -89,8 +91,8 @@ impl Checked for Banner {
     fn checked(label: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Spelling<'_>, ()>> = Spelling::lexer(label).collect();
         <[Result<Spelling<'_>, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .and_then(Spelling::word)
             .map(|_word| label)
             .ok_or(Unspelled)

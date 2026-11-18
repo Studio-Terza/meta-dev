@@ -1,4 +1,5 @@
 mod command;
+mod ignored;
 pub mod ports;
 
 use std::ffi::OsString;
@@ -28,6 +29,9 @@ impl<P: Ports> Teller for Cli<'_, P> {
         Self: 'teller;
 
     fn told(&self) -> Telling<'_> {
-        self.command.as_ref().map_or_else(Telling::refused, |command| command.carry_out(self.ports))
+        match &self.command {
+            Ok(command) => command.carry_out(self.ports),
+            Err(refusal) => Telling::refused(refusal),
+        }
     }
 }

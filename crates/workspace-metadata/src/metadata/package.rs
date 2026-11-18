@@ -1,5 +1,6 @@
 mod declared;
 mod dependency;
+mod ignored;
 mod target;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -9,11 +10,13 @@ use serde::Deserialize;
 
 use crate::crate_name::CrateName;
 use crate::format::Format;
+use crate::metadata::package::ignored::Ignored;
 use crate::package_id::PackageId;
 use crate::role::Role;
 use declared::Declared;
 pub use declared::{Expanders, MacroName, PortTable};
 use dependency::Dependency;
+use invariants::Ignoring;
 pub use target::Form;
 use target::Target;
 
@@ -58,7 +61,7 @@ impl Package {
     }
 
     pub fn directory_under(&self, root: &Path) -> Option<&Path> {
-        self.manifest_path.parent().and_then(|directory| directory.strip_prefix(root).ok())
+        self.manifest_path.parent().and_then(|directory| directory.strip_prefix(root).ignoring(Ignored::Outside))
     }
 
     pub fn into_manifest(self) -> PathBuf {

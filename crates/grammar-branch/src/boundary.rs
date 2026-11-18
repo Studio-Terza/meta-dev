@@ -1,4 +1,5 @@
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -38,6 +39,6 @@ impl Base {
 impl From<&str> for Base {
     fn from(name: &str) -> Base {
         let spelled: Result<Vec<Spelling>, ()> = Spelling::lexer(name).collect();
-        Base::spelled(&spelled.unwrap_or_default())
+        Base::spelled(&spelled.ignoring(Unlexed::NotThisGrammar).unwrap_or_default())
     }
 }

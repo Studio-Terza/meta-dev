@@ -89,6 +89,7 @@ name = "body-shape"
 version = "0.1.0"
 dependencies = [
  "equivalence",
+ "invariants",
  "laws",
  "lint-layout",
  "newtype",
@@ -113,6 +114,7 @@ name = "cargo-ports"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "invariants",
  "port-core",
  "thiserror",
 ]
@@ -150,6 +152,7 @@ dependencies = [
  "grammar-test-summary",
  "grammar-timing-page",
  "grammar-unit-label",
+ "invariants",
  "laws",
  "mutation-report",
  "named-derive",
@@ -172,6 +175,7 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 name = "console-ports"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "newtype",
 ]
 
@@ -276,6 +280,7 @@ dependencies = [
  "grammar-output",
  "grammar-search",
  "grammar-slug",
+ "invariants",
  "laws",
  "local-config",
  "named-derive",
@@ -303,6 +308,7 @@ dependencies = [
  "e2e",
  "file-ports",
  "grammar-slug",
+ "invariants",
  "laws",
  "newtype",
  "serde_json",
@@ -364,6 +370,7 @@ dependencies = [
  "file-ports",
  "grammar-notes",
  "grammar-search",
+ "invariants",
  "laws",
  "newtype",
  "port-core",
@@ -383,6 +390,7 @@ dependencies = [
  "grammar-notes",
  "grammar-project",
  "grammar-provenance",
+ "invariants",
  "laws",
  "message-id",
  "named-derive",
@@ -400,6 +408,7 @@ dependencies = [
  "design-model",
  "design-store",
  "dispatch-ports",
+ "invariants",
  "laws",
  "named-derive",
  "newtype",
@@ -423,6 +432,7 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar-search",
+ "invariants",
  "laws",
  "newtype",
  "port-core",
@@ -714,6 +724,7 @@ version = "0.1.0"
 dependencies = [
  "cargo-ports",
  "file-ports",
+ "invariants",
  "lint-runner",
  "proptest",
  "timer-ports",
@@ -760,6 +771,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
+ "invariants",
  "laws",
  "newtype",
  "text-lines",
@@ -770,6 +782,7 @@ dependencies = [
 name = "grammar"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "logos",
 ]
 
@@ -1055,6 +1068,7 @@ version = "0.1.0"
 dependencies = [
  "algebra",
  "body-lifts",
+ "invariants",
  "lint-layout",
  "newtype",
 ]
@@ -1065,6 +1079,7 @@ version = "0.1.0"
 dependencies = [
  "graph",
  "graph-reader",
+ "invariants",
  "laws",
  "lint-core",
  "lint-fixtures",
@@ -1085,6 +1100,7 @@ version = "0.1.0"
 dependencies = [
  "body-lifts",
  "graph",
+ "invariants",
  "laws",
  "lint-core",
  "lint-layout",
@@ -2333,6 +2349,7 @@ version = "0.1.0"
 dependencies = [
  "design-model",
  "file-ports",
+ "invariants",
  "laws",
  "serde",
  "thiserror",
@@ -2429,6 +2446,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "golden",
+ "invariants",
  "laws",
  "newtype",
  "serde",
@@ -2443,6 +2461,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
+ "invariants",
  "laws",
  "serde",
  "serde_json",
@@ -2462,6 +2481,7 @@ dependencies = [
 name = "newtype"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "laws",
  "newtype-derive",
  "proptest",
@@ -2606,6 +2626,7 @@ name = "query-cache"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "invariants",
  "laws",
  "serde",
  "serde_json",
@@ -2622,6 +2643,7 @@ dependencies = [
  "golden",
  "graph-reader",
  "hex",
+ "invariants",
  "libsqlite3-sys",
  "lint-layout",
  "lint-reader",
@@ -2697,6 +2719,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "golden",
+ "invariants",
  "laws",
  "newtype",
  "serde_json",
@@ -2917,6 +2940,7 @@ dependencies = [
 name = "sqlite-ports"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "newtype",
  "port-core",
  "rusqlite",
@@ -3111,6 +3135,7 @@ dependencies = [
  "dispatch-ports",
  "file-ports",
  "grammar-search",
+ "invariants",
  "laws",
  "newtype",
  "port-core",
@@ -3129,6 +3154,7 @@ version = "0.1.0"
 dependencies = [
  "grammar-migration",
  "hex",
+ "invariants",
  "query-cache",
  "serde",
  "serde_json",
@@ -3144,6 +3170,7 @@ dependencies = [
  "file-ports",
  "grammar-anchor",
  "grammar-message",
+ "invariants",
  "laws",
  "named-derive",
  "newtype",
@@ -3172,6 +3199,7 @@ dependencies = [
  "grammar-cited",
  "grammar-directive",
  "grammar-output",
+ "invariants",
  "laws",
  "named-derive",
  "newtype",
@@ -3238,6 +3266,7 @@ dependencies = [
 name = "syntax"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -3247,6 +3276,7 @@ dependencies = [
 name = "syntax-lexer"
 version = "0.1.0"
 dependencies = [
+ "invariants",
  "syntax",
 ]
 
@@ -3268,6 +3298,7 @@ name = "test-log"
 version = "0.1.0"
 dependencies = [
  "grammar-banner",
+ "invariants",
  "laws",
  "newtype",
  "serde",
@@ -3575,6 +3606,7 @@ name = "workspace-metadata"
 version = "0.1.0"
 dependencies = [
  "golden",
+ "invariants",
  "laws",
  "newtype",
  "serde",

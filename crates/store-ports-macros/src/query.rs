@@ -1,4 +1,5 @@
 mod bound;
+mod ignored;
 mod typed;
 
 use syntax::Punctuated;
@@ -8,7 +9,9 @@ use syntax::quote;
 use syntax::{LitStr, Token, Type};
 
 use crate::expanded::Expanding;
+use crate::query::ignored::Ignored;
 use bound::Bound;
+use invariants::Ignoring;
 use query_cache::{Entry, Unexpanded};
 use typed::{ColumnName, Typed};
 
@@ -57,8 +60,8 @@ impl Expanding for Query {
 
 impl Query {
     fn row(input: ParseStream<'_>) -> syntax::Result<Option<Type>> {
-        input.fork().parse::<LitStr>().map_or_else(
-            |_| {
+        input.fork().parse::<LitStr>().ignoring(Ignored::RowTypeFirst).map_or_else(
+            || {
                 let row = input.parse::<Type>()?;
                 input.parse::<Token![,]>()?;
                 Ok(Some(row))
