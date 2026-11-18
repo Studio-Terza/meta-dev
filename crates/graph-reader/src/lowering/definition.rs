@@ -24,9 +24,22 @@ use repeats::Parameters;
 pub(super) use repeats::Repeats;
 
 #[derive(Debug)]
-enum LoweredReceiving {
+enum UnboundReceiving {
     Owner,
     Named(Name),
+    Call(CallOrder),
+    Unknown,
+}
+
+#[derive(Debug)]
+enum Unbound {
+    Method { receiver: UnboundReceiving, name: Name },
+    Path { owner: Option<Name>, name: Name },
+}
+
+#[derive(Debug)]
+enum LoweredReceiving {
+    Owner,
     Bound(TypeRef<Written>),
     Call(CallOrder),
     Unknown,
@@ -50,7 +63,7 @@ pub(super) struct LoweredDefinition {
 
 #[derive(Debug)]
 enum PendingReceiver {
-    Settled(LoweredReceiving),
+    Settled(UnboundReceiving),
     CallAt(Address),
 }
 
@@ -136,19 +149,19 @@ impl BodyPart {
     fn receiver(found: &Expr) -> PendingReceiver {
         match found {
             Expr::Path(path) => PendingReceiver::Settled(
-                path.path.get_ident().map_or(LoweredReceiving::Unknown, |ident| Self::named(Name::from(ident))),
+                path.path.get_ident().map_or(UnboundReceiving::Unknown, |ident| Self::named(Name::from(ident))),
             ),
             Expr::MethodCall(inner) => PendingReceiver::CallAt(Address::from(inner)),
             Expr::Call(call) => Syntax::expr_path(&call.func)
-                .map_or(PendingReceiver::Settled(LoweredReceiving::Unknown), |_| {
+                .map_or(PendingReceiver::Settled(UnboundReceiving::Unknown), |_| {
                     PendingReceiver::CallAt(Address::from(call))
                 }),
-            _ => PendingReceiver::Settled(LoweredReceiving::Unknown),
+            _ => PendingReceiver::Settled(UnboundReceiving::Unknown),
         }
     }
 
-    fn named(name: Name) -> LoweredReceiving {
-        name.matches::<Whole>(&[Self::OWNER]).map_or(LoweredReceiving::Named(name), |_| LoweredReceiving::Owner)
+    fn named(name: Name) -> UnboundReceiving {
+        name.matches::<Whole>(&[Self::OWNER]).map_or(UnboundReceiving::Named(name), |_| UnboundReceiving::Owner)
     }
 }
 
@@ -164,27 +177,47 @@ impl Made {
         }
     }
 
-    fn settled(self, order: Option<CallOrder>) -> Option<LoweredInvocation> {
+    fn settled(self, order: Option<CallOrder>) -> Option<Unbound> {
         self.invocation.map(|pending| pending.settled(order))
     }
 }
 
 impl PendingInvocation {
-    fn settled(self, order: Option<CallOrder>) -> LoweredInvocation {
+    fn settled(self, order: Option<CallOrder>) -> Unbound {
         match self {
-            PendingInvocation::Method { receiver, name } => {
-                LoweredInvocation::Method { receiver: receiver.settled(order), name }
-            }
-            PendingInvocation::Path { owner, name } => LoweredInvocation::Path { owner, name },
+            PendingInvocation::Method { receiver, name } => Unbound::Method { receiver: receiver.settled(order), name },
+            PendingInvocation::Path { owner, name } => Unbound::Path { owner, name },
         }
     }
 }
 
 impl PendingReceiver {
-    fn settled(self, order: Option<CallOrder>) -> LoweredReceiving {
+    fn settled(self, order: Option<CallOrder>) -> UnboundReceiving {
         match self {
             PendingReceiver::Settled(receiving) => receiving,
-            PendingReceiver::CallAt(_) => order.map_or(LoweredReceiving::Unknown, LoweredReceiving::Call),
+            PendingReceiver::CallAt(_) => order.map_or(UnboundReceiving::Unknown, UnboundReceiving::Call),
+        }
+    }
+}
+
+impl Unbound {
+    fn bound(self, bound: &BTreeMap<Name, TypeRef<Written>>) -> LoweredInvocation {
+        match self {
+            Unbound::Method { receiver, name } => LoweredInvocation::Method { receiver: receiver.bound(bound), name },
+            Unbound::Path { owner, name } => LoweredInvocation::Path { owner, name },
+        }
+    }
+}
+
+impl UnboundReceiving {
+    fn bound(self, bound: &BTreeMap<Name, TypeRef<Written>>) -> LoweredReceiving {
+        match self {
+            UnboundReceiving::Owner => LoweredReceiving::Owner,
+            UnboundReceiving::Named(name) => {
+                bound.get(&name).map_or(LoweredReceiving::Unknown, |ty| LoweredReceiving::Bound(ty.clone()))
+            }
+            UnboundReceiving::Call(order) => LoweredReceiving::Call(order),
+            UnboundReceiving::Unknown => LoweredReceiving::Unknown,
         }
     }
 }
@@ -253,15 +286,6 @@ impl LoweredInvocation {
             LoweredInvocation::Path { owner, name } => Invocation::Path { owner, name },
         }
     }
-
-    fn bound(self, bound: &BTreeMap<Name, TypeRef<Written>>) -> LoweredInvocation {
-        match self {
-            LoweredInvocation::Method { receiver, name } => {
-                LoweredInvocation::Method { receiver: receiver.bound(bound), name }
-            }
-            LoweredInvocation::Path { .. } => self,
-        }
-    }
 }
 
 impl LoweredReceiving {
@@ -270,19 +294,7 @@ impl LoweredReceiving {
             LoweredReceiving::Owner => Receiving::Owner,
             LoweredReceiving::Bound(ty) => Receiving::Bound(Written::typed(&ty, resolving, scope)),
             LoweredReceiving::Call(order) => Receiving::Call(order),
-            LoweredReceiving::Named(_) | LoweredReceiving::Unknown => Receiving::Unknown,
-        }
-    }
-
-    fn bound(self, bound: &BTreeMap<Name, TypeRef<Written>>) -> LoweredReceiving {
-        match self {
-            LoweredReceiving::Named(name) => {
-                bound.get(&name).map_or(LoweredReceiving::Unknown, |ty| LoweredReceiving::Bound(ty.clone()))
-            }
-            LoweredReceiving::Owner
-            | LoweredReceiving::Bound(_)
-            | LoweredReceiving::Call(_)
-            | LoweredReceiving::Unknown => self,
+            LoweredReceiving::Unknown => Receiving::Unknown,
         }
     }
 }
