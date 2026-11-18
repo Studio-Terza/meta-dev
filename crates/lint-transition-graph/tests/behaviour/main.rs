@@ -11,3 +11,4 @@ mod repeated_routes;
 mod shown;
 mod transition_graph;
 mod transitions;
+mod undeclared_algebra;

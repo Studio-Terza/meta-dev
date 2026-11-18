@@ -27,9 +27,33 @@ impl Subject {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Interface {
+    sited: Sited,
+    arguments: Vec<TypeRef>,
+}
+
+impl Interface {
+    #[must_use]
+    pub fn new(sited: Sited, arguments: Vec<TypeRef>) -> Interface {
+        Interface { sited, arguments }
+    }
+
+    #[must_use]
+    pub fn arguments(&self) -> &[TypeRef] {
+        &self.arguments
+    }
+}
+
+impl AsRef<Sited> for Interface {
+    fn as_ref(&self) -> &Sited {
+        &self.sited
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Implementation {
     subject: Subject,
-    implemented: Option<Sited>,
+    implemented: Option<Interface>,
     origin: Origin,
     region: Region,
     parameters: Vec<Parameter>,
@@ -63,7 +87,7 @@ impl AsRef<TypeRef> for Assigned {
 
 impl Implementation {
     #[must_use]
-    pub fn new(subject: Subject, implemented: Option<Sited>, origin: Origin, region: Region) -> Implementation {
+    pub fn new(subject: Subject, implemented: Option<Interface>, origin: Origin, region: Region) -> Implementation {
         Implementation { subject, implemented, origin, region, parameters: Vec::new(), assigned: Vec::new() }
     }
 
@@ -92,17 +116,22 @@ impl Implementation {
 
     #[must_use]
     pub fn implemented(&self) -> Option<&Resolved> {
-        self.implemented.as_ref().map(AsRef::as_ref)
+        self.interface().map(AsRef::as_ref)
     }
 
     #[must_use]
     pub fn interface_name(&self) -> Option<&Name> {
-        AsRef::<Spelling>::as_ref(self.implemented.as_ref()?).written()?.last()
+        AsRef::<Spelling>::as_ref(self.interface()?).written()?.last()
     }
 
     #[must_use]
     pub fn interface(&self) -> Option<&Sited> {
-        self.implemented.as_ref()
+        self.implemented.as_ref().map(AsRef::as_ref)
+    }
+
+    #[must_use]
+    pub fn interface_arguments(&self) -> &[TypeRef] {
+        self.implemented.as_ref().map_or(&[], Interface::arguments)
     }
 
     #[must_use]

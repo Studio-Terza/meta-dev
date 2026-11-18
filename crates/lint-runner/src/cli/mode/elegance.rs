@@ -12,7 +12,7 @@ use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
     AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction, GraphLint,
     Homomorphisms, InterfaceByConsumers, LowestCluster, ParallelStructures, RepeatedRoutes, TransitionGraph,
-    Transitions, TypeSystem,
+    Transitions, TypeSystem, UndeclaredAlgebra,
 };
 
 #[derive(Debug)]
@@ -29,6 +29,7 @@ impl Elegance {
             TransitionGraph::report_graph(&system),
             DuplicateTransitions::report_graph(&system),
             CoreMutation::report_graph(&system),
+            UndeclaredAlgebra::report_graph(&system),
             AlgebraLaws::report_graph(&system),
             Homomorphisms::report_graph(&system),
             RepeatedRoutes::report_graph(&system),

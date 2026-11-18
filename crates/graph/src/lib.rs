@@ -46,7 +46,7 @@ pub use function::{
     Taken,
 };
 pub use holding::{Held, Holding};
-pub use implementation::{Assigned, Implementation, Origin, Subject};
+pub use implementation::{Assigned, Implementation, Interface, Origin, Subject};
 pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind};
 pub use item_declaration::ItemDeclaration;
 pub use item_graph::ItemGraph;
