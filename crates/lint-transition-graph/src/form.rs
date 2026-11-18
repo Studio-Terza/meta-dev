@@ -83,12 +83,12 @@ impl<'found> Acting<'found> {
     }
 
     fn grounded(&self) -> Option<Count> {
-        self.held.nonzero().or_else(|| self.pure().map(|_| self.held))
+        self.held.positive().map(Count::from).or_else(|| self.parameters.first().map_or(Some(self.held), |_| None))
     }
 
     fn admitted(self, fixed_by: Option<&Name>) -> Option<Admitted<'found>> {
-        let fixing = fixed_by.map(Operators::named);
-        Some(self).filter(|acting| fixing.is_none_or(|named| named.and(acting.pure()).is_some())).map(Admitted)
+        let operating = fixed_by.map(|fixing| Operators::named(fixing).is_some_and(|_| self.parameters.is_empty()));
+        operating.is_none_or(|operator| operator).then_some(Admitted(self))
     }
 
     fn about(unwrapped: Unwrapped<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {
@@ -102,8 +102,8 @@ impl<'found> Acting<'found> {
     }
 
     #[must_use]
-    pub fn pure(&self) -> Option<&Acting<'found>> {
-        Some(self).filter(|acting| acting.parameters.is_empty())
+    pub fn parameters(&self) -> &[End<'found>] {
+        &self.parameters
     }
 
     #[must_use]

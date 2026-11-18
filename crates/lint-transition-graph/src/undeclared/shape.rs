@@ -93,9 +93,9 @@ impl Shape {
     }
 
     fn of_acting(acting: &Acting<'_>) -> Option<Shape> {
-        let held = acting.held().nonzero()?;
+        let held = Count::from(acting.held().positive()?);
         let single = (held == Count::new(1)).then_some(Shape::Unary);
-        Some(acting.pure().map_or(Shape::Builder, |_| single.unwrap_or(Shape::Binary)))
+        Some(acting.parameters().first().map_or_else(|| single.unwrap_or(Shape::Binary), |_| Shape::Builder))
     }
 
     fn fix(self) -> Fix {

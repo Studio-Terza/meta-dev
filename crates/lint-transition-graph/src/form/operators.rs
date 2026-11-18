@@ -29,7 +29,7 @@ impl Operators {
         "ShrAssign"
     ];
 
-    pub(crate) fn named(name: &Name) -> Option<&Name> {
-        Some(name).filter(|candidate| candidate.matches::<Whole>(&Self::NAMES).is_some())
+    pub(crate) fn named(name: &Name) -> Option<Word<'static>> {
+        name.matches::<Whole>(&Self::NAMES)
     }
 }
