@@ -55,7 +55,7 @@ pub use node_edge::{Inversion, NodeEdge};
 pub use node_id::{NodeId, Unnumbered};
 pub use node_relation::NodeRelation;
 pub use notes_line::NotesLine;
-pub use outline::Outline;
+pub use outline::{Outline, Sketch};
 pub use prefix::Prefix;
 pub use project::{Project, Unnamed};
 pub use provenance::Provenance;

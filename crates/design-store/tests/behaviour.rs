@@ -801,7 +801,8 @@ struct Proposals;
 impl Proposals {
     fn node(id: i64) -> Result<Node<Vague>, Box<dyn Error>> {
         let entry = Entry::new("p".parse()?, Facet::Feature, Entered::Apply.into());
-        Ok(Node::new(NodeId::new(id), entry).titled(Title::new(format!("child {id}"))))
+        let core = Casting::new(Role::Core, entry.provenance());
+        Ok(Node::proposed(NodeId::new(id), entry, core, Title::new(format!("child {id}"))))
     }
 
     fn child(parent: NodeId, id: i64) -> Result<Directed, Box<dyn Error>> {

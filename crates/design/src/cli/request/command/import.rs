@@ -389,7 +389,7 @@ impl Reading for Entries {
 impl Taking<'_> {
     fn node(&self, parent: Parent, line: &notes::Line) -> Node<Vague> {
         let entry = Entry::new(self.project.clone(), Facet::Feature, Provenance::Import(NotesLine::new(line.number())));
-        Node::proposed(self.draft.next, entry, parent.casting).titled(Title::from(line))
+        Node::proposed(self.draft.next, entry, parent.casting, Title::from(line))
     }
 
     fn entered(self, line: &notes::Line, entry: &notes::Entry, voice: Voice) -> Draft {

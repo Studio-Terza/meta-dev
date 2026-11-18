@@ -416,7 +416,7 @@ impl<S: Store> Visit for &Resolution<'_, '_, S> {
         let unbound = fresh.map(|label| self.batch.unbound(label)).transpose()?;
         let parent = self.node(refines)?;
         let entry = Entry::new(parent.entry().project().clone(), facet, self.grounds.provenance);
-        let node = Node::proposed(self.batch.next, entry, parent.casting()).titled(title.clone());
+        let node = Node::proposed(self.batch.next, entry, parent.casting(), title.clone());
         let effect = Effect::Proposed { node: node.clone(), fresh: unbound };
         Ok(Grounded { directed: Directed::Proposed { node, parent: parent.identity() }, heard: Vec::new(), effect })
     }

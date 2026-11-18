@@ -9,6 +9,11 @@ pub struct NodeEdge {
     target: NodeId,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Upheld {
+    edge: NodeEdge,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("the edge would have a core node depend on a secondary one")]
 pub struct Inversion {
@@ -31,10 +36,10 @@ impl NodeEdge {
         self.relation
     }
 
-    pub fn upheld(self, source: Role, target: Role) -> Result<NodeEdge, Inversion> {
+    pub fn upheld(self, source: Role, target: Role) -> Result<Upheld, Inversion> {
         self.leaning(source, target)
             .filter(|roles| *roles == [Role::Core, Role::Secondary])
-            .map_or(Ok(self), |_inverted| Err(Inversion { edge: self }))
+            .map_or(Ok(Upheld { edge: self }), |_inverted| Err(Inversion { edge: self }))
     }
 
     fn leaning(self, source: Role, target: Role) -> Option<[Role; ENDS]> {
@@ -42,6 +47,12 @@ impl NodeEdge {
             NodeRelation::Refines | NodeRelation::Consumes => Some([source, target]),
             NodeRelation::Supersedes => None,
         }
+    }
+}
+
+impl AsRef<NodeEdge> for Upheld {
+    fn as_ref(&self) -> &NodeEdge {
+        &self.edge
     }
 }
 
