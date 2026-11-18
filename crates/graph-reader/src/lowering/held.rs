@@ -87,9 +87,10 @@ impl<'read> Frame<'read> {
         ty: &Type,
         attributes: &[Attribute],
     ) -> Contributed<Framed<'read>, Grains> {
-        let target = self.generics.lowered(ty);
-        let held = self.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
-        self.owned_by(ident, Domain::Values, attributes, held)
+        let tabled = Frame { tabled: Some(()), ..self.clone() };
+        let target = tabled.generics.lowered(ty);
+        let held = tabled.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
+        tabled.owned_by(ident, Domain::Values, attributes, held)
     }
 
     pub(super) fn hold(&self, holder: Holder, link: Link, ty: TypeRef<Written>) -> Grains {
