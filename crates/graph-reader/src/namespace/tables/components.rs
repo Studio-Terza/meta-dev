@@ -1,119 +1,10 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::ops::ControlFlow;
 
-use super::super::boundary::{Reach, ScopeId};
+use graph::{Event, Trees};
 
-#[derive(Clone, Copy, Debug)]
-struct Visit {
-    order: Reach,
-    low: Reach,
-}
-
-impl Visit {
-    fn root(self) -> Option<Reach> {
-        Some(self.order).filter(|order| *order == self.low)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-enum Mark {
-    Unseen,
-    Open(Visit),
-    Closed,
-}
-
-impl Mark {
-    fn open(self) -> Option<Visit> {
-        match self {
-            Mark::Open(visit) => Some(visit),
-            Mark::Unseen | Mark::Closed => None,
-        }
-    }
-
-    fn lowered(self, reached: Reach) -> Mark {
-        match self {
-            Mark::Open(visit) => Mark::Open(Visit { order: visit.order, low: visit.low.min(reached) }),
-            Mark::Unseen | Mark::Closed => self,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Marks {
-    marks: Vec<Mark>,
-    visited: Reach,
-}
-
-impl Marks {
-    fn visit(&self, scope: ScopeId) -> Option<Visit> {
-        scope.row(&self.marks).copied().and_then(Mark::open)
-    }
-
-    fn opened(mut self, scope: ScopeId) -> Marks {
-        let visit = Visit { order: self.visited, low: self.visited };
-        scope.row_mut(&mut self.marks).into_iter().for_each(|mark| *mark = Mark::Open(visit));
-        Marks { marks: self.marks, visited: self.visited.next() }
-    }
-
-    fn inherited(mut self, parent: ScopeId, child: ScopeId) -> Marks {
-        let low = self.visit(child).map(|visit| visit.low);
-        let row = parent.row_mut(&mut self.marks);
-        row.zip(low).into_iter().for_each(|(mark, child_low)| *mark = mark.lowered(child_low));
-        self
-    }
-
-    fn closed(mut self, component: &Component) -> Marks {
-        component
-            .scopes
-            .iter()
-            .for_each(|member| member.row_mut(&mut self.marks).into_iter().for_each(|mark| *mark = Mark::Closed));
-        self
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Descent<'graph> {
-    scope: ScopeId,
-    successors: &'graph [ScopeId],
-}
-
-#[derive(Debug)]
-struct Walk<'graph> {
-    successors: &'graph [Vec<ScopeId>],
-    marks: Marks,
-    open: Vec<ScopeId>,
-    components: Vec<Component>,
-}
-
-impl<'graph> Walk<'graph> {
-    fn reached(self, scope: ScopeId) -> Walk<'graph> {
-        let unseen = scope.row(&self.marks.marks).filter(|mark| matches!(mark, Mark::Unseen));
-        let descent = unseen.and(scope.row(self.successors)).map(|successors| Descent { scope, successors });
-        descent.into_iter().fold(self, Walk::visited)
-    }
-
-    fn visited(mut self, descent: Descent<'graph>) -> Walk<'graph> {
-        let scope = descent.scope;
-        self.open.push(scope);
-        self.marks = self.marks.opened(scope);
-        let walk = descent.successors.iter().fold(self, |walking, next| {
-            let reached = walking.reached(*next);
-            Walk { marks: reached.marks.inherited(scope, *next), ..reached }
-        });
-        let root = walk.marks.visit(scope).and_then(Visit::root);
-        root.into_iter().fold(walk, Walk::closed)
-    }
-
-    fn closed(mut self, root: Reach) -> Walk<'graph> {
-        let marks = &self.marks;
-        let kept = self.open.partition_point(|open| marks.visit(*open).map(|visit| visit.order) < Some(root));
-        let component = Component::from_members(self.open.split_off(kept), self.successors);
-        self.marks = self.marks.closed(&component);
-        self.components.push(component);
-        self
-    }
-}
+use super::super::boundary::ScopeId;
 
 #[derive(Debug)]
 pub(super) struct Component {
@@ -176,10 +67,17 @@ pub(super) struct Components(Vec<Component>);
 
 impl Components {
     pub(super) fn ordered(successors: &[Vec<ScopeId>]) -> Components {
-        let marks = Marks { marks: vec![Mark::Unseen; successors.len()], visited: Reach::FIRST };
-        let walk = Walk { successors, marks, open: Vec::new(), components: Vec::new() };
-        let walked = ScopeId::ids(successors).fold(walk, Walk::reached);
-        Components(walked.components)
+        let forward = |scope: ScopeId| scope.row(successors).into_iter().flatten().copied();
+        let finished: Vec<ScopeId> =
+            Event::walked(ScopeId::ids(successors), forward).filter_map(Event::finished).collect();
+        let edges = ScopeId::ids(successors).flat_map(|from| forward(from).map(move |to| [to, from]));
+        let predecessors = edges.fold(BTreeMap::new(), |mut reversed: BTreeMap<ScopeId, Vec<ScopeId>>, [to, from]| {
+            reversed.entry(to).or_default().push(from);
+            reversed
+        });
+        let backward = |scope: ScopeId| predecessors.get(&scope).into_iter().flatten().copied();
+        let trees: Trees<ScopeId> = Event::walked(finished.iter().rev().copied(), backward).collect();
+        Components(trees.into_iter().rev().map(|scopes| Component::from_members(scopes, successors)).collect())
     }
 
     pub(super) fn settled<State>(&self, state: State, settling: &impl Settling<State>) -> State {

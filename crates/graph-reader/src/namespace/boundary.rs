@@ -43,17 +43,6 @@ impl GlobId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Reach(usize);
-
-impl Reach {
-    pub(super) const FIRST: Reach = Reach(0);
-
-    pub(super) fn next(self) -> Reach {
-        Reach(self.0 + 1)
-    }
-}
-
 pub(super) trait Lattice: Semigroup + Eq + Clone {
     fn settled(self, advanced: impl Fn(&Self) -> Self) -> Self {
         Self::reached(iter::repeat(()).try_fold(self, |state, ()| {
