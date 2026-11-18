@@ -140,14 +140,14 @@ pub(super) enum Deference {
 }
 
 #[derive(Debug)]
-struct Walks<'walk, 'tables, 'rows, 'key> {
-    resolver: &'walk Resolver<'tables, 'rows>,
+struct Walks<'walk, 'tables, 'rows, 'key, Imports> {
+    resolver: &'walk Resolver<'tables, 'rows, Imports>,
     levels: &'walk [ScopeId],
     key: Key<'key>,
     written: View<'rows>,
 }
 
-impl<'rows> Walks<'_, '_, 'rows, '_> {
+impl<'rows, Imports: Levels> Walks<'_, '_, 'rows, '_, Imports> {
     fn walk(&self, reading: Reading) -> View<'rows> {
         self.resolver.walked(self.levels, self.key, Lookup::new(Sight::Inside, self.resolver.ignored, reading))
     }
@@ -167,24 +167,25 @@ impl<'rows> Walks<'_, '_, 'rows, '_> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(super) struct Importer<'tables, 'rows> {
-    parent: Resolver<'tables, 'rows>,
-    key: Key<'tables>,
+pub(crate) trait Levels: Copy {
+    fn levels<'levels>(self, levels: &'levels [ScopeId], key: Key<'_>) -> &'levels [ScopeId];
 }
 
-impl<'tables, 'rows> From<Importer<'tables, 'rows>> for Resolver<'tables, 'rows> {
-    fn from(importer: Importer<'tables, 'rows>) -> Resolver<'tables, 'rows> {
-        Resolver { importing: Some(importer.key), ..importer.parent }
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Plain;
+
+impl Levels for Plain {
+    fn levels<'levels>(self, levels: &'levels [ScopeId], _: Key<'_>) -> &'levels [ScopeId] {
+        levels
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Importing<'tables>(Option<Key<'tables>>);
+pub(crate) struct Importing<'tables>(Key<'tables>);
 
-impl Importing<'_> {
+impl Levels for Importing<'_> {
     fn levels<'levels>(self, levels: &'levels [ScopeId], key: Key<'_>) -> &'levels [ScopeId] {
-        match self.0.filter(|importing| *importing == key).filter(|_| key.domain() != Domain::Macros) {
+        match Some(self.0).filter(|importing| *importing == key).filter(|_| key.domain() != Domain::Macros) {
             Some(_) => levels.get(1..).unwrap_or_default(),
             None => levels,
         }
@@ -192,22 +193,24 @@ impl Importing<'_> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Resolver<'tables, 'rows> {
+pub(crate) struct Resolver<'tables, 'rows, Imports = Plain> {
     space: &'tables Namespace<'tables>,
     tables: &'tables Tables<'rows>,
     ignored: Option<GlobId>,
-    importing: Option<Key<'tables>>,
+    imports: Imports,
 }
 
 impl<'tables, 'rows> Resolver<'tables, 'rows> {
     pub(crate) fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Resolver<'tables, 'rows> {
-        Resolver { space, tables, ignored: None, importing: None }
+        Resolver { space, tables, ignored: None, imports: Plain }
     }
 
-    pub(super) fn importer(self, key: Key<'tables>) -> Importer<'tables, 'rows> {
-        Importer { parent: self, key }
+    pub(super) fn importer(self, key: Key<'tables>) -> Resolver<'tables, 'rows, Importing<'tables>> {
+        Resolver { space: self.space, tables: self.tables, ignored: self.ignored, imports: Importing(key) }
     }
+}
 
+impl<'tables, 'rows, Imports: Levels> Resolver<'tables, 'rows, Imports> {
     pub(super) fn path(&self, path: &UsePath, viewer: ScopeId, domain: Domain) -> Resolution {
         let tail = path.tail();
         let (within, last) = tail.split_at(tail.len().saturating_sub(1));
@@ -218,14 +221,14 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     pub(super) fn glob_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId) -> Target {
-        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), importing: None };
+        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), imports: Plain };
         resolver
             .path(path, scope, Domain::Types)
             .target(|module| self.space.sight(module, scope).unwrap_or(Sight::ByGlob))
     }
 
     pub(super) fn invoked_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId, written: &Written) -> Target {
-        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), importing: None };
+        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), imports: Plain };
         let found = resolver.path(path, scope, Domain::Macros);
         let rules = found.declared().and_then(|at| self.space.rules(at));
         found.narrowed(rules, written)
@@ -293,7 +296,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
-        let levels = Importing(self.importing).levels(self.space.chain(scope), key);
+        let levels = self.imports.levels(self.space.chain(scope), key);
         let written = self.walked(levels, key, Lookup::new(Sight::Inside, self.ignored, reading));
         Walks { resolver: self, levels, key, written }.settled(written.dispute())
     }

@@ -11,7 +11,7 @@ use super::anchor::Anchor;
 use super::binding::Binding;
 use super::boundary::ScopeId;
 use super::entries::Imported;
-use super::resolver::{Outer, Resolution, Resolver};
+use super::resolver::{Levels, Outer, Resolution, Resolver};
 use super::std_names::{Canonical, StdNames, Table};
 use super::tables::Key;
 use super::view::View;
@@ -143,7 +143,12 @@ impl Relative<'_> {
         )
     }
 
-    fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
+    fn started<Imports: Levels>(
+        self,
+        resolver: &Resolver<'_, '_, Imports>,
+        viewer: ScopeId,
+        domain: Domain,
+    ) -> Resolution {
         match self.shape.looked(domain) {
             Domain::Types => resolver.named(self.first, self.shape, self.reading, viewer),
             Domain::Macros => resolver.macro_named(self.first, viewer),
@@ -161,7 +166,12 @@ pub(super) enum Head<'path> {
 }
 
 impl Head<'_> {
-    pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
+    pub(super) fn started<Imports: Levels>(
+        self,
+        resolver: &Resolver<'_, '_, Imports>,
+        viewer: ScopeId,
+        domain: Domain,
+    ) -> Resolution {
         match self {
             Head::Empty => Resolution::Bound(Binding::UNBOUND),
             Head::Global(first) => {

@@ -14,7 +14,7 @@ use super::view::{Nearest, View};
 use components::{Components, Settling};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Key<'name> {
+pub(crate) struct Key<'name> {
     domain: Domain,
     name: &'name Name,
 }
