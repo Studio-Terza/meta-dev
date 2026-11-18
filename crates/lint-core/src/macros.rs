@@ -4,16 +4,18 @@ use syntax::Punctuated;
 use syntax::parse::Speculative;
 use syntax::parse::{ParseStream, Parser};
 use syntax::quote;
-use syntax::{Attribute, Block, Expr, Item, Macro, Stmt, Token};
+use syntax::{Attribute, Block, Expr, Item, Macro, Mentioned, Stmt, Token};
 use syntax::{Group, TokenStream, TokenTree};
 
+use crate::ignored::Ignored;
 use crate::source_file::SourceFile;
 use crate::syntax::Syntax;
 use crate::watch::Address;
+use invariants::Ignoring;
 
 mod boundary;
 
-pub use boundary::Expansions;
+pub use boundary::{Expansions, Transcriber};
 
 #[derive(Debug)]
 pub struct Macros;
@@ -30,8 +32,24 @@ impl Macros {
             .map_or_else(|| vec![invocation.tokens.clone()], |_| Self::transcribers(invocation.tokens.clone()));
         bodies
             .into_iter()
-            .flat_map(|tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default())
+            .flat_map(|tokens| {
+                Self::statements_or_expressions.parse2(tokens).ignoring(Ignored::Unparsed).unwrap_or_default()
+            })
             .collect()
+    }
+
+    #[must_use]
+    pub fn mentioned(definition: &Macro) -> Mentioned {
+        let rules = definition.path.get_ident().filter(|ident| *ident == "macro_rules");
+        let statements: Vec<Stmt> = rules
+            .map_or_default(|_| Self::transcribers(definition.tokens.clone()))
+            .into_iter()
+            .map(Transcriber::substituted)
+            .flat_map(|tokens| {
+                Self::statements_or_expressions.parse2(tokens).ignoring(Ignored::Unparsed).unwrap_or_default()
+            })
+            .collect();
+        Mentioned::in_statements(&statements)
     }
 
     #[must_use]
@@ -72,7 +90,7 @@ impl Macros {
         let here = trees.iter().zip(trees.iter().skip(1)).filter_map(|(mark, body)| {
             Syntax::punct(mark)
                 .and(Syntax::group(body))
-                .and_then(|_| Attribute::parse_outer.parse2(quote!(#mark #body)).ok())
+                .and_then(|_| Attribute::parse_outer.parse2(quote!(#mark #body)).ignoring(Ignored::Unparsed))
         });
         let nested = trees.iter().filter_map(Syntax::group).map(Group::stream);
         here.flatten().chain(nested.flat_map(Self::attributes_in)).collect()
@@ -80,8 +98,8 @@ impl Macros {
 
     fn statements_or_expressions(input: ParseStream) -> syntax::Result<Vec<Stmt>> {
         let attempt = input.fork();
-        Block::parse_within(&attempt).map_or_else(
-            |_| Punctuated::<Expr, Token![,]>::parse_terminated(input).map(Self::expressions),
+        Block::parse_within(&attempt).ignoring(Ignored::Unparsed).map_or_else(
+            || Punctuated::<Expr, Token![,]>::parse_terminated(input).map(Self::expressions),
             |statements| {
                 input.advance_to(&attempt);
                 Ok(statements)

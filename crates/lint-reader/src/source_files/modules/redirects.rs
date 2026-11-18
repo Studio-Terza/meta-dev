@@ -4,6 +4,8 @@ use syntax::Punctuated;
 use syntax::{Attribute, Expr, ExprLit, ItemMod, Lit, Meta, Token};
 
 use super::child::Child;
+use crate::source_files::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct Redirects;
@@ -33,7 +35,12 @@ impl Redirects {
     }
 
     fn literal(meta: &Meta) -> Option<PathBuf> {
-        match &meta.require_name_value().ok().filter(|_| meta.path().is_ident(Self::PATH_ATTRIBUTE))?.value {
+        match &meta
+            .require_name_value()
+            .ignoring(Ignored::NotAPath)
+            .filter(|_| meta.path().is_ident(Self::PATH_ATTRIBUTE))?
+            .value
+        {
             Expr::Lit(ExprLit { lit: Lit::Str(path), .. }) => Some(PathBuf::from(path.value())),
             _ => None,
         }

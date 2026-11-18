@@ -1,5 +1,7 @@
 use syntax::{Attribute, Meta};
 
+use crate::skip_marks::ignored::Ignored;
+use invariants::Ignoring;
 use lint_layout::LineNumber;
 
 #[derive(Debug)]
@@ -16,7 +18,7 @@ impl Gate {
             .filter(|attribute| {
                 attribute
                     .parse_args::<Meta>()
-                    .ok()
+                    .ignoring(Ignored::Unparsed)
                     .and_then(|condition| condition.path().get_ident().cloned())
                     .is_none_or(|ident| ident != Self::TEST_CONDITION)
             })

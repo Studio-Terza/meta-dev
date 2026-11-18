@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use crate::crate_name::CrateName;
 use crate::crate_root::CrateRoot;
+use crate::ignored::Ignored;
 use file_ports::Files;
+use invariants::Ignoring;
 use lint_layout::Dependencies;
 use lint_layout::DependencySites;
 use lint_layout::KeyLines;
@@ -25,14 +27,16 @@ pub struct PackageRoot {
 impl PackageRoot {
     #[must_use]
     pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<PackageRoot> {
-        let manifests: Vec<Option<Manifest>> =
-            Manifest::read_many(files, directories).into_iter().map(|read| read.ok().flatten()).collect();
+        let manifests: Vec<Option<Manifest>> = Manifest::read_many(files, directories)
+            .into_iter()
+            .map(|read| read.ignoring(Ignored::NotAManifest).flatten())
+            .collect();
         let named: Vec<PathBuf> = manifests.iter().flatten().flat_map(Manifest::named_paths).collect();
         let found: BTreeMap<PathBuf, PathBuf> = named
             .iter()
             .cloned()
             .zip(files.canonical_many(&named))
-            .filter_map(|(path, real)| Some((path, real.ok()?)))
+            .filter_map(|(path, real)| Some((path, real.ignoring(Ignored::Uncanonical)?)))
             .collect();
         let canonical = |path: &Path| found.get(path).cloned();
         let workspaces = Self::workspaces(files, directories);
@@ -67,7 +71,7 @@ impl PackageRoot {
             .iter()
             .cloned()
             .zip(Manifest::read_many(files, &enclosing))
-            .filter_map(|(directory, read)| Some((directory, read.ok().flatten()?)))
+            .filter_map(|(directory, read)| Some((directory, read.ignoring(Ignored::NotAManifest).flatten()?)))
             .filter(|(_, manifest)| manifest.workspace().is_some())
             .collect()
     }

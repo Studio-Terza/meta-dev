@@ -1,5 +1,7 @@
 use std::iter;
 
+use crate::assertions::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::Syntax;
 use syntax::Expr;
 use syntax::{Delimiter, Group, Spacing, TokenStream, TokenTree};
@@ -34,7 +36,8 @@ impl TableRows {
 
     fn wanted(row: &[TokenTree]) -> Option<Expr> {
         let arrow = row.iter().zip(row.iter().skip(1)).position(|(start, end)| Self::arrow(start, end).is_some())?;
-        syntax::parse::parse2(row.iter().skip(arrow.checked_add(Self::ARROW_LENGTH)?).cloned().collect()).ok()
+        syntax::parse::parse2(row.iter().skip(arrow.checked_add(Self::ARROW_LENGTH)?).cloned().collect())
+            .ignoring(Ignored::Unparsed)
     }
 
     fn arrow<'end>(start: &TokenTree, end: &'end TokenTree) -> Option<&'end TokenTree> {

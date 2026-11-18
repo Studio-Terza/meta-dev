@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 
 use lint_core::{Readout, RepoFile, SourceFile};
 use lint_layout::Failure;
@@ -12,10 +12,12 @@ use super::boundary::Expected;
 use super::boundary::Partition;
 use super::declared::{Declared, Explored};
 use crate::source_files::Stage;
+use crate::source_files::ignored::Ignored;
 use crate::source_files::located::Located;
 use crate::source_files::modules::Child;
 use crate::source_files::scope::Scope;
 use crate::source_files::staged::Staged;
+use invariants::{Ignoring, Unpoisoned};
 
 #[derive(Debug)]
 struct MainFile<'tree> {
@@ -55,7 +57,7 @@ impl<'tree> Assembly<'tree> {
             self.mains.iter().filter_map(|(located, main)| main.taken(located, &mut local)).collect();
         let failures = Some(share)
             .filter(|found| *found == Partition::MAIN)
-            .map_or_default(|_| mem::take(&mut *self.failures.lock().unwrap_or_else(PoisonError::into_inner)));
+            .map_or_default(|_| mem::take(&mut *self.failures.lock().unpoisoned()));
         let with_files =
             mains.into_iter().fold(Readout::default().with_repo_files(self.repo_files.clone()), Readout::with_file);
         failures.into_iter().fold(with_files, Readout::with_failure).sorted()
@@ -67,7 +69,7 @@ impl<'tree> Assembly<'tree> {
     }
 
     fn failed(mut self, failures: Vec<Failure>) -> Assembly<'tree> {
-        self.failures.get_mut().unwrap_or_else(PoisonError::into_inner).extend(failures);
+        self.failures.get_mut().unpoisoned().extend(failures);
         self
     }
 }
@@ -153,7 +155,9 @@ impl<'tree> Testing<'tree> {
     fn file(mut self, scope: &Scope<'tree>, file: &Path) -> Testing<'tree> {
         let located = Located::new(scope.tree(), scope.package(), file);
         let fresh = self.seen.insert(file.to_path_buf()).then_some(&located);
-        let declared = fresh.and_then(|unseen| self.walk.explored.remove(unseen)).and_then(Result::ok);
+        let declared = fresh
+            .and_then(|unseen| self.walk.explored.remove(unseen))
+            .and_then(|explored| explored.ignoring(Ignored::Unread));
         declared.into_iter().fold(self, |testing, found| testing.nested(scope, &located, &found))
     }
 

@@ -2,9 +2,11 @@ use std::path::Path;
 
 use super::Placement;
 use crate::crate_root::CrateRoot;
+use crate::ignored::Ignored;
 use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::role::Role;
+use invariants::Ignoring;
 
 #[derive(Debug)]
 pub struct TargetDirectory;
@@ -13,7 +15,7 @@ impl TargetDirectory {
     #[must_use]
     pub fn place(package: PackageRoot, directory: &Path, inside: &Path) -> Option<Placement> {
         let first = inside.components().next()?;
-        let rest = inside.strip_prefix(first).ok()?;
+        let rest = inside.strip_prefix(first).ignoring(Ignored::Outside)?;
         let module = Some(rest)
             .filter(|candidate| candidate.as_os_str().is_empty())
             .map_or_else(|| ModulePath::of_file(rest), |_| ModulePath::default());

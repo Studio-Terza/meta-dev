@@ -1,3 +1,4 @@
+mod ignored;
 mod roots;
 mod survey;
 mod tree;
