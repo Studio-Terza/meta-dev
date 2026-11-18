@@ -6,12 +6,13 @@ use syntax::{ExprPath, ExprStruct, Macro, Pat, PatTree, QSelf, Type, TypeParamBo
 use graph::{Building, Domain, Member, Mention, PathUse, Region, Resolved, Seat};
 use lint_layout::{Name, Position, Whole, Word, words};
 
-use crate::namespace::UsePath;
+use crate::namespace::{Invoked, Invoker, UsePath};
 
 use super::Lowering;
 use super::places::PlaceId;
 use super::quotes::QuoteRow;
 use super::seat::{Built, Footing, Located};
+
 use lint_sweep::Address;
 use tokens::TokenPaths;
 
@@ -33,7 +34,8 @@ impl UseRow {
             | Mention::Interpolated
             | Mention::Dispatched
             | Mention::Typed
-            | Mention::Matched => Domain::Types,
+            | Mention::Matched
+            | Mention::Expanded => Domain::Types,
         }
     }
 
@@ -48,12 +50,32 @@ impl UseRow {
         Some(Resolved::Member(Member::new(seat.owner()?, last.clone())))
     }
 
+    fn expanded(&self, footing: Footing<'_>, resolved: &Resolved, invoked: &Invoked, building: Building) -> Building {
+        match self.mention {
+            Mention::Invoked => footing.resolving().transcriptions().expanded(
+                resolved,
+                Invoker::new(footing.resolving(), self.located.scope(), invoked),
+                building,
+            ),
+            Mention::Expression
+            | Mention::InMacro
+            | Mention::Interpolated
+            | Mention::Dispatched
+            | Mention::Typed
+            | Mention::Matched
+            | Mention::Expanded => building,
+        }
+    }
+
     fn kept<'resolved>(&self, resolved: &'resolved Resolved) -> Option<&'resolved Resolved> {
         match self.mention {
             Mention::Invoked | Mention::Dispatched => Some(resolved),
-            Mention::Expression | Mention::InMacro | Mention::Interpolated | Mention::Typed | Mention::Matched => {
-                self.written.tail().first().map(|_| resolved).or_else(|| resolved.known())
-            }
+            Mention::Expression
+            | Mention::InMacro
+            | Mention::Interpolated
+            | Mention::Typed
+            | Mention::Matched
+            | Mention::Expanded => self.written.tail().first().map(|_| resolved).or_else(|| resolved.known()),
         }
     }
 }
@@ -79,10 +101,12 @@ impl Built for UseRow {
         };
         let resolved = self.owned(&seat).or(aliased).or(member).or_else(valued).unwrap_or(direct);
         let written = self.written.written();
-        let named = self.kept(&resolved).map(|_| ()).map(|()| resolved);
         let line = self.located.position().line();
+        let invoked = Invoked::new(footing.file(), line, seat.clone());
+        let expanded = self.expanded(footing, &resolved, &invoked, building);
+        let named = self.kept(&resolved).map(|_| ()).map(|()| resolved);
         let used = named.map(|kept| PathUse::new(written, kept, self.mention, seat));
-        used.into_iter().fold(building, |mut built, found| {
+        used.into_iter().fold(expanded, |mut built, found| {
             built.path_use(footing.file(), line, found);
             built
         })
