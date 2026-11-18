@@ -21,6 +21,7 @@ mod routes;
 mod signatures;
 mod system;
 mod transitions;
+mod undeclared;
 mod workspace_types;
 
 use lint_core::{Headline, Report};
@@ -40,6 +41,7 @@ pub use routes::RepeatedRoutes;
 pub use signatures::Alike;
 pub use system::{Extraction, TypeSystem};
 pub use transitions::{Endpoint, Ground, Transition, Transitions};
+pub use undeclared::UndeclaredAlgebra;
 
 #[derive(Debug)]
 pub struct TransitionGraph;

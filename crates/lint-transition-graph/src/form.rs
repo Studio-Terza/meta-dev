@@ -52,6 +52,10 @@ impl<'found> Acting<'found> {
         Acting { subject, held: Count::new(held.len()), parameters }
     }
 
+    pub(crate) fn held(&self) -> Count {
+        self.held
+    }
+
     #[must_use]
     pub fn pure(&self) -> Option<&Acting<'found>> {
         Some(self).filter(|acting| acting.parameters.is_empty())
