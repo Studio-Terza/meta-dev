@@ -1,5 +1,4 @@
 use std::ffi::OsString;
-use std::iter::Peekable;
 use std::path::PathBuf;
 
 use algebra::{Monoid, Semigroup};
@@ -32,7 +31,7 @@ pub(super) enum Heard {
 
 #[derive(Debug)]
 pub(super) struct Saying<I: Iterator<Item = OsString>> {
-    arguments: Peekable<I>,
+    arguments: I,
     verb: Option<Verb>,
 }
 
@@ -105,7 +104,7 @@ impl<I: Iterator<Item = OsString>> Iterator for Saying<I> {
 
 impl<I: Iterator<Item = OsString>> Saying<I> {
     pub(super) fn said(arguments: I) -> impl Iterator<Item = Result<Said, Failure>> {
-        Saying { arguments: arguments.peekable(), verb: None }
+        Saying { arguments, verb: None }
     }
 
     fn heard(&self, argument: OsString) -> Result<Heard, Failure> {
