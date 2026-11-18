@@ -91,6 +91,7 @@ path = "tests/behaviour.rs"
 [dev-dependencies]
 cargo-ports = { path = "../cargo-ports" }
 golden = { path = "../golden" }
+laws = { path = "../laws" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }
 

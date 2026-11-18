@@ -12,7 +12,7 @@ use file_ports::Files;
 use graph::Model;
 use graph_reader::{FileFacts, Reader};
 use lint_core::{FileHead, Readout};
-use lint_reader::{CrateSources, Described, Partition, SharedRead, Stage, Unlocated};
+use lint_reader::{CrateSources, Crew, Described, Partition, Reads, SharedRead, Stage, Unlocated};
 use lint_sweep::Gathers;
 
 use timer_ports::Timer;
@@ -80,10 +80,12 @@ impl<'run, F: Files, C: Cargo, T: Timer> Sources<'run, F, C, T> {
         self.wired
     }
 
-    pub(crate) fn read(&self, worker: Worker) -> Measured<Readout> {
-        Stopwatch::measured(self.wired.timer, Step::Read(worker), || {
-            self.shared.read(self.wired.files, Partition::from(worker))
-        })
+    pub(crate) fn read(&self, worker: Worker, reader: impl Reads) -> Measured<Readout> {
+        Stopwatch::measured(self.wired.timer, Step::Read(worker), || reader.read(self.wired.files))
+    }
+
+    pub(crate) fn crew(&self, helpers: impl IntoIterator<Item = Worker>) -> Crew<'run, 'run> {
+        self.shared.crew(helpers.into_iter().map(Partition::from))
     }
 
     pub(crate) fn earlier(&self) -> impl Iterator<Item = Timing> {

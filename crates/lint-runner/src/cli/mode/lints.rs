@@ -224,12 +224,14 @@ impl Lints {
         Entry::spelled::<NoPlaintext>(Work::Modelled(<NoPlaintext as ModelLint>::report)),
     ];
 
-    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
+    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
+        readers: Vec<lint_reader::Reader<'run>>,
     ) -> Crew<'scope> {
-        let helpers = Workers::available().helpers().filter_map(|index| {
-            Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ignoring(Ignored::Unspawned)
+        let helpers = Workers::available().helpers().zip(readers).filter_map(|(index, reader)| {
+            Helper::spawned(scope, move || Self::helped(sources, Worker::from(index), reader))
+                .ignoring(Ignored::Unspawned)
         });
         let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
         Crew { helpers: locating.into_iter().chain(helpers).collect() }
@@ -249,8 +251,12 @@ impl Lints {
         Worked::timed(sources.located().timing())
     }
 
-    fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>, worker: Worker) -> Worked {
-        let readout = ManuallyDrop::new(sources.read(worker));
+    fn helped(
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        worker: Worker,
+        reader: lint_reader::Reader<'_>,
+    ) -> Worked {
+        let readout = ManuallyDrop::new(sources.read(worker, reader));
         [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 

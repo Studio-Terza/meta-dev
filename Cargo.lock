@@ -2017,6 +2017,7 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "cargo-ports",
  "file-ports",
  "invariants",
@@ -2075,6 +2076,7 @@ dependencies = [
 name = "lint-roots"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "invariants",
  "lint-layout",
@@ -2092,6 +2094,7 @@ dependencies = [
  "graph-query",
  "graph-reader",
  "invariants",
+ "laws",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",

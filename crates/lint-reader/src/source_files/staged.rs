@@ -10,7 +10,7 @@ use lint_core::RepoFile;
 use lint_layout::Failure;
 use lint_roots::{Below, Listing, Roots, Target, Tree};
 
-use super::located::{Located, Node};
+use super::located::{Home, Node};
 use invariants::{Rejoined, Unpoisoned};
 use repo_files::RepoFiles;
 
@@ -74,7 +74,7 @@ impl Staged {
             .flat_map(|target| {
                 target.files().iter().map(move |file| {
                     let children = file.parent().map_or_default(Path::to_path_buf);
-                    Located::new(tree, target.package(), file).node(&children)
+                    Home::new(tree, target.package()).located(file).node(&children)
                 })
             })
             .collect()
