@@ -1,3 +1,4 @@
+mod ignored;
 mod source;
 
 use std::collections::BTreeSet;
@@ -16,6 +17,8 @@ use sqlx::{Connection, Executor, SqlStr, Sqlite, SqliteConnection};
 use sqlx_core::describe::Describe;
 use tokio::runtime::{Builder, Runtime};
 
+use crate::query_cache::boundary::ignored::Ignored;
+use invariants::Ignoring;
 use source::Sources;
 
 #[derive(Debug)]
@@ -76,7 +79,7 @@ impl QueryCache {
 
     pub fn answered(arguments: Vec<OsString>) -> Answer {
         let prepared = QueryCache::try_from(arguments).and_then(|cache| cache.prepared());
-        let shown = prepared.as_ref().map_or_default(ToString::to_string);
+        let shown = prepared.as_ref().ignoring(Ignored::Complained).map_or_default(ToString::to_string);
         Answer::reported(prepared).showing(shown)
     }
 
@@ -100,7 +103,7 @@ impl QueryCache {
         let hash = hex::encode(Sha256::digest(query.as_bytes()));
         let path = self.root.join(Self::DIRECTORY).join(format!("query-{hash}.json"));
         let text = scratch.described(query, hash)?;
-        let current = fs::read(&path).ok();
+        let current = fs::read(&path).ignoring(Ignored::Absent);
         let change = Some(text)
             .filter(|fresh| current.as_ref() != Some(fresh))
             .map(|fresh| self.rewritten(&path, &fresh))
@@ -114,7 +117,7 @@ impl QueryCache {
     }
 
     fn change(&self, verb: &'static str, path: &Path) -> Change {
-        Change { verb, path: path.strip_prefix(&self.root).unwrap_or(path).to_path_buf() }
+        Change { verb, path: path.strip_prefix(&self.root).ignoring(Ignored::Outside).unwrap_or(path).to_path_buf() }
     }
 
     fn pruned(&self, kept: &BTreeSet<PathBuf>) -> Result<Vec<Change>, Uncached> {

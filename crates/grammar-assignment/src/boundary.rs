@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 use newtype::{Arbitrary, Checked, Newtype};
 
 use grammar_unspelled::Unspelled;
@@ -38,8 +39,8 @@ impl Checked for Emptied {
     fn checked(name: &String) -> Result<&String, Unspelled> {
         let spelled: Vec<Result<Spelling<'_>, ()>> = Spelling::lexer(name).collect();
         <[Result<Spelling<'_>, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .and_then(Spelling::name)
             .map(|_name| name)
             .ok_or(Unspelled)
@@ -52,8 +53,8 @@ impl FromStr for Emptied {
     fn from_str(line: &str) -> Result<Emptied, Unspelled> {
         let spelled: Result<Vec<Spelling<'_>>, ()> = Spelling::lexer(line).collect();
         spelled
-            .ok()
-            .and_then(|lexed| <[Spelling<'_>; 2]>::try_from(lexed).ok())
+            .ignoring(Unlexed::NotThisGrammar)
+            .and_then(|lexed| <[Spelling<'_>; 2]>::try_from(lexed).ignoring(Unlexed::OtherShape))
             .and_then(Spelling::emptied)
             .ok_or(Unspelled)
             .and_then(|name| Emptied::try_new(name.to_owned()))

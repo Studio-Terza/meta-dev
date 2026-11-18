@@ -10,6 +10,7 @@ mod entered;
 mod entry;
 mod explicitness;
 mod facet;
+mod ignored;
 mod job_id;
 mod kin;
 mod lifecycle;

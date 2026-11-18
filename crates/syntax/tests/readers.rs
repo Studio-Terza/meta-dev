@@ -1,9 +1,16 @@
+use invariants::{Ignoring, ignored};
 use syntax::parse::{Parser, parse_str, parse2};
 use syntax::{
     Application, Applied, Block, BlockItems, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro, File, Fold,
     Group, Ident, Macro, MacroTree, Mentioned, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens,
     TokenStream, TokenTree, Type, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
 };
+
+ignored! {
+    enum Ignored {
+        Unparsed => "a body that is not one macro call has no nested macro",
+    }
+}
 
 #[test]
 fn use_leaves_carry_their_path_and_the_name_they_bind() -> Result<(), Error> {
@@ -78,8 +85,9 @@ fn macro_trees_expand_items_and_walk_nested_invocations() -> Result<(), Error> {
         MacroTree::expanded_items(&file.items).iter().map(|item| item.to_token_stream().to_string()).collect();
     assert_eq!(expanded, ["fn f () { }", "inner ! { fn g () { } }", "fn g () { }"]);
     let root: ExprMacro = parse_str("a!(b!(c!(d)))")?;
-    let nested =
-        |invocation: &Macro| invocation.parse_body::<ExprMacro>().map_or_else(|_| Vec::new(), |inner| vec![inner.mac]);
+    let nested = |invocation: &Macro| {
+        invocation.parse_body::<ExprMacro>().ignoring(Ignored::Unparsed).map_or_default(|inner| vec![inner.mac])
+    };
     let named =
         |found: &[Macro]| found.iter().map(|invocation| invocation.path.to_token_stream().to_string()).collect();
     let preorder: Vec<String> = named(&MacroTree::preorder(&root.mac, &nested));

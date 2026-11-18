@@ -1,6 +1,8 @@
+mod compiled;
 mod readers;
 mod walk;
 
+pub use compiled::Compiled;
 pub use proc_macro2::{Delimiter, Group, Ident, LineColumn, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 pub use quote::{ToTokens, format_ident, quote, quote_spanned};
 pub use readers::applied::Applied;

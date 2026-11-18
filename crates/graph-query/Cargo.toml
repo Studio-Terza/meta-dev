@@ -22,6 +22,7 @@ graph = { path = "../graph" }
 workspace-metadata = { path = "../workspace-metadata" }
 
 [dev-dependencies]
+invariants = { path = "../invariants" }
 laws = { path = "../laws" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }

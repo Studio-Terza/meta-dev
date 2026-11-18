@@ -12,10 +12,12 @@ use super::super::kept::{Commits, Mutant, Outcomes};
 use super::boundary::Costs;
 use super::tested::Reach;
 use crate::cli::command::failure::Failure;
+use crate::cli::ignored::Ignored;
 use crate::cli::ports::{Invocation, Ports, Text};
 pub(super) use boundary::Choice;
 use boundary::Reason;
 use edits::Edits;
+use invariants::Ignoring;
 use since::Since;
 
 #[derive(Debug)]
@@ -35,7 +37,7 @@ impl Prior {
     }
 
     pub(super) fn chosen(&self, ports: &impl Ports, reach: &Reach, diff: &Path) -> Result<Choice, Failure<'static>> {
-        let marker = ports.files().read_text(&self.directory.join(Self::TESTED)).ok();
+        let marker = ports.files().read_text(&self.directory.join(Self::TESTED)).ignoring(Ignored::Unmarked);
         let commits = marker.as_ref().and_then(Commits::read);
         commits.map_or(Ok(Choice::Full(Reason::NoPrior)), |found| self.compared(ports, reach, &found, diff))
     }
@@ -63,7 +65,7 @@ impl Prior {
 
 impl Prior {
     pub(super) fn costs(&self, ports: &impl Ports) -> Result<Costs, Failure<'static>> {
-        let marker = ports.files().read_text(&self.directory.join(Self::TESTED)).ok();
+        let marker = ports.files().read_text(&self.directory.join(Self::TESTED)).ignoring(Ignored::Unmarked);
         let outcomes = marker.map_or(Ok(Vec::new()), |_| self.outcomes(ports))?;
         Ok(Costs::measured(outcomes.into_iter().flat_map(Outcomes::spent).collect()))
     }

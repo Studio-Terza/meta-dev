@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use grammar::{Ignoring, Unlexed};
 use grammar_assignment::Emptied;
 use laws::proptest::prelude::any;
 
@@ -7,13 +8,13 @@ laws::roundtrip!(
     an_emptied_assignment_reads_back_its_name,
     any::<Emptied>(),
     |emptied: &Emptied| format!("{}=", emptied.clone().into_inner()),
-    |text: &String| text.parse::<Emptied>().ok(),
+    |text: &String| text.parse::<Emptied>().ignoring(Unlexed::NotThisGrammar),
     Some
 );
 
 laws::table!(
     an_emptied_name_is_exactly_one_identifier,
-    |name: &&str| Emptied::try_new((*name).to_owned()).ok().map(Emptied::into_inner),
+    |name: &&str| Emptied::try_new((*name).to_owned()).ignoring(Unlexed::NotThisGrammar).map(Emptied::into_inner),
     [
         "RUSTFLAGS" => Some("RUSTFLAGS".to_owned()),
         "_cache9" => Some("_cache9".to_owned()),

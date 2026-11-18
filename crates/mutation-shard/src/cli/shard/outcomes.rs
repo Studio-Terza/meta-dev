@@ -1,3 +1,4 @@
+mod ignored;
 mod outcome;
 
 use std::collections::BTreeMap;
@@ -13,6 +14,8 @@ use text_lines::LossyText;
 
 use super::mutant_result::MutantResult;
 use crate::cli::shard::failure::Failure;
+use crate::cli::shard::outcomes::ignored::Ignored;
+use invariants::Ignoring;
 
 #[derive(Debug, Deserialize)]
 pub struct Outcomes {
@@ -45,7 +48,7 @@ impl Outcomes {
             .iter()
             .copied()
             .zip(files.read_many(&wanted))
-            .filter_map(|(path, bytes)| Some((path, bytes.ok()?)))
+            .filter_map(|(path, bytes)| Some((path, bytes.ignoring(Ignored::Unread)?)))
             .collect();
         chosen
             .into_iter()

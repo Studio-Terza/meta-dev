@@ -1,4 +1,4 @@
-use std::fmt::{self, Write};
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -21,9 +21,7 @@ impl Named {
     }
 
     pub fn title(&self) -> Title {
-        let mut title = String::new();
-        write!(title, "{self}").ok();
-        Title::from(title)
+        Title::from(self.to_string())
     }
 }
 

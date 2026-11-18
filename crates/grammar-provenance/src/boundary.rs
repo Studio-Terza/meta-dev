@@ -1,4 +1,5 @@
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -27,8 +28,8 @@ impl Origins {
     pub fn read<Origin: Originating>(text: &str, origin: Origin) -> Option<Origin::Output> {
         let spelled: Vec<Result<Spelling, ()>> = Spelling::lexer(text).collect();
         <[Result<Spelling, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .and_then(|spelling| spelling.originated(origin))
     }
 
@@ -45,11 +46,14 @@ impl Origins {
 
 impl Spelling {
     fn counted(lexer: &Lexer<'_, Spelling>) -> Option<i64> {
-        lexer.slice().get(Origins::AGENT.len()..).and_then(|digits| digits.parse::<i64>().ok())
+        lexer.slice().get(Origins::AGENT.len()..).and_then(|digits| digits.parse::<i64>().ignoring(Unlexed::OutOfRange))
     }
 
     fn lined(lexer: &Lexer<'_, Spelling>) -> Option<usize> {
-        lexer.slice().get(Origins::IMPORT.len()..).and_then(|digits| digits.parse::<usize>().ok())
+        lexer
+            .slice()
+            .get(Origins::IMPORT.len()..)
+            .and_then(|digits| digits.parse::<usize>().ignoring(Unlexed::OutOfRange))
     }
 
     fn originated<Origin: Originating>(self, origin: Origin) -> Option<Origin::Output> {

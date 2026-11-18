@@ -1,3 +1,5 @@
+mod ignored;
+
 use std::error::Error;
 use std::ffi::OsStr;
 use std::path::PathBuf;
@@ -5,6 +7,8 @@ use std::process::ExitCode;
 
 use console_ports::Complaint;
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
+use ignored::Ignored;
+use invariants::Ignoring;
 use mutation_report::Cli;
 use serde_json::{Value, json};
 
@@ -350,7 +354,7 @@ impl Checkout {
     }
 
     fn text(&self, name: &str) -> Option<String> {
-        self.files.read_text(&self.path(name)).ok().map(|text| text.to_string())
+        self.files.read_text(&self.path(name)).ignoring(Ignored::Unread).map(|text| text.to_string())
     }
 
     fn markdown(&self) -> String {
@@ -362,7 +366,9 @@ impl Checkout {
     }
 
     fn json(&self) -> Value {
-        self.text("report.json").and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
+        self.text("report.json")
+            .and_then(|text| serde_json::from_str(&text).ignoring(Ignored::Unread))
+            .unwrap_or_default()
     }
 }
 

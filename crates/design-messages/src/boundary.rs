@@ -1,3 +1,5 @@
+mod ignored;
+
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -13,7 +15,9 @@ use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shap
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
+use crate::boundary::ignored::Ignored;
 use design_closure::Keyed;
+use invariants::Ignoring;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rank(f64);
@@ -203,7 +207,7 @@ impl SegmentRow {
             .segments()
             .iter()
             .filter_map(|segment| {
-                segment.text(message).ok().map(|body| SegmentRow {
+                segment.text(message).ignoring(Ignored::Unsliced).map(|body| SegmentRow {
                     message: uuid.clone(),
                     ordinal: Ordinal::new(segment.identity().ordinal().into_inner()),
                     shape: Shape::from(segment.form()),

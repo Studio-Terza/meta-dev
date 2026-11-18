@@ -44,16 +44,25 @@ impl<'step> Telling<'step> {
     }
 
     fn answered(ended: Result<Exit, Failure<'_>>) -> Answer {
-        ended.map_or_else(
-            |failure| Answer::complained(ExitCode::FAILURE, Lined(&failure)),
-            |exit| Answer::new(ExitCode::from(exit)),
-        )
+        match ended {
+            Ok(exit) => Answer::new(ExitCode::from(exit)),
+            Err(failure) => Answer::complained(ExitCode::FAILURE, Lined(&failure)),
+        }
     }
 }
 
 impl Told<'_> {
     pub(crate) fn said(text: impl Display) -> Told<'static> {
         Told::Said(Shown::said(text))
+    }
+}
+
+impl<'step> Told<'step> {
+    pub(crate) fn listed(told: Result<Vec<Told<'step>>, Failure<'step>>) -> Vec<Told<'step>> {
+        match told {
+            Ok(listed) => listed,
+            Err(failure) => vec![Told::Ended(Err(failure))],
+        }
     }
 }
 

@@ -8,8 +8,10 @@ use design_model::{NodeId, NotesLine};
 use design_store::StreamSchema;
 use file_ports::{Bytes, Files};
 use grammar_notes::{Cite, Quote};
+use invariants::Ignoring;
 use port_core::Run;
 
+use super::ignored::Ignored;
 use super::view::Viewing;
 use super::{Applying, FakeLent, Invocation, Session, Speaker, Spread, Staff};
 
@@ -74,22 +76,23 @@ impl Noting {
     }
 
     fn imported(applying: &Applying, notes: &str) -> Result<String, Failure> {
-        applying.files.create_directories(Path::new("/work/notes")).ok();
-        applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
+        applying.files.create_directories(Path::new("/work/notes")).ignoring(Ignored::Unseeded);
+        applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ignoring(Ignored::Unseeded);
         applying.run(&["import-notes", NOTES])
     }
 
     fn outcome(line: &str) -> Option<&'static str> {
         Noting::ready()
-            .ok()
+            .ignoring(Ignored::Unrun)
             .map(|applying| Noting::imported(&applying, &format!("# Notes\n{line}\n")))
             .and_then(Noting::sorted)
     }
 
     fn placed(remark: &str) -> Option<Result<Vec<String>, Miss>> {
-        let applying = Noting::ready().ok()?;
+        let applying = Noting::ready().ignoring(Ignored::Unrun)?;
         let reported = Noting::reported(&applying, &format!("# Notes\nRULING (owner c3c3c3c3): {remark}\n"));
-        let shown = applying.run(&["show", "n3"]).map_or_default(|shown| Spread::parsed(&shown));
+        let shown =
+            applying.run(&["show", "n3"]).ignoring(Ignored::Unrun).map_or_default(|shown| Spread::parsed(&shown));
         Some(reported.lines.into_iter().chain(shown).filter_map(Noting::found).collect())
     }
 
@@ -141,8 +144,8 @@ impl Noting {
     }
 
     fn reported(applying: &Applying, notes: &str) -> Reported {
-        applying.files.create_directories(Path::new("/work/notes")).ok();
-        applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ok();
+        applying.files.create_directories(Path::new("/work/notes")).ignoring(Ignored::Unseeded);
+        applying.files.write(&Path::new("/work").join(NOTES), Bytes::from(notes)).ignoring(Ignored::Unseeded);
         let uttered = Cli::new(
             &Invocation::environment(),
             FakeLent::new(&applying.files),
@@ -443,8 +446,8 @@ fn notes_are_refused_without_a_project_a_readable_file_or_the_right_words() -> R
     Invocation::against(&store, &Noting::session(), &["ingest"])?;
     assert!(matches!(Invocation::against(&store, &Noting::session(), &["view", "notes"]), Err(Failure::Unconfigured)));
     let files = Noting::session().files();
-    files.create_directories(Path::new("/work/notes")).ok();
-    files.write(&Path::new("/work").join(NOTES), Bytes::from("# Notes\n")).ok();
+    files.create_directories(Path::new("/work/notes")).ignoring(Ignored::Unseeded);
+    files.write(&Path::new("/work").join(NOTES), Bytes::from("# Notes\n")).ignoring(Ignored::Unseeded);
     assert!(matches!(Invocation::within(&store, files, &["import-notes", NOTES]), Err(Failure::Unconfigured)));
     let applying = Noting::ready()?;
     assert!(matches!(applying.run(&["import-notes", "notes/absent.md"]), Err(Failure::Notes(_))));

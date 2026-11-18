@@ -1,3 +1,4 @@
+mod ignored;
 mod lexed;
 mod lexeme;
 

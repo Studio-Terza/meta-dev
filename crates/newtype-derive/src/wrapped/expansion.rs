@@ -55,7 +55,7 @@ impl Strategy {
                 ::newtype::proptest::strategy::Strategy::prop_filter_map(
                     inner,
                     "the check refuses this value",
-                    |value| Self::try_new(value).ok(),
+                    |value| ::newtype::Ignoring::ignoring(Self::try_new(value), ::newtype::Ignored::Refused),
                 )
             },
         }

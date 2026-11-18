@@ -24,6 +24,7 @@ thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
+invariants = { path = "../invariants" }
 design-store = { path = "../design-store" }
 laws = { path = "../laws" }
 sqlite-ports = { path = "../sqlite-ports" }

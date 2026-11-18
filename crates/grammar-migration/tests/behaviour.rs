@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use grammar::{Ignoring, Unlexed};
 use grammar_migration::MigrationFile;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -11,7 +12,7 @@ struct Named {
 impl Named {
     fn read(name: &&str) -> Option<Named> {
         name.parse::<MigrationFile>()
-            .ok()
+            .ignoring(Unlexed::NotThisGrammar)
             .map(|file| Named { version: file.version(), description: file.description() })
     }
 

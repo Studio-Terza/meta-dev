@@ -2,6 +2,7 @@ pub(crate) mod applied;
 pub(crate) mod block_items;
 pub(crate) mod boundary;
 pub(crate) mod expr_shapes;
+mod ignored;
 pub(crate) mod macro_tree;
 pub(crate) mod mentioned;
 pub(crate) mod nested;

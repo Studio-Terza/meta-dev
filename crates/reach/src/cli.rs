@@ -4,7 +4,6 @@ mod request;
 
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
-use std::process::ExitCode;
 
 use console_ports::Answer;
 use file_ports::Files;
@@ -18,8 +17,7 @@ pub struct Cli;
 
 impl Cli {
     pub fn answer(arguments: impl Iterator<Item = OsString>, files: &impl Files) -> Answer {
-        Self::report(arguments, files)
-            .unwrap_or_else(|failure| Answer::complained(ExitCode::FAILURE, format_args!("{failure}\n")))
+        Answer::answered(Self::report(arguments, files))
     }
 
     fn report(mut arguments: impl Iterator<Item = OsString>, files: &impl Files) -> Result<Answer, Failure> {

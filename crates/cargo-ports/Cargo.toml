@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 file-ports = { path = "../file-ports" }
 port-core = { path = "../port-core" }
 thiserror.workspace = true

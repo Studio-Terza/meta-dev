@@ -5,6 +5,8 @@ use std::process::ExitCode;
 use ci::ports::Invocation;
 
 use super::{ExactReply, Scratch, Script, Text};
+use crate::ignored::Ignored;
+use invariants::Ignoring;
 
 const SURVIVOR: &str = r#"{"name": "crates/a/src/lib.rs:3:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 3, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const SURVIVOR_MOVED: &str = r#"{"name": "crates/a/src/lib.rs:4:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 4, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
@@ -199,6 +201,7 @@ laws::table!(
     only_test_code_edited_other_than_by_additions_since_the_prior_falls_back_to_every_changed_line,
     |since: &&'static str| Prior { timed_out: &[], survivors: &[SURVIVOR], since_head: since, moved: NOTHING_MOVED, listed: vec![SURVIVOR, UNTOUCHED], since: Vec::new(), earlier_tests: "", since_tests: "" }
         .planned()
+        .ignoring(Ignored::Unplanned)
         .map_or_default(|planned| (planned.out.first().cloned().unwrap_or_default(), planned.selected.len())),
     [
         TEST_EDITED => ("mutants: every changed line, since test code changed other than by additions: crates/a/tests/behaviour.rs".to_owned(), 0),
@@ -321,7 +324,7 @@ impl Earlier {
 
 laws::table!(
     only_a_complete_earlier_run_on_an_ancestor_of_the_head_is_reused,
-    |earlier: &Earlier| earlier.looked().unwrap_or_default(),
+    |earlier: &Earlier| earlier.looked().ignoring(Ignored::Unplanned).unwrap_or_default(),
     [
         Earlier { ancestry: Ancestry::Ancestor, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: reusing run 7, which tested h0".to_owned()], marked: vec!["t0".to_owned(), "h0".to_owned()], downloads: 2 },
         Earlier { ancestry: Ancestry::Diverged, uploaded: r#"[{"index": 0, "count": 2}, {"index": 1, "count": 2}]"# } => Looked { out: vec!["mutants: no earlier run on an ancestor of this head kept every shard's result, so this run mutates every changed line".to_owned()], marked: Vec::new(), downloads: 0 },
@@ -468,6 +471,7 @@ impl Retested {
             since_tests: self.since,
         }
         .planned()
+        .ignoring(Ignored::Unplanned)
         .map_or_default(|planned| planned.wholes)
     }
 }

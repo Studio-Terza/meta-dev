@@ -31,12 +31,10 @@ impl<'step> Reruns<'step> {
     }
 
     pub(super) fn after(&self, ports: &impl Ports, survivors: Option<&Survivors>) -> Vec<Told<'step>> {
-        survivors
-            .map_or_else(
-                || self.keeping.kept(ports, None).map(|()| Verdict::NoneMissed.told()),
-                |found| self.rerun(ports, found),
-            )
-            .unwrap_or_else(|failure| vec![Told::Ended(Err(failure))])
+        Told::listed(survivors.map_or_else(
+            || self.keeping.kept(ports, None).map(|()| Verdict::NoneMissed.told()),
+            |found| self.rerun(ports, found),
+        ))
     }
 
     fn rerun(&self, ports: &impl Ports, missed: &Survivors) -> Result<Vec<Told<'step>>, Failure<'step>> {

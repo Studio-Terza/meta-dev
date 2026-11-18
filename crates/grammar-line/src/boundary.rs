@@ -1,4 +1,5 @@
 use grammar::logos::Logos;
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -17,6 +18,9 @@ impl Unbroken {
     #[must_use]
     pub fn spelled(text: &str) -> Option<&str> {
         let spelled: Vec<Result<Spelling, ()>> = Spelling::lexer(text).collect();
-        <[Result<Spelling, ()>; 1]>::try_from(spelled).ok().and_then(|[only]| only.ok()).map(|_line| text)
+        <[Result<Spelling, ()>; 1]>::try_from(spelled)
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
+            .map(|_line| text)
     }
 }

@@ -1,5 +1,6 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+use grammar::{Ignoring, Unlexed};
 use std::path::{Path, PathBuf};
 
 use grammar_hunk::{Changed, Patch};
@@ -17,7 +18,9 @@ struct Read {
 
 impl Read {
     fn all(text: &&str) -> Option<Vec<Read>> {
-        text.parse::<Patch>().ok().map(|patch| patch.changed().iter().map(Read::of).collect())
+        text.parse::<Patch>()
+            .ignoring(Unlexed::NotThisGrammar)
+            .map(|patch| patch.changed().iter().map(Read::of).collect())
     }
 
     fn of(changed: &Changed) -> Read {
@@ -33,7 +36,7 @@ struct Old(u32);
 
 impl Old {
     fn moved(&self) -> Option<u32> {
-        TWO_FILES.parse::<Patch>().ok()?.changed().first()?.moved(self.0)
+        TWO_FILES.parse::<Patch>().ignoring(Unlexed::NotThisGrammar)?.changed().first()?.moved(self.0)
     }
 }
 

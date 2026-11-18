@@ -16,7 +16,10 @@ pub use file_ports::{Disk, Files, Memory};
 #[macro_export]
 macro_rules! golden {
     ($name:expr, $actual:expr $(,)?) => {
-        $crate::verdict!($name, $actual).unwrap_or_else(|failure| panic!("{failure}"))
+        match $crate::verdict!($name, $actual) {
+            Ok(verified) => verified,
+            Err(failure) => panic!("{failure}"),
+        }
     };
 }
 

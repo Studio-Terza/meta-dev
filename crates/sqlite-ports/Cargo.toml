@@ -14,6 +14,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 rusqlite = { version = "0.37.0", default-features = false, features = ["serialize"] }

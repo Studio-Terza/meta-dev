@@ -1,5 +1,7 @@
 use crate::cli::command::Telling;
+use crate::cli::ignored::Ignored;
 use console_ports::Shown;
+use invariants::Ignoring;
 mod listing;
 mod unit;
 
@@ -49,7 +51,7 @@ impl CompileTimes {
             .next()
             .and_then(|(at, found)| text.get(at + found.len()..))
             .and_then(|rest| Deserializer::from_str(rest).into_iter::<Vec<Timed>>().next())
-            .and_then(Result::ok)
+            .and_then(|timed| timed.ignoring(Ignored::Unparsed))
             .ok_or_else(|| Failure::NoTimings { path: page.into() })
     }
 }

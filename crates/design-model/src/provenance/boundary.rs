@@ -5,7 +5,9 @@ use grammar_provenance::{Originating, Origins};
 use newtype::Enumerated;
 use newtype::{Spelled, Wrapping};
 
+use crate::ignored::Ignored;
 use crate::{Entered, NotesLine, RunId};
+use invariants::Ignoring;
 
 #[derive(Spelled, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Provenance {
@@ -67,6 +69,10 @@ impl FromStr for Provenance {
 
     fn from_str(text: &str) -> Result<Provenance, Unprovenanced> {
         let origin = || Origins::read(text, Originated);
-        text.parse::<Entered>().map(Provenance::Lead).ok().or_else(origin).ok_or_else(|| Unprovenanced(text.to_owned()))
+        text.parse::<Entered>()
+            .map(Provenance::Lead)
+            .ignoring(Ignored::NotEntered)
+            .or_else(origin)
+            .ok_or_else(|| Unprovenanced(text.to_owned()))
     }
 }

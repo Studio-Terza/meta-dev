@@ -7,6 +7,7 @@ use design_model::{
     SenseKind, SpanRelation, Specificity, Stage, Title,
 };
 use dispatch_ports::Reply;
+use invariants::{Ignoring, ignored};
 use laws::proptest::arbitrary::any;
 use laws::proptest::collection::vec;
 use laws::proptest::option;
@@ -21,6 +22,35 @@ use structurer::{
 };
 use transcript_ports::Body;
 
+ignored! {
+    enum Ignored {
+        Refused => "a text the check or parse refuses is filtered out, or is the None the case expects",
+    }
+}
+
+enum Misreading {
+    Parsed,
+    Lapsed(Lapse),
+}
+
+impl From<&str> for Misreading {
+    fn from(reply: &str) -> Misreading {
+        match reply.parse::<Directives>() {
+            Ok(_directives) => Misreading::Parsed,
+            Err(misread) => Misreading::Lapsed(Lapse::from(misread)),
+        }
+    }
+}
+
+impl From<Misreading> for Option<Lapse> {
+    fn from(misreading: Misreading) -> Option<Lapse> {
+        match misreading {
+            Misreading::Parsed => None,
+            Misreading::Lapsed(lapse) => Some(lapse),
+        }
+    }
+}
+
 struct Generated;
 
 impl Generated {
@@ -30,7 +60,8 @@ impl Generated {
     }
 
     fn label() -> impl Strategy<Value = Label> {
-        "[A-Za-z_][A-Za-z0-9_-]{0,8}".prop_filter_map("a node id is no label", |label| label.parse::<Label>().ok())
+        "[A-Za-z_][A-Za-z0-9_-]{0,8}"
+            .prop_filter_map("a node id is no label", |label| label.parse::<Label>().ignoring(Ignored::Refused))
     }
 
     fn node() -> impl Strategy<Value = NodeRef> {
@@ -41,20 +72,23 @@ impl Generated {
     }
 
     fn replacement() -> impl Strategy<Value = Edge<NodeRef>> {
-        (Self::node(), Self::node())
-            .prop_filter_map("a node never supersedes itself", |(old, by)| Edge::new(old, by).ok())
+        (Self::node(), Self::node()).prop_filter_map("a node never supersedes itself", |(old, by)| {
+            Edge::new(old, by).ignoring(Ignored::Refused)
+        })
     }
 
     fn link() -> impl Strategy<Value = Edge<structurer::SegmentRef>> {
-        (Self::segment(), Self::segment())
-            .prop_filter_map("a segment never links to itself", |(source, target)| Edge::new(source, target).ok())
+        (Self::segment(), Self::segment()).prop_filter_map("a segment never links to itself", |(source, target)| {
+            Edge::new(source, target).ignoring(Ignored::Refused)
+        })
     }
 
     fn proposal() -> impl Strategy<Value = Proposal> {
         prop_oneof![
             Self::node().prop_map(Proposal::Anonymous),
             (Self::label(), Self::node())
-                .prop_filter_map("a node never refines itself", |(label, refines)| Edge::new(label, refines).ok())
+                .prop_filter_map("a node never refines itself", |(label, refines)| Edge::new(label, refines)
+                    .ignoring(Ignored::Refused))
                 .prop_map(Proposal::Labelled)
         ]
     }
@@ -90,7 +124,7 @@ laws::roundtrip!(
     a_label_is_displayed_and_parsed_back,
     Generated::label(),
     |label: &Label| label.to_string(),
-    |text: &String| text.parse::<Label>().ok(),
+    |text: &String| text.parse::<Label>().ignoring(Ignored::Refused),
     Some
 );
 
@@ -98,7 +132,7 @@ laws::roundtrip!(
     a_node_ref_is_displayed_and_parsed_back,
     Generated::node(),
     |node: &NodeRef| node.to_string(),
-    |text: &String| text.parse::<NodeRef>().ok(),
+    |text: &String| text.parse::<NodeRef>().ignoring(Ignored::Refused),
     Some
 );
 
@@ -106,7 +140,7 @@ laws::roundtrip!(
     a_directive_is_displayed_and_parsed_back,
     Generated::directive(),
     |directive: &Directive| directive.to_string(),
-    |text: &String| text.parse::<Directive>().ok(),
+    |text: &String| text.parse::<Directive>().ignoring(Ignored::Refused),
     Some
 );
 
@@ -116,7 +150,7 @@ laws::roundtrip!(
     |directives: &Vec<Directive>| directives.iter().map(ToString::to_string).collect::<Vec<String>>().join("\n\n"),
     |text: &String| text
         .parse::<Directives>()
-        .ok()
+        .ignoring(Ignored::Refused)
         .map(|directives| directives.into_iter().collect::<Vec<Directive>>()),
     Some
 );
@@ -218,7 +252,8 @@ impl Jobs {
         )
             .prop_filter_map("a project name", |((id, facet, stage, basis), (title, parent, project))| {
                 let outline =
-                    Outline::new(NodeId::new(id), project.parse::<Project>().ok()?, facet, stage).based(basis);
+                    Outline::new(NodeId::new(id), project.parse::<Project>().ignoring(Ignored::Refused)?, facet, stage)
+                        .based(basis);
                 Some(outline.titled(title.map(Title::new)).parented(parent.map(NodeId::new)))
             })
     }
@@ -234,7 +269,7 @@ impl Jobs {
             (Generated::segment(), vec(Generated::segment(), 0..Job::SEGMENTS))
                 .prop_map(|(first, rest)| Lapse::from(Uncovered::new(first, rest))),
             "[ -~]{0,30}"
-                .prop_filter_map("a misread reply", |reply| reply.parse::<Directives>().err().map(Lapse::from)),
+                .prop_filter_map("a misread reply", |reply| Option::<Lapse>::from(Misreading::from(reply.as_str()))),
         ]
     }
 
@@ -247,7 +282,7 @@ laws::roundtrip!(
     a_briefing_reads_back_as_it_is_rendered,
     (Jobs::any(), Jobs::attempt()),
     |drawn: &(Job, Attempt)| drawn.0.briefing(&drawn.1).to_string(),
-    |text: &String| text.parse::<Briefing>().ok(),
+    |text: &String| text.parse::<Briefing>().ignoring(Ignored::Refused),
     |drawn: (Job, Attempt)| Some(drawn.0.briefing(&drawn.1))
 );
 
@@ -298,7 +333,7 @@ laws::law!(
             .parse()
             .map_err(|misread: Misread| laws::proptest::test_runner::TestCaseError::fail(misread.to_string()))?;
         laws::proptest::prop_assert_eq!(parsed, Reading::Parsed { directives, attempt: attempt.clone() });
-        let misread = "place(".parse::<Directives>().err().map(Lapse::from);
+        let misread = Option::<Lapse>::from(Misreading::from("place("));
         laws::proptest::prop_assert_eq!(
             Some(attempt.clone().read(&Reply::new("place(".to_owned()))),
             misread.map(|lapse| attempt.lapsed(lapse))

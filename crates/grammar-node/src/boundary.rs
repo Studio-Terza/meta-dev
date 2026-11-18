@@ -1,4 +1,5 @@
 use grammar::logos::{Lexer, Logos};
+use grammar::{Ignoring, Unlexed};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -50,8 +51,8 @@ impl Ids {
     pub fn spelled(text: &str) -> Spelled {
         let spelled: Vec<Result<Spelling, ()>> = Spelling::lexer(text).collect();
         <[Result<Spelling, ()>; 1]>::try_from(spelled)
-            .ok()
-            .and_then(|[only]| only.ok())
+            .ignoring(Unlexed::OtherShape)
+            .and_then(|[only]| only.ignoring(Unlexed::NotThisGrammar))
             .map_or(Spelled::Unspelled, Spelling::spelled)
     }
 }
@@ -61,7 +62,7 @@ impl Spelling {
         lexer
             .slice()
             .get(1..)
-            .and_then(|digits| digits.parse::<i64>().ok())
+            .and_then(|digits| digits.parse::<i64>().ignoring(Unlexed::OutOfRange))
             .map_or(Spelled::Misnumbered, Spelled::Numbered)
     }
 

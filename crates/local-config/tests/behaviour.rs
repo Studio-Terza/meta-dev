@@ -3,10 +3,18 @@ use std::path::{Path, PathBuf};
 
 use design_model::Project;
 use file_ports::{Files, Memory};
+use invariants::{Ignoring, ignored};
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use local_config::{ConfigFailure, Kept, LocalConfig};
+
+ignored! {
+    enum Ignored {
+        Refused => "a generated project name that does not parse is filtered out",
+        Unserialised => "a config that fails to write or read back breaks the roundtrip, which the law reports",
+    }
+}
 
 const REPO: &str = "/repo";
 
@@ -19,7 +27,8 @@ impl Configs {
     }
 
     fn projects() -> impl Strategy<Value = Project> {
-        "[A-Za-z0-9][A-Za-z0-9._-]{0,15}".prop_filter_map("a project name", |name| name.parse::<Project>().ok())
+        "[A-Za-z0-9][A-Za-z0-9._-]{0,15}"
+            .prop_filter_map("a project name", |name| name.parse::<Project>().ignoring(Ignored::Refused))
     }
 
     fn stored(memory: &Memory) -> Result<LocalConfig, TestCaseError> {
@@ -86,7 +95,9 @@ fn a_kept_config_leaves_the_meta_directory_ignored_by_git() -> Result<(), Box<dy
 laws::roundtrip!(
     a_local_config_is_serialized_and_deserialized_back,
     Configs::any(),
-    |config: &LocalConfig| toml::to_string(config).ok(),
-    |text: &Option<String>| text.as_deref().and_then(|written| toml::from_str::<LocalConfig>(written).ok()),
+    |config: &LocalConfig| toml::to_string(config).ignoring(Ignored::Unserialised),
+    |text: &Option<String>| text
+        .as_deref()
+        .and_then(|written| toml::from_str::<LocalConfig>(written).ignoring(Ignored::Unserialised)),
     Some
 );
