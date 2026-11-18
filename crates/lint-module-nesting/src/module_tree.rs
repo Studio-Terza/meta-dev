@@ -129,7 +129,12 @@ impl Contribute for UseScan {
         &[Kind::ItemUse]
     }
 
-    fn on_item_use(&self, item: &ItemUse, _: &Facts<'_, ItemUse>) -> Contributed<(), UsePaths> {
+    fn on_item_use(
+        &self,
+        item: &ItemUse,
+        _: &Facts<'_, ItemUse>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), UsePaths> {
         Contributed::new((), UsePaths(UseEdges::of_tree(&item.tree).into_iter().collect()), Descend::Over)
     }
 }

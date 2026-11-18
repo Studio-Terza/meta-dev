@@ -4,8 +4,9 @@ use std::sync::Arc;
 use graph::{Building, Call, FileId, Found, Function, Holding, Implementation, Law, Region};
 use lint_layout::Position;
 
-use crate::namespace::{Resolving, ScopeId};
+use crate::namespace::{Resolving, ScopeKey, ScopeMap};
 
+use super::Grown;
 use super::places::Places;
 
 pub(super) trait Built {
@@ -18,16 +19,16 @@ pub(super) struct Footing<'grown> {
     file: FileId,
     outer: Region,
     places: &'grown Places,
+    scopes: &'grown ScopeMap,
 }
 
 impl<'grown> Footing<'grown> {
     pub(super) fn new(
         resolving: Resolving<'grown, 'grown, 'grown>,
-        file: FileId,
-        outer: Region,
+        grown: &'grown Grown,
         places: &'grown Places,
     ) -> Footing<'grown> {
-        Footing { resolving, file, outer, places }
+        Footing { resolving, file: grown.file, outer: grown.outer, places, scopes: &grown.scopes }
     }
 
     pub(super) fn resolving(self) -> Resolving<'grown, 'grown, 'grown> {
@@ -42,6 +43,10 @@ impl<'grown> Footing<'grown> {
         self.outer
     }
 
+    pub(super) fn scopes(self) -> &'grown ScopeMap {
+        self.scopes
+    }
+
     pub(super) fn file(self) -> FileId {
         self.file
     }
@@ -49,17 +54,17 @@ impl<'grown> Footing<'grown> {
 
 #[derive(Clone, Debug)]
 pub(super) struct Seat {
-    scope: ScopeId,
+    scope: ScopeKey,
     children: Arc<Path>,
 }
 
 impl Seat {
-    pub(super) fn new(scope: ScopeId, children: Arc<Path>) -> Seat {
+    pub(super) fn new(scope: ScopeKey, children: Arc<Path>) -> Seat {
         Seat { scope, children }
     }
 
-    pub(super) fn scope(&self) -> ScopeId {
-        self.scope
+    pub(super) fn scope(&self) -> &ScopeKey {
+        &self.scope
     }
 
     pub(super) fn children(&self) -> Arc<Path> {
@@ -67,22 +72,22 @@ impl Seat {
     }
 
     pub(super) fn located(&self, position: Position) -> Located {
-        Located { position, scope: self.scope }
+        Located { position, scope: self.scope.clone() }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Located {
     position: Position,
-    scope: ScopeId,
+    scope: ScopeKey,
 }
 
 impl Located {
-    pub(super) fn scope(self) -> ScopeId {
-        self.scope
+    pub(super) fn scope(&self) -> &ScopeKey {
+        &self.scope
     }
 
-    pub(super) fn position(self) -> Position {
+    pub(super) fn position(&self) -> Position {
         self.position
     }
 

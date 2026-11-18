@@ -81,7 +81,12 @@ impl Contribute for TestScan<'_> {
         const { &[Scope::new(Kind::ItemMod)] }
     }
 
-    fn on_item_fn(&self, _: &ItemFn, facts: &Facts<'_, ItemFn>) -> Contributed<(), Tally> {
+    fn on_item_fn(
+        &self,
+        _: &ItemFn,
+        facts: &Facts<'_, ItemFn>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Tally> {
         Contributed::parted(Tally::tested(Count::new(facts.test_mark().into_iter().count())))
     }
 
@@ -95,7 +100,12 @@ impl Contribute for TestScan<'_> {
         }
     }
 
-    fn on_macro(&self, invocation: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Tally> {
+    fn on_macro(
+        &self,
+        invocation: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Tally> {
         Contributed::new((), Tally::tested(self.tests_in(invocation)), Descend::Over)
     }
 }

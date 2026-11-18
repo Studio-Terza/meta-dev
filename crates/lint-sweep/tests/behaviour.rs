@@ -1,6 +1,6 @@
 use invariants::{invariant, invariants};
 use lint_core::{Descend, Facts, Kind, SourceFile, SourceText, Watch, Watching};
-use lint_sweep::{Attaches, Attachment, Gathers, Scoped, Sweep};
+use lint_sweep::Sweep;
 use syntax::{Block, ExprBinary, Macro};
 
 invariants! {
@@ -62,29 +62,6 @@ struct Unfolding {
     sums: usize,
 }
 
-#[derive(Debug)]
-struct Unattached;
-
-impl Gathers<Unattached> for Unattached {
-    fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Vec::new()
-    }
-
-    fn gathered(self) -> Unattached {
-        self
-    }
-}
-
-impl Attaches<Unattached> for Unfolding {
-    const ATTACHED: &'static [Kind] = &[];
-
-    fn attaching(&mut self) -> Vec<Attachment<Unattached>> {
-        Vec::new()
-    }
-
-    fn detached(&mut self, _: Unattached) {}
-}
-
 impl<'ast> Watch<'ast> for Unfolding {
     fn kinds(&self) -> &'static [Kind] {
         &[Kind::Macro, Kind::ExprBinary]
@@ -101,10 +78,10 @@ impl<'ast> Watch<'ast> for Unfolding {
 }
 
 #[test]
-fn a_scoped_watcher_that_unfolds_a_macro_hears_what_the_macro_holds() {
+fn a_watcher_that_unfolds_a_macro_hears_what_the_macro_holds() {
     let file = SourceFile::parse("a.rs", SourceText::new(SUMMED.to_owned()));
     let parsed = invariant!(holding file, Invariant::FixtureParses, detailed);
-    let mut scoped = Scoped::<Unfolding, Unattached>::new(Unfolding::default());
-    Sweep::watching(&parsed, vec![&mut scoped]);
-    assert_eq!(scoped.into_parent().sums, 2);
+    let mut unfolding = Unfolding::default();
+    Sweep::watching(&parsed, vec![&mut unfolding]);
+    assert_eq!(unfolding.sums, 2);
 }

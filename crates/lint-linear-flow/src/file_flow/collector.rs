@@ -134,39 +134,84 @@ impl<'file> Contribute for Collector<'file> {
         self.closed(&function.sig, function.default.as_ref(), inner)
     }
 
-    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<(), Flows<'file>> {
+    fn on_macro(
+        &self,
+        _: &Macro,
+        _: &Facts<'_, Macro>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Contributed::descending(Descend::Expand)
     }
 
-    fn on_expr_if(&self, expr: &ExprIf, _: &Facts<'_, ExprIf>) -> Contributed<(), Flows<'file>> {
+    fn on_expr_if(
+        &self,
+        expr: &ExprIf,
+        _: &Facts<'_, ExprIf>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::branched(self.path(), expr))
     }
 
-    fn on_expr_match(&self, expr: &ExprMatch, _: &Facts<'_, ExprMatch>) -> Contributed<(), Flows<'file>> {
+    fn on_expr_match(
+        &self,
+        expr: &ExprMatch,
+        _: &Facts<'_, ExprMatch>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::matched(self.path(), expr))
     }
 
-    fn on_expr_while(&self, expr: &ExprWhile, _: &Facts<'_, ExprWhile>) -> Contributed<(), Flows<'file>> {
+    fn on_expr_while(
+        &self,
+        expr: &ExprWhile,
+        _: &Facts<'_, ExprWhile>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::looped(self.path(), expr.while_token.span, Finding::While))
     }
 
-    fn on_expr_for_loop(&self, expr: &ExprForLoop, _: &Facts<'_, ExprForLoop>) -> Contributed<(), Flows<'file>> {
+    fn on_expr_for_loop(
+        &self,
+        expr: &ExprForLoop,
+        _: &Facts<'_, ExprForLoop>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::looped(self.path(), expr.for_token.span, Finding::For))
     }
 
-    fn on_expr_loop(&self, expr: &ExprLoop, _: &Facts<'_, ExprLoop>) -> Contributed<(), Flows<'file>> {
+    fn on_expr_loop(
+        &self,
+        expr: &ExprLoop,
+        _: &Facts<'_, ExprLoop>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::looped(self.path(), expr.loop_token.span, Finding::Loop))
     }
 
-    fn on_local(&self, local: &Local, _: &Facts<'_, Local>) -> Contributed<(), Flows<'file>> {
+    fn on_local(
+        &self,
+        local: &Local,
+        _: &Facts<'_, Local>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::bound(self.path(), local))
     }
 
-    fn on_expr_binary(&self, expr: &ExprBinary, _: &Facts<'_, ExprBinary>) -> Contributed<(), Flows<'file>> {
+    fn on_expr_binary(
+        &self,
+        expr: &ExprBinary,
+        _: &Facts<'_, ExprBinary>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::joined(self.path(), expr))
     }
 
-    fn on_expr_unary(&self, expr: &ExprUnary, _: &Facts<'_, ExprUnary>) -> Contributed<(), Flows<'file>> {
+    fn on_expr_unary(
+        &self,
+        expr: &ExprUnary,
+        _: &Facts<'_, ExprUnary>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Flows<'file>> {
         Self::candidate(Candidate::negated(self.path(), expr))
     }
 }

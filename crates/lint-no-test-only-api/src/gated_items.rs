@@ -23,22 +23,42 @@ impl Contribute for GatedItems<'_> {
         &[Kind::Item, Kind::ItemMod, Kind::ItemImpl, Kind::Field]
     }
 
-    fn on_item(&self, item: &Item, _: &Facts<'_, Item>) -> Contributed<(), Vec<Flagged>> {
+    fn on_item(
+        &self,
+        item: &Item,
+        _: &Facts<'_, Item>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Flagged>> {
         Contributed::parted(ItemHead::of_item(item).and_then(|head| head.flagged(None)).into_iter().collect())
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Vec<Flagged>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Flagged>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&self, item: &ItemImpl, _: &Facts<'_, ItemImpl>) -> Contributed<(), Vec<Flagged>> {
+    fn on_item_impl(
+        &self,
+        item: &ItemImpl,
+        _: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Flagged>> {
         let gated = ItemHead::gate_of(&item.attrs);
         Contributed::parted(
             item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated)).collect(),
         )
     }
 
-    fn on_field(&self, field: &Field, _: &Facts<'_, Field>) -> Contributed<(), Vec<Flagged>> {
+    fn on_field(
+        &self,
+        field: &Field,
+        _: &Facts<'_, Field>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Vec<Flagged>> {
         Contributed::parted(ItemHead::of_field(field).flagged(None).into_iter().collect())
     }
 }

@@ -71,20 +71,40 @@ impl Contribute for Consuming {
         self.kinds
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Consumers> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Consumers> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_trait_bound(&self, bound: &TraitBound, _: &Facts<'_, TraitBound>) -> Contributed<(), Consumers> {
+    fn on_trait_bound(
+        &self,
+        bound: &TraitBound,
+        _: &Facts<'_, TraitBound>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Consumers> {
         let bounds = bound.path.segments.last().map(|segment| Name::from(&segment.ident)).into_iter().collect();
         Contributed::parted(Consumers { bounds, called: BTreeSet::new() })
     }
 
-    fn on_expr_method_call(&self, _: &ExprMethodCall, facts: &Facts<'_, ExprMethodCall>) -> Contributed<(), Consumers> {
+    fn on_expr_method_call(
+        &self,
+        _: &ExprMethodCall,
+        facts: &Facts<'_, ExprMethodCall>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Consumers> {
         Consumers::called(facts.name().cloned())
     }
 
-    fn on_expr_path(&self, path: &ExprPath, _: &Facts<'_, ExprPath>) -> Contributed<(), Consumers> {
+    fn on_expr_path(
+        &self,
+        path: &ExprPath,
+        _: &Facts<'_, ExprPath>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Consumers> {
         Consumers::called(
             path.path
                 .segments

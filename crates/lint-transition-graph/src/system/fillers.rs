@@ -77,11 +77,21 @@ impl<'file> Contribute for Scan<'_, 'file> {
         &[Kind::ItemMod, Kind::ItemImpl]
     }
 
-    fn on_item_mod(&self, _: &ItemMod, facts: &Facts<'_, ItemMod>) -> Contributed<(), Fillers<'file>> {
+    fn on_item_mod(
+        &self,
+        _: &ItemMod,
+        facts: &Facts<'_, ItemMod>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Fillers<'file>> {
         Contributed::descending(Descend::from(facts.gate()))
     }
 
-    fn on_item_impl(&self, found: &ItemImpl, facts: &Facts<'_, ItemImpl>) -> Contributed<(), Fillers<'file>> {
+    fn on_item_impl(
+        &self,
+        found: &ItemImpl,
+        facts: &Facts<'_, ItemImpl>,
+        _around: lint_sweep::Around<'_, Self::Open, Self::Part>,
+    ) -> Contributed<(), Fillers<'file>> {
         let interface =
             found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
         let filled = interface.zip(facts.name().cloned()).map(|(trait_name, filler)| Filled {
