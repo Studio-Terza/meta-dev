@@ -45,7 +45,9 @@ impl Macros {
             .map_or_default(|_| Self::transcribers(definition.tokens.clone()))
             .into_iter()
             .map(Transcriber::substituted)
-            .flat_map(|tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default())
+            .flat_map(|tokens| {
+                Self::statements_or_expressions.parse2(tokens).ignoring(Ignored::Unparsed).unwrap_or_default()
+            })
             .collect();
         Mentioned::in_statements(&statements)
     }
