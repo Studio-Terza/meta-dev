@@ -7,6 +7,7 @@ use graph::{Domain, FileId, ItemId, ItemPath, Member, Mention, ModelPart, PathUs
 use lint_core::Macros;
 use lint_layout::LineNumber;
 
+use super::binding::Binding;
 use super::boundary::{ScopeId, ScopeKey, ScopeMap};
 use super::items::ItemIds;
 use super::resolver::Resolver;
@@ -37,7 +38,8 @@ impl<'ids, 'tables, 'rows> Resolving<'ids, 'tables, 'rows> {
     }
 
     pub(crate) fn path(&self, scope: ScopeId, path: &UsePath, domain: Domain) -> Resolved {
-        self.resolver.path(path, scope.above(self.base), domain).forced().resolved(self.ids, path.written())
+        let resolution = self.resolver.path(path, scope.above(self.base), domain);
+        Option::<Binding>::from(resolution).unwrap_or(Binding::UNBOUND).resolved(self.ids, path.written())
     }
 }
 

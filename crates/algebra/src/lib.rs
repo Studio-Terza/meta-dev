@@ -15,6 +15,17 @@ impl Semigroup for () {
 
 impl Monoid for () {}
 
+impl<Part: Semigroup> Semigroup for Option<Part> {
+    fn combine(self, other: Option<Part>) -> Option<Part> {
+        match self {
+            Some(held) => Some(other.into_iter().fold(held, Part::combine)),
+            None => other,
+        }
+    }
+}
+
+impl<Part: Semigroup> Monoid for Option<Part> {}
+
 impl<Item> Semigroup for Vec<Item> {
     fn combine(mut self, other: Vec<Item>) -> Vec<Item> {
         self.extend(other);

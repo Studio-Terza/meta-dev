@@ -1,3 +1,4 @@
+use algebra::Semigroup;
 use graph::{External, ItemId, ItemPath, Primitive, Resolved, Unresolved};
 use lint_layout::{Dependencies, Name};
 
@@ -54,13 +55,6 @@ impl Binding {
         }
     }
 
-    pub(super) fn agreed(&self, found: Binding) -> Binding {
-        match [found].into_iter().find(|candidate| candidate == self) {
-            Some(agreed) => agreed,
-            None => Binding::UNBOUND,
-        }
-    }
-
     pub(super) fn resolved(self, ids: &ItemIds, written: ItemPath) -> Resolved {
         match self {
             Binding::Item(scope, item) => Binding::issued(ids.issued(scope, item), written),
@@ -98,6 +92,12 @@ impl Binding {
             Some(issued) => Resolved::Crate(issued),
             None => Resolved::Unknown(written, Unresolved::Unbound),
         }
+    }
+}
+
+impl Semigroup for Binding {
+    fn combine(self, found: Binding) -> Binding {
+        Some(found).filter(|candidate| *candidate == self).unwrap_or(Binding::UNBOUND)
     }
 }
 

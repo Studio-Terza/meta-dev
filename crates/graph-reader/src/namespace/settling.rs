@@ -140,7 +140,11 @@ impl ScopeSettling {
 
     fn forced(self) -> ScopeSettling {
         ScopeSettling {
-            imports: self.imports.into_iter().map(|import| Resolution::Bound(import.forced())).collect(),
+            imports: self
+                .imports
+                .into_iter()
+                .map(|import| Resolution::Bound(Option::from(import).unwrap_or(Binding::UNBOUND)))
+                .collect(),
             targets: self.targets.into_iter().map(Target::forced).collect(),
         }
     }

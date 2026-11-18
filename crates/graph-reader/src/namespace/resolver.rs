@@ -96,20 +96,6 @@ impl Resolution {
         }
     }
 
-    pub(super) fn forced(self) -> Binding {
-        match self {
-            Resolution::Waiting => Binding::UNBOUND,
-            Resolution::Bound(binding) => binding,
-        }
-    }
-
-    fn kept(self, held: &Binding) -> Resolution {
-        match self {
-            Resolution::Waiting => Resolution::Bound(held.clone()),
-            Resolution::Bound(found) => Resolution::Bound(held.agreed(found)),
-        }
-    }
-
     fn target(self, sight_of: impl FnOnce(ScopeId) -> Sight) -> Target {
         match self {
             Resolution::Waiting => Target::Waiting,
@@ -120,10 +106,22 @@ impl Resolution {
 
 impl Semigroup for Resolution {
     fn combine(self, computed: Resolution) -> Resolution {
-        match self {
-            Resolution::Waiting => computed,
-            Resolution::Bound(held) => computed.kept(&held),
+        Resolution::from(Option::<Binding>::from(self).combine(Option::from(computed)))
+    }
+}
+
+impl From<Resolution> for Option<Binding> {
+    fn from(resolution: Resolution) -> Option<Binding> {
+        match resolution {
+            Resolution::Waiting => None,
+            Resolution::Bound(binding) => Some(binding),
         }
+    }
+}
+
+impl From<Option<Binding>> for Resolution {
+    fn from(binding: Option<Binding>) -> Resolution {
+        binding.map_or(Resolution::Waiting, Resolution::Bound)
     }
 }
 
