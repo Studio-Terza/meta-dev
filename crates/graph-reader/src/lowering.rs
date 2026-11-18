@@ -26,9 +26,9 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMod};
 
 use graph::{
-    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Function,
-    Implementation, Interface, Model, ModelPart, Mutation, Named, Origin, Output, Owner, Region, Signature, Sited,
-    Spelling, Subject, TypeRef,
+    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Implementation,
+    Interface, Model, ModelPart, Mutation, Named, Origin, Output, Owner, Region, Signature, Signed, Sited, Spelling,
+    Subject, TypeRef,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
@@ -198,11 +198,10 @@ impl Lowers for FnRow {
             self.mutation,
             mutated,
         );
-        let function = Function::new(self.name, self.owner, self.entry, signature)
-            .exposed(self.exposure)
-            .evaluated(self.evaluation)
-            .seated(footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref()))
-            .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
+        let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
+        let function = Signed::new(self.name, self.owner, self.entry, signature)
+            .seated(seat, self.exposure)
+            .defined(self.evaluation, self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, function)
     }
 }

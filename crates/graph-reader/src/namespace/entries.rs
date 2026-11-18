@@ -8,7 +8,7 @@ use syntax::{
     Token, VisRestricted,
 };
 
-use graph::{CrateExports, Domain, Exposure, Item as ModelItem, ItemKind, ItemPath, Reexport};
+use graph::{CrateExports, Domain, Exposure, Item as ModelItem, ItemKind, ItemPath, Reexport, Unplaced};
 use lint_layout::{Casing, Dependencies, Name, Whole, Word, words};
 
 use super::Namespace;
@@ -213,12 +213,7 @@ impl Declared {
 
     fn issued(&self, krate: Option<&Name>) -> Option<ModelItem> {
         let kind = self.kind.item_kind()?;
-        Some(
-            ModelItem::new(self.name.clone(), kind)
-                .marked(self.marks.clone())
-                .homed(krate.cloned())
-                .exposed(self.exposure),
-        )
+        Some(Unplaced::new(self.name.clone(), kind).placed(self.marks.clone(), krate.cloned(), self.exposure))
     }
 }
 

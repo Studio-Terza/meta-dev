@@ -1,6 +1,6 @@
 use graph::{
     Domain, Entry, Exposure, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved,
-    Sited, TypeRef, Unresolved,
+    Sited, TypeRef, Unplaced, Unresolved,
 };
 use graph_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -269,7 +269,11 @@ enum Seen {
 impl Seen {
     fn of(model: &Model, resolved: Resolved) -> Seen {
         match resolved.crate_item().and_then(|id| model.declared(id)) {
-            Some(item) => Seen::Item(item.clone().homed(None).exposed(Exposure::Hidden)),
+            Some(item) => Seen::Item(Unplaced::new(AsRef::<Name>::as_ref(item).clone(), item.kind()).placed(
+                item.marks().to_vec(),
+                None,
+                Exposure::Hidden,
+            )),
             None => Seen::Resolved(resolved),
         }
     }
@@ -324,7 +328,7 @@ impl Expect {
     }
 
     fn item(name: &str, kind: ItemKind) -> Seen {
-        Seen::Item(Item::new(Name::from(name), kind))
+        Seen::Item(Unplaced::new(Name::from(name), kind).placed(Vec::new(), None, Exposure::Hidden))
     }
 
     fn external(path: &[&str]) -> Seen {

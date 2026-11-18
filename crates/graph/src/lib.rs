@@ -41,11 +41,11 @@ pub use function::definition::{
 };
 pub use function::{
     Entry, Evaluation, Function, Input, MethodShape, Mutated, Mutation, Output, Owner, Parameter, Receiver, Returned,
-    Signature, Taken,
+    Signature, Signed, Taken,
 };
 pub use holding::{Held, Holding};
 pub use implementation::{Assigned, Implementation, Interface, Origin, Subject};
-pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind};
+pub use item::{Alias, AliasParameter, Exposure, Item, ItemKind, Unplaced};
 pub use item_declaration::ItemDeclaration;
 pub use item_graph::ItemGraph;
 pub use item_path::ItemPath;

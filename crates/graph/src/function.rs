@@ -211,41 +211,42 @@ pub struct Function {
     evaluation: Evaluation,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Signed {
+    name: Name,
+    owner: Owner,
+    entry: Entry,
+    signature: Signature,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Seated {
+    signed: Signed,
+    seat: Seat,
+    exposure: Exposure,
+}
+
+impl Signed {
+    #[must_use]
+    pub fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Signed {
+        Signed { name, owner, entry, signature }
+    }
+
+    #[must_use]
+    pub fn seated(self, seat: Seat, exposure: Exposure) -> Seated {
+        Seated { signed: self, seat, exposure }
+    }
+}
+
+impl Seated {
+    #[must_use]
+    pub fn defined(self, evaluation: Evaluation, definition: Option<Definition>) -> Function {
+        let Seated { signed: Signed { name, owner, entry, signature }, seat, exposure } = self;
+        Function { name, owner, entry, signature, seat, definition, exposure, evaluation }
+    }
+}
+
 impl Function {
-    #[must_use]
-    pub fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Function {
-        Function {
-            name,
-            owner,
-            entry,
-            signature,
-            seat: Seat::new(Region::SHIPPED, None),
-            definition: None,
-            exposure: Exposure::Hidden,
-            evaluation: Evaluation::Runtime,
-        }
-    }
-
-    #[must_use]
-    pub fn seated(self, seat: Seat) -> Function {
-        Function { seat, ..self }
-    }
-
-    #[must_use]
-    pub fn exposed(self, exposure: Exposure) -> Function {
-        Function { exposure, ..self }
-    }
-
-    #[must_use]
-    pub fn evaluated(self, evaluation: Evaluation) -> Function {
-        Function { evaluation, ..self }
-    }
-
-    #[must_use]
-    pub fn defined(self, definition: Option<Definition>) -> Function {
-        Function { definition, ..self }
-    }
-
     #[must_use]
     pub fn definition(&self) -> Option<&Definition> {
         self.definition.as_ref()

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use graph::{
     Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, Named, Owner, Primitive, Reach,
-    Region, Resolved, Seat, Sited, Spelling, TypeRef, Within, Zone,
+    Region, Resolved, Seat, Sited, Spelling, TypeRef, Unplaced, Within, Zone,
 };
 use graph_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -446,7 +446,8 @@ fn a_dollar_crate_path_is_used_by_the_defining_crate_not_by_the_crate_that_invok
             (placed.site().to_string(), item)
         })
         .collect();
-    let kept = Item::new(Name::from("Kept"), ItemKind::Struct).homed(Some(Name::from("a"))).exposed(Exposure::Public);
+    let kept =
+        Unplaced::new(Name::from("Kept"), ItemKind::Struct).placed(Vec::new(), Some(Name::from("a")), Exposure::Public);
     assert_eq!(expanded, [("crates/a/src/lib.rs:5".to_owned(), Some(kept))]);
     Ok(())
 }
