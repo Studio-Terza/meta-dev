@@ -11,6 +11,21 @@ pub(crate) struct Link<'found> {
     to: Member<'found>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Reversed<'found>(Link<'found>);
+
+impl<'found> From<Link<'found>> for Reversed<'found> {
+    fn from(link: Link<'found>) -> Reversed<'found> {
+        Reversed(link)
+    }
+}
+
+impl<'found> From<Reversed<'found>> for Link<'found> {
+    fn from(reversed: Reversed<'found>) -> Link<'found> {
+        Link { from: reversed.0.to, to: reversed.0.from }
+    }
+}
+
 impl<'found> Link<'found> {
     pub(crate) fn new(from: Member<'found>, to: Member<'found>) -> Link<'found> {
         Link { from, to }
@@ -18,10 +33,6 @@ impl<'found> Link<'found> {
 
     pub(crate) fn ends(&self) -> [Member<'found>; ENDS] {
         [self.from, self.to]
-    }
-
-    pub(crate) fn reversed(self) -> Link<'found> {
-        Link { from: self.to, to: self.from }
     }
 
     pub(crate) fn star(linked: &BTreeSet<Member<'found>>) -> Vec<Link<'found>> {

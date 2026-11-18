@@ -17,10 +17,20 @@ impl<'found> Edge<'found> {
     pub fn target_from(&self, seen: &BTreeSet<&TypeName>) -> Option<&'found TypeName> {
         seen.contains(self.source).then_some(self.target)
     }
+}
 
-    #[must_use]
-    pub fn reversed(self) -> Edge<'found> {
-        Edge { source: self.target, target: self.source }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Reversed<'found>(Edge<'found>);
+
+impl<'found> From<Edge<'found>> for Reversed<'found> {
+    fn from(edge: Edge<'found>) -> Reversed<'found> {
+        Reversed(edge)
+    }
+}
+
+impl<'found> From<Reversed<'found>> for Edge<'found> {
+    fn from(reversed: Reversed<'found>) -> Edge<'found> {
+        Edge { source: reversed.0.target, target: reversed.0.source }
     }
 }
 
