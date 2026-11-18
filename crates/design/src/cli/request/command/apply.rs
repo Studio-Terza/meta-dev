@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use design_model::{
-    AnyNode, Entered, Entry, Facet, Node, NodeId, NodeRelation, Ordinal, Prefix, Provenance, Segment, SegmentRelation,
-    Sense, SpanRelation, Straddling, Supersession, Title, Vague,
+    AnyNode, Entered, Entry, Facet, Inherited, Node, NodeId, NodeRelation, Ordinal, Prefix, Provenance, Segment,
+    SegmentRelation, Sense, SpanRelation, Straddling, Supersession, Title, Vague,
 };
 use design_store::{
     AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, JobRepeated, NextNode, Prefixed, Remit, Sees,
@@ -416,7 +416,7 @@ impl<S: Store> Visit for &Resolution<'_, '_, S> {
         let unbound = fresh.map(|label| self.batch.unbound(label)).transpose()?;
         let parent = self.node(refines)?;
         let entry = Entry::new(parent.entry().project().clone(), facet, self.grounds.provenance);
-        let node = Node::proposed(self.batch.next, entry, parent.casting(), title.clone());
+        let node = Node::proposed(self.batch.next, entry, Inherited::from(parent.casting()), title.clone());
         let effect = Effect::Proposed { node: node.clone(), fresh: unbound };
         Ok(Grounded { directed: Directed::Proposed { node, parent: parent.identity() }, heard: Vec::new(), effect })
     }

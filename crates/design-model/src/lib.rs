@@ -40,7 +40,7 @@ mod transition;
 pub use artifact::{Artifact, Unspecified};
 pub use artifact_kind::ArtifactKind;
 pub use basis::Basis;
-pub use casting::Casting;
+pub use casting::{Casting, Inherited};
 pub use confidence::Confidence;
 pub use ending::Ending;
 pub use entered::Entered;

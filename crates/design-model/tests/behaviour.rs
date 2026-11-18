@@ -6,9 +6,9 @@ use std::str::FromStr;
 
 use design_model::{
     AnyNode, AnyStage, Artifact, ArtifactKind, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry,
-    Explicitness, Facet, Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Project,
-    Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title,
-    Transition,
+    Explicitness, Facet, Inherited, Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine,
+    Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal,
+    Title, Transition,
 };
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq, prop_oneof};
@@ -261,7 +261,7 @@ impl Lifecycle {
 
     fn fresh() -> Result<AnyNode, Box<dyn Error>> {
         let entry = Entry::new("demo".parse()?, Facet::Feature, Provenance::from(Entered::Apply));
-        let core = Casting::new(Role::Core, entry.provenance());
+        let core = Inherited::from(Casting::new(Role::Core, entry.provenance()));
         Ok(Node::proposed(NodeId::new(7), entry, core, Title::new("lifecycle".to_owned())).any())
     }
 

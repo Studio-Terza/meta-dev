@@ -1,7 +1,7 @@
 use crate::lifecycle::{Live, Refinable};
 use crate::{
-    AnyStage, Artifact, Basis, Casting, Condition, Dropped, Entry, Misstaged, NodeId, Reason, Refining, Role, Terminal,
-    Title, Vague,
+    AnyStage, Artifact, Basis, Casting, Condition, Dropped, Entry, Inherited, Misstaged, NodeId, Reason, Refining,
+    Role, Terminal, Title, Vague,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,8 +40,8 @@ impl Node<Vague> {
     }
 
     #[must_use]
-    pub fn proposed(identity: NodeId, entry: Entry, parent: Casting, title: Title) -> Node<Vague> {
-        let casting = parent.inherited(entry.provenance());
+    pub fn proposed(identity: NodeId, entry: Entry, parent: Inherited, title: Title) -> Node<Vague> {
+        let casting = parent.casting(entry.provenance());
         Node { identity, entry, title: Some(title), casting, stage: Vague, basis: Basis::Vague }
     }
 }

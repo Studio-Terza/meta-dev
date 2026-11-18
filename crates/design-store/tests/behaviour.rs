@@ -9,8 +9,9 @@ use std::sync::LazyLock;
 
 use design_jobs::{OpenJobs, job};
 use design_model::{
-    AnyNode, Casting, Entered, Entry, Facet, JobId, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal,
-    Prefix, Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
+    AnyNode, Casting, Entered, Entry, Facet, Inherited, JobId, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation,
+    Ordinal, Prefix, Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title,
+    Transition, Vague,
 };
 use design_runs::{
     Account, FailuresReported, FlailedSegments, Halted, HeldBy, JobFlailed, JobHalted, JobOpened, JobRetried, NextJob,
@@ -801,7 +802,7 @@ struct Proposals;
 impl Proposals {
     fn node(id: i64) -> Result<Node<Vague>, Box<dyn Error>> {
         let entry = Entry::new("p".parse()?, Facet::Feature, Entered::Apply.into());
-        let core = Casting::new(Role::Core, entry.provenance());
+        let core = Inherited::from(Casting::new(Role::Core, entry.provenance()));
         Ok(Node::proposed(NodeId::new(id), entry, core, Title::new(format!("child {id}"))))
     }
 
