@@ -1,6 +1,10 @@
+mod ignored;
+
 use syntax::Punctuated;
 use syntax::{Attribute, Path, Token};
 
+use crate::ungenerated::derived::ignored::Ignored;
+use invariants::Ignoring;
 use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Debug)]
@@ -25,7 +29,11 @@ impl From<&[Attribute]> for Derived {
             attributes
                 .iter()
                 .filter(|attribute| attribute.path().is_ident(Self::DERIVE))
-                .filter_map(|attribute| attribute.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
+                .filter_map(|attribute| {
+                    attribute
+                        .parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated)
+                        .ignoring(Ignored::Unparsed)
+                })
                 .flatten()
                 .filter_map(|path| path.segments.last().map(|last| Name::from(&last.ident)))
                 .collect(),

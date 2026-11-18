@@ -1,9 +1,8 @@
 mod repo_files;
 
 use std::io;
-use std::panic;
 use std::path::Path;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 use std::thread::{self, ScopedJoinHandle};
 
 use file_ports::Files;
@@ -12,6 +11,7 @@ use lint_layout::Failure;
 use lint_roots::{Below, Listing, Roots, Target, Tree};
 
 use super::located::{Located, Node};
+use invariants::{Rejoined, Unpoisoned};
 use repo_files::RepoFiles;
 
 type Listed = Vec<Result<Vec<RepoFile>, Failure>>;
@@ -57,13 +57,13 @@ impl Staged {
         parked: &Mutex<Option<Listing>>,
     ) -> Listed {
         match reading {
-            Ok(handle) => handle.join().unwrap_or_else(|payload| panic::resume_unwind(payload)),
+            Ok(handle) => handle.join().rejoined(),
             Err(_) => Self::read(files, trees, parked),
         }
     }
 
     fn read(files: &impl Files, trees: &[&Tree<'_>], parked: &Mutex<Option<Listing>>) -> Listed {
-        let taken = parked.lock().unwrap_or_else(PoisonError::into_inner).take();
+        let taken = parked.lock().unpoisoned().take();
         taken.map_or_default(|listing| RepoFiles::under(files, trees, listing))
     }
 

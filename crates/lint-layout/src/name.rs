@@ -1,6 +1,7 @@
 mod boundary;
 mod camel_word;
 mod casing;
+mod invariant;
 mod length;
 mod lowered;
 mod prefix;
@@ -17,6 +18,8 @@ use crate::word::Word;
 use boundary::Spelling;
 pub use camel_word::CamelWord;
 pub use casing::Casing;
+use invariant::Invariant;
+use invariants::invariant;
 pub use length::Length;
 pub use lowered::Lowered;
 use newtype::Wrapping;
@@ -131,7 +134,9 @@ impl From<Word<'_>> for Name {
 
 impl From<&Ident> for Name {
     fn from(ident: &Ident) -> Name {
-        Name(Spelling::written(|written| write!(written, "{ident}").unwrap_or_default()))
+        Name(Spelling::written(
+            |written| invariant!(holding write!(written, "{ident}"), Invariant::WritingToAStringSucceeds),
+        ))
     }
 }
 

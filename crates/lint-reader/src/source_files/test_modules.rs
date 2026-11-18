@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use super::modules::{Child, Modules};
 use super::scope::Scope;
 use super::shelf::Shelf;
+use crate::source_files::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::SourceFile;
 
 #[derive(Debug)]
@@ -30,7 +32,7 @@ impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
             .insert(file.to_path_buf())
             .then_some(file)
             .and_then(|unseen| self.shelf.source(scope, unseen))
-            .and_then(Result::ok);
+            .and_then(|opened| opened.ignoring(Ignored::Unread));
         self.opened(scope, file, children_directory, source)
     }
 

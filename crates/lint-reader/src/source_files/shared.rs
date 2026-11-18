@@ -6,7 +6,7 @@ mod exploring;
 
 use std::collections::BTreeMap;
 use std::mem;
-use std::sync::{Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
+use std::sync::{Condvar, Mutex, MutexGuard, OnceLock};
 
 use file_ports::Files;
 use lint_core::{FileHead, Readout, SourceFile};
@@ -20,6 +20,7 @@ use boundary::Expected;
 pub use boundary::Partition;
 use declared::Declared;
 use exploring::{Exploring, Queued};
+use invariants::Unpoisoned;
 
 #[derive(Debug)]
 pub struct SharedRead<'tree> {
@@ -66,21 +67,18 @@ impl<'tree> SharedRead<'tree> {
 
     fn claimed(&self, share: Partition) -> Option<Queued<'tree>> {
         let guard = self.locked();
-        let mut ready = self
-            .changed
-            .wait_while(guard, |state| state.waiting(share).is_some())
-            .unwrap_or_else(PoisonError::into_inner);
+        let mut ready = self.changed.wait_while(guard, |state| state.waiting(share).is_some()).unpoisoned();
         let claimed = ready.claimed(share);
         self.changed.notify_all();
         claimed
     }
 
     fn locked(&self) -> MutexGuard<'_, Exploring<'tree>> {
-        self.exploring.lock().unwrap_or_else(PoisonError::into_inner)
+        self.exploring.lock().unpoisoned()
     }
 
     fn deposited(&self, heads: Vec<FileHead>, expected: Expected) {
-        let mut held = self.heads.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut held = self.heads.lock().unpoisoned();
         held.extend(heads);
         let complete = expected.met(&held).map(|_| mem::take(&mut *held));
         let sorted = complete.map(|mut table| {

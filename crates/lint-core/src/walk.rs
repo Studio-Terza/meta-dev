@@ -1,6 +1,8 @@
 use syntax::Punctuated;
 
+use crate::ignored::Ignored;
 use crate::syntax::Syntax;
+use invariants::Ignoring;
 use syntax::{Attribute, ItemImpl, Meta, MetaList, Token};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,7 +34,7 @@ impl Walk {
     fn of_attribute(attribute: &Attribute) -> Walk {
         Some(attribute)
             .filter(|candidate| candidate.path().is_ident("cfg"))
-            .and_then(|cfg| cfg.parse_args::<Meta>().ok())
+            .and_then(|cfg| cfg.parse_args::<Meta>().ignoring(Ignored::Unparsed))
             .map_or(Walk::Entered, |condition| Self::of_condition(&condition))
     }
 
@@ -43,6 +45,7 @@ impl Walk {
             }
             Meta::List(list) => list
                 .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .ignoring(Ignored::Unparsed)
                 .map_or(Walk::Entered, |nested| Self::of_nested(list, &nested)),
             Meta::NameValue(_) => Walk::Entered,
         }

@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+invariants = { path = "../invariants" }
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 syntax = { path = "../syntax" }
@@ -18,6 +19,7 @@ toml.workspace = true
 serde_core.workspace = true
 
 [dev-dependencies]
+file-ports = { path = "../file-ports" }
 laws = { path = "../laws" }
 
 [lints]

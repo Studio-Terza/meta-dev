@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 use file_ports::{FileFailure, Files, Kind};
 use lint_layout::Failure;
 
+use crate::ignored::Ignored;
 use boundary::Spot;
+use invariants::Ignoring;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Fact {
@@ -49,7 +51,11 @@ impl Survey {
                 canonical: Self::extended(
                     self.canonical,
                     paths,
-                    files.canonical_many(paths).into_iter().map(Result::ok).collect(),
+                    files
+                        .canonical_many(paths)
+                        .into_iter()
+                        .map(|canonical| canonical.ignoring(Ignored::Uncanonical))
+                        .collect(),
                 ),
                 ..self
             },

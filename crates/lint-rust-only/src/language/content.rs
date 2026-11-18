@@ -14,7 +14,9 @@ use lint_core::Contents;
 use newtype::Wrapping;
 
 use super::Language;
+use crate::ignored::Ignored;
 use cuts::Cuts;
+use invariants::Ignoring;
 use rule::Rule;
 use scan_bytes::ScanBytes;
 use shebang::Shebang;
@@ -33,7 +35,7 @@ impl Content {
     const EVERY_OTHER: Stride = Stride::new(2);
 
     pub(crate) fn language_of(contents: &Contents) -> Option<Language> {
-        let bytes = contents.read().ok()?;
+        let bytes = contents.read().ignoring(Ignored::Unread)?;
         Shebang::read_from(bytes)
             .and_then(Shebang::foreign)
             .map(|_| Language::Script)
@@ -51,9 +53,9 @@ impl Content {
                         kept.truncate(valid);
                         String::from_utf8(kept)
                     })
-                    .ok()
+                    .ignoring(Ignored::Undecoded)
             })
-            .and_then(|text| text.parse().ok())
+            .and_then(|text| text.parse().ignoring(Ignored::Unparsed))
     }
 
     fn language(&self) -> Option<Language> {

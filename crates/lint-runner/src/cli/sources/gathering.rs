@@ -1,7 +1,6 @@
 use std::mem;
-use std::panic;
 use std::path::Path;
-use std::sync::{Mutex, OnceLock, PoisonError};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 
 use graph::Model;
@@ -11,6 +10,8 @@ use lint_sweep::Gathers;
 
 use super::super::timings::{Measured, Timing};
 use super::contexts::{Contexts, Contributed};
+use crate::cli::ignored::Ignored;
+use invariants::{Ignoring, Rejoined, Unpoisoned};
 
 use super::super::boundary::FileOrder;
 
@@ -98,7 +99,7 @@ impl<'run> Merging<'run> {
         thread::scope(|scope| {
             let joined = scope.spawn(|| contexts(parts).kept(&gathering.contexts));
             let modelled = model(split.facts).kept(&gathering.model);
-            vec![modelled, joined.join().unwrap_or_else(|failure| panic::resume_unwind(failure))]
+            vec![modelled, joined.join().rejoined()]
         })
     }
 
@@ -142,7 +143,7 @@ impl<'run> Gathering<'run> {
             .filter_map(|((group, file), unwalked)| {
                 let index = heads
                     .binary_search_by(|head| AsRef::<Path>::as_ref(head).cmp(AsRef::<Path>::as_ref(file.head())))
-                    .ok()?;
+                    .ignoring(Ignored::Unclaimed)?;
                 Some(Claim { order: FileOrder::from(index), group, file, head: heads.get(index)?, unwalked })
             })
             .collect();
@@ -165,7 +166,7 @@ impl<'run> Gathering<'run> {
     }
 
     fn deposited(&self, parts: Vec<Gathered<'run>>, heads: &[FileHead]) -> Option<Merging<'run>> {
-        let mut held = self.deposited.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut held = self.deposited.lock().unpoisoned();
         held.extend(parts);
         let complete = Some(held.len()).filter(|count| *count == heads.len()).map(|_| mem::take(&mut *held));
         complete.map(Merging)

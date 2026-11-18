@@ -2,12 +2,19 @@ use std::path::PathBuf;
 
 use file_ports::{Bytes, Memory};
 use graph_reader::Reader;
+use invariants::{Ignoring, ignored};
 use lint_core::{SourceFile, SourceText};
 use lint_file::ModelLint;
 use lint_no_test_io::NoTestIo;
 use lint_placement::Placement;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
+
+ignored! {
+    enum Ignored {
+        Unparsed => "a source that does not parse has no count, so the row reads usize::MAX and fails",
+    }
+}
 
 const READ: &str = "fn f() {\n    std::fs::read_to_string(\"a\");\n}\n";
 const PARENT: &str = "fn f() {\n    std::fs::read_to_string(\"a\");\n}\nmod b;\n";
@@ -197,6 +204,7 @@ fn tests_of_a_crate_whose_name_ends_in_ports_check_its_real_fillers() {
             let path = PathBuf::from("/r/tests/a.rs");
             let placement = Placement::locate(&files, &path);
             SourceFile::parse_at(path.clone(), path, placement, SourceText::new(DISK.to_owned()))
+                .ignoring(Ignored::Unparsed)
                 .map_or(usize::MAX, |file| NoTestIo::report(&Reader::read_files(&[file])).violations().len())
         })
         .collect();

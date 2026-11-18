@@ -1,8 +1,12 @@
+mod ignored;
+
 use std::path::{Component, Path, PathBuf};
 
 use syntax::ItemMod;
 
 use super::PublicApiTests;
+use crate::path_reach::ignored::Ignored;
+use invariants::Ignoring;
 use lint_core::{Site, SourceFile, Syntax, Violation};
 use lint_layout::LineNumber;
 use lint_layout::Name;
@@ -50,7 +54,7 @@ impl<'file> PathReach<'file> {
             .attrs
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::PATH_ATTRIBUTE))
-            .filter_map(|attribute| attribute.meta.require_name_value().ok())
+            .filter_map(|attribute| attribute.meta.require_name_value().ignoring(Ignored::Unparsed))
             .find_map(|pair| Syntax::string_literal(&pair.value))
             .map(|path| PathBuf::from(path.value()))
     }

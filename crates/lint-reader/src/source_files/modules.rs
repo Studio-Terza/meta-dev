@@ -11,8 +11,10 @@ use lint_core::Walk;
 use lint_layout::Failure;
 use lint_roots::Survey;
 
+use crate::source_files::ignored::Ignored;
 pub use child::Child;
 use declaration::Declaration;
+use invariants::Ignoring;
 use redirects::Redirects;
 
 #[derive(Debug)]
@@ -52,7 +54,9 @@ impl Modules {
         let skipped = Declaration::within(items, children_directory, Walk::Skipped);
         let tests = skipped
             .iter()
-            .flat_map(|declaration| Self::resolve(survey, &file_directory, declaration).unwrap_or_default())
+            .flat_map(|declaration| {
+                Self::resolve(survey, &file_directory, declaration).ignoring(Ignored::Unresolved).unwrap_or_default()
+            })
             .collect();
         entered
             .into_iter()
