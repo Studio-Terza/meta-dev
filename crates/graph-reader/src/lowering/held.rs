@@ -1,5 +1,5 @@
 use super::FileRows;
-use super::{Frame, Framed, Grains};
+use super::{Frame, Framed, Grain, Grains};
 use algebra::{Monoid, Semigroup};
 use lint_sweep::Contributed;
 use syntax::Spanned;
@@ -96,12 +96,12 @@ impl<'read> Frame<'read> {
     pub(super) fn hold(&self, holder: Holder, link: Link, ty: TypeRef<Written>) -> Grains {
         let located = self.here.located(holder.position);
         let row = HoldingRow { located, holder, region: self.context.region(), link, ty };
-        Grains::from(FileRows { holdings: vec![row], ..FileRows::default() })
+        Grains::from(Grain::Holding(row))
     }
 
     pub(super) fn attributed(&self, attributes: &Attributes, ident: &Ident) -> Grains {
         let rows = ImplRow::derives(&self.here, self.context.region(), attributes, ident);
-        Grains::from(FileRows { impls: rows, ..FileRows::default() })
+        rows.into_iter().map(Grain::Impl).collect()
     }
 
     pub(super) fn parameters(&self, holder: &Holder, generics: &Generics, link: &Link) -> Grains {

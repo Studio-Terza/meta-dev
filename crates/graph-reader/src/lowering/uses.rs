@@ -1,5 +1,5 @@
 use super::FileRows;
-use super::{Frame, Grains};
+use super::{Frame, Grain, Grains};
 use algebra::{Monoid, Semigroup};
 mod tokens;
 
@@ -210,7 +210,7 @@ impl Frame<'_> {
             .map_or_else(|| Position::from(invoked.path.span()), |last| Position::from(last.ident.span()));
         let law = self.law_row(invoked);
         let quotes = QuoteRow::found(self.source, invoked, &self.here);
-        let lawful = Grains::from(FileRows { laws: law.into_iter().collect(), quotes, ..FileRows::default() });
+        let lawful: Grains = law.into_iter().map(Grain::Law).chain(quotes.into_iter().map(Grain::Quote)).collect();
         let invoking = self.used(UsePath::from(&invoked.path), position, Mention::Invoked);
         let plain = TokenPaths::within(invoked.tokens.clone()).into_iter().map(|spelled| (spelled, Mention::InMacro));
         let interpolated =
@@ -228,7 +228,7 @@ impl Frame<'_> {
             region: self.context.region(),
             place: self.context.place(),
         };
-        Grains::from(FileRows { uses: vec![row], ..FileRows::default() })
+        Grains::from(Grain::Use(row))
     }
 }
 

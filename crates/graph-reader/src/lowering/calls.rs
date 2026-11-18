@@ -1,5 +1,5 @@
 use super::FileRows;
-use super::{Frame, Grains};
+use super::{Frame, Grain, Grains};
 use syntax::Spanned;
 use syntax::{ExprCall, ExprMacro, ExprMethodCall};
 
@@ -64,6 +64,6 @@ impl Frame<'_> {
     fn called(&self, position: Position, callee: Callee) -> Grains {
         let located = self.here.located(position);
         let row = CallRow { located, callee, region: self.context.region(), place: self.context.place() };
-        Grains::from(FileRows { calls: vec![row], ..FileRows::default() })
+        Grains::from(Grain::Call(row))
     }
 }

@@ -1,6 +1,6 @@
 use super::FileRows;
 use super::walk::Lowering;
-use super::{Frame, Framed, Grains, Owning};
+use super::{Frame, Framed, Grain, Grains, Owning};
 use crate::namespace::ScopeOp;
 use lint_sweep::{Address, Contributed, Contributing};
 use std::collections::BTreeMap;
@@ -153,7 +153,7 @@ impl<'read> Frame<'read> {
     fn placed(&self, key: Address, seed: PlaceSeed) -> Owning {
         let place = PlaceId(ScopeKey::reached(&self.within, key));
         let row = PlaceRow { key: place.clone(), subject: seed.subject, owner: seed.owner };
-        let rows = FileRows { places: PlaceRows { places: vec![row], subjects: Vec::new() }, ..FileRows::default() };
+        let rows = Grain::Place(PlaceRows { places: vec![row], subjects: Vec::new() });
         Owning { place, grains: Grains::from(rows) }
     }
 
@@ -202,7 +202,7 @@ impl<'read> Frame<'read> {
         let items = Macros::items_in_file(self.source, invocation);
         let absorbed = ScopeOp::Absorbed { key: self.here.scope().clone(), entries: Entries::of_items(&items) };
         let walked = Self::swept(self.expansion(item, MacroItems::Expanded), items.iter());
-        Grains { ops: vec![absorbed], ..Grains::default() }.combine(walked)
+        Grains::from(Grain::Op(absorbed)).combine(walked)
     }
 
     pub(super) fn trait_owning(&self, ident: &Ident, attributes: &[Attribute]) -> Owning {
@@ -246,18 +246,17 @@ impl<'read> Frame<'read> {
             SubjectRow { key: key.clone(), scope: self.here.scope().clone(), ty: subject, implemented: named, traited };
         let Owning { place, grains } =
             self.placed(Address::from(&block.self_ty), PlaceSeed { subject: Some(key), owner: None });
-        let rows = FileRows {
-            impls: vec![implemented],
-            places: PlaceRows { subjects: vec![subjected], places: Vec::new() },
-            ..FileRows::default()
-        };
+        let rows: Grains =
+            [Grain::Impl(implemented), Grain::Place(PlaceRows { subjects: vec![subjected], places: Vec::new() })]
+                .into_iter()
+                .collect();
         let inner = Frame {
             context: self.context.of_impl(block, place),
             enclosure: Enclosure::of_impl(block),
             generics: Arc::new(generics),
             ..self.clone()
         };
-        Contributed::new(Framed::framing(inner), Grains::from(rows).combine(grains), Descend::Into)
+        Contributed::new(Framed::framing(inner), rows.combine(grains), Descend::Into)
     }
 }
 

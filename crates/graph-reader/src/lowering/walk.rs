@@ -20,7 +20,7 @@ use super::held::{Holder, Link};
 use super::regions::{Context, Regions};
 use super::seat::Seat;
 use super::signature::{InScope, LoweredParameter};
-use super::{AliasRow, FileRows, FileShape, FnRow, Frame, Framed, Grains, Lowered, Slot};
+use super::{AliasRow, FileShape, FnRow, Frame, Framed, Grain, Grains, Lowered, Slot, Sorted};
 use crate::namespace::{Domain, Entries, Exposing, Openings, ScopeKey, ScopeKind, ScopeOp, UsePath, Visibility};
 use graph::Held;
 
@@ -37,7 +37,7 @@ impl<'read> Frame<'read> {
     }
 
     pub(super) fn framed(self, grains: Grains, descend: Descend) -> Grown<'read> {
-        Contributed::new(Framed(Some(self)), grains, descend)
+        Contributed::new(Framed(Some(Box::new(self))), grains, descend)
     }
 
     pub(super) fn with_context(&self, context: Context) -> Frame<'read> {
@@ -87,7 +87,7 @@ impl<'read> Frame<'read> {
         let inner = self.with_context(self.context.within_item(attributes));
         let Functioned { row, generics } = inner.function(attributes, visibility, signature);
         let frame = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
-        frame.framed(Grains::from(FileRows { functions: vec![row], ..FileRows::default() }), Descend::Into)
+        frame.framed(Grains::from(Grain::Function(row)), Descend::Into)
     }
 
     pub(super) fn module_entered(&self, item: &ItemMod, items: &[syntax::Item]) -> Grown<'read> {
@@ -103,12 +103,12 @@ impl<'read> Frame<'read> {
         };
         let context = inner.context.within_module(item);
         let module = Frame { enclosure: Enclosure::Module, context, ..inner };
-        module.framed(Grains { ops: vec![op, declared], ..Grains::default() }, Descend::Into)
+        module.framed([op, declared].into_iter().map(Grain::Op).collect::<Grains>(), Descend::Into)
     }
 
     pub(super) fn slotted(&self, item: &ItemMod) -> Grown<'read> {
         let slot = Slot::new(&self.here, self.context.region(), item);
-        Contributed::new(Framed::default(), Grains { slots: vec![slot], ..Grains::default() }, Descend::Over)
+        Contributed::new(Framed::default(), Grains::from(Grain::Slot(slot)), Descend::Over)
     }
 
     pub(super) fn defined(
@@ -119,13 +119,19 @@ impl<'read> Frame<'read> {
     ) -> Grains {
         inner.concluded(|framed, grown| {
             let generics = framed.0.map_or_else(|| Arc::clone(&self.generics), |frame| frame.generics);
-            let Grains { rows, ops, slots, body: part } = grown;
+            let (bodies, kept): (Vec<Box<Grain>>, Vec<Box<Grain>>) =
+                grown.grains.into_iter().partition(|grain| grain.bodied().is_some());
+            let part: BodyPart = Monoid::concat(bodies.into_iter().filter_map(|grain| grain.body()));
             let definition = body.map(|block| {
                 let mut group = BodyGroup::opened(&generics, signature, block);
                 Sweep::block_in(self.source, block, lint_sweep::Gathers::watching(&mut group).into_iter().collect());
                 lint_sweep::Gathers::gathered(group).lowered(part)
             });
-            Grains { rows: rows.defined(definition), ops, slots, body: BodyPart::default() }
+            let own = kept.iter().position(|grain| grain.function().is_some());
+            let mut ahead = kept;
+            let rest = ahead.split_off(own.map_or(ahead.len(), |found| found + 1));
+            let defined = own.and_then(|_| ahead.pop()).map(|function| Box::new(function.defined(definition)));
+            Grains { grains: ahead.into_iter().chain(defined).chain(rest).collect(), bodied: None }
         })
     }
 }
@@ -159,12 +165,13 @@ impl<'read> Lowering<'read> {
     }
 
     pub(crate) fn lowered(self, grains: Grains) -> Lowered {
-        let replayed = Openings::replayed(Entries::of_items(&self.top.source.syntax().items), grains.ops);
-        replayed.concluded(|openings, scopes| Lowered { openings, scopes, slots: grains.slots, rows: grains.rows })
+        let sorted = Sorted::from(grains);
+        let replayed = Openings::replayed(Entries::of_items(&self.top.source.syntax().items), sorted.ops);
+        replayed.concluded(|openings, scopes| Lowered { openings, scopes, slots: sorted.slots, rows: sorted.rows })
     }
 
     fn frame<'around>(&'around self, around: &Around<'around, Framed<'read>, Grains>) -> &'around Frame<'read> {
-        around.nearest().find_map(|framed| framed.0.as_ref()).unwrap_or(&self.top)
+        around.nearest().find_map(|framed| framed.0.as_deref()).unwrap_or(&self.top)
     }
 
     pub(super) fn below(frame: Frame<'read>) -> Lowering<'read> {
@@ -216,7 +223,6 @@ impl<'read> Contribute for Lowering<'read> {
                 Scope::new(Kind::ImplItemConst),
                 Scope::new(Kind::ItemMacro),
                 Scope::new(Kind::ExprCall),
-                Scope::new(Kind::ExprMethodCall),
                 Scope::new(Kind::Item),
                 Scope::new(Kind::Signature),
             ]
@@ -250,7 +256,7 @@ impl<'read> Contribute for Lowering<'read> {
             Entries::of_block(&block.stmts),
             frame.here.children(),
         );
-        inner.framed(Grains { ops: vec![op], ..Grains::default() }, Descend::Into)
+        inner.framed(Grains::from(Grain::Op(op)), Descend::Into)
     }
 
     fn on_item_impl(
@@ -290,10 +296,7 @@ impl<'read> Contribute for Lowering<'read> {
         let inner = frame.with_context(owning.within(&frame.context.within_item(&item.attrs)));
         let Functioned { row, generics } = inner.function(&item.attrs, &item.vis, &item.sig);
         let body = Frame { enclosure: Enclosure::Body, generics: Arc::new(generics), ..inner };
-        body.framed(
-            owning.grains.combine(Grains::from(FileRows { functions: vec![row], ..FileRows::default() })),
-            Descend::Into,
-        )
+        body.framed(owning.grains.combine(Grains::from(Grain::Function(row))), Descend::Into)
     }
 
     fn off_item_fn(&self, item: &ItemFn, _: &Facts<'_, ItemFn>, inner: Contribution<Framed<'read>, Grains>) -> Grains {
@@ -344,7 +347,7 @@ impl<'read> Contribute for Lowering<'read> {
     ) -> Grown<'read> {
         let foreign = Frame { enclosure: Enclosure::Foreign, ..self.frame(&around).clone() };
         let Functioned { row, .. } = foreign.function(&item.attrs, &item.vis, &item.sig);
-        Contributed::parted(Grains::from(FileRows { functions: vec![row], ..FileRows::default() }))
+        Contributed::parted(Grains::from(Grain::Function(row)))
     }
 
     fn on_item_type(
@@ -363,7 +366,7 @@ impl<'read> Contribute for Lowering<'read> {
             parameters: generics.declarations(&item.generics),
             target,
         };
-        let rows = held.combine(Grains::from(FileRows { aliases: vec![alias], ..FileRows::default() }));
+        let rows = held.combine(Grains::from(Grain::Alias(alias)));
         frame.owned_by(&item.ident, Domain::Types, &item.attrs, rows)
     }
 
@@ -463,7 +466,9 @@ impl<'read> Contribute for Lowering<'read> {
         around: Around<'_, Framed<'read>, Grains>,
     ) -> Grown<'read> {
         Contributed::parted(
-            self.frame(&around).method_called(call).combine(Grains::from(BodyPart::method_entered(call))),
+            self.frame(&around)
+                .method_called(call)
+                .combine(Grains::from(BodyPart::method_entered(call).combine(BodyPart::method_made(call)))),
         )
     }
 
@@ -475,7 +480,9 @@ impl<'read> Contribute for Lowering<'read> {
     ) -> Grown<'read> {
         let frame = self.frame(&around);
         let calling = Frame { calling: lint_core::Syntax::expr_path(&call.func).map(Address::from), ..frame.clone() };
-        let called = frame.path_called(call).combine(Grains::from(BodyPart::call_entered(call)));
+        let called = frame
+            .path_called(call)
+            .combine(Grains::from(BodyPart::call_entered(call).combine(BodyPart::call_made(call))));
         calling.framed(called, Descend::Into)
     }
 
@@ -557,7 +564,7 @@ impl<'read> Contribute for Lowering<'read> {
         inner: Contribution<Framed<'read>, Grains>,
     ) -> Grains {
         inner.concluded(|framed, grown| {
-            let frame = framed.0.unwrap_or_else(|| self.top.clone());
+            let frame = framed.0.map_or_else(|| self.top.clone(), |boxed| *boxed);
             grown.combine(frame.macro_left(item))
         })
     }
@@ -616,31 +623,16 @@ impl<'read> Contribute for Lowering<'read> {
         Contributed::parted(Grains::from(BodyPart::rebinding(found)))
     }
 
-    fn off_expr_method_call(
-        &self,
-        call: &ExprMethodCall,
-        _: &Facts<'_, ExprMethodCall>,
-        inner: Contribution<Framed<'read>, Grains>,
-    ) -> Grains {
-        inner.concluded(|_, grown| grown.combine(Grains::from(BodyPart::method_made(call))))
-    }
-
-    fn off_expr_call(
-        &self,
-        call: &ExprCall,
-        _: &Facts<'_, ExprCall>,
-        inner: Contribution<Framed<'read>, Grains>,
-    ) -> Grains {
-        inner.concluded(|_, grown| grown.combine(Grains::from(BodyPart::call_made(call))))
-    }
-
     fn off_item(
         &self,
         _: &syntax::Item,
         _: &Facts<'_, syntax::Item>,
         inner: Contribution<Framed<'read>, Grains>,
     ) -> Grains {
-        inner.concluded(|_, grown| grown.unbodied())
+        inner.concluded(|_, grown| match grown.bodied {
+            Some(()) => grown.unbodied(),
+            None => grown,
+        })
     }
 
     fn off_signature(
@@ -649,7 +641,10 @@ impl<'read> Contribute for Lowering<'read> {
         _: &Facts<'_, SynSignature>,
         inner: Contribution<Framed<'read>, Grains>,
     ) -> Grains {
-        inner.concluded(|_, grown| grown.unbodied())
+        inner.concluded(|_, grown| match grown.bodied {
+            Some(()) => grown.unbodied(),
+            None => grown,
+        })
     }
 
     fn on_macro(

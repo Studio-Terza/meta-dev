@@ -315,16 +315,6 @@ impl Semigroup for FileRows {
 impl Monoid for FileRows {}
 
 impl FileRows {
-    fn defined(self, definition: Option<LoweredDefinition>) -> FileRows {
-        let mut functions = self.functions;
-        let rest = functions.split_off(functions.len().min(1));
-        let own = functions
-            .into_iter()
-            .zip([definition])
-            .map(|(function, defined)| FnRow { definition: defined.or(function.definition), ..function });
-        FileRows { functions: own.chain(rest).collect(), ..self }
-    }
-
     fn spread<'footing>(self, footing: Footing<'footing>, columns: Columns<'footing>) -> Columns<'footing> {
         Columns {
             aliases: Footed::appended(columns.aliases, footing, self.aliases),
@@ -509,7 +499,7 @@ pub(super) struct Frame<'read> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Framed<'read>(Option<Frame<'read>>);
+pub(crate) struct Framed<'read>(Option<Box<Frame<'read>>>);
 
 impl Semigroup for Framed<'_> {
     fn combine(self, other: Self) -> Self {
@@ -519,36 +509,9 @@ impl Semigroup for Framed<'_> {
 
 impl Monoid for Framed<'_> {}
 
-#[derive(Debug, Default)]
-pub(crate) struct Grains {
-    rows: FileRows,
-    ops: Vec<ScopeOp>,
-    slots: Vec<Slot<ScopeKey>>,
-    body: BodyPart,
-}
-
-impl Semigroup for Grains {
-    fn combine(self, other: Grains) -> Grains {
-        Grains {
-            rows: self.rows.combine(other.rows),
-            ops: self.ops.combine(other.ops),
-            slots: self.slots.combine(other.slots),
-            body: self.body.combine(other.body),
-        }
-    }
-}
-
-impl Monoid for Grains {}
-
-impl From<FileRows> for Grains {
-    fn from(rows: FileRows) -> Grains {
-        Grains { rows, ..Grains::default() }
-    }
-}
-
 impl<'read> Framed<'read> {
     pub(super) fn framing(frame: Frame<'read>) -> Framed<'read> {
-        Framed(Some(frame))
+        Framed(Some(Box::new(frame)))
     }
 }
 #[derive(Debug)]
@@ -563,14 +526,170 @@ impl Owning {
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum Grain {
+    Impl(ImplRow),
+    Function(FnRow),
+    Alias(AliasRow),
+    Holding(HoldingRow),
+    Call(CallRow),
+    Use(UseRow),
+    Law(LawRow),
+    Quote(QuoteRow),
+    Place(PlaceRows),
+    Op(ScopeOp),
+    Slot(Slot<ScopeKey>),
+    Body(BodyPart),
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Grains {
+    grains: Vec<Box<Grain>>,
+    bodied: Option<()>,
+}
+
+impl Semigroup for Grains {
+    fn combine(self, other: Grains) -> Grains {
+        Grains { grains: self.grains.combine(other.grains), bodied: self.bodied.or(other.bodied) }
+    }
+}
+
+impl Monoid for Grains {}
+
+impl From<Grain> for Grains {
+    fn from(grain: Grain) -> Grains {
+        let bodied = grain.bodied();
+        Grains { grains: vec![Box::new(grain)], bodied }
+    }
+}
+
+impl FromIterator<Grain> for Grains {
+    fn from_iter<Found: IntoIterator<Item = Grain>>(found: Found) -> Grains {
+        let grains: Vec<Box<Grain>> = found.into_iter().map(Box::new).collect();
+        let bodied = grains.iter().find_map(|grain| grain.bodied());
+        Grains { grains, bodied }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Sorted {
+    rows: FileRows,
+    ops: Vec<ScopeOp>,
+    slots: Vec<Slot<ScopeKey>>,
+}
+
+impl Semigroup for Sorted {
+    fn combine(self, other: Sorted) -> Sorted {
+        Sorted {
+            rows: self.rows.combine(other.rows),
+            ops: self.ops.combine(other.ops),
+            slots: self.slots.combine(other.slots),
+        }
+    }
+}
+
+impl Monoid for Sorted {}
+
+impl From<Grain> for Sorted {
+    fn from(grain: Grain) -> Sorted {
+        match grain {
+            Grain::Impl(row) => Sorted::of(FileRows { impls: vec![row], ..FileRows::default() }),
+            Grain::Function(row) => Sorted::of(FileRows { functions: vec![row], ..FileRows::default() }),
+            Grain::Alias(row) => Sorted::of(FileRows { aliases: vec![row], ..FileRows::default() }),
+            Grain::Holding(row) => Sorted::of(FileRows { holdings: vec![row], ..FileRows::default() }),
+            Grain::Call(row) => Sorted::of(FileRows { calls: vec![row], ..FileRows::default() }),
+            Grain::Use(row) => Sorted::of(FileRows { uses: vec![row], ..FileRows::default() }),
+            Grain::Law(row) => Sorted::of(FileRows { laws: vec![row], ..FileRows::default() }),
+            Grain::Quote(row) => Sorted::of(FileRows { quotes: vec![row], ..FileRows::default() }),
+            Grain::Place(places) => Sorted::of(FileRows { places, ..FileRows::default() }),
+            Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
+            Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
+            Grain::Body(_) => Sorted::default(),
+        }
+    }
+}
+
+impl Sorted {
+    fn of(rows: FileRows) -> Sorted {
+        Sorted { rows, ..Sorted::default() }
+    }
+}
+
+impl From<Grains> for Sorted {
+    fn from(grains: Grains) -> Sorted {
+        Monoid::concat(grains.grains.into_iter().map(|grain| Sorted::from(*grain)))
+    }
+}
+
+impl Grain {
+    fn body(self: Box<Self>) -> Option<BodyPart> {
+        match *self {
+            Grain::Body(part) => Some(part),
+            Grain::Impl(_)
+            | Grain::Function(_)
+            | Grain::Alias(_)
+            | Grain::Holding(_)
+            | Grain::Call(_)
+            | Grain::Use(_)
+            | Grain::Law(_)
+            | Grain::Quote(_)
+            | Grain::Place(_)
+            | Grain::Op(_)
+            | Grain::Slot(_) => None,
+        }
+    }
+
+    fn bodied(&self) -> Option<()> {
+        match self {
+            Grain::Body(_) => Some(()),
+            Grain::Impl(_)
+            | Grain::Function(_)
+            | Grain::Alias(_)
+            | Grain::Holding(_)
+            | Grain::Call(_)
+            | Grain::Use(_)
+            | Grain::Law(_)
+            | Grain::Quote(_)
+            | Grain::Place(_)
+            | Grain::Op(_)
+            | Grain::Slot(_) => None,
+        }
+    }
+
+    fn function(&self) -> Option<&FnRow> {
+        match self {
+            Grain::Function(row) => Some(row),
+            Grain::Impl(_)
+            | Grain::Alias(_)
+            | Grain::Holding(_)
+            | Grain::Call(_)
+            | Grain::Use(_)
+            | Grain::Law(_)
+            | Grain::Quote(_)
+            | Grain::Place(_)
+            | Grain::Op(_)
+            | Grain::Slot(_)
+            | Grain::Body(_) => None,
+        }
+    }
+
+    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
+        match self {
+            Grain::Function(row) => Grain::Function(FnRow { definition: definition.or(row.definition), ..row }),
+            other => other,
+        }
+    }
+}
+
 impl From<BodyPart> for Grains {
-    fn from(body: BodyPart) -> Grains {
-        Grains { body, ..Grains::default() }
+    fn from(part: BodyPart) -> Grains {
+        Grains::from(Grain::Body(part))
     }
 }
 
 impl Grains {
     fn unbodied(self) -> Grains {
-        Grains { body: BodyPart::default(), ..self }
+        let grains = self.grains.into_iter().filter(|grain| grain.bodied().is_none()).collect();
+        Grains { grains, bodied: None }
     }
 }

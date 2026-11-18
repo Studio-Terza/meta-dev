@@ -60,6 +60,7 @@ enum PendingInvocation {
 #[derive(Debug)]
 pub(crate) struct Made {
     at: Address,
+    closed: syntax::Span,
     invocation: Option<PendingInvocation>,
 }
 
@@ -116,7 +117,9 @@ impl BodyPart {
     pub(super) fn method_made(found: &ExprMethodCall) -> BodyPart {
         let receiver = Self::receiver(&found.receiver);
         let invocation = PendingInvocation::Method { receiver, name: Name::from(&found.method) };
-        BodyPart { made: vec![Made { at: Address::from(found), invocation: Some(invocation) }], ..BodyPart::default() }
+        let made =
+            Made { at: Address::from(found), closed: found.paren_token.span.close(), invocation: Some(invocation) };
+        BodyPart { made: vec![made], ..BodyPart::default() }
     }
 
     pub(super) fn call_made(found: &ExprCall) -> BodyPart {
@@ -124,7 +127,8 @@ impl BodyPart {
             .map_or_default(|path| path.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect());
         let owner = segments.iter().rev().nth(1).cloned();
         let invocation = segments.last().cloned().map(|name| PendingInvocation::Path { owner, name });
-        BodyPart { made: vec![Made { at: Address::from(found), invocation }], ..BodyPart::default() }
+        let made = Made { at: Address::from(found), closed: found.paren_token.span.close(), invocation };
+        BodyPart { made: vec![made], ..BodyPart::default() }
     }
 
     fn receiver(found: &Expr) -> Pending {
@@ -210,9 +214,10 @@ impl BodyGroup {
         let read = part.reads.settled(&self.scope, self.shared, self.tail, &rebound);
         let bound: BTreeMap<Name, TypeRef<Written>> =
             self.parameters.into_iter().filter(|(name, _)| rebound.contains(name).then_some(()).is_none()).collect();
-        let orders: Vec<Option<CallOrder>> = part.made.iter().map(|made| made.order(&part.made)).collect();
-        let invocations = part
-            .made
+        let mut made = part.made;
+        made.sort_by_key(|found| found.closed.byte_range().end);
+        let orders: Vec<Option<CallOrder>> = made.iter().map(|found| found.order(&made)).collect();
+        let invocations = made
             .into_iter()
             .zip(orders)
             .filter_map(|(made, order)| made.settled(order))
