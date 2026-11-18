@@ -1399,6 +1399,8 @@ impl Cargo {
                 "--unviable",
                 "--build-timeout",
                 "600",
+                "--cargo-test-arg",
+                Runner::LIMITED,
                 "--output",
                 output,
                 "--",
@@ -1515,6 +1517,8 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
                 "--unviable",
                 "--build-timeout",
                 "600",
+                "--cargo-test-arg",
+                Runner::LIMITED,
                 "--output",
                 scratch.file("out").as_str(),
             ]
@@ -1712,6 +1716,8 @@ fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_
                 "--unviable",
                 "--build-timeout",
                 "600",
+                "--cargo-test-arg",
+                Runner::LIMITED,
                 "--output",
                 scratch.file("out/scoped").as_str(),
             ]
@@ -2801,4 +2807,11 @@ fn a_mutant_its_own_crate_missed_that_times_out_in_the_scope_is_still_a_survivor
         ]
     );
     Ok(())
+}
+
+struct Runner;
+
+impl Runner {
+    const LIMITED: &'static str =
+        r#"--config=target.'cfg(target_os = "linux")'.runner = ["prlimit", "--as=6442450944", "--cpu=300", "--"]"#;
 }
