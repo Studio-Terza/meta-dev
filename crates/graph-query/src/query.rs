@@ -155,7 +155,7 @@ impl Query {
             .iter()
             .filter_map(|context| {
                 let krate: &Name = AsRef::<CrateName>::as_ref(context).borrow();
-                context.subject().map(|subject| ((krate, subject.as_ref()), *context.as_ref()))
+                context.selfish().subject().map(|subject| ((krate, subject.as_ref()), *context.as_ref()))
             })
             .collect();
         let ground = |stocked: Stocked<'_>| grounds.get(&(stocked.placed().krate(), stocked.name())).copied();

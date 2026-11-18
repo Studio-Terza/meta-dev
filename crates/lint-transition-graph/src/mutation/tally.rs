@@ -1,4 +1,5 @@
 use std::fmt;
+use std::iter;
 
 use crate::transitions::Ground;
 use graph::Mutation;
@@ -9,13 +10,31 @@ use newtype::Counter;
 
 use crate::count::Count;
 use crate::edge::Edge;
+use crate::forms::{Lifted, Stored, Written};
 
-#[derive(Clone, Copy, Debug)]
-pub(super) struct Counted<'edge, 'found, 'file>(&'edge Edge<'found, 'file>);
+#[derive(Debug, Default)]
+pub(super) struct Counted<'edge, 'found, 'file>(Vec<&'edge Edge<'found, 'file>>);
 
-impl<'edge, 'found, 'file> From<Counted<'edge, 'found, 'file>> for &'edge Edge<'found, 'file> {
-    fn from(counted: Counted<'edge, 'found, 'file>) -> &'edge Edge<'found, 'file> {
-        counted.0
+impl<'edge, 'found, 'file> FromIterator<&'edge Edge<'found, 'file>> for Counted<'edge, 'found, 'file> {
+    fn from_iter<Edges: IntoIterator<Item = &'edge Edge<'found, 'file>>>(edges: Edges) -> Self {
+        Counted(
+            edges
+                .into_iter()
+                .filter_map(|edge| {
+                    let stored = iter::once(edge).collect::<Stored<'edge, 'found, 'file>>().into_iter().next();
+                    stored.or_else(|| Tally::mutating(edge).and(Some(edge)))
+                })
+                .collect(),
+        )
+    }
+}
+
+impl<'edge, 'found, 'file> IntoIterator for Counted<'edge, 'found, 'file> {
+    type Item = &'edge Edge<'found, 'file>;
+    type IntoIter = std::vec::IntoIter<&'edge Edge<'found, 'file>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -28,30 +47,25 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counts<'edge, 'found, 'file>(
-        edge: &'edge Edge<'found, 'file>,
-    ) -> Option<Counted<'edge, 'found, 'file>> {
-        let mutating = Some(edge)
-            .filter(|candidate| *AsRef::<Ground>::as_ref(candidate.transition()) == Ground::Core)
-            .filter(|core| {
-                matches!(core.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
-            })
-            .map(Counted);
-        edge.form().storing(edge).map(|stored| Counted(stored.as_ref())).or(mutating)
+    fn mutating(edge: &Edge<'_, '_>) -> Option<Mutation> {
+        (*AsRef::<Ground>::as_ref(edge.transition()) == Ground::Core)
+            .then_some(edge.transition().function().mutation())
+            .filter(|mutation| matches!(mutation, Mutation::ThroughSelf | Mutation::ThroughParameter))
     }
 
     pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Tally {
-        edges.fold(Tally::default(), |tally, edge| {
-            tally.by_form(edge, edge.transition().function().mutation()).fixed(edge, edge.fixed_by())
-        })
-    }
-
-    fn by_form(self, edge: &Edge<'_, '_>, mutation: Mutation) -> Tally {
-        edge.form()
-            .storing(Tally { operations: self.operations.incremented(), ..self })
-            .map_or_else(|| self.by_mutation(mutation), |stored| *stored.as_ref())
+        let all: Vec<&'edge Edge<'found, 'file>> = edges.collect();
+        let stored = all.iter().copied().collect::<Stored<'edge, 'found, 'file>>().into_iter().count();
+        let written = all.iter().copied().collect::<Written<'edge, 'found, 'file>>();
+        let lifts = all.iter().copied().collect::<Lifted<'edge, 'found, 'file>>();
+        written
+            .into_iter()
+            .chain(lifts)
+            .fold(Tally { operations: Count::new(stored), ..Tally::default() }, |tally, edge| {
+                tally.by_mutation(edge.transition().function().mutation()).fixed(edge.fixed_by())
+            })
     }
 
     fn by_mutation(self, mutation: Mutation) -> Tally {
@@ -63,9 +77,8 @@ impl Tally {
         }
     }
 
-    fn fixed(self, edge: &Edge<'_, '_>, fixed_by: Option<&Name>) -> Tally {
-        let fixing = fixed_by.map_or(self, |_| Tally { fixed: self.fixed.incremented(), ..self });
-        edge.form().storing(self).map_or(fixing, |stored| *stored.as_ref())
+    fn fixed(self, fixed_by: Option<&Name>) -> Tally {
+        fixed_by.map_or(self, |_| Tally { fixed: self.fixed.incremented(), ..self })
     }
 
     pub(super) fn violation(self, first: Option<Site<'_>>) -> Option<Violation<'_>> {

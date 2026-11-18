@@ -13,31 +13,13 @@ use crate::edge::Edge;
 use crate::end::{End, Node};
 use operators::Operators;
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Written<Carrier>(Carrier);
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Lifted<Carrier>(Carrier);
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Stored<Carrier>(Carrier);
-
-impl<Carrier> AsRef<Carrier> for Written<Carrier> {
-    fn as_ref(&self) -> &Carrier {
-        &self.0
-    }
-}
-
-impl<Carrier> AsRef<Carrier> for Lifted<Carrier> {
-    fn as_ref(&self) -> &Carrier {
-        &self.0
-    }
-}
-
-impl<Carrier> AsRef<Carrier> for Stored<Carrier> {
-    fn as_ref(&self) -> &Carrier {
-        &self.0
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Role {
+    Written,
+    Operation,
+    Port,
+    Lift,
+    Store,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -113,9 +95,6 @@ impl<'found> Acting<'found> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Effect;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Form<'found> {
     Operation(Acting<'found>),
@@ -161,31 +140,13 @@ impl<'found> Form<'found> {
         }
     }
 
-    pub(crate) fn writing<Carrier>(&self, carrier: Carrier) -> Option<Written<Carrier>> {
+    pub(crate) fn role(&self) -> Role {
         match self {
-            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Port => Some(Written(carrier)),
-            Form::Lift | Form::Store => None,
-        }
-    }
-
-    pub(crate) fn lifting<Carrier>(&self, carrier: Carrier) -> Option<Lifted<Carrier>> {
-        match self {
-            Form::Lift => Some(Lifted(carrier)),
-            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Port | Form::Store => None,
-        }
-    }
-
-    pub(crate) fn storing<Carrier>(&self, carrier: Carrier) -> Option<Stored<Carrier>> {
-        match self {
-            Form::Store => Some(Stored(carrier)),
-            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Port | Form::Lift => None,
-        }
-    }
-
-    pub(crate) fn ported(&self) -> Option<Effect> {
-        match self {
-            Form::Port => Some(Effect),
-            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Lift | Form::Store => None,
+            Form::Operation(_) | Form::Partial(_) => Role::Operation,
+            Form::Port => Role::Port,
+            Form::Lift => Role::Lift,
+            Form::Store => Role::Store,
+            Form::Transition => Role::Written,
         }
     }
 

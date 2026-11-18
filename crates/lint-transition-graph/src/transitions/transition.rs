@@ -27,17 +27,17 @@ impl<'found, 'file> Transition<'found, 'file> {
 
     #[must_use]
     pub fn takes(&self) -> Inputs<'found> {
-        Inputs::new(self.function.takes(), self.context.selfish())
+        Inputs::new(self.function.takes(), self.context.selfish().endpoint())
     }
 
     #[must_use]
     pub fn gives(&self) -> Output<'found> {
-        Output::new(self.function.gives().resolved_with(self.context.selfish()))
+        Output::new(self.function.gives().resolved_with(self.context.selfish().endpoint()))
     }
 
     #[must_use]
     pub fn implementer(&self) -> Option<Implementer<'found>> {
-        self.context.filler().implementer(self.context.selfish())
+        self.context.filler().implementer(self.context.selfish().endpoint())
     }
 
     #[must_use]

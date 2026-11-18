@@ -10,6 +10,7 @@ use super::leg::Leg;
 use super::walk::Walk;
 use crate::edge::Edge;
 use crate::end::{End, Hop};
+use crate::forms::Written;
 use crate::transitions::Wrapping;
 use graph::CallOwner;
 
@@ -49,7 +50,7 @@ pub(super) struct Stops<'graph, 'found, 'file> {
 impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
     pub(super) fn indexed(edges: &'graph [Edge<'found, 'file>]) -> Stops<'graph, 'found, 'file> {
         let joins: Vec<&'graph Edge<'found, 'file>> =
-            edges.iter().filter_map(|edge| edge.form().writing(edge)).map(|written| *written.as_ref()).collect();
+            edges.iter().collect::<Written<'graph, 'found, 'file>>().into_iter().collect();
         let named = edges.iter().fold(BTreeMap::new(), |mut named: BTreeMap<_, Vec<_>>, edge| {
             named.entry(AsRef::<Name>::as_ref(edge.transition().function())).or_default().push(edge);
             named
@@ -66,7 +67,7 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
     }
 
     pub(super) fn walked(&self, edge: &'graph Edge<'found, 'file>) -> Walk<'graph, 'found, 'file> {
-        let walker = edge.transition().context().subject().map(AsRef::<Name>::as_ref);
+        let walker = edge.transition().context().selfish().subject().map(AsRef::<Name>::as_ref);
         let resolved = edge.transition().function().calls().iter().fold(Vec::new(), |mut resolved, callee| {
             let earlier: Vec<Option<&Name>> = resolved
                 .iter()
@@ -113,7 +114,9 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
             .into_iter()
             .flatten()
             .copied()
-            .filter(|candidate| owner.admits(candidate.transition().context().subject().map(AsRef::as_ref)).is_some())
+            .filter(|candidate| {
+                owner.admits(candidate.transition().context().selfish().subject().map(AsRef::as_ref)).is_some()
+            })
             .collect();
         Some(candidates).filter(|found| found.len() == 1).and_then(|found| found.first().copied())
     }

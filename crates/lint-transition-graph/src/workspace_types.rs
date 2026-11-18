@@ -79,7 +79,7 @@ impl<'found> WorkspaceTypes<'found> {
     pub(crate) fn owner(&self, transition: &Transition<'found, '_>) -> Option<End<'found>> {
         let context = transition.context();
         let from: &Name = AsRef::<CrateName>::as_ref(transition).borrow();
-        context.trait_name().map_or(context.subject(), |_| None).map(|subject| self.end(from, subject, None))
+        context.trait_name().map_or(context.selfish().subject(), |_| None).map(|subject| self.end(from, subject, None))
     }
 
     fn end(&self, from: &Name, endpoint: &'found Endpoint, fixed_by: Option<&'found Name>) -> End<'found> {

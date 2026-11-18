@@ -18,7 +18,7 @@ impl ModelLint for NoTestIo {
             model
                 .uses()
                 .filter(|placed| placed.harness() == Harness::TestTarget)
-                .filter(|placed| Gate::PORTS.names_crate(placed.krate()).is_none())
+                .filter_map(|placed| Gate::PORTS.names_crate(placed.krate(), None).unwrap_or(Some(placed)))
                 .filter_map(|placed| {
                     paths.effect(placed.entity()).map(|path| Violation::new(placed.site(), Finding::from(path.clone())))
                 })

@@ -47,12 +47,26 @@ impl Implemented {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Subject<'selfish>(&'selfish Endpoint);
+#[derive(Debug)]
+pub enum Subjected {
+    Subject(Endpoint),
+    Bare(Endpoint),
+}
 
-impl<'selfish> From<Subject<'selfish>> for &'selfish Endpoint {
-    fn from(subject: Subject<'selfish>) -> &'selfish Endpoint {
-        subject.0
+impl Subjected {
+    #[must_use]
+    pub fn endpoint(&self) -> &Endpoint {
+        match self {
+            Subjected::Subject(endpoint) | Subjected::Bare(endpoint) => endpoint,
+        }
+    }
+
+    #[must_use]
+    pub fn subject(&self) -> Option<&Endpoint> {
+        match self {
+            Subjected::Subject(endpoint) => Some(endpoint),
+            Subjected::Bare(_) => None,
+        }
     }
 }
 
@@ -79,10 +93,10 @@ impl Filler {
         }
     }
 
-    pub(crate) fn subject<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<Subject<'selfish>> {
+    pub(crate) fn subjected(&self, selfish: Endpoint) -> Subjected {
         match self {
-            Filler::Free => None,
-            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Some(Subject(selfish)),
+            Filler::Free => Subjected::Bare(selfish),
+            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Subjected::Subject(selfish),
         }
     }
 }

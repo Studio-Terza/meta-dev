@@ -23,8 +23,7 @@ impl<'unit, 'meta> Claim<'unit, 'meta> {
     pub(super) fn reached(package: &'meta PackageId, named: &Package, unit: &'unit Unit<'meta>) -> Claim<'unit, 'meta> {
         let owner = unit.port();
         let name = AsRef::<CrateName>::as_ref(named);
-        let shared = unit.declarations().values().find_map(|declared| declared.shares(name));
-        Claim { package, open: shared.map_or(Some(owner), |_| None), unit }
+        Claim { package, open: unit.shared().get(name).map_or(Some(owner), |_| None), unit }
     }
 
     pub(super) fn package(&self) -> &'meta PackageId {

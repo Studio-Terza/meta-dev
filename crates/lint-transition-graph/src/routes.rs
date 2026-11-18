@@ -6,6 +6,7 @@ mod walk;
 use lint_core::{Headline, Report, Violation};
 
 use crate::edge::Edge;
+use crate::forms::Written;
 use crate::graph_lint::GraphLint;
 use crate::system::TypeSystem;
 use equivalence::Groups;
@@ -22,8 +23,8 @@ impl GraphLint for RepeatedRoutes {
         let walks: Vec<Walk<'_, '_, 'file>> = system
             .edges()
             .iter()
-            .filter_map(|edge| edge.form().writing(edge))
-            .map(|written| *written.as_ref())
+            .collect::<Written<'_, '_, 'file>>()
+            .into_iter()
             .map(|edge| stops.walked(edge))
             .collect();
         let routes: Vec<Route<'_, '_, '_, 'file>> = Groups::grouped(walks.iter().flat_map(Walk::legs))

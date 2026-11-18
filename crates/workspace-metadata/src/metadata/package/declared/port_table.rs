@@ -7,12 +7,16 @@ use crate::role::Role;
 
 use super::expanders::Expanders;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Shared<'table>(&'table CrateName);
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(transparent)]
+pub struct Sharing(BTreeSet<CrateName>);
 
-impl AsRef<CrateName> for Shared<'_> {
-    fn as_ref(&self) -> &CrateName {
-        self.0
+impl<'sharing> IntoIterator for &'sharing Sharing {
+    type Item = &'sharing CrateName;
+    type IntoIter = std::collections::btree_set::Iter<'sharing, CrateName>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
@@ -22,7 +26,7 @@ pub struct PortTable {
     #[serde(default)]
     owns: BTreeSet<CrateName>,
     #[serde(default)]
-    shared: BTreeSet<CrateName>,
+    shared: Sharing,
     dependents: Option<Role>,
     expanders: Option<Expanders>,
 }
@@ -32,8 +36,8 @@ impl PortTable {
         &self.owns
     }
 
-    pub fn shares(&self, package: &CrateName) -> Option<Shared<'_>> {
-        self.shared.get(package).map(Shared)
+    pub fn shared(&self) -> &Sharing {
+        &self.shared
     }
 
     pub fn dependents(&self) -> Option<Role> {

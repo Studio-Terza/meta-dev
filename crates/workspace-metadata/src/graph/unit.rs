@@ -35,6 +35,10 @@ impl<'meta> Unit<'meta> {
         &self.declarations
     }
 
+    pub(super) fn shared(&self) -> BTreeSet<&'meta CrateName> {
+        self.declarations.values().flat_map(|declared| declared.shared()).collect()
+    }
+
     pub(super) fn unreached(&self, graph: &Graph<'meta>) -> Stale<'meta> {
         let reach = graph.reach(self);
         self.declarations

@@ -11,6 +11,7 @@ use newtype::Counter;
 use crate::algebra::{Algebra, Algebras, Totality};
 use crate::count::Count;
 use crate::edge::Edge;
+use crate::forms::{Lifted, Stored, Written};
 use crate::system::TypeSystem;
 pub(crate) use share::Share;
 
@@ -31,22 +32,16 @@ impl Coverage {
     ) -> Coverage {
         let edges: Vec<&Edge<'found, 'file>> = listed.collect();
         let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
-        let counted = Coverage::concat(edges.iter().map(|edge| Coverage::counted(edge)));
-        counted.combine(Coverage::algebraic(system.algebras(), &sites))
-    }
-
-    fn counted(edge: &Edge<'_, '_>) -> Coverage {
-        let one = Count::zero().incremented();
-        let written = edge.form().writing(edge).map(|written| Coverage {
-            written: one,
-            covered: written.as_ref().ends().class().covered(),
+        let written: Vec<&Edge<'found, 'file>> =
+            edges.iter().copied().collect::<Written<'edge, 'found, 'file>>().into_iter().collect();
+        let counted = Coverage {
+            written: Count::new(written.len()),
+            covered: Count::total(written.iter().map(|edge| edge.ends().class().covered())),
+            lifts: Count::new(edges.iter().copied().collect::<Lifted<'edge, 'found, 'file>>().into_iter().count()),
+            operations: Count::new(edges.iter().copied().collect::<Stored<'edge, 'found, 'file>>().into_iter().count()),
             ..Coverage::default()
-        });
-        written
-            .or_else(|| {
-                edge.form().lifting(one).map(|lifts| Coverage { lifts: *lifts.as_ref(), ..Coverage::default() })
-            })
-            .unwrap_or(Coverage { operations: one, ..Coverage::default() })
+        };
+        counted.combine(Coverage::algebraic(system.algebras(), &sites))
     }
 
     fn algebraic<'file>(algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
