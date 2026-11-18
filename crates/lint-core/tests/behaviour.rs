@@ -115,6 +115,6 @@ fn a_macro_rules_transcriber_mentions_its_paths_with_each_metavariable_as_its_na
         .map(|path| syntax::ToTokens::to_token_stream(path).to_string())
         .collect();
     assert_eq!(mentioned, ["crate :: Kind", "name", ":: a :: B", "c :: d", "e :: F"]);
-    assert!(Macros::mentioned(&other.mac).paths().is_empty());
+    assert_eq!(Macros::mentioned(&other.mac).paths().iter().count(), 0);
     Ok(())
 }
