@@ -397,3 +397,17 @@ fn a_struct_literal_uses_its_type_path() {
         .collect();
     assert_eq!(literals, ["Point a.rs:5"]);
 }
+
+const TRANSCRIBED: &str = "pub struct Kept;\nmod inner {\n    pub struct Thing;\n}\nuse inner::Thing;\nmacro_rules! made {\n    ($($name:ident),*) => {\n        $(fn $name() -> crate::Kept {\n            Thing::from(Gone)\n        })*\n    };\n}\nmade!(f, g);\n";
+
+#[test]
+fn an_invocation_names_what_its_macro_transcriber_names_where_it_resolves() {
+    let model = Read::model(TRANSCRIBED);
+    let mut expanded: Vec<String> = model
+        .uses()
+        .filter(|placed| placed.entity().mention() == Mention::Expanded)
+        .map(|placed| placed.entity().written().to_string())
+        .collect();
+    expanded.sort();
+    assert_eq!(expanded, ["Thing::from", "crate::Kept"]);
+}
