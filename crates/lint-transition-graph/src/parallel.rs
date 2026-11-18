@@ -18,7 +18,7 @@ pub struct ParallelStructures;
 
 impl ParallelStructures {
     pub(crate) const EQUIVALENCE: Equivalence =
-        Equivalence::erasing(&[Erased::Names, Erased::Literals]).comparing(Laws::WhereDeclared);
+        Equivalence::comparing(&[Erased::Names, Erased::Literals], Laws::WhereDeclared);
 }
 
 impl GraphLint for ParallelStructures {
