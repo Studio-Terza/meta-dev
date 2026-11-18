@@ -4,6 +4,7 @@ mod calls;
 mod definition;
 mod frames;
 mod held;
+mod interface;
 mod laws;
 mod places;
 mod quotes;
@@ -26,8 +27,8 @@ use syntax::{
 };
 
 use graph::{
-    Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Held, Implementation, Model, Mutation,
-    Named, Origin, Output, Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Held, Implementation, Interface, Model,
+    Mutation, Named, Origin, Output, Owner, Reach, Region, Signature, Sited, Spelling, Subject, TypeRef,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
@@ -45,6 +46,7 @@ pub(crate) use definition::BodyGroup;
 use definition::{LoweredDefinition, Mutations, RowIndex};
 use frames::{Enclosure, Frame};
 use held::{Holder, HoldingRow, Link};
+use interface::TraitPath;
 use laws::LawRow;
 use lint_sweep::{Address, Attaches, Attachment, Descend, Facts, Kind, Watch};
 use places::{PlaceId, PlaceRows, Places};
@@ -62,6 +64,7 @@ struct ImplRow {
     subject: Name,
     ty: TypeRef<Written>,
     implemented: Option<UsePath>,
+    arguments: Vec<TypeRef<Written>>,
     domain: Domain,
     origin: Origin,
     region: Region,
@@ -78,11 +81,13 @@ struct LoweredAssigned {
 impl ImplRow {
     fn written(seat: &Seat, region: Region, block: &ItemImpl, scope: &InScope) -> ImplRow {
         let ty = scope.lowered(&block.self_ty);
+        let within = scope.subject(ty.clone());
         ImplRow {
             located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),
             ty,
             implemented: block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path)),
+            arguments: block.trait_.as_ref().map_or_default(|(_, path, _)| TraitPath::from(path).arguments(&within)),
             domain: Domain::Types,
             origin: Origin::Written,
             region,
@@ -106,6 +111,7 @@ impl ImplRow {
             subject: Name::from(subject),
             ty: TypeRef::Named(Named::new(Written::path(UsePath::from(subject), position), Vec::new())),
             implemented: Some(UsePath::from(path)),
+            arguments: Vec::new(),
             domain: Domain::Macros,
             origin: Origin::Derived,
             region,
@@ -125,7 +131,9 @@ impl Built for ImplRow {
         let resolving = footing.resolving();
         let implemented = self.implemented.map(|path| {
             let spelling = Spelling::Written(path.written(), located.position());
-            Sited::new(resolving.path(located.scope(), &path, self.domain), spelling)
+            let arguments =
+                self.arguments.iter().map(|argument| Written::typed(argument, &resolving, located.scope())).collect();
+            Interface::new(Sited::new(resolving.path(located.scope(), &path, self.domain), spelling), arguments)
         });
         let subject = Subject::new(self.subject, Written::typed(&self.ty, &resolving, located.scope()));
         let implementation =
