@@ -21,7 +21,6 @@ struct Spotted<'found> {
 #[derive(Debug, Default)]
 pub(crate) struct WorkspaceTypes<'found> {
     types: BTreeMap<&'found Name, BTreeSet<&'found Name>>,
-    traits: BTreeSet<&'found Name>,
     crates: BTreeSet<&'found Name>,
     ambiguous: BTreeMap<&'found Name, BTreeSet<&'found Name>>,
 }
@@ -50,7 +49,6 @@ impl<'found> WorkspaceTypes<'found> {
                 names.entry(found.name).or_default().insert(found.krate);
                 names
             }),
-            traits: declared.iter().filter(|found| found.kind == ItemKind::Trait).map(|found| found.name).collect(),
         }
     }
 
@@ -69,8 +67,7 @@ impl<'found> WorkspaceTypes<'found> {
     }
 
     pub(crate) fn edge<'file>(&self, transition: Transition<'found, 'file>) -> Edge<'found, 'file> {
-        let fixed_by =
-            transition.context().trait_name().and_then(|name| self.traits.get(name).map_or(Some(name), |_| None));
+        let fixed_by = transition.context().filler().foreign_trait();
         let from: &Name = AsRef::<CrateName>::as_ref(&transition).borrow();
         let end = |endpoint: &'found Endpoint| self.end(from, endpoint, fixed_by);
         let implementer = transition.implementer().map(Implementer::endpoint).map(end);

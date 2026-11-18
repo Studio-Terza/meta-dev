@@ -13,6 +13,7 @@ use graph::Model;
 
 pub use context::Context;
 pub use endpoint::Endpoint;
+pub(crate) use filler::Declares;
 pub use ground::Ground;
 pub use implementer::Implementer;
 use reading::Reading;

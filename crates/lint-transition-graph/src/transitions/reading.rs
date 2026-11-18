@@ -13,7 +13,7 @@ use lint_layout::{Name, Whole, Word, words};
 
 use crate::transitions::context::Context;
 use crate::transitions::endpoint::{Endpoint, Nature, Unnamed};
-use crate::transitions::filler::Filler;
+use crate::transitions::filler::{Filler, Implemented};
 use crate::transitions::function::Function as Transitive;
 use crate::transitions::ground::Ground;
 use crate::transitions::resolved::Resolved;
@@ -125,7 +125,7 @@ impl<'file> Reading<'file> {
             .find(|assigned| AsRef::<Name>::as_ref(*assigned).matches::<Whole>(&Self::OUTPUT).is_some())
             .map(AsRef::<TypeRef>::as_ref);
         let scope = Scope { output, ..outer };
-        let filler = implementation.interface_name().cloned().map_or(Filler::Inherent, Filler::Implemented);
+        let filler = Implemented::read(self.model, implementation).map_or(Filler::Inherent, Filler::Implemented);
         let seated = self
             .seated
             .get(placed.site().path())
