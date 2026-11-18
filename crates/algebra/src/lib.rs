@@ -45,7 +45,10 @@ struct Opened<Item> {
 
 impl<Item> Semigroup for Catenation<Item> {
     fn combine(self, other: Catenation<Item>) -> Catenation<Item> {
-        Catenation::Joined(Box::new(self), Box::new(other))
+        match self.occupied() {
+            Some(first) => Catenation::after(first, other.occupied()),
+            None => other,
+        }
     }
 }
 
@@ -89,5 +92,24 @@ impl<Item> Iterator for Leaves<Item> {
         let Opened { leaf, children } = self.pending.pop()?.opened();
         self.pending.extend(children);
         Some(leaf)
+    }
+}
+
+impl<Item> Catenation<Item> {
+    fn occupied(self) -> Option<Catenation<Item>> {
+        match self {
+            Catenation::Empty => None,
+            Catenation::Leaf(leaf) => leaf.first().map(|_| ()).map(|()| Catenation::Leaf(leaf)),
+            joined @ Catenation::Joined(..) => Some(joined),
+        }
+    }
+}
+
+impl<Item> Catenation<Item> {
+    fn after(first: Catenation<Item>, second: Option<Catenation<Item>>) -> Catenation<Item> {
+        match second {
+            Some(tail) => Catenation::Joined(Box::new(first), Box::new(tail)),
+            None => first,
+        }
     }
 }
