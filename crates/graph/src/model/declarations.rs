@@ -2,6 +2,8 @@ mod ignored;
 
 use std::collections::BTreeMap;
 
+use algebra::{Monoid, Semigroup};
+
 use crate::boundary::ItemId;
 use crate::domain::Domain;
 use crate::item::{Alias, Item};
@@ -19,18 +21,35 @@ struct StdAlias {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Aliases {
+pub struct Aliases {
     declared: BTreeMap<ItemId, Alias>,
     std: Vec<StdAlias>,
 }
 
+impl Semigroup for Aliases {
+    fn combine(self, other: Aliases) -> Aliases {
+        let mut declared = self.declared;
+        declared.extend(other.declared);
+        Aliases { declared, std: self.std.combine(other.std) }
+    }
+}
+
+impl Monoid for Aliases {}
+
 impl Aliases {
-    pub(crate) fn declare(&mut self, item: ItemId, alias: Alias) {
-        self.declared.insert(item, alias);
+    #[must_use]
+    pub fn declaring(item: ItemId, alias: Alias) -> Aliases {
+        Aliases { declared: BTreeMap::from([(item, alias)]), std: Vec::new() }
     }
 
-    pub(crate) fn declare_std(&mut self, path: ItemPath, alias: Alias) {
-        self.std.push(StdAlias { path, alias });
+    #[must_use]
+    pub fn std(path: ItemPath, alias: Alias) -> Aliases {
+        Aliases { declared: BTreeMap::new(), std: vec![StdAlias { path, alias }] }
+    }
+
+    #[must_use]
+    pub fn target(&self, path: &Resolved) -> Option<&Named<Sited>> {
+        self.aliasing(path)?.target().named()
     }
 
     pub(crate) fn expanded(&self, ty: &TypeRef) -> TypeRef {
@@ -50,19 +69,60 @@ impl Aliases {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Declarations {
+pub struct Exports {
+    domains: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
+}
+
+impl Semigroup for Exports {
+    fn combine(self, other: Exports) -> Exports {
+        let mut domains = self.domains;
+        other.domains.into_iter().for_each(|(domain, exported)| domains.entry(domain).or_default().extend(exported));
+        Exports { domains }
+    }
+}
+
+impl Monoid for Exports {}
+
+impl Exports {
+    #[must_use]
+    pub fn export(domain: Domain, path: ItemPath, resolved: &Resolved) -> Exports {
+        let exported = resolved.known().map(|known| (path, known.clone())).into_iter().collect();
+        Exports { domains: BTreeMap::from([(domain, exported)]) }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Issued {
+    items: Vec<Item>,
+    scopes: Vec<Vec<Option<ItemId>>>,
+}
+
+impl FromIterator<Vec<Option<Item>>> for Issued {
+    fn from_iter<Scopes: IntoIterator<Item = Vec<Option<Item>>>>(scopes: Scopes) -> Issued {
+        let declared: Vec<Vec<Option<Item>>> = scopes.into_iter().collect();
+        let numbered = ItemId::numbered(&declared);
+        Issued { items: declared.into_iter().flatten().flatten().collect(), scopes: numbered }
+    }
+}
+
+impl Issued {
+    #[must_use]
+    pub fn scopes(&self) -> &[Vec<Option<ItemId>>] {
+        &self.scopes
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Declarations {
     items: Vec<Item>,
     aliases: Aliases,
     exports: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
 }
 
 impl Declarations {
-    pub(crate) fn new(
-        items: Vec<Item>,
-        aliases: Aliases,
-        exports: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
-    ) -> Declarations {
-        Declarations { items, aliases, exports }
+    #[must_use]
+    pub fn issued(issued: Issued, aliases: Aliases, exports: Exports) -> Declarations {
+        Declarations { items: issued.items, aliases, exports: exports.domains }
     }
 
     pub(crate) fn exports(&self) -> &BTreeMap<Domain, BTreeMap<ItemPath, Resolved>> {

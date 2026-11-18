@@ -7,6 +7,15 @@ use graph::Quote;
 use invariants::Ignoring;
 use lint_layout::Name;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct SlotOrdinal(usize);
+
+impl SlotOrdinal {
+    pub(super) fn every<Row>(rows: &[Row]) -> impl Iterator<Item = SlotOrdinal> + use<Row> {
+        (0..rows.len()).map(SlotOrdinal)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct SelfType;
 
