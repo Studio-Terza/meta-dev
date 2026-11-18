@@ -165,7 +165,7 @@ impl Qualified {
     fn under_type(qself: &QSelf, path: &syntax::Path) -> Option<UsePath> {
         let trait_named = qself.position.checked_sub(1);
         let own = trait_named.map_or(Some(&*qself.ty), |_| None);
-        own.and_then(Self::type_path).map(|inner| UsePath::from(inner).extended(&UsePath::from(path)))
+        own.and_then(Self::type_path).map(|inner| UsePath::from(inner).combine(UsePath::from(path)))
     }
 
     fn type_path(ty: &Type) -> Option<&syntax::Path> {
@@ -220,7 +220,7 @@ impl Frame<'_> {
             self.generics.traits_of(&lint_layout::Name::from(&first.ident)).into_iter().cloned().collect()
         });
         let traits = qualified.into_iter().chain(bounded);
-        member.map_or_default(|named| traits.map(|traited| traited.extended(&named)).collect())
+        member.map_or_default(|named| traits.map(|traited| traited.combine(named.clone())).collect())
     }
 
     pub(super) fn macro_used(&self, invoked: &Macro) -> Grains {
