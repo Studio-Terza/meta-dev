@@ -1,66 +1,118 @@
-use syntax::{Ident, ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
+use std::borrow::Cow;
+
+use syntax::{ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
 
 use lint_core::Parsed;
-use lint_sweep::{Descend, Facts, Gathers, Kind as Node, Sweep, Watch, Watching};
+use lint_layout::Name;
+use lint_placement::{CrateRoot, ModulePath};
+use lint_sweep::{
+    Contribute, Contributed, Contributing, Contribution, Descend, Facts, Gathers, Kind as Node, Scope, Sweep, Watching,
+};
 
-use super::{Declaration, Kind};
+use super::Kind;
+use super::declaration::{Declaration, Declared};
 
 #[derive(Debug)]
 pub struct Declarations<'head> {
-    open: Vec<Declaration<'head>>,
-    closed: Vec<Declaration<'head>>,
+    crate_root: &'head CrateRoot,
+    module: &'head ModulePath,
+    scan: Contributing<DeclarationScan>,
+}
+
+#[derive(Debug)]
+pub struct DeclarationScan;
+
+#[derive(Debug)]
+pub struct Nested {
+    path: Vec<Name>,
+    types: Vec<Declared>,
+}
+
+impl Nested {
+    fn under(self, name: Name) -> Nested {
+        Nested { path: [name].into_iter().chain(self.path).collect(), types: self.types }
+    }
+
+    fn declaration<'head>(self, crate_root: &'head CrateRoot, module: &'head ModulePath) -> Declaration<'head> {
+        let placed = self.path.into_iter().fold(Cow::Borrowed(module), |within, name| Cow::Owned(within.child(name)));
+        Declaration::placed(crate_root, placed, self.types)
+    }
 }
 
 impl<'head> Declarations<'head> {
     pub fn in_file(parsed: Parsed<'_, 'head>) -> Declarations<'head> {
         let placement = parsed.head().placement();
-        Declarations { open: vec![Declaration::new(placement.crate_root(), placement.module())], closed: Vec::new() }
-    }
-
-    fn record(&mut self, ident: &Ident, kind: Kind) -> Descend {
-        self.open.last_mut().into_iter().for_each(|declaration| declaration.record(ident, kind));
-        Descend::Over
+        Declarations {
+            crate_root: placement.crate_root(),
+            module: placement.module(),
+            scan: Contributing::new(DeclarationScan),
+        }
     }
 }
 
-impl<'ast> Watch<'ast> for Declarations<'_> {
+impl DeclarationScan {
+    fn record(name: &syntax::Ident, kind: Kind) -> Contributed<Vec<Declared>, Vec<Nested>> {
+        Contributed::new(vec![Declared::new(Name::from(name), kind)], Vec::new(), Descend::Over)
+    }
+}
+
+impl Contribute for DeclarationScan {
+    type Open = Vec<Declared>;
+    type Part = Vec<Nested>;
+
     fn kinds(&self) -> &'static [Node] {
-        &[Node::ItemMod, Node::ItemEnum, Node::ItemStruct, Node::ItemUnion, Node::Macro]
+        &[Node::ItemEnum, Node::ItemStruct, Node::ItemUnion, Node::Macro]
     }
 
-    fn on_item_mod(&mut self, module: &'ast ItemMod, _: &Facts<'_, ItemMod>) -> Descend {
-        let inner = self.open.last().map(|outer| outer.nested(&module.ident));
-        self.open.extend(inner);
-        Descend::Into
+    fn scopes(&self) -> &'static [Scope] {
+        const { &[Scope::new(Node::ItemMod)] }
     }
 
-    fn off_item_mod(&mut self, _: &'ast ItemMod, _: &Facts<'_, ItemMod>) {
-        self.closed.extend(self.open.pop());
+    fn off_item_mod(
+        &self,
+        module: &ItemMod,
+        _: &Facts<'_, ItemMod>,
+        inner: Contribution<Vec<Declared>, Vec<Nested>>,
+    ) -> Vec<Nested> {
+        inner.concluded(|types, nested| {
+            [Nested { path: Vec::new(), types }]
+                .into_iter()
+                .chain(nested)
+                .map(|within| within.under(Name::from(&module.ident)))
+                .collect()
+        })
     }
 
-    fn on_item_enum(&mut self, item: &'ast ItemEnum, _: &Facts<'_, ItemEnum>) -> Descend {
-        self.record(&item.ident, Kind::Enum)
+    fn on_item_enum(&self, item: &ItemEnum, _: &Facts<'_, ItemEnum>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+        Self::record(&item.ident, Kind::Enum)
     }
 
-    fn on_item_struct(&mut self, item: &'ast ItemStruct, _: &Facts<'_, ItemStruct>) -> Descend {
-        self.record(&item.ident, Kind::Other)
+    fn on_item_struct(&self, item: &ItemStruct, _: &Facts<'_, ItemStruct>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+        Self::record(&item.ident, Kind::Other)
     }
 
-    fn on_item_union(&mut self, item: &'ast ItemUnion, _: &Facts<'_, ItemUnion>) -> Descend {
-        self.record(&item.ident, Kind::Other)
+    fn on_item_union(&self, item: &ItemUnion, _: &Facts<'_, ItemUnion>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+        Self::record(&item.ident, Kind::Other)
     }
 
-    fn on_macro(&mut self, _: &'ast Macro, _: &Facts<'_, Macro>) -> Descend {
-        Descend::Expand
+    fn on_macro(&self, _: &Macro, _: &Facts<'_, Macro>) -> Contributed<Vec<Declared>, Vec<Nested>> {
+        Contributed::descending(Descend::Expand)
     }
 }
 
 impl<'head> Gathers<Vec<Declaration<'head>>> for Declarations<'head> {
     fn watching(&mut self) -> impl IntoIterator<Item = &mut Watching<'_>> {
-        Sweep::alone(self)
+        Sweep::alone(&mut self.scan)
     }
 
     fn gathered(self) -> Vec<Declaration<'head>> {
-        self.closed.into_iter().chain(self.open).collect()
+        let Declarations { crate_root, module, scan } = self;
+        scan.concluded(|_, types, nested| {
+            [Nested { path: Vec::new(), types }]
+                .into_iter()
+                .chain(nested)
+                .map(|within| within.declaration(crate_root, module))
+                .collect()
+        })
     }
 }
