@@ -196,13 +196,13 @@ impl<'tree> Rooted<'_, 'tree> {
         let unseen = marks.seen(path).map_or(Some(()), |()| None);
         unseen.map_or_default(|()| {
             let seeing = Plan { seen: BTreeSet::from([path.to_path_buf()]), ..Plan::default() };
-            let rest = self.fresh(self.home.located(path), Marks { plan: &seeing, up: Some(&marks) });
+            let rest = self.fresh(&self.home.located(path), Marks { plan: &seeing, up: Some(&marks) });
             seeing.combine(rest)
         })
     }
 
-    fn fresh(self, located: Located<'tree>, marks: Marks<'_, 'tree>) -> Plan<'tree> {
-        let found = marks.consumed(&located).map_or_else(|| self.outcomes.get(&located), |()| None);
+    fn fresh(self, located: &Located<'tree>, marks: Marks<'_, 'tree>) -> Plan<'tree> {
+        let found = marks.consumed(located).map_or_else(|| self.outcomes.get(located), |()| None);
         let claimed = Plan { consumed: found.map(|_| located.clone()).into_iter().collect(), ..Plan::default() };
         let inner = Marks { plan: &claimed, up: Some(&marks) };
         let declared = found.and_then(|outcome| outcome.iter().next());
@@ -248,13 +248,13 @@ impl<'tree> Testing<'_, 'tree> {
         unseen.map_or_default(|()| {
             let seeing = Tested { seen: BTreeSet::from([path.to_path_buf()]), ..Tested::default() };
             let inner = TestMarks { tested: &seeing, up: Some(&marks), outer: marks.outer };
-            let rest = self.fresh(self.rooted.home.located(path), inner);
+            let rest = self.fresh(&self.rooted.home.located(path), inner);
             seeing.combine(rest)
         })
     }
 
-    fn fresh(self, located: Located<'tree>, marks: TestMarks<'_, 'tree>) -> Tested<'tree> {
-        let found = marks.consumed(&located).map_or_else(|| self.rooted.outcomes.get(&located), |()| None);
+    fn fresh(self, located: &Located<'tree>, marks: TestMarks<'_, 'tree>) -> Tested<'tree> {
+        let found = marks.consumed(located).map_or_else(|| self.rooted.outcomes.get(located), |()| None);
         let declared = found.and_then(|outcome| outcome.iter().next());
         let own = Tested {
             found: declared.map(|_| located.clone()).into_iter().collect(),

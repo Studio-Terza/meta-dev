@@ -76,18 +76,13 @@ impl Reads for Reader<'_> {
 impl<'tree> Reader<'tree> {
     fn awaiting(self, files: &impl Files, kept: BTreeMap<Located<'tree>, SourceFile>) -> Readout {
         match self.orders.recv() {
-            Ok(Order::Parse(nodes)) => self.parsed(files, kept, nodes),
+            Ok(Order::Parse(nodes)) => self.parsed(files, kept, &nodes),
             Ok(Order::Assemble(assignment)) => self.assembled(assignment, kept),
             Err(_) => Readout::default(),
         }
     }
 
-    fn parsed(
-        self,
-        files: &impl Files,
-        kept: BTreeMap<Located<'tree>, SourceFile>,
-        nodes: Vec<Node<'tree>>,
-    ) -> Readout {
+    fn parsed(self, files: &impl Files, kept: BTreeMap<Located<'tree>, SourceFile>, nodes: &[Node<'tree>]) -> Readout {
         Parsed::read(files, self.packages, nodes, |report, fresh| {
             let mut held = kept;
             held.extend(fresh);

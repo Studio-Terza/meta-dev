@@ -34,10 +34,10 @@ impl Hands {
     ) -> Vec<Assigned<'tree>> {
         let loads: BTreeMap<Partition, Size> = self.0.iter().map(|hand| (*hand, Size::default())).collect();
         due.into_iter()
-            .scan(loads, |loads, found| {
-                let lightest = loads.iter().min_by_key(|(hand, load)| (**load, **hand)).map(|(hand, _)| *hand);
+            .scan(loads, |tally, found| {
+                let lightest = tally.iter().min_by_key(|(hand, load)| (**load, **hand)).map(|(hand, _)| *hand);
                 let hand = found.owner().or(lightest).unwrap_or(Partition::MAIN);
-                let load = loads.entry(hand).or_default();
+                let load = tally.entry(hand).or_default();
                 *load = [*load, weighed(&found)].into_iter().sum();
                 Some(found.assigned(hand))
             })

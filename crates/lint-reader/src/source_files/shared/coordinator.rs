@@ -12,10 +12,11 @@ use lint_roots::Survey;
 
 use super::boundary::{Hands, Partition};
 use super::protocol::{Assigned, Assignment, Due, Parsed, Reads, Report, Sighting};
-use super::reader::{Dispatched, Linked, Reader, Remote};
+use super::reader::{Assembling, Dispatched, Linked, Reader, Remote};
 use crate::source_files::Stage;
 use crate::source_files::declared::{Declared, Kind};
 use crate::source_files::located::{Located, Node};
+use crate::source_files::staged::Staged;
 use assembly::{Assembled, Outcomes, Planner};
 
 #[derive(Debug)]
@@ -142,15 +143,14 @@ impl Reads for Coordinator<'_, '_> {
             .flat_map(|(tree, staged)| staged.iter().flat_map(|entry| entry.starts(tree)));
         let hands: Hands = iter::once(Partition::MAIN).chain(self.remotes.iter().map(Remote::hand)).collect();
         let exploring = Exploring { coordinator: &self, files };
-        let explored = exploring.explored(Level::started(starts.collect()), Survey::default(), hands);
+        let explored = exploring.explored(Level::started(starts.collect()), Survey::default(), &hands);
         let planned = Planner::new(&explored.gathered.outcomes, &explored.survey).planned(stage);
         let Gathered { outcomes, hands: placed, kept } = explored.gathered;
         let taken = planned.into_iter().scan(outcomes, |owned, found| {
             let outcome = owned.remove(found.as_ref());
             Some(found.taken(outcome, &placed))
         });
-        let repo_files: Vec<RepoFile> =
-            stage.staged.iter().flatten().flat_map(|entry| entry.repo_files()).cloned().collect();
+        let repo_files: Vec<RepoFile> = stage.staged.iter().flatten().flat_map(Staged::repo_files).cloned().collect();
         <Assembled<'_> as Monoid>::concat(taken).concluded(|mains, failures| {
             let mut assigned = mains;
             let assembling: Vec<_> = self
@@ -164,7 +164,7 @@ impl Reads for Coordinator<'_, '_> {
             let own = assigned.remove(&Partition::MAIN).unwrap_or_default();
             let readout = Assignment::new(own, repo_files, failures).readout(kept);
             let mut heads: Vec<FileHead> = readout.files().iter().map(|file| file.head().clone()).collect();
-            heads.extend(assembling.into_iter().flat_map(|waiting| waiting.heads()));
+            heads.extend(assembling.into_iter().flat_map(Assembling::heads));
             heads.sort_by(|earlier, later| AsRef::<Path>::as_ref(earlier).cmp(AsRef::<Path>::as_ref(later)));
             self.shared.table.get_or_init(|| heads);
             readout
@@ -179,16 +179,16 @@ struct Exploring<'run, 'shared, 'tree, Port> {
 }
 
 impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
-    fn explored(&self, level: Level<'tree>, survey: Survey, hands: Hands) -> Explored<'tree> {
+    fn explored(&self, level: Level<'tree>, survey: Survey, hands: &Hands) -> Explored<'tree> {
         match level.due.first() {
-            Some(_) => self.levelled(level.dealt(&hands, self.files), survey, hands),
+            Some(_) => self.levelled(level.dealt(hands, self.files), survey, hands),
             None => Explored { gathered: Gathered::default(), survey },
         }
     }
 
-    fn levelled(&self, dealt: Dealt<'tree>, survey: Survey, hands: Hands) -> Explored<'tree> {
+    fn levelled(&self, dealt: Dealt<'tree>, survey: Survey, hands: &Hands) -> Explored<'tree> {
         let assigned = dealt.assigned;
-        let sighted = self.sighted(&assigned, &hands);
+        let sighted = self.sighted(&assigned, hands);
         let every: BTreeSet<Partition> = hands.live().collect();
         let live: Hands = every.difference(&sighted.dead).copied().collect();
         let parsed_by =
@@ -203,28 +203,29 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
                 (located, sighting.sought().map(|sought| Declared::resolved(&sought, known)))
             })
             .collect();
-        let next: Vec<Due<'tree>> = assigned
-            .iter()
-            .flat_map(|found| {
-                let hand = parsed_by(found);
-                let home = found.node().home();
-                let declared = outcomes.get(found.node().located()).into_iter().flatten();
-                let modules = declared.clone().flat_map(|done| done.children(Kind::Module));
-                let tests = declared.flat_map(|done| done.children(Kind::Test));
-                let owned = modules.map(move |module| Due::new(home.child(module, known), found.owned_by(hand)));
-                owned.chain(tests.map(move |test| Due::new(home.child(test, known), Some(hand))))
-            })
-            .collect();
-        let following = Level::after(dealt.seen, next.into_iter());
+        let next = assigned.iter().flat_map(|found| {
+            let hand = parsed_by(found);
+            let home = found.node().home();
+            let declared = outcomes.get(found.node().located()).into_iter().flatten();
+            let modules = declared.clone().flat_map(|done| done.children(Kind::Module));
+            let tests = declared.flat_map(|done| done.children(Kind::Test));
+            let owned = modules.map(move |module| Due::new(home.child(module, known), found.owned_by(hand)));
+            owned.chain(tests.map(move |test| Due::new(home.child(test, known), Some(hand))))
+        });
+        let following = Level::after(dealt.seen, next);
         let hands_of = assigned.iter().map(|found| (found.node().located().clone(), parsed_by(found))).collect();
-        let deeper = self.explored(following, learned, live);
+        let deeper = self.explored(following, learned, &live);
         let own = Gathered { outcomes, hands: hands_of, kept: sighted.kept };
         Explored { gathered: own.combine(deeper.gathered), survey: deeper.survey }
     }
 
     fn sighted(&self, assigned: &[Assigned<'tree>], hands: &Hands) -> Sighted<'tree> {
-        let mut by_hand: BTreeMap<Partition, Vec<Node<'tree>>> = BTreeMap::new();
-        assigned.iter().for_each(|found| by_hand.entry(found.hand()).or_default().push(found.node().clone()));
+        let grouped: BTreeMap<Partition, Vec<Node<'tree>>> =
+            assigned.iter().fold(BTreeMap::new(), |mut by: BTreeMap<Partition, Vec<Node<'tree>>>, found| {
+                by.entry(found.hand()).or_default().push(found.node().clone());
+                by
+            });
+        let mut by_hand = grouped;
         let live: BTreeSet<Partition> = hands.live().collect();
         let remotes = self.coordinator.remotes.iter().filter(|remote| live.contains(&remote.hand()));
         let sendings: Vec<Sending<'_, 'tree>> = remotes
@@ -238,9 +239,10 @@ impl<'tree, Port: Files> Exploring<'_, '_, 'tree, Port> {
             sendings.into_iter().partition(|sending| sending.sent.is_ok());
         let dead: BTreeSet<Partition> = refused.iter().map(|sending| sending.hand).collect();
         let returned = refused.into_iter().flat_map(|sending| sending.sent.map_or_else(|nodes| nodes, |_| Vec::new()));
-        let local = by_hand.remove(&Partition::MAIN).unwrap_or_default().into_iter().chain(returned).collect();
+        let local: Vec<Node<'tree>> =
+            by_hand.remove(&Partition::MAIN).unwrap_or_default().into_iter().chain(returned).collect();
         let packages = &self.coordinator.shared.stage.packages;
-        Parsed::read(self.files, packages, local, |own, kept| {
+        Parsed::read(self.files, packages, &local, |own, kept| {
             let remote = waiting.into_iter().flat_map(|sending| sending.sent.into_iter()).map(Dispatched::sighted);
             let report: Report<'tree> = Monoid::concat(iter::once(own).chain(remote));
             report.concluded(|sightings, survey| Sighted { sightings, survey, kept, dead })

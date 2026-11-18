@@ -117,7 +117,7 @@ pub(super) struct Sighting<'tree> {
     sought: Result<Vec<Sought>, Failure>,
 }
 
-impl<'tree> Sighting<'tree> {
+impl Sighting<'_> {
     pub(super) fn sought(self) -> Result<Vec<Sought>, Failure> {
         self.sought
     }
@@ -173,19 +173,19 @@ impl<'tree> Parsed<'tree> {
     pub(super) fn read<Out>(
         files: &impl Files,
         packages: &Packages,
-        nodes: Vec<Node<'tree>>,
+        nodes: &[Node<'tree>],
         into: impl FnOnce(Report<'tree>, BTreeMap<Located<'tree>, SourceFile>) -> Out,
     ) -> Out {
         let located: Vec<Located<'tree>> = nodes.iter().map(|node| node.located().clone()).collect();
         let sources = Located::parsed_many(files, packages, &located);
         let parsed: Parsed<'tree> =
-            Monoid::concat(nodes.into_iter().zip(sources).map(|(node, source)| Parsed::sighted(node, source)));
+            Monoid::concat(nodes.iter().zip(sources).map(|(node, source)| Parsed::sighted(node, source)));
         let candidates: Vec<PathBuf> = parsed.sightings.iter().flat_map(Sighting::candidates).collect();
         let survey = Survey::default().learn(files, Fact::Followed, &candidates);
         into(Report { sightings: parsed.sightings, survey }, parsed.kept)
     }
 
-    fn sighted(node: Node<'tree>, source: Result<SourceFile, Failure>) -> Parsed<'tree> {
+    fn sighted(node: &Node<'tree>, source: Result<SourceFile, Failure>) -> Parsed<'tree> {
         match source {
             Ok(file) => Parsed {
                 sightings: vec![Sighting {
