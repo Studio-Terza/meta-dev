@@ -1,5 +1,8 @@
 #![deny(clippy::wildcard_enum_match_arm)]
 
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use grammar_spec_line::Attachment;
 use laws::proptest::prelude::{Just, Strategy, any, prop_assert_eq, prop_oneof};
 

@@ -13,6 +13,7 @@ use graph::Model;
 use graph_query::{Answered, Query, QueryFailure};
 use graph_reader::Reader;
 use lint_core::{Readout, Report, SourceFile};
+use lint_laws::LawRunners;
 use lint_reader::Described;
 use lint_test_budget::TestBudget;
 
@@ -32,6 +33,7 @@ pub(crate) enum Mode {
     Gate,
     Report,
     Query(Result<Query, QueryFailure>),
+    Laws(Vec<PathBuf>),
     Dump(Vec<PathBuf>),
 }
 
@@ -40,16 +42,21 @@ pub(crate) enum Run<'scope, 'mode> {
     Gate(Crew<'scope>),
     Report,
     Query(Option<&'mode Query>),
+    Laws,
     Dump,
 }
 
 impl Mode {
     const REPORT_FLAG: &'static str = "--report";
     const QUERY_WORD: &'static str = "query";
+    const LAWS_WORD: &'static str = "laws";
     const DUMP_WORD: &'static str = "graph-dump";
 
     pub(crate) fn of_arguments(arguments: &[OsString]) -> Mode {
         let first = arguments.split_first();
+        let lawed = first
+            .filter(|(word, _)| word.as_os_str() == Self::LAWS_WORD)
+            .map(|(_, rest)| Mode::Laws(rest.iter().map(PathBuf::from).collect()));
         let dumped = first
             .filter(|(word, _)| word.as_os_str() == Self::DUMP_WORD)
             .map(|(_, rest)| Mode::Dump(rest.iter().map(PathBuf::from).collect()));
@@ -58,14 +65,14 @@ impl Mode {
             .map(|(_, rest)| Mode::Query(Query::read(rest)));
         let reported =
             arguments.iter().find(|argument| argument.as_os_str() == Self::REPORT_FLAG).map(|_| Mode::Report);
-        dumped.or(queried).or(reported).unwrap_or(Mode::Gate)
+        lawed.or(dumped).or(queried).or(reported).unwrap_or(Mode::Gate)
     }
 
     pub(crate) fn roots(&self, arguments: &[OsString]) -> Vec<PathBuf> {
         match self {
             Mode::Query(Ok(query)) => query.roots().to_vec(),
             Mode::Query(Err(_)) => Vec::new(),
-            Mode::Dump(roots) => roots.clone(),
+            Mode::Laws(roots) | Mode::Dump(roots) => roots.clone(),
             Mode::Gate | Mode::Report => arguments
                 .iter()
                 .filter(|argument| argument.as_os_str() != Self::REPORT_FLAG)
@@ -77,7 +84,7 @@ impl Mode {
     pub(crate) fn refusal(&self) -> Option<&QueryFailure> {
         match self {
             Mode::Query(Err(failure)) => Some(failure),
-            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) | Mode::Dump(_) => None,
+            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) | Mode::Laws(_) | Mode::Dump(_) => None,
         }
     }
 
@@ -90,6 +97,7 @@ impl Mode {
             Mode::Gate => Run::Gate(Lints::started(scope, sources)),
             Mode::Report => Run::Report,
             Mode::Query(found) => Run::Query(found.as_ref().ignoring(Ignored::Refused)),
+            Mode::Laws(_) => Run::Laws,
             Mode::Dump(_) => Run::Dump,
         }
     }
@@ -114,7 +122,14 @@ impl Run<'_, '_> {
                 out,
                 err,
             ),
+            Run::Laws => Self::lawful(readout.done().files(), sources.wired().files(), err),
         }
+    }
+
+    fn lawful(files: &[SourceFile], disk: &impl Files, err: &mut impl Write) -> Verdict {
+        let model = Reader::read_files(files);
+        disk.write_each(LawRunners::from(&model).written())
+            .map_or_else(|failure| Verdict::refused(&failure, err), |()| Verdict::Clean)
     }
 
     fn reported(files: &[SourceFile], out: &mut impl Write, err: &mut impl Write) -> Verdict {

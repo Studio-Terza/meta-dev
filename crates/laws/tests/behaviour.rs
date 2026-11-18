@@ -161,6 +161,23 @@ table!(
     }
 );
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Larger(u8);
+
+impl algebra::Semigroup for Larger {
+    fn combine(self, other: Larger) -> Larger {
+        Larger(self.0.max(other.0))
+    }
+}
+
+impl algebra::Monoid for Larger {}
+
+laws::monoid!(
+    the_larger_of_two_bytes_forms_a_monoid,
+    Larger,
+    proptest::strategy::Strategy::prop_map(any::<u8>(), Larger)
+);
+
 laws::generates!(
     a_generator_that_rejects_a_quarter_generates,
     proptest::strategy::Strategy::prop_filter(any::<u8>(), "a multiple of four", |number| number % 4 != 0)

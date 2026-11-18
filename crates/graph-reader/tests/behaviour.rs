@@ -1042,3 +1042,20 @@ const FOREIGN_SUBJECT: [Fixture; 2] = [
 fn an_impl_of_a_local_trait_for_a_foreign_type_links_the_trait_to_the_type() {
     assert_eq!(Read::links(&FOREIGN_SUBJECT), ["Shown -> Record"]);
 }
+
+#[test]
+fn a_trait_method_taking_and_returning_self_is_shaped_as_itself() {
+    let model = Reader::read_files(&[Read::file(
+        "a.rs",
+        "trait Joined {\n    fn joined(self, other: Self) -> Self;\n    fn counted(self, other: Option) -> Option;\n}\n",
+    )]);
+    let shapes: Vec<String> = model
+        .functions()
+        .map(|placed| {
+            let shape = graph::MethodShape::from(placed.entity());
+            let takes: Vec<String> = shape.takes().iter().map(ToString::to_string).collect();
+            format!("{}{}", takes.join(", "), shape.returned())
+        })
+        .collect();
+    assert_eq!(shapes, ["Self -> Self", "_ -> Option"]);
+}

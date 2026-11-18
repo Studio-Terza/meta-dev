@@ -11,5 +11,8 @@ doctest = false
 [dependencies]
 proptest.workspace = true
 
+[dev-dependencies]
+algebra = { path = "../algebra" }
+
 [lints]
 workspace = true

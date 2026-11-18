@@ -294,11 +294,12 @@ laws::law!(a_formatted_string_with_its_own_strategy_generates, any::<Digest>(), 
     prop_assert!(Digest::checked(&digest.into_inner()).is_ok());
 });
 
-laws::generates!(a_checked_word_rarely_rejects, any::<Word>());
-
-laws::generates!(a_narrow_check_rarely_rejects_its_own_strategy, any::<Small>());
-
-laws::generates!(a_formatted_check_rarely_rejects_its_own_strategy, any::<Digest>());
+#[test]
+fn derived_checked_generators_stay_under_the_rejection_bound() {
+    assert!(laws::Generation::bounded(&any::<Word>()).is_ok());
+    assert!(laws::Generation::bounded(&any::<Small>()).is_ok());
+    assert!(laws::Generation::bounded(&any::<Digest>()).is_ok());
+}
 
 laws::law!(a_plain_newtype_takes_its_own_strategy, any::<Even>(), even, {
     prop_assert!(even.into_inner().is_multiple_of(2));

@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use serde_json::error::Category;
 use text_lines::{KeptLines, Lines, LossyText, NotOneLine, OneLine};
 

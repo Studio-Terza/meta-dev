@@ -260,8 +260,12 @@ impl UsePath {
         self.segments.get(1..).unwrap_or_default()
     }
 
-    pub(super) fn exported(krate: &Name, entry: &Name) -> UsePath {
-        UsePath { leading: Leading::Global, reading: Reading::Written, segments: vec![krate.clone(), entry.clone()] }
+    pub(super) fn exported(modules: &[Name], entry: &Name) -> UsePath {
+        UsePath {
+            leading: Leading::Global,
+            reading: Reading::Written,
+            segments: modules.iter().chain([entry]).cloned().collect(),
+        }
     }
 
     pub(crate) fn written(&self) -> ItemPath {

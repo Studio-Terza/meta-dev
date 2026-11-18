@@ -191,7 +191,7 @@ impl<'file> Scope<'_, 'file> {
         let peeled = |ty: &TypeRef| ty.outlined(Peeling::new(&inner));
         Some(
             Transitive::new(placed.site(), AsRef::<Name>::as_ref(function).clone(), takes, gives)
-                .shaped(signature.mutation(), definition.shape(), definition.branching())
+                .shaped(signature.mutation(), definition.shape())
                 .wrapped(
                     signature.output().written().map_or(Wrapping::Plain, peeled),
                     signature.inputs().iter().map(|input| input.typed().map_or(Wrapping::Plain, peeled)).collect(),

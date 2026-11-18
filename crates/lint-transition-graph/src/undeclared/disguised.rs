@@ -63,8 +63,8 @@ impl<'model> Disguised<'model> {
     }
 
     fn std_of(placed: Placed<'model, &'model Implementation>) -> Option<Std> {
-        let implemented = placed.entity().implemented()?.std_trait()?;
-        let path: &ItemPath = implemented.as_ref();
+        let implemented = placed.entity().implemented()?;
+        let path: &ItemPath = implemented.std_trait().and_then(|_| implemented.std())?;
         Self::STD
             .into_iter()
             .find(|(_, words)| words.iter().copied().collect::<ItemPath>() == *path)

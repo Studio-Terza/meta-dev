@@ -1,7 +1,4 @@
 use algebra::{Catenation, Monoid, Semigroup};
-use laws::proptest::collection::vec;
-use laws::proptest::prelude::any;
-use laws::proptest::strategy::Strategy;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 struct Joined(Vec<u8>);
@@ -13,8 +10,6 @@ impl Semigroup for Joined {
 }
 
 impl Monoid for Joined {}
-
-laws::monoid!(joined_bytes_form_a_monoid, Joined, vec(any::<u8>(), 0..4).prop_map(Joined));
 
 #[test]
 fn concatenating_nothing_gives_the_identity_and_keeps_order() {

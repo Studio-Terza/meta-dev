@@ -22,6 +22,7 @@ use lint_layout::{Dependencies, Name};
 use anchor::{Anchor, Anchors};
 use binding::Binding;
 pub(crate) use boundary::{KeyRole, NodeKey, ScopeId, ScopeKey, ScopeMap};
+use entries::Below;
 use entries::DeclaredAt;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, Exposing, Visibility};
 pub(crate) use graph::Domain;
@@ -48,6 +49,18 @@ impl Export {
     pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>, mut building: Building) -> Building {
         building.export(self.domain, self.path.written(), &resolving.path(self.root, &self.path, self.domain));
         building
+    }
+
+    fn below(space: &Namespace<'_>, root: ScopeId, below: &Below) -> Vec<Export> {
+        below.scope().row(&space.scopes).map_or_default(|row| {
+            let own = row.entries().exported().map(|key| Export {
+                root,
+                path: UsePath::exported(below.modules(), key.name()),
+                domain: key.domain(),
+            });
+            let nested = below.deeper(row.entries()).into_iter().flat_map(|deeper| Export::below(space, root, &deeper));
+            own.chain(nested).collect()
+        })
     }
 }
 
@@ -231,17 +244,7 @@ impl<'read> Namespace<'read> {
     }
 
     pub(crate) fn exports(&self) -> Vec<Export> {
-        self.crates
-            .iter()
-            .filter_map(|(krate, root)| Some((*krate, *root, root.row(&self.scopes)?)))
-            .flat_map(|(krate, root, row)| {
-                row.entries().exported().map(move |key| Export {
-                    root,
-                    path: UsePath::exported(krate, key.name()),
-                    domain: key.domain(),
-                })
-            })
-            .collect()
+        self.crates.iter().flat_map(|(krate, root)| Export::below(self, *root, &Below::root(*root, krate))).collect()
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {
