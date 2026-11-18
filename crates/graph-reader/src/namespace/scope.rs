@@ -1,6 +1,6 @@
 use std::iter;
 
-use graph::{Building, ItemId};
+use graph::Item;
 use lint_layout::Name;
 
 use super::anchor::{Anchor, Anchors};
@@ -77,9 +77,9 @@ impl ScopeRow {
         self.ancestry.iter().copied().find(|ancestor| *ancestor == level)
     }
 
-    pub(super) fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Vec<Option<ItemId>> {
+    pub(super) fn issued(&self, krate: Option<&Name>) -> Vec<Option<Item>> {
         match Anchor::Crate.anchored(self.anchors) {
-            Some(_) => self.entries.issued(building, krate),
+            Some(_) => self.entries.issued(krate),
             None => Vec::new(),
         }
     }

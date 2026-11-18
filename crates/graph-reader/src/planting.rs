@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use algebra::{Monoid, Semigroup};
-use graph::{Building, FileHome, FileId, Harness, Model};
+use graph::{FileHome, FileId, FileModel, FileTable, Harness, Model};
 use lint_core::{SourceFile, TestFile};
 use lint_layout::{Dependencies, Name};
 use lint_placement::{Placement, Role};
@@ -220,13 +220,10 @@ pub(crate) struct Planting<'read> {
 
 impl<'read> Planting<'read> {
     pub(crate) fn merged(placings: &'read [Placing], bodies: Vec<Lowered>) -> Model {
-        let mut building = Building::default();
-        let unplanted = placings
+        let files: FileTable = placings
             .iter()
-            .zip(bodies)
-            .map(|(placing, lowered)| Unplanted {
-                placing,
-                file: building.file(
+            .map(|placing| {
+                FileModel::new(
                     placing.path.clone(),
                     FileHome::new(
                         placing.krate.clone(),
@@ -234,11 +231,16 @@ impl<'read> Planting<'read> {
                         placing.module.clone(),
                         placing.harness,
                     ),
-                ),
-                lowered,
+                )
             })
             .collect();
-        Planting::new(unplanted).planted().built(building)
+        let unplanted = placings
+            .iter()
+            .zip(bodies)
+            .zip(FileId::every(files.as_ref()))
+            .map(|((placing, lowered), file)| Unplanted { placing, file, lowered })
+            .collect();
+        Planting::new(unplanted).planted().built(files)
     }
 
     fn new(unplanted: Vec<Unplanted<'read>>) -> Planting<'read> {

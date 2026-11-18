@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use syntax::{Ident, Macro, Path};
 
-use graph::{Building, Domain, FileId, ItemId, ItemPath, Member, Mention, PathUse, Resolved, Seat};
+use algebra::Monoid;
+use graph::{Domain, FileId, ItemId, ItemPath, Member, Mention, ModelPart, PathUse, Resolved, Seat};
 use lint_core::Macros;
 use lint_layout::LineNumber;
 
@@ -135,11 +136,13 @@ impl Transcriptions {
         Transcriptions(transcriptions.into_iter().map(|found| (found.defined, found.transcribed)).collect())
     }
 
-    pub(crate) fn expanded(&self, definition: &Resolved, invoker: Invoker<'_, '_>, building: Building) -> Building {
+    pub(crate) fn expanded(&self, definition: &Resolved, invoker: Invoker<'_, '_>) -> ModelPart {
         let transcribed = definition.crate_item().and_then(|item| self.0.get(&item)).map_or(&[][..], Vec::as_slice);
-        transcribed.iter().filter_map(|path| invoker.used(path)).fold(building, |mut built, used| {
-            built.path_use(invoker.invoked.file, invoker.invoked.line, used);
-            built
-        })
+        Monoid::concat(
+            transcribed
+                .iter()
+                .filter_map(|path| invoker.used(path))
+                .map(|used| ModelPart::path_use(invoker.invoked.file, invoker.invoked.line, used)),
+        )
     }
 }
