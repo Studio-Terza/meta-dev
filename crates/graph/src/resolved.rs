@@ -1,9 +1,9 @@
-use algebra::Semigroup;
+use algebra::{Act, Semigroup};
 use lint_layout::Name;
 
 use crate::boundary::ItemId;
 use crate::external::External;
-use crate::item_path::{ItemPath, Segment};
+use crate::item_path::ItemPath;
 use crate::member::Member;
 use crate::primitive::Primitive;
 use crate::unresolved::Unresolved;
@@ -18,6 +18,26 @@ pub enum Resolved {
     Primitive(Primitive),
     Param(Name),
     Unknown(ItemPath, Unresolved),
+}
+
+impl Act<ItemPath> for Resolved {
+    fn acted(self, by: ItemPath) -> Option<Resolved> {
+        match self {
+            Resolved::Std(path) => Some(Resolved::Std(path.combine(by))),
+            Resolved::StdTrait(path) => {
+                Some(by.last().map_or_else(
+                    || Resolved::StdTrait(path.clone()),
+                    |_| Resolved::Std(path.clone().combine(by.clone())),
+                ))
+            }
+            Resolved::External(external) => Some(Resolved::External(external.combine(External::from(by)))),
+            unpathed @ (Resolved::Crate(_)
+            | Resolved::Member(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_)
+            | Resolved::Unknown(..)) => by.last().map_or(Some(unpathed), |_| None),
+        }
+    }
 }
 
 impl Resolved {
@@ -42,23 +62,6 @@ impl Resolved {
             | Resolved::Crate(_)
             | Resolved::Member(_)
             | Resolved::External(_)
-            | Resolved::Primitive(_)
-            | Resolved::Param(_)
-            | Resolved::Unknown(..) => None,
-        }
-    }
-
-    #[must_use]
-    pub fn joined(&self, segment: Segment<'_>) -> Option<Resolved> {
-        match self {
-            Resolved::Std(path) | Resolved::StdTrait(path) => {
-                Some(Resolved::Std(path.clone().combine(ItemPath::from(segment))))
-            }
-            Resolved::External(external) => {
-                Some(Resolved::External(external.clone().combine(External::from(ItemPath::from(segment)))))
-            }
-            Resolved::Crate(_)
-            | Resolved::Member(_)
             | Resolved::Primitive(_)
             | Resolved::Param(_)
             | Resolved::Unknown(..) => None,

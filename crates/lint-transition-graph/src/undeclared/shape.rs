@@ -54,9 +54,10 @@ impl<'edge, 'file> Shaped<'edge, 'file> {
         let transition = edge.transition();
         let core = (*AsRef::<Ground>::as_ref(transition) == Ground::Core).then_some(edge);
         let shape = core.and_then(|_| Shape::of_edge(edge))?;
-        let declared = Some(shape)
-            .filter(|found| *found == Shape::Binary)
-            .filter(|_| transition.context().filler().declares() == Declares::Semigroup);
+        let filler = transition.context().filler().declares();
+        let semigroup = (filler == Declares::Semigroup).then_some(Shape::Binary);
+        let action = (filler == Declares::Action).then_some(Shape::Builder);
+        let declared = semigroup.or(action).filter(|covered| *covered == shape);
         let standing = edge.fixed_by().map_or(Standing::Undeclared, |_| Standing::Fixed);
         declared.map_or(Some(Shaped { edge, shape, standing }), |_| None)
     }

@@ -17,6 +17,23 @@ const NAMESAKE_VISIT: &str = "mod local {\n    pub trait Visit {\n        fn vis
 const TYPESTATE: &str = "pub struct Refining;\npub type Refined = Refining;\npub struct Title;\npub struct Node<S> {\n    stage: S,\n}\nimpl<S> Node<S> {\n    pub fn refine(self) -> Node<Refining> {}\n    pub fn titled(self, title: Title) -> Node<S> {}\n    pub fn staged<T>(self, stage: T) -> Node<T> {}\n}\nimpl Node<Refining> {\n    pub fn renamed(self) -> Node<Refined> {}\n}\n";
 
 const LIBRARY: Source = Source::new(Located::new("crates/algebra/src/lib.rs"), Text::new(ALGEBRA));
+
+const ACTING: &str = "pub trait Semigroup {\n    fn combine(self, other: Self) -> Self;\n}\npub trait Monoid: Semigroup + Default {}\npub trait Act<Actor: Monoid> {\n    fn acted(self, by: Actor) -> Option<Self>;\n}\n";
+const ACTED: &str = "use algebra::{Act, Monoid, Semigroup};\npub struct Path;\nimpl Semigroup for Path {\n    fn combine(self, other: Path) -> Path {}\n}\nimpl Monoid for Path {}\npub struct Place;\nimpl Act<Path> for Place {\n    fn acted(self, by: Path) -> Option<Place> {}\n}\n";
+const NAMESAKE_ACT: &str = "use algebra::{Monoid, Semigroup};\npub trait Act<Actor> {\n    fn acted(self, by: Actor) -> Option<Self>;\n}\npub struct Path;\nimpl Semigroup for Path {\n    fn combine(self, other: Path) -> Path {}\n}\nimpl Monoid for Path {}\npub struct Place;\nimpl Act<Path> for Place {\n    fn acted(self, by: Path) -> Option<Place> {}\n}\n";
+const ACTING_LIBRARY: Source = Source::new(Located::new("crates/algebra/src/lib.rs"), Text::new(ACTING));
+
+laws::table!(
+    an_algebra_act_impl_declares_its_action_and_a_local_trait_named_act_does_not,
+    Fixture::reported,
+    [
+        [ACTING_LIBRARY, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ACTED))] => Vec::<String>::new(),
+        [ACTING_LIBRARY, Source::new(Located::new("crates/y/src/lib.rs"), Text::new(NAMESAKE_ACT))] => vec![
+            "crates/y/src/lib.rs:12: y::Place::acted is an undeclared builder (T, X) -> T; make each fixed step a typestate edge T<S1> to T<S2>, or turn a per-item accumulation into contributions merged by a declared algebra::Monoid".to_owned(),
+            Fixture::workspace("crates/y/src/lib.rs:12: workspace: 1 undeclared same-type edges, 0 unary, 1 builder, 0 binary, 0 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
 const WORKSPACE_FIX: &str =
     "remove each site with the fix its own finding names; the lint blocks once the workspace count reaches zero";
 const HIDDEN_FIX: &str = "declare the algebra this impl hides: implement algebra::Semigroup, and algebra::Monoid when there is an identity, for the type";

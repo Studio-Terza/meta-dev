@@ -14,6 +14,7 @@ enum Origin {
 pub(crate) enum Declares {
     Nothing,
     Semigroup,
+    Action,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -33,14 +34,17 @@ pub(crate) enum Filler {
 
 impl Implemented {
     const SEMIGROUP: [Word<'static>; 2] = words!["algebra", "Semigroup"];
+    const ACT: [Word<'static>; 2] = words!["algebra", "Act"];
 
     pub(crate) fn read(model: &Model, implementation: &Implementation) -> Option<Implemented> {
         let name = implementation.interface_name()?.clone();
-        let semigroup: ItemPath = Self::SEMIGROUP.into_iter().collect();
-        let exported = model.exported(Domain::Types, &semigroup);
-        let declares = exported
-            .filter(|found| implementation.implemented() == Some(*found))
-            .map_or(Declares::Nothing, |_| Declares::Semigroup);
+        let matched = |path: &[Word<'static>], kind: Declares| {
+            let exported = model.exported(Domain::Types, &path.iter().copied().collect::<ItemPath>());
+            exported.filter(|found| implementation.implemented() == Some(*found)).map(|_| kind)
+        };
+        let declares = matched(&Self::SEMIGROUP, Declares::Semigroup)
+            .or_else(|| matched(&Self::ACT, Declares::Action))
+            .unwrap_or(Declares::Nothing);
         let origin =
             implementation.implemented().and_then(Resolved::crate_item).map_or(Origin::Foreign, |_| Origin::Workspace);
         Some(Implemented { name, declares, origin })
