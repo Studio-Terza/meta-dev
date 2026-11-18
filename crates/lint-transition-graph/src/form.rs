@@ -22,9 +22,12 @@ impl<'found> Acting<'found> {
     pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Option<Acting<'found>> {
         let ends = edge.ends();
         let function = edge.transition().function();
-        ends.subject(function.mutation(), function.wrapping())
-            .and_then(|subject| Acting::unwrapped(subject, ends.takes(), function.takings()))
-            .map(|subject| Acting::about(subject, ends.takes()))
+        let subject = ends.subject(function.mutation(), function.wrapping())?;
+        subject
+            .node()
+            .copied()
+            .and_then(|node| Acting::unwrapped(node, ends.takes(), function.takings()))
+            .map(|node| Acting::about(node, subject, ends.takes()))
             .filter(|acting| acting.grounded().is_some())
             .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
     }
@@ -46,9 +49,9 @@ impl<'found> Acting<'found> {
         fixed_by.map_or(Some(self), |fixing| Operators::named(fixing).and(self.pure()))
     }
 
-    fn about(subject: Node<'found>, takes: &[End<'found>]) -> Acting<'found> {
+    fn about(subject: Node<'found>, given: &End<'found>, takes: &[End<'found>]) -> Acting<'found> {
         let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
-            takes.iter().copied().partition(|taken| taken.node() == Some(&subject));
+            takes.iter().copied().partition(|taken| taken.alike(given).is_some());
         Acting { subject, held: Count::new(held.len()), parameters }
     }
 

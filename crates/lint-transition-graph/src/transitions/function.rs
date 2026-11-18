@@ -1,4 +1,4 @@
-use body_lifts::{Body, Branching};
+use body_lifts::Body;
 use lint_core::Site;
 use lint_layout::Name;
 
@@ -15,7 +15,6 @@ pub struct Function<'file> {
     gives: Resolved,
     mutation: Mutation,
     body: Body,
-    branching: Branching,
     wrapping: Wrapping,
     takings: Vec<Wrapping>,
     calls: &'file [Invocation],
@@ -30,17 +29,15 @@ impl<'file> Function<'file> {
             gives,
             mutation: Mutation::Absent,
             body: Body::Written,
-            branching: Branching::new(1),
             wrapping: Wrapping::Plain,
             takings: Vec::new(),
             calls: &[],
         }
     }
 
-    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, branching: Branching) -> Function<'file> {
+    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body) -> Function<'file> {
         self.mutation = mutation;
         self.body = body;
-        self.branching = branching;
         self
     }
 
@@ -86,11 +83,6 @@ impl<'file> Function<'file> {
     #[must_use]
     pub fn calls(&self) -> &'file [Invocation] {
         self.calls
-    }
-
-    #[must_use]
-    pub fn branches(&self) -> Branching {
-        self.branching
     }
 }
 

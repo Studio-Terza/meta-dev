@@ -5,7 +5,7 @@ use lint_layout::{Name, Whole, Word, words};
 use newtype::Newtype;
 
 use super::Scope;
-use crate::transitions::endpoint::{Endpoint, Nature, Unnamed};
+use crate::transitions::endpoint::{Argument, Endpoint, Nature, Unnamed};
 use crate::transitions::resolved::Resolved;
 
 #[derive(Newtype, Clone, Copy, Debug)]
@@ -71,6 +71,18 @@ impl Endpoints<'_, '_, '_> {
     }
 }
 
+impl Argument {
+    fn listed(named: &Named<Sited>, endpoints: Endpoints<'_, '_, '_>) -> Vec<Argument> {
+        let model = endpoints.scope.reading.model;
+        named.arguments().iter().map(|argument| Argument::expanded(&model.expanded(argument), endpoints)).collect()
+    }
+
+    fn expanded(ty: &TypeRef, endpoints: Endpoints<'_, '_, '_>) -> Argument {
+        let parameter = ty.named().and_then(|named| AsRef::<Target>::as_ref(named).parameter().cloned());
+        parameter.map_or_else(|| Argument::Typed(ty.outlined(endpoints).or_opaque()), Argument::Parameter)
+    }
+}
+
 impl Outline for Endpoints<'_, '_, '_> {
     type Kind = Resolved;
 
@@ -85,7 +97,11 @@ impl Outline for Endpoints<'_, '_, '_> {
         };
         let declared = || {
             target.crate_item().and_then(|id| self.scope.reading.declared(id)).map(|found| {
-                Resolved::Found(Endpoint::new(Nature::Named, found.name.clone()).originating(found.krate.cloned()))
+                Resolved::Found(Endpoint::declared(
+                    found.name.clone(),
+                    found.krate.cloned(),
+                    Argument::listed(named, self),
+                ))
             })
         };
         let external = || {
