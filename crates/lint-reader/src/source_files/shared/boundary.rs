@@ -1,8 +1,4 @@
-use std::collections::BTreeMap;
-
-use file_ports::Size;
-
-use super::protocol::{Assigned, Due};
+use algebra::{Monoid, Semigroup};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Partition(usize);
@@ -17,34 +13,34 @@ impl From<usize> for Partition {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(super) struct Hands(Vec<Partition>);
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct Flights {
+    sent: usize,
+    landed: usize,
+}
 
-impl FromIterator<Partition> for Hands {
-    fn from_iter<Found: IntoIterator<Item = Partition>>(found: Found) -> Hands {
-        Hands(found.into_iter().collect())
+impl Semigroup for Flights {
+    fn combine(self, other: Flights) -> Flights {
+        Flights { sent: self.sent + other.sent, landed: self.landed + other.landed }
     }
 }
 
-impl Hands {
-    pub(super) fn dealt<'tree>(
-        &self,
-        due: Vec<Due<'tree>>,
-        weighed: impl Fn(&Due<'tree>) -> Size,
-    ) -> Vec<Assigned<'tree>> {
-        let loads: BTreeMap<Partition, Size> = self.0.iter().map(|hand| (*hand, Size::default())).collect();
-        due.into_iter()
-            .scan(loads, |loads, found| {
-                let lightest = loads.iter().min_by_key(|(hand, load)| (**load, **hand)).map(|(hand, _)| *hand);
-                let hand = found.owner().or(lightest).unwrap_or(Partition::MAIN);
-                let load = loads.entry(hand).or_default();
-                *load = [*load, weighed(&found)].into_iter().sum();
-                Some(found.assigned(hand))
-            })
-            .collect()
-    }
+impl Monoid for Flights {}
 
-    pub(super) fn live(&self) -> impl Iterator<Item = Partition> + '_ {
-        self.0.iter().copied()
+impl Flights {
+    pub(super) const SENT: Flights = Flights { sent: 1, landed: 0 };
+    pub(super) const LANDED: Flights = Flights { sent: 0, landed: 1 };
+
+    pub(super) fn airborne(self) -> Option<()> {
+        Some(()).filter(|()| self.sent > self.landed)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Rank(usize);
+
+impl From<usize> for Rank {
+    fn from(index: usize) -> Rank {
+        Rank(index)
     }
 }
