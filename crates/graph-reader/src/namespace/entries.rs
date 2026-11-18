@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use algebra::{Monoid, Semigroup};
 use syntax::MacroTree;
 use syntax::Punctuated;
 use syntax::{
@@ -571,10 +572,6 @@ impl Entries {
         Entries { declared: vec![declared], ..Entries::default() }
     }
 
-    pub(super) fn declare(&mut self, declared: Declared) {
-        self.declared.push(declared);
-    }
-
     pub(super) fn exported_aliases(&self, scope: ScopeId) -> Vec<Declared> {
         let exported = self.declared.iter().enumerate().filter(|(_, declared)| declared.kind == DeclaredKind::EXPORTED);
         let aliased =
@@ -715,18 +712,25 @@ impl Entries {
             imported.chain(externs).fold(with_declared, |exports, (name, reexport)| exports.with_named(name, reexport));
         globs.fold(with_named, CrateExports::with_glob)
     }
+}
 
-    fn merged(mut self, other: Entries) -> Entries {
-        self.declared.extend(other.declared);
-        self.imports.extend(other.imports);
-        other.externs.into_iter().for_each(|(name, externs)| self.externs.entry(name).or_default().extend(externs));
-        self.globs.extend(other.globs);
-        self
+impl Semigroup for Entries {
+    fn combine(self, other: Entries) -> Entries {
+        let mut externs = self.externs;
+        other.externs.into_iter().for_each(|(name, found)| externs.entry(name).or_default().extend(found));
+        Entries {
+            declared: self.declared.combine(other.declared),
+            imports: self.imports.combine(other.imports),
+            externs,
+            globs: self.globs.combine(other.globs),
+        }
     }
 }
 
+impl Monoid for Entries {}
+
 impl FromIterator<Entries> for Entries {
     fn from_iter<Parts: IntoIterator<Item = Entries>>(parts: Parts) -> Entries {
-        parts.into_iter().fold(Entries::default(), Entries::merged)
+        Monoid::concat(parts)
     }
 }
