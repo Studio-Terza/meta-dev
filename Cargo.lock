@@ -138,6 +138,7 @@ dependencies = [
 name = "ci"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "file-ports",
  "gate-limits",
@@ -904,6 +905,7 @@ dependencies = [
 name = "grammar-message"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "grammar",
  "laws",
  "newtype",
@@ -1061,6 +1063,7 @@ version = "0.1.0"
 dependencies = [
  "algebra",
  "body-lifts",
+ "laws",
  "lint-layout",
  "newtype",
 ]
@@ -1069,6 +1072,7 @@ dependencies = [
 name = "graph-query"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "graph-reader",
  "laws",
@@ -1639,6 +1643,7 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "graph-reader",
  "laws",
@@ -1893,6 +1898,7 @@ dependencies = [
 name = "lint-placement"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "invariants",
  "laws",
@@ -2441,6 +2447,7 @@ dependencies = [
 name = "mutation-report"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "file-ports",
  "golden",
@@ -3172,6 +3179,7 @@ dependencies = [
 name = "stream"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "grammar-anchor",
  "grammar-message",

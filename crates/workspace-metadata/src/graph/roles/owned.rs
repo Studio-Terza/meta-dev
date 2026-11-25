@@ -1,5 +1,6 @@
 use crate::crate_name::CrateName;
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Not;
 
 use crate::graph::DependencyKeys;
 use crate::metadata::{Package, PortTable};
@@ -61,7 +62,7 @@ impl<'meta> Owner<'_, 'meta> {
         owned: &Owned<'_, 'meta>,
         package: &'meta Package,
     ) -> Option<Unported<'meta>> {
-        let id = package.package_id().filter(|id| self.unit.holds(id).is_none())?;
+        let id = package.package_id().filter(|id| self.unit.members().contains(*id).not())?;
         let role = self.declared.dependents();
         let declaring = role.map_or_default(|declared| graph.declaring(declared));
         let avoided: BTreeSet<&PackageId> = declaring.union(owned.compiled()).copied().collect();

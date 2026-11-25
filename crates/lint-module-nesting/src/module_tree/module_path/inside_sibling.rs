@@ -8,16 +8,14 @@ use super::ModulePath;
 pub struct InsideSibling;
 
 impl InsideSibling {
-    pub fn holds<'module, 'file>(
-        this: &ModulePath<'_>,
-        module: &'module ModulePath<'file>,
-    ) -> Option<&'module ModulePath<'file>> {
+    pub fn holder<'module>(this: &ModulePath<'_>, module: &ModulePath<'module>) -> Option<Nest<'module>> {
         let length = <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(module)).len();
+        let inside = *AsRef::<Nest<'_>>::as_ref(this);
         AsRef::<Nest<'_>>::as_ref(module)
             .parent()
             .filter(|parent| parent.level() != Level::Workspace)
-            .and_then(|parent| parent.holding(*AsRef::<Nest<'_>>::as_ref(this)).map(|_| module))
-            .filter(|_| <&[Name]>::from(*AsRef::<Nest<'_>>::as_ref(this)).len() >= length)
+            .filter(|parent| inside.lineage().any(|outer| outer == *parent))
+            .filter(|_| <&[Name]>::from(inside).len() >= length)
     }
 
     pub fn home<'file>(user: &ModulePath<'file>, module: &ModulePath<'_>) -> ModulePath<'file> {

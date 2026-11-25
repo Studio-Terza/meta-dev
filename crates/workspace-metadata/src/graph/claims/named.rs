@@ -12,8 +12,11 @@ pub(super) struct Named<'unit, 'meta>(BTreeMap<&'meta PackageId, Vec<Claim<'unit
 impl<'meta> Named<'_, 'meta> {
     pub(super) fn owners(&self, dependent: &PackageId, required: &PackageId) -> Option<BTreeSet<&'meta PackageId>> {
         self.0.get(required).map(|named| {
-            let held: BTreeSet<&PackageId> =
-                named.iter().filter(|claim| claim.unit().holds(dependent).is_some()).filter_map(Claim::open).collect();
+            let held: BTreeSet<&PackageId> = named
+                .iter()
+                .filter(|claim| claim.unit().members().contains(dependent))
+                .filter_map(Claim::open)
+                .collect();
             named.iter().filter_map(Claim::open).collect::<BTreeSet<_>>().difference(&held).copied().collect()
         })
     }

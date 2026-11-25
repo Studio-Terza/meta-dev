@@ -4,8 +4,12 @@ use std::path::PathBuf;
 use lint_layout::Name;
 use lint_transition_graph::Ask;
 
+use algebra::Semigroup;
+
 use crate::boundary::QueryFailure;
-use crate::query::{Consumer, Query};
+use crate::query::top::Top;
+use crate::query::{Consumer, Query, Term};
+use crate::role::Role;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Item {
@@ -83,35 +87,35 @@ impl Item {
     }
 }
 
+impl From<Query> for Reading {
+    fn from(query: Query) -> Reading {
+        Reading { query, expecting: Expecting::Word }
+    }
+}
+
 impl Reading {
     fn next(self, word: &str) -> Result<Reading, QueryFailure> {
         match self.expecting {
             Expecting::Word | Expecting::Crates => self.flagged(Expecting::flag(word), word),
-            Expecting::Root => {
-                Ok(Reading { query: self.query.with_root(PathBuf::from(word)), expecting: Expecting::Word })
+            Expecting::Root => Ok(Reading::from(self.query.combine(Query::from(PathBuf::from(word))))),
+            Expecting::Consumer => {
+                Ok(Reading::from(self.query.combine(Query::from(Consumer::new(PathBuf::from(word))))))
             }
-            Expecting::Consumer => Ok(Reading {
-                query: self.query.with_consumer(Consumer::new(PathBuf::from(word))),
-                expecting: Expecting::Word,
-            }),
-            Expecting::Role => Ok(Reading { query: self.query.with_role(word.parse()?), expecting: Expecting::Word }),
-            Expecting::Top => Ok(Reading { query: self.query.with_top(word.parse()?), expecting: Expecting::Word }),
-            Expecting::Item(item) => {
-                Ok(Reading { query: self.query.with_ask(item.ask(Name::from(word))), expecting: Expecting::Word })
-            }
+            Expecting::Role => Ok(Reading::from(self.query.combine(Query::from(word.parse::<Role>()?)))),
+            Expecting::Top => Ok(Reading::from(self.query.combine(Query::from(word.parse::<Top>()?)))),
+            Expecting::Item(item) => Ok(Reading::from(self.query.combine(Query::from(item.ask(Name::from(word)))))),
             Expecting::From => Ok(Reading { query: self.query, expecting: Expecting::To(Name::from(word)) }),
-            Expecting::To(from) => Ok(Reading {
-                query: self.query.with_ask(Ask::Path(from, Name::from(word))),
-                expecting: Expecting::Word,
-            }),
+            Expecting::To(from) => {
+                Ok(Reading::from(self.query.combine(Query::from(Ask::Path(from, Name::from(word))))))
+            }
         }
     }
 
     fn flagged(self, flag: Option<Expecting>, word: &str) -> Result<Reading, QueryFailure> {
         match flag {
-            Some(Expecting::Crates) => Ok(Reading { query: self.query.with_crates(), expecting: Expecting::Word }),
+            Some(Expecting::Crates) => Ok(Reading::from(self.query.combine(Query::CRATES))),
             Some(expecting) => Ok(Reading { query: self.query, expecting }),
-            None => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
+            None => Ok(Reading::from(self.query.combine(Query::from(word.parse::<Term>()?)))),
         }
     }
 

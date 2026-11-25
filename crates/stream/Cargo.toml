@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+algebra = { path = "../algebra" }
 grammar-anchor = { path = "../grammar-anchor" }
 grammar-message = { path = "../grammar-message" }
 named-derive = { path = "../named-derive" }

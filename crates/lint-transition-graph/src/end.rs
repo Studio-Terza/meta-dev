@@ -54,8 +54,12 @@ pub(crate) struct Hop<'found> {
 }
 
 impl<'found> Hop<'found> {
-    pub(crate) fn joins(&self, first: &Hop<'found>, last: &Hop<'found>) -> Option<&Hop<'found>> {
-        Some(self).filter(|hop| hop.takes == first.takes).filter(|hop| hop.gives == last.gives)
+    pub(crate) fn takes(&self) -> &Tuple<'found> {
+        &self.takes
+    }
+
+    pub(crate) fn gives(&self) -> Node<'found> {
+        self.gives
     }
 
     pub(crate) fn distinct<'ends>(ends: impl Iterator<Item = &'ends Ends<'found>>) -> Count
@@ -180,12 +184,8 @@ pub(crate) struct Ends<'found> {
 }
 
 impl<'found> Ends<'found> {
-    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>) -> Ends<'found> {
-        Ends { takes, gives, implementer: None }
-    }
-
-    pub(crate) fn implemented_by(self, implementer: Option<End<'found>>) -> Ends<'found> {
-        Ends { implementer, ..self }
+    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>, implementer: Option<End<'found>>) -> Ends<'found> {
+        Ends { takes, gives, implementer }
     }
 
     pub(crate) fn placed(&self, place: Place) -> impl Iterator<Item = &End<'found>> {

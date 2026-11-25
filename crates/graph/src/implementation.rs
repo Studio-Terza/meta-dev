@@ -85,28 +85,31 @@ impl AsRef<TypeRef> for Assigned {
     }
 }
 
-impl Implementation {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unparameterised {
+    subject: Subject,
+    implemented: Option<Interface>,
+    origin: Origin,
+    region: Region,
+}
+
+impl Unparameterised {
     #[must_use]
-    pub fn new(subject: Subject, implemented: Option<Interface>, origin: Origin, region: Region) -> Implementation {
-        Implementation { subject, implemented, origin, region, parameters: Vec::new(), assigned: Vec::new() }
+    pub fn new(subject: Subject, implemented: Option<Interface>, origin: Origin, region: Region) -> Unparameterised {
+        Unparameterised { subject, implemented, origin, region }
     }
 
     #[must_use]
     pub fn parameterised(self, parameters: Vec<Parameter>, assigned: Vec<Assigned>) -> Implementation {
-        Implementation { parameters, assigned, ..self }
+        let Unparameterised { subject, implemented, origin, region } = self;
+        Implementation { subject, implemented, origin, region, parameters, assigned }
     }
+}
 
+impl Implementation {
     #[must_use]
     pub fn assigned(&self) -> &[Assigned] {
         &self.assigned
-    }
-
-    #[must_use]
-    pub fn hand_written(&self) -> Option<&Implementation> {
-        match self.origin {
-            Origin::Written => Some(self),
-            Origin::Derived => None,
-        }
     }
 
     #[must_use]

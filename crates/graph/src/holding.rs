@@ -26,17 +26,26 @@ pub struct Holding {
     ty: TypeRef,
 }
 
-impl Holding {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unsited {
+    name: Name,
+    held: Held,
+    ty: TypeRef,
+}
+
+impl Unsited {
     #[must_use]
-    pub fn new(name: Name, held: Held, ty: TypeRef) -> Holding {
-        Holding { name, held, region: Region::SHIPPED, declares: None, ty }
+    pub fn new(name: Name, held: Held, ty: TypeRef) -> Unsited {
+        Unsited { name, held, ty }
     }
 
     #[must_use]
     pub fn placed(self, region: Region, declares: Option<ItemId>) -> Holding {
         Holding { name: self.name, held: self.held, region, declares, ty: self.ty }
     }
+}
 
+impl Holding {
     #[must_use]
     pub fn held(&self) -> Held {
         self.held

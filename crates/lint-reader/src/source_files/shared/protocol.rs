@@ -100,9 +100,9 @@ impl<'tree> Assignment<'tree> {
                 Some(file.in_crate_file(main.crate_file).with_test_modules(tests))
             })
             .collect();
-        let with_files =
-            files.into_iter().fold(Readout::default().with_repo_files(self.repo_files), Readout::with_file);
-        self.failures.into_iter().fold(with_files, Readout::with_failure).sorted()
+        let found: Readout = self.repo_files.into_iter().collect();
+        let failed: Readout = self.failures.into_iter().collect();
+        found.combine(files.into_iter().collect()).combine(failed).sorted()
     }
 }
 

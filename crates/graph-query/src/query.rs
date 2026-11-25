@@ -12,6 +12,7 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use algebra::{Monoid, Semigroup};
 use graph::{ItemKind, Model};
 use lint_core::SourceFile;
 use lint_layout::Name;
@@ -42,41 +43,68 @@ pub struct Query {
     consumers: Vec<Consumer>,
 }
 
+impl Semigroup for Query {
+    fn combine(self, later: Query) -> Query {
+        Query {
+            terms: self.terms.combine(later.terms),
+            roles: self.roles.combine(later.roles),
+            questions: self.questions.combine(later.questions),
+            top: later.top.or(self.top),
+            roots: self.roots.combine(later.roots),
+            crates: self.crates.or(later.crates),
+            consumers: self.consumers.combine(later.consumers),
+        }
+    }
+}
+
+impl Monoid for Query {}
+
+impl From<Term> for Query {
+    fn from(term: Term) -> Query {
+        Query { terms: vec![term], ..Query::default() }
+    }
+}
+
+impl From<Role> for Query {
+    fn from(role: Role) -> Query {
+        Query { roles: vec![role], ..Query::default() }
+    }
+}
+
+impl From<Ask> for Query {
+    fn from(ask: Ask) -> Query {
+        Query { questions: vec![ask], ..Query::default() }
+    }
+}
+
+impl From<PathBuf> for Query {
+    fn from(root: PathBuf) -> Query {
+        Query { roots: vec![root], ..Query::default() }
+    }
+}
+
+impl From<Consumer> for Query {
+    fn from(consumer: Consumer) -> Query {
+        Query { consumers: vec![consumer], ..Query::default() }
+    }
+}
+
+impl From<Top> for Query {
+    fn from(top: Top) -> Query {
+        Query { top: Some(top), ..Query::default() }
+    }
+}
+
 impl Query {
-    pub(crate) fn with_term(mut self, term: Term) -> Query {
-        self.terms.push(term);
-        self
-    }
-
-    pub(crate) fn with_role(mut self, role: Role) -> Query {
-        self.roles.push(role);
-        self
-    }
-
-    pub(crate) fn with_ask(mut self, ask: Ask) -> Query {
-        self.questions.push(ask);
-        self
-    }
-
-    pub(crate) fn with_root(mut self, root: PathBuf) -> Query {
-        self.roots.push(root);
-        self
-    }
-
-    pub(crate) fn with_consumer(mut self, file: Consumer) -> Query {
-        self.consumers.push(file);
-        self
-    }
-
-    pub(crate) fn with_crates(mut self) -> Query {
-        self.crates = Some(());
-        self
-    }
-
-    pub(crate) fn with_top(mut self, top: Top) -> Query {
-        self.top = Some(top);
-        self
-    }
+    pub(crate) const CRATES: Query = Query {
+        terms: Vec::new(),
+        roles: Vec::new(),
+        questions: Vec::new(),
+        top: None,
+        roots: Vec::new(),
+        crates: Some(()),
+        consumers: Vec::new(),
+    };
 
     fn searches(&self) -> Option<()> {
         self.terms.first().map(|_| ()).or_else(|| self.roles.first().map(|_| ()))
@@ -127,7 +155,7 @@ impl Query {
             .iter()
             .filter_map(|context| {
                 let krate: &Name = AsRef::<CrateName>::as_ref(context).borrow();
-                context.subject().map(|subject| ((krate, subject.as_ref()), *context.as_ref()))
+                context.selfish().subject().map(|subject| ((krate, subject.as_ref()), *context.as_ref()))
             })
             .collect();
         let ground = |stocked: Stocked<'_>| grounds.get(&(stocked.placed().krate(), stocked.name())).copied();

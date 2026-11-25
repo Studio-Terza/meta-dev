@@ -5,7 +5,7 @@ use lint_layout::Name;
 
 use super::anchor::{Anchor, Anchors};
 use super::boundary::ScopeId;
-use super::entries::Entries;
+use super::entries::{Entries, Sight};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CrateForm {
@@ -16,7 +16,7 @@ pub(crate) enum CrateForm {
 impl CrateForm {
     pub(super) fn anchors(self, root: ScopeId) -> Anchors {
         match self {
-            CrateForm::Planted => Anchors::rooted(root),
+            CrateForm::Planted => Anchors::from(root),
             CrateForm::Island => Anchors::default(),
         }
     }
@@ -29,10 +29,10 @@ pub(crate) enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub(super) fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
+    pub(super) fn entered(self, scope: ScopeId) -> Anchors {
         match self {
-            ScopeKind::Module => parent.nested(scope),
-            ScopeKind::Block => parent,
+            ScopeKind::Module => Anchors::from(scope),
+            ScopeKind::Block => Anchors::default(),
         }
     }
 
@@ -73,8 +73,8 @@ impl ScopeRow {
         self.ancestry.last().copied()
     }
 
-    pub(super) fn ancestor(&self, level: ScopeId) -> Option<ScopeId> {
-        self.ancestry.iter().copied().find(|ancestor| *ancestor == level)
+    pub(super) fn sight(&self, level: ScopeId) -> Option<Sight> {
+        self.ancestry.iter().find(|ancestor| **ancestor == level).map(|_| Sight::Inside)
     }
 
     pub(super) fn issued(&self, krate: Option<&Name>) -> Vec<Option<Item>> {

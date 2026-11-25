@@ -43,7 +43,7 @@ impl<'meta> Unleafed<'meta> {
             .port()
             .and_then(PortTable::dependents)
             .filter(|role| *role == Role::Lexer)
-            .or_else(|| dependency.declares(Role::Lexer));
+            .or_else(|| dependency.roles().into_iter().find(|role| *role == Role::Lexer));
         let at_compile = admitted.map(|_| ()).or(dependency.proc_macro().map(|_| ()));
         let held =
             at_compile.map_or_else(|| owned.first_in(&graph.normal_reach(required, owned.compiled())), |()| None)?;

@@ -29,7 +29,7 @@ pub use syn::{
     TypeParamBound, TypePath, TypeReference, TypeTuple, UnOp, UseTree, Variant, VisRestricted, Visibility,
     WherePredicate, braced, custom_keyword, token,
 };
-pub use walk::Node;
+pub use walk::{Entered, Node};
 
 pub mod parse {
     pub use syn::parse::discouraged::Speculative;

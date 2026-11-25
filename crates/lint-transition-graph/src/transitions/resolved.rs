@@ -10,7 +10,7 @@ pub(crate) enum Resolved {
 
 impl Resolved {
     pub(crate) fn interface(name: Word<'static>) -> Resolved {
-        Resolved::Found(Endpoint::new(Nature::Interface, Name::from(name)))
+        Resolved::Found(Endpoint::new(Nature::Interface, Name::from(name), None))
     }
 
     pub(crate) fn resolved_with<'found>(&'found self, selfish: &'found Endpoint) -> &'found Endpoint {
