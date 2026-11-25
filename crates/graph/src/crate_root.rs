@@ -14,7 +14,7 @@ use crate::item_path::{ItemPath, Segment};
 use crate::resolved::Resolved;
 use crate::unresolved::Unresolved;
 
-#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reexport {
     External(External),
     Own,
@@ -35,7 +35,7 @@ struct Globs(Vec<Reexport>);
 #[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
 #[newtype(generate = CrateExports::sampled)]
 pub struct CrateExports {
-    named: BTreeMap<Name, Vec<Reexport>>,
+    named: BTreeMap<Name, BTreeSet<Reexport>>,
     declared: BTreeSet<Name>,
     globs: Globs,
 }
@@ -55,11 +55,11 @@ impl CrateExports {
     const SAMPLED: Range<usize> = 0..4;
 
     fn sampled() -> impl Strategy<Value = CrateExports> {
-        let drawn_named = btree_map(any::<Name>(), vec(any::<Reexport>(), Self::SAMPLED), Self::SAMPLED);
+        let drawn_named = btree_map(any::<Name>(), btree_set(any::<Reexport>(), Self::SAMPLED), Self::SAMPLED);
         let drawn_declared = btree_set(any::<Name>(), Self::SAMPLED);
         let drawn_globs = vec(any::<Reexport>(), Self::SAMPLED);
         Strategy::prop_map((drawn_named, drawn_declared, drawn_globs), |(named, declared, globs)| CrateExports {
-            named: named.into_iter().map(|(name, bound)| (name, Bound(Vec::new()).combine(Bound(bound)).0)).collect(),
+            named,
             declared,
             globs: Globs(globs),
         })
@@ -156,35 +156,20 @@ impl Globs {
 
 impl Semigroup for CrateExports {
     fn combine(self, other: CrateExports) -> CrateExports {
-        let named = other.named.into_iter().fold(self.named, |mut held, (name, bound)| {
-            let merged = Bound(held.remove(&name).unwrap_or_default()).combine(Bound(bound));
-            held.insert(name, merged.0);
-            held
-        });
-        let declared = self.declared.into_iter().chain(other.declared).collect();
-        CrateExports { named, declared, globs: Globs(self.globs.0.combine(other.globs.0)) }
+        CrateExports {
+            named: self.named.combine(other.named),
+            declared: self.declared.combine(other.declared),
+            globs: Globs(self.globs.0.combine(other.globs.0)),
+        }
     }
 }
 
 impl Monoid for CrateExports {}
 
-#[derive(Debug)]
-struct Bound(Vec<Reexport>);
-
-impl Semigroup for Bound {
-    fn combine(self, other: Bound) -> Bound {
-        Bound(other.0.into_iter().fold(self.0, |mut kept, reexport| {
-            kept.retain(|seen| *seen != reexport);
-            kept.push(reexport);
-            kept
-        }))
-    }
-}
-
 impl FromIterator<(Name, Reexport)> for CrateExports {
     fn from_iter<Bound: IntoIterator<Item = (Name, Reexport)>>(bound: Bound) -> CrateExports {
         Monoid::concat(bound.into_iter().map(|(name, reexport)| CrateExports {
-            named: BTreeMap::from([(name, vec![reexport])]),
+            named: BTreeMap::from([(name, BTreeSet::from([reexport]))]),
             ..CrateExports::default()
         }))
     }
@@ -210,7 +195,7 @@ impl CrateExports {
     fn found(
         &self,
         name: &Name,
-        chosen: &impl Fn(&[Reexport]) -> Vec<&Reexport>,
+        chosen: &impl Fn(&BTreeSet<Reexport>) -> Vec<&Reexport>,
         inside: &impl Fn(&PackageName, &Name) -> Found,
     ) -> Found {
         self.named
@@ -290,7 +275,7 @@ impl CrateRoots {
         )
     }
 
-    fn chosen<'bound>(&self, bound: &'bound [Reexport], domain: Domain) -> Vec<&'bound Reexport> {
+    fn chosen<'bound>(&self, bound: &'bound BTreeSet<Reexport>, domain: Domain) -> Vec<&'bound Reexport> {
         let (macros, others): (Vec<&Reexport>, Vec<&Reexport>) = bound.iter().partition(|reexport| {
             reexport.package().and_then(|package| self.0.get(package)?.form()) == Some(LibraryForm::ProcMacro)
         });

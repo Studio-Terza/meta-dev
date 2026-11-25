@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub trait Semigroup: Sized {
     #[must_use]
@@ -47,6 +47,14 @@ impl<Item> Semigroup for Vec<Item> {
 }
 
 impl<Item> Monoid for Vec<Item> {}
+
+impl<Item: Ord> Semigroup for BTreeSet<Item> {
+    fn combine(self, other: BTreeSet<Item>) -> BTreeSet<Item> {
+        self.into_iter().chain(other).collect()
+    }
+}
+
+impl<Item: Ord> Monoid for BTreeSet<Item> {}
 
 impl<Key: Ord, Value: Semigroup> Semigroup for BTreeMap<Key, Value> {
     fn combine(self, other: BTreeMap<Key, Value>) -> BTreeMap<Key, Value> {
