@@ -12,26 +12,30 @@ mod scope;
 use std::ffi::OsString;
 use std::fmt;
 use std::num::NonZeroU8;
-use std::path::Path;
 
 use super::super::Step;
 use super::super::changed::Changed;
 use super::super::journal::Journal;
 use super::pull_number::PullNumber;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Utf8};
 use crate::cli::ports::{Exit, Ports};
 use branch::Branch;
 use check::Check;
 use fault::Owed;
 use git::Git;
+use grammar_output::Record;
 use hub::Hub;
 use scope::Scope;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct Labels {
+    #[field(Utf8, via = Branch::new)]
     base: Branch,
+    #[field(Utf8, via = PullNumber::new)]
     pull_request: PullNumber,
+    #[field(Journaled)]
     metadata: Journal,
 }
 
@@ -43,16 +47,7 @@ impl fmt::Display for Labels {
 
 impl Step for Labels {
     fn from_arguments(given: Vec<OsString>) -> Result<Labels, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let base = &arguments.taken()?;
-        let pull_request = &arguments.taken()?;
-        let metadata = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(Labels {
-            base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
-            pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()),
-            metadata: Journal::file(Path::new(metadata)),
-        })
+        Labels::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

@@ -14,9 +14,9 @@ use super::Step;
 use super::boundary::Shard;
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
-use crate::cli::command::step::Flag;
+use crate::cli::command::step::{Arguments, Flag, Journaled, Location, Parsing};
 use crate::cli::ports::{Exit, Ports};
+use grammar_output::Record;
 use keeping::Keeping;
 use pass::Pass;
 use reruns::Reruns;
@@ -69,26 +69,36 @@ impl MutantsChanged {
             Ok(Telling::lazy(iter::once(Told::Said(timed_out)).chain(rest)))
         })
     }
+
+    fn flagged(head: ChangedHead, given: Arguments) -> Result<MutantsChanged, Failure<'static>> {
+        given.flagged::<Journaled>(Self::SELECTED)?.concluded(|selected, following| {
+            Ok(following.flagged::<Location>(Self::KEPT)?.concluded(|kept, rest| MutantsChanged {
+                diff: head.diff,
+                scoped: Pass::within(head.output.join(Self::SCOPED)),
+                own: Pass::within(head.output),
+                shard: head.shard,
+                selected,
+                keeping: Keeping::from(kept),
+                scope: rest.rest(),
+            }))
+        })
+    }
+}
+
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
+struct ChangedHead {
+    #[field(Journaled)]
+    diff: Journal,
+    #[field(Location)]
+    output: PathBuf,
+    #[field(Parsing<Shard>)]
+    shard: Shard,
 }
 
 impl Step for MutantsChanged {
     fn from_arguments(given: Vec<OsString>) -> Result<MutantsChanged, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let diff = PathBuf::from(arguments.taken()?);
-        let output = PathBuf::from(arguments.taken()?);
-        let shard = arguments.taken()?.to_str().ok_or(Failure::Usage)?.parse()?;
-        let selected = arguments.flagged(Self::SELECTED)?;
-        let kept = selected.path().map(Journal::from);
-        let keeping = selected.following().flagged(Self::KEPT)?;
-        Ok(MutantsChanged {
-            diff: Journal::from(diff),
-            scoped: Pass::within(output.join(Self::SCOPED)),
-            own: Pass::within(output),
-            shard,
-            selected: kept,
-            keeping: Keeping::from(keeping.path()),
-            scope: keeping.following().rest(),
-        })
+        ChangedHead::read(Arguments::from(given))?.concluded(MutantsChanged::flagged)
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

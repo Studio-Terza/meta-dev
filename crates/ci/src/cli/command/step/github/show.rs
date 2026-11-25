@@ -10,8 +10,9 @@ use file_ports::Files;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Word};
 use crate::cli::ports::{Exit, Ports, Text};
+use grammar_output::Record;
 
 #[derive(Debug)]
 pub(super) struct Shows<'journal>(Vec<Entry<'journal>>);
@@ -46,16 +47,25 @@ impl Show {
     }
 }
 
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
+struct ShownWords {
+    #[field(Journaled)]
+    first: Journal,
+    #[repeated(Word)]
+    rest: Vec<OsString>,
+}
+
+impl From<ShownWords> for Show {
+    fn from(words: ShownWords) -> Show {
+        let rest = words.rest.into_iter().map(|file| Journal::from(PathBuf::from(file)));
+        Show { journals: iter::once(words.first).chain(rest).collect() }
+    }
+}
+
 impl Step for Show {
     fn from_arguments(given: Vec<OsString>) -> Result<Show, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let first = arguments.taken()?;
-        Ok(Show {
-            journals: iter::once(first)
-                .chain(arguments.rest())
-                .map(|file| Journal::from(PathBuf::from(file)))
-                .collect(),
-        })
+        ShownWords::read(Arguments::from(given))?.ended().map(Show::from)
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

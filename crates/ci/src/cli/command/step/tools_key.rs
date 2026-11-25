@@ -1,18 +1,21 @@
 use crate::cli::command::Telling;
 use std::ffi::OsString;
-use std::path::Path;
 
 use super::Step;
 use super::changed::Changed;
 use super::install_tools::InstallTools;
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled};
 use crate::cli::ports::{Exit, Ports, Text};
+use grammar_output::Record;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct ToolsKey {
+    #[field(Journaled)]
     metadata: Journal,
+    #[field(Journaled)]
     output: Journal,
 }
 
@@ -30,11 +33,7 @@ impl ToolsKey {
 
 impl Step for ToolsKey {
     fn from_arguments(given: Vec<OsString>) -> Result<ToolsKey, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let metadata = &arguments.taken()?;
-        let output = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(ToolsKey { metadata: Journal::file(Path::new(metadata)), output: Journal::file(Path::new(output)) })
+        ToolsKey::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

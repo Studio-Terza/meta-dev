@@ -146,6 +146,7 @@ dependencies = [
  "grammar-branch",
  "grammar-cargo-option",
  "grammar-hunk",
+ "grammar-output",
  "grammar-shard",
  "grammar-spec-line",
  "grammar-test-summary",

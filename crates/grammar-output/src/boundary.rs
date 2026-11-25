@@ -102,6 +102,14 @@ pub enum Unread {
 #[derive(Debug)]
 pub struct Fields(Peekable<IntoIter<Token>>);
 
+pub trait Source: Sized {
+    type Unread;
+}
+
+impl Source for Fields {
+    type Unread = Unread;
+}
+
 pub trait Field {
     type Value;
 
