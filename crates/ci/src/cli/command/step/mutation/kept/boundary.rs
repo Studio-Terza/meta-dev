@@ -116,6 +116,14 @@ impl Mutant {
         Text::new(self.name.to_string())
     }
 
+    pub(in super::super) fn file(&self) -> &Path {
+        Path::new(self.file.as_ref())
+    }
+
+    pub(in super::super) fn line(&self) -> u32 {
+        self.span.start.line
+    }
+
     pub(in super::super) fn listed(text: &Text) -> Result<Vec<Mutant>, serde_json::Error> {
         serde_json::Deserializer::from_str(text.as_ref())
             .into_iter::<Vec<Mutant>>()

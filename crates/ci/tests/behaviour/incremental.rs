@@ -4,13 +4,14 @@ use std::process::ExitCode;
 
 use ci::ports::Invocation;
 
-use super::{ExactReply, Scratch, Script, Text};
+use super::{ExactReply, Missed, Scratch, Script, Text};
 
 const SURVIVOR: &str = r#"{"name": "crates/a/src/lib.rs:3:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 3, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const SURVIVOR_MOVED: &str = r#"{"name": "crates/a/src/lib.rs:4:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 4, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const ADDED: &str = r#"{"name": "crates/a/src/lib.rs:9:5: replace g -> u8 with 0", "file": "crates/a/src/lib.rs", "function": {"function_name": "g"}, "span": {"start": {"line": 9, "column": 5}}, "replacement": "0", "genre": "FnValue"}"#;
 const ELSEWHERE: &str = r#"{"name": "crates/b/src/lib.rs:2:5: replace e -> u8 with 0", "file": "crates/b/src/lib.rs", "function": {"function_name": "e"}, "span": {"start": {"line": 2, "column": 5}}, "replacement": "0", "genre": "FnValue"}"#;
 const UNTOUCHED: &str = r#"{"name": "crates/a/src/lib.rs:20:5: replace h -> u8 with 1", "file": "crates/a/src/lib.rs", "function": {"function_name": "h"}, "span": {"start": {"line": 20, "column": 5}}, "replacement": "1", "genre": "FnValue"}"#;
+const FIELD_DELETED: &str = r#"{"name": "crates/a/src/lib.rs:5:9: delete field b from struct A expression in g", "file": "crates/a/src/lib.rs", "function": {"function_name": "g"}, "span": {"start": {"line": 5, "column": 9}}, "replacement": "", "genre": "StructField"}"#;
 const CAUGHT_BEFORE: &str = r#"{"name": "crates/a/src/lib.rs:12:5: replace k -> u8 with 1", "file": "crates/a/src/lib.rs", "function": {"function_name": "k"}, "span": {"start": {"line": 12, "column": 5}}, "replacement": "1", "genre": "FnValue"}"#;
 
 const TEST_ADDED: &str = "diff --git a/crates/a/tests/behaviour.rs b/crates/a/tests/behaviour.rs\n--- a/crates/a/tests/behaviour.rs\n+++ b/crates/a/tests/behaviour.rs\n@@ -9,0 +10,3 @@\n+#[test]\n+fn f_is_false() {\n+}\n";
@@ -335,11 +336,14 @@ fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<()
     let scratch = Scratch::new()?;
     scratch.directory("prior")?;
     scratch.write("prior/selected.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true")?;
+    scratch.placed(std::path::Path::new("crates/a/src/lib.rs"), "line 1\nline 2\nline 3\nline 4\nline 5\n")?;
+    let listed =
+        Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()]);
     let script = Script {
-        exact: vec![ExactReply {
-            asked: Invocation::new("git", ["rev-parse", "HEAD", "HEAD^2"]),
-            text: "t1\nh1\n".to_owned(),
-        }],
+        exact: vec![
+            ExactReply { asked: Invocation::new("git", ["rev-parse", "HEAD", "HEAD^2"]), text: "t1\nh1\n".to_owned() },
+            ExactReply { asked: listed, text: ["[", SURVIVOR, ", ", FIELD_DELETED, "]"].concat() },
+        ],
         ..Script::new()
     };
     let arguments = [
@@ -355,15 +359,19 @@ fn a_shard_mutates_only_the_selected_names_and_keeps_what_it_left() -> Result<()
     ];
     let answer = scratch.answer(&script, &arguments);
     assert_eq!(answer.exit, ExitCode::SUCCESS);
-    let mutated: Vec<String> = script.calls.borrow().first().map_or_default(|call| {
+    let mutated: Vec<String> = script.calls.borrow().get(1).map_or_default(|call| {
         call.arguments().iter().map(|argument| argument.to_string_lossy().into_owned()).collect()
     });
+    assert_eq!(
+        Text::lines(&scratch.read("out/selected.diff")),
+        ["--- a/crates/a/src/lib.rs", "+++ b/crates/a/src/lib.rs", "@@ -3,1 +3,1 @@", "-line 3", "+line 3"]
+    );
     assert_eq!(
         mutated.get(..5).map_or_default(<[String]>::to_vec),
         [
             "mutants",
             "--in-diff",
-            &scratch.file("c.diff"),
+            &scratch.file("out/selected.diff"),
             "--re",
             "^crates/a/src/lib\\.rs:3:5: replace f \\-> bool with true$"
         ]
@@ -419,9 +427,12 @@ fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() 
 #[test]
 fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    scratch.directory("out/mutants.out")?;
+    scratch.survived(&[Missed {
+        name: "crates/a/src/lib.rs:3:5: replace f -> bool with true",
+        file: "crates/a/src/lib.rs",
+        line: 3,
+    }])?;
     scratch.directory("out/scoped/mutants.out")?;
-    scratch.write("out/mutants.out/missed.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true\n")?;
     scratch.write("out/scoped/mutants.out/missed.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true\n")?;
     let outcomes = Prior::outcomes(&[SURVIVOR], &[]);
     scratch.write("out/scoped/mutants.out/outcomes.json", &outcomes)?;
