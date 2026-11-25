@@ -60,10 +60,11 @@ impl Step for Labels {
         let pull_request = Hub::with_ports(ports).pull_request(&self.pull_request)?;
         Changed::stored_metadata(ports, &self.metadata)?;
         let scope = Scope::reached_by(&self.metadata, &changes);
+        let carried = pull_request.carried();
         let checks: Vec<Check> =
-            Check::ALL.into_iter().filter(|check| pull_request.carrying(*check).is_none()).collect();
-        let judged: Vec<Owed> = scope.judged(ports, &checks, pull_request.refactor(), &changes)?;
-        let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();
+            Check::ALL.into_iter().filter(|check| carried.iter().all(|label| label != check)).collect();
+        let judged: Vec<Owed> = scope.judged(ports, &checks, pull_request.purpose(), &changes)?;
+        let faults: Vec<&Owed> = judged.iter().filter(|owed| owed.outstanding().is_some()).collect();
         let said = [Shown::said(format_args!("{self}\n"))].into_iter().chain(faults.iter().map(Shown::said)).collect();
         Ok(Telling::reported(said, Ok(faults.first().map_or(Exit::Success, |_| Exit::Failure(NonZeroU8::MIN)))))
     }

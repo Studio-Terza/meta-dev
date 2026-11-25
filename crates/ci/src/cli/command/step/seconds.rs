@@ -8,12 +8,6 @@ use serde::Deserialize;
 #[derive(Newtype, Arbitrary, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Seconds(f64);
 
-impl Seconds {
-    pub(crate) fn longer(self, other: Seconds) -> Seconds {
-        Seconds(self.0.max(other.0))
-    }
-}
-
 impl From<Duration> for Seconds {
     fn from(elapsed: Duration) -> Seconds {
         Seconds(elapsed.as_secs_f64())

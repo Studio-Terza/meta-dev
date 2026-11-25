@@ -12,7 +12,7 @@ use super::Step;
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Ports, Text};
 
 #[derive(Debug)]
 pub struct ColdSize {
@@ -36,9 +36,7 @@ impl Step for ColdSize {
             .map_err(|failure| Failure::unusable(self.directory.as_path(), failure))?;
         let kilobytes = Kilobytes::from(size);
         let said = vec![Shown::said(format_args!("{kilobytes}"))];
-        Ok(Telling::reported(
-            said,
-            self.out.emptied(ports.files())?.append(ports.files(), kilobytes).map(|()| Exit::Success),
-        ))
+        self.out.replace(ports.files(), &Text::default())?;
+        Ok(Telling::reported(said, self.out.append(ports.files(), kilobytes).map(|()| Exit::Success)))
     }
 }

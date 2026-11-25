@@ -50,7 +50,8 @@ impl GraphPath {
 
     fn skipped(&self, ports: &impl Ports) -> Result<Telling<'_>, Failure<'_>> {
         let said = vec![Shown::said(PartialTimings)];
-        let ended = self.report.emptied(ports.files())?.append(ports.files(), PartialTimings).map(|()| Exit::Success);
+        self.report.replace(ports.files(), &Text::default())?;
+        let ended = self.report.append(ports.files(), PartialTimings).map(|()| Exit::Success);
         Ok(Telling::reported(said, ended))
     }
 
@@ -61,9 +62,9 @@ impl GraphPath {
         let critical = dag.critical();
         let work = Work::from(dag.work());
         let said = vec![Shown::said(format_args!("{critical}{work}"))];
-        let report = self.report.emptied(ports.files())?;
-        report.append(ports.files(), &critical)?;
-        report.append(ports.files(), work)?;
+        self.report.replace(ports.files(), &Text::default())?;
+        self.report.append(ports.files(), &critical)?;
+        self.report.append(ports.files(), work)?;
         let ended = self
             .measured
             .append(ports.files(), &Stage::new(Self::PATH.to_owned()), *critical.as_ref())

@@ -34,10 +34,6 @@ impl Change {
         }
     }
 
-    pub(crate) fn touching(&self, place: Place) -> Option<&Change> {
-        self.paths().into_iter().find_map(|path| place.containing(path)).map(|_| self)
-    }
-
     pub(crate) fn bringing_in(&self, place: Place) -> Option<&Path> {
         match self {
             Change::Added(path) | Change::Copied(path) => place.containing(path).map(|_| path.as_path()),

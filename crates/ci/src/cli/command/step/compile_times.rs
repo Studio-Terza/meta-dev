@@ -66,9 +66,7 @@ impl Step for CompileTimes {
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let listing = Listing::totalled(Self::per_crate(&self.page, &self.page.read(ports.files())?)?);
         let said = vec![Shown::said(format_args!("{listing}"))];
-        Ok(Telling::reported(
-            said,
-            self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Success),
-        ))
+        self.report.replace(ports.files(), &Text::default())?;
+        Ok(Telling::reported(said, self.report.append(ports.files(), &listing).map(|()| Exit::Success)))
     }
 }
