@@ -67,6 +67,7 @@ impl Shards {
 
 impl Planned {
     const SETUP: Duration = Duration::from_secs(94);
+    const PASSES: u32 = 2;
     const MARGIN_NUMERATOR: u32 = 3;
     const MARGIN_DENOMINATOR: u32 = 2;
     const SECONDS_PER_MINUTE: u64 = 60;
@@ -74,7 +75,7 @@ impl Planned {
     const HOSTED_RUNNER_MINUTES: u64 = 360;
 
     fn minutes(self) -> u64 {
-        let predicted = Self::SETUP.saturating_add(self.seconds);
+        let predicted = Self::SETUP.saturating_add(self.seconds.saturating_mul(Self::PASSES));
         let margined = predicted.saturating_mul(Self::MARGIN_NUMERATOR) / Self::MARGIN_DENOMINATOR;
         margined.as_secs().div_ceil(Self::SECONDS_PER_MINUTE).clamp(Self::FLOOR_MINUTES, Self::HOSTED_RUNNER_MINUTES)
     }

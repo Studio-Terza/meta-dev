@@ -512,6 +512,6 @@ fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Re
         since_tests: "",
     }
     .planned()?;
-    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":153}]"#]);
+    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":303}]"#]);
     Ok(())
 }
