@@ -1,0 +1,4 @@
+use laws::proptest::prelude::any;
+
+laws::generates!(joined_generates, any::<y::Joined>());
+laws::semigroup!(joined_forms_a_semigroup, y::Joined, any::<y::Joined>());

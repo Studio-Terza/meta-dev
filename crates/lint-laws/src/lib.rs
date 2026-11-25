@@ -17,7 +17,7 @@ use runner::Runner;
 #[derive(Debug)]
 pub struct LawRunners<'model> {
     runners: Vec<Runner<'model>>,
-    ungenerated: Vec<ItemId>,
+    ungenerated: BTreeSet<ItemId>,
 }
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ impl<'model> LawRunners<'model> {
         self.runners.iter().filter_map(Runner::file).collect()
     }
 
-    pub(crate) fn ungenerated(&self) -> &[ItemId] {
+    pub(crate) fn ungenerated(&self) -> &BTreeSet<ItemId> {
         &self.ungenerated
     }
 
@@ -54,6 +54,7 @@ impl<'model> LawRunners<'model> {
 impl<'model> From<&'model Model> for LawRunners<'model> {
     fn from(model: &'model Model) -> LawRunners<'model> {
         let labels = Labels::from(model);
+        let unlabelled = labels.ungenerated();
         let named: Vec<(ItemId, usize, &ItemPath)> = model
             .exports(Domain::Types)
             .filter_map(|exported| Some((exported.resolved().crate_item()?, exported)))
@@ -76,7 +77,7 @@ impl<'model> From<&'model Model> for LawRunners<'model> {
             .collect();
         LawRunners {
             runners: laws.chunk_by(|left, right| left.home() == right.home()).map(Runner::from).collect(),
-            ungenerated: shortest.iter().filter_map(|(item, _, _)| labels.ungenerated(*item)).collect(),
+            ungenerated: shortest.iter().map(|(item, _, _)| *item).filter(|item| unlabelled.contains(item)).collect(),
         }
     }
 }
@@ -101,9 +102,8 @@ impl<'model> Labels<'model> {
         self.monoids.get(&item).map(|_| Label::Monoid).or(semigroup).unwrap_or(Label::Generated)
     }
 
-    fn ungenerated(&self, item: ItemId) -> Option<ItemId> {
-        let lawful = self.monoids.get(&item).or_else(|| self.semigroups.get(&item));
-        lawful.filter(|_| self.generated.contains_key(&item).not()).copied()
+    fn ungenerated(&self) -> BTreeSet<ItemId> {
+        self.monoids.union(&self.semigroups).filter(|item| self.generated.contains_key(item).not()).copied().collect()
     }
 }
 

@@ -14,6 +14,10 @@ const ROOT: &str = "mod a;\npub mod b;\npub use a::Total;\nuse newtype::Arbitrar
 const MODULE: &str = "#[derive(newtype::Arbitrary)]\npub struct Total(u8);\n";
 const PUBLIC_MODULE: &str = "#[derive(newtype::Arbitrary)]\npub struct Nested(u8);\n";
 const HAND_WRITTEN: &str = "laws::generates!(total_generates, any::<x::Total>());\n";
+const JOINED: &str = "#[derive(newtype::Arbitrary)]\npub struct Joined(u8);\nimpl algebra::Semigroup for Joined {}\n";
+const BARE: &str =
+    "pub struct Bare;\nimpl algebra::Semigroup for Bare {}\npub struct Empty;\nimpl algebra::Monoid for Empty {}\n";
+const HIDDEN: &str = "struct Hidden;\nimpl algebra::Semigroup for Hidden {}\n";
 
 struct Workspace;
 
@@ -53,6 +57,29 @@ laws::table!(a_generated_law_written_outside_the_runner_is_refused, |sources: &V
     Workspace::with(Source::new(Located::new("crates/x/tests/generated/laws.rs"), Text::new(HAND_WRITTEN)))
         => Lines::default(),
     Workspace::with(Source::new(Located::new("crates/laws/tests/behaviour.rs"), Text::new(HAND_WRITTEN)))
+        => Lines::from(["crates/x/src/lib.rs:1"]),
+]);
+
+#[test]
+fn a_semigroup_that_is_no_monoid_gets_only_associativity() -> Result<(), FileFailure> {
+    let model = Reader::read_files(&Sources::parsed(&Workspace::with(Source::new(
+        Located::new("crates/y/src/lib.rs"),
+        Text::new(JOINED),
+    ))));
+    let path = PathBuf::from("crates/y/tests/generated/laws.rs");
+    let disk = Memory::default();
+    disk.write_each(LawRunners::from(&model).written())?;
+    let runner = disk.read_text(&path)?;
+    golden!("semigroup.rs.txt", runner.as_ref());
+    Ok(())
+}
+
+laws::table!(a_public_semigroup_the_runner_cannot_generate_is_refused, |sources: &Vec<Source>| Sources::flagged::<Queried<HandWrittenLaws>>(sources), [
+    Workspace::with(Source::new(Located::new("crates/y/src/lib.rs"), Text::new(BARE)))
+        => Lines::from(["crates/x/src/lib.rs:1", "crates/y/src/lib.rs:1", "crates/y/src/lib.rs:3"]),
+    Workspace::with(Source::new(Located::new("crates/y/src/lib.rs"), Text::new(JOINED)))
+        => Lines::from(["crates/x/src/lib.rs:1", "crates/y/src/lib.rs:1"]),
+    Workspace::with(Source::new(Located::new("crates/y/src/lib.rs"), Text::new(HIDDEN)))
         => Lines::from(["crates/x/src/lib.rs:1"]),
 ]);
 

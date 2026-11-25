@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use graph::{Domain, Item, ItemId, Mention, Model, PathUse, Placed, Resolved};
+use graph::{Domain, Item, Mention, Model, PathUse, Placed, Resolved};
 use lint_core::{Fix, Headline, Message, Problem, Report, Violation};
 use lint_file::ModelLint;
 use lint_layout::Site;
@@ -49,10 +49,9 @@ impl ModelLint for HandWrittenLaws {
             .undeclared(&read)
             .into_iter()
             .map(|root| Violation::new(Site::of_file(root), HandWrittenLaws::UNDECLARED));
-        let ungenerated: BTreeSet<ItemId> = runners.ungenerated().iter().copied().collect();
         let unlawful = model
             .items()
-            .filter(|placed| ungenerated.contains(&placed.entity().declared()))
+            .filter(|placed| runners.ungenerated().contains(&placed.entity().declared()))
             .map(|placed| Violation::new(placed.site(), HandWrittenLaws::UNGENERATED));
         Report::new(
             Headline::new(
