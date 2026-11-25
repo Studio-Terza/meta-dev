@@ -36,7 +36,7 @@ impl From<Parsed<'_, '_>> for DeclarationGathering {
     fn from(parsed: Parsed<'_, '_>) -> DeclarationGathering {
         DeclarationGathering {
             reading: Contributing::new(DeclarationScan),
-            shipped: <&SourceFile>::from(parsed).shipped().map(|_| ()),
+            shipped: <&SourceFile>::from(parsed).head().shipped().map(|_| ()),
         }
     }
 }

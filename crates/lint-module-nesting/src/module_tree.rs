@@ -66,7 +66,7 @@ impl<'head> From<Parsed<'_, 'head>> for ModuleGathering<'head> {
     fn from(parsed: Parsed<'_, 'head>) -> ModuleGathering<'head> {
         let head = parsed.head();
         let file = <&SourceFile>::from(parsed);
-        let module = file.shipped().map(|_| {
+        let module = file.head().shipped().map(|_| {
             let tests = file.test_modules().iter().map(|test| TestUses {
                 segments: AsRef::<[Name]>::as_ref(test.head().placement().module()).to_vec(),
                 uses: Sweep::gathered(test, Contributing::new(UseScan)).0,

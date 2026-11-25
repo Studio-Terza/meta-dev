@@ -87,7 +87,7 @@ impl<'read> Listing<'read> {
             files
                 .iter()
                 .map(|source| {
-                    let reach = source.shipped().map_or(Reach::Test, |_| Reach::Shipped);
+                    let reach = source.head().shipped().map_or(Reach::Test, |_| Reach::Shipped);
                     let members = iter::once((source, reach))
                         .chain(source.test_modules().iter().map(|module| (module, Reach::Test)));
                     ListedGroup(

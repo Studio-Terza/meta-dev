@@ -37,8 +37,8 @@ impl Package {
         self.targets.iter().find(|target| target.form().is_some())
     }
 
-    pub fn proc_macro(&self) -> Option<&Package> {
-        self.targets.iter().filter_map(Target::form).find(|form| *form == Form::ProcMacro).map(|_| self)
+    pub fn proc_macro(&self) -> Option<Form> {
+        self.targets.iter().filter_map(Target::form).find(|form| *form == Form::ProcMacro)
     }
 
     pub fn port(&self) -> Option<&PortTable> {

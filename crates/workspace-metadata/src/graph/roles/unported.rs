@@ -21,7 +21,8 @@ impl<'meta> Unported<'meta> {
         graph
             .members
             .iter()
-            .filter_map(|id| graph.package(id)?.proc_macro())
+            .filter_map(|id| graph.package(id))
+            .filter(|package| package.proc_macro().is_some())
             .flat_map(|package| Self::reached(graph, owned, package))
             .collect()
     }

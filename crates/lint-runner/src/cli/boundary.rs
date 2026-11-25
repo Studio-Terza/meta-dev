@@ -40,7 +40,7 @@ pub(crate) struct Rendered {
 
 impl Rendered {
     pub(crate) fn dirty(slot: Slot, report: Report<'_>) -> Option<Rendered> {
-        report.dirty().map(|found| Rendered { slot, text: found.to_string() })
+        Some(report).filter(|found| found.dirty().is_some()).map(|found| Rendered { slot, text: found.to_string() })
     }
 
     pub(crate) fn slot(&self) -> Slot {

@@ -76,7 +76,7 @@ impl From<&SourceFile> for Reading {
         let own_tests = Some(package.directory().join(ForeignReferences::TESTS))
             .filter(|tests| head.placement().crate_root().directory().starts_with(tests))
             .map(|_| CrateName::from(package));
-        let shipped = file.shipped().map(|_| Reader::Shipped);
+        let shipped = file.head().shipped().map(|_| Reader::Shipped);
         let reader = shipped.or_else(|| own_tests.as_ref().map(|_| Reader::Tests)).unwrap_or(Reader::Neither);
         let own = shipped.and(own_crate);
         let scan = Contributing::new(ReferenceScan { own_crate: own, reader });

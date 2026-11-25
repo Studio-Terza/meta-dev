@@ -11,7 +11,7 @@ pub trait GraphLint {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file>;
 
     fn dirty<'file>(system: &TypeSystem<'_, 'file>) -> Option<Report<'file>> {
-        Self::report_graph(system).dirty()
+        Some(Self::report_graph(system)).filter(|report| report.dirty().is_some())
     }
 }
 

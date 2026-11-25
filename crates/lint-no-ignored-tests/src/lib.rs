@@ -45,7 +45,7 @@ impl SweptLint for NoIgnoredTests {
     const READS: Reads = Reads::Every;
 
     fn watcher(file: &SourceFile) -> Box<dyn Finds<'_> + '_> {
-        let unrun = file.shipped().and_then(Self::never_tested).map(|_| ());
+        let unrun = file.head().shipped().and_then(|_| Self::never_tested(file)).map(|_| ());
         Box::new(Contributing::new(SkipMarks::new(file, unrun)))
     }
 }

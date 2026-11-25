@@ -58,7 +58,7 @@ pub struct BudgetGathering<'file> {
 
 impl<'file> From<&'file SourceFile> for BudgetGathering<'file> {
     fn from(file: &'file SourceFile) -> BudgetGathering<'file> {
-        let share = file.shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
+        let share = file.head().shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
         let tested = file.test_modules().iter().map(|module| {
             let scan = Sweep::gathered(module, Contributing::new(TestScan::new(module)));
             CrateBudget::measured(module, TestShare::WholeFile, scan)

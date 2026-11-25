@@ -64,8 +64,8 @@ impl FileHead {
     }
 
     #[must_use]
-    pub fn shipped(&self) -> Option<&FileHead> {
-        (self.placement.role() != Role::Target).then_some(self)
+    pub fn shipped(&self) -> Option<Role> {
+        Some(self.placement.role()).filter(|role| *role != Role::Target)
     }
 
     #[must_use]

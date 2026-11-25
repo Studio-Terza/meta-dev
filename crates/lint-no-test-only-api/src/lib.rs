@@ -106,7 +106,7 @@ impl WatchingLint for NoTestOnlyApi {
 
     fn watched(file: &SourceFile) -> Offering<'_> {
         let path = AsRef::<Path>::as_ref(file.head());
-        let shipped = file.shipped().map(|_| ());
+        let shipped = file.head().shipped().map(|_| ());
         let gated =
             shipped.map(|()| -> Box<dyn Finds<'_> + '_> { Box::new(Contributing::new(GatedItems::from(path))) });
         let features: Box<dyn Finds<'_> + '_> = Box::new(Contributing::new(TestFeatures::from(path)));

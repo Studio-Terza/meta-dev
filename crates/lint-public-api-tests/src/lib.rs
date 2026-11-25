@@ -46,7 +46,7 @@ impl WatchingLint for PublicApiTests {
     type Watched<'file> = Watched<'file>;
 
     fn watched(file: &SourceFile) -> Watched<'_> {
-        file.shipped().map_or_else(
+        file.head().shipped().map_or_else(
             || Watched::Beside(Contributing::new(PathReach::beside(file))),
             |_| Watched::Shipped(Contributing::new(TestCode::from(file))),
         )
