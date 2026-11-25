@@ -514,6 +514,12 @@ const LEXER_ON_MACROS: Text = roles!(
     node!("design-model", "grammar-notes"),
     node!("port-derive", "grammar-ident")
 );
+const LEXER_ON_LEXER: Text = roles!(
+    node!("grammar-notes", "grammar", "grammar-ident"),
+    "{\"lexer\": {\"format\": \"ident\"}}",
+    node!("design-model", "grammar-notes"),
+    node!("port-derive", "grammar-ident")
+);
 const MACRO_ON_OWNED: Text = roles!(
     node!("grammar-notes", "grammar"),
     "{\"lexer\": {\"format\": \"ident\"}}",
@@ -788,6 +794,7 @@ laws::table!(
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, LEXER_ON_STORE) => Lines::from(["crates/grammar-notes/Cargo.toml:9"]),
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, SHARED_FORMAT) => Lines::from(["crates/grammar-ident/Cargo.toml:5", "crates/grammar-notes/Cargo.toml:5"]),
         Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, LEXER_ON_MACROS) => Lines::default(),
+        Placed::new(&ROLE_MANIFESTS, ROLE_CRATES, LEXER_ON_LEXER) => Lines::default(),
     ]
 );
 

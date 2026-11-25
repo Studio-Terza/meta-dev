@@ -19,9 +19,3 @@ impl Member {
         self.owner
     }
 }
-
-impl AsRef<Name> for Member {
-    fn as_ref(&self) -> &Name {
-        &self.name
-    }
-}

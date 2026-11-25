@@ -1,14 +1,20 @@
 use graph_reader::Reader;
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
+use lint_layout::Name;
 use lint_transition_graph::{
-    AcyclicQuotients, Clustered as ClusterReport, ConnectedClusters, Extraction, GraphLint, InterfaceByConsumers,
+    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, Extraction, GraphLint, InterfaceByConsumers,
     LowestCluster, Transitions, TypeSystem,
 };
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::thread;
+use std::time::Duration;
 
 struct Clustered;
 
 impl Clustered {
+    const PROMPTLY: Duration = Duration::from_secs(10);
+
     fn lines(
         sources: &[Source],
         report: impl for<'found, 'file> Fn(&TypeSystem<'found, 'file>) -> Vec<Violation<'file>>,
@@ -616,6 +622,26 @@ fn a_cycle_closed_through_a_trait_impl_an_aliased_field_or_a_bound_is_reported()
         ]
     );
 }
+
+#[test]
+fn a_path_against_the_direction_of_use_ends_with_none_promptly() -> Result<(), RecvTimeoutError> {
+    let (sending, receiving) = mpsc::channel();
+    thread::spawn(move || {
+        let files = Sources::parsed(&LAYERED);
+        let extraction = Extraction::from(files.as_slice());
+        let model = Reader::read_files(&files);
+        let transitions = Transitions::from(&model);
+        let system = TypeSystem::built_from(&extraction, &transitions);
+        let ask = Ask::Path(Name::from("B"), Name::from("A"));
+        sending.send(ask.answered(system.containment(), None).to_string())
+    });
+    let answered = receiving.recv_timeout(Clustered::PROMPTLY)?;
+    assert!(answered.contains("use path from B to A:"), "{answered}");
+    assert!(answered.contains("  none"), "{answered}");
+    Ok(())
+}
+
+const LAYERED: [Source; 1] = [Clustered::at("crates/x/src/lib.rs", "pub struct A(B);\npub struct B;\n")];
 
 #[test]
 fn a_type_declared_for_tests_uses_nothing() {
