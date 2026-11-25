@@ -27,7 +27,7 @@ pub use syn::{
     PredicateType, QSelf, Receiver, Result, ReturnType, Signature, Stmt, StmtMacro, Token, TraitBound,
     TraitBoundModifier, TraitItem, TraitItemConst, TraitItemFn, TraitItemType, Type, TypeArray, TypeParam,
     TypeParamBound, TypePath, TypeReference, TypeTuple, UnOp, UseTree, Variant, VisRestricted, Visibility,
-    WherePredicate, braced, custom_keyword, token,
+    WherePredicate, braced, bracketed, custom_keyword, parenthesized, token,
 };
 pub use walk::{Entered, Node};
 
