@@ -26,6 +26,7 @@ use verdict::Verdict;
 #[derive(Debug)]
 pub struct MutantsChanged {
     diff: Journal,
+    narrowed: Journal,
     own: Pass,
     scoped: Pass,
     shard: Shard,
@@ -37,6 +38,7 @@ pub struct MutantsChanged {
 impl MutantsChanged {
     const IN_DIFF: &'static str = "--in-diff";
     const SCOPED: &'static str = "scoped";
+    const NARROWED: &'static str = "survivors.diff";
     const SELECTED: Flag = Flag::new("--selected");
     const KEPT: Flag = Flag::new("--kept");
 
@@ -64,7 +66,12 @@ impl MutantsChanged {
         Some(own).filter(|exit| *exit == Exit::Success).map_or(Ok(Telling::ended(Ok(own))), |_| {
             let timed_out = self.own.timed_out(ports.files())?;
             let survivors = self.own.survivors(ports.files())?;
-            let reruns = Reruns::new(&self.diff, &self.scoped, &self.scope, &self.keeping);
+            survivors
+                .as_ref()
+                .map(|found| self.own.narrowed(ports.files(), found))
+                .transpose()?
+                .map_or(Ok(()), |narrowed| self.narrowed.replace(ports.files(), &narrowed))?;
+            let reruns = Reruns::new(&self.narrowed, &self.scoped, &self.scope, &self.keeping);
             let rest = iter::once_with(move || reruns.after(ports, survivors.as_ref())).flatten();
             Ok(Telling::lazy(iter::once(Told::Said(timed_out)).chain(rest)))
         })
@@ -82,6 +89,7 @@ impl Step for MutantsChanged {
         let keeping = selected.following().flagged(Self::KEPT)?;
         Ok(MutantsChanged {
             diff: Journal::from(diff),
+            narrowed: Journal::from(output.join(Self::NARROWED)),
             scoped: Pass::within(output.join(Self::SCOPED)),
             own: Pass::within(output),
             shard,

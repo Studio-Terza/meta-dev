@@ -4,7 +4,7 @@ use std::process::ExitCode;
 
 use ci::ports::Invocation;
 
-use super::{ExactReply, Scratch, Script, Text};
+use super::{ExactReply, Missed, Scratch, Script, Text};
 
 const SURVIVOR: &str = r#"{"name": "crates/a/src/lib.rs:3:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 3, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
 const SURVIVOR_MOVED: &str = r#"{"name": "crates/a/src/lib.rs:4:5: replace f -> bool with true", "file": "crates/a/src/lib.rs", "function": {"function_name": "f"}, "span": {"start": {"line": 4, "column": 5}}, "replacement": "true", "genre": "FnValue"}"#;
@@ -419,9 +419,12 @@ fn a_shard_given_an_empty_selection_mutates_nothing_and_keeps_an_empty_result() 
 #[test]
 fn a_survivor_the_scoped_pass_still_misses_is_kept_for_the_next_push() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    scratch.directory("out/mutants.out")?;
+    scratch.survived(&[Missed {
+        name: "crates/a/src/lib.rs:3:5: replace f -> bool with true",
+        file: "crates/a/src/lib.rs",
+        line: 3,
+    }])?;
     scratch.directory("out/scoped/mutants.out")?;
-    scratch.write("out/mutants.out/missed.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true\n")?;
     scratch.write("out/scoped/mutants.out/missed.txt", "crates/a/src/lib.rs:3:5: replace f -> bool with true\n")?;
     let outcomes = Prior::outcomes(&[SURVIVOR], &[]);
     scratch.write("out/scoped/mutants.out/outcomes.json", &outcomes)?;
@@ -512,6 +515,6 @@ fn a_full_plan_sizes_each_shard_from_the_prior_s_measured_cost_per_crate() -> Re
         since_tests: "",
     }
     .planned()?;
-    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":303}]"#]);
+    assert_eq!(planned.shards, [r#"shards=[{"index":0,"minutes":153}]"#]);
     Ok(())
 }

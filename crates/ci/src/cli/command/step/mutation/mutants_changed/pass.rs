@@ -8,13 +8,17 @@ use std::path::PathBuf;
 use file_ports::Files;
 use text_lines::Lines;
 
+mod boundary;
+
 use super::super::boundary::Exact;
+use super::super::kept::Outcomes;
 use super::verdict::Verdict;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::journal::Journal;
 use crate::cli::command::step::mutation::cargo_mutants::CargoMutants;
 use crate::cli::command::step::mutation::shard_summary::outcome::Outcome;
 use crate::cli::ports::{Exit, Ports, Text};
+use boundary::Narrowed;
 
 #[derive(Debug)]
 pub(super) struct Pass {
@@ -86,6 +90,13 @@ impl Pass {
         let unproven = self.listed(files, Outcome::Missed)?.into_iter().chain(self.listed(files, Outcome::Timeout)?);
         let missed: Vec<String> = unproven.map(|name| [name.as_ref(), "\n"].concat()).collect();
         Ok(Verdict::from(&Text::new(missed.concat())).told())
+    }
+
+    pub(super) fn narrowed(&self, files: &impl Files, survivors: &Survivors) -> Result<Text, Failure<'static>> {
+        let path = self.outcomes();
+        let read = files.read_text(&path).map_err(|failure| Failure::unusable(path.clone(), failure))?;
+        let missed = Outcomes::read(&read).map_err(Failure::Outcomes)?.missed();
+        missed.iter().filter(|mutant| survivors.0.contains(&mutant.name())).collect::<Narrowed>().diff(files)
     }
 
     pub(super) fn outcomes(&self) -> PathBuf {

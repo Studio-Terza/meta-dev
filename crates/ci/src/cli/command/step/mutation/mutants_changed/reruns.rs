@@ -12,7 +12,7 @@ use crate::cli::ports::{Exit, Ports};
 
 #[derive(Debug)]
 pub(super) struct Reruns<'step> {
-    diff: &'step Journal,
+    narrowed: &'step Journal,
     scoped: &'step Pass,
     scope: &'step [OsString],
     keeping: &'step Keeping,
@@ -22,12 +22,12 @@ impl<'step> Reruns<'step> {
     const IN_DIFF: &'static str = "--in-diff";
 
     pub(super) fn new(
-        diff: &'step Journal,
+        narrowed: &'step Journal,
         scoped: &'step Pass,
         scope: &'step [OsString],
         keeping: &'step Keeping,
     ) -> Reruns<'step> {
-        Reruns { diff, scoped, scope, keeping }
+        Reruns { narrowed, scoped, scope, keeping }
     }
 
     pub(super) fn after(&self, ports: &impl Ports, survivors: Option<&Survivors>) -> Vec<Told<'step>> {
@@ -40,7 +40,7 @@ impl<'step> Reruns<'step> {
     }
 
     fn rerun(&self, ports: &impl Ports, missed: &Survivors) -> Result<Vec<Told<'step>>, Failure<'step>> {
-        let diff: &Path = self.diff.as_ref();
+        let diff: &Path = self.narrowed.as_ref();
         let named = missed.examined();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
             .into_iter()
