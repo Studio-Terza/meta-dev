@@ -1,6 +1,10 @@
 use std::convert::Infallible;
+use std::ops::Range;
 
 use lint_layout::Name;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 
 use crate::item_path::ItemPath;
 use crate::resolved::Resolved;
@@ -83,7 +87,7 @@ impl AsRef<Name> for Item {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct AliasParameter {
     name: Name,
     default: Option<TypeRef>,
@@ -106,13 +110,22 @@ impl AsRef<Name> for AliasParameter {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(generate = Alias::sampled)]
 pub struct Alias {
     parameters: Vec<AliasParameter>,
     target: TypeRef,
 }
 
 impl Alias {
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn sampled() -> impl Strategy<Value = Alias> {
+        Strategy::prop_map((vec(any::<AliasParameter>(), Alias::SAMPLED), any::<TypeRef>()), |(parameters, target)| {
+            Alias { parameters, target }
+        })
+    }
+
     #[must_use]
     pub fn new(parameters: Vec<AliasParameter>, target: TypeRef) -> Alias {
         Alias { parameters, target }

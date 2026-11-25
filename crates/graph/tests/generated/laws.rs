@@ -1,5 +1,12 @@
 use laws::proptest::prelude::any;
 
+laws::generates!(alias_generates, any::<graph::Alias>());
+
+laws::generates!(alias_parameter_generates, any::<graph::AliasParameter>());
+
+laws::generates!(aliases_generates, any::<graph::Aliases>());
+laws::monoid!(aliases_forms_a_monoid, graph::Aliases, any::<graph::Aliases>());
+
 laws::generates!(crate_exports_generates, any::<graph::CrateExports>());
 laws::monoid!(crate_exports_forms_a_monoid, graph::CrateExports, any::<graph::CrateExports>());
 
@@ -44,6 +51,10 @@ laws::generates!(resolved_generates, any::<graph::Resolved>());
 laws::generates!(returned_generates, any::<graph::Returned>());
 
 laws::generates!(root_generates, any::<graph::Root>());
+
+laws::generates!(sited_generates, any::<graph::Sited>());
+
+laws::generates!(spelling_generates, any::<graph::Spelling>());
 
 laws::generates!(taken_generates, any::<graph::Taken>());
 

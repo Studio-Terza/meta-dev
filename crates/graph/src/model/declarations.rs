@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use algebra::{Monoid, Semigroup};
 use newtype::proptest::arbitrary::any;
-use newtype::proptest::collection::btree_map;
+use newtype::proptest::collection::{btree_map, vec};
 use newtype::proptest::strategy::Strategy;
 
 use crate::boundary::ItemId;
@@ -14,13 +14,14 @@ use crate::resolved::Resolved;
 use crate::sited::Sited;
 use crate::type_ref::{Named, Rebuild, TypeRef};
 
-#[derive(Clone, Debug)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 struct StdAlias {
     path: ItemPath,
     alias: Alias,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(newtype::Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(generate = Aliases::sampled)]
 pub struct Aliases {
     declared: BTreeMap<ItemId, Alias>,
     std: Vec<StdAlias>,
@@ -37,6 +38,15 @@ impl Semigroup for Aliases {
 impl Monoid for Aliases {}
 
 impl Aliases {
+    const SAMPLED: Range<usize> = 0..4;
+
+    fn sampled() -> impl Strategy<Value = Aliases> {
+        Strategy::prop_map(
+            (btree_map(any::<ItemId>(), any::<Alias>(), Aliases::SAMPLED), vec(any::<StdAlias>(), Aliases::SAMPLED)),
+            |(declared, std)| Aliases { declared, std },
+        )
+    }
+
     #[must_use]
     pub fn declaring(item: ItemId, alias: Alias) -> Aliases {
         Aliases { declared: BTreeMap::from([(item, alias)]), std: Vec::new() }

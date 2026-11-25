@@ -3,7 +3,7 @@ use lint_layout::Position;
 use crate::item_path::ItemPath;
 use crate::resolved::Resolved;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Spelling {
     Written(ItemPath, Position),
     Implied,
@@ -27,7 +27,7 @@ impl Spelling {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Sited {
     resolved: Resolved,
     spelling: Spelling,

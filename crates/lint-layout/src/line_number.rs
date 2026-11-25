@@ -1,7 +1,8 @@
 use newtype::Display;
 use syntax::Span;
 
-#[derive(Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Display, newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[newtype(from = LineNumber)]
 pub struct LineNumber(usize);
 
 impl LineNumber {

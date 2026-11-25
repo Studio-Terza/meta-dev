@@ -1,9 +1,15 @@
+use std::ops::Range;
+
 use algebra::{Monoid, Semigroup};
 use lint_layout::{Name, PathTail, Word};
 use newtype::Arbitrary;
 use newtype::Wrapping;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 
 #[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(generate = ItemPath::sampled)]
 pub struct ItemPath {
     segments: Vec<Name>,
 }
@@ -44,6 +50,12 @@ impl Semigroup for ItemPath {
 impl Monoid for ItemPath {}
 
 impl ItemPath {
+    const SAMPLED: Range<usize> = 0..4;
+
+    fn sampled() -> impl Strategy<Value = ItemPath> {
+        Strategy::prop_map(vec(any::<Name>(), ItemPath::SAMPLED), |segments| ItemPath { segments })
+    }
+
     #[must_use]
     pub fn last(&self) -> Option<&Name> {
         self.segments.last()

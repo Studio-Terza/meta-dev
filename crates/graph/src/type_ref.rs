@@ -1,8 +1,13 @@
 use std::convert::Infallible;
+use std::ops::Range;
 
 use std::{fmt, vec};
 
 use lint_layout::Name;
+use newtype::proptest::arbitrary::{Arbitrary, any};
+use newtype::proptest::collection;
+use newtype::proptest::prop_oneof;
+use newtype::proptest::strategy::{BoxedStrategy, Just, Strategy};
 
 mod outline;
 
@@ -306,6 +311,46 @@ impl TypeRef {
             TypeRef::Function(callable) => outline.callable(callable),
             TypeRef::Opaque => outline.other(),
         }
+    }
+}
+
+impl TypeRef {
+    const DEPTH: u32 = 3;
+    const NODES: u32 = 16;
+    const BRANCHES: u32 = 3;
+    const SAMPLED: Range<usize> = 0..3;
+
+    fn grown(inner: BoxedStrategy<TypeRef>) -> BoxedStrategy<TypeRef> {
+        let listed = collection::vec(inner.clone(), TypeRef::SAMPLED);
+        let boxed = inner.prop_map(Box::new);
+        prop_oneof![
+            (any::<Sited>(), listed.clone(), listed.clone())
+                .prop_map(|(path, arguments, bindings)| TypeRef::Named(Named { path, arguments, bindings })),
+            listed.clone().prop_map(TypeRef::Tuple),
+            boxed.clone().prop_map(TypeRef::Reference),
+            boxed.clone().prop_map(TypeRef::Pointer),
+            boxed.clone().prop_map(TypeRef::Slice),
+            (boxed.clone(), listed.clone())
+                .prop_map(|(element, measured)| TypeRef::Array(Arrayed { element, measured })),
+            listed.clone().prop_map(TypeRef::Bounded),
+            (boxed.clone(), listed.clone(), any::<Option<Name>>()).prop_map(|(subject, arguments, associated)| {
+                TypeRef::Projected(Projection { subject, arguments, associated })
+            }),
+            (listed, boxed).prop_map(|(inputs, output)| TypeRef::Function(Callable { inputs, output })),
+        ]
+        .boxed()
+    }
+}
+
+impl Arbitrary for TypeRef {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<TypeRef>;
+
+    fn arbitrary_with((): ()) -> BoxedStrategy<TypeRef> {
+        let named = any::<Sited>().prop_map(|path| TypeRef::Named(Named::new(path, Vec::new())));
+        prop_oneof![Just(TypeRef::Opaque), named]
+            .prop_recursive(TypeRef::DEPTH, TypeRef::NODES, TypeRef::BRANCHES, TypeRef::grown)
+            .boxed()
     }
 }
 
