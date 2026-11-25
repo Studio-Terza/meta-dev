@@ -166,6 +166,20 @@ impl Resolved {
     }
 
     #[must_use]
+    pub fn unknown(&self) -> Option<UnknownPath<'_>> {
+        match self {
+            Resolved::Unknown(path, _) => Some(UnknownPath(path)),
+            Resolved::Std(_)
+            | Resolved::StdTrait(_)
+            | Resolved::Crate(_)
+            | Resolved::Member(_)
+            | Resolved::External(_)
+            | Resolved::Primitive(_)
+            | Resolved::Param(_) => None,
+        }
+    }
+
+    #[must_use]
     pub fn parameter(&self) -> Option<&Name> {
         match self {
             Resolved::Param(name) => Some(name),
@@ -186,6 +200,15 @@ pub struct StdTrait<'path>(&'path ItemPath);
 impl AsRef<ItemPath> for StdTrait<'_> {
     fn as_ref(&self) -> &ItemPath {
         self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnknownPath<'path>(&'path ItemPath);
+
+impl<'path> From<UnknownPath<'path>> for &'path ItemPath {
+    fn from(unknown: UnknownPath<'path>) -> &'path ItemPath {
+        unknown.0
     }
 }
 
