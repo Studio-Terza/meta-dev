@@ -3,16 +3,17 @@ mod ground;
 mod ignored;
 mod persistence;
 mod projects;
+mod said;
 mod token;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use algebra::Monoid;
 use console_ports::Environment;
 use design_store::Scope;
 use file_ports::Files;
-use grammar_flag::Flags;
 use store_ports::Opens;
 
 use super::failure::Failure;
@@ -22,6 +23,7 @@ pub use ground::Ground;
 use persistence::Persistence;
 use projects::Projects;
 pub use projects::{Kept, Located};
+use said::{Heard, Said, Saying, Wanting};
 pub use token::{Shaped, Token, Valued};
 
 #[derive(Debug)]
@@ -36,21 +38,6 @@ struct Words {
     spoken: Vec<Token>,
     workspace: Option<PathBuf>,
     scope: Scope,
-    expecting: Expecting,
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-enum Expecting {
-    #[default]
-    Word,
-    Path,
-    Value(Valued),
-}
-
-#[derive(Debug)]
-enum Argument {
-    Flag(Flag),
-    Plain(OsString),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,27 +69,27 @@ impl Flag {
         ("--reason", Flag::Valued(Valued::Reason)),
     ];
 
-    fn owned(self, verb: Option<Verb>) -> Result<Flag, Failure> {
+    fn heard(self, verb: Option<Verb>) -> Result<Heard, Failure> {
         [Flag::Workspace]
             .iter()
             .chain(verb.map_or(&[][..], Verb::options))
             .find(|owned| **owned == self)
-            .copied()
             .ok_or(Failure::Usage)
+            .map(|owned| owned.listened())
     }
 
-    fn expectation(self) -> Expecting {
+    fn listened(self) -> Heard {
         match self {
-            Flag::Workspace => Expecting::Path,
-            Flag::Valued(valued) => Expecting::Value(valued),
-            Flag::DryRun | Flag::All | Flag::Settings => Expecting::Word,
+            Flag::Workspace => Heard::Wanting(Wanting::Path),
+            Flag::Valued(valued) => Heard::Wanting(Wanting::Value(valued)),
+            Flag::DryRun | Flag::All | Flag::Settings => Heard::Whole(Said::Flagged(self)),
         }
     }
 
-    fn scope(self, current: Scope) -> Scope {
+    fn scope(self) -> Scope {
         match self {
             Flag::All => Scope::Everyone,
-            Flag::Workspace | Flag::DryRun | Flag::Settings | Flag::Valued(_) => current,
+            Flag::Workspace | Flag::DryRun | Flag::Settings | Flag::Valued(_) => Scope::default(),
         }
     }
 
@@ -115,74 +102,24 @@ impl Flag {
     }
 }
 
-impl TryFrom<OsString> for Argument {
-    type Error = Failure;
-
-    fn try_from(argument: OsString) -> Result<Argument, Failure> {
-        match argument.to_str().and_then(Flags::spelled) {
-            Some(flag) => flag.parse().map(Argument::Flag),
-            None => Ok(Argument::Plain(argument)),
-        }
-    }
-}
-
-impl Words {
-    fn taking(self, argument: OsString) -> Result<Words, Failure> {
-        match self.expecting {
-            Expecting::Path => {
-                Ok(Words { workspace: Some(PathBuf::from(argument)), expecting: Expecting::Word, ..self })
-            }
-            Expecting::Value(valued) => Ok(Words {
-                spoken: self.spoken.into_iter().chain([Token::Valued(valued, argument)]).collect(),
-                expecting: Expecting::Word,
-                ..self
-            }),
-            Expecting::Word => Argument::try_from(argument).and_then(|read| self.worded(read)),
-        }
-    }
-
-    fn worded(self, argument: Argument) -> Result<Words, Failure> {
-        match argument {
-            Argument::Flag(flag) => flag.owned(self.verb).map(|owned| self.flagged(owned)),
-            Argument::Plain(word) => self.said(Token::Word(word)),
-        }
-    }
-
-    fn said(self, word: Token) -> Result<Words, Failure> {
-        match self.verb {
-            None => word.text().ok_or(Failure::Usage)?.parse().map(|verb| Words { verb: Some(verb), ..self }),
-            Some(_) => Ok(Words { spoken: self.spoken.into_iter().chain([word]).collect(), ..self }),
-        }
-    }
-
-    fn flagged(self, flag: Flag) -> Words {
-        Words {
-            expecting: flag.expectation(),
-            scope: flag.scope(self.scope),
-            spoken: self.spoken.into_iter().chain(flag.token()).collect(),
-            ..self
-        }
-    }
-}
-
 impl TryFrom<Words> for Request {
     type Error = Failure;
 
     fn try_from(words: Words) -> Result<Request, Failure> {
-        match words.expecting {
-            Expecting::Path | Expecting::Value(_) => Err(Failure::Usage),
-            Expecting::Word => words
-                .verb
-                .ok_or(Failure::Usage)
-                .and_then(|verb| verb.command(&words.spoken, words.scope))
-                .map(|command| Request { command, workspace: words.workspace }),
-        }
+        words
+            .verb
+            .ok_or(Failure::Usage)
+            .and_then(|verb| verb.command(&words.spoken, words.scope))
+            .map(|command| Request { command, workspace: words.workspace })
     }
 }
 
 impl Request {
-    pub fn parsed(mut arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
-        arguments.try_fold(Words::default(), Words::taking).and_then(Request::try_from)
+    pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
+        Saying::said(arguments)
+            .collect::<Result<Vec<Said>, Failure>>()
+            .map(|said| Words::concat(said.into_iter().map(Words::from)))
+            .and_then(Request::try_from)
     }
 
     pub fn located(&self, environment: &impl Environment, files: &impl Files) -> Result<Located, Failure> {

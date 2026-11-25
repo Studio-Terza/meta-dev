@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 invariants = { path = "../invariants" }
+algebra = { path = "../algebra" }
 console-ports = { path = "../console-ports" }
 design-model = { path = "../design-model" }
 design-jobs = { path = "../design-jobs" }

@@ -14,7 +14,7 @@ use lint_core::{Site, TypeName, Violation};
 use lint_layout::LineNumber;
 
 use crate::declared_graphs::graph::ignored::Ignored;
-use crate::edge::Edge;
+use crate::edge::{Edge, Reversed};
 use crate::finding::Finding;
 use block::Block;
 use header::Header;
@@ -36,7 +36,7 @@ impl Graph {
 
     pub fn violations<'file>(&self, path: &'file Path) -> Vec<Violation<'file>> {
         let edges: Vec<Edge<'_>> = self.0.iter().flat_map(Block::edges).collect();
-        let reversed: Vec<Edge<'_>> = edges.iter().copied().map(Edge::reversed).collect();
+        let reversed: Vec<Edge<'_>> = edges.iter().copied().map(Reversed::from).map(Edge::from).collect();
         let reachable = self.closed(Kind::Start, &edges);
         let ending = self.closed(Kind::Terminal, &reversed);
         self.0.iter().flat_map(|block| block.violations(path, &reachable, &ending)).collect()

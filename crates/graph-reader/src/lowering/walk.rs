@@ -72,6 +72,7 @@ impl<'read> Frame<'read> {
             constraints: generics.constraints(&signature.generics),
             parameters: LoweredParameter::declared(&generics, &signature.generics),
             mutation: Mutations::signed(signature),
+            mutated: Mutations::mutated(&generics, signature),
             definition: None,
             region: self.context.region(),
             place: self.context.place(),
@@ -120,15 +121,14 @@ impl<'read> Frame<'read> {
     ) -> Grains {
         inner.concluded(|framed, grown| {
             let generics = framed.0.map_or_else(|| Arc::clone(&self.generics), |frame| frame.generics);
-            let (bodies, kept): (Vec<Grain>, Vec<Grain>) =
-                grown.grains.into_iter().partition(|grain| grain.bodied().is_some());
-            let part: BodyPart = Monoid::concat(bodies.into_iter().filter_map(super::Grain::body));
+            let kept: Vec<Grain> = grown.grains.into_iter().collect();
+            let part: BodyPart = Monoid::concat(grown.bodies);
             let definition = body.map(|block| BodyGroup::opened(&generics, signature, block).lowered(part));
             let own = kept.iter().position(|grain| grain.function().is_some());
             let mut ahead = kept;
             let rest = ahead.split_off(own.map_or(ahead.len(), |found| found + 1));
             let defined = own.and_then(|_| ahead.pop()).map(|function| function.defined(definition));
-            Grains { grains: ahead.into_iter().chain(defined).chain(rest).collect(), bodied: None }
+            Grains { grains: ahead.into_iter().chain(defined).chain(rest).collect(), ..Grains::default() }
         })
     }
 }

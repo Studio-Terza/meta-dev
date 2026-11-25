@@ -1,3 +1,5 @@
+mod stored;
+
 use std::collections::BTreeMap;
 
 use graph::{Function, Implementation, ItemId, ItemKind, Model, Owner, Reach, Region, Resolved, Seat};
@@ -7,6 +9,7 @@ use lint_layout::{Name, Whole, Word, words};
 use super::exposure::Exposure;
 use super::profile::Profile;
 use crate::subject::Subject;
+use stored::Stores;
 
 #[derive(Clone, Copy, Debug)]
 struct Typed<'model> {
@@ -20,6 +23,7 @@ struct Typed<'model> {
 pub(super) struct Reading<'model> {
     model: &'model Model,
     types: BTreeMap<ItemId, Typed<'model>>,
+    stores: Stores,
 }
 
 impl<'model> From<&'model Model> for Reading<'model> {
@@ -34,7 +38,7 @@ impl<'model> From<&'model Model> for Reading<'model> {
                 Some((id, Typed { krate: placed.krate(), name: item.as_ref(), site: placed.site(), exposure }))
             })
             .collect();
-        Reading { model, types }
+        Reading { model, types, stores: Stores::from(model) }
     }
 }
 
@@ -70,6 +74,7 @@ impl<'model> Reading<'model> {
         let typed = self.types.get(&resolved.crate_item()?)?;
         let listed = implementation.hand_written().map_or(&Self::DERIVED[..], |_| &Self::TRAITS[..]);
         let name = implementation.interface_name().filter(|found| found.matches::<Whole>(listed).is_some())?;
+        Stores::record(name).map_or(Some(()), |()| self.stores.admits(implementation))?;
         Some(Profile::declared(Self::subject(*typed), typed.site, Exposure::Private, vec![name.clone()]))
     }
 

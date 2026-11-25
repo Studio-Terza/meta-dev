@@ -1,9 +1,10 @@
-use body_lifts::{Body, Branching};
+use body_lifts::Body;
 use lint_core::Site;
 use lint_layout::Name;
 
 use graph::{Invocation, Mutation};
 
+use super::handle::Handle;
 use super::resolved::Resolved;
 use super::wrapping::Wrapping;
 
@@ -14,8 +15,8 @@ pub struct Function<'file> {
     takes: Vec<Resolved>,
     gives: Resolved,
     mutation: Mutation,
+    handle: Handle,
     body: Body,
-    branching: Branching,
     wrapping: Wrapping,
     takings: Vec<Wrapping>,
     calls: &'file [Invocation],
@@ -29,18 +30,18 @@ impl<'file> Function<'file> {
             takes,
             gives,
             mutation: Mutation::Absent,
+            handle: Handle::Owned,
             body: Body::Written,
-            branching: Branching::new(1),
             wrapping: Wrapping::Plain,
             takings: Vec::new(),
             calls: &[],
         }
     }
 
-    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, branching: Branching) -> Function<'file> {
+    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, handle: Handle) -> Function<'file> {
         self.mutation = mutation;
         self.body = body;
-        self.branching = branching;
+        self.handle = handle;
         self
     }
 
@@ -69,6 +70,11 @@ impl<'file> Function<'file> {
     }
 
     #[must_use]
+    pub fn held(&self) -> Handle {
+        self.handle
+    }
+
+    #[must_use]
     pub fn wrapping(&self) -> Wrapping {
         self.wrapping
     }
@@ -86,11 +92,6 @@ impl<'file> Function<'file> {
     #[must_use]
     pub fn calls(&self) -> &'file [Invocation] {
         self.calls
-    }
-
-    #[must_use]
-    pub fn branches(&self) -> Branching {
-        self.branching
     }
 }
 

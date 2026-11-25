@@ -4,6 +4,7 @@ use lint_layout::Name;
 use newtype::Wrapping;
 
 use super::super::Containment;
+use super::super::link::{Link, Reversed};
 use super::super::slice::Slice;
 use super::listing::{Listed, Names, Placed, Spelled};
 
@@ -32,7 +33,9 @@ impl fmt::Display for Exported<'_, '_, '_> {
         slices.into_iter().try_for_each(|slice| {
             writeln!(formatter, "  {}", slice.cluster())?;
             let users: Vec<_> =
-                Containment::adjacency(slice.cut().outgoing().iter().map(|link| link.reversed())).into_iter().collect();
+                Containment::adjacency(slice.cut().outgoing().iter().map(|link| Link::from(Reversed::from(*link))))
+                    .into_iter()
+                    .collect();
             users.first().map_or_else(|| writeln!(formatter, "    none"), |_| Ok(()))?;
             users.iter().take(self.listed.into_inner()).try_for_each(|(export, outside)| {
                 let placed = Placed::new(self.view, *export, Spelled::Name);

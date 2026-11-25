@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use graph::{
-    Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, Named, Owner, Primitive, Reach,
-    Region, Resolved, Seat, Sited, Spelling, TypeRef, Within, Zone,
+    Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, Named, Owner, ParamIndex, Primitive,
+    Reach, Region, Resolved, Seat, Sited, Spelling, TypeRef, Within, Zone,
 };
 use graph_reader::Reader;
 use invariants::{invariant, invariants};
@@ -46,7 +46,7 @@ impl Read {
     }
 
     fn resolved(ty: &TypeRef) -> TypeRef<Resolved> {
-        ty.mapped(&mut |sited: &Sited| AsRef::<Resolved>::as_ref(sited).clone())
+        ty.mapped(|sited: &Sited| AsRef::<Resolved>::as_ref(sited).clone())
     }
 
     fn spelt(text: &str) -> Vec<Sited> {
@@ -395,6 +395,22 @@ fn a_shared_adaptor_chained_on_another_still_repeats_per_element() {
 }
 
 #[test]
+fn a_self_field_read_in_a_loop_repeats_per_pass() {
+    let model = Read::model(
+        "struct Counter {\n    limit: u8,\n}\nimpl Counter {\n    fn f(&self, ids: Vec<u8>) -> u8 {\n        ids.iter().map(|id| id.min(&self.limit)).sum()\n    }\n}\n",
+    );
+    let fields: Vec<String> = model
+        .functions()
+        .filter_map(|placed| placed.entity().definition())
+        .flat_map(|definition| {
+            definition.repetitions().iter().filter(|repetition| repetition.reach().index().is_none())
+        })
+        .map(|repetition| AsRef::<lint_layout::Name>::as_ref(repetition.reach()).to_string())
+        .collect();
+    assert_eq!(fields, ["limit"]);
+}
+
+#[test]
 fn a_struct_literal_uses_its_type_path() {
     let model = Read::model("struct Point {\n    x: u8,\n}\nfn f() -> Point {\n    Point { x: 1 }\n}\n");
     let literals: Vec<String> = model
@@ -440,4 +456,30 @@ fn a_dollar_crate_path_is_used_by_the_defining_crate_not_by_the_crate_that_invok
     let kept = Item::new(Name::from("Kept"), ItemKind::Struct).homed(Some(Name::from("a"))).exposed(Exposure::Public);
     assert_eq!(expanded, [("crates/a/src/lib.rs:5".to_owned(), Some(kept))]);
     Ok(())
+}
+
+#[test]
+fn a_method_call_beside_the_tail_call_keeps_the_whole_parameter_read() {
+    let model = Read::model(
+        "struct X;\nstruct Y;\nfn helper(n: u8, x: &X) -> u8 {\n    n\n}\nfn f(x: &X, y: &Y) -> u8 {\n    helper(y.size(), x)\n}\n",
+    );
+    let reads: Vec<ParamIndex> = model
+        .functions()
+        .filter(|placed| AsRef::<Name>::as_ref(placed.entity()) == &Name::from("f"))
+        .filter_map(|placed| placed.entity().definition())
+        .flat_map(|definition| definition.reads().iter().map(graph::Read::parameter))
+        .collect();
+    assert_eq!(reads, [ParamIndex::from(0)]);
+}
+
+#[test]
+fn a_free_function_body_resolves_the_function_type_parameters() {
+    let model = Read::model("fn f<T: Clone>(x: &T) -> T {\n    x.clone()\n}\n");
+    let receivers_are_the_parameter: Vec<bool> = model
+        .functions()
+        .filter_map(|placed| placed.entity().definition())
+        .flat_map(|definition| definition.invocations().iter().map(|invocation| format!("{invocation:?}")))
+        .map(|shown| shown.contains("resolved: Param(Name(\"T\"))"))
+        .collect();
+    assert_eq!(receivers_are_the_parameter, [true]);
 }

@@ -1,6 +1,6 @@
 use graph::{
-    Domain, Entry, Exposure, External, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved,
-    Sited, TypeRef, Unresolved,
+    Domain, Entry, Exposure, External, Function, Item, ItemKind, ItemPath, Model, Named, Owner, Primitive, Projection,
+    Resolved, Sited, TypeRef, Unresolved,
 };
 use graph_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -279,7 +279,7 @@ impl Seen {
     }
 
     fn typed(model: &Model, ty: &TypeRef) -> TypeRef<Seen> {
-        ty.mapped(&mut |sited: &Sited| Seen::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
+        ty.mapped(|sited: &Sited| Seen::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
     }
 }
 
@@ -1006,6 +1006,39 @@ fn an_item_knows_the_library_crate_that_declares_it() {
         })
         .collect();
     assert_eq!(homes, [Some(Name::from("d")), Some(Name::from("d"))]);
+}
+
+const MARKED_AND_LOCAL_RULES: &str = "#[macro_export]\nmacro_rules! shared {\n    () => {};\n}\n#[doc(hidden)]\nmacro_rules! local {\n    () => {};\n}\n";
+
+#[test]
+fn only_a_macro_export_marked_rule_is_exported_from_its_crate_root() {
+    let model = Reader::read_files(&[Read::file("crates/a/src/lib.rs", MARKED_AND_LOCAL_RULES)]);
+    let exported: Vec<bool> = ["shared", "local"]
+        .iter()
+        .map(|rule| [Name::from("a"), Name::from(*rule)].into_iter().collect::<ItemPath>())
+        .map(|path| model.exported(Domain::Macros, &path).is_some())
+        .collect();
+    assert_eq!(exported, [true, false]);
+}
+
+#[test]
+fn a_macro_export_marked_rule_in_a_module_file_is_exported_from_the_crate_root() {
+    let files = [
+        Read::file("crates/a/src/lib.rs", "mod x;\n"),
+        Read::file("crates/a/src/x.rs", "#[macro_export]\nmacro_rules! made {\n    () => {};\n}\n"),
+    ];
+    let model = Reader::read_files(&files);
+    let path: ItemPath = [Name::from("a"), Name::from("made")].into_iter().collect();
+    assert!(model.exported(Domain::Macros, &path).is_some());
+}
+
+const TRANSCRIBED_AFTER_A_BODY: &str = "fn host() {\n    struct Hidden;\n}\nmacro_rules! later {\n    () => {\n        fn g() {\n            let _ = Hidden;\n        }\n        fn h() -> Hidden {\n            todo!()\n        }\n    };\n}\n";
+
+#[test]
+fn a_macro_transcriber_lowers_in_scopes_of_its_own_not_those_of_an_earlier_body() {
+    let model = Reader::read_files(&[Read::file("a.rs", TRANSCRIBED_AFTER_A_BODY)]);
+    let written: Vec<String> = model.uses().map(|placed| placed.entity().written().to_string()).collect();
+    assert_eq!(written, ["macro_rules", "todo"]);
 }
 
 const AFTER_GENERIC_FN: &str = "struct Out;\nfn host<Out>() {}\nfn after() -> Out { todo!() }\n";

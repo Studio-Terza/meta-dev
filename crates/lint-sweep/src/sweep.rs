@@ -2,16 +2,56 @@ mod boundary;
 
 use std::fmt;
 
-use lint_core::{Contribute, Contributing, SourceFile, Unwalked, Violation};
+use lint_core::{Contribute, Contributing, SourceFile, Unwalked, Violation, Visits};
 
-pub use boundary::Member;
+pub use boundary::{Member, Spelled};
 
 pub trait Gathers<Part> {
     fn gathered(self, file: &SourceFile) -> Part;
 }
 
 pub trait Finds<'file>: fmt::Debug {
-    fn found(self: Box<Self>, file: &SourceFile) -> Vec<Violation<'file>>;
+    fn found(self: Box<Self>, file: &SourceFile) -> Found<'file>;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Visited {
+    contributor: Spelled,
+    nodes: Visits,
+}
+
+impl Visited {
+    #[must_use]
+    pub fn contributor(&self) -> Spelled {
+        self.contributor
+    }
+
+    #[must_use]
+    pub fn nodes(&self) -> Visits {
+        self.nodes
+    }
+}
+
+#[derive(Debug)]
+pub struct Found<'file> {
+    violations: Vec<Violation<'file>>,
+    visited: Visited,
+}
+
+impl Found<'_> {
+    #[must_use]
+    pub fn visited(&self) -> Visited {
+        self.visited
+    }
+}
+
+impl<'file> IntoIterator for Found<'file> {
+    type Item = Violation<'file>;
+    type IntoIter = std::vec::IntoIter<Violation<'file>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.violations.into_iter()
+    }
 }
 
 pub trait Sorts<'file>: fmt::Debug {
@@ -23,8 +63,11 @@ pub trait Concludes<'file>: Contribute + fmt::Debug {
 }
 
 impl<'file, Contributor: Concludes<'file>> Finds<'file> for Contributing<Contributor> {
-    fn found(self: Box<Self>, file: &SourceFile) -> Vec<Violation<'file>> {
-        self.concluded(file, Contributor::violations)
+    fn found(self: Box<Self>, file: &SourceFile) -> Found<'file> {
+        self.tallied(file).concluded(|contributor, open, part, nodes| Found {
+            violations: contributor.violations(open, part),
+            visited: Visited { contributor: Spelled::naming::<Contributor>(), nodes },
+        })
     }
 }
 
@@ -66,7 +109,7 @@ impl Sweep {
     }
 
     #[must_use]
-    pub fn found<'file>(file: &'file SourceFile, watcher: Box<dyn Finds<'file> + '_>) -> Vec<Violation<'file>> {
+    pub fn found<'file>(file: &'file SourceFile, watcher: Box<dyn Finds<'file> + '_>) -> Found<'file> {
         watcher.found(file)
     }
 }

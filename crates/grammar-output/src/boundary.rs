@@ -1,9 +1,11 @@
-use std::iter::Peekable;
+use std::iter::{self, Peekable};
 use std::str::FromStr;
 use std::vec::IntoIter;
 
 use grammar::logos::{Lexer, Logos};
 use grammar::{Ignoring, Unlexed};
+
+use crate::record::{Parsed, Record};
 use newtype::{Guarded, Inner, Listed, Newtype, Stored, Validated};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
@@ -159,27 +161,50 @@ impl Fields {
         format!("\"{escaped}\"")
     }
 
-    pub fn field<F: Field>(&mut self) -> Result<F::Value, Unread> {
+    pub fn field<F: Field>(mut self) -> Result<Parsed<F::Value, Fields>, Unread> {
         let token = self.0.next().ok_or(Unread::Ended)?;
-        F::taken(token).map_err(Unread::Unexpected)
+        F::taken(token).map(|value| Parsed::new(value, self)).map_err(Unread::Unexpected)
     }
 
-    pub fn optional<F: Field>(&mut self) -> Option<F::Value> {
-        self.0
+    #[must_use]
+    pub fn optional<F: Field>(mut self) -> Parsed<Option<F::Value>, Fields> {
+        let value = self
+            .0
             .next_if(|token| F::taken(token.clone()).is_ok())
-            .and_then(|token| F::taken(token).ignoring(Unlexed::NotThisGrammar))
+            .and_then(|token| F::taken(token).ignoring(Unlexed::NotThisGrammar));
+        Parsed::new(value, self)
     }
 
-    pub fn past<K: FromStr + PartialEq>(&mut self, keys: &[K]) -> Result<&mut Fields, Unread> {
-        keys.iter().try_fold(self, |fields, key| {
+    #[must_use]
+    pub fn repeated<F: Field>(mut self) -> Parsed<Vec<F::Value>, Fields> {
+        let values = iter::from_fn(|| self.0.next_if(|token| F::taken(token.clone()).is_ok()))
+            .filter_map(|token| F::taken(token).ignoring(Unlexed::NotThisGrammar))
+            .collect();
+        Parsed::new(values, self)
+    }
+
+    pub fn past<K: FromStr + PartialEq>(self, keys: &[K]) -> Result<Fields, Unread> {
+        keys.iter().try_fold(self, |mut fields, key| {
             let token = fields.0.next().ok_or(Unread::Ended)?;
             let word: K = token.parsed(Kind::Bare).map_err(Unread::Unexpected)?;
             (word == *key).then_some(fields).ok_or(Unread::Unkeyed)
         })
     }
 
-    pub fn ended<T>(mut self, value: T) -> Result<T, Unread> {
-        self.0.find(|token| token.kind != Kind::End).map_or(Ok(value), |stray| Err(Unread::Unexpected(stray)))
+    pub fn passing<K: FromStr + PartialEq, T>(self, keys: &[K], value: T) -> Result<Parsed<T, Fields>, Unread> {
+        self.past(keys).map(|rest| Parsed::new(value, rest))
+    }
+
+    pub fn record<R: Record>(self) -> Result<Parsed<R, Fields>, Unread> {
+        R::read(self)
+    }
+}
+
+impl<T> Parsed<T, Fields> {
+    pub fn ended(self) -> Result<T, Unread> {
+        self.concluded(|value, Fields(mut tokens)| {
+            tokens.find(|token| token.kind != Kind::End).map_or(Ok(value), |stray| Err(Unread::Unexpected(stray)))
+        })
     }
 }
 

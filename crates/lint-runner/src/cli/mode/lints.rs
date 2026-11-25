@@ -21,7 +21,7 @@ use lint_file::{
 use lint_file::{ModelLint, WorkspaceLint};
 use lint_port_dependencies::RoleFacts;
 use lint_reader::{Described, Unlocated};
-use lint_sweep::{Finds, Gathers, Member, Sorts};
+use lint_sweep::{Finds, Found, Gathers, Member, Sorts};
 use timer_ports::Timer;
 use workspace_metadata::Metadata;
 
@@ -103,7 +103,7 @@ impl Crew<'_> {
         let mine = Lints::worked(readout.done(), sources, Worker::MAIN);
         let worked: Worked = [mine].into_iter().chain(self.helpers.into_iter().map(Helper::joined)).collect();
         let first = sources.earlier().chain([readout.timing()]);
-        let table = sources.wired().table(first.chain(worked.timings().iter().copied()));
+        let table = sources.wired().table(first.chain(worked.timings().iter().copied()), worked.visited().clone());
         let outcome = Lints::gathered(readout.done(), sources.located().done(), worked);
         outcome.surveyed(&[table], out, err)
     }
@@ -224,12 +224,14 @@ impl Lints {
         Entry::spelled::<NoPlaintext>(Work::Modelled(<NoPlaintext as ModelLint>::report)),
     ];
 
-    pub(crate) fn started<'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
+    pub(crate) fn started<'scope, 'run: 'scope, F: Files + Sync, C: Cargo + Sync, T: Timer + Sync>(
         scope: &'scope Scope<'scope, '_>,
         sources: &'scope Sources<F, C, T>,
+        readers: Vec<lint_reader::Reader<'run>>,
     ) -> Crew<'scope> {
-        let helpers = Workers::available().helpers().filter_map(|index| {
-            Helper::spawned(scope, move || Self::helped(sources, Worker::from(index))).ignoring(Ignored::Unspawned)
+        let helpers = Workers::available().helpers().zip(readers).filter_map(|(index, reader)| {
+            Helper::spawned(scope, move || Self::helped(sources, Worker::from(index), reader))
+                .ignoring(Ignored::Unspawned)
         });
         let locating = Helper::spawned(scope, move || Self::locating(sources)).ignoring(Ignored::Unspawned);
         Crew { helpers: locating.into_iter().chain(helpers).collect() }
@@ -249,8 +251,12 @@ impl Lints {
         Worked::timed(sources.located().timing())
     }
 
-    fn helped(sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>, worker: Worker) -> Worked {
-        let readout = ManuallyDrop::new(sources.read(worker));
+    fn helped(
+        sources: &Sources<impl Files, impl Cargo, impl Timer + Sync>,
+        worker: Worker,
+        reader: lint_reader::Reader<'_>,
+    ) -> Worked {
+        let readout = ManuallyDrop::new(sources.read(worker, reader));
         [Self::worked(readout.done(), sources, worker), Worked::timed(readout.timing())].into_iter().collect()
     }
 
@@ -586,13 +592,17 @@ impl<'file> Gathers<FileWork<'file>> for Filer<'file> {
     fn gathered(self, _: &SourceFile) -> FileWork<'file> {
         let Filer { claimed, rulings, concluding, admitted, leads, starts, sorting, finds, sorts } = self;
         let file = <&SourceFile>::from(claimed);
-        let listed = starts.into_iter().zip(finds).map(|(key, watcher)| (key, vec![watcher.found(file)]));
+        let swept: Vec<(TypeId, Found<'_>)> =
+            starts.into_iter().zip(finds).map(|(key, watcher)| (key, watcher.found(file))).collect();
+        let visited: Worked = swept.iter().map(|(_, sweep)| Worked::visiting(sweep.visited())).collect();
+        let listed = swept.into_iter().map(|(key, sweep)| (key, vec![sweep.into_iter().collect()]));
         let watched =
             listed.chain(sorting.into_iter().zip(sorts).map(|(key, watcher)| (key, Vec::from(watcher.sorted(file)))));
         let scanned = leads.iter().filter_map(|(key, lead)| lead.scanned(file).map(|found| (*key, found)));
         let mut sorted: BTreeMap<TypeId, Vec<Vec<Violation<'_>>>> = watched.chain(scanned).collect();
         let found = admitted.into_iter().map(|found| (found.slot, Self::taken(&mut sorted, found.source)));
-        let worked = found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations)).collect();
+        let filed = found.map(|(slot, violations)| Worked::filing(slot, claimed.order(), &violations));
+        let worked = filed.chain([visited]).collect();
         FileWork { order: claimed.order(), worked, rulings, concluding }
     }
 }

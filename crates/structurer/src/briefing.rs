@@ -2,11 +2,11 @@ use std::fmt;
 use std::str::FromStr;
 
 use design_model::{
-    Confidence, Explicitness, Facet, Outline, SegmentRelation, SenseKind, SpanRelation, Specificity, Title,
+    Basis, Confidence, Explicitness, Facet, NodeId, Outline, Project, SegmentRelation, SenseKind, Sketch, SpanRelation,
+    Specificity, Stage, Title,
 };
-use grammar_cited::Cited;
 use grammar_output::field::{Id, Phrase, Quoted, Word};
-use grammar_output::{Fields, Unread};
+use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
 use named_derive::Named;
 use newtype::Enumerated;
 use newtype::Wrapping;
@@ -16,7 +16,7 @@ use crate::ignored::Ignored;
 use crate::job::Listing;
 use crate::lapse::Retried;
 use crate::verb::Form;
-use crate::{Attempt, Directive, Edge, Job, Label, Lapse, NodeRef, Proposal, Said, SegmentRef};
+use crate::{Attempt, Directive, Edge, Job, Label, Lapse, NodeRef, Proposal, Said};
 use invariants::Ignoring;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -140,19 +140,15 @@ impl Choice {
         Choice::Facet,
     ];
 
-    fn read(self, fields: &mut Fields) -> Result<Choice, Unread> {
-        self.passed(fields).map(|_fields| self)
-    }
-
-    fn passed(self, fields: &mut Fields) -> Result<&mut Fields, Unread> {
+    fn read(self, fields: Fields) -> Result<Parsed<Choice, Fields>, Unread> {
         match self {
-            Choice::SpanRelation => fields.past(SpanRelation::VARIANTS),
-            Choice::SegmentRelation => fields.past(SegmentRelation::VARIANTS),
-            Choice::Kind => fields.past(SenseKind::VARIANTS),
-            Choice::Specificity => fields.past(Specificity::VARIANTS),
-            Choice::Confidence => fields.past(Confidence::VARIANTS),
-            Choice::Explicitness => fields.past(Explicitness::VARIANTS),
-            Choice::Facet => fields.past(Facet::VARIANTS),
+            Choice::SpanRelation => fields.passing(SpanRelation::VARIANTS, self),
+            Choice::SegmentRelation => fields.passing(SegmentRelation::VARIANTS, self),
+            Choice::Kind => fields.passing(SenseKind::VARIANTS, self),
+            Choice::Specificity => fields.passing(Specificity::VARIANTS, self),
+            Choice::Confidence => fields.passing(Confidence::VARIANTS, self),
+            Choice::Explicitness => fields.passing(Explicitness::VARIANTS, self),
+            Choice::Facet => fields.passing(Facet::VARIANTS, self),
         }
     }
 
@@ -267,45 +263,52 @@ impl FromStr for Brief {
     type Err = Unread;
 
     fn from_str(text: &str) -> Result<Brief, Unread> {
-        let mut fields = Fields::lexed(text)?;
-        let brief = Brief::read(&mut fields)?;
-        fields.ended(brief)
+        Fields::lexed(text)?.field::<Word<Key>>()?.concluded(Key::brief)?.ended()
     }
 }
 
-impl Brief {
-    fn read(fields: &mut Fields) -> Result<Brief, Unread> {
-        match fields.field::<Word<Key>>()? {
-            Key::Rule => Ok(Brief::Rule(fields.field::<Phrase<_>>()?)),
-            Key::Form => Ok(Brief::Form(fields.field::<Phrase<_>>()?)),
-            Key::Choices => fields.field::<Word<Choice>>()?.read(fields).map(Brief::Choices),
-            Key::Example => Ok(Brief::Example(fields.field::<Phrase<_>>()?)),
-            Key::Segment => Said::read(fields).map(|said| Brief::Said(Listing::Segment, said)),
-            Key::Asked => Said::read(fields).map(|said| Brief::Said(Listing::Asked, said)),
-            Key::Node => Outlined::read(fields).map(Brief::Node),
-            Key::Retry => Lapse::read(fields).map(Brief::Retry),
+impl Key {
+    fn brief(self, fields: Fields) -> Result<Parsed<Brief, Fields>, Unread> {
+        match self {
+            Key::Rule => fields.field::<Phrase<_>>().mapped(Brief::Rule),
+            Key::Form => fields.field::<Phrase<_>>().mapped(Brief::Form),
+            Key::Choices => fields.field::<Word<Choice>>()?.concluded(Choice::read).mapped(Brief::Choices),
+            Key::Example => fields.field::<Phrase<_>>().mapped(Brief::Example),
+            Key::Segment => fields.record::<Said>().mapped(|said| Brief::Said(Listing::Segment, said)),
+            Key::Asked => fields.record::<Said>().mapped(|said| Brief::Said(Listing::Asked, said)),
+            Key::Node => Outlined::read(fields).mapped(Brief::Node),
+            Key::Retry => fields.record::<Lapse>().mapped(Brief::Retry),
         }
     }
 }
 
-impl Said {
-    fn read(fields: &mut Fields) -> Result<Said, Unread> {
-        Ok(Said::new(SegmentRef::from(&fields.field::<Cited>()?), fields.field::<Quoted<_>>()?))
+impl Outlined<'_> {
+    pub fn read(fields: Fields) -> Result<Parsed<Outline, Fields>, Unread> {
+        fields.record::<OutlineLine>().mapped(Outline::from)
     }
 }
 
-impl Outlined<'_> {
-    pub fn read(fields: &mut Fields) -> Result<Outline, Unread> {
-        let outline = Outline::new(
-            fields.field::<Id<_>>()?,
-            fields.field::<Phrase<_>>()?,
-            fields.field::<Word<_>>()?,
-            fields.field::<Word<_>>()?,
-        );
-        Ok(outline
-            .based(fields.field::<Word<_>>()?)
-            .parented(fields.optional::<Id<_>>())
-            .titled(fields.optional::<Quoted<_>>()))
+#[derive(Debug, Record)]
+struct OutlineLine {
+    #[field(Id<_>)]
+    node: NodeId,
+    #[field(Phrase<_>)]
+    project: Project,
+    #[field(Word<_>)]
+    facet: Facet,
+    #[field(Word<_>)]
+    stage: Stage,
+    #[field(Word<_>)]
+    basis: Basis,
+    #[optional(Id<_>)]
+    parent: Option<NodeId>,
+    #[optional(Quoted<_>)]
+    title: Option<Title>,
+}
+
+impl From<OutlineLine> for Outline {
+    fn from(line: OutlineLine) -> Outline {
+        Sketch::new(line.node, line.project, line.facet, line.stage).described(line.basis, line.title, line.parent)
     }
 }
 

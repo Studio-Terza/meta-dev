@@ -15,18 +15,10 @@ use crate::path_use::PathUse;
 use crate::placed::Placed;
 use crate::region::{Reach, Region, Seat};
 use crate::resolved::Resolved;
-use crate::sited::Sited;
-use crate::type_ref::{Named, TypeRef, TypeUses};
+use crate::type_ref::TypeRef;
 
 #[derive(Debug, Default)]
 struct Reached(BTreeSet<ItemId>);
-
-impl TypeUses for Reached {
-    fn named(&mut self, named: &Named<Sited>) {
-        self.0.extend(AsRef::<Resolved>::as_ref(named).crate_item());
-        named.each_inner_use(self);
-    }
-}
 
 impl From<&Resolved> for Reached {
     fn from(resolved: &Resolved) -> Reached {
@@ -36,10 +28,7 @@ impl From<&Resolved> for Reached {
 
 impl<'ty> FromIterator<&'ty TypeRef> for Reached {
     fn from_iter<Types: IntoIterator<Item = &'ty TypeRef>>(types: Types) -> Reached {
-        types.into_iter().fold(Reached::default(), |mut reached, ty| {
-            ty.each_use(&mut reached);
-            reached
-        })
+        Reached(types.into_iter().flat_map(|ty| ty.uses().items()).collect())
     }
 }
 

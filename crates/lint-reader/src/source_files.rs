@@ -1,32 +1,25 @@
 mod crate_sources;
+mod declared;
 mod described;
 mod ignored;
 mod located;
 mod modules;
-mod opened;
-mod scope;
 mod shared;
-mod shelf;
 mod staged;
-mod test_modules;
 mod unlocated;
 
-use std::collections::BTreeSet;
+use std::iter;
 use std::path::{Path, PathBuf};
 
 pub use crate_sources::CrateSources;
 pub use described::Described;
 use file_ports::Files;
-use lint_core::{Readout, SourceFile};
+use lint_core::Readout;
 use lint_layout::Failure;
-use lint_placement::{CrateFile, Packages};
+use lint_placement::Packages;
 use lint_roots::{Regrouped, Target, Tree};
-use modules::Modules;
-use scope::Scope;
-pub use shared::{Partition, SharedRead};
-use shelf::Shelf;
+pub use shared::{Crew, Partition, Reader, Reads, SharedRead};
 use staged::Staged;
-use test_modules::TestModules;
 pub use unlocated::Unlocated;
 
 #[derive(Debug)]
@@ -44,13 +37,9 @@ impl Stage<'_> {
 }
 
 #[derive(Debug)]
-pub struct SourceFiles<'tree> {
-    seen: BTreeSet<PathBuf>,
-    readout: Readout,
-    shelf: Shelf<'tree>,
-}
+pub struct SourceFiles;
 
-impl<'tree> SourceFiles<'tree> {
+impl SourceFiles {
     pub fn read(files: &(impl Files + Sync), root: &Path) -> Result<Readout, Failure> {
         SourceFiles::read_all(files, &[root.to_path_buf()])
     }
@@ -75,75 +64,7 @@ impl<'tree> SourceFiles<'tree> {
     }
 
     #[must_use]
-    pub fn read_staged(files: &impl Files, stage: &'tree Stage<'tree>) -> Readout {
-        let starts = stage
-            .trees
-            .iter()
-            .zip(&stage.staged)
-            .flat_map(|(tree, staged)| staged.iter().flat_map(|entry| entry.starts(tree)));
-        let started = SourceFiles {
-            seen: BTreeSet::new(),
-            readout: Readout::default(),
-            shelf: Shelf::stocked(files, &stage.packages, &starts.collect::<Vec<_>>()),
-        };
-        let read = stage
-            .trees
-            .iter()
-            .zip(&stage.staged)
-            .flat_map(|(tree, staged)| staged.iter().map(move |entry| (tree, entry)));
-        read.fold(started, |reading, (tree, staged)| reading.tree(tree, staged)).readout.sorted()
-    }
-
-    fn tree(self, tree: &'tree Tree<'tree>, staged: &Staged) -> SourceFiles<'tree> {
-        let read = staged.targets().iter().fold(self, |reading, target| {
-            target.files().iter().fold(reading, |in_target, file| {
-                let scope = Scope::new(tree, target.package(), CrateFile::from(tree.display(file)));
-                let children = file.parent().map_or_default(Path::to_path_buf);
-                in_target.file(&scope, file, &children)
-            })
-        });
-        SourceFiles { readout: read.readout.with_repo_files(staged.repo_files().to_vec()), ..read }
-    }
-
-    fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> SourceFiles<'tree> {
-        let source =
-            self.seen.insert(file.to_path_buf()).then_some(file).and_then(|unseen| self.shelf.source(scope, unseen));
-        self.opened(scope, file, children_directory, source)
-    }
-
-    fn opened(
-        self,
-        scope: &Scope<'tree>,
-        file: &Path,
-        children_directory: &Path,
-        source: Option<Result<SourceFile, Failure>>,
-    ) -> SourceFiles<'tree> {
-        match source {
-            Some(Ok(parsed)) => {
-                self.parsed(scope, file, children_directory, parsed.in_crate_file(scope.crate_file().clone()))
-            }
-            Some(Err(failure)) => SourceFiles { readout: self.readout.with_failure(failure), ..self },
-            None => self,
-        }
-    }
-
-    fn parsed(
-        mut self,
-        scope: &Scope<'tree>,
-        file: &Path,
-        children_directory: &Path,
-        parsed: SourceFile,
-    ) -> SourceFiles<'tree> {
-        let mut modules = Modules::declared_in(self.shelf.survey(), file, children_directory, &parsed.syntax().items);
-        let tests = TestModules::read(&mut self.shelf, scope, modules.tests());
-        let children = modules.take_children(self.shelf.survey());
-        let with_file = SourceFiles { readout: self.readout.with_file(parsed.with_test_modules(tests)), ..self };
-        let with_failures = modules.take_failures().into_iter().fold(with_file, |reading, failure| SourceFiles {
-            readout: reading.readout.with_failure(failure),
-            ..reading
-        });
-        children
-            .into_iter()
-            .fold(with_failures, |reading, child| child.visit(|path, directory| reading.file(scope, path, directory)))
+    pub fn read_staged<'tree>(files: &impl Files, stage: &'tree Stage<'tree>) -> Readout {
+        SharedRead::new(stage).crew(iter::empty()).concluded(|coordinator, _| coordinator.read(files))
     }
 }

@@ -168,11 +168,11 @@ impl Rebuild<Sited> for Expanding<'_> {
     type Into = Sited;
     type Fail = Exhausted;
 
-    fn path(&mut self, path: &Sited) -> Sited {
+    fn path(&self, path: &Sited) -> Sited {
         path.clone()
     }
 
-    fn child(&mut self, ty: &TypeRef) -> Result<TypeRef, Exhausted> {
+    fn child(&self, ty: &TypeRef) -> Result<TypeRef, Exhausted> {
         match ty.named().and_then(|named| self.expansion(named)) {
             Some(expansion) => Expanding { aliases: self.aliases, steps: self.steps.taken()? }.child(&expansion),
             None => ty.rebuilt(self),

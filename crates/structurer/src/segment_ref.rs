@@ -14,8 +14,8 @@ impl SegmentRef {
     }
 }
 
-impl From<&Cited> for SegmentRef {
-    fn from(cited: &Cited) -> SegmentRef {
+impl From<Cited> for SegmentRef {
+    fn from(cited: Cited) -> SegmentRef {
         SegmentRef::new(Prefix::new(cited.prefix().to_owned()), Ordinal::new(cited.ordinal()))
     }
 }

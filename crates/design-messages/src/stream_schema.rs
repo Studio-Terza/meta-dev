@@ -1,24 +1,19 @@
 mod anchored;
+mod boundary;
 mod resegmented;
 
 use std::sync::LazyLock;
 
-use port_core::Op;
-use store_ports::{Batch, Migrator, Schema, Statements, StoreFailure, Version, Written};
+use store_ports::{Migrator, Schema, Version};
 
 use anchored::Anchored;
+pub use boundary::Rewrite;
 use resegmented::Resegmented;
 
 static MIGRATOR: LazyLock<Migrator> = LazyLock::new(|| store_ports::migrate!());
 
 #[derive(Clone, Copy, Debug)]
 pub struct StreamSchema;
-
-#[derive(Debug, Op)]
-pub enum Rewrite {
-    Resegmented(Resegmented),
-    Anchored(Anchored),
-}
 
 impl Schema for StreamSchema {
     type Rewrite = Rewrite;
@@ -31,16 +26,5 @@ impl Schema for StreamSchema {
         (pending == Resegmented::PENDING)
             .then_some(Rewrite::Resegmented(Resegmented))
             .or_else(|| (pending == Anchored::PENDING).then_some(Rewrite::Anchored(Anchored)))
-    }
-}
-
-impl Batch for Rewrite {
-    type Failure = StoreFailure;
-
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        match self {
-            Rewrite::Resegmented(resegmented) => resegmented.written(statements),
-            Rewrite::Anchored(anchored) => anchored.written(statements),
-        }
     }
 }

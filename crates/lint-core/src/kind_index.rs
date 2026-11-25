@@ -12,7 +12,7 @@ struct Offset(usize);
 
 #[derive(Clone, Copy, Debug)]
 struct Subtree {
-    size: Offset,
+    descendants: Offset,
     kinds: Kinds,
 }
 
@@ -21,15 +21,12 @@ pub(crate) struct KindIndex(Vec<Subtree>);
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Indexed<'index> {
-    index: &'index KindIndex,
-    at: Offset,
+    from: &'index [Subtree],
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cursors<'index> {
-    index: &'index KindIndex,
-    at: Offset,
-    end: Offset,
+    rest: &'index [Subtree],
 }
 
 #[derive(Debug, Default)]
@@ -78,8 +75,12 @@ impl Monoid for Built {}
 impl From<Node<'_>> for Built {
     fn from(node: Node<'_>) -> Built {
         let below: Built = Monoid::concat(node.children().into_iter().map(Built::from));
-        let own = Subtree { size: below.size.incremented(), kinds: Kinds::from(Kind::of(node)).combine(below.kinds) };
-        Built { subtrees: Catenation::from(vec![own]).combine(below.subtrees), size: own.size, kinds: own.kinds }
+        let own = Subtree { descendants: below.size, kinds: Kinds::from(Kind::of(node)).combine(below.kinds) };
+        Built {
+            subtrees: Catenation::from(vec![own]).combine(below.subtrees),
+            size: below.size.incremented(),
+            kinds: own.kinds,
+        }
     }
 }
 
@@ -92,22 +93,18 @@ impl From<&syntax::File> for KindIndex {
 
 impl KindIndex {
     pub(crate) fn top(&self) -> Cursors<'_> {
-        Cursors { index: self, at: Offset::zero(), end: Offset::new(self.0.len()) }
-    }
-
-    fn subtree(&self, at: Offset) -> Option<&Subtree> {
-        self.0.get(at.count())
+        Cursors { rest: &self.0 }
     }
 }
 
 impl<'index> Indexed<'index> {
     pub(crate) fn watches(self, kinds: Kinds) -> Option<()> {
-        self.index.subtree(self.at)?.kinds.overlap(kinds)
+        self.from.first()?.kinds.overlap(kinds)
     }
 
     pub(crate) fn children(self) -> Cursors<'index> {
-        let size = self.index.subtree(self.at).map_or(Offset::zero().incremented(), |here| here.size);
-        Cursors { index: self.index, at: self.at.incremented(), end: self.at.plus(size) }
+        let below = self.from.split_first().and_then(|(here, below)| below.get(..here.descendants.count()));
+        Cursors { rest: below.unwrap_or_default() }
     }
 }
 
@@ -115,9 +112,9 @@ impl<'index> Iterator for Cursors<'index> {
     type Item = Indexed<'index>;
 
     fn next(&mut self) -> Option<Indexed<'index>> {
-        let here = Some(self.at).filter(|at| *at < self.end)?;
-        let size = self.index.subtree(here).map_or(Offset::zero().incremented(), |subtree| subtree.size);
-        self.at = here.plus(size);
-        Some(Indexed { index: self.index, at: here })
+        let from = self.rest;
+        let (here, below) = from.split_first()?;
+        self.rest = below.get(here.descendants.count()..).unwrap_or_default();
+        Some(Indexed { from })
     }
 }
