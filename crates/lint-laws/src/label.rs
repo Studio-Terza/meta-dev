@@ -7,6 +7,7 @@ use lint_layout::{Name, Word, words};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Label {
     Generated,
+    Semigroup,
     Monoid,
 }
 
@@ -31,12 +32,21 @@ struct Labelled<'model> {
 impl Label {
     pub const GENERATES: [Word<'static>; 2] = words!["laws", "generates"];
     pub const MONOID: [Word<'static>; 2] = words!["laws", "monoid"];
+    pub const SEMIGROUP: [Word<'static>; 2] = words!["laws", "semigroup"];
 }
 
 impl fmt::Display for Labelled<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.label {
             Label::Generated => Ok(()),
+            Label::Semigroup => writeln!(
+                formatter,
+                "{}!({}_forms_a_semigroup, {}, any::<{}>());",
+                Joined(&Label::SEMIGROUP),
+                TestName(self.path),
+                Joined(self.path.as_ref()),
+                Joined(self.path.as_ref())
+            ),
             Label::Monoid => writeln!(
                 formatter,
                 "{}!({}_forms_a_monoid, {}, any::<{}>());",

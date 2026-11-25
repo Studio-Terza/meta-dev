@@ -3,6 +3,7 @@ mod label;
 mod runner;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Not;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Written};
@@ -16,12 +17,14 @@ use runner::Runner;
 #[derive(Debug)]
 pub struct LawRunners<'model> {
     runners: Vec<Runner<'model>>,
+    ungenerated: Vec<ItemId>,
 }
 
 #[derive(Debug)]
 struct Labels<'model> {
     generated: BTreeMap<ItemId, &'model Path>,
     monoids: BTreeSet<ItemId>,
+    semigroups: BTreeSet<ItemId>,
 }
 
 impl<'model> LawRunners<'model> {
@@ -33,6 +36,10 @@ impl<'model> LawRunners<'model> {
     #[must_use]
     pub fn paths(&self) -> BTreeSet<PathBuf> {
         self.runners.iter().filter_map(Runner::file).collect()
+    }
+
+    pub(crate) fn ungenerated(&self) -> &[ItemId] {
+        &self.ungenerated
     }
 
     pub(crate) fn undeclared(&self, read: &BTreeSet<&Path>) -> Vec<&'model Path> {
@@ -59,20 +66,25 @@ impl<'model> From<&'model Model> for LawRunners<'model> {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        let laws: Vec<Law<'model>> = named
-            .chunk_by(|left, right| left.0 == right.0)
-            .filter_map(<[_]>::first)
+        let shortest: Vec<&(ItemId, usize, &ItemPath)> =
+            named.chunk_by(|left, right| left.0 == right.0).filter_map(<[_]>::first).collect();
+        let laws: Vec<Law<'model>> = shortest
+            .iter()
             .filter_map(|(item, _, path)| labels.law(*item, path))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        LawRunners { runners: laws.chunk_by(|left, right| left.home() == right.home()).map(Runner::from).collect() }
+        LawRunners {
+            runners: laws.chunk_by(|left, right| left.home() == right.home()).map(Runner::from).collect(),
+            ungenerated: shortest.iter().filter_map(|(item, _, _)| labels.ungenerated(*item)).collect(),
+        }
     }
 }
 
 impl<'model> Labels<'model> {
     const ARBITRARY: [Word<'static>; 2] = words!["newtype", "Arbitrary"];
     const MONOID: [Word<'static>; 2] = words!["algebra", "Monoid"];
+    const SEMIGROUP: [Word<'static>; 2] = words!["algebra", "Semigroup"];
 
     fn subject(wanted: Option<&Resolved>, placed: &Placed<'model, &'model graph::Implementation>) -> Option<ItemId> {
         wanted.filter(|found| placed.entity().implemented() == Some(*found))?;
@@ -81,7 +93,17 @@ impl<'model> Labels<'model> {
 
     fn law(&self, item: ItemId, path: &'model ItemPath) -> Option<Law<'model>> {
         let root = self.generated.get(&item)?;
-        Some(Law::new(root, path, self.monoids.get(&item).map_or(Label::Generated, |_| Label::Monoid)))
+        Some(Law::new(root, path, self.label(item)))
+    }
+
+    fn label(&self, item: ItemId) -> Label {
+        let semigroup = self.semigroups.get(&item).map(|_| Label::Semigroup);
+        self.monoids.get(&item).map(|_| Label::Monoid).or(semigroup).unwrap_or(Label::Generated)
+    }
+
+    fn ungenerated(&self, item: ItemId) -> Option<ItemId> {
+        let lawful = self.monoids.get(&item).or_else(|| self.semigroups.get(&item));
+        lawful.filter(|_| self.generated.contains_key(&item).not()).copied()
     }
 }
 
@@ -89,6 +111,7 @@ impl<'model> From<&'model Model> for Labels<'model> {
     fn from(model: &'model Model) -> Labels<'model> {
         let arbitrary = model.exported(Domain::Macros, &Labels::ARBITRARY.into_iter().collect());
         let monoid = model.exported(Domain::Types, &Labels::MONOID.into_iter().collect());
+        let semigroup = model.exported(Domain::Types, &Labels::SEMIGROUP.into_iter().collect());
         let shipped: Vec<_> = model
             .implementations()
             .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
@@ -99,6 +122,7 @@ impl<'model> From<&'model Model> for Labels<'model> {
                 .filter_map(|placed| Some((Labels::subject(arbitrary, placed)?, placed.root())))
                 .collect(),
             monoids: shipped.iter().filter_map(|placed| Labels::subject(monoid, placed)).collect(),
+            semigroups: shipped.iter().filter_map(|placed| Labels::subject(semigroup, placed)).collect(),
         }
     }
 }

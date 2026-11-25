@@ -1,11 +1,12 @@
 use algebra::{Monoid, Semigroup};
 use lint_layout::Name;
+use newtype::Arbitrary;
 
 use crate::boundary::ItemId;
 use crate::resolved::Resolved;
 use crate::type_ref::TypeRef;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reach {
     #[default]
     Shipped,
@@ -13,21 +14,21 @@ pub enum Reach {
     Test,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Zone {
     #[default]
     Open,
     Boundary,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Within {
     #[default]
     Own,
     TraitImpl,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ground {
     #[default]
     Open,
@@ -35,14 +36,14 @@ pub enum Ground {
     Ports,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Writing {
     #[default]
     Written,
     Expanded,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Region {
     reach: Reach,
     zone: Zone,

@@ -31,6 +31,21 @@ macro_rules! generates {
 }
 
 #[macro_export]
+macro_rules! semigroup {
+    ($(#[$meta:meta])* $name:ident, $type:ty, $strategy:expr $(,)?) => {
+        mod $name {
+            use super::*;
+
+            $crate::associative!(
+                $(#[$meta])* combining_is_associative,
+                $strategy,
+                <$type as ::algebra::Semigroup>::combine
+            );
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! monoid {
     ($(#[$meta:meta])* $name:ident, $type:ty, $strategy:expr $(,)?) => {
         mod $name {

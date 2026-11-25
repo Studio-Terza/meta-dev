@@ -127,8 +127,14 @@ impl Generator<'_> {
     fn shaping(input: &DeriveInput) -> syntax::Result<TokenStream> {
         match &input.data {
             Data::Enum(shape) => Generated::from(input).enumerated(&shape.variants),
-            Data::Struct(_) | Data::Union(_) => Ok(Wrapped::derived::<Strategy>(input.clone())),
+            Data::Struct(shape) => Ok(Generator::structured(input, &shape.fields)),
+            Data::Union(_) => Ok(Wrapped::derived::<Strategy>(input.clone())),
         }
+    }
+
+    fn structured(input: &DeriveInput, fields: &Fields) -> TokenStream {
+        let lone = fields.iter().next().filter(|only| only.ident.is_none()).filter(|_| fields.len() == 1);
+        lone.map_or_else(|| Drawn::from(fields).filled(input, fields), |_| Wrapped::derived::<Strategy>(input.clone()))
     }
 }
 
@@ -155,6 +161,13 @@ impl From<&Fields> for Drawn {
 }
 
 impl Drawn {
+    fn filled(self, input: &DeriveInput, fields: &Fields) -> TokenStream {
+        let members = fields.members();
+        let names = &self.names;
+        let strategy = self.generating(&quote!(Self { #(#members: #names),* }), Checking::Unchecked);
+        Generated::from(input).implemented(self.required, &strategy)
+    }
+
     fn generating(&self, built: &TokenStream, checking: Checking) -> TokenStream {
         let Drawn { source, names, .. } = self;
         let kept = Drawn::kept(built, checking);

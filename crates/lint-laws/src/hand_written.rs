@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use graph::{Domain, Item, Mention, Model, PathUse, Placed, Resolved};
+use graph::{Domain, Item, ItemId, Mention, Model, PathUse, Placed, Resolved};
 use lint_core::{Fix, Headline, Message, Problem, Report, Violation};
 use lint_file::ModelLint;
 use lint_layout::Site;
@@ -32,6 +32,10 @@ impl HandWrittenLaws {
         ),
         Fix::new("add #[path = \"generated/laws.rs\"] mod generated_laws; to one of the crate's integration tests"),
     );
+    const UNGENERATED: Message = Message::new(
+        Problem::new("a Semigroup or Monoid the law runner cannot generate, so its laws never run"),
+        Fix::new("derive newtype::Arbitrary on the type and run lint laws to regenerate"),
+    );
 }
 
 impl ModelLint for HandWrittenLaws {
@@ -45,11 +49,16 @@ impl ModelLint for HandWrittenLaws {
             .undeclared(&read)
             .into_iter()
             .map(|root| Violation::new(Site::of_file(root), HandWrittenLaws::UNDECLARED));
+        let ungenerated: BTreeSet<ItemId> = runners.ungenerated().iter().copied().collect();
+        let unlawful = model
+            .items()
+            .filter(|placed| ungenerated.contains(&placed.entity().declared()))
+            .map(|placed| Violation::new(placed.site(), HandWrittenLaws::UNGENERATED));
         Report::new(
             Headline::new(
                 "laws are labels: the law macros lint laws emits appear only in the runners it generates, and each runner is declared in one of its crate's test binaries, so the graph owns every such law and every one runs",
             ),
-            refused.chain(undeclared).collect(),
+            refused.chain(undeclared).chain(unlawful).collect(),
         )
     }
 }
@@ -75,7 +84,7 @@ impl<'model> Emitted<'model> {
 impl<'model> From<&'model Model> for Emitted<'model> {
     fn from(model: &'model Model) -> Emitted<'model> {
         Emitted {
-            macros: [Label::GENERATES, Label::MONOID]
+            macros: [Label::GENERATES, Label::SEMIGROUP, Label::MONOID]
                 .into_iter()
                 .filter_map(|spelled| model.exported(Domain::Macros, &spelled.into_iter().collect()))
                 .collect(),

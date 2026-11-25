@@ -1,9 +1,10 @@
 use algebra::{Monoid, Semigroup};
 use lint_layout::{Name, PackageName};
+use newtype::Arbitrary;
 
 use crate::item_path::ItemPath;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct External {
     package: Option<PackageName>,
     path: ItemPath,

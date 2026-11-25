@@ -1,7 +1,10 @@
+use newtype::Arbitrary;
+
 use crate::name::Name;
 use crate::word::Word;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[newtype(from = PackageName)]
 pub struct PackageName(Name);
 
 impl From<&Name> for PackageName {

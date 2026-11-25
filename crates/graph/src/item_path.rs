@@ -1,8 +1,9 @@
 use algebra::{Monoid, Semigroup};
 use lint_layout::{Name, PathTail, Word};
+use newtype::Arbitrary;
 use newtype::Wrapping;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ItemPath {
     segments: Vec<Name>,
 }

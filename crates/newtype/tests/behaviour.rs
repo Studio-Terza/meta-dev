@@ -110,6 +110,15 @@ impl Span {
 }
 
 #[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
+struct Pair {
+    low: u8,
+    high: u16,
+}
+
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
+struct Triple(u8, u16, char);
+
+#[derive(Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 #[newtype(checked, from = Ratio::try_new)]
 struct Ratio {
     above: u8,
@@ -332,6 +341,20 @@ fn an_enum_generates_every_variant() {
     let kinds: BTreeSet<&str> =
         (0..64_u8).flat_map(|_| any::<Shape<char>>().new_tree(&mut runner)).map(|tree| tree.current().kind()).collect();
     assert_eq!(kinds, BTreeSet::from(["box", "dot", "line"]));
+}
+
+#[test]
+fn a_plain_struct_generates_each_field_on_its_own() {
+    let mut runner = TestRunner::deterministic();
+    let pairs: BTreeSet<(bool, bool)> = (0..64_u8)
+        .flat_map(|_| any::<Pair>().new_tree(&mut runner))
+        .map(|tree| (tree.current().high > u16::MAX / 2, tree.current().low > u8::MAX / 2))
+        .collect();
+    let triples: BTreeSet<bool> = (0..64_u8)
+        .flat_map(|_| any::<Triple>().new_tree(&mut runner))
+        .map(|tree| tree.current().1 > u16::MAX / 2)
+        .collect();
+    assert_eq!((pairs.len(), triples.len()), (4, 2));
 }
 
 laws::law!(a_constructor_shapes_every_generated_value, any::<Span>(), span, {
