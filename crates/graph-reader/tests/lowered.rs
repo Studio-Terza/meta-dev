@@ -495,3 +495,10 @@ fn a_method_shape_counts_only_its_own_type_written_by_name_as_itself() {
     let shapes: Vec<MethodShape> = model.functions().map(|placed| MethodShape::from(placed.entity())).collect();
     assert_eq!(shapes, [MethodShape::new(Some(Receiver::Owned), vec![Taken::Itself, Taken::Other], Returned::Itself)]);
 }
+
+#[test]
+fn a_trait_method_shape_counts_self_as_itself_and_another_parameter_as_other() {
+    let model = Read::model("trait Join<T> {\n    fn join(self, other: Self, by: T) -> Self;\n}\n");
+    let shapes: Vec<MethodShape> = model.functions().map(|placed| MethodShape::from(placed.entity())).collect();
+    assert_eq!(shapes, [MethodShape::new(Some(Receiver::Owned), vec![Taken::Itself, Taken::Other], Returned::Itself)]);
+}
