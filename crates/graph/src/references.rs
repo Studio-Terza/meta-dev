@@ -100,8 +100,15 @@ impl References {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct Homed<'model> {
+    owner: ItemId,
+    reached: BTreeSet<ItemId>,
+    root: &'model Path,
+}
+
 impl References {
-    pub(crate) fn homed<Entity>(model: &Model, placed: Placed<'_, Entity>) -> References
+    pub(crate) fn homed<'model, Entity>(model: &Model, placed: Placed<'model, Entity>) -> Option<Homed<'model>>
     where
         Entity: Copy,
         Owned: From<Entity>,
@@ -111,12 +118,21 @@ impl References {
             |item: &ItemId| model.declared(*item).and_then(Item::krate).is_none_or(|krate| krate == placed.krate());
         let home = owner.filter(at_home);
         let foreign = home.map_or(owner, |_| None);
-        let link = home.or_else(|| traited.filter(at_home));
-        let targets: BTreeSet<ItemId> = reached.0.into_iter().chain(foreign).collect();
-        link.map_or_default(|found| References {
-            targets: BTreeMap::from([(found, targets.into_iter().filter(|target| *target != found).collect())]),
-            roots: BTreeMap::from([(found, placed.root().to_path_buf())]),
-        })
+        let link = home.or_else(|| traited.filter(at_home))?;
+        let targets = reached.0.into_iter().chain(foreign).filter(|target| *target != link).collect();
+        Some(Homed { owner: link, reached: targets, root: placed.root() })
+    }
+}
+
+impl<'model> FromIterator<Homed<'model>> for References {
+    fn from_iter<Homes: IntoIterator<Item = Homed<'model>>>(homes: Homes) -> References {
+        let gathered: Vec<Homed<'model>> = homes.into_iter().collect();
+        let roots: BTreeMap<ItemId, &Path> = gathered.iter().map(|home| (home.owner, home.root)).collect();
+        let targets = gathered.into_iter().fold(BTreeMap::new(), |mut by: BTreeMap<ItemId, BTreeSet<ItemId>>, home| {
+            by.entry(home.owner).or_default().extend(home.reached);
+            by
+        });
+        References { targets, roots: roots.into_iter().map(|(owner, root)| (owner, root.to_path_buf())).collect() }
     }
 }
 
