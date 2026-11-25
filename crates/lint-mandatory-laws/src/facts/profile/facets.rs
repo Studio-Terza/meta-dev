@@ -4,6 +4,8 @@ mod unstored;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use algebra::Semigroup;
+
 use super::super::exposure::Exposure;
 use crate::coverage::Coverage;
 use crate::subject::Subject;
@@ -19,6 +21,16 @@ pub(crate) struct Facets<'file> {
     site: Site<'file>,
     exposure: Exposure,
     facts: BTreeSet<Name>,
+}
+
+impl Semigroup for Facets<'_> {
+    fn combine(self, other: Self) -> Self {
+        Facets {
+            site: self.site,
+            exposure: self.exposure.max(other.exposure),
+            facts: self.facts.into_iter().chain(other.facts).collect(),
+        }
+    }
 }
 
 impl<'file> Facets<'file> {
@@ -38,15 +50,9 @@ impl<'file> Facets<'file> {
 
     pub(crate) fn after(self, earlier: Option<Facets<'file>>) -> Facets<'file> {
         match earlier {
-            Some(previous) => previous.merged(self),
+            Some(previous) => previous.combine(self),
             None => self,
         }
-    }
-
-    fn merged(mut self, other: Facets<'file>) -> Facets<'file> {
-        self.facts.extend(other.facts);
-        self.exposure = self.exposure.max(other.exposure);
-        self
     }
 
     pub(crate) fn unmet<'facts>(

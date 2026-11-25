@@ -52,7 +52,7 @@ impl Kinds {
     const ROUNDTRIP: [Word<'static>; 1] = words!["roundtrip"];
     const CRUD: [Word<'static>; 1] = words!["crud"];
     const PROPTEST: [Word<'static>; 1] = words!["proptest"];
-    const PROPERTIES: [Word<'static>; 8] = words![
+    const PROPERTIES: [Word<'static>; 9] = words![
         "associative",
         "commutative",
         "identity",
@@ -60,9 +60,10 @@ impl Kinds {
         "idempotent",
         "absorbing",
         "distributive",
-        "preserves"
+        "preserves",
+        "action"
     ];
-    const NAMED: [Property; 8] = [
+    const NAMED: [Property; 9] = [
         Property::Associative,
         Property::Commutative,
         Property::Identity,
@@ -71,6 +72,7 @@ impl Kinds {
         Property::Absorbing,
         Property::Distributive,
         Property::Preserves,
+        Property::Acting,
     ];
 
     fn of_macro(invocation: &Macro) -> Option<LawKind> {

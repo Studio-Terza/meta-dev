@@ -40,7 +40,7 @@ impl<'file> Contribute for CloneSites<'file> {
         _around: &lint_sweep::Around<'_, Self::Open>,
     ) -> Contributed<(), Vec<Violation<'file>>> {
         Contributed::descending(
-            Gate::BOUNDARY.names(module).map_or_else(|| Descend::from(facts.gate()), |_| Descend::Over),
+            Gate::BOUNDARY.names(module, Descend::Over).unwrap_or_else(|| Descend::from(facts.gate())),
         )
     }
 

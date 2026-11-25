@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::iter;
 
 use syntax::{File, Item, ItemMod};
 
@@ -14,41 +15,34 @@ pub(crate) struct RootReading;
 struct RootFile;
 
 #[derive(Debug)]
-struct Closing {
-    read: CrateRoots,
-    pending: BTreeSet<PackageName>,
+struct Widening<'crates> {
+    crates: &'crates Crates,
+    seen: BTreeSet<PackageName>,
+    pending: Vec<PackageName>,
+}
+
+impl Iterator for Widening<'_> {
+    type Item = (PackageName, Root);
+
+    fn next(&mut self) -> Option<(PackageName, Root)> {
+        let package = iter::from_fn(|| self.pending.pop()).find(|package| self.seen.insert(package.clone()))?;
+        let root = RootFile::read(self.crates, &package);
+        self.pending.extend(root.packages().cloned());
+        Some((package, root))
+    }
 }
 
 impl RootReading {
     pub(crate) fn read(model: &Model, crates: &Crates) -> CrateRoots {
-        let wanted: BTreeSet<PackageName> =
+        let wanted: Vec<PackageName> =
             model.implementations().filter_map(|placed| Self::derived(placed.entity())).collect();
-        Closing { read: CrateRoots::default(), pending: wanted }.closed(crates)
+        Widening { crates, seen: BTreeSet::new(), pending: wanted }.collect()
     }
 
     fn derived(implementation: &Implementation) -> Option<PackageName> {
         Some(implementation)
             .filter(|derived| derived.origin() == Origin::Derived)
             .and_then(|derived| derived.implemented()?.external()?.package().cloned())
-    }
-}
-
-impl Closing {
-    fn closed(self, crates: &Crates) -> CrateRoots {
-        match self.pending.first().map(|_| ()) {
-            None => self.read,
-            Some(()) => self.widened(crates).closed(crates),
-        }
-    }
-
-    fn widened(self, crates: &Crates) -> Closing {
-        let fresh: BTreeSet<PackageName> =
-            self.pending.into_iter().filter(|package| self.read.root(package).is_none()).collect();
-        let read = fresh
-            .iter()
-            .fold(self.read, |roots, package| roots.with_root(package.clone(), RootFile::read(crates, package)));
-        let pending = fresh.iter().filter_map(|package| read.root(package)).flat_map(Root::packages).cloned().collect();
-        Closing { read, pending }
     }
 }
 

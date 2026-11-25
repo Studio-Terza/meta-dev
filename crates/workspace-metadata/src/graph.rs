@@ -114,7 +114,7 @@ impl<'meta> Graph<'meta> {
         self.members
             .iter()
             .copied()
-            .filter(|id| self.package(id).and_then(|package| package.declares(role)).is_some())
+            .filter(|id| self.package(id).is_some_and(|package| package.roles().contains(&role)))
             .collect()
     }
 

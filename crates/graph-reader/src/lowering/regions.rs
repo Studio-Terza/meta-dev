@@ -13,15 +13,19 @@ pub(super) struct Regions;
 impl Regions {
     pub(super) fn of_file(source: &SourceFile, reach: Reach) -> Region {
         let head = source.head();
-        let ported = Gate::PORTS.admits(head).map(|_| Ground::Ports);
-        let ground = ported.or_else(|| Gate::STORE.admits(head).map(|_| Ground::Store)).unwrap_or(Ground::Open);
+        let ground = Gate::PORTS
+            .admits(head, Ground::Ports)
+            .or_else(|| Gate::STORE.admits(head, Ground::Store))
+            .unwrap_or(Ground::Open);
         Region::new(reach, Self::zone_of(source), Within::Own).combine(Region::from(ground))
     }
 
     pub(super) fn of_module(item: &ItemMod) -> Region {
-        let ported = Gate::PORTS.names(item).map(|_| Ground::Ports);
-        let ground = ported.or_else(|| Gate::STORE.names(item).map(|_| Ground::Store)).unwrap_or(Ground::Open);
-        let zone = Gate::BOUNDARY.names(item).map_or(Zone::Open, |_| Zone::Boundary);
+        let ground = Gate::PORTS
+            .names(item, Ground::Ports)
+            .or_else(|| Gate::STORE.names(item, Ground::Store))
+            .unwrap_or(Ground::Open);
+        let zone = Gate::BOUNDARY.names(item, Zone::Boundary).unwrap_or(Zone::Open);
         Monoid::concat([Self::tested(&item.attrs), Region::from(zone), Region::from(ground)])
     }
 
@@ -33,10 +37,7 @@ impl Regions {
     }
 
     fn zone_of(source: &SourceFile) -> Zone {
-        match Gate::BOUNDARY.admits(source.head()) {
-            Some(_) => Zone::Boundary,
-            None => Zone::Open,
-        }
+        Gate::BOUNDARY.admits(source.head(), Zone::Boundary).unwrap_or(Zone::Open)
     }
 }
 

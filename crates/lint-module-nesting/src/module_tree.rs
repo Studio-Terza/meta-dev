@@ -208,11 +208,13 @@ impl<'file> ModuleTree<'file> {
             .users
             .callers_of(module)?
             .iter()
-            .filter(|user| AsRef::<Nest<'_>>::as_ref(module).holding(*AsRef::<Nest<'_>>::as_ref(*user)).is_none())
+            .filter(|user| {
+                AsRef::<Nest<'_>>::as_ref(*user).lineage().all(|outer| outer != *AsRef::<Nest<'_>>::as_ref(module))
+            })
             .collect();
         outsiders
             .iter()
-            .all(|user| InsideSibling::holds(user, module).is_some())
+            .all(|user| InsideSibling::holder(user, module).is_some())
             .then(|| {
                 let homes: BTreeSet<ModulePath<'file>> =
                     outsiders.iter().map(|user| InsideSibling::home(user, module)).collect();

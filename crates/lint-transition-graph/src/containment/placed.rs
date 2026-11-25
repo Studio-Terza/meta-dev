@@ -34,7 +34,7 @@ struct Misplaced<'found> {
 impl<'found> Misplaced<'found> {
     fn found(view: &Containment<'found, '_>, member: Member<'found>) -> Option<Misplaced<'found>> {
         let lowest = view.users_within(member)?;
-        let outside = lowest.holding(member.cluster()).map_or(Some(lowest), |_| None)?;
+        let outside = Some(lowest).filter(|cluster| member.cluster().lineage().all(|outer| outer != *cluster))?;
         Some(Misplaced { member, lowest: outside })
     }
 }

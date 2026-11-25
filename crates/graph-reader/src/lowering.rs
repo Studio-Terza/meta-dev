@@ -26,16 +26,16 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMod};
 
 use graph::{
-    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Function,
-    Implementation, Interface, Model, ModelPart, Mutation, Named, Origin, Output, Owner, Region, Signature, Sited,
-    Spelling, Subject, TypeRef,
+    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Interface, Model,
+    ModelPart, Monomorphic, Mutation, Named, Origin, Output, Owner, Region, Signed, Sited, Spelling, Subject, TypeRef,
+    Unparameterised,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
     Declared, DeclaredKind, Domain, ItemIds, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap,
-    ScopeOp, Seeds, Sowing, Sown, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
+    ScopeOp, Seeds, Sowing, Sown, StdNames, Top, TranscribedRow, Transcriptions, Unbased, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
 use crate::planting::Unclaimed;
@@ -81,7 +81,7 @@ struct LoweredAssigned {
 impl ImplRow {
     fn written(seat: &Seat, region: Region, block: &ItemImpl, scope: &InScope) -> ImplRow {
         let ty = scope.lowered(&block.self_ty);
-        let within = scope.subject(ty.clone());
+        let within = scope.clone().combine(InScope::from(ty.clone()));
         ImplRow {
             located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),
@@ -138,21 +138,22 @@ impl Lowers for ImplRow {
         let subject =
             Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scopes().scope(located.scope())));
         let implementation =
-            Implementation::new(subject, implemented, self.origin, self.region.combine(footing.outer())).parameterised(
-                self.parameters
-                    .into_iter()
-                    .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
-                    .collect(),
-                self.assigned
-                    .iter()
-                    .map(|assigned| {
-                        Assigned::new(
-                            assigned.name.clone(),
-                            Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
-                        )
-                    })
-                    .collect(),
-            );
+            Unparameterised::new(subject, implemented, self.origin, self.region.combine(footing.outer()))
+                .parameterised(
+                    self.parameters
+                        .into_iter()
+                        .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
+                        .collect(),
+                    self.assigned
+                        .iter()
+                        .map(|assigned| {
+                            Assigned::new(
+                                assigned.name.clone(),
+                                Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
+                            )
+                        })
+                        .collect(),
+                );
         located.implementation(footing, implementation)
     }
 }
@@ -193,16 +194,15 @@ impl Lowers for FnRow {
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
         let mutated = self.mutated.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
-        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints).generic(
+        let signature = Monomorphic::new(inputs, Self::resolved(resolving, scope, self.output), constraints).generic(
             parameters,
             self.mutation,
             mutated,
         );
-        let function = Function::new(self.name, self.owner, self.entry, signature)
-            .exposed(self.exposure)
-            .evaluated(self.evaluation)
-            .seated(footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref()))
-            .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
+        let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
+        let function = Signed::new(self.name, self.owner, self.entry, signature)
+            .seated(seat, self.exposure)
+            .defined(self.evaluation, self.definition.map(|definition| definition.resolved(resolving, scope)));
         self.located.function(footing, function)
     }
 }
@@ -391,7 +391,7 @@ struct Grown {
 }
 
 impl Grown {
-    fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Places {
+    fn settled(&self, resolving: &Unbased<'_, '_, '_>) -> Places {
         self.rows.places.settled(&resolving.based(self.base), &self.scopes)
     }
 }
@@ -488,13 +488,14 @@ impl Plot<'_> {
         let issued = space.issued();
         let ids = ItemIds::from(&issued);
         let unexpanded = Transcriptions::default();
-        let naming = Resolving::new(Resolver::new(&space, &tables), &ids, &unexpanded);
+        let naming = Unbased::new(Resolver::new(&space, &tables), &ids, &unexpanded);
         let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
             let based = naming.based(grown.base);
             grown.rows.transcribed.iter().filter_map(move |row| row.settled(based, &grown.scopes))
         }));
-        let resolving = Resolving::new(Resolver::new(&space, &tables), &ids, &transcriptions);
-        let exports: Exports = Monoid::concat(space.exports().iter().map(|export| export.recorded(&resolving)));
+        let resolving = Unbased::new(Resolver::new(&space, &tables), &ids, &transcriptions);
+        let rooted = resolving.based(ScopeId::FIRST);
+        let exports: Exports = Monoid::concat(space.exports().iter().map(|export| export.recorded(&rooted)));
         let places: Vec<Places> = Parallel::available().mapped(&self.grown, |grown| grown.settled(&resolving));
         let declarations: ModelPart =
             Monoid::concat(self.grown.iter().zip(&places).map(|(grown, seated)| seated.placed(grown.file)));
@@ -582,13 +583,18 @@ enum Grain {
 
 #[derive(Debug, Default)]
 pub(crate) struct Grains {
-    grains: Catenation<Grain>,
+    sown: Catenation<Grain>,
     bodies: Catenation<BodyPart>,
+    opened: Option<Box<FnRow>>,
 }
 
 impl Semigroup for Grains {
     fn combine(self, other: Grains) -> Grains {
-        Grains { grains: self.grains.combine(other.grains), bodies: self.bodies.combine(other.bodies) }
+        Grains {
+            sown: self.sown.combine(other.sown),
+            bodies: self.bodies.combine(other.bodies),
+            opened: self.opened.or(other.opened),
+        }
     }
 }
 
@@ -596,7 +602,13 @@ impl Monoid for Grains {}
 
 impl From<Grain> for Grains {
     fn from(grain: Grain) -> Grains {
-        Grains { grains: Catenation::from(vec![grain]), bodies: Catenation::default() }
+        Grains { sown: Catenation::from(vec![grain]), ..Grains::default() }
+    }
+}
+
+impl From<FnRow> for Grains {
+    fn from(row: FnRow) -> Grains {
+        Grains { opened: Some(Box::new(row)), ..Grains::default() }
     }
 }
 
@@ -646,44 +658,24 @@ impl From<FileRows> for Sorted {
 
 impl From<Grains> for Sorted {
     fn from(grains: Grains) -> Sorted {
-        Monoid::concat(grains.grains.into_iter().map(Sorted::from))
-    }
-}
-
-impl Grain {
-    fn function(&self) -> Option<&FnRow> {
-        match self {
-            Grain::Function(row) => Some(row),
-            Grain::Impl(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
-    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
-        match self {
-            Grain::Function(row) => Grain::Function(FnRow { definition: definition.or(row.definition), ..row }),
-            other => other,
-        }
+        Monoid::concat(grains.sown.into_iter().map(Sorted::from))
     }
 }
 
 impl From<BodyPart> for Grains {
     fn from(part: BodyPart) -> Grains {
-        Grains { grains: Catenation::default(), bodies: Catenation::from(vec![part]) }
+        Grains { bodies: Catenation::from(vec![part]), ..Grains::default() }
     }
 }
 
 impl Grains {
     fn closed(self) -> Grains {
-        Grains { grains: self.grains, bodies: Catenation::default() }
+        Grains { bodies: Catenation::default(), ..self }
+    }
+}
+
+impl FnRow {
+    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
+        Grain::Function(FnRow { definition: definition.or(self.definition), ..self })
     }
 }

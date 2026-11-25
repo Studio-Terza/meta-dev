@@ -16,6 +16,12 @@ use build::Build;
 use fortnight::Fortnight;
 use notice::{Notice, Report};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Pace {
+    Slower,
+    Steady,
+}
+
 #[derive(Debug)]
 pub struct CompileTrend {
     today: PathBuf,
@@ -27,9 +33,9 @@ impl CompileTrend {
         Title::new("compile-time trend: the cold build is slower than every run of the previous 14 days");
 
     fn concluded<'step>(notice: &Notice<'_>, ports: &impl Ports) -> Result<Telling<'step>, Failure<'step>> {
-        match notice.slower() {
-            Some(slower) => Self::filed(&slower.reported(&Fortnight::merged(ports)?), ports),
-            None => Ok(Telling::reported(vec![Shown::said(format_args!("{notice}\n"))], Ok(Exit::Success))),
+        match notice.pace() {
+            Pace::Slower => Self::filed(&notice.reported(&Fortnight::merged(ports)?), ports),
+            Pace::Steady => Ok(Telling::reported(vec![Shown::said(format_args!("{notice}\n"))], Ok(Exit::Success))),
         }
     }
 

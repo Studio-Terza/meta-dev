@@ -14,6 +14,8 @@ use graph::{
 use lint_core::Syntax;
 use lint_layout::{Name, Position, Whole, Word};
 
+use algebra::{Monoid, Semigroup};
+
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 pub(super) use bounds::ParamBounds;
 
@@ -136,51 +138,81 @@ impl LoweredInput {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(super) struct InScope {
+#[derive(Clone, Debug, Default)]
+pub(super) struct Declared {
     parameters: Vec<Name>,
-    subject: TypeRef<Written>,
     bounds: Vec<ParamBounds>,
+}
+
+impl Semigroup for Declared {
+    fn combine(self, inner: Self) -> Self {
+        Declared { parameters: self.parameters.combine(inner.parameters), bounds: self.bounds.combine(inner.bounds) }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Generic<'scope>(&'scope Name);
+
+impl Generic<'_> {
+    pub(super) fn param(self) -> Resolved {
+        Resolved::Param(self.0.clone())
+    }
+
+    fn parameter(self, position: Position) -> TypeRef<Written> {
+        Written::parameter(self.0.clone(), Spelling::Written([self.0.clone()].into_iter().collect(), position))
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(super) struct InScope {
+    declared: Declared,
+    subject: Option<TypeRef<Written>>,
+}
+
+impl Semigroup for InScope {
+    fn combine(self, inner: Self) -> Self {
+        InScope { declared: self.declared.combine(inner.declared), subject: inner.subject.or(self.subject) }
+    }
+}
+
+impl Monoid for InScope {}
+
+impl From<&Generics> for InScope {
+    fn from(generics: &Generics) -> InScope {
+        let parameters = generics.params.iter().filter_map(TypeParameter::named).collect();
+        InScope { declared: Declared { parameters, bounds: ParamBounds::declared(generics) }, subject: None }
+    }
+}
+
+impl From<TypeRef<Written>> for InScope {
+    fn from(subject: TypeRef<Written>) -> InScope {
+        InScope { declared: Declared::default(), subject: Some(subject) }
+    }
+}
+
+impl From<Declared> for InScope {
+    fn from(declared: Declared) -> InScope {
+        InScope { declared, subject: None }
+    }
 }
 
 impl InScope {
     const SELF: Word<'static> = Word::new("Self");
 
-    pub(super) fn outside() -> InScope {
-        InScope {
-            parameters: Vec::new(),
-            subject: Written::parameter(Name::from(InScope::SELF), Spelling::Implied),
-            bounds: Vec::new(),
-        }
-    }
-
-    pub(super) fn extended(&self, generics: &Generics) -> InScope {
-        let declared = generics.params.iter().filter_map(TypeParameter::named);
-        InScope {
-            parameters: self.parameters.iter().cloned().chain(declared).collect(),
-            subject: self.subject.clone(),
-            bounds: self.bounds.iter().cloned().chain(ParamBounds::declared(generics)).collect(),
-        }
-    }
-
-    pub(super) fn subject(&self, subject: TypeRef<Written>) -> InScope {
-        InScope { parameters: self.parameters.clone(), subject, bounds: self.bounds.clone() }
-    }
-
-    pub(super) fn generic(&self, name: &Name) -> Option<&Name> {
-        self.parameters.iter().find(|parameter| *parameter == name)
+    pub(super) fn generic(&self, name: &Name) -> Option<Generic<'_>> {
+        self.declared.parameters.iter().find(|parameter| *parameter == name).map(Generic)
     }
 
     pub(super) fn traits_of(&self, param: &Name) -> Vec<&UsePath> {
-        self.bounds.iter().filter(|bound| bound.param() == param).flat_map(ParamBounds::traits).collect()
+        self.declared.bounds.iter().filter(|bound| bound.param() == param).flat_map(ParamBounds::traits).collect()
     }
 
-    pub(super) fn current_subject(&self) -> &TypeRef<Written> {
-        &self.subject
+    pub(super) fn current_subject(&self) -> TypeRef<Written> {
+        self.subject.clone().unwrap_or_else(|| Written::parameter(Name::from(InScope::SELF), Spelling::Implied))
     }
 
-    pub(super) fn subjectless(&self) -> InScope {
-        InScope::outside().with_parameters(self)
+    pub(super) fn declared(&self) -> &Declared {
+        &self.declared
     }
 
     pub(super) fn declarations(&self, generics: &Generics) -> Vec<DeclaredParameter> {
@@ -221,20 +253,14 @@ impl InScope {
         Fold::over(tree, |fold, ty| Lowering { scope: self, fold }.lowered(ty).unwrap_or(TypeRef::Opaque))
     }
 
-    fn with_parameters(self, scope: &InScope) -> InScope {
-        InScope { parameters: scope.parameters.clone(), subject: self.subject, bounds: scope.bounds.clone() }
-    }
-
     fn held(&self, path: &syntax::Path, position: Position) -> Option<TypeRef<Written>> {
         let first = path.segments.first().map(|first| Name::from(&first.ident));
         let declared = first.as_ref().and_then(|head| self.generic(head));
-        let parameter = declared.map(|name| {
-            Written::parameter(name.clone(), Spelling::Written([name.clone()].into_iter().collect(), position))
-        });
+        let parameter = declared.map(|generic| generic.parameter(position));
         let subject = first
             .as_ref()
             .and_then(|head| head.matches::<Whole>(&[Self::SELF]))
-            .map(|_| self.subject.clone().respelled(Written::implied));
+            .map(|_| self.current_subject().respelled(Written::implied));
         parameter.or(subject)
     }
 }

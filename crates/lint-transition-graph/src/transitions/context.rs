@@ -4,30 +4,41 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::transitions::endpoint::Endpoint;
-use crate::transitions::filler::Filler;
+use crate::transitions::filler::{Filler, Subjected};
 use crate::transitions::function::Function;
 use crate::transitions::ground::Ground;
 
 #[derive(Debug)]
 pub struct Context<'file> {
     krate: CrateName,
-    selfish: Endpoint,
+    selfish: Subjected,
     ground: Ground,
     filler: Filler,
     functions: Vec<Function<'file>>,
 }
 
+#[derive(Debug)]
+pub(crate) struct Grounded {
+    krate: CrateName,
+    selfish: Subjected,
+    ground: Ground,
+    filler: Filler,
+}
+
+impl Grounded {
+    pub(crate) fn new(krate: &Name, selfish: Endpoint, ground: Ground, filler: Filler) -> Grounded {
+        Grounded { krate: CrateName::from(krate), selfish: filler.subjected(selfish), ground, filler }
+    }
+
+    pub(crate) fn with_functions<'file>(self, functions: impl IntoIterator<Item = Function<'file>>) -> Context<'file> {
+        let Grounded { krate, selfish, ground, filler } = self;
+        Context { krate, selfish, ground, filler, functions: functions.into_iter().collect() }
+    }
+}
+
 impl<'file> Context<'file> {
-    pub(crate) fn new(krate: &Name, selfish: Endpoint, ground: Ground, filler: Filler) -> Context<'file> {
-        Context { krate: CrateName::from(krate), selfish, ground, filler, functions: Vec::new() }
-    }
-
-    pub(crate) fn with_functions(mut self, functions: impl IntoIterator<Item = Function<'file>>) -> Context<'file> {
-        self.functions.extend(functions);
-        self
-    }
-
-    pub(crate) fn selfish(&self) -> &Endpoint {
+    #[must_use]
+    pub fn selfish(&self) -> &Subjected {
         &self.selfish
     }
 
@@ -40,13 +51,8 @@ impl<'file> Context<'file> {
     }
 
     #[must_use]
-    pub fn subject(&self) -> Option<&Endpoint> {
-        self.filler.owned().map(|_| &self.selfish)
-    }
-
-    #[must_use]
     pub fn trait_name(&self) -> Option<&Name> {
-        self.filler.trait_name(self.selfish.as_ref())
+        self.filler.trait_name(self.selfish.endpoint().as_ref())
     }
 }
 
@@ -64,8 +70,8 @@ impl AsRef<CrateName> for Context<'_> {
 
 impl fmt::Display for Context<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.filler.owned() {
-            Some(_) => write!(formatter, "{}::{}", self.krate, AsRef::<Name>::as_ref(&self.selfish)),
+        match self.selfish.subject() {
+            Some(selfish) => write!(formatter, "{}::{}", self.krate, AsRef::<Name>::as_ref(selfish)),
             None => write!(formatter, "{}", self.krate),
         }
     }

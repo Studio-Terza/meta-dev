@@ -1,5 +1,6 @@
 mod boundary;
 
+use algebra::Semigroup;
 use newtype::{Arbitrary, Newtype};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -17,14 +18,15 @@ impl Position {
     }
 }
 
+impl Semigroup for Span {
+    fn combine(self, later: Span) -> Span {
+        Span { start: self.start, end: later.end }
+    }
+}
+
 impl Span {
     pub(crate) fn new(start: Position, end: Position) -> Span {
         Span { start, end }
-    }
-
-    #[must_use]
-    pub fn through(self, later: Span) -> Span {
-        Span { start: self.start, end: later.end }
     }
 
     #[must_use]

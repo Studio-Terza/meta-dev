@@ -2,7 +2,9 @@ mod finding;
 
 use std::collections::BTreeMap;
 
-use graph::{Ground, Harness, Implementation, ItemId, ItemKind, ItemPath, Model, Placed, Region, Resolved, Spelling};
+use graph::{
+    Ground, Harness, Implementation, ItemId, ItemKind, ItemPath, Model, Origin, Placed, Region, Resolved, Spelling,
+};
 use lint_core::{Site, Violation};
 use lint_layout::{CamelWord, Name, Whole, Word, words};
 
@@ -56,7 +58,7 @@ impl<'model> Doubles<'model> {
     pub(crate) fn violations(&self, model: &'model Model) -> Vec<Violation<'model>> {
         let implemented: Vec<Implemented<'model>> = model
             .implementations()
-            .filter(|placed| placed.entity().hand_written().is_some())
+            .filter(|placed| placed.entity().origin() == Origin::Written)
             .filter_map(|placed| {
                 let implementation = placed.entity();
                 let target: &Resolved = implementation.subject_type().named()?.as_ref();

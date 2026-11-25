@@ -44,8 +44,8 @@ impl Equivalence {
     }
 
     #[must_use]
-    pub const fn comparing(self, laws: Laws) -> Equivalence {
-        Equivalence { laws: Some(laws), ..self }
+    pub const fn comparing(erased: &'static [Erased], laws: Laws) -> Equivalence {
+        Equivalence { erased, laws: Some(laws) }
     }
 
     #[must_use]

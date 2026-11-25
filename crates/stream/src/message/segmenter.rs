@@ -1,3 +1,4 @@
+use algebra::Semigroup;
 use grammar_message::{Boundary, Lexeme, Span};
 
 use crate::form::{Form, Forms};
@@ -38,12 +39,13 @@ pub struct Segmenter {
     open: Option<Open>,
 }
 
-impl Part {
-    fn joined(self, later: Part) -> Part {
-        let ink = self.ink.map_or(later.ink, |ink| Some(later.ink.map_or(ink, |last| ink.through(last))));
-        Part { form: self.form, span: self.span.through(later.span), ink }
+impl Semigroup for Part {
+    fn combine(self, later: Part) -> Part {
+        Part { form: self.form, span: self.span.combine(later.span), ink: self.ink.combine(later.ink) }
     }
+}
 
+impl Part {
     fn inked(self) -> Span {
         self.ink.unwrap_or_else(|| self.span.emptied())
     }
@@ -90,7 +92,7 @@ impl Open {
 
     fn extended(self, lexeme: Lexeme) -> Open {
         Open {
-            part: self.part.joined(Part { form: self.part.form, span: lexeme.span(), ink: lexeme.ink() }),
+            part: self.part.combine(Part { form: self.part.form, span: lexeme.span(), ink: lexeme.ink() }),
             fill: self.fill.after(lexeme),
         }
     }
@@ -104,7 +106,7 @@ impl Open {
 
     fn placed(self, previous: Option<Part>) -> Vec<Part> {
         match self.fill {
-            Fill::Blank => previous.map_or_else(|| vec![self.part], |earlier| vec![earlier.joined(self.part)]),
+            Fill::Blank => previous.map_or_else(|| vec![self.part], |earlier| vec![earlier.combine(self.part)]),
             Fill::Written => previous.into_iter().chain(Some(self.part)).collect(),
         }
     }

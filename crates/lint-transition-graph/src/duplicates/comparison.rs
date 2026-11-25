@@ -8,6 +8,7 @@ use super::family::Family;
 use crate::class::Class;
 use crate::count::Count;
 use crate::edge::Edge;
+use crate::forms::Written;
 use newtype::Counter;
 
 #[derive(Debug)]
@@ -22,7 +23,7 @@ pub(super) struct Comparison {
 
 impl Comparison {
     pub(super) fn of_families(edges: &[Edge<'_, '_>], families: &[Family<'_, '_>]) -> Comparison {
-        let written: Vec<&Edge<'_, '_>> = edges.iter().filter(|edge| edge.form().hand_written().is_some()).collect();
+        let written: Vec<&Edge<'_, '_>> = edges.iter().collect::<Written<'_, '_, '_>>().into_iter().collect();
         let compared = Count::new(written.iter().filter(|edge| edge.ends().key().is_some()).count());
         let primitive = Count::new(written.iter().filter(|edge| edge.ends().class() == Class::Primitive).count());
         Comparison {

@@ -6,14 +6,16 @@ use lint_layout::Name;
 use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::Binding;
-use super::boundary::{GlobId, Lattice, ScopeId};
+use algebra::{Monoid, Semigroup};
+
+use super::boundary::{GlobId, ScopeId};
 use super::entries::{DeclaredAt, Sight};
 use super::rules::{RulesDefinition, Written};
 use super::settling::Target;
 use super::std_names::{Canonical, StdNames, Table};
 use super::tables::{Key, Lookup, Tables};
 use super::use_path::{Reading, Shape, UsePath};
-use super::view::View;
+use super::view::{Nearest, View};
 
 #[derive(Debug)]
 pub(super) enum Outer {
@@ -73,13 +75,6 @@ pub(crate) enum Resolution {
 }
 
 impl Resolution {
-    pub(super) fn present(&self) -> Option<&Resolution> {
-        match self {
-            Resolution::Waiting => Some(self),
-            Resolution::Bound(binding) => binding.present().map(|_| self),
-        }
-    }
-
     pub(super) fn declared(&self) -> Option<DeclaredAt> {
         match self {
             Resolution::Waiting => None,
@@ -94,20 +89,6 @@ impl Resolution {
         }
     }
 
-    pub(super) fn forced(self) -> Binding {
-        match self {
-            Resolution::Waiting => Binding::UNBOUND,
-            Resolution::Bound(binding) => binding,
-        }
-    }
-
-    fn kept(self, held: &Binding) -> Resolution {
-        match self {
-            Resolution::Waiting => Resolution::Bound(held.clone()),
-            Resolution::Bound(found) => Resolution::Bound(held.agreed(found)),
-        }
-    }
-
     fn target(self, sight_of: impl FnOnce(ScopeId) -> Sight) -> Target {
         match self {
             Resolution::Waiting => Target::Waiting,
@@ -116,30 +97,93 @@ impl Resolution {
     }
 }
 
-impl Lattice for Resolution {
-    fn joined(&self, computed: Resolution) -> Resolution {
-        match self {
-            Resolution::Waiting => computed,
-            Resolution::Bound(held) => computed.kept(held),
+impl Semigroup for Resolution {
+    fn combine(self, computed: Resolution) -> Resolution {
+        Resolution::from(Option::<Binding>::from(self).combine(Option::from(computed)))
+    }
+}
+
+impl From<Resolution> for Option<Binding> {
+    fn from(resolution: Resolution) -> Option<Binding> {
+        match resolution {
+            Resolution::Waiting => None,
+            Resolution::Bound(binding) => Some(binding),
         }
     }
 }
 
-impl<'rows> From<&'rows Resolution> for View<'rows> {
-    fn from(resolution: &'rows Resolution) -> View<'rows> {
+impl From<Option<Binding>> for Resolution {
+    fn from(binding: Option<Binding>) -> Resolution {
+        binding.map_or(Resolution::Waiting, Resolution::Bound)
+    }
+}
+
+impl<'rows> From<&'rows Resolution> for Option<View<'rows>> {
+    fn from(resolution: &'rows Resolution) -> Option<View<'rows>> {
         match resolution {
-            Resolution::Waiting => View::WAITING,
-            Resolution::Bound(binding) => View::from(binding),
+            Resolution::Waiting => Some(View::WAITING),
+            Resolution::Bound(binding) => (*binding != Binding::Absent).then(|| View::from(binding)),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Dispute {
+    Clear,
+    Contested,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Deference {
+    Stands,
+    Defers,
+}
+
+#[derive(Debug)]
+struct Walks<'walk, 'tables, 'rows, 'key, Imports> {
+    resolver: &'walk Resolver<'tables, 'rows, Imports>,
+    levels: &'walk [ScopeId],
+    key: Key<'key>,
+    written: View<'rows>,
+}
+
+impl<'rows, Imports: Levels> Walks<'_, '_, 'rows, '_, Imports> {
+    fn settled(&self, dispute: Dispute) -> View<'rows> {
+        match dispute {
+            Dispute::Clear => self.written,
+            Dispute::Contested => {
+                self.deferred(self.resolver.walked(self.levels, self.key, Reading::Explicit).deference())
+            }
+        }
+    }
+
+    fn deferred(&self, deference: Deference) -> View<'rows> {
+        match deference {
+            Deference::Stands => self.written,
+            Deference::Defers => self.resolver.walked(self.levels, self.key, Reading::Imported),
+        }
+    }
+}
+
+pub(crate) trait Levels: Copy {
+    fn levels<'levels>(self, levels: &'levels [ScopeId], key: Key<'_>) -> &'levels [ScopeId];
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Plain;
+
+impl Levels for Plain {
+    fn levels<'levels>(self, levels: &'levels [ScopeId], _: Key<'_>) -> &'levels [ScopeId] {
+        levels
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Importing<'tables>(Option<Key<'tables>>);
+pub(crate) struct Importing<'tables>(Key<'tables>);
 
-impl Importing<'_> {
+impl Levels for Importing<'_> {
     fn levels<'levels>(self, levels: &'levels [ScopeId], key: Key<'_>) -> &'levels [ScopeId] {
-        match self.0.filter(|importing| *importing == key).filter(|_| key.domain() != Domain::Macros) {
+        match Some(self.0).filter(|importing| *importing == key).filter(|_| key.domain() != Domain::Macros) {
             Some(_) => levels.get(1..).unwrap_or_default(),
             None => levels,
         }
@@ -147,22 +191,24 @@ impl Importing<'_> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Resolver<'tables, 'rows> {
+pub(crate) struct Resolver<'tables, 'rows, Imports = Plain> {
     space: &'tables Namespace<'tables>,
     tables: &'tables Tables<'rows>,
     ignored: Option<GlobId>,
-    importing: Option<Key<'tables>>,
+    imports: Imports,
 }
 
 impl<'tables, 'rows> Resolver<'tables, 'rows> {
     pub(crate) fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Resolver<'tables, 'rows> {
-        Resolver { space, tables, ignored: None, importing: None }
+        Resolver { space, tables, ignored: None, imports: Plain }
     }
 
-    pub(super) fn importing(self, key: Key<'tables>) -> Resolver<'tables, 'rows> {
-        Resolver { space: self.space, tables: self.tables, ignored: self.ignored, importing: Some(key) }
+    pub(super) fn importer(self, key: Key<'tables>) -> Resolver<'tables, 'rows, Importing<'tables>> {
+        Resolver { space: self.space, tables: self.tables, ignored: self.ignored, imports: Importing(key) }
     }
+}
 
+impl<'tables, 'rows, Imports: Levels> Resolver<'tables, 'rows, Imports> {
     pub(super) fn path(&self, path: &UsePath, viewer: ScopeId, domain: Domain) -> Resolution {
         let tail = path.tail();
         let (within, last) = tail.split_at(tail.len().saturating_sub(1));
@@ -173,14 +219,14 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     pub(super) fn glob_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId) -> Target {
-        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), importing: None };
+        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), imports: Plain };
         resolver
             .path(path, scope, Domain::Types)
-            .target(|module| Sight::ByGlob.beyond(self.space.within_reach(module, scope)))
+            .target(|module| self.space.sight(module, scope).unwrap_or(Sight::ByGlob))
     }
 
     pub(super) fn invoked_target(&self, path: &UsePath, scope: ScopeId, glob: GlobId, written: &Written) -> Target {
-        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), importing: None };
+        let resolver = Resolver { space: self.space, tables: self.tables, ignored: Some(glob), imports: Plain };
         let found = resolver.path(path, scope, Domain::Macros);
         let rules = found.declared().and_then(|at| self.space.rules(at));
         found.narrowed(rules, written)
@@ -232,7 +278,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
                 .found(
                     module,
                     Key::new(domain, segment),
-                    Lookup::new(Sight::ByPath.beyond(self.space.within_reach(module, viewer)), None, Reading::Written),
+                    Lookup::new(self.space.sight(module, viewer).unwrap_or(Sight::ByPath), None, Reading::Written),
                 )
                 .settled(|| Outer::Assumed(Binding::Absent), || self.expanded(module, segment)),
         }
@@ -248,19 +294,15 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
     }
 
     fn chained(&self, scope: ScopeId, key: Key<'_>, reading: Reading) -> View<'rows> {
-        let levels = Importing(self.importing).levels(self.space.chain(scope), key);
-        let first = |asked: Reading| Lookup::new(Sight::Inside, self.ignored, asked);
-        self.walked(levels, key, first(reading)).disputed(
-            || self.walked(levels, key, first(Reading::Explicit)),
-            || self.walked(levels, key, first(Reading::Imported)),
-        )
+        let levels = self.imports.levels(self.space.chain(scope), key);
+        let written = self.walked(levels, key, reading);
+        Walks { resolver: self, levels, key, written }.settled(written.dispute())
     }
 
-    fn walked(&self, levels: &[ScopeId], key: Key<'_>, first: Lookup) -> View<'rows> {
-        let lookups = iter::once(first).chain(iter::repeat(first.outer()));
-        levels
-            .iter()
-            .zip(lookups)
-            .fold(View::ABSENT, |found, (level, lookup)| found.or_else(|| self.tables.found(*level, key, lookup)))
+    fn walked(&self, levels: &[ScopeId], key: Key<'_>, reading: Reading) -> View<'rows> {
+        let first = Lookup::new(Sight::Inside, self.ignored, reading);
+        let lookups = iter::once(first).chain(iter::repeat(Lookup::new(Sight::Inside, None, reading)));
+        let views = levels.iter().zip(lookups).map(|(level, lookup)| self.tables.found(*level, key, lookup));
+        View::from(Nearest::concat(views.map(Nearest::from)))
     }
 }

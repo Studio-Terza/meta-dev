@@ -22,40 +22,54 @@ pub struct Function<'file> {
     calls: &'file [Invocation],
 }
 
+#[derive(Debug)]
+pub(crate) struct Outlined<'file> {
+    site: Site<'file>,
+    name: Name,
+    takes: Vec<Resolved>,
+    gives: Resolved,
+}
+
+#[derive(Debug)]
+pub(crate) struct Bodied<'file> {
+    outline: Outlined<'file>,
+    mutation: Mutation,
+    handle: Handle,
+    body: Body,
+}
+
+#[derive(Debug)]
+pub(crate) struct Peeled<'file> {
+    bodied: Bodied<'file>,
+    wrapping: Wrapping,
+    takings: Vec<Wrapping>,
+}
+
+impl<'file> Outlined<'file> {
+    pub(crate) fn new(site: Site<'file>, name: Name, takes: Vec<Resolved>, gives: Resolved) -> Outlined<'file> {
+        Outlined { site, name, takes, gives }
+    }
+
+    pub(crate) fn shaped(self, mutation: Mutation, body: Body, handle: Handle) -> Bodied<'file> {
+        Bodied { outline: self, mutation, handle, body }
+    }
+}
+
+impl<'file> Bodied<'file> {
+    pub(crate) fn wrapped(self, wrapping: Wrapping, takings: Vec<Wrapping>) -> Peeled<'file> {
+        Peeled { bodied: self, wrapping, takings }
+    }
+}
+
+impl<'file> Peeled<'file> {
+    pub(crate) fn called(self, calls: &'file [Invocation]) -> Function<'file> {
+        let Peeled { bodied: Bodied { outline, mutation, handle, body }, wrapping, takings } = self;
+        let Outlined { site, name, takes, gives } = outline;
+        Function { site, name, takes, gives, mutation, handle, body, wrapping, takings, calls }
+    }
+}
+
 impl<'file> Function<'file> {
-    pub(crate) fn new(site: Site<'file>, name: Name, takes: Vec<Resolved>, gives: Resolved) -> Function<'file> {
-        Function {
-            site,
-            name,
-            takes,
-            gives,
-            mutation: Mutation::Absent,
-            handle: Handle::Owned,
-            body: Body::Written,
-            wrapping: Wrapping::Plain,
-            takings: Vec::new(),
-            calls: &[],
-        }
-    }
-
-    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, handle: Handle) -> Function<'file> {
-        self.mutation = mutation;
-        self.body = body;
-        self.handle = handle;
-        self
-    }
-
-    pub(crate) fn wrapped(mut self, wrapping: Wrapping, takings: Vec<Wrapping>) -> Function<'file> {
-        self.wrapping = wrapping;
-        self.takings = takings;
-        self
-    }
-
-    pub(crate) fn called(mut self, calls: &'file [Invocation]) -> Function<'file> {
-        self.calls = calls;
-        self
-    }
-
     pub(crate) fn takes(&self) -> &[Resolved] {
         &self.takes
     }

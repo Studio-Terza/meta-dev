@@ -34,7 +34,7 @@ impl From<Nesting<'_>> for ScopeShape {
     fn from(nesting: Nesting<'_>) -> ScopeShape {
         let Nesting { parent, kind, scope } = nesting;
         ScopeShape {
-            anchors: kind.anchors(parent.anchors, scope),
+            anchors: parent.anchors.combine(kind.entered(scope)),
             chain: kind.chain(&parent.chain, scope),
             ancestry: iter::once(scope).chain(parent.ancestry.iter().copied()).collect(),
         }
@@ -143,13 +143,13 @@ impl<'sown, 'read> Sowing<'sown, 'read> {
     pub(crate) fn placed(self, top: Top<'read>, openings: Openings) -> Sown<'read> {
         let base = self.base;
         let root = top.root(self);
-        let topped = top.sown(self, openings.top.above(base));
+        let topped = top.sown(self, openings.top.placed(base));
         let placed = openings.nested.into_iter().fold(topped, |placed, opening| {
             let scope = ScopeId::after(&placed.shapes).above(base);
             let shape = self
                 .shape(&placed, opening.parent.above(base))
                 .map(|parent| ScopeShape::from(Nesting { parent, kind: opening.kind, scope }));
-            placed.combine(Sown::shaped(shape, opening.entries.above(base)))
+            placed.combine(Sown::shaped(shape, opening.entries.placed(base)))
         });
         let exported = placed.exported(base);
         let aliased = root.map_or_default(|scope| {

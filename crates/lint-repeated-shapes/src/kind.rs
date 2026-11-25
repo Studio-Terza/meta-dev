@@ -1,5 +1,6 @@
 use std::fmt;
 
+use algebra::Semigroup;
 use lint_core::Fix;
 use lint_placement::Role;
 
@@ -10,16 +11,18 @@ pub(crate) enum Kind {
     Mixed,
 }
 
+impl Semigroup for Kind {
+    fn combine(self, other: Kind) -> Kind {
+        Some(self).filter(|kind| *kind == other).unwrap_or(Kind::Mixed)
+    }
+}
+
 impl Kind {
     pub(crate) fn of_role(role: Role) -> Kind {
         match role {
             Role::Target => Kind::Tests,
             Role::BinaryRoot | Role::LibraryRoot | Role::BuildScript | Role::Other => Kind::Shipped,
         }
-    }
-
-    pub(crate) fn joined(self, other: Kind) -> Kind {
-        Some(self).filter(|kind| *kind == other).unwrap_or(Kind::Mixed)
     }
 
     pub(crate) fn fix(self) -> Fix {

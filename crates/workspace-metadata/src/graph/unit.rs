@@ -35,6 +35,10 @@ impl<'meta> Unit<'meta> {
         &self.declarations
     }
 
+    pub(super) fn shared(&self) -> BTreeSet<&'meta CrateName> {
+        self.declarations.values().flat_map(|declared| declared.shared()).collect()
+    }
+
     pub(super) fn unreached(&self, graph: &Graph<'meta>) -> Stale<'meta> {
         let reach = graph.reach(self);
         self.declarations
@@ -45,13 +49,5 @@ impl<'meta> Unit<'meta> {
             })
             .filter_map(|(declarer, owned)| Some((AsRef::<CrateName>::as_ref(graph.package(declarer)?), owned)))
             .collect()
-    }
-
-    pub(super) fn holds(&self, package: &PackageId) -> Option<&'meta PackageId> {
-        self.members.get(package).copied()
-    }
-
-    pub(super) fn shares(&self, package: &CrateName) -> Option<&'meta CrateName> {
-        self.declarations.values().find_map(|declared| declared.shares(package))
     }
 }

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use algebra::Semigroup;
 use body_shape::TokenCount;
 use equivalence::{Equivalence, Erased, Group, Holes};
 use lint_core::{Fix, Site, Violation};
@@ -20,7 +21,7 @@ impl Finding<'_> {
         equivalence: Equivalence,
     ) -> Option<Violation<'file>> {
         let sites = group.sites();
-        let kind = group.members().iter().map(Occurrence::kind).reduce(Kind::joined).unwrap_or(Kind::Mixed);
+        let kind = group.members().iter().map(Occurrence::kind).reduce(Kind::combine).unwrap_or(Kind::Mixed);
         let spelled: Vec<&[_]> = group.members().iter().map(|member| member.literals().as_ref()).collect();
         let template = Template { holes: Holes::between(&spelled), naming: Naming::erased_by(equivalence) };
         sites.first().map(|site| {

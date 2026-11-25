@@ -507,11 +507,7 @@ impl Packaged {
         cases
             .iter()
             .map(|case| {
-                let readout = case
-                    .sources()
-                    .iter()
-                    .map(|source| Self::parsed(&manifests, source))
-                    .fold(Readout::default(), Readout::with_file);
+                let readout = case.sources().iter().map(|source| Self::parsed(&manifests, source)).collect::<Readout>();
                 format!(
                     "{} flagged {}",
                     case.name(),

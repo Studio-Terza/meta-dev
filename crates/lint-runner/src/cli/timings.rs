@@ -4,6 +4,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::sync::OnceLock;
 
+use algebra::Semigroup;
 use lint_reader::Partition;
 use timer_ports::{Elapsed, Moment, Timer};
 
@@ -125,8 +126,8 @@ pub(crate) struct Timing {
     took: Elapsed,
 }
 
-impl Timing {
-    fn joined(self, later: Timing) -> Timing {
+impl Semigroup for Timing {
+    fn combine(self, later: Timing) -> Timing {
         Timing { step: self.step, began: self.began.min(later.began), took: self.took + later.took }
     }
 }
@@ -192,7 +193,7 @@ pub(crate) struct Table {
 impl Table {
     pub(crate) fn new(shown: Timings, timings: Vec<Timing>, visited: Visiting) -> Table {
         let summed = timings.into_iter().fold(BTreeMap::new(), |mut steps: BTreeMap<String, Timing>, timing| {
-            let held = steps.remove(&timing.step.to_string()).map_or(timing, |earlier| earlier.joined(timing));
+            let held = steps.remove(&timing.step.to_string()).map_or(timing, |earlier| earlier.combine(timing));
             steps.insert(held.step.to_string(), held);
             steps
         });
@@ -209,15 +210,9 @@ impl Table {
 impl fmt::Display for Table {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.shown {
-            Timings::Shown => self.listed(formatter),
+            Timings::Shown => write!(formatter, "{}{}", Rows(&self.rows()), self.visited),
             Timings::Hidden => Ok(()),
         }
-    }
-}
-
-impl Table {
-    fn listed(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}{}", Rows(&self.rows()), self.visited)
     }
 }
 

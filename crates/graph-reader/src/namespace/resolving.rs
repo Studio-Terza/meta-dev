@@ -7,6 +7,7 @@ use graph::{Domain, FileId, ItemId, ItemPath, Member, Mention, ModelPart, PathUs
 use lint_core::Macros;
 use lint_layout::LineNumber;
 
+use super::binding::Binding;
 use super::boundary::{ScopeId, ScopeKey, ScopeMap};
 use super::items::ItemIds;
 use super::resolver::Resolver;
@@ -19,25 +20,35 @@ pub(crate) struct Resolving<'ids, 'tables, 'rows> {
     base: ScopeId,
 }
 
-impl<'ids, 'tables, 'rows> Resolving<'ids, 'tables, 'rows> {
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Unbased<'ids, 'tables, 'rows> {
+    resolver: Resolver<'tables, 'rows>,
+    ids: &'ids ItemIds,
+    transcriptions: &'ids Transcriptions,
+}
+
+impl<'ids, 'tables, 'rows> Unbased<'ids, 'tables, 'rows> {
     pub(crate) fn new(
         resolver: Resolver<'tables, 'rows>,
         ids: &'ids ItemIds,
         transcriptions: &'ids Transcriptions,
-    ) -> Resolving<'ids, 'tables, 'rows> {
-        Resolving { resolver, ids, transcriptions, base: ScopeId::FIRST }
+    ) -> Unbased<'ids, 'tables, 'rows> {
+        Unbased { resolver, ids, transcriptions }
     }
 
     pub(crate) fn based(self, base: ScopeId) -> Resolving<'ids, 'tables, 'rows> {
-        Resolving { base, ..self }
+        Resolving { resolver: self.resolver, ids: self.ids, transcriptions: self.transcriptions, base }
     }
+}
 
+impl<'ids> Resolving<'ids, '_, '_> {
     pub(crate) fn transcriptions(&self) -> &'ids Transcriptions {
         self.transcriptions
     }
 
     pub(crate) fn path(&self, scope: ScopeId, path: &UsePath, domain: Domain) -> Resolved {
-        self.resolver.path(path, scope.above(self.base), domain).forced().resolved(self.ids, path.written())
+        let resolution = self.resolver.path(path, scope.above(self.base), domain);
+        Option::<Binding>::from(resolution).unwrap_or(Binding::UNBOUND).resolved(self.ids, path.written())
     }
 }
 

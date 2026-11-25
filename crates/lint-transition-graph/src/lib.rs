@@ -10,6 +10,7 @@ mod duplicates;
 mod edge;
 mod end;
 mod form;
+mod forms;
 mod graph_lint;
 mod homomorphism;
 mod key;

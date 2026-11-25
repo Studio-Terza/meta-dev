@@ -13,6 +13,7 @@ mod slice;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use algebra::Semigroup;
 use graph::Model;
 use lint_core::{Headline, Report, Site, Violation};
 use lint_layout::Name;
@@ -107,7 +108,7 @@ impl<'found, 'file> Containment<'found, 'file> {
     }
 
     pub(crate) fn users_within(&self, member: Member<'found>) -> Option<Cluster<'found>> {
-        self.adjacent(member, Toward::Users).map(|user| user.cluster()).reduce(Cluster::common)
+        self.adjacent(member, Toward::Users).map(|user| user.cluster()).reduce(Cluster::combine)
     }
 
     pub(crate) fn outside(

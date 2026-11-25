@@ -45,8 +45,8 @@ impl Package {
         self.metadata.as_ref().and_then(Declared::port)
     }
 
-    pub fn declares(&self, role: Role) -> Option<Role> {
-        self.metadata.as_ref().and_then(|declared| declared.declares(role))
+    pub fn roles(&self) -> Vec<Role> {
+        self.metadata.as_ref().map_or_else(Vec::new, Declared::roles)
     }
 
     pub fn format(&self) -> Option<&Format> {
