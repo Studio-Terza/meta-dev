@@ -2,6 +2,12 @@ use std::collections::BTreeSet;
 
 use lint_layout::Name;
 
+#[derive(Debug)]
+pub enum Reached {
+    Named(Name),
+    Glob,
+}
+
 #[derive(Debug, Default)]
 pub struct CrateReach {
     names: BTreeSet<Name>,
@@ -16,16 +22,16 @@ enum Used {
     Globbed,
 }
 
+impl From<Reached> for CrateReach {
+    fn from(reached: Reached) -> CrateReach {
+        match reached {
+            Reached::Named(name) => CrateReach { names: BTreeSet::from([name]), used: Used::Named },
+            Reached::Glob => CrateReach { names: BTreeSet::new(), used: Used::Globbed },
+        }
+    }
+}
+
 impl CrateReach {
-    pub fn named(&mut self, name: Name) {
-        self.names.insert(name);
-        self.used = self.used.max(Used::Named);
-    }
-
-    pub fn globbed(&mut self) {
-        self.used = Used::Globbed;
-    }
-
     pub fn names_only(self) -> CrateReach {
         CrateReach { names: self.names, used: Used::Unused }
     }

@@ -11,7 +11,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 
-use crate_reach::CrateReach;
+use crate_reach::{CrateReach, Reached};
 
 #[derive(Debug, Default)]
 pub struct ForeignReferences {
@@ -21,12 +21,6 @@ pub struct ForeignReferences {
 #[derive(Clone, Copy)]
 enum Leaf<'tree> {
     Named(&'tree Ident),
-    Glob,
-}
-
-#[derive(Debug)]
-enum Reached {
-    Named(Name),
     Glob,
 }
 
@@ -45,20 +39,11 @@ impl From<Leaf<'_>> for Reached {
     }
 }
 
-impl Reached {
-    fn reached(self, reach: &mut CrateReach) {
-        match self {
-            Reached::Named(name) => reach.named(name),
-            Reached::Glob => reach.globbed(),
-        }
-    }
-}
-
 impl FromIterator<Sighting> for ForeignReferences {
     fn from_iter<Sightings: IntoIterator<Item = Sighting>>(sightings: Sightings) -> ForeignReferences {
         let crates =
             sightings.into_iter().fold(BTreeMap::new(), |mut crates: BTreeMap<CrateName, CrateReach>, seen| {
-                seen.reached.reached(crates.entry(seen.crate_name).or_default());
+                crates.entry(seen.crate_name).or_default().absorb(CrateReach::from(seen.reached));
                 crates
             });
         ForeignReferences { crates }
