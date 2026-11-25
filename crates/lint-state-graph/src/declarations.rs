@@ -36,7 +36,7 @@ impl From<Parsed<'_, '_>> for DeclarationGathering {
     fn from(parsed: Parsed<'_, '_>) -> DeclarationGathering {
         DeclarationGathering {
             reading: Contributing::new(DeclarationScan),
-            shipped: <&SourceFile>::from(parsed).shipped().map(|_| ()),
+            shipped: <&SourceFile>::from(parsed).head().shipped().map(|_| ()),
         }
     }
 }
@@ -68,8 +68,9 @@ impl FromIterator<Option<Declarations>> for Declarations {
                 .flatten()
                 .map(|part| DeclarationReading { vertices: part.vertices, aliases: part.aliases }),
         );
-        let merged = Declarations { vertices: gathered.vertices, aliases: gathered.aliases };
-        merged.with_resolved_vertices()
+        let DeclarationReading { vertices, aliases } = gathered;
+        let resolved = vertices.into_iter().map(|vertex| aliases.get(&vertex).cloned().unwrap_or(vertex)).collect();
+        Declarations { vertices: resolved, aliases }
     }
 }
 
@@ -80,13 +81,6 @@ impl Declarations {
 
     pub fn vertex_named(&self, name: &TypeName) -> Option<Vertex<'_>> {
         self.vertices.get(name).map(Vertex::new)
-    }
-
-    fn with_resolved_vertices(mut self) -> Declarations {
-        let vertices = std::mem::take(&mut self.vertices);
-        self.vertices =
-            vertices.into_iter().map(|vertex| self.aliases.get(&vertex).cloned().unwrap_or(vertex)).collect();
-        self
     }
 
     fn vertex(item: &ItemImpl) -> Option<TypeName> {

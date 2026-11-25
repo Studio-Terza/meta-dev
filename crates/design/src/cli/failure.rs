@@ -249,16 +249,16 @@ impl Failure {
         outcome: Result<Outcome, Failure>,
         released: Result<Snapshot, ReleaseFailures>,
     ) -> Result<Outcome, Failure> {
-        match outcome {
-            Ok(done) => released.map(|_snapshot| done).map_err(Failure::Released),
-            Err(command) => Err(Failure::unreleasing(command, released)),
+        match released {
+            Ok(_snapshot) => outcome,
+            Err(failures) => Err(Failure::unreleased(outcome, failures)),
         }
     }
 
-    fn unreleasing(command: Failure, released: Result<Snapshot, ReleaseFailures>) -> Failure {
-        match released {
-            Ok(_snapshot) => command,
-            Err(failures) => Failure::Unreleased { command: Box::new(command), released: failures },
+    fn unreleased(outcome: Result<Outcome, Failure>, failures: ReleaseFailures) -> Failure {
+        match outcome {
+            Ok(_done) => Failure::Released(failures),
+            Err(command) => Failure::Unreleased { command: Box::new(command), released: failures },
         }
     }
 }

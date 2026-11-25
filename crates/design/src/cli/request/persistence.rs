@@ -21,13 +21,6 @@ impl TryFrom<&[Token]> for Persistence {
 }
 
 impl Persistence {
-    pub fn then(self, next: Persistence) -> Result<Persistence, Failure> {
-        match self {
-            Persistence::File => Ok(next),
-            Persistence::DryRun => Err(Failure::Usage),
-        }
-    }
-
     pub fn opened<O: Opens>(self, path: PathBuf, opens: &O) -> O::Store {
         match self {
             Persistence::File => opens.file::<StreamSchema>(path),

@@ -1,10 +1,17 @@
 use text_lines::Lines;
 
 use super::super::check::Check;
+use super::super::fault::Fault;
 use crate::cli::ports::Text;
 
 #[derive(Debug)]
 pub struct PullRequest(Text);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Purpose {
+    Refactor,
+    Change,
+}
 
 impl PullRequest {
     pub(crate) const KIND: &'static str =
@@ -15,7 +22,7 @@ impl PullRequest {
         PullRequest(kind_then_labels)
     }
 
-    pub(crate) fn carrying(&self, check: Check) -> Option<&PullRequest> {
+    pub(crate) fn carried(&self) -> Vec<Check> {
         self.0
             .as_ref()
             .parse::<Lines>()
@@ -23,11 +30,10 @@ impl PullRequest {
             .flatten()
             .skip(1)
             .filter_map(|name| name.parse::<Check>().ok())
-            .find(|carried| *carried == check)
-            .map(|_| self)
+            .collect()
     }
 
-    pub(crate) fn refactor(&self) -> Option<&PullRequest> {
+    pub(crate) fn purpose(&self) -> Purpose {
         self.0
             .as_ref()
             .parse::<Lines>()
@@ -35,6 +41,15 @@ impl PullRequest {
             .flatten()
             .next()
             .filter(|kind| *kind == Self::REFACTOR_KIND)
-            .map(|_| self)
+            .map_or(Purpose::Change, |_| Purpose::Refactor)
+    }
+}
+
+impl Purpose {
+    pub(crate) fn waiver(self) -> Option<Fault> {
+        match self {
+            Purpose::Refactor => Some(Fault::Refactor),
+            Purpose::Change => None,
+        }
     }
 }

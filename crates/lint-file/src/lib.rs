@@ -24,7 +24,7 @@ impl Reads {
     #[must_use]
     pub fn admits(self, file: &SourceFile) -> Option<&SourceFile> {
         match self {
-            Reads::Shipped => file.shipped(),
+            Reads::Shipped => file.head().shipped().map(|_| file),
             Reads::Every => Some(file),
         }
     }

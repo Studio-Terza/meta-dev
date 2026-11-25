@@ -21,8 +21,8 @@ impl<'file> Report<'file> {
     }
 
     #[must_use]
-    pub fn dirty(self) -> Option<Report<'file>> {
-        self.violations.first().map(|_| ()).map(|()| self)
+    pub fn dirty(&self) -> Option<&Violation<'file>> {
+        self.violations.first()
     }
 }
 

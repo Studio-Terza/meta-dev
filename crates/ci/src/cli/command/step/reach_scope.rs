@@ -4,7 +4,6 @@ mod event;
 mod skipped;
 
 use std::ffi::OsString;
-use std::path::Path;
 
 use file_ports::Files;
 use grammar_branch::Base;
@@ -13,17 +12,24 @@ use super::Step;
 use super::changed::{Changed, Question};
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Utf8};
 use crate::cli::ports::{Exit, Ports, Text};
 use event::Event;
+use grammar_output::Record;
 use skipped::Skips;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct ReachScope {
+    #[field(Journaled)]
     metadata: Journal,
+    #[field(Utf8, via = |text: String| Event::from(text.as_str()))]
     event: Event,
+    #[field(Utf8, via = |text: String| Base::from(text.as_str()))]
     base: Base,
+    #[field(Journaled)]
     environment: Journal,
+    #[field(Journaled)]
     summary: Journal,
 }
 
@@ -54,20 +60,7 @@ impl ReachScope {
 
 impl Step for ReachScope {
     fn from_arguments(given: Vec<OsString>) -> Result<ReachScope, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let metadata = &arguments.taken()?;
-        let event = &arguments.taken()?;
-        let base = &arguments.taken()?;
-        let environment = &arguments.taken()?;
-        let summary = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(ReachScope {
-            metadata: Journal::file(Path::new(metadata)),
-            event: Event::from(event.to_str().ok_or(Failure::Usage)?),
-            base: Base::from(base.to_str().ok_or(Failure::Usage)?),
-            environment: Journal::file(Path::new(environment)),
-            summary: Journal::file(Path::new(summary)),
-        })
+        ReachScope::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

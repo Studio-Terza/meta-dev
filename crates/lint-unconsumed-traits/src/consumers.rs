@@ -21,6 +21,7 @@ pub struct Consuming {
 impl From<&SourceFile> for Consuming {
     fn from(file: &SourceFile) -> Consuming {
         let kinds = file
+            .head()
             .shipped()
             .map_or(&[][..], |_| &[Kind::ItemMod, Kind::TraitBound, Kind::ExprMethodCall, Kind::ExprPath][..]);
         Consuming { kinds }

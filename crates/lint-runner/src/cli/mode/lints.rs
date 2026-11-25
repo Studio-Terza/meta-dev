@@ -214,7 +214,10 @@ impl Lints {
             [OneEdge::dirty(&system), DistinctSignatures::dirty(&system)].into_iter().flatten().collect()
         })),
         Entry::spelled::<Clustered<AcyclicQuotients>>(Work::Extracted(|model| {
-            <Clustered<AcyclicQuotients> as ModelLint>::report(model).dirty().into_iter().collect()
+            Some(<Clustered<AcyclicQuotients> as ModelLint>::report(model))
+                .filter(|report| report.dirty().is_some())
+                .into_iter()
+                .collect()
         })),
         <Judged<UnconsumedTraits> as Registered>::ENTRY,
         Entry::spelled::<RustOnly>(Work::Checked(|readout| vec![RustOnly::report(readout.repo_files())])),

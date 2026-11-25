@@ -155,8 +155,8 @@ impl<'found> End<'found> {
         }
     }
 
-    pub(crate) fn unit(&self) -> Option<&End<'found>> {
-        Some(self).filter(|end| end.name.matches::<Whole>(&[Self::UNIT]).is_some())
+    pub(crate) fn unit(&self) -> Option<&'found Name> {
+        Some(self.name).filter(|name| name.matches::<Whole>(&[Self::UNIT]).is_some())
     }
 }
 

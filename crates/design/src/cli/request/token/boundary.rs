@@ -40,7 +40,7 @@ impl Token {
     pub fn persisted(&self, earlier: Persistence) -> Result<Persistence, Failure> {
         match self {
             Token::Word(_) | Token::Valued(..) | Token::Settings => Err(Failure::Usage),
-            Token::Persisted(next) => earlier.then(*next),
+            Token::Persisted(next) => (earlier == Persistence::File).then_some(*next).ok_or(Failure::Usage),
         }
     }
 

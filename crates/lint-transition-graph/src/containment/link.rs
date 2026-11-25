@@ -42,8 +42,8 @@ impl<'found> Link<'found> {
             .map_or_else(Vec::new, |first| linked.iter().map(|other| Link::new(first, *other)).collect())
     }
 
-    pub(crate) fn apart(self) -> Option<Link<'found>> {
-        Some(self).filter(|link| link.from != link.to)
+    pub(crate) fn looped(&self) -> Option<Member<'found>> {
+        Some(self.from).filter(|from| *from == self.to)
     }
 }
 

@@ -7,7 +7,7 @@ mod report;
 mod tally;
 
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use file_ports::Files;
 use text_lines::Lines;
@@ -15,17 +15,21 @@ use text_lines::Lines;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Location};
 use crate::cli::ports::{Exit, Ports, Text};
 use count::Count;
+use grammar_output::Record;
 use mutant::Mutant;
 use outcome::Outcome;
 use report::Report;
 use tally::Tally;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct ShardSummary {
+    #[field(Location)]
     shards: PathBuf,
+    #[field(Journaled)]
     summary: Journal,
 }
 
@@ -77,11 +81,7 @@ impl ShardSummary {
 
 impl Step for ShardSummary {
     fn from_arguments(given: Vec<OsString>) -> Result<ShardSummary, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let shards = &arguments.taken()?;
-        let summary = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(ShardSummary { shards: PathBuf::from(shards), summary: Journal::file(Path::new(summary)) })
+        ShardSummary::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

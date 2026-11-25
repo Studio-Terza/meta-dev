@@ -3,6 +3,9 @@ use newtype::{Arbitrary, Counter, Display, Newtype};
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Holes(usize);
 
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Differing(usize);
+
 impl Holes {
     #[must_use]
     pub fn between<Item: PartialEq>(sequences: &[&[Item]]) -> Holes {
@@ -14,7 +17,7 @@ impl Holes {
     }
 
     #[must_use]
-    pub fn none(self) -> Option<Holes> {
-        Some(self).filter(|holes| *holes == Holes::zero())
+    pub fn differing(self) -> Option<Differing> {
+        Some(self).filter(|holes| *holes != Holes::zero()).map(|holes| Differing::new(holes.count()))
     }
 }

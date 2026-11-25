@@ -21,10 +21,6 @@ impl Journal {
             .map_err(|failure| Failure::unusable(self, failure))
     }
 
-    pub(crate) fn emptied(&self, files: &impl Files) -> Result<&Journal, Failure<'_>> {
-        self.replace(files, &Text::default()).map(|()| self)
-    }
-
     pub(crate) fn replace(&self, files: &impl Files, text: &Text) -> Result<(), Failure<'_>> {
         self.prepared(files)
             .and_then(|()| files.write(&self.0, Bytes::from(text.as_ref())))

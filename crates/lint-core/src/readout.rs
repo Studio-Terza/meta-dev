@@ -1,5 +1,4 @@
 use std::mem;
-use std::path::Path;
 use std::sync::Mutex;
 
 use algebra::{Monoid, Semigroup};
@@ -74,13 +73,5 @@ impl Readout {
     #[must_use]
     pub fn unwalked(&self) -> Vec<Unwalked> {
         mem::take(&mut *self.unwalked.lock().unpoisoned())
-    }
-
-    #[must_use]
-    pub fn sorted(mut self) -> Readout {
-        self.files.sort_by(|left, right| AsRef::<Path>::as_ref(left.head()).cmp(AsRef::<Path>::as_ref(right.head())));
-        self.repo_files.sort();
-        self.repo_files.dedup();
-        self
     }
 }

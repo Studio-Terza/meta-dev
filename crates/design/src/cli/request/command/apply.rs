@@ -23,6 +23,7 @@ use crate::cli::failure::Failure;
 use crate::cli::output::{Count, Line};
 use crate::cli::request::Ground;
 use crate::cli::request::command::rendering::Refs;
+use algebra::Semigroup;
 use console_ports::Shown;
 
 #[derive(Debug, thiserror::Error)]
@@ -113,12 +114,12 @@ struct Batch {
 struct Cycled;
 
 #[derive(Debug)]
-struct Labels<'batch>(&'batch BTreeMap<Label, NodeId>);
+struct Unbound(Label);
 
 #[derive(Debug)]
 enum Effect {
     Unchanged,
-    Proposed { node: Node<Vague>, fresh: Option<Label> },
+    Proposed { node: Node<Vague>, fresh: Option<Unbound> },
 }
 
 #[derive(Debug)]
@@ -224,8 +225,12 @@ impl Applied {
         let Parsed { directives, grounds } = parsed;
         let store = grounds.store;
         let started = Folded { resolved: Vec::new(), batch: Batch::starting(store.read(NextNode)?) };
-        let folded =
-            directives.into_iter().try_fold(started, |folded, directive| folded.resolving(&grounds, directive))?;
+        let folded = directives.into_iter().try_fold(started, |Folded { mut resolved, batch }, directive| {
+            let grounded = directive.visited(&Resolution { grounds: &grounds, batch: &batch })?;
+            let proposed = Batch::proposing(&grounded.effect).into_iter().fold(batch, Semigroup::combine);
+            resolved.push(Resolved { directive, grounded });
+            Ok::<Folded, Failure>(Folded { resolved, batch: proposed })
+        })?;
         let directed: Vec<Directed> =
             folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
         let written = store.write(Directions::new(grounds.provenance, unseen, directed, grounds.remit))?;
@@ -273,12 +278,13 @@ impl From<Resolved> for Echo {
     }
 }
 
-impl Folded {
-    fn resolving<S: Store>(self, grounds: &Grounds<'_, S>, directive: Directive) -> Result<Folded, Failure> {
-        let grounded = directive.visited(&Resolution { grounds, batch: &self.batch })?;
-        let batch = self.batch.after(&grounded.effect);
-        let resolved = self.resolved.into_iter().chain([Resolved { directive, grounded }]).collect();
-        Ok(Folded { resolved, batch })
+impl Semigroup for Batch {
+    fn combine(self, later: Batch) -> Batch {
+        let mut labels = self.labels;
+        labels.extend(later.labels);
+        let mut proposed = self.proposed;
+        proposed.extend(later.proposed);
+        Batch { next: later.next, labels, proposed }
     }
 }
 
@@ -287,31 +293,34 @@ impl Batch {
         Batch { next, labels: BTreeMap::new(), proposed: BTreeMap::new() }
     }
 
-    fn after(self, effect: &Effect) -> Batch {
+    fn proposing(effect: &Effect) -> Option<Batch> {
         match effect {
-            Effect::Proposed { node, fresh } => Batch {
+            Effect::Proposed { node, fresh } => Some(Batch {
                 next: NodeId::new(node.identity().into_inner().saturating_add(1)),
-                labels: self.labels.into_iter().chain(fresh.clone().map(|label| (label, node.identity()))).collect(),
-                proposed: self.proposed.into_iter().chain([(node.identity(), node.clone().any())]).collect(),
-            },
-            Effect::Unchanged => self,
+                labels: fresh.iter().map(|unbound| (unbound.0.clone(), node.identity())).collect(),
+                proposed: BTreeMap::from([(node.identity(), node.clone().any())]),
+            }),
+            Effect::Unchanged => None,
         }
     }
 
-    fn unbound(&self, label: &Label) -> Result<Label, Unresolved> {
-        self.labels.get(label).map_or_else(|| Ok(label.clone()), |_bound| Err(Unresolved::Rebound(label.clone())))
+    fn unbound(&self, label: &Label) -> Result<Unbound, Unresolved> {
+        self.labels
+            .get(label)
+            .map_or_else(|| Ok(Unbound(label.clone())), |_bound| Err(Unresolved::Rebound(label.clone())))
     }
 }
 
-impl Bind for Labels<'_> {
-    type Output = Result<NodeId, Unresolved>;
+impl<S: Store> Bind for &Resolution<'_, '_, S> {
+    type Output = Result<AnyNode, Failure>;
 
-    fn stored(self, id: NodeId) -> Result<NodeId, Unresolved> {
-        Ok(id)
+    fn stored(self, id: NodeId) -> Result<AnyNode, Failure> {
+        self.batch.proposed.get(&id).cloned().map_or_else(|| self.placed(id), Ok)
     }
 
-    fn labelled(self, label: &Label) -> Result<NodeId, Unresolved> {
-        self.0.get(label).copied().ok_or_else(|| Unresolved::Unbound(label.clone()))
+    fn labelled(self, label: &Label) -> Result<AnyNode, Failure> {
+        let id = self.batch.labels.get(label).copied().ok_or_else(|| Unresolved::Unbound(label.clone()))?;
+        Bind::stored(self, id)
     }
 }
 
@@ -332,12 +341,7 @@ impl<S: Store> Resolution<'_, '_, S> {
         Ok(Heard { segment: admitted, message: spoken })
     }
 
-    fn node(&self, reference: &NodeRef) -> Result<AnyNode, Failure> {
-        let id = reference.bound(Labels(&self.batch.labels))?;
-        self.batch.proposed.get(&id).cloned().map_or_else(|| self.stored(id), Ok)
-    }
-
-    fn stored(&self, id: NodeId) -> Result<AnyNode, Failure> {
+    fn placed(&self, id: NodeId) -> Result<AnyNode, Failure> {
         let placed = self.grounds.store.read(ShownNode::from(id))?;
         Ok(placed.map(|shown| shown.node().clone()).ok_or(Unresolved::Unplaced(id))?)
     }
@@ -378,7 +382,7 @@ impl<S: Store> Visit for &Resolution<'_, '_, S> {
 
     fn place(self, segment: &SegmentRef, node: &NodeRef, relation: SpanRelation) -> Result<Grounded, Failure> {
         let Heard { segment: placed, message } = self.heard(segment, &self.grounds.remit)?;
-        let identity = self.node(node)?.identity();
+        let identity = node.bound(self)?.identity();
         Ok(Grounded {
             directed: Directed::Placed { segment: placed, node: identity, relation },
             heard: message,
@@ -414,7 +418,7 @@ impl<S: Store> Visit for &Resolution<'_, '_, S> {
         title: &Title,
     ) -> Result<Grounded, Failure> {
         let unbound = fresh.map(|label| self.batch.unbound(label)).transpose()?;
-        let parent = self.node(refines)?;
+        let parent = refines.bound(self)?;
         let entry = Entry::new(parent.entry().project().clone(), facet, self.grounds.provenance);
         let node = Node::proposed(self.batch.next, entry, Inherited::from(parent.casting()), title.clone());
         let effect = Effect::Proposed { node: node.clone(), fresh: unbound };
@@ -422,8 +426,8 @@ impl<S: Store> Visit for &Resolution<'_, '_, S> {
     }
 
     fn supersede(self, old: &NodeRef, by: &NodeRef) -> Result<Grounded, Failure> {
-        let replaced = self.node(old)?;
-        let replacing = self.node(by)?;
+        let replaced = old.bound(self)?;
+        let replacing = by.bound(self)?;
         let supersession = Supersession::within(&replaced, &replacing).map_err(Unresolved::from)?;
         Ok(Grounded { directed: Directed::Superseded(supersession), heard: Vec::new(), effect: Effect::Unchanged })
     }

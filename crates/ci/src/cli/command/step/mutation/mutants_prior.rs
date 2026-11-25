@@ -10,14 +10,19 @@ use text_lines::Lines;
 use super::Step;
 use crate::cli::command::Telling;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Location, Word};
 use crate::cli::ports::{Exit, Invocation, Ports, Text};
 use boundary::{Complete, Found, Run};
+use grammar_output::Record;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct MutantsPrior {
+    #[field(Word)]
     repository: OsString,
+    #[field(Word)]
     branch: OsString,
+    #[field(Location)]
     directory: PathBuf,
 }
 
@@ -72,12 +77,7 @@ impl MutantsPrior {
 
 impl Step for MutantsPrior {
     fn from_arguments(given: Vec<OsString>) -> Result<MutantsPrior, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let repository = arguments.taken()?;
-        let branch = arguments.taken()?;
-        let directory = PathBuf::from(arguments.taken()?);
-        arguments.ended()?;
-        Ok(MutantsPrior { repository, branch, directory })
+        MutantsPrior::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

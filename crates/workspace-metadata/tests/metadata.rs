@@ -92,7 +92,7 @@ const CHAINED: &str = concat!(
 fn each_member_knows_its_depth_and_the_workspace_crates_below_and_above_it_on_the_compile_chain()
 -> Result<(), Box<dyn Error>> {
     let metadata: Metadata = serde_json::from_str(CHAINED)?;
-    let graph: Graph<'_> = std::iter::once(&metadata).collect();
+    let graph = Graph::from(&metadata);
     let placed: Vec<String> =
         graph.chained().iter().map(|chained| format!("{}: {chained}", AsRef::<CrateName>::as_ref(chained))).collect();
     assert_eq!(

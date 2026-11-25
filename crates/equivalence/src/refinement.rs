@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
+use algebra::{Act, Monoid};
 use newtype::{Arbitrary, Display, Newtype};
 
-use crate::cluster::{Cluster, Placing};
+use crate::cluster::{Cluster, Placed};
 use crate::erased::Laws;
-use crate::renaming::Renaming;
+use crate::renaming::{Pair, Renaming};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Colour(usize);
@@ -40,18 +41,14 @@ impl<Node: Ord + Copy, Label: Ord, Law: Ord> Move<Node, Label, Law> {
         }
     }
 
-    fn renamed(
-        &self,
-        ours: &Move<Node, Label, Law>,
-        renaming: Renaming<Node>,
-        lens: Lens<'_, Node>,
-    ) -> Option<Renaming<Node>> {
-        let agreed = lens.agreeing(&self.laws, &ours.laws).map(|_| renaming);
-        let labelled = agreed.filter(|_| self.label == ours.label)?;
-        lens.ordered(&self.with)
-            .into_iter()
-            .zip(lens.ordered(&ours.with))
-            .try_fold(labelled.through(self.reached, ours.reached)?, |grown, (from, to)| grown.paired(from, to))
+    fn paired(&self, ours: &Move<Node, Label, Law>, lens: Lens<'_, Node>) -> Option<Vec<Pair<Node>>> {
+        let agreed = lens.agreeing(&self.laws, &ours.laws).filter(|_| self.label == ours.label)?;
+        let with = agreed.ordered(&self.with).into_iter().zip(agreed.ordered(&ours.with));
+        Some(
+            iter::once(Pair::new(self.reached, ours.reached))
+                .chain(with.map(|(from, to)| Pair::new(Some(from), Some(to))))
+                .collect(),
+        )
     }
 }
 
@@ -61,11 +58,19 @@ struct Lens<'colours, Node> {
     laws: Option<Laws>,
 }
 
-impl<Node: Ord + Copy> Lens<'_, Node> {
-    fn agreeing<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Self> {
-        self.laws.map_or(Some(self), |laws| laws.agree(ours, theirs).map(|_| self))
-    }
+#[derive(Clone, Copy, Debug)]
+struct Agreed<'colours, Node> {
+    colours: &'colours BTreeMap<Node, Colour>,
+}
 
+impl<'colours, Node: Ord + Copy> Lens<'colours, Node> {
+    fn agreeing<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Agreed<'colours, Node>> {
+        let agreed = Agreed { colours: self.colours };
+        self.laws.map_or(Some(agreed), |laws| laws.agree(ours, theirs).map(|_| agreed))
+    }
+}
+
+impl<Node: Ord + Copy> Agreed<'_, Node> {
     fn ordered(self, nodes: &BTreeSet<Node>) -> Vec<Node> {
         let mut ordered: Vec<Node> = nodes.iter().copied().collect();
         ordered.sort_by_key(|node| self.colours.get(node).copied());
@@ -128,25 +133,31 @@ impl<Node: Ord + Copy, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
         coloured
             .values()
             .flat_map(|nodes| {
-                nodes.iter().fold(Vec::new(), |clusters, node| self.placed(clusters, *node, colours, &alike))
+                let placed = nodes.iter().fold(Vec::new(), |mut placed, node| {
+                    let placing = self.placing(&placed, *node, colours, &alike);
+                    placed.push(placing);
+                    placed
+                });
+                Placed::gathered(placed)
             })
             .filter(|cluster| cluster.members().nth(1).is_some())
             .collect()
     }
 
-    fn placed(
+    fn placing(
         &self,
-        clusters: Vec<Cluster<Node>>,
+        placed: &[Placed<Node>],
         node: Node,
         colours: &BTreeMap<Node, Colour>,
         alike: &impl Fn(Node, Node) -> Option<Node>,
-    ) -> Vec<Cluster<Node>> {
-        clusters
-            .into_iter()
-            .fold(Placing::starting_with(node), |placing, cluster| {
-                placing.offered(cluster, |first, pending| self.renaming(first, pending, colours, alike))
+    ) -> Placed<Node> {
+        placed
+            .iter()
+            .filter_map(Placed::leader)
+            .find_map(|leader| {
+                self.renaming(leader, node, colours, alike).map(|renaming| Placed::Joins { leader, renaming })
             })
-            .finished()
+            .unwrap_or(Placed::Leads(node))
     }
 
     fn renaming(
@@ -159,11 +170,16 @@ impl<Node: Ord + Copy, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
         alike(first, other)?;
         let ours = self.aligned(first, colours);
         let theirs = self.aligned(other, colours);
-        Some(theirs.len()).filter(|count| *count == ours.len()).and_then(|_| {
-            theirs.iter().zip(&ours).try_fold(Renaming::started(other, first), |renaming, (their, our)| {
-                their.renamed(our, renaming, Lens { colours, laws: self.laws })
-            })
-        })
+        let lens = Lens { colours, laws: self.laws };
+        let aligned = Some(theirs.len()).filter(|count| *count == ours.len());
+        let pairs = aligned.and_then(|_| {
+            theirs
+                .iter()
+                .zip(&ours)
+                .map(|(their, our)| their.paired(our, lens))
+                .collect::<Option<Vec<Vec<Pair<Node>>>>>()
+        })?;
+        Renaming::started(other, first).acted(Monoid::concat(pairs))
     }
 
     fn aligned(&self, node: Node, colours: &BTreeMap<Node, Colour>) -> Vec<&Move<Node, Label, Law>> {

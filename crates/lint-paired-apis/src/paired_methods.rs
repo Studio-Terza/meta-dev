@@ -24,6 +24,7 @@ impl<'file> PairedMethods<'file> {
     pub fn of_file(parsed: Parsed<'_, 'file>) -> PairedMethods<'file> {
         let head = parsed.head();
         let kinds = <&SourceFile>::from(parsed)
+            .head()
             .shipped()
             .map_or(&[][..], |_| &[Kind::ItemMod, Kind::ItemImpl, Kind::ItemTrait][..]);
         PairedMethods { head, module: Module::of_head(head), kinds }

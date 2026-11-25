@@ -2,7 +2,6 @@ use crate::cli::command::Telling;
 mod boundary;
 
 use std::ffi::OsString;
-use std::path::Path;
 
 use boundary::Finished;
 use text_lines::Lines;
@@ -13,28 +12,24 @@ use super::measured::Measured;
 use super::seconds::Seconds;
 use super::stage::Stage;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Recording, Utf8};
 use crate::cli::ports::{Exit, Ports};
+use grammar_output::Record;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct LibtestSeconds {
+    #[field(Recording)]
     measured: Measured,
+    #[field(Utf8, via = Stage::new)]
     stage: Stage,
+    #[field(Journaled)]
     output: Journal,
 }
 
 impl Step for LibtestSeconds {
     fn from_arguments(given: Vec<OsString>) -> Result<LibtestSeconds, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let measured = &arguments.taken()?;
-        let stage = &arguments.taken()?;
-        let output = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(LibtestSeconds {
-            measured: Measured::file(Path::new(measured)),
-            stage: Stage::new(stage.to_str().ok_or(Failure::Usage)?.to_owned()),
-            output: Journal::file(Path::new(output)),
-        })
+        LibtestSeconds::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

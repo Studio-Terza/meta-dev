@@ -13,7 +13,6 @@ mod weighed;
 mod work;
 
 use std::ffi::OsString;
-use std::path::Path;
 
 use super::Step;
 use super::compile_times::CompileTimes;
@@ -21,9 +20,10 @@ use super::journal::Journal;
 use super::measured::Measured;
 use super::stage::Stage;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Journaled, Recording};
 use crate::cli::ports::{Exit, Ports};
 use file_ports::Text;
+use grammar_output::Record;
 use grammar_timing_page::Build;
 use host::Host;
 use partial_timings::PartialTimings;
@@ -31,10 +31,14 @@ use timed_unit::TimedUnit;
 use unit_dag::UnitDag;
 use work::Work;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct GraphPath {
+    #[field(Journaled)]
     page: Journal,
+    #[field(Recording)]
     measured: Measured,
+    #[field(Journaled)]
     report: Journal,
 }
 
@@ -50,7 +54,8 @@ impl GraphPath {
 
     fn skipped(&self, ports: &impl Ports) -> Result<Telling<'_>, Failure<'_>> {
         let said = vec![Shown::said(PartialTimings)];
-        let ended = self.report.emptied(ports.files())?.append(ports.files(), PartialTimings).map(|()| Exit::Success);
+        self.report.replace(ports.files(), &Text::default())?;
+        let ended = self.report.append(ports.files(), PartialTimings).map(|()| Exit::Success);
         Ok(Telling::reported(said, ended))
     }
 
@@ -61,9 +66,9 @@ impl GraphPath {
         let critical = dag.critical();
         let work = Work::from(dag.work());
         let said = vec![Shown::said(format_args!("{critical}{work}"))];
-        let report = self.report.emptied(ports.files())?;
-        report.append(ports.files(), &critical)?;
-        report.append(ports.files(), work)?;
+        self.report.replace(ports.files(), &Text::default())?;
+        self.report.append(ports.files(), &critical)?;
+        self.report.append(ports.files(), work)?;
         let ended = self
             .measured
             .append(ports.files(), &Stage::new(Self::PATH.to_owned()), *critical.as_ref())
@@ -74,16 +79,7 @@ impl GraphPath {
 
 impl Step for GraphPath {
     fn from_arguments(given: Vec<OsString>) -> Result<GraphPath, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let page = &arguments.taken()?;
-        let measured = &arguments.taken()?;
-        let report = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(GraphPath {
-            page: Journal::file(Path::new(page)),
-            measured: Measured::file(Path::new(measured)),
-            report: Journal::file(Path::new(report)),
-        })
+        GraphPath::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

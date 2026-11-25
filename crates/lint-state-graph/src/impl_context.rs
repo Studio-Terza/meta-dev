@@ -14,6 +14,12 @@ pub struct ImplContext<'found> {
     kind: ImplKind<'found>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Exposure {
+    ThroughTrait,
+    Declared,
+}
+
 impl<'found> ImplContext<'found> {
     pub fn self_type(&self) -> &TypeName {
         &self.self_type
@@ -23,8 +29,8 @@ impl<'found> ImplContext<'found> {
         &self.kind
     }
 
-    pub fn public<'function>(&self, function: &'function WrittenFn) -> Option<&'function WrittenFn> {
-        self.kind.trait_name().map(|_| ()).or(function.public()).map(|()| function)
+    pub fn public(&self, function: &WrittenFn) -> Option<Exposure> {
+        self.kind.trait_name().map(|_| Exposure::ThroughTrait).or(function.public().map(|()| Exposure::Declared))
     }
 
     pub fn edge_name(&self, function: &WrittenFn) -> Name {

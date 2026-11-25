@@ -12,10 +12,12 @@ use super::super::kept::{Commits, Mutant, Outcomes};
 use super::boundary::Costs;
 use super::tested::Reach;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::{Arguments, Location};
 use crate::cli::ports::{Invocation, Ports, Text};
 pub(super) use boundary::Choice;
 use boundary::Reason;
 use edits::Edits;
+use grammar_output::Parsed;
 use since::Since;
 
 #[derive(Debug)]
@@ -29,6 +31,16 @@ impl Prior {
     const DOWNLOADED: &'static str = "download";
     const OUTCOMES: &'static str = "outcomes.json";
     const HEAD: [&'static str; 2] = ["rev-parse", "HEAD^2"];
+
+    pub(super) fn following(
+        directory: Option<PathBuf>,
+        rest: Arguments,
+    ) -> Result<Parsed<Option<Prior>, Arguments>, Failure<'static>> {
+        match directory {
+            Some(found) => Ok(rest.field::<Location>()?.map(|metadata| Some(Prior::new(found, metadata)))),
+            None => Ok(Parsed::new(None, rest)),
+        }
+    }
 
     pub(super) fn new(directory: PathBuf, metadata: PathBuf) -> Prior {
         Prior { directory, metadata }

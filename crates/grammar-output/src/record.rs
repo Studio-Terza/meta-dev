@@ -1,4 +1,4 @@
-use crate::boundary::{Fields, Unread};
+use crate::boundary::{Fields, Source, Unread};
 
 #[derive(Debug)]
 pub struct Parsed<T, Rest> {
@@ -6,8 +6,8 @@ pub struct Parsed<T, Rest> {
     rest: Rest,
 }
 
-pub trait Record: Sized {
-    fn read(fields: Fields) -> Result<Parsed<Self, Fields>, Unread>;
+pub trait Record<From: Source = Fields>: Sized {
+    fn read(from: From) -> Result<Parsed<Self, From>, From::Unread>;
 }
 
 pub trait Mapped<T>: Into<Result<Parsed<T, Fields>, Unread>> {

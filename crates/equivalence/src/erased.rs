@@ -11,6 +11,12 @@ pub enum Laws {
     Matched,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Agreement {
+    Same,
+    Undeclared,
+}
+
 impl Laws {
     #[must_use]
     pub fn kept<Law>(self, laws: &[Law]) -> &[Law] {
@@ -21,12 +27,13 @@ impl Laws {
     }
 
     #[must_use]
-    pub fn agree<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Laws> {
+    pub fn agree<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Agreement> {
         match self {
-            Laws::Matched => (ours == theirs).then_some(self),
-            Laws::WhereDeclared => {
-                ours.first().zip(theirs.first()).map_or(Some(self), |_| (ours == theirs).then_some(self))
-            }
+            Laws::Matched => (ours == theirs).then_some(Agreement::Same),
+            Laws::WhereDeclared => ours
+                .first()
+                .zip(theirs.first())
+                .map_or(Some(Agreement::Undeclared), |_| (ours == theirs).then_some(Agreement::Same)),
         }
     }
 }
@@ -49,8 +56,8 @@ impl Equivalence {
     }
 
     #[must_use]
-    pub fn erases(&self, what: Erased) -> Option<Erased> {
-        self.erased.iter().copied().find(|erased| *erased == what)
+    pub fn unerased<Value>(&self, what: Erased, value: Value) -> Option<Value> {
+        self.erased.iter().find(|erased| **erased == what).map_or(Some(value), |_| None)
     }
 
     #[must_use]

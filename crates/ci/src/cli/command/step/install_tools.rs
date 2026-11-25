@@ -8,13 +8,17 @@ use file_ports::Files;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::Arguments;
+use crate::cli::command::step::{Arguments, Ended, Location};
 use crate::cli::ports::{Exit, Invocation, Ports};
+use grammar_output::Record;
 use tool::Tool;
 
-#[derive(Debug)]
+#[derive(Debug, Record)]
+#[record(source = Arguments)]
 pub struct InstallTools {
+    #[field(Location)]
     built: PathBuf,
+    #[field(Location)]
     destination: PathBuf,
 }
 
@@ -45,11 +49,7 @@ impl InstallTools {
 
 impl Step for InstallTools {
     fn from_arguments(given: Vec<OsString>) -> Result<InstallTools, Failure<'static>> {
-        let mut arguments = Arguments::from(given);
-        let built = &arguments.taken()?;
-        let destination = &arguments.taken()?;
-        arguments.ended()?;
-        Ok(InstallTools { built: PathBuf::from(built), destination: PathBuf::from(destination) })
+        InstallTools::read(Arguments::from(given))?.ended()
     }
 
     fn carry_out<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {

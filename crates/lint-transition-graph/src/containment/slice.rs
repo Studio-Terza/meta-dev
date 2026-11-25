@@ -121,6 +121,6 @@ impl<'found> Slice<'found> {
     }
 
     pub(crate) fn components(&self, view: &Containment<'found, '_>, toward: Toward) -> Option<Groups<'found>> {
-        Groups::linked(&self.members, view.links_within(&self.members, toward).into_iter()).split()
+        Groups::split(&self.members, view.links_within(&self.members, toward).into_iter())
     }
 }

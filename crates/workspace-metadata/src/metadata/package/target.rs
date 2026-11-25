@@ -10,7 +10,7 @@ pub enum Form {
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-enum TargetKind {
+pub(crate) enum TargetKind {
     Lib,
     Rlib,
     Dylib,
@@ -41,8 +41,8 @@ impl Target {
         self.kind.iter().find_map(|kind| kind.form())
     }
 
-    pub fn binary(&self) -> Option<&Target> {
-        self.kind.iter().find(|kind| **kind == TargetKind::Bin).map(|_| self)
+    pub fn binary(&self) -> Option<&TargetKind> {
+        self.kind.iter().find(|kind| **kind == TargetKind::Bin)
     }
 
     pub fn root(&self) -> &Path {

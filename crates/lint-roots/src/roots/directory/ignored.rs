@@ -1,4 +1,7 @@
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+
+use file_ports::Kind;
 
 use lint_layout::Name;
 use lint_layout::Prefix;
@@ -27,24 +30,23 @@ impl Ignored {
     }
 
     pub fn among(rules: &[Ignored], survey: &Survey, path: &Path) -> Option<Ignored> {
-        rules.iter().find_map(|rule| rule.applying_to(survey, path))
+        rules.iter().find_map(|rule| rule.matched(survey, path).map(|_| *rule))
     }
 
-    pub fn applying_to(self, survey: &Survey, path: &Path) -> Option<Ignored> {
+    fn matched<'path>(self, survey: &Survey, path: &'path Path) -> Option<&'path OsStr> {
         match self {
-            Ignored::Hidden => path
-                .file_name()
-                .map(Name::from)
-                .filter(|name| name.matches::<Prefix>(&[Self::HIDDEN]).is_some())
-                .map(|_| self),
-            Ignored::VersionControl => path.file_name().filter(|name| *name == Self::VERSION_CONTROL).map(|_| self),
+            Ignored::Hidden => {
+                path.file_name().filter(|name| Name::from(*name).matches::<Prefix>(&[Self::HIDDEN]).is_some())
+            }
+            Ignored::VersionControl => path.file_name().filter(|name| *name == Self::VERSION_CONTROL),
             Ignored::BuildOutput => path
                 .file_name()
                 .filter(|name| *name == Self::BUILD_DIRECTORY)
-                .and_then(|_| path.parent())
-                .map(|parent| parent.join(Self::MANIFEST))
-                .filter(|manifest| survey.file(manifest).is_some())
-                .map(|_| self),
+                .filter(|_| Self::manifested(survey, path).is_some()),
         }
+    }
+
+    fn manifested(survey: &Survey, path: &Path) -> Option<Kind> {
+        path.parent().map(|parent| parent.join(Self::MANIFEST)).and_then(|manifest| survey.file(&manifest))
     }
 }
