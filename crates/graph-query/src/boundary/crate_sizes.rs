@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use workspace_metadata::CrateName;
 
+use algebra::Monoid;
 use lint_core::SourceFile;
 use workspace_metadata::{Chained, Graph, Metadata};
 
@@ -38,7 +39,7 @@ impl<'files> CrateSizes<'files> {
                 (name, Size { files: found.len(), lines })
             })
             .collect();
-        CrateSizes { sizes, chained: workspaces.iter().collect::<Graph<'files>>().chained() }
+        CrateSizes { sizes, chained: Monoid::concat(workspaces.iter().map(Graph::from)).chained() }
     }
 }
 
