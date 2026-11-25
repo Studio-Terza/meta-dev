@@ -116,12 +116,6 @@ struct RunEnding {
     run: RunId,
 }
 
-#[derive(Debug)]
-enum Progress {
-    Going(Vec<Worked>),
-    Halted(Vec<Worked>),
-}
-
 #[derive(Clone, Copy, Debug)]
 struct Reaped {
     run: RunId,
@@ -164,10 +158,12 @@ impl<'ports, S: Store, D: Dispatch, C: Clock> Structure<'ports, S, D, C> {
         let unplaced = self.store.read(Unstructured)?;
         let chunks = unplaced.chunks(structurer::Job::SEGMENTS);
         let sequels = chunks.clone().skip(1).map(|_later| Sequel::WentOn).chain([Sequel::NoMoreJobs]);
-        let progress = chunks
-            .zip(sequels)
-            .try_fold(Progress::Going(Vec::new()), |progress, (chunk, sequel)| progress.next(self, chunk, sequel))?;
-        let worked = progress.worked();
+        let worked = chunks.zip(sequels).try_fold(Vec::new(), |mut worked: Vec<Worked>, (chunk, sequel)| {
+            let halted = worked.last().map(Worked::course).filter(|course| *course == Course::Halting);
+            let done = halted.map_or_else(|| self.job(chunk, sequel, &worked).map(Some), |_| Ok(None))?;
+            worked.extend(done);
+            Ok::<Vec<Worked>, Failure>(worked)
+        })?;
         let flailed = self.store.read(FlailedSegments)?;
         lock.end()?;
         Ok(Structured { reaped, interrupted, worked, flailed })
@@ -404,30 +400,6 @@ impl Step {
     }
 }
 
-impl Progress {
-    fn next<S: Store, D: Dispatch, C: Clock>(
-        self,
-        structure: &Structure<'_, S, D, C>,
-        chunk: &[Unplaced],
-        sequel: Sequel,
-    ) -> Result<Progress, Failure> {
-        match self {
-            Progress::Going(worked) => structure.job(chunk, sequel, &worked).map(|done| Progress::after(worked, done)),
-            Progress::Halted(worked) => Ok(Progress::Halted(worked)),
-        }
-    }
-
-    fn after(worked: Vec<Worked>, done: Worked) -> Progress {
-        done.course().progress(worked.into_iter().chain([done]).collect())
-    }
-
-    fn worked(self) -> Vec<Worked> {
-        match self {
-            Progress::Going(worked) | Progress::Halted(worked) => worked,
-        }
-    }
-}
-
 impl Worked {
     fn course(&self) -> Course {
         self.halt.as_ref().map_or(Course::Onward, Halt::course)
@@ -437,15 +409,6 @@ impl Worked {
         let flailed = self.halt.as_ref().and_then(Halt::flailed).cloned().map(Halt::Flailed);
         flailed
             .map(|halt| Retold::new(self.job, Account::told(&halt.failure(self.job, Sequel::Halted { job: stalled }))))
-    }
-}
-
-impl Course {
-    fn progress(self, worked: Vec<Worked>) -> Progress {
-        match self {
-            Course::Onward => Progress::Going(worked),
-            Course::Halting => Progress::Halted(worked),
-        }
     }
 }
 
