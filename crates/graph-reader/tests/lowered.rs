@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use graph::{
-    Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, Named, Owner, Primitive, Reach,
-    Region, Resolved, Seat, Sited, Spelling, TypeRef, Unplaced, Within, Zone,
+    Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, Named, Owner, ParamIndex, Primitive,
+    Reach, Region, Resolved, Seat, Sited, Spelling, TypeRef, Unplaced, Within, Zone,
 };
 use graph_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -450,4 +450,30 @@ fn a_dollar_crate_path_is_used_by_the_defining_crate_not_by_the_crate_that_invok
         Unplaced::new(Name::from("Kept"), ItemKind::Struct).placed(Vec::new(), Some(Name::from("a")), Exposure::Public);
     assert_eq!(expanded, [("crates/a/src/lib.rs:5".to_owned(), Some(kept))]);
     Ok(())
+}
+
+#[test]
+fn a_method_call_beside_the_tail_call_keeps_the_whole_parameter_read() {
+    let model = Read::model(
+        "struct X;\nstruct Y;\nfn helper(n: u8, x: &X) -> u8 {\n    n\n}\nfn f(x: &X, y: &Y) -> u8 {\n    helper(y.size(), x)\n}\n",
+    );
+    let reads: Vec<ParamIndex> = model
+        .functions()
+        .filter(|placed| AsRef::<Name>::as_ref(placed.entity()) == &Name::from("f"))
+        .filter_map(|placed| placed.entity().definition())
+        .flat_map(|definition| definition.reads().iter().map(graph::Read::parameter))
+        .collect();
+    assert_eq!(reads, [ParamIndex::from(0)]);
+}
+
+#[test]
+fn a_free_function_body_resolves_the_function_type_parameters() {
+    let model = Read::model("fn f<T: Clone>(x: &T) -> T {\n    x.clone()\n}\n");
+    let receivers_are_the_parameter: Vec<bool> = model
+        .functions()
+        .filter_map(|placed| placed.entity().definition())
+        .flat_map(|definition| definition.invocations().iter().map(|invocation| format!("{invocation:?}")))
+        .map(|shown| shown.contains("resolved: Param(Name(\"T\"))"))
+        .collect();
+    assert_eq!(receivers_are_the_parameter, [true]);
 }

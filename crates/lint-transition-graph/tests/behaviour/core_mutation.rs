@@ -95,3 +95,28 @@ laws::table!(
         [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(PORT_MIXED))] => Vec::<String>::new(),
     ]
 );
+
+const PORT_BESIDE_TUPLE: &str =
+    "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>, sink: &mut (u8, u8)) {}\n}\n";
+const PORT_BESIDE_SLICE: &str =
+    "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>, sink: &mut [u8]) {}\n}\n";
+const PORT_BESIDE_ARRAY: &str =
+    "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>, sink: &mut [u8; 2]) {}\n}\n";
+const PORT_BESIDE_PROJECTION: &str = "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>, sink: &mut <u8 as Iterator>::Item) {}\n}\n";
+const PORT_BESIDE_OPAQUE: &str =
+    "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>, sink: &mut _) {}\n}\n";
+const PORT_BESIDE_CALLABLE: &str =
+    "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>, sink: &mut fn(u8)) {}\n}\n";
+
+laws::table!(
+    a_mut_parameter_of_any_other_shape_beside_the_store_port_is_not_a_store_operation,
+    Handles::reported,
+    [
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(PORT_BESIDE_TUPLE))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(PORT_BESIDE_SLICE))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(PORT_BESIDE_ARRAY))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(PORT_BESIDE_PROJECTION))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(PORT_BESIDE_OPAQUE))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(PORT_BESIDE_CALLABLE))] => Vec::<String>::new(),
+    ]
+);

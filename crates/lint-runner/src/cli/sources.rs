@@ -18,7 +18,7 @@ use lint_sweep::Gathers;
 use timer_ports::Timer;
 
 use super::boundary::Queue;
-use super::timings::{Measured, Step, Stopwatch, Table, Timing, Timings, Worker};
+use super::timings::{Measured, Step, Stopwatch, Table, Timing, Timings, Visiting, Worker};
 use crate::cli::ignored::Ignored;
 use invariants::Ignoring;
 
@@ -54,8 +54,8 @@ impl<'run, F: Files, C: Cargo, T: Timer> Wired<'run, F, C, T> {
         self.timer
     }
 
-    pub(crate) fn table(&self, timings: impl Iterator<Item = Timing>) -> Table {
-        Table::new(self.shown, timings.chain([self.total.stopped(Step::Total)]).collect())
+    pub(crate) fn table(&self, timings: impl Iterator<Item = Timing>, visited: Visiting) -> Table {
+        Table::new(self.shown, timings.chain([self.total.stopped(Step::Total)]).collect(), visited)
     }
 }
 

@@ -8,14 +8,17 @@ use timer_ports::Monotonic;
 
 use std::ffi::OsString;
 use std::num::NonZeroUsize;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 use cargo_ports::{Recorded, Toolchain};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
-use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
+use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable, FakeUnsized};
 use crate::ignored::Ignored;
 use invariants::Ignoring;
 
@@ -370,6 +373,15 @@ fn the_timings_flag_lists_every_lint_and_phase_once() -> Result<(), Box<dyn Erro
     Ok(())
 }
 
+#[test]
+fn the_timings_flag_counts_only_the_subtrees_that_hold_the_kinds_a_contributor_watches() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "struct A {\n    b: u8,\n}\nimpl A {}\n")?;
+    let timed = root.flagged(&["--timings"]).out;
+    assert_eq!(timed.matches("\n      2  lint_bool_methods::returns::Returns<'_>\n").count(), 1, "{timed}");
+    Ok(())
+}
+
 struct Trees;
 
 impl Trees {
@@ -533,6 +545,76 @@ impl Scratch {
         let readout = SourceFiles::read(&self.files, &self.root)?;
         Ok(Queried::<CrateGraph>::flagged(readout.files()))
     }
+
+    fn read_files(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        let readout = SourceFiles::read(&self.files, &self.root)?;
+        let shown = |file: &lint_core::SourceFile| {
+            let path: &Path = file.head().as_ref();
+            path.strip_prefix(&self.root).unwrap_or(path).display().to_string()
+        };
+        Ok(readout
+            .files()
+            .iter()
+            .flat_map(|file| {
+                let tests = file.test_modules().iter().map(|test| format!("test {}", shown(test)));
+                [shown(file)].into_iter().chain(tests)
+            })
+            .collect())
+    }
+}
+
+#[test]
+fn a_module_file_two_packages_both_reach_is_read_once() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::temporary()?;
+    root.write("Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n")?;
+    root.write("crates/a/Cargo.toml", "[package]\nname = \"a\"\n")?;
+    root.write("crates/a/src/lib.rs", "#[path = \"../../shared.rs\"]\nmod shared;\n")?;
+    root.write("crates/b/Cargo.toml", "[package]\nname = \"b\"\n")?;
+    root.write("crates/b/src/lib.rs", "#[path = \"../../shared.rs\"]\nmod shared;\n")?;
+    root.write("crates/shared.rs", CLEAN)?;
+    assert_eq!(root.read_files()?, ["crates/a/src/lib.rs", "crates/b/src/lib.rs", "crates/shared.rs"]);
+    Ok(())
+}
+
+#[test]
+fn a_file_two_test_modules_name_is_read_once() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "#[cfg(test)]\nmod t;\n#[cfg(test)]\n#[path = \"t.rs\"]\nmod again;\n")?;
+    root.write("src/t.rs", CLEAN)?;
+    assert_eq!(root.read_files()?, ["src/lib.rs", "test src/t.rs"]);
+    Ok(())
+}
+
+#[test]
+fn reading_a_module_path_cycle_finishes() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    PATH_CYCLE.iter().try_for_each(|[path, text]| root.write(path, text).map(|_| ()))?;
+    let (sending, receiving) = mpsc::channel();
+    thread::spawn(move || sending.send(root.read_files().map_err(|failure| failure.to_string())));
+    let read = receiving.recv_timeout(Duration::from_secs(10))?;
+    assert_eq!(read?, ["src/a.rs", "src/b.rs", "src/lib.rs"]);
+    Ok(())
+}
+
+#[test]
+fn a_panic_while_reading_reaches_the_caller_rather_than_stranding_the_helpers() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "mod a;\n")?;
+    root.write("src/a.rs", CLEAN)?;
+    let (sending, receiving) = mpsc::channel();
+    thread::spawn(move || {
+        let sizing = FakeUnsized::new(&root.files);
+        let ran = panic::catch_unwind(AssertUnwindSafe(|| Trees::flagged(&sizing, &root.root, &[]).exit));
+        sending.send(ran.map_or(Verdicts::Panicked, |_| Verdicts::Returned))
+    });
+    assert_eq!(receiving.recv_timeout(Duration::from_secs(10))?, Verdicts::Panicked);
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Verdicts {
+    Panicked,
+    Returned,
 }
 
 struct Printed {

@@ -1,3 +1,4 @@
+use std::fmt;
 use std::iter;
 use std::rc::Rc;
 
@@ -32,10 +33,28 @@ pub struct Contributing<Contributor: Contribute> {
     mask: Kinds,
 }
 
+#[derive(Debug)]
+pub struct Tallied<Contributor: Contribute> {
+    contributor: Contributor,
+    contribution: Contribution<Contributor::Open, Contributor::Part>,
+    visits: Visits,
+}
+
+impl<Contributor: Contribute> Tallied<Contributor> {
+    pub fn concluded<Out>(
+        self,
+        into: impl FnOnce(Contributor, Contributor::Open, Contributor::Part, Visits) -> Out,
+    ) -> Out {
+        let Contribution { open, part } = self.contribution;
+        into(self.contributor, open, part, self.visits)
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Walked<Open, Part> {
     contribution: Contribution<Open, Part>,
     entered: WalkPosition,
+    visits: Visits,
 }
 
 #[derive(Debug, Default)]
@@ -46,6 +65,27 @@ struct Stepping<'index, Open, Part> {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WalkPosition(usize);
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Visits(usize);
+
+impl Visits {
+    const ONE: Visits = Visits(1);
+}
+
+impl Semigroup for Visits {
+    fn combine(self, other: Visits) -> Visits {
+        Visits(self.0 + other.0)
+    }
+}
+
+impl Monoid for Visits {}
+
+impl fmt::Display for Visits {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
 
 #[derive(Debug)]
 struct Frame<'up, Open> {
@@ -137,11 +177,18 @@ impl<Open: Semigroup, Part: Semigroup> Semigroup for Walked<Open, Part> {
         Walked {
             contribution: self.contribution.combine(other.contribution),
             entered: self.entered.combine(other.entered),
+            visits: self.visits.combine(other.visits),
         }
     }
 }
 
 impl<Open: Monoid, Part: Monoid> Monoid for Walked<Open, Part> {}
+
+impl<Open: Monoid, Part: Monoid> From<Visits> for Walked<Open, Part> {
+    fn from(visits: Visits) -> Walked<Open, Part> {
+        Walked { visits, ..Walked::default() }
+    }
+}
 
 impl<Contributor: Contribute> Contributing<Contributor> {
     pub fn new(contributor: Contributor) -> Contributing<Contributor> {
@@ -160,11 +207,20 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         into(self.contributor, open, part)
     }
 
+    pub fn tallied(self, file: &SourceFile) -> Tallied<Contributor> {
+        let Walked { contribution, visits, .. } = self.walked_file(file);
+        Tallied { contributor: self.contributor, contribution, visits }
+    }
+
     #[must_use]
     pub fn contributed(&self, file: &SourceFile) -> Contribution<Contributor::Open, Contributor::Part> {
+        self.walked_file(file).contribution
+    }
+
+    fn walked_file(&self, file: &SourceFile) -> Walked<Contributor::Open, Contributor::Part> {
         let top = Around { frame: None, position: WalkPosition::default() };
         let cursors = Some(file.kind_index().top());
-        self.siblings(Some(file), Node::top_level(file.syntax()), cursors, &top).contribution
+        self.siblings(Some(file), Node::top_level(file.syntax()), cursors, &top)
     }
 
     #[must_use]
@@ -209,7 +265,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         around: &Around<'_, Contributor::Open>,
     ) -> Walked<Contributor::Open, Contributor::Part> {
         let relevant = indexed.map_or(Some(()), |cursor| cursor.watches(self.mask));
-        relevant.map_or_default(|()| self.dispatched(file, node, indexed, around))
+        relevant.map_or_default(|()| Walked::from(Visits::ONE).combine(self.dispatched(file, node, indexed, around)))
     }
 
     pub(crate) fn unwatched(
@@ -259,7 +315,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
         let below = children.combine(expansion);
         let entered = below.entered.combine(WalkPosition::ONE);
         let merged = within.combine(below.contribution);
-        scoping.walked(merged, entered, |inside| off(&self.contributor, inside))
+        scoping.walked(merged, entered, |inside| off(&self.contributor, inside)).combine(Walked::from(below.visits))
     }
 }
 
@@ -288,10 +344,12 @@ impl Scoping {
         off: impl FnOnce(Contribution<Open, Part>) -> Part,
     ) -> Walked<Open, Part> {
         match self {
-            Scoping::Scoped => {
-                Walked { contribution: Contribution { open: Open::default(), part: off(merged) }, entered }
-            }
-            Scoping::Flat => Walked { contribution: merged, entered },
+            Scoping::Scoped => Walked {
+                contribution: Contribution { open: Open::default(), part: off(merged) },
+                entered,
+                visits: Visits::default(),
+            },
+            Scoping::Flat => Walked { contribution: merged, entered, visits: Visits::default() },
         }
     }
 }
