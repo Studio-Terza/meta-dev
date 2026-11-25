@@ -14,7 +14,7 @@ use module_path::{InsideSibling, ModuleIndex, ModulePath, Target};
 use algebra::{Monoid, Semigroup};
 use lint_core::{Parsed, Site, Violation};
 use lint_file::Concluded;
-use lint_layout::{Name, UseEdges, UsePath};
+use lint_layout::{Length, Name, UseEdges, UsePath};
 use lint_placement::{CrateRoot, Krate, Level, Nest};
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind, Sweep};
 use reexport_count::ReexportCount;
@@ -141,20 +141,66 @@ impl Gathers<UsePaths> for Contributing<UseScan> {
     }
 }
 
+#[derive(Default)]
+struct Absorbed<'file> {
+    users: Users<'file>,
+    deep_uses: Vec<Violation<'file>>,
+    reexports: BTreeMap<ModulePath<'file>, ReexportCount>,
+}
+
+impl Semigroup for Absorbed<'_> {
+    fn combine(self, other: Self) -> Self {
+        let mut reexports = self.reexports;
+        reexports.extend(other.reexports);
+        Absorbed {
+            users: self.users.combine(other.users),
+            deep_uses: self.deep_uses.combine(other.deep_uses),
+            reexports,
+        }
+    }
+}
+
+impl Monoid for Absorbed<'_> {}
+
 impl<'file> From<&'file [ModuleUses<'file>]> for ModuleTree<'file> {
     fn from(files: &'file [ModuleUses<'file>]) -> ModuleTree<'file> {
-        let empty = ModuleTree {
-            modules: ModuleIndex::from(
-                files
-                    .iter()
-                    .map(|file| ModulePath::new(file.file, Nest::module(Krate::Rooted(file.crate_root), file.segments)))
-                    .collect::<Vec<_>>(),
-            ),
-            users: Users::default(),
-            deep_uses: Vec::new(),
+        let modules = ModuleIndex::from(
+            files
+                .iter()
+                .map(|file| ModulePath::new(file.file, Nest::module(Krate::Rooted(file.crate_root), file.segments)))
+                .collect::<Vec<_>>(),
+        );
+        let Absorbed { users, deep_uses, reexports } =
+            Monoid::concat(files.iter().map(|file| Absorbed::of_file(&modules, file)));
+        ModuleTree { modules, users, deep_uses, reexports }
+    }
+}
+
+impl<'file> Absorbed<'file> {
+    fn of_file(modules: &ModuleIndex<'file>, file: &'file ModuleUses<'file>) -> Absorbed<'file> {
+        let module = ModulePath::new(file.file, Nest::module(Krate::Rooted(file.crate_root), file.segments));
+        let tested = file.tests.iter().map(|test| test.recorded(modules, file.crate_root));
+        let used = file.uses.iter().map(|path| Absorbed::of_use(modules, module, path));
+        let reexports = Absorbed { reexports: BTreeMap::from([(module, file.reexports)]), ..Absorbed::default() };
+        Monoid::concat(
+            [reexports].into_iter().chain(tested.map(|users| Absorbed { users, ..Absorbed::default() })).chain(used),
+        )
+    }
+
+    fn of_use(modules: &ModuleIndex<'file>, module: ModulePath<'file>, path: &UsePath) -> Absorbed<'file> {
+        let target = Target::from_use(&module, path, modules);
+        let used = target.as_ref().and_then(|found| found.deepest_in(modules));
+        let crossed = target.as_ref().filter(|found| found.crossed_directory(&module, modules).is_some());
+        Absorbed {
+            users: Users::recorded(used, module),
+            deep_uses: crossed
+                .map(|crossing| {
+                    Violation::new(Site::of_file(module.path()), Finding::ReachesPastModRs { target: crossing })
+                })
+                .into_iter()
+                .collect(),
             reexports: BTreeMap::new(),
-        };
-        files.iter().fold(empty, ModuleTree::absorbed)
+        }
     }
 }
 
@@ -166,44 +212,22 @@ impl<'file> ModuleTree<'file> {
             .reexports
             .iter()
             .filter(|(module, _)| AsRef::<Nest<'_>>::as_ref(*module).level() == Level::Module)
-            .filter_map(move |(module, count)| count.beyond(most).map(|crowded| (module, crowded)))
+            .filter(move |(_, count)| most.allows(Length::from(**count)).is_none())
             .map(move |(module, count)| {
-                Violation::new(Site::of_file(module.path()), Finding::CrowdedReexports { count, most })
+                Violation::new(Site::of_file(module.path()), Finding::CrowdedReexports { count: *count, most })
             });
         self.modules
             .modules()
             .iter()
             .filter_map(|module| {
-                self.home_of(module).map(|home| {
-                    Violation::new(
-                        Site::of_file(module.path()),
-                        Finding::UsedFromOneSibling { home: *AsRef::<Nest<'_>>::as_ref(&home) },
-                    )
-                })
+                self.home_of(module)
+                    .map(|home| Violation::new(Site::of_file(module.path()), Finding::UsedFromOneSibling { home }))
             })
             .chain(deep_uses)
             .chain(crowded)
     }
 
-    fn absorbed(mut self, file: &'file ModuleUses<'file>) -> ModuleTree<'file> {
-        let module = ModulePath::new(file.file, Nest::module(Krate::Rooted(file.crate_root), file.segments));
-        self.reexports.insert(module, file.reexports);
-        file.tests.iter().for_each(|test| test.recorded(&mut self.users, &self.modules, file.crate_root));
-        file.uses.iter().for_each(|path| self.absorb(module, path));
-        self
-    }
-
-    fn absorb(&mut self, module: ModulePath<'file>, path: &UsePath) {
-        let target = Target::from_use(&module, path, &self.modules);
-        let used = target.as_ref().and_then(|found| found.deepest_in(&self.modules));
-        self.users.record(used, module);
-        let crossed = target.as_ref().and_then(|found| found.crossed_directory(&module, &self.modules));
-        self.deep_uses.extend(crossed.map(|crossing| {
-            Violation::new(Site::of_file(module.path()), Finding::ReachesPastModRs { target: crossing })
-        }));
-    }
-
-    fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
+    fn home_of(&self, module: &ModulePath<'file>) -> Option<Nest<'file>> {
         let outsiders: Vec<&ModulePath<'file>> = self
             .users
             .callers_of(module)?
@@ -212,29 +236,18 @@ impl<'file> ModuleTree<'file> {
                 AsRef::<Nest<'_>>::as_ref(*user).lineage().all(|outer| outer != *AsRef::<Nest<'_>>::as_ref(module))
             })
             .collect();
-        outsiders
-            .iter()
-            .all(|user| InsideSibling::holder(user, module).is_some())
-            .then(|| {
-                let homes: BTreeSet<ModulePath<'file>> =
-                    outsiders.iter().map(|user| InsideSibling::home(user, module)).collect();
-                (homes.len() == 1).then(|| homes.into_iter().next()).flatten()
-            })
-            .flatten()
+        let homes: Option<BTreeSet<Nest<'file>>> =
+            outsiders.iter().map(|user| InsideSibling::home(user, module)).collect();
+        homes.filter(|found| found.len() == 1).and_then(|found| found.into_iter().next())
     }
 }
 
 impl TestUses {
-    fn recorded<'file>(
-        &'file self,
-        users: &mut Users<'file>,
-        modules: &ModuleIndex<'file>,
-        crate_root: &'file CrateRoot,
-    ) {
+    fn recorded<'file>(&'file self, modules: &ModuleIndex<'file>, crate_root: &'file CrateRoot) -> Users<'file> {
         let caller = ModulePath::new(Path::new(""), Nest::module(Krate::Rooted(crate_root), &self.segments));
-        self.uses.iter().for_each(|path| {
+        Monoid::concat(self.uses.iter().map(|path| {
             let home = Target::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules));
-            users.record(home, caller);
-        });
+            Users::recorded(home, caller)
+        }))
     }
 }
