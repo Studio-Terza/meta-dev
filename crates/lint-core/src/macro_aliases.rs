@@ -5,13 +5,15 @@ use syntax::{UseLeaf, UseTree};
 use algebra::{Monoid, Semigroup};
 use lint_layout::Name;
 use lint_layout::Word;
+use newtype::Arbitrary;
 
 #[derive(Debug)]
 pub struct MacroAliases {
     original: Name,
 }
 
-#[derive(Debug, Default)]
+#[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(from = Aliases)]
 pub struct Aliases(BTreeSet<Name>);
 
 #[derive(Debug)]

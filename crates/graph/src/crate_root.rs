@@ -1,7 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Range;
 
 use algebra::{Monoid, Semigroup};
 use lint_layout::{LibraryForm, Name, PackageName};
+use newtype::Arbitrary;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::{btree_map, btree_set, vec};
+use newtype::proptest::strategy::Strategy;
 
 use crate::domain::Domain;
 use crate::external::External;
@@ -9,7 +14,7 @@ use crate::item_path::{ItemPath, Segment};
 use crate::resolved::Resolved;
 use crate::unresolved::Unresolved;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Reexport {
     External(External),
     Own,
@@ -27,22 +32,45 @@ enum Found {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct Globs(Vec<Reexport>);
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(generate = CrateExports::sampled)]
 pub struct CrateExports {
     named: BTreeMap<Name, Vec<Reexport>>,
     declared: BTreeSet<Name>,
     globs: Globs,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Root {
     Read(CrateExports),
     ProcMacro(CrateExports),
     Unread,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(generate = CrateRoots::sampled)]
 pub struct CrateRoots(BTreeMap<PackageName, Root>);
+
+impl CrateExports {
+    const SAMPLED: Range<usize> = 0..4;
+
+    fn sampled() -> impl Strategy<Value = CrateExports> {
+        let drawn_named = btree_map(any::<Name>(), vec(any::<Reexport>(), Self::SAMPLED), Self::SAMPLED);
+        let drawn_declared = btree_set(any::<Name>(), Self::SAMPLED);
+        let drawn_globs = vec(any::<Reexport>(), Self::SAMPLED);
+        Strategy::prop_map((drawn_named, drawn_declared, drawn_globs), |(named, declared, globs)| CrateExports {
+            named: named.into_iter().map(|(name, bound)| (name, Bound(Vec::new()).combine(Bound(bound)).0)).collect(),
+            declared,
+            globs: Globs(globs),
+        })
+    }
+}
+
+impl CrateRoots {
+    fn sampled() -> impl Strategy<Value = CrateRoots> {
+        Strategy::prop_map(btree_map(any::<PackageName>(), any::<Root>(), CrateExports::SAMPLED), CrateRoots)
+    }
+}
 
 impl Reexport {
     #[must_use]

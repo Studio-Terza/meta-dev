@@ -1,5 +1,11 @@
 use laws::proptest::prelude::any;
 
+laws::generates!(crate_exports_generates, any::<graph::CrateExports>());
+laws::monoid!(crate_exports_forms_a_monoid, graph::CrateExports, any::<graph::CrateExports>());
+
+laws::generates!(crate_roots_generates, any::<graph::CrateRoots>());
+laws::monoid!(crate_roots_forms_a_monoid, graph::CrateRoots, any::<graph::CrateRoots>());
+
 laws::generates!(external_generates, any::<graph::External>());
 laws::monoid!(external_forms_a_monoid, graph::External, any::<graph::External>());
 
@@ -12,11 +18,15 @@ laws::monoid!(item_path_forms_a_monoid, graph::ItemPath, any::<graph::ItemPath>(
 
 laws::generates!(reach_generates, any::<graph::Reach>());
 
+laws::generates!(reexport_generates, any::<graph::Reexport>());
+
 laws::generates!(references_generates, any::<graph::References>());
 laws::monoid!(references_forms_a_monoid, graph::References, any::<graph::References>());
 
 laws::generates!(region_generates, any::<graph::Region>());
 laws::monoid!(region_forms_a_monoid, graph::Region, any::<graph::Region>());
+
+laws::generates!(root_generates, any::<graph::Root>());
 
 laws::generates!(within_generates, any::<graph::Within>());
 
