@@ -2,7 +2,7 @@ use std::fmt;
 
 use algebra::Semigroup;
 use body_shape::TokenCount;
-use equivalence::{Equivalence, Group, Holes, Names};
+use equivalence::{Equivalence, Erased, Group, Holes};
 use lint_core::{Fix, Site, Violation};
 
 use crate::kind::Kind;
@@ -67,7 +67,7 @@ enum Naming {
 
 impl Naming {
     fn erased_by(equivalence: Equivalence) -> Naming {
-        equivalence.erases::<Names>().map_or(Naming::Local, |_| Naming::Every)
+        equivalence.unerased(Erased::Names, Naming::Local).unwrap_or(Naming::Every)
     }
 }
 

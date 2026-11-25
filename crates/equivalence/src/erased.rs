@@ -5,31 +5,6 @@ pub enum Erased {
     Literals,
 }
 
-pub trait Erasable: Default {
-    const KIND: Erased;
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Locals;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Names;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Literals;
-
-impl Erasable for Locals {
-    const KIND: Erased = Erased::Locals;
-}
-
-impl Erasable for Names {
-    const KIND: Erased = Erased::Names;
-}
-
-impl Erasable for Literals {
-    const KIND: Erased = Erased::Literals;
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Laws {
     WhereDeclared,
@@ -81,8 +56,8 @@ impl Equivalence {
     }
 
     #[must_use]
-    pub fn erases<Kind: Erasable>(&self) -> Option<Kind> {
-        self.erased.iter().find(|erased| **erased == Kind::KIND).map(|_| Kind::default())
+    pub fn unerased<Value>(&self, what: Erased, value: Value) -> Option<Value> {
+        self.erased.iter().find(|erased| **erased == what).map_or(Some(value), |_| None)
     }
 
     #[must_use]

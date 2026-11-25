@@ -8,7 +8,7 @@ mod refinement;
 mod renaming;
 
 pub use cluster::Cluster;
-pub use erased::{Agreement, Equivalence, Erased, Laws, Literals, Locals, Names};
+pub use erased::{Agreement, Equivalence, Erased, Laws};
 pub use group::Group;
 pub use groups::Groups;
 pub use holes::Holes;
