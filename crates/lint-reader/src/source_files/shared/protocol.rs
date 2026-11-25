@@ -176,7 +176,7 @@ impl<'tree> Parsed<'tree> {
         let parsed: Parsed<'tree> =
             Monoid::concat(nodes.iter().zip(sources).map(|(node, source)| Parsed::sighted(node, source)));
         let candidates: Vec<PathBuf> = parsed.sightings.iter().flat_map(Sighting::candidates).collect();
-        let survey = Survey::default().learn(files, Fact::Followed, &candidates);
+        let survey = Survey::learned(files, Fact::Followed, &candidates);
         into(Report { sightings: parsed.sightings, survey }, parsed.kept)
     }
 
