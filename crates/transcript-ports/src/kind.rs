@@ -3,7 +3,7 @@ use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 use crate::blank::Blank;
 
 #[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[newtype(checked)]
+#[newtype(checked, strategy = "\\PC+")]
 pub struct Kind(String);
 
 impl Checked for Kind {

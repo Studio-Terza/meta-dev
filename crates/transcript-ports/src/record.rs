@@ -2,7 +2,7 @@ mod boundary;
 
 use crate::{Authorship, Body, Instant, SessionId, Skipped, Uuid};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Record {
     uuid: Uuid,
     parent: Option<Uuid>,

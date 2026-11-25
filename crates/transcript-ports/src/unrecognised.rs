@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{Kind, Skipped, Uuid};
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Unrecognised {
     #[serde(rename = "type", alias = "kind")]
     kind: Kind,

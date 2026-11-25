@@ -1,3 +1,6 @@
+#[path = "generated/laws.rs"]
+mod generated_laws;
+
 use graph::MethodShape;
 use graph_reader::Reader;
 use std::ffi::OsString;

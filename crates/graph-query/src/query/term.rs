@@ -3,7 +3,8 @@ use std::str::FromStr;
 
 use lint_layout::Name;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(from = Term)]
 pub struct Term(Name);
 
 impl Term {

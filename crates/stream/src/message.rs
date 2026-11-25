@@ -6,7 +6,8 @@ use transcript_ports::Record;
 use crate::segment::Segment;
 use segmenter::Segmenter;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(from = Message)]
 pub struct Message(Record);
 
 impl From<Record> for Message {

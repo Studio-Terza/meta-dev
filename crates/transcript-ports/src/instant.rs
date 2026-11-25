@@ -3,7 +3,7 @@ use newtype::{Arbitrary, Checked, CheckedDeserialize, Display, Newtype};
 use crate::blank::Blank;
 
 #[derive(Newtype, Arbitrary, Display, CheckedDeserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[newtype(checked)]
+#[newtype(checked, strategy = "\\PC+")]
 pub struct Instant(String);
 
 impl Checked for Instant {

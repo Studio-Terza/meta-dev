@@ -9,7 +9,8 @@ use syntax::{FnArg, Past, ReturnType, Signature, Type, TypeParamBound, TypeSpine
 use crate::boundary::QueryFailure;
 use crate::score::Score;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(from = Role)]
 pub struct Role(MethodShape);
 
 #[derive(Clone, Copy, Debug)]

@@ -9,13 +9,13 @@ use crate::type_ref::{Bounds, Callable, Element, Grouped, Named, Outline, Projec
 
 use super::{Function, Input, Receiver};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Taken {
     Itself,
     Other,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Returned {
     Nothing,
     Itself,
@@ -25,7 +25,7 @@ pub enum Returned {
     Value,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MethodShape {
     receiver: Option<Receiver>,
     takes: Vec<Taken>,

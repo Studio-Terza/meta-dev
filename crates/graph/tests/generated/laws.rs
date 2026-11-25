@@ -23,9 +23,13 @@ laws::monoid!(item_path_forms_a_monoid, graph::ItemPath, any::<graph::ItemPath>(
 
 laws::generates!(member_generates, any::<graph::Member>());
 
+laws::generates!(method_shape_generates, any::<graph::MethodShape>());
+
 laws::generates!(primitive_generates, any::<graph::Primitive>());
 
 laws::generates!(reach_generates, any::<graph::Reach>());
+
+laws::generates!(receiver_generates, any::<graph::Receiver>());
 
 laws::generates!(reexport_generates, any::<graph::Reexport>());
 
@@ -37,7 +41,11 @@ laws::monoid!(region_forms_a_monoid, graph::Region, any::<graph::Region>());
 
 laws::generates!(resolved_generates, any::<graph::Resolved>());
 
+laws::generates!(returned_generates, any::<graph::Returned>());
+
 laws::generates!(root_generates, any::<graph::Root>());
+
+laws::generates!(taken_generates, any::<graph::Taken>());
 
 laws::generates!(unresolved_generates, any::<graph::Unresolved>());
 

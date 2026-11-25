@@ -18,7 +18,7 @@ use named::Named;
 use neighbours::Neighbours;
 use route::Route;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     Defined(Name),
     Uses(Name),

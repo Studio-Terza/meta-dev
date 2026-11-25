@@ -1,6 +1,6 @@
 use crate::Uuid;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Skipped {
     uuid: Uuid,
     parent: Option<Uuid>,

@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use newtype::Spelled;
 
-#[derive(Spelled, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Spelled, newtype::Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Authorship {
     Owner,
     Lead,

@@ -1,8 +1,12 @@
 mod links;
 
 use std::collections::BTreeSet;
+use std::ops::Range;
 
 use algebra::Semigroup;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
 use transcript_ports::{Line, Record, Skipped, Unrecognised, Uuid};
 
@@ -12,13 +16,14 @@ use links::Links;
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Earliest(usize);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Resumed {
     messages: Earliest,
     skipped: Earliest,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(generate = Stream::sampled)]
 pub struct Stream {
     messages: Vec<Message>,
     skipped: Vec<Skipped>,
@@ -72,6 +77,20 @@ impl AsRef<[Message]> for Stream {
 }
 
 impl Stream {
+    const SAMPLED: Range<usize> = 0..4;
+
+    fn sampled() -> impl Strategy<Value = Stream> {
+        Strategy::prop_map(
+            (
+                vec(any::<Message>(), Self::SAMPLED),
+                vec(any::<Skipped>(), Self::SAMPLED),
+                vec(any::<Unrecognised>(), Self::SAMPLED),
+                any::<Resumed>(),
+            ),
+            |(messages, skipped, unrecognised, resumed)| Stream { messages, skipped, unrecognised, resumed },
+        )
+    }
+
     pub(crate) fn after(messages: Vec<Message>, skipped: Vec<Skipped>) -> Stream {
         let resumed = Resumed { messages: Earliest::new(messages.len()), skipped: Earliest::new(skipped.len()) };
         Stream { messages, skipped, unrecognised: Vec::new(), resumed }

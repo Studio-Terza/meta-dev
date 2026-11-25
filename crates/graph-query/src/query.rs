@@ -10,6 +10,7 @@ mod top;
 
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use algebra::{Monoid, Semigroup};
@@ -19,6 +20,9 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_transition_graph::{Ask, Ground, Listed, Transitions, TypeSystem};
 use newtype::Wrapping;
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::vec;
+use newtype::proptest::strategy::Strategy;
 use workspace_metadata::Metadata;
 
 use crate::boundary::CrateSizes;
@@ -32,7 +36,8 @@ use reply::Reply;
 pub use term::Term;
 use top::Top;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(newtype::Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(generate = Query::sampled)]
 pub struct Query {
     terms: Vec<Term>,
     roles: Vec<Role>,
@@ -105,6 +110,31 @@ impl Query {
         crates: Some(()),
         consumers: Vec::new(),
     };
+
+    const SAMPLED: Range<usize> = 0..4;
+
+    fn sampled() -> impl Strategy<Value = Query> {
+        Strategy::prop_map(
+            (
+                vec(any::<Term>(), Self::SAMPLED),
+                vec(any::<Role>(), Self::SAMPLED),
+                vec(any::<Ask>(), Self::SAMPLED),
+                any::<Option<Top>>(),
+                vec(any::<PathBuf>(), Self::SAMPLED),
+                any::<Option<()>>(),
+                vec(any::<Consumer>(), Self::SAMPLED),
+            ),
+            |(terms, roles, questions, top, roots, crates, consumers)| Query {
+                terms,
+                roles,
+                questions,
+                top,
+                roots,
+                crates,
+                consumers,
+            },
+        )
+    }
 
     fn searches(&self) -> Option<()> {
         self.terms.first().map(|_| ()).or_else(|| self.roles.first().map(|_| ()))
