@@ -46,18 +46,18 @@ struct Backward {
 }
 
 impl Kinds {
-    pub(crate) fn listed(kinds: &[Kind]) -> Kinds {
-        Monoid::concat(kinds.iter().copied().map(Kinds::from))
+    pub(crate) fn listed(kinds: impl Iterator<Item = Kind>) -> Kinds {
+        Monoid::concat(kinds.map(Kinds::from))
     }
 
-    fn overlap(self, other: Kinds) -> Option<()> {
+    pub(crate) fn overlap(self, other: Kinds) -> Option<()> {
         (self.0 & other.0 != 0).then_some(())
     }
 }
 
 impl From<Kind> for Kinds {
     fn from(kind: Kind) -> Kinds {
-        let bit = Kind::ALL.iter().position(|listed| *listed == kind).and_then(|at| u32::try_from(at).ok());
+        let bit = Kind::ALL.binary_search(&kind).ok().and_then(|at| u32::try_from(at).ok());
         Kinds(bit.and_then(|at| 1_u128.checked_shl(at)).unwrap_or_default())
     }
 }
