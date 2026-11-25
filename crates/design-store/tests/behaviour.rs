@@ -512,6 +512,18 @@ ORDER BY
 }
 
 #[test]
+fn an_in_memory_store_opened_after_two_of_its_schema_is_copied_from_the_migrated_template() -> Result<(), Box<dyn Error>>
+{
+    let run = Run::root();
+    let opened: Vec<Option<store_ports::Provenance>> = iter::repeat_with(Sqlite::in_memory::<StreamSchema>)
+        .take(3)
+        .map(|store| run.port(store.clone()).read(SegmentKeys).map(|_keys| store.provenance()))
+        .collect::<Result<_, _>>()?;
+    assert_eq!(opened.last(), Some(&Some(store_ports::Provenance::Copied)));
+    Ok(())
+}
+
+#[test]
 fn every_foreign_key_into_segments_is_immediate_and_neither_cascades_nor_sets() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let keys = run.port(Sqlite::in_memory::<StreamSchema>()).read(SegmentKeys)?;

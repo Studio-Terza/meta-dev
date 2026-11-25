@@ -3,7 +3,7 @@ use syntax::parse::{Parser, parse_str, parse2};
 use syntax::{
     Application, Applied, Block, BlockItems, Constructed, Delimiter, Error, Expr, ExprClosure, ExprMacro, File, Fold,
     Group, Ident, Macro, MacroTree, Mentioned, Meta, Nested, Pat, PatEdge, PatSpine, PatTree, Spine, ToTokens,
-    TokenStream, TokenTree, Type, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
+    TokenStream, TokenTree, Type, TypeParamBound, TypeSpine, TypeTree, UseLeaf, UseTree, quote,
 };
 
 ignored! {
@@ -187,6 +187,16 @@ fn block_items_are_the_items_a_block_declares_at_any_depth_but_not_inside_items(
     let declared: Vec<String> =
         BlockItems::declared(&block).iter().map(|item| item.to_token_stream().to_string()).collect();
     assert_eq!(declared, ["use a :: b ;", "fn f () { fn g () { } }", "struct S ;"]);
+    Ok(())
+}
+
+#[test]
+fn a_bound_list_yields_every_type_it_names_children_first() -> Result<(), Error> {
+    let into: TypeParamBound = parse_str("Into<Vec<u8>>")?;
+    let shown: TypeParamBound = parse_str("AsRef<str>")?;
+    let named: Vec<String> =
+        TypeTree::bounds(&[&into, &shown]).into_iter().map(|ty| ty.to_token_stream().to_string()).collect();
+    assert_eq!(named, ["u8", "Vec < u8 >", "str"]);
     Ok(())
 }
 
