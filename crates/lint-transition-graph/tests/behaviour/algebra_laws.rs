@@ -250,6 +250,20 @@ fn a_closure_attaches_to_the_method_it_calls_on_its_parameters() {
 }
 
 #[test]
+fn a_closure_parameter_typed_self_is_the_type_of_the_impl_around_the_law() {
+    let law = "impl B {\n    fn checked() {\n        laws::associative!(a_join, any::<B>(), |a: Self, b: Self| a.join(b));\n    }\n}\n";
+    let text = Declared::lawed(TWO_JOINS, law);
+    assert!(text.contains("crate x: 1 of 2 algebra operations declare no law; x::A: join"), "{text}");
+}
+
+#[test]
+fn a_closure_parameter_typed_by_a_generic_is_not_the_workspace_type_of_that_name() {
+    let law = "impl<A> B {\n    fn checked() {\n        laws::associative!(a_join, any::<B>(), |a: A, b: A| a.join(b));\n    }\n}\n";
+    let text = Declared::lawed(TWO_JOINS, law);
+    assert!(text.contains("crate x: 2 of 2 algebra operations declare no law"), "{text}");
+}
+
+#[test]
 fn a_closure_the_lint_cannot_resolve_is_named_with_its_site() {
     let text = Declared::lawed(PRIVATE, "laws::associative!(a_join, any::<A>(), |a: A, b: A| combine(a, b));\n");
     assert!(

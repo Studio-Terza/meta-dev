@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 
 use graph::{
-    Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, Named, Owner, ParamIndex, Primitive,
-    Reach, Region, Resolved, Seat, Sited, Spelling, TypeRef, Unplaced, Within, Zone,
+    Arrayed, Callee, Exposure, Held, Item, ItemKind, ItemPath, MacroCall, Mention, MethodShape, Named, Owner,
+    ParamIndex, Primitive, Reach, Receiver, Region, Resolved, Returned, Seat, Sited, Spelling, Taken, TypeRef,
+    Unplaced, Within, Zone,
 };
 use graph_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -237,6 +238,14 @@ fn a_signature_reads_its_generic_constraints_inputs_and_output() {
             parameter("U"),
         ]
     );
+}
+
+const NESTED_TRAIT: &str = "fn f<T>() {\n    trait Q {\n        fn g(&self, x: T);\n    }\n}\n";
+
+#[test]
+fn a_trait_nested_in_a_generic_function_keeps_the_function_type_parameters() {
+    let parameter = Expect::named(Resolved::Param(Name::from("T")), Vec::new());
+    assert!(Read::written(NESTED_TRAIT).contains(&parameter));
 }
 
 const SELF_SPELLED: &str = "struct S;\nimpl S {\n    fn f() -> Self {\n        S\n    }\n}\n";
@@ -476,4 +485,20 @@ fn a_free_function_body_resolves_the_function_type_parameters() {
         .map(|shown| shown.contains("resolved: Param(Name(\"T\"))"))
         .collect();
     assert_eq!(receivers_are_the_parameter, [true]);
+}
+
+#[test]
+fn a_method_shape_counts_only_its_own_type_written_by_name_as_itself() {
+    let model = Read::model(
+        "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A, by: B) -> A {\n        other\n    }\n}\n",
+    );
+    let shapes: Vec<MethodShape> = model.functions().map(|placed| MethodShape::from(placed.entity())).collect();
+    assert_eq!(shapes, [MethodShape::new(Some(Receiver::Owned), vec![Taken::Itself, Taken::Other], Returned::Itself)]);
+}
+
+#[test]
+fn a_trait_method_shape_counts_self_as_itself_and_another_parameter_as_other() {
+    let model = Read::model("trait Join<T> {\n    fn join(self, other: Self, by: T) -> Self;\n}\n");
+    let shapes: Vec<MethodShape> = model.functions().map(|placed| MethodShape::from(placed.entity())).collect();
+    assert_eq!(shapes, [MethodShape::new(Some(Receiver::Owned), vec![Taken::Itself, Taken::Other], Returned::Itself)]);
 }

@@ -142,7 +142,8 @@ impl Owners<'_> {
     }
 
     fn typed(self, ty: &TypeRef, fallback: Option<&OperationOwner>) -> Option<LawOwner> {
-        let named = ty.dereferenced().named()?;
+        let named =
+            ty.dereferenced().named().filter(|found| AsRef::<Resolved>::as_ref(*found).parameter().is_none())?;
         let resolved: &Resolved = named.as_ref();
         let declared = resolved.crate_item().and_then(|id| self.model.declared(id));
         let traited = declared
@@ -152,6 +153,7 @@ impl Owners<'_> {
         let name = declared
             .map(AsRef::<Name>::as_ref)
             .or_else(|| resolved.std().and_then(ItemPath::last))
+            .or_else(|| resolved.unknown().map(<&ItemPath>::from).and_then(ItemPath::last))
             .or_else(|| named.last_spelled())?;
         traited.map_or_else(
             || Some(LawOwner::Named(name.clone())),
