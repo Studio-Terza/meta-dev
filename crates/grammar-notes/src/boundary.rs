@@ -77,8 +77,6 @@ enum Lexeme {
 pub trait Reading {
     type Output;
 
-    fn layout(self, line: &Line) -> Self::Output;
-
     fn entry(self, line: &Line, entry: &Entry, marking: Marking) -> Self::Output;
 }
 
@@ -249,11 +247,11 @@ impl Line {
         self.number
     }
 
-    pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Reader::Output {
+    pub fn read_by<Reader: Reading>(&self, reader: Reader) -> Option<Reader::Output> {
         match &self.form {
-            Form::Layout(_) => reader.layout(self),
-            Form::Content(Content::Heading(entry)) => reader.entry(self, entry, Marking::Heading),
-            Form::Content(Content::Entry(entry)) => reader.entry(self, entry, entry.kind.marking()),
+            Form::Layout(_) => None,
+            Form::Content(Content::Heading(entry)) => Some(reader.entry(self, entry, Marking::Heading)),
+            Form::Content(Content::Entry(entry)) => Some(reader.entry(self, entry, entry.kind.marking())),
         }
     }
 }

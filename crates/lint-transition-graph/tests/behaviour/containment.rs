@@ -644,6 +644,18 @@ fn a_path_against_the_direction_of_use_ends_with_none_promptly() -> Result<(), R
 const LAYERED: [Source; 1] = [Clustered::at("crates/x/src/lib.rs", "pub struct A(B);\npub struct B;\n")];
 
 #[test]
+fn a_type_that_holds_itself_is_not_its_own_use() {
+    let files = Sources::parsed(&[Clustered::at("crates/x/src/lib.rs", "pub struct Node(Box<Node>);\n")]);
+    let extraction = Extraction::from(files.as_slice());
+    let model = Reader::read_files(&files);
+    let transitions = Transitions::from(&model);
+    let system = TypeSystem::built_from(&extraction, &transitions);
+    let answered = Ask::Uses(Name::from("Node")).answered(system.containment(), None).to_string();
+    assert!(answered.contains("x::Node"), "{answered}");
+    assert!(answered.contains("    none"), "{answered}");
+}
+
+#[test]
 fn a_type_declared_for_tests_uses_nothing() {
     let in_tests = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A;\n"),

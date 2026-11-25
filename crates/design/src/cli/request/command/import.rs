@@ -203,7 +203,7 @@ impl<S: Store> Sheet<'_, S> {
             || Ok(self.store.read(NextNode)?),
             |_imported| Err(Failure::Reimported(self.project.clone())),
         )?;
-        let mentions: Vec<Mentions> = notes.lines().iter().map(|line| line.read_by(Entries)).collect();
+        let mentions: Vec<Mentions> = notes.lines().iter().filter_map(|line| line.read_by(Entries)).collect();
         let cited: Cited = mentions
             .iter()
             .flat_map(|mentioned| &mentioned.cites)
@@ -238,7 +238,7 @@ impl Answers {
         let start = Step { next: self.next, section: self.root, drafted: Vec::new() };
         let stepped = notes.lines().iter().fold(start, |step, line| {
             let taken = line.read_by(Taking { next: step.next, section: step.section, heard: self, project });
-            step.combine(taken)
+            taken.into_iter().fold(step, Semigroup::combine)
         });
         Draft { drafted: stepped.drafted, ending: notes.ending() }
     }
@@ -393,10 +393,6 @@ impl<Found> Sought<Found> {
 impl Reading for Entries {
     type Output = Mentions;
 
-    fn layout(self, _line: &notes::Line) -> Mentions {
-        Mentions::default()
-    }
-
     fn entry(self, _line: &notes::Line, entry: &notes::Entry, _marking: Marking) -> Mentions {
         Mentions {
             cites: entry.cites().into_iter().cloned().collect(),
@@ -435,10 +431,6 @@ impl Taking<'_> {
 
 impl Reading for Taking<'_> {
     type Output = Step;
-
-    fn layout(self, _line: &notes::Line) -> Step {
-        Step { next: self.next, section: self.section, drafted: Vec::new() }
-    }
 
     fn entry(self, line: &notes::Line, entry: &notes::Entry, marking: Marking) -> Step {
         match marking {

@@ -1,5 +1,5 @@
 use algebra::Act;
-use equivalence::{Agreement, Holes, Laws, Pair, Renaming};
+use equivalence::{Agreement, Equivalence, Holes, Laws, Pair, Renaming};
 use laws::proptest::collection::vec;
 use laws::proptest::option::of;
 use laws::proptest::sample::select;
@@ -79,6 +79,17 @@ laws::table!(
         [Laws::WhereDeclared] => 0,
     ]
 );
+
+#[test]
+fn an_equivalence_keeps_laws_only_when_it_compares_matched_laws() {
+    let laws = ["first law", "second law"];
+    let kept = [
+        Equivalence::comparing(&[], Laws::Matched).kept(&laws).len(),
+        Equivalence::comparing(&[], Laws::WhereDeclared).kept(&laws).len(),
+        Equivalence::erasing(&[]).kept(&laws).len(),
+    ];
+    assert_eq!(kept, [2, 0, 0]);
+}
 
 laws::table!(
     only_sequences_that_disagree_somewhere_differ,
