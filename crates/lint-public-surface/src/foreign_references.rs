@@ -5,13 +5,13 @@ use std::collections::BTreeMap;
 use syntax::{Ident, ItemUse, Macro, Path, UseLeaf, UseTree};
 
 use super::export::Export;
-use algebra::{Monoid, Semigroup};
+use algebra::{Catenation, Monoid, Semigroup};
 use lint_core::{Macros, SourceFile};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_sweep::{Contribute, Contributed, Contributing, Descend, Facts, Gathers, Kind};
 
-use crate_reach::CrateReach;
+use crate_reach::{CrateReach, Reached};
 
 #[derive(Debug, Default)]
 pub struct ForeignReferences {
@@ -24,12 +24,29 @@ enum Leaf<'tree> {
     Glob,
 }
 
-impl Leaf<'_> {
-    fn reached(self, reach: &mut CrateReach) {
-        match self {
-            Leaf::Named(name) => reach.named(Name::from(name)),
-            Leaf::Glob => reach.globbed(),
+#[derive(Debug)]
+pub struct Sighting {
+    crate_name: CrateName,
+    reached: Reached,
+}
+
+impl From<Leaf<'_>> for Reached {
+    fn from(leaf: Leaf<'_>) -> Reached {
+        match leaf {
+            Leaf::Named(name) => Reached::Named(Name::from(name)),
+            Leaf::Glob => Reached::Glob,
         }
+    }
+}
+
+impl FromIterator<Sighting> for ForeignReferences {
+    fn from_iter<Sightings: IntoIterator<Item = Sighting>>(sightings: Sightings) -> ForeignReferences {
+        let crates =
+            sightings.into_iter().fold(BTreeMap::new(), |mut crates: BTreeMap<CrateName, CrateReach>, seen| {
+                crates.entry(seen.crate_name).or_default().absorb(CrateReach::from(seen.reached));
+                crates
+            });
+        ForeignReferences { crates }
     }
 }
 
@@ -86,7 +103,7 @@ impl From<&SourceFile> for Reading {
 
 impl Gathers<ForeignReferences> for Reading {
     fn gathered(self, file: &SourceFile) -> ForeignReferences {
-        let read = self.scan.concluded(file, |_, (), references| references);
+        let read = self.scan.concluded(file, |_, (), sightings| sightings.into_iter().collect());
         self.reader.kept(read, self.tested)
     }
 }
@@ -113,47 +130,41 @@ impl ForeignReferences {
         let named = leaf.end().named().map(|named| &named.ident);
         named.or_else(|| leaf.end().renamed().map(|renamed| &renamed.ident)).map_or(Leaf::Glob, Leaf::Named)
     }
-
-    fn reaching(crate_name: CrateName, leaf: Leaf<'_>) -> ForeignReferences {
-        let mut reach = CrateReach::default();
-        leaf.reached(&mut reach);
-        ForeignReferences { crates: BTreeMap::from([(crate_name, reach)]) }
-    }
 }
 
 impl ReferenceScan {
-    fn used(&self, tree: &UseTree) -> ForeignReferences {
+    fn used(&self, tree: &UseTree) -> Catenation<Sighting> {
         let leaves = UseLeaf::of_tree(tree);
         let reached = leaves.iter().flat_map(|leaf| {
             let first = leaf.path().first().copied();
             let module = leaf.path().get(1).copied().map(Leaf::Named);
             [Some(ForeignReferences::reach(leaf)), module].into_iter().flatten().map(move |reach| (first, reach))
         });
-        Monoid::concat(reached.map(|(first, reach)| self.recorded(first, reach)))
+        reached.filter_map(|(first, reach)| self.recorded(first, reach)).collect()
     }
 
-    fn pathed(&self, path: &Path) -> ForeignReferences {
+    fn pathed(&self, path: &Path) -> Option<Sighting> {
         let pair = path.segments.first().zip(path.segments.iter().nth(1));
-        pair.map_or_default(|(first, second)| self.recorded(Some(&first.ident), Leaf::Named(&second.ident)))
+        pair.and_then(|(first, second)| self.recorded(Some(&first.ident), Leaf::Named(&second.ident)))
     }
 
-    fn transcribed(&self, definition: &Macro) -> ForeignReferences {
+    fn transcribed(&self, definition: &Macro) -> Catenation<Sighting> {
         let mentioned = Macros::mentioned(definition);
-        let pathed = mentioned.paths().iter().map(|path| self.pathed(path));
-        Monoid::concat(pathed.chain(mentioned.uses().iter().map(|tree| self.used(tree))))
+        let pathed: Catenation<Sighting> = mentioned.paths().iter().filter_map(|path| self.pathed(path)).collect();
+        pathed.combine(Monoid::concat(mentioned.uses().iter().map(|tree| self.used(tree))))
     }
 
-    fn recorded(&self, first: Option<&Ident>, leaf: Leaf<'_>) -> ForeignReferences {
+    fn recorded(&self, first: Option<&Ident>, leaf: Leaf<'_>) -> Option<Sighting> {
         first
             .map(CrateName::from)
             .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
-            .map_or_else(ForeignReferences::default, |crate_name| ForeignReferences::reaching(crate_name, leaf))
+            .map(|crate_name| Sighting { crate_name, reached: Reached::from(leaf) })
     }
 }
 
 impl Contribute for ReferenceScan {
     type Open = ();
-    type Part = ForeignReferences;
+    type Part = Catenation<Sighting>;
 
     fn kinds(&self) -> &'static [Kind] {
         match self.reader {
@@ -167,7 +178,7 @@ impl Contribute for ReferenceScan {
         item: &ItemUse,
         _: &Facts<'_, ItemUse>,
         _around: &lint_sweep::Around<'_, Self::Open>,
-    ) -> Contributed<(), ForeignReferences> {
+    ) -> Contributed<(), Catenation<Sighting>> {
         Contributed::new((), self.used(&item.tree), Descend::Over)
     }
 
@@ -176,7 +187,7 @@ impl Contribute for ReferenceScan {
         invoked: &Macro,
         _: &Facts<'_, Macro>,
         _around: &lint_sweep::Around<'_, Self::Open>,
-    ) -> Contributed<(), ForeignReferences> {
+    ) -> Contributed<(), Catenation<Sighting>> {
         Contributed::new((), self.transcribed(invoked), Descend::Unfold)
     }
 
@@ -185,7 +196,7 @@ impl Contribute for ReferenceScan {
         path: &Path,
         _: &Facts<'_, Path>,
         _around: &lint_sweep::Around<'_, Self::Open>,
-    ) -> Contributed<(), ForeignReferences> {
-        Contributed::parted(self.pathed(path))
+    ) -> Contributed<(), Catenation<Sighting>> {
+        Contributed::parted(self.pathed(path).into_iter().collect())
     }
 }
