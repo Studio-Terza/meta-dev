@@ -5,6 +5,7 @@ use crate::class::Class;
 use crate::count::Count;
 use crate::key::Key;
 use crate::transitions::Wrapping;
+use crate::transitions::endpoint::Argument;
 use graph::Mutation;
 use lint_layout::{Name, Whole, Word};
 
@@ -53,8 +54,12 @@ pub(crate) struct Hop<'found> {
 }
 
 impl<'found> Hop<'found> {
-    pub(crate) fn joins(&self, first: &Hop<'found>, last: &Hop<'found>) -> Option<&Hop<'found>> {
-        Some(self).filter(|hop| hop.takes == first.takes).filter(|hop| hop.gives == last.gives)
+    pub(crate) fn takes(&self) -> &Tuple<'found> {
+        &self.takes
+    }
+
+    pub(crate) fn gives(&self) -> Node<'found> {
+        self.gives
     }
 
     pub(crate) fn distinct<'ends>(ends: impl Iterator<Item = &'ends Ends<'found>>) -> Count
@@ -100,26 +105,47 @@ enum Spelling<'end, 'found> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Identity<'found> {
+    node: Node<'found>,
+    arguments: &'found [Argument],
+}
+
+impl fmt::Display for Identity<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.node)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct End<'found> {
     place: Place,
     name: &'found Name,
     node: Option<Node<'found>>,
+    arguments: &'found [Argument],
 }
 
 impl<'found> End<'found> {
     const UNIT: Word<'static> = Word::new("()");
 
     pub(crate) fn placed(place: Place, name: &'found Name) -> End<'found> {
-        End { place, name, node: None }
+        End { place, name, node: None, arguments: &[] }
     }
 
-    pub(crate) fn domain(node: Node<'found>) -> End<'found> {
-        End { place: Place::Domain, name: node.name, node: Some(node) }
+    pub(crate) fn domain(node: Node<'found>, arguments: &'found [Argument]) -> End<'found> {
+        End { place: Place::Domain, name: node.name, node: Some(node), arguments }
     }
 
     #[must_use]
     pub fn node(&self) -> Option<&Node<'found>> {
         self.node.as_ref()
+    }
+
+    pub(crate) fn alike(&self, other: &End<'found>) -> Option<()> {
+        self.identity().filter(|own| Some(*own) == other.identity()).map(|_| ())
+    }
+
+    pub(crate) fn identity(&self) -> Option<Identity<'found>> {
+        self.node.map(|node| Identity { node, arguments: self.arguments })
     }
 
     fn spelling(&self) -> Spelling<'_, 'found> {
@@ -158,12 +184,8 @@ pub(crate) struct Ends<'found> {
 }
 
 impl<'found> Ends<'found> {
-    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>) -> Ends<'found> {
-        Ends { takes, gives, implementer: None }
-    }
-
-    pub(crate) fn implemented_by(self, implementer: Option<End<'found>>) -> Ends<'found> {
-        Ends { implementer, ..self }
+    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>, implementer: Option<End<'found>>) -> Ends<'found> {
+        Ends { takes, gives, implementer }
     }
 
     pub(crate) fn placed(&self, place: Place) -> impl Iterator<Item = &End<'found>> {
@@ -174,13 +196,13 @@ impl<'found> Ends<'found> {
         &self.takes
     }
 
-    pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<Node<'found>> {
+    pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<&End<'found>> {
         let receiver = Some(mutation)
             .filter(|candidate| *candidate == Mutation::ThroughSelf)
             .filter(|_| wrapping == Wrapping::Plain)
             .and_then(|_| self.gives.unit())
             .and_then(|_| self.takes.first().or(self.implementer.as_ref()));
-        self.gives.node.or_else(|| receiver.and_then(|end| end.node))
+        self.gives.node.map(|_| &self.gives).or_else(|| receiver.filter(|end| end.node.is_some()))
     }
 
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {
@@ -195,12 +217,13 @@ impl<'found> Ends<'found> {
     }
 
     pub(crate) fn key(&self) -> Option<Key<'found>> {
-        let mut takes: Vec<Node<'found>> = self.takes.iter().map(|taken| taken.node).collect::<Option<Vec<Node>>>()?;
-        let gives = self.gives.node?;
+        let mut takes: Vec<Identity<'found>> =
+            self.takes.iter().map(End::identity).collect::<Option<Vec<Identity>>>()?;
+        let gives = self.gives.identity()?;
         let selector = self
             .implementer
             .as_ref()
-            .and_then(|implementer| implementer.node)
+            .and_then(End::identity)
             .filter(|implementer| *implementer != gives)
             .filter(|implementer| takes.iter().all(|taken| taken != implementer));
         takes.extend(selector);

@@ -71,21 +71,20 @@ impl<'found> WorkspaceTypes<'found> {
         let from: &Name = AsRef::<CrateName>::as_ref(&transition).borrow();
         let end = |endpoint: &'found Endpoint| self.end(from, endpoint, fixed_by);
         let implementer = transition.implementer().map(Implementer::endpoint).map(end);
-        let ends =
-            Ends::new(Inputs::iter(transition.takes()).map(end).collect(), end(Output::endpoint(transition.gives())))
-                .implemented_by(implementer);
+        let takes = Inputs::iter(transition.takes()).map(end).collect();
+        let ends = Ends::new(takes, end(Output::endpoint(transition.gives())), implementer);
         Edge::new(transition, ends, fixed_by)
     }
 
     pub(crate) fn owner(&self, transition: &Transition<'found, '_>) -> Option<End<'found>> {
         let context = transition.context();
         let from: &Name = AsRef::<CrateName>::as_ref(transition).borrow();
-        context.trait_name().map_or(context.subject(), |_| None).map(|subject| self.end(from, subject, None))
+        context.trait_name().map_or(context.selfish().subject(), |_| None).map(|subject| self.end(from, subject, None))
     }
 
     fn end(&self, from: &Name, endpoint: &'found Endpoint, fixed_by: Option<&'found Name>) -> End<'found> {
         match endpoint.nature() {
-            Nature::Named => self.named(endpoint.origin().map_or(from, Borrow::borrow), endpoint.as_ref()),
+            Nature::Named => self.named(endpoint.origin().map_or(from, Borrow::borrow), endpoint),
             Nature::Interface => End::placed(Place::Interface, endpoint.as_ref()),
             Nature::Primitive => fixed_by.map_or_else(
                 || End::placed(Place::Primitive, endpoint.as_ref()),
@@ -95,11 +94,14 @@ impl<'found> WorkspaceTypes<'found> {
         }
     }
 
-    fn named(&self, from: &Name, name: &'found Name) -> End<'found> {
+    fn named(&self, from: &Name, endpoint: &'found Endpoint) -> End<'found> {
+        let name = endpoint.as_ref();
         let declaring = self.types.get(name).filter(|_| self.crates.contains(from));
         let resolved = declaring.map(|crates| Node::resolved(crates, from, name));
         resolved.map_or(End::placed(Place::External, name), |found| {
-            found.and_then(|node| self.unambiguous(node)).map_or(End::placed(Place::Shared, name), End::domain)
+            found
+                .and_then(|node| self.unambiguous(node))
+                .map_or(End::placed(Place::Shared, name), |node| End::domain(node, endpoint.arguments()))
         })
     }
 

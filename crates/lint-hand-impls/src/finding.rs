@@ -1,16 +1,16 @@
 use std::fmt;
 
 use lint_core::Fix;
-use lint_layout::{Name, Word};
+use lint_layout::{Fitted, Name};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Finding<'model> {
-    derivable: Word<'static>,
+    derivable: Fitted<'static>,
     subject: &'model Name,
 }
 
 impl<'model> Finding<'model> {
-    pub(crate) fn new(derivable: Word<'static>, subject: &'model Name) -> Finding<'model> {
+    pub(crate) fn new(derivable: Fitted<'static>, subject: &'model Name) -> Finding<'model> {
         Finding { derivable, subject }
     }
 }

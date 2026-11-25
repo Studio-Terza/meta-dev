@@ -9,7 +9,7 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMacro, ItemTrait, Stmt};
 
 use algebra::{Monoid, Semigroup};
-use graph::{Building, FileId, ItemDeclaration, ItemId, Mention, Region, Resolved, Seat, TypeRef};
+use graph::{FileId, ItemDeclaration, ItemId, Mention, ModelPart, Region, Resolved, Seat, TypeRef, Unowned};
 use lint_core::{Macros, Syntax};
 use lint_layout::{LineNumber, Name, Position};
 
@@ -18,7 +18,7 @@ use crate::namespace::{
 };
 
 use super::regions::MacroItems;
-use super::signature::Written;
+use super::signature::{InScope, Written};
 use super::{Enclosure, ImplRow};
 use lint_sweep::Descend;
 
@@ -135,19 +135,19 @@ pub(super) struct Places {
 }
 
 impl Places {
-    pub(super) fn placed(&self, file: FileId, building: Building) -> Building {
-        self.order.iter().filter_map(|id| self.places.get(id)?.declared).fold(building, |mut built, declared| {
-            built.placed(file, declared.line, ItemDeclaration::new(declared.item, declared.region));
-            built
-        })
+    pub(super) fn placed(&self, file: FileId) -> ModelPart {
+        Monoid::concat(self.order.iter().filter_map(|id| self.places.get(id)?.declared).map(|declared| {
+            ModelPart::placed(file, declared.line, ItemDeclaration::new(declared.item, declared.region))
+        }))
     }
 
     pub(super) fn seat(&self, region: Region, place: Option<&PlaceId>) -> Seat {
         let found = place.and_then(|id| self.places.get(id));
-        Seat::new(region, found.and_then(|seated| seated.subject.clone()))
-            .owned(found.and_then(|seated| seated.owner))
-            .implementing(found.and_then(|seated| seated.implemented.clone()))
-            .traited(found.and_then(|seated| seated.traited.clone()))
+        Unowned::new(region, found.and_then(|seated| seated.subject.clone())).owned(
+            found.and_then(|seated| seated.owner),
+            found.and_then(|seated| seated.implemented.clone()),
+            found.and_then(|seated| seated.traited.clone()),
+        )
     }
 }
 
@@ -244,9 +244,9 @@ impl<'read> Frame<'read> {
     }
 
     pub(super) fn impl_entered(&self, block: &ItemImpl) -> Contributed<Framed<'read>, Grains> {
-        let declared = self.generics.extended(&block.generics);
+        let declared = InScope::clone(&self.generics).combine(InScope::from(&block.generics));
         let subject = declared.lowered(&block.self_ty);
-        let generics = declared.subject(subject.clone());
+        let generics = declared.clone().combine(InScope::from(subject.clone()));
         let implemented = ImplRow::written(&self.here, self.context.region(), block, &declared);
         let key = ScopeKey::reached(&self.within, NodeKey::new(self.at, KeyRole::Scope));
         let traited = block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path));

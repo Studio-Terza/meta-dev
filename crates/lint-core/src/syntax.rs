@@ -1,9 +1,8 @@
-use syntax::Punctuated;
 use syntax::{
     AngleBracketedGenericArguments, Expr, ExprCall, ExprClosure, ExprLit, ExprPath, Field, Fields, FnArg,
     GenericArgument, GenericParam, Ident, ImplItem, ImplItemFn, ImplItemType, Item, ItemImpl, ItemMod, ItemUse, Lit,
-    LitStr, Member, Pat, PatIdent, PatType, PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn,
-    TraitItemType, Type, TypeParam, TypeParamBound, TypePath,
+    LitStr, Member, Pat, PatIdent, PatType, PathArguments, ReturnType, Stmt, TraitItem, TraitItemFn, TraitItemType,
+    Type, TypeParam, TypePath,
 };
 use syntax::{Group, Literal, Punct, TokenTree};
 
@@ -111,23 +110,6 @@ impl Syntax {
     pub fn item_mod(item: &Item) -> Option<&ItemMod> {
         match item {
             Item::Mod(module) => Some(module),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn bounds(ty: &Type) -> Option<&Punctuated<TypeParamBound, Token![+]>> {
-        match ty {
-            Type::ImplTrait(bounded) => Some(&bounded.bounds),
-            Type::TraitObject(bounded) => Some(&bounded.bounds),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn trait_bound(bound: &TypeParamBound) -> Option<&TraitBound> {
-        match bound {
-            TypeParamBound::Trait(traited) => Some(traited),
             _ => None,
         }
     }

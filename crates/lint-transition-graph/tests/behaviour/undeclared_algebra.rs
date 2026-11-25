@@ -14,7 +14,26 @@ const NAMESAKE: &str = "pub trait Semigroup {\n    fn combine(self, other: Self)
 
 const NAMESAKE_VISIT: &str = "mod local {\n    pub trait Visit {\n        fn visit(&mut self);\n    }\n}\npub struct A;\nimpl local::Visit for A {\n    fn visit(&mut self) {}\n}\npub struct B;\nimpl syn::visit::Visit<'_> for B {\n    fn visit_item(&mut self, item: &syn::Item) {}\n}\n";
 
+const TYPESTATE: &str = "pub struct Refining;\npub type Refined = Refining;\npub struct Title;\npub struct Node<S> {\n    stage: S,\n}\nimpl<S> Node<S> {\n    pub fn refine(self) -> Node<Refining> {}\n    pub fn titled(self, title: Title) -> Node<S> {}\n    pub fn staged<T>(self, stage: T) -> Node<T> {}\n}\nimpl Node<Refining> {\n    pub fn renamed(self) -> Node<Refined> {}\n}\n";
+
 const LIBRARY: Source = Source::new(Located::new("crates/algebra/src/lib.rs"), Text::new(ALGEBRA));
+
+const ACTING: &str = "pub trait Semigroup {\n    fn combine(self, other: Self) -> Self;\n}\npub trait Monoid: Semigroup + Default {}\npub trait Act<Actor: Monoid> {\n    fn acted(self, by: Actor) -> Option<Self>;\n}\n";
+const ACTED: &str = "use algebra::{Act, Monoid, Semigroup};\npub struct Path;\nimpl Semigroup for Path {\n    fn combine(self, other: Path) -> Path {}\n}\nimpl Monoid for Path {}\npub struct Place;\nimpl Act<Path> for Place {\n    fn acted(self, by: Path) -> Option<Place> {}\n}\n";
+const NAMESAKE_ACT: &str = "use algebra::{Monoid, Semigroup};\npub trait Act<Actor> {\n    fn acted(self, by: Actor) -> Option<Self>;\n}\npub struct Path;\nimpl Semigroup for Path {\n    fn combine(self, other: Path) -> Path {}\n}\nimpl Monoid for Path {}\npub struct Place;\nimpl Act<Path> for Place {\n    fn acted(self, by: Path) -> Option<Place> {}\n}\n";
+const ACTING_LIBRARY: Source = Source::new(Located::new("crates/algebra/src/lib.rs"), Text::new(ACTING));
+
+laws::table!(
+    an_algebra_act_impl_declares_its_action_and_a_local_trait_named_act_does_not,
+    Fixture::reported,
+    [
+        [ACTING_LIBRARY, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ACTED))] => Vec::<String>::new(),
+        [ACTING_LIBRARY, Source::new(Located::new("crates/y/src/lib.rs"), Text::new(NAMESAKE_ACT))] => vec![
+            "crates/y/src/lib.rs:12: y::Place::acted is an undeclared builder (T, X) -> T; make each fixed step a typestate edge T<S1> to T<S2>, or turn a per-item accumulation into contributions merged by a declared algebra::Monoid".to_owned(),
+            Fixture::workspace("crates/y/src/lib.rs:12: workspace: 1 undeclared same-type edges, 0 unary, 1 builder, 0 binary, 0 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
 const WORKSPACE_FIX: &str =
     "remove each site with the fix its own finding names; the lint blocks once the workspace count reaches zero";
 const HIDDEN_FIX: &str = "declare the algebra this impl hides: implement algebra::Semigroup, and algebra::Monoid when there is an identity, for the type";
@@ -81,6 +100,65 @@ laws::table!(
         [LIBRARY, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(NAMESAKE_VISIT))] => vec![
             "crates/x/src/lib.rs:8: x::A::visit is an undeclared mutating &mut; return a new value, or move the mutation into a store operation".to_owned(),
             Fixture::workspace("crates/x/src/lib.rs:8: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 0 binary, 1 mutating; 0 std impls are an undeclared algebra; 1 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
+
+laws::table!(
+    a_typestate_edge_is_no_same_type_edge_but_equal_arguments_are_even_through_an_alias,
+    Fixture::reported,
+    [
+        [LIBRARY, Source::new(Located::new("crates/z/src/lib.rs"), Text::new(TYPESTATE))] => vec![
+            "crates/z/src/lib.rs:9: z::Node::titled is an undeclared builder (T, X) -> T; make each fixed step a typestate edge T<S1> to T<S2>, or turn a per-item accumulation into contributions merged by a declared algebra::Monoid".to_owned(),
+            "crates/z/src/lib.rs:13: z::Node::renamed is an undeclared unary T -> T; write the refinement type this produces (transition-graph D14), so the edge goes from the type to a new type".to_owned(),
+            Fixture::workspace("crates/z/src/lib.rs:9: workspace: 2 undeclared same-type edges, 1 unary, 1 builder, 0 binary, 0 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
+
+const STORE_PORTS: &str = "pub trait Execute {}\npub type Statements<'run> = dyn Execute + 'run;\n";
+
+const PORTS: Source = Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new(STORE_PORTS));
+
+const HANDLE_BOUNDARY: &str = "mod boundary {\n    pub fn read(statements: &mut store_ports::Statements<'_>) {}\n}\n";
+
+const HANDLE_CORE: &str = "pub fn read(statements: &mut store_ports::Statements<'_>) {}\n";
+
+const HANDLE_DIRECT: &str = "mod boundary {\n    pub fn read(statements: &mut dyn store_ports::Execute) {}\n}\n";
+
+const HANDLE_LOCAL: &str =
+    "trait Execute {}\ntype Statements<'run> = dyn Execute + 'run;\npub fn read(statements: &mut Statements<'_>) {}\n";
+
+const HANDLE_STORE: &str = "mod store {\n    pub fn read(statements: &mut store_ports::Statements<'_>) {}\n}\n";
+
+laws::table!(
+    a_mut_store_ports_statements_parameter_in_a_boundary_module_is_a_store_operation,
+    Fixture::reported,
+    [
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_BOUNDARY))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_DIRECT))] => Vec::<String>::new(),
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_STORE))] => Vec::<String>::new(),
+    ]
+);
+
+laws::table!(
+    a_mut_store_ports_statements_parameter_outside_a_boundary_module_is_still_mutating,
+    Fixture::reported,
+    [
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_CORE))] => vec![
+            "crates/x/src/lib.rs:1: x::read is an undeclared mutating &mut; return a new value, or move the mutation into a store operation".to_owned(),
+            Fixture::workspace("crates/x/src/lib.rs:1: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 0 binary, 1 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
+        ],
+    ]
+);
+
+laws::table!(
+    a_local_trait_named_execute_is_not_the_store_port,
+    Fixture::reported,
+    [
+        [PORTS, Source::new(Located::new("crates/x/src/lib.rs"), Text::new(HANDLE_LOCAL))] => vec![
+            "crates/x/src/lib.rs:3: x::read is an undeclared mutating &mut; return a new value, or move the mutation into a store operation".to_owned(),
+            Fixture::workspace("crates/x/src/lib.rs:3: workspace: 1 undeclared same-type edges, 0 unary, 0 builder, 0 binary, 1 mutating; 0 std impls are an undeclared algebra; 0 edges with a signature fixed by a foreign trait are counted apart"),
         ],
     ]
 );

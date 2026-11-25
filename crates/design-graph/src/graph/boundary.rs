@@ -1,7 +1,7 @@
 use design_model::{
     AnyNode, AnyStage, Artifact, Basis, Casting, Condition, Dropped, Ending, Entered, Entry, Facet, Kin, Node,
-    NodeEdge, NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Stage, Staging, Terminal,
-    Title, Transition, Vague,
+    NodeEdge, NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Sketch, Stage, Staging,
+    Terminal, Title, Transition, Vague,
 };
 use newtype::Counter;
 use port_core::Op;
@@ -282,7 +282,8 @@ WHERE
     fn upheld(self, statements: &mut Statements<'_>) -> Result<EdgeColumns, Refusal> {
         let source_role = RoleRow::read(self.source, statements)?;
         let target_role = RoleRow::read(self.target, statements)?;
-        let edge = NodeEdge::new(self.source.0, self.relation, self.target.0).upheld(source_role, target_role)?;
+        let upheld = NodeEdge::new(self.source.0, self.relation, self.target.0).upheld(source_role, target_role)?;
+        let edge: &NodeEdge = upheld.as_ref();
         let [source, target] = edge.ends();
         Ok(EdgeColumns { source, relation: edge.relation(), target, provenance: self.provenance })
     }
@@ -460,20 +461,17 @@ impl TryFrom<NodeRow> for AnyNode {
 
     fn try_from(row: NodeRow) -> Result<AnyNode, ColumnFailure> {
         let entry = Entry::new(row.project, row.facet, row.provenance);
-        let stage = row.basis.staged(row.stage);
+        let stage = row.basis.implied().unwrap_or(row.stage);
         let columns = StageColumns { stage, artifact: row.artifact, condition: row.condition, reason: row.reason };
         let casting = Casting::new(row.role, row.role_provenance);
-        let node = AnyNode::loaded(row.id, entry, casting, columns.try_into()?).based(row.basis);
-        Ok(row.title.into_iter().fold(node, Node::titled))
+        Ok(AnyNode::loaded(row.id, entry, casting, columns.try_into()?).described(row.basis, row.title))
     }
 }
 
 impl From<OutlineRow> for Outline {
     fn from(row: OutlineRow) -> Outline {
-        Outline::new(row.id, row.project, row.facet, row.basis.staged(row.stage))
-            .based(row.basis)
-            .titled(row.title)
-            .parented(row.parent)
+        let stage = row.basis.implied().unwrap_or(row.stage);
+        Sketch::new(row.id, row.project, row.facet, stage).described(row.basis, row.title, row.parent)
     }
 }
 

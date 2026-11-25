@@ -1399,6 +1399,8 @@ impl Cargo {
                 "--unviable",
                 "--build-timeout",
                 "600",
+                "--timeout",
+                "120",
                 "--cargo-test-arg",
                 Runner::LIMITED,
                 "--output",
@@ -1423,8 +1425,7 @@ impl Exits {
     fn changed(code: &Code) -> ExitCode {
         let scratch = Scratch::fresh();
         let seeded = scratch
-            .directory("out/mutants.out")
-            .and_then(|()| scratch.write("out/mutants.out/missed.txt", "src/a.rs:1: replace f -> bool with true\n"))
+            .survived(&[Missed { name: "src/a.rs:1: replace f -> bool with true", file: "src/a.rs", line: 1 }])
             .and_then(|()| scratch.directory("out/scoped/mutants.out"))
             .and_then(|()| {
                 scratch.write("out/scoped/mutants.out/caught.txt", "src/a.rs:1: replace f -> bool with true\n")
@@ -1517,6 +1518,8 @@ fn changed_lines_are_tested_first_against_their_own_crate() -> Result<(), Box<dy
                 "--unviable",
                 "--build-timeout",
                 "600",
+                "--timeout",
+                "120",
                 "--cargo-test-arg",
                 Runner::LIMITED,
                 "--output",
@@ -1563,7 +1566,8 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_t
             ":(glob)crates/e/src/**/*.rs",
         ],
     );
-    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
+    let listed =
+        Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()]);
     let fake = Script {
         exact: vec![
             ExactReply {
@@ -1573,7 +1577,7 @@ fn a_plan_mutates_the_whole_source_of_crates_whose_tests_changed_or_that_those_t
             ExactReply { asked: consumed.clone(), text: "crates/e/src/lib.rs\ncrates/d/tests/u.rs\n".to_owned() },
             ExactReply { asked: kept.clone(), text: "+changed\n".to_owned() },
             ExactReply { asked: whole.clone(), text: "+whole\n".to_owned() },
-            ExactReply { asked: listed.clone(), text: "m\n".repeat(61) },
+            ExactReply { asked: listed.clone(), text: Listing::of(61) },
         ],
         ..Script::new()
     };
@@ -1610,7 +1614,16 @@ fn a_plan_with_no_changed_tests_asks_no_graph_and_keeps_the_changed_lines() -> R
     );
     let fake = Script {
         changed: "+a line\n".to_owned(),
-        exact: vec![ExactReply { asked: named, text: String::new() }],
+        exact: vec![
+            ExactReply { asked: named, text: String::new() },
+            ExactReply {
+                asked: Invocation::new(
+                    "cargo",
+                    ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()],
+                ),
+                text: Listing::of(1),
+            },
+        ],
         ..Script::new()
     };
     let answer = scratch.answer(
@@ -1636,8 +1649,9 @@ impl Plans {
 
     fn shards(mutants: usize) -> Vec<String> {
         let scratch = Scratch::fresh();
-        let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
-        let fake = Script { exact: vec![ExactReply { asked: listed, text: "m\n".repeat(mutants) }], ..Script::new() };
+        let listed =
+            Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()]);
+        let fake = Script { exact: vec![ExactReply { asked: listed, text: Listing::of(mutants) }], ..Script::new() };
         scratch.answer(
             &fake,
             &["mutants-plan", &scratch.file("c.diff"), &scratch.file("plan.txt"), "consumed-by", "lint", "-p"],
@@ -1653,8 +1667,8 @@ laws::table!(
         0 => [r#"shards=[{"index":0,"minutes":45}]"#],
         60 => [r#"shards=[{"index":0,"minutes":45}]"#],
         61 => [r#"shards=[{"index":0,"minutes":45},{"index":1,"minutes":45}]"#],
-        5_068 => [Plans::capped(&[66; 14])],
-        5_095 => [Plans::capped(&[67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 66])],
+        5_068 => [Plans::capped(&[102; 14])],
+        5_069 => [Plans::capped(&[103, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102, 102])],
         100_000 => [Plans::capped(&[360; 14])],
     ]
 );
@@ -1675,10 +1689,11 @@ fn a_plan_for_a_change_that_reaches_no_crate_runs_one_shard_and_nothing_else() -
 fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_still_missed()
 -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    scratch.directory("out/mutants.out")?;
+    scratch.survived(&[
+        Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 },
+        Missed { name: "src/b.rs:2:9: delete match arm A::B(_) | C in D<'a>::e", file: "src/b.rs", line: 2 },
+    ])?;
     scratch.directory("out/scoped/mutants.out")?;
-    let own = "src/a.rs:1:5: replace f -> bool with true\nsrc/b.rs:2:9: delete match arm A::B(_) | C in D<'a>::e\n";
-    scratch.write("out/mutants.out/missed.txt", own)?;
     scratch.write("out/mutants.out/timeout.txt", "src/c.rs:3:1: replace g with ()\n")?;
     scratch.write("out/scoped/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
     scratch.write("out/scoped/mutants.out/caught.txt", "src/b.rs:2:9: delete match arm A::B(_) | C in D<'a>::e\n")?;
@@ -1711,7 +1726,7 @@ fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_
             [
                 "mutants",
                 "--in-diff",
-                scratch.file("c.diff").as_str(),
+                scratch.file("out/survivors.diff").as_str(),
                 "--re",
                 r"^src/a\.rs:1:5: replace f \-> bool with true$",
                 "--re",
@@ -1727,6 +1742,8 @@ fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_
                 "--unviable",
                 "--build-timeout",
                 "600",
+                "--timeout",
+                "120",
                 "--cargo-test-arg",
                 Runner::LIMITED,
                 "--output",
@@ -1734,6 +1751,44 @@ fn mutants_missed_by_their_own_crate_are_rerun_by_name_in_the_scope_and_fail_if_
             ]
         ))
     );
+    Ok(())
+}
+
+#[test]
+fn the_scoped_rerun_diff_touches_only_the_lines_of_the_survivors() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.survived(&[
+        Missed { name: "src/a.rs:3:5: replace f -> bool with true", file: "src/a.rs", line: 3 },
+        Missed { name: "src/a.rs:1:9: replace g -> u8 with 0", file: "src/a.rs", line: 1 },
+        Missed { name: "src/b.rs:2:9: replace h with ()", file: "src/b.rs", line: 2 },
+    ])?;
+    scratch.directory("out/scoped/mutants.out")?;
+    scratch.write("out/mutants.out/timeout.txt", "src/c.rs:4:1: replace k with ()\n")?;
+    let caught = "src/a.rs:3:5: replace f -> bool with true\nsrc/a.rs:1:9: replace g -> u8 with 0\nsrc/b.rs:2:9: replace h with ()\n";
+    scratch.write("out/scoped/mutants.out/caught.txt", caught)?;
+    let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "--test-package=a"];
+    let answer = scratch.answer(&Script::new(), &arguments);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    let narrowed = Text::lines(&scratch.read("out/survivors.diff"));
+    assert_eq!(
+        narrowed,
+        [
+            "--- a/src/a.rs",
+            "+++ b/src/a.rs",
+            "@@ -1,1 +1,1 @@",
+            "-line 1",
+            "+line 1",
+            "@@ -3,1 +3,1 @@",
+            "-line 3",
+            "+line 3",
+            "--- a/src/b.rs",
+            "+++ b/src/b.rs",
+            "@@ -2,1 +2,1 @@",
+            "-line 2",
+            "+line 2",
+        ]
+    );
+    assert_eq!(narrowed.iter().filter(|line| line.contains("@@")).count(), 3);
     Ok(())
 }
 
@@ -2588,8 +2643,37 @@ impl Scratch {
         self.files.kind(&self.root.join(name))
     }
 
+    fn survived(&self, missed: &[Missed]) -> Result<(), FileFailure> {
+        let names: String = missed.iter().map(|mutant| [mutant.name, "\n"].concat()).collect();
+        let outcomes: String = missed.iter().map(|mutant| [", ", &mutant.outcome()].concat()).collect();
+        self.directory("out/mutants.out")?;
+        self.write("out/mutants.out/missed.txt", &names)?;
+        self.write(
+            "out/mutants.out/outcomes.json",
+            &["{\"outcomes\": [{\"scenario\": \"Baseline\", \"summary\": \"Success\"}", &outcomes, "]}"].concat(),
+        )?;
+        missed.iter().try_for_each(|mutant| self.placed(Path::new(mutant.file), Missed::SOURCE))
+    }
+
     fn path(&self) -> &Path {
         &self.root
+    }
+}
+
+struct Missed {
+    name: &'static str,
+    file: &'static str,
+    line: u32,
+}
+
+impl Missed {
+    const SOURCE: &'static str = "line 1\nline 2\nline 3\nline 4\n";
+
+    fn outcome(&self) -> String {
+        format!(
+            r#"{{"scenario": {{"Mutant": {{"name": "{}", "file": "{}", "function": null, "span": {{"start": {{"line": {}, "column": 1}}}}, "replacement": "true", "genre": "FnValue"}}}}, "summary": "MissedMutant"}}"#,
+            self.name, self.file, self.line
+        )
     }
 }
 
@@ -2717,8 +2801,7 @@ fn a_build_script_waits_for_the_host_build_of_its_build_dependencies() -> Result
 #[test]
 fn a_scoped_rerun_that_tests_fewer_mutants_than_were_missed_fails() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    scratch.directory("out/mutants.out")?;
-    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
+    scratch.survived(&[Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 }])?;
     let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
     let answer = scratch.answer(&Script::new(), &arguments);
     assert_eq!(answer.exit, ExitCode::FAILURE);
@@ -2752,13 +2835,14 @@ fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Re
             ":(glob)crates/d/src/**/*.rs",
         ],
     );
-    let listed = Invocation::new("cargo", ["mutants", "--list", "--in-diff", scratch.file("c.diff").as_str()]);
+    let listed =
+        Invocation::new("cargo", ["mutants", "--list", "--json", "--in-diff", scratch.file("c.diff").as_str()]);
     let fake = Script {
         exact: vec![
             ExactReply { asked: named.clone(), text: "crates/d/tests/behaviour.rs\n".to_owned() },
             ExactReply { asked: kept.clone(), text: "+changed\n".to_owned() },
             ExactReply { asked: whole.clone(), text: "+whole\n".to_owned() },
-            ExactReply { asked: listed.clone(), text: "m\n".repeat(3) },
+            ExactReply { asked: listed.clone(), text: Listing::of(3) },
         ],
         ..Script::new()
     };
@@ -2773,9 +2857,8 @@ fn a_plan_for_a_pull_request_reaches_only_the_crates_whose_tests_changed() -> Re
 #[test]
 fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    scratch.directory("out/mutants.out")?;
+    scratch.survived(&[Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 }])?;
     scratch.directory("out/scoped/mutants.out")?;
-    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
     scratch.write("out/scoped/mutants.out/caught.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
     let fake = Script::new();
     let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "0/8", "-p"];
@@ -2800,9 +2883,8 @@ fn the_timed_out_count_is_told_before_the_scoped_rerun_runs() -> Result<(), Box<
 #[test]
 fn a_mutant_its_own_crate_missed_that_times_out_in_the_scope_is_still_a_survivor() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    scratch.directory("out/mutants.out")?;
+    scratch.survived(&[Missed { name: "src/a.rs:1:5: replace f -> bool with true", file: "src/a.rs", line: 1 }])?;
     scratch.directory("out/scoped/mutants.out")?;
-    scratch.write("out/mutants.out/missed.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
     scratch.write("out/scoped/mutants.out/timeout.txt", "src/a.rs:1:5: replace f -> bool with true\n")?;
     let answer = scratch.answer(
         &Script::new(),
@@ -2825,4 +2907,14 @@ struct Runner;
 impl Runner {
     const LIMITED: &'static str =
         r#"--config=target.'cfg(target_os = "linux")'.runner = ["prlimit", "--data=6442450944", "--cpu=300", "--"]"#;
+}
+
+struct Listing;
+
+impl Listing {
+    const MUTANT: &'static str = r#"{"name": "crates/m/src/lib.rs:1:1: replace m -> u8 with 0", "file": "crates/m/src/lib.rs", "function": {"function_name": "m"}, "span": {"start": {"line": 1, "column": 1}}, "replacement": "0", "genre": "FnValue"}"#;
+
+    fn of(mutants: usize) -> String {
+        format!("[{}]", vec![Self::MUTANT; mutants].join(", "))
+    }
 }

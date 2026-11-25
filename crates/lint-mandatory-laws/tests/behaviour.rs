@@ -44,8 +44,24 @@ const WRITTEN_RECORD: &str = "pub struct A;\nimpl store_ports::Record for A {}\n
 const CRUD: &str = "laws::crud!(stored, A, any::<A>(), store());\n";
 const OTHER_CRUD: &str = "laws::crud!(stored, B, any::<B>(), store());\n";
 const RECORD_ROUNDTRIP: &str = "laws::roundtrip!(a, any::<A>(), A::encode, A::decode);\n";
+const LOCAL_RECORD: &str = "pub trait Record {}\npub struct A;\nimpl Record for A {}\n";
+const STORE_PORTS: &str = "pub trait Record {}\n";
+const WORKSPACE_RECORD: &str = "pub struct A;\nimpl store_ports::Record for A {}\n";
 
-const CASES: [Case; 38] = [
+const CASES: [Case; 40] = [
+    Case::new(
+        Title::new("a local trait named Record is not a stored record"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(LOCAL_RECORD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("the workspace's store-ports Record is a stored record"),
+        &[
+            Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new(STORE_PORTS)),
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(WORKSPACE_RECORD)),
+        ],
+        Flagged::new(&["crates/x/src/lib.rs:1"]),
+    ),
     Case::new(
         Title::new("display and from_str"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_PAIR))],

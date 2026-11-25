@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::ops::Not;
 
 use crate::transitions::Transition;
 use lint_core::Fix;
@@ -8,7 +9,7 @@ use lint_layout::{Name, Whole, Word, words};
 
 use crate::count::Count;
 use crate::edge::Edge;
-use crate::form::Acting;
+use crate::forms::Written;
 use crate::key::Key;
 
 #[derive(Debug)]
@@ -23,8 +24,9 @@ impl<'found, 'file> Family<'found, 'file> {
     pub(super) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Family<'found, 'file>> {
         let keyed = edges
             .iter()
-            .filter_map(|edge| edge.form().hand_written().map(|_| edge))
-            .filter(|edge| edge.form().algebraic().and_then(Acting::pure).is_none())
+            .collect::<Written<'found, 'found, 'file>>()
+            .into_iter()
+            .filter(|edge| edge.form().algebraic().is_none_or(|acting| acting.parameters().is_empty().not()))
             .fold(BTreeMap::new(), |mut keys: BTreeMap<Key<'found>, Vec<&'found Transition<'found, 'file>>>, edge| {
                 edge.ends()
                     .key()

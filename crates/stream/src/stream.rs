@@ -2,8 +2,9 @@ mod links;
 
 use std::collections::BTreeSet;
 
+use algebra::Semigroup;
 use newtype::{Arbitrary, Display, Newtype, Wrapping};
-use transcript_ports::{Gather, Line, Record, Skipped, Unrecognised, Uuid};
+use transcript_ports::{Line, Record, Skipped, Unrecognised, Uuid};
 
 use crate::{Earlier, MechanicalLink, Message};
 use links::Links;
@@ -31,21 +32,36 @@ impl FromIterator<Line> for Stream {
     }
 }
 
-impl Gather for Stream {
-    fn said(mut self, record: Record) -> Stream {
-        self.messages.push(Message::from(record));
-        self
+impl Semigroup for Stream {
+    fn combine(self, later: Stream) -> Stream {
+        Stream {
+            messages: self.messages.combine(later.messages),
+            skipped: self.skipped.combine(later.skipped),
+            unrecognised: self.unrecognised.combine(later.unrecognised),
+            resumed: self.resumed,
+        }
     }
+}
 
-    fn skipped(mut self, skipped: Skipped) -> Stream {
-        self.skipped.push(skipped);
-        self
+impl From<Record> for Stream {
+    fn from(record: Record) -> Stream {
+        Stream { messages: vec![Message::from(record)], ..Stream::default() }
     }
+}
 
-    fn unrecognised(mut self, unrecognised: Unrecognised) -> Stream {
-        self.skipped.extend(unrecognised.passing());
-        self.unrecognised.push(unrecognised);
-        self
+impl From<Skipped> for Stream {
+    fn from(skipped: Skipped) -> Stream {
+        Stream { skipped: vec![skipped], ..Stream::default() }
+    }
+}
+
+impl From<Unrecognised> for Stream {
+    fn from(unrecognised: Unrecognised) -> Stream {
+        Stream {
+            skipped: unrecognised.passing().into_iter().collect(),
+            unrecognised: vec![unrecognised],
+            ..Stream::default()
+        }
     }
 }
 

@@ -5,14 +5,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use graph::{Domain, Unresolved};
 use lint_layout::Name;
 
-use super::boundary::{GlobId, Lattice, ScopeId};
+use algebra::{Monoid, Semigroup};
+
+use super::boundary::{GlobId, Pointwise, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::use_path::Reading;
-use super::view::View;
+use super::view::{Nearest, View};
 use components::{Components, Settling};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Key<'name> {
+pub(crate) struct Key<'name> {
     domain: Domain,
     name: &'name Name,
 }
@@ -103,8 +105,8 @@ impl<'rows> Explicit<'rows> {
     fn named(&self, key: Key<'_>, sight: Sight) -> Option<View<'rows>> {
         let rows = self.0.get(&key)?;
         let layers = rows.chunk_by(|left, right| left.layer == right.layer);
-        let views = layers.map(|layer| layer.iter().map(|row| row.seen(sight)).fold(View::ABSENT, View::union));
-        Some(views.fold(View::ABSENT, |found, view| found.or_else(|| view)))
+        let views = layers.map(|layer| layer.iter().map(|row| row.seen(sight)).fold(View::ABSENT, View::combine));
+        Some(View::from(Nearest::concat(views.map(Nearest::from))))
     }
 }
 
@@ -120,6 +122,17 @@ impl<'rows> FromIterator<Keyed<'rows, View<'rows>>> for Exposed<'rows> {
     }
 }
 
+impl Semigroup for Exposed<'_> {
+    fn combine(self, computed: Self) -> Self {
+        let keys: BTreeSet<Key<'_>> = self.names.keys().chain(computed.names.keys()).copied().collect();
+        let names = keys
+            .into_iter()
+            .map(|key| (key, self.found(Sought::Named(key)).combine(computed.found(Sought::Named(key)))))
+            .collect();
+        Exposed { default: self.default.combine(computed.default), names }
+    }
+}
+
 impl<'rows> From<View<'rows>> for Exposed<'rows> {
     fn from(default: View<'rows>) -> Exposed<'rows> {
         Exposed { default, names: BTreeMap::new() }
@@ -127,15 +140,6 @@ impl<'rows> From<View<'rows>> for Exposed<'rows> {
 }
 
 impl<'rows> Exposed<'rows> {
-    fn joined(&self, computed: &Exposed<'rows>) -> Exposed<'rows> {
-        let keys: BTreeSet<Key<'rows>> = self.names.keys().chain(computed.names.keys()).copied().collect();
-        let names = keys
-            .into_iter()
-            .map(|key| (key, self.found(Sought::Named(key)).union(computed.found(Sought::Named(key)))))
-            .collect();
-        Exposed { default: self.default.union(computed.default), names }
-    }
-
     fn found(&self, sought: Sought<'_>) -> View<'rows> {
         match sought {
             Sought::Named(key) => self.names.get(&key).copied().unwrap_or(self.default),
@@ -186,13 +190,13 @@ impl<'rows> ModuleGlob<'rows> {
     }
 }
 
-impl<'rows> Lattice for ModuleGlob<'rows> {
-    fn joined(&self, computed: ModuleGlob<'rows>) -> ModuleGlob<'rows> {
+impl Semigroup for ModuleGlob<'_> {
+    fn combine(self, computed: Self) -> Self {
         ModuleGlob {
             glob: GlobView {
                 id: self.glob.id,
                 visibility: self.glob.visibility,
-                exposed: self.glob.exposed.joined(&computed.glob.exposed),
+                exposed: self.glob.exposed.combine(computed.glob.exposed),
             },
             module: self.module,
             sight: self.sight,
@@ -212,15 +216,11 @@ impl Lookup {
         Lookup { sight, ignored, reading }
     }
 
-    pub(super) fn outer(self) -> Lookup {
-        Lookup { sight: self.sight, ignored: None, reading: self.reading }
-    }
-
     fn found<'rows>(self, level: Level<'_, 'rows>, sought: Sought<'_>) -> View<'rows> {
         let globbed = || {
             level
                 .globs(self.ignored)
-                .fold(View::ABSENT, |found, glob| found.union(self.reading.seen(glob.found(sought, self.sight))))
+                .fold(View::ABSENT, |found, glob| found.combine(self.reading.seen(glob.found(sought, self.sight))))
         };
         level.explicit.found(sought, self.sight).unwrap_or_else(globbed)
     }
@@ -282,7 +282,9 @@ impl<'tables, 'rows> Names<'tables, 'rows> {
         let rows = scopes.iter().filter_map(|scope| scope.row(self.modules).map(|globs| (*scope, globs)));
         rows.map(|(scope, globs)| Exposing {
             scope,
-            globs: globs.joined(globs.iter().map(|glob| glob.exposing(self)).collect()),
+            globs: Pointwise::from(globs.clone())
+                .combine(Pointwise::from(globs.iter().map(|glob| glob.exposing(self)).collect::<Vec<_>>()))
+                .into(),
         })
         .collect()
     }

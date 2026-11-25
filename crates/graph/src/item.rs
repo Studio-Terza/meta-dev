@@ -37,27 +37,25 @@ pub struct Item {
     exposure: Exposure,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unplaced {
+    name: Name,
+    kind: ItemKind,
+}
+
+impl Unplaced {
+    #[must_use]
+    pub fn new(name: Name, kind: ItemKind) -> Unplaced {
+        Unplaced { name, kind }
+    }
+
+    #[must_use]
+    pub fn placed(self, marks: Vec<ItemPath>, krate: Option<Name>, exposure: Exposure) -> Item {
+        Item { name: self.name, kind: self.kind, marks, krate, exposure }
+    }
+}
+
 impl Item {
-    #[must_use]
-    pub fn new(name: Name, kind: ItemKind) -> Item {
-        Item { name, kind, marks: Vec::new(), krate: None, exposure: Exposure::Hidden }
-    }
-
-    #[must_use]
-    pub fn marked(self, marks: Vec<ItemPath>) -> Item {
-        Item { marks, ..self }
-    }
-
-    #[must_use]
-    pub fn homed(self, krate: Option<Name>) -> Item {
-        Item { krate, ..self }
-    }
-
-    #[must_use]
-    pub fn exposed(self, exposure: Exposure) -> Item {
-        Item { exposure, ..self }
-    }
-
     #[must_use]
     pub fn exposure(&self) -> Exposure {
         self.exposure
@@ -144,7 +142,7 @@ struct Substituting<'given> {
 }
 
 impl<'given> Substituting<'given> {
-    fn substituted(mut self, ty: &TypeRef) -> TypeRef {
+    fn substituted(self, ty: &TypeRef) -> TypeRef {
         let Ok(substituted) = self.child(ty);
         substituted
     }
@@ -162,11 +160,11 @@ impl Rebuild<Sited> for Substituting<'_> {
     type Into = Sited;
     type Fail = Infallible;
 
-    fn path(&mut self, path: &Sited) -> Sited {
+    fn path(&self, path: &Sited) -> Sited {
         path.clone()
     }
 
-    fn child(&mut self, ty: &TypeRef) -> Result<TypeRef, Infallible> {
+    fn child(&self, ty: &TypeRef) -> Result<TypeRef, Infallible> {
         match ty.named().and_then(|named| self.bound(named)) {
             Some(bound) => Ok(bound.clone()),
             None => ty.rebuilt(self),

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 pub trait Semigroup: Sized {
     #[must_use]
     fn combine(self, other: Self) -> Self;
@@ -9,11 +11,33 @@ pub trait Monoid: Semigroup + Default {
     }
 }
 
+pub trait Act<Actor: Monoid>: Sized {
+    #[must_use]
+    fn acted(self, by: Actor) -> Option<Self>;
+}
+
+impl<Actor: Monoid, Target: Act<Actor>> Act<Actor> for Option<Target> {
+    fn acted(self, by: Actor) -> Option<Option<Target>> {
+        Some(self.and_then(|held| held.acted(by)))
+    }
+}
+
 impl Semigroup for () {
     fn combine(self, (): ()) {}
 }
 
 impl Monoid for () {}
+
+impl<Part: Semigroup> Semigroup for Option<Part> {
+    fn combine(self, other: Option<Part>) -> Option<Part> {
+        match self {
+            Some(held) => Some(other.into_iter().fold(held, Part::combine)),
+            None => other,
+        }
+    }
+}
+
+impl<Part: Semigroup> Monoid for Option<Part> {}
 
 impl<Item> Semigroup for Vec<Item> {
     fn combine(mut self, other: Vec<Item>) -> Vec<Item> {
@@ -23,6 +47,18 @@ impl<Item> Semigroup for Vec<Item> {
 }
 
 impl<Item> Monoid for Vec<Item> {}
+
+impl<Key: Ord, Value: Semigroup> Semigroup for BTreeMap<Key, Value> {
+    fn combine(self, other: BTreeMap<Key, Value>) -> BTreeMap<Key, Value> {
+        other.into_iter().fold(self, |mut merged, (key, value)| {
+            let combined = merged.remove(&key).into_iter().chain([value]).reduce(Semigroup::combine);
+            merged.extend(combined.map(|joined| (key, joined)));
+            merged
+        })
+    }
+}
+
+impl<Key: Ord, Value: Semigroup> Monoid for BTreeMap<Key, Value> {}
 
 #[derive(Debug, Default)]
 pub enum Catenation<Item> {

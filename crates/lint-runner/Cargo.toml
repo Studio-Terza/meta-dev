@@ -11,6 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
+algebra = { path = "../algebra" }
 invariants = { path = "../invariants" }
 lint-sweep = { path = "../lint-sweep" }
 cargo-ports = { path = "../cargo-ports" }
@@ -92,6 +93,7 @@ path = "tests/behaviour.rs"
 [dev-dependencies]
 cargo-ports = { path = "../cargo-ports" }
 golden = { path = "../golden" }
+laws = { path = "../laws" }
 lint-fixtures = { path = "../lint-fixtures" }
 text-lines = { path = "../text-lines" }
 

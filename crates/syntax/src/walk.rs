@@ -1,4 +1,10 @@
+mod boundary;
+
+use std::mem;
+
 use syn::visit::{self, Visit};
+
+pub use boundary::Entered;
 use syn::{File, Ident, Macro};
 
 #[macro_export]
@@ -97,6 +103,22 @@ macro_rules! nodes {
             )*
         }
 
+        impl<'ast, Acc: Default, Step: FnMut(Acc, Node<'ast>) -> Acc> Visit<'ast> for Folding<Acc, Step> {
+            fn visit_macro(&mut self, node: &'ast Macro) {
+                self.acc = (self.step)(mem::take(&mut self.acc), Node::Macro(node));
+            }
+
+            fn visit_ident(&mut self, node: &'ast Ident) {
+                self.acc = (self.step)(mem::take(&mut self.acc), Node::Ident(node));
+            }
+
+            $(
+                fn $visit(&mut self, node: &'ast syn::$node) {
+                    self.acc = (self.step)(mem::take(&mut self.acc), Node::$kind(node));
+                }
+            )*
+        }
+
         impl<'ast> Node<'ast> {
             #[must_use]
             pub fn children(self) -> Vec<Node<'ast>> {
@@ -106,8 +128,23 @@ macro_rules! nodes {
                     $(Node::$kind(node) => Children::collected(|children| visit::$visit(children, node)),)*
                 }
             }
+
+            pub fn folded<Acc: Default>(self, init: Acc, step: impl FnMut(Acc, Node<'ast>) -> Acc) -> Acc {
+                let mut folding = Folding { acc: init, step };
+                match self {
+                    Node::Macro(node) => visit::visit_macro(&mut folding, node),
+                    Node::Ident(_) => (),
+                    $(Node::$kind(node) => visit::$visit(&mut folding, node),)*
+                }
+                folding.acc
+            }
         }
     };
+}
+
+struct Folding<Acc, Step> {
+    acc: Acc,
+    step: Step,
 }
 
 struct Children<'ast>(Vec<Node<'ast>>);

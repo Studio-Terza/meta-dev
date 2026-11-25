@@ -2,43 +2,35 @@
 
 use grammar_cited::Cited;
 use grammar_output::field::{Bare, Id, Integer, Quoted};
-use grammar_output::{Fields, Unread};
+use grammar_output::{Fields, Record};
 use grammar_search::Term;
 
 struct Read;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Record)]
 struct Read6 {
+    #[field(Id<Node>, via = Node::number)]
     node: i64,
+    #[field(Quoted<Term>)]
     quoted: Term,
+    #[field(Bare<Term>)]
     bare: Term,
+    #[past("to".to_owned())]
+    #[field(Integer<u64>)]
     integer: u64,
+    #[field(Cited, via = |cited: Cited| cited.ordinal())]
     ordinal: u32,
+    #[field(Bare<Term>)]
     message: Term,
 }
 
 impl Read {
     fn quoted(text: &str) -> Option<Term> {
-        let mut fields = Fields::lexed(&Fields::quoting(text)).ok()?;
-        let read = fields.field::<Quoted<Term>>().ok()?;
-        fields.ended(read).ok()
+        Fields::lexed(&Fields::quoting(text)).ok()?.field::<Quoted<Term>>().ok()?.ended().ok()
     }
 
     fn line(text: &&str) -> Option<Read6> {
-        let mut fields = Fields::lexed(text).ok()?;
-        let line = Read::fields(&mut fields).ok()?;
-        fields.ended(line).ok()
-    }
-
-    fn fields(fields: &mut Fields) -> Result<Read6, Unread> {
-        Ok(Read6 {
-            node: fields.field::<Id<Node>>()?.number(),
-            quoted: fields.field::<Quoted<Term>>()?,
-            bare: fields.field::<Bare<Term>>()?,
-            integer: fields.past(&["to".to_owned()])?.field::<Integer<u64>>()?,
-            ordinal: fields.field::<Cited>()?.ordinal(),
-            message: fields.field::<Bare<Term>>()?,
-        })
+        Fields::lexed(text).ok()?.record::<Read6>().ok()?.ended().ok()
     }
 }
 

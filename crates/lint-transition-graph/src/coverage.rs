@@ -3,15 +3,15 @@ mod share;
 use std::collections::BTreeSet;
 use std::fmt;
 
+use algebra::{Monoid, Semigroup};
 use lint_core::Fix;
 use lint_core::{Site, Violation};
 use newtype::Counter;
 
 use crate::algebra::{Algebra, Algebras, Totality};
-use crate::class::Class;
 use crate::count::Count;
 use crate::edge::Edge;
-use crate::form::Form;
+use crate::forms::{Lifted, Stored, Written};
 use crate::system::TypeSystem;
 pub(crate) use share::Share;
 
@@ -32,21 +32,19 @@ impl Coverage {
     ) -> Coverage {
         let edges: Vec<&Edge<'found, 'file>> = listed.collect();
         let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
-        edges
-            .iter()
-            .fold(Coverage::default(), |tally, edge| tally.counted(edge.form(), edge.ends().class()))
-            .algebraic(system.algebras(), &sites)
+        let written: Vec<&Edge<'found, 'file>> =
+            edges.iter().copied().collect::<Written<'edge, 'found, 'file>>().into_iter().collect();
+        let counted = Coverage {
+            written: Count::new(written.len()),
+            covered: Count::total(written.iter().map(|edge| edge.ends().class().covered())),
+            lifts: Count::new(edges.iter().copied().collect::<Lifted<'edge, 'found, 'file>>().into_iter().count()),
+            operations: Count::new(edges.iter().copied().collect::<Stored<'edge, 'found, 'file>>().into_iter().count()),
+            ..Coverage::default()
+        };
+        counted.combine(Coverage::algebraic(system.algebras(), &sites))
     }
 
-    fn counted(self, form: &Form<'_>, class: Class) -> Coverage {
-        form.sorted(
-            Coverage { written: self.written.incremented(), covered: class.covering(self.covered), ..self },
-            Coverage { lifts: self.lifts.incremented(), ..self },
-            Coverage { operations: self.operations.incremented(), ..self },
-        )
-    }
-
-    fn algebraic<'file>(self, algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
+    fn algebraic<'file>(algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
         let operations: Vec<_> = algebras
             .types()
             .filter_map(|node| algebras.of_type(node))
@@ -56,7 +54,7 @@ impl Coverage {
         Coverage {
             algebraic: Count::new(operations.len()),
             partial: Count::new(operations.iter().filter(|operation| operation.partial() == Totality::Partial).count()),
-            ..self
+            ..Coverage::default()
         }
     }
 
@@ -64,6 +62,21 @@ impl Coverage {
         first.map(|site| Violation::new(site, Workspace(self)))
     }
 }
+
+impl Semigroup for Coverage {
+    fn combine(self, other: Coverage) -> Coverage {
+        Coverage {
+            written: self.written.plus(other.written),
+            covered: self.covered.plus(other.covered),
+            lifts: self.lifts.plus(other.lifts),
+            operations: self.operations.plus(other.operations),
+            algebraic: self.algebraic.plus(other.algebraic),
+            partial: self.partial.plus(other.partial),
+        }
+    }
+}
+
+impl Monoid for Coverage {}
 
 impl fmt::Display for Coverage {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

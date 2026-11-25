@@ -4,7 +4,7 @@ use lint_sweep::Contributed;
 use syntax::Spanned;
 use syntax::{Attribute, Field, Generics, Ident, ItemStruct, ItemTrait, Type};
 
-use graph::{Building, Held, Holding, ItemId};
+use graph::{Held, ItemId, ModelPart, Unsited};
 use lint_core::Syntax;
 use lint_layout::{Name, Position};
 
@@ -12,7 +12,7 @@ use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
 use super::ImplRow;
 use super::attributes::Attributes;
-use super::seat::{Built, Footing, Located};
+use super::seat::{Footing, Located, Lowers};
 use super::signature::{InScope, Written};
 use graph::{Region, TypeRef};
 
@@ -47,12 +47,8 @@ pub(super) struct Link {
 }
 
 impl Link {
-    pub(super) fn declaring(ident: &Ident) -> Link {
-        Link { name: UsePath::from(ident), domain: Domain::Types }
-    }
-
-    pub(super) fn valued(self) -> Link {
-        Link { domain: Domain::Values, ..self }
+    pub(super) fn declaring(ident: &Ident, domain: Domain) -> Link {
+        Link { name: UsePath::from(ident), domain }
     }
 
     fn declares(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Option<ItemId> {
@@ -69,14 +65,14 @@ pub(super) struct HoldingRow {
     ty: TypeRef<Written>,
 }
 
-impl Built for HoldingRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for HoldingRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let declares = self.link.declares(resolving, scope);
-        let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
-            .placed(self.region.joined(footing.outer()), declares);
-        self.located.holding(footing, building, holding)
+        let holding = Unsited::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
+            .placed(self.region.combine(footing.outer()), declares);
+        self.located.holding(footing, holding)
     }
 }
 
@@ -87,9 +83,10 @@ impl<'read> Frame<'read> {
         ty: &Type,
         attributes: &[Attribute],
     ) -> Contributed<Framed<'read>, Grains> {
-        let target = self.generics.lowered(ty);
-        let held = self.hold(Holder::named(ident, Held::Value), Link::declaring(ident).valued(), target);
-        self.owned_by(ident, Domain::Values, attributes, held)
+        let tabled = Frame { tabled: Some(()), ..self.clone() };
+        let target = tabled.generics.lowered(ty);
+        let held = tabled.hold(Holder::named(ident, Held::Value), Link::declaring(ident, Domain::Values), target);
+        tabled.owned_by(ident, Domain::Values, attributes, held)
     }
 
     pub(super) fn hold(&self, holder: Holder, link: Link, ty: TypeRef<Written>) -> Grains {
@@ -104,13 +101,13 @@ impl<'read> Frame<'read> {
     }
 
     pub(super) fn parameters(&self, holder: &Holder, generics: &Generics, link: &Link) -> Grains {
-        let scope = self.generics.extended(generics);
+        let scope = InScope::clone(&self.generics).combine(InScope::from(generics));
         Monoid::concat(scope.constraints(generics).into_iter().map(|ty| self.hold(holder.clone(), link.clone(), ty)))
     }
 
     pub(super) fn trait_bounds(&self, item: &ItemTrait, scope: &InScope) -> Grains {
         let holder = Holder::named(&item.ident, Held::Bound);
-        let link = Link::declaring(&item.ident);
+        let link = Link::declaring(&item.ident, Domain::Types);
         let associated =
             item.items.iter().filter_map(Syntax::trait_type).map(|declared| scope.bounded(declared.bounds.iter()));
         let parameters = self.parameters(&holder, &item.generics, &link);

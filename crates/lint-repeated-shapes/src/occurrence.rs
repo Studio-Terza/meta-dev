@@ -1,6 +1,9 @@
+use std::ops::RangeInclusive;
+
 use body_shape::{Labels, Literals, Reading, Shape, TokenCount};
 use equivalence::{Keyed, Nested};
 use lint_core::Site;
+use syntax_lexer::Place;
 
 use crate::extent::Extent;
 use crate::kind::Kind;
@@ -58,9 +61,11 @@ impl Keyed for Occurrence<'_> {
 
 impl<'file> Nested for Occurrence<'file> {
     fn lies_within<'outer>(&self, outer: &'outer Occurrence<'file>) -> Option<&'outer Occurrence<'file>> {
+        let inner = RangeInclusive::<Place>::from(self.extent);
         Some(outer)
             .filter(|candidate| self.site.path() == candidate.site.path())
-            .and_then(|same_file| same_file.extent.holds(&self.extent).map(|_| same_file))
+            .filter(|same_file| RangeInclusive::<Place>::from(same_file.extent).contains(inner.start()))
+            .filter(|same_file| RangeInclusive::<Place>::from(same_file.extent).contains(inner.end()))
     }
 }
 

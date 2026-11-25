@@ -36,10 +36,8 @@ impl Declared {
         self.lexer.as_ref().map(AsRef::as_ref)
     }
 
-    pub fn declares(&self, role: Role) -> Option<Role> {
-        match role {
-            Role::Lexer => self.lexer.as_ref().map(|_| role),
-            Role::Store => self.store.as_ref().map(|_| role),
-        }
+    pub fn roles(&self) -> Vec<Role> {
+        let lexer = self.lexer.as_ref().map(|_| Role::Lexer);
+        lexer.into_iter().chain(self.store.as_ref().map(|_| Role::Store)).collect()
     }
 }

@@ -10,8 +10,8 @@ use crate::type_ref::TypeRef;
 pub struct FileId(usize);
 
 impl FileId {
-    pub(crate) fn next<Row>(rows: &[Row]) -> FileId {
-        FileId(rows.len())
+    pub fn every<Row>(rows: &[Row]) -> impl Iterator<Item = FileId> + use<Row> {
+        (0..rows.len()).map(FileId)
     }
 
     pub(crate) fn within<Row>(self, rows: &[Row]) -> Option<&Row> {
@@ -24,8 +24,24 @@ impl FileId {
 pub struct ItemId(usize);
 
 impl ItemId {
-    pub(crate) fn next<Row>(rows: &[Row]) -> ItemId {
-        ItemId(rows.len())
+    pub(crate) fn numbered<Row>(scopes: &[Vec<Option<Row>>]) -> Vec<Vec<Option<ItemId>>> {
+        let present = scopes.iter().flatten().map(Option::as_ref);
+        let flat: Vec<Option<ItemId>> = present
+            .scan(0, |next: &mut usize, declared| {
+                let issued = declared.map(|_| ItemId(*next));
+                *next += issued.map_or(0, |_| 1);
+                Some(issued)
+            })
+            .collect();
+        scopes
+            .iter()
+            .scan(0, |start: &mut usize, scope| {
+                let end = *start + scope.len();
+                let group = flat.get(*start..end).map_or_default(<[Option<ItemId>]>::to_vec);
+                *start = end;
+                Some(group)
+            })
+            .collect()
     }
 
     pub(crate) fn index(self) -> usize {

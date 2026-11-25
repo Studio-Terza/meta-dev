@@ -66,7 +66,7 @@ impl WatchingLint for NamedNumbers {
     type Watched<'file> = Watchers<'file>;
 
     fn watched(file: &SourceFile) -> Watchers<'_> {
-        let counted = Some(file).filter(|found| Gate::BOUNDARY.admits(found.head()).is_none());
+        let counted = Gate::BOUNDARY.admits(file.head(), None).unwrap_or(Some(file));
         let numbers = counted.map(|found| Contributing::new(Numbers { path: AsRef::<Path>::as_ref(found.head()) }));
         numbers.into_iter().map(|watched| -> Box<dyn Finds<'_> + '_> { Box::new(watched) }).collect()
     }

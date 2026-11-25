@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use body_shape::Bounds;
 use syntax::Span;
 use syntax_lexer::Place;
@@ -8,13 +10,13 @@ pub(crate) struct Extent {
     end: Place,
 }
 
-impl Extent {
-    pub(crate) fn holds<'inner>(&self, inner: &'inner Extent) -> Option<&'inner Extent> {
-        Some(inner)
-            .filter(|candidate| self.start <= candidate.start)
-            .filter(|starting_inside| starting_inside.end <= self.end)
+impl From<Extent> for RangeInclusive<Place> {
+    fn from(extent: Extent) -> RangeInclusive<Place> {
+        extent.start..=extent.end
     }
+}
 
+impl Extent {
     pub(crate) fn spanning(first: Span, last: Span) -> Extent {
         Extent { start: Place::from(first.start()), end: Place::from(last.end()) }
     }

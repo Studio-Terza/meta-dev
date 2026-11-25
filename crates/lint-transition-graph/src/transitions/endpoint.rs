@@ -15,10 +15,17 @@ pub(crate) enum Unnamed {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Argument {
+    Parameter(Name),
+    Typed(Endpoint),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Endpoint {
     nature: Nature,
     name: Name,
     origin: Option<Name>,
+    arguments: Vec<Argument>,
 }
 
 impl Unnamed {
@@ -34,12 +41,17 @@ impl Unnamed {
 }
 
 impl Endpoint {
-    pub(crate) fn new(nature: Nature, name: Name) -> Endpoint {
-        Endpoint { nature, name, origin: None }
+    pub(crate) fn new(nature: Nature, name: Name, origin: Option<Name>) -> Endpoint {
+        Endpoint { nature, name, origin, arguments: Vec::new() }
     }
 
-    pub(crate) fn originating(self, origin: Option<Name>) -> Endpoint {
-        Endpoint { origin, ..self }
+    pub(crate) fn declared(name: Name, origin: Option<Name>, arguments: Vec<Argument>) -> Endpoint {
+        Endpoint { nature: Nature::Named, name, origin, arguments }
+    }
+
+    #[must_use]
+    pub fn arguments(&self) -> &[Argument] {
+        &self.arguments
     }
 
     #[must_use]
@@ -55,7 +67,7 @@ impl Endpoint {
 
 impl From<Unnamed> for Endpoint {
     fn from(unnamed: Unnamed) -> Endpoint {
-        Endpoint { nature: Nature::Boxed, name: Name::from(unnamed.word()), origin: None }
+        Endpoint { nature: Nature::Boxed, name: Name::from(unnamed.word()), origin: None, arguments: Vec::new() }
     }
 }
 

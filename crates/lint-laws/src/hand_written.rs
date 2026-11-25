@@ -18,6 +18,9 @@ struct Emitted<'model> {
     files: BTreeSet<PathBuf>,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Invoked<'model>(Placed<'model, &'model PathUse>);
+
 impl HandWrittenLaws {
     const REFUSED: Message = Message::new(
         Problem::new("a law the law runner generates, written by hand"),
@@ -35,9 +38,9 @@ impl ModelLint for HandWrittenLaws {
     fn report(model: &Model) -> Report<'_> {
         let emitted = Emitted::from(model);
         let runners = LawRunners::from(model);
-        let invoking: Vec<Placed<'_, &PathUse>> = model.uses().filter_map(|placed| emitted.invoked(placed)).collect();
-        let read: BTreeSet<&Path> = invoking.iter().map(|placed| placed.site().path()).collect();
-        let refused = invoking.iter().filter_map(|placed| emitted.refused(model, *placed));
+        let invoking: Vec<Invoked<'_>> = model.uses().filter_map(|placed| emitted.invoked(placed)).collect();
+        let read: BTreeSet<&Path> = invoking.iter().map(|invoked| invoked.0.site().path()).collect();
+        let refused = invoking.iter().filter_map(|invoked| emitted.refused(model, *invoked));
         let undeclared = runners
             .undeclared(&read)
             .into_iter()
@@ -52,13 +55,15 @@ impl ModelLint for HandWrittenLaws {
 }
 
 impl<'model> Emitted<'model> {
-    fn invoked(&self, placed: Placed<'model, &'model PathUse>) -> Option<Placed<'model, &'model PathUse>> {
+    fn invoked(&self, placed: Placed<'model, &'model PathUse>) -> Option<Invoked<'model>> {
         Some(placed)
             .filter(|found| found.entity().mention() == Mention::Invoked)
             .filter(|found| self.macros.contains(&found.entity().resolved()))
+            .map(Invoked)
     }
 
-    fn refused(&self, model: &Model, placed: Placed<'model, &'model PathUse>) -> Option<Violation<'model>> {
+    fn refused(&self, model: &Model, invoked: Invoked<'model>) -> Option<Violation<'model>> {
+        let Invoked(placed) = invoked;
         let used = placed.entity();
         let declaring = used.resolved().crate_item().and_then(|item| model.declared(item)).and_then(Item::krate);
         declaring.filter(|krate| *krate == placed.krate()).map_or(Some(()), |_| None)?;

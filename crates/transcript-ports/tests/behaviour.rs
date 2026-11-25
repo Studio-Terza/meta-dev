@@ -14,7 +14,7 @@ use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
+    Authorship, ClaudeCodeDir, Cursor, Instant, Kind, Read, Record, Session, SessionId, Skipped, Transcripts,
     Unrecognised,
 };
 
@@ -139,27 +139,40 @@ struct Gathered {
     classes: Vec<String>,
 }
 
-impl Gather for Gathered {
-    fn said(mut self, record: Record) -> Gathered {
-        self.classes.push(format!("{:?} {}", record.author(), record.text()));
-        self.records.push(record);
-        self
+impl From<Record> for Gathered {
+    fn from(record: Record) -> Gathered {
+        let classes = vec![format!("{:?} {}", record.author(), record.text())];
+        Gathered { records: vec![record], skipped: Vec::new(), classes }
     }
+}
 
-    fn skipped(mut self, skipped: Skipped) -> Gathered {
-        self.classes.extend(Gathered::edge(&skipped));
-        self.skipped.push(skipped);
-        self
+impl From<Skipped> for Gathered {
+    fn from(skipped: Skipped) -> Gathered {
+        Gathered {
+            records: Vec::new(),
+            classes: Gathered::edge(&skipped).into_iter().collect(),
+            skipped: vec![skipped],
+        }
     }
+}
 
-    fn unrecognised(mut self, unrecognised: Unrecognised) -> Gathered {
-        self.classes.push(format!("unrecognised {}", unrecognised.kind()));
-        self.classes.extend(unrecognised.passing().as_ref().and_then(Gathered::edge));
-        self
+impl From<Unrecognised> for Gathered {
+    fn from(unrecognised: Unrecognised) -> Gathered {
+        let kind = format!("unrecognised {}", unrecognised.kind());
+        let classes = [kind].into_iter().chain(unrecognised.passing().as_ref().and_then(Gathered::edge)).collect();
+        Gathered { records: Vec::new(), skipped: Vec::new(), classes }
     }
 }
 
 impl Gathered {
+    fn joined(self, later: Gathered) -> Gathered {
+        Gathered {
+            records: self.records.into_iter().chain(later.records).collect(),
+            skipped: self.skipped.into_iter().chain(later.skipped).collect(),
+            classes: self.classes.into_iter().chain(later.classes).collect(),
+        }
+    }
+
     fn edge(skipped: &Skipped) -> Option<String> {
         skipped.parent().map(|parent| format!("{} after {parent}", skipped.uuid()))
     }
@@ -167,7 +180,7 @@ impl Gathered {
 
 impl From<Read> for Gathered {
     fn from(read: Read) -> Gathered {
-        read.into_iter().fold(Gathered::default(), |gathered, line| line.gathered(gathered))
+        read.into_iter().fold(Gathered::default(), |gathered, line| gathered.joined(line.gathered()))
     }
 }
 

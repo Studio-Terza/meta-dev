@@ -1,6 +1,6 @@
-use algebra::{Catenation, Monoid, Semigroup};
+use algebra::{Monoid, Semigroup};
 use newtype::{Arbitrary, Counter, Newtype};
-use syntax::Node;
+use syntax::Entered;
 
 use crate::watch::Kind;
 
@@ -10,9 +10,12 @@ pub(crate) struct Kinds(u128);
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct Offset(usize);
 
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+struct Depth(usize);
+
 #[derive(Clone, Copy, Debug)]
 struct Subtree {
-    size: Offset,
+    descendants: Offset,
     kinds: Kinds,
 }
 
@@ -21,37 +24,40 @@ pub(crate) struct KindIndex(Vec<Subtree>);
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Indexed<'index> {
-    index: &'index KindIndex,
-    at: Offset,
+    from: &'index [Subtree],
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cursors<'index> {
-    index: &'index KindIndex,
-    at: Offset,
-    end: Offset,
+    rest: &'index [Subtree],
 }
 
-#[derive(Debug, Default)]
-struct Built {
-    subtrees: Catenation<Subtree>,
+#[derive(Clone, Copy, Debug)]
+struct Pending {
+    depth: Depth,
     size: Offset,
     kinds: Kinds,
 }
 
+#[derive(Debug, Default)]
+struct Backward {
+    done: Vec<Subtree>,
+    open: Vec<Pending>,
+}
+
 impl Kinds {
-    pub(crate) fn listed(kinds: &[Kind]) -> Kinds {
-        Monoid::concat(kinds.iter().copied().map(Kinds::from))
+    pub(crate) fn listed(kinds: impl Iterator<Item = Kind>) -> Kinds {
+        Monoid::concat(kinds.map(Kinds::from))
     }
 
-    fn overlap(self, other: Kinds) -> Option<()> {
+    pub(crate) fn overlap(self, other: Kinds) -> Option<()> {
         (self.0 & other.0 != 0).then_some(())
     }
 }
 
 impl From<Kind> for Kinds {
     fn from(kind: Kind) -> Kinds {
-        let bit = Kind::ALL.iter().position(|listed| *listed == kind).and_then(|at| u32::try_from(at).ok());
+        let bit = Kind::ALL.binary_search(&kind).ok().and_then(|at| u32::try_from(at).ok());
         Kinds(bit.and_then(|at| 1_u128.checked_shl(at)).unwrap_or_default())
     }
 }
@@ -64,51 +70,44 @@ impl Semigroup for Kinds {
 
 impl Monoid for Kinds {}
 
-impl Semigroup for Built {
-    fn combine(self, other: Built) -> Built {
-        Built {
-            subtrees: self.subtrees.combine(other.subtrees),
-            size: self.size.plus(other.size),
-            kinds: self.kinds.combine(other.kinds),
-        }
-    }
-}
-
-impl Monoid for Built {}
-
-impl From<Node<'_>> for Built {
-    fn from(node: Node<'_>) -> Built {
-        let below: Built = Monoid::concat(node.children().into_iter().map(Built::from));
-        let own = Subtree { size: below.size.incremented(), kinds: Kinds::from(Kind::of(node)).combine(below.kinds) };
-        Built { subtrees: Catenation::from(vec![own]).combine(below.subtrees), size: own.size, kinds: own.kinds }
+impl<'ast> FromIterator<Entered<'ast>> for KindIndex {
+    fn from_iter<Preorder: IntoIterator<Item = Entered<'ast>>>(preorder: Preorder) -> KindIndex {
+        let entered: Vec<Entered<'ast>> = preorder.into_iter().collect();
+        let backward = entered.iter().rev().fold(Backward::default(), |mut backward, entry| {
+            let depth = Depth::new(entry.depth());
+            let deeper = backward.open.iter().rev().take_while(|pending| pending.depth > depth).count();
+            let children = backward.open.split_off(backward.open.len().saturating_sub(deeper));
+            let size = Offset::new(children.iter().map(|child| child.size.count()).sum());
+            let kinds =
+                Monoid::concat(children.iter().map(|child| child.kinds)).combine(Kinds::from(Kind::of(entry.node())));
+            backward.open.push(Pending { depth, size: size.incremented(), kinds });
+            backward.done.push(Subtree { descendants: size, kinds });
+            backward
+        });
+        KindIndex(backward.done.into_iter().rev().collect())
     }
 }
 
 impl From<&syntax::File> for KindIndex {
     fn from(file: &syntax::File) -> KindIndex {
-        let built: Built = Monoid::concat(Node::top_level(file).into_iter().map(Built::from));
-        KindIndex(built.subtrees.into_iter().collect())
+        Entered::preordered(file).into_iter().collect()
     }
 }
 
 impl KindIndex {
     pub(crate) fn top(&self) -> Cursors<'_> {
-        Cursors { index: self, at: Offset::zero(), end: Offset::new(self.0.len()) }
-    }
-
-    fn subtree(&self, at: Offset) -> Option<&Subtree> {
-        self.0.get(at.count())
+        Cursors { rest: &self.0 }
     }
 }
 
 impl<'index> Indexed<'index> {
     pub(crate) fn watches(self, kinds: Kinds) -> Option<()> {
-        self.index.subtree(self.at)?.kinds.overlap(kinds)
+        self.from.first()?.kinds.overlap(kinds)
     }
 
     pub(crate) fn children(self) -> Cursors<'index> {
-        let size = self.index.subtree(self.at).map_or(Offset::zero().incremented(), |here| here.size);
-        Cursors { index: self.index, at: self.at.incremented(), end: self.at.plus(size) }
+        let below = self.from.split_first().and_then(|(here, below)| below.get(..here.descendants.count()));
+        Cursors { rest: below.unwrap_or_default() }
     }
 }
 
@@ -116,9 +115,9 @@ impl<'index> Iterator for Cursors<'index> {
     type Item = Indexed<'index>;
 
     fn next(&mut self) -> Option<Indexed<'index>> {
-        let here = Some(self.at).filter(|at| *at < self.end)?;
-        let size = self.index.subtree(here).map_or(Offset::zero().incremented(), |subtree| subtree.size);
-        self.at = here.plus(size);
-        Some(Indexed { index: self.index, at: here })
+        let from = self.rest;
+        let (here, below) = from.split_first()?;
+        self.rest = below.get(here.descendants.count()..).unwrap_or_default();
+        Some(Indexed { from })
     }
 }

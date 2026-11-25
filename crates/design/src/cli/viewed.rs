@@ -3,7 +3,7 @@ use std::fmt;
 use design_model::{NodeId, Outline, Provenance, SpanRelation};
 use grammar_cited::Cited;
 use grammar_output::field::{Id, Quoted, Word};
-use grammar_output::{Fields, Unread};
+use grammar_output::{Fields, Mapped, Parsed, Record, Unread};
 use named_derive::Named;
 use newtype::Wrapping;
 use structurer::{Outlined, SegmentRef};
@@ -35,23 +35,51 @@ pub(crate) enum Seen {
     Unplaced,
 }
 
-impl Viewed {
-    pub(crate) fn read(seen: Seen, fields: &mut Fields) -> Result<Viewed, Unread> {
-        match seen {
-            Seen::Outline => Outlined::read(fields).map(Viewed::Outlined),
-            Seen::Standing => Ok(Viewed::Standing {
-                node: fields.field::<Id<_>>()?,
-                relation: fields.field::<Word<_>>()?,
-                segment: SegmentRef::from(&fields.field::<Cited>()?),
-                author: fields.field::<Word<_>>()?,
-                entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
-                body: fields.field::<Quoted<_>>()?,
-            }),
-            Seen::Unplaced => Ok(Viewed::Unplaced {
-                segment: SegmentRef::from(&fields.field::<Cited>()?),
-                body: fields.field::<Quoted<_>>()?,
-            }),
+#[derive(Debug, Record)]
+struct Standing {
+    #[field(Id<_>)]
+    node: NodeId,
+    #[field(Word<_>)]
+    relation: SpanRelation,
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+    #[field(Word<_>)]
+    author: Authorship,
+    #[past(Key::Entered)]
+    #[field(Word<_>)]
+    entered: Provenance,
+    #[field(Quoted<_>)]
+    body: Body,
+}
+
+#[derive(Debug, Record)]
+struct Unplaced {
+    #[field(Cited, via = SegmentRef::from)]
+    segment: SegmentRef,
+    #[field(Quoted<_>)]
+    body: Body,
+}
+
+impl Seen {
+    pub(crate) fn viewed(self, fields: Fields) -> Result<Parsed<Viewed, Fields>, Unread> {
+        match self {
+            Seen::Outline => Outlined::read(fields).mapped(Viewed::Outlined),
+            Seen::Standing => fields.record::<Standing>().map(Parsed::converted),
+            Seen::Unplaced => fields.record::<Unplaced>().map(Parsed::converted),
         }
+    }
+}
+
+impl From<Standing> for Viewed {
+    fn from(read: Standing) -> Viewed {
+        let Standing { node, relation, segment, author, entered, body } = read;
+        Viewed::Standing { node, relation, segment, author, entered, body }
+    }
+}
+
+impl From<Unplaced> for Viewed {
+    fn from(read: Unplaced) -> Viewed {
+        Viewed::Unplaced { segment: read.segment, body: read.body }
     }
 }
 

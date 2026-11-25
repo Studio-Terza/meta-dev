@@ -6,10 +6,10 @@ use std::collections::BTreeSet;
 use syntax::Macro;
 use syntax::{TokenStream, TokenTree};
 
-use graph::{Building, Law, LawKind, Operation, OperationOwner, Property, Route, Side, TypeRef};
+use graph::{Law, LawKind, ModelPart, Operation, OperationOwner, Property, Route, Side, TypeRef};
 use lint_layout::{Name, TestMarks, Whole, Word, words};
 
-use super::seat::{Built, Footing, Located};
+use super::seat::{Footing, Located, Lowers};
 use super::signature::Written;
 use crate::namespace::TokenNames;
 use reading::Reading;
@@ -52,7 +52,7 @@ impl Kinds {
     const ROUNDTRIP: [Word<'static>; 1] = words!["roundtrip"];
     const CRUD: [Word<'static>; 1] = words!["crud"];
     const PROPTEST: [Word<'static>; 1] = words!["proptest"];
-    const PROPERTIES: [Word<'static>; 8] = words![
+    const PROPERTIES: [Word<'static>; 9] = words![
         "associative",
         "commutative",
         "identity",
@@ -60,9 +60,10 @@ impl Kinds {
         "idempotent",
         "absorbing",
         "distributive",
-        "preserves"
+        "preserves",
+        "action"
     ];
-    const NAMED: [Property; 8] = [
+    const NAMED: [Property; 9] = [
         Property::Associative,
         Property::Commutative,
         Property::Identity,
@@ -71,6 +72,7 @@ impl Kinds {
         Property::Absorbing,
         Property::Distributive,
         Property::Preserves,
+        Property::Acting,
     ];
 
     fn of_macro(invocation: &Macro) -> Option<LawKind> {
@@ -132,11 +134,11 @@ impl LoweredRoute {
     }
 }
 
-impl Built for LawRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for LawRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let located = self.located;
         let routes = self.routes.into_iter().map(|route| route.resolved(&footing, &located)).collect();
-        located.law(footing, building, Law::new(self.kind, self.title, self.mentions, routes))
+        located.law(footing, Law::new(self.kind, self.title, self.mentions, routes))
     }
 }
 

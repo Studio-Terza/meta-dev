@@ -1,11 +1,11 @@
 use std::iter;
 
-use graph::{Building, ItemId};
+use graph::Item;
 use lint_layout::Name;
 
 use super::anchor::{Anchor, Anchors};
 use super::boundary::ScopeId;
-use super::entries::Entries;
+use super::entries::{Entries, Sight};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CrateForm {
@@ -14,9 +14,9 @@ pub(crate) enum CrateForm {
 }
 
 impl CrateForm {
-    fn anchors(self, root: ScopeId) -> Anchors {
+    pub(super) fn anchors(self, root: ScopeId) -> Anchors {
         match self {
-            CrateForm::Planted => Anchors::rooted(root),
+            CrateForm::Planted => Anchors::from(root),
             CrateForm::Island => Anchors::default(),
         }
     }
@@ -29,23 +29,14 @@ pub(crate) enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub(super) fn opened(self, parent: &ScopeRow, scope: ScopeId, entries: Entries) -> ScopeRow {
-        ScopeRow {
-            anchors: self.anchors(parent.anchors, scope),
-            chain: self.chain(&parent.chain, scope),
-            ancestry: iter::once(scope).chain(parent.ancestry.iter().copied()).collect(),
-            entries,
-        }
-    }
-
-    fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
+    pub(super) fn entered(self, scope: ScopeId) -> Anchors {
         match self {
-            ScopeKind::Module => parent.nested(scope),
-            ScopeKind::Block => parent,
+            ScopeKind::Module => Anchors::from(scope),
+            ScopeKind::Block => Anchors::default(),
         }
     }
 
-    fn chain(self, parent: &[ScopeId], scope: ScopeId) -> Vec<ScopeId> {
+    pub(super) fn chain(self, parent: &[ScopeId], scope: ScopeId) -> Vec<ScopeId> {
         match self {
             ScopeKind::Module => vec![scope],
             ScopeKind::Block => iter::once(scope).chain(parent.iter().copied()).collect(),
@@ -62,8 +53,8 @@ pub(super) struct ScopeRow {
 }
 
 impl ScopeRow {
-    pub(super) fn root(scope: ScopeId, form: CrateForm, entries: Entries) -> ScopeRow {
-        ScopeRow { anchors: form.anchors(scope), chain: vec![scope], ancestry: vec![scope], entries }
+    pub(super) fn new(anchors: Anchors, chain: Vec<ScopeId>, ancestry: Vec<ScopeId>, entries: Entries) -> ScopeRow {
+        ScopeRow { anchors, chain, ancestry, entries }
     }
 
     pub(super) fn anchors(&self) -> Anchors {
@@ -78,21 +69,17 @@ impl ScopeRow {
         &self.entries
     }
 
-    pub(super) fn entries_mut(&mut self) -> &mut Entries {
-        &mut self.entries
-    }
-
     pub(super) fn outermost(&self) -> Option<ScopeId> {
         self.ancestry.last().copied()
     }
 
-    pub(super) fn ancestor(&self, level: ScopeId) -> Option<ScopeId> {
-        self.ancestry.iter().copied().find(|ancestor| *ancestor == level)
+    pub(super) fn sight(&self, level: ScopeId) -> Option<Sight> {
+        self.ancestry.iter().find(|ancestor| **ancestor == level).map(|_| Sight::Inside)
     }
 
-    pub(super) fn issued(&self, building: &mut Building, krate: Option<&Name>) -> Vec<Option<ItemId>> {
+    pub(super) fn issued(&self, krate: Option<&Name>) -> Vec<Option<Item>> {
         match Anchor::Crate.anchored(self.anchors) {
-            Some(_) => self.entries.issued(building, krate),
+            Some(_) => self.entries.issued(krate),
             None => Vec::new(),
         }
     }

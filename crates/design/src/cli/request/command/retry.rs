@@ -21,9 +21,9 @@ impl FromStr for Retry {
     type Err = Failure;
 
     fn from_str(word: &str) -> Result<Retry, Failure> {
-        let mut fields = Fields::lexed(word).map_err(|_stray| Failure::Usage)?;
-        let job = fields.field::<Integer<_>>().map(JobId::new).map_err(|_unread| Failure::Usage)?;
-        fields.ended(Retry(job)).map_err(|_unended| Failure::Usage)
+        let fields = Fields::lexed(word).map_err(|_stray| Failure::Usage)?;
+        let job = fields.field::<Integer<_>>().map_err(|_unread| Failure::Usage)?;
+        job.map(|number| Retry(JobId::new(number))).ended().map_err(|_unended| Failure::Usage)
     }
 }
 

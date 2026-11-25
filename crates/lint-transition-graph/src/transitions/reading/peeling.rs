@@ -1,3 +1,4 @@
+use algebra::Semigroup;
 use graph::{
     Bounds, Callable, Element, Grouped, ItemPath, Named, Outline, Projection, Resolved as Target, Sited, TypeRef,
 };
@@ -24,9 +25,9 @@ impl Peeling<'_, '_, '_> {
     }
 
     fn wrapped(self, name: &Name, arguments: &[TypeRef]) -> Option<Wrapping> {
-        let optional = name.matches::<Whole>(&Self::OPTION).map(|_| Wrapping::Optional.around(self.inside(arguments)));
+        let optional = name.matches::<Whole>(&Self::OPTION).map(|_| Wrapping::Optional.combine(self.inside(arguments)));
         let fallible =
-            || name.matches::<Whole>(&Self::RESULT).map(|_| Wrapping::Fallible.around(self.inside(arguments)));
+            || name.matches::<Whole>(&Self::RESULT).map(|_| Wrapping::Fallible.combine(self.inside(arguments)));
         let many = || name.matches::<Whole>(&Self::COLLECTIONS).map(|_| Wrapping::Many);
         let transparent = || name.matches::<Whole>(&Self::TRANSPARENT).map(|_| self.inside(arguments));
         optional.or_else(fallible).or_else(many).or_else(transparent)

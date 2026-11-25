@@ -4,7 +4,9 @@ use graph::ItemPath;
 use lint_layout::Name;
 
 use super::binding::Binding;
-use super::boundary::{GlobId, Lattice, ScopeId};
+use algebra::Semigroup;
+
+use super::boundary::{GlobId, Lattice, Pointwise, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::resolver::{Resolution, Resolver};
 use super::rules::{RulesDefinition, Written};
@@ -105,24 +107,6 @@ impl Target {
     fn shadowed(names: &[Name]) -> Exposed<'_> {
         names.iter().flat_map(Key::every).map(|key| Keyed::new(key, View::CONFLICT)).collect()
     }
-
-    fn kept(self, held: &Target) -> Target {
-        match self {
-            Target::Waiting => held.clone(),
-            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => {
-                [self].into_iter().find(|found| found == held).unwrap_or(Target::Opaque)
-            }
-        }
-    }
-
-    fn forced(self) -> Target {
-        match self {
-            Target::Waiting | Target::Opaque => Target::Opaque,
-            Target::Module(module, sight) => Target::Module(module, sight),
-            Target::Listed(listed) => Target::Listed(listed),
-            Target::Scoped(names) => Target::Scoped(names),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -135,48 +119,76 @@ impl ScopeSettling {
     pub(super) fn new(imports: Vec<Resolution>, targets: Vec<Target>) -> ScopeSettling {
         ScopeSettling { imports, targets }
     }
+}
 
-    fn forced(self) -> ScopeSettling {
-        ScopeSettling {
-            imports: self.imports.into_iter().map(|import| Resolution::Bound(import.forced())).collect(),
-            targets: self.targets.into_iter().map(Target::forced).collect(),
-        }
+impl AsRef<ScopeSettling> for ScopeSettling {
+    fn as_ref(&self) -> &ScopeSettling {
+        self
     }
 }
 
-impl Lattice for Target {
-    fn joined(&self, computed: Target) -> Target {
+#[derive(Debug)]
+pub(crate) struct Forced(ScopeSettling);
+
+impl From<ScopeSettling> for Forced {
+    fn from(settling: ScopeSettling) -> Forced {
+        let imports = settling.imports.into_iter().map(|import| Option::from(import).unwrap_or(Binding::UNBOUND));
+        let targets = settling
+            .targets
+            .into_iter()
+            .map(|target| Some(target).filter(|settled| *settled != Target::Waiting).unwrap_or(Target::Opaque));
+        Forced(ScopeSettling { imports: imports.map(Resolution::Bound).collect(), targets: targets.collect() })
+    }
+}
+
+impl AsRef<ScopeSettling> for Forced {
+    fn as_ref(&self) -> &ScopeSettling {
+        &self.0
+    }
+}
+
+impl Semigroup for Target {
+    fn combine(self, computed: Target) -> Target {
         match self {
             Target::Waiting => computed,
-            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => computed.kept(self),
+            Target::Module(..) | Target::Listed(_) | Target::Scoped(_) | Target::Opaque => {
+                Some(self).filter(|held| [Target::Waiting, held.clone()].contains(&computed)).unwrap_or(Target::Opaque)
+            }
         }
     }
 }
 
-impl Lattice for ScopeSettling {
-    fn joined(&self, computed: ScopeSettling) -> ScopeSettling {
-        ScopeSettling { imports: self.imports.joined(computed.imports), targets: self.targets.joined(computed.targets) }
+impl Semigroup for ScopeSettling {
+    fn combine(self, computed: ScopeSettling) -> ScopeSettling {
+        let imports = Pointwise::from(self.imports).combine(Pointwise::from(computed.imports));
+        let targets = Pointwise::from(self.targets).combine(Pointwise::from(computed.targets));
+        ScopeSettling { imports: imports.into(), targets: targets.into() }
     }
 }
 
 impl Seeds<'_> {
-    pub(crate) fn settled(&self) -> Vec<ScopeSettling> {
+    pub(crate) fn settled(&self) -> Vec<Forced> {
         let unsettled: Vec<ScopeSettling> = self.space.scopes.iter().map(|row| row.entries().unsettled()).collect();
-        unsettled.settled(|settling| self.advanced(settling)).into_iter().map(ScopeSettling::forced).collect()
+        let settled = Pointwise::from(unsettled).settled(|settling| Pointwise::from(self.advanced(settling.as_ref())));
+        Vec::from(settled).into_iter().map(Forced::from).collect()
     }
 
-    pub(crate) fn tables<'rows>(&'rows self, settling: &'rows [ScopeSettling]) -> Tables<'rows> {
+    pub(crate) fn tables<'rows, Settle: AsRef<ScopeSettling> + Sync>(
+        &'rows self,
+        settling: &'rows [Settle],
+    ) -> Tables<'rows> {
         let scopes = &self.space.scopes;
         let ids: Vec<ScopeId> = ScopeId::ids(scopes).collect();
         let explicit = Parallel::available().mapped(&ids, |scope| {
             let row = scope.row(scopes).map(ScopeRow::entries);
             let seeds = scope.row(&self.scopes).map_or(&[][..], Vec::as_slice);
-            let imports = scope.row(settling).map_or(&[][..], |settled| settled.imports.as_slice());
+            let imports = scope.row(settling).map_or(&[][..], |settled| settled.as_ref().imports.as_slice());
             row.map_or_default(|entries| entries.explicit(seeds, imports))
         });
-        let fixed = scopes.iter().zip(settling).map(|(row, settled)| row.entries().fixed(&settled.targets));
-        let modules = scopes.iter().zip(settling).map(|(row, settled)| row.entries().modules(&settled.targets));
-        let declaring = scopes.iter().zip(settling).map(|(row, settled)| row.entries().declaring(&settled.targets));
+        let rows = settling.iter().map(AsRef::<ScopeSettling>::as_ref);
+        let fixed = scopes.iter().zip(rows.clone()).map(|(row, settled)| row.entries().fixed(&settled.targets));
+        let modules = scopes.iter().zip(rows.clone()).map(|(row, settled)| row.entries().modules(&settled.targets));
+        let declaring = scopes.iter().zip(rows).map(|(row, settled)| row.entries().declaring(&settled.targets));
         Tables::new(explicit, fixed.collect(), modules.collect(), declaring.collect())
     }
 

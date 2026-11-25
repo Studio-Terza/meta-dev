@@ -130,9 +130,11 @@ impl Cli {
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> Verdict {
-        thread::scope(|scope| {
-            let run = self.mode.started(scope, sources);
-            run.verdict_of(&ManuallyDrop::new(sources.read(Worker::MAIN)), sources, out, err)
+        sources.crew(self.mode.helpers()).concluded(|coordinator, readers| {
+            thread::scope(|scope| {
+                let run = self.mode.started(scope, sources, readers);
+                run.verdict_of(&ManuallyDrop::new(sources.read(Worker::MAIN, coordinator)), sources, out, err)
+            })
         })
     }
 }

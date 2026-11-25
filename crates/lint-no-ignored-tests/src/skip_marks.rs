@@ -19,7 +19,7 @@ use invariants::Ignoring;
 use lint_layout::Name;
 use lint_layout::TestMarks;
 use lint_layout::Whole;
-use lint_layout::{LineNumber, Word, words};
+use lint_layout::{Fitted, LineNumber, Word, words};
 
 #[derive(Debug)]
 pub(crate) struct SkipMarks<'file> {
@@ -62,7 +62,7 @@ impl<'file> SkipMarks<'file> {
         SkipMarks { file, gates: Gate::lines_in(&file.syntax().attrs), unrun }
     }
 
-    fn skip_named(list: &MetaList) -> Option<Word<'static>> {
+    fn skip_named(list: &MetaList) -> Option<Fitted<'static>> {
         list.tokens
             .clone()
             .into_iter()
@@ -77,7 +77,7 @@ impl<'file> SkipMarks<'file> {
         }
     }
 
-    fn skip(attribute: &Attribute) -> Option<Word<'static>> {
+    fn skip(attribute: &Attribute) -> Option<Fitted<'static>> {
         attribute
             .meta
             .require_list()

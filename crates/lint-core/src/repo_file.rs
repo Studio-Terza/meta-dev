@@ -29,14 +29,6 @@ impl RepoFile {
     }
 
     #[must_use]
-    pub fn lies_under(&self, directory: &Path) -> Option<&RepoFile> {
-        self.inside
-            .parent()
-            .filter(|parents| parents.components().any(|part| part.as_os_str() == directory.as_os_str()))
-            .map(|_| self)
-    }
-
-    #[must_use]
     pub fn beneath_named(&self, directory: &Path) -> Option<PathBuf> {
         let mut parts = self.inside.components();
         parts.by_ref().find(|part| part.as_os_str() == directory.as_os_str())?;

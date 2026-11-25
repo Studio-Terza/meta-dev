@@ -2,6 +2,7 @@ use syntax::{Ident, ItemUse, Path, Token, UseLeaf, UseTree};
 
 use std::collections::BTreeSet;
 
+use algebra::Semigroup;
 use graph::{Domain, ItemPath, Primitive, Reexport};
 use lint_layout::{Dependencies, Name, Whole, Word, words};
 
@@ -10,7 +11,7 @@ use super::anchor::Anchor;
 use super::binding::Binding;
 use super::boundary::ScopeId;
 use super::entries::Imported;
-use super::resolver::{Outer, Resolution, Resolver};
+use super::resolver::{Levels, Outer, Resolution, Resolver};
 use super::std_names::{Canonical, StdNames, Table};
 use super::tables::Key;
 use super::view::View;
@@ -55,10 +56,10 @@ impl Reading {
         }
     }
 
-    fn lone(self, external: Binding) -> Binding {
+    fn lone(self, first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         match self {
             Reading::Written | Reading::Explicit => Binding::UNBOUND,
-            Reading::Imported => external,
+            Reading::Imported => Binding::external(first, dependencies),
         }
     }
 }
@@ -88,7 +89,7 @@ impl Shape {
             .or_else(|| space.workspace(first).map(Binding::Module))
             .or_else(|| StdNames::root(first))
             .or_else(|| self.prelude(first).map(Binding::Std));
-        Outer::known_or(known, || self.unbound(reading, Binding::external(first, space.dependencies(viewer))))
+        Outer::known_or(known, || self.unbound(reading, first, space.dependencies(viewer)))
     }
 
     pub(super) fn builtin(self, first: &Name, reading: Reading, space: &Namespace, viewer: ScopeId) -> Option<Binding> {
@@ -119,10 +120,10 @@ impl Shape {
         }
     }
 
-    fn unbound(self, reading: Reading, external: Binding) -> Binding {
+    fn unbound(self, reading: Reading, first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         match self {
-            Shape::Single => reading.lone(external),
-            Shape::Multiple => external,
+            Shape::Single => reading.lone(first, dependencies),
+            Shape::Multiple => Binding::external(first, dependencies),
         }
     }
 }
@@ -142,7 +143,12 @@ impl Relative<'_> {
         )
     }
 
-    fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
+    fn started<Imports: Levels>(
+        self,
+        resolver: &Resolver<'_, '_, Imports>,
+        viewer: ScopeId,
+        domain: Domain,
+    ) -> Resolution {
         match self.shape.looked(domain) {
             Domain::Types => resolver.named(self.first, self.shape, self.reading, viewer),
             Domain::Macros => resolver.macro_named(self.first, viewer),
@@ -160,7 +166,12 @@ pub(super) enum Head<'path> {
 }
 
 impl Head<'_> {
-    pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId, domain: Domain) -> Resolution {
+    pub(super) fn started<Imports: Levels>(
+        self,
+        resolver: &Resolver<'_, '_, Imports>,
+        viewer: ScopeId,
+        domain: Domain,
+    ) -> Resolution {
         match self {
             Head::Empty => Resolution::Bound(Binding::UNBOUND),
             Head::Global(first) => {
@@ -212,10 +223,14 @@ impl Leaf {
         }
     }
 
-    fn path(self, prefix: &UsePath) -> Option<UsePath> {
+    fn suffix(self) -> Option<UsePath> {
         match self {
-            Leaf::Itself => prefix.segments.last().map(|_| prefix.clone()),
-            Leaf::Named(name) => Some(prefix.joined(name)),
+            Leaf::Itself => {
+                Some(UsePath { leading: Leading::Relative, reading: Reading::Written, segments: Vec::new() })
+            }
+            Leaf::Named(name) => {
+                Some(UsePath { leading: Leading::Relative, reading: Reading::Written, segments: vec![name] })
+            }
             Leaf::Discarded => None,
         }
     }
@@ -277,10 +292,6 @@ impl UsePath {
         kept.first().map(|_| UsePath { segments: kept.to_vec(), ..self.clone() })
     }
 
-    pub(crate) fn extended(&self, rest: &UsePath) -> UsePath {
-        UsePath { segments: self.segments.iter().chain(&rest.segments).cloned().collect(), ..self.clone() }
-    }
-
     pub(crate) fn suffixed(ident: &Ident, ending: Word<'_>) -> UsePath {
         UsePath {
             leading: Leading::Relative,
@@ -297,20 +308,13 @@ impl UsePath {
         self.head().reexported(&self.written(), dependencies, declared)
     }
 
-    fn joined(&self, segment: Name) -> UsePath {
-        UsePath {
-            leading: self.leading,
-            reading: self.reading,
-            segments: self.segments.iter().cloned().chain([segment]).collect(),
-        }
-    }
-
     fn leaves(&self, tree: &UseTree) -> Vec<Imported> {
         UseLeaf::of_tree(tree).iter().flat_map(|leaf| self.leaf(leaf)).collect()
     }
 
     fn leaf(&self, leaf: &UseLeaf<'_>) -> Vec<Imported> {
-        let base = leaf.path().iter().fold(self.clone(), |path, segment| path.joined(Name::from(*segment)));
+        let segments = self.segments.iter().cloned().chain(leaf.path().iter().map(|segment| Name::from(*segment)));
+        let base = UsePath { segments: segments.collect(), ..self.clone() };
         let named = leaf.end().named().map(|named| &named.ident);
         let written = named.or_else(|| leaf.end().renamed().map(|renamed| &renamed.ident)).map(Name::from);
         let bound = leaf.end().bound().map(Name::from);
@@ -321,11 +325,19 @@ impl UsePath {
 
     fn named(&self, ident: Name, binds: Name) -> Vec<Imported> {
         Leaf::from(ident)
-            .path(self)
+            .suffix()
+            .map(|suffix| self.clone().combine(suffix))
+            .filter(|path| path.segments.last().is_some())
             .zip(Leaf::from(binds).bound(self))
             .map(|(path, bound)| Imported::Named(bound, path))
             .into_iter()
             .collect()
+    }
+}
+
+impl Semigroup for UsePath {
+    fn combine(self, rest: Self) -> Self {
+        UsePath { segments: self.segments.into_iter().chain(rest.segments).collect(), ..self }
     }
 }
 

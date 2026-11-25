@@ -8,9 +8,10 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, AnyStage, Artifact, ArtifactKind, Basis, Condition, Confidence, Dropped, Entered, Entry, Explicitness,
-    Facet, Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine, Project, Provenance, Reason,
-    Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title, Transition,
+    AnyNode, AnyStage, Artifact, ArtifactKind, Basis, Casting, Condition, Confidence, Dropped, Entered, Entry,
+    Explicitness, Facet, Inherited, Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, NotesLine,
+    Project, Provenance, Reason, Role, RunId, SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal,
+    Title, Transition,
 };
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq, prop_oneof};
@@ -72,7 +73,7 @@ laws::law!(
     select(Stage::VARIANTS),
     stored,
     {
-        let staged: Vec<Stage> = Basis::VARIANTS.iter().map(|basis| basis.staged(stored)).collect();
+        let staged: Vec<Stage> = Basis::VARIANTS.iter().map(|basis| basis.implied().unwrap_or(stored)).collect();
         prop_assert_eq!(staged, [stored, Stage::Refining, Stage::Vague]);
     }
 );
@@ -263,7 +264,8 @@ impl Lifecycle {
 
     fn fresh() -> Result<AnyNode, Box<dyn Error>> {
         let entry = Entry::new("demo".parse()?, Facet::Feature, Provenance::from(Entered::Apply));
-        Ok(Node::new(NodeId::new(7), entry).titled(Title::new("lifecycle".to_owned())).any())
+        let core = Inherited::from(Casting::new(Role::Core, entry.provenance()));
+        Ok(Node::proposed(NodeId::new(7), entry, core, Title::new("lifecycle".to_owned())).any())
     }
 
     fn path(stage: Stage) -> &'static [Move] {

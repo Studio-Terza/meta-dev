@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use design_model::{
-    Casting, Confidence, Entry, Explicitness, Facet, Node, NodeId, NotesLine, Ordinal, Prefix, Project, Provenance,
-    Segment, Sense, SenseKind, SpanRelation, Specificity, Title, Vague,
+    Casting, Confidence, Entry, Explicitness, Facet, Inherited, Node, NodeId, NotesLine, Ordinal, Prefix, Project,
+    Provenance, Segment, Sense, SenseKind, SpanRelation, Specificity, Title, Vague,
 };
 use design_store::{
     Cited, Directed, Imported, ImportedNotes, Imports, NextNode, ProjectRoot, Quoted, QuotedSegments, ShownNode, Spoken,
@@ -389,7 +389,7 @@ impl Reading for Entries {
 impl Taking<'_> {
     fn node(&self, parent: Parent, line: &notes::Line) -> Node<Vague> {
         let entry = Entry::new(self.project.clone(), Facet::Feature, Provenance::Import(NotesLine::new(line.number())));
-        Node::proposed(self.draft.next, entry, parent.casting).titled(Title::from(line))
+        Node::proposed(self.draft.next, entry, Inherited::from(parent.casting), Title::from(line))
     }
 
     fn entered(self, line: &notes::Line, entry: &notes::Entry, voice: Voice) -> Draft {

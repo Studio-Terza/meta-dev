@@ -6,6 +6,7 @@ use lint_placement::CrateName;
 
 use super::tally::Tally;
 use crate::edge::Edge;
+use crate::forms::Stored;
 
 #[derive(Debug)]
 pub(super) struct CrateMutation<'found, 'file> {
@@ -24,7 +25,7 @@ impl<'found, 'file> CrateMutation<'found, 'file> {
             name,
             first: edges.iter().map(|edge| edge.site()).min(),
             tally: Tally::counted(edges.iter().copied()),
-            operations: edges.iter().copied().filter_map(Edge::stored).collect(),
+            operations: edges.iter().copied().collect::<Stored<'found, 'found, 'file>>().into_iter().collect(),
         }
     }
 

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use graph::{Domain, Implementation, ItemPath, Model, Placed, Reach, Region, Resolved, TypeRef};
+use graph::{Domain, Implementation, ItemPath, Model, Origin, Placed, Reach, Region, Resolved, TypeRef};
 use lint_core::{Finding, Fix, Site, Violation};
 use lint_layout::{Name, Whole, Word, words};
 
@@ -50,7 +50,7 @@ impl<'model> Disguised<'model> {
     pub(super) fn found(model: &'model Model) -> Vec<Disguised<'model>> {
         let core: Vec<Placed<'model, &'model Implementation>> = model
             .implementations()
-            .filter(|placed| placed.entity().hand_written().is_some())
+            .filter(|placed| placed.entity().origin() == Origin::Written)
             .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).reach() == Reach::Shipped)
             .filter(|placed| Ground::from(*AsRef::<Region>::as_ref(placed.entity())) == Ground::Core)
             .collect();

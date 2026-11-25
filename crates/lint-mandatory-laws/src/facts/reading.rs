@@ -1,12 +1,15 @@
+mod stored;
+
 use std::collections::BTreeMap;
 
-use graph::{Function, Implementation, ItemId, ItemKind, Model, Owner, Reach, Region, Resolved, Seat};
+use graph::{Function, Implementation, ItemId, ItemKind, Model, Origin, Owner, Reach, Region, Resolved, Seat};
 use lint_core::Site;
 use lint_layout::{Name, Whole, Word, words};
 
 use super::exposure::Exposure;
 use super::profile::Profile;
 use crate::subject::Subject;
+use stored::Stores;
 
 #[derive(Clone, Copy, Debug)]
 struct Typed<'model> {
@@ -20,6 +23,7 @@ struct Typed<'model> {
 pub(super) struct Reading<'model> {
     model: &'model Model,
     types: BTreeMap<ItemId, Typed<'model>>,
+    stores: Stores,
 }
 
 impl<'model> From<&'model Model> for Reading<'model> {
@@ -34,7 +38,7 @@ impl<'model> From<&'model Model> for Reading<'model> {
                 Some((id, Typed { krate: placed.krate(), name: item.as_ref(), site: placed.site(), exposure }))
             })
             .collect();
-        Reading { model, types }
+        Reading { model, types, stores: Stores::from(model) }
     }
 }
 
@@ -42,6 +46,8 @@ impl<'model> Reading<'model> {
     const TYPES: [ItemKind; 2] = [ItemKind::Struct, ItemKind::Enum];
     const TRAITS: [Word<'static>; 5] = words!["Display", "FromStr", "Serialize", "Deserialize", "Record"];
     const DERIVED: [Word<'static>; 3] = words!["Serialize", "Deserialize", "Record"];
+    const LISTED: [(Origin, &'static [Word<'static>]); 2] =
+        [(Origin::Written, &Self::TRAITS), (Origin::Derived, &Self::DERIVED)];
     const METHODS: [Word<'static>; 2] = words!["encode", "decode"];
     const LEADS: [Word<'static>; 2] = words!["to", "from"];
     const OWNERS: [Owner; 2] = [Owner::Inherent, Owner::TraitImpl];
@@ -68,8 +74,12 @@ impl<'model> Reading<'model> {
     fn implemented(&self, implementation: &Implementation) -> Option<Profile<'model>> {
         let resolved: &Resolved = implementation.subject_type().named()?.as_ref();
         let typed = self.types.get(&resolved.crate_item()?)?;
-        let listed = implementation.hand_written().map_or(&Self::DERIVED[..], |_| &Self::TRAITS[..]);
+        let listed = Self::LISTED
+            .iter()
+            .find(|(origin, _)| *origin == implementation.origin())
+            .map_or(&[][..], |(_, listed)| *listed);
         let name = implementation.interface_name().filter(|found| found.matches::<Whole>(listed).is_some())?;
+        Stores::record(name).map_or(Some(()), |()| self.stores.admits(implementation))?;
         Some(Profile::declared(Self::subject(*typed), typed.site, Exposure::Private, vec![name.clone()]))
     }
 

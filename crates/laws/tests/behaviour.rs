@@ -178,6 +178,45 @@ laws::monoid!(
     proptest::strategy::Strategy::prop_map(any::<u8>(), Larger)
 );
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Summed(usize);
+
+impl algebra::Semigroup for Summed {
+    fn combine(self, other: Summed) -> Summed {
+        Summed(self.0 + other.0)
+    }
+}
+
+impl algebra::Monoid for Summed {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Capped(usize);
+
+impl Capped {
+    const MOST: usize = 4;
+}
+
+impl algebra::Act<Summed> for Capped {
+    fn acted(self, by: Summed) -> Option<Capped> {
+        Some(Capped(self.0 + by.0)).filter(|grown| grown.0 <= Capped::MOST)
+    }
+}
+
+laws::action!(
+    counts_act_on_a_capped_count,
+    proptest::strategy::Strategy::prop_map(0..=Capped::MOST, Capped),
+    <Capped as algebra::Act<Summed>>::acted,
+    proptest::strategy::Strategy::prop_map(0..3_usize, Summed)
+);
+
+#[test]
+fn an_optional_target_is_acted_on_when_present_and_stays_absent_otherwise() {
+    use algebra::Act;
+    assert_eq!(Some(Capped(1)).acted(Summed(1)), Some(Some(Capped(2))));
+    assert_eq!(Some(Capped(Capped::MOST)).acted(Summed(1)), Some(None));
+    assert_eq!(None::<Capped>.acted(Summed(1)), Some(None));
+}
+
 laws::generates!(
     a_generator_that_rejects_a_quarter_generates,
     proptest::strategy::Strategy::prop_filter(any::<u8>(), "a multiple of four", |number| number % 4 != 0)

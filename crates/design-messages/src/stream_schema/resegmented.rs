@@ -1,14 +1,15 @@
+mod boundary;
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
 use design_model::{Ordinal, Segment};
-use newtype::Counter;
 use port_core::Op;
-use store_ports::{Batch, Released, Statements, StoreFailure, Version, Written};
+use store_ports::{Released, StoreFailure, Version};
 use transcript_ports::Uuid;
 
-use crate::boundary::{MessageRow, Row, SegmentRow};
+use crate::boundary::SegmentRow;
 
 #[derive(Debug, Op)]
 pub struct Resegmented;
@@ -61,19 +62,3 @@ impl fmt::Display for Referenced {
 }
 
 impl Error for Referenced {}
-
-impl Batch for Resegmented {
-    type Failure = StoreFailure;
-
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let messages = MessageRow::every(statements)?;
-        let derived: Vec<SegmentRow> = messages.iter().flat_map(SegmentRow::within).collect();
-        let stale = Resegmented::stale(&derived, SegmentRow::every(statements)?);
-        let released =
-            stale.iter().map(|row| row.released(statements)).collect::<Result<Vec<Released>, StoreFailure>>()?;
-        let cleared = Referenced::cleared(derived, &stale, &released)?;
-        let written =
-            cleared.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
-    }
-}

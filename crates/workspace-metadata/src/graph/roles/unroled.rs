@@ -33,9 +33,8 @@ impl<'meta> Unroled<'meta> {
             AsRef::<CrateName>::as_ref(package),
             package.keys(AsRef::<CrateName>::as_ref(port)).collect(),
         );
-        package
-            .declares(role)
-            .map_or(Some(Unroled { breaching, port: AsRef::<CrateName>::as_ref(port), role }), |_| None)
+        let unroled = Unroled { breaching, port: AsRef::<CrateName>::as_ref(port), role };
+        package.roles().into_iter().find(|declared| *declared == role).map_or(Some(unroled), |_| None)
     }
 }
 

@@ -16,6 +16,7 @@ mod uses;
 mod walk;
 
 use algebra::{Catenation, Monoid, Semigroup};
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -25,20 +26,21 @@ use syntax::Spanned;
 use syntax::{Attribute, Ident, ItemImpl, ItemMod};
 
 use graph::{
-    Alias, Assigned, Building, Entry, Evaluation, Exposure, FileId, Function, Implementation, Interface, Model,
-    Mutation, Named, Origin, Output, Owner, Region, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Aliases, Assigned, Declarations, Entry, Evaluation, Exports, Exposure, FileId, FileTable, Interface, Model,
+    ModelPart, Monomorphic, Mutation, Named, Origin, Output, Owner, Region, Signed, Sited, Spelling, Subject, TypeRef,
+    Unparameterised,
 };
 use lint_core::{SourceFile, Syntax};
 use lint_layout::{Name, Position};
 
 use crate::namespace::{
-    Declared, DeclaredKind, Domain, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap, ScopeOp,
-    Seeds, StdNames, Top, TranscribedRow, Transcriptions, UsePath, Visibility,
+    Declared, DeclaredKind, Domain, ItemIds, Namespace, Openings, Resolver, Resolving, ScopeId, ScopeKey, ScopeMap,
+    ScopeOp, Seeds, Sowing, Sown, StdNames, Top, TranscribedRow, Transcriptions, Unbased, UsePath, Visibility,
 };
 use crate::parallel::{Parallel, Parked};
-use crate::planting::Files;
+use crate::planting::Unclaimed;
 use attributes::Attributes;
-use boundary::SelfType;
+use boundary::{SelfType, SlotOrdinal};
 use calls::CallRow;
 use definition::{BodyPart, LoweredDefinition};
 use frames::Enclosure;
@@ -49,7 +51,7 @@ use lint_sweep::{Address, WalkPosition};
 use places::{PlaceId, PlaceRows, Places};
 use quotes::QuoteRow;
 use regions::{Context, Regions};
-use seat::{Built, Footing, Located, Seat};
+use seat::{Footing, Located, Lowers, Seat};
 pub use signature::ReceiverSyntax;
 use signature::{DeclaredParameter, InScope, LoweredInput, LoweredParameter, Written};
 
@@ -79,7 +81,7 @@ struct LoweredAssigned {
 impl ImplRow {
     fn written(seat: &Seat, region: Region, block: &ItemImpl, scope: &InScope) -> ImplRow {
         let ty = scope.lowered(&block.self_ty);
-        let within = scope.subject(ty.clone());
+        let within = scope.clone().combine(InScope::from(ty.clone()));
         ImplRow {
             located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),
@@ -123,8 +125,8 @@ impl ImplRow {
     }
 }
 
-impl Built for ImplRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for ImplRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let located = self.located;
         let resolving = footing.resolving();
         let implemented = self.implemented.map(|path| {
@@ -136,22 +138,23 @@ impl Built for ImplRow {
         let subject =
             Subject::new(self.subject, Written::typed(&self.ty, &resolving, footing.scopes().scope(located.scope())));
         let implementation =
-            Implementation::new(subject, implemented, self.origin, self.region.joined(footing.outer())).parameterised(
-                self.parameters
-                    .into_iter()
-                    .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
-                    .collect(),
-                self.assigned
-                    .iter()
-                    .map(|assigned| {
-                        Assigned::new(
-                            assigned.name.clone(),
-                            Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
-                        )
-                    })
-                    .collect(),
-            );
-        located.implementation(footing, building, implementation)
+            Unparameterised::new(subject, implemented, self.origin, self.region.combine(footing.outer()))
+                .parameterised(
+                    self.parameters
+                        .into_iter()
+                        .map(|parameter| parameter.resolved(&resolving, footing.scopes().scope(located.scope())))
+                        .collect(),
+                    self.assigned
+                        .iter()
+                        .map(|assigned| {
+                            Assigned::new(
+                                assigned.name.clone(),
+                                Written::typed(&assigned.ty, &resolving, footing.scopes().scope(located.scope())),
+                            )
+                        })
+                        .collect(),
+                );
+        located.implementation(footing, implementation)
     }
 }
 
@@ -168,6 +171,7 @@ struct FnRow {
     constraints: Vec<TypeRef<Written>>,
     parameters: Vec<LoweredParameter>,
     mutation: Mutation,
+    mutated: Vec<TypeRef<Written>>,
     definition: Option<LoweredDefinition>,
     region: Region,
     place: Option<PlaceId>,
@@ -182,21 +186,24 @@ impl FnRow {
     }
 }
 
-impl Built for FnRow {
-    fn built(self, footing: Footing<'_>, building: Building) -> Building {
+impl Lowers for FnRow {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
         let scope = footing.scopes().scope(self.located.scope());
         let resolving = &footing.resolving();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
-        let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints)
-            .generic(parameters, self.mutation);
-        let function = Function::new(self.name, self.owner, self.entry, signature)
-            .exposed(self.exposure)
-            .evaluated(self.evaluation)
-            .seated(footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref()))
-            .defined(self.definition.map(|definition| definition.resolved(resolving, scope)));
-        self.located.function(footing, building, function)
+        let mutated = self.mutated.iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
+        let signature = Monomorphic::new(inputs, Self::resolved(resolving, scope, self.output), constraints).generic(
+            parameters,
+            self.mutation,
+            mutated,
+        );
+        let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
+        let function = Signed::new(self.name, self.owner, self.entry, signature)
+            .seated(seat, self.exposure)
+            .defined(self.evaluation, self.definition.map(|definition| definition.resolved(resolving, scope)));
+        self.located.function(footing, function)
     }
 }
 
@@ -208,15 +215,13 @@ struct AliasRow {
     target: TypeRef<Written>,
 }
 
-impl Built for AliasRow {
-    fn built(self, footing: Footing<'_>, mut building: Building) -> Building {
-        let resolving = &footing.resolving();
-        let scope = footing.scopes().scope(&self.scope);
+impl AliasRow {
+    fn declared(self, resolving: &Resolving<'_, '_, '_>, scopes: &ScopeMap) -> Aliases {
+        let scope = scopes.scope(&self.scope);
         let declared = resolving.path(scope, &self.name, Domain::Types).crate_item();
         let parameters = self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, scope)).collect();
         let alias = Alias::new(parameters, Written::typed(&self.target, resolving, scope));
-        declared.into_iter().zip([alias]).for_each(|(item, aliased)| building.alias(item, aliased));
-        building
+        declared.map_or_default(|item| Aliases::declaring(item, alias))
     }
 }
 
@@ -259,7 +264,7 @@ impl<Scope> Slot<Scope> {
     const EXTENSION: &'static str = "rs";
     const MODULE_FILE: &'static str = "mod.rs";
 
-    pub(crate) fn found(&self, files: &Files<'_>) -> Option<PathBuf> {
+    pub(crate) fn found(&self, files: Unclaimed<'_, '_, '_>) -> Option<PathBuf> {
         let named = self.children.join(&self.name);
         let flat = named.with_extension(Self::EXTENSION);
         let nested = named.join(Self::MODULE_FILE);
@@ -277,7 +282,7 @@ impl Slot<ScopeKey> {
             children: seat.children(),
             form: SlotForm::from(item.attrs.as_slice()),
             visibility: Visibility::from(&item.vis),
-            region: Regions::of_module(region, item),
+            region: region.combine(Regions::of_module(item)),
         }
     }
 
@@ -288,7 +293,7 @@ impl Slot<ScopeKey> {
             children: self.children,
             form: self.form,
             visibility: self.visibility,
-            region: self.region.joined(outer),
+            region: self.region.combine(outer),
         }
     }
 }
@@ -326,36 +331,24 @@ impl Semigroup for FileRows {
 
 impl Monoid for FileRows {}
 
-impl FileRows {
-    fn spread<'footing>(self, footing: Footing<'footing>, columns: Columns<'footing>) -> Columns<'footing> {
-        Columns {
-            aliases: Footed::appended(columns.aliases, footing, self.aliases),
-            impls: Footed::appended(columns.impls, footing, self.impls),
-            functions: Footed::appended(columns.functions, footing, self.functions),
-            holdings: Footed::appended(columns.holdings, footing, self.holdings),
-            calls: Footed::appended(columns.calls, footing, self.calls),
-            uses: Footed::appended(columns.uses, footing, self.uses),
-            laws: Footed::appended(columns.laws, footing, self.laws),
-            quotes: Footed::appended(columns.quotes, footing, self.quotes),
-        }
+impl Lowers for FileRows {
+    fn lowered(self, footing: Footing<'_>) -> ModelPart {
+        Monoid::concat([
+            footing.every(self.impls),
+            footing.every(self.functions),
+            footing.every(self.holdings),
+            footing.every(self.calls),
+            footing.every(self.uses),
+            footing.every(self.laws),
+            footing.every(self.quotes),
+        ])
     }
 }
 
 #[derive(Debug)]
-struct Footed<'footing, Row> {
+struct Footed<'footing> {
     footing: Footing<'footing>,
-    row: Row,
-}
-
-impl<'footing, Row: Built> Footed<'footing, Row> {
-    fn appended(mut column: Vec<Self>, footing: Footing<'footing>, rows: Vec<Row>) -> Vec<Self> {
-        column.extend(rows.into_iter().map(|row| Footed { footing, row }));
-        column
-    }
-
-    fn every_built(column: Vec<Self>, building: Building) -> Building {
-        column.into_iter().fold(building, |built, footed| footed.row.built(footed.footing, built))
-    }
+    rows: FileRows,
 }
 
 #[derive(Debug)]
@@ -398,109 +391,136 @@ struct Grown {
 }
 
 impl Grown {
-    fn settled(&self, resolving: &Resolving<'_, '_, '_>) -> Places {
+    fn settled(&self, resolving: &Unbased<'_, '_, '_>) -> Places {
         self.rows.places.settled(&resolving.based(self.base), &self.scopes)
     }
 }
 
-#[derive(Debug, Default)]
-struct Columns<'footing> {
-    aliases: Vec<Footed<'footing, AliasRow>>,
-    impls: Vec<Footed<'footing, ImplRow>>,
-    functions: Vec<Footed<'footing, FnRow>>,
-    holdings: Vec<Footed<'footing, HoldingRow>>,
-    calls: Vec<Footed<'footing, CallRow>>,
-    uses: Vec<Footed<'footing, UseRow>>,
-    laws: Vec<Footed<'footing, LawRow>>,
-    quotes: Vec<Footed<'footing, QuoteRow>>,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct SlotAt {
+    file: FileId,
+    ordinal: SlotOrdinal,
 }
 
-impl Columns<'_> {
-    fn built(self, building: Building) -> Building {
-        let with_aliases = Footed::every_built(self.aliases, building);
-        let with_impls = Footed::every_built(self.impls, with_aliases);
-        let with_functions = Footed::every_built(self.functions, with_impls);
-        let with_holdings = Footed::every_built(self.holdings, with_functions);
-        let with_calls = Footed::every_built(self.calls, with_holdings);
-        let with_uses = Footed::every_built(self.uses, with_calls);
-        let with_laws = Footed::every_built(self.laws, with_uses);
-        Footed::every_built(self.quotes, with_laws)
+impl SlotAt {
+    pub(crate) fn every(file: FileId, lowered: &Lowered) -> impl Iterator<Item = SlotAt> + use<> {
+        SlotOrdinal::every(&lowered.slots).map(move |ordinal| SlotAt { file, ordinal })
+    }
+
+    fn placed<'plot>(self, plot: &'plot Plot<'_>) -> Option<&'plot Slot> {
+        plot.slots.get(&self)
+    }
+}
+
+impl Lowered {
+    pub(crate) fn slots(&self) -> &[Slot<ScopeKey>] {
+        &self.slots
     }
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Plot<'read> {
-    space: Namespace<'read>,
+    space: Sown<'read>,
     grown: Vec<Grown>,
+    slots: BTreeMap<SlotAt, Slot>,
 }
 
-impl<'read> Plot<'read> {
-    pub(crate) fn rooted(&mut self, top: Top<'read>, file: FileId, lowered: Lowered) -> Vec<Slot> {
+impl Semigroup for Plot<'_> {
+    fn combine(self, other: Self) -> Self {
+        let mut slots = self.slots;
+        slots.extend(other.slots);
+        Plot { space: self.space.combine(other.space), grown: self.grown.combine(other.grown), slots }
+    }
+}
+
+impl Monoid for Plot<'_> {}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Plotting<'plot, 'read> {
+    plot: &'plot Plot<'read>,
+}
+
+impl<'plot, 'read> From<&'plot Plot<'read>> for Plotting<'plot, 'read> {
+    fn from(plot: &'plot Plot<'read>) -> Plotting<'plot, 'read> {
+        Plotting { plot }
+    }
+}
+
+impl<'read> Plotting<'_, 'read> {
+    pub(crate) fn rooted(self, top: Top<'read>, file: FileId, lowered: Lowered) -> Plot<'read> {
         self.grown_at(top, file, Region::SHIPPED, lowered)
     }
 
-    pub(crate) fn planted(&mut self, slot: Slot, file: FileId, lowered: Lowered) -> Vec<Slot> {
-        let top = Top::Child { parent: slot.scope, name: slot.name, visibility: slot.visibility };
-        self.grown_at(top, file, slot.region, lowered)
+    pub(crate) fn planted(self, at: SlotAt, file: FileId, lowered: Lowered) -> Plot<'read> {
+        at.placed(self.plot).map_or_default(|slot| {
+            let top = Top::Child { parent: slot.scope, name: slot.name.clone(), visibility: slot.visibility };
+            self.grown_at(top, file, slot.region, lowered)
+        })
     }
 
-    pub(crate) fn opaque(&mut self, slot: Slot) {
-        self.space.declare(slot.scope, Declared::new(slot.name, slot.visibility, DeclaredKind::OpaqueModule));
+    pub(crate) fn opaque(self, at: SlotAt) -> Plot<'read> {
+        at.placed(self.plot).map_or_default(|slot| {
+            let declared = Declared::new(slot.name.clone(), slot.visibility, DeclaredKind::OpaqueModule);
+            Plot { space: Sown::declaring(slot.scope, declared), ..Plot::default() }
+        })
     }
 
-    fn grown_at(&mut self, top: Top<'read>, file: FileId, outer: Region, lowered: Lowered) -> Vec<Slot> {
-        let base = self.space.placed(top, lowered.openings);
-        let slots = lowered.slots.into_iter().map(|slot| slot.placed(base, &lowered.scopes, outer)).collect();
-        self.grown.push(Grown { file, base, outer, rows: lowered.rows, scopes: lowered.scopes });
-        slots
+    fn grown_at(self, top: Top<'read>, file: FileId, outer: Region, lowered: Lowered) -> Plot<'read> {
+        let sowing = Sowing::from(&self.plot.space);
+        let base = sowing.base();
+        let space = sowing.placed(top, lowered.openings);
+        let ordinals = SlotOrdinal::every(&lowered.slots);
+        let slots = ordinals
+            .zip(lowered.slots)
+            .map(|(ordinal, slot)| (SlotAt { file, ordinal }, slot.placed(base, &lowered.scopes, outer)))
+            .collect();
+        let grown = vec![Grown { file, base, outer, rows: lowered.rows, scopes: lowered.scopes }];
+        Plot { space, grown, slots }
     }
+}
 
-    pub(crate) fn built(self, mut building: Building) -> Model {
-        let seeds = Seeds::from(&self.space);
+impl Plot<'_> {
+    pub(crate) fn built(self, files: FileTable) -> Model {
+        let space = Namespace::from(self.space);
+        let seeds = Seeds::from(&space);
         let settled = seeds.settled();
         let tables = seeds.tables(&settled);
-        let ids = self.space.issued(&mut building);
+        let issued = space.issued();
+        let ids = ItemIds::from(&issued);
         let unexpanded = Transcriptions::default();
-        let naming = Resolving::new(Resolver::new(&self.space, &tables), &ids, &unexpanded);
+        let naming = Unbased::new(Resolver::new(&space, &tables), &ids, &unexpanded);
         let transcriptions = Transcriptions::settled(self.grown.iter().flat_map(|grown| {
             let based = naming.based(grown.base);
             grown.rows.transcribed.iter().filter_map(move |row| row.settled(based, &grown.scopes))
         }));
-        let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids, &transcriptions);
-        let exports = self.space.exports();
-        let with_exports =
-            exports.iter().fold(StdNames::aliased(building), |built, export| export.recorded(&resolving, built));
+        let resolving = Unbased::new(Resolver::new(&space, &tables), &ids, &transcriptions);
+        let rooted = resolving.based(ScopeId::FIRST);
+        let exports: Exports = Monoid::concat(space.exports().iter().map(|export| export.recorded(&rooted)));
         let places: Vec<Places> = Parallel::available().mapped(&self.grown, |grown| grown.settled(&resolving));
-        let with_places = self
-            .grown
-            .iter()
-            .zip(&places)
-            .fold(with_exports, |built, (grown, seated)| seated.placed(grown.file, built));
+        let declarations: ModelPart =
+            Monoid::concat(self.grown.iter().zip(&places).map(|(grown, seated)| seated.placed(grown.file)));
         let mut planted = self.grown;
-        let mut footed: Vec<Footed<'_, FileRows>> = planted
-            .iter_mut()
+        let mut taken: Vec<FileRows> = planted.iter_mut().map(|file| mem::take(&mut file.rows)).collect();
+        let declared: Aliases = Monoid::concat(taken.iter_mut().zip(&planted).flat_map(|(row, grown)| {
+            let based = resolving.based(grown.base);
+            mem::take(&mut row.aliases).into_iter().map(move |alias| alias.declared(&based, &grown.scopes))
+        }));
+        let aliases = StdNames::aliased().combine(declared);
+        let parked: Vec<Parked<Footed<'_>>> = taken
+            .into_iter()
+            .zip(&planted)
             .zip(&places)
-            .map(|(file, seated)| {
-                let row = mem::take(&mut file.rows);
-                let rooted: &Grown = file;
-                Footed { footing: Footing::new(resolving.based(rooted.base), rooted, seated), row }
+            .map(|((rows, grown), seated)| Footed {
+                footing: Footing::new(resolving.based(grown.base), grown, seated, &aliases),
+                rows,
             })
+            .map(Parked::from)
             .collect();
-        let aliases: Vec<Footed<'_, AliasRow>> = footed
-            .iter_mut()
-            .flat_map(|file| {
-                let footing = file.footing;
-                mem::take(&mut file.row.aliases).into_iter().map(move |row| Footed { footing, row })
-            })
-            .collect();
-        let with_aliases = Footed::every_built(aliases, with_places);
-        let parked: Vec<Parked<Footed<'_, FileRows>>> = footed.into_iter().map(Parked::from).collect();
         let fragments = Parallel::available().shares(&parked).worked(|share| {
-            let files = share.iter().filter_map(Parked::taken);
-            let columns = files.fold(Columns::default(), |columns, file| file.row.spread(file.footing, columns));
-            columns.built(with_aliases.fragment())
+            Monoid::concat(share.iter().filter_map(Parked::taken).map(|file| file.rows.lowered(file.footing)))
         });
-        fragments.into_iter().fold(with_aliases, Building::absorbed).built()
+        let part = declarations.combine(Monoid::concat(fragments));
+        Model::lowered(files, Declarations::issued(issued, aliases, exports), part)
     }
 }
 
@@ -558,19 +578,23 @@ enum Grain {
     Place(PlaceRows),
     Op(ScopeOp),
     Slot(Slot<ScopeKey>),
-    Body(BodyPart),
     Transcribed(TranscribedRow),
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Grains {
-    grains: Catenation<Grain>,
-    bodied: Option<()>,
+    sown: Catenation<Grain>,
+    bodies: Catenation<BodyPart>,
+    opened: Option<Box<FnRow>>,
 }
 
 impl Semigroup for Grains {
     fn combine(self, other: Grains) -> Grains {
-        Grains { grains: self.grains.combine(other.grains), bodied: self.bodied.or(other.bodied) }
+        Grains {
+            sown: self.sown.combine(other.sown),
+            bodies: self.bodies.combine(other.bodies),
+            opened: self.opened.or(other.opened),
+        }
     }
 }
 
@@ -578,8 +602,13 @@ impl Monoid for Grains {}
 
 impl From<Grain> for Grains {
     fn from(grain: Grain) -> Grains {
-        let bodied = grain.bodied();
-        Grains { grains: Catenation::from(vec![grain]), bodied }
+        Grains { sown: Catenation::from(vec![grain]), ..Grains::default() }
+    }
+}
+
+impl From<FnRow> for Grains {
+    fn from(row: FnRow) -> Grains {
+        Grains { opened: Some(Box::new(row)), ..Grains::default() }
     }
 }
 
@@ -617,7 +646,6 @@ impl From<Grain> for Sorted {
             Grain::Place(places) => Sorted::from(FileRows { places, ..FileRows::default() }),
             Grain::Op(op) => Sorted { ops: vec![op], ..Sorted::default() },
             Grain::Slot(slot) => Sorted { slots: vec![slot], ..Sorted::default() },
-            Grain::Body(_) => Sorted::default(),
         }
     }
 }
@@ -630,81 +658,24 @@ impl From<FileRows> for Sorted {
 
 impl From<Grains> for Sorted {
     fn from(grains: Grains) -> Sorted {
-        Monoid::concat(grains.grains.into_iter().map(Sorted::from))
-    }
-}
-
-impl Grain {
-    fn body(self) -> Option<BodyPart> {
-        match self {
-            Grain::Body(part) => Some(part),
-            Grain::Impl(_)
-            | Grain::Function(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
-    fn bodied(&self) -> Option<()> {
-        match self {
-            Grain::Body(_) => Some(()),
-            Grain::Impl(_)
-            | Grain::Function(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_) => None,
-        }
-    }
-
-    fn function(&self) -> Option<&FnRow> {
-        match self {
-            Grain::Function(row) => Some(row),
-            Grain::Impl(_)
-            | Grain::Alias(_)
-            | Grain::Holding(_)
-            | Grain::Call(_)
-            | Grain::Use(_)
-            | Grain::Law(_)
-            | Grain::Quote(_)
-            | Grain::Transcribed(_)
-            | Grain::Place(_)
-            | Grain::Op(_)
-            | Grain::Slot(_)
-            | Grain::Body(_) => None,
-        }
-    }
-
-    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
-        match self {
-            Grain::Function(row) => Grain::Function(FnRow { definition: definition.or(row.definition), ..row }),
-            other => other,
-        }
+        Monoid::concat(grains.sown.into_iter().map(Sorted::from))
     }
 }
 
 impl From<BodyPart> for Grains {
     fn from(part: BodyPart) -> Grains {
-        Grains::from(Grain::Body(part))
+        Grains { bodies: Catenation::from(vec![part]), ..Grains::default() }
     }
 }
 
 impl Grains {
     fn closed(self) -> Grains {
-        Grains { grains: self.grains.into_iter().filter(|grain| grain.bodied().is_none()).collect(), bodied: None }
+        Grains { bodies: Catenation::default(), ..self }
+    }
+}
+
+impl FnRow {
+    fn defined(self, definition: Option<LoweredDefinition>) -> Grain {
+        Grain::Function(FnRow { definition: definition.or(self.definition), ..self })
     }
 }

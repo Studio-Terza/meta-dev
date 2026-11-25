@@ -5,20 +5,20 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use syntax::{Block, Expr, ExprCall, ExprField, MemberText, Signature, Spine, Type};
 
-use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef};
+use graph::{Argument, ParamIndex, Read, Reader, Resolved, TypeRef, Unpassed};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name, Whole, Word};
 use lint_sweep::Address;
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
-use super::super::signature::{InScope, Written};
+use super::super::signature::{Generic, InScope, Written};
 use shaped::Shaped;
 
 #[derive(Clone, Debug)]
 enum Spelled {
     Path(UsePath),
-    Generic { owner: Name, name: Name },
+    Generic { owner: Resolved, name: Name },
     Subject { subject: TypeRef<Written>, name: Name },
 }
 
@@ -127,20 +127,24 @@ impl Lowered {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-enum Calls {
-    #[default]
-    Zero,
+#[derive(Clone, Copy, Debug)]
+enum Called {
     One(Address),
     Many,
 }
 
-impl Calls {
+impl Called {
     fn only(self) -> Option<Address> {
         match self {
-            Calls::One(at) => Some(at),
-            Calls::Zero | Calls::Many => None,
+            Called::One(at) => Some(at),
+            Called::Many => None,
         }
+    }
+}
+
+impl Semigroup for Called {
+    fn combine(self, _: Called) -> Called {
+        Called::Many
     }
 }
 
@@ -155,7 +159,7 @@ struct LoweredRead {
 #[derive(Debug, Default)]
 pub(super) struct Reads {
     found: Vec<LoweredRead>,
-    calls: Calls,
+    calls: Option<Called>,
 }
 
 #[derive(Debug)]
@@ -197,7 +201,7 @@ impl Reads {
         rebound: &BTreeSet<Name>,
     ) -> ReadsLowered {
         let parameters = shared.unbound(rebound);
-        let forwarding = self.calls.only().filter(|only| tail == Some(*only));
+        let forwarding = self.calls.and_then(Called::only).filter(|only| tail == Some(*only));
         let kept = self.found.into_iter().filter(|read| forwarding.and(read.rooted.whole()).is_none());
         let settled = kept.filter_map(|read| {
             let parameter = *parameters.get(&read.rooted.root)?;
@@ -221,7 +225,7 @@ impl Reads {
     }
 
     pub(super) fn counted(at: Address) -> Reads {
-        Reads { found: Vec::new(), calls: Calls::One(at) }
+        Reads { found: Vec::new(), calls: Some(Called::One(at)) }
     }
 
     pub(super) fn called(call: &ExprCall, at: Address) -> Reads {
@@ -234,7 +238,7 @@ impl Reads {
                 .map(|rooted| LoweredRead { path: UsePath::from(&found.path), rooted, passed: passed.clone(), line })
                 .collect()
         });
-        Reads { found: recorded, calls: Calls::One(at) }
+        Reads { found: recorded, calls: Some(Called::One(at)) }
     }
 }
 
@@ -244,11 +248,10 @@ impl Spelled {
     fn under(path: UsePath, scope: &InScope) -> Spelled {
         let single = path.qualifier().map(|parent| parent.written()).filter(|parent| parent.as_ref().len() == 1);
         let head = single.as_ref().and_then(|parent| parent.last().cloned());
-        let owner = head.as_ref().and_then(|parent| scope.generic(parent).cloned());
+        let owner = head.as_ref().and_then(|parent| scope.generic(parent).map(Generic::param));
         let last = path.written().last().cloned();
-        let subject = head
-            .filter(|parent| parent.matches::<Whole>(&[Self::SUBJECT]).is_some())
-            .map(|_| scope.current_subject().clone());
+        let subject =
+            head.filter(|parent| parent.matches::<Whole>(&[Self::SUBJECT]).is_some()).map(|_| scope.current_subject());
         let generic = owner.zip(last.clone()).map(|(generic, name)| Spelled::Generic { owner: generic, name });
         let own = subject.zip(last).map(|(implementer, name)| Spelled::Subject { subject: implementer, name });
         generic.or(own).unwrap_or(Spelled::Path(path))
@@ -257,7 +260,7 @@ impl Spelled {
     fn reader(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Reader {
         match self {
             Spelled::Path(path) => Self::path_reader(&path, resolving, scope),
-            Spelled::Generic { owner, name } => Reader::Associated { owner: Resolved::Param(owner), name },
+            Spelled::Generic { owner, name } => Reader::Associated { owner, name },
             Spelled::Subject { subject, name } => Self::subject_reader(&subject, name, resolving, scope),
         }
     }
@@ -294,7 +297,7 @@ impl ReadsLowered {
             .into_iter()
             .map(|read| {
                 let arguments = Lowered::all_resolved(read.arguments, resolving, scope);
-                Read::new(read.spelled.reader(resolving, scope), read.parameter, read.fields, read.line)
+                Unpassed::new(read.spelled.reader(resolving, scope), read.parameter, read.fields, read.line)
                     .passing(arguments)
             })
             .collect()
@@ -308,23 +311,3 @@ impl Semigroup for Reads {
 }
 
 impl Monoid for Reads {}
-
-impl Semigroup for Calls {
-    fn combine(self, other: Calls) -> Calls {
-        match self {
-            Calls::Zero => other,
-            Calls::One(_) | Calls::Many => self.followed(other),
-        }
-    }
-}
-
-impl Monoid for Calls {}
-
-impl Calls {
-    fn followed(self, other: Calls) -> Calls {
-        match other {
-            Calls::Zero => self,
-            Calls::One(_) | Calls::Many => Calls::Many,
-        }
-    }
-}

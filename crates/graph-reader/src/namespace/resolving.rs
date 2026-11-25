@@ -2,10 +2,12 @@ use std::collections::HashMap;
 
 use syntax::{Ident, Macro, Path};
 
-use graph::{Building, Domain, FileId, ItemId, ItemPath, Member, Mention, PathUse, Resolved, Seat};
+use algebra::Monoid;
+use graph::{Domain, FileId, ItemId, ItemPath, Member, Mention, ModelPart, PathUse, Resolved, Seat};
 use lint_core::Macros;
 use lint_layout::LineNumber;
 
+use super::binding::Binding;
 use super::boundary::{ScopeId, ScopeKey, ScopeMap};
 use super::items::ItemIds;
 use super::resolver::Resolver;
@@ -18,25 +20,35 @@ pub(crate) struct Resolving<'ids, 'tables, 'rows> {
     base: ScopeId,
 }
 
-impl<'ids, 'tables, 'rows> Resolving<'ids, 'tables, 'rows> {
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Unbased<'ids, 'tables, 'rows> {
+    resolver: Resolver<'tables, 'rows>,
+    ids: &'ids ItemIds,
+    transcriptions: &'ids Transcriptions,
+}
+
+impl<'ids, 'tables, 'rows> Unbased<'ids, 'tables, 'rows> {
     pub(crate) fn new(
         resolver: Resolver<'tables, 'rows>,
         ids: &'ids ItemIds,
         transcriptions: &'ids Transcriptions,
-    ) -> Resolving<'ids, 'tables, 'rows> {
-        Resolving { resolver, ids, transcriptions, base: ScopeId::FIRST }
+    ) -> Unbased<'ids, 'tables, 'rows> {
+        Unbased { resolver, ids, transcriptions }
     }
 
     pub(crate) fn based(self, base: ScopeId) -> Resolving<'ids, 'tables, 'rows> {
-        Resolving { base, ..self }
+        Resolving { resolver: self.resolver, ids: self.ids, transcriptions: self.transcriptions, base }
     }
+}
 
+impl<'ids> Resolving<'ids, '_, '_> {
     pub(crate) fn transcriptions(&self) -> &'ids Transcriptions {
         self.transcriptions
     }
 
     pub(crate) fn path(&self, scope: ScopeId, path: &UsePath, domain: Domain) -> Resolved {
-        self.resolver.path(path, scope.above(self.base), domain).forced().resolved(self.ids, path.written())
+        let resolution = self.resolver.path(path, scope.above(self.base), domain);
+        Option::<Binding>::from(resolution).unwrap_or(Binding::UNBOUND).resolved(self.ids, path.written())
     }
 }
 
@@ -135,11 +147,13 @@ impl Transcriptions {
         Transcriptions(transcriptions.into_iter().map(|found| (found.defined, found.transcribed)).collect())
     }
 
-    pub(crate) fn expanded(&self, definition: &Resolved, invoker: Invoker<'_, '_>, building: Building) -> Building {
+    pub(crate) fn expanded(&self, definition: &Resolved, invoker: Invoker<'_, '_>) -> ModelPart {
         let transcribed = definition.crate_item().and_then(|item| self.0.get(&item)).map_or(&[][..], Vec::as_slice);
-        transcribed.iter().filter_map(|path| invoker.used(path)).fold(building, |mut built, used| {
-            built.path_use(invoker.invoked.file, invoker.invoked.line, used);
-            built
-        })
+        Monoid::concat(
+            transcribed
+                .iter()
+                .filter_map(|path| invoker.used(path))
+                .map(|used| ModelPart::path_use(invoker.invoked.file, invoker.invoked.line, used)),
+        )
     }
 }

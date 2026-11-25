@@ -32,8 +32,9 @@ impl Limit {
     pub fn lowered(self, measured: Seconds) -> Result<Seconds, Refusal> {
         match self {
             Limit::Levels { .. } => Err(Refusal::Levels),
-            Limit::Record(record) => Self::exceeded(measured, record)
-                .map_or(Ok(measured), |exceeded| Err(Refusal::Above { record: exceeded })),
+            Limit::Record(record) => {
+                Self::exceeded(measured, record).map_or(Ok(measured), |exceeded| Err(Refusal::from(exceeded)))
+            }
         }
     }
 
@@ -44,8 +45,17 @@ impl Limit {
             .unwrap_or(Verdict::Within)
     }
 
-    fn exceeded(measured: Seconds, level: Seconds) -> Option<Seconds> {
-        (measured > level).then_some(level)
+    fn exceeded(measured: Seconds, level: Seconds) -> Option<Exceeded> {
+        (measured > level).then_some(Exceeded(level))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Exceeded(Seconds);
+
+impl From<Exceeded> for Refusal {
+    fn from(exceeded: Exceeded) -> Refusal {
+        Refusal::Above { record: exceeded.0 }
     }
 }
 
