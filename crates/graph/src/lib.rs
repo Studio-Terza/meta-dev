@@ -40,8 +40,8 @@ pub use function::definition::{
     Repeating, Repetition,
 };
 pub use function::{
-    Entry, Evaluation, Function, Input, MethodShape, Mutation, Output, Owner, Parameter, Receiver, Returned, Signature,
-    Taken,
+    Entry, Evaluation, Function, Input, MethodShape, Mutated, Mutation, Output, Owner, Parameter, Receiver, Returned,
+    Signature, Taken,
 };
 pub use holding::{Held, Holding};
 pub use implementation::{Assigned, Implementation, Interface, Origin, Subject};
@@ -61,6 +61,6 @@ pub use references::{Consumers, References};
 pub use region::{Ground, Reach, Region, Seat, Within, Writing, Zone};
 pub use resolved::{Nominal, Resolved};
 pub use sited::{Sited, Spelling};
-pub use traversal::Traversal;
-pub use type_ref::{Arrayed, Bounds, Callable, Element, Grouped, Named, Outline, Projection, TypeRef, TypeUses};
+pub use traversal::{Event, Trees};
+pub use type_ref::{Arrayed, Bounds, Callable, Element, Grouped, Named, Outline, Projection, TypeRef};
 pub use unresolved::Unresolved;

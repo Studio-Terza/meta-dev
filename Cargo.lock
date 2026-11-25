@@ -261,6 +261,7 @@ dependencies = [
 name = "design"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "console-ports",
  "design-jobs",
  "design-model",
@@ -947,6 +948,7 @@ dependencies = [
  "grammar-search",
  "laws",
  "newtype",
+ "record-derive",
  "thiserror",
 ]
 
@@ -2017,6 +2019,7 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "cargo-ports",
  "file-ports",
  "invariants",
@@ -2075,6 +2078,7 @@ dependencies = [
 name = "lint-roots"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "file-ports",
  "invariants",
  "lint-layout",
@@ -2085,6 +2089,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "cargo-ports",
  "file-ports",
  "golden",
@@ -2092,6 +2097,7 @@ dependencies = [
  "graph-query",
  "graph-reader",
  "invariants",
+ "laws",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",
@@ -2715,6 +2721,13 @@ dependencies = [
  "text-lines",
  "thiserror",
  "workspace-metadata",
+]
+
+[[package]]
+name = "record-derive"
+version = "0.1.0"
+dependencies = [
+ "syntax",
 ]
 
 [[package]]

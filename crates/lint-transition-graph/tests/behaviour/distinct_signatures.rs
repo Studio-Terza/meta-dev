@@ -29,7 +29,20 @@ const OPERATIONS: &str =
 const MUTATING_BOTH: &str =
     "struct A;\nimpl A {\n    fn left(&mut self) -> u8 { 1 }\n    fn right(&mut self) -> u8 { 2 }\n}\n";
 const PLATFORMS_AND_OTHER: &str = "struct A;\nimpl A {\n    #[cfg(unix)]\n    fn read(&self) -> u8 { 1 }\n    #[cfg(windows)]\n    fn read(&self) -> u8 { 1 }\n    fn other(&self) -> u8 { 2 }\n}\n";
-const CASES: [Case; 15] = [
+const ARGUMENTS_APART: &str = "struct P<T>(T);\nstruct A;\nstruct B;\nstruct S;\nimpl S {\n    fn a(&self) -> P<A> {}\n    fn b(&self) -> P<B> {}\n    fn c(&self) -> P<Option<A>> {}\n    fn d(&self) -> P<Vec<A>> {}\n}\n";
+const ARGUMENTS_SAME: &str =
+    "struct P<T>(T);\nstruct A;\nstruct S;\nimpl S {\n    fn a(&self) -> P<A> {}\n    fn e(&self) -> P<A> {}\n}\n";
+const CASES: [Case; 17] = [
+    Case::new(
+        Title::new("one generic type with different arguments, a wrapper inside an argument included"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ARGUMENTS_APART))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("one generic type with the same arguments"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ARGUMENTS_SAME))],
+        Flagged::new(&["crates/x/src/lib.rs:5"]),
+    ),
     Case::new(
         Title::new("same signature"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME))],

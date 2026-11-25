@@ -295,20 +295,30 @@ impl Mutations {
     pub(super) fn signed(signature: &Signature) -> Mutation {
         let receiver = signature
             .receiver()
-            .filter(|receiver| Self::mutable(&receiver.ty).is_some())
+            .filter(|receiver| Self::referent(&receiver.ty).is_some())
             .map(|_| Mutation::ThroughSelf);
         let parameter = signature
             .inputs
             .iter()
             .filter_map(Syntax::typed)
-            .find_map(|typed| Self::mutable(&typed.ty))
+            .find_map(|typed| Self::referent(&typed.ty))
             .map(|_| Mutation::ThroughParameter);
         receiver.or(parameter).unwrap_or(Mutation::Absent)
     }
 
-    fn mutable(found: &Type) -> Option<&Type> {
+    pub(super) fn mutated(scope: &InScope, signature: &Signature) -> Vec<TypeRef<Written>> {
+        signature
+            .inputs
+            .iter()
+            .filter_map(Syntax::typed)
+            .filter_map(|typed| Self::referent(&typed.ty))
+            .map(|referent| scope.lowered(referent))
+            .collect()
+    }
+
+    fn referent(found: &Type) -> Option<&Type> {
         match found {
-            Type::Reference(reference) => reference.mutability.map(|_| found),
+            Type::Reference(reference) => reference.mutability.map(|_| &*reference.elem),
             _ => None,
         }
     }

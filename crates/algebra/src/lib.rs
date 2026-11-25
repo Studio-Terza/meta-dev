@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 pub trait Semigroup: Sized {
     #[must_use]
     fn combine(self, other: Self) -> Self;
@@ -23,6 +25,18 @@ impl<Item> Semigroup for Vec<Item> {
 }
 
 impl<Item> Monoid for Vec<Item> {}
+
+impl<Key: Ord, Value: Semigroup> Semigroup for BTreeMap<Key, Value> {
+    fn combine(self, other: BTreeMap<Key, Value>) -> BTreeMap<Key, Value> {
+        other.into_iter().fold(self, |mut merged, (key, value)| {
+            let combined = merged.remove(&key).into_iter().chain([value]).reduce(Semigroup::combine);
+            merged.extend(combined.map(|joined| (key, joined)));
+            merged
+        })
+    }
+}
+
+impl<Key: Ord, Value: Semigroup> Monoid for BTreeMap<Key, Value> {}
 
 #[derive(Debug, Default)]
 pub enum Catenation<Item> {

@@ -111,13 +111,12 @@ impl TokenPaths {
 
     fn attempted(input: ParseStream, attempt: &ParseBuffer) -> syntax::Result<Vec<Spelled>> {
         match attempt.call(Path::parse_mod_style) {
-            Ok(path) => Ok(Self::advanced(input, attempt, &path)),
+            Ok(path) => Ok(Self::spelled(&path)).inspect(|_| input.advance_to(attempt)),
             Err(_) => Self::skipped(input.parse()?, input),
         }
     }
 
-    fn advanced(input: ParseStream, attempt: &ParseBuffer, path: &Path) -> Vec<Spelled> {
-        input.advance_to(attempt);
+    fn spelled(path: &Path) -> Vec<Spelled> {
         let first = path.segments.first();
         let spelled = first
             .map(|segment| Spelled { path: UsePath::from(path), started_at: Position::from(segment.ident.span()) });

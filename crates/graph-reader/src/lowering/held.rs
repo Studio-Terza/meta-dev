@@ -75,7 +75,7 @@ impl Lowers for HoldingRow {
         let resolving = &footing.resolving();
         let declares = self.link.declares(resolving, scope);
         let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(&self.ty, resolving, scope))
-            .placed(self.region.joined(footing.outer()), declares);
+            .placed(self.region.combine(footing.outer()), declares);
         self.located.holding(footing, holding)
     }
 }

@@ -11,90 +11,57 @@ use lint_core::Walk;
 use lint_layout::Failure;
 use lint_roots::Survey;
 
+use super::declared::Resolution;
 use crate::source_files::ignored::Ignored;
 pub use child::Child;
 use declaration::Declaration;
 use invariants::Ignoring;
 use redirects::Redirects;
 
-#[derive(Debug)]
-pub struct Modules {
-    children: Vec<Child>,
-    tests: Vec<Child>,
-    failures: Vec<Failure>,
+#[derive(Clone, Debug)]
+pub struct Sought {
+    walk: Walk,
+    choices: Vec<Child>,
+    conditional: Vec<Child>,
+    expected: PathBuf,
 }
 
-impl Modules {
+impl Sought {
     #[must_use]
-    pub fn candidates(file: &Path, children_directory: &Path, items: &[Item]) -> Vec<PathBuf> {
+    pub fn within(file: &Path, children_directory: &Path, items: &[Item]) -> Vec<Sought> {
         let file_directory = file.parent().map_or_default(Path::to_path_buf);
         [Walk::Entered, Walk::Skipped]
             .into_iter()
-            .flat_map(|wanted| Declaration::within(items, children_directory, wanted))
-            .flat_map(|declaration| {
-                declaration
-                    .choices(&file_directory)
+            .flat_map(|wanted| {
+                Declaration::within(items, children_directory, wanted)
                     .into_iter()
-                    .chain(Redirects::conditional(&file_directory, declaration.module()))
+                    .map(move |declaration| (wanted, declaration))
             })
-            .map(|child| child.as_ref().to_path_buf())
+            .map(|(walk, declaration)| Sought {
+                walk,
+                choices: declaration.choices(&file_directory),
+                conditional: Redirects::conditional(&file_directory, declaration.module()),
+                expected: declaration.expected(&file_directory),
+            })
             .collect()
     }
 
-    #[must_use]
-    pub fn nested_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Vec<Child> {
-        let declared = Self::declared_in(survey, file, children_directory, items);
-        declared.children.into_iter().chain(declared.tests).collect()
+    pub fn candidates(&self) -> impl Iterator<Item = PathBuf> + '_ {
+        self.choices.iter().chain(&self.conditional).map(|child| child.as_ref().to_path_buf())
     }
 
-    #[must_use]
-    pub fn declared_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
-        let file_directory = file.parent().map_or_default(Path::to_path_buf);
-        let entered = Declaration::within(items, children_directory, Walk::Entered);
-        let skipped = Declaration::within(items, children_directory, Walk::Skipped);
-        let tests = skipped
-            .iter()
-            .flat_map(|declaration| {
-                Self::resolve(survey, &file_directory, declaration).ignoring(Ignored::Unresolved).unwrap_or_default()
-            })
-            .collect();
-        entered
-            .into_iter()
-            .fold(Modules { children: Vec::new(), tests, failures: Vec::new() }, |modules, declaration| {
-                modules.resolved_into(Self::resolve(survey, &file_directory, &declaration))
-            })
-    }
-
-    pub fn take_children(&mut self, survey: &Survey) -> Vec<Child> {
-        std::mem::take(&mut self.children).into_iter().map(|child| child.canonical(survey)).collect()
-    }
-
-    #[must_use]
-    pub fn tests(&self) -> &[Child] {
-        &self.tests
-    }
-
-    pub fn take_failures(&mut self) -> Vec<Failure> {
-        std::mem::take(&mut self.failures)
-    }
-
-    fn resolved_into(self, resolved: Result<Vec<Child>, Failure>) -> Modules {
-        match resolved {
-            Ok(found) => Modules { children: self.children.into_iter().chain(found).collect(), ..self },
-            Err(failure) => Modules { failures: self.failures.into_iter().chain([failure]).collect(), ..self },
+    pub(super) fn resolution(&self, survey: &Survey) -> Option<Resolution> {
+        match self.walk {
+            Walk::Entered => Some(self.resolved(survey).map_or_else(Resolution::Failed, Resolution::Modules)),
+            Walk::Skipped => self.resolved(survey).ignoring(Ignored::Unresolved).map(Resolution::Tests),
         }
     }
 
-    fn resolve(survey: &Survey, file_directory: &Path, declaration: &Declaration<'_>) -> Result<Vec<Child>, Failure> {
-        let primary =
-            declaration.choices(file_directory).into_iter().find(|choice| survey.file(choice.as_ref()).is_some());
-        let candidates: Vec<Child> = primary
+    fn resolved(&self, survey: &Survey) -> Result<Vec<Child>, Failure> {
+        let primary = self.choices.iter().find(|choice| survey.file(choice.as_ref()).is_some());
+        let candidates: Vec<&Child> = primary
             .into_iter()
-            .chain(
-                Redirects::conditional(file_directory, declaration.module())
-                    .into_iter()
-                    .filter(|child| survey.file(child.as_ref()).is_some()),
-            )
+            .chain(self.conditional.iter().filter(|child| survey.file(child.as_ref()).is_some()))
             .collect();
         let firsts: Vec<Option<usize>> = candidates
             .iter()
@@ -102,9 +69,9 @@ impl Modules {
             .map(|(index, child)| candidates.iter().position(|other| other == child).filter(|first| *first == index))
             .collect();
         let found: Vec<Child> =
-            candidates.into_iter().zip(firsts).filter_map(|(child, first)| first.map(|_| child)).collect();
+            candidates.into_iter().zip(firsts).filter_map(|(child, first)| first.map(|_| child.clone())).collect();
         found.first().map(|_| ()).map(|()| found).ok_or_else(|| Failure::Io {
-            path: declaration.expected(file_directory),
+            path: self.expected.clone(),
             source: io::Error::from(io::ErrorKind::NotFound),
         })
     }

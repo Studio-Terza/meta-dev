@@ -1,4 +1,8 @@
-use lint_core::FileHead;
+use std::collections::BTreeMap;
+
+use file_ports::Size;
+
+use super::protocol::{Assigned, Due};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Partition(usize);
@@ -13,39 +17,30 @@ impl From<usize> for Partition {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(super) enum Change {
-    Lifted,
-    Landed,
-}
+#[derive(Clone, Debug)]
+pub(super) struct Hands(Vec<Partition>);
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct Flights(usize);
-
-impl Flights {
-    pub(super) fn flown(self, change: Change) -> Flights {
-        match change {
-            Change::Lifted => Flights(self.0 + 1),
-            Change::Landed => Flights(self.0.saturating_sub(1)),
-        }
-    }
-
-    pub(super) fn airborne(self) -> Option<Flights> {
-        Some(self).filter(|flights| flights.0 > 0)
+impl FromIterator<Partition> for Hands {
+    fn from_iter<Found: IntoIterator<Item = Partition>>(found: Found) -> Hands {
+        Hands(found.into_iter().collect())
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct Expected(usize);
-
-impl Expected {
-    pub(super) fn met(self, heads: &[FileHead]) -> Option<Expected> {
-        Some(self).filter(|expected| heads.len() == expected.0)
-    }
-}
-
-impl Expected {
-    pub(super) fn counted(count: usize) -> Expected {
-        Expected(count)
+impl Hands {
+    pub(super) fn dealt<'tree>(
+        &self,
+        due: Vec<Due<'tree>>,
+        weighed: impl Fn(&Due<'tree>) -> Size,
+    ) -> Vec<Assigned<'tree>> {
+        let loads: BTreeMap<Partition, Size> = self.0.iter().map(|hand| (*hand, Size::default())).collect();
+        due.into_iter()
+            .scan(loads, |tally, found| {
+                let lightest = tally.iter().min_by_key(|(hand, load)| (**load, **hand)).map(|(hand, _)| *hand);
+                let hand = found.owner().or(lightest).unwrap_or(Partition::MAIN);
+                let load = tally.entry(hand).or_default();
+                *load = [*load, weighed(&found)].into_iter().sum();
+                Some(found.assigned(hand))
+            })
+            .collect()
     }
 }

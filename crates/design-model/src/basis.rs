@@ -11,11 +11,11 @@ pub enum Basis {
 
 impl Basis {
     #[must_use]
-    pub fn staged(self, stored: Stage) -> Stage {
+    pub fn implied(self) -> Option<Stage> {
         match self {
-            Basis::Set => stored,
-            Basis::Decided => Stage::Refining,
-            Basis::Vague => Stage::Vague,
+            Basis::Set => None,
+            Basis::Decided => Some(Stage::Refining),
+            Basis::Vague => Some(Stage::Vague),
         }
     }
 }

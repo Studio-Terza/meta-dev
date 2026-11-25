@@ -92,7 +92,7 @@ impl Lowers for UseRow {
         let declared = footing.aliases();
         let target = |parent: &Resolved| declared.target(parent).map(AsRef::<Resolved>::as_ref);
         let aliased = head.as_ref().and_then(|(parent, last)| target(parent)?.joined(last));
-        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref());
+        let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
         let member = head.as_ref().and_then(|(parent, last)| {
             let owner = target(parent).and_then(Resolved::crate_item).or_else(|| parent.crate_item())?;
             Some(Resolved::Member(Member::new(owner, (*last).clone())))

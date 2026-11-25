@@ -8,10 +8,12 @@ use std::thread::{self, Scope, ScopedJoinHandle};
 
 use std::collections::BTreeMap;
 
+use algebra::{Monoid, Semigroup};
 use lint_core::{Headline, Report, Violation};
+use lint_sweep::Visited;
 
 use super::stack_size::StackSize;
-use super::timings::Timing;
+use super::timings::{Timing, Visiting};
 use crate::cli::ignored::Ignored;
 use invariants::{Ignoring, Rejoined};
 
@@ -77,6 +79,7 @@ pub(crate) struct Worked {
     rendered: Vec<Rendered>,
     filed: Vec<FileLines>,
     timings: Vec<Timing>,
+    visited: Visiting,
 }
 
 impl Worked {
@@ -105,6 +108,14 @@ impl Worked {
         &self.timings
     }
 
+    pub(crate) fn visiting(visited: Visited) -> Worked {
+        Worked { visited: Visiting::from(visited), ..Worked::default() }
+    }
+
+    pub(crate) fn visited(&self) -> &Visiting {
+        &self.visited
+    }
+
     pub(crate) fn into_rendered(self, headline: impl Fn(Slot) -> Option<Headline>) -> Vec<Rendered> {
         let mut filed = self.filed;
         filed.sort_by_key(|part| (part.slot, part.order));
@@ -119,14 +130,22 @@ impl Worked {
     }
 }
 
+impl Semigroup for Worked {
+    fn combine(self, other: Worked) -> Worked {
+        Worked {
+            rendered: self.rendered.combine(other.rendered),
+            filed: self.filed.combine(other.filed),
+            timings: self.timings.combine(other.timings),
+            visited: self.visited.combine(other.visited),
+        }
+    }
+}
+
+impl Monoid for Worked {}
+
 impl FromIterator<Worked> for Worked {
     fn from_iter<Parts: IntoIterator<Item = Worked>>(parts: Parts) -> Worked {
-        parts.into_iter().fold(Worked::default(), |mut whole, part| {
-            whole.rendered.extend(part.rendered);
-            whole.filed.extend(part.filed);
-            whole.timings.extend(part.timings);
-            whole
-        })
+        Monoid::concat(parts)
     }
 }
 

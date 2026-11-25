@@ -1,4 +1,5 @@
 use super::{Frame, Grain, Grains};
+use algebra::Semigroup;
 use syntax::Spanned;
 use syntax::{ExprCall, ExprMacro, ExprMethodCall};
 
@@ -19,7 +20,7 @@ pub(super) struct CallRow {
 
 impl Lowers for CallRow {
     fn lowered(self, footing: Footing<'_>) -> ModelPart {
-        let seat = footing.places().seat(self.region.joined(footing.outer()), self.place.as_ref());
+        let seat = footing.places().seat(self.region.combine(footing.outer()), self.place.as_ref());
         self.located.call(footing, Call::new(self.callee, seat))
     }
 }

@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use graph::{
-    Function, Holding, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Named, Origin, Placed, Reach,
-    References, Region, Resolved, Seat, Sited, Traversal, TypeRef, TypeUses,
+    Event, Function, Holding, Implementation, ItemDeclaration, ItemId, ItemKind, Model, Origin, Placed, Reach,
+    References, Region, Resolved, Seat, TypeRef,
 };
 use lint_core::Site;
 use lint_layout::Name;
@@ -14,19 +14,9 @@ use super::outsider::Outsider;
 #[derive(Debug, Default)]
 struct Reached(BTreeSet<ItemId>);
 
-impl TypeUses for Reached {
-    fn named(&mut self, named: &Named<Sited>) {
-        self.0.extend(AsRef::<Resolved>::as_ref(named).crate_item());
-        named.each_inner_use(self);
-    }
-}
-
 impl<'ty> FromIterator<&'ty TypeRef> for Reached {
     fn from_iter<Types: IntoIterator<Item = &'ty TypeRef>>(types: Types) -> Reached {
-        types.into_iter().fold(Reached::default(), |mut reached, ty| {
-            ty.each_use(&mut reached);
-            reached
-        })
+        Reached(types.into_iter().flat_map(|ty| ty.uses().items()).collect())
     }
 }
 
@@ -130,7 +120,7 @@ impl<'file> Members<'file> {
             let used = standing(item).and_then(|found| targets.get(&found)).into_iter().flatten().copied();
             used.filter(move |target| self.crates.get(target) == krate)
         };
-        let ends = Traversal::trees(reached.0, &next).into_iter().flatten();
+        let ends = Event::walked(reached.0, &next).filter_map(Event::finished);
         ends.filter_map(|end| self.declarations.get(&end)).map(|member| Link::new(holder, *member)).collect()
     }
 

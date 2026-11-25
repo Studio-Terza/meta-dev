@@ -61,6 +61,58 @@ impl Files for FakeUnlistable<'_> {
     }
 }
 
+pub struct FakeUnsized<'memory> {
+    memory: &'memory Memory,
+}
+
+impl FakeUnsized<'_> {
+    pub fn new(memory: &Memory) -> FakeUnsized<'_> {
+        FakeUnsized { memory }
+    }
+}
+
+impl Files for FakeUnsized<'_> {
+    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        self.memory.read(path)
+    }
+
+    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        self.memory.read_text(path)
+    }
+
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
+        self.memory.write(path, bytes)
+    }
+
+    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        self.memory.append(path, bytes)
+    }
+
+    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
+        self.memory.create_directories(path)
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
+        self.memory.copy(from, to)
+    }
+
+    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        self.memory.entries(directory)
+    }
+
+    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
+        self.memory.canonical(path)
+    }
+
+    fn kind(&self, path: &Path) -> Kind {
+        self.memory.kind(path)
+    }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        std::panic::resume_unwind(Box::new(path.to_path_buf()))
+    }
+}
+
 pub struct FakeLinked<'memory> {
     memory: &'memory Memory,
     link: PathBuf,

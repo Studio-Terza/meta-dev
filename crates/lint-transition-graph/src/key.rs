@@ -1,15 +1,15 @@
 use std::fmt;
 
-use crate::end::Node;
+use crate::end::Identity;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Key<'found> {
-    takes: Vec<Node<'found>>,
-    gives: Node<'found>,
+    takes: Vec<Identity<'found>>,
+    gives: Identity<'found>,
 }
 
 impl<'found> Key<'found> {
-    pub(crate) fn new(takes: Vec<Node<'found>>, gives: Node<'found>) -> Key<'found> {
+    pub(crate) fn new(takes: Vec<Identity<'found>>, gives: Identity<'found>) -> Key<'found> {
         Key { takes, gives }
     }
 

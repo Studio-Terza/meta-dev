@@ -5,6 +5,7 @@ use std::iter;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
+use algebra::{Monoid, Semigroup};
 use file_ports::{FileFailure, Files, Kind};
 use lint_layout::Failure;
 
@@ -27,6 +28,20 @@ pub struct Survey {
     listed: BTreeMap<Spot, Vec<PathBuf>>,
     failed: Vec<Failure>,
 }
+
+impl Semigroup for Survey {
+    fn combine(self, other: Survey) -> Survey {
+        let mut kinds = self.kinds;
+        kinds.extend(other.kinds);
+        let mut canonical = self.canonical;
+        canonical.extend(other.canonical);
+        let mut listed = self.listed;
+        listed.extend(other.listed);
+        Survey { kinds, canonical, listed, failed: self.failed.combine(other.failed) }
+    }
+}
+
+impl Monoid for Survey {}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Settled<'survey>(&'survey Survey);

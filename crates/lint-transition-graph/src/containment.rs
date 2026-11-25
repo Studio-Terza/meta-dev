@@ -18,7 +18,7 @@ use lint_core::{Headline, Report, Site, Violation};
 use lint_layout::Name;
 
 use cluster::Cluster;
-use link::Link;
+use link::{Link, Reversed};
 use member::Member;
 use members::{Implemented, Members};
 use outsider::Outsider;
@@ -76,14 +76,14 @@ impl<'found, 'file> Containment<'found, 'file> {
         );
         let links: BTreeSet<Link<'found>> =
             defined.iter().copied().chain(members.used()).filter_map(Link::apart).collect();
-        let users = Self::adjacency(links.iter().copied().map(Link::reversed));
+        let users = Self::adjacency(links.iter().copied().map(Reversed::from).map(Link::from));
         Containment {
             slices: Slice::all(members.declared(), &users),
             sites: members.sites().iter().map(|(member, site)| (*member, *site)).collect(),
             uses: Self::adjacency(links.iter().copied()),
             users,
             defines: Self::adjacency(defined.into_iter()),
-            implementers: Self::adjacency(implemented.into_iter().map(Link::reversed)),
+            implementers: Self::adjacency(implemented.into_iter().map(Reversed::from).map(Link::from)),
             outsiders,
         }
     }

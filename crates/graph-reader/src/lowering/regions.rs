@@ -1,3 +1,4 @@
+use algebra::{Monoid, Semigroup};
 use syntax::{Attribute, ItemImpl, ItemMod};
 
 use graph::{Ground, Reach, Region, Within, Writing, Zone};
@@ -14,20 +15,20 @@ impl Regions {
         let head = source.head();
         let ported = Gate::PORTS.admits(head).map(|_| Ground::Ports);
         let ground = ported.or_else(|| Gate::STORE.admits(head).map(|_| Ground::Store)).unwrap_or(Ground::Open);
-        Region::new(reach, Self::zone_of(source), Within::Own).grounded(ground)
+        Region::new(reach, Self::zone_of(source), Within::Own).combine(Region::from(ground))
     }
 
-    pub(super) fn of_module(region: Region, item: &ItemMod) -> Region {
+    pub(super) fn of_module(item: &ItemMod) -> Region {
         let ported = Gate::PORTS.names(item).map(|_| Ground::Ports);
         let ground = ported.or_else(|| Gate::STORE.names(item).map(|_| Ground::Store)).unwrap_or(Ground::Open);
         let zone = Gate::BOUNDARY.names(item).map_or(Zone::Open, |_| Zone::Boundary);
-        Self::tested(region, &item.attrs).zoned(zone).grounded(ground)
+        Monoid::concat([Self::tested(&item.attrs), Region::from(zone), Region::from(ground)])
     }
 
-    fn tested(region: Region, attributes: &[Attribute]) -> Region {
+    fn tested(attributes: &[Attribute]) -> Region {
         match Walk::outside_tests(attributes) {
-            Walk::Skipped => region.reached(Reach::Test),
-            Walk::Entered => region,
+            Walk::Skipped => Region::from(Reach::Test),
+            Walk::Entered => Region::default(),
         }
     }
 
@@ -45,11 +46,11 @@ pub(super) enum MacroItems {
     Expanded,
 }
 
-impl MacroItems {
-    fn region(self, outer: Region) -> Region {
-        match self {
-            MacroItems::Transcribed => outer.reached(Reach::Transcribed),
-            MacroItems::Expanded => outer.written(Writing::Expanded),
+impl From<MacroItems> for Region {
+    fn from(items: MacroItems) -> Region {
+        match items {
+            MacroItems::Transcribed => Region::from(Reach::Transcribed),
+            MacroItems::Expanded => Region::from(Writing::Expanded),
         }
     }
 }
@@ -82,19 +83,19 @@ impl Context {
     }
 
     pub(super) fn within_item(&self, attributes: &[Attribute]) -> Context {
-        Context { region: Regions::tested(self.region, attributes), ..self.clone() }
+        Context { region: self.region.combine(Regions::tested(attributes)), ..self.clone() }
     }
 
     pub(super) fn within_module(&self, item: &ItemMod) -> Context {
-        Context { region: Regions::of_module(self.region, item), ..self.clone() }
+        Context { region: self.region.combine(Regions::of_module(item)), ..self.clone() }
     }
 
     pub(super) fn of_impl(&self, block: &ItemImpl, place: PlaceId) -> Context {
-        Context { region: self.region.inside(Self::within(block)), place: Some(place), spot: self.spot }
+        Context { region: self.region.combine(Region::from(Self::within(block))), place: Some(place), spot: self.spot }
     }
 
     pub(super) fn within_macro(&self, items: MacroItems) -> Context {
-        Context { region: items.region(self.region), ..self.clone() }
+        Context { region: self.region.combine(Region::from(items)), ..self.clone() }
     }
 
     pub(super) fn owned(&self, place: PlaceId) -> Context {

@@ -144,7 +144,7 @@ struct Substituting<'given> {
 }
 
 impl<'given> Substituting<'given> {
-    fn substituted(mut self, ty: &TypeRef) -> TypeRef {
+    fn substituted(self, ty: &TypeRef) -> TypeRef {
         let Ok(substituted) = self.child(ty);
         substituted
     }
@@ -162,11 +162,11 @@ impl Rebuild<Sited> for Substituting<'_> {
     type Into = Sited;
     type Fail = Infallible;
 
-    fn path(&mut self, path: &Sited) -> Sited {
+    fn path(&self, path: &Sited) -> Sited {
         path.clone()
     }
 
-    fn child(&mut self, ty: &TypeRef) -> Result<TypeRef, Infallible> {
+    fn child(&self, ty: &TypeRef) -> Result<TypeRef, Infallible> {
         match ty.named().and_then(|named| self.bound(named)) {
             Some(bound) => Ok(bound.clone()),
             None => ty.rebuilt(self),

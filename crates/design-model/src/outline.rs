@@ -11,27 +11,28 @@ pub struct Outline {
     parent: Option<NodeId>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Sketch {
+    node: NodeId,
+    project: Project,
+    facet: Facet,
+    stage: Stage,
+}
+
+impl Sketch {
+    #[must_use]
+    pub fn new(node: NodeId, project: Project, facet: Facet, stage: Stage) -> Sketch {
+        Sketch { node, project, facet, stage }
+    }
+
+    #[must_use]
+    pub fn described(self, basis: Basis, title: Option<Title>, parent: Option<NodeId>) -> Outline {
+        let Sketch { node, project, facet, stage } = self;
+        Outline { node, project, facet, stage, basis, title, parent }
+    }
+}
+
 impl Outline {
-    #[must_use]
-    pub fn new(node: NodeId, project: Project, facet: Facet, stage: Stage) -> Outline {
-        Outline { node, project, facet, stage, basis: Basis::Vague, title: None, parent: None }
-    }
-
-    #[must_use]
-    pub fn based(self, basis: Basis) -> Outline {
-        Outline { basis, ..self }
-    }
-
-    #[must_use]
-    pub fn titled(self, title: Option<Title>) -> Outline {
-        Outline { title, ..self }
-    }
-
-    #[must_use]
-    pub fn parented(self, parent: Option<NodeId>) -> Outline {
-        Outline { parent, ..self }
-    }
-
     #[must_use]
     pub fn node(&self) -> NodeId {
         self.node

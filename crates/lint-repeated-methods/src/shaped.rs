@@ -70,12 +70,12 @@ impl<'model> Shaped<'model> {
             .filter(|_| region.reach() == Reach::Shipped)
             .and(seat.owner())?;
         let subject = Subject { resolved: seat.subject()?.named()?.as_ref() };
-        let inner = inners.only(owner).map(|ty| ty.mapped(&mut |sited| subject.erased(sited)));
+        let inner = inners.only(owner).map(|ty| ty.mapped(|sited| subject.erased(sited)));
         let signature = function.signature();
         let inputs = signature.inputs().iter().map(|input| subject.spot(input, inner.as_ref())).collect();
-        let output = signature.output().written().map(|ty| ty.mapped(&mut |sited| subject.erased(sited)));
+        let output = signature.output().written().map(|ty| ty.mapped(|sited| subject.erased(sited)));
         let parameters = AsRef::<[Parameter]>::as_ref(signature).iter().flat_map(Parameter::bounds);
-        let bounds = parameters.map(|ty| ty.mapped(&mut |sited| subject.erased(sited))).collect();
+        let bounds = parameters.map(|ty| ty.mapped(|sited| subject.erased(sited))).collect();
         Some(Shaped {
             function,
             key: Key { name: function.as_ref(), inputs, output, bounds },
@@ -123,7 +123,7 @@ impl Subject<'_> {
     }
 
     fn typed(self, ty: Option<&TypeRef>, inner: Option<&TypeRef<Erased>>) -> Spot {
-        let erased = ty.map(|written| written.mapped(&mut |sited| self.erased(sited)));
+        let erased = ty.map(|written| written.mapped(|sited| self.erased(sited)));
         erased.filter(|found| Some(found) != inner).map_or(Spot::Inner, Spot::Typed)
     }
 }
