@@ -46,7 +46,7 @@ impl GraphLint for Homomorphisms {
 #[derive(Debug)]
 struct InScope<'edge, 'found, 'file> {
     name: &'edge CrateName,
-    morphisms: Vec<Morphism<'edge, 'found, 'file>>,
+    morphisms: Vec<Candidate<'edge, 'found, 'file>>,
 }
 
 impl<'edge, 'found, 'file> InScope<'edge, 'found, 'file> {
@@ -55,7 +55,7 @@ impl<'edge, 'found, 'file> InScope<'edge, 'found, 'file> {
         edges: &[&'edge Edge<'found, 'file>],
         algebras: &Algebras<'found, 'file>,
     ) -> InScope<'edge, 'found, 'file> {
-        InScope { name, morphisms: edges.iter().filter_map(|edge| Morphism::of_edge(edge, algebras)).collect() }
+        InScope { name, morphisms: edges.iter().filter_map(|edge| Candidate::of_edge(edge, algebras)).collect() }
     }
 
     fn sites(&self) -> impl Iterator<Item = Site<'file>> + '_ {
@@ -75,25 +75,30 @@ impl<'edge, 'found, 'file> InScope<'edge, 'found, 'file> {
     }
 }
 
-#[derive(Debug)]
-struct Morphism<'edge, 'found, 'file> {
+#[derive(Clone, Copy, Debug)]
+struct Candidate<'edge, 'found, 'file> {
     edge: &'edge Edge<'found, 'file>,
     source: Node<'found>,
     target: Node<'found>,
+}
+
+#[derive(Debug)]
+struct Morphism<'edge, 'found, 'file> {
+    candidate: Candidate<'edge, 'found, 'file>,
     shortfalls: Vec<Shortfall<'edge, 'found, 'file>>,
 }
 
-impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
+impl<'edge, 'found, 'file> Candidate<'edge, 'found, 'file> {
     fn of_edge(
         edge: &'edge Edge<'found, 'file>,
         algebras: &Algebras<'found, 'file>,
-    ) -> Option<Morphism<'edge, 'found, 'file>> {
+    ) -> Option<Candidate<'edge, 'found, 'file>> {
         let mut inputs = edge.ends().taken().copied();
         let source = inputs.next()?;
         let target = AsRef::<End<'found>>::as_ref(edge.ends()).node().copied()?;
         inputs
             .next()
-            .map_or(Some(Morphism { edge, source, target, shortfalls: Vec::new() }), |_| None)
+            .map_or(Some(Candidate { edge, source, target }), |_| None)
             .filter(|_| matches!(edge.form(), Form::Transition))
             .filter(|morphism| morphism.source != morphism.target)
             .filter(|morphism| algebras.of_type(&morphism.source).is_some())
@@ -124,14 +129,24 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
             .map(|law| Shortfall::of_law(law, self.source, self.target, algebras))
             .collect();
         let passing_law = verdicts.iter().position(Vec::is_empty);
-        passing_law
-            .map_or_else(|| Some(Morphism { shortfalls: verdicts.into_iter().flatten().collect(), ..self }), |_| None)
+        passing_law.map_or_else(
+            || Some(Morphism { candidate: self, shortfalls: verdicts.into_iter().flatten().collect() }),
+            |_| None,
+        )
     }
 }
 
 impl fmt::Display for Morphism<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} -> {}: {} at {}", self.source, self.target, self.function(), self.edge.site())?;
+        let candidate = self.candidate;
+        write!(
+            formatter,
+            "{} -> {}: {} at {}",
+            candidate.source,
+            candidate.target,
+            candidate.function(),
+            candidate.edge.site()
+        )?;
         self.shortfalls.iter().try_for_each(|shortfall| write!(formatter, " ({shortfall})"))
     }
 }
@@ -196,7 +211,11 @@ struct CrateMorphisms<'edge, 'found, 'file> {
 
 impl<'file> CrateMorphisms<'_, '_, 'file> {
     fn reported(self) -> Option<Violation<'file>> {
-        self.undeclared.iter().map(|morphism| morphism.edge.site()).min().map(|site| Violation::new(site, &self))
+        self.undeclared
+            .iter()
+            .map(|morphism| morphism.candidate.edge.site())
+            .min()
+            .map(|site| Violation::new(site, &self))
     }
 }
 

@@ -113,11 +113,17 @@ impl Route {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Admission {
+    ByName,
+    AsOperand,
+}
+
 impl LawOwner {
-    fn admits<'name>(&self, owner: &'name Name) -> Option<&'name Name> {
+    fn admits(&self, owner: &Name) -> Option<Admission> {
         match self {
-            LawOwner::Named(named) => Some(owner).filter(|candidate| *candidate == named),
-            LawOwner::Operand => Some(owner),
+            LawOwner::Named(named) => (owner == named).then_some(Admission::ByName),
+            LawOwner::Operand => Some(Admission::AsOperand),
         }
     }
 }
