@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use equivalence::{Equivalence, Erased};
+use equivalence::{Equivalence, Literals, Locals, Names};
 use lint_layout::{Casing, Name, Whole, Word, words};
 use std::ops::Range;
 
@@ -118,10 +118,6 @@ impl Classes {
         let sign = window.neighbours(lexemes, index).sign();
         lexemes.get(index).and_then(|lexeme| lexeme.kind().read(&Speaking { facts: &self.facts, sign }))
     }
-
-    fn literals_erased(&self) -> Option<Erased> {
-        self.equivalence.erases(Erased::Literals)
-    }
 }
 
 #[derive(Debug)]
@@ -132,21 +128,25 @@ struct Classifying<'classes> {
 
 impl Classifying<'_> {
     fn renamed(&self, named: Named, sort: Sort, word: &Code) -> Token {
-        let every = self.classes.equivalence.erases(Erased::Names);
+        let slot = *named.as_ref();
+        let every = self.classes.equivalence.erases::<Names>().map(|_| Token::Slotted(slot));
         let local = self
             .classes
             .equivalence
-            .erases(Erased::Locals)
+            .erases::<Locals>()
             .filter(|_| sort == Sort::Lower)
-            .filter(|_| self.spot != Spot::Named);
-        every.or(local).map_or_else(|| Token::Shaped(word.clone()), |_| Token::Slotted(*named.as_ref()))
+            .filter(|_| self.spot != Spot::Named)
+            .map(|_| Token::Slotted(slot));
+        every.or(local).unwrap_or_else(|| Token::Shaped(word.clone()))
     }
 
     fn sorted(&self, named: Named, fact: &Fact) -> Token {
         match fact.sort {
-            Sort::LiteralWord => {
-                self.classes.literals_erased().map_or(Token::Shaped(fact.word.clone()), |_| Token::Shaped(Code::Erased))
-            }
+            Sort::LiteralWord => self
+                .classes
+                .equivalence
+                .erases::<Literals>()
+                .map_or(Token::Shaped(fact.word.clone()), |_| Token::Shaped(Code::Erased)),
             Sort::Keyword => Token::Shaped(fact.word.clone()),
             Sort::Lower | Sort::Other => self.renamed(named, fact.sort, &fact.word),
         }
@@ -162,14 +162,14 @@ impl Lexemes for Classifying<'_> {
 
     fn literal(&self, quoted: Quoted) -> Token {
         let code = self.classes.facts.fact(*quoted.as_ref()).map_or(Code::Erased, |fact| fact.word.literal());
-        self.classes.literals_erased().map_or(Token::Shaped(code), |_| Token::Shaped(Code::Erased))
+        self.classes.equivalence.erases::<Literals>().map_or(Token::Shaped(code), |_| Token::Shaped(Code::Erased))
     }
 
     fn mark(&self, mark: char) -> Token {
         let dropped = Some(mark)
             .filter(|found| *found == '-')
             .filter(|_| self.spot == Spot::BeforeLiteral)
-            .and(self.classes.literals_erased());
+            .and(self.classes.equivalence.erases::<Literals>());
         dropped.map_or(Token::Shaped(Code::Mark(mark)), |_| Token::Dropped)
     }
 }

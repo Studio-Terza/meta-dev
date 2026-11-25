@@ -535,6 +535,7 @@ dependencies = [
 name = "equivalence"
 version = "0.1.0"
 dependencies = [
+ "algebra",
  "graph",
  "laws",
  "newtype",

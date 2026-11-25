@@ -3,7 +3,7 @@ mod taken;
 
 use std::fmt;
 
-use equivalence::{Equivalence, Erased, Keyed};
+use equivalence::{Equivalence, Keyed, Names};
 use graph::Mutation;
 use lint_core::Site;
 use lint_layout::Name;
@@ -72,7 +72,7 @@ impl<'found, 'file> Keyed for Method<'_, 'found, 'file> {
             takes: takes.collect(),
             gives: Taken::new(*AsRef::as_ref(ends), function.wrapping()),
             mutation: Mutating(function.mutation()),
-            name: self.equivalence.erases(Erased::Names).map_or(Some(AsRef::<Name>::as_ref(function)), |_| None),
+            name: self.equivalence.erases::<Names>().map_or(Some(AsRef::<Name>::as_ref(function)), |_| None),
         }
     }
 }

@@ -27,7 +27,6 @@ impl RepeatedShapes {
     ) -> Vec<Violation<'file>> {
         Groups::grouped(occurrences)
             .outermost(|exact| TokenCount::from(exact))
-            .listed()
             .iter()
             .filter_map(|group| Finding::violation(group, equivalence))
             .collect()
