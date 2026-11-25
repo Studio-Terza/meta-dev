@@ -200,7 +200,7 @@ impl CrateExports {
     ) -> Found {
         self.named
             .get(name)
-            .map(|bound| chosen(bound))
+            .map(chosen)
             .and_then(|bound| Reexport::bound(&bound))
             .unwrap_or_else(|| self.declared.get(name).map_or_else(|| self.globs.found(name, inside), |_| Found::Own))
     }
