@@ -2,7 +2,7 @@ use lint_layout::Name;
 
 use crate::boundary::ItemId;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Member {
     owner: ItemId,
     name: Name,

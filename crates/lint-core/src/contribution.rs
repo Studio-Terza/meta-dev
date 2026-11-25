@@ -1,8 +1,11 @@
 use std::fmt;
 use std::iter;
+use std::ops::Range;
 use std::rc::Rc;
 
 use algebra::{Monoid, Semigroup};
+use newtype::Arbitrary;
+use newtype::proptest::strategy::Strategy;
 use syntax::Node;
 
 use crate::kind_index::{Cursors, Indexed, Kinds};
@@ -62,14 +65,20 @@ struct Stepping<'index, Open, Part> {
     cursors: Option<Cursors<'index>>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[newtype(generate = WalkPosition::sampled)]
 pub struct WalkPosition(usize);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[newtype(generate = Visits::sampled)]
 pub struct Visits(usize);
 
 impl Visits {
     const ONE: Visits = Visits(1);
+
+    fn sampled() -> impl Strategy<Value = Visits> {
+        Strategy::prop_map(WalkPosition::SAMPLED, Visits)
+    }
 }
 
 impl Semigroup for Visits {
@@ -354,6 +363,11 @@ impl Scoping {
 
 impl WalkPosition {
     const ONE: WalkPosition = WalkPosition(1);
+    const SAMPLED: Range<usize> = 0..1_000_000;
+
+    fn sampled() -> impl Strategy<Value = WalkPosition> {
+        Strategy::prop_map(Self::SAMPLED, WalkPosition)
+    }
 }
 
 impl Scope {

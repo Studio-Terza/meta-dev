@@ -8,7 +8,7 @@ use crate::member::Member;
 use crate::primitive::Primitive;
 use crate::unresolved::Unresolved;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(newtype::Arbitrary, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Resolved {
     Std(ItemPath),
     StdTrait(ItemPath),

@@ -1,6 +1,10 @@
 use std::collections::BTreeMap;
+use std::ops::Range;
 
 use algebra::{Monoid, Semigroup};
+use newtype::proptest::arbitrary::any;
+use newtype::proptest::collection::btree_map;
+use newtype::proptest::strategy::Strategy;
 
 use crate::boundary::ItemId;
 use crate::domain::Domain;
@@ -61,7 +65,8 @@ impl Aliases {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(newtype::Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[newtype(generate = Exports::sampled)]
 pub struct Exports {
     domains: BTreeMap<Domain, BTreeMap<ItemPath, Resolved>>,
 }
@@ -77,6 +82,13 @@ impl Semigroup for Exports {
 impl Monoid for Exports {}
 
 impl Exports {
+    const SAMPLED: Range<usize> = 0..4;
+
+    fn sampled() -> impl Strategy<Value = Exports> {
+        let exported = btree_map(any::<ItemPath>(), any::<Resolved>(), Self::SAMPLED);
+        Strategy::prop_map(btree_map(any::<Domain>(), exported, Self::SAMPLED), |domains| Exports { domains })
+    }
+
     #[must_use]
     pub fn export(domain: Domain, path: ItemPath, resolved: &Resolved) -> Exports {
         let exported = resolved.known().map(|known| (path, known.clone())).into_iter().collect();
