@@ -29,7 +29,6 @@ pub struct Contribution<Open, Part> {
 #[derive(Debug)]
 pub struct Contributing<Contributor: Contribute> {
     contributor: Contributor,
-    kinds: Vec<Kind>,
     mask: Kinds,
 }
 
@@ -192,10 +191,9 @@ impl<Open: Monoid, Part: Monoid> From<Visits> for Walked<Open, Part> {
 
 impl<Contributor: Contribute> Contributing<Contributor> {
     pub fn new(contributor: Contributor) -> Contributing<Contributor> {
-        let kinds: Vec<Kind> =
-            contributor.kinds().iter().copied().chain(contributor.scopes().iter().map(|scope| scope.0)).collect();
-        let mask = Kinds::listed(&kinds);
-        Contributing { contributor, kinds, mask }
+        let mask =
+            Kinds::listed(contributor.kinds().iter().copied().chain(contributor.scopes().iter().map(|scope| scope.0)));
+        Contributing { contributor, mask }
     }
 
     pub fn concluded<Out>(
@@ -286,7 +284,7 @@ impl<Contributor: Contribute> Contributing<Contributor> {
     }
 
     pub(crate) fn watches(&self, kind: Kind) -> Option<Kind> {
-        self.kinds.contains(&kind).then_some(kind)
+        self.mask.overlap(Kinds::from(kind)).map(|()| kind)
     }
 
     pub(crate) fn entered<On, Off>(
