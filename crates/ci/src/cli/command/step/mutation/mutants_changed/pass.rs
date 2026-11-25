@@ -3,7 +3,7 @@ use console_ports::Shown;
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
 use std::num::NonZeroU8;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use file_ports::Files;
 use text_lines::Lines;
@@ -11,13 +11,13 @@ use text_lines::Lines;
 mod boundary;
 
 use super::super::boundary::Exact;
-use super::super::kept::Outcomes;
+use super::super::kept::{Mutant, Outcomes};
 use super::verdict::Verdict;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::journal::Journal;
 use crate::cli::command::step::mutation::cargo_mutants::CargoMutants;
 use crate::cli::command::step::mutation::shard_summary::outcome::Outcome;
-use crate::cli::ports::{Exit, Ports, Text};
+use crate::cli::ports::{Exit, Invocation, Ports, Text};
 use boundary::Narrowed;
 
 #[derive(Debug)]
@@ -51,6 +51,7 @@ impl Survivors {
 impl Pass {
     const OUTCOMES: &'static str = "mutants.out";
     const OUTCOMES_FILE: &'static str = "outcomes.json";
+    const LISTED: [&'static str; 4] = ["mutants", "--list", "--json", "--in-diff"];
 
     pub(super) fn within(output: PathBuf) -> Pass {
         Pass { output }
@@ -90,6 +91,14 @@ impl Pass {
         let unproven = self.listed(files, Outcome::Missed)?.into_iter().chain(self.listed(files, Outcome::Timeout)?);
         let missed: Vec<String> = unproven.map(|name| [name.as_ref(), "\n"].concat()).collect();
         Ok(Verdict::from(&Text::new(missed.concat())).told())
+    }
+
+    pub(super) fn chosen(ports: &impl Ports, diff: &Path, names: &[Text]) -> Result<Text, Failure<'static>> {
+        let invocation =
+            Invocation::new("cargo", Self::LISTED.map(OsString::from).into_iter().chain([diff.as_os_str().to_owned()]));
+        let listed = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
+        let mutants = Mutant::listed(&Text::new(listed.as_ref().to_owned())).map_err(Failure::Outcomes)?;
+        mutants.iter().filter(|mutant| names.contains(&mutant.name())).collect::<Narrowed>().diff(ports.files())
     }
 
     pub(super) fn narrowed(&self, files: &impl Files, survivors: &Survivors) -> Result<Text, Failure<'static>> {

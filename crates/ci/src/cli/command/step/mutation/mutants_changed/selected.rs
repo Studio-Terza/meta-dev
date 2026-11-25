@@ -20,9 +20,14 @@ impl Selected {
     }
 
     pub(super) fn examined(&self) -> Option<Vec<OsString>> {
-        self.0.as_ref().map_or(Some(Vec::new()), |names| {
-            let listed: Vec<Text> = names.as_ref().parse::<Lines>().into_iter().flatten().map(Text::new).collect();
-            Some(Survivors::from(listed).examined()).filter(|examined| examined.iter().next().is_some())
+        self.0.as_ref().map_or(Some(Vec::new()), |_| {
+            Some(Survivors::from(self.named()).examined()).filter(|examined| examined.iter().next().is_some())
         })
+    }
+
+    pub(super) fn named(&self) -> Vec<Text> {
+        self.0
+            .as_ref()
+            .map_or_default(|names| names.as_ref().parse::<Lines>().into_iter().flatten().map(Text::new).collect())
     }
 }

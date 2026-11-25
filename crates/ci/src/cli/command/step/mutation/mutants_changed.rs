@@ -16,7 +16,7 @@ use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
 use crate::cli::command::step::Flag;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Ports, Text};
 use keeping::Keeping;
 use pass::Pass;
 use reruns::Reruns;
@@ -27,6 +27,7 @@ use verdict::Verdict;
 pub struct MutantsChanged {
     diff: Journal,
     narrowed: Journal,
+    chosen: Journal,
     own: Pass,
     scoped: Pass,
     shard: Shard,
@@ -39,14 +40,16 @@ impl MutantsChanged {
     const IN_DIFF: &'static str = "--in-diff";
     const SCOPED: &'static str = "scoped";
     const NARROWED: &'static str = "survivors.diff";
+    const CHOSEN: &'static str = "selected.diff";
     const SELECTED: Flag = Flag::new("--selected");
     const KEPT: Flag = Flag::new("--kept");
 
     fn tested<'step>(&'step self, ports: &'step impl Ports) -> Result<Telling<'step>, Failure<'step>> {
         let selected = Selected::read(ports, self.selected.as_ref())?;
+        let names = selected.named();
         selected.examined().map_or_else(
             || self.keeping.concluded(ports, Verdict::Unchanged),
-            |examined| self.mutated(ports, &examined),
+            |examined| self.mutated(ports, &examined, &names),
         )
     }
 
@@ -54,8 +57,15 @@ impl MutantsChanged {
         &'step self,
         ports: &'step impl Ports,
         examined: &[OsString],
+        names: &[Text],
     ) -> Result<Telling<'step>, Failure<'step>> {
-        let diff: &Path = self.diff.as_ref();
+        let chosen = names
+            .first()
+            .map(|_| Pass::chosen(ports, self.diff.as_ref(), names))
+            .transpose()?
+            .map(|text| self.chosen.replace(ports.files(), &text))
+            .transpose()?;
+        let diff: &Path = chosen.map_or_else(|| self.diff.as_ref(), |()| self.chosen.as_ref());
         let shard = self.shard.arguments();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
             .into_iter()
@@ -90,6 +100,7 @@ impl Step for MutantsChanged {
         Ok(MutantsChanged {
             diff: Journal::from(diff),
             narrowed: Journal::from(output.join(Self::NARROWED)),
+            chosen: Journal::from(output.join(Self::CHOSEN)),
             scoped: Pass::within(output.join(Self::SCOPED)),
             own: Pass::within(output),
             shard,
