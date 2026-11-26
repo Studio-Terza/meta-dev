@@ -1,8 +1,10 @@
-use named_derive::Named;
+use newtype::Listed;
+use strum::{Display, IntoStaticStr, VariantArray};
 
 use crate::Stage;
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Basis {
     Set,
     Decided,

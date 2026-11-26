@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO overruns (task)\nVALUES\n  (?1)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "293f1f243f1fb290f781686e9be5d59e1a3fee9c2ea638394e0ab0da95e5a926"
+}

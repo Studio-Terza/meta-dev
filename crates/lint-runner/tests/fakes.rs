@@ -59,6 +59,10 @@ impl Files for FakeUnlistable<'_> {
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
     }
+
+    fn stamps(&self, path: &Path) -> Result<file_ports::Stamps, FileFailure> {
+        self.memory.stamps(path)
+    }
 }
 
 pub struct FakeUnsized<'memory> {
@@ -110,6 +114,10 @@ impl Files for FakeUnsized<'_> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         std::panic::resume_unwind(Box::new(path.to_path_buf()))
+    }
+
+    fn stamps(&self, path: &Path) -> Result<file_ports::Stamps, FileFailure> {
+        self.memory.stamps(path)
     }
 }
 
@@ -170,6 +178,10 @@ impl Files for FakeLinked<'_> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
+    }
+
+    fn stamps(&self, path: &Path) -> Result<file_ports::Stamps, FileFailure> {
+        self.memory.stamps(path)
     }
 }
 
@@ -244,5 +256,9 @@ impl Files for FakeCounted<'_> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
+    }
+
+    fn stamps(&self, path: &Path) -> Result<file_ports::Stamps, FileFailure> {
+        self.memory.stamps(path)
     }
 }

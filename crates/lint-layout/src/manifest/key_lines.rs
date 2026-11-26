@@ -2,6 +2,7 @@ mod boundary;
 
 use std::collections::BTreeMap;
 
+use strum::VariantArray;
 use toml::de::DeTable;
 
 use super::Manifest;
@@ -22,9 +23,10 @@ impl KeyLines {
     pub(super) fn read(text: &SourceText, top: &DeTable<'_>) -> KeyLines {
         KeyLines {
             features: Self::features_in(text, top),
-            keys: TableKey::ALL
-                .into_iter()
-                .filter_map(|key| Some((key, Manifest::key_in(text, top, &key.table(), key.name())?)))
+            keys: TableKey::VARIANTS
+                .iter()
+                .copied()
+                .filter_map(|key| Some((key, Manifest::key_in(text, top, &key.table(), key.into())?)))
                 .collect(),
         }
     }

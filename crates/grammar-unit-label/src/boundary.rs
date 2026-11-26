@@ -2,7 +2,8 @@ use std::fmt;
 
 use grammar::logos::{Lexer, Logos};
 use grammar::{Ignoring, Unlexed};
-use named_derive::Named;
+use newtype::Listed;
+use strum::{Display, IntoStaticStr, VariantArray};
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(crate = grammar::logos)]
@@ -35,17 +36,17 @@ pub trait Unit: Sized {
     }
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fixed {
-    #[name("")]
+    #[strum(serialize = "")]
     Built,
-    #[name(" (check)")]
+    #[strum(serialize = " (check)")]
     Checked,
-    #[name(" (check-test)")]
+    #[strum(serialize = " (check-test)")]
     CheckedTest,
-    #[name(" build-script")]
+    #[strum(serialize = " build-script")]
     BuildScript,
-    #[name(" build-script (run)")]
+    #[strum(serialize = " build-script (run)")]
     BuildRun,
 }
 
@@ -56,7 +57,8 @@ pub struct Target {
     mode: Mode,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[strum(serialize_all = "snake_case")]
 pub enum Kind {
     Bin,
     Test,
@@ -64,11 +66,11 @@ pub enum Kind {
     Example,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mode {
-    #[name("(check)")]
+    #[strum(serialize = "(check)")]
     Check,
-    #[name("(check-test)")]
+    #[strum(serialize = "(check-test)")]
     CheckTest,
 }
 

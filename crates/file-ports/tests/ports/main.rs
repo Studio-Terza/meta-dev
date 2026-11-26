@@ -5,8 +5,11 @@ mod ignored;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Text};
+use file_ports::{
+    Absent, Bytes, Cached, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Stamp, Stamps, Tail, Text,
+};
 use invariants::Ignoring;
+use newtype::Wrapping;
 
 use ignored::Ignored;
 
@@ -270,8 +273,36 @@ impl Batches {
         assert_eq!(files.bytes_below(&root.join("copies"))?, Size::new(7));
         assert!(matches!(files.bytes_below(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
         assert!(matches!(files.size(&root.join("nothing-here")), Err(FileFailure::Missing(_))));
+        let [deep, single] = ["copies/deep.txt", "copies/c.txt"].map(|name| root.join(name));
+        let sized = files.sizes(&[deep.clone(), root.join("nothing-here"), single]);
+        assert!(
+            matches!(sized.as_slice(), [Ok(five), Err(FileFailure::Missing(_)), Ok(one)] if *five == Size::new(5) && *one == Size::new(1))
+        );
+        let tails: Vec<Tail> = [3, 1]
+            .into_iter()
+            .filter_map(|at| Offset::try_new(at).ignoring(Ignored::Negative))
+            .map(|at| Tail::new(deep.clone(), at))
+            .collect();
+        assert_eq!(
+            files.read_tails(&tails).into_iter().collect::<Result<Vec<Bytes>, _>>()?,
+            [Bytes::from("45"), Bytes::from("2345")]
+        );
         Ok(())
     }
+}
+
+const WRITTEN_AFTER: i64 = 1_767_225_600;
+
+#[test]
+fn disk_stamps_each_file_with_the_time_it_was_written_and_misses_an_absent_one() -> Result<(), FileFailure> {
+    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
+    let written = scratch.path().join("stamped.txt");
+    Disk.write(&written, Bytes::from("now"))?;
+    let stamped = Disk.stamps_many(&[written, scratch.path().join("absent.txt")]);
+    let dated =
+        |stamps: &Stamps| [Stamp::Born, Stamp::Touched].map(|stamp| stamps.dated(stamp).into_inner() > WRITTEN_AFTER);
+    assert!(matches!(stamped.as_slice(), [Ok(stamps), Err(FileFailure::Missing(_))] if dated(stamps) == [true, true]));
+    Ok(())
 }
 
 #[test]

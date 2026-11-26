@@ -4,6 +4,8 @@ laws::generates!(deadline_generates, any::<dispatch_ports::Deadline>());
 
 laws::generates!(fault_generates, any::<dispatch_ports::Fault>());
 
+laws::generates!(moment_generates, any::<dispatch_ports::Moment>());
+
 laws::generates!(pause_generates, any::<dispatch_ports::Pause>());
 
 laws::generates!(pid_generates, any::<dispatch_ports::Pid>());

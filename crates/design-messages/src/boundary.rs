@@ -12,7 +12,7 @@ use newtype::{Arbitrary, Newtype, Wrapping};
 use store_ports::Record as _;
 use store_ports::{Columns, Deletion, Execute, Prepared, StoreFailure, Written};
 use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shape};
-use transcript_ports::{Authorship, Body, Cursor, Event, Happening, Instant, Record, SessionId, Skipped, Uuid};
+use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::boundary::ignored::Ignored;
 use crate::{Said, Scope};
@@ -34,26 +34,6 @@ pub struct MessageRow {
     at: Instant,
     author: Authorship,
     body: Body,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Columns)]
-pub struct EventRow {
-    uuid: Uuid,
-    session: SessionId,
-    at: Instant,
-    happening: Happening,
-    body: Body,
-}
-
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Began(i64);
-
-#[derive(Clone, Debug, PartialEq, Eq, Columns)]
-pub struct HeardEvent {
-    at: Instant,
-    happening: Happening,
-    body: Body,
-    began: Option<Began>,
 }
 
 #[derive(Clone, Debug, PartialEq, Columns)]
@@ -115,65 +95,6 @@ impl From<&Message> for MessageRow {
             at: record.stamp().clone(),
             author: record.author(),
             body: record.text().clone(),
-        }
-    }
-}
-
-impl HeardEvent {
-    pub(crate) fn in_session(
-        session: &SessionId,
-        statements: &mut impl Execute,
-    ) -> Result<Vec<HeardEvent>, StoreFailure> {
-        statements.rows(store_ports::query!(
-            HeardEvent,
-            r#"
-SELECT
-  at,
-  happening,
-  body,
-  CAST(strftime('%s', at) AS INTEGER) AS began
-FROM
-  events
-WHERE
-  session = ?1
-ORDER BY
-  at
-"#,
-            session: SessionId
-        ))
-    }
-
-    #[must_use]
-    pub fn happening(&self) -> Happening {
-        self.happening
-    }
-
-    #[must_use]
-    pub fn began(&self) -> Option<Began> {
-        self.began
-    }
-}
-
-impl AsRef<Body> for HeardEvent {
-    fn as_ref(&self) -> &Body {
-        &self.body
-    }
-}
-
-impl AsRef<Instant> for HeardEvent {
-    fn as_ref(&self) -> &Instant {
-        &self.at
-    }
-}
-
-impl From<&Event> for EventRow {
-    fn from(event: &Event) -> EventRow {
-        EventRow {
-            uuid: AsRef::<Uuid>::as_ref(event).clone(),
-            session: AsRef::<SessionId>::as_ref(event).clone(),
-            at: AsRef::<Instant>::as_ref(event).clone(),
-            happening: event.happening(),
-            body: AsRef::<Body>::as_ref(event).clone(),
         }
     }
 }
@@ -645,25 +566,6 @@ VALUES
             parent: Option<Uuid>,
             at: Instant,
             author: Authorship,
-            body: Body
-        )
-    }
-}
-
-impl Row for EventRow {
-    fn inserted(&self) -> Prepared<()> {
-        let EventRow { uuid, session, at, happening, body } = self;
-        store_ports::query!(
-            r#"
-INSERT
-  OR IGNORE INTO events (uuid, session, at, happening, body)
-VALUES
-  (?1, ?2, ?3, ?4, ?5)
-"#,
-            uuid: Uuid,
-            session: SessionId,
-            at: Instant,
-            happening: Happening,
             body: Body
         )
     }

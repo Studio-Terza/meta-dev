@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT task AS \"task!\", at AS \"at!\" FROM overruns",
+  "describe": {
+    "columns": [
+      {
+        "name": "task!",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "overruns",
+            "name": "task"
+          }
+        }
+      },
+      {
+        "name": "at!",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "overruns",
+            "name": "at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c7223931517928a7c62921ec698ce74f86f1b4a9fb4925aa553e5017dbc6356a"
+}

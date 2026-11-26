@@ -4,6 +4,7 @@ use std::fmt;
 
 use lint_layout::{Name, UsePath, Whole, Word, words};
 use lint_placement::Krate;
+use strum::{IntoStaticStr, VariantArray};
 
 use super::{ModuleIndex, ModulePath};
 
@@ -14,11 +15,28 @@ enum Start {
     Relative,
 }
 
-impl Start {
-    const NAMED: [(&'static str, Start); 2] = [("crate", Start::Crate), ("super", Start::Super)];
+#[derive(IntoStaticStr, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
+enum Keyword {
+    Crate,
+    Super,
+}
 
+impl Keyword {
+    fn start(self) -> Start {
+        match self {
+            Keyword::Crate => Start::Crate,
+            Keyword::Super => Start::Super,
+        }
+    }
+}
+
+impl Start {
     fn spelled(name: &Name) -> Start {
-        Self::NAMED.iter().find(|(word, _)| *name == Name::from(*word)).map_or(Start::Relative, |(_, start)| *start)
+        Keyword::VARIANTS
+            .iter()
+            .find(|keyword| AsRef::<str>::as_ref(name) == <&str>::from(**keyword))
+            .map_or(Start::Relative, |keyword| keyword.start())
     }
 
     fn advance<'path>(self, mut segments: Vec<&'path Name>, segment: &'path Name) -> Option<Vec<&'path Name>> {

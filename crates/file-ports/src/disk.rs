@@ -6,7 +6,7 @@ use invariants::Ignoring;
 
 mod spread;
 
-use crate::{Bytes, FileFailure, Files, Ignored, Kind, Offset, Size, Text};
+use crate::{Bytes, Epoch, FileFailure, Files, Ignored, Kind, Offset, Size, Stamps, Text};
 use spread::Spread;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -62,6 +62,11 @@ impl Files for Disk {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         Ok(Size::new(fs::symlink_metadata(path)?.len()))
+    }
+
+    fn stamps(&self, path: &Path) -> Result<Stamps, FileFailure> {
+        let metadata = fs::metadata(path)?;
+        Ok(Stamps::new(Epoch::from(metadata.created()?), Epoch::from(metadata.modified()?)))
     }
 
     fn read_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Bytes, FileFailure>> {

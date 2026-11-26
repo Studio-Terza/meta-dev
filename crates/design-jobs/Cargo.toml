@@ -13,7 +13,7 @@ doctest = false
 
 [dependencies]
 design-model = { path = "../design-model" }
-named-derive = { path = "../named-derive" }
+strum.workspace = true
 port-core = { path = "../port-core" }
 states = { path = "../states" }
 newtype = { path = "../newtype" }

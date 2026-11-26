@@ -5,51 +5,52 @@ use std::fmt;
 use grammar_directive::{Lexed, Location};
 use grammar_output::field::{Phrase, Word};
 use grammar_output::{Fields, Mapped, Parsed, Unread};
-use named_derive::Named;
+use newtype::Listed;
+use strum::{Display, IntoStaticStr, VariantArray};
 
 use crate::briefing::Quoting;
 
 use crate::verb::Verb;
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Wanted {
-    #[name("a directive")]
+    #[strum(serialize = "a directive")]
     Directive,
-    #[name("an opening parenthesis")]
+    #[strum(serialize = "an opening parenthesis")]
     Open,
-    #[name("a comma or a closing parenthesis")]
+    #[strum(serialize = "a comma or a closing parenthesis")]
     Separator,
-    #[name("an argument")]
+    #[strum(serialize = "an argument")]
     Argument,
-    #[name("the end of the line")]
+    #[strum(serialize = "the end of the line")]
     End,
-    #[name("a segment, as in 85b287b3.0")]
+    #[strum(serialize = "a segment, as in 85b287b3.0")]
     Segment,
-    #[name("a node id, as in n42, or the label of a node proposed earlier in the file")]
+    #[strum(serialize = "a node id, as in n42, or the label of a node proposed earlier in the file")]
     Node,
-    #[name("a quoted title")]
+    #[strum(serialize = "a quoted title")]
     Title,
-    #[name("a span relation")]
+    #[strum(serialize = "a span relation")]
     SpanRelation,
-    #[name("a segment relation")]
+    #[strum(serialize = "a segment relation")]
     SegmentRelation,
-    #[name("a sense kind")]
+    #[strum(serialize = "a sense kind")]
     SenseKind,
-    #[name("a specificity")]
+    #[strum(serialize = "a specificity")]
     Specificity,
-    #[name("a confidence")]
+    #[strum(serialize = "a confidence")]
     Confidence,
-    #[name("an explicitness")]
+    #[strum(serialize = "an explicitness")]
     Explicitness,
-    #[name("a facet")]
+    #[strum(serialize = "a facet")]
     Facet,
-    #[name("new, or new and a label that is not a node id")]
+    #[strum(serialize = "new, or new and a label that is not a node id")]
     New,
-    #[name("refines(<node>)")]
+    #[strum(serialize = "refines(<node>)")]
     Refines,
-    #[name("by(<node>)")]
+    #[strum(serialize = "by(<node>)")]
     By,
-    #[name("an end other than the first, as nothing relates to itself")]
+    #[strum(serialize = "an end other than the first, as nothing relates to itself")]
     Distinct,
 }
 
@@ -67,7 +68,8 @@ impl Misread {
     }
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 enum Missing {
     Expected,
     Arity,

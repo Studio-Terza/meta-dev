@@ -1,18 +1,11 @@
-use std::fmt;
+use strum::Display;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mark {
+    #[strum(serialize = " ")]
     Context,
+    #[strum(serialize = "-")]
     Recorded,
+    #[strum(serialize = "+")]
     Actual,
-}
-
-impl fmt::Display for Mark {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Mark::Context => formatter.write_str(" "),
-            Mark::Recorded => formatter.write_str("-"),
-            Mark::Actual => formatter.write_str("+"),
-        }
-    }
 }

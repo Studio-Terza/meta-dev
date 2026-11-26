@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 grammar-ident = { path = "../grammar-ident" }
+strum.workspace = true
 syntax = { path = "../syntax" }
 
 [lints]

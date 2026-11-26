@@ -21,6 +21,7 @@ dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar-cited = { path = "../grammar-cited" }
 grammar-flag = { path = "../grammar-flag" }
+grammar-lines = { path = "../grammar-lines" }
 grammar-notes = { path = "../grammar-notes" }
 grammar-output = { path = "../grammar-output" }
 grammar-search = { path = "../grammar-search" }

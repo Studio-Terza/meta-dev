@@ -8,6 +8,8 @@ mod kind;
 mod memory;
 mod offset;
 mod size;
+mod stamps;
+mod tail;
 mod text;
 mod written;
 
@@ -21,6 +23,8 @@ pub use kind::Kind;
 pub use memory::Memory;
 pub use offset::Offset;
 pub use size::Size;
+pub use stamps::{Epoch, Stamp, Stamps};
+pub use tail::Tail;
 pub use text::Text;
 pub use written::Written;
 
@@ -33,5 +37,6 @@ invariants::ignored! {
         Unreadable => "metadata that cannot be read reads as a missing path",
         Unstored => "appending to a path with nothing stored starts from empty",
         Outside => "a held path outside the directory is not one of its entries",
+        BeforeEpoch => "a file time before 1970 reads as the epoch itself",
     }
 }

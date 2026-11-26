@@ -9,8 +9,8 @@ use port_core::Pass;
 
 use boundary::Spawns;
 use dispatch_ports::{
-    AgentRun, Bell, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Job, Model, Output, Pause, Pid,
-    Prompt, Started, Wall, clock_ops, dispatch_ops,
+    AgentRun, Bell, ClockFiller, Deadline, DispatchFailure, DispatchFiller, Ended, Job, Model, Moment, Output, Pause,
+    Pid, Prompt, Started, Wall, clock_ops, dispatch_ops,
 };
 
 #[derive(Clone, Debug)]
@@ -127,6 +127,10 @@ impl ClockFiller for Stepped {
         *self.now.lock().unpoisoned()
     }
 
+    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
+        Moment::from(*self.now.lock().unpoisoned())
+    }
+
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, _bell: &Bell) -> Wall {
         self.stepped(pause)
     }
@@ -135,6 +139,10 @@ impl ClockFiller for Stepped {
 impl ClockFiller for Heeding {
     fn now(&self, _pass: Pass<'_, clock_ops::Now>) -> Wall {
         *self.0.now.lock().unpoisoned()
+    }
+
+    fn moment(&self, _pass: Pass<'_, clock_ops::Moment>) -> Moment {
+        Moment::from(*self.0.now.lock().unpoisoned())
     }
 
     fn waited(&self, _pass: Pass<'_, clock_ops::Waited>, pause: Pause, bell: &Bell) -> Wall {
