@@ -125,9 +125,8 @@ impl TokenPaths {
 
     fn skipped(tree: TokenTree, input: ParseStream) -> syntax::Result<Vec<Spelled>> {
         match tree {
-            TokenTree::Group(group) => Ok(Self::within(group.stream())),
             TokenTree::Punct(punct) => Self::punctuated(&punct, input),
-            _ => Ok(Vec::new()),
+            TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Literal(_) => Ok(Vec::new()),
         }
     }
 
