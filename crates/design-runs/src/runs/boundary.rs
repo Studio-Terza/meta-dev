@@ -1,8 +1,8 @@
 use design_model::{JobId, Ordinal, RunId, Segment};
 use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
-use newtype::{Counter, Wrapping};
+use newtype::Wrapping;
 use store_ports::Record as _;
-use store_ports::{Batch, Columns, Edge, Execute, Moved, Prepared, Query, Staged, StoreFailure, Written};
+use store_ports::{Batch, Columns, Edge, Execute, Moved, Prepared, Query, Staged, StoreFailure};
 use transcript_ports::{Body, Instant, SessionId, Uuid};
 
 use design_jobs::{JobState, OpenJobs};
@@ -151,10 +151,12 @@ impl From<RanRow> for Ran {
 impl Batch for JobOpened {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let JobOpened { job, covering } = self;
         let open = JobState::Open;
-        let opened = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   jobs (id, state)
@@ -197,18 +199,20 @@ WHERE
                 )
             })
             .collect::<Vec<Prepared<()>>>();
-        Ok(opened.plus(statements.written_all(succeeded)?))
+        statements.written_all(succeeded)
     }
 }
 
 impl Batch for JobHalted {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let JobHalted { job, halted, account, held, retold } = self;
-        let closed = JobState::from(halted).closing(job).written(statements)?;
+        JobState::from(halted).closing(job).written(statements)?;
         let unreported = Delivery::Unreported;
-        let recorded = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 INSERT INTO
   failures (job, halted, account, delivery)
@@ -220,18 +224,19 @@ VALUES
             account: Account,
             unreported: Delivery
         ))?;
-        let holding = held.map(|flailing| flailing.written(statements)).transpose()?;
-        let retelling = statements.written_all(retold)?;
-        Ok(Written::total([closed, recorded, retelling].into_iter().chain(holding)))
+        held.map(|flailing| flailing.written(statements)).transpose()?;
+        statements.written_all(retold)
     }
 }
 
 impl Batch for Retold {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let Retold { job, account } = self;
-        let recorded = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 UPDATE
   failures
@@ -245,8 +250,7 @@ WHERE
         ))?;
         let retold =
             Delivery::Reported.held(job, statements)?.map(|reported| delivery::Reported::held(reported).unreported());
-        let moved = retold.map(|unreported| unreported.written(statements)).transpose()?.unwrap_or_default();
-        Ok(Written::total([recorded, moved].into_iter()))
+        retold.map_or(Ok(()), |unreported| unreported.written(statements))
     }
 }
 
@@ -277,7 +281,9 @@ ORDER BY
 impl Batch for FailuresReported {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         statements.written_all(self.0.into_iter().map(delivery::Unreported::reported))
     }
 }
@@ -285,7 +291,9 @@ impl Batch for FailuresReported {
 impl Batch for JobsInterrupted {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let open = OpenJobs.rows(statements)?;
         statements.written_all(open.into_iter().map(design_jobs::job::Open::interrupted))
     }
@@ -294,7 +302,9 @@ impl Batch for JobsInterrupted {
 impl Batch for RunSpawned {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let RunSpawned { run, job, spawned } = self;
         let pid = spawned.pid();
         let started = spawned.started().cloned();
@@ -320,11 +330,13 @@ VALUES
 impl Batch for RunEnded {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let RunEnded { run, state, usage, reply } = self;
         let Spent { input, output, cache_written, cache_read } = Spent::from(usage);
-        let moved = Moved::<RunState>::new(run, Edge::new(RunState::Running, state)).written(statements)?;
-        let recorded = statements.written(store_ports::query!(
+        Moved::<RunState>::new(run, Edge::new(RunState::Running, state)).written(statements)?;
+        statements.written(store_ports::query!(
             r#"
 UPDATE
   runs
@@ -343,13 +355,12 @@ WHERE
             cache_written: Option<Tokens>,
             cache_read: Option<Tokens>,
             reply: Option<Excerpt>
-        ))?;
-        Ok(Written::total([moved, recorded].into_iter()))
+        ))
     }
 }
 
 impl JobFlailed {
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let JobFlailed { run, segments } = self;
         let written = segments
             .iter()
@@ -396,13 +407,13 @@ WHERE
 impl Batch for JobRetried {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let job = self.0;
         let released = statements.one(Release::created(&ReleaseNew { job }))?;
         let unreported = Delivery::Unreported.held(*released.key(), statements)?;
-        let withdrawing = unreported.map(|held| delivery::Unreported::held(held).withdrawn().written(statements));
-        let withdrawn = withdrawing.transpose()?.unwrap_or_default();
-        Ok(Written::total([Written::new(1), withdrawn].into_iter()))
+        unreported.map_or(Ok(()), |held| delivery::Unreported::held(held).withdrawn().written(statements))
     }
 }
 
@@ -659,7 +670,9 @@ WHERE
 impl Batch for RunReaped {
     type Failure = StoreFailure;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         let RunReaped { held, ended } = self;
         held.moved(ended).written(statements)
     }

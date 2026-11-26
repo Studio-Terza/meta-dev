@@ -119,9 +119,9 @@ impl Lockable {
         }
     }
 
-    fn ended(self, receipt: Result<ReleaseReceipt, Gone>) -> Result<ReleaseReceipt, Gone> {
+    fn ended(self) -> Result<(), Gone> {
         match self {
-            Lockable::Intact => receipt,
+            Lockable::Intact => Ok(()),
             Lockable::Broken => Err(Gone),
         }
     }
@@ -340,23 +340,16 @@ laws::law!(acquiring_counts_the_op_and_dropping_counts_one_release, 0usize..3, s
     prop_assert!(measured.settled().is_ok());
 });
 
-laws::law!(
-    ending_a_held_resource_releases_once_and_returns_its_receipt_or_failure,
-    select(Lockable::VARIANTS),
-    lockable,
-    {
-        let run = Run::root();
-        let port = run.port(Memory::default());
-        let ended = Transcripts::lock(&port, &lockable.session()).map(Held::end);
-        drop(port);
-        let measured = run.finish();
-        let other = Run::root();
-        let receipt = Transcripts::lock_bare(&other.port(Memory::default()), &Session("a".to_owned())).end();
-        prop_assert_eq!(ended, Ok(lockable.ended(receipt)));
-        prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
-        prop_assert!(measured.settled().is_ok());
-    }
-);
+laws::law!(ending_a_held_resource_releases_once_and_returns_its_failure, select(Lockable::VARIANTS), lockable, {
+    let run = Run::root();
+    let port = run.port(Memory::default());
+    let ended = Transcripts::lock(&port, &lockable.session()).map(Held::end);
+    drop(port);
+    let measured = run.finish();
+    prop_assert_eq!(ended, Ok(lockable.ended()));
+    prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));
+    prop_assert!(measured.settled().is_ok());
+});
 
 laws::law!(a_failed_release_on_drop_shows_in_the_measured_failures, select(Lockable::VARIANTS), lockable, {
     let run = Run::root();
@@ -377,7 +370,7 @@ laws::law!(a_resource_is_released_exactly_once_whether_ended_or_dropped, any::<b
     let port = run.port(Memory::holding(&["a"]));
     let held = Transcripts::lock(&port, &Session("a".to_owned()));
     let ended = ending.then_some(held).map(|lock| lock.map(Held::end));
-    prop_assert!(ended.iter().all(|result| matches!(result, Ok(Ok(_)))));
+    prop_assert!(ended.iter().all(|result| matches!(result, Ok(Ok(())))));
     drop(port);
     let measured = run.finish();
     prop_assert_eq!(measured.snapshot().calls::<Released<SessionLock>>(), Calls::new(1));

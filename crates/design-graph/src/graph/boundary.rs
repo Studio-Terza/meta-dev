@@ -3,9 +3,8 @@ use design_model::{
     NodeEdge, NodeId, NodeRelation, Outline, Project, Provenance, Reason, Refining, Role, Sketch, Stage, Staging,
     Terminal, Title, Transition, Vague,
 };
-use newtype::Counter;
 use port_core::Op;
-use store_ports::{Batch, ColumnFailure, Columns, Execute, Query, StoreFailure, Written};
+use store_ports::{Batch, ColumnFailure, Columns, Done, Execute, Query, StoreFailure};
 
 use crate::Refusal;
 use crate::{Link, Relative};
@@ -211,10 +210,10 @@ impl Planting {
 }
 
 impl Root {
-    fn sown(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn sown(&self, statements: &mut impl Execute) -> Result<(), StoreFailure> {
         match self {
             Root::Sown(node) => NodeRow::proposed(node, statements),
-            Root::Found(_) => Ok(Written::zero()),
+            Root::Found(_) => Ok(()),
         }
     }
 
@@ -246,12 +245,17 @@ impl Linked {
         Linked { source, relation, target, provenance }
     }
 
-    fn closed(self, upheld: EdgeColumns, statements: &mut impl Execute) -> Result<Written, Refusal> {
+    pub(crate) fn linked<D: Done>(self, statements: &mut impl Execute) -> Result<D, Refusal> {
+        let upheld = self.upheld(statements)?;
+        self.closed(upheld, statements)
+    }
+
+    fn closed<D: Done>(self, upheld: EdgeColumns, statements: &mut impl Execute) -> Result<D, Refusal> {
         match self.relation {
             NodeRelation::Refines => Closing::<Refines>::new(self.source.0, self.target.0)
                 .written(statements, |edged| upheld.inserted(edged)),
             NodeRelation::Supersedes => Closing::<Supersedes>::new(self.source.0, self.target.0)
-                .written(statements, |edged| Ok::<Written, Refusal>(self.succeeding(upheld, edged)?.inserted(edged)?)),
+                .written(statements, |edged| Ok::<D, Refusal>(self.succeeding(upheld, edged)?.inserted(edged)?)),
             NodeRelation::Consumes => Ok(upheld.inserted(statements)?),
         }
     }
@@ -309,9 +313,9 @@ WHERE
 }
 
 impl EdgeColumns {
-    fn inserted(self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn inserted<D: Done>(self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let EdgeColumns { source, relation, target, provenance } = self;
-        statements.written(store_ports::query!(
+        statements.done(store_ports::query!(
             r#"
 INSERT
   OR IGNORE INTO node_edges (source, relation, target, provenance)
@@ -329,32 +333,33 @@ VALUES
 impl Batch for Planting {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
-        let sown = self.root.sown(statements)?;
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), Refusal> {
+        self.root.sown(statements)?;
         let root = self.root.resolved(statements)?;
-        let linked = self
-            .consumed
-            .map(|consumed| {
-                Linked::new(root, NodeRelation::Consumes, consumed, Provenance::from(Entered::Init)).written(statements)
-            })
-            .transpose()?;
-        Ok(Written::total([sown].into_iter().chain(linked)))
+        self.consumed.map_or(Ok(()), |consumed| {
+            Linked::new(root, NodeRelation::Consumes, consumed, Provenance::from(Entered::Init)).written(statements)
+        })
     }
 }
 
 impl Batch for Linked {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
-        let upheld = self.upheld(statements)?;
-        self.closed(upheld, statements)
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), Refusal> {
+        self.linked(statements)
     }
 }
 
 impl Batch for Restaged {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), Refusal> {
         let id = self.node.0;
         let provenance = Provenance::Lead(Entered::Stage);
         let moved = self.transition.applied(NodeRow::loaded(self.node, statements)?)?;
@@ -385,11 +390,13 @@ WHERE
 impl Batch for Cast {
     type Failure = Refusal;
 
-    fn written(self, statements: &mut impl Execute) -> Result<Written, Refusal> {
+    type Done = ();
+
+    fn written(self, statements: &mut impl Execute) -> Result<(), Refusal> {
         let id = self.node.0;
         let role = self.casting.role();
         let provenance = self.casting.provenance();
-        let written = statements.written(store_ports::query!(
+        statements.written(store_ports::query!(
             r#"
 UPDATE
   nodes
@@ -404,8 +411,7 @@ WHERE
             provenance: Provenance
         ))?;
         let around = EdgeRow::around(id, statements)?;
-        let relinked = statements.written_all(around.into_iter().map(Linked::from))?;
-        Ok(written.plus(relinked))
+        statements.written_all(around.into_iter().map(Linked::from))
     }
 }
 
@@ -601,7 +607,7 @@ FROM
         Ok(row.next)
     }
 
-    pub(crate) fn proposed(node: &Node<Vague>, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    pub(crate) fn proposed<D: Done>(node: &Node<Vague>, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let id = node.identity();
         let entry = node.entry();
         let project = entry.project();
@@ -611,7 +617,7 @@ FROM
         let title = node.title().cloned();
         let role = node.casting().role();
         let cast = node.casting().provenance();
-        statements.written(store_ports::query!(
+        statements.done(store_ports::query!(
             r#"
 INSERT INTO
   nodes (

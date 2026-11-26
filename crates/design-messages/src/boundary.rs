@@ -10,7 +10,7 @@ use file_ports::Offset;
 use grammar_search::Term;
 use newtype::{Arbitrary, Newtype, Wrapping};
 use store_ports::Record as _;
-use store_ports::{Columns, Deletion, Execute, Prepared, StoreFailure, Written};
+use store_ports::{Columns, Deletion, Done, Execute, Prepared, StoreFailure};
 use stream::{Anchor, Anchors, MechanicalLink, Message, Relation, SegmentId, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
@@ -537,17 +537,21 @@ FROM
         &self.session
     }
 
-    fn reconciled(&self, stored: Option<&CursorRow>, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn reconciled<D: Done>(
+        &self,
+        stored: Option<&CursorRow>,
+        statements: &mut impl Execute,
+    ) -> Result<D, StoreFailure> {
         match stored {
-            None => statements.one(CursorRow::created(&CursorRowNew::from(self))).map(|_created| Written::new(1)),
+            None => statements.one(CursorRow::created(&CursorRowNew::from(self))).map(|_created| D::changed(1)),
             Some(found) => self.revising(found, statements),
         }
     }
 
-    fn revising(&self, found: &CursorRow, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    fn revising<D: Done>(&self, found: &CursorRow, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         Some(found)
             .filter(|stored| *stored != self)
-            .map_or_else(|| Ok(Written::default()), |_changed| statements.written(self.updated()))
+            .map_or_else(|| Ok(D::unchanged()), |_changed| statements.done(self.updated()))
     }
 }
 
@@ -632,7 +636,7 @@ VALUES
 }
 
 impl CursorRow {
-    pub(crate) fn written(&self, statements: &mut impl Execute) -> Result<Written, StoreFailure> {
+    pub(crate) fn written<D: Done>(&self, statements: &mut impl Execute) -> Result<D, StoreFailure> {
         let stored = statements.rows(CursorRow::fetched(&self.session))?;
         self.reconciled(stored.first(), statements)
     }
