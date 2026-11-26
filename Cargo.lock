@@ -287,7 +287,6 @@ dependencies = [
  "invariants",
  "laws",
  "local-config",
- "named-derive",
  "newtype",
  "port-core",
  "serde",
@@ -296,6 +295,7 @@ dependencies = [
  "store-ports",
  "stream",
  "structurer",
+ "strum",
  "text-lines",
  "thiserror",
  "transcript-ports",
@@ -400,7 +400,6 @@ dependencies = [
  "invariants",
  "laws",
  "message-id",
- "named-derive",
  "newtype",
  "serde",
  "serde_json",
@@ -448,6 +447,7 @@ dependencies = [
  "sqlite-ports",
  "store-ports",
  "stream",
+ "strum",
  "transcript-ports",
 ]
 
@@ -490,11 +490,11 @@ dependencies = [
  "grammar-reply",
  "invariants",
  "laws",
- "named-derive",
  "newtype",
  "port-core",
  "serde",
  "serde_json",
+ "strum",
  "thiserror",
 ]
 
@@ -524,6 +524,7 @@ dependencies = [
  "file-ports",
  "laws",
  "serde_json",
+ "strum",
  "tempfile",
  "toml",
 ]
@@ -739,6 +740,7 @@ dependencies = [
  "invariants",
  "lint-runner",
  "proptest",
+ "strum",
  "timer-ports",
 ]
 
@@ -1127,6 +1129,7 @@ dependencies = [
  "lint-placement",
  "lint-sweep",
  "newtype",
+ "strum",
  "syntax",
 ]
 
@@ -1482,6 +1485,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-derived-tables"
+version = "0.1.0"
+dependencies = [
+ "algebra",
+ "invariants",
+ "lint-core",
+ "lint-file",
+ "lint-fixtures",
+ "lint-layout",
+ "lint-sweep",
+ "syntax",
+]
+
+[[package]]
 name = "lint-distinct-signatures"
 version = "0.1.0"
 dependencies = [
@@ -1682,6 +1699,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-sweep",
+ "strum",
  "syntax",
 ]
 
@@ -2162,6 +2180,7 @@ dependencies = [
  "lint-const-shape",
  "lint-core",
  "lint-crate-graph",
+ "lint-derived-tables",
  "lint-distinct-signatures",
  "lint-effect-sites",
  "lint-enum-predicates",
@@ -2531,16 +2550,6 @@ dependencies = [
  "serde_json",
  "test-log",
  "text-lines",
- "thiserror",
-]
-
-[[package]]
-name = "named-derive"
-version = "0.1.0"
-dependencies = [
- "laws",
- "newtype",
- "syntax",
  "thiserror",
 ]
 
@@ -3260,9 +3269,9 @@ dependencies = [
  "grammar-message",
  "invariants",
  "laws",
- "named-derive",
  "newtype",
  "port-core",
+ "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -3559,6 +3568,7 @@ dependencies = [
  "port-core",
  "serde",
  "serde_json",
+ "strum",
  "text-lines",
  "thiserror",
 ]

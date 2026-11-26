@@ -9,6 +9,7 @@ use super::package::Package;
 use super::unit_key::UnitKey;
 use grammar_unit_label::Target;
 use serde::Deserialize;
+use strum::VariantArray;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(try_from = "String")]
@@ -23,7 +24,6 @@ pub(super) enum UnitRole {
 }
 
 impl UnitRole {
-    const EVERY_ORIGIN: [Origin; 3] = [Origin::Workspace, Origin::ProcMacro, Origin::Registry];
     const LINKED_ORIGINS: [Origin; 2] = [Origin::Workspace, Origin::ProcMacro];
     const WORKSPACE_ORIGIN: [Origin; 1] = [Origin::Workspace];
     const NORMAL: [Kind; 1] = [Kind::Normal];
@@ -32,7 +32,7 @@ impl UnitRole {
 
     pub(super) fn uncached(&self) -> &'static [Origin] {
         match self {
-            UnitRole::BuildScript | UnitRole::BuildRun => &Self::EVERY_ORIGIN,
+            UnitRole::BuildScript | UnitRole::BuildRun => Origin::VARIANTS,
             UnitRole::HostBuild => &Self::LINKED_ORIGINS,
             UnitRole::Library | UnitRole::LibraryTest | UnitRole::Target(_) | UnitRole::TestTarget(_) => {
                 &Self::WORKSPACE_ORIGIN

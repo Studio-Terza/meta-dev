@@ -12,7 +12,7 @@ pub(super) struct Crates {
     edges: BTreeMap<Package, Vec<Edge>>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(strum::VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Origin {
     Workspace,
     ProcMacro,

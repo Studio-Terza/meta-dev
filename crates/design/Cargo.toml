@@ -27,7 +27,6 @@ grammar-output = { path = "../grammar-output" }
 grammar-search = { path = "../grammar-search" }
 grammar-slug = { path = "../grammar-slug" }
 local-config = { path = "../local-config" }
-named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 serde.workspace = true
@@ -35,6 +34,7 @@ serde_json.workspace = true
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 structurer = { path = "../structurer" }
+strum.workspace = true
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

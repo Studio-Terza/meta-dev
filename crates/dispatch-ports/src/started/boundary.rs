@@ -3,54 +3,54 @@ use std::str::FromStr;
 
 use grammar_lstart::Stamp;
 use invariants::Ignoring;
-use named_derive::Named;
-use newtype::Spelled;
+use newtype::{Listed, Spelled};
+use strum::{Display, IntoStaticStr, VariantArray};
 
 use crate::Ignored;
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
 enum Weekday {
-    #[name("Mon")]
+    #[strum(serialize = "Mon")]
     Monday,
-    #[name("Tue")]
+    #[strum(serialize = "Tue")]
     Tuesday,
-    #[name("Wed")]
+    #[strum(serialize = "Wed")]
     Wednesday,
-    #[name("Thu")]
+    #[strum(serialize = "Thu")]
     Thursday,
-    #[name("Fri")]
+    #[strum(serialize = "Fri")]
     Friday,
-    #[name("Sat")]
+    #[strum(serialize = "Sat")]
     Saturday,
-    #[name("Sun")]
+    #[strum(serialize = "Sun")]
     Sunday,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
 enum Month {
-    #[name("Jan")]
+    #[strum(serialize = "Jan")]
     January,
-    #[name("Feb")]
+    #[strum(serialize = "Feb")]
     February,
-    #[name("Mar")]
+    #[strum(serialize = "Mar")]
     March,
-    #[name("Apr")]
+    #[strum(serialize = "Apr")]
     April,
-    #[name("May")]
+    #[strum(serialize = "May")]
     May,
-    #[name("Jun")]
+    #[strum(serialize = "Jun")]
     June,
-    #[name("Jul")]
+    #[strum(serialize = "Jul")]
     July,
-    #[name("Aug")]
+    #[strum(serialize = "Aug")]
     August,
-    #[name("Sep")]
+    #[strum(serialize = "Sep")]
     September,
-    #[name("Oct")]
+    #[strum(serialize = "Oct")]
     October,
-    #[name("Nov")]
+    #[strum(serialize = "Nov")]
     November,
-    #[name("Dec")]
+    #[strum(serialize = "Dec")]
     December,
 }
 

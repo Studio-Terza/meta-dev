@@ -8,6 +8,7 @@ use newtype::Wrapping;
 use port_core::Run;
 use store_ports::Store;
 use structurer::SegmentRef;
+use strum::VariantArray;
 
 use super::ignored::Ignored;
 use super::{Applying, Invocation, Session, Spread};
@@ -93,7 +94,7 @@ enum Derivation {
     Refined,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(VariantArray, Clone, Copy, Debug)]
 enum Own {
     Bare,
     Placed,
@@ -527,8 +528,6 @@ laws::table!(
 );
 
 impl Own {
-    const ALL: [Own; 6] = [Own::Bare, Own::Placed, Own::Sensed, Own::Conversational, Own::Linking, Own::Linked];
-
     fn directive(self, segment: &str) -> Option<String> {
         match self {
             Own::Bare => None,
@@ -550,11 +549,12 @@ impl Own {
 
 laws::table!(
     the_unplaced_view_lists_exactly_the_owner_segments_without_a_directive_of_their_own,
-    0..Own::ALL.len(),
+    0..Own::VARIANTS.len(),
     turn,
     {
         let segments = [format!("{}.0", Session::ASKED), Applying::answer(0), Applying::answer(1), LATER.to_owned()];
-        let owned: Vec<(&String, Own)> = segments.iter().zip(Own::ALL.into_iter().cycle().skip(turn)).collect();
+        let owned: Vec<(&String, Own)> =
+            segments.iter().zip(Own::VARIANTS.iter().copied().cycle().skip(turn)).collect();
         let directives: Vec<String> = owned.iter().filter_map(|(segment, own)| own.directive(segment)).collect();
         let applying = Applying::ready()?;
         applying

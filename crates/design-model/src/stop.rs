@@ -1,13 +1,16 @@
-use named_derive::Named;
+use newtype::Listed;
+use strum::{Display, IntoStaticStr, VariantArray};
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Halt {
     Live,
     Stalled,
     Overrun,
 }
 
-#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, IntoStaticStr, VariantArray, Listed, Clone, Copy, Debug, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum Fate {
     Blocked,
     Passed,

@@ -16,6 +16,7 @@ lint-sweep = { path = "../lint-sweep" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
+strum.workspace = true
 syntax = { path = "../syntax" }
 
 [dev-dependencies]

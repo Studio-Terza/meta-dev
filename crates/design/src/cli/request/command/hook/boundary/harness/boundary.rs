@@ -128,7 +128,7 @@ impl Runner {
 
     fn ending(self, text: &str) -> Option<Ended> {
         match self {
-            Runner::Shell => Task::TRAILERS.iter().any(|trailer| text.contains(trailer)).then_some(Ended),
+            Runner::Shell => text.contains(Task::TRAILER).then_some(Ended),
             Runner::Agent => Last::parsed(text).and_then(Last::ending),
         }
     }
@@ -200,7 +200,7 @@ impl Closing {
 }
 
 impl Task {
-    const TRAILERS: [&'static str; 2] = ["[exited with code", "[killed]"];
+    const TRAILER: &'static str = "[exited with code";
     const QUIET: i64 = 20 * 60;
     const CONTINUATION: u8 = 0b1100_0000;
     const FOLLOWER: u8 = 0b1000_0000;
