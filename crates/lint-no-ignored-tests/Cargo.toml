@@ -11,7 +11,6 @@ doctest = false
 
 [dependencies]
 invariants = { path = "../invariants" }
-algebra = { path = "../algebra" }
 lint-sweep = { path = "../lint-sweep" }
 lint-core = { path = "../lint-core" }
 lint-file = { path = "../lint-file" }
@@ -22,7 +21,6 @@ syntax = { path = "../syntax" }
 [dev-dependencies]
 lint-file = { path = "../lint-file" }
 lint-fixtures = { path = "../lint-fixtures" }
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

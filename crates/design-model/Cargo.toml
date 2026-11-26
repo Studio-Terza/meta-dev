@@ -24,7 +24,6 @@ thiserror.workspace = true
 message-id = { path = "../message-id" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
 serde_json.workspace = true
 
 [lints]

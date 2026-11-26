@@ -1,4 +1,0 @@
-{"workspace_root": "/w", "packages": [
-  {"name": "root", "manifest_path": "/w/Cargo.toml", "dependencies": []},
-  {"name": "leaf", "manifest_path": "/w/crates/leaf/Cargo.toml", "dependencies": []}
-]}

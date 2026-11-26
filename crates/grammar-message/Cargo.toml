@@ -13,12 +13,10 @@ test = false
 doctest = false
 
 [dependencies]
-algebra = { path = "../algebra" }
 grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

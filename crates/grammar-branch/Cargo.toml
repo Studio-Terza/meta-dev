@@ -16,7 +16,6 @@ doctest = false
 grammar = { path = "../grammar" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

@@ -10,7 +10,6 @@ test = false
 doctest = false
 
 [dependencies]
-graph-reader = { path = "../graph-reader" }
 file-ports = { path = "../file-ports" }
 invariants = { path = "../invariants" }
 lint-core = { path = "../lint-core" }
@@ -20,7 +19,6 @@ newtype = { path = "../newtype" }
 workspace-metadata = { path = "../workspace-metadata" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

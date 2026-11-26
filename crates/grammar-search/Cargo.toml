@@ -17,7 +17,6 @@ grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

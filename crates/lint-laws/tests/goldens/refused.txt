@@ -1,3 +1,0 @@
-laws are labels: the law macros lint laws emits appear only in the runners it generates, and each runner is declared in one of its crate's test binaries, so the graph owns every such law and every one runs:
-crates/x/tests/behaviour.rs:1: a law the law runner generates, written by hand; label the type instead (derive Arbitrary, implement Monoid) and run lint laws to regenerate
-crates/x/src/lib.rs:1: this crate's generated law runner tests/generated/laws.rs is in no test binary, so its laws never run; add #[path = "generated/laws.rs"] mod generated_laws; to one of the crate's integration tests

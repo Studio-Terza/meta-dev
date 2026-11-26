@@ -12,8 +12,6 @@ test = false
 doctest = false
 
 [dependencies]
-design-closure = { path = "../design-closure" }
-design-graph = { path = "../design-graph" }
 design-messages = { path = "../design-messages" }
 
 [dev-dependencies]
@@ -27,10 +25,7 @@ dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 stream = { path = "../stream" }
 transcript-ports = { path = "../transcript-ports" }
-design-jobs = { path = "../design-jobs" }
-design-runs = { path = "../design-runs" }
 sqlite-ports = { path = "../sqlite-ports" }
-laws = { path = "../laws" }
 strum.workspace = true
 
 [lints]

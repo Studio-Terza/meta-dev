@@ -10,7 +10,6 @@ test = false
 doctest = false
 
 [dependencies]
-algebra = { path = "../algebra" }
 invariants = { path = "../invariants" }
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
@@ -22,8 +21,6 @@ strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-golden = { path = "../golden" }
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

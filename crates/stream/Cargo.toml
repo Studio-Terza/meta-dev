@@ -10,7 +10,6 @@ test = false
 doctest = false
 
 [dependencies]
-algebra = { path = "../algebra" }
 invariants = { path = "../invariants" }
 grammar-anchor = { path = "../grammar-anchor" }
 grammar-message = { path = "../grammar-message" }
@@ -21,7 +20,6 @@ transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
 file-ports = { path = "../file-ports" }
-laws = { path = "../laws" }
 port-core = { path = "../port-core" }
 
 [lints]

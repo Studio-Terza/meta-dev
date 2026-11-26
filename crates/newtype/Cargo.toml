@@ -17,7 +17,6 @@ serde.workspace = true
 strum.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
 serde_json.workspace = true
 thiserror.workspace = true
 

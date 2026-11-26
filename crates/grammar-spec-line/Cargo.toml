@@ -19,7 +19,6 @@ newtype = { path = "../newtype" }
 thiserror.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

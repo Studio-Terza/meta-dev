@@ -17,7 +17,6 @@ thiserror.workspace = true
 grammar = { path = "../grammar" }
 
 [dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true

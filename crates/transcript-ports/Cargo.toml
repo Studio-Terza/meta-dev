@@ -25,7 +25,6 @@ strum.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true
